@@ -1,0 +1,182 @@
+import type {
+  JenkinsBuild,
+  JenkinsBuildDetails,
+  JenkinsConsoleText,
+  JenkinsConsoleTextTail,
+  JenkinsProgressiveConsoleText,
+  JenkinsTestReport,
+  JenkinsWorkflowRun
+} from "../types";
+import { buildActionUrl, buildApiUrlFromItem } from "../urls";
+import type { JenkinsClientContext } from "./JenkinsClientContext";
+
+export class JenkinsBuildsApi {
+  constructor(private readonly context: JenkinsClientContext) {}
+
+  async getBuilds(jobUrl: string, limit = 20): Promise<JenkinsBuild[]> {
+    const end = Math.max(limit - 1, 0);
+    const tree = `builds[number,url,result,building,timestamp]{0,${end}}`;
+    const url = buildApiUrlFromItem(jobUrl, tree);
+    const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
+    return Array.isArray(response.builds) ? response.builds : [];
+  }
+
+  async getBuildDetails(buildUrl: string): Promise<JenkinsBuildDetails> {
+    const tree =
+      "number,url,result,building,timestamp,duration,displayName,fullDisplayName,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,failCount,skipCount,totalCount]";
+    const url = buildApiUrlFromItem(buildUrl, tree);
+    return this.context.requestJson<JenkinsBuildDetails>(url);
+  }
+
+  async getTestReport(buildUrl: string): Promise<JenkinsTestReport> {
+    const url = new URL(buildActionUrl(buildUrl, "testReport/api/json"));
+    url.searchParams.set(
+      "tree",
+      "failCount,skipCount,totalCount,suites[cases[name,className,status]]"
+    );
+    return this.context.requestJson<JenkinsTestReport>(url.toString());
+  }
+
+  async getWorkflowRun(buildUrl: string): Promise<JenkinsWorkflowRun> {
+    const url = buildActionUrl(buildUrl, "wfapi/describe");
+    return this.context.requestJson<JenkinsWorkflowRun>(url);
+  }
+
+  async getConsoleText(buildUrl: string, maxChars?: number): Promise<JenkinsConsoleText> {
+    if (maxChars === undefined || maxChars <= 0) {
+      const url = buildActionUrl(buildUrl, "consoleText");
+      const text = await this.context.requestText(url);
+      return { text, truncated: false };
+    }
+
+    const tail = await this.getConsoleTextTail(buildUrl, maxChars);
+    return { text: tail.text, truncated: tail.truncated };
+  }
+
+  async getConsoleTextTail(buildUrl: string, maxChars: number): Promise<JenkinsConsoleTextTail> {
+    if (maxChars <= 0) {
+      const url = buildActionUrl(buildUrl, "consoleText");
+      const text = await this.context.requestText(url);
+      return {
+        text,
+        truncated: false,
+        nextStart: text.length,
+        progressiveSupported: false
+      };
+    }
+
+    const headUrl = this.buildProgressiveTextUrl(buildUrl, 0);
+    try {
+      const headers = await this.context.requestHeaders(headUrl);
+      const textSize = this.parseTextSize(headers["x-text-size"]);
+      if (Number.isFinite(textSize) && textSize >= 0) {
+        const start = Math.max(0, textSize - maxChars);
+        const tailUrl = this.buildProgressiveTextUrl(buildUrl, start);
+        const response = await this.context.requestTextWithHeaders(tailUrl);
+        const responseSize = this.parseTextSize(response.headers["x-text-size"]);
+        const nextStart = Number.isFinite(responseSize)
+          ? responseSize
+          : start + response.text.length;
+        return {
+          text: response.text,
+          truncated: textSize > maxChars,
+          nextStart,
+          progressiveSupported: true
+        };
+      }
+    } catch {
+      // Fall through to consoleText for Jenkins instances that do not support HEAD.
+    }
+
+    const url = buildActionUrl(buildUrl, "consoleText");
+    const text = await this.context.requestText(url);
+    if (text.length > maxChars) {
+      return {
+        text: text.slice(text.length - maxChars),
+        truncated: true,
+        nextStart: text.length,
+        progressiveSupported: false
+      };
+    }
+    return {
+      text,
+      truncated: false,
+      nextStart: text.length,
+      progressiveSupported: false
+    };
+  }
+
+  async getConsoleTextProgressive(
+    buildUrl: string,
+    start: number
+  ): Promise<JenkinsProgressiveConsoleText> {
+    const safeStart = Math.max(0, Math.floor(start));
+    const url = this.buildProgressiveTextUrl(buildUrl, safeStart);
+    const response = await this.context.requestTextWithHeaders(url);
+    const textSize = this.parseTextSize(response.headers["x-text-size"]);
+    const moreData = this.parseMoreData(response.headers["x-more-data"]);
+    return {
+      text: response.text,
+      textSize: Number.isFinite(textSize) ? textSize : safeStart + response.text.length,
+      moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0
+    };
+  }
+
+  async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
+    const tree = "lastFailedBuild[number,url,result,building,timestamp]";
+    const url = buildApiUrlFromItem(jobUrl, tree);
+    const response = await this.context.requestJson<{
+      lastFailedBuild?: JenkinsBuild | null;
+    }>(url);
+    return response.lastFailedBuild ?? undefined;
+  }
+
+  async triggerBuild(
+    jobUrl: string,
+    params?: URLSearchParams
+  ): Promise<{ queueLocation?: string }> {
+    if (params && Array.from(params.keys()).length > 0) {
+      const url = buildActionUrl(jobUrl, "buildWithParameters");
+      const response = await this.context.requestPostWithCrumb(url, params.toString());
+      return { queueLocation: response.location };
+    }
+    const url = buildActionUrl(jobUrl, "build");
+    const response = await this.context.requestPostWithCrumb(url);
+    return { queueLocation: response.location };
+  }
+
+  async stopBuild(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "stop");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  async replayBuild(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "replay");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  async rebuildBuild(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "rebuild");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  private buildProgressiveTextUrl(buildUrl: string, start: number): string {
+    const url = new URL(buildActionUrl(buildUrl, "logText/progressiveText"));
+    url.searchParams.set("start", Math.max(0, Math.floor(start)).toString());
+    return url.toString();
+  }
+
+  private parseTextSize(value: string | string[] | undefined): number {
+    const text = Array.isArray(value) ? value[0] : value;
+    const parsed = text ? Number.parseInt(text, 10) : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : Number.NaN;
+  }
+
+  private parseMoreData(value: string | string[] | undefined): boolean | undefined {
+    const text = Array.isArray(value) ? value[0] : value;
+    if (!text) {
+      return undefined;
+    }
+    return text.toLowerCase() === "true";
+  }
+}

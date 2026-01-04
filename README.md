@@ -1,0 +1,241 @@
+# Jenkins Workbench
+
+[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/airizom.jenkins-workbench?style=flat-square&label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com/)
+
+A powerful VS Code extension that brings Jenkins directly into your editor. Browse jobs, trigger builds, stream console logs, watch for status changes, and manage your CI/CD pipelines without leaving VS Code.
+
+## Features
+
+### Browse & Navigate
+
+- **Activity Bar View** — Dedicated Jenkins sidebar with a hierarchical tree view
+- **Multi-Environment Support** — Connect to multiple Jenkins instances with workspace or global scope
+- **Browse Everything** — Explore folders, multibranch pipelines, jobs, builds, and nodes
+- **Go to Job...** — Quick search across all configured Jenkins environments
+
+### Build Management
+
+- **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords)
+- **Stop Builds** — Abort running builds directly from the tree
+- **Replay & Rebuild** — Re-run builds with the same or modified configuration
+- **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
+
+### Build Details Panel
+
+- **Live Console Streaming** — Watch build output in real-time with automatic scrolling
+- **Pipeline Visualization** — View stage-by-stage progress for Pipeline jobs
+- **Test Results** — See test summary when builds complete
+- **Build Notifications** — Get notified when watched builds finish
+
+### Watch Jobs
+
+- **Status Notifications** — Watch jobs and receive alerts when builds succeed, fail, or change status
+- **Configurable Polling** — Adjust poll intervals to balance responsiveness and server load
+- **Smart Recovery** — Automatic retry with backoff for transient errors
+
+### Filtering
+
+- **Job Status Filters** — Show all jobs, only failing jobs, or only running jobs
+- **Branch Filtering** — Filter branches within multibranch pipeline folders
+- **Quick Access** — Filter icons in the view title bar for one-click filtering
+
+### Build Queue
+
+- **Queue Visibility** — See pending builds waiting in the queue
+- **Cancel Queue Items** — Remove builds from the queue before they start
+- **Auto-Refresh** — Queue updates automatically when expanded
+
+## Quick Start
+
+1. **Open the Jenkins Workbench view** in the Activity Bar (look for the Jenkins icon)
+2. **Click the Add Environment button** (plus icon) or run `Jenkins Workbench: Add Environment` from the Command Palette
+3. **Choose a scope**:
+   - **Workspace** — Available only in the current workspace
+   - **Global** — Available across all workspaces
+4. **Enter your Jenkins details**:
+   - **URL** — Your Jenkins base URL (e.g., `https://jenkins.example.com`)
+   - **Username** — Optional, required if using an API token
+   - **API Token** — Optional, for authenticated access
+5. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
+
+## Requirements
+
+| Requirement | Details |
+|-------------|---------|
+| VS Code | ^1.85.0 or later |
+| Network | Access to your Jenkins instance(s) |
+| Jenkins API | JSON API must be accessible (`/api/json`) |
+| Permissions | Read access for browsing; write access for build actions |
+
+## Extension Settings
+
+### Caching & Performance
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.cacheTtlSeconds` | 300 | Cache TTL for Jenkins data. Use 0 to disable. |
+| `jenkinsWorkbench.maxCacheEntries` | 1000 | Maximum cache entries before eviction. |
+| `jenkinsWorkbench.requestTimeoutSeconds` | 30 | Timeout for Jenkins API requests. |
+
+### Polling & Watches
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for watched jobs. |
+| `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
+| `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
+| `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
+
+### Job Search
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.jobSearchConcurrency` | 4 | Concurrent folder requests for Go to Job. |
+| `jenkinsWorkbench.jobSearchBackoffBaseMs` | 200 | Base delay for transient error backoff. |
+| `jenkinsWorkbench.jobSearchBackoffMaxMs` | 2000 | Maximum delay for adaptive backoff. |
+| `jenkinsWorkbench.jobSearchMaxRetries` | 2 | Retries for transient errors (429/5xx). |
+
+## Commands
+
+### Environment Management
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Add Environment` | Add a new Jenkins environment |
+| `Jenkins Workbench: Remove Environment` | Remove the selected environment |
+| `Jenkins Workbench: Refresh` | Refresh the tree view and clear cache |
+
+### Build Actions
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Trigger Build` | Start a new build for the selected job |
+| `Jenkins Workbench: Abort/Stop Build` | Stop a running build |
+| `Jenkins Workbench: Replay Build` | Replay a Pipeline build |
+| `Jenkins Workbench: Rebuild` | Rebuild with the same parameters |
+| `Jenkins Workbench: View Build Details` | Open the build details panel |
+| `Jenkins Workbench: Open Last Failed Build` | Jump to the last failed build |
+| `Jenkins Workbench: Cancel Queue Item` | Remove a build from the queue |
+
+### Navigation & Search
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Go to Job...` | Search and navigate to any job |
+| `Jenkins Workbench: Open in Jenkins` | Open the selected item in your browser |
+
+### Filtering
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Show All Jobs` | Clear job status filters |
+| `Jenkins Workbench: Show Failing Jobs` | Show only failing jobs |
+| `Jenkins Workbench: Show Running Jobs` | Show only running jobs |
+| `Jenkins Workbench: Filter Branches` | Filter branches in a multibranch folder |
+| `Jenkins Workbench: Clear Branch Filter` | Clear the branch filter |
+
+### Watch
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Watch Job` | Watch a job for status changes |
+| `Jenkins Workbench: Unwatch Job` | Stop watching a job |
+
+## Security
+
+Jenkins Workbench takes security seriously:
+
+- **Secure Credential Storage** — API tokens are stored in VS Code's SecretStorage, never in plain text or workspace files
+- **Basic Authentication** — Credentials are sent via HTTP Basic Auth only when both username and token are configured
+- **CSRF Protection** — Full support for Jenkins crumb issuer when CSRF protection is enabled
+- **Network Security** — All API calls use the configured URL scheme; use HTTPS for production Jenkins instances
+
+### Recommended Setup
+
+1. **Use HTTPS** — Always configure your Jenkins URL with `https://`
+2. **Create an API Token** — Generate a dedicated API token in Jenkins (`User > Configure > API Token`)
+3. **Use a Service Account** — Consider a dedicated Jenkins user with minimal required permissions
+
+## Troubleshooting
+
+### Empty Tree View
+
+- Verify the Jenkins URL is correct and reachable
+- Test that `/api/json` returns JSON data in your browser
+- Check that your network allows connections to Jenkins
+
+### 403 Forbidden Errors
+
+- Confirm your account has read permissions for jobs
+- Regenerate your API token if it may have expired
+- Ensure the username matches the token owner
+
+### CSRF / Login Redirect Errors
+
+- Verify your Jenkins user can access `/crumbIssuer/api/json`
+- Check that Jenkins security settings allow API access
+- Confirm you're using an API token, not your password
+
+### Missing Build Actions (404)
+
+- Some actions require Jenkins plugins:
+  - **Replay** requires the Workflow Plugin
+  - **Rebuild** requires the Rebuild Plugin
+- Check that the plugins are installed and the user has permissions
+
+### Slow Job Search
+
+- Adjust `jobSearchConcurrency` based on your Jenkins server capacity
+- Increase `jobSearchBackoffBaseMs` if you see rate limiting
+- Large Jenkins instances may take longer to index
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. **Fork the repository** and create a feature branch
+2. **Follow Conventional Commits**: `type(scope): message`
+   - Examples: `feat(tree): add folder icons`, `fix(auth): handle expired tokens`
+3. **Include in your PR**:
+   - A concise summary of changes
+   - Link to related issues
+   - Screenshots for UI changes
+   - Commands run (e.g., `npm run compile`)
+
+### Development Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Compile TypeScript
+npm run compile
+
+# Watch mode for development
+npm run watch
+
+# Lint and format
+npm run check:fix
+
+# Launch Extension Development Host
+# Press F5 in VS Code
+```
+
+### Manual Testing Checklist
+
+1. Run `npm run compile`, then press F5 to launch the Extension Development Host
+2. Add a workspace and a global environment
+3. Verify jobs, builds, and nodes load correctly
+4. Test build actions (trigger, stop, replay, rebuild)
+5. Verify watch notifications work
+6. Confirm removing an environment clears it from the tree
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+**Enjoy using Jenkins Workbench!** If you find it helpful, please consider [leaving a review](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench&ssr=false#review-details) on the Visual Studio Marketplace.

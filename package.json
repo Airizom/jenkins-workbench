@@ -1,0 +1,345 @@
+{
+  "name": "jenkins-workbench",
+  "displayName": "Jenkins Workbench",
+  "publisher": "airizom",
+  "description": "Browse Jenkins instances, trigger builds, view logs, and manage CI/CD pipelines from VS Code.",
+  "icon": "resources/icon.png",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Airizom/jenkins-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Airizom/jenkins-workbench/issues"
+  },
+  "homepage": "https://github.com/Airizom/jenkins-workbench#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "jenkins",
+    "ci",
+    "cd",
+    "cicd",
+    "build",
+    "pipeline",
+    "devops",
+    "automation",
+    "continuous integration"
+  ],
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "jenkinsWorkbench.addEnvironment",
+        "title": "Jenkins Workbench: Add Environment",
+        "icon": "$(add)"
+      },
+      {
+        "command": "jenkinsWorkbench.removeEnvironment",
+        "title": "Jenkins Workbench: Remove Environment",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "jenkinsWorkbench.triggerBuild",
+        "title": "Jenkins Workbench: Trigger Build"
+      },
+      {
+        "command": "jenkinsWorkbench.abortBuild",
+        "title": "Jenkins Workbench: Abort/Stop Build"
+      },
+      {
+        "command": "jenkinsWorkbench.cancelQueueItem",
+        "title": "Jenkins Workbench: Cancel Queue Item"
+      },
+      {
+        "command": "jenkinsWorkbench.replayBuild",
+        "title": "Jenkins Workbench: Replay Build"
+      },
+      {
+        "command": "jenkinsWorkbench.rebuildBuild",
+        "title": "Jenkins Workbench: Rebuild"
+      },
+      {
+        "command": "jenkinsWorkbench.openInJenkins",
+        "title": "Jenkins Workbench: Open in Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.goToJob",
+        "title": "Jenkins Workbench: Go to Job...",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jenkinsWorkbench.filterJobsAll",
+        "title": "Jenkins Workbench: Show All Jobs",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "jenkinsWorkbench.filterJobsFailing",
+        "title": "Jenkins Workbench: Show Failing Jobs",
+        "icon": "$(error)"
+      },
+      {
+        "command": "jenkinsWorkbench.filterJobsRunning",
+        "title": "Jenkins Workbench: Show Running Jobs",
+        "icon": "$(play)"
+      },
+      {
+        "command": "jenkinsWorkbench.showBuildDetails",
+        "title": "Jenkins Workbench: View Build Details"
+      },
+      {
+        "command": "jenkinsWorkbench.openLastFailedBuild",
+        "title": "Jenkins Workbench: Open Last Failed Build"
+      },
+      {
+        "command": "jenkinsWorkbench.filterBranches",
+        "title": "Jenkins Workbench: Filter Branches"
+      },
+      {
+        "command": "jenkinsWorkbench.clearBranchFilter",
+        "title": "Jenkins Workbench: Clear Branch Filter"
+      },
+      {
+        "command": "jenkinsWorkbench.watchJob",
+        "title": "Jenkins Workbench: Watch Job"
+      },
+      {
+        "command": "jenkinsWorkbench.unwatchJob",
+        "title": "Jenkins Workbench: Unwatch Job"
+      },
+      {
+        "command": "jenkinsWorkbench.refresh",
+        "title": "Jenkins Workbench: Refresh",
+        "icon": "$(refresh)"
+      }
+    ],
+    "configuration": {
+      "title": "Jenkins Workbench",
+      "properties": {
+        "jenkinsWorkbench.cacheTtlSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 0,
+          "description": "Cache TTL in seconds for Jenkins data (jobs, builds, nodes, parameters). Use 0 to disable caching."
+        },
+        "jenkinsWorkbench.pollIntervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "description": "Polling interval in seconds for watched jobs."
+        },
+        "jenkinsWorkbench.queuePollIntervalSeconds": {
+          "type": "number",
+          "default": 10,
+          "minimum": 2,
+          "description": "Polling interval in seconds for the build queue while the Build Queue folder is expanded."
+        },
+        "jenkinsWorkbench.watchErrorThreshold": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "description": "Consecutive polling errors before warning about a watched job. Watches are removed only when Jenkins reports the job missing."
+        },
+        "jenkinsWorkbench.buildDetailsRefreshIntervalSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 2,
+          "description": "Polling interval in seconds for refreshing build details and streaming logs."
+        },
+        "jenkinsWorkbench.jobSearchConcurrency": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "description": "Maximum number of concurrent folder requests per environment while indexing jobs for Go to Job."
+        },
+        "jenkinsWorkbench.jobSearchBackoffBaseMs": {
+          "type": "number",
+          "default": 200,
+          "minimum": 0,
+          "description": "Base delay in milliseconds used when Jenkins responds with transient errors during job search."
+        },
+        "jenkinsWorkbench.jobSearchBackoffMaxMs": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "description": "Maximum delay in milliseconds for adaptive backoff during job search."
+        },
+        "jenkinsWorkbench.jobSearchMaxRetries": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "description": "Maximum number of retries for transient Jenkins errors (429/5xx) during job search."
+        },
+        "jenkinsWorkbench.requestTimeoutSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 300,
+          "description": "Request timeout in seconds for Jenkins API calls."
+        },
+        "jenkinsWorkbench.maxCacheEntries": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 100,
+          "description": "Maximum number of entries to keep in the data cache. Older entries are evicted when the limit is reached."
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "jenkinsWorkbench.refresh",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "navigation@0"
+        },
+        {
+          "command": "jenkinsWorkbench.addEnvironment",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.goToJob",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jenkinsWorkbench.filterJobsAll",
+          "when": "view == jenkinsWorkbench.tree && jenkinsWorkbench.filterMode != all",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jenkinsWorkbench.filterJobsFailing",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "navigation@3"
+        },
+        {
+          "command": "jenkinsWorkbench.filterJobsRunning",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "navigation@4"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "jenkinsWorkbench.removeEnvironment",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "inline"
+        },
+        {
+          "command": "jenkinsWorkbench.refresh",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "inline@1"
+        },
+        {
+          "command": "jenkinsWorkbench.triggerBuild",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.openLastFailedBuild",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.watchJob",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == pipelineUnwatched)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.unwatchJob",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobWatched || viewItem == pipelineWatched)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.abortBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem == buildRunning",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.cancelQueueItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.showBuildDetails",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.replayBuild",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.rebuildBuild",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.filterBranches",
+          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.clearBranchFilter",
+          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jenkinsWorkbench",
+          "title": "Jenkins Workbench",
+          "icon": "resources/activity-bar-icon.png"
+        }
+      ]
+    },
+    "views": {
+      "jenkinsWorkbench": [
+        {
+          "id": "jenkinsWorkbench.tree",
+          "name": "Jenkins Workbench"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint src/ --write",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check src/",
+    "check:fix": "biome check src/ --write"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^20.11.10",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  }
+}
