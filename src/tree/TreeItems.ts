@@ -7,7 +7,9 @@ import {
   buildIcon,
   formatBuildStatus,
   formatJobColor,
+  formatWatchedDescription,
   formatQueueItemDescription,
+  jobIcon,
   normalizeQueueReason
 } from "./formatters";
 
@@ -146,8 +148,8 @@ export class JobTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.isWatched = isWatched;
     this.contextValue = isWatched ? "jobWatched" : "jobUnwatched";
-    this.description = formatJobColor(color);
-    this.iconPath = new vscode.ThemeIcon("tools");
+    this.description = formatWatchedDescription(formatJobColor(color), isWatched);
+    this.iconPath = jobIcon("job", color);
   }
 }
 
@@ -164,8 +166,8 @@ export class PipelineTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.isWatched = isWatched;
     this.contextValue = isWatched ? "pipelineWatched" : "pipelineUnwatched";
-    this.description = formatJobColor(color);
-    this.iconPath = new vscode.ThemeIcon("symbol-structure");
+    this.description = formatWatchedDescription(formatJobColor(color), isWatched);
+    this.iconPath = jobIcon("pipeline", color);
   }
 }
 
