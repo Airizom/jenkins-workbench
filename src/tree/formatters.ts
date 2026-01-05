@@ -75,10 +75,29 @@ export function formatBuildStatus(build: JenkinsBuild): string {
 
 export function formatBuildDescription(build: JenkinsBuild): string {
   if (build.building) {
-    const elapsedLabel = formatDurationLabel(resolveBuildElapsedMs(build));
+    const elapsedMs = resolveBuildElapsedMs(build);
+    const elapsedLabel = formatDurationLabel(elapsedMs);
+    const estimatedMs = Number.isFinite(build.estimatedDuration)
+      ? (build.estimatedDuration as number)
+      : undefined;
+    const estimatedLabel =
+      estimatedMs && estimatedMs > 0 ? formatDurationLabel(estimatedMs) : undefined;
+
+    if (
+      elapsedLabel &&
+      estimatedLabel &&
+      Number.isFinite(elapsedMs) &&
+      typeof estimatedMs === "number"
+    ) {
+      const progressPercentRaw = Math.floor(((elapsedMs as number) / estimatedMs) * 100);
+      const progressPercent = Math.max(0, Math.min(100, progressPercentRaw));
+      return `$(clock) ${elapsedLabel} / ~${estimatedLabel} • Running (${progressPercent}%)`;
+    }
+
     if (elapsedLabel) {
       return `$(clock) ${elapsedLabel} • Running`;
     }
+
     return "Running";
   }
 

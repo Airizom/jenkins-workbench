@@ -40,11 +40,10 @@ export class JenkinsBuildsApi {
   }): string {
     const parts: string[] = [
       "builds[",
-      "number,url,result,building,timestamp,duration"
+      "number,url,result,building,timestamp,duration,estimatedDuration"
     ];
 
     if (options?.includeDetails) {
-      parts.push(",estimatedDuration");
       parts.push(",changeSet[items[commitId,msg,author[fullName]]]");
       parts.push(",changeSets[items[commitId,msg,author[fullName]]]");
     }
