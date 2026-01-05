@@ -318,7 +318,7 @@ function formatDurationLabel(durationMs?: number): string | undefined {
   return formatDurationMs(Math.max(0, durationMs as number));
 }
 
-function formatDurationMs(duration: number): string {
+export function formatDurationMs(duration: number): string {
   if (!Number.isFinite(duration)) {
     return "Unknown";
   }

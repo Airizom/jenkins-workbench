@@ -6,7 +6,8 @@ import type {
 import type {
   JenkinsBuildDetails,
   JenkinsConsoleText,
-  JenkinsTestReport
+  JenkinsTestReport,
+  JenkinsTestSummaryAction
 } from "../../jenkins/types";
 import {
   formatCulprits,
@@ -221,21 +222,29 @@ function buildTestSummary(
   return { failed, total, skipped, label };
 }
 
-type TestSummaryAction = NonNullable<JenkinsBuildDetails["actions"]>[number];
+type BuildAction = NonNullable<NonNullable<JenkinsBuildDetails["actions"]>[number]>;
+
+function isTestSummaryAction(action: BuildAction): action is JenkinsTestSummaryAction {
+  const candidate = action as JenkinsTestSummaryAction;
+  return (
+    typeof candidate.failCount === "number" ||
+    typeof candidate.totalCount === "number" ||
+    typeof candidate.skipCount === "number"
+  );
+}
 
 function findTestSummaryAction(
   actions: JenkinsBuildDetails["actions"]
-): TestSummaryAction | undefined {
+): JenkinsTestSummaryAction | undefined {
   if (!actions || actions.length === 0) {
     return undefined;
   }
-  return actions.find(
-    (action) =>
-      action !== null &&
-      (typeof action.failCount === "number" ||
-        typeof action.totalCount === "number" ||
-        typeof action.skipCount === "number")
-  );
+  for (const action of actions) {
+    if (action && isTestSummaryAction(action)) {
+      return action;
+    }
+  }
+  return undefined;
 }
 
 function buildFailedTests(

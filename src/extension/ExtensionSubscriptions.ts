@@ -4,6 +4,8 @@ import { BuildQueueFolderTreeItem, InstanceTreeItem, RootSectionTreeItem } from 
 import type { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import {
   buildConfigKey,
+  getBuildListFetchOptions,
+  getBuildTooltipOptions,
   getCacheTtlMs,
   getExtensionConfiguration,
   getPollIntervalSeconds,
@@ -29,12 +31,36 @@ export function registerExtensionSubscriptions(
     const affectsQueuePollInterval = event.affectsConfiguration(
       buildConfigKey("queuePollIntervalSeconds")
     );
+    const affectsBuildTooltipDetails = event.affectsConfiguration(
+      buildConfigKey("buildTooltips.includeDetails")
+    );
+    const affectsBuildTooltipParameters = event.affectsConfiguration(
+      buildConfigKey("buildTooltips.parameters.enabled")
+    );
+    const affectsBuildTooltipAllowList = event.affectsConfiguration(
+      buildConfigKey("buildTooltips.parameters.allowList")
+    );
+    const affectsBuildTooltipDenyList = event.affectsConfiguration(
+      buildConfigKey("buildTooltips.parameters.denyList")
+    );
+    const affectsBuildTooltipMaskPatterns = event.affectsConfiguration(
+      buildConfigKey("buildTooltips.parameters.maskPatterns")
+    );
+    const affectsBuildTooltipMaskValue = event.affectsConfiguration(
+      buildConfigKey("buildTooltips.parameters.maskValue")
+    );
 
     if (
       !affectsCacheTtl &&
       !affectsPollInterval &&
       !affectsWatchErrors &&
-      !affectsQueuePollInterval
+      !affectsQueuePollInterval &&
+      !affectsBuildTooltipDetails &&
+      !affectsBuildTooltipParameters &&
+      !affectsBuildTooltipAllowList &&
+      !affectsBuildTooltipDenyList &&
+      !affectsBuildTooltipMaskPatterns &&
+      !affectsBuildTooltipMaskValue
     ) {
       return;
     }
@@ -56,6 +82,26 @@ export function registerExtensionSubscriptions(
 
     if (affectsQueuePollInterval) {
       queuePoller.updatePollIntervalSeconds(getQueuePollIntervalSeconds(updatedConfig));
+    }
+
+    if (
+      affectsBuildTooltipDetails ||
+      affectsBuildTooltipParameters ||
+      affectsBuildTooltipAllowList ||
+      affectsBuildTooltipDenyList ||
+      affectsBuildTooltipMaskPatterns ||
+      affectsBuildTooltipMaskValue
+    ) {
+      services.treeDataProvider.updateBuildTooltipOptions(
+        getBuildTooltipOptions(updatedConfig)
+      );
+      services.treeDataProvider.updateBuildListFetchOptions(
+        getBuildListFetchOptions(updatedConfig)
+      );
+      if (affectsBuildTooltipDetails || affectsBuildTooltipParameters) {
+        services.dataService.clearCache();
+      }
+      services.treeDataProvider.refreshView();
     }
   });
 

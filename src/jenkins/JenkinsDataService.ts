@@ -50,6 +50,11 @@ export interface JenkinsDataServiceOptions {
   maxCacheEntries?: number;
 }
 
+export interface BuildListFetchOptions {
+  detailLevel?: "summary" | "details";
+  includeParameters?: boolean;
+}
+
 export class JenkinsDataService {
   private readonly cache: JenkinsDataCache;
   private readonly jobIndex: JenkinsJobIndex;
@@ -124,14 +129,21 @@ export class JenkinsDataService {
   async getBuildsForJob(
     environment: JenkinsEnvironmentRef,
     jobUrl: string,
-    limit: number
+    limit: number,
+    options?: BuildListFetchOptions
   ): Promise<JenkinsBuild[]> {
-    const cacheKey = await this.buildCacheKey(environment, "builds", jobUrl);
+    const detailLevel = options?.detailLevel ?? "summary";
+    const includeParameters = options?.includeParameters ?? false;
+    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}`;
+    const cacheKey = await this.buildCacheKey(environment, cacheKind, jobUrl);
     return this.cache.getOrLoad(
       cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
-        return client.getBuilds(jobUrl, limit);
+        return client.getBuilds(jobUrl, limit, {
+          includeDetails: detailLevel === "details",
+          includeParameters
+        });
       },
       this.cacheTtlMs
     );

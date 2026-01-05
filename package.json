@@ -197,6 +197,45 @@
           "default": 1000,
           "minimum": 100,
           "description": "Maximum number of entries to keep in the data cache. Older entries are evicted when the limit is reached."
+        },
+        "jenkinsWorkbench.buildTooltips.includeDetails": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fetch additional build details (change sets, causes, parameters, estimated duration) for tree tooltips. Enabling this may increase build list response sizes."
+        },
+        "jenkinsWorkbench.buildTooltips.parameters.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show build parameters in build tooltips. Parameter values may be sensitive."
+        },
+        "jenkinsWorkbench.buildTooltips.parameters.allowList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Only show parameters whose names contain any of these case-insensitive substrings."
+        },
+        "jenkinsWorkbench.buildTooltips.parameters.denyList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Hide parameters whose names contain any of these case-insensitive substrings."
+        },
+        "jenkinsWorkbench.buildTooltips.parameters.maskPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["password", "token", "secret", "apikey", "api_key", "credential", "passphrase"],
+          "description": "Mask parameter values when their names contain any of these case-insensitive substrings."
+        },
+        "jenkinsWorkbench.buildTooltips.parameters.maskValue": {
+          "type": "string",
+          "default": "[redacted]",
+          "description": "Replacement text for masked parameter values."
         }
       }
     },

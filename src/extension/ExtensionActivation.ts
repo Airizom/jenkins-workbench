@@ -4,6 +4,8 @@ import { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import { registerExtensionCommands } from "./ExtensionCommands";
 import { syncNoEnvironmentsContext } from "./contextKeys";
 import {
+  getBuildListFetchOptions,
+  getBuildTooltipOptions,
   getCacheTtlMs,
   getExtensionConfiguration,
   getMaxCacheEntries,
@@ -24,11 +26,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const queuePollIntervalSeconds = getQueuePollIntervalSeconds(config);
   const maxCacheEntries = getMaxCacheEntries(config);
   const requestTimeoutMs = getRequestTimeoutMs(config);
+  const buildTooltipOptions = getBuildTooltipOptions(config);
+  const buildListFetchOptions = getBuildListFetchOptions(config);
 
   const services = createExtensionServices(context, {
     cacheTtlMs,
     maxCacheEntries,
-    requestTimeoutMs
+    requestTimeoutMs,
+    buildTooltipOptions,
+    buildListFetchOptions
   });
   try {
     await services.environmentStore.migrateLegacyAuthConfigs();

@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
+import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 
 export const CONFIG_SECTION = "jenkinsWorkbench";
 
@@ -8,6 +10,18 @@ const DEFAULT_WATCH_ERROR_THRESHOLD = 3;
 const DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
 const DEFAULT_MAX_CACHE_ENTRIES = 1000;
+const DEFAULT_BUILD_TOOLTIP_DETAILS = false;
+const DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED = false;
+const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE = "[redacted]";
+const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
+  "password",
+  "token",
+  "secret",
+  "apikey",
+  "api_key",
+  "credential",
+  "passphrase"
+];
 
 export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
   return vscode.workspace.getConfiguration(CONFIG_SECTION);
@@ -64,4 +78,78 @@ export function getRequestTimeoutMs(config: vscode.WorkspaceConfiguration): numb
 export function getMaxCacheEntries(config: vscode.WorkspaceConfiguration): number {
   const maxEntries = config.get<number>("maxCacheEntries", DEFAULT_MAX_CACHE_ENTRIES);
   return Number.isFinite(maxEntries) ? Math.max(100, maxEntries) : DEFAULT_MAX_CACHE_ENTRIES;
+}
+
+export function getBuildTooltipDetailsEnabled(
+  config: vscode.WorkspaceConfiguration
+): boolean {
+  return Boolean(
+    config.get<boolean>("buildTooltips.includeDetails", DEFAULT_BUILD_TOOLTIP_DETAILS)
+  );
+}
+
+export function getBuildTooltipParametersEnabled(
+  config: vscode.WorkspaceConfiguration
+): boolean {
+  const includeParameters = config.get<boolean>(
+    "buildTooltips.parameters.enabled",
+    DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED
+  );
+  return Boolean(includeParameters);
+}
+
+export function getBuildTooltipOptions(
+  config: vscode.WorkspaceConfiguration
+): BuildTooltipOptions {
+  const includeParameters = getBuildTooltipParametersEnabled(config);
+  const parameterAllowList = normalizeStringList(
+    config.get<unknown>("buildTooltips.parameters.allowList")
+  );
+  const parameterDenyList = normalizeStringList(
+    config.get<unknown>("buildTooltips.parameters.denyList")
+  );
+  const parameterMaskPatterns = normalizeStringList(
+    config.get<unknown>(
+      "buildTooltips.parameters.maskPatterns",
+      DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS
+    )
+  );
+  const parameterMaskValue =
+    normalizeString(config.get<unknown>("buildTooltips.parameters.maskValue")) ??
+    DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE;
+
+  return {
+    includeParameters,
+    parameterAllowList,
+    parameterDenyList,
+    parameterMaskPatterns,
+    parameterMaskValue
+  };
+}
+
+export function getBuildListFetchOptions(
+  config: vscode.WorkspaceConfiguration
+): BuildListFetchOptions {
+  const includeDetails = getBuildTooltipDetailsEnabled(config);
+  return {
+    detailLevel: includeDetails ? "details" : "summary",
+    includeParameters: getBuildTooltipParametersEnabled(config)
+  };
+}
+
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => normalizeString(item))
+    .filter((item): item is string => Boolean(item));
+}
+
+function normalizeString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }

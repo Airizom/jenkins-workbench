@@ -3,6 +3,7 @@ import { formatScopeLabel } from "../formatters/ScopeFormatters";
 import type { JenkinsBuild, JenkinsJobKind, JenkinsNode } from "../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
+import { buildBuildTooltip, type BuildTooltipOptions } from "./BuildTooltips";
 import {
   buildIcon,
   formatBuildDescription,
@@ -178,7 +179,8 @@ export class BuildTreeItem extends vscode.TreeItem {
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
-    build: JenkinsBuild
+    build: JenkinsBuild,
+    tooltipOptions?: BuildTooltipOptions
   ) {
     const label = `#${build.number}`;
     super(label, vscode.TreeItemCollapsibleState.None);
@@ -187,7 +189,7 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.contextValue = this.isBuilding ? "buildRunning" : "build";
     this.description = formatBuildDescription(build);
     this.iconPath = buildIcon(build);
-    this.tooltip = build.url;
+    this.tooltip = buildBuildTooltip(build, tooltipOptions);
     this.command = {
       command: "jenkinsWorkbench.showBuildDetails",
       title: "View Build Details",

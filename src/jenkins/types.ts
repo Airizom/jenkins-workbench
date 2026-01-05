@@ -36,6 +36,10 @@ export interface JenkinsBuild {
   building?: boolean;
   timestamp?: number;
   duration?: number;
+  estimatedDuration?: number;
+  changeSet?: JenkinsChangeSet;
+  changeSets?: JenkinsChangeSet[];
+  actions?: Array<JenkinsBuildAction | null> | null;
 }
 
 export interface JenkinsUser {
@@ -64,6 +68,32 @@ export interface JenkinsTestSummaryAction {
   totalCount?: number;
 }
 
+export interface JenkinsBuildCause {
+  shortDescription?: string;
+  userId?: string;
+  userName?: string;
+}
+
+export interface JenkinsCauseAction {
+  _class?: string;
+  causes?: JenkinsBuildCause[];
+}
+
+export interface JenkinsBuildParameter {
+  name?: string;
+  value?: unknown;
+}
+
+export interface JenkinsParametersAction {
+  _class?: string;
+  parameters?: JenkinsBuildParameter[];
+}
+
+export type JenkinsBuildAction =
+  | JenkinsCauseAction
+  | JenkinsParametersAction
+  | JenkinsTestSummaryAction;
+
 export interface JenkinsTestReportCase {
   name?: string;
   className?: string;
@@ -87,9 +117,6 @@ export interface JenkinsBuildDetails extends JenkinsBuild {
   fullDisplayName?: string;
   culprits?: JenkinsUser[];
   artifacts?: JenkinsArtifact[];
-  changeSet?: JenkinsChangeSet;
-  changeSets?: JenkinsChangeSet[];
-  actions?: Array<JenkinsTestSummaryAction | null> | null;
 }
 
 export interface JenkinsWorkflowStep {

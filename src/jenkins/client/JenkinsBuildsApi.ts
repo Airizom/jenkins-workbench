@@ -13,19 +13,78 @@ import type { JenkinsClientContext } from "./JenkinsClientContext";
 export class JenkinsBuildsApi {
   constructor(private readonly context: JenkinsClientContext) {}
 
-  async getBuilds(jobUrl: string, limit = 20): Promise<JenkinsBuild[]> {
+  async getBuilds(
+    jobUrl: string,
+    limit = 20,
+    options?: { includeDetails?: boolean; includeParameters?: boolean }
+  ): Promise<JenkinsBuild[]> {
     const end = Math.max(limit - 1, 0);
-    const tree = `builds[number,url,result,building,timestamp,duration]{0,${end}}`;
+    const tree = this.buildBuildsTree(options).replace("{limit}", `{0,${end}}`);
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
     return Array.isArray(response.builds) ? response.builds : [];
   }
 
-  async getBuildDetails(buildUrl: string): Promise<JenkinsBuildDetails> {
-    const tree =
-      "number,url,result,building,timestamp,duration,displayName,fullDisplayName,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,failCount,skipCount,totalCount]";
+  async getBuildDetails(
+    buildUrl: string,
+    options?: { includeCauses?: boolean; includeParameters?: boolean }
+  ): Promise<JenkinsBuildDetails> {
+    const tree = this.buildBuildDetailsTree(options);
     const url = buildApiUrlFromItem(buildUrl, tree);
     return this.context.requestJson<JenkinsBuildDetails>(url);
+  }
+
+  private buildBuildsTree(options?: {
+    includeDetails?: boolean;
+    includeParameters?: boolean;
+  }): string {
+    const parts: string[] = [
+      "builds[",
+      "number,url,result,building,timestamp,duration"
+    ];
+
+    if (options?.includeDetails) {
+      parts.push(",estimatedDuration");
+      parts.push(",changeSet[items[commitId,msg,author[fullName]]]");
+      parts.push(",changeSets[items[commitId,msg,author[fullName]]]");
+    }
+
+    const includeCauses = Boolean(options?.includeDetails);
+    const includeParameters = Boolean(options?.includeParameters);
+    if (includeCauses || includeParameters) {
+      const actionParts = ["_class"];
+      if (includeCauses) {
+        actionParts.push("causes[shortDescription,userId,userName]");
+      }
+      if (includeParameters) {
+        actionParts.push("parameters[name,value]");
+      }
+      parts.push(`,actions[${actionParts.join(",")}]`);
+    }
+
+    parts.push("]{limit}");
+    return parts.join("");
+  }
+
+  private buildBuildDetailsTree(options?: {
+    includeCauses?: boolean;
+    includeParameters?: boolean;
+  }): string {
+    const actionParts = ["_class", "failCount", "skipCount", "totalCount"];
+    if (options?.includeCauses) {
+      actionParts.push("causes[shortDescription,userId,userName]");
+    }
+    if (options?.includeParameters) {
+      actionParts.push("parameters[name,value]");
+    }
+    return [
+      "number,url,result,building,timestamp,duration,estimatedDuration,",
+      "displayName,fullDisplayName,culprits[fullName],",
+      "artifacts[fileName,relativePath],",
+      "changeSet[items[commitId,msg,author[fullName]]],",
+      "changeSets[items[commitId,msg,author[fullName]]],",
+      `actions[${actionParts.join(",")}]`
+    ].join("");
   }
 
   async getTestReport(buildUrl: string): Promise<JenkinsTestReport> {

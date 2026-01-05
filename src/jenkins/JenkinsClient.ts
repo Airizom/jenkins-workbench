@@ -22,10 +22,15 @@ import type {
 
 export type {
   JenkinsBuild,
+  JenkinsBuildAction,
+  JenkinsBuildCause,
+  JenkinsBuildParameter,
   JenkinsBuildDetails,
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsChangeSet,
+  JenkinsChangeSetItem,
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
@@ -33,6 +38,7 @@ export type {
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
   JenkinsTestReport,
+  JenkinsTestSummaryAction,
   JenkinsWorkflowRun
 } from "./types";
 
@@ -64,12 +70,19 @@ export class JenkinsClient {
     return this.jobsApi.getJob(jobUrl);
   }
 
-  async getBuilds(jobUrl: string, limit = 20): Promise<JenkinsBuild[]> {
-    return this.buildsApi.getBuilds(jobUrl, limit);
+  async getBuilds(
+    jobUrl: string,
+    limit = 20,
+    options?: { includeDetails?: boolean; includeParameters?: boolean }
+  ): Promise<JenkinsBuild[]> {
+    return this.buildsApi.getBuilds(jobUrl, limit, options);
   }
 
-  async getBuildDetails(buildUrl: string): Promise<JenkinsBuildDetails> {
-    return this.buildsApi.getBuildDetails(buildUrl);
+  async getBuildDetails(
+    buildUrl: string,
+    options?: { includeCauses?: boolean; includeParameters?: boolean }
+  ): Promise<JenkinsBuildDetails> {
+    return this.buildsApi.getBuildDetails(buildUrl, options);
   }
 
   async getConsoleText(buildUrl: string, maxChars?: number): Promise<JenkinsConsoleText> {

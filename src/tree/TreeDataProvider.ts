@@ -1,9 +1,14 @@
 import * as vscode from "vscode";
-import type { JenkinsDataService, JobSearchEntry } from "../jenkins/JenkinsDataService";
+import type {
+  BuildListFetchOptions,
+  JenkinsDataService,
+  JobSearchEntry
+} from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
+import type { BuildTooltipOptions } from "./BuildTooltips";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { BuildQueueFolderTreeItem, type WorkbenchTreeElement } from "./TreeItems";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
@@ -36,14 +41,18 @@ export class JenkinsWorkbenchTreeDataProvider
     store: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
     watchStore: JenkinsWatchStore,
-    treeFilter: JenkinsTreeFilter
+    treeFilter: JenkinsTreeFilter,
+    buildTooltipOptions: BuildTooltipOptions,
+    buildListFetchOptions: BuildListFetchOptions
   ) {
     this.childrenLoader = new JenkinsTreeChildrenLoader(
       store,
       dataService,
       watchStore,
       treeFilter,
-      BUILD_LIMIT
+      BUILD_LIMIT,
+      buildTooltipOptions,
+      buildListFetchOptions
     );
     this.revealResolver = new JenkinsTreeRevealResolver(this.getChildrenInternal.bind(this));
   }
@@ -70,6 +79,14 @@ export class JenkinsWorkbenchTreeDataProvider
   refreshQueueFolder(environment: JenkinsEnvironmentRef): void {
     const item = new BuildQueueFolderTreeItem(environment);
     this._onDidChangeTreeData.fire(item);
+  }
+
+  updateBuildTooltipOptions(options: BuildTooltipOptions): void {
+    this.childrenLoader.updateBuildTooltipOptions(options);
+  }
+
+  updateBuildListFetchOptions(options: BuildListFetchOptions): void {
+    this.childrenLoader.updateBuildListFetchOptions(options);
   }
 
   onEnvironmentChanged(environmentId?: string): void {

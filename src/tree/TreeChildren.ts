@@ -1,6 +1,7 @@
 import { formatScopeLabel } from "../formatters/ScopeFormatters";
 import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type {
+  BuildListFetchOptions,
   JenkinsDataService,
   JenkinsJobInfo,
   JenkinsQueueItemInfo
@@ -9,6 +10,7 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
+import type { BuildTooltipOptions } from "./BuildTooltips";
 import {
   BuildQueueFolderTreeItem,
   BuildTreeItem,
@@ -37,8 +39,18 @@ export class JenkinsTreeChildrenLoader {
     private readonly dataService: JenkinsDataService,
     private readonly watchStore: JenkinsWatchStore,
     private readonly treeFilter: JenkinsTreeFilter,
-    private readonly buildLimit: number
+    private readonly buildLimit: number,
+    private buildTooltipOptions: BuildTooltipOptions,
+    private buildListFetchOptions: BuildListFetchOptions
   ) {}
+
+  updateBuildTooltipOptions(options: BuildTooltipOptions): void {
+    this.buildTooltipOptions = options;
+  }
+
+  updateBuildListFetchOptions(options: BuildListFetchOptions): void {
+    this.buildListFetchOptions = options;
+  }
 
   async getChildren(
     element?: WorkbenchTreeElement,
@@ -196,7 +208,12 @@ export class JenkinsTreeChildrenLoader {
     jobUrl: string
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const builds = await this.dataService.getBuildsForJob(environment, jobUrl, this.buildLimit);
+      const builds = await this.dataService.getBuildsForJob(
+        environment,
+        jobUrl,
+        this.buildLimit,
+        this.buildListFetchOptions
+      );
       if (builds.length === 0) {
         return [
           new PlaceholderTreeItem(
@@ -206,7 +223,7 @@ export class JenkinsTreeChildrenLoader {
           )
         ];
       }
-      return builds.map((build) => new BuildTreeItem(environment, build));
+      return builds.map((build) => new BuildTreeItem(environment, build, this.buildTooltipOptions));
     } catch (error) {
       return [this.createErrorPlaceholder("Unable to load builds.", error)];
     }

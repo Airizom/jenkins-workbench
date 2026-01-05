@@ -4,6 +4,8 @@ import { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
+import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
 import { JenkinsTreeFilter } from "../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../tree/TreeItems";
@@ -25,6 +27,8 @@ export interface ExtensionServicesOptions {
   cacheTtlMs: number;
   maxCacheEntries: number;
   requestTimeoutMs: number;
+  buildTooltipOptions: BuildTooltipOptions;
+  buildListFetchOptions: BuildListFetchOptions;
 }
 
 const VIEW_ID = "jenkinsWorkbench.tree";
@@ -48,7 +52,9 @@ export function createExtensionServices(
     environmentStore,
     dataService,
     watchStore,
-    treeFilter
+    treeFilter,
+    options.buildTooltipOptions,
+    options.buildListFetchOptions
   );
   const treeView = vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
     treeDataProvider
