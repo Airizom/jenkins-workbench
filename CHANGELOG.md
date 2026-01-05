@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-01-05
+
+### Added
+
+- feat: enhance authentication methods and improve security features
+
 ## [1.0.0] - 2026-01-04
 
 ### Added
@@ -32,4 +38,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - API tokens stored in VS Code SecretStorage (never in plain text)
 - Credentials transmitted only via HTTPS when configured
-
