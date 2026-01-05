@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService, JobParameter } from "../../jenkins/JenkinsDataService";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
+import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 import { formatActionError, getOpenUrl, getTreeItemLabel } from "./BuildCommandUtils";
@@ -129,11 +130,18 @@ export async function rebuildBuild(
 }
 
 export async function openInJenkins(
-  item?: JobTreeItem | PipelineTreeItem | BuildTreeItem
+  item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem
 ): Promise<void> {
+  if (item instanceof NodeTreeItem && !item.nodeUrl) {
+    void vscode.window.showInformationMessage(
+      "That node does not expose a stable URL in the Jenkins API."
+    );
+    return;
+  }
+
   const url = getOpenUrl(item);
   if (!url) {
-    void vscode.window.showInformationMessage("Select a job, pipeline, or build to open.");
+    void vscode.window.showInformationMessage("Select a job, pipeline, build, or node to open.");
     return;
   }
 

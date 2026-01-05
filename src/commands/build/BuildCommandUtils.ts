@@ -1,9 +1,14 @@
 import type * as vscode from "vscode";
 import { BuildActionError } from "../../jenkins/JenkinsDataService";
-import { BuildTreeItem, type JobTreeItem, type PipelineTreeItem } from "../../tree/TreeItems";
+import {
+  BuildTreeItem,
+  type JobTreeItem,
+  NodeTreeItem,
+  type PipelineTreeItem
+} from "../../tree/TreeItems";
 
 export function getOpenUrl(
-  item?: JobTreeItem | PipelineTreeItem | BuildTreeItem
+  item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem
 ): string | undefined {
   if (!item) {
     return undefined;
@@ -11,6 +16,10 @@ export function getOpenUrl(
 
   if (item instanceof BuildTreeItem) {
     return item.buildUrl;
+  }
+
+  if (item instanceof NodeTreeItem) {
+    return item.nodeUrl;
   }
 
   return item.jobUrl;

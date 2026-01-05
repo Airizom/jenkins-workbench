@@ -2,6 +2,7 @@ import type {
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
   JenkinsJobKind,
+  JenkinsNode,
   JenkinsProgressiveConsoleText
 } from "../JenkinsClient";
 
@@ -26,6 +27,10 @@ export interface JenkinsJobInfo {
   url: string;
   color?: string;
   kind: JenkinsJobKind;
+}
+
+export interface JenkinsNodeInfo extends JenkinsNode {
+  nodeUrl?: string;
 }
 
 export interface JenkinsQueueItemInfo {

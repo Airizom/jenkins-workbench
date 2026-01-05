@@ -174,6 +174,11 @@ export interface JenkinsProgressiveConsoleText {
 
 export interface JenkinsNode {
   displayName: string;
+  name?: string;
+  url?: string;
+  assignedLabels?: Array<{
+    name?: string;
+  }>;
   offline: boolean;
   temporarilyOffline: boolean;
   numExecutors?: number;

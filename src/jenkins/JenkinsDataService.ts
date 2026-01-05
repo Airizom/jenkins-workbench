@@ -3,7 +3,6 @@ import type {
   JenkinsBuildDetails,
   JenkinsJob,
   JenkinsJobKind,
-  JenkinsNode,
   JenkinsParameterDefinition,
   JenkinsQueueItem,
   JenkinsWorkflowRun
@@ -16,6 +15,7 @@ import type {
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobInfo,
+  JenkinsNodeInfo,
   JenkinsQueueItemInfo,
   JobParameter,
   JobParameterKind,
@@ -26,6 +26,7 @@ import type {
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
 import { JenkinsRequestError } from "./errors";
 import type { JenkinsTestReport } from "./types";
+import { resolveNodeUrl } from "./urls";
 
 export type {
   BuildActionErrorCode,
@@ -35,6 +36,7 @@ export type {
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobInfo,
+  JenkinsNodeInfo,
   JenkinsQueueItemInfo,
   JobParameter,
   JobParameterKind,
@@ -263,13 +265,17 @@ export class JenkinsDataService {
     }
   }
 
-  async getNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNode[]> {
+  async getNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNodeInfo[]> {
     const cacheKey = await this.buildCacheKey(environment, "nodes");
     return this.cache.getOrLoad(
       cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
-        return client.getNodes();
+        const nodes = await client.getNodes();
+        return nodes.map((node) => ({
+          ...node,
+          nodeUrl: resolveNodeUrl(environment.url, node)
+        }));
       },
       this.cacheTtlMs
     );

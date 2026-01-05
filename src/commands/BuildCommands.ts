@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
+import type { BuildTreeItem, JobTreeItem, NodeTreeItem, PipelineTreeItem } from "../tree/TreeItems";
 import {
   openInJenkins,
   openLastFailedBuild,
@@ -33,7 +33,7 @@ export function registerBuildCommands(
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.openInJenkins",
-      (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem) => openInJenkins(item)
+      (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.showBuildDetails", (item?: BuildTreeItem) =>
       showBuildDetails(dataService, item)

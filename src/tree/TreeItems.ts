@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../formatters/ScopeFormatters";
-import type { JenkinsBuild, JenkinsJobKind, JenkinsNode } from "../jenkins/JenkinsClient";
+import type { JenkinsBuild, JenkinsJobKind } from "../jenkins/JenkinsClient";
+import type { JenkinsNodeInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
 import { buildBuildTooltip, type BuildTooltipOptions } from "./BuildTooltips";
@@ -220,12 +221,15 @@ export class BuildTreeItem extends vscode.TreeItem {
 }
 
 export class NodeTreeItem extends vscode.TreeItem {
+  public readonly nodeUrl?: string;
+
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
-    node: JenkinsNode
+    node: JenkinsNodeInfo
   ) {
     super(node.displayName, vscode.TreeItemCollapsibleState.None);
-    this.contextValue = "node";
+    this.nodeUrl = node.nodeUrl;
+    this.contextValue = node.nodeUrl ? "node nodeOpenable" : "node";
     this.description = formatNodeDescription(node);
     this.iconPath = node.offline
       ? new vscode.ThemeIcon("debug-disconnect")

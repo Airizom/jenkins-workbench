@@ -9,7 +9,7 @@ export class JenkinsNodesApi {
     const url = buildApiUrlFromBase(
       this.context.baseUrl,
       "computer/api/json",
-      "computer[displayName,offline,temporarilyOffline,numExecutors,busyExecutors]"
+      "computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,numExecutors,busyExecutors]"
     );
     const response = await this.context.requestJson<{ computer?: JenkinsNode[] }>(url);
     return Array.isArray(response.computer) ? response.computer : [];

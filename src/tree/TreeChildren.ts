@@ -1,17 +1,4 @@
 import { formatScopeLabel } from "../formatters/ScopeFormatters";
-import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
-import type {
-  BuildListFetchOptions,
-  JenkinsDataService,
-  JenkinsJobInfo,
-  JenkinsQueueItemInfo
-} from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
-import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { JenkinsTreeFilter } from "./TreeFilter";
-import type { BuildTooltipOptions } from "./BuildTooltips";
 import {
   BuildQueueFolderTreeItem,
   BuildTreeItem,
@@ -30,6 +17,19 @@ import {
   SettingsEnvironmentsTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
+import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
+import type {
+  BuildListFetchOptions,
+  JenkinsDataService,
+  JenkinsJobInfo,
+  JenkinsQueueItemInfo
+} from "../jenkins/JenkinsDataService";
+import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
+import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import type { BuildTooltipOptions } from "./BuildTooltips";
+import type { JenkinsTreeFilter } from "./TreeFilter";
 import type { TreeChildrenOptions } from "./TreeTypes";
 
 export class JenkinsTreeChildrenLoader {
