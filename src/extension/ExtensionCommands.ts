@@ -10,6 +10,7 @@ import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
+import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
@@ -24,6 +25,7 @@ export interface ExtensionCommandDependencies {
   pinStore: JenkinsPinStore;
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
+  artifactActionHandler: ArtifactActionHandler;
   viewStateStore: JenkinsViewStateStore;
   treeNavigator: DefaultJenkinsTreeNavigator;
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
@@ -70,7 +72,12 @@ export function registerExtensionCommands(
     refreshHost
   );
 
-  registerBuildCommands(context, dependencies.dataService, refreshHost);
+  registerBuildCommands(
+    context,
+    dependencies.dataService,
+    dependencies.artifactActionHandler,
+    refreshHost
+  );
 
   registerQueueCommands(context, dependencies.dataService, refreshHost);
 

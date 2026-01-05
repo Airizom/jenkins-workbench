@@ -30,6 +30,13 @@ export interface OpenExternalMessage {
   url: string;
 }
 
+export interface ArtifactActionMessage {
+  type: "artifactAction";
+  action: "preview" | "download";
+  relativePath: string;
+  fileName?: string;
+}
+
 export function isToggleFollowLogMessage(message: unknown): message is ToggleFollowLogMessage {
   if (!isRecord(message)) {
     return false;
@@ -42,6 +49,21 @@ export function isOpenExternalMessage(message: unknown): message is OpenExternal
     return false;
   }
   return message.type === "openExternal" && typeof message.url === "string";
+}
+
+export function isArtifactActionMessage(message: unknown): message is ArtifactActionMessage {
+  if (!isRecord(message)) {
+    return false;
+  }
+  if (message.type !== "artifactAction") {
+    return false;
+  }
+  const action = (message as Record<string, unknown>).action;
+  const relativePath = (message as Record<string, unknown>).relativePath;
+  if (action !== "preview" && action !== "download") {
+    return false;
+  }
+  return typeof relativePath === "string" && relativePath.length > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

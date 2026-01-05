@@ -104,9 +104,7 @@ export function formatBuildDescription(build: JenkinsBuild): string {
   const status = formatBuildStatus(build);
   const durationLabel = formatDurationLabel(build.duration);
   const completionTimestamp = resolveBuildCompletionTimestamp(build);
-  const relativeLabel = completionTimestamp
-    ? formatRelativeTime(completionTimestamp)
-    : undefined;
+  const relativeLabel = completionTimestamp ? formatRelativeTime(completionTimestamp) : undefined;
 
   const base = durationLabel ? `${status} (${durationLabel})` : status;
   return relativeLabel ? `${base} • ${relativeLabel}` : base;
@@ -152,10 +150,7 @@ export function formatNodeDescription(node: JenkinsNode): string {
   const totalExecutors = node.numExecutors;
   const busyExecutors = node.busyExecutors;
   if (Number.isFinite(totalExecutors) && Number.isFinite(busyExecutors)) {
-    const freeExecutors = Math.max(
-      0,
-      (totalExecutors as number) - (busyExecutors as number)
-    );
+    const freeExecutors = Math.max(0, (totalExecutors as number) - (busyExecutors as number));
     return `Online (${freeExecutors}/${totalExecutors})`;
   }
 
@@ -176,10 +171,7 @@ export function jobIcon(kind: "job" | "pipeline", color?: string): vscode.ThemeI
   return new vscode.ThemeIcon(iconId, status ? STATUS_THEME_COLORS[status] : undefined);
 }
 
-export function formatWatchedDescription(
-  status?: string,
-  isWatched = false
-): string | undefined {
+export function formatWatchedDescription(status?: string, isWatched = false): string | undefined {
   if (!isWatched) {
     return status;
   }
@@ -190,7 +182,6 @@ export function formatWatchedDescription(
 
   return `${status} • $(eye)`;
 }
-
 
 export function formatQueueItemDescription(
   position: number,

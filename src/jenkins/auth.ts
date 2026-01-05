@@ -24,7 +24,7 @@ export function parseHeadersJson(input: string): {
   try {
     parsed = JSON.parse(input);
   } catch {
-    return { error: "Enter valid JSON (e.g. {\"Header\":\"Value\"})." };
+    return { error: 'Enter valid JSON (e.g. {"Header":"Value"}).' };
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

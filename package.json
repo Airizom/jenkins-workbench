@@ -17,10 +17,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Other",
-    "Visualization"
-  ],
+  "categories": ["Other", "Visualization"],
   "keywords": [
     "jenkins",
     "ci",
@@ -105,6 +102,16 @@
       {
         "command": "jenkinsWorkbench.openLastFailedBuild",
         "title": "Jenkins Workbench: Open Last Failed Build"
+      },
+      {
+        "command": "jenkinsWorkbench.previewArtifact",
+        "title": "Jenkins Workbench: Preview Artifact",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "jenkinsWorkbench.downloadArtifact",
+        "title": "Jenkins Workbench: Download Artifact",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "jenkinsWorkbench.filterBranches",
@@ -201,6 +208,17 @@
           "minimum": 5,
           "maximum": 300,
           "description": "Request timeout in seconds for Jenkins API calls."
+        },
+        "jenkinsWorkbench.artifactDownloadRoot": {
+          "type": "string",
+          "default": "jenkins-artifacts",
+          "description": "Workspace-relative folder for downloaded artifacts."
+        },
+        "jenkinsWorkbench.artifactMaxDownloadMb": {
+          "type": "number",
+          "default": 100,
+          "minimum": 0,
+          "description": "Maximum artifact download size in megabytes. Set to 0 to disable the limit."
         },
         "jenkinsWorkbench.maxCacheEntries": {
           "type": "number",
@@ -367,6 +385,16 @@
           "group": "inline@0"
         },
         {
+          "command": "jenkinsWorkbench.previewArtifact",
+          "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
+          "group": "inline@0"
+        },
+        {
+          "command": "jenkinsWorkbench.downloadArtifact",
+          "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
+          "group": "inline@1"
+        },
+        {
           "command": "jenkinsWorkbench.cancelQueueItem",
           "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
           "group": "navigation"
@@ -389,6 +417,16 @@
         {
           "command": "jenkinsWorkbench.openInJenkins",
           "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.previewArtifact",
+          "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.downloadArtifact",
+          "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
           "group": "navigation"
         },
         {

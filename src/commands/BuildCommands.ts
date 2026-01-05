@@ -1,6 +1,14 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { BuildTreeItem, JobTreeItem, NodeTreeItem, PipelineTreeItem } from "../tree/TreeItems";
+import type {
+  ArtifactTreeItem,
+  BuildTreeItem,
+  JobTreeItem,
+  NodeTreeItem,
+  PipelineTreeItem
+} from "../tree/TreeItems";
+import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import { downloadArtifact, previewArtifact } from "./build/BuildArtifactHandlers";
 import {
   openInJenkins,
   openLastFailedBuild,
@@ -15,6 +23,7 @@ import type { BuildCommandRefreshHost } from "./build/BuildCommandTypes";
 export function registerBuildCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
+  artifactActionHandler: ArtifactActionHandler,
   refreshHost: BuildCommandRefreshHost
 ): void {
   context.subscriptions.push(
@@ -36,11 +45,19 @@ export function registerBuildCommands(
       (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.showBuildDetails", (item?: BuildTreeItem) =>
-      showBuildDetails(dataService, item)
+      showBuildDetails(dataService, artifactActionHandler, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.openLastFailedBuild",
-      (item?: JobTreeItem | PipelineTreeItem) => openLastFailedBuild(dataService, item)
+      (item?: JobTreeItem | PipelineTreeItem) =>
+        openLastFailedBuild(dataService, artifactActionHandler, item)
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.previewArtifact", (item?: ArtifactTreeItem) =>
+      previewArtifact(artifactActionHandler, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.downloadArtifact",
+      (item?: ArtifactTreeItem) => downloadArtifact(artifactActionHandler, item)
     )
   );
 }

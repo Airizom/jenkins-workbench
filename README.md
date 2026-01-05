@@ -1,6 +1,7 @@
 # Jenkins Workbench
 
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/airizom.jenkins-workbench?style=flat-square&label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench)
+[![Open VSX Version](https://img.shields.io/open-vsx/v/airizom/jenkins-workbench?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/airizom/jenkins-workbench)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com/)
 
@@ -14,6 +15,8 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 - **Multi-Environment Support** — Connect to multiple Jenkins instances with workspace or global scope
 - **Browse Everything** — Explore folders, multibranch pipelines, jobs, builds, and nodes
 - **Go to Job...** — Quick search across all configured Jenkins environments
+- **Pin Jobs & Pipelines** — Keep critical items at the top of the tree for quick access
+- **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
 
 ### Build Management
 
@@ -21,6 +24,12 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 - **Stop Builds** — Abort running builds directly from the tree
 - **Replay & Rebuild** — Re-run builds with the same or modified configuration
 - **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
+
+### Build Insights & Artifacts
+
+- **Build Progress** — Estimated progress and duration for running builds
+- **Richer Tooltips** — Optional build tooltips with causes, changes, and parameters
+- **Artifact Preview & Download** — Open images/text artifacts or download them to your workspace
 
 ### Build Details Panel
 
@@ -77,6 +86,7 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | Network | Access to your Jenkins instance(s) |
 | Jenkins API | JSON API must be accessible (`/api/json`) |
 | Permissions | Read access for browsing; write access for build actions |
+| Workspace | A folder-backed workspace is required for artifact preview/download |
 
 ## Extension Settings
 
@@ -106,6 +116,24 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `jenkinsWorkbench.jobSearchBackoffMaxMs` | 2000 | Maximum delay for adaptive backoff. |
 | `jenkinsWorkbench.jobSearchMaxRetries` | 2 | Retries for transient errors (429/5xx). |
 
+### Build Tooltips
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.buildTooltips.includeDetails` | false | Fetch extra build details (causes, change sets, parameters, estimated duration) for tooltips. |
+| `jenkinsWorkbench.buildTooltips.parameters.enabled` | false | Include build parameters in tooltips. |
+| `jenkinsWorkbench.buildTooltips.parameters.allowList` | `[]` | Only show parameters whose names contain these substrings. |
+| `jenkinsWorkbench.buildTooltips.parameters.denyList` | `[]` | Hide parameters whose names contain these substrings. |
+| `jenkinsWorkbench.buildTooltips.parameters.maskPatterns` | `["password", "token", "secret", "apikey", "api_key", "credential", "passphrase"]` | Mask parameter values that match these substrings. |
+| `jenkinsWorkbench.buildTooltips.parameters.maskValue` | `[redacted]` | Replacement text for masked parameter values. |
+
+### Artifacts
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.artifactDownloadRoot` | `jenkins-artifacts` | Workspace-relative folder for downloaded artifacts. |
+| `jenkinsWorkbench.artifactMaxDownloadMb` | 100 | Maximum artifact download size in megabytes (0 disables limit). |
+
 ## Commands
 
 ### Environment Management
@@ -128,6 +156,13 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `Jenkins Workbench: Open Last Failed Build` | Jump to the last failed build |
 | `Jenkins Workbench: Cancel Queue Item` | Remove a build from the queue |
 
+### Artifacts
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Preview Artifact` | Open an artifact (image/text) from a build |
+| `Jenkins Workbench: Download Artifact` | Download an artifact to the workspace |
+
 ### Navigation & Search
 
 | Command | Description |
@@ -144,6 +179,13 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `Jenkins Workbench: Show Running Jobs` | Show only running jobs |
 | `Jenkins Workbench: Filter Branches` | Filter branches in a multibranch folder |
 | `Jenkins Workbench: Clear Branch Filter` | Clear the branch filter |
+
+### Organization
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins Workbench: Pin Job` | Pin a job or pipeline to the top of the tree |
+| `Jenkins Workbench: Unpin Job` | Remove a pinned job or pipeline |
 
 ### Watch
 
@@ -196,6 +238,11 @@ Jenkins Workbench takes security seriously:
   - **Rebuild** requires the Rebuild Plugin
 - Check that the plugins are installed and the user has permissions
 
+### Artifact Downloads
+
+- Artifact preview/downloads require a folder-backed workspace
+- If downloads fail, check the `jenkinsWorkbench.artifactMaxDownloadMb` limit
+
 ### Slow Job Search
 
 - Adjust `jobSearchConcurrency` based on your Jenkins server capacity
@@ -242,6 +289,8 @@ npm run check:fix
 4. Test build actions (trigger, stop, replay, rebuild)
 5. Verify watch notifications work
 6. Confirm removing an environment clears it from the tree
+7. Preview or download a build artifact
+8. Pin and unpin a job or pipeline
 
 ## License
 

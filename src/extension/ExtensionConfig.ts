@@ -12,6 +12,8 @@ const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
 const DEFAULT_MAX_CACHE_ENTRIES = 1000;
 const DEFAULT_BUILD_TOOLTIP_DETAILS = false;
 const DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED = false;
+const DEFAULT_ARTIFACT_DOWNLOAD_ROOT = "jenkins-artifacts";
+const DEFAULT_ARTIFACT_MAX_DOWNLOAD_MB = 100;
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE = "[redacted]";
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
   "password",
@@ -80,17 +82,13 @@ export function getMaxCacheEntries(config: vscode.WorkspaceConfiguration): numbe
   return Number.isFinite(maxEntries) ? Math.max(100, maxEntries) : DEFAULT_MAX_CACHE_ENTRIES;
 }
 
-export function getBuildTooltipDetailsEnabled(
-  config: vscode.WorkspaceConfiguration
-): boolean {
+export function getBuildTooltipDetailsEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>("buildTooltips.includeDetails", DEFAULT_BUILD_TOOLTIP_DETAILS)
   );
 }
 
-export function getBuildTooltipParametersEnabled(
-  config: vscode.WorkspaceConfiguration
-): boolean {
+export function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfiguration): boolean {
   const includeParameters = config.get<boolean>(
     "buildTooltips.parameters.enabled",
     DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED
@@ -98,9 +96,33 @@ export function getBuildTooltipParametersEnabled(
   return Boolean(includeParameters);
 }
 
-export function getBuildTooltipOptions(
+export function getArtifactDownloadRoot(config: vscode.WorkspaceConfiguration): string {
+  return (
+    normalizeString(config.get<unknown>("artifactDownloadRoot")) ?? DEFAULT_ARTIFACT_DOWNLOAD_ROOT
+  );
+}
+
+export function getArtifactActionOptions(config: vscode.WorkspaceConfiguration): {
+  downloadRoot: string;
+  maxBytes?: number;
+} {
+  return {
+    downloadRoot: getArtifactDownloadRoot(config),
+    maxBytes: getArtifactMaxDownloadBytes(config)
+  };
+}
+
+export function getArtifactMaxDownloadBytes(
   config: vscode.WorkspaceConfiguration
-): BuildTooltipOptions {
+): number | undefined {
+  const value = config.get<number>("artifactMaxDownloadMb", DEFAULT_ARTIFACT_MAX_DOWNLOAD_MB);
+  if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return Math.floor(value) * 1024 * 1024;
+}
+
+export function getBuildTooltipOptions(config: vscode.WorkspaceConfiguration): BuildTooltipOptions {
   const includeParameters = getBuildTooltipParametersEnabled(config);
   const parameterAllowList = normalizeStringList(
     config.get<unknown>("buildTooltips.parameters.allowList")
@@ -141,9 +163,7 @@ function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((item) => normalizeString(item))
-    .filter((item): item is string => Boolean(item));
+  return value.map((item) => normalizeString(item)).filter((item): item is string => Boolean(item));
 }
 
 function normalizeString(value: unknown): string | undefined {

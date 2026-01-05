@@ -92,9 +92,7 @@ export function registerExtensionSubscriptions(
       affectsBuildTooltipMaskPatterns ||
       affectsBuildTooltipMaskValue
     ) {
-      services.treeDataProvider.updateBuildTooltipOptions(
-        getBuildTooltipOptions(updatedConfig)
-      );
+      services.treeDataProvider.updateBuildTooltipOptions(getBuildTooltipOptions(updatedConfig));
       services.treeDataProvider.updateBuildListFetchOptions(
         getBuildListFetchOptions(updatedConfig)
       );

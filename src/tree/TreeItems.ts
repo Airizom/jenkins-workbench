@@ -29,6 +29,8 @@ export type WorkbenchTreeElement =
   | JobTreeItem
   | PipelineTreeItem
   | BuildTreeItem
+  | BuildArtifactsFolderTreeItem
+  | ArtifactTreeItem
   | NodeTreeItem
   | QueueItemTreeItem
   | PlaceholderTreeItem;
@@ -197,17 +199,22 @@ function buildJobContextValue(
 
 export class BuildTreeItem extends vscode.TreeItem {
   public readonly buildUrl: string;
+  public readonly buildNumber: number;
   public readonly isBuilding: boolean;
+  public readonly jobNameHint?: string;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     build: JenkinsBuild,
-    tooltipOptions?: BuildTooltipOptions
+    tooltipOptions?: BuildTooltipOptions,
+    jobNameHint?: string
   ) {
     const label = `#${build.number}`;
-    super(label, vscode.TreeItemCollapsibleState.None);
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.buildUrl = build.url;
+    this.buildNumber = build.number;
     this.isBuilding = Boolean(build.building);
+    this.jobNameHint = jobNameHint;
     this.contextValue = this.isBuilding ? "buildRunning" : "build";
     this.description = formatBuildDescription(build);
     this.iconPath = buildIcon(build);
@@ -217,6 +224,37 @@ export class BuildTreeItem extends vscode.TreeItem {
       title: "View Build Details",
       arguments: [this]
     };
+  }
+}
+
+export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    public readonly buildUrl: string,
+    public readonly buildNumber: number,
+    public readonly jobNameHint?: string
+  ) {
+    super("Artifacts", vscode.TreeItemCollapsibleState.Collapsed);
+    this.contextValue = "artifactFolder";
+    this.iconPath = new vscode.ThemeIcon("folder");
+  }
+}
+
+export class ArtifactTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    public readonly buildUrl: string,
+    public readonly buildNumber: number,
+    public readonly relativePath: string,
+    public readonly fileName?: string,
+    public readonly jobNameHint?: string
+  ) {
+    const label = fileName || relativePath || "Artifact";
+    super(label, vscode.TreeItemCollapsibleState.None);
+    this.contextValue = "artifactItem";
+    this.description =
+      fileName && relativePath && relativePath !== fileName ? relativePath : undefined;
+    this.iconPath = new vscode.ThemeIcon("file");
   }
 }
 

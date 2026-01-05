@@ -5,6 +5,7 @@
 - VS Code extension that surfaces Jenkins instances, jobs, and build activity in an Activity Bar view.
 - Uses the Jenkins JSON API via `src/jenkins/` services; stores environment metadata in VS Code state.
 - Target VS Code version: `^1.85.0`
+- Includes pinned jobs/pipelines, artifact preview/download workflows, and richer build tooltips.
 
 ## Project Structure & Module Organization
 
@@ -24,6 +25,7 @@ src/
 │   │   └── BuildParameterPrompts.ts
 │   ├── BuildCommands.ts          # Build command registration
 │   ├── environment/              # Environment management
+│   ├── pin/                       # Pin/unpin commands
 │   ├── queue/                    # Queue operations
 │   └── watch/                    # Watch/poll operations
 ├── jenkins/                  # Jenkins API layer
@@ -37,6 +39,7 @@ src/
 │   │   ├── JenkinsDataCache.ts       # LRU cache with TTL
 │   │   ├── JenkinsDataErrors.ts      # Error transformation
 │   │   └── JenkinsJobIndex.ts        # Job search index
+│   ├── pipeline/                 # Pipeline stage adapters and types
 │   ├── JenkinsClient.ts          # Client facade
 │   ├── JenkinsClientProvider.ts  # Client factory per environment
 │   ├── JenkinsDataService.ts     # Cached data access layer
@@ -56,6 +59,8 @@ src/
 ├── panels/                   # Webview panels
 │   ├── BuildDetailsPanel.ts      # Build details webview
 │   └── buildDetails/             # Panel internals
+├── services/                 # Shared services (artifacts, storage)
+├── ui/                       # UI handlers (artifact preview/download)
 ├── watch/                    # Polling infrastructure
 │   ├── JenkinsStatusPoller.ts    # Job status polling
 │   └── StatusNotifier.ts         # Notification abstraction
@@ -72,9 +77,12 @@ src/
 | `jenkins/` | All Jenkins API interaction and data access |
 | `jenkins/client/` | Low-level HTTP and endpoint-specific APIs |
 | `jenkins/data/` | Caching, error handling, and indexing |
+| `jenkins/pipeline/` | Pipeline stage adapters and types |
 | `tree/` | TreeDataProvider, TreeItems, formatting |
 | `storage/` | VS Code state persistence (environments, watches, view state) |
 | `panels/` | Webview panels and their rendering logic |
+| `services/` | Cross-cutting services (artifact storage/actions) |
+| `ui/` | UI handlers for user-facing flows (artifact preview/download) |
 | `watch/` | Background polling for job status changes |
 | `formatters/` | Reusable display formatting functions |
 
@@ -391,8 +399,12 @@ export class JobTreeItem extends vscode.TreeItem {
 Use descriptive `contextValue` strings for menu contributions:
 
 - `environment` - Environment items (supports remove, refresh)
-- `jobUnwatched` / `jobWatched` - Job items (supports trigger, watch/unwatch)
+- `folder` / `multibranchFolder` - Folder items (supports branch filtering)
+- `jobItem` / `pipelineItem` - Job items (supports trigger, watch/unwatch, pin)
+- `watched` / `pinned` - Context flags appended to job/pipeline items
 - `buildRunning` / `build` - Build items (supports abort, view details)
+- `artifactFolder` / `artifactItem` - Artifact folders and artifact entries
+- `node` / `nodeOpenable` - Node items (openable nodes include a Jenkins URL)
 - `queueItem` - Queue items (supports cancel)
 
 ### Parent Tracking
@@ -655,6 +667,8 @@ The project uses Biome with these settings:
 5. Trigger a build and verify the notification and tree refresh
 6. Watch a job and confirm polling notifications work
 7. Open build details and verify log streaming for running builds
+8. Preview or download a build artifact from the tree
+9. Pin and unpin a job or pipeline and confirm ordering
 
 ## Commit & Pull Request Guidelines
 

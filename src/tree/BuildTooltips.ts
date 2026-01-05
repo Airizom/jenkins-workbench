@@ -161,9 +161,7 @@ function resolveParameterSummary(
   }
 
   const formatted = parameters.map((param) => {
-    const value = param.isMasked
-      ? options.parameterMaskValue
-      : formatParameterValue(param.value);
+    const value = param.isMasked ? options.parameterMaskValue : formatParameterValue(param.value);
     const truncated = truncateText(value, options.maxParameterValueLength).text;
     return `${param.name}=${truncated}`;
   });
@@ -278,9 +276,7 @@ function collectParameters(
   return results;
 }
 
-function isActionWithCauses(
-  action: BuildAction | null
-): action is { causes: JenkinsBuildCause[] } {
+function isActionWithCauses(action: BuildAction | null): action is { causes: JenkinsBuildCause[] } {
   if (!action) {
     return false;
   }

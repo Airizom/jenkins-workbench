@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { type PipelineRun, toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../jenkins/types";
@@ -10,6 +11,7 @@ import {
 import { formatError, formatResult } from "./buildDetails/BuildDetailsFormatters";
 import {
   type BuildDetailsOutgoingMessage,
+  isArtifactActionMessage,
   isOpenExternalMessage,
   isToggleFollowLogMessage
 } from "./buildDetails/BuildDetailsMessages";
@@ -30,6 +32,7 @@ export class BuildDetailsPanel {
   private readonly completionPoller: BuildDetailsCompletionPoller;
   private loadToken = 0;
   private dataService?: BuildDetailsDataService;
+  private artifactActionHandler?: ArtifactActionHandler;
   private environment?: JenkinsEnvironmentRef;
   private currentBuildUrl?: string;
   private currentDetails?: JenkinsBuildDetails;
@@ -46,6 +49,7 @@ export class BuildDetailsPanel {
 
   static async show(
     dataService: BuildDetailsDataService,
+    artifactActionHandler: ArtifactActionHandler,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     label?: string
@@ -65,7 +69,7 @@ export class BuildDetailsPanel {
 
     const activePanel = BuildDetailsPanel.currentPanel;
     activePanel.panel.reveal(undefined, true);
-    await activePanel.load(dataService, environment, buildUrl, label);
+    await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
 
   private constructor(panel: vscode.WebviewPanel) {
@@ -91,6 +95,10 @@ export class BuildDetailsPanel {
     );
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
+        if (isArtifactActionMessage(message)) {
+          void this.handleArtifactAction(message);
+          return;
+        }
         if (isOpenExternalMessage(message)) {
           void this.openExternalUrl(message.url);
           return;
@@ -117,6 +125,7 @@ export class BuildDetailsPanel {
 
   private async load(
     dataService: BuildDetailsDataService,
+    artifactActionHandler: ArtifactActionHandler,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     label?: string
@@ -126,6 +135,7 @@ export class BuildDetailsPanel {
     this.pollingController = undefined;
     this.stopCompletionPolling();
     this.dataService = dataService;
+    this.artifactActionHandler = artifactActionHandler;
     this.environment = environment;
     this.currentBuildUrl = buildUrl;
     this.currentDetails = undefined;
@@ -466,6 +476,33 @@ export class BuildDetailsPanel {
     if (selection === action && this.currentBuildUrl) {
       await vscode.env.openExternal(vscode.Uri.parse(this.currentBuildUrl));
     }
+  }
+
+  private async handleArtifactAction(message: {
+    action: "preview" | "download";
+    relativePath: string;
+    fileName?: string;
+  }): Promise<void> {
+    if (!this.artifactActionHandler || !this.environment || !this.currentBuildUrl) {
+      return;
+    }
+    const fileName =
+      typeof message.fileName === "string" && message.fileName.length > 0
+        ? message.fileName
+        : undefined;
+    const jobNameHint =
+      this.currentDetails?.fullDisplayName?.trim() ||
+      this.currentDetails?.displayName?.trim() ||
+      undefined;
+    await this.artifactActionHandler.handle({
+      action: message.action,
+      environment: this.environment,
+      buildUrl: this.currentBuildUrl,
+      buildNumber: this.currentDetails?.number,
+      relativePath: message.relativePath,
+      fileName,
+      jobNameHint
+    });
   }
 
   private async openExternalUrl(url: string): Promise<void> {

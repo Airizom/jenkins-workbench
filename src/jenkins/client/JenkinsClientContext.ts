@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders } from "node:http";
-import type { JenkinsPostResponse } from "../request";
+import type { JenkinsBufferResponse, JenkinsPostResponse, JenkinsStreamResponse } from "../request";
 
 export interface JenkinsClientContext {
   baseUrl: string;
@@ -7,6 +7,11 @@ export interface JenkinsClientContext {
   requestHeaders(url: string): Promise<IncomingHttpHeaders>;
   requestText(url: string): Promise<string>;
   requestTextWithHeaders(url: string): Promise<{ text: string; headers: IncomingHttpHeaders }>;
+  requestBufferWithHeaders(
+    url: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse>;
+  requestStream(url: string, options?: { maxBytes?: number }): Promise<JenkinsStreamResponse>;
   requestVoidWithCrumb(url: string, body?: string): Promise<void>;
   requestPostWithCrumb(url: string, body?: string): Promise<JenkinsPostResponse>;
 }

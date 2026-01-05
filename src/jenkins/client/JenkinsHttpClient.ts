@@ -3,9 +3,13 @@ import { buildAuthHeaders } from "../auth";
 import { JenkinsCrumbService } from "../crumbs";
 import { JenkinsRequestError } from "../errors";
 import {
+  type JenkinsBufferResponse,
   type JenkinsPostResponse,
+  type JenkinsStreamResponse,
+  requestBufferWithHeaders as requestBufferWithHeadersInternal,
   requestHeaders as requestHeadersInternal,
   requestJson as requestJsonInternal,
+  requestStream as requestStreamInternal,
   requestText as requestTextInternal,
   requestTextWithHeaders as requestTextWithHeadersInternal,
   requestVoidWithLocation as requestVoidWithLocationInternal
@@ -54,6 +58,32 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     url: string
   ): Promise<{ text: string; headers: IncomingHttpHeaders }> {
     return requestTextWithHeadersInternal(url, this.getRequestOptions());
+  }
+
+  async requestBufferWithHeaders(
+    url: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse> {
+    return this.requestWithCrumbRetry((crumbHeaders) =>
+      requestBufferWithHeadersInternal(url, {
+        ...this.getRequestOptions(),
+        headers: this.mergeHeaders(crumbHeaders),
+        maxBytes: options?.maxBytes
+      })
+    );
+  }
+
+  async requestStream(
+    url: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsStreamResponse> {
+    return this.requestWithCrumbRetry((crumbHeaders) =>
+      requestStreamInternal(url, {
+        ...this.getRequestOptions(),
+        headers: this.mergeHeaders(crumbHeaders),
+        maxBytes: options?.maxBytes
+      })
+    );
   }
 
   async requestVoidWithCrumb(url: string, body?: string): Promise<void> {
@@ -127,9 +157,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     };
   }
 
-  private mergeHeaders(
-    headers?: Record<string, string>
-  ): Record<string, string> | undefined {
+  private mergeHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
     const baseHeaders = this.baseHeaders;
     if (!baseHeaders || Object.keys(baseHeaders).length === 0) {
       return headers;
@@ -141,5 +169,36 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       ...baseHeaders,
       ...headers
     };
+  }
+
+  private async requestWithCrumbRetry<T>(
+    requestFn: (headers?: Record<string, string>) => Promise<T>
+  ): Promise<T> {
+    const crumbHeader = await this.crumbService.getCrumbHeader();
+    const headers = crumbHeader
+      ? {
+          [crumbHeader.field]: crumbHeader.value
+        }
+      : undefined;
+
+    try {
+      return await requestFn(headers);
+    } catch (error) {
+      if (error instanceof JenkinsRequestError) {
+        if (error.statusCode === 401 || error.statusCode === 403) {
+          this.crumbService.invalidate();
+        }
+        if (error.statusCode === 403) {
+          const refreshed = await this.crumbService.getCrumbHeader(true);
+          if (refreshed) {
+            const retryHeaders = {
+              [refreshed.field]: refreshed.value
+            };
+            return await requestFn(retryHeaders);
+          }
+        }
+      }
+      throw error;
+    }
   }
 }

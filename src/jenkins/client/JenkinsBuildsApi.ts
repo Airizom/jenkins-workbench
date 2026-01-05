@@ -4,10 +4,12 @@ import type {
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
   JenkinsProgressiveConsoleText,
+  JenkinsArtifact,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../types";
-import { buildActionUrl, buildApiUrlFromItem } from "../urls";
+import { buildActionUrl, buildApiUrlFromItem, buildArtifactDownloadUrl } from "../urls";
+import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 
 export class JenkinsBuildsApi {
@@ -32,6 +34,12 @@ export class JenkinsBuildsApi {
     const tree = this.buildBuildDetailsTree(options);
     const url = buildApiUrlFromItem(buildUrl, tree);
     return this.context.requestJson<JenkinsBuildDetails>(url);
+  }
+
+  async getBuildArtifacts(buildUrl: string): Promise<JenkinsArtifact[]> {
+    const url = buildApiUrlFromItem(buildUrl, "artifacts[fileName,relativePath]");
+    const response = await this.context.requestJson<{ artifacts?: JenkinsArtifact[] }>(url);
+    return Array.isArray(response.artifacts) ? response.artifacts : [];
   }
 
   private buildBuildsTree(options?: {
@@ -98,6 +106,24 @@ export class JenkinsBuildsApi {
   async getWorkflowRun(buildUrl: string): Promise<JenkinsWorkflowRun> {
     const url = buildActionUrl(buildUrl, "wfapi/describe");
     return this.context.requestJson<JenkinsWorkflowRun>(url);
+  }
+
+  async getArtifact(
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse> {
+    const url = buildArtifactDownloadUrl(buildUrl, relativePath);
+    return this.context.requestBufferWithHeaders(url, options);
+  }
+
+  async getArtifactStream(
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsStreamResponse> {
+    const url = buildArtifactDownloadUrl(buildUrl, relativePath);
+    return this.context.requestStream(url, options);
   }
 
   async getConsoleText(buildUrl: string, maxChars?: number): Promise<JenkinsConsoleText> {

@@ -35,8 +35,8 @@ export interface BuildFailureFailedTest {
 
 export interface BuildFailureArtifact {
   name: string;
-  openUrl: string;
-  downloadUrl: string;
+  fileName?: string;
+  relativePath: string;
 }
 
 export interface PipelineStageStepViewModel {
@@ -288,17 +288,27 @@ function isFailedTestCase(status?: string): boolean {
 }
 
 function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {
-  if (!details?.url || !details.artifacts || details.artifacts.length === 0) {
+  if (!details?.artifacts || details.artifacts.length === 0) {
     return [];
   }
-  const baseUrl = ensureTrailingSlash(details.url);
-  return details.artifacts.map((artifact) => {
-    const name = artifact.fileName || artifact.relativePath || "Artifact";
-    const encodedPath = encodeArtifactPath(artifact.relativePath);
-    const downloadUrl = new URL(`artifact/${encodedPath}`, baseUrl).toString();
-    const openUrl = new URL(`artifact/${encodedPath}/*view*/`, baseUrl).toString();
-    return { name, openUrl, downloadUrl };
-  });
+  const items: BuildFailureArtifact[] = [];
+  for (const artifact of details.artifacts) {
+    const relativePath = (artifact.relativePath ?? "").trim();
+    if (!relativePath) {
+      continue;
+    }
+    const fileName = artifact.fileName?.trim();
+    const name = fileName || relativePath || "Artifact";
+    const entry: BuildFailureArtifact = {
+      name,
+      relativePath
+    };
+    if (fileName) {
+      entry.fileName = fileName;
+    }
+    items.push(entry);
+  }
+  return items;
 }
 
 export function buildPipelineStagesViewModel(pipelineRun?: PipelineRun): PipelineStageViewModel[] {
@@ -383,15 +393,4 @@ function pickNumber(primary?: number, fallback?: number): number | undefined {
     return fallback;
   }
   return undefined;
-}
-
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
-}
-
-function encodeArtifactPath(path: string): string {
-  return path
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
 }

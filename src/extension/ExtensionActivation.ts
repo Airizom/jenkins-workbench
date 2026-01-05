@@ -1,4 +1,4 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import { registerExtensionCommands } from "./ExtensionCommands";
@@ -7,6 +7,7 @@ import {
   getBuildListFetchOptions,
   getBuildTooltipOptions,
   getCacheTtlMs,
+  getArtifactActionOptions,
   getExtensionConfiguration,
   getMaxCacheEntries,
   getPollIntervalSeconds,
@@ -28,13 +29,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const requestTimeoutMs = getRequestTimeoutMs(config);
   const buildTooltipOptions = getBuildTooltipOptions(config);
   const buildListFetchOptions = getBuildListFetchOptions(config);
+  const artifactActionOptionsProvider = (
+    workspaceFolder: vscode.WorkspaceFolder
+  ): { downloadRoot: string; maxBytes?: number } => {
+    const folderConfig = vscode.workspace.getConfiguration("jenkinsWorkbench", workspaceFolder.uri);
+    return getArtifactActionOptions(folderConfig);
+  };
 
   const services = createExtensionServices(context, {
     cacheTtlMs,
     maxCacheEntries,
     requestTimeoutMs,
     buildTooltipOptions,
-    buildListFetchOptions
+    buildListFetchOptions,
+    artifactActionOptionsProvider
   });
   try {
     await services.environmentStore.migrateLegacyAuthConfigs();
@@ -75,6 +83,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     pinStore: services.pinStore,
     clientProvider: services.clientProvider,
     dataService: services.dataService,
+    artifactActionHandler: services.artifactActionHandler,
     viewStateStore: services.viewStateStore,
     treeNavigator: services.treeNavigator,
     treeDataProvider: services.treeDataProvider,

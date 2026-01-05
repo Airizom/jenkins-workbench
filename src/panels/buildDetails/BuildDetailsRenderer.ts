@@ -492,12 +492,12 @@ function renderArtifactItems(items: BuildDetailsViewModel["insights"]["artifacts
       (item) => `<li class="artifact-item">
           <div class="artifact-name">${escapeHtml(item.name)}</div>
           <div class="artifact-actions">
-            <a class="artifact-link" href="#" data-external-url="${escapeHtml(
-              item.openUrl
-            )}">Open</a>
-            <a class="artifact-link" href="#" data-external-url="${escapeHtml(
-              item.downloadUrl
-            )}">Download</a>
+            <a class="artifact-link" href="#" data-artifact-action="preview" data-artifact-path="${escapeHtml(
+              item.relativePath
+            )}" data-artifact-name="${escapeHtml(item.fileName ?? "")}">Preview</a>
+            <a class="artifact-link" href="#" data-artifact-action="download" data-artifact-path="${escapeHtml(
+              item.relativePath
+            )}" data-artifact-name="${escapeHtml(item.fileName ?? "")}">Download</a>
           </div>
         </li>`
     )

@@ -1,4 +1,5 @@
 import type {
+  JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsJob,
@@ -26,6 +27,7 @@ import type {
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
 import { JenkinsRequestError } from "./errors";
 import type { JenkinsTestReport } from "./types";
+import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import { resolveNodeUrl } from "./urls";
 
 export type {
@@ -175,15 +177,19 @@ export class JenkinsDataService {
     }
   }
 
+  async getBuildArtifacts(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsArtifact[]> {
+    const client = await this.clientProvider.getClient(environment);
+    return client.getBuildArtifacts(buildUrl);
+  }
+
   async getWorkflowRun(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsWorkflowRun | undefined> {
-    const unsupportedKey = await this.buildCacheKey(
-      environment,
-      "wfapi-unsupported",
-      buildUrl
-    );
+    const unsupportedKey = await this.buildCacheKey(environment, "wfapi-unsupported", buildUrl);
     if (this.cache.has(unsupportedKey)) {
       return undefined;
     }
@@ -197,6 +203,26 @@ export class JenkinsDataService {
       }
       throw toBuildActionError(error);
     }
+  }
+
+  async getArtifact(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse> {
+    const client = await this.clientProvider.getClient(environment);
+    return client.getArtifact(buildUrl, relativePath, options);
+  }
+
+  async getArtifactStream(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsStreamResponse> {
+    const client = await this.clientProvider.getClient(environment);
+    return client.getArtifactStream(buildUrl, relativePath, options);
   }
 
   async getConsoleText(

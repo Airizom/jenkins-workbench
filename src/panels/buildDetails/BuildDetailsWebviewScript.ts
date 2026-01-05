@@ -260,12 +260,16 @@ export function renderBuildDetailsScript(nonce: string): string {
               const open = document.createElement("a");
               open.className = "artifact-link";
               open.href = "#";
-              open.dataset.externalUrl = item.openUrl || "";
-              open.textContent = "Open";
+              open.dataset.artifactAction = "preview";
+              open.dataset.artifactPath = item.relativePath || "";
+              open.dataset.artifactName = item.fileName || "";
+              open.textContent = "Preview";
               const download = document.createElement("a");
               download.className = "artifact-link";
               download.href = "#";
-              download.dataset.externalUrl = item.downloadUrl || "";
+              download.dataset.artifactAction = "download";
+              download.dataset.artifactPath = item.relativePath || "";
+              download.dataset.artifactName = item.fileName || "";
               download.textContent = "Download";
               actions.appendChild(open);
               actions.appendChild(download);
@@ -732,16 +736,32 @@ export function renderBuildDetailsScript(nonce: string): string {
           if (!(target instanceof HTMLElement)) {
             return;
           }
+          const artifactLink = target.closest("a[data-artifact-action]");
+          if (artifactLink) {
+            const action = artifactLink.dataset.artifactAction;
+            const relativePath = artifactLink.dataset.artifactPath;
+            const fileName = artifactLink.dataset.artifactName;
+            if (!action || !relativePath) {
+              return;
+            }
+            event.preventDefault();
+            vscode.postMessage({
+              type: "artifactAction",
+              action,
+              relativePath,
+              fileName
+            });
+            return;
+          }
           const link = target.closest("a[data-external-url]");
-          if (!link) {
-            return;
+          if (link) {
+            const url = link.dataset.externalUrl;
+            if (!url) {
+              return;
+            }
+            event.preventDefault();
+            vscode.postMessage({ type: "openExternal", url });
           }
-          const url = link.dataset.externalUrl;
-          if (!url) {
-            return;
-          }
-          event.preventDefault();
-          vscode.postMessage({ type: "openExternal", url });
         });
 
         window.addEventListener("message", (event) => {

@@ -68,7 +68,11 @@ export class JenkinsPinStore {
     await this.savePins(scope, entries);
   }
 
-  async removePin(scope: EnvironmentScope, environmentId: string, jobUrl: string): Promise<boolean> {
+  async removePin(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string
+  ): Promise<boolean> {
     const entries = await this.getPins(scope);
     const next = entries.filter(
       (entry) => entry.environmentId !== environmentId || entry.jobUrl !== jobUrl

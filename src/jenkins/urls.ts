@@ -28,6 +28,26 @@ export function buildActionUrl(itemUrl: string, action: string): string {
   return url.toString();
 }
 
+export function encodePathSegments(path: string): string {
+  return path
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+export function buildArtifactDownloadUrl(buildUrl: string, relativePath: string): string {
+  const base = ensureTrailingSlash(buildUrl);
+  const encodedPath = encodePathSegments(relativePath);
+  return new URL(`artifact/${encodedPath}`, base).toString();
+}
+
+export function buildArtifactViewUrl(buildUrl: string, relativePath: string): string {
+  const base = ensureTrailingSlash(buildUrl);
+  const encodedPath = encodePathSegments(relativePath);
+  return new URL(`artifact/${encodedPath}/*view*/`, base).toString();
+}
+
 export function resolveNodeUrl(baseUrl: string, node: JenkinsNode): string | undefined {
   const base = ensureTrailingSlash(baseUrl);
   let resolvedUrl: string | undefined;

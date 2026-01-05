@@ -69,10 +69,7 @@ export class JenkinsClientProvider {
       return cachedSignature.authSignature;
     }
 
-    const authConfig = await this.store.getAuthConfig(
-      environment.scope,
-      environment.environmentId
-    );
+    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
     const token = authConfig
       ? undefined
       : await this.store.getToken(environment.scope, environment.environmentId);
@@ -94,10 +91,7 @@ export class JenkinsClientProvider {
       environment.scope,
       environment.environmentId
     );
-    const authConfig = await this.store.getAuthConfig(
-      environment.scope,
-      environment.environmentId
-    );
+    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
     const token = authConfig
       ? undefined
       : await this.store.getToken(environment.scope, environment.environmentId);

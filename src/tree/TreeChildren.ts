@@ -1,5 +1,7 @@
 import { formatScopeLabel } from "../formatters/ScopeFormatters";
 import {
+  ArtifactTreeItem,
+  BuildArtifactsFolderTreeItem,
   BuildQueueFolderTreeItem,
   BuildTreeItem,
   EnvironmentGroupTreeItem,
@@ -110,7 +112,26 @@ export class JenkinsTreeChildrenLoader {
     }
 
     if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
-      return await this.loadBuildsForJob(element.environment, element.jobUrl);
+      return await this.loadBuildsForJob(
+        element.environment,
+        element.jobUrl,
+        getTreeItemLabel(element.label)
+      );
+    }
+
+    if (element instanceof BuildTreeItem) {
+      return [
+        new BuildArtifactsFolderTreeItem(
+          element.environment,
+          element.buildUrl,
+          element.buildNumber,
+          element.jobNameHint
+        )
+      ];
+    }
+
+    if (element instanceof BuildArtifactsFolderTreeItem) {
+      return await this.loadArtifactsForBuild(element);
     }
 
     if (element instanceof NodesFolderTreeItem) {
@@ -220,7 +241,8 @@ export class JenkinsTreeChildrenLoader {
 
   private async loadBuildsForJob(
     environment: JenkinsEnvironmentRef,
-    jobUrl: string
+    jobUrl: string,
+    jobNameHint?: string
   ): Promise<WorkbenchTreeElement[]> {
     try {
       const builds = await this.dataService.getBuildsForJob(
@@ -238,7 +260,9 @@ export class JenkinsTreeChildrenLoader {
           )
         ];
       }
-      return builds.map((build) => new BuildTreeItem(environment, build, this.buildTooltipOptions));
+      return builds.map(
+        (build) => new BuildTreeItem(environment, build, this.buildTooltipOptions, jobNameHint)
+      );
     } catch (error) {
       return [this.createErrorPlaceholder("Unable to load builds.", error)];
     }
@@ -269,6 +293,45 @@ export class JenkinsTreeChildrenLoader {
       return this.mapQueueItemsToTreeItems(environment, items);
     } catch (error) {
       return [this.createErrorPlaceholder("Unable to load build queue.", error)];
+    }
+  }
+
+  private async loadArtifactsForBuild(
+    folder: BuildArtifactsFolderTreeItem
+  ): Promise<WorkbenchTreeElement[]> {
+    try {
+      const artifacts = await this.dataService.getBuildArtifacts(
+        folder.environment,
+        folder.buildUrl
+      );
+      if (artifacts.length === 0) {
+        return [new PlaceholderTreeItem("No artifacts available.", undefined, "empty")];
+      }
+      const items = artifacts
+        .map((artifact) => {
+          const relativePath = (artifact.relativePath ?? "").trim();
+          if (!relativePath) {
+            return undefined;
+          }
+          const fileName = artifact.fileName?.trim();
+          return new ArtifactTreeItem(
+            folder.environment,
+            folder.buildUrl,
+            folder.buildNumber,
+            relativePath,
+            fileName || undefined,
+            folder.jobNameHint
+          );
+        })
+        .filter((item): item is ArtifactTreeItem => Boolean(item));
+
+      if (items.length === 0) {
+        return [new PlaceholderTreeItem("No artifacts available.", undefined, "empty")];
+      }
+
+      return items;
+    } catch (error) {
+      return [this.createErrorPlaceholder("Unable to load artifacts.", error)];
     }
   }
 
@@ -319,14 +382,7 @@ export class JenkinsTreeChildrenLoader {
             isPinned
           );
         default:
-          return new JobTreeItem(
-            environment,
-            job.name,
-            job.url,
-            job.color,
-            isWatched,
-            isPinned
-          );
+          return new JobTreeItem(environment, job.name, job.url, job.color, isWatched, isPinned);
       }
     });
   }
@@ -361,10 +417,7 @@ export class JenkinsTreeChildrenLoader {
     return pinned;
   }
 
-  private orderPinnedJobsFirst(
-    jobs: JenkinsJobInfo[],
-    pinnedJobs: Set<string>
-  ): JenkinsJobInfo[] {
+  private orderPinnedJobsFirst(jobs: JenkinsJobInfo[], pinnedJobs: Set<string>): JenkinsJobInfo[] {
     if (pinnedJobs.size === 0) {
       return jobs;
     }
@@ -399,4 +452,14 @@ export class JenkinsTreeChildrenLoader {
     const message = error instanceof Error ? error.message : "Unexpected error.";
     return new PlaceholderTreeItem(label, message, "error");
   }
+}
+
+function getTreeItemLabel(label: string | { label: string } | undefined): string | undefined {
+  if (!label) {
+    return undefined;
+  }
+  if (typeof label === "string") {
+    return label;
+  }
+  return typeof label.label === "string" ? label.label : undefined;
 }

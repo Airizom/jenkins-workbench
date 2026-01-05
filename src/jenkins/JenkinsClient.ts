@@ -4,7 +4,10 @@ import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
 import { JenkinsRequestError } from "./errors";
+import type { JenkinsBufferResponse } from "./request";
+import type { JenkinsStreamResponse } from "./request";
 import type {
+  JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsClientOptions,
@@ -26,6 +29,7 @@ export type {
   JenkinsBuildCause,
   JenkinsBuildParameter,
   JenkinsBuildDetails,
+  JenkinsArtifact,
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
@@ -85,6 +89,10 @@ export class JenkinsClient {
     return this.buildsApi.getBuildDetails(buildUrl, options);
   }
 
+  async getBuildArtifacts(buildUrl: string): Promise<JenkinsArtifact[]> {
+    return this.buildsApi.getBuildArtifacts(buildUrl);
+  }
+
   async getConsoleText(buildUrl: string, maxChars?: number): Promise<JenkinsConsoleText> {
     return this.buildsApi.getConsoleText(buildUrl, maxChars);
   }
@@ -110,6 +118,22 @@ export class JenkinsClient {
 
   async getWorkflowRun(buildUrl: string): Promise<JenkinsWorkflowRun> {
     return this.buildsApi.getWorkflowRun(buildUrl);
+  }
+
+  async getArtifact(
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse> {
+    return this.buildsApi.getArtifact(buildUrl, relativePath, options);
+  }
+
+  async getArtifactStream(
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsStreamResponse> {
+    return this.buildsApi.getArtifactStream(buildUrl, relativePath, options);
   }
 
   async getNodes(): Promise<JenkinsNode[]> {

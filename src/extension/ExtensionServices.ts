@@ -1,6 +1,14 @@
 import * as vscode from "vscode";
 import { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { ArtifactActionService } from "../services/ArtifactActionService";
+import { createFileArtifactFilesystem } from "../services/ArtifactFilesystem";
+import { ArtifactStorageService } from "../services/ArtifactStorageService";
+import {
+  DefaultArtifactActionHandler,
+  type ArtifactActionHandler,
+  type ArtifactActionOptionsProvider
+} from "../ui/ArtifactActionHandler";
 import { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
@@ -16,6 +24,8 @@ export interface ExtensionServices {
   environmentStore: JenkinsEnvironmentStore;
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
+  artifactStorageService: ArtifactStorageService;
+  artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
   viewStateStore: JenkinsViewStateStore;
@@ -31,6 +41,7 @@ export interface ExtensionServicesOptions {
   requestTimeoutMs: number;
   buildTooltipOptions: BuildTooltipOptions;
   buildListFetchOptions: BuildListFetchOptions;
+  artifactActionOptionsProvider: ArtifactActionOptionsProvider;
 }
 
 const VIEW_ID = "jenkinsWorkbench.tree";
@@ -47,6 +58,15 @@ export function createExtensionServices(
     cacheTtlMs: options.cacheTtlMs,
     maxCacheEntries: options.maxCacheEntries
   });
+  const artifactStorageService = new ArtifactStorageService(
+    dataService,
+    createFileArtifactFilesystem()
+  );
+  const artifactActionService = new ArtifactActionService(artifactStorageService);
+  const artifactActionHandler = new DefaultArtifactActionHandler(
+    artifactActionService,
+    options.artifactActionOptionsProvider
+  );
   const watchStore = new JenkinsWatchStore(context);
   const pinStore = new JenkinsPinStore(context);
   const viewStateStore = new JenkinsViewStateStore(context);
@@ -69,6 +89,8 @@ export function createExtensionServices(
     environmentStore,
     clientProvider,
     dataService,
+    artifactStorageService,
+    artifactActionHandler,
     watchStore,
     pinStore,
     viewStateStore,

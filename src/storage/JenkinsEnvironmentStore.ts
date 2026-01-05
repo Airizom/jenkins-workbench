@@ -111,10 +111,7 @@ export class JenkinsEnvironmentStore {
     await this.context.secrets.delete(this.getAuthConfigKey(scope, id));
   }
 
-  async getAuthConfig(
-    scope: EnvironmentScope,
-    id: string
-  ): Promise<JenkinsAuthConfig | undefined> {
+  async getAuthConfig(scope: EnvironmentScope, id: string): Promise<JenkinsAuthConfig | undefined> {
     const stored = await this.context.secrets.get(this.getAuthConfigKey(scope, id));
     if (!stored) {
       return undefined;
