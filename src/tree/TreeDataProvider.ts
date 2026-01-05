@@ -6,6 +6,7 @@ import type {
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import type { BuildTooltipOptions } from "./BuildTooltips";
@@ -41,6 +42,7 @@ export class JenkinsWorkbenchTreeDataProvider
     store: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
     watchStore: JenkinsWatchStore,
+    pinStore: JenkinsPinStore,
     treeFilter: JenkinsTreeFilter,
     buildTooltipOptions: BuildTooltipOptions,
     buildListFetchOptions: BuildListFetchOptions
@@ -49,6 +51,7 @@ export class JenkinsWorkbenchTreeDataProvider
       store,
       dataService,
       watchStore,
+      pinStore,
       treeFilter,
       BUILD_LIMIT,
       buildTooltipOptions,
@@ -65,6 +68,7 @@ export class JenkinsWorkbenchTreeDataProvider
     this.lastManualRefreshAt = now;
     this.dataService.clearCache();
     this.childrenLoader.clearWatchCacheForEnvironment();
+    this.childrenLoader.clearPinCacheForEnvironment();
     this._onDidChangeTreeData.fire(undefined);
   }
 
@@ -93,9 +97,11 @@ export class JenkinsWorkbenchTreeDataProvider
     if (environmentId) {
       this.dataService.clearCacheForEnvironment(environmentId);
       this.childrenLoader.clearWatchCacheForEnvironment(environmentId);
+      this.childrenLoader.clearPinCacheForEnvironment(environmentId);
     } else {
       this.dataService.clearCache();
       this.childrenLoader.clearWatchCacheForEnvironment();
+      this.childrenLoader.clearPinCacheForEnvironment();
     }
     this.scheduleRefresh(undefined);
   }

@@ -72,6 +72,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerExtensionCommands(context, {
     environmentStore: services.environmentStore,
     watchStore: services.watchStore,
+    pinStore: services.pinStore,
     clientProvider: services.clientProvider,
     dataService: services.dataService,
     viewStateStore: services.viewStateStore,

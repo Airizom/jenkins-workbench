@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
@@ -16,6 +17,7 @@ export interface ExtensionServices {
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
   watchStore: JenkinsWatchStore;
+  pinStore: JenkinsPinStore;
   viewStateStore: JenkinsViewStateStore;
   treeFilter: JenkinsTreeFilter;
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
@@ -46,12 +48,14 @@ export function createExtensionServices(
     maxCacheEntries: options.maxCacheEntries
   });
   const watchStore = new JenkinsWatchStore(context);
+  const pinStore = new JenkinsPinStore(context);
   const viewStateStore = new JenkinsViewStateStore(context);
   const treeFilter = new JenkinsTreeFilter(viewStateStore);
   const treeDataProvider = new JenkinsWorkbenchTreeDataProvider(
     environmentStore,
     dataService,
     watchStore,
+    pinStore,
     treeFilter,
     options.buildTooltipOptions,
     options.buildListFetchOptions
@@ -66,6 +70,7 @@ export function createExtensionServices(
     clientProvider,
     dataService,
     watchStore,
+    pinStore,
     viewStateStore,
     treeFilter,
     treeDataProvider,

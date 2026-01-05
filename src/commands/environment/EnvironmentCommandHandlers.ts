@@ -9,6 +9,7 @@ import type {
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../../storage/JenkinsEnvironmentStore";
+import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
 import {
@@ -136,6 +137,7 @@ export async function addEnvironment(
 export async function removeEnvironment(
   store: JenkinsEnvironmentStore,
   watchStore: JenkinsWatchStore,
+  pinStore: JenkinsPinStore,
   clientProvider: JenkinsClientProvider,
   refreshHost: EnvironmentCommandRefreshHost,
   item?: JenkinsEnvironmentRef
@@ -186,6 +188,7 @@ export async function removeEnvironment(
   const removed = await store.removeEnvironment(target.scope, target.id);
   if (removed) {
     await watchStore.removeWatchesForEnvironment(target.scope, target.id);
+    await pinStore.removePinsForEnvironment(target.scope, target.id);
     clientProvider.invalidateClient(target.scope, target.id);
     refreshHost.onEnvironmentRemoved?.({
       environmentId: target.id,

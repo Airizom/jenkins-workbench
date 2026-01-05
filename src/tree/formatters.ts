@@ -91,11 +91,11 @@ export function formatBuildDescription(build: JenkinsBuild): string {
     ) {
       const progressPercentRaw = Math.floor(((elapsedMs as number) / estimatedMs) * 100);
       const progressPercent = Math.max(0, Math.min(100, progressPercentRaw));
-      return `$(clock) ${elapsedLabel} / ~${estimatedLabel} • Running (${progressPercent}%)`;
+      return `${elapsedLabel} / ~${estimatedLabel} • Running (${progressPercent}%)`;
     }
 
     if (elapsedLabel) {
-      return `$(clock) ${elapsedLabel} • Running`;
+      return `${elapsedLabel} • Running`;
     }
 
     return "Running";
@@ -190,6 +190,7 @@ export function formatWatchedDescription(
 
   return `${status} • $(eye)`;
 }
+
 
 export function formatQueueItemDescription(
   position: number,

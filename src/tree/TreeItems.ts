@@ -139,17 +139,20 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
 
 export class JobTreeItem extends vscode.TreeItem {
   public readonly isWatched: boolean;
+  public readonly isPinned: boolean;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
     public readonly jobUrl: string,
     color?: string,
-    isWatched = false
+    isWatched = false,
+    isPinned = false
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.isWatched = isWatched;
-    this.contextValue = isWatched ? "jobWatched" : "jobUnwatched";
+    this.isPinned = isPinned;
+    this.contextValue = buildJobContextValue("jobItem", isWatched, isPinned);
     this.description = formatWatchedDescription(formatJobColor(color), isWatched);
     this.iconPath = jobIcon("job", color);
   }
@@ -157,20 +160,38 @@ export class JobTreeItem extends vscode.TreeItem {
 
 export class PipelineTreeItem extends vscode.TreeItem {
   public readonly isWatched: boolean;
+  public readonly isPinned: boolean;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
     public readonly jobUrl: string,
     color?: string,
-    isWatched = false
+    isWatched = false,
+    isPinned = false
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.isWatched = isWatched;
-    this.contextValue = isWatched ? "pipelineWatched" : "pipelineUnwatched";
+    this.isPinned = isPinned;
+    this.contextValue = buildJobContextValue("pipelineItem", isWatched, isPinned);
     this.description = formatWatchedDescription(formatJobColor(color), isWatched);
     this.iconPath = jobIcon("pipeline", color);
   }
+}
+
+function buildJobContextValue(
+  base: "jobItem" | "pipelineItem",
+  isWatched: boolean,
+  isPinned: boolean
+): string {
+  const parts: string[] = [base];
+  if (isPinned) {
+    parts.push("pinned");
+  }
+  if (isWatched) {
+    parts.push("watched");
+  }
+  return parts.join(" ");
 }
 
 export class BuildTreeItem extends vscode.TreeItem {

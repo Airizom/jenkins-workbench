@@ -123,6 +123,16 @@
         "title": "Jenkins Workbench: Unwatch Job"
       },
       {
+        "command": "jenkinsWorkbench.pinJob",
+        "title": "Jenkins Workbench: Pin Job",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "jenkinsWorkbench.unpinJob",
+        "title": "Jenkins Workbench: Unpin Job",
+        "icon": "$(pinned)"
+      },
+      {
         "command": "jenkinsWorkbench.refresh",
         "title": "Jenkins Workbench: Refresh",
         "icon": "$(refresh)"
@@ -285,37 +295,47 @@
         },
         {
           "command": "jenkinsWorkbench.triggerBuild",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "inline@0"
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "inline@1"
         },
         {
+          "command": "jenkinsWorkbench.pinJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)pinned(\\s|$)/)",
+          "group": "inline@2"
+        },
+        {
+          "command": "jenkinsWorkbench.unpinJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)pinned(\\s|$)/",
+          "group": "inline@2"
+        },
+        {
           "command": "jenkinsWorkbench.triggerBuild",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.openLastFailedBuild",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.watchJob",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == pipelineUnwatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)watched(\\s|$)/)",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.unwatchJob",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == jobWatched || viewItem == pipelineWatched)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)watched(\\s|$)/",
           "group": "navigation"
         },
         {

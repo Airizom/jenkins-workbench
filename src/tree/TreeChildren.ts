@@ -8,6 +8,7 @@ import type {
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import type { BuildTooltipOptions } from "./BuildTooltips";
@@ -33,11 +34,13 @@ import type { TreeChildrenOptions } from "./TreeTypes";
 
 export class JenkinsTreeChildrenLoader {
   private readonly watchedUrlsCache = new Map<string, Set<string>>();
+  private readonly pinnedUrlsCache = new Map<string, Set<string>>();
 
   constructor(
     private readonly store: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
     private readonly watchStore: JenkinsWatchStore,
+    private readonly pinStore: JenkinsPinStore,
     private readonly treeFilter: JenkinsTreeFilter,
     private readonly buildLimit: number,
     private buildTooltipOptions: BuildTooltipOptions,
@@ -129,6 +132,18 @@ export class JenkinsTreeChildrenLoader {
     for (const key of this.watchedUrlsCache.keys()) {
       if (key.endsWith(`:${environmentId}`)) {
         this.watchedUrlsCache.delete(key);
+      }
+    }
+  }
+
+  clearPinCacheForEnvironment(environmentId?: string): void {
+    if (!environmentId) {
+      this.pinnedUrlsCache.clear();
+      return;
+    }
+    for (const key of this.pinnedUrlsCache.keys()) {
+      if (key.endsWith(`:${environmentId}`)) {
+        this.pinnedUrlsCache.delete(key);
       }
     }
   }
@@ -270,7 +285,10 @@ export class JenkinsTreeChildrenLoader {
       return [new PlaceholderTreeItem("No jobs, folders, or pipelines found.", undefined, "empty")];
     }
 
-    const watchedJobs = await this.getWatchedJobUrls(environment);
+    const [watchedJobs, pinnedJobs] = await Promise.all([
+      this.getWatchedJobUrls(environment),
+      this.getPinnedJobUrls(environment)
+    ]);
     const filteredJobs = this.treeFilter.filterJobs(
       environment,
       jobs,
@@ -282,16 +300,33 @@ export class JenkinsTreeChildrenLoader {
       return [new PlaceholderTreeItem("No jobs match the current filters.", undefined, "empty")];
     }
 
-    return filteredJobs.map((job) => {
+    const orderedJobs = this.orderPinnedJobsFirst(filteredJobs, pinnedJobs);
+
+    return orderedJobs.map((job) => {
       const isWatched = watchedJobs.has(job.url);
+      const isPinned = pinnedJobs.has(job.url);
       switch (job.kind) {
         case "folder":
         case "multibranch":
           return new JenkinsFolderTreeItem(environment, job.name, job.url, job.kind);
         case "pipeline":
-          return new PipelineTreeItem(environment, job.name, job.url, job.color, isWatched);
+          return new PipelineTreeItem(
+            environment,
+            job.name,
+            job.url,
+            job.color,
+            isWatched,
+            isPinned
+          );
         default:
-          return new JobTreeItem(environment, job.name, job.url, job.color, isWatched);
+          return new JobTreeItem(
+            environment,
+            job.name,
+            job.url,
+            job.color,
+            isWatched,
+            isPinned
+          );
       }
     });
   }
@@ -309,6 +344,48 @@ export class JenkinsTreeChildrenLoader {
     );
     this.watchedUrlsCache.set(key, watched);
     return watched;
+  }
+
+  private async getPinnedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
+    const key = `${environment.scope}:${environment.environmentId}`;
+    const cached = this.pinnedUrlsCache.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const pinned = await this.pinStore.getPinnedJobUrls(
+      environment.scope,
+      environment.environmentId
+    );
+    this.pinnedUrlsCache.set(key, pinned);
+    return pinned;
+  }
+
+  private orderPinnedJobsFirst(
+    jobs: JenkinsJobInfo[],
+    pinnedJobs: Set<string>
+  ): JenkinsJobInfo[] {
+    if (pinnedJobs.size === 0) {
+      return jobs;
+    }
+
+    const pinned: JenkinsJobInfo[] = [];
+    const unpinned: JenkinsJobInfo[] = [];
+
+    for (const job of jobs) {
+      const isPinnable = job.kind === "job" || job.kind === "pipeline";
+      if (isPinnable && pinnedJobs.has(job.url)) {
+        pinned.push(job);
+      } else {
+        unpinned.push(job);
+      }
+    }
+
+    if (pinned.length === 0) {
+      return jobs;
+    }
+
+    return [...pinned, ...unpinned];
   }
 
   private mapQueueItemsToTreeItems(
