@@ -11,6 +11,7 @@ import type {
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsViewStateStore, JobFilterMode } from "../storage/JenkinsViewStateStore";
+import { formatJobColor } from "../tree/formatters";
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import type { JenkinsTreeNavigator } from "../tree/TreeNavigator";
 
@@ -109,10 +110,11 @@ async function goToJob(
           continue;
         }
         seenEntries.add(key);
+        const statusLabel = formatJobColor(entry.color) ?? "Unknown";
         picks.push({
           label: entry.name,
-          description: envRef.url,
-          detail: entry.fullName,
+          description: statusLabel,
+          detail: `${entry.fullName} • ${envRef.url}`,
           environment: envRef,
           entry
         });

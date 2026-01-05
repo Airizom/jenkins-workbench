@@ -52,15 +52,18 @@
       },
       {
         "command": "jenkinsWorkbench.triggerBuild",
-        "title": "Jenkins Workbench: Trigger Build"
+        "title": "Jenkins Workbench: Trigger Build",
+        "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.abortBuild",
-        "title": "Jenkins Workbench: Abort/Stop Build"
+        "title": "Jenkins Workbench: Abort/Stop Build",
+        "icon": "$(debug-stop)"
       },
       {
         "command": "jenkinsWorkbench.cancelQueueItem",
-        "title": "Jenkins Workbench: Cancel Queue Item"
+        "title": "Jenkins Workbench: Cancel Queue Item",
+        "icon": "$(close)"
       },
       {
         "command": "jenkinsWorkbench.replayBuild",
@@ -72,7 +75,8 @@
       },
       {
         "command": "jenkinsWorkbench.openInJenkins",
-        "title": "Jenkins Workbench: Open in Jenkins"
+        "title": "Jenkins Workbench: Open in Jenkins",
+        "icon": "$(link-external)"
       },
       {
         "command": "jenkinsWorkbench.goToJob",
@@ -243,6 +247,16 @@
         {
           "command": "jenkinsWorkbench.triggerBuild",
           "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "group": "inline@0"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
+          "group": "inline@1"
+        },
+        {
+          "command": "jenkinsWorkbench.triggerBuild",
+          "when": "view == jenkinsWorkbench.tree && (viewItem == jobUnwatched || viewItem == jobWatched || viewItem == pipelineUnwatched || viewItem == pipelineWatched)",
           "group": "navigation"
         },
         {
@@ -268,7 +282,17 @@
         {
           "command": "jenkinsWorkbench.abortBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem == buildRunning",
+          "group": "inline@0"
+        },
+        {
+          "command": "jenkinsWorkbench.abortBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem == buildRunning",
           "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.cancelQueueItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
+          "group": "inline@0"
         },
         {
           "command": "jenkinsWorkbench.cancelQueueItem",
@@ -323,7 +347,14 @@
           "name": "Jenkins Workbench"
         }
       ]
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "jenkinsWorkbench.tree",
+        "contents": "No Jenkins environments configured.\\n[Add Environment](command:jenkinsWorkbench.addEnvironment)",
+        "when": "jenkinsWorkbench.noEnvironments"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

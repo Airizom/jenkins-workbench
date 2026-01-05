@@ -14,6 +14,7 @@ import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
 import type { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
+import { syncNoEnvironmentsContext } from "./contextKeys";
 
 export interface ExtensionCommandDependencies {
   environmentStore: JenkinsEnvironmentStore;
@@ -51,6 +52,7 @@ export function registerExtensionCommands(
     refreshEnvironment: (environmentId?: string) => {
       dependencies.treeDataProvider.onEnvironmentChanged(environmentId);
       void updateQueueEnvironment(environmentId);
+      void syncNoEnvironmentsContext(dependencies.environmentStore);
     },
     onEnvironmentRemoved: (environment: JenkinsEnvironmentRef) =>
       dependencies.queuePoller.clearEnvironment(environment)

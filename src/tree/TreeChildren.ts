@@ -45,6 +45,10 @@ export class JenkinsTreeChildrenLoader {
     options?: TreeChildrenOptions
   ): Promise<WorkbenchTreeElement[]> {
     if (!element) {
+      const environments = await this.store.listEnvironmentsWithScope();
+      if (environments.length === 0) {
+        return [];
+      }
       return [
         new RootSectionTreeItem("Jenkins Instances", "instances"),
         new RootSectionTreeItem("Settings", "settings")

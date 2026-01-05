@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import { registerExtensionCommands } from "./ExtensionCommands";
+import { syncNoEnvironmentsContext } from "./contextKeys";
 import {
   getCacheTtlMs,
   getExtensionConfiguration,
@@ -34,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } catch (error) {
     console.warn("Failed to migrate legacy Jenkins auth config.", error);
   }
+  await syncNoEnvironmentsContext(services.environmentStore);
   const notifier = new VscodeStatusNotifier();
   const poller = new JenkinsStatusPoller(
     services.environmentStore,
