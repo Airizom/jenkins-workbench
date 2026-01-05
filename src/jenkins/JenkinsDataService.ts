@@ -77,8 +77,9 @@ export class JenkinsDataService {
   }
 
   async getJobsForEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsJobInfo[]> {
+    const cacheKey = await this.buildCacheKey(environment, "jobs");
     return this.cache.getOrLoad(
-      this.cache.buildKey(environment, "jobs"),
+      cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
         const jobs = await client.getRootJobs();
@@ -92,8 +93,9 @@ export class JenkinsDataService {
     environment: JenkinsEnvironmentRef,
     folderUrl: string
   ): Promise<JenkinsJobInfo[]> {
+    const cacheKey = await this.buildCacheKey(environment, "folder", folderUrl);
     return this.cache.getOrLoad(
-      this.cache.buildKey(environment, "folder", folderUrl),
+      cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
         const jobs = await client.getFolderJobs(folderUrl);
@@ -124,8 +126,9 @@ export class JenkinsDataService {
     jobUrl: string,
     limit: number
   ): Promise<JenkinsBuild[]> {
+    const cacheKey = await this.buildCacheKey(environment, "builds", jobUrl);
     return this.cache.getOrLoad(
-      this.cache.buildKey(environment, "builds", jobUrl),
+      cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
         return client.getBuilds(jobUrl, limit);
@@ -138,7 +141,7 @@ export class JenkinsDataService {
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsBuildDetails> {
-    const cacheKey = this.cache.buildKey(environment, "build-details", buildUrl);
+    const cacheKey = await this.buildCacheKey(environment, "build-details", buildUrl);
     const cached = this.cache.get<JenkinsBuildDetails>(cacheKey);
     if (cached && !cached.building) {
       return cached;
@@ -162,7 +165,11 @@ export class JenkinsDataService {
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsWorkflowRun | undefined> {
-    const unsupportedKey = this.cache.buildKey(environment, "wfapi-unsupported", buildUrl);
+    const unsupportedKey = await this.buildCacheKey(
+      environment,
+      "wfapi-unsupported",
+      buildUrl
+    );
     if (this.cache.has(unsupportedKey)) {
       return undefined;
     }
@@ -245,8 +252,9 @@ export class JenkinsDataService {
   }
 
   async getNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNode[]> {
+    const cacheKey = await this.buildCacheKey(environment, "nodes");
     return this.cache.getOrLoad(
-      this.cache.buildKey(environment, "nodes"),
+      cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
         return client.getNodes();
@@ -269,8 +277,9 @@ export class JenkinsDataService {
     environment: JenkinsEnvironmentRef,
     jobUrl: string
   ): Promise<JobParameter[]> {
+    const cacheKey = await this.buildCacheKey(environment, "parameters", jobUrl);
     return this.cache.getOrLoad(
-      this.cache.buildKey(environment, "parameters", jobUrl),
+      cacheKey,
       async () => {
         const client = await this.clientProvider.getClient(environment);
         try {
@@ -331,6 +340,15 @@ export class JenkinsDataService {
     } catch (error) {
       throw toBuildActionError(error);
     }
+  }
+
+  private async buildCacheKey(
+    environment: JenkinsEnvironmentRef,
+    kind: string,
+    path?: string
+  ): Promise<string> {
+    const authSignature = await this.clientProvider.getAuthSignature(environment);
+    return this.cache.buildKey(environment, kind, path, authSignature);
   }
 
   private mapJobParameter(parameter: JenkinsParameterDefinition): JobParameter {

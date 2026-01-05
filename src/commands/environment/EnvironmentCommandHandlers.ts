@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsAuthConfig } from "../../jenkins/types";
 import type {
   EnvironmentScope,
   JenkinsEnvironment,
@@ -10,7 +11,12 @@ import type {
 } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
-import { promptOptionalInput, promptRequiredInput, promptScope } from "./EnvironmentPrompts";
+import {
+  promptAuthMode,
+  promptHeadersJson,
+  promptRequiredInput,
+  promptScope
+} from "./EnvironmentPrompts";
 
 function normalizeJenkinsUrl(url: string): string {
   let normalized = url.trim();
@@ -63,35 +69,67 @@ export async function addEnvironment(
     return;
   }
 
-  const username = await promptOptionalInput("Username (optional)");
-  if (username === undefined) {
+  const authMode = await promptAuthMode();
+  if (!authMode) {
     return;
   }
 
-  const token = await promptOptionalInput("API Token (optional)", undefined, true);
-  if (token === undefined) {
-    return;
-  }
+  let authConfig: JenkinsAuthConfig | undefined;
 
-  const normalizedUsername = username.trim();
-  const normalizedToken = token.trim();
-
-  if (normalizedToken.length > 0 && normalizedUsername.length === 0) {
-    void vscode.window.showErrorMessage("Username is required when an API token is provided.");
-    return;
+  if (authMode === "basic") {
+    const authUsername = await promptRequiredInput("Username");
+    if (!authUsername) {
+      return;
+    }
+    const authToken = await promptRequiredInput("API Token", undefined, true);
+    if (!authToken) {
+      return;
+    }
+    authConfig = {
+      type: "basic",
+      username: authUsername,
+      token: authToken
+    };
+  } else if (authMode === "bearer") {
+    const token = await promptRequiredInput("Bearer Token", undefined, true);
+    if (!token) {
+      return;
+    }
+    authConfig = {
+      type: "bearer",
+      token
+    };
+  } else if (authMode === "cookie") {
+    const cookie = await promptRequiredInput("Cookie Header Value", undefined, true);
+    if (!cookie) {
+      return;
+    }
+    authConfig = {
+      type: "cookie",
+      cookie
+    };
+  } else if (authMode === "headers") {
+    const headers = await promptHeadersJson();
+    if (!headers) {
+      return;
+    }
+    authConfig = {
+      type: "headers",
+      headers
+    };
+  } else {
+    authConfig = { type: "none" };
   }
 
   const environment: JenkinsEnvironment = {
     id: crypto.randomUUID(),
-    url,
-    username: normalizedUsername.length > 0 ? normalizedUsername : undefined
+    url
   };
 
-  await store.addEnvironment(
-    scope,
-    environment,
-    normalizedToken.length > 0 ? normalizedToken : undefined
-  );
+  await store.addEnvironment(scope, environment);
+  if (authConfig) {
+    await store.setAuthConfig(scope, environment.id, authConfig);
+  }
   refreshHost.refreshEnvironment(environment.id);
 }
 

@@ -15,7 +15,7 @@ import { createExtensionServices } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
 import { VscodeStatusNotifier } from "./VscodeStatusNotifier";
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
   const cacheTtlMs = getCacheTtlMs(config);
   const pollIntervalSeconds = getPollIntervalSeconds(config);
@@ -29,6 +29,11 @@ export function activate(context: vscode.ExtensionContext): void {
     maxCacheEntries,
     requestTimeoutMs
   });
+  try {
+    await services.environmentStore.migrateLegacyAuthConfigs();
+  } catch (error) {
+    console.warn("Failed to migrate legacy Jenkins auth config.", error);
+  }
   const notifier = new VscodeStatusNotifier();
   const poller = new JenkinsStatusPoller(
     services.environmentStore,

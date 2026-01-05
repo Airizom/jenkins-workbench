@@ -54,7 +54,8 @@ export class JenkinsJobIndex {
     environment: JenkinsEnvironmentRef,
     options?: JobSearchOptions
   ): AsyncIterable<JobSearchEntry[]> {
-    const cacheKey = this.cache.buildKey(environment, "job-index");
+    const authSignature = await this.clientProvider.getAuthSignature(environment);
+    const cacheKey = this.cache.buildKey(environment, "job-index", undefined, authSignature);
     const cached = this.cache.get<JobIndexCacheEntry | JobSearchEntry[]>(cacheKey);
     if (cached) {
       if (Array.isArray(cached)) {

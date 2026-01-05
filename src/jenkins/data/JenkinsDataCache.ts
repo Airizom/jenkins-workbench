@@ -75,8 +75,13 @@ export class JenkinsDataCache {
     }
   }
 
-  buildKey(environment: JenkinsEnvironmentRef, kind: string, path?: string): string {
-    const envSignature = `${environment.environmentId}:${environment.url}:${environment.username ?? ""}`;
+  buildKey(
+    environment: JenkinsEnvironmentRef,
+    kind: string,
+    path?: string,
+    authSignature?: string
+  ): string {
+    const envSignature = `${environment.environmentId}:${environment.url}:${authSignature ?? ""}`;
     return `${envSignature}:${kind}:${path ?? ""}`;
   }
 

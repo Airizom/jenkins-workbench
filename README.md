@@ -56,9 +56,18 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
    - **Global** — Available across all workspaces
 4. **Enter your Jenkins details**:
    - **URL** — Your Jenkins base URL (e.g., `https://jenkins.example.com`)
-   - **Username** — Optional, required if using an API token
-   - **API Token** — Optional, for authenticated access
-5. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
+5. **Select an auth method**:
+   - **None** — No authentication headers
+   - **Basic** — Username + API token
+   - **Bearer token** — `Authorization: Bearer <token>`
+   - **Cookie header** — Send a `Cookie` header with every request
+   - **Custom headers (JSON)** — Arbitrary headers (e.g., `{"Cookie":"JSESSIONID=...","X-Forwarded-User":"jenkins"}`)
+6. **Provide credentials if prompted**:
+   - **Basic** — Username + API token
+   - **Bearer token** — Token value
+   - **Cookie header** — Cookie string
+   - **Custom headers (JSON)** — JSON object of headers
+7. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
 ## Requirements
 
@@ -147,10 +156,11 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 
 Jenkins Workbench takes security seriously:
 
-- **Secure Credential Storage** — API tokens are stored in VS Code's SecretStorage, never in plain text or workspace files
-- **Basic Authentication** — Credentials are sent via HTTP Basic Auth only when both username and token are configured
+- **Secure Credential Storage** — API tokens, bearer tokens, cookie values, and custom headers are stored in VS Code's SecretStorage
+- **Auth Header Support** — Basic, Bearer, Cookie, and custom headers are sent on every request, including CSRF crumb acquisition
 - **CSRF Protection** — Full support for Jenkins crumb issuer when CSRF protection is enabled
 - **Network Security** — All API calls use the configured URL scheme; use HTTPS for production Jenkins instances
+- **No Interactive SSO** — The extension does not perform browser-based OAuth/SAML flows; supply cookies/tokens manually
 
 ### Recommended Setup
 
@@ -176,7 +186,8 @@ Jenkins Workbench takes security seriously:
 
 - Verify your Jenkins user can access `/crumbIssuer/api/json`
 - Check that Jenkins security settings allow API access
-- Confirm you're using an API token, not your password
+- Confirm you're using an API token or another supported header-based auth method
+- For SSO-backed Jenkins, capture a session cookie or token and use Cookie/Bearer/Custom headers
 
 ### Missing Build Actions (404)
 

@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders } from "node:http";
-import { getAuthorizationHeader } from "../auth";
+import { buildAuthHeaders } from "../auth";
 import { JenkinsCrumbService } from "../crumbs";
 import { JenkinsRequestError } from "../errors";
 import {
@@ -18,6 +18,8 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   private readonly username?: string;
   private readonly token?: string;
   private readonly requestTimeoutMs?: number;
+  private readonly authHeader?: string;
+  private readonly baseHeaders?: Record<string, string>;
   private readonly crumbService: JenkinsCrumbService;
 
   constructor(options: JenkinsClientOptions) {
@@ -27,6 +29,12 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     this.username = username && username.length > 0 ? username : undefined;
     this.token = token && token.length > 0 ? token : undefined;
     this.requestTimeoutMs = options.requestTimeoutMs;
+    const authHeaders = buildAuthHeaders(options.authConfig, {
+      username: this.username,
+      token: this.token
+    });
+    this.authHeader = authHeaders.authHeader;
+    this.baseHeaders = authHeaders.headers;
     this.crumbService = new JenkinsCrumbService(this.baseUrl, (url) => this.requestJson(url));
   }
 
@@ -101,19 +109,37 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   ): Promise<JenkinsPostResponse> {
     return requestVoidWithLocationInternal(url, {
       ...options,
-      authHeader: this.getAuthorizationHeader(),
+      headers: this.mergeHeaders(options.headers),
+      authHeader: this.authHeader,
       timeoutMs: this.requestTimeoutMs
     });
   }
 
-  private getRequestOptions(): { authHeader?: string; timeoutMs?: number } {
+  private getRequestOptions(): {
+    authHeader?: string;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+  } {
     return {
-      authHeader: getAuthorizationHeader(this.username, this.token),
+      authHeader: this.authHeader,
+      headers: this.baseHeaders,
       timeoutMs: this.requestTimeoutMs
     };
   }
 
-  private getAuthorizationHeader(): string | undefined {
-    return getAuthorizationHeader(this.username, this.token);
+  private mergeHeaders(
+    headers?: Record<string, string>
+  ): Record<string, string> | undefined {
+    const baseHeaders = this.baseHeaders;
+    if (!baseHeaders || Object.keys(baseHeaders).length === 0) {
+      return headers;
+    }
+    if (!headers || Object.keys(headers).length === 0) {
+      return { ...baseHeaders };
+    }
+    return {
+      ...baseHeaders,
+      ...headers
+    };
   }
 }

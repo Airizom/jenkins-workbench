@@ -2,8 +2,18 @@ export interface JenkinsClientOptions {
   baseUrl: string;
   username?: string;
   token?: string;
+  authConfig?: JenkinsAuthConfig;
   requestTimeoutMs?: number;
 }
+
+export type JenkinsAuthType = "none" | "basic" | "bearer" | "cookie" | "headers";
+
+export type JenkinsAuthConfig =
+  | { type: "none" }
+  | { type: "basic"; username: string; token: string }
+  | { type: "bearer"; token: string }
+  | { type: "cookie"; cookie: string }
+  | { type: "headers"; headers: Record<string, string> };
 
 export interface JenkinsJob {
   name: string;

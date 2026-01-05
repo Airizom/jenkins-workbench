@@ -33,6 +33,7 @@ export interface JenkinsVoidRequestOptions {
 
 export interface JenkinsSimpleRequestOptions {
   authHeader?: string;
+  headers?: Record<string, string>;
   timeoutMs?: number;
 }
 
@@ -43,6 +44,7 @@ export async function requestJson<T>(
   return request<T>(url, {
     parseJson: true,
     authHeader: options?.authHeader,
+    headers: options?.headers,
     timeoutMs: options?.timeoutMs
   });
 }
@@ -55,6 +57,7 @@ export async function requestText(
     parseJson: false,
     returnText: true,
     authHeader: options?.authHeader,
+    headers: options?.headers,
     timeoutMs: options?.timeoutMs
   });
 }
@@ -68,6 +71,7 @@ export async function requestTextWithHeaders(
     returnText: true,
     returnHeaders: true,
     authHeader: options?.authHeader,
+    headers: options?.headers,
     timeoutMs: options?.timeoutMs
   });
 }
@@ -81,6 +85,7 @@ export async function requestHeaders(
     parseJson: false,
     returnHeaders: true,
     authHeader: options?.authHeader,
+    headers: options?.headers,
     timeoutMs: options?.timeoutMs
   });
 }
