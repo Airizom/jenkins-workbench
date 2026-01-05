@@ -35,6 +35,7 @@ export interface JenkinsBuild {
   result?: string;
   building?: boolean;
   timestamp?: number;
+  duration?: number;
 }
 
 export interface JenkinsUser {
@@ -82,7 +83,6 @@ export interface JenkinsTestReport {
 }
 
 export interface JenkinsBuildDetails extends JenkinsBuild {
-  duration?: number;
   displayName?: string;
   fullDisplayName?: string;
   culprits?: JenkinsUser[];
@@ -149,6 +149,8 @@ export interface JenkinsNode {
   displayName: string;
   offline: boolean;
   temporarilyOffline: boolean;
+  numExecutors?: number;
+  busyExecutors?: number;
 }
 
 export interface JenkinsQueueTask {

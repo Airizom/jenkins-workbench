@@ -15,7 +15,7 @@ export class JenkinsBuildsApi {
 
   async getBuilds(jobUrl: string, limit = 20): Promise<JenkinsBuild[]> {
     const end = Math.max(limit - 1, 0);
-    const tree = `builds[number,url,result,building,timestamp]{0,${end}}`;
+    const tree = `builds[number,url,result,building,timestamp,duration]{0,${end}}`;
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
     return Array.isArray(response.builds) ? response.builds : [];
@@ -123,7 +123,7 @@ export class JenkinsBuildsApi {
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
-    const tree = "lastFailedBuild[number,url,result,building,timestamp]";
+    const tree = "lastFailedBuild[number,url,result,building,timestamp,duration]";
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<{
       lastFailedBuild?: JenkinsBuild | null;

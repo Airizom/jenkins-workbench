@@ -5,8 +5,9 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
 import {
   buildIcon,
-  formatBuildStatus,
+  formatBuildDescription,
   formatJobColor,
+  formatNodeDescription,
   formatWatchedDescription,
   formatQueueItemDescription,
   jobIcon,
@@ -184,7 +185,7 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.buildUrl = build.url;
     this.isBuilding = Boolean(build.building);
     this.contextValue = this.isBuilding ? "buildRunning" : "build";
-    this.description = formatBuildStatus(build);
+    this.description = formatBuildDescription(build);
     this.iconPath = buildIcon(build);
     this.tooltip = build.url;
     this.command = {
@@ -202,11 +203,7 @@ export class NodeTreeItem extends vscode.TreeItem {
   ) {
     super(node.displayName, vscode.TreeItemCollapsibleState.None);
     this.contextValue = "node";
-    this.description = node.offline
-      ? node.temporarilyOffline
-        ? "Temporarily offline"
-        : "Offline"
-      : "Online";
+    this.description = formatNodeDescription(node);
     this.iconPath = node.offline
       ? new vscode.ThemeIcon("debug-disconnect")
       : new vscode.ThemeIcon("server");

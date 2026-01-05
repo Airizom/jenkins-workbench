@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { JenkinsBuild } from "../jenkins/JenkinsClient";
+import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
 
 type NormalizedStatus =
   | "success"
@@ -73,6 +73,76 @@ export function formatBuildStatus(build: JenkinsBuild): string {
   }
 }
 
+export function formatBuildDescription(build: JenkinsBuild): string {
+  if (build.building) {
+    const elapsedLabel = formatDurationLabel(resolveBuildElapsedMs(build));
+    if (elapsedLabel) {
+      return `$(clock) ${elapsedLabel} • Running`;
+    }
+    return "Running";
+  }
+
+  const status = formatBuildStatus(build);
+  const durationLabel = formatDurationLabel(build.duration);
+  const completionTimestamp = resolveBuildCompletionTimestamp(build);
+  const relativeLabel = completionTimestamp
+    ? formatRelativeTime(completionTimestamp)
+    : undefined;
+
+  const base = durationLabel ? `${status} (${durationLabel})` : status;
+  return relativeLabel ? `${base} • ${relativeLabel}` : base;
+}
+
+export function formatRelativeTime(timestampMs: number): string | undefined {
+  if (!Number.isFinite(timestampMs)) {
+    return undefined;
+  }
+
+  const now = Date.now();
+  const diffMs = Math.max(0, now - timestampMs);
+  const minuteMs = 60_000;
+  const hourMs = 3_600_000;
+  const dayMs = 86_400_000;
+
+  if (diffMs < hourMs) {
+    const minutes = Math.floor(diffMs / minuteMs);
+    return `${minutes}m ago`;
+  }
+
+  if (diffMs < dayMs) {
+    const hours = Math.floor(diffMs / hourMs);
+    return `${hours}h ago`;
+  }
+
+  const days = Math.floor(diffMs / dayMs);
+  if (days === 1) {
+    return "yesterday";
+  }
+  if (days < 7) {
+    return `${days} days ago`;
+  }
+
+  return new Date(timestampMs).toLocaleDateString();
+}
+
+export function formatNodeDescription(node: JenkinsNode): string {
+  if (node.offline) {
+    return node.temporarilyOffline ? "Temporarily offline" : "Offline";
+  }
+
+  const totalExecutors = node.numExecutors;
+  const busyExecutors = node.busyExecutors;
+  if (Number.isFinite(totalExecutors) && Number.isFinite(busyExecutors)) {
+    const freeExecutors = Math.max(
+      0,
+      (totalExecutors as number) - (busyExecutors as number)
+    );
+    return `Online (${freeExecutors}/${totalExecutors})`;
+  }
+
+  return "Online";
+}
+
 export function buildIcon(build: JenkinsBuild): vscode.ThemeIcon {
   const status = resolveBuildStatus(build);
   if (status === "running") {
@@ -110,17 +180,17 @@ export function formatQueueItemDescription(
   const parts: string[] = [];
 
   if (Number.isFinite(position) && position > 0) {
-    parts.push(`Pos ${position}`);
+    parts.push(`#${position} in queue`);
   }
 
   const duration = formatQueueDuration(inQueueSince);
   if (duration) {
-    parts.push(duration);
+    parts.push(`waiting ${duration}`);
   }
 
   const normalizedReason = normalizeQueueReason(reason);
   if (normalizedReason) {
-    parts.push(normalizedReason);
+    parts.push(`"${normalizedReason}"`);
   }
 
   return parts.length > 0 ? parts.join(" • ") : undefined;
@@ -214,6 +284,38 @@ export function resolveJobStatus(color?: string): NormalizedStatus | undefined {
   }
 
   return isRunning ? "running" : status;
+}
+
+function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefined {
+  if (!Number.isFinite(build.timestamp)) {
+    return undefined;
+  }
+
+  const timestamp = build.timestamp as number;
+  if (Number.isFinite(build.duration)) {
+    return timestamp + (build.duration as number);
+  }
+
+  return timestamp;
+}
+
+function resolveBuildElapsedMs(build: JenkinsBuild): number | undefined {
+  if (Number.isFinite(build.timestamp)) {
+    return Math.max(0, Date.now() - (build.timestamp as number));
+  }
+
+  if (Number.isFinite(build.duration)) {
+    return Math.max(0, build.duration as number);
+  }
+
+  return undefined;
+}
+
+function formatDurationLabel(durationMs?: number): string | undefined {
+  if (!Number.isFinite(durationMs)) {
+    return undefined;
+  }
+  return formatDurationMs(Math.max(0, durationMs as number));
 }
 
 function formatDurationMs(duration: number): string {
