@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-01-05
+
+### Added
+
+- feat: add pinning for jobs and pipelines in the tree
+- feat: surface build progress using estimated duration
+- feat: add configurable build tooltips with richer Jenkins data
+
 ## [1.2.0] - 2026-01-05
 
 ### Added
