@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-01-06
+
+### Added
+
+- feat: move build details webview to React with bundled assets
+- feat: add artifact preview/download and richer build artifact flows
+
+### Changed
+
+- refactor: extract build details panel state and callbacks
+
 ## [1.4.0] - 2026-01-05
 
 ### Added
