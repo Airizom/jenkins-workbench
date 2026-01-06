@@ -2,6 +2,7 @@ import type {
   JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
+  JenkinsBuildTriggerOptions,
   JenkinsJob,
   JenkinsJobKind,
   JenkinsParameterDefinition,
@@ -339,12 +340,32 @@ export class JenkinsDataService {
 
   async triggerBuild(
     environment: JenkinsEnvironmentRef,
+    jobUrl: string
+  ): Promise<{ queueLocation?: string }> {
+    return this.triggerBuildInternal(environment, jobUrl, { mode: "build" });
+  }
+
+  async triggerBuildWithParameters(
+    environment: JenkinsEnvironmentRef,
     jobUrl: string,
-    params?: URLSearchParams
+    params?: URLSearchParams,
+    options?: { allowEmptyParams?: boolean }
+  ): Promise<{ queueLocation?: string }> {
+    return this.triggerBuildInternal(environment, jobUrl, {
+      mode: "buildWithParameters",
+      params,
+      allowEmptyParams: options?.allowEmptyParams
+    });
+  }
+
+  private async triggerBuildInternal(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    options: JenkinsBuildTriggerOptions
   ): Promise<{ queueLocation?: string }> {
     const client = await this.clientProvider.getClient(environment);
     try {
-      return await client.triggerBuild(jobUrl, params);
+      return await client.triggerBuild(jobUrl, options);
     } catch (error) {
       throw toBuildActionError(error);
     }

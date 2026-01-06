@@ -1,16 +1,19 @@
 import type { JenkinsParameterDefinition } from "../types";
 
+type JenkinsParameterContainer = {
+  parameterDefinitions?: Array<{
+    name?: string;
+    type?: string;
+    defaultParameterValue?: { value?: unknown };
+    defaultValue?: unknown;
+    choices?: unknown;
+    description?: string;
+  }>;
+} | null;
+
 export interface JenkinsJobParametersResponse {
-  actions?: Array<{
-    parameterDefinitions?: Array<{
-      name?: string;
-      type?: string;
-      defaultParameterValue?: { value?: unknown };
-      defaultValue?: unknown;
-      choices?: unknown;
-      description?: string;
-    }>;
-  } | null>;
+  actions?: JenkinsParameterContainer[];
+  property?: JenkinsParameterContainer[];
 }
 
 export function extractParameterDefinitions(
@@ -46,32 +49,37 @@ export function extractParameterDefinitions(
     }
   };
 
-  for (const action of response.actions ?? []) {
-    if (!action || !Array.isArray(action.parameterDefinitions)) {
-      continue;
-    }
-
-    for (const definition of action.parameterDefinitions) {
-      if (!definition.name || seen.has(definition.name)) {
+  const collectDefinitions = (containers?: JenkinsParameterContainer[]): void => {
+    for (const container of containers ?? []) {
+      if (!container || !Array.isArray(container.parameterDefinitions)) {
         continue;
       }
 
-      const choices = Array.isArray(definition.choices)
-        ? definition.choices.map((choice) => String(choice))
-        : undefined;
-      const rawDefault = definition.defaultParameterValue?.value ?? definition.defaultValue;
-      const defaultValue = formatDefaultValue(rawDefault);
+      for (const definition of container.parameterDefinitions) {
+        if (!definition.name || seen.has(definition.name)) {
+          continue;
+        }
 
-      definitions.push({
-        name: definition.name,
-        type: definition.type,
-        defaultValue,
-        choices,
-        description: definition.description
-      });
-      seen.add(definition.name);
+        const choices = Array.isArray(definition.choices)
+          ? definition.choices.map((choice) => String(choice))
+          : undefined;
+        const rawDefault = definition.defaultParameterValue?.value ?? definition.defaultValue;
+        const defaultValue = formatDefaultValue(rawDefault);
+
+        definitions.push({
+          name: definition.name,
+          type: definition.type,
+          defaultValue,
+          choices,
+          description: definition.description
+        });
+        seen.add(definition.name);
+      }
     }
-  }
+  };
+
+  collectDefinitions(response.actions);
+  collectDefinitions(response.property);
 
   return definitions;
 }

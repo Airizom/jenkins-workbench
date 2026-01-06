@@ -56,8 +56,9 @@ export class JenkinsJobsApi {
   }
 
   async getJobParameters(jobUrl: string): Promise<JenkinsParameterDefinition[]> {
-    const tree =
-      "actions[parameterDefinitions[name,type,defaultParameterValue[value],defaultValue,choices,description]]";
+    const parameterTree =
+      "parameterDefinitions[name,type,defaultParameterValue[value],defaultValue,choices,description]";
+    const tree = `actions[${parameterTree}],property[${parameterTree}]`;
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<JenkinsJobParametersResponse>(url);
     return extractParameterDefinitions(response);

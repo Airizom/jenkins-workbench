@@ -20,20 +20,31 @@ export async function triggerBuild(
 
   const label = getTreeItemLabel(item);
   let parameters: JobParameter[] = [];
+  let useParameters = false;
+  let allowEmptyParams = false;
 
   try {
     parameters = await dataService.getJobParameters(item.environment, item.jobUrl);
   } catch (error) {
+    const buildWithDefaultsLabel = "Try default parameters";
+    const buildWithoutParametersLabel = "Run without parameters";
     const decision = await vscode.window.showWarningMessage(
       `Unable to load parameters for ${label}: ${formatActionError(
         error
-      )}. Trigger build without parameters?`,
-      "Trigger Build",
+      )}. Choose how to trigger the build.`,
+      buildWithDefaultsLabel,
+      buildWithoutParametersLabel,
       "Cancel"
     );
-    if (decision !== "Trigger Build") {
+    if (!decision || decision === "Cancel") {
       return;
     }
+    const useParametersByChoice: Record<string, boolean> = {
+      [buildWithDefaultsLabel]: true,
+      [buildWithoutParametersLabel]: false
+    };
+    useParameters = useParametersByChoice[decision] ?? false;
+    allowEmptyParams = useParameters;
   }
 
   let payload: URLSearchParams | undefined;
@@ -42,10 +53,15 @@ export async function triggerBuild(
     if (!payload) {
       return;
     }
+    useParameters = true;
   }
 
   try {
-    const result = await dataService.triggerBuild(item.environment, item.jobUrl, payload);
+    const result = useParameters
+      ? await dataService.triggerBuildWithParameters(item.environment, item.jobUrl, payload, {
+          allowEmptyParams
+        })
+      : await dataService.triggerBuild(item.environment, item.jobUrl);
     const message = result.queueLocation
       ? `Triggered build for ${label}. Queued at ${result.queueLocation}`
       : `Triggered build for ${label}.`;

@@ -10,7 +10,18 @@ import type {
 } from "../types";
 import { buildActionUrl, buildApiUrlFromItem, buildArtifactDownloadUrl } from "../urls";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
+import { JenkinsRequestError } from "../errors";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
+
+export type JenkinsBuildTriggerMode = "build" | "buildWithParameters";
+
+export type JenkinsBuildTriggerOptions =
+  | { mode: "build" }
+  | {
+      mode: "buildWithParameters";
+      params?: URLSearchParams;
+      allowEmptyParams?: boolean;
+    };
 
 export class JenkinsBuildsApi {
   constructor(private readonly context: JenkinsClientContext) {}
@@ -217,12 +228,31 @@ export class JenkinsBuildsApi {
 
   async triggerBuild(
     jobUrl: string,
-    params?: URLSearchParams
+    options: JenkinsBuildTriggerOptions
   ): Promise<{ queueLocation?: string }> {
-    if (params && Array.from(params.keys()).length > 0) {
+    if (options.mode === "buildWithParameters") {
+      const hasParams = options.params ? Array.from(options.params.keys()).length > 0 : false;
+      const allowEmptyParams = options.allowEmptyParams === true;
+      if (!hasParams && !allowEmptyParams) {
+        const fallbackUrl = buildActionUrl(jobUrl, "build");
+        const fallbackResponse = await this.context.requestPostWithCrumb(fallbackUrl);
+        return { queueLocation: fallbackResponse.location };
+      }
       const url = buildActionUrl(jobUrl, "buildWithParameters");
-      const response = await this.context.requestPostWithCrumb(url, params.toString());
-      return { queueLocation: response.location };
+      const body = options.params ? options.params.toString() : undefined;
+      try {
+        const response = await this.context.requestPostWithCrumb(url, body);
+        return { queueLocation: response.location };
+      } catch (error) {
+        if (allowEmptyParams && !hasParams && error instanceof JenkinsRequestError) {
+          if (error.statusCode === 400 || error.statusCode === 404) {
+            const fallbackUrl = buildActionUrl(jobUrl, "build");
+            const fallbackResponse = await this.context.requestPostWithCrumb(fallbackUrl);
+            return { queueLocation: fallbackResponse.location };
+          }
+        }
+        throw error;
+      }
     }
     const url = buildActionUrl(jobUrl, "build");
     const response = await this.context.requestPostWithCrumb(url);

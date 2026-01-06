@@ -1,4 +1,5 @@
 import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
+import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
@@ -45,6 +46,8 @@ export type {
   JenkinsTestSummaryAction,
   JenkinsWorkflowRun
 } from "./types";
+
+export type { JenkinsBuildTriggerMode, JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 
 export { JenkinsRequestError };
 
@@ -150,9 +153,9 @@ export class JenkinsClient {
 
   async triggerBuild(
     jobUrl: string,
-    params?: URLSearchParams
+    options: JenkinsBuildTriggerOptions
   ): Promise<{ queueLocation?: string }> {
-    return this.buildsApi.triggerBuild(jobUrl, params);
+    return this.buildsApi.triggerBuild(jobUrl, options);
   }
 
   async stopBuild(buildUrl: string): Promise<void> {
