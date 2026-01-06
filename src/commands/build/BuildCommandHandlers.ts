@@ -152,6 +152,7 @@ export async function openInJenkins(
 export async function showBuildDetails(
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
+  extensionUri: vscode.Uri,
   item?: BuildTreeItem
 ): Promise<void> {
   if (!item) {
@@ -165,6 +166,7 @@ export async function showBuildDetails(
       artifactActionHandler,
       item.environment,
       item.buildUrl,
+      extensionUri,
       getTreeItemLabel(item)
     );
   } catch (error) {
@@ -177,6 +179,7 @@ export async function showBuildDetails(
 export async function openLastFailedBuild(
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
+  extensionUri: vscode.Uri,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
   if (!item) {
@@ -206,6 +209,7 @@ export async function openLastFailedBuild(
       artifactActionHandler,
       item.environment,
       lastFailed.url,
+      extensionUri,
       `#${lastFailed.number}`
     );
   } catch (error) {

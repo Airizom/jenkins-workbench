@@ -1,18 +1,6 @@
-import type {
-  BuildFailureInsightsViewModel,
-  PipelineStageViewModel
-} from "./BuildDetailsViewModel";
+import type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsContracts";
 
-export interface BuildDetailsUpdateMessage {
-  type: "updateDetails";
-  resultLabel: string;
-  resultClass: string;
-  durationLabel: string;
-  timestampLabel: string;
-  culpritsLabel: string;
-  insights: BuildFailureInsightsViewModel;
-  pipelineStages: PipelineStageViewModel[];
-}
+export type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsContracts";
 
 export type BuildDetailsOutgoingMessage =
   | BuildDetailsUpdateMessage

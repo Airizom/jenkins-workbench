@@ -25,11 +25,16 @@ import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
 import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
 import { buildDetailsUpdateMessage } from "./buildDetails/BuildDetailsUpdateBuilder";
 import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
+import {
+  BUILD_DETAILS_WEBVIEW_BUNDLE_PATH,
+  BUILD_DETAILS_WEBVIEW_CSS_PATH
+} from "./buildDetails/BuildDetailsWebviewAssets";
 import { createNonce } from "./buildDetails/BuildDetailsWebviewUtils";
 
 export class BuildDetailsPanel {
   private static currentPanel: BuildDetailsPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
+  private readonly extensionUri: vscode.Uri;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly completionPoller: BuildDetailsCompletionPoller;
   private readonly state = new BuildDetailsPanelState();
@@ -43,8 +48,11 @@ export class BuildDetailsPanel {
     artifactActionHandler: ArtifactActionHandler,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
+    extensionUri: vscode.Uri,
     label?: string
   ): Promise<void> {
+    const bundleSegments = BUILD_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
+    const bundleRootSegments = bundleSegments.slice(0, -1);
     if (!BuildDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
         "jenkinsWorkbench.buildDetails",
@@ -52,10 +60,11 @@ export class BuildDetailsPanel {
         vscode.ViewColumn.Active,
         {
           enableScripts: true,
-          retainContextWhenHidden: true
+          retainContextWhenHidden: true,
+          localResourceRoots: [vscode.Uri.joinPath(extensionUri, ...bundleRootSegments)]
         }
       );
-      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel);
+      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel, extensionUri);
     }
 
     const activePanel = BuildDetailsPanel.currentPanel;
@@ -63,8 +72,9 @@ export class BuildDetailsPanel {
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
 
-  private constructor(panel: vscode.WebviewPanel) {
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
+    this.extensionUri = extensionUri;
     this.completionPoller = new BuildDetailsCompletionPoller({
       getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
       fetchBuildDetails: (token) => this.fetchBuildDetails(token),
@@ -128,10 +138,15 @@ export class BuildDetailsPanel {
     this.dataService = dataService;
     this.artifactActionHandler = artifactActionHandler;
     this.state.resetForLoad(environment, buildUrl, createNonce());
+    const styleSegments = BUILD_DETAILS_WEBVIEW_CSS_PATH.split("/");
+    const styleUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, ...styleSegments)
+    );
 
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,
-      nonce: this.state.currentNonce
+      nonce: this.state.currentNonce,
+      styleUri: styleUri.toString()
     });
 
     this.pollingController = new BuildDetailsPollingController({
@@ -183,9 +198,15 @@ export class BuildDetailsPanel {
       maxConsoleChars: MAX_CONSOLE_CHARS,
       followLog: this.state.followLog
     });
+    const bundleSegments = BUILD_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
+    const scriptUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, ...bundleSegments)
+    );
     this.panel.webview.html = renderBuildDetailsHtml(viewModel, {
       cspSource: this.panel.webview.cspSource,
-      nonce: this.state.currentNonce
+      nonce: this.state.currentNonce,
+      scriptUri: scriptUri.toString(),
+      styleUri: styleUri.toString()
     });
 
     if (details && !details.building && initialState.workflowError) {

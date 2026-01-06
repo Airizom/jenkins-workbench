@@ -45,12 +45,12 @@ export function registerBuildCommands(
       (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.showBuildDetails", (item?: BuildTreeItem) =>
-      showBuildDetails(dataService, artifactActionHandler, item)
+      showBuildDetails(dataService, artifactActionHandler, context.extensionUri, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.openLastFailedBuild",
       (item?: JobTreeItem | PipelineTreeItem) =>
-        openLastFailedBuild(dataService, artifactActionHandler, item)
+        openLastFailedBuild(dataService, artifactActionHandler, context.extensionUri, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.previewArtifact", (item?: ArtifactTreeItem) =>
       previewArtifact(artifactActionHandler, item)
