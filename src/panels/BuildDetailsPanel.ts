@@ -1,14 +1,15 @@
 import * as vscode from "vscode";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { type PipelineRun, toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
-import type { JenkinsBuildDetails, JenkinsTestReport } from "../jenkins/types";
+import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
+import type { JenkinsBuildDetails } from "../jenkins/types";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
   MAX_CONSOLE_CHARS,
   getBuildDetailsRefreshIntervalMs
 } from "./buildDetails/BuildDetailsConfig";
 import { formatError, formatResult } from "./buildDetails/BuildDetailsFormatters";
+import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsPollingCallbacks";
 import {
   type BuildDetailsOutgoingMessage,
   isArtifactActionMessage,
@@ -20,6 +21,7 @@ import {
   type BuildDetailsInitialState,
   BuildDetailsPollingController
 } from "./buildDetails/BuildDetailsPollingController";
+import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
 import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
 import { buildDetailsUpdateMessage } from "./buildDetails/BuildDetailsUpdateBuilder";
 import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
@@ -30,22 +32,11 @@ export class BuildDetailsPanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly completionPoller: BuildDetailsCompletionPoller;
+  private readonly state = new BuildDetailsPanelState();
   private loadToken = 0;
   private dataService?: BuildDetailsDataService;
   private artifactActionHandler?: ArtifactActionHandler;
-  private environment?: JenkinsEnvironmentRef;
-  private currentBuildUrl?: string;
-  private currentDetails?: JenkinsBuildDetails;
-  private currentTestReport?: JenkinsTestReport;
-  private currentPipelineRun?: PipelineRun;
-  private currentErrors: string[] = [];
-  private baseErrors: string[] = [];
-  private pipelineError?: string;
   private pollingController?: BuildDetailsPollingController;
-  private followLog = true;
-  private completionToastShown = false;
-  private currentNonce = "";
-  private lastDetailsBuilding = false;
 
   static async show(
     dataService: BuildDetailsDataService,
@@ -78,7 +69,7 @@ export class BuildDetailsPanel {
       getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
       fetchBuildDetails: (token) => this.fetchBuildDetails(token),
       isTokenCurrent: (token) => this.isTokenCurrent(token),
-      shouldPoll: () => this.lastDetailsBuilding,
+      shouldPoll: () => this.state.lastDetailsBuilding,
       onDetailsUpdate: (details) => this.applyDetailsUpdate(details, false)
     });
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
@@ -104,7 +95,7 @@ export class BuildDetailsPanel {
           return;
         }
         if (isToggleFollowLogMessage(message)) {
-          this.followLog = Boolean(message.value);
+          this.state.setFollowLog(Boolean(message.value));
         }
       },
       null,
@@ -136,21 +127,11 @@ export class BuildDetailsPanel {
     this.stopCompletionPolling();
     this.dataService = dataService;
     this.artifactActionHandler = artifactActionHandler;
-    this.environment = environment;
-    this.currentBuildUrl = buildUrl;
-    this.currentDetails = undefined;
-    this.currentTestReport = undefined;
-    this.currentPipelineRun = undefined;
-    this.currentErrors = [];
-    this.baseErrors = [];
-    this.pipelineError = undefined;
-    this.completionToastShown = false;
-    this.lastDetailsBuilding = false;
-    this.currentNonce = createNonce();
+    this.state.resetForLoad(environment, buildUrl, createNonce());
 
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,
-      nonce: this.currentNonce
+      nonce: this.state.currentNonce
     });
 
     this.pollingController = new BuildDetailsPollingController({
@@ -160,77 +141,17 @@ export class BuildDetailsPanel {
       maxConsoleChars: MAX_CONSOLE_CHARS,
       getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
       formatError,
-      callbacks: {
-        onDetails: (details) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
-          this.currentDetails = details;
-          this.lastDetailsBuilding = Boolean(details.building);
-          this.postMessage(
-            buildDetailsUpdateMessage(details, this.currentTestReport, this.currentPipelineRun)
-          );
-        },
-        onWorkflowRun: (workflowRun) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
-          this.currentPipelineRun = toPipelineRun(workflowRun);
-          this.pipelineError = undefined;
-          this.publishErrors();
-          if (this.currentDetails) {
-            this.postMessage(
-              buildDetailsUpdateMessage(
-                this.currentDetails,
-                this.currentTestReport,
-                this.currentPipelineRun
-              )
-            );
-          }
-        },
-        onWorkflowError: (error) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
-          this.pipelineError = `Pipeline stages: ${formatError(error)}`;
-          this.publishErrors();
-        },
-        onTitle: (title) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
+      callbacks: createBuildDetailsPollingCallbacks(this.state, token, {
+        postMessage: (message) => this.postMessage(message),
+        setTitle: (title) => {
           this.panel.title = `Build Details - ${title}`;
         },
-        onConsoleAppend: (text) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
-          this.postMessage({ type: "appendConsole", text });
-        },
-        onConsoleSet: (payload) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
-          this.postMessage({
-            type: "setConsole",
-            text: payload.text,
-            truncated: payload.truncated
-          });
-        },
-        onErrors: (errors) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
-          this.baseErrors = errors;
-          this.publishErrors();
-        },
-        onComplete: (details) => {
-          if (!this.isTokenCurrent(token)) {
-            return;
-          }
+        publishErrors: () => this.publishErrors(),
+        isTokenCurrent: (currentToken) => this.isTokenCurrent(currentToken),
+        showCompletionToast: (details) => {
           void this.showCompletionToast(details);
         }
-      }
+      })
     });
 
     const initialState: BuildDetailsInitialState = await this.pollingController.loadInitial();
@@ -239,21 +160,14 @@ export class BuildDetailsPanel {
       return;
     }
 
-    const details = initialState.details;
     const consoleTextResult = initialState.consoleTextResult;
     const pipelineRun = toPipelineRun(initialState.workflowRun);
-    const errors = initialState.errors;
     const pipelineError = initialState.workflowError
       ? `Pipeline stages: ${formatError(initialState.workflowError)}`
       : undefined;
-    this.lastDetailsBuilding = details?.building ?? false;
-    this.currentDetails = details;
-    this.currentTestReport = undefined;
-    this.currentPipelineRun = pipelineRun;
-    this.baseErrors = errors;
-    this.pipelineError = pipelineError;
-    this.currentErrors = composeErrors(errors, pipelineError);
+    this.state.applyInitialState(initialState, pipelineRun, pipelineError);
 
+    const details = this.state.currentDetails;
     const title = details?.fullDisplayName ?? details?.displayName ?? label;
     if (title) {
       this.panel.title = `Build Details - ${title}`;
@@ -263,15 +177,15 @@ export class BuildDetailsPanel {
 
     const viewModel = buildBuildDetailsViewModel({
       details,
-      pipelineRun,
+      pipelineRun: this.state.currentPipelineRun,
       consoleTextResult,
-      errors: this.currentErrors,
+      errors: this.state.currentErrors,
       maxConsoleChars: MAX_CONSOLE_CHARS,
-      followLog: this.followLog
+      followLog: this.state.followLog
     });
     this.panel.webview.html = renderBuildDetailsHtml(viewModel, {
       cspSource: this.panel.webview.cspSource,
-      nonce: this.currentNonce
+      nonce: this.state.currentNonce
     });
 
     if (details && !details.building && initialState.workflowError) {
@@ -301,7 +215,7 @@ export class BuildDetailsPanel {
   private async handlePanelVisible(): Promise<void> {
     this.stopCompletionPolling();
     await this.refreshBuildStatus(this.loadToken);
-    if (this.lastDetailsBuilding) {
+    if (this.state.lastDetailsBuilding) {
       this.pollingController?.start();
     } else {
       await Promise.all([
@@ -313,10 +227,10 @@ export class BuildDetailsPanel {
   }
 
   private startCompletionPolling(token: number): void {
-    if (!this.lastDetailsBuilding || !this.isTokenCurrent(token)) {
+    if (!this.state.lastDetailsBuilding || !this.isTokenCurrent(token)) {
       return;
     }
-    if (!this.dataService || !this.environment || !this.currentBuildUrl) {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
       return;
     }
     this.completionPoller.start(token);
@@ -335,26 +249,25 @@ export class BuildDetailsPanel {
   }
 
   private async refreshWorkflowRun(token: number): Promise<void> {
-    if (!this.dataService || !this.environment || !this.currentBuildUrl) {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
       return;
     }
     try {
       const workflowRun = await this.dataService.getWorkflowRun(
-        this.environment,
-        this.currentBuildUrl
+        this.state.environment,
+        this.state.currentBuildUrl
       );
       if (!this.isTokenCurrent(token)) {
         return;
       }
-      this.currentPipelineRun = toPipelineRun(workflowRun);
-      this.pipelineError = undefined;
+      this.state.setPipelineRun(toPipelineRun(workflowRun));
       this.publishErrors();
-      if (this.currentDetails && this.panel.visible) {
+      if (this.state.currentDetails && this.panel.visible) {
         this.postMessage(
           buildDetailsUpdateMessage(
-            this.currentDetails,
-            this.currentTestReport,
-            this.currentPipelineRun
+            this.state.currentDetails,
+            this.state.currentTestReport,
+            this.state.currentPipelineRun
           )
         );
       }
@@ -362,19 +275,19 @@ export class BuildDetailsPanel {
       if (!this.isTokenCurrent(token)) {
         return;
       }
-      this.pipelineError = `Pipeline stages: ${formatError(error)}`;
+      this.state.setPipelineError(`Pipeline stages: ${formatError(error)}`);
       this.publishErrors();
     }
   }
 
   private async fetchBuildDetails(token: number): Promise<JenkinsBuildDetails | undefined> {
-    if (!this.dataService || !this.environment || !this.currentBuildUrl) {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
       return undefined;
     }
     try {
       const details = await this.dataService.getBuildDetails(
-        this.environment,
-        this.currentBuildUrl
+        this.state.environment,
+        this.state.currentBuildUrl
       );
       if (!this.isTokenCurrent(token)) {
         return undefined;
@@ -389,13 +302,13 @@ export class BuildDetailsPanel {
     if (!this.panel.visible) {
       return;
     }
-    if (!this.dataService || !this.environment || !this.currentBuildUrl) {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
       return;
     }
     try {
       const consoleText = await this.dataService.getConsoleTextTail(
-        this.environment,
-        this.currentBuildUrl,
+        this.state.environment,
+        this.state.currentBuildUrl,
         MAX_CONSOLE_CHARS
       );
       if (!this.isTokenCurrent(token)) {
@@ -412,27 +325,27 @@ export class BuildDetailsPanel {
   }
 
   private async refreshTestReport(token: number): Promise<void> {
-    if (!this.dataService || !this.environment || !this.currentBuildUrl) {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
       return;
     }
-    if (this.currentDetails?.building) {
+    if (this.state.currentDetails?.building) {
       return;
     }
     try {
       const testReport = await this.dataService.getTestReport(
-        this.environment,
-        this.currentBuildUrl
+        this.state.environment,
+        this.state.currentBuildUrl
       );
       if (!this.isTokenCurrent(token)) {
         return;
       }
-      this.currentTestReport = testReport;
-      if (this.currentDetails) {
+      this.state.setTestReport(testReport);
+      if (this.state.currentDetails) {
         this.postMessage(
           buildDetailsUpdateMessage(
-            this.currentDetails,
-            this.currentTestReport,
-            this.currentPipelineRun
+            this.state.currentDetails,
+            this.state.currentTestReport,
+            this.state.currentPipelineRun
           )
         );
       }
@@ -442,13 +355,14 @@ export class BuildDetailsPanel {
   }
 
   private applyDetailsUpdate(details: JenkinsBuildDetails, updateUi: boolean): void {
-    const wasBuilding = this.lastDetailsBuilding;
-    const isBuilding = Boolean(details.building);
-    this.lastDetailsBuilding = isBuilding;
-    this.currentDetails = details;
+    const { wasBuilding, isBuilding } = this.state.updateDetails(details);
     if (updateUi && this.panel.visible) {
       this.postMessage(
-        buildDetailsUpdateMessage(details, this.currentTestReport, this.currentPipelineRun)
+        buildDetailsUpdateMessage(
+          details,
+          this.state.currentTestReport,
+          this.state.currentPipelineRun
+        )
       );
       const title = details.fullDisplayName ?? details.displayName;
       if (title) {
@@ -462,10 +376,9 @@ export class BuildDetailsPanel {
   }
 
   private async showCompletionToast(details: JenkinsBuildDetails): Promise<void> {
-    if (this.completionToastShown) {
+    if (!this.state.takeCompletionToastSlot()) {
       return;
     }
-    this.completionToastShown = true;
     const title = details.fullDisplayName ?? details.displayName ?? "Build";
     const resultLabel = formatResult(details);
     const action = "Open in Jenkins";
@@ -473,8 +386,8 @@ export class BuildDetailsPanel {
       `${title} finished with status ${resultLabel}.`,
       action
     );
-    if (selection === action && this.currentBuildUrl) {
-      await vscode.env.openExternal(vscode.Uri.parse(this.currentBuildUrl));
+    if (selection === action && this.state.currentBuildUrl) {
+      await vscode.env.openExternal(vscode.Uri.parse(this.state.currentBuildUrl));
     }
   }
 
@@ -483,7 +396,11 @@ export class BuildDetailsPanel {
     relativePath: string;
     fileName?: string;
   }): Promise<void> {
-    if (!this.artifactActionHandler || !this.environment || !this.currentBuildUrl) {
+    if (
+      !this.artifactActionHandler ||
+      !this.state.environment ||
+      !this.state.currentBuildUrl
+    ) {
       return;
     }
     const fileName =
@@ -491,14 +408,14 @@ export class BuildDetailsPanel {
         ? message.fileName
         : undefined;
     const jobNameHint =
-      this.currentDetails?.fullDisplayName?.trim() ||
-      this.currentDetails?.displayName?.trim() ||
+      this.state.currentDetails?.fullDisplayName?.trim() ||
+      this.state.currentDetails?.displayName?.trim() ||
       undefined;
     await this.artifactActionHandler.handle({
       action: message.action,
-      environment: this.environment,
-      buildUrl: this.currentBuildUrl,
-      buildNumber: this.currentDetails?.number,
+      environment: this.state.environment,
+      buildUrl: this.state.currentBuildUrl,
+      buildNumber: this.state.currentDetails?.number,
       relativePath: message.relativePath,
       fileName,
       jobNameHint
@@ -523,9 +440,8 @@ export class BuildDetailsPanel {
   }
 
   private publishErrors(): void {
-    const nextErrors = composeErrors(this.baseErrors, this.pipelineError);
-    if (!areErrorsEqual(nextErrors, this.currentErrors)) {
-      this.currentErrors = nextErrors;
+    const nextErrors = this.state.updateErrors();
+    if (nextErrors) {
       this.postMessage({ type: "setErrors", errors: nextErrors });
     }
   }
@@ -533,19 +449,4 @@ export class BuildDetailsPanel {
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
   }
-}
-
-function areErrorsEqual(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  return left.every((value, index) => value === right[index]);
-}
-
-function composeErrors(baseErrors: string[], pipelineError?: string): string[] {
-  const nextErrors = [...baseErrors];
-  if (pipelineError && !nextErrors.includes(pipelineError)) {
-    nextErrors.push(pipelineError);
-  }
-  return nextErrors;
 }
