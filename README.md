@@ -1,5 +1,7 @@
 # Jenkins Workbench
 
+[![CI Build](https://img.shields.io/github/actions/workflow/status/Airizom/jenkins-workbench/ci.yml?style=flat-square&label=CI)](https://github.com/Airizom/jenkins-workbench/actions/workflows/ci.yml)
+[![Release Build](https://img.shields.io/github/actions/workflow/status/Airizom/jenkins-workbench/release.yml?style=flat-square&label=Release)](https://github.com/Airizom/jenkins-workbench/actions/workflows/release.yml)
 [![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/airizom.jenkins-workbench?style=flat-square&label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/airizom/jenkins-workbench?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/airizom/jenkins-workbench)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
