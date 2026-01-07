@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
-import type { ChangeEvent, MouseEvent } from "react";
+import * as React from "react";
+import type { ChangeEvent, MouseEvent as ReactMouseEvent } from "react";
 import type {
   BuildDetailsUpdateMessage,
   BuildDetailsViewModel,
@@ -10,6 +10,15 @@ import type {
   PipelineStageStepViewModel,
   PipelineStageViewModel
 } from "../shared/BuildDetailsContracts";
+import { Alert, AlertDescription } from "./components/ui/alert";
+import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
+import { Separator } from "./components/ui/separator";
+import { Switch } from "./components/ui/switch";
+import { cn } from "./lib/utils";
+
+const { useEffect, useMemo, useReducer, useState } = React;
 
 type VsCodeApi = {
   postMessage: (message: unknown) => void;
@@ -189,7 +198,7 @@ function pruneStageState(
   return next;
 }
 
-function StatusLabel({
+function StatusText({
   label,
   status,
   className
@@ -199,21 +208,39 @@ function StatusLabel({
   className?: string;
 }) {
   const statusClass = getStatusClass(status);
-  const classes = ["font-semibold", statusClass, className].filter(Boolean).join(" ");
-  return <span className={classes}>{label}</span>;
+  return <span className={cn("font-semibold", statusClass, className)}>{label}</span>;
+}
+
+function StatusPill({
+  label,
+  status,
+  className,
+  id
+}: {
+  label: string;
+  status?: string;
+  className?: string;
+  id?: string;
+}) {
+  const statusClass = getStatusClass(status);
+  return (
+    <Badge id={id} variant="outline" className={cn("border-current bg-muted text-xs", statusClass, className)}>
+      {label}
+    </Badge>
+  );
 }
 
 function StepsList({ steps }: { steps: PipelineStageStepViewModel[] }) {
   return (
-    <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
+    <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {steps.map((step, index) => (
         <li
-          className="flex flex-col gap-1 rounded-md border border-panelBorder bg-editorWidget px-2 py-1.5"
+          className="flex flex-col gap-1 rounded-md border border-border bg-muted px-3 py-2"
           key={`${step.name}-${index}`}
         >
           <div className="text-xs font-semibold text-foreground">{step.name || "Step"}</div>
-          <div className="flex items-center gap-1.5 text-[11px] text-description">
-            <StatusLabel
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <StatusText
               label={step.statusLabel || "Unknown"}
               status={step.statusClass}
               className="text-[11px]"
@@ -238,17 +265,17 @@ function BranchSteps({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2 text-xs">
         <div className="font-semibold text-foreground">{branch.name || "Branch"}</div>
-        <StatusLabel
+        <StatusText
           label={branch.statusLabel || "Unknown"}
           status={branch.statusClass}
           className="text-[11px]"
         />
-        <div className="text-[11px] text-description">{branch.durationLabel || "Unknown"}</div>
+        <div className="text-[11px] text-muted-foreground">{branch.durationLabel || "Unknown"}</div>
       </div>
       {steps.length > 0 ? (
         <StepsList steps={steps} />
       ) : (
-        <div className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description">
+        <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
           {showAll ? "No steps available." : "No failed steps."}
         </div>
       )}
@@ -267,96 +294,96 @@ function StageCard({
   expanded: boolean;
   showAll: boolean;
   onToggleExpanded: () => void;
-  onToggleShowAll: (event: MouseEvent<HTMLButtonElement>) => void;
+  onToggleShowAll: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
   const hasBranches = stage.parallelBranches.length > 0;
   const hasSteps = Boolean(stage.hasSteps);
   const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
   const titleLabel = expanded ? "Hide steps" : "Show steps";
-  const expandedClass = expanded ? "border-focus ring-1 ring-focus" : "";
+  const expandedClass = expanded ? "border-ring ring-1 ring-ring" : "";
 
   return (
-    <div
-      className={`rounded-xl border border-panelBorder bg-background p-3.5 flex flex-col gap-2.5 transition-colors ${expandedClass}`}
-      data-stage-key={stage.key}
-    >
-      <button
-        type="button"
-        className="w-full border-0 bg-transparent p-0 text-left cursor-pointer font-inherit text-inherit flex flex-col gap-1.5"
-        onClick={onToggleExpanded}
-      >
-        <div className="flex items-center justify-between gap-2.5">
-          <div className="text-sm font-semibold text-foreground">{stage.name || "Stage"}</div>
-          <StatusLabel
-            label={stage.statusLabel || "Unknown"}
-            status={stage.statusClass}
-            className="text-xs"
-          />
-        </div>
-        <div className="flex items-center justify-between gap-2.5 text-xs text-description">
-          <div>{stage.durationLabel || "Unknown"}</div>
-          <div className="text-[11px] text-link">{titleLabel}</div>
-        </div>
-      </button>
-      {hasBranches ? (
-        <div className="flex flex-col gap-1.5">
-          {stage.parallelBranches.map((branch, index) => (
-            <div
-              className="flex items-center justify-between gap-2 rounded-md border border-panelBorder bg-editorWidget px-2 py-1.5"
-              key={`${branch.key}-${index}`}
-            >
-              <div className="text-xs font-semibold text-foreground">
-                {branch.name || "Branch"}
+    <Card className={cn("bg-background transition-colors", expandedClass)} data-stage-key={stage.key}>
+      <div className="flex flex-col gap-3 p-3">
+        <button
+          type="button"
+          className="w-full border-0 bg-transparent p-0 text-left cursor-pointer font-inherit text-inherit flex flex-col gap-2"
+          onClick={onToggleExpanded}
+        >
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="text-sm font-semibold text-foreground">{stage.name || "Stage"}</div>
+            <StatusPill
+              label={stage.statusLabel || "Unknown"}
+              status={stage.statusClass}
+              className="text-[11px]"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2.5 text-xs text-muted-foreground">
+            <div>{stage.durationLabel || "Unknown"}</div>
+            <div className="text-[11px] text-primary">{titleLabel}</div>
+          </div>
+        </button>
+        {hasBranches ? (
+          <div className="flex flex-col gap-2">
+            {stage.parallelBranches.map((branch, index) => (
+              <div
+                className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted px-3 py-2"
+                key={`${branch.key}-${index}`}
+              >
+                <div className="text-xs font-semibold text-foreground">
+                  {branch.name || "Branch"}
+                </div>
+                <StatusText
+                  label={branch.statusLabel || "Unknown"}
+                  status={branch.statusClass}
+                  className="text-[11px]"
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  {branch.durationLabel || "Unknown"}
+                </div>
               </div>
-              <StatusLabel
-                label={branch.statusLabel || "Unknown"}
-                status={branch.statusClass}
-                className="text-[11px]"
-              />
-              <div className="text-[11px] text-description">
-                {branch.durationLabel || "Unknown"}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      <div
-        className="border-t border-dashed border-panelBorder pt-2.5 flex flex-col gap-2.5"
-        hidden={!expanded}
-      >
-        {hasSteps ? (
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-description">
-              Steps
-            </div>
-            <button
-              type="button"
-              className="border-0 bg-transparent p-0 text-xs text-link cursor-pointer"
-              onClick={onToggleShowAll}
-            >
-              {showAll ? "Show failed steps" : "Show all steps"}
-            </button>
+            ))}
           </div>
         ) : null}
-        {hasBranches ? (
-          stage.parallelBranches.map((branch, index) => (
-            <BranchSteps branch={branch} showAll={showAll} key={`${branch.key}-${index}`} />
-          ))
-        ) : hasSteps ? (
-          steps.length > 0 ? (
-            <StepsList steps={steps} />
-          ) : (
-            <div className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description">
-              {showAll ? "No steps available." : "No failed steps."}
+        <div
+          className="border-t border-dashed border-border pt-3 flex flex-col gap-3"
+          hidden={!expanded}
+        >
+          {hasSteps ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Steps
+              </div>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto px-0 text-xs"
+                onClick={onToggleShowAll}
+              >
+                {showAll ? "Show failed steps" : "Show all steps"}
+              </Button>
             </div>
-          )
-        ) : (
-          <div className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description">
-            No steps available.
-          </div>
-        )}
+          ) : null}
+          {hasBranches ? (
+            stage.parallelBranches.map((branch, index) => (
+              <BranchSteps branch={branch} showAll={showAll} key={`${branch.key}-${index}`} />
+            ))
+          ) : hasSteps ? (
+            steps.length > 0 ? (
+              <StepsList steps={steps} />
+            ) : (
+              <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+                {showAll ? "No steps available." : "No failed steps."}
+              </div>
+            )
+          ) : (
+            <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+              No steps available.
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -371,7 +398,9 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
         return (
           <li className="flex flex-col gap-1" key={`${item.message}-${index}`}>
             <div className="text-[13px] font-semibold text-foreground">{item.message}</div>
-            <div className="text-xs text-description break-words">{metaParts.join(" • ")}</div>
+            <div className="text-xs text-muted-foreground break-words">
+              {metaParts.join(" • ")}
+            </div>
           </li>
         );
       })}
@@ -388,7 +417,7 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
             {item.name || "Unnamed test"}
           </div>
           {item.className ? (
-            <div className="text-xs text-description break-words">{item.className}</div>
+            <div className="text-xs text-muted-foreground break-words">{item.className}</div>
           ) : null}
         </li>
       ))}
@@ -403,24 +432,26 @@ function ArtifactsList({ items }: { items: BuildFailureArtifact[] }) {
         <li className="flex items-center justify-between gap-2" key={`${item.relativePath}-${index}`}>
           <div className="text-[13px] break-words">{item.name || "Artifact"}</div>
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              className="text-xs text-link hover:underline border-0 bg-transparent p-0 cursor-pointer"
-              type="button"
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto px-0 text-xs"
               data-artifact-action="preview"
               data-artifact-path={item.relativePath}
               data-artifact-name={item.fileName ?? ""}
             >
               Preview
-            </button>
-            <button
-              className="text-xs text-link hover:underline border-0 bg-transparent p-0 cursor-pointer"
-              type="button"
+            </Button>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto px-0 text-xs"
               data-artifact-action="download"
               data-artifact-path={item.relativePath}
               data-artifact-name={item.fileName ?? ""}
             >
               Download
-            </button>
+            </Button>
           </div>
         </li>
       ))}
@@ -493,7 +524,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   }, [state.followLog, consoleScrollKey]);
 
   useEffect(() => {
-    const handleClick = (event: MouseEvent) => {
+    const handleClick = (event: globalThis.MouseEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target) {
         return;
@@ -550,196 +581,205 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   };
 
   return (
-    <div className="box-border px-6 pt-5 pb-7 flex flex-col gap-5">
+    <div className="min-h-screen px-6 py-6 flex flex-col gap-6">
       {state.errors.length > 0 ? (
-        <div
-          id="errors"
-          className="rounded-lg border border-inputErrorBorder bg-inputErrorBg text-inputErrorFg p-3 flex flex-col gap-1.5"
-        >
+        <Alert id="errors" variant="destructive" className="flex flex-col gap-1.5">
           {state.errors.map((error) => (
-            <div className="text-[13px]" key={error}>
+            <AlertDescription className="text-[13px]" key={error}>
               {error}
-            </div>
+            </AlertDescription>
           ))}
-        </div>
+        </Alert>
       ) : null}
-      <div className="flex items-baseline justify-between gap-3">
-        <div id="detail-title" className="text-xl font-semibold text-foreground">
-          {state.displayName}
-        </div>
-      </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-y-3 gap-x-5 rounded-lg border border-panelBorder bg-background p-3.5">
-        <div className="flex flex-col gap-1">
-          <div className="text-[11px] uppercase tracking-[0.08em] text-description">Result</div>
-          <div
-            id="detail-result"
-            className={`text-sm font-semibold ${getStatusClass(state.resultClass)}`}
-          >
-            {state.resultLabel}
+
+      <Card>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <CardTitle id="detail-title" className="text-xl">
+                {state.displayName}
+              </CardTitle>
+              <CardDescription>Build status and runtime metadata.</CardDescription>
+            </div>
+            <StatusPill
+              id="detail-result"
+              label={state.resultLabel}
+              status={state.resultClass}
+              className="text-sm"
+            />
           </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="text-[11px] uppercase tracking-[0.08em] text-description">Duration</div>
-          <div id="detail-duration" className="text-sm">
-            {state.durationLabel}
+        </CardHeader>
+        <Separator />
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-y-3 gap-x-5">
+            <div className="flex flex-col gap-1">
+              <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                Duration
+              </div>
+              <div id="detail-duration" className="text-sm font-medium">
+                {state.durationLabel}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                Timestamp
+              </div>
+              <div id="detail-timestamp" className="text-sm font-medium">
+                {state.timestampLabel}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+                Culprit(s)
+              </div>
+              <div id="detail-culprits" className="text-sm font-medium">
+                {state.culpritsLabel}
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="text-[11px] uppercase tracking-[0.08em] text-description">
-            Timestamp
-          </div>
-          <div id="detail-timestamp" className="text-sm">
-            {state.timestampLabel}
-          </div>
-        </div>
-        <div className="flex flex-col gap-1">
-          <div className="text-[11px] uppercase tracking-[0.08em] text-description">
-            Culprit(s)
-          </div>
-          <div id="detail-culprits" className="text-sm">
-            {state.culpritsLabel}
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
+
       {pipelineStages.length > 0 ? (
-        <section id="pipeline-section" className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <div className="text-[15px] font-semibold text-foreground">Pipeline Stages</div>
-            <div className="text-xs text-description">
-              Stage status, duration, and steps from Jenkins Pipeline.
+        <Card id="pipeline-section">
+          <CardHeader>
+            <CardTitle className="text-base">Pipeline Stages</CardTitle>
+            <CardDescription>Stage status, duration, and steps from Jenkins Pipeline.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div
+              id="pipeline-stages"
+              className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3"
+            >
+              {pipelineStages.map((stage, index) => {
+                const stageKey = typeof stage.key === "string" ? stage.key : "";
+                const expanded = expandedStages[stageKey] ?? false;
+                const showAll = showAllStages[stageKey] ?? false;
+                return (
+                  <StageCard
+                    key={stageKey || `stage-${index}`}
+                    stage={stage}
+                    expanded={expanded}
+                    showAll={showAll}
+                    onToggleExpanded={() =>
+                      setExpandedStages((prev) => ({
+                        ...prev,
+                        [stageKey]: !expanded
+                      }))
+                    }
+                    onToggleShowAll={(event) => {
+                      event.stopPropagation();
+                      setShowAllStages((prev) => ({
+                        ...prev,
+                        [stageKey]: !showAll
+                      }));
+                    }}
+                  />
+                );
+              })}
             </div>
-          </div>
-          <div
-            id="pipeline-stages"
-            className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3"
-          >
-            {pipelineStages.map((stage, index) => {
-              const stageKey = typeof stage.key === "string" ? stage.key : "";
-              const expanded = expandedStages[stageKey] ?? false;
-              const showAll = showAllStages[stageKey] ?? false;
-              return (
-                <StageCard
-                  key={stageKey || `stage-${index}`}
-                  stage={stage}
-                  expanded={expanded}
-                  showAll={showAll}
-                  onToggleExpanded={() =>
-                    setExpandedStages((prev) => ({
-                      ...prev,
-                      [stageKey]: !expanded
-                    }))
-                  }
-                  onToggleShowAll={(event) => {
-                    event.stopPropagation();
-                    setShowAllStages((prev) => ({
-                      ...prev,
-                      [stageKey]: !showAll
-                    }));
-                  }}
-                />
-              );
-            })}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
       ) : null}
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <div className="text-[15px] font-semibold text-foreground">Build Failure Insights</div>
-          <div className="text-xs text-description">
-            Changelog, test summary, and artifacts for this build.
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Build Failure Insights</CardTitle>
+          <CardDescription>Changelog, test summary, and artifacts for this build.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+            <Card className="bg-background">
+              <div className="min-h-[120px] p-3 flex flex-col gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Changelog
+                </div>
+                {insights.changelogItems.length > 0 ? (
+                  <ChangelogList items={insights.changelogItems} />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+                    No changes detected.
+                  </div>
+                )}
+                {insights.changelogOverflow > 0 ? (
+                  <div className="text-xs text-muted-foreground">
+                    {formatOverflow(insights.changelogOverflow)}
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+            <Card className="bg-background">
+              <div className="min-h-[120px] p-3 flex flex-col gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Tests
+                </div>
+                <div id="test-summary" className="text-[13px] font-semibold">
+                  {insights.testSummaryLabel}
+                </div>
+                {insights.failedTests.length > 0 ? (
+                  <FailedTestsList items={insights.failedTests} />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+                    {insights.failedTestsMessage}
+                  </div>
+                )}
+                {insights.failedTestsOverflow > 0 ? (
+                  <div className="text-xs text-muted-foreground">
+                    {formatOverflow(insights.failedTestsOverflow)}
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+            <Card className="bg-background">
+              <div className="min-h-[120px] p-3 flex flex-col gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Artifacts
+                </div>
+                {insights.artifacts.length > 0 ? (
+                  <ArtifactsList items={insights.artifacts} />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+                    No artifacts available.
+                  </div>
+                )}
+                {insights.artifactsOverflow > 0 ? (
+                  <div className="text-xs text-muted-foreground">
+                    {formatOverflow(insights.artifactsOverflow)}
+                  </div>
+                ) : null}
+              </div>
+            </Card>
           </div>
-        </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
-          <div className="min-h-[120px] rounded-lg border border-panelBorder bg-background p-3.5 flex flex-col gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-description">
-              Changelog
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="space-y-2">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="text-base">Console Output</CardTitle>
+            <div className="flex items-center gap-2">
+              <Switch id="follow-log" checked={state.followLog} onChange={handleFollowLogChange} />
+              <label htmlFor="follow-log" className="text-xs text-muted-foreground select-none">
+                Follow Log
+              </label>
             </div>
-            {insights.changelogItems.length > 0 ? (
-              <ChangelogList items={insights.changelogItems} />
-            ) : (
-              <div className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description">
-                No changes detected.
-              </div>
-            )}
-            {insights.changelogOverflow > 0 ? (
-              <div className="text-xs text-description">
-                {formatOverflow(insights.changelogOverflow)}
-              </div>
-            ) : null}
-          </div>
-          <div className="min-h-[120px] rounded-lg border border-panelBorder bg-background p-3.5 flex flex-col gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-description">
-              Tests
-            </div>
-            <div id="test-summary" className="text-[13px] font-semibold">
-              {insights.testSummaryLabel}
-            </div>
-            {insights.failedTests.length > 0 ? (
-              <FailedTestsList items={insights.failedTests} />
-            ) : (
-              <div className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description">
-                {insights.failedTestsMessage}
-              </div>
-            )}
-            {insights.failedTestsOverflow > 0 ? (
-              <div className="text-xs text-description">
-                {formatOverflow(insights.failedTestsOverflow)}
-              </div>
-            ) : null}
-          </div>
-          <div className="min-h-[120px] rounded-lg border border-panelBorder bg-background p-3.5 flex flex-col gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-description">
-              Artifacts
-            </div>
-            {insights.artifacts.length > 0 ? (
-              <ArtifactsList items={insights.artifacts} />
-            ) : (
-              <div className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description">
-                No artifacts available.
-              </div>
-            )}
-            {insights.artifactsOverflow > 0 ? (
-              <div className="text-xs text-description">
-                {formatOverflow(insights.artifactsOverflow)}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="text-sm font-semibold text-foreground">Console Output</div>
-            <label className="inline-flex items-center gap-1.5 text-xs text-description select-none">
-              <input
-                id="follow-log"
-                type="checkbox"
-                checked={state.followLog}
-                onChange={handleFollowLogChange}
-                className="m-0"
-              />
-              Follow Log
-            </label>
           </div>
           {consoleNote ? (
-            <div id="console-note" className="text-xs text-description">
+            <div id="console-note" className="text-xs text-muted-foreground">
               {consoleNote}
             </div>
           ) : null}
-        </div>
-        <div className="flex flex-col gap-2">
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
           {state.consoleError ? (
-            <div
-              id="console-error"
-              className="rounded-lg border border-inputWarningBorder bg-inputWarningBg text-inputWarningFg px-3 py-2.5 text-[13px]"
-            >
-              {state.consoleError}
-            </div>
+            <Alert id="console-error" variant="warning">
+              <AlertDescription className="text-[13px]">{state.consoleError}</AlertDescription>
+            </Alert>
           ) : null}
           {!state.consoleError && state.consoleText.length > 0 ? (
             <pre
               id="console-output"
-              className="m-0 rounded-lg border border-panelBorder bg-background px-4 py-3.5 font-mono text-[length:var(--vscode-editor-font-size)] leading-6 whitespace-pre overflow-x-auto"
+              className="m-0 rounded-lg border border-border bg-background px-4 py-3.5 font-mono text-[length:var(--vscode-editor-font-size)] leading-6 whitespace-pre overflow-x-auto"
             >
               {state.consoleText}
             </pre>
@@ -747,13 +787,13 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           {!state.consoleError && state.consoleText.length === 0 ? (
             <div
               id="console-empty"
-              className="rounded-lg border border-dashed border-panelBorder px-3 py-2.5 text-description"
+              className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground"
             >
               No console output available.
             </div>
           ) : null}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

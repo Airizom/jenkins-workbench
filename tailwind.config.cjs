@@ -6,8 +6,39 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        foreground: "var(--vscode-editor-foreground)",
-        background: "var(--vscode-editor-background)",
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        primary: {
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)"
+        },
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)"
+        },
+        muted: {
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)"
+        },
+        accent: {
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)"
+        },
+        card: {
+          DEFAULT: "var(--card)",
+          foreground: "var(--card-foreground)"
+        },
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)"
+        },
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)"
+        },
         panelBorder: "var(--vscode-panel-border)",
         description: "var(--vscode-descriptionForeground)",
         link: "var(--vscode-textLink-foreground)",
@@ -23,6 +54,11 @@ module.exports = {
         inputErrorBorder: "var(--vscode-inputValidation-errorBorder)",
         inputErrorBg: "var(--vscode-inputValidation-errorBackground)",
         inputErrorFg: "var(--vscode-inputValidation-errorForeground)"
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)"
       },
       fontFamily: {
         body: ["var(--vscode-font-family)"],
