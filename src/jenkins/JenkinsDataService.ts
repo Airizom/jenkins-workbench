@@ -48,7 +48,7 @@ export type {
   JobSearchEntry,
   JobSearchOptions
 } from "./data/JenkinsDataTypes";
-export { BuildActionError, CancellationError } from "./data/JenkinsDataErrors";
+export { BuildActionError, CancellationError } from "./errors";
 
 export interface JenkinsDataServiceOptions {
   cacheTtlMs?: number;

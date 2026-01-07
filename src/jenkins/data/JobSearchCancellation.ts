@@ -1,4 +1,4 @@
-import { CancellationError } from "./JenkinsDataErrors";
+import { CancellationError } from "../errors";
 import type { CancellationInput } from "./JenkinsDataTypes";
 
 const CANCELLATION_POLL_MS = 50;

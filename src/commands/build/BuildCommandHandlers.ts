@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService, JobParameter } from "../../jenkins/JenkinsDataService";
+import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import { NodeTreeItem } from "../../tree/TreeItems";
@@ -168,6 +169,7 @@ export async function openInJenkins(
 export async function showBuildDetails(
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
+  consoleExporter: BuildConsoleExporter,
   extensionUri: vscode.Uri,
   item?: BuildTreeItem
 ): Promise<void> {
@@ -180,6 +182,7 @@ export async function showBuildDetails(
     await BuildDetailsPanel.show(
       dataService,
       artifactActionHandler,
+      consoleExporter,
       item.environment,
       item.buildUrl,
       extensionUri,
@@ -195,6 +198,7 @@ export async function showBuildDetails(
 export async function openLastFailedBuild(
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
+  consoleExporter: BuildConsoleExporter,
   extensionUri: vscode.Uri,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
@@ -223,6 +227,7 @@ export async function openLastFailedBuild(
     await BuildDetailsPanel.show(
       dataService,
       artifactActionHandler,
+      consoleExporter,
       item.environment,
       lastFailed.url,
       extensionUri,

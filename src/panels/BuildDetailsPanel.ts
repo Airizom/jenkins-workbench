@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import { BuildActionError } from "../jenkins/errors";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../jenkins/types";
+import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
   MAX_CONSOLE_CHARS,
@@ -13,6 +15,7 @@ import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsP
 import {
   type BuildDetailsOutgoingMessage,
   isArtifactActionMessage,
+  isExportConsoleMessage,
   isOpenExternalMessage,
   isToggleFollowLogMessage
 } from "./buildDetails/BuildDetailsMessages";
@@ -35,6 +38,7 @@ export class BuildDetailsPanel {
   private static currentPanel: BuildDetailsPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
+  private consoleExporter: BuildConsoleExporter;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly completionPoller: BuildDetailsCompletionPoller;
   private readonly state = new BuildDetailsPanelState();
@@ -46,6 +50,7 @@ export class BuildDetailsPanel {
   static async show(
     dataService: BuildDetailsDataService,
     artifactActionHandler: ArtifactActionHandler,
+    consoleExporter: BuildConsoleExporter,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     extensionUri: vscode.Uri,
@@ -64,17 +69,23 @@ export class BuildDetailsPanel {
           localResourceRoots: [vscode.Uri.joinPath(extensionUri, ...bundleRootSegments)]
         }
       );
-      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel, extensionUri);
+      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel, extensionUri, consoleExporter);
     }
 
     const activePanel = BuildDetailsPanel.currentPanel;
+    activePanel.consoleExporter = consoleExporter;
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+  private constructor(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    consoleExporter: BuildConsoleExporter
+  ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
+    this.consoleExporter = consoleExporter;
     this.completionPoller = new BuildDetailsCompletionPoller({
       getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
       fetchBuildDetails: (token) => this.fetchBuildDetails(token),
@@ -102,6 +113,10 @@ export class BuildDetailsPanel {
         }
         if (isOpenExternalMessage(message)) {
           void this.openExternalUrl(message.url);
+          return;
+        }
+        if (isExportConsoleMessage(message)) {
+          void this.handleExportConsole();
           return;
         }
         if (isToggleFollowLogMessage(message)) {
@@ -443,6 +458,58 @@ export class BuildDetailsPanel {
     });
   }
 
+  private async handleExportConsole(): Promise<void> {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+      void vscode.window.showErrorMessage("Build details are not ready to export console output.");
+      return;
+    }
+
+    const defaultFileName = this.consoleExporter.getDefaultFileName(this.state.currentDetails);
+    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const defaultUri = workspaceUri
+      ? vscode.Uri.joinPath(workspaceUri, defaultFileName)
+      : undefined;
+    const targetUri = await vscode.window.showSaveDialog({
+      title: "Export Jenkins Console Output",
+      saveLabel: "Export Logs",
+      defaultUri,
+      filters: {
+        "Log files": ["log", "txt"]
+      }
+    });
+
+    if (!targetUri) {
+      return;
+    }
+    if (!targetUri.fsPath) {
+      void vscode.window.showErrorMessage("Export logs requires a file system path.");
+      return;
+    }
+
+    try {
+      const result = await this.consoleExporter.exportToFile({
+        environment: this.state.environment,
+        buildUrl: this.state.currentBuildUrl,
+        targetPath: targetUri.fsPath
+      });
+      if (result.mode === "tail" || result.truncated) {
+        void vscode.window.showWarningMessage(
+          `Saved last ${MAX_CONSOLE_CHARS.toLocaleString()} characters of console output to ${
+            targetUri.fsPath
+          }.`
+        );
+        return;
+      }
+      void vscode.window.showInformationMessage(
+        `Saved console output to ${targetUri.fsPath}.`
+      );
+    } catch (error) {
+      void vscode.window.showErrorMessage(
+        `Failed to export console output: ${formatActionError(error)}`
+      );
+    }
+  }
+
   private async openExternalUrl(url: string): Promise<void> {
     let parsed: vscode.Uri;
     try {
@@ -470,4 +537,11 @@ export class BuildDetailsPanel {
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
   }
+}
+
+function formatActionError(error: unknown): string {
+  if (error instanceof BuildActionError) {
+    return error.message;
+  }
+  return error instanceof Error ? error.message : "Unexpected error.";
 }

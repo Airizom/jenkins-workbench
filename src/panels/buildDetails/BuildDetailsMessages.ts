@@ -18,6 +18,10 @@ export interface OpenExternalMessage {
   url: string;
 }
 
+export interface ExportConsoleMessage {
+  type: "exportConsole";
+}
+
 export interface ArtifactActionMessage {
   type: "artifactAction";
   action: "preview" | "download";
@@ -37,6 +41,13 @@ export function isOpenExternalMessage(message: unknown): message is OpenExternal
     return false;
   }
   return message.type === "openExternal" && typeof message.url === "string";
+}
+
+export function isExportConsoleMessage(message: unknown): message is ExportConsoleMessage {
+  if (!isRecord(message)) {
+    return false;
+  }
+  return message.type === "exportConsole";
 }
 
 export function isArtifactActionMessage(message: unknown): message is ArtifactActionMessage {

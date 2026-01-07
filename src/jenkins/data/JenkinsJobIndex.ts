@@ -3,7 +3,7 @@ import type { JenkinsClientProvider } from "../JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { AsyncQueue, JobQueue } from "./AsyncQueue";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
-import { CancellationError } from "./JenkinsDataErrors";
+import { CancellationError } from "../errors";
 import type {
   CancellationInput,
   JenkinsJobInfo,

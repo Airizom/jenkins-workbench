@@ -84,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     clientProvider: services.clientProvider,
     dataService: services.dataService,
     artifactActionHandler: services.artifactActionHandler,
+    consoleExporter: services.consoleExporter,
     viewStateStore: services.viewStateStore,
     treeNavigator: services.treeNavigator,
     treeDataProvider: services.treeDataProvider,

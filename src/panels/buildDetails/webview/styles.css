@@ -50,4 +50,17 @@
     font: inherit;
     color: inherit;
   }
+
+  .console-match {
+    background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 220, 0, 0.2));
+    border-radius: 3px;
+    color: inherit;
+    padding: 0 1px;
+  }
+
+  .console-match--active {
+    background-color: var(--vscode-editor-findMatchBackground, rgba(255, 200, 0, 0.35));
+    outline: 1px solid var(--vscode-editor-findMatchBorder, var(--vscode-focusBorder));
+    outline-offset: 1px;
+  }
 }

@@ -16,7 +16,10 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Separator } from "./components/ui/separator";
 import { Switch } from "./components/ui/switch";
+import { stripAnsi } from "./lib/ansi";
 import { cn } from "./lib/utils";
+import { ConsoleSearchToolbar } from "./components/ConsoleSearchToolbar";
+import { useConsoleSearch } from "./hooks/useConsoleSearch";
 
 const { useEffect, useMemo, useReducer, useState } = React;
 
@@ -463,6 +466,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState);
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
   const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
+  const displayConsoleText = useMemo(() => stripAnsi(state.consoleText), [state.consoleText]);
+  const consoleSearch = useConsoleSearch(displayConsoleText);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>) => {
@@ -510,18 +515,18 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   }, [state.pipelineStages]);
 
   const consoleScrollKey = useMemo(
-    () => `${state.consoleText.length}-${state.consoleError ?? ""}`,
-    [state.consoleText, state.consoleError]
+    () => `${displayConsoleText.length}-${state.consoleError ?? ""}`,
+    [displayConsoleText, state.consoleError]
   );
 
   useEffect(() => {
-    if (!state.followLog) {
+    if (!state.followLog || consoleSearch.isSearchActive) {
       return;
     }
     if (consoleScrollKey || consoleScrollKey === "") {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "auto" });
     }
-  }, [state.followLog, consoleScrollKey]);
+  }, [state.followLog, consoleScrollKey, consoleSearch.isSearchActive]);
 
   useEffect(() => {
     const handleClick = (event: globalThis.MouseEvent) => {
@@ -578,6 +583,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     if (nextValue) {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "auto" });
     }
+  };
+
+  const handleExportLogs = () => {
+    vscode.postMessage({ type: "exportConsole" });
   };
 
   return (
@@ -754,16 +763,38 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
       </Card>
 
       <Card>
-        <CardHeader className="space-y-2">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+        <CardHeader className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <CardTitle className="text-base">Console Output</CardTitle>
-            <div className="flex items-center gap-2">
-              <Switch id="follow-log" checked={state.followLog} onChange={handleFollowLogChange} />
-              <label htmlFor="follow-log" className="text-xs text-muted-foreground select-none">
-                Follow Log
-              </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="outline" size="sm" onClick={handleExportLogs}>
+                Export Logs
+              </Button>
+              <div className="flex items-center gap-2">
+                <Switch id="follow-log" checked={state.followLog} onChange={handleFollowLogChange} />
+                <label htmlFor="follow-log" className="text-xs text-muted-foreground select-none">
+                  Follow Log
+                </label>
+              </div>
             </div>
           </div>
+          <ConsoleSearchToolbar
+            visible={consoleSearch.showSearchToolbar}
+            query={consoleSearch.searchQuery}
+            useRegex={consoleSearch.useRegex}
+            matchCountLabel={consoleSearch.matchCountLabel}
+            matchCount={consoleSearch.matchCount}
+            isSearchActive={consoleSearch.isSearchActive}
+            error={consoleSearch.searchError}
+            tooManyMatchesLabel={consoleSearch.tooManyMatchesLabel}
+            inputRef={consoleSearch.searchInputRef}
+            onChange={consoleSearch.handleSearchChange}
+            onKeyDown={consoleSearch.handleSearchKeyDown}
+            onToggleRegex={() => consoleSearch.setUseRegex((prev) => !prev)}
+            onPrev={() => consoleSearch.handleSearchStep("prev")}
+            onNext={() => consoleSearch.handleSearchStep("next")}
+            onClear={consoleSearch.handleClearSearch}
+          />
           {consoleNote ? (
             <div id="console-note" className="text-xs text-muted-foreground">
               {consoleNote}
@@ -779,9 +810,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           {!state.consoleError && state.consoleText.length > 0 ? (
             <pre
               id="console-output"
+              ref={consoleSearch.consoleOutputRef}
               className="m-0 rounded-lg border border-border bg-background px-4 py-3.5 font-mono text-[length:var(--vscode-editor-font-size)] leading-6 whitespace-pre overflow-x-auto"
             >
-              {state.consoleText}
+              {consoleSearch.consoleSegments}
             </pre>
           ) : null}
           {!state.consoleError && state.consoleText.length === 0 ? (

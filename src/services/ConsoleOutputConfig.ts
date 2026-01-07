@@ -1,0 +1,1 @@
+export const MAX_CONSOLE_CHARS = 200000;

@@ -1,22 +1,4 @@
-import { JenkinsRequestError } from "../JenkinsClient";
-import type { BuildActionErrorCode } from "./JenkinsDataTypes";
-
-export class BuildActionError extends Error {
-  readonly code: BuildActionErrorCode;
-  readonly statusCode?: number;
-
-  constructor(message: string, code: BuildActionErrorCode, statusCode?: number) {
-    super(message);
-    this.code = code;
-    this.statusCode = statusCode;
-  }
-}
-
-export class CancellationError extends Error {
-  constructor() {
-    super("Operation cancelled.");
-  }
-}
+import { BuildActionError, JenkinsRequestError } from "../errors";
 
 export const toBuildActionError = (error: unknown): BuildActionError => {
   if (error instanceof BuildActionError) {

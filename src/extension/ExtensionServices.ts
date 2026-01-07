@@ -1,9 +1,14 @@
 import * as vscode from "vscode";
 import { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
 import { ArtifactActionService } from "../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../services/ArtifactFilesystem";
 import { ArtifactStorageService } from "../services/ArtifactStorageService";
+import {
+  BuildConsoleExporter,
+  createNodeBuildConsoleFilesystem
+} from "../services/BuildConsoleExporter";
 import {
   DefaultArtifactActionHandler,
   type ArtifactActionHandler,
@@ -24,6 +29,7 @@ export interface ExtensionServices {
   environmentStore: JenkinsEnvironmentStore;
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
+  consoleExporter: BuildConsoleExporter;
   artifactStorageService: ArtifactStorageService;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
@@ -58,6 +64,13 @@ export function createExtensionServices(
     cacheTtlMs: options.cacheTtlMs,
     maxCacheEntries: options.maxCacheEntries
   });
+  const consoleExporter = new BuildConsoleExporter(
+    dataService,
+    createNodeBuildConsoleFilesystem(),
+    {
+      maxConsoleChars: MAX_CONSOLE_CHARS
+    }
+  );
   const artifactStorageService = new ArtifactStorageService(
     dataService,
     createFileArtifactFilesystem()
@@ -89,6 +102,7 @@ export function createExtensionServices(
     environmentStore,
     clientProvider,
     dataService,
+    consoleExporter,
     artifactStorageService,
     artifactActionHandler,
     watchStore,

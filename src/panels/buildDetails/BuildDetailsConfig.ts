@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { CONFIG_SECTION } from "../../extension/ExtensionConfig";
-
-export const MAX_CONSOLE_CHARS = 200000;
+export { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 5;
 const MIN_REFRESH_INTERVAL_SECONDS = 2;

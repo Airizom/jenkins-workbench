@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type {
   ArtifactTreeItem,
   BuildTreeItem,
@@ -24,6 +25,7 @@ export function registerBuildCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
+  consoleExporter: BuildConsoleExporter,
   refreshHost: BuildCommandRefreshHost
 ): void {
   context.subscriptions.push(
@@ -45,12 +47,18 @@ export function registerBuildCommands(
       (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.showBuildDetails", (item?: BuildTreeItem) =>
-      showBuildDetails(dataService, artifactActionHandler, context.extensionUri, item)
+      showBuildDetails(dataService, artifactActionHandler, consoleExporter, context.extensionUri, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.openLastFailedBuild",
       (item?: JobTreeItem | PipelineTreeItem) =>
-        openLastFailedBuild(dataService, artifactActionHandler, context.extensionUri, item)
+        openLastFailedBuild(
+          dataService,
+          artifactActionHandler,
+          consoleExporter,
+          context.extensionUri,
+          item
+        )
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.previewArtifact", (item?: ArtifactTreeItem) =>
       previewArtifact(artifactActionHandler, item)
