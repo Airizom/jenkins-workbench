@@ -55,6 +55,7 @@ export interface BuildDetailsViewModel {
   pipelineStages: PipelineStageViewModel[];
   insights: BuildFailureInsightsViewModel;
   consoleText: string;
+  consoleHtml?: string;
   consoleTruncated: boolean;
   consoleMaxChars: number;
   consoleError?: string;

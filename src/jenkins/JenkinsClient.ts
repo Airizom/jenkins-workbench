@@ -18,6 +18,7 @@ import type {
   JenkinsJobKind,
   JenkinsNode,
   JenkinsParameterDefinition,
+  JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
   JenkinsQueueItem,
   JenkinsTestReport,
@@ -40,6 +41,7 @@ export type {
   JenkinsJobKind,
   JenkinsNode,
   JenkinsParameterDefinition,
+  JenkinsProgressiveConsoleHtml,
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
   JenkinsTestReport,
@@ -109,6 +111,14 @@ export class JenkinsClient {
     start: number
   ): Promise<JenkinsProgressiveConsoleText> {
     return this.buildsApi.getConsoleTextProgressive(buildUrl, start);
+  }
+
+  async getConsoleHtmlProgressive(
+    buildUrl: string,
+    start: number,
+    annotator?: string
+  ): Promise<JenkinsProgressiveConsoleHtml> {
+    return this.buildsApi.getConsoleHtmlProgressive(buildUrl, start, annotator);
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {

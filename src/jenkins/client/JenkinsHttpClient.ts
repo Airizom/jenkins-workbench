@@ -55,9 +55,13 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   }
 
   async requestTextWithHeaders(
-    url: string
+    url: string,
+    options?: { headers?: Record<string, string> }
   ): Promise<{ text: string; headers: IncomingHttpHeaders }> {
-    return requestTextWithHeadersInternal(url, this.getRequestOptions());
+    return requestTextWithHeadersInternal(url, {
+      ...this.getRequestOptions(),
+      headers: this.mergeHeaders(options?.headers)
+    });
   }
 
   async requestBufferWithHeaders(

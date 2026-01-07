@@ -46,6 +46,7 @@ export interface BuildDetailsViewModelInput {
   pipelineRun?: PipelineRun;
   testReport?: JenkinsTestReport;
   consoleTextResult?: JenkinsConsoleText;
+  consoleHtmlResult?: { html: string; truncated: boolean };
   consoleError?: string;
   errors: string[];
   maxConsoleChars: number;
@@ -57,7 +58,10 @@ export function buildBuildDetailsViewModel(
 ): BuildDetailsViewModel {
   const details = input.details;
   const truncated = truncateConsoleText(input.consoleTextResult?.text ?? "", input.maxConsoleChars);
-  const consoleTruncated = truncated.truncated || Boolean(input.consoleTextResult?.truncated);
+  const consoleTruncated =
+    Boolean(input.consoleHtmlResult?.truncated) ||
+    truncated.truncated ||
+    Boolean(input.consoleTextResult?.truncated);
   const nonConsoleErrors = input.errors.filter(
     (error) => !error.toLowerCase().startsWith("console output:")
   );
@@ -73,6 +77,7 @@ export function buildBuildDetailsViewModel(
     pipelineStages: buildPipelineStagesViewModel(input.pipelineRun),
     insights: buildBuildFailureInsights(details, input.testReport),
     consoleText: truncated.text,
+    consoleHtml: input.consoleHtmlResult?.html,
     consoleTruncated,
     consoleMaxChars: input.maxConsoleChars,
     consoleError,

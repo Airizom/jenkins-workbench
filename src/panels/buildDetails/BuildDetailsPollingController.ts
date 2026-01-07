@@ -2,20 +2,16 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type {
   JenkinsBuildDetails,
   JenkinsConsoleText,
+  JenkinsConsoleTextTail,
+  JenkinsProgressiveConsoleHtml,
+  JenkinsProgressiveConsoleText,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
-
-interface JenkinsConsoleTextTail extends JenkinsConsoleText {
-  nextStart: number;
-  progressiveSupported: boolean;
-}
-
-interface JenkinsProgressiveConsoleText {
-  text: string;
-  textSize: number;
-  moreData: boolean;
-}
+import {
+  ConsoleStreamManager,
+  type ConsoleSnapshotResult
+} from "./ConsoleStreamManager";
 
 export interface BuildDetailsDataService {
   getBuildDetails(
@@ -45,6 +41,12 @@ export interface BuildDetailsDataService {
     buildUrl: string,
     start: number
   ): Promise<JenkinsProgressiveConsoleText>;
+  getConsoleHtmlProgressive(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    start: number,
+    annotator?: string
+  ): Promise<JenkinsProgressiveConsoleHtml>;
 }
 
 export interface BuildDetailsPollingCallbacks {
@@ -54,6 +56,8 @@ export interface BuildDetailsPollingCallbacks {
   onTitle(title: string): void;
   onConsoleAppend(text: string): void;
   onConsoleSet(payload: { text: string; truncated: boolean }): void;
+  onConsoleHtmlAppend(html: string): void;
+  onConsoleHtmlSet(payload: { html: string; truncated: boolean }): void;
   onErrors(errors: string[]): void;
   onComplete(details: JenkinsBuildDetails): void;
 }
@@ -71,6 +75,7 @@ export interface BuildDetailsPollingOptions {
 export interface BuildDetailsInitialState {
   details?: JenkinsBuildDetails;
   consoleTextResult?: JenkinsConsoleTextTail;
+  consoleHtmlResult?: { html: string; truncated: boolean };
   workflowRun?: JenkinsWorkflowRun;
   workflowError?: unknown;
   errors: string[];
@@ -87,15 +92,12 @@ export class BuildDetailsPollingController {
   private readonly getRefreshIntervalMs: () => number;
   private readonly callbacks: BuildDetailsPollingCallbacks;
   private readonly formatError: (error: unknown) => string;
+  private readonly consoleStreamManager: ConsoleStreamManager;
   private pollTimer: NodeJS.Timeout | undefined;
   private pollInFlight = false;
   private pollingActive = false;
   private disposed = false;
   private pollGeneration = 0;
-  private consoleOffset = 0;
-  private consoleBuffer = "";
-  private consoleTruncated = false;
-  private progressiveSupported = false;
   private lastWorkflowFetchAt = 0;
   private lastKnownBuilding: boolean | undefined;
   private workflowRetryPending = false;
@@ -108,22 +110,38 @@ export class BuildDetailsPollingController {
     this.getRefreshIntervalMs = options.getRefreshIntervalMs;
     this.callbacks = options.callbacks;
     this.formatError = options.formatError;
+    this.consoleStreamManager = new ConsoleStreamManager({
+      dataService: options.dataService,
+      environment: this.environment,
+      buildUrl: this.buildUrl,
+      maxConsoleChars: this.maxConsoleChars,
+      callbacks: {
+        onConsoleAppend: this.callbacks.onConsoleAppend,
+        onConsoleSet: this.callbacks.onConsoleSet,
+        onConsoleHtmlAppend: this.callbacks.onConsoleHtmlAppend,
+        onConsoleHtmlSet: this.callbacks.onConsoleHtmlSet
+      }
+    });
+  }
+
+  async refreshConsoleSnapshot(): Promise<{
+    consoleTextResult?: JenkinsConsoleTextTail;
+    consoleHtmlResult?: { html: string; truncated: boolean };
+  }> {
+    return this.consoleStreamManager.refreshSnapshot();
   }
 
   async loadInitial(): Promise<BuildDetailsInitialState> {
     const detailsPromise = this.dataService.getBuildDetails(this.environment, this.buildUrl);
     const workflowPromise = this.dataService.getWorkflowRun(this.environment, this.buildUrl);
-    const consolePromise = this.dataService.getConsoleTextTail(
-      this.environment,
-      this.buildUrl,
-      this.maxConsoleChars
-    );
+    const consolePromise = this.consoleStreamManager.loadInitialConsole();
 
     const errors: string[] = [];
     let details: JenkinsBuildDetails | undefined;
     let detailsError: unknown;
     let consoleTextResult: JenkinsConsoleTextTail | undefined;
     let consoleError: unknown;
+    let consoleHtmlResult: { html: string; truncated: boolean } | undefined;
     let workflowRun: JenkinsWorkflowRun | undefined;
     let workflowError: unknown;
 
@@ -139,29 +157,26 @@ export class BuildDetailsPollingController {
       workflowError = error;
     }
 
+    let consoleSnapshot: ConsoleSnapshotResult | undefined;
     try {
-      consoleTextResult = await consolePromise;
+      consoleSnapshot = await consolePromise;
     } catch (error) {
       consoleError = error;
+    }
+
+    if (consoleSnapshot) {
+      consoleTextResult = consoleSnapshot.consoleTextResult;
+      consoleHtmlResult = consoleSnapshot.consoleHtmlResult;
+      if (consoleSnapshot.consoleError) {
+        consoleError = consoleSnapshot.consoleError;
+      }
     }
 
     if (detailsError) {
       errors.push(`Build details: ${this.formatError(detailsError)}`);
     }
-    if (consoleError) {
+    if (consoleError && !consoleHtmlResult) {
       errors.push(`Console output: ${this.formatError(consoleError)}`);
-    }
-
-    if (consoleTextResult) {
-      this.consoleBuffer = consoleTextResult.text;
-      this.consoleTruncated = consoleTextResult.truncated;
-      this.consoleOffset = consoleTextResult.nextStart;
-      this.progressiveSupported = consoleTextResult.progressiveSupported;
-    } else {
-      this.consoleBuffer = "";
-      this.consoleTruncated = false;
-      this.consoleOffset = 0;
-      this.progressiveSupported = false;
     }
 
     if (workflowError && details?.building === false) {
@@ -173,7 +188,7 @@ export class BuildDetailsPollingController {
     }
     this.lastKnownBuilding = details?.building;
 
-    return { details, consoleTextResult, workflowRun, workflowError, errors };
+    return { details, consoleTextResult, consoleHtmlResult, workflowRun, workflowError, errors };
   }
 
   start(): void {
@@ -220,19 +235,11 @@ export class BuildDetailsPollingController {
 
     try {
       const detailsPromise = this.dataService.getBuildDetails(this.environment, this.buildUrl);
-      const usingProgressive = this.progressiveSupported;
-      const consolePromise: Promise<JenkinsProgressiveConsoleText | JenkinsConsoleText> =
-        usingProgressive
-          ? this.dataService.getConsoleTextProgressive(
-              this.environment,
-              this.buildUrl,
-              this.consoleOffset
-            )
-          : this.dataService.getConsoleText(this.environment, this.buildUrl, this.maxConsoleChars);
+      const consolePromise = this.consoleStreamManager.fetchNext();
 
       let details: JenkinsBuildDetails | undefined;
       let detailsError: unknown;
-      let consoleValue: JenkinsProgressiveConsoleText | JenkinsConsoleText | undefined;
+      let consoleResult: { mode: "html" | "text"; value?: unknown; error?: unknown } | undefined;
       let consoleError: unknown;
       let workflowRun: JenkinsWorkflowRun | undefined;
       let workflowError: unknown;
@@ -244,7 +251,7 @@ export class BuildDetailsPollingController {
       }
 
       try {
-        consoleValue = await consolePromise;
+        consoleResult = await consolePromise;
       } catch (error) {
         consoleError = error;
       }
@@ -259,24 +266,17 @@ export class BuildDetailsPollingController {
         errors.push(`Build details: ${this.formatError(detailsError)}`);
       }
 
-      if (consoleError) {
-        errors.push(`Console output: ${this.formatError(consoleError)}`);
-        if (usingProgressive) {
-          this.progressiveSupported = false;
-        }
-      } else if (consoleValue) {
-        if (usingProgressive) {
-          this.handleProgressiveChunk(consoleValue as JenkinsProgressiveConsoleText);
-        } else {
-          const consoleText = consoleValue as JenkinsConsoleText;
-          this.consoleBuffer = consoleText.text;
-          this.consoleTruncated = consoleText.truncated;
-          this.consoleOffset = this.consoleBuffer.length;
-          this.callbacks.onConsoleSet({
-            text: this.consoleBuffer,
-            truncated: this.consoleTruncated
-          });
-        }
+      const consoleFailure = consoleError ?? consoleResult?.error;
+      if (consoleFailure) {
+        errors.push(`Console output: ${this.formatError(consoleFailure)}`);
+      } else if (consoleResult?.value) {
+        this.consoleStreamManager.applyResult(
+          consoleResult.mode,
+          consoleResult.value as
+            | JenkinsProgressiveConsoleHtml
+            | JenkinsProgressiveConsoleText
+            | JenkinsConsoleText
+        );
       }
 
       if (details) {
@@ -317,39 +317,22 @@ export class BuildDetailsPollingController {
 
       this.callbacks.onErrors(errors);
 
-      if (!details || details.building || this.workflowRetryPending) {
+      const shouldContinuePolling =
+        !details ||
+        details.building ||
+        this.workflowRetryPending ||
+        this.consoleStreamManager.shouldContinuePolling();
+      if (shouldContinuePolling) {
         this.scheduleNextPoll();
-        return;
+      } else {
+        this.stop();
       }
-
-      this.stop();
-      if (completedNow) {
+      if (completedNow && details) {
         this.callbacks.onComplete(details);
       }
     } finally {
       this.pollInFlight = false;
     }
-  }
-
-  private handleProgressiveChunk(chunk: JenkinsProgressiveConsoleText): void {
-    this.consoleOffset = chunk.textSize;
-    if (!chunk.text) {
-      return;
-    }
-
-    const nextBuffer = this.consoleBuffer + chunk.text;
-    if (nextBuffer.length > this.maxConsoleChars) {
-      this.consoleBuffer = nextBuffer.slice(nextBuffer.length - this.maxConsoleChars);
-      this.consoleTruncated = true;
-      this.callbacks.onConsoleSet({
-        text: this.consoleBuffer,
-        truncated: true
-      });
-      return;
-    }
-
-    this.consoleBuffer = nextBuffer;
-    this.callbacks.onConsoleAppend(chunk.text);
   }
 
   private shouldFetchWorkflow(building: boolean | undefined, completedNow: boolean): boolean {

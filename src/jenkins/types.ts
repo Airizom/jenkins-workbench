@@ -172,6 +172,14 @@ export interface JenkinsProgressiveConsoleText {
   moreData: boolean;
 }
 
+export interface JenkinsProgressiveConsoleHtml {
+  html: string;
+  textSize: number;
+  textSizeKnown: boolean;
+  moreData: boolean;
+  annotator?: string;
+}
+
 export interface JenkinsNode {
   displayName: string;
   name?: string;

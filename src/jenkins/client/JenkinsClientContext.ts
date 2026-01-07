@@ -6,7 +6,10 @@ export interface JenkinsClientContext {
   requestJson<T>(url: string): Promise<T>;
   requestHeaders(url: string): Promise<IncomingHttpHeaders>;
   requestText(url: string): Promise<string>;
-  requestTextWithHeaders(url: string): Promise<{ text: string; headers: IncomingHttpHeaders }>;
+  requestTextWithHeaders(
+    url: string,
+    options?: { headers?: Record<string, string> }
+  ): Promise<{ text: string; headers: IncomingHttpHeaders }>;
   requestBufferWithHeaders(
     url: string,
     options?: { maxBytes?: number }

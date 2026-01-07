@@ -17,6 +17,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./com
 import { Separator } from "./components/ui/separator";
 import { Switch } from "./components/ui/switch";
 import { stripAnsi } from "./lib/ansi";
+import type { ConsoleHtmlModel } from "./lib/consoleHtml";
+import { parseConsoleHtml, renderConsoleHtmlWithHighlights } from "./lib/consoleHtml";
 import { cn } from "./lib/utils";
 import { ConsoleSearchToolbar } from "./components/ConsoleSearchToolbar";
 import { useConsoleSearch } from "./hooks/useConsoleSearch";
@@ -29,14 +31,22 @@ type VsCodeApi = {
 
 type BuildDetailsIncomingMessage =
   | { type: "appendConsole"; text?: string }
+  | { type: "appendConsoleHtml"; html?: string }
   | { type: "setConsole"; text?: string; truncated?: boolean }
+  | { type: "setConsoleHtml"; html?: string; truncated?: boolean }
   | { type: "setErrors"; errors?: string[] }
   | { type: "setFollowLog"; value?: unknown }
   | BuildDetailsUpdateMessage;
 
+type BuildDetailsState = BuildDetailsViewModel & {
+  consoleHtmlModel?: ConsoleHtmlModel;
+};
+
 type BuildDetailsAction =
   | { type: "appendConsole"; text: string }
+  | { type: "appendConsoleHtml"; html: string }
   | { type: "setConsole"; text: string; truncated: boolean }
+  | { type: "setConsoleHtml"; html: string; truncated: boolean }
   | { type: "setErrors"; errors: string[] }
   | { type: "setFollowLog"; value: boolean }
   | { type: "updateDetails"; payload: BuildDetailsUpdateMessage };
@@ -52,7 +62,7 @@ const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   artifactsOverflow: 0
 };
 
-const FALLBACK_STATE: BuildDetailsViewModel = {
+const FALLBACK_STATE: BuildDetailsState = {
   displayName: "Build Details",
   resultLabel: "Unknown",
   resultClass: "neutral",
@@ -62,6 +72,8 @@ const FALLBACK_STATE: BuildDetailsViewModel = {
   pipelineStages: [],
   insights: DEFAULT_INSIGHTS,
   consoleText: "",
+  consoleHtml: undefined,
+  consoleHtmlModel: undefined,
   consoleTruncated: false,
   consoleMaxChars: 0,
   errors: [],
@@ -114,10 +126,23 @@ function splitConsoleError(errors: string[]): { consoleError?: string; displayEr
   return { consoleError, displayErrors };
 }
 
-function buildDetailsReducer(
-  state: BuildDetailsViewModel,
-  action: BuildDetailsAction
-): BuildDetailsViewModel {
+function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
+  const merged: BuildDetailsState = {
+    ...FALLBACK_STATE,
+    ...initialState,
+    consoleHtmlModel: undefined
+  };
+  if (merged.consoleHtml) {
+    return {
+      ...merged,
+      consoleHtmlModel: parseConsoleHtml(merged.consoleHtml),
+      consoleHtml: undefined
+    };
+  }
+  return merged;
+}
+
+function buildDetailsReducer(state: BuildDetailsState, action: BuildDetailsAction): BuildDetailsState {
   switch (action.type) {
     case "appendConsole": {
       if (!action.text) {
@@ -126,6 +151,20 @@ function buildDetailsReducer(
       return {
         ...state,
         consoleText: state.consoleText + action.text,
+        consoleHtml: undefined,
+        consoleHtmlModel: undefined,
+        consoleError: undefined
+      };
+    }
+    case "appendConsoleHtml": {
+      if (!action.html) {
+        return state;
+      }
+      const nextModel = appendConsoleHtmlModel(state.consoleHtmlModel, action.html);
+      return {
+        ...state,
+        consoleHtml: undefined,
+        consoleHtmlModel: nextModel,
         consoleError: undefined
       };
     }
@@ -133,6 +172,18 @@ function buildDetailsReducer(
       return {
         ...state,
         consoleText: action.text,
+        consoleHtml: undefined,
+        consoleHtmlModel: undefined,
+        consoleTruncated: action.truncated,
+        consoleError: undefined
+      };
+    }
+    case "setConsoleHtml": {
+      const nextModel = appendConsoleHtmlModel(undefined, action.html);
+      return {
+        ...state,
+        consoleHtml: undefined,
+        consoleHtmlModel: nextModel,
         consoleTruncated: action.truncated,
         consoleError: undefined
       };
@@ -164,6 +215,20 @@ function buildDetailsReducer(
     default:
       return state;
   }
+}
+
+function appendConsoleHtmlModel(
+  current: ConsoleHtmlModel | undefined,
+  htmlChunk: string
+): ConsoleHtmlModel {
+  const parsed = parseConsoleHtml(htmlChunk);
+  if (!current) {
+    return parsed;
+  }
+  return {
+    nodes: [...current.nodes, ...parsed.nodes],
+    text: current.text + parsed.text
+  };
 }
 
 function formatOverflow(value: number): string {
@@ -463,11 +528,28 @@ function ArtifactsList({ items }: { items: BuildFailureArtifact[] }) {
 }
 
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
-  const [state, dispatch] = useReducer(buildDetailsReducer, initialState);
+  const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
   const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
   const displayConsoleText = useMemo(() => stripAnsi(state.consoleText), [state.consoleText]);
-  const consoleSearch = useConsoleSearch(displayConsoleText);
+  const consoleHtmlModel = state.consoleHtmlModel;
+  const consoleSourceText = consoleHtmlModel?.text ?? displayConsoleText;
+  const consoleSearch = useConsoleSearch(consoleSourceText);
+  const consoleSegments = useMemo(() => {
+    if (consoleHtmlModel) {
+      return renderConsoleHtmlWithHighlights(
+        consoleHtmlModel,
+        consoleSearch.matches,
+        consoleSearch.activeMatchIndex
+      );
+    }
+    return consoleSearch.consoleSegments;
+  }, [
+    consoleHtmlModel,
+    consoleSearch.matches,
+    consoleSearch.activeMatchIndex,
+    consoleSearch.consoleSegments
+  ]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>) => {
@@ -481,10 +563,22 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             dispatch({ type: "appendConsole", text: message.text });
           }
           break;
+        case "appendConsoleHtml":
+          if (typeof message.html === "string" && message.html.length > 0) {
+            dispatch({ type: "appendConsoleHtml", html: message.html });
+          }
+          break;
         case "setConsole":
           dispatch({
             type: "setConsole",
             text: typeof message.text === "string" ? message.text : "",
+            truncated: Boolean(message.truncated)
+          });
+          break;
+        case "setConsoleHtml":
+          dispatch({
+            type: "setConsoleHtml",
+            html: typeof message.html === "string" ? message.html : "",
             truncated: Boolean(message.truncated)
           });
           break;
@@ -515,8 +609,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   }, [state.pipelineStages]);
 
   const consoleScrollKey = useMemo(
-    () => `${displayConsoleText.length}-${state.consoleError ?? ""}`,
-    [displayConsoleText, state.consoleError]
+    () => `${consoleSourceText.length}-${state.consoleError ?? ""}`,
+    [consoleSourceText, state.consoleError]
   );
 
   useEffect(() => {
@@ -575,6 +669,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
 
   const pipelineStages = state.pipelineStages;
   const insights = state.insights ?? DEFAULT_INSIGHTS;
+  const hasConsoleOutput = consoleSourceText.length > 0;
 
   const handleFollowLogChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.checked;
@@ -807,16 +902,16 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               <AlertDescription className="text-[13px]">{state.consoleError}</AlertDescription>
             </Alert>
           ) : null}
-          {!state.consoleError && state.consoleText.length > 0 ? (
+          {!state.consoleError && hasConsoleOutput ? (
             <pre
               id="console-output"
               ref={consoleSearch.consoleOutputRef}
               className="m-0 rounded-lg border border-border bg-background px-4 py-3.5 font-mono text-[length:var(--vscode-editor-font-size)] leading-6 whitespace-pre overflow-x-auto"
             >
-              {consoleSearch.consoleSegments}
+              {consoleSegments}
             </pre>
           ) : null}
-          {!state.consoleError && state.consoleText.length === 0 ? (
+          {!state.consoleError && !hasConsoleOutput ? (
             <div
               id="console-empty"
               className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground"

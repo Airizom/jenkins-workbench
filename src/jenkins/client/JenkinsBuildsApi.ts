@@ -3,6 +3,7 @@ import type {
   JenkinsBuildDetails,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
   JenkinsArtifact,
   JenkinsTestReport,
@@ -217,6 +218,29 @@ export class JenkinsBuildsApi {
     };
   }
 
+  async getConsoleHtmlProgressive(
+    buildUrl: string,
+    start: number,
+    annotator?: string
+  ): Promise<JenkinsProgressiveConsoleHtml> {
+    const safeStart = Math.max(0, Math.floor(start));
+    const url = this.buildProgressiveHtmlUrl(buildUrl, safeStart);
+    const response = await this.context.requestTextWithHeaders(url, {
+      headers: annotator ? { "X-ConsoleAnnotator": annotator } : undefined
+    });
+    const textSize = this.parseTextSize(response.headers["x-text-size"]);
+    const moreData = this.parseMoreData(response.headers["x-more-data"]);
+    const nextAnnotator = this.parseConsoleAnnotator(response.headers["x-console-annotator"]);
+    const textSizeKnown = Number.isFinite(textSize);
+    return {
+      html: response.text,
+      textSize: textSizeKnown ? textSize : safeStart,
+      textSizeKnown,
+      moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0,
+      annotator: nextAnnotator
+    };
+  }
+
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
     const tree = "lastFailedBuild[number,url,result,building,timestamp,duration]";
     const url = buildApiUrlFromItem(jobUrl, tree);
@@ -280,6 +304,12 @@ export class JenkinsBuildsApi {
     return url.toString();
   }
 
+  private buildProgressiveHtmlUrl(buildUrl: string, start: number): string {
+    const url = new URL(buildActionUrl(buildUrl, "logText/progressiveHtml"));
+    url.searchParams.set("start", Math.max(0, Math.floor(start)).toString());
+    return url.toString();
+  }
+
   private parseTextSize(value: string | string[] | undefined): number {
     const text = Array.isArray(value) ? value[0] : value;
     const parsed = text ? Number.parseInt(text, 10) : Number.NaN;
@@ -293,4 +323,14 @@ export class JenkinsBuildsApi {
     }
     return text.toLowerCase() === "true";
   }
+
+  private parseConsoleAnnotator(value: string | string[] | undefined): string | undefined {
+    const text = Array.isArray(value) ? value[0] : value;
+    if (!text) {
+      return undefined;
+    }
+    const trimmed = text.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+
 }

@@ -5,7 +5,9 @@ export type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsContracts";
 export type BuildDetailsOutgoingMessage =
   | BuildDetailsUpdateMessage
   | { type: "appendConsole"; text: string }
+  | { type: "appendConsoleHtml"; html: string }
   | { type: "setConsole"; text: string; truncated: boolean }
+  | { type: "setConsoleHtml"; html: string; truncated: boolean }
   | { type: "setErrors"; errors: string[] };
 
 export interface ToggleFollowLogMessage {

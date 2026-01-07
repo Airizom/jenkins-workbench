@@ -23,6 +23,7 @@ import type {
   JobParameterKind,
   JobSearchEntry,
   JobSearchOptions,
+  ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult
 } from "./data/JenkinsDataTypes";
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
@@ -43,6 +44,7 @@ export type {
   JenkinsQueueItemInfo,
   JobParameter,
   JobParameterKind,
+  ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult,
   JobPathSegment,
   JobSearchEntry,
@@ -260,6 +262,20 @@ export class JenkinsDataService {
     const client = await this.clientProvider.getClient(environment);
     try {
       return await client.getConsoleTextProgressive(buildUrl, start);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async getConsoleHtmlProgressive(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    start: number,
+    annotator?: string
+  ): Promise<ProgressiveConsoleHtmlResult> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.getConsoleHtmlProgressive(buildUrl, start, annotator);
     } catch (error) {
       throw toBuildActionError(error);
     }

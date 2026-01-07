@@ -3,6 +3,7 @@ import type {
   JenkinsConsoleTextTail,
   JenkinsJobKind,
   JenkinsNode,
+  JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText
 } from "../JenkinsClient";
 
@@ -21,6 +22,7 @@ export interface JobParameter {
 export type ConsoleTextResult = JenkinsConsoleText;
 export type ConsoleTextTailResult = JenkinsConsoleTextTail;
 export type ProgressiveConsoleTextResult = JenkinsProgressiveConsoleText;
+export type ProgressiveConsoleHtmlResult = JenkinsProgressiveConsoleHtml;
 
 export interface JenkinsJobInfo {
   name: string;

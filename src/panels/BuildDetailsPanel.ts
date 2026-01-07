@@ -191,6 +191,7 @@ export class BuildDetailsPanel {
     }
 
     const consoleTextResult = initialState.consoleTextResult;
+    const consoleHtmlResult = initialState.consoleHtmlResult;
     const pipelineRun = toPipelineRun(initialState.workflowRun);
     const pipelineError = initialState.workflowError
       ? `Pipeline stages: ${formatError(initialState.workflowError)}`
@@ -209,6 +210,7 @@ export class BuildDetailsPanel {
       details,
       pipelineRun: this.state.currentPipelineRun,
       consoleTextResult,
+      consoleHtmlResult,
       errors: this.state.currentErrors,
       maxConsoleChars: MAX_CONSOLE_CHARS,
       followLog: this.state.followLog
@@ -338,22 +340,34 @@ export class BuildDetailsPanel {
     if (!this.panel.visible) {
       return;
     }
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+    if (
+      !this.pollingController ||
+      !this.dataService ||
+      !this.state.environment ||
+      !this.state.currentBuildUrl
+    ) {
       return;
     }
     try {
-      const consoleText = await this.dataService.getConsoleTextTail(
-        this.state.environment,
-        this.state.currentBuildUrl,
-        MAX_CONSOLE_CHARS
-      );
+      const snapshot = await this.pollingController.refreshConsoleSnapshot();
       if (!this.isTokenCurrent(token)) {
+        return;
+      }
+      if (snapshot.consoleHtmlResult) {
+        this.postMessage({
+          type: "setConsoleHtml",
+          html: snapshot.consoleHtmlResult.html,
+          truncated: snapshot.consoleHtmlResult.truncated
+        });
+        return;
+      }
+      if (!snapshot.consoleTextResult) {
         return;
       }
       this.postMessage({
         type: "setConsole",
-        text: consoleText.text,
-        truncated: consoleText.truncated
+        text: snapshot.consoleTextResult.text,
+        truncated: snapshot.consoleTextResult.truncated
       });
     } catch {
       // Swallow failures to avoid blocking the panel resume flow.

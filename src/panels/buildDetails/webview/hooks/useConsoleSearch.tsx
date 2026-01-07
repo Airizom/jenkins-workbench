@@ -4,7 +4,7 @@ const { useEffect, useMemo, useRef, useState } = React;
 
 const MAX_CONSOLE_MATCHES = 2000;
 
-type ConsoleMatch = {
+export type ConsoleMatch = {
   start: number;
   end: number;
 };
@@ -84,6 +84,8 @@ export type ConsoleSearchState = {
   showSearchToolbar: boolean;
   matchCount: number;
   matchCountLabel: string;
+  matches: ConsoleMatch[];
+  activeMatchIndex: number;
   searchError?: string;
   tooManyMatchesLabel?: string;
   consoleSegments: React.ReactNode[];
@@ -254,6 +256,8 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
     showSearchToolbar,
     matchCount,
     matchCountLabel,
+    matches: consoleSearchState.matches,
+    activeMatchIndex,
     searchError: consoleSearchState.error,
     tooManyMatchesLabel: consoleSearchState.tooManyMatches
       ? `Showing first ${MAX_CONSOLE_MATCHES.toLocaleString()} matches.`

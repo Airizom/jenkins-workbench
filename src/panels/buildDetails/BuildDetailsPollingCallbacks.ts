@@ -68,6 +68,12 @@ export function createBuildDetailsPollingCallbacks(
       }
       hooks.postMessage({ type: "appendConsole", text });
     },
+    onConsoleHtmlAppend: (html) => {
+      if (!hooks.isTokenCurrent(token)) {
+        return;
+      }
+      hooks.postMessage({ type: "appendConsoleHtml", html });
+    },
     onConsoleSet: (payload) => {
       if (!hooks.isTokenCurrent(token)) {
         return;
@@ -75,6 +81,16 @@ export function createBuildDetailsPollingCallbacks(
       hooks.postMessage({
         type: "setConsole",
         text: payload.text,
+        truncated: payload.truncated
+      });
+    },
+    onConsoleHtmlSet: (payload) => {
+      if (!hooks.isTokenCurrent(token)) {
+        return;
+      }
+      hooks.postMessage({
+        type: "setConsoleHtml",
+        html: payload.html,
         truncated: payload.truncated
       });
     },
