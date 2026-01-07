@@ -58,6 +58,38 @@ export function formatDuration(duration?: number): string {
   return parts.join(" ");
 }
 
+export function formatTestDuration(durationSeconds?: number): string | undefined {
+  if (durationSeconds === undefined || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
+    return undefined;
+  }
+  if (durationSeconds < 1) {
+    return `${Math.round(durationSeconds * 1000)} ms`;
+  }
+  if (durationSeconds < 60) {
+    const rounded = Math.round(durationSeconds * 10) / 10;
+    return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)} s`;
+  }
+  const totalSeconds = Math.round(durationSeconds);
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600) % 24;
+  const days = Math.floor(totalSeconds / 86400);
+  const parts: string[] = [];
+  if (days > 0) {
+    parts.push(`${days}d`);
+  }
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+  if (seconds > 0 || parts.length === 0) {
+    parts.push(`${seconds}s`);
+  }
+  return parts.join(" ");
+}
+
 export function formatTimestamp(timestamp?: number): string {
   if (timestamp === undefined) {
     return "Unknown";

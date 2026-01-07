@@ -24,12 +24,15 @@ import {
   formatNumber,
   formatResult,
   formatResultClass,
+  formatTestDuration,
   formatTimestamp,
   normalizePipelineStatus,
   truncateConsoleText
 } from "./BuildDetailsFormatters";
 
 const INSIGHTS_LIST_LIMIT = 20;
+const MAX_TEST_CASE_LOG_CHARS = 8000;
+const TEST_CASE_LOG_TRUNCATION_SUFFIX = "\n... (truncated)";
 
 export type {
   BuildDetailsViewModel,
@@ -224,7 +227,15 @@ function buildFailedTests(
       if (isFailedTestCase(testCase.status)) {
         const name = testCase.name ?? testCase.className ?? "Unnamed test";
         const className = testCase.name && testCase.className ? testCase.className : undefined;
-        items.push({ name, className });
+        items.push({
+          name,
+          className,
+          errorDetails: normalizeTestText(testCase.errorDetails, true),
+          errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
+          stdout: normalizeTestText(testCase.stdout, true),
+          stderr: normalizeTestText(testCase.stderr, true),
+          durationLabel: formatTestDuration(testCase.duration)
+        });
       }
     }
   }
@@ -245,6 +256,17 @@ function isFailedTestCase(status?: string): boolean {
     return false;
   }
   return true;
+}
+
+function normalizeTestText(value?: string, allowTruncation = false): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (!allowTruncation || trimmed.length <= MAX_TEST_CASE_LOG_CHARS) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, MAX_TEST_CASE_LOG_CHARS)}${TEST_CASE_LOG_TRUNCATION_SUFFIX}`;
 }
 
 function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {

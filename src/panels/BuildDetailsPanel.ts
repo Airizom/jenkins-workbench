@@ -8,7 +8,9 @@ import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
   MAX_CONSOLE_CHARS,
-  getBuildDetailsRefreshIntervalMs
+  getBuildDetailsRefreshIntervalMs,
+  getTestReportIncludeCaseLogs,
+  getTestReportIncludeCaseLogsConfigKey
 } from "./buildDetails/BuildDetailsConfig";
 import { formatError, formatResult } from "./buildDetails/BuildDetailsFormatters";
 import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsPollingCallbacks";
@@ -126,6 +128,16 @@ export class BuildDetailsPanel {
       null,
       this.disposables
     );
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (!event.affectsConfiguration(getTestReportIncludeCaseLogsConfigKey())) {
+          return;
+        }
+        this.pollingController?.setTestReportOptions({
+          includeCaseLogs: getTestReportIncludeCaseLogs()
+        });
+      })
+    );
   }
 
   private dispose(): void {
@@ -170,6 +182,7 @@ export class BuildDetailsPanel {
       buildUrl,
       maxConsoleChars: MAX_CONSOLE_CHARS,
       getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
+      testReportOptions: { includeCaseLogs: getTestReportIncludeCaseLogs() },
       formatError,
       callbacks: createBuildDetailsPollingCallbacks(this.state, token, {
         postMessage: (message) => this.postMessage(message),
@@ -375,17 +388,14 @@ export class BuildDetailsPanel {
   }
 
   private async refreshTestReport(token: number): Promise<void> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+    if (!this.pollingController || !this.state.environment || !this.state.currentBuildUrl) {
       return;
     }
     if (this.state.currentDetails?.building) {
       return;
     }
     try {
-      const testReport = await this.dataService.getTestReport(
-        this.state.environment,
-        this.state.currentBuildUrl
-      );
+      const testReport = await this.pollingController.fetchTestReport();
       if (!this.isTokenCurrent(token)) {
         return;
       }

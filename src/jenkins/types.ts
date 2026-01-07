@@ -98,6 +98,11 @@ export interface JenkinsTestReportCase {
   name?: string;
   className?: string;
   status?: string;
+  errorDetails?: string;
+  errorStackTrace?: string;
+  duration?: number;
+  stdout?: string;
+  stderr?: string;
 }
 
 export interface JenkinsTestReportSuite {

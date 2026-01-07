@@ -181,6 +181,11 @@
           "minimum": 2,
           "description": "Polling interval in seconds for refreshing build details and streaming logs."
         },
+        "jenkinsWorkbench.buildDetails.testReport.includeCaseLogs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include per-test stack traces and stdout/stderr when fetching test reports. Enabling this can increase payload size for large test suites."
+        },
         "jenkinsWorkbench.jobSearchConcurrency": {
           "type": "number",
           "default": 4,

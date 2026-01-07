@@ -4,6 +4,7 @@ import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
+import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsRequestError } from "./errors";
 import type { JenkinsBufferResponse } from "./request";
 import type { JenkinsStreamResponse } from "./request";
@@ -50,6 +51,7 @@ export type {
 } from "./types";
 
 export type { JenkinsBuildTriggerMode, JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
+export type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 
 export { JenkinsRequestError };
 
@@ -125,8 +127,11 @@ export class JenkinsClient {
     return this.buildsApi.getLastFailedBuild(jobUrl);
   }
 
-  async getTestReport(buildUrl: string): Promise<JenkinsTestReport> {
-    return this.buildsApi.getTestReport(buildUrl);
+  async getTestReport(
+    buildUrl: string,
+    options?: JenkinsTestReportOptions
+  ): Promise<JenkinsTestReport> {
+    return this.buildsApi.getTestReport(buildUrl, options);
   }
 
   async getWorkflowRun(buildUrl: string): Promise<JenkinsWorkflowRun> {

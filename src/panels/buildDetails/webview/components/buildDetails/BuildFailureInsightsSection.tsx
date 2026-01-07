@@ -119,7 +119,7 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
 
 function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
   return (
-    <ul className="list-none m-0 p-0 flex flex-col gap-2">
+    <ul className="list-none m-0 p-0 flex flex-col gap-3">
       {items.map((item, index) => (
         <li className="flex flex-col gap-1" key={`${item.name}-${index}`}>
           <div className="text-[13px] font-semibold text-foreground">
@@ -128,9 +128,37 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
           {item.className ? (
             <div className="text-xs text-muted-foreground break-words">{item.className}</div>
           ) : null}
+          {item.errorDetails ? (
+            <div className="text-xs text-foreground whitespace-pre-wrap break-words">
+              {item.errorDetails}
+            </div>
+          ) : null}
+          {item.durationLabel ? (
+            <div className="text-[11px] text-muted-foreground">
+              Duration • {item.durationLabel}
+            </div>
+          ) : null}
+          {item.errorStackTrace ? (
+            <FailedTestDetail label="Stack trace" value={item.errorStackTrace} />
+          ) : null}
+          {item.stdout ? <FailedTestDetail label="Stdout" value={item.stdout} /> : null}
+          {item.stderr ? <FailedTestDetail label="Stderr" value={item.stderr} /> : null}
         </li>
       ))}
     </ul>
+  );
+}
+
+function FailedTestDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <details className="rounded-lg border border-border bg-background/40 px-2 py-1.5">
+      <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </summary>
+      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-background px-2 py-1 text-[11px] font-mono leading-5">
+        {value}
+      </pre>
+    </details>
   );
 }
 

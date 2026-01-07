@@ -8,6 +8,7 @@ import type {
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
+import type { JenkinsTestReportOptions } from "../../jenkins/JenkinsTestReportOptions";
 import {
   ConsoleStreamManager,
   type ConsoleSnapshotResult
@@ -24,7 +25,8 @@ export interface BuildDetailsDataService {
   ): Promise<JenkinsWorkflowRun | undefined>;
   getTestReport(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    options?: JenkinsTestReportOptions
   ): Promise<JenkinsTestReport | undefined>;
   getConsoleText(
     environment: JenkinsEnvironmentRef,
@@ -68,6 +70,7 @@ export interface BuildDetailsPollingOptions {
   buildUrl: string;
   maxConsoleChars: number;
   getRefreshIntervalMs: () => number;
+  testReportOptions?: JenkinsTestReportOptions;
   callbacks: BuildDetailsPollingCallbacks;
   formatError: (error: unknown) => string;
 }
@@ -90,6 +93,7 @@ export class BuildDetailsPollingController {
   private readonly buildUrl: string;
   private readonly maxConsoleChars: number;
   private readonly getRefreshIntervalMs: () => number;
+  private testReportOptions?: JenkinsTestReportOptions;
   private readonly callbacks: BuildDetailsPollingCallbacks;
   private readonly formatError: (error: unknown) => string;
   private readonly consoleStreamManager: ConsoleStreamManager;
@@ -108,6 +112,7 @@ export class BuildDetailsPollingController {
     this.buildUrl = options.buildUrl;
     this.maxConsoleChars = options.maxConsoleChars;
     this.getRefreshIntervalMs = options.getRefreshIntervalMs;
+    this.testReportOptions = options.testReportOptions;
     this.callbacks = options.callbacks;
     this.formatError = options.formatError;
     this.consoleStreamManager = new ConsoleStreamManager({
@@ -129,6 +134,18 @@ export class BuildDetailsPollingController {
     consoleHtmlResult?: { html: string; truncated: boolean };
   }> {
     return this.consoleStreamManager.refreshSnapshot();
+  }
+
+  async fetchTestReport(): Promise<JenkinsTestReport | undefined> {
+    return this.dataService.getTestReport(
+      this.environment,
+      this.buildUrl,
+      this.testReportOptions
+    );
+  }
+
+  setTestReportOptions(options?: JenkinsTestReportOptions): void {
+    this.testReportOptions = options;
   }
 
   async loadInitial(): Promise<BuildDetailsInitialState> {

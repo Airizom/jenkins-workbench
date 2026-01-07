@@ -7,6 +7,11 @@ export interface BuildFailureChangelogItem {
 export interface BuildFailureFailedTest {
   name: string;
   className?: string;
+  errorDetails?: string;
+  errorStackTrace?: string;
+  stdout?: string;
+  stderr?: string;
+  durationLabel?: string;
 }
 
 export interface BuildFailureArtifact {

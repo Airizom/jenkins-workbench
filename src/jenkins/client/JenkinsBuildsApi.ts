@@ -9,6 +9,7 @@ import type {
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../types";
+import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import { buildActionUrl, buildApiUrlFromItem, buildArtifactDownloadUrl } from "../urls";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import { JenkinsRequestError } from "../errors";
@@ -106,11 +107,18 @@ export class JenkinsBuildsApi {
     ].join("");
   }
 
-  async getTestReport(buildUrl: string): Promise<JenkinsTestReport> {
+  async getTestReport(
+    buildUrl: string,
+    options?: JenkinsTestReportOptions
+  ): Promise<JenkinsTestReport> {
     const url = new URL(buildActionUrl(buildUrl, "testReport/api/json"));
+    const caseFields = ["name", "className", "status", "errorDetails", "duration"];
+    if (options?.includeCaseLogs) {
+      caseFields.push("errorStackTrace", "stdout", "stderr");
+    }
     url.searchParams.set(
       "tree",
-      "failCount,skipCount,totalCount,suites[cases[name,className,status]]"
+      `failCount,skipCount,totalCount,suites[cases[${caseFields.join(",")}]]`
     );
     return this.context.requestJson<JenkinsTestReport>(url.toString());
   }

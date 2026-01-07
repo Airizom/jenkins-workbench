@@ -29,6 +29,7 @@ import type {
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
 import { JenkinsRequestError } from "./errors";
 import type { JenkinsTestReport } from "./types";
+import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import { resolveNodeUrl } from "./urls";
 
@@ -295,11 +296,12 @@ export class JenkinsDataService {
 
   async getTestReport(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    options?: JenkinsTestReportOptions
   ): Promise<JenkinsTestReport | undefined> {
     const client = await this.clientProvider.getClient(environment);
     try {
-      return await client.getTestReport(buildUrl);
+      return await client.getTestReport(buildUrl, options);
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
         return undefined;
