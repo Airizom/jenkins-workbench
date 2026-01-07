@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-01-07
+
+### Added
+
+- feat: add console search and export for build details
+- feat: add progressive HTML console streaming to build details
+- feat: refresh build details UI with reusable components
+
+### Changed
+
+- refactor: split build details webview into focused modules
+
+### Documentation
+
+- docs: add CI and release workflow badges
+
 ## [1.6.0] - 2026-01-06
 
 ### Added
