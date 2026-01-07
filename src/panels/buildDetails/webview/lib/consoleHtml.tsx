@@ -46,14 +46,16 @@ export function parseConsoleHtml(html: string): ConsoleHtmlModel {
 export function renderConsoleHtmlWithHighlights(
   model: ConsoleHtmlModel,
   matches: ConsoleMatch[],
-  activeMatchIndex: number
+  activeMatchIndex: number,
+  onOpenExternal?: (url: string) => void
 ): React.ReactNode[] {
   const context = {
     matches,
     activeMatchIndex,
     cursor: 0,
     matchPointer: 0,
-    keyIndex: 0
+    keyIndex: 0,
+    onOpenExternal
   };
   return renderNodes(model.nodes, context);
 }
@@ -64,6 +66,7 @@ type RenderContext = {
   cursor: number;
   matchPointer: number;
   keyIndex: number;
+  onOpenExternal?: (url: string) => void;
 };
 
 function renderNodes(nodes: ConsoleHtmlNode[], context: RenderContext): React.ReactNode[] {
@@ -81,13 +84,23 @@ function renderNodes(nodes: ConsoleHtmlNode[], context: RenderContext): React.Re
       continue;
     }
     const children = renderNodes(node.children, context);
+    const props: Record<string, unknown> = {
+      ...node.attrs,
+      key
+    };
+    if (node.tag === "a" && context.onOpenExternal) {
+      const url = node.attrs["data-external-url"] ?? node.attrs.href;
+      if (url) {
+        props.onClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+          event.preventDefault();
+          context.onOpenExternal?.(url);
+        };
+      }
+    }
     rendered.push(
       React.createElement(
         node.tag,
-        {
-          ...node.attrs,
-          key
-        },
+        props,
         children
       )
     );

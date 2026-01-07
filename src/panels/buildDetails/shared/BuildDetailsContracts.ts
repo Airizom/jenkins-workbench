@@ -15,6 +15,8 @@ export interface BuildFailureArtifact {
   relativePath: string;
 }
 
+export type ArtifactAction = "preview" | "download";
+
 export interface PipelineStageStepViewModel {
   name: string;
   statusLabel: string;

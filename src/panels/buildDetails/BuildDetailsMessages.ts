@@ -1,4 +1,4 @@
-import type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsContracts";
+import type { ArtifactAction, BuildDetailsUpdateMessage } from "./shared/BuildDetailsContracts";
 
 export type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsContracts";
 
@@ -26,7 +26,7 @@ export interface ExportConsoleMessage {
 
 export interface ArtifactActionMessage {
   type: "artifactAction";
-  action: "preview" | "download";
+  action: ArtifactAction;
   relativePath: string;
   fileName?: string;
 }

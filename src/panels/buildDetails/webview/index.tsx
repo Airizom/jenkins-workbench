@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
-import { BuildDetailsApp, getInitialState } from "./BuildDetailsApp";
+import { BuildDetailsApp } from "./BuildDetailsApp";
+import { getInitialState } from "./state/buildDetailsState";
 
 const rootElement = document.getElementById("root");
 
