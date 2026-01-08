@@ -53,7 +53,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const notifier = new VscodeStatusNotifier();
   const poller = new JenkinsStatusPoller(
     services.environmentStore,
-    services.clientProvider,
+    services.dataService,
+    services.pendingInputCoordinator,
     services.watchStore,
     notifier,
     {
@@ -74,7 +75,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   poller.start();
   void services.viewStateStore.syncFilterContext();
 
-  context.subscriptions.push(services.treeView, poller, queuePoller);
+  context.subscriptions.push(
+    services.treeView,
+    services.treeDataProvider,
+    services.pendingInputCoordinator,
+    poller,
+    queuePoller
+  );
 
   registerExtensionSubscriptions(context, services, poller, queuePoller);
   registerExtensionCommands(context, {
@@ -85,6 +92,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     dataService: services.dataService,
     artifactActionHandler: services.artifactActionHandler,
     consoleExporter: services.consoleExporter,
+    queuedBuildWaiter: services.queuedBuildWaiter,
+    pendingInputCoordinator: services.pendingInputCoordinator,
     viewStateStore: services.viewStateStore,
     treeNavigator: services.treeNavigator,
     treeDataProvider: services.treeDataProvider,

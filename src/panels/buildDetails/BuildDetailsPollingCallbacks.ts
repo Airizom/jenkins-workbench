@@ -29,7 +29,8 @@ export function createBuildDetailsPollingCallbacks(
         buildDetailsUpdateMessage(
           details,
           state.currentTestReport,
-          state.currentPipelineRun
+          state.currentPipelineRun,
+          state.currentPendingInputs
         )
       );
     },
@@ -44,7 +45,8 @@ export function createBuildDetailsPollingCallbacks(
           buildDetailsUpdateMessage(
             state.currentDetails,
             state.currentTestReport,
-            state.currentPipelineRun
+            state.currentPipelineRun,
+            state.currentPendingInputs
           )
         );
       }
@@ -100,6 +102,22 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setBaseErrors(errors);
       hooks.publishErrors();
+    },
+    onPendingInputs: (pendingInputs) => {
+      if (!hooks.isTokenCurrent(token)) {
+        return;
+      }
+      state.setPendingInputs(pendingInputs);
+      if (state.currentDetails) {
+        hooks.postMessage(
+          buildDetailsUpdateMessage(
+            state.currentDetails,
+            state.currentTestReport,
+            state.currentPipelineRun,
+            state.currentPendingInputs
+          )
+        );
+      }
     },
     onComplete: (details) => {
       if (!hooks.isTokenCurrent(token)) {

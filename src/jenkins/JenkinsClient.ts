@@ -18,6 +18,7 @@ import type {
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
+  JenkinsPendingInputAction,
   JenkinsParameterDefinition,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
@@ -41,6 +42,8 @@ export type {
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
+  JenkinsPendingInputAction,
+  JenkinsPendingInputParameterDefinition,
   JenkinsParameterDefinition,
   JenkinsProgressiveConsoleHtml,
   JenkinsQueueItem,
@@ -138,6 +141,10 @@ export class JenkinsClient {
     return this.buildsApi.getWorkflowRun(buildUrl);
   }
 
+  async getPendingInputActions(buildUrl: string): Promise<JenkinsPendingInputAction[]> {
+    return this.buildsApi.getPendingInputActions(buildUrl);
+  }
+
   async getArtifact(
     buildUrl: string,
     relativePath: string,
@@ -162,6 +169,10 @@ export class JenkinsClient {
     return this.queueApi.getQueue();
   }
 
+  async getQueueItem(id: number): Promise<JenkinsQueueItem> {
+    return this.queueApi.getQueueItem(id);
+  }
+
   classifyJob(job: JenkinsJob): JenkinsJobKind {
     return this.jobsApi.classifyJob(job);
   }
@@ -183,6 +194,18 @@ export class JenkinsClient {
 
   async rebuildBuild(buildUrl: string): Promise<void> {
     await this.buildsApi.rebuildBuild(buildUrl);
+  }
+
+  async proceedInput(
+    buildUrl: string,
+    inputId: string,
+    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+  ): Promise<void> {
+    await this.buildsApi.proceedInput(buildUrl, inputId, options);
+  }
+
+  async abortInput(buildUrl: string, inputId: string, abortUrl?: string): Promise<void> {
+    await this.buildsApi.abortInput(buildUrl, inputId, abortUrl);
   }
 
   async getJobParameters(jobUrl: string): Promise<JenkinsParameterDefinition[]> {

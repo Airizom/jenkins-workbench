@@ -52,6 +52,22 @@ export interface BuildFailureInsightsViewModel {
   artifactsOverflow: number;
 }
 
+export interface PendingInputParameterViewModel {
+  name: string;
+  kind: string;
+  description?: string;
+  choices?: string[];
+  defaultValue?: string | number | boolean;
+}
+
+export interface PendingInputViewModel {
+  id: string;
+  message: string;
+  submitterLabel: string;
+  parametersLabel: string;
+  parameters: PendingInputParameterViewModel[];
+}
+
 export interface BuildDetailsViewModel {
   displayName: string;
   resultLabel: string;
@@ -61,6 +77,7 @@ export interface BuildDetailsViewModel {
   culpritsLabel: string;
   pipelineStages: PipelineStageViewModel[];
   insights: BuildFailureInsightsViewModel;
+  pendingInputs: PendingInputViewModel[];
   consoleText: string;
   consoleHtml?: string;
   consoleTruncated: boolean;
@@ -79,4 +96,5 @@ export interface BuildDetailsUpdateMessage {
   culpritsLabel: string;
   insights: BuildFailureInsightsViewModel;
   pipelineStages: PipelineStageViewModel[];
+  pendingInputs: PendingInputViewModel[];
 }

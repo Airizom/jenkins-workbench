@@ -9,12 +9,15 @@ import type {
   JenkinsTestReport,
   JenkinsTestSummaryAction
 } from "../../jenkins/types";
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type {
   BuildDetailsViewModel,
   BuildFailureArtifact,
   BuildFailureChangelogItem,
   BuildFailureFailedTest,
   BuildFailureInsightsViewModel,
+  PendingInputParameterViewModel,
+  PendingInputViewModel,
   PipelineStageStepViewModel,
   PipelineStageViewModel
 } from "./shared/BuildDetailsContracts";
@@ -40,6 +43,8 @@ export type {
   BuildFailureChangelogItem,
   BuildFailureFailedTest,
   BuildFailureInsightsViewModel,
+  PendingInputParameterViewModel,
+  PendingInputViewModel,
   PipelineStageStepViewModel,
   PipelineStageViewModel
 } from "./shared/BuildDetailsContracts";
@@ -54,7 +59,15 @@ export interface BuildDetailsViewModelInput {
   errors: string[];
   maxConsoleChars: number;
   followLog?: boolean;
+  pendingInputs?: PendingInputAction[];
 }
+
+const PARAMETER_KIND_LABELS: Record<string, string> = {
+  boolean: "Boolean",
+  choice: "Choice",
+  password: "Password",
+  string: "String"
+};
 
 export function buildBuildDetailsViewModel(
   input: BuildDetailsViewModelInput
@@ -79,6 +92,7 @@ export function buildBuildDetailsViewModel(
     culpritsLabel: details ? formatCulprits(details.culprits) : "Unknown",
     pipelineStages: buildPipelineStagesViewModel(input.pipelineRun),
     insights: buildBuildFailureInsights(details, input.testReport),
+    pendingInputs: buildPendingInputsViewModel(input.pendingInputs),
     consoleText: truncated.text,
     consoleHtml: input.consoleHtmlResult?.html,
     consoleTruncated,
@@ -95,6 +109,41 @@ function extractConsoleError(errors: string[]): string | undefined {
     return consoleError.replace(/^console output:\s*/i, "");
   }
   return undefined;
+}
+
+export function buildPendingInputsViewModel(
+  pendingInputs?: PendingInputAction[]
+): PendingInputViewModel[] {
+  if (!pendingInputs || pendingInputs.length === 0) {
+    return [];
+  }
+
+  return pendingInputs.map((action) => {
+    const parameters: PendingInputParameterViewModel[] = action.parameters.map((param) => ({
+      name: param.name,
+      kind: PARAMETER_KIND_LABELS[param.kind] ?? "String",
+      description: param.description,
+      choices: param.choices,
+      defaultValue: param.defaultValue
+    }));
+    const parametersLabel =
+      parameters.length > 0
+        ? `Parameters: ${parameters
+            .map((param) => `${param.name} (${param.kind})`)
+            .join(", ")}`
+        : "No parameters";
+    const submitterLabel = action.submitter
+      ? `Submitter: ${action.submitter}`
+      : "Submitter: Any";
+
+    return {
+      id: action.id,
+      message: action.message,
+      submitterLabel,
+      parametersLabel,
+      parameters
+    };
+  });
 }
 
 export function buildBuildFailureInsights(

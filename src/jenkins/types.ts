@@ -21,11 +21,14 @@ export interface JenkinsJob {
   _class?: string;
   color?: string;
   lastCompletedBuild?: JenkinsBuildSummary;
+  lastBuild?: JenkinsBuildSummary;
 }
 
 export interface JenkinsBuildSummary {
   number: number;
+  url?: string;
   result?: string;
+  building?: boolean;
   timestamp?: number;
 }
 
@@ -124,6 +127,28 @@ export interface JenkinsBuildDetails extends JenkinsBuild {
   artifacts?: JenkinsArtifact[];
 }
 
+export interface JenkinsPendingInputParameterDefinition {
+  name?: string;
+  type?: string;
+  defaultParameterValue?: { value?: unknown };
+  defaultValue?: unknown;
+  choices?: unknown;
+  description?: string;
+}
+
+export interface JenkinsPendingInputAction {
+  id?: string;
+  inputId?: string;
+  message?: string;
+  proceedText?: string;
+  proceedUrl?: string;
+  abortUrl?: string;
+  submitter?: string;
+  submitterParameter?: string;
+  inputs?: JenkinsPendingInputParameterDefinition[];
+  parameters?: JenkinsPendingInputParameterDefinition[];
+}
+
 export interface JenkinsWorkflowStep {
   id?: string;
   name?: string;
@@ -203,6 +228,11 @@ export interface JenkinsQueueTask {
   url?: string;
 }
 
+export interface JenkinsQueueExecutable {
+  number: number;
+  url?: string;
+}
+
 export interface JenkinsQueueItem {
   id: number;
   task?: JenkinsQueueTask;
@@ -211,6 +241,8 @@ export interface JenkinsQueueItem {
   blocked?: boolean;
   buildable?: boolean;
   stuck?: boolean;
+  cancelled?: boolean;
+  executable?: JenkinsQueueExecutable;
 }
 
 export interface JenkinsParameterDefinition {

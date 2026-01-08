@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import { formatCompletionStatus } from "../formatters/CompletionFormatters";
-import type { CompletionNotification, StatusNotifier } from "../watch/StatusNotifier";
+import type {
+  CompletionNotification,
+  PendingInputNotification,
+  StatusNotifier
+} from "../watch/StatusNotifier";
 
 export class VscodeStatusNotifier implements StatusNotifier {
   notifyFailure(message: string): void {
@@ -23,5 +27,19 @@ export class VscodeStatusNotifier implements StatusNotifier {
       return;
     }
     void vscode.window.showInformationMessage(message);
+  }
+
+  notifyPendingInput(notification: PendingInputNotification): void {
+    const base = `${notification.jobLabel} is awaiting input in ${notification.environmentUrl}.`;
+    const details = notification.inputMessage ? ` Prompt: ${notification.inputMessage}` : "";
+    const message = `${base}${details}`;
+    const action = "Open in Jenkins";
+    void vscode.window
+      .showInformationMessage(message, action)
+      .then((selection) => {
+        if (selection === action) {
+          void vscode.env.openExternal(vscode.Uri.parse(notification.buildUrl));
+        }
+      });
   }
 }

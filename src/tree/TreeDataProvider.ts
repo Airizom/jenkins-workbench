@@ -8,10 +8,16 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import type { JenkinsTreeFilter } from "./TreeFilter";
-import { BuildQueueFolderTreeItem, type WorkbenchTreeElement } from "./TreeItems";
+import {
+  BuildQueueFolderTreeItem,
+  InstanceTreeItem,
+  RootSectionTreeItem,
+  type WorkbenchTreeElement
+} from "./TreeItems";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
 import type { TreeChildrenOptions } from "./TreeTypes";
@@ -21,7 +27,7 @@ const REFRESH_DEBOUNCE_MS = 150;
 const MANUAL_REFRESH_COOLDOWN_MS = 2000;
 
 export class JenkinsWorkbenchTreeDataProvider
-  implements vscode.TreeDataProvider<WorkbenchTreeElement>, JenkinsTreeRevealProvider
+  implements vscode.TreeDataProvider<WorkbenchTreeElement>, JenkinsTreeRevealProvider, vscode.Disposable
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     WorkbenchTreeElement | undefined
@@ -32,6 +38,9 @@ export class JenkinsWorkbenchTreeDataProvider
   >();
   private readonly childrenLoader: JenkinsTreeChildrenLoader;
   private readonly revealResolver: JenkinsTreeRevealResolver;
+  private readonly pendingInputCoordinator: PendingInputRefreshCoordinator;
+  private pendingInputUnsubscribe: (() => void) | undefined;
+  private readonly instanceItems = new Map<string, InstanceTreeItem>();
   private debounceTimer: NodeJS.Timeout | undefined;
   private pendingRefreshElement: WorkbenchTreeElement | undefined | null = null;
   private lastManualRefreshAt = 0;
@@ -45,8 +54,19 @@ export class JenkinsWorkbenchTreeDataProvider
     pinStore: JenkinsPinStore,
     treeFilter: JenkinsTreeFilter,
     buildTooltipOptions: BuildTooltipOptions,
-    buildListFetchOptions: BuildListFetchOptions
+    buildListFetchOptions: BuildListFetchOptions,
+    pendingInputCoordinator: PendingInputRefreshCoordinator
   ) {
+    this.pendingInputCoordinator = pendingInputCoordinator;
+    this.pendingInputUnsubscribe = this.pendingInputCoordinator.onSummaryChange((change) => {
+      const key = this.buildEnvironmentKey(change.environment);
+      const instance = this.instanceItems.get(key);
+      if (instance) {
+        this.refreshElement(instance);
+        return;
+      }
+      this.refreshView();
+    });
     this.childrenLoader = new JenkinsTreeChildrenLoader(
       store,
       dataService,
@@ -55,9 +75,21 @@ export class JenkinsWorkbenchTreeDataProvider
       treeFilter,
       BUILD_LIMIT,
       buildTooltipOptions,
-      buildListFetchOptions
+      buildListFetchOptions,
+      pendingInputCoordinator
     );
     this.revealResolver = new JenkinsTreeRevealResolver(this.getChildrenInternal.bind(this));
+  }
+
+  dispose(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
+    if (this.pendingInputUnsubscribe) {
+      this.pendingInputUnsubscribe();
+      this.pendingInputUnsubscribe = undefined;
+    }
   }
 
   refresh(): void {
@@ -98,10 +130,16 @@ export class JenkinsWorkbenchTreeDataProvider
       this.dataService.clearCacheForEnvironment(environmentId);
       this.childrenLoader.clearWatchCacheForEnvironment(environmentId);
       this.childrenLoader.clearPinCacheForEnvironment(environmentId);
+      for (const key of this.instanceItems.keys()) {
+        if (key.endsWith(`:${environmentId}`)) {
+          this.instanceItems.delete(key);
+        }
+      }
     } else {
       this.dataService.clearCache();
       this.childrenLoader.clearWatchCacheForEnvironment();
       this.childrenLoader.clearPinCacheForEnvironment();
+      this.instanceItems.clear();
     }
     this.scheduleRefresh(undefined);
   }
@@ -156,9 +194,19 @@ export class JenkinsWorkbenchTreeDataProvider
     parent: WorkbenchTreeElement | undefined,
     children: WorkbenchTreeElement[]
   ): WorkbenchTreeElement[] {
+    if (parent instanceof RootSectionTreeItem && parent.section === "instances") {
+      this.instanceItems.clear();
+    }
     for (const child of children) {
       this.parentMap.set(child, parent);
+      if (child instanceof InstanceTreeItem) {
+        this.instanceItems.set(this.buildEnvironmentKey(child), child);
+      }
     }
     return children;
+  }
+
+  private buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
+    return `${environment.scope}:${environment.environmentId}`;
   }
 }

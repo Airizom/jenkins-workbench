@@ -73,7 +73,7 @@ export function formatBuildStatus(build: JenkinsBuild): string {
   }
 }
 
-export function formatBuildDescription(build: JenkinsBuild): string {
+export function formatBuildDescription(build: JenkinsBuild, awaitingInput = false): string {
   if (build.building) {
     const elapsedMs = resolveBuildElapsedMs(build);
     const elapsedLabel = formatDurationLabel(elapsedMs);
@@ -91,14 +91,17 @@ export function formatBuildDescription(build: JenkinsBuild): string {
     ) {
       const progressPercentRaw = Math.floor(((elapsedMs as number) / estimatedMs) * 100);
       const progressPercent = Math.max(0, Math.min(100, progressPercentRaw));
-      return `${elapsedLabel} / ~${estimatedLabel} • Running (${progressPercent}%)`;
+      const base = `${elapsedLabel} / ~${estimatedLabel} • Running (${progressPercent}%)`;
+      return awaitingInput ? `${base} • Awaiting input` : base;
     }
 
     if (elapsedLabel) {
-      return `${elapsedLabel} • Running`;
+      const base = `${elapsedLabel} • Running`;
+      return awaitingInput ? `${base} • Awaiting input` : base;
     }
 
-    return "Running";
+    const runningLabel = "Running";
+    return awaitingInput ? `${runningLabel} • Awaiting input` : runningLabel;
   }
 
   const status = formatBuildStatus(build);
@@ -157,7 +160,10 @@ export function formatNodeDescription(node: JenkinsNode): string {
   return "Online";
 }
 
-export function buildIcon(build: JenkinsBuild): vscode.ThemeIcon {
+export function buildIcon(build: JenkinsBuild, awaitingInput = false): vscode.ThemeIcon {
+  if (awaitingInput) {
+    return new vscode.ThemeIcon("debug-pause", STATUS_THEME_COLORS.running);
+  }
   const status = resolveBuildStatus(build);
   if (status === "running") {
     return new vscode.ThemeIcon("sync~spin", STATUS_THEME_COLORS.running);

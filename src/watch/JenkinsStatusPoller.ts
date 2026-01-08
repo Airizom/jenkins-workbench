@@ -1,7 +1,8 @@
 import type * as vscode from "vscode";
-import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
+import type { JenkinsDataService, PendingInputSummary } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { JenkinsRequestError } from "../jenkins/errors";
+import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { EnvironmentScope, JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWatchStore, WatchedJobEntry } from "../storage/JenkinsWatchStore";
 import { JenkinsJobStatusEvaluator } from "./JenkinsJobStatusEvaluator";
@@ -21,12 +22,14 @@ export class JenkinsStatusPoller implements vscode.Disposable {
   private isPolling = false;
   private readonly evaluator: JenkinsJobStatusEvaluator;
   private readonly failureCounts = new Map<string, number>();
+  private readonly pendingInputSignatures = new Map<string, string>();
   private pollIntervalMs: number;
   private maxConsecutiveErrors: number;
 
   constructor(
     private readonly store: JenkinsEnvironmentStore,
-    private readonly clientProvider: JenkinsClientProvider,
+    private readonly dataService: JenkinsDataService,
+    private readonly pendingInputCoordinator: PendingInputRefreshCoordinator,
     private readonly watchStore: JenkinsWatchStore,
     private readonly notifier: StatusNotifier,
     private readonly host: JenkinsStatusPollerHost,
@@ -154,6 +157,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
       for (const environmentId of environmentIds) {
         await this.watchStore.removeWatchesForEnvironment(scope, environmentId);
         this.clearFailuresForEnvironment(scope, environmentId);
+        this.clearPendingInputsForEnvironment(scope, environmentId);
         didChange = true;
       }
     }
@@ -175,8 +179,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
     entry: WatchedJobEntry
   ): Promise<boolean> {
     try {
-      const client = await this.clientProvider.getClient(environment);
-      const job = await client.getJob(entry.jobUrl);
+      const job = await this.dataService.getJob(environment, entry.jobUrl);
       this.resetFailureCount(entry);
       const evaluation = this.evaluator.evaluate(
         entry,
@@ -184,6 +187,13 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         job.color,
         job.lastCompletedBuild,
         environment.url
+      );
+      await this.checkPendingInputs(
+        environment,
+        entry,
+        job.lastBuild?.url,
+        job.lastBuild,
+        job.name
       );
 
       const shouldUpdateEntry =
@@ -219,6 +229,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
     if (error instanceof JenkinsRequestError && error.statusCode === 404) {
       await this.watchStore.removeWatch(entry.scope, entry.environmentId, entry.jobUrl);
       this.failureCounts.delete(this.buildFailureKey(entry));
+      this.clearPendingInputsForJob(entry);
       this.notifier.notifyWatchError(
         `${this.formatWatchLabel(entry)} was removed because Jenkins reported it missing in ${environment.url}.`
       );
@@ -258,9 +269,80 @@ export class JenkinsStatusPoller implements vscode.Disposable {
     }
   }
 
-  private formatWatchLabel(entry: WatchedJobEntry): string {
-    const label = entry.jobName ?? entry.jobUrl;
+  private clearPendingInputsForEnvironment(scope: EnvironmentScope, environmentId: string): void {
+    const prefix = `${scope}:${environmentId}:`;
+    for (const key of this.pendingInputSignatures.keys()) {
+      if (key.startsWith(prefix)) {
+        this.pendingInputSignatures.delete(key);
+      }
+    }
+  }
+
+  private formatWatchLabel(entry: WatchedJobEntry, jobName?: string): string {
+    const label = jobName ?? entry.jobName ?? entry.jobUrl;
     const kind = entry.jobKind === "pipeline" ? "Pipeline" : "Job";
     return `${kind} ${label}`;
+  }
+
+  private clearPendingInputsForJob(entry: WatchedJobEntry): void {
+    const prefix = `${entry.scope}:${entry.environmentId}:${entry.jobUrl}:`;
+    for (const key of this.pendingInputSignatures.keys()) {
+      if (key.startsWith(prefix)) {
+        this.pendingInputSignatures.delete(key);
+      }
+    }
+  }
+
+  private buildPendingInputKey(entry: WatchedJobEntry, buildUrl: string): string {
+    return `${entry.scope}:${entry.environmentId}:${entry.jobUrl}:${buildUrl}`;
+  }
+
+  private async checkPendingInputs(
+    environment: JenkinsEnvironmentRef,
+    entry: WatchedJobEntry,
+    buildUrl: string | undefined,
+    buildSummary?: { building?: boolean },
+    jobName?: string
+  ): Promise<void> {
+    if (!buildUrl || !buildSummary?.building) {
+      this.clearPendingInputsForJob(entry);
+      return;
+    }
+
+    try {
+      const pendingKey = this.buildPendingInputKey(entry, buildUrl);
+      const summary = await this.pendingInputCoordinator.getSummary(environment, buildUrl, {
+        maxAgeMs: this.pollIntervalMs,
+        notify: false
+      });
+      this.handlePendingInputSummary(summary, pendingKey, entry, environment.url, buildUrl, jobName);
+    } catch {
+      return;
+    }
+  }
+
+  private handlePendingInputSummary(
+    summary: PendingInputSummary,
+    pendingKey: string,
+    entry: WatchedJobEntry,
+    environmentUrl: string,
+    buildUrl: string,
+    jobName?: string
+  ): void {
+    if (!summary.awaitingInput || !summary.signature) {
+      this.pendingInputSignatures.delete(pendingKey);
+      return;
+    }
+    const previousSignature = this.pendingInputSignatures.get(pendingKey);
+    if (previousSignature !== summary.signature) {
+      this.pendingInputSignatures.set(pendingKey, summary.signature);
+      this.notifier.notifyPendingInput({
+        jobLabel: this.formatWatchLabel(entry, jobName),
+        environmentUrl,
+        buildUrl,
+        inputCount: summary.count,
+        inputMessage: summary.message
+      });
+    }
   }
 }

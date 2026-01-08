@@ -5,6 +5,8 @@ import type {
   JenkinsBuildTriggerOptions,
   JenkinsJob,
   JenkinsJobKind,
+  JenkinsPendingInputAction,
+  JenkinsPendingInputParameterDefinition,
   JenkinsParameterDefinition,
   JenkinsQueueItem,
   JenkinsWorkflowRun
@@ -21,6 +23,8 @@ import type {
   JenkinsQueueItemInfo,
   JobParameter,
   JobParameterKind,
+  PendingInputAction,
+  PendingInputSummary,
   JobSearchEntry,
   JobSearchOptions,
   ProgressiveConsoleHtmlResult,
@@ -45,6 +49,8 @@ export type {
   JenkinsQueueItemInfo,
   JobParameter,
   JobParameterKind,
+  PendingInputAction,
+  PendingInputSummary,
   ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult,
   JobPathSegment,
@@ -62,6 +68,10 @@ export interface BuildListFetchOptions {
   detailLevel?: "summary" | "details";
   includeParameters?: boolean;
 }
+
+const PENDING_INPUT_ACTIONS_TTL_MS = 5000;
+const PENDING_INPUT_SUMMARY_TTL_MS = 60_000;
+const PENDING_INPUT_UNSUPPORTED_TTL_MS = 5 * 60 * 1000;
 
 export class JenkinsDataService {
   private readonly cache: JenkinsDataCache;
@@ -100,6 +110,11 @@ export class JenkinsDataService {
       },
       this.cacheTtlMs
     );
+  }
+
+  async getJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<JenkinsJob> {
+    const client = await this.clientProvider.getClient(environment);
+    return client.getJob(jobUrl);
   }
 
   async getJobsForFolder(
@@ -206,6 +221,104 @@ export class JenkinsDataService {
         return undefined;
       }
       throw toBuildActionError(error);
+    }
+  }
+
+  async getPendingInputActions(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { mode?: "cached" | "refresh" }
+  ): Promise<PendingInputAction[]> {
+    const cacheKey = await this.buildCacheKey(environment, "pending-inputs", buildUrl);
+    const summaryKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
+    const unsupportedKey = await this.buildCacheKey(
+      environment,
+      "pending-inputs-unsupported",
+      buildUrl
+    );
+    if (this.cache.has(unsupportedKey)) {
+      return [];
+    }
+    const cached = this.cache.get<PendingInputAction[]>(cacheKey);
+    if (options?.mode === "cached") {
+      return cached ?? [];
+    }
+    if (cached && options?.mode !== "refresh") {
+      return cached;
+    }
+    return this.fetchPendingInputActions(environment, buildUrl, {
+      cacheKey,
+      summaryKey,
+      unsupportedKey
+    });
+  }
+
+  async getPendingInputSummary(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { mode?: "cached" | "refresh"; maxAgeMs?: number }
+  ): Promise<PendingInputSummary> {
+    const cacheKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
+    const cached = this.cache.get<PendingInputSummary>(cacheKey);
+    if (options?.mode === "cached") {
+      return cached ?? this.buildPendingInputSummary([], 0);
+    }
+    if (cached && options?.mode !== "refresh") {
+      const maxAgeMs = options?.maxAgeMs;
+      if (!Number.isFinite(maxAgeMs) || typeof maxAgeMs !== "number") {
+        return cached;
+      }
+      const ageMs = Date.now() - cached.fetchedAt;
+      if (ageMs <= maxAgeMs) {
+        return cached;
+      }
+    }
+    const summary = await this.refreshPendingInputSummary(environment, buildUrl);
+    return summary;
+  }
+
+  async refreshPendingInputSummary(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<PendingInputSummary> {
+    const actions = await this.getPendingInputActions(environment, buildUrl, {
+      mode: "refresh"
+    });
+    const summary = this.buildPendingInputSummary(actions);
+    const cacheKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
+    this.cache.set(cacheKey, summary, PENDING_INPUT_SUMMARY_TTL_MS);
+    return summary;
+  }
+
+  async approveInput(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    inputId: string,
+    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+  ): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.proceedInput(buildUrl, inputId, options);
+    } catch (error) {
+      throw toBuildActionError(error);
+    } finally {
+      await this.clearPendingInputCache(environment, buildUrl);
+    }
+  }
+
+  async rejectInput(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    inputId: string,
+    abortUrl?: string
+  ): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.abortInput(buildUrl, inputId, abortUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    } finally {
+      await this.clearPendingInputCache(environment, buildUrl);
     }
   }
 
@@ -336,6 +449,18 @@ export class JenkinsDataService {
     }
   }
 
+  async getQueueItem(
+    environment: JenkinsEnvironmentRef,
+    queueId: number
+  ): Promise<JenkinsQueueItem> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.getQueueItem(queueId);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
   async getJobParameters(
     environment: JenkinsEnvironmentRef,
     jobUrl: string
@@ -434,6 +559,57 @@ export class JenkinsDataService {
     return this.cache.buildKey(environment, kind, path, authSignature);
   }
 
+  private async clearPendingInputCache(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<void> {
+    const cacheKey = await this.buildCacheKey(environment, "pending-inputs", buildUrl);
+    const summaryKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
+    const unsupportedKey = await this.buildCacheKey(
+      environment,
+      "pending-inputs-unsupported",
+      buildUrl
+    );
+    this.cache.delete(cacheKey);
+    this.cache.delete(summaryKey);
+    this.cache.delete(unsupportedKey);
+  }
+
+  private async fetchPendingInputActions(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    keys: { cacheKey: string; summaryKey: string; unsupportedKey: string }
+  ): Promise<PendingInputAction[]> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      const actions = await client.getPendingInputActions(buildUrl);
+      const mapped = this.mapPendingInputActions(actions);
+      this.cache.set(keys.cacheKey, mapped, PENDING_INPUT_ACTIONS_TTL_MS);
+      this.cache.set(
+        keys.summaryKey,
+        this.buildPendingInputSummary(mapped),
+        PENDING_INPUT_SUMMARY_TTL_MS
+      );
+      return mapped;
+    } catch (error) {
+      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+        this.cache.set(
+          keys.unsupportedKey,
+          true,
+          this.cacheTtlMs ?? PENDING_INPUT_UNSUPPORTED_TTL_MS
+        );
+        this.cache.set(keys.cacheKey, [], PENDING_INPUT_ACTIONS_TTL_MS);
+        this.cache.set(
+          keys.summaryKey,
+          this.buildPendingInputSummary([]),
+          PENDING_INPUT_SUMMARY_TTL_MS
+        );
+        return [];
+      }
+      throw toBuildActionError(error);
+    }
+  }
+
   private mapJobParameter(parameter: JenkinsParameterDefinition): JobParameter {
     const normalizedType = (parameter.type ?? "").toLowerCase();
     let kind: JobParameterKind = "string";
@@ -456,6 +632,164 @@ export class JenkinsDataService {
       choices: parameter.choices,
       description: parameter.description
     };
+  }
+
+  private mapPendingInputActions(actions: JenkinsPendingInputAction[]): PendingInputAction[] {
+    const results: PendingInputAction[] = [];
+    for (const action of actions) {
+      const id = (action.id ?? action.inputId ?? "").trim();
+      if (!id) {
+        continue;
+      }
+      const message = (action.message ?? "").trim() || "Input required";
+      const submitter = this.normalizeString(action.submitter);
+      const proceedText = this.normalizeString(action.proceedText);
+      const proceedUrl = this.normalizeString(action.proceedUrl);
+      const abortUrl = this.normalizeString(action.abortUrl);
+      const parameters = this.mapPendingInputParameters(action);
+      results.push({
+        id,
+        message,
+        submitter,
+        proceedText,
+        proceedUrl,
+        abortUrl,
+        parameters
+      });
+    }
+    return results;
+  }
+
+  private buildPendingInputSummary(
+    actions: PendingInputAction[],
+    fetchedAt = Date.now()
+  ): PendingInputSummary {
+    const signature = this.buildPendingInputSignature(actions);
+    const message = actions[0]?.message;
+    return {
+      awaitingInput: actions.length > 0,
+      count: actions.length,
+      signature,
+      message,
+      fetchedAt
+    };
+  }
+
+  private buildPendingInputSignature(actions: PendingInputAction[]): string | undefined {
+    const normalizedActions = actions.map((action) => ({
+      id: action.id.trim(),
+      message: action.message,
+      submitter: action.submitter ?? "",
+      proceedText: action.proceedText ?? "",
+      parameters: [...action.parameters]
+        .map((param) => ({
+          name: param.name,
+          kind: param.kind,
+          description: param.description ?? "",
+          defaultValue: param.defaultValue ?? "",
+          choices: Array.isArray(param.choices) ? [...param.choices].sort() : []
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind))
+    }));
+
+    normalizedActions.sort(
+      (a, b) => a.id.localeCompare(b.id) || a.message.localeCompare(b.message)
+    );
+
+    const parts = normalizedActions
+      .map((action) => JSON.stringify(action))
+      .filter((part) => part.length > 0);
+    return parts.length > 0 ? parts.join("|") : undefined;
+  }
+
+  private mapPendingInputParameters(action: JenkinsPendingInputAction): JobParameter[] {
+    const rawParameters = Array.isArray(action.parameters)
+      ? action.parameters
+      : Array.isArray(action.inputs)
+        ? action.inputs
+        : [];
+    const results: JobParameter[] = [];
+    for (const parameter of rawParameters) {
+      if (!parameter || !parameter.name) {
+        continue;
+      }
+      results.push(this.mapPendingInputParameter(parameter));
+    }
+    return results;
+  }
+
+  private mapPendingInputParameter(
+    parameter: JenkinsPendingInputParameterDefinition
+  ): JobParameter {
+    const normalizedType = (parameter.type ?? "").toLowerCase();
+    let kind: JobParameterKind = "string";
+
+    if (normalizedType.includes("booleanparameterdefinition") || normalizedType.includes("boolean")) {
+      kind = "boolean";
+    } else if (
+      normalizedType.includes("choiceparameterdefinition") ||
+      normalizedType.includes("choice") ||
+      (Array.isArray(parameter.choices) && parameter.choices.length > 0)
+    ) {
+      kind = "choice";
+    } else if (
+      normalizedType.includes("passwordparameterdefinition") ||
+      normalizedType.includes("password")
+    ) {
+      kind = "password";
+    }
+
+    const rawDefault = parameter.defaultParameterValue?.value ?? parameter.defaultValue;
+    const defaultValue = this.formatParameterDefaultValue(rawDefault);
+    const choices = Array.isArray(parameter.choices)
+      ? parameter.choices.map((choice) => String(choice))
+      : undefined;
+
+    return {
+      name: parameter.name ?? "parameter",
+      kind,
+      defaultValue,
+      choices,
+      description: parameter.description
+    };
+  }
+
+  private formatParameterDefaultValue(
+    value: unknown
+  ): string | number | boolean | undefined {
+    switch (typeof value) {
+      case "string":
+      case "number":
+      case "boolean":
+        return value;
+      case "undefined":
+        return undefined;
+      case "bigint":
+        return value.toString();
+      case "symbol":
+        return value.description ?? value.toString();
+      case "function":
+        return value.name ? `[function ${value.name}]` : "[function]";
+      case "object":
+        if (value === null) {
+          return undefined;
+        }
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return "[object]";
+        }
+      default:
+        return undefined;
+    }
+  }
+
+  private normalizeString(value?: string): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private mapJobs(

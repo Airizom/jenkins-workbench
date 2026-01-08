@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { JobParameter } from "../../jenkins/JenkinsDataService";
+import type { JobParameter } from "../jenkins/JenkinsDataService";
 
 export async function promptForParameters(
   parameters: JobParameter[]

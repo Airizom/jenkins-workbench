@@ -61,6 +61,16 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "jenkinsWorkbench.approveInput",
+        "title": "Jenkins Workbench: Approve Input",
+        "icon": "$(check)"
+      },
+      {
+        "command": "jenkinsWorkbench.rejectInput",
+        "title": "Jenkins Workbench: Reject Input",
+        "icon": "$(close)"
+      },
+      {
         "command": "jenkinsWorkbench.cancelQueueItem",
         "title": "Jenkins Workbench: Cancel Queue Item",
         "icon": "$(close)"
@@ -379,13 +389,33 @@
         },
         {
           "command": "jenkinsWorkbench.abortBuild",
-          "when": "view == jenkinsWorkbench.tree && viewItem == buildRunning",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/",
           "group": "inline@0"
         },
         {
+          "command": "jenkinsWorkbench.approveInput",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
+          "group": "inline@1"
+        },
+        {
+          "command": "jenkinsWorkbench.rejectInput",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
+          "group": "inline@2"
+        },
+        {
           "command": "jenkinsWorkbench.abortBuild",
-          "when": "view == jenkinsWorkbench.tree && viewItem == buildRunning",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/",
           "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.approveInput",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jenkinsWorkbench.rejectInput",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
+          "group": "navigation@2"
         },
         {
           "command": "jenkinsWorkbench.cancelQueueItem",
@@ -409,22 +439,22 @@
         },
         {
           "command": "jenkinsWorkbench.showBuildDetails",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.replayBuild",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.rebuildBuild",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && (viewItem == build || viewItem == buildRunning)",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "navigation"
         },
         {

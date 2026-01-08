@@ -1,16 +1,20 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService, JobParameter } from "../../jenkins/JenkinsDataService";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
+import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
+import type { PendingInputActionProvider } from "../../panels/buildDetails/BuildDetailsPollingController";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
+import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 import { formatActionError, getOpenUrl, getTreeItemLabel } from "./BuildCommandUtils";
-import { promptForParameters } from "./BuildParameterPrompts";
+import { promptForParameters } from "../../ui/ParameterPrompts";
 
 export async function triggerBuild(
   dataService: JenkinsDataService,
+  queuedBuildWaiter: QueuedBuildWaiter,
   refreshHost: BuildCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
@@ -67,7 +71,11 @@ export async function triggerBuild(
       ? `Triggered build for ${label}. Queued at ${result.queueLocation}`
       : `Triggered build for ${label}.`;
     void vscode.window.showInformationMessage(message);
-    refreshHost.refreshEnvironment(item.environment.environmentId);
+    void queuedBuildWaiter
+      .awaitQueuedBuildStart(item.environment, result.queueLocation)
+      .finally(() => {
+        refreshHost.refreshEnvironment(item.environment.environmentId);
+      });
   } catch (error) {
     void vscode.window.showErrorMessage(
       `Failed to trigger build for ${label}: ${formatActionError(error)}`
@@ -102,6 +110,49 @@ export async function stopBuild(
     );
   }
 }
+
+export async function approveInput(
+  dataService: JenkinsDataService,
+  refreshHost: BuildCommandRefreshHost,
+  item?: BuildTreeItem
+): Promise<void> {
+  if (!item) {
+    void vscode.window.showInformationMessage("Select a build to approve input.");
+    return;
+  }
+
+  const label = getTreeItemLabel(item);
+  await handlePendingInputAction({
+    dataService,
+    environment: item.environment,
+    buildUrl: item.buildUrl,
+    label,
+    action: "approve",
+    onRefresh: () => refreshHost.refreshEnvironment(item.environment.environmentId)
+  });
+}
+
+export async function rejectInput(
+  dataService: JenkinsDataService,
+  refreshHost: BuildCommandRefreshHost,
+  item?: BuildTreeItem
+): Promise<void> {
+  if (!item) {
+    void vscode.window.showInformationMessage("Select a build to reject input.");
+    return;
+  }
+
+  const label = getTreeItemLabel(item);
+  await handlePendingInputAction({
+    dataService,
+    environment: item.environment,
+    buildUrl: item.buildUrl,
+    label,
+    action: "reject",
+    onRefresh: () => refreshHost.refreshEnvironment(item.environment.environmentId)
+  });
+}
+
 
 export async function replayBuild(
   dataService: JenkinsDataService,
@@ -170,6 +221,8 @@ export async function showBuildDetails(
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
   consoleExporter: BuildConsoleExporter,
+  refreshHost: BuildCommandRefreshHost,
+  pendingInputProvider: PendingInputActionProvider,
   extensionUri: vscode.Uri,
   item?: BuildTreeItem
 ): Promise<void> {
@@ -183,6 +236,8 @@ export async function showBuildDetails(
       dataService,
       artifactActionHandler,
       consoleExporter,
+      refreshHost,
+      pendingInputProvider,
       item.environment,
       item.buildUrl,
       extensionUri,
@@ -199,6 +254,8 @@ export async function openLastFailedBuild(
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
   consoleExporter: BuildConsoleExporter,
+  refreshHost: BuildCommandRefreshHost,
+  pendingInputProvider: PendingInputActionProvider,
   extensionUri: vscode.Uri,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
@@ -228,6 +285,8 @@ export async function openLastFailedBuild(
       dataService,
       artifactActionHandler,
       consoleExporter,
+      refreshHost,
+      pendingInputProvider,
       item.environment,
       lastFailed.url,
       extensionUri,

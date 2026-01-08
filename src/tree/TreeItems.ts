@@ -201,23 +201,30 @@ export class BuildTreeItem extends vscode.TreeItem {
   public readonly buildUrl: string;
   public readonly buildNumber: number;
   public readonly isBuilding: boolean;
+  public readonly awaitingInput: boolean;
   public readonly jobNameHint?: string;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     build: JenkinsBuild,
     tooltipOptions?: BuildTooltipOptions,
-    jobNameHint?: string
+    jobNameHint?: string,
+    awaitingInput = false
   ) {
     const label = `#${build.number}`;
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.buildUrl = build.url;
     this.buildNumber = build.number;
     this.isBuilding = Boolean(build.building);
+    this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
-    this.contextValue = this.isBuilding ? "buildRunning" : "build";
-    this.description = formatBuildDescription(build);
-    this.iconPath = buildIcon(build);
+    const contextParts = [this.isBuilding ? "buildRunning" : "build"];
+    if (this.awaitingInput) {
+      contextParts.push("awaitingInput");
+    }
+    this.contextValue = contextParts.join(" ");
+    this.description = formatBuildDescription(build, awaitingInput);
+    this.iconPath = buildIcon(build, awaitingInput);
     this.tooltip = buildBuildTooltip(build, tooltipOptions);
     this.command = {
       command: "jenkinsWorkbench.showBuildDetails",

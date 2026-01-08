@@ -31,6 +31,16 @@ export interface ArtifactActionMessage {
   fileName?: string;
 }
 
+export interface ApproveInputMessage {
+  type: "approveInput";
+  inputId: string;
+}
+
+export interface RejectInputMessage {
+  type: "rejectInput";
+  inputId: string;
+}
+
 export function isToggleFollowLogMessage(message: unknown): message is ToggleFollowLogMessage {
   if (!isRecord(message)) {
     return false;
@@ -65,6 +75,28 @@ export function isArtifactActionMessage(message: unknown): message is ArtifactAc
     return false;
   }
   return typeof relativePath === "string" && relativePath.length > 0;
+}
+
+export function isApproveInputMessage(message: unknown): message is ApproveInputMessage {
+  if (!isRecord(message)) {
+    return false;
+  }
+  if (message.type !== "approveInput") {
+    return false;
+  }
+  const inputId = (message as Record<string, unknown>).inputId;
+  return typeof inputId === "string" && inputId.length > 0;
+}
+
+export function isRejectInputMessage(message: unknown): message is RejectInputMessage {
+  if (!isRecord(message)) {
+    return false;
+  }
+  if (message.type !== "rejectInput") {
+    return false;
+  }
+  const inputId = (message as Record<string, unknown>).inputId;
+  return typeof inputId === "string" && inputId.length > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

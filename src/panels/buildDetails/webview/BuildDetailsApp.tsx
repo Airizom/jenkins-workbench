@@ -3,6 +3,7 @@ import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
 import { BuildFailureInsightsSection } from "./components/buildDetails/BuildFailureInsightsSection";
 import { BuildSummaryCard } from "./components/buildDetails/BuildSummaryCard";
 import { ConsoleOutputSection } from "./components/buildDetails/ConsoleOutputSection";
+import { PendingInputsSection } from "./components/buildDetails/PendingInputsSection";
 import { PipelineStagesSection } from "./components/buildDetails/PipelineStagesSection";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { useBuildDetailsInteractions } from "./hooks/useBuildDetailsInteractions";
@@ -37,6 +38,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         durationLabel={state.durationLabel}
         timestampLabel={state.timestampLabel}
         culpritsLabel={state.culpritsLabel}
+      />
+
+      <PendingInputsSection
+        pendingInputs={state.pendingInputs}
+        onApprove={(inputId) => postMessage({ type: "approveInput", inputId })}
+        onReject={(inputId) => postMessage({ type: "rejectInput", inputId })}
       />
 
       <PipelineStagesSection stages={state.pipelineStages} />

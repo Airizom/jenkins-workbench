@@ -1,5 +1,6 @@
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import {
   formatCulprits,
   formatDuration,
@@ -8,12 +9,17 @@ import {
   formatTimestamp
 } from "./BuildDetailsFormatters";
 import type { BuildDetailsUpdateMessage } from "./BuildDetailsMessages";
-import { buildBuildFailureInsights, buildPipelineStagesViewModel } from "./BuildDetailsViewModel";
+import {
+  buildBuildFailureInsights,
+  buildPendingInputsViewModel,
+  buildPipelineStagesViewModel
+} from "./BuildDetailsViewModel";
 
 export function buildDetailsUpdateMessage(
   details: JenkinsBuildDetails,
   testReport?: JenkinsTestReport,
-  pipelineRun?: PipelineRun
+  pipelineRun?: PipelineRun,
+  pendingInputs?: PendingInputAction[]
 ): BuildDetailsUpdateMessage {
   return {
     type: "updateDetails",
@@ -23,6 +29,7 @@ export function buildDetailsUpdateMessage(
     timestampLabel: formatTimestamp(details.timestamp),
     culpritsLabel: formatCulprits(details.culprits),
     insights: buildBuildFailureInsights(details, testReport),
-    pipelineStages: buildPipelineStagesViewModel(pipelineRun)
+    pipelineStages: buildPipelineStagesViewModel(pipelineRun),
+    pendingInputs: buildPendingInputsViewModel(pendingInputs)
   };
 }

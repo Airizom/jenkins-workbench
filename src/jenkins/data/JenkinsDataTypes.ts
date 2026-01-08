@@ -19,6 +19,24 @@ export interface JobParameter {
   description?: string;
 }
 
+export interface PendingInputAction {
+  id: string;
+  message: string;
+  submitter?: string;
+  proceedText?: string;
+  proceedUrl?: string;
+  abortUrl?: string;
+  parameters: JobParameter[];
+}
+
+export interface PendingInputSummary {
+  awaitingInput: boolean;
+  count: number;
+  signature?: string;
+  message?: string;
+  fetchedAt: number;
+}
+
 export type ConsoleTextResult = JenkinsConsoleText;
 export type ConsoleTextTailResult = JenkinsConsoleTextTail;
 export type ProgressiveConsoleTextResult = JenkinsProgressiveConsoleText;

@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 import { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
 import { ArtifactActionService } from "../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../services/ArtifactFilesystem";
 import { ArtifactStorageService } from "../services/ArtifactStorageService";
+import { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
@@ -29,6 +31,8 @@ export interface ExtensionServices {
   environmentStore: JenkinsEnvironmentStore;
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
+  pendingInputCoordinator: PendingInputRefreshCoordinator;
+  queuedBuildWaiter: QueuedBuildWaiter;
   consoleExporter: BuildConsoleExporter;
   artifactStorageService: ArtifactStorageService;
   artifactActionHandler: ArtifactActionHandler;
@@ -64,6 +68,8 @@ export function createExtensionServices(
     cacheTtlMs: options.cacheTtlMs,
     maxCacheEntries: options.maxCacheEntries
   });
+  const pendingInputCoordinator = new PendingInputRefreshCoordinator(dataService);
+  const queuedBuildWaiter = new QueuedBuildWaiter(dataService);
   const consoleExporter = new BuildConsoleExporter(
     dataService,
     createNodeBuildConsoleFilesystem(),
@@ -91,7 +97,8 @@ export function createExtensionServices(
     pinStore,
     treeFilter,
     options.buildTooltipOptions,
-    options.buildListFetchOptions
+    options.buildListFetchOptions,
+    pendingInputCoordinator
   );
   const treeView = vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
     treeDataProvider
@@ -102,6 +109,8 @@ export function createExtensionServices(
     environmentStore,
     clientProvider,
     dataService,
+    pendingInputCoordinator,
+    queuedBuildWaiter,
     consoleExporter,
     artifactStorageService,
     artifactActionHandler,

@@ -31,6 +31,7 @@ import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "./BuildTooltips";
+import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import type { TreeChildrenOptions } from "./TreeTypes";
 
@@ -46,7 +47,8 @@ export class JenkinsTreeChildrenLoader {
     private readonly treeFilter: JenkinsTreeFilter,
     private readonly buildLimit: number,
     private buildTooltipOptions: BuildTooltipOptions,
-    private buildListFetchOptions: BuildListFetchOptions
+    private buildListFetchOptions: BuildListFetchOptions,
+    private readonly pendingInputCoordinator: PendingInputRefreshCoordinator
   ) {}
 
   updateBuildTooltipOptions(options: BuildTooltipOptions): void {
@@ -260,9 +262,23 @@ export class JenkinsTreeChildrenLoader {
           )
         ];
       }
-      return builds.map(
-        (build) => new BuildTreeItem(environment, build, this.buildTooltipOptions, jobNameHint)
+      const runningBuilds = builds.filter((build) => Boolean(build.building) && build.url);
+      const summariesByUrl = await this.pendingInputCoordinator.getSummaries(
+        environment,
+        runningBuilds.map((build) => build.url),
+        { queueRefresh: true }
       );
+
+      return builds.map((build) => {
+        const summary = summariesByUrl.get(build.url);
+        return new BuildTreeItem(
+          environment,
+          build,
+          this.buildTooltipOptions,
+          jobNameHint,
+          summary?.awaitingInput ?? false
+        );
+      });
     } catch (error) {
       return [this.createErrorPlaceholder("Unable to load builds.", error)];
     }

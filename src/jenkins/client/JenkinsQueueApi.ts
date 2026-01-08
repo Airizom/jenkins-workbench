@@ -16,6 +16,14 @@ export class JenkinsQueueApi {
     return Array.isArray(response.items) ? response.items : [];
   }
 
+  async getQueueItem(id: number): Promise<JenkinsQueueItem> {
+    const safeId = Math.max(0, Math.floor(id));
+    const tree =
+      "id,task[name,url],why,inQueueSince,blocked,buildable,stuck,cancelled,executable[number,url]";
+    const url = buildApiUrlFromBase(this.context.baseUrl, `queue/item/${safeId}/api/json`, tree);
+    return this.context.requestJson<JenkinsQueueItem>(url);
+  }
+
   async cancelQueueItem(id: number): Promise<void> {
     const url = new URL(buildApiUrlFromBase(this.context.baseUrl, "queue/cancelItem"));
     url.searchParams.set("id", Math.floor(id).toString());

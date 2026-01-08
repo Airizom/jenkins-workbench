@@ -1,6 +1,7 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { BuildDetailsInitialState } from "./BuildDetailsPollingController";
 
 export class BuildDetailsPanelState {
@@ -12,6 +13,7 @@ export class BuildDetailsPanelState {
   private currentErrorsValue: string[] = [];
   private baseErrorsValue: string[] = [];
   private pipelineErrorValue: string | undefined;
+  private currentPendingInputsValue: PendingInputAction[] = [];
   private followLogValue = true;
   private completionToastShownValue = false;
   private currentNonceValue = "";
@@ -41,6 +43,10 @@ export class BuildDetailsPanelState {
     return this.currentErrorsValue;
   }
 
+  get currentPendingInputs(): PendingInputAction[] {
+    return this.currentPendingInputsValue;
+  }
+
   get followLog(): boolean {
     return this.followLogValue;
   }
@@ -62,6 +68,7 @@ export class BuildDetailsPanelState {
     this.currentErrorsValue = [];
     this.baseErrorsValue = [];
     this.pipelineErrorValue = undefined;
+    this.currentPendingInputsValue = [];
     this.completionToastShownValue = false;
     this.currentNonceValue = nonce;
     this.lastDetailsBuildingValue = false;
@@ -77,6 +84,7 @@ export class BuildDetailsPanelState {
     this.currentPipelineRunValue = pipelineRun;
     this.baseErrorsValue = initialState.errors;
     this.pipelineErrorValue = pipelineError;
+    this.currentPendingInputsValue = initialState.pendingInputs ?? [];
     this.lastDetailsBuildingValue = initialState.details?.building ?? false;
     this.currentErrorsValue = composeErrors(this.baseErrorsValue, this.pipelineErrorValue);
   }
@@ -104,6 +112,10 @@ export class BuildDetailsPanelState {
 
   setBaseErrors(errors: string[]): void {
     this.baseErrorsValue = errors;
+  }
+
+  setPendingInputs(pendingInputs: PendingInputAction[]): void {
+    this.currentPendingInputsValue = pendingInputs;
   }
 
   setFollowLog(value: boolean): void {

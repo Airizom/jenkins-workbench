@@ -8,6 +8,7 @@ import type {
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { JenkinsTestReportOptions } from "../../jenkins/JenkinsTestReportOptions";
 import {
   ConsoleStreamManager,
@@ -49,12 +50,36 @@ export interface BuildDetailsDataService {
     start: number,
     annotator?: string
   ): Promise<JenkinsProgressiveConsoleHtml>;
+  getPendingInputActions(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<PendingInputAction[]>;
+  approveInput(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    inputId: string,
+    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+  ): Promise<void>;
+  rejectInput(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    inputId: string,
+    abortUrl?: string
+  ): Promise<void>;
+}
+
+export interface PendingInputActionProvider {
+  getPendingInputActions(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<PendingInputAction[]>;
 }
 
 export interface BuildDetailsPollingCallbacks {
   onDetails(details: JenkinsBuildDetails): void;
   onWorkflowRun(workflowRun: JenkinsWorkflowRun | undefined): void;
   onWorkflowError(error: unknown): void;
+  onPendingInputs(pendingInputs: PendingInputAction[]): void;
   onTitle(title: string): void;
   onConsoleAppend(text: string): void;
   onConsoleSet(payload: { text: string; truncated: boolean }): void;
@@ -66,6 +91,7 @@ export interface BuildDetailsPollingCallbacks {
 
 export interface BuildDetailsPollingOptions {
   dataService: BuildDetailsDataService;
+  pendingInputProvider?: PendingInputActionProvider;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   maxConsoleChars: number;
@@ -81,6 +107,7 @@ export interface BuildDetailsInitialState {
   consoleHtmlResult?: { html: string; truncated: boolean };
   workflowRun?: JenkinsWorkflowRun;
   workflowError?: unknown;
+  pendingInputs?: PendingInputAction[];
   errors: string[];
 }
 
@@ -89,6 +116,7 @@ const MIN_WORKFLOW_REFRESH_MS = 5000;
 
 export class BuildDetailsPollingController {
   private readonly dataService: BuildDetailsDataService;
+  private readonly pendingInputProvider: PendingInputActionProvider;
   private readonly environment: JenkinsEnvironmentRef;
   private readonly buildUrl: string;
   private readonly maxConsoleChars: number;
@@ -105,9 +133,11 @@ export class BuildDetailsPollingController {
   private lastWorkflowFetchAt = 0;
   private lastKnownBuilding: boolean | undefined;
   private workflowRetryPending = false;
+  private lastPendingInputsCount = 0;
 
   constructor(options: BuildDetailsPollingOptions) {
     this.dataService = options.dataService;
+    this.pendingInputProvider = options.pendingInputProvider ?? options.dataService;
     this.environment = options.environment;
     this.buildUrl = options.buildUrl;
     this.maxConsoleChars = options.maxConsoleChars;
@@ -144,6 +174,19 @@ export class BuildDetailsPollingController {
     );
   }
 
+  async refreshPendingInputs(): Promise<void> {
+    try {
+      const pendingInputs = await this.pendingInputProvider.getPendingInputActions(
+        this.environment,
+        this.buildUrl
+      );
+      this.lastPendingInputsCount = pendingInputs.length;
+      this.callbacks.onPendingInputs(pendingInputs);
+    } catch {
+      // Swallow failures to keep the panel responsive.
+    }
+  }
+
   setTestReportOptions(options?: JenkinsTestReportOptions): void {
     this.testReportOptions = options;
   }
@@ -152,6 +195,10 @@ export class BuildDetailsPollingController {
     const detailsPromise = this.dataService.getBuildDetails(this.environment, this.buildUrl);
     const workflowPromise = this.dataService.getWorkflowRun(this.environment, this.buildUrl);
     const consolePromise = this.consoleStreamManager.loadInitialConsole();
+    const pendingInputsPromise = this.pendingInputProvider.getPendingInputActions(
+      this.environment,
+      this.buildUrl
+    );
 
     const errors: string[] = [];
     let details: JenkinsBuildDetails | undefined;
@@ -161,6 +208,8 @@ export class BuildDetailsPollingController {
     let consoleHtmlResult: { html: string; truncated: boolean } | undefined;
     let workflowRun: JenkinsWorkflowRun | undefined;
     let workflowError: unknown;
+    let pendingInputs: PendingInputAction[] = [];
+    let pendingInputsError: unknown;
 
     try {
       details = await detailsPromise;
@@ -172,6 +221,13 @@ export class BuildDetailsPollingController {
       workflowRun = await workflowPromise;
     } catch (error) {
       workflowError = error;
+    }
+
+    try {
+      pendingInputs = await pendingInputsPromise;
+      this.lastPendingInputsCount = pendingInputs.length;
+    } catch (error) {
+      pendingInputsError = error;
     }
 
     let consoleSnapshot: ConsoleSnapshotResult | undefined;
@@ -195,6 +251,9 @@ export class BuildDetailsPollingController {
     if (consoleError && !consoleHtmlResult) {
       errors.push(`Console output: ${this.formatError(consoleError)}`);
     }
+    if (pendingInputsError) {
+      errors.push(`Pending inputs: ${this.formatError(pendingInputsError)}`);
+    }
 
     if (workflowError && details?.building === false) {
       this.workflowRetryPending = true;
@@ -205,7 +264,15 @@ export class BuildDetailsPollingController {
     }
     this.lastKnownBuilding = details?.building;
 
-    return { details, consoleTextResult, consoleHtmlResult, workflowRun, workflowError, errors };
+    return {
+      details,
+      consoleTextResult,
+      consoleHtmlResult,
+      workflowRun,
+      workflowError,
+      pendingInputs,
+      errors
+    };
   }
 
   start(): void {
@@ -260,6 +327,8 @@ export class BuildDetailsPollingController {
       let consoleError: unknown;
       let workflowRun: JenkinsWorkflowRun | undefined;
       let workflowError: unknown;
+      let pendingInputs: PendingInputAction[] = [];
+      let pendingInputsError: unknown;
 
       try {
         details = await detailsPromise;
@@ -271,6 +340,22 @@ export class BuildDetailsPollingController {
         consoleResult = await consolePromise;
       } catch (error) {
         consoleError = error;
+      }
+
+      const shouldFetchPendingInputs =
+        Boolean(details?.building ?? this.lastKnownBuilding) || this.lastPendingInputsCount > 0;
+      if (shouldFetchPendingInputs) {
+        try {
+          pendingInputs = await this.pendingInputProvider.getPendingInputActions(
+            this.environment,
+            this.buildUrl
+          );
+          this.lastPendingInputsCount = pendingInputs.length;
+        } catch (error) {
+          pendingInputsError = error;
+        }
+      } else if (this.lastPendingInputsCount > 0) {
+        this.lastPendingInputsCount = 0;
       }
 
       if (pollGeneration !== this.pollGeneration) {
@@ -295,6 +380,9 @@ export class BuildDetailsPollingController {
             | JenkinsConsoleText
         );
       }
+      if (pendingInputsError) {
+        errors.push(`Pending inputs: ${this.formatError(pendingInputsError)}`);
+      }
 
       if (details) {
         this.callbacks.onDetails(details);
@@ -302,6 +390,9 @@ export class BuildDetailsPollingController {
         if (title) {
           this.callbacks.onTitle(title);
         }
+      }
+      if (!pendingInputsError && shouldFetchPendingInputs) {
+        this.callbacks.onPendingInputs(pendingInputs);
       }
 
       const building = details?.building;

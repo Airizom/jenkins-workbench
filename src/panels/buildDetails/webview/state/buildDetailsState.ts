@@ -50,6 +50,7 @@ export const FALLBACK_STATE: BuildDetailsState = {
   culpritsLabel: "Unknown",
   pipelineStages: [],
   insights: DEFAULT_INSIGHTS,
+  pendingInputs: [],
   consoleText: "",
   consoleHtml: undefined,
   consoleHtmlModel: undefined,
@@ -145,7 +146,8 @@ export function buildDetailsReducer(
         timestampLabel: payload.timestampLabel,
         culpritsLabel: payload.culpritsLabel,
         insights: payload.insights,
-        pipelineStages: payload.pipelineStages
+        pipelineStages: payload.pipelineStages,
+        pendingInputs: payload.pendingInputs ?? []
       };
     }
     default:
@@ -161,7 +163,8 @@ export function getInitialState(): BuildDetailsViewModel {
   return {
     ...FALLBACK_STATE,
     ...candidate,
-    insights: candidate.insights ?? DEFAULT_INSIGHTS
+    insights: candidate.insights ?? DEFAULT_INSIGHTS,
+    pendingInputs: candidate.pendingInputs ?? []
   };
 }
 

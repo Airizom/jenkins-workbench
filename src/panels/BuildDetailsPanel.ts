@@ -5,6 +5,7 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import { handlePendingInputAction } from "../ui/PendingInputActions";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
   MAX_CONSOLE_CHARS,
@@ -16,14 +17,17 @@ import { formatError, formatResult } from "./buildDetails/BuildDetailsFormatters
 import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsPollingCallbacks";
 import {
   type BuildDetailsOutgoingMessage,
+  isApproveInputMessage,
   isArtifactActionMessage,
   isExportConsoleMessage,
   isOpenExternalMessage,
+  isRejectInputMessage,
   isToggleFollowLogMessage
 } from "./buildDetails/BuildDetailsMessages";
 import {
   type BuildDetailsDataService,
   type BuildDetailsInitialState,
+  type PendingInputActionProvider,
   BuildDetailsPollingController
 } from "./buildDetails/BuildDetailsPollingController";
 import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
@@ -48,11 +52,15 @@ export class BuildDetailsPanel {
   private dataService?: BuildDetailsDataService;
   private artifactActionHandler?: ArtifactActionHandler;
   private pollingController?: BuildDetailsPollingController;
+  private refreshHost?: { refreshEnvironment(environmentId: string): void };
+  private pendingInputProvider?: PendingInputActionProvider;
 
   static async show(
     dataService: BuildDetailsDataService,
     artifactActionHandler: ArtifactActionHandler,
     consoleExporter: BuildConsoleExporter,
+    refreshHost: { refreshEnvironment(environmentId: string): void } | undefined,
+    pendingInputProvider: PendingInputActionProvider | undefined,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     extensionUri: vscode.Uri,
@@ -76,6 +84,8 @@ export class BuildDetailsPanel {
 
     const activePanel = BuildDetailsPanel.currentPanel;
     activePanel.consoleExporter = consoleExporter;
+    activePanel.refreshHost = refreshHost;
+    activePanel.pendingInputProvider = pendingInputProvider;
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
@@ -119,6 +129,14 @@ export class BuildDetailsPanel {
         }
         if (isExportConsoleMessage(message)) {
           void this.handleExportConsole();
+          return;
+        }
+        if (isApproveInputMessage(message)) {
+          void this.handleApproveInput(message);
+          return;
+        }
+        if (isRejectInputMessage(message)) {
+          void this.handleRejectInput(message);
           return;
         }
         if (isToggleFollowLogMessage(message)) {
@@ -178,6 +196,7 @@ export class BuildDetailsPanel {
 
     this.pollingController = new BuildDetailsPollingController({
       dataService,
+      pendingInputProvider: this.pendingInputProvider,
       environment,
       buildUrl,
       maxConsoleChars: MAX_CONSOLE_CHARS,
@@ -226,7 +245,8 @@ export class BuildDetailsPanel {
       consoleHtmlResult,
       errors: this.state.currentErrors,
       maxConsoleChars: MAX_CONSOLE_CHARS,
-      followLog: this.state.followLog
+      followLog: this.state.followLog,
+      pendingInputs: this.state.currentPendingInputs
     });
     const bundleSegments = BUILD_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
     const scriptUri = this.panel.webview.asWebviewUri(
@@ -272,7 +292,8 @@ export class BuildDetailsPanel {
       await Promise.all([
         this.refreshConsoleSnapshot(this.loadToken),
         this.refreshTestReport(this.loadToken),
-        this.refreshWorkflowRun(this.loadToken)
+        this.refreshWorkflowRun(this.loadToken),
+        this.pollingController?.refreshPendingInputs()
       ]);
     }
   }
@@ -318,7 +339,8 @@ export class BuildDetailsPanel {
           buildDetailsUpdateMessage(
             this.state.currentDetails,
             this.state.currentTestReport,
-            this.state.currentPipelineRun
+            this.state.currentPipelineRun,
+            this.state.currentPendingInputs
           )
         );
       }
@@ -405,7 +427,8 @@ export class BuildDetailsPanel {
           buildDetailsUpdateMessage(
             this.state.currentDetails,
             this.state.currentTestReport,
-            this.state.currentPipelineRun
+            this.state.currentPipelineRun,
+            this.state.currentPendingInputs
           )
         );
       }
@@ -421,7 +444,8 @@ export class BuildDetailsPanel {
         buildDetailsUpdateMessage(
           details,
           this.state.currentTestReport,
-          this.state.currentPipelineRun
+          this.state.currentPipelineRun,
+          this.state.currentPendingInputs
         )
       );
       const title = details.fullDisplayName ?? details.displayName;
@@ -449,6 +473,56 @@ export class BuildDetailsPanel {
     if (selection === action && this.state.currentBuildUrl) {
       await vscode.env.openExternal(vscode.Uri.parse(this.state.currentBuildUrl));
     }
+  }
+
+  private async handleApproveInput(message: { inputId: string }): Promise<void> {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+      void vscode.window.showErrorMessage("Build details are not ready for input approval.");
+      return;
+    }
+    const environmentId = this.state.environment.environmentId;
+    const label =
+      this.state.currentDetails?.fullDisplayName ??
+      this.state.currentDetails?.displayName ??
+      "build";
+    await handlePendingInputAction({
+      dataService: this.dataService,
+      environment: this.state.environment,
+      buildUrl: this.state.currentBuildUrl,
+      label,
+      inputId: message.inputId,
+      action: "approve",
+      onRefresh: async () => {
+        await this.pollingController?.refreshPendingInputs();
+        await this.refreshBuildStatus(this.loadToken);
+        this.refreshHost?.refreshEnvironment(environmentId);
+      }
+    });
+  }
+
+  private async handleRejectInput(message: { inputId: string }): Promise<void> {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+      void vscode.window.showErrorMessage("Build details are not ready for input rejection.");
+      return;
+    }
+    const environmentId = this.state.environment.environmentId;
+    const label =
+      this.state.currentDetails?.fullDisplayName ??
+      this.state.currentDetails?.displayName ??
+      "build";
+    await handlePendingInputAction({
+      dataService: this.dataService,
+      environment: this.state.environment,
+      buildUrl: this.state.currentBuildUrl,
+      label,
+      inputId: message.inputId,
+      action: "reject",
+      onRefresh: async () => {
+        await this.pollingController?.refreshPendingInputs();
+        await this.refreshBuildStatus(this.loadToken);
+        this.refreshHost?.refreshEnvironment(environmentId);
+      }
+    });
   }
 
   private async handleArtifactAction(message: {

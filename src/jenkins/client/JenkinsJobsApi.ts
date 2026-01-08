@@ -28,7 +28,7 @@ export class JenkinsJobsApi {
   async getJob(jobUrl: string): Promise<JenkinsJob> {
     const url = buildApiUrlFromItem(
       jobUrl,
-      "name,url,_class,color,lastCompletedBuild[number,result,timestamp]"
+      "name,url,_class,color,lastCompletedBuild[number,result,timestamp],lastBuild[number,url,result,building,timestamp]"
     );
     return this.context.requestJson<JenkinsJob>(url);
   }
