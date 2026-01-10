@@ -3,19 +3,28 @@ import type {
   BuildFailureArtifact,
   BuildFailureChangelogItem,
   BuildFailureFailedTest,
-  BuildFailureInsightsViewModel
+  BuildFailureInsightsViewModel,
 } from "../../../shared/BuildDetailsContracts";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
 
 export function BuildFailureInsightsSection({
   insights,
   resultClass,
-  onArtifactAction
+  onArtifactAction,
 }: {
   insights: BuildFailureInsightsViewModel;
   resultClass: string;
-  onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
+  onArtifactAction: (
+    action: ArtifactAction,
+    artifact: BuildFailureArtifact
+  ) => void;
 }) {
   const isFailure = resultClass === "failure" || resultClass === "unstable";
   const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
@@ -24,7 +33,9 @@ export function BuildFailureInsightsSection({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{sectionTitle}</CardTitle>
-        <CardDescription>Changelog, test summary, and artifacts for this build.</CardDescription>
+        <CardDescription>
+          Changelog, test summary, and artifacts for this build.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
@@ -75,7 +86,10 @@ export function BuildFailureInsightsSection({
                 Artifacts
               </div>
               {insights.artifacts.length > 0 ? (
-                <ArtifactsList items={insights.artifacts} onArtifactAction={onArtifactAction} />
+                <ArtifactsList
+                  items={insights.artifacts}
+                  onArtifactAction={onArtifactAction}
+                />
               ) : (
                 <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
                   No artifacts available.
@@ -111,7 +125,9 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
         }
         return (
           <li className="flex flex-col gap-1" key={`${item.message}-${index}`}>
-            <div className="text-[13px] font-semibold text-foreground">{item.message}</div>
+            <div className="text-[13px] font-semibold text-foreground">
+              {item.message}
+            </div>
             <div className="text-xs text-muted-foreground break-words">
               {metaParts.join(" • ")}
             </div>
@@ -131,7 +147,9 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
             {item.name || "Unnamed test"}
           </div>
           {item.className ? (
-            <div className="text-xs text-muted-foreground break-words">{item.className}</div>
+            <div className="text-xs text-muted-foreground break-words">
+              {item.className}
+            </div>
           ) : null}
           {item.errorDetails ? (
             <div className="text-xs text-foreground whitespace-pre-wrap break-words">
@@ -144,10 +162,17 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
             </div>
           ) : null}
           {item.errorStackTrace ? (
-            <FailedTestDetail label="Stack trace" value={item.errorStackTrace} />
+            <FailedTestDetail
+              label="Stack trace"
+              value={item.errorStackTrace}
+            />
           ) : null}
-          {item.stdout ? <FailedTestDetail label="Stdout" value={item.stdout} /> : null}
-          {item.stderr ? <FailedTestDetail label="Stderr" value={item.stderr} /> : null}
+          {item.stdout ? (
+            <FailedTestDetail label="Stdout" value={item.stdout} />
+          ) : null}
+          {item.stderr ? (
+            <FailedTestDetail label="Stderr" value={item.stderr} />
+          ) : null}
         </li>
       ))}
     </ul>
@@ -169,16 +194,24 @@ function FailedTestDetail({ label, value }: { label: string; value: string }) {
 
 function ArtifactsList({
   items,
-  onArtifactAction
+  onArtifactAction,
 }: {
   items: BuildFailureArtifact[];
-  onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
+  onArtifactAction: (
+    action: ArtifactAction,
+    artifact: BuildFailureArtifact
+  ) => void;
 }) {
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {items.map((item, index) => (
-        <li className="flex items-center justify-between gap-2" key={`${item.relativePath}-${index}`}>
-          <div className="text-[13px] break-words">{item.name || "Artifact"}</div>
+        <li
+          className="flex items-center justify-between gap-2"
+          key={`${item.relativePath}-${index}`}
+        >
+          <div className="text-[13px] break-words">
+            {item.name || "Artifact"}
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="link"
