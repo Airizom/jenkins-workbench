@@ -50,6 +50,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
 
       <BuildFailureInsightsSection
         insights={insights}
+        resultClass={state.resultClass}
         onArtifactAction={(action, artifact) =>
           postMessage({
             type: "artifactAction",

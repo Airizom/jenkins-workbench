@@ -10,15 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 
 export function BuildFailureInsightsSection({
   insights,
+  resultClass,
   onArtifactAction
 }: {
   insights: BuildFailureInsightsViewModel;
+  resultClass: string;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
+  const isFailure = resultClass === "failure" || resultClass === "unstable";
+  const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Build Failure Insights</CardTitle>
+        <CardTitle className="text-base">{sectionTitle}</CardTitle>
         <CardDescription>Changelog, test summary, and artifacts for this build.</CardDescription>
       </CardHeader>
       <CardContent>
