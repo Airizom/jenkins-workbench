@@ -28,6 +28,31 @@ export function BuildFailureInsightsSection({
 }) {
   const isFailure = resultClass === "failure" || resultClass === "unstable";
   const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
+  const hasChangelog =
+    insights.changelogItems.length > 0 || insights.changelogOverflow > 0;
+  const hasFailedTests =
+    insights.failedTests.length > 0 || insights.failedTestsOverflow > 0;
+  const hasArtifacts =
+    insights.artifacts.length > 0 || insights.artifactsOverflow > 0;
+  const hasInsights = hasChangelog || hasFailedTests || hasArtifacts;
+
+  if (!hasInsights) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{sectionTitle}</CardTitle>
+          <CardDescription>
+            No changelog, failed tests, or artifacts were reported for this build.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground text-sm">
+            Nothing to highlight for this run.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
