@@ -32,7 +32,7 @@ import {
 } from "./buildDetails/BuildDetailsPollingController";
 import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
 import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
-import { buildDetailsUpdateMessage } from "./buildDetails/BuildDetailsUpdateBuilder";
+import { buildUpdateMessageFromState } from "./buildDetails/BuildDetailsUpdateBuilder";
 import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
 import {
   BUILD_DETAILS_WEBVIEW_BUNDLE_PATH,
@@ -212,7 +212,8 @@ export class BuildDetailsPanel {
         isTokenCurrent: (currentToken) => this.isTokenCurrent(currentToken),
         showCompletionToast: (details) => {
           void this.showCompletionToast(details);
-        }
+        },
+        onPipelineLoading: (currentToken) => this.handlePipelineLoading(currentToken)
       })
     });
 
@@ -241,6 +242,7 @@ export class BuildDetailsPanel {
     const viewModel = buildBuildDetailsViewModel({
       details,
       pipelineRun: this.state.currentPipelineRun,
+      pipelineLoading: this.state.pipelineLoading,
       consoleTextResult,
       consoleHtmlResult,
       errors: this.state.currentErrors,
@@ -321,36 +323,7 @@ export class BuildDetailsPanel {
   }
 
   private async refreshWorkflowRun(token: number): Promise<void> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      return;
-    }
-    try {
-      const workflowRun = await this.dataService.getWorkflowRun(
-        this.state.environment,
-        this.state.currentBuildUrl
-      );
-      if (!this.isTokenCurrent(token)) {
-        return;
-      }
-      this.state.setPipelineRun(toPipelineRun(workflowRun));
-      this.publishErrors();
-      if (this.state.currentDetails && this.panel.visible) {
-        this.postMessage(
-          buildDetailsUpdateMessage(
-            this.state.currentDetails,
-            this.state.currentTestReport,
-            this.state.currentPipelineRun,
-            this.state.currentPendingInputs
-          )
-        );
-      }
-    } catch (error) {
-      if (!this.isTokenCurrent(token)) {
-        return;
-      }
-      this.state.setPipelineError(`Pipeline stages: ${formatError(error)}`);
-      this.publishErrors();
-    }
+    await this.pollingController?.fetchWorkflowRunWithCallbacks(token);
   }
 
   private async fetchBuildDetails(token: number): Promise<JenkinsBuildDetails | undefined> {
@@ -368,6 +341,19 @@ export class BuildDetailsPanel {
       return details;
     } catch {
       return undefined;
+    }
+  }
+
+  private handlePipelineLoading(token: number): void {
+    if (!this.isTokenCurrent(token)) {
+      return;
+    }
+    const loadingChanged = this.state.setPipelineLoading(true);
+    if (loadingChanged && this.panel.visible) {
+      const updateMessage = buildUpdateMessageFromState(this.state);
+      if (updateMessage) {
+        this.postMessage(updateMessage);
+      }
     }
   }
 
@@ -422,15 +408,9 @@ export class BuildDetailsPanel {
         return;
       }
       this.state.setTestReport(testReport);
-      if (this.state.currentDetails) {
-        this.postMessage(
-          buildDetailsUpdateMessage(
-            this.state.currentDetails,
-            this.state.currentTestReport,
-            this.state.currentPipelineRun,
-            this.state.currentPendingInputs
-          )
-        );
+      const updateMessage = buildUpdateMessageFromState(this.state);
+      if (updateMessage) {
+        this.postMessage(updateMessage);
       }
     } catch {
       // Swallow failures to keep the panel responsive.
@@ -440,14 +420,10 @@ export class BuildDetailsPanel {
   private applyDetailsUpdate(details: JenkinsBuildDetails, updateUi: boolean): void {
     const { wasBuilding, isBuilding } = this.state.updateDetails(details);
     if (updateUi && this.panel.visible) {
-      this.postMessage(
-        buildDetailsUpdateMessage(
-          details,
-          this.state.currentTestReport,
-          this.state.currentPipelineRun,
-          this.state.currentPendingInputs
-        )
-      );
+      const updateMessage = buildUpdateMessageFromState(this.state);
+      if (updateMessage) {
+        this.postMessage(updateMessage);
+      }
       const title = details.fullDisplayName ?? details.displayName;
       if (title) {
         this.panel.title = `Build Details - ${title}`;

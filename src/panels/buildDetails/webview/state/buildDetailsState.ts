@@ -48,6 +48,7 @@ export const FALLBACK_STATE: BuildDetailsState = {
   durationLabel: "Unknown",
   timestampLabel: "Unknown",
   culpritsLabel: "Unknown",
+  pipelineStagesLoading: false,
   pipelineStages: [],
   insights: DEFAULT_INSIGHTS,
   pendingInputs: [],
@@ -145,6 +146,7 @@ export function buildDetailsReducer(
         durationLabel: payload.durationLabel,
         timestampLabel: payload.timestampLabel,
         culpritsLabel: payload.culpritsLabel,
+        pipelineStagesLoading: payload.pipelineStagesLoading,
         insights: payload.insights,
         pipelineStages: payload.pipelineStages,
         pendingInputs: payload.pendingInputs ?? []

@@ -18,6 +18,7 @@ export class BuildDetailsPanelState {
   private completionToastShownValue = false;
   private currentNonceValue = "";
   private lastDetailsBuildingValue = false;
+  private pipelineLoadingValue = false;
 
   get environment(): JenkinsEnvironmentRef | undefined {
     return this.environmentValue;
@@ -59,6 +60,10 @@ export class BuildDetailsPanelState {
     return this.lastDetailsBuildingValue;
   }
 
+  get pipelineLoading(): boolean {
+    return this.pipelineLoadingValue;
+  }
+
   resetForLoad(environment: JenkinsEnvironmentRef, buildUrl: string, nonce: string): void {
     this.environmentValue = environment;
     this.currentBuildUrlValue = buildUrl;
@@ -72,6 +77,7 @@ export class BuildDetailsPanelState {
     this.completionToastShownValue = false;
     this.currentNonceValue = nonce;
     this.lastDetailsBuildingValue = false;
+    this.pipelineLoadingValue = true;
   }
 
   applyInitialState(
@@ -86,6 +92,7 @@ export class BuildDetailsPanelState {
     this.pipelineErrorValue = pipelineError;
     this.currentPendingInputsValue = initialState.pendingInputs ?? [];
     this.lastDetailsBuildingValue = initialState.details?.building ?? false;
+    this.pipelineLoadingValue = false;
     this.currentErrorsValue = composeErrors(this.baseErrorsValue, this.pipelineErrorValue);
   }
 
@@ -104,14 +111,24 @@ export class BuildDetailsPanelState {
   setPipelineRun(pipelineRun: PipelineRun | undefined): void {
     this.currentPipelineRunValue = pipelineRun;
     this.pipelineErrorValue = undefined;
+    this.pipelineLoadingValue = false;
   }
 
   setPipelineError(pipelineError: string | undefined): void {
     this.pipelineErrorValue = pipelineError;
+    this.pipelineLoadingValue = false;
   }
 
   setBaseErrors(errors: string[]): void {
     this.baseErrorsValue = errors;
+  }
+
+  setPipelineLoading(value: boolean): boolean {
+    if (this.pipelineLoadingValue === value) {
+      return false;
+    }
+    this.pipelineLoadingValue = value;
+    return true;
   }
 
   setPendingInputs(pendingInputs: PendingInputAction[]): void {

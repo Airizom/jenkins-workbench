@@ -52,6 +52,7 @@ export type {
 export interface BuildDetailsViewModelInput {
   details?: JenkinsBuildDetails;
   pipelineRun?: PipelineRun;
+  pipelineLoading?: boolean;
   testReport?: JenkinsTestReport;
   consoleTextResult?: JenkinsConsoleText;
   consoleHtmlResult?: { html: string; truncated: boolean };
@@ -90,6 +91,7 @@ export function buildBuildDetailsViewModel(
     durationLabel: details ? formatDuration(details.duration) : "Unknown",
     timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown",
     culpritsLabel: details ? formatCulprits(details.culprits) : "Unknown",
+    pipelineStagesLoading: Boolean(input.pipelineLoading),
     pipelineStages: buildPipelineStagesViewModel(input.pipelineRun),
     insights: buildBuildFailureInsights(details, input.testReport),
     pendingInputs: buildPendingInputsViewModel(input.pendingInputs),

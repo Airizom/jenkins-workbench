@@ -75,6 +75,7 @@ export interface BuildDetailsViewModel {
   durationLabel: string;
   timestampLabel: string;
   culpritsLabel: string;
+  pipelineStagesLoading: boolean;
   pipelineStages: PipelineStageViewModel[];
   insights: BuildFailureInsightsViewModel;
   pendingInputs: PendingInputViewModel[];
@@ -94,6 +95,7 @@ export interface BuildDetailsUpdateMessage {
   durationLabel: string;
   timestampLabel: string;
   culpritsLabel: string;
+  pipelineStagesLoading: boolean;
   insights: BuildFailureInsightsViewModel;
   pipelineStages: PipelineStageViewModel[];
   pendingInputs: PendingInputViewModel[];

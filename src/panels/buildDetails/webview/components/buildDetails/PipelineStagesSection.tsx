@@ -2,68 +2,93 @@ import * as React from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type {
   PipelineStageStepViewModel,
-  PipelineStageViewModel
+  PipelineStageViewModel,
 } from "../../../shared/BuildDetailsContracts";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
 import { cn } from "../../lib/utils";
 import { getStatusClass, StatusPill } from "./StatusPill";
 
 const { useEffect, useMemo, useState } = React;
 
-export function PipelineStagesSection({ stages }: { stages: PipelineStageViewModel[] }) {
-  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
-  const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
+export function PipelineStagesSection({
+  stages,
+  loading,
+}: {
+  stages: PipelineStageViewModel[];
+  loading: boolean;
+}) {
+  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>(
+    {}
+  );
+  const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const stageKeys = useMemo(() => collectStageKeys(stages), [stages]);
+  const hasStages = stages.length > 0;
+  const showPlaceholder = loading && !hasStages;
 
   useEffect(() => {
     setExpandedStages((prev) => pruneStageState(prev, stageKeys));
     setShowAllStages((prev) => pruneStageState(prev, stageKeys));
   }, [stageKeys]);
 
-  if (stages.length === 0) {
+  if (!loading && !hasStages) {
     return null;
   }
 
   return (
-    <Card id="pipeline-section">
+    <Card id="pipeline-section" aria-busy={loading}>
       <CardHeader>
         <CardTitle className="text-base">Pipeline Stages</CardTitle>
-        <CardDescription>Stage status, duration, and steps from Jenkins Pipeline.</CardDescription>
+        <CardDescription>
+          Stage status, duration, and steps from Jenkins Pipeline.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div
-          id="pipeline-stages"
-          className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3"
-        >
-          {stages.map((stage, index) => {
-            const stageKey = typeof stage.key === "string" ? stage.key : "";
-            const expanded = expandedStages[stageKey] ?? false;
-            const showAll = showAllStages[stageKey] ?? false;
-            return (
-              <StageCard
-                key={stageKey || `stage-${index}`}
-                stage={stage}
-                expanded={expanded}
-                showAll={showAll}
-                onToggleExpanded={() =>
-                  setExpandedStages((prev) => ({
-                    ...prev,
-                    [stageKey]: !expanded
-                  }))
-                }
-                onToggleShowAll={(event) => {
-                  event.stopPropagation();
-                  setShowAllStages((prev) => ({
-                    ...prev,
-                    [stageKey]: !showAll
-                  }));
-                }}
-              />
-            );
-          })}
-        </div>
+        {loading && hasStages ? <LoadingBanner /> : null}
+        {showPlaceholder ? (
+          <PipelineStagesPlaceholder />
+        ) : (
+          <div
+            id="pipeline-stages"
+            className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3"
+          >
+            {stages.map((stage, index) => {
+              const stageKey = typeof stage.key === "string" ? stage.key : "";
+              const expanded = expandedStages[stageKey] ?? false;
+              const showAll = showAllStages[stageKey] ?? false;
+              return (
+                <StageCard
+                  key={stageKey || `stage-${index}`}
+                  stage={stage}
+                  expanded={expanded}
+                  showAll={showAll}
+                  onToggleExpanded={() =>
+                    setExpandedStages((prev) => ({
+                      ...prev,
+                      [stageKey]: !expanded,
+                    }))
+                  }
+                  onToggleShowAll={(event) => {
+                    event.stopPropagation();
+                    setShowAllStages((prev) => ({
+                      ...prev,
+                      [stageKey]: !showAll,
+                    }));
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -100,14 +125,16 @@ function pruneStageState(
 function StatusText({
   label,
   status,
-  className
+  className,
 }: {
   label: string;
   status?: string;
   className?: string;
 }) {
   const statusClass = getStatusClass(status);
-  return <span className={cn("font-semibold", statusClass, className)}>{label}</span>;
+  return (
+    <span className={cn("font-semibold", statusClass, className)}>{label}</span>
+  );
 }
 
 function StepsList({ steps }: { steps: PipelineStageStepViewModel[] }) {
@@ -118,7 +145,9 @@ function StepsList({ steps }: { steps: PipelineStageStepViewModel[] }) {
           className="flex flex-col gap-1 rounded-md border border-border bg-muted px-3 py-2"
           key={`${step.name}-${index}`}
         >
-          <div className="text-xs font-semibold text-foreground">{step.name || "Step"}</div>
+          <div className="text-xs font-semibold text-foreground">
+            {step.name || "Step"}
+          </div>
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <StatusText
               label={step.statusLabel || "Unknown"}
@@ -135,7 +164,7 @@ function StepsList({ steps }: { steps: PipelineStageStepViewModel[] }) {
 
 function BranchSteps({
   branch,
-  showAll
+  showAll,
 }: {
   branch: PipelineStageViewModel;
   showAll: boolean;
@@ -144,7 +173,9 @@ function BranchSteps({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2 text-xs">
-        <div className="font-semibold text-foreground">{branch.name || "Branch"}</div>
+        <div className="font-semibold text-foreground">
+          {branch.name || "Branch"}
+        </div>
         <StatusText
           label={branch.statusLabel || "Unknown"}
           status={branch.statusClass}
@@ -170,7 +201,7 @@ function StageCard({
   expanded,
   showAll,
   onToggleExpanded,
-  onToggleShowAll
+  onToggleShowAll,
 }: {
   stage: PipelineStageViewModel;
   expanded: boolean;
@@ -185,7 +216,10 @@ function StageCard({
   const expandedClass = expanded ? "border-ring ring-1 ring-ring" : "";
 
   return (
-    <Card className={cn("bg-background transition-colors", expandedClass)} data-stage-key={stage.key}>
+    <Card
+      className={cn("bg-background transition-colors", expandedClass)}
+      data-stage-key={stage.key}
+    >
       <div className="flex flex-col gap-3 p-3">
         <button
           type="button"
@@ -193,7 +227,9 @@ function StageCard({
           onClick={onToggleExpanded}
         >
           <div className="flex items-center justify-between gap-2.5">
-            <div className="text-sm font-semibold text-foreground">{stage.name || "Stage"}</div>
+            <div className="text-sm font-semibold text-foreground">
+              {stage.name || "Stage"}
+            </div>
             <StatusPill
               label={stage.statusLabel || "Unknown"}
               status={stage.statusClass}
@@ -212,7 +248,9 @@ function StageCard({
                 className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted px-3 py-2"
                 key={`${branch.key}-${index}`}
               >
-                <div className="text-xs font-semibold text-foreground">{branch.name || "Branch"}</div>
+                <div className="text-xs font-semibold text-foreground">
+                  {branch.name || "Branch"}
+                </div>
                 <StatusText
                   label={branch.statusLabel || "Unknown"}
                   status={branch.statusClass}
@@ -225,20 +263,32 @@ function StageCard({
             ))}
           </div>
         ) : null}
-        <div className="border-t border-dashed border-border pt-3 flex flex-col gap-3" hidden={!expanded}>
+        <div
+          className="border-t border-dashed border-border pt-3 flex flex-col gap-3"
+          hidden={!expanded}
+        >
           {hasSteps ? (
             <div className="flex items-center justify-between gap-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Steps
               </div>
-              <Button variant="link" size="sm" className="h-auto px-0 text-xs" onClick={onToggleShowAll}>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto px-0 text-xs"
+                onClick={onToggleShowAll}
+              >
                 {showAll ? "Show failed steps" : "Show all steps"}
               </Button>
             </div>
           ) : null}
           {hasBranches ? (
             stage.parallelBranches.map((branch, index) => (
-              <BranchSteps branch={branch} showAll={showAll} key={`${branch.key}-${index}`} />
+              <BranchSteps
+                branch={branch}
+                showAll={showAll}
+                key={`${branch.key}-${index}`}
+              />
             ))
           ) : hasSteps ? (
             steps.length > 0 ? (
@@ -256,5 +306,42 @@ function StageCard({
         </div>
       </div>
     </Card>
+  );
+}
+
+function PipelineStagesPlaceholder(): JSX.Element {
+  const placeholders = ["placeholder-a", "placeholder-b", "placeholder-c"];
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-muted/60 px-4 py-6 flex flex-col gap-3 text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <span
+          className="inline-block h-2.5 w-2.5 rounded-full bg-primary animate-pulse"
+          aria-hidden
+        />
+        <span>Loading stages...</span>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-2">
+        {placeholders.map((placeholderKey) => (
+          <div
+            key={placeholderKey}
+            className="h-20 rounded-md border border-border bg-background shadow-sm overflow-hidden"
+          >
+            <div className="h-full w-full animate-pulse bg-gradient-to-r from-muted via-muted/70 to-muted" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LoadingBanner(): JSX.Element {
+  return (
+    <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
+      <span
+        className="inline-block h-2 w-2 rounded-full bg-primary animate-ping"
+        aria-hidden
+      />
+      Refreshing stages...
+    </div>
   );
 }

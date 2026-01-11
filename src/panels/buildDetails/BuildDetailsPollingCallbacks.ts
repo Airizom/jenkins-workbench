@@ -2,7 +2,7 @@ import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPollingCallbacks } from "./BuildDetailsPollingController";
-import { buildDetailsUpdateMessage } from "./BuildDetailsUpdateBuilder";
+import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
 import { formatError } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 
@@ -12,6 +12,7 @@ export interface BuildDetailsPollingCallbackHooks {
   publishErrors: () => void;
   isTokenCurrent: (token: number) => boolean;
   showCompletionToast: (details: JenkinsBuildDetails) => void;
+  onPipelineLoading?: (token: number) => void;
 }
 
 export function createBuildDetailsPollingCallbacks(
@@ -25,14 +26,16 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       state.updateDetails(details);
-      hooks.postMessage(
-        buildDetailsUpdateMessage(
-          details,
-          state.currentTestReport,
-          state.currentPipelineRun,
-          state.currentPendingInputs
-        )
-      );
+      const message = buildUpdateMessageFromState(state);
+      if (message) {
+        hooks.postMessage(message);
+      }
+    },
+    onWorkflowFetchStart: () => {
+      if (!hooks.isTokenCurrent(token)) {
+        return;
+      }
+      hooks.onPipelineLoading?.(token);
     },
     onWorkflowRun: (workflowRun) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -40,15 +43,9 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setPipelineRun(toPipelineRun(workflowRun));
       hooks.publishErrors();
-      if (state.currentDetails) {
-        hooks.postMessage(
-          buildDetailsUpdateMessage(
-            state.currentDetails,
-            state.currentTestReport,
-            state.currentPipelineRun,
-            state.currentPendingInputs
-          )
-        );
+      const message = buildUpdateMessageFromState(state);
+      if (message) {
+        hooks.postMessage(message);
       }
     },
     onWorkflowError: (error) => {
@@ -57,6 +54,10 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setPipelineError(`Pipeline stages: ${formatError(error)}`);
       hooks.publishErrors();
+      const message = buildUpdateMessageFromState(state);
+      if (message) {
+        hooks.postMessage(message);
+      }
     },
     onTitle: (title) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -108,15 +109,9 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       state.setPendingInputs(pendingInputs);
-      if (state.currentDetails) {
-        hooks.postMessage(
-          buildDetailsUpdateMessage(
-            state.currentDetails,
-            state.currentTestReport,
-            state.currentPipelineRun,
-            state.currentPendingInputs
-          )
-        );
+      const message = buildUpdateMessageFromState(state);
+      if (message) {
+        hooks.postMessage(message);
       }
     },
     onComplete: (details) => {

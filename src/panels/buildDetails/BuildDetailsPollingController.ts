@@ -76,6 +76,7 @@ export interface PendingInputActionProvider {
 }
 
 export interface BuildDetailsPollingCallbacks {
+  onWorkflowFetchStart?: () => void;
   onDetails(details: JenkinsBuildDetails): void;
   onWorkflowRun(workflowRun: JenkinsWorkflowRun | undefined): void;
   onWorkflowError(error: unknown): void;
@@ -172,6 +173,25 @@ export class BuildDetailsPollingController {
       this.buildUrl,
       this.testReportOptions
     );
+  }
+
+  async fetchWorkflowRunWithCallbacks(_token: number): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    this.callbacks.onWorkflowFetchStart?.();
+    try {
+      const workflowRun = await this.dataService.getWorkflowRun(this.environment, this.buildUrl);
+      if (this.disposed) {
+        return;
+      }
+      this.callbacks.onWorkflowRun(workflowRun);
+    } catch (error) {
+      if (this.disposed) {
+        return;
+      }
+      this.callbacks.onWorkflowError(error);
+    }
   }
 
   async refreshPendingInputs(): Promise<void> {
@@ -408,6 +428,7 @@ export class BuildDetailsPollingController {
         if (retryingWorkflow) {
           this.workflowRetryPending = false;
         }
+        this.callbacks.onWorkflowFetchStart?.();
         try {
           workflowRun = await this.dataService.getWorkflowRun(this.environment, this.buildUrl);
           this.callbacks.onWorkflowRun(workflowRun);

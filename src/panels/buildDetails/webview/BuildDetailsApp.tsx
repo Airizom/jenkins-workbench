@@ -46,7 +46,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         onReject={(inputId) => postMessage({ type: "rejectInput", inputId })}
       />
 
-      <PipelineStagesSection stages={state.pipelineStages} />
+      <PipelineStagesSection
+        stages={state.pipelineStages}
+        loading={state.pipelineStagesLoading}
+      />
 
       <BuildFailureInsightsSection
         insights={insights}
