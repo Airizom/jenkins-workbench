@@ -91,13 +91,33 @@ export function ConsoleOutputSection({
     onExportLogs();
   };
 
-
   return (
     <Card>
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <CardTitle className="text-base">Console Output</CardTitle>
           <div className="flex flex-wrap items-center gap-3">
+            <Button
+              aria-label="Search console output"
+              onClick={consoleSearch.openSearchToolbar}
+              size="icon"
+              variant="ghost"
+              title="Search (Cmd/Ctrl+F)"
+            >
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <circle cx="11" cy="11" r="6" />
+                <line x1="15.5" y1="15.5" x2="20" y2="20" />
+              </svg>
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExportLogs}>
               Export Logs
             </Button>

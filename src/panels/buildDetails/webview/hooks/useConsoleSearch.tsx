@@ -1,6 +1,6 @@
 import * as React from "react";
 
-const { useEffect, useMemo, useRef, useState } = React;
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
 const MAX_CONSOLE_MATCHES = 2000;
 
@@ -96,15 +96,24 @@ export type ConsoleSearchState = {
   handleSearchStep: (direction: "next" | "prev") => void;
   handleClearSearch: () => void;
   setUseRegex: React.Dispatch<React.SetStateAction<boolean>>;
+  openSearchToolbar: () => void;
 };
 
 export function useConsoleSearch(consoleText: string): ConsoleSearchState {
   const [searchQuery, setSearchQuery] = useState("");
   const [useRegex, setUseRegex] = useState(false);
-  const [searchVisible, setSearchVisible] = useState(true);
+  const [searchVisible, setSearchVisible] = useState(false);
   const [activeMatchIndex, setActiveMatchIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const consoleOutputRef = useRef<HTMLPreElement>(null);
+
+  const openSearchToolbar = useCallback(() => {
+    setSearchVisible(true);
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }, []);
 
   const consoleSearchState = useMemo(
     () => buildConsoleMatches(consoleText, searchQuery, useRegex),
@@ -132,11 +141,7 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
       const key = event.key.toLowerCase();
       if ((event.metaKey || event.ctrlKey) && key === "f") {
         event.preventDefault();
-        setSearchVisible(true);
-        requestAnimationFrame(() => {
-          searchInputRef.current?.focus();
-          searchInputRef.current?.select();
-        });
+        openSearchToolbar();
         return;
       }
       if (event.key === "Escape" && (searchVisible || searchQuery.length > 0)) {
@@ -147,7 +152,7 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [searchQuery, searchVisible]);
+  }, [openSearchToolbar, searchQuery, searchVisible]);
 
   const consoleSegments = useMemo(() => {
     if (!isSearchActive || matchCount === 0) {
@@ -269,6 +274,7 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
     handleSearchKeyDown,
     handleSearchStep,
     handleClearSearch,
-    setUseRegex
+    setUseRegex,
+    openSearchToolbar
   };
 }
