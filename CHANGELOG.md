@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-01-12
+
+### Changed
+
+- refactor: drop unused settings environment section
+
 ## [1.10.0] - 2026-01-12
 
 ### Added
