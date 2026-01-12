@@ -1,10 +1,8 @@
-import { formatScopeLabel } from "../formatters/ScopeFormatters";
 import {
   ArtifactTreeItem,
   BuildArtifactsFolderTreeItem,
   BuildQueueFolderTreeItem,
   BuildTreeItem,
-  EnvironmentGroupTreeItem,
   InstanceTreeItem,
   JenkinsFolderTreeItem,
   JobTreeItem,
@@ -15,8 +13,6 @@ import {
   PlaceholderTreeItem,
   QueueItemTreeItem,
   RootSectionTreeItem,
-  SettingsEnvironmentTreeItem,
-  SettingsEnvironmentsTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
 import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
@@ -68,28 +64,11 @@ export class JenkinsTreeChildrenLoader {
       if (environments.length === 0) {
         return [];
       }
-      return [
-        new RootSectionTreeItem("Jenkins Instances", "instances"),
-        new RootSectionTreeItem("Settings", "settings")
-      ];
+      return [new RootSectionTreeItem("Jenkins Instances", "instances")];
     }
 
     if (element instanceof RootSectionTreeItem) {
-      if (element.section === "instances") {
-        return await this.getInstanceItems();
-      }
-      return [new SettingsEnvironmentsTreeItem()];
-    }
-
-    if (element instanceof SettingsEnvironmentsTreeItem) {
-      return [
-        new EnvironmentGroupTreeItem("Workspace", "workspace"),
-        new EnvironmentGroupTreeItem("Global", "global")
-      ];
-    }
-
-    if (element instanceof EnvironmentGroupTreeItem) {
-      return await this.getEnvironmentGroupItems(element);
+      return await this.getInstanceItems();
     }
 
     if (element instanceof InstanceTreeItem) {
@@ -184,31 +163,6 @@ export class JenkinsTreeChildrenLoader {
     }
 
     return environments.map((environment) => new InstanceTreeItem(environment));
-  }
-
-  private async getEnvironmentGroupItems(
-    element: EnvironmentGroupTreeItem
-  ): Promise<WorkbenchTreeElement[]> {
-    const environments = await this.store.getEnvironments(element.scope);
-    if (environments.length === 0) {
-      return [
-        new PlaceholderTreeItem(
-          "No environments stored.",
-          `Add one to ${formatScopeLabel(element.scope)}.`,
-          "empty"
-        )
-      ];
-    }
-
-    return environments.map(
-      (environment) =>
-        new SettingsEnvironmentTreeItem(
-          environment.id,
-          element.scope,
-          environment.url,
-          environment.username
-        )
-    );
   }
 
   private async loadJobsForEnvironment(

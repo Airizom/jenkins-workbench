@@ -18,9 +18,6 @@ import {
 
 export type WorkbenchTreeElement =
   | RootSectionTreeItem
-  | SettingsEnvironmentsTreeItem
-  | EnvironmentGroupTreeItem
-  | SettingsEnvironmentTreeItem
   | InstanceTreeItem
   | JobsFolderTreeItem
   | BuildQueueFolderTreeItem
@@ -38,44 +35,10 @@ export type WorkbenchTreeElement =
 export class RootSectionTreeItem extends vscode.TreeItem {
   constructor(
     label: string,
-    public readonly section: "instances" | "settings"
+    public readonly section: "instances"
   ) {
     super(label, vscode.TreeItemCollapsibleState.Expanded);
     this.contextValue = section;
-  }
-}
-
-export class SettingsEnvironmentsTreeItem extends vscode.TreeItem {
-  constructor() {
-    super("Environments", vscode.TreeItemCollapsibleState.Expanded);
-    this.contextValue = "settingsEnvironments";
-  }
-}
-
-export class EnvironmentGroupTreeItem extends vscode.TreeItem {
-  constructor(
-    label: string,
-    public readonly scope: EnvironmentScope
-  ) {
-    super(label, vscode.TreeItemCollapsibleState.Expanded);
-    this.contextValue = "environmentGroup";
-  }
-}
-
-export class SettingsEnvironmentTreeItem extends vscode.TreeItem implements JenkinsEnvironmentRef {
-  public readonly environmentId: string;
-  public readonly scope: EnvironmentScope;
-  public readonly url: string;
-  public readonly username?: string;
-
-  constructor(environmentId: string, scope: EnvironmentScope, url: string, username?: string) {
-    super(url, vscode.TreeItemCollapsibleState.None);
-    this.environmentId = environmentId;
-    this.scope = scope;
-    this.url = url;
-    this.username = username;
-    this.contextValue = "environment";
-    this.description = formatScopeLabel(scope);
   }
 }
 

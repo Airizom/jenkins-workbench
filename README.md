@@ -25,19 +25,23 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 - **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords)
 - **Stop Builds** — Abort running builds directly from the tree
 - **Replay & Rebuild** — Re-run builds with the same or modified configuration
+- **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds
 - **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
 
 ### Build Insights & Artifacts
 
 - **Build Progress** — Estimated progress and duration for running builds
 - **Richer Tooltips** — Optional build tooltips with causes, changes, and parameters
+- **Console Search & Export** — Quickly search logs or export console output from build details
+- **Failure Insights** — Focused cards that summarize why a build failed, with empty states when no data is available
 - **Artifact Preview & Download** — Open images/text artifacts or download them to your workspace
 
 ### Build Details Panel
 
 - **Live Console Streaming** — Watch build output in real-time with automatic scrolling
 - **Pipeline Visualization** — View stage-by-stage progress for Pipeline jobs
-- **Test Results** — See test summary when builds complete
+- **Stage Load Feedback** — Inline loading states while pipeline stages resolve
+- **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
 
 ### Watch Jobs
@@ -108,6 +112,7 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
 | `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
+| `jenkinsWorkbench.buildDetails.testReport.includeCaseLogs` | false | Include per-test stack traces and stdout/stderr when fetching test reports. |
 
 ### Job Search
 
@@ -157,6 +162,8 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `Jenkins Workbench: View Build Details` | Open the build details panel |
 | `Jenkins Workbench: Open Last Failed Build` | Jump to the last failed build |
 | `Jenkins Workbench: Cancel Queue Item` | Remove a build from the queue |
+| `Jenkins Workbench: Approve Input` | Approve a pending input step for a running build |
+| `Jenkins Workbench: Reject Input` | Reject a pending input step for a running build |
 
 ### Artifacts
 
@@ -270,7 +277,7 @@ Contributions are welcome! Please follow these guidelines:
 # Install dependencies
 npm install
 
-# Compile TypeScript
+# Compile webview + TypeScript
 npm run compile
 
 # Watch mode for development

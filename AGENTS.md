@@ -5,7 +5,7 @@
 - VS Code extension that surfaces Jenkins instances, jobs, and build activity in an Activity Bar view.
 - Uses the Jenkins JSON API via `src/jenkins/` services; stores environment metadata in VS Code state.
 - Target VS Code version: `^1.85.0`
-- Includes pinned jobs/pipelines, artifact preview/download workflows, and richer build tooltips.
+- Includes pinned jobs/pipelines, artifact preview/download workflows, richer build tooltips, and a React-based build details panel with console search/export and failure insights cards.
 
 ## Project Structure & Module Organization
 
@@ -598,8 +598,10 @@ function isOpenExternalMessage(msg: unknown): msg is OpenExternalMessage {
 | Command | Description |
 |---------|-------------|
 | `npm install` | Install dev dependencies |
-| `npm run compile` | Build TypeScript into `out/` |
-| `npm run watch` | Run `tsc -watch` for iterative development |
+| `npm run compile` | Build webview bundle then TypeScript into `out/` |
+| `npm run watch` | Watch webview bundle + `tsc -watch` |
+| `npm run build:webview` | Bundle the React build details webview via `scripts/build-webview.mjs` |
+| `npm run watch:webview` | Watch mode for webview assets |
 | `npm run lint` | Run Biome linter for `src/` |
 | `npm run lint:fix` | Apply Biome lint autofixes |
 | `npm run format` | Format all files with Biome |
