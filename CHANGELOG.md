@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-01-12
+
+### Added
+
+- feat: add console search button with focus shortcut for build details
+- feat: show pipeline stage loading feedback in build details
+- feat: show empty state for build failure insights
+- feat: tailor build insights titles for failures vs non-failures
+
+### Changed
+
+- refactor: modularize build failure insights cards
+- chore: reflow build failure insights markup for consistency
+
 ## [1.9.0] - 2026-01-08
 
 ### Added
