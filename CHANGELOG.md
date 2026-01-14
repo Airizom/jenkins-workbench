@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-01-14
+
+### Added
+
+- feat: add scroll-to-top control for build details
+
+### Fixed
+
+- fix: prevent switch thumb from catching pointer events
+
 ## [1.10.1] - 2026-01-12
 
 ### Changed
