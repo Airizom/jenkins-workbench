@@ -6,8 +6,10 @@ import { ConsoleOutputSection } from "./components/buildDetails/ConsoleOutputSec
 import { PendingInputsSection } from "./components/buildDetails/PendingInputsSection";
 import { PipelineStagesSection } from "./components/buildDetails/PipelineStagesSection";
 import { Alert, AlertDescription } from "./components/ui/alert";
+import { Button } from "./components/ui/button";
 import { useBuildDetailsInteractions } from "./hooks/useBuildDetailsInteractions";
 import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
+import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
 import { buildDetailsReducer, buildInitialState, DEFAULT_INSIGHTS } from "./state/buildDetailsState";
 
 const { useReducer } = React;
@@ -16,6 +18,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
   const postMessage = useBuildDetailsInteractions();
   useBuildDetailsMessages(dispatch);
+  const { showButton, scrollToTop } = useScrollToTopButton();
 
   const insights = state.insights ?? DEFAULT_INSIGHTS;
 
@@ -78,6 +81,31 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         onExportLogs={() => postMessage({ type: "exportConsole" })}
         onOpenExternal={(url) => postMessage({ type: "openExternal", url })}
       />
+
+      {showButton && !state.followLog ? (
+        <Button
+          aria-label="Scroll to top"
+          className="fixed bottom-6 right-6 z-50 rounded-full shadow-md"
+          onClick={scrollToTop}
+          size="icon"
+          title="Scroll to top"
+          variant="secondary"
+        >
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <line x1="12" y1="19" x2="12" y2="5" />
+            <polyline points="5 12 12 5 19 12" />
+          </svg>
+        </Button>
+      ) : null}
     </div>
   );
 }
