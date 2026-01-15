@@ -43,6 +43,12 @@ export function registerSearchCommands(
     vscode.commands.registerCommand("jenkinsWorkbench.filterJobsRunning", () =>
       toggleJobFilterMode(viewStateStore, "running")
     ),
+    vscode.commands.registerCommand("jenkinsWorkbench.filterJobs", () =>
+      promptJobFilter(viewStateStore)
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.filterJobsActive", () =>
+      promptJobFilter(viewStateStore)
+    ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.filterBranches",
       (item?: JenkinsFolderTreeItem) => promptBranchFilter(viewStateStore, item)
@@ -198,6 +204,38 @@ async function toggleJobFilterMode(
   const current = viewStateStore.getJobFilterMode();
   const next = current === mode ? "all" : mode;
   await viewStateStore.setJobFilterMode(next);
+}
+
+type FilterQuickPickItem = vscode.QuickPickItem & { mode: JobFilterMode };
+
+async function promptJobFilter(viewStateStore: JenkinsViewStateStore): Promise<void> {
+  const currentMode = viewStateStore.getJobFilterMode();
+
+  const items: FilterQuickPickItem[] = [
+    {
+      label: "All Jobs",
+      description: currentMode === "all" ? "(current)" : undefined,
+      mode: "all"
+    },
+    {
+      label: "Failing Jobs",
+      description: currentMode === "failing" ? "(current)" : undefined,
+      mode: "failing"
+    },
+    {
+      label: "Running Jobs",
+      description: currentMode === "running" ? "(current)" : undefined,
+      mode: "running"
+    }
+  ];
+
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: "Filter jobs by status"
+  });
+
+  if (selected) {
+    await viewStateStore.setJobFilterMode(selected.mode);
+  }
 }
 
 async function promptBranchFilter(

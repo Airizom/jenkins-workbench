@@ -109,6 +109,16 @@
         "icon": "$(play)"
       },
       {
+        "command": "jenkinsWorkbench.filterJobs",
+        "title": "Jenkins Workbench: Filter Jobs",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "jenkinsWorkbench.filterJobsActive",
+        "title": "Jenkins Workbench: Filter Jobs",
+        "icon": "$(filter-filled)"
+      },
+      {
         "command": "jenkinsWorkbench.showBuildDetails",
         "title": "Jenkins Workbench: View Build Details"
       },
@@ -296,34 +306,29 @@
     "menus": {
       "view/title": [
         {
-          "command": "jenkinsWorkbench.refresh",
+          "command": "jenkinsWorkbench.addEnvironment",
           "when": "view == jenkinsWorkbench.tree",
           "group": "navigation@0"
         },
         {
-          "command": "jenkinsWorkbench.addEnvironment",
-          "when": "view == jenkinsWorkbench.tree",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.goToJob",
+          "command": "jenkinsWorkbench.refresh",
           "when": "view == jenkinsWorkbench.tree",
           "group": "navigation@1"
         },
         {
-          "command": "jenkinsWorkbench.filterJobsAll",
-          "when": "view == jenkinsWorkbench.tree && jenkinsWorkbench.filterMode != all",
+          "command": "jenkinsWorkbench.goToJob",
+          "when": "view == jenkinsWorkbench.tree",
           "group": "navigation@2"
         },
         {
-          "command": "jenkinsWorkbench.filterJobsFailing",
-          "when": "view == jenkinsWorkbench.tree",
+          "command": "jenkinsWorkbench.filterJobs",
+          "when": "view == jenkinsWorkbench.tree && jenkinsWorkbench.filterMode == all",
           "group": "navigation@3"
         },
         {
-          "command": "jenkinsWorkbench.filterJobsRunning",
-          "when": "view == jenkinsWorkbench.tree",
-          "group": "navigation@4"
+          "command": "jenkinsWorkbench.filterJobsActive",
+          "when": "view == jenkinsWorkbench.tree && jenkinsWorkbench.filterMode != all",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
