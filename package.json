@@ -42,129 +42,129 @@
     "commands": [
       {
         "command": "jenkinsWorkbench.addEnvironment",
-        "title": "Jenkins Workbench: Add Environment",
+        "title": "Jenkins: Add Environment",
         "icon": "$(add)"
       },
       {
         "command": "jenkinsWorkbench.removeEnvironment",
-        "title": "Jenkins Workbench: Remove Environment",
+        "title": "Jenkins: Remove Environment",
         "icon": "$(trash)"
       },
       {
         "command": "jenkinsWorkbench.triggerBuild",
-        "title": "Jenkins Workbench: Trigger Build",
+        "title": "Jenkins: Trigger Build",
         "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.abortBuild",
-        "title": "Jenkins Workbench: Abort/Stop Build",
+        "title": "Jenkins: Abort/Stop Build",
         "icon": "$(debug-stop)"
       },
       {
         "command": "jenkinsWorkbench.approveInput",
-        "title": "Jenkins Workbench: Approve Input",
+        "title": "Jenkins: Approve Input",
         "icon": "$(check)"
       },
       {
         "command": "jenkinsWorkbench.rejectInput",
-        "title": "Jenkins Workbench: Reject Input",
+        "title": "Jenkins: Reject Input",
         "icon": "$(close)"
       },
       {
         "command": "jenkinsWorkbench.cancelQueueItem",
-        "title": "Jenkins Workbench: Cancel Queue Item",
+        "title": "Jenkins: Cancel Queue Item",
         "icon": "$(close)"
       },
       {
         "command": "jenkinsWorkbench.replayBuild",
-        "title": "Jenkins Workbench: Replay Build"
+        "title": "Jenkins: Replay Build"
       },
       {
         "command": "jenkinsWorkbench.rebuildBuild",
-        "title": "Jenkins Workbench: Rebuild"
+        "title": "Jenkins: Rebuild"
       },
       {
         "command": "jenkinsWorkbench.openInJenkins",
-        "title": "Jenkins Workbench: Open in Jenkins",
+        "title": "Jenkins: Open in Jenkins",
         "icon": "$(link-external)"
       },
       {
         "command": "jenkinsWorkbench.goToJob",
-        "title": "Jenkins Workbench: Go to Job...",
+        "title": "Jenkins: Go to Job...",
         "icon": "$(search)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsAll",
-        "title": "Jenkins Workbench: Show All Jobs",
+        "title": "Jenkins: Show All Jobs",
         "icon": "$(list-flat)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsFailing",
-        "title": "Jenkins Workbench: Show Failing Jobs",
+        "title": "Jenkins: Show Failing Jobs",
         "icon": "$(error)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsRunning",
-        "title": "Jenkins Workbench: Show Running Jobs",
+        "title": "Jenkins: Show Running Jobs",
         "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.filterJobs",
-        "title": "Jenkins Workbench: Filter Jobs",
+        "title": "Jenkins: Filter Jobs",
         "icon": "$(filter)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsActive",
-        "title": "Jenkins Workbench: Filter Jobs",
+        "title": "Jenkins: Filter Jobs",
         "icon": "$(filter-filled)"
       },
       {
         "command": "jenkinsWorkbench.showBuildDetails",
-        "title": "Jenkins Workbench: View Build Details"
+        "title": "Jenkins: View Build Details"
       },
       {
         "command": "jenkinsWorkbench.openLastFailedBuild",
-        "title": "Jenkins Workbench: Open Last Failed Build"
+        "title": "Jenkins: Open Last Failed Build"
       },
       {
         "command": "jenkinsWorkbench.previewArtifact",
-        "title": "Jenkins Workbench: Preview Artifact",
+        "title": "Jenkins: Preview Artifact",
         "icon": "$(eye)"
       },
       {
         "command": "jenkinsWorkbench.downloadArtifact",
-        "title": "Jenkins Workbench: Download Artifact",
+        "title": "Jenkins: Download Artifact",
         "icon": "$(cloud-download)"
       },
       {
         "command": "jenkinsWorkbench.filterBranches",
-        "title": "Jenkins Workbench: Filter Branches"
+        "title": "Jenkins: Filter Branches"
       },
       {
         "command": "jenkinsWorkbench.clearBranchFilter",
-        "title": "Jenkins Workbench: Clear Branch Filter"
+        "title": "Jenkins: Clear Branch Filter"
       },
       {
         "command": "jenkinsWorkbench.watchJob",
-        "title": "Jenkins Workbench: Watch Job"
+        "title": "Jenkins: Watch Job"
       },
       {
         "command": "jenkinsWorkbench.unwatchJob",
-        "title": "Jenkins Workbench: Unwatch Job"
+        "title": "Jenkins: Unwatch Job"
       },
       {
         "command": "jenkinsWorkbench.pinJob",
-        "title": "Jenkins Workbench: Pin Job",
+        "title": "Jenkins: Pin Job",
         "icon": "$(pin)"
       },
       {
         "command": "jenkinsWorkbench.unpinJob",
-        "title": "Jenkins Workbench: Unpin Job",
+        "title": "Jenkins: Unpin Job",
         "icon": "$(pinned)"
       },
       {
         "command": "jenkinsWorkbench.refresh",
-        "title": "Jenkins Workbench: Refresh",
+        "title": "Jenkins: Refresh",
         "icon": "$(refresh)"
       }
     ],
