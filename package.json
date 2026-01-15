@@ -355,7 +355,7 @@
         {
           "command": "jenkinsWorkbench.openInJenkins",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
-          "group": "inline@1"
+          "group": "inline@0"
         },
         {
           "command": "jenkinsWorkbench.pinJob",
@@ -368,29 +368,19 @@
           "group": "inline@2"
         },
         {
-          "command": "jenkinsWorkbench.triggerBuild",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
-          "group": "navigation"
-        },
-        {
           "command": "jenkinsWorkbench.openLastFailedBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
-          "group": "navigation"
+          "group": "1_actions@0"
         },
         {
           "command": "jenkinsWorkbench.watchJob",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)watched(\\s|$)/)",
-          "group": "navigation"
+          "group": "2_watch@0"
         },
         {
           "command": "jenkinsWorkbench.unwatchJob",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)watched(\\s|$)/",
-          "group": "navigation"
+          "group": "2_watch@0"
         },
         {
           "command": "jenkinsWorkbench.abortBuild",
@@ -408,21 +398,6 @@
           "group": "inline@2"
         },
         {
-          "command": "jenkinsWorkbench.abortBuild",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.approveInput",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
-          "group": "navigation@1"
-        },
-        {
-          "command": "jenkinsWorkbench.rejectInput",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
-          "group": "navigation@2"
-        },
-        {
           "command": "jenkinsWorkbench.cancelQueueItem",
           "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
           "group": "inline@0"
@@ -438,54 +413,34 @@
           "group": "inline@1"
         },
         {
-          "command": "jenkinsWorkbench.cancelQueueItem",
-          "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
-          "group": "navigation"
-        },
-        {
           "command": "jenkinsWorkbench.showBuildDetails",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "navigation"
+          "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "1_actions@1"
         },
         {
           "command": "jenkinsWorkbench.replayBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "navigation"
+          "group": "2_rebuild@0"
         },
         {
           "command": "jenkinsWorkbench.rebuildBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.previewArtifact",
-          "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.downloadArtifact",
-          "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
-          "group": "navigation"
-        },
-        {
-          "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
-          "group": "navigation"
+          "group": "2_rebuild@1"
         },
         {
           "command": "jenkinsWorkbench.filterBranches",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
-          "group": "navigation"
+          "group": "navigation@0"
         },
         {
           "command": "jenkinsWorkbench.clearBranchFilter",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
-          "group": "navigation"
+          "group": "navigation@1"
         }
       ]
     },
