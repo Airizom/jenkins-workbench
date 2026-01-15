@@ -333,14 +333,14 @@
       ],
       "view/item/context": [
         {
-          "command": "jenkinsWorkbench.removeEnvironment",
+          "command": "jenkinsWorkbench.refresh",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
           "group": "inline"
         },
         {
-          "command": "jenkinsWorkbench.refresh",
+          "command": "jenkinsWorkbench.removeEnvironment",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
-          "group": "inline@1"
+          "group": "navigation"
         },
         {
           "command": "jenkinsWorkbench.triggerBuild",
