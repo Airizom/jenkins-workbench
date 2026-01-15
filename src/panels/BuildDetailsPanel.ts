@@ -79,6 +79,19 @@ export class BuildDetailsPanel {
           localResourceRoots: [vscode.Uri.joinPath(extensionUri, ...bundleRootSegments)]
         }
       );
+      const lightIconPath = vscode.Uri.joinPath(
+        extensionUri,
+        "resources",
+        "codicons",
+        "terminal-light.svg"
+      );
+      const darkIconPath = vscode.Uri.joinPath(
+        extensionUri,
+        "resources",
+        "codicons",
+        "terminal-dark.svg"
+      );
+      panel.iconPath = { light: lightIconPath, dark: darkIconPath };
       BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel, extensionUri, consoleExporter);
     }
 
