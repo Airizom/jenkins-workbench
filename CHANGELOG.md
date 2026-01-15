@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-01-15
+
+### Added
+
+- feat: add job filter picker and toolbar state toggle
+- feat: add terminal icon for build details panel
+
 ## [1.11.0] - 2026-01-14
 
 ### Added
