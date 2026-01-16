@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-01-16
+
+### Added
+
+- feat: add in-memory artifact previews with size limits
+
+### Changed
+
+- refactor: standardize command titles for Jenkins actions
+
 ## [1.12.1] - 2026-01-15
 
 ### Fixed
