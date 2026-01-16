@@ -11,6 +11,8 @@ import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
 } from "../services/BuildConsoleExporter";
+import { ArtifactPreviewProvider } from "../ui/ArtifactPreviewProvider";
+import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
 import {
   DefaultArtifactActionHandler,
   type ArtifactActionHandler,
@@ -35,6 +37,7 @@ export interface ExtensionServices {
   queuedBuildWaiter: QueuedBuildWaiter;
   consoleExporter: BuildConsoleExporter;
   artifactStorageService: ArtifactStorageService;
+  artifactPreviewProvider: ArtifactPreviewProvider;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
@@ -52,6 +55,7 @@ export interface ExtensionServicesOptions {
   buildTooltipOptions: BuildTooltipOptions;
   buildListFetchOptions: BuildListFetchOptions;
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
+  artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
 }
 
 const VIEW_ID = "jenkinsWorkbench.tree";
@@ -82,8 +86,15 @@ export function createExtensionServices(
     createFileArtifactFilesystem()
   );
   const artifactActionService = new ArtifactActionService(artifactStorageService);
+  const artifactPreviewProvider = new ArtifactPreviewProvider();
+  const artifactPreviewer = new ArtifactPreviewer(
+    dataService,
+    artifactPreviewProvider,
+    options.artifactPreviewOptionsProvider
+  );
   const artifactActionHandler = new DefaultArtifactActionHandler(
     artifactActionService,
+    artifactPreviewer,
     options.artifactActionOptionsProvider
   );
   const watchStore = new JenkinsWatchStore(context);
@@ -113,6 +124,7 @@ export function createExtensionServices(
     queuedBuildWaiter,
     consoleExporter,
     artifactStorageService,
+    artifactPreviewProvider,
     artifactActionHandler,
     watchStore,
     pinStore,

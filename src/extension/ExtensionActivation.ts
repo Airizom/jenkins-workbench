@@ -8,6 +8,7 @@ import {
   getBuildTooltipOptions,
   getCacheTtlMs,
   getArtifactActionOptions,
+  getArtifactMaxDownloadBytes,
   getExtensionConfiguration,
   getMaxCacheEntries,
   getPollIntervalSeconds,
@@ -18,6 +19,7 @@ import {
 import { createExtensionServices } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
 import { VscodeStatusNotifier } from "./VscodeStatusNotifier";
+import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
@@ -35,6 +37,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const folderConfig = vscode.workspace.getConfiguration("jenkinsWorkbench", workspaceFolder.uri);
     return getArtifactActionOptions(folderConfig);
   };
+  const artifactPreviewOptionsProvider = (): { maxBytes?: number } => {
+    const previewConfig = getExtensionConfiguration();
+    return { maxBytes: getArtifactMaxDownloadBytes(previewConfig) };
+  };
 
   const services = createExtensionServices(context, {
     cacheTtlMs,
@@ -42,7 +48,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     requestTimeoutMs,
     buildTooltipOptions,
     buildListFetchOptions,
-    artifactActionOptionsProvider
+    artifactActionOptionsProvider,
+    artifactPreviewOptionsProvider
   });
   try {
     await services.environmentStore.migrateLegacyAuthConfigs();
@@ -79,6 +86,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     services.treeView,
     services.treeDataProvider,
     services.pendingInputCoordinator,
+    vscode.workspace.registerFileSystemProvider(
+      ARTIFACT_PREVIEW_SCHEME,
+      services.artifactPreviewProvider,
+      { isReadonly: true }
+    ),
+    vscode.workspace.onDidCloseTextDocument((document) => {
+      if (document.uri.scheme !== ARTIFACT_PREVIEW_SCHEME) {
+        return;
+      }
+      services.artifactPreviewProvider.release(document.uri);
+    }),
     poller,
     queuePoller
   );

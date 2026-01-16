@@ -1,7 +1,7 @@
 import * as http from "node:http";
 import * as https from "node:https";
 import { PassThrough } from "node:stream";
-import { JenkinsRequestError } from "./errors";
+import { JenkinsMaxBytesError, JenkinsRequestError } from "./errors";
 import { isAuthRedirect } from "./urls";
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -294,10 +294,7 @@ function requestStreamInternal(
         const contentLength = parseContentLength(res.headers["content-length"]);
         if (maxBytes !== undefined && contentLength !== undefined && contentLength > maxBytes) {
           safeReject(
-            new JenkinsRequestError(
-              `Response exceeded max download size (${maxBytes} bytes).`,
-              statusCode
-            )
+            new JenkinsMaxBytesError(maxBytes, statusCode)
           );
           res.destroy();
           return;
@@ -313,10 +310,7 @@ function requestStreamInternal(
           receivedBytes += buffer.length;
           if (receivedBytes > maxBytes) {
             stream.destroy(
-              new JenkinsRequestError(
-                `Response exceeded max download size (${maxBytes} bytes).`,
-                statusCode
-              )
+              new JenkinsMaxBytesError(maxBytes, statusCode)
             );
             res.destroy();
           }
@@ -470,10 +464,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
                   contentLength > maxBytes
                 ) {
                   safeReject(
-                    new JenkinsRequestError(
-                      `Response exceeded max download size (${maxBytes} bytes).`,
-                      statusCode
-                    )
+                    new JenkinsMaxBytesError(maxBytes, statusCode)
                   );
                   res.destroy();
                   return;
@@ -488,10 +479,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
                     receivedBytes += buffer.length;
                     if (receivedBytes > maxLength) {
                       safeReject(
-                        new JenkinsRequestError(
-                          `Response exceeded max download size (${maxLength} bytes).`,
-                          statusCode
-                        )
+                        new JenkinsMaxBytesError(maxLength, statusCode)
                       );
                       res.destroy();
                       return;
@@ -538,10 +526,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
         if (options.returnBuffer && maxBytes !== undefined && contentLength !== undefined) {
           if (contentLength > maxBytes) {
             safeReject(
-              new JenkinsRequestError(
-                `Response exceeded max download size (${maxBytes} bytes).`,
-                statusCode
-              )
+              new JenkinsMaxBytesError(maxBytes, statusCode)
             );
             res.destroy();
             return;
@@ -557,10 +542,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
             receivedBytes += buffer.length;
             if (receivedBytes > maxLength) {
               safeReject(
-                new JenkinsRequestError(
-                  `Response exceeded max download size (${maxLength} bytes).`,
-                  statusCode
-                )
+                new JenkinsMaxBytesError(maxLength, statusCode)
               );
               res.destroy();
               return;
