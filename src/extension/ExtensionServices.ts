@@ -5,13 +5,20 @@ import { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshC
 import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
 import { ArtifactActionService } from "../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../services/ArtifactFilesystem";
+import {
+  DefaultArtifactRetrievalService,
+  type ArtifactRetrievalService
+} from "../services/ArtifactRetrievalService";
 import { ArtifactStorageService } from "../services/ArtifactStorageService";
 import { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
 } from "../services/BuildConsoleExporter";
-import { ArtifactPreviewProvider } from "../ui/ArtifactPreviewProvider";
+import {
+  ArtifactPreviewProvider,
+  type ArtifactPreviewProviderOptions
+} from "../ui/ArtifactPreviewProvider";
 import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
 import {
   DefaultArtifactActionHandler,
@@ -36,6 +43,7 @@ export interface ExtensionServices {
   pendingInputCoordinator: PendingInputRefreshCoordinator;
   queuedBuildWaiter: QueuedBuildWaiter;
   consoleExporter: BuildConsoleExporter;
+  artifactRetrievalService: ArtifactRetrievalService;
   artifactStorageService: ArtifactStorageService;
   artifactPreviewProvider: ArtifactPreviewProvider;
   artifactActionHandler: ArtifactActionHandler;
@@ -56,6 +64,7 @@ export interface ExtensionServicesOptions {
   buildListFetchOptions: BuildListFetchOptions;
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
   artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
+  artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
 }
 
 const VIEW_ID = "jenkinsWorkbench.tree";
@@ -81,14 +90,15 @@ export function createExtensionServices(
       maxConsoleChars: MAX_CONSOLE_CHARS
     }
   );
+  const artifactRetrievalService = new DefaultArtifactRetrievalService(dataService);
   const artifactStorageService = new ArtifactStorageService(
-    dataService,
+    artifactRetrievalService,
     createFileArtifactFilesystem()
   );
   const artifactActionService = new ArtifactActionService(artifactStorageService);
-  const artifactPreviewProvider = new ArtifactPreviewProvider();
+  const artifactPreviewProvider = new ArtifactPreviewProvider(options.artifactPreviewCacheOptions);
   const artifactPreviewer = new ArtifactPreviewer(
-    dataService,
+    artifactRetrievalService,
     artifactPreviewProvider,
     options.artifactPreviewOptionsProvider
   );
@@ -123,6 +133,7 @@ export function createExtensionServices(
     pendingInputCoordinator,
     queuedBuildWaiter,
     consoleExporter,
+    artifactRetrievalService,
     artifactStorageService,
     artifactPreviewProvider,
     artifactActionHandler,

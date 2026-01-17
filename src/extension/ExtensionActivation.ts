@@ -8,6 +8,9 @@ import {
   getBuildTooltipOptions,
   getCacheTtlMs,
   getArtifactActionOptions,
+  getArtifactPreviewCacheMaxBytes,
+  getArtifactPreviewCacheMaxEntries,
+  getArtifactPreviewCacheTtlMs,
   getArtifactMaxDownloadBytes,
   getExtensionConfiguration,
   getMaxCacheEntries,
@@ -31,6 +34,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const requestTimeoutMs = getRequestTimeoutMs(config);
   const buildTooltipOptions = getBuildTooltipOptions(config);
   const buildListFetchOptions = getBuildListFetchOptions(config);
+  const artifactPreviewCacheMaxEntries = getArtifactPreviewCacheMaxEntries(config);
+  const artifactPreviewCacheMaxBytes = getArtifactPreviewCacheMaxBytes(config);
+  const artifactPreviewCacheTtlMs = getArtifactPreviewCacheTtlMs(config);
   const artifactActionOptionsProvider = (
     workspaceFolder: vscode.WorkspaceFolder
   ): { downloadRoot: string; maxBytes?: number } => {
@@ -49,7 +55,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     buildTooltipOptions,
     buildListFetchOptions,
     artifactActionOptionsProvider,
-    artifactPreviewOptionsProvider
+    artifactPreviewOptionsProvider,
+    artifactPreviewCacheOptions: {
+      maxEntries: artifactPreviewCacheMaxEntries,
+      maxTotalBytes: artifactPreviewCacheMaxBytes,
+      ttlMs: artifactPreviewCacheTtlMs
+    }
   });
   try {
     await services.environmentStore.migrateLegacyAuthConfigs();

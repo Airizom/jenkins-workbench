@@ -7,6 +7,12 @@ const DEFAULT_MAX_PREVIEW_ENTRIES = 50;
 const DEFAULT_MAX_PREVIEW_BYTES = 200 * 1024 * 1024;
 const DEFAULT_PREVIEW_TTL_MS = 15 * 60 * 1000;
 
+export interface ArtifactPreviewProviderOptions {
+  maxEntries?: number;
+  maxTotalBytes?: number;
+  ttlMs?: number;
+}
+
 interface ArtifactPreviewEntry {
   data: Uint8Array;
   ctime: number;
@@ -26,11 +32,10 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
   private readonly ttlMs: number;
   private totalBytes = 0;
 
-  constructor(
-    maxEntries = DEFAULT_MAX_PREVIEW_ENTRIES,
-    maxTotalBytes = DEFAULT_MAX_PREVIEW_BYTES,
-    ttlMs = DEFAULT_PREVIEW_TTL_MS
-  ) {
+  constructor(options: ArtifactPreviewProviderOptions = {}) {
+    const maxEntries = options.maxEntries ?? DEFAULT_MAX_PREVIEW_ENTRIES;
+    const maxTotalBytes = options.maxTotalBytes ?? DEFAULT_MAX_PREVIEW_BYTES;
+    const ttlMs = options.ttlMs ?? DEFAULT_PREVIEW_TTL_MS;
     this.maxEntries = Math.max(1, maxEntries);
     this.maxTotalBytes = Math.max(1, maxTotalBytes);
     this.ttlMs = Math.max(1000, ttlMs);

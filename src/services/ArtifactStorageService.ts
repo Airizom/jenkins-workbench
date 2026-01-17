@@ -2,16 +2,8 @@ import * as path from "node:path";
 import type { IncomingHttpHeaders } from "node:http";
 import { pipeline } from "node:stream/promises";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { ArtifactRetrievalService } from "./ArtifactRetrievalService";
 import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactPathUtils";
-
-export interface ArtifactDataService {
-  getArtifactStream(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    relativePath: string,
-    options?: { maxBytes?: number }
-  ): Promise<{ stream: NodeJS.ReadableStream; headers: IncomingHttpHeaders }>;
-}
 
 export interface ArtifactFilesystem {
   createDirectory(path: string): Thenable<void>;
@@ -51,14 +43,14 @@ export class ArtifactStorageError extends Error {
 
 export class ArtifactStorageService {
   constructor(
-    private readonly dataService: ArtifactDataService,
+    private readonly retrievalService: ArtifactRetrievalService,
     private readonly filesystem: ArtifactFilesystem
   ) {}
 
   async downloadArtifact(request: ArtifactDownloadRequest): Promise<ArtifactDownloadResult> {
     const resolved = resolveArtifactTargetPath(request);
 
-    const response = await this.dataService.getArtifactStream(
+    const response = await this.retrievalService.getArtifactStream(
       request.environment,
       request.buildUrl,
       request.relativePath,

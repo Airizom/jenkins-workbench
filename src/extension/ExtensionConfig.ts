@@ -14,6 +14,9 @@ const DEFAULT_BUILD_TOOLTIP_DETAILS = false;
 const DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED = false;
 const DEFAULT_ARTIFACT_DOWNLOAD_ROOT = "jenkins-artifacts";
 const DEFAULT_ARTIFACT_MAX_DOWNLOAD_MB = 100;
+const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES = 50;
+const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB = 200;
+const DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS = 900;
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE = "[redacted]";
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
   "password",
@@ -120,6 +123,45 @@ export function getArtifactMaxDownloadBytes(
     return undefined;
   }
   return Math.floor(value) * 1024 * 1024;
+}
+
+export function getArtifactPreviewCacheMaxEntries(
+  config: vscode.WorkspaceConfiguration
+): number {
+  const value = config.get<number>(
+    "artifactPreviewCacheMaxEntries",
+    DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES
+  );
+  if (!Number.isFinite(value)) {
+    return DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES;
+  }
+  return Math.max(1, Math.floor(value));
+}
+
+export function getArtifactPreviewCacheMaxBytes(
+  config: vscode.WorkspaceConfiguration
+): number {
+  const value = config.get<number>(
+    "artifactPreviewCacheMaxMb",
+    DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB
+  );
+  if (!Number.isFinite(value)) {
+    return DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB * 1024 * 1024;
+  }
+  return Math.max(1, Math.floor(value)) * 1024 * 1024;
+}
+
+export function getArtifactPreviewCacheTtlMs(
+  config: vscode.WorkspaceConfiguration
+): number {
+  const value = config.get<number>(
+    "artifactPreviewCacheTtlSeconds",
+    DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS
+  );
+  if (!Number.isFinite(value)) {
+    return DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS * 1000;
+  }
+  return Math.max(1, Math.floor(value)) * 1000;
 }
 
 export function getBuildTooltipOptions(config: vscode.WorkspaceConfiguration): BuildTooltipOptions {

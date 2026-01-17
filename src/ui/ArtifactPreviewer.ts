@@ -1,8 +1,8 @@
 import * as path from "node:path";
 import type { IncomingHttpHeaders } from "node:http";
 import * as vscode from "vscode";
-import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { ArtifactRetrievalService } from "../services/ArtifactRetrievalService";
 import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
 
 const IMAGE_EXTENSIONS = new Set([
@@ -33,9 +33,11 @@ export interface ArtifactPreviewOptions {
 
 export type ArtifactPreviewOptionsProvider = () => ArtifactPreviewOptions;
 
+type ArtifactPreviewKind = "image" | "text";
+
 export class ArtifactPreviewer {
   constructor(
-    private readonly dataService: JenkinsDataService,
+    private readonly retrievalService: ArtifactRetrievalService,
     private readonly previewProvider: ArtifactPreviewProvider,
     private readonly optionsProvider: ArtifactPreviewOptionsProvider
   ) {}
@@ -45,19 +47,25 @@ export class ArtifactPreviewer {
     const previewPath = resolvePreviewPath(request);
     const fileName = path.basename(previewPath);
 
-    const response = await this.dataService.getArtifact(
+    const response = await this.retrievalService.getArtifact(
       request.environment,
       request.buildUrl,
       request.relativePath,
       { maxBytes: options.maxBytes }
     );
 
+    const previewKind = resolvePreviewKind(response.headers, previewPath);
     const uri = this.previewProvider.registerArtifact(response.data, fileName);
-    this.previewProvider.markInUse(uri);
+    const trackUsage = previewKind === "text";
+    if (trackUsage) {
+      this.previewProvider.markInUse(uri);
+    }
     try {
-      await openArtifactPreview(uri, response.headers, previewPath);
+      await openArtifactPreview(uri, previewKind);
     } catch (error) {
-      this.previewProvider.release(uri);
+      if (trackUsage) {
+        this.previewProvider.release(uri);
+      }
       throw error;
     }
   }
@@ -108,16 +116,17 @@ function isImageContentType(contentType?: string): boolean {
   return normalized.startsWith("image/");
 }
 
-async function openArtifactPreview(
-  uri: vscode.Uri,
+function resolvePreviewKind(
   headers: IncomingHttpHeaders,
   previewPath: string
-): Promise<void> {
+): ArtifactPreviewKind {
   const contentType = getHeaderValue(headers, "content-type");
   const extension = path.extname(previewPath).toLowerCase();
-  const isImage = isImageContentType(contentType) || IMAGE_EXTENSIONS.has(extension);
+  return isImageContentType(contentType) || IMAGE_EXTENSIONS.has(extension) ? "image" : "text";
+}
 
-  if (isImage) {
+async function openArtifactPreview(uri: vscode.Uri, kind: ArtifactPreviewKind): Promise<void> {
+  if (kind === "image") {
     await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
     return;
   }
