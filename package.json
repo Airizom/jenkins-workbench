@@ -123,6 +123,11 @@
         "title": "Jenkins: View Build Details"
       },
       {
+        "command": "jenkinsWorkbench.previewBuildLog",
+        "title": "Jenkins: Preview Build Logs",
+        "icon": "$(terminal)"
+      },
+      {
         "command": "jenkinsWorkbench.openLastFailedBuild",
         "title": "Jenkins: Open Last Failed Build"
       },
@@ -404,6 +409,11 @@
           "command": "jenkinsWorkbench.abortBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/",
           "group": "inline@0"
+        },
+        {
+          "command": "jenkinsWorkbench.previewBuildLog",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "inline@1"
         },
         {
           "command": "jenkinsWorkbench.approveInput",

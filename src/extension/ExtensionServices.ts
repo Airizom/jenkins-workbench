@@ -15,11 +15,13 @@ import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
 } from "../services/BuildConsoleExporter";
+import { BuildLogService } from "../services/BuildLogService";
 import {
   ArtifactPreviewProvider,
   type ArtifactPreviewProviderOptions
 } from "../ui/ArtifactPreviewProvider";
 import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
+import { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import {
   DefaultArtifactActionHandler,
   type ArtifactActionHandler,
@@ -43,9 +45,11 @@ export interface ExtensionServices {
   pendingInputCoordinator: PendingInputRefreshCoordinator;
   queuedBuildWaiter: QueuedBuildWaiter;
   consoleExporter: BuildConsoleExporter;
+  buildLogService: BuildLogService;
   artifactRetrievalService: ArtifactRetrievalService;
   artifactStorageService: ArtifactStorageService;
   artifactPreviewProvider: ArtifactPreviewProvider;
+  buildLogPreviewer: BuildLogPreviewer;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
@@ -90,6 +94,7 @@ export function createExtensionServices(
       maxConsoleChars: MAX_CONSOLE_CHARS
     }
   );
+  const buildLogService = new BuildLogService(dataService);
   const artifactRetrievalService = new DefaultArtifactRetrievalService(dataService);
   const artifactStorageService = new ArtifactStorageService(
     artifactRetrievalService,
@@ -101,6 +106,11 @@ export function createExtensionServices(
     artifactRetrievalService,
     artifactPreviewProvider,
     options.artifactPreviewOptionsProvider
+  );
+  const buildLogPreviewer = new BuildLogPreviewer(
+    buildLogService,
+    artifactPreviewProvider,
+    MAX_CONSOLE_CHARS
   );
   const artifactActionHandler = new DefaultArtifactActionHandler(
     artifactActionService,
@@ -133,9 +143,11 @@ export function createExtensionServices(
     pendingInputCoordinator,
     queuedBuildWaiter,
     consoleExporter,
+    buildLogService,
     artifactRetrievalService,
     artifactStorageService,
     artifactPreviewProvider,
+    buildLogPreviewer,
     artifactActionHandler,
     watchStore,
     pinStore,

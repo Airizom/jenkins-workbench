@@ -14,6 +14,7 @@ import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
@@ -29,6 +30,7 @@ export interface ExtensionCommandDependencies {
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
   artifactActionHandler: ArtifactActionHandler;
+  buildLogPreviewer: BuildLogPreviewer;
   consoleExporter: BuildConsoleExporter;
   queuedBuildWaiter: QueuedBuildWaiter;
   pendingInputCoordinator: PendingInputRefreshCoordinator;
@@ -82,6 +84,7 @@ export function registerExtensionCommands(
     context,
     dependencies.dataService,
     dependencies.artifactActionHandler,
+    dependencies.buildLogPreviewer,
     dependencies.consoleExporter,
     dependencies.queuedBuildWaiter,
     dependencies.pendingInputCoordinator,

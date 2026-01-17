@@ -11,11 +11,13 @@ import type {
   PipelineTreeItem
 } from "../tree/TreeItems";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import { downloadArtifact, previewArtifact } from "./build/BuildArtifactHandlers";
 import {
   approveInput,
   openInJenkins,
   openLastFailedBuild,
+  previewBuildLog,
   rejectInput,
   rebuildBuild,
   replayBuild,
@@ -29,6 +31,7 @@ export function registerBuildCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
   artifactActionHandler: ArtifactActionHandler,
+  buildLogPreviewer: BuildLogPreviewer,
   consoleExporter: BuildConsoleExporter,
   queuedBuildWaiter: QueuedBuildWaiter,
   pendingInputProvider: PendingInputActionProvider,
@@ -82,6 +85,9 @@ export function registerBuildCommands(
           context.extensionUri,
           item
         )
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.previewBuildLog", (item?: BuildTreeItem) =>
+      previewBuildLog(buildLogPreviewer, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.previewArtifact", (item?: ArtifactTreeItem) =>
       previewArtifact(artifactActionHandler, item)

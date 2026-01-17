@@ -5,6 +5,7 @@ import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import type { PendingInputActionProvider } from "../../panels/buildDetails/BuildDetailsPollingController";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
+import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
@@ -295,6 +296,32 @@ export async function openLastFailedBuild(
   } catch (error) {
     void vscode.window.showErrorMessage(
       `Unable to open the last failed build for ${label}: ${formatActionError(error)}`
+    );
+  }
+}
+
+export async function previewBuildLog(
+  previewer: BuildLogPreviewer,
+  item?: BuildTreeItem
+): Promise<void> {
+  if (!item) {
+    void vscode.window.showInformationMessage("Select a build to preview logs.");
+    return;
+  }
+
+  const label = getTreeItemLabel(item);
+  const fileName = `build-${item.buildNumber}.log`;
+
+  try {
+    const result = await previewer.preview(item.environment, item.buildUrl, fileName);
+    if (result.truncated) {
+      void vscode.window.showInformationMessage(
+        `Showing last ${result.maxChars.toLocaleString()} characters of console output for ${label}.`
+      );
+    }
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Failed to preview logs for ${label}: ${formatActionError(error)}`
     );
   }
 }
