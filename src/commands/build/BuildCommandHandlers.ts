@@ -10,7 +10,7 @@ import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
-import { formatActionError, getOpenUrl, getTreeItemLabel } from "./BuildCommandUtils";
+import { formatActionError, getOpenUrl, getTreeItemLabel } from "../CommandUtils";
 import { promptForParameters } from "../../ui/ParameterPrompts";
 
 export async function triggerBuild(

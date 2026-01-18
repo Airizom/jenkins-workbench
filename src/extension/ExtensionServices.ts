@@ -22,6 +22,7 @@ import {
 } from "../ui/ArtifactPreviewProvider";
 import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
 import { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
+import { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import {
   DefaultArtifactActionHandler,
   type ArtifactActionHandler,
@@ -50,6 +51,7 @@ export interface ExtensionServices {
   artifactStorageService: ArtifactStorageService;
   artifactPreviewProvider: ArtifactPreviewProvider;
   buildLogPreviewer: BuildLogPreviewer;
+  jobConfigPreviewer: JobConfigPreviewer;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
@@ -112,6 +114,7 @@ export function createExtensionServices(
     artifactPreviewProvider,
     MAX_CONSOLE_CHARS
   );
+  const jobConfigPreviewer = new JobConfigPreviewer(artifactPreviewProvider);
   const artifactActionHandler = new DefaultArtifactActionHandler(
     artifactActionService,
     artifactPreviewer,
@@ -148,6 +151,7 @@ export function createExtensionServices(
     artifactStorageService,
     artifactPreviewProvider,
     buildLogPreviewer,
+    jobConfigPreviewer,
     artifactActionHandler,
     watchStore,
     pinStore,

@@ -5,7 +5,7 @@
 - VS Code extension that surfaces Jenkins instances, jobs, and build activity in an Activity Bar view.
 - Uses the Jenkins JSON API via `src/jenkins/` services; stores environment metadata in VS Code state.
 - Target VS Code version: `^1.85.0`
-- Includes pinned jobs/pipelines, artifact preview/download workflows, richer build tooltips, and a React-based build details panel with console search/export and failure insights cards.
+- Includes pinned jobs/pipelines, artifact preview/download workflows, build log and job config previews, richer build tooltips, and a React-based build details panel with console search/export and failure insights cards.
 
 ## Project Structure & Module Organization
 
@@ -17,40 +17,80 @@ src/
 │   ├── ExtensionCommands.ts      # Command registration orchestration
 │   ├── ExtensionConfig.ts        # Configuration accessors
 │   ├── ExtensionServices.ts      # Service factory (dependency wiring)
-│   └── ExtensionSubscriptions.ts # Subscription registration
+│   ├── ExtensionSubscriptions.ts # Subscription registration
+│   ├── VscodeStatusNotifier.ts   # VS Code notification adapter
+│   └── contextKeys.ts            # Context key helpers
 ├── commands/                 # Command handlers organized by domain
 │   ├── build/                    # Build-related command internals
+│   │   ├── BuildArtifactHandlers.ts
 │   │   ├── BuildCommandHandlers.ts
-│   │   ├── BuildCommandTypes.ts
-│   │   └── BuildParameterPrompts.ts
-│   ├── BuildCommands.ts          # Build command registration
+│   │   └── BuildCommandTypes.ts
 │   ├── environment/              # Environment management
+│   │   ├── EnvironmentCommandHandlers.ts
+│   │   ├── EnvironmentCommandTypes.ts
+│   │   └── EnvironmentPrompts.ts
+│   ├── job/                       # Job-specific commands
+│   │   └── JobCommandHandlers.ts
 │   ├── pin/                       # Pin/unpin commands
+│   │   ├── PinCommandHandlers.ts
+│   │   └── PinCommandTypes.ts
 │   ├── queue/                    # Queue operations
-│   └── watch/                    # Watch/poll operations
+│   │   ├── QueueCommandHandlers.ts
+│   │   └── QueueCommandTypes.ts
+│   ├── watch/                    # Watch/poll operations
+│   │   ├── WatchCommandHandlers.ts
+│   │   └── WatchCommandTypes.ts
+│   ├── BuildCommands.ts          # Build command registration
+│   ├── CommandUtils.ts           # Shared command utilities
+│   ├── EnvironmentCommands.ts    # Environment command registration
+│   ├── JobCommands.ts            # Job command registration
+│   ├── PinCommands.ts            # Pin command registration
+│   ├── QueueCommands.ts          # Queue command registration
+│   ├── RefreshCommands.ts        # Refresh command registration
+│   ├── SearchCommands.ts         # Go to Job command registration
+│   └── WatchCommands.ts          # Watch command registration
 ├── jenkins/                  # Jenkins API layer
-│   ├── client/                   # HTTP client and API modules
-│   │   ├── JenkinsHttpClient.ts      # HTTP abstraction
-│   │   ├── JenkinsBuildsApi.ts       # Build endpoints
-│   │   ├── JenkinsJobsApi.ts         # Job endpoints
-│   │   ├── JenkinsNodesApi.ts        # Node endpoints
-│   │   └── JenkinsQueueApi.ts        # Queue endpoints
-│   ├── data/                     # Data layer utilities
-│   │   ├── JenkinsDataCache.ts       # LRU cache with TTL
-│   │   ├── JenkinsDataErrors.ts      # Error transformation
-│   │   └── JenkinsJobIndex.ts        # Job search index
-│   ├── pipeline/                 # Pipeline stage adapters and types
+│   ├── auth.ts                   # Auth header helpers
+│   ├── crumbs.ts                 # CSRF crumb support
+│   ├── request.ts                # Request orchestration
+│   ├── urls.ts                   # URL building helpers
 │   ├── JenkinsClient.ts          # Client facade
 │   ├── JenkinsClientProvider.ts  # Client factory per environment
 │   ├── JenkinsDataService.ts     # Cached data access layer
 │   ├── JenkinsEnvironmentRef.ts  # Environment reference interface
+│   ├── JenkinsTestReportOptions.ts # Test report options
+│   ├── errors.ts                 # Request error class
 │   ├── types.ts                  # Jenkins API types
-│   └── errors.ts                 # Request error class
+│   ├── client/                   # HTTP client and API modules
+│   │   ├── JenkinsBuildsApi.ts       # Build endpoints
+│   │   ├── JenkinsClientContext.ts   # Request context
+│   │   ├── JenkinsHttpClient.ts      # HTTP abstraction
+│   │   ├── JenkinsJobsApi.ts         # Job endpoints
+│   │   ├── JenkinsNodesApi.ts        # Node endpoints
+│   │   ├── JenkinsParameters.ts      # Build parameter helpers
+│   │   └── JenkinsQueueApi.ts        # Queue endpoints
+│   ├── data/                     # Data layer utilities
+│   │   ├── AsyncQueue.ts             # Async work queue
+│   │   ├── JobSearchBackoff.ts       # Job search backoff
+│   │   ├── JobSearchCancellation.ts  # Job search cancellation
+│   │   ├── JobSearchConfig.ts        # Job search config
+│   │   ├── JenkinsDataCache.ts       # LRU cache with TTL
+│   │   ├── JenkinsDataErrors.ts      # Error transformation
+│   │   ├── JenkinsDataTypes.ts       # Data-layer types
+│   │   └── JenkinsJobIndex.ts        # Job search index
+│   └── pipeline/                 # Pipeline stage adapters and types
+│       ├── JenkinsPipelineAdapter.ts
+│       └── PipelineTypes.ts
 ├── tree/                     # Tree view components
-│   ├── TreeDataProvider.ts       # TreeDataProvider implementation
-│   ├── TreeItems.ts              # TreeItem subclasses
+│   ├── BuildTooltips.ts          # Build tooltip formatting
 │   ├── TreeChildren.ts           # Child loading logic
+│   ├── TreeDataProvider.ts       # TreeDataProvider implementation
 │   ├── TreeFilter.ts             # Job filtering
+│   ├── TreeFilterKeys.ts         # Filter key helpers
+│   ├── TreeItems.ts              # TreeItem subclasses
+│   ├── TreeNavigator.ts          # Tree reveal helpers
+│   ├── TreeRevealResolver.ts     # Tree reveal resolution
+│   ├── TreeTypes.ts              # Tree element types
 │   └── formatters.ts             # Display formatting
 ├── storage/                  # Persistence layer
 │   ├── JenkinsEnvironmentStore.ts    # Environment CRUD
@@ -58,14 +98,37 @@ src/
 │   └── JenkinsViewStateStore.ts      # UI state persistence
 ├── panels/                   # Webview panels
 │   ├── BuildDetailsPanel.ts      # Build details webview
-│   └── buildDetails/             # Panel internals
+│   └── buildDetails/             # Panel internals + React webview
 ├── services/                 # Shared services (artifacts, storage)
+│   ├── ArtifactActionService.ts
+│   ├── ArtifactFilesystem.ts
+│   ├── ArtifactPathUtils.ts
+│   ├── ArtifactRetrievalService.ts
+│   ├── ArtifactStorageService.ts
+│   ├── BuildConsoleExporter.ts
+│   ├── BuildLogService.ts
+│   ├── ConsoleOutputConfig.ts
+│   ├── PendingInputRefreshCoordinator.ts
+│   └── QueuedBuildWaiter.ts
 ├── ui/                       # UI handlers (artifact preview/download)
+│   ├── ArtifactActionHandler.ts
+│   ├── ArtifactActions.ts
+│   ├── ArtifactPreviewProvider.ts
+│   ├── ArtifactPreviewer.ts
+│   ├── BuildLogPreviewer.ts
+│   ├── JobConfigPreviewer.ts
+│   ├── ParameterPrompts.ts
+│   ├── PendingInputActions.ts
+│   └── PreviewLifecycle.ts
 ├── watch/                    # Polling infrastructure
+│   ├── JenkinsJobStatusEvaluator.ts
 │   ├── JenkinsStatusPoller.ts    # Job status polling
 │   └── StatusNotifier.ts         # Notification abstraction
 ├── queue/                    # Queue polling
+│   └── JenkinsQueuePoller.ts
 └── formatters/               # Shared formatting utilities
+    ├── CompletionFormatters.ts
+    └── ScopeFormatters.ts
 ```
 
 ### Module Responsibilities
@@ -399,13 +462,15 @@ export class JobTreeItem extends vscode.TreeItem {
 Use descriptive `contextValue` strings for menu contributions:
 
 - `environment` - Environment items (supports remove, refresh)
+- `jobs` / `nodes` / `queueFolder` - Section headers for job, node, and queue groups
 - `folder` / `multibranchFolder` - Folder items (supports branch filtering)
 - `jobItem` / `pipelineItem` - Job items (supports trigger, watch/unwatch, pin)
 - `watched` / `pinned` - Context flags appended to job/pipeline items
-- `buildRunning` / `build` - Build items (supports abort, view details)
+- `buildRunning` / `build` / `awaitingInput` - Build items (supports abort, view details, input)
 - `artifactFolder` / `artifactItem` - Artifact folders and artifact entries
 - `node` / `nodeOpenable` - Node items (openable nodes include a Jenkins URL)
 - `queueItem` - Queue items (supports cancel)
+- `placeholder` - Placeholder rows during loading/empty states
 
 ### Parent Tracking
 

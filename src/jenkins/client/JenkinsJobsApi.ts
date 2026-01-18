@@ -1,5 +1,5 @@
 import type { JenkinsJob, JenkinsJobKind, JenkinsParameterDefinition } from "../types";
-import { buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
+import { buildActionUrl, buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 import {
   type JenkinsJobParametersResponse,
@@ -62,5 +62,10 @@ export class JenkinsJobsApi {
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<JenkinsJobParametersResponse>(url);
     return extractParameterDefinitions(response);
+  }
+
+  async getJobConfigXml(jobUrl: string): Promise<string> {
+    const url = buildActionUrl(jobUrl, "config.xml");
+    return this.context.requestText(url);
   }
 }

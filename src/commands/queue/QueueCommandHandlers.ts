@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { QueueItemTreeItem } from "../../tree/TreeItems";
-import { formatActionError, getTreeItemLabel } from "../build/BuildCommandUtils";
+import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 import type { QueueCommandRefreshHost } from "./QueueCommandTypes";
 
 export async function cancelQueueItem(

@@ -121,6 +121,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     dataService: services.dataService,
     artifactActionHandler: services.artifactActionHandler,
     buildLogPreviewer: services.buildLogPreviewer,
+    jobConfigPreviewer: services.jobConfigPreviewer,
     consoleExporter: services.consoleExporter,
     queuedBuildWaiter: services.queuedBuildWaiter,
     pendingInputCoordinator: services.pendingInputCoordinator,

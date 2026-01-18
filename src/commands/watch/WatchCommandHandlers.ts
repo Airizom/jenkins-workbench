@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import { type JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { getTreeItemLabel } from "../build/BuildCommandUtils";
+import { getTreeItemLabel } from "../CommandUtils";
 import type { WatchCommandRefreshHost } from "./WatchCommandTypes";
 
 export async function watchJob(

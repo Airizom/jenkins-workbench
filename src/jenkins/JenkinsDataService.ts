@@ -461,6 +461,15 @@ export class JenkinsDataService {
     }
   }
 
+  async getJobConfigXml(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<string> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.getJobConfigXml(jobUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
   async getJobParameters(
     environment: JenkinsEnvironmentRef,
     jobUrl: string

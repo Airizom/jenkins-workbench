@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import { type JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { getTreeItemLabel } from "../build/BuildCommandUtils";
+import { getTreeItemLabel } from "../CommandUtils";
 import type { PinCommandRefreshHost } from "./PinCommandTypes";
 
 export async function pinJob(

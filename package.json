@@ -132,6 +132,11 @@
         "title": "Jenkins: Open Last Failed Build"
       },
       {
+        "command": "jenkinsWorkbench.viewJobConfig",
+        "title": "Jenkins: View Job Config",
+        "icon": "$(file-code)"
+      },
+      {
         "command": "jenkinsWorkbench.previewArtifact",
         "title": "Jenkins: Preview Artifact",
         "icon": "$(eye)"
@@ -394,6 +399,11 @@
           "command": "jenkinsWorkbench.openLastFailedBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.viewJobConfig",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
+          "group": "1_actions@1"
         },
         {
           "command": "jenkinsWorkbench.watchJob",

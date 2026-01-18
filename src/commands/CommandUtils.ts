@@ -1,11 +1,11 @@
 import type * as vscode from "vscode";
-import { BuildActionError } from "../../jenkins/JenkinsDataService";
+import { BuildActionError } from "../jenkins/JenkinsDataService";
 import {
   BuildTreeItem,
   type JobTreeItem,
   NodeTreeItem,
   type PipelineTreeItem
-} from "../../tree/TreeItems";
+} from "../tree/TreeItems";
 
 export function getOpenUrl(
   item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem

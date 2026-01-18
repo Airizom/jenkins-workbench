@@ -212,6 +212,10 @@ export class JenkinsClient {
     return this.jobsApi.getJobParameters(jobUrl);
   }
 
+  async getJobConfigXml(jobUrl: string): Promise<string> {
+    return this.jobsApi.getJobConfigXml(jobUrl);
+  }
+
   async cancelQueueItem(id: number): Promise<void> {
     await this.queueApi.cancelQueueItem(id);
   }

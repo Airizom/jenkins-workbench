@@ -1,7 +1,7 @@
-import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildLogService } from "../services/BuildLogService";
 import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
+import { openTextPreview } from "./PreviewLifecycle";
 
 export interface BuildLogPreviewResult {
   truncated: boolean;
@@ -27,20 +27,7 @@ export class BuildLogPreviewer {
     );
     const data = Buffer.from(consoleText.text, "utf8");
     const uri = this.previewProvider.registerArtifact(data, fileName);
-    this.previewProvider.markInUse(uri);
-    try {
-      await vscode.window.showTextDocument(uri, { preview: true });
-      const releaseOnClose = vscode.workspace.onDidCloseTextDocument((document) => {
-        if (document.uri.toString() !== uri.toString()) {
-          return;
-        }
-        this.previewProvider.release(uri);
-        releaseOnClose.dispose();
-      });
-    } catch (error) {
-      this.previewProvider.release(uri);
-      throw error;
-    }
+    await openTextPreview(this.previewProvider, uri);
     return { truncated: consoleText.truncated, maxChars: this.maxChars };
   }
 }

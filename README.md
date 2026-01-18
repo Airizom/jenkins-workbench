@@ -25,6 +25,7 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 - **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords)
 - **Stop Builds** — Abort running builds directly from the tree
 - **Replay & Rebuild** — Re-run builds with the same or modified configuration
+- **Preview Build Logs** — Open console output in a lightweight preview editor
 - **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds
 - **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
 
@@ -65,7 +66,7 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 ## Quick Start
 
 1. **Open the Jenkins Workbench view** in the Activity Bar (look for the Jenkins icon)
-2. **Click the Add Environment button** (plus icon) or run `Jenkins Workbench: Add Environment` from the Command Palette
+2. **Click the Add Environment button** (plus icon) or run `Jenkins: Add Environment` from the Command Palette
 3. **Choose a scope**:
    - **Workspace** — Available only in the current workspace
    - **Global** — Available across all workspaces
@@ -141,67 +142,83 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `jenkinsWorkbench.artifactDownloadRoot` | `jenkins-artifacts` | Workspace-relative folder for downloaded artifacts. |
 | `jenkinsWorkbench.artifactMaxDownloadMb` | 100 | Maximum artifact download size in megabytes (0 disables limit). |
 
+### Artifact Preview Cache
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.artifactPreviewCacheMaxEntries` | 50 | Maximum number of in-memory artifact previews to keep before eviction. |
+| `jenkinsWorkbench.artifactPreviewCacheMaxMb` | 200 | Maximum total size in megabytes for in-memory artifact previews. |
+| `jenkinsWorkbench.artifactPreviewCacheTtlSeconds` | 900 | Time-to-live in seconds for unused in-memory artifact previews. |
+
 ## Commands
 
 ### Environment Management
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Add Environment` | Add a new Jenkins environment |
-| `Jenkins Workbench: Remove Environment` | Remove the selected environment |
-| `Jenkins Workbench: Refresh` | Refresh the tree view and clear cache |
+| `Jenkins: Add Environment` | Add a new Jenkins environment |
+| `Jenkins: Remove Environment` | Remove the selected environment |
+| `Jenkins: Refresh` | Refresh the tree view and clear cache |
 
 ### Build Actions
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Trigger Build` | Start a new build for the selected job |
-| `Jenkins Workbench: Abort/Stop Build` | Stop a running build |
-| `Jenkins Workbench: Replay Build` | Replay a Pipeline build |
-| `Jenkins Workbench: Rebuild` | Rebuild with the same parameters |
-| `Jenkins Workbench: View Build Details` | Open the build details panel |
-| `Jenkins Workbench: Open Last Failed Build` | Jump to the last failed build |
-| `Jenkins Workbench: Cancel Queue Item` | Remove a build from the queue |
-| `Jenkins Workbench: Approve Input` | Approve a pending input step for a running build |
-| `Jenkins Workbench: Reject Input` | Reject a pending input step for a running build |
+| `Jenkins: Trigger Build` | Start a new build for the selected job |
+| `Jenkins: Abort/Stop Build` | Stop a running build |
+| `Jenkins: Replay Build` | Replay a Pipeline build |
+| `Jenkins: Rebuild` | Rebuild with the same parameters |
+| `Jenkins: Preview Build Logs` | Open console output in a read-only preview |
+| `Jenkins: View Build Details` | Open the build details panel |
+| `Jenkins: Open Last Failed Build` | Jump to the last failed build |
+| `Jenkins: Cancel Queue Item` | Remove a build from the queue |
+| `Jenkins: Approve Input` | Approve a pending input step for a running build |
+| `Jenkins: Reject Input` | Reject a pending input step for a running build |
+
+### Job Actions
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins: View Job Config` | Open the selected job or pipeline's `config.xml` in a read-only preview |
 
 ### Artifacts
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Preview Artifact` | Open an artifact (image/text) from a build |
-| `Jenkins Workbench: Download Artifact` | Download an artifact to the workspace |
+| `Jenkins: Preview Artifact` | Open an artifact (image/text) from a build |
+| `Jenkins: Download Artifact` | Download an artifact to the workspace |
 
 ### Navigation & Search
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Go to Job...` | Search and navigate to any job |
-| `Jenkins Workbench: Open in Jenkins` | Open the selected item in your browser |
+| `Jenkins: Go to Job...` | Search and navigate to any job |
+| `Jenkins: Open in Jenkins` | Open the selected item in your browser |
 
 ### Filtering
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Show All Jobs` | Clear job status filters |
-| `Jenkins Workbench: Show Failing Jobs` | Show only failing jobs |
-| `Jenkins Workbench: Show Running Jobs` | Show only running jobs |
-| `Jenkins Workbench: Filter Branches` | Filter branches in a multibranch folder |
-| `Jenkins Workbench: Clear Branch Filter` | Clear the branch filter |
+| `Jenkins: Filter Jobs` | Open the job filter picker in the view header |
+| `Jenkins: Show All Jobs` | Clear job status filters |
+| `Jenkins: Show Failing Jobs` | Show only failing jobs |
+| `Jenkins: Show Running Jobs` | Show only running jobs |
+| `Jenkins: Filter Branches` | Filter branches in a multibranch folder |
+| `Jenkins: Clear Branch Filter` | Clear the branch filter |
 
 ### Organization
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Pin Job` | Pin a job or pipeline to the top of the tree |
-| `Jenkins Workbench: Unpin Job` | Remove a pinned job or pipeline |
+| `Jenkins: Pin Job` | Pin a job or pipeline to the top of the tree |
+| `Jenkins: Unpin Job` | Remove a pinned job or pipeline |
 
 ### Watch
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins Workbench: Watch Job` | Watch a job for status changes |
-| `Jenkins Workbench: Unwatch Job` | Stop watching a job |
+| `Jenkins: Watch Job` | Watch a job for status changes |
+| `Jenkins: Unwatch Job` | Stop watching a job |
 
 ## Security
 
