@@ -7,7 +7,8 @@ import type {
   JenkinsProgressiveConsoleText
 } from "../JenkinsClient";
 
-export type BuildActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
+export type JenkinsActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
+export type BuildActionErrorCode = JenkinsActionErrorCode;
 
 export type JobParameterKind = "boolean" | "choice" | "password" | "string";
 

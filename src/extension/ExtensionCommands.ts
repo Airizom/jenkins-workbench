@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import { registerBuildCommands } from "../commands/BuildCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
 import { registerJobCommands } from "../commands/JobCommands";
+import { registerNodeCommands } from "../commands/NodeCommands";
 import { registerPinCommands } from "../commands/PinCommands";
 import { registerQueueCommands } from "../commands/QueueCommands";
 import { registerRefreshCommands } from "../commands/RefreshCommands";
@@ -95,6 +96,8 @@ export function registerExtensionCommands(
   );
 
   registerJobCommands(context, dependencies.dataService, dependencies.jobConfigPreviewer);
+
+  registerNodeCommands(context, dependencies.dataService);
 
   registerQueueCommands(context, dependencies.dataService, refreshHost);
 

@@ -5,6 +5,7 @@ import type {
   JenkinsBuildTriggerOptions,
   JenkinsJob,
   JenkinsJobKind,
+  JenkinsNodeDetails,
   JenkinsPendingInputAction,
   JenkinsPendingInputParameterDefinition,
   JenkinsParameterDefinition,
@@ -14,7 +15,7 @@ import type {
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import { JenkinsDataCache } from "./data/JenkinsDataCache";
-import { toBuildActionError } from "./data/JenkinsDataErrors";
+import { toBuildActionError, toJenkinsActionError } from "./data/JenkinsDataErrors";
 import type {
   ConsoleTextResult,
   ConsoleTextTailResult,
@@ -437,6 +438,32 @@ export class JenkinsDataService {
       },
       this.cacheTtlMs
     );
+  }
+
+  async getNodeDetails(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string,
+    options?: { mode?: "refresh"; detailLevel?: "basic" | "advanced" }
+  ): Promise<JenkinsNodeDetails> {
+    const detailLevel = options?.detailLevel ?? "basic";
+    const cacheKey = await this.buildCacheKey(
+      environment,
+      `node-details-${detailLevel}`,
+      nodeUrl
+    );
+    const cached =
+      options?.mode !== "refresh" ? this.cache.get<JenkinsNodeDetails>(cacheKey) : undefined;
+    if (cached) {
+      return cached;
+    }
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      const details = await client.getNodeDetails(nodeUrl, { detailLevel });
+      this.cache.set(cacheKey, details, this.cacheTtlMs);
+      return details;
+    } catch (error) {
+      throw toJenkinsActionError(error);
+    }
   }
 
   async getQueueItems(environment: JenkinsEnvironmentRef): Promise<JenkinsQueueItemInfo[]> {

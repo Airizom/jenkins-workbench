@@ -18,6 +18,7 @@ import type {
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
+  JenkinsNodeDetails,
   JenkinsPendingInputAction,
   JenkinsParameterDefinition,
   JenkinsProgressiveConsoleHtml,
@@ -42,6 +43,10 @@ export type {
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
+  JenkinsNodeDetails,
+  JenkinsNodeExecutable,
+  JenkinsNodeExecutor,
+  JenkinsNodeOfflineCause,
   JenkinsPendingInputAction,
   JenkinsPendingInputParameterDefinition,
   JenkinsParameterDefinition,
@@ -163,6 +168,13 @@ export class JenkinsClient {
 
   async getNodes(): Promise<JenkinsNode[]> {
     return this.nodesApi.getNodes();
+  }
+
+  async getNodeDetails(
+    nodeUrl: string,
+    options?: { detailLevel?: "basic" | "advanced" }
+  ): Promise<JenkinsNodeDetails> {
+    return this.nodesApi.getNodeDetails(nodeUrl, options);
   }
 
   async getQueue(): Promise<JenkinsQueueItem[]> {

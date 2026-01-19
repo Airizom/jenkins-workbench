@@ -38,7 +38,7 @@ import {
   BUILD_DETAILS_WEBVIEW_BUNDLE_PATH,
   BUILD_DETAILS_WEBVIEW_CSS_PATH
 } from "./buildDetails/BuildDetailsWebviewAssets";
-import { createNonce } from "./buildDetails/BuildDetailsWebviewUtils";
+import { createNonce } from "./shared/webview/WebviewNonce";
 
 export class BuildDetailsPanel {
   private static currentPanel: BuildDetailsPanel | undefined;

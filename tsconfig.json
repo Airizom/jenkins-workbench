@@ -14,5 +14,11 @@
     "esModuleInterop": true,
     "types": ["node", "vscode"]
   },
-  "exclude": ["node_modules", ".vscode-test", "src/panels/buildDetails/webview"]
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "src/panels/buildDetails/webview",
+    "src/panels/nodeDetails/webview",
+    "src/panels/shared/webview"
+  ]
 }

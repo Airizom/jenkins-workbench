@@ -16,6 +16,9 @@
   "include": [
     "src/panels/buildDetails/webview/**/*.ts",
     "src/panels/buildDetails/webview/**/*.tsx",
-    "src/panels/buildDetails/shared/**/*.ts"
+    "src/panels/buildDetails/shared/**/*.ts",
+    "src/panels/nodeDetails/webview/**/*.ts",
+    "src/panels/nodeDetails/webview/**/*.tsx",
+    "src/panels/nodeDetails/shared/**/*.ts"
   ]
 }

@@ -1,4 +1,4 @@
-import type { BuildActionErrorCode } from "./data/JenkinsDataTypes";
+import type { JenkinsActionErrorCode } from "./data/JenkinsDataTypes";
 
 export class JenkinsRequestError extends Error {
   readonly statusCode?: number;
@@ -18,16 +18,18 @@ export class JenkinsMaxBytesError extends JenkinsRequestError {
   }
 }
 
-export class BuildActionError extends Error {
-  readonly code: BuildActionErrorCode;
+export class JenkinsActionError extends Error {
+  readonly code: JenkinsActionErrorCode;
   readonly statusCode?: number;
 
-  constructor(message: string, code: BuildActionErrorCode, statusCode?: number) {
+  constructor(message: string, code: JenkinsActionErrorCode, statusCode?: number) {
     super(message);
     this.code = code;
     this.statusCode = statusCode;
   }
 }
+
+export class BuildActionError extends JenkinsActionError {}
 
 export class CancellationError extends Error {
   constructor() {

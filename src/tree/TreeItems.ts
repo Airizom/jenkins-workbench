@@ -242,6 +242,11 @@ export class NodeTreeItem extends vscode.TreeItem {
     this.iconPath = node.offline
       ? new vscode.ThemeIcon("debug-disconnect")
       : new vscode.ThemeIcon("server");
+    this.command = {
+      command: "jenkinsWorkbench.showNodeDetails",
+      title: "View Node Details",
+      arguments: [this]
+    };
   }
 }
 

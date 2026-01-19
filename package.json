@@ -123,6 +123,10 @@
         "title": "Jenkins: View Build Details"
       },
       {
+        "command": "jenkinsWorkbench.showNodeDetails",
+        "title": "Jenkins: View Node Details"
+      },
+      {
         "command": "jenkinsWorkbench.previewBuildLog",
         "title": "Jenkins: Preview Build Logs",
         "icon": "$(terminal)"
@@ -384,6 +388,11 @@
           "command": "jenkinsWorkbench.openInJenkins",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
           "group": "inline@0"
+        },
+        {
+          "command": "jenkinsWorkbench.showNodeDetails",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)node(\\s|$)/",
+          "group": "1_actions@0"
         },
         {
           "command": "jenkinsWorkbench.pinJob",

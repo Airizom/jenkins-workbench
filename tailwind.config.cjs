@@ -1,7 +1,10 @@
 module.exports = {
   content: [
     "./src/panels/buildDetails/webview/**/*.{ts,tsx}",
-    "./src/panels/buildDetails/BuildDetailsRenderer.ts"
+    "./src/panels/buildDetails/BuildDetailsRenderer.ts",
+    "./src/panels/nodeDetails/webview/**/*.{ts,tsx}",
+    "./src/panels/nodeDetails/NodeDetailsRenderer.ts",
+    "./src/panels/shared/webview/**/*.{ts,tsx}"
   ],
   theme: {
     extend: {

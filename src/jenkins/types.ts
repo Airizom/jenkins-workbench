@@ -223,6 +223,47 @@ export interface JenkinsNode {
   busyExecutors?: number;
 }
 
+export interface JenkinsNodeExecutable {
+  number?: number;
+  url?: string;
+  displayName?: string;
+  fullDisplayName?: string;
+  result?: string;
+}
+
+export interface JenkinsNodeExecutor {
+  number?: number;
+  idle?: boolean;
+  progress?: number;
+  currentExecutable?: JenkinsNodeExecutable;
+  currentWorkUnit?: JenkinsNodeExecutable;
+}
+
+export interface JenkinsNodeOfflineCause {
+  _class?: string;
+  description?: string;
+  shortDescription?: string;
+  timestamp?: number;
+  name?: string;
+}
+
+export interface JenkinsNodeDetails extends JenkinsNode {
+  _class?: string;
+  description?: string;
+  icon?: string;
+  iconClassName?: string;
+  idle?: boolean;
+  offlineCauseReason?: string;
+  offlineCause?: JenkinsNodeOfflineCause;
+  jnlpAgent?: boolean;
+  launchSupported?: boolean;
+  manualLaunchAllowed?: boolean;
+  monitorData?: Record<string, unknown>;
+  loadStatistics?: Record<string, unknown>;
+  executors?: JenkinsNodeExecutor[];
+  oneOffExecutors?: JenkinsNodeExecutor[];
+}
+
 export interface JenkinsQueueTask {
   name?: string;
   url?: string;
