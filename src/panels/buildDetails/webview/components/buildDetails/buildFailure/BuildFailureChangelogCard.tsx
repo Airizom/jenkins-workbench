@@ -12,13 +12,13 @@ export function BuildFailureChangelogCard({
   return (
     <Card className="bg-background">
       <div className="min-h-[120px] p-3 flex flex-col gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Changelog
         </div>
         {items.length > 0 ? (
           <ChangelogList items={items} />
         ) : (
-          <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+          <div className="rounded border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
             No changes detected.
           </div>
         )}
@@ -38,7 +38,7 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
         }
         return (
           <li className="flex flex-col gap-1" key={`${item.message}-${index}`}>
-            <div className="text-[13px] font-semibold text-foreground">
+            <div className="text-sm font-semibold text-foreground">
               {item.message}
             </div>
             <div className="text-xs text-muted-foreground break-words">

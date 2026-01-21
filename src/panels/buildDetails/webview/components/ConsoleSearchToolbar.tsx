@@ -38,15 +38,14 @@ export function ConsoleSearchToolbar({
   onClear
 }: ConsoleSearchToolbarProps) {
   const searchInputClassName = cn(
-    "flex-1 min-w-[220px] h-8 rounded-md border bg-background px-2.5 text-xs",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    "focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-    "placeholder:text-muted-foreground",
-    error ? "border-inputErrorBorder focus-visible:ring-inputErrorBorder" : "border-input"
+    "flex-1 min-w-[220px] h-7 rounded border px-2 text-xs",
+    "bg-input-background text-input-foreground",
+    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+    error ? "border-inputErrorBorder" : "border-input"
   );
 
   return (
-    <div className="flex flex-col gap-1" hidden={!visible}>
+    <div className="flex flex-col gap-1.5" hidden={!visible}>
       <div className="flex flex-wrap items-center gap-2">
         <input
           ref={inputRef}
@@ -61,7 +60,7 @@ export function ConsoleSearchToolbar({
         />
         <Button
           aria-pressed={useRegex}
-          className={cn(useRegex ? "bg-accent text-accent-foreground" : "")}
+          className={cn(useRegex ? "bg-list-active text-list-activeForeground" : "")}
           onClick={onToggleRegex}
           size="sm"
           title="Toggle regex search"
@@ -69,7 +68,7 @@ export function ConsoleSearchToolbar({
         >
           Regex
         </Button>
-        <span className="text-[11px] text-muted-foreground">{matchCountLabel}</span>
+        <span className="text-xs text-muted-foreground">{matchCountLabel}</span>
         <Button
           disabled={!isSearchActive || matchCount === 0}
           onClick={onPrev}
@@ -95,9 +94,9 @@ export function ConsoleSearchToolbar({
           Clear
         </Button>
       </div>
-      {error ? <div className="text-[11px] text-inputErrorFg">{error}</div> : null}
+      {error ? <div className="text-xs text-inputErrorFg">{error}</div> : null}
       {tooManyMatchesLabel ? (
-        <div className="text-[11px] text-muted-foreground">{tooManyMatchesLabel}</div>
+        <div className="text-xs text-muted-foreground">{tooManyMatchesLabel}</div>
       ) : null}
     </div>
   );

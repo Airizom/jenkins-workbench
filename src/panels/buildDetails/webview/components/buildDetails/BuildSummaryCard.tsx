@@ -22,7 +22,7 @@ export function BuildSummaryCard({
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <CardTitle id="detail-title" className="text-xl">
+            <CardTitle id="detail-title" className="text-base">
               {displayName}
             </CardTitle>
             <CardDescription>Build status and runtime metadata.</CardDescription>
@@ -31,7 +31,6 @@ export function BuildSummaryCard({
             id="detail-result"
             label={resultLabel}
             status={resultClass}
-            className="text-sm"
           />
         </div>
       </CardHeader>
@@ -39,7 +38,7 @@ export function BuildSummaryCard({
       <CardContent className="pt-4">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-y-3 gap-x-5">
           <div className="flex flex-col gap-1">
-            <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Duration
             </div>
             <div id="detail-duration" className="text-sm font-medium">
@@ -47,7 +46,7 @@ export function BuildSummaryCard({
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Timestamp
             </div>
             <div id="detail-timestamp" className="text-sm font-medium">
@@ -55,7 +54,7 @@ export function BuildSummaryCard({
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
               Culprit(s)
             </div>
             <div id="detail-culprits" className="text-sm font-medium">

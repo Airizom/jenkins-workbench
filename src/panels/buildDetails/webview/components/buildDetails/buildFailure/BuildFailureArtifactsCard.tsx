@@ -21,13 +21,13 @@ export function BuildFailureArtifactsCard({
   return (
     <Card className="bg-background">
       <div className="min-h-[120px] p-3 flex flex-col gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Artifacts
         </div>
         {items.length > 0 ? (
           <ArtifactsList items={items} onArtifactAction={onArtifactAction} />
         ) : (
-          <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+          <div className="rounded border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
             No artifacts available.
           </div>
         )}
@@ -54,12 +54,11 @@ function ArtifactsList({
           className="flex items-center justify-between gap-2"
           key={`${item.relativePath}-${index}`}
         >
-          <div className="text-[13px] break-words">{item.name || "Artifact"}</div>
+          <div className="text-sm break-words">{item.name || "Artifact"}</div>
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="link"
               size="sm"
-              className="h-auto px-0 text-xs"
               onClick={() => onArtifactAction("preview", item)}
             >
               Preview
@@ -67,7 +66,6 @@ function ArtifactsList({
             <Button
               variant="link"
               size="sm"
-              className="h-auto px-0 text-xs"
               onClick={() => onArtifactAction("download", item)}
             >
               Download

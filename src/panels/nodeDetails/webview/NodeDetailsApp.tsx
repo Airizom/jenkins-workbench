@@ -22,10 +22,10 @@ import {
 const { useEffect, useMemo, useReducer, useState } = React;
 
 const STATUS_STYLES: Record<NodeStatusClass, string> = {
-  online: "border-success/40 text-success bg-success/10",
-  idle: "border-warning/40 text-warning bg-warning/10",
-  temporary: "border-warning/40 text-warning bg-warning/10",
-  offline: "border-failure/40 text-failure bg-failure/10",
+  online: "border-success/50 text-success bg-success/10",
+  idle: "border-warning/50 text-warning bg-warning/10",
+  temporary: "border-warning/50 text-warning bg-warning/10",
+  offline: "border-failure/50 text-failure bg-failure/10",
   unknown: "border-border text-foreground bg-muted"
 };
 
@@ -83,13 +83,13 @@ export function NodeDetailsApp(): JSX.Element {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-10 border-b border-panelBorder bg-background/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-1">
-              <div className="text-xs uppercase tracking-wide text-description">Node</div>
-              <h1 className="text-xl font-semibold">{state.displayName}</h1>
-              <div className="text-xs text-description">{state.name}</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Node</div>
+              <h1 className="text-base font-semibold">{state.displayName}</h1>
+              <div className="text-xs text-muted-foreground">{state.name}</div>
             </div>
             <div className="flex flex-col items-start gap-2 md:items-end">
               <div className="flex flex-wrap items-center gap-2">
@@ -105,7 +105,7 @@ export function NodeDetailsApp(): JSX.Element {
                   </Badge>
                 ) : null}
                 {state.loading ? (
-                  <Badge variant="outline" className="border-focus text-focus">
+                  <Badge variant="outline" className="border-ring text-link">
                     Refreshing
                   </Badge>
                 ) : null}
@@ -121,20 +121,20 @@ export function NodeDetailsApp(): JSX.Element {
                   Open in Jenkins
                 </Button>
               </div>
-              <div className="text-xs text-description" title={updatedAtTitle}>
+              <div className="text-xs text-muted-foreground" title={updatedAtTitle}>
                 Last updated {updatedAtLabel}
               </div>
             </div>
           </div>
           {state.description ? (
-            <div className="text-sm text-description">{state.description}</div>
+            <div className="text-sm text-muted-foreground">{state.description}</div>
           ) : null}
         </div>
       </header>
 
       <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-6" aria-busy={state.loading}>
         {showOfflineBanner ? (
-          <Alert className="border-inputWarningBorder bg-inputWarningBg text-inputWarningFg">
+          <Alert variant="warning">
             <AlertTitle>{state.statusLabel}</AlertTitle>
             <AlertDescription>
               {state.offlineReason ?? "Jenkins reported this node as offline."}
@@ -142,7 +142,7 @@ export function NodeDetailsApp(): JSX.Element {
           </Alert>
         ) : null}
         {state.errors.length > 0 ? (
-          <Alert className="border-inputErrorBorder bg-inputErrorBg text-inputErrorFg">
+          <Alert variant="destructive">
             <AlertTitle>Unable to load full node details</AlertTitle>
             <AlertDescription>
               <ul className="list-disc space-y-1 pl-4">
@@ -162,14 +162,14 @@ export function NodeDetailsApp(): JSX.Element {
           <CardContent>
             <div className="grid gap-3 md:grid-cols-2">
               {overviewRows.map((row) => (
-                <div key={row.label} className="rounded-md border border-border px-3 py-2">
-                  <div className="text-xs uppercase text-description">{row.label}</div>
+                <div key={row.label} className="rounded border border-border px-3 py-2">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">{row.label}</div>
                   <div className="text-sm font-medium">{row.value}</div>
                 </div>
               ))}
             </div>
             {state.offlineReason ? (
-              <div className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+              <div className="mt-4 rounded border border-border bg-muted/50 px-3 py-2 text-sm">
                 <span className="font-semibold">Offline reason: </span>
                 {state.offlineReason}
               </div>
@@ -192,7 +192,7 @@ export function NodeDetailsApp(): JSX.Element {
                 ))}
               </div>
             ) : (
-              <div className="text-sm text-description">No labels reported.</div>
+              <div className="text-sm text-muted-foreground">No labels reported.</div>
             )}
           </CardContent>
         </Card>
@@ -209,16 +209,16 @@ export function NodeDetailsApp(): JSX.Element {
           </CardContent>
         </Card>
 
-        <details className="rounded-md border border-border bg-muted/20" onToggle={handleAdvancedToggle}>
+        <details className="rounded border border-border bg-muted/30" onToggle={handleAdvancedToggle}>
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
             Advanced
-            <span className="ml-2 text-xs text-description">
+            <span className="ml-2 text-xs text-muted-foreground">
               Monitor data, diagnostics, and raw payload
             </span>
           </summary>
           <div className="space-y-6 px-4 pb-4">
             {!state.advancedLoaded ? (
-              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-description">
+              <div className="rounded border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                 {state.loading
                   ? "Loading advanced diagnostics..."
                   : "Advanced diagnostics load the first time you expand this section."}
@@ -256,11 +256,11 @@ export function NodeDetailsApp(): JSX.Element {
               </CardHeader>
               <CardContent>
                 {state.rawJson ? (
-                  <pre className="max-h-96 overflow-auto rounded-md border border-border bg-muted/40 p-3 text-xs font-mono">
+                  <pre className="max-h-96 overflow-auto rounded border border-border bg-muted/50 p-3 text-xs font-mono">
                     {state.rawJson}
                   </pre>
                 ) : (
-                  <div className="text-sm text-description">No JSON payload available.</div>
+                  <div className="text-sm text-muted-foreground">No JSON payload available.</div>
                 )}
               </CardContent>
             </Card>
@@ -282,7 +282,7 @@ function ExecutorsTable({
     return (
       <div>
         <div className="text-sm font-semibold">{title}</div>
-        <div className="text-sm text-description">No executor data available.</div>
+        <div className="text-sm text-muted-foreground">No executor data available.</div>
       </div>
     );
   }
@@ -291,22 +291,22 @@ function ExecutorsTable({
       <div className="text-sm font-semibold">{title}</div>
       <div className="mt-2 space-y-3 md:hidden">
         {entries.map((entry) => (
-          <div key={`${title}-card-${entry.id}`} className="rounded-md border border-border p-3">
-            <div className="flex items-center justify-between text-xs text-description">
+          <div key={`${title}-card-${entry.id}`} className="rounded border border-border p-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="font-mono">{entry.id}</span>
               <span>{entry.statusLabel}</span>
             </div>
-            <div className="mt-2 text-xs uppercase text-description">Work</div>
+            <div className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">Work</div>
             <div className="text-sm">{renderWorkLabel(entry, "block truncate")}</div>
-            <div className="mt-2 text-xs uppercase text-description">Progress</div>
+            <div className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">Progress</div>
             <div className="text-sm">{entry.progressLabel ?? "—"}</div>
           </div>
         ))}
       </div>
       <div className="hidden md:block">
-        <div className="overflow-x-auto rounded-md border border-border">
+        <div className="overflow-x-auto rounded border border-border">
           <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-            <thead className="bg-muted/40 text-xs uppercase text-description">
+            <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Executor</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -317,7 +317,7 @@ function ExecutorsTable({
             <tbody>
               {entries.map((entry) => (
                 <tr key={`${title}-${entry.id}`} className="border-b border-border last:border-b-0">
-                  <td className="px-3 py-2 align-top font-mono text-xs text-description">
+                  <td className="px-3 py-2 align-top font-mono text-xs text-muted-foreground">
                     {entry.id}
                   </td>
                   <td className="px-3 py-2 align-top">{entry.statusLabel}</td>
@@ -346,7 +346,7 @@ function MonitorSection({
     return (
       <div>
         <div className="text-sm font-semibold">{title}</div>
-        <div className="text-sm text-description">No data available.</div>
+        <div className="text-sm text-muted-foreground">No data available.</div>
       </div>
     );
   }
@@ -355,12 +355,12 @@ function MonitorSection({
       <div className="text-sm font-semibold">{title}</div>
       <div className="mt-3 flex flex-col gap-2">
         {entries.map((entry) => (
-          <details key={entry.key} className="rounded-md border border-border bg-muted/30 px-3 py-2">
+          <details key={entry.key} className="rounded border border-border bg-muted/50 px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium">
-              <span className="mr-2 text-description">{entry.key}</span>
+              <span className="mr-2 text-muted-foreground">{entry.key}</span>
               <span>{entry.summary}</span>
             </summary>
-            <pre className="mt-2 max-h-64 overflow-auto text-xs font-mono text-description">
+            <pre className="mt-2 max-h-64 overflow-auto text-xs font-mono text-muted-foreground">
               {formatJson(entry.raw)}
             </pre>
           </details>
@@ -406,13 +406,13 @@ type ExecutorEntry = NodeDetailsState["executors"][number];
 
 function renderWorkLabel(entry: ExecutorEntry, className?: string): JSX.Element {
   if (!entry.workLabel) {
-    return <span className="text-description">None</span>;
+    return <span className="text-muted-foreground">None</span>;
   }
   if (entry.workUrl) {
     return (
       <button
         type="button"
-        className={`text-link hover:underline ${className ?? ""}`.trim()}
+        className={`text-link hover:text-link-hover hover:underline cursor-pointer border-0 bg-transparent p-0 ${className ?? ""}`.trim()}
         title={entry.workLabel}
         onClick={() => postVsCodeMessage({ type: "openExternal", url: entry.workUrl })}
       >

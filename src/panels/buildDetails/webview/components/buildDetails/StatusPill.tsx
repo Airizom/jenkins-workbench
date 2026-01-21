@@ -2,12 +2,12 @@ import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 
 const STATUS_CLASS_MAP: Record<string, string> = {
-  success: "text-success",
-  failure: "text-failure",
-  unstable: "text-warning",
-  aborted: "text-aborted",
-  running: "text-warning",
-  neutral: "text-foreground"
+  success: "border-success/50 text-success bg-success/10",
+  failure: "border-failure/50 text-failure bg-failure/10",
+  unstable: "border-warning/50 text-warning bg-warning/10",
+  aborted: "border-aborted/50 text-aborted bg-aborted/10",
+  running: "border-warning/50 text-warning bg-warning/10",
+  neutral: "border-border text-foreground bg-muted"
 };
 
 export function getStatusClass(status?: string): string {
@@ -33,7 +33,7 @@ export function StatusPill({
     <Badge
       id={id}
       variant="outline"
-      className={cn("border-current bg-muted text-xs", statusClass, className)}
+      className={cn("border text-xs font-medium", statusClass, className)}
     >
       {label}
     </Badge>

@@ -18,25 +18,25 @@ export function PendingInputsSection({
   return (
     <Card>
       <CardHeader className="space-y-2">
-        <CardTitle className="text-lg">Pending inputs</CardTitle>
+        <CardTitle>Pending inputs</CardTitle>
         <CardDescription>Build steps are waiting for approval.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {pendingInputs.map((input) => (
           <div
             key={input.id}
-            className="rounded-lg border border-border/60 bg-background/40 p-4"
+            className="rounded border border-border bg-muted/50 p-4"
           >
             <div className="flex flex-col gap-2">
               <div className="text-sm font-semibold">{input.message}</div>
               <div className="text-xs text-muted-foreground">{input.submitterLabel}</div>
               <div className="text-xs text-muted-foreground">{input.parametersLabel}</div>
               {input.parameters.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-muted-foreground">
+                <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
                   {input.parameters.map((param) => (
                     <span
                       key={`${input.id}-${param.name}`}
-                      className="rounded-full border border-border/60 px-2 py-0.5"
+                      className="rounded border border-border px-2 py-0.5"
                     >
                       {param.name} ({param.kind})
                     </span>

@@ -142,17 +142,17 @@ function StepsList({ steps }: { steps: PipelineStageStepViewModel[] }) {
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {steps.map((step, index) => (
         <li
-          className="flex flex-col gap-1 rounded-md border border-border bg-muted px-3 py-2"
+          className="flex flex-col gap-1 rounded border border-border bg-muted px-3 py-2"
           key={`${step.name}-${index}`}
         >
           <div className="text-xs font-semibold text-foreground">
             {step.name || "Step"}
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <StatusText
               label={step.statusLabel || "Unknown"}
               status={step.statusClass}
-              className="text-[11px]"
+              className="text-xs"
             />
             <span>{step.durationLabel || "Unknown"}</span>
           </div>
@@ -179,16 +179,16 @@ function BranchSteps({
         <StatusText
           label={branch.statusLabel || "Unknown"}
           status={branch.statusClass}
-          className="text-[11px]"
+          className="text-xs"
         />
-        <div className="text-[11px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           {branch.durationLabel || "Unknown"}
         </div>
       </div>
       {steps.length > 0 ? (
         <StepsList steps={steps} />
       ) : (
-        <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+        <div className="rounded border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
           {showAll ? "No steps available." : "No failed steps."}
         </div>
       )}
@@ -233,19 +233,19 @@ function StageCard({
             <StatusPill
               label={stage.statusLabel || "Unknown"}
               status={stage.statusClass}
-              className="text-[11px]"
+              className="text-xs"
             />
           </div>
           <div className="flex items-center justify-between gap-2.5 text-xs text-muted-foreground">
             <div>{stage.durationLabel || "Unknown"}</div>
-            <div className="text-[11px] text-primary">{titleLabel}</div>
+            <div className="text-xs text-link">{titleLabel}</div>
           </div>
         </button>
         {hasBranches ? (
           <div className="flex flex-col gap-2">
             {stage.parallelBranches.map((branch, index) => (
               <div
-                className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded border border-border bg-muted px-3 py-2"
                 key={`${branch.key}-${index}`}
               >
                 <div className="text-xs font-semibold text-foreground">
@@ -254,9 +254,9 @@ function StageCard({
                 <StatusText
                   label={branch.statusLabel || "Unknown"}
                   status={branch.statusClass}
-                  className="text-[11px]"
+                  className="text-xs"
                 />
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   {branch.durationLabel || "Unknown"}
                 </div>
               </div>
@@ -269,13 +269,12 @@ function StageCard({
         >
           {hasSteps ? (
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Steps
               </div>
               <Button
                 variant="link"
                 size="sm"
-                className="h-auto px-0 text-xs"
                 onClick={onToggleShowAll}
               >
                 {showAll ? "Show failed steps" : "Show all steps"}
@@ -294,12 +293,12 @@ function StageCard({
             steps.length > 0 ? (
               <StepsList steps={steps} />
             ) : (
-              <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+              <div className="rounded border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
                 {showAll ? "No steps available." : "No failed steps."}
               </div>
             )
           ) : (
-            <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground">
+            <div className="rounded border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
               No steps available.
             </div>
           )}
@@ -312,10 +311,10 @@ function StageCard({
 function PipelineStagesPlaceholder(): JSX.Element {
   const placeholders = ["placeholder-a", "placeholder-b", "placeholder-c"];
   return (
-    <div className="rounded-lg border border-dashed border-border bg-muted/60 px-4 py-6 flex flex-col gap-3 text-muted-foreground">
+    <div className="rounded border border-dashed border-border bg-muted/60 px-4 py-6 flex flex-col gap-3 text-muted-foreground">
       <div className="flex items-center gap-2 text-sm font-medium">
         <span
-          className="inline-block h-2.5 w-2.5 rounded-full bg-primary animate-pulse"
+          className="inline-block h-2.5 w-2.5 rounded-full bg-badge animate-pulse"
           aria-hidden
         />
         <span>Loading stages...</span>
@@ -324,7 +323,7 @@ function PipelineStagesPlaceholder(): JSX.Element {
         {placeholders.map((placeholderKey) => (
           <div
             key={placeholderKey}
-            className="h-20 rounded-md border border-border bg-background shadow-sm overflow-hidden"
+            className="h-20 rounded border border-border bg-background overflow-hidden"
           >
             <div className="h-full w-full animate-pulse bg-gradient-to-r from-muted via-muted/70 to-muted" />
           </div>
@@ -336,9 +335,9 @@ function PipelineStagesPlaceholder(): JSX.Element {
 
 function LoadingBanner(): JSX.Element {
   return (
-    <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
+    <div className="mb-3 inline-flex items-center gap-2 rounded bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
       <span
-        className="inline-block h-2 w-2 rounded-full bg-primary animate-ping"
+        className="inline-block h-2 w-2 rounded-full bg-badge animate-ping"
         aria-hidden
       />
       Refreshing stages...

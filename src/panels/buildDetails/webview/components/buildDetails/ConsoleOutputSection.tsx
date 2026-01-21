@@ -162,7 +162,7 @@ export function ConsoleOutputSection({
           <pre
             id="console-output"
             ref={consoleSearch.consoleOutputRef}
-            className="m-0 rounded-lg border border-border bg-background px-4 py-3.5 font-mono text-[length:var(--vscode-editor-font-size)] leading-6 whitespace-pre overflow-x-auto"
+            className="m-0 rounded border border-border bg-muted px-4 py-3 font-mono text-vscode-editor leading-relaxed whitespace-pre overflow-x-auto"
           >
             {consoleSegments}
           </pre>
@@ -170,7 +170,7 @@ export function ConsoleOutputSection({
         {!consoleError && !hasConsoleOutput ? (
           <div
             id="console-empty"
-            className="rounded-lg border border-dashed border-border px-3 py-2.5 text-muted-foreground"
+            className="rounded border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground"
           >
             No console output available.
           </div>

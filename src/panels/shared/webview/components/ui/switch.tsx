@@ -6,15 +6,29 @@ export type SwitchProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "typ
 
 export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
   ({ className, ...props }, ref) => (
-    <span className={cn("relative inline-flex h-5 w-9 shrink-0", className)}>
+    <span className={cn("relative inline-flex h-[18px] w-9 shrink-0", className)}>
       <input
         ref={ref}
         type="checkbox"
-        className="peer absolute inset-0 m-0 h-full w-full cursor-pointer opacity-0"
+        className="peer absolute inset-0 m-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
         {...props}
       />
-      <span className="h-5 w-9 rounded-full bg-muted transition-colors peer-checked:bg-primary" />
-      <span className="pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background transition-transform peer-checked:translate-x-4" />
+      <span
+        className={cn(
+          "h-[18px] w-9 rounded-full border-2 transition-colors",
+          "bg-transparent border-muted-foreground/50",
+          "peer-checked:bg-primary peer-checked:border-primary",
+          "peer-focus-visible:ring-1 peer-focus-visible:ring-ring",
+          "peer-disabled:opacity-50"
+        )}
+      />
+      <span
+        className={cn(
+          "pointer-events-none absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+          "bg-muted-foreground peer-checked:bg-primary-foreground",
+          "peer-checked:translate-x-[18px]"
+        )}
+      />
     </span>
   )
 );
