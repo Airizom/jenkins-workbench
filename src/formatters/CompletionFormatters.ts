@@ -1,49 +1,65 @@
+type CompletionSeverity = "info" | "warning";
+type CompletionStatus = { label: string; severity: CompletionSeverity };
+
+const COMPLETION_STATUSES = {
+  success: { label: "Success", severity: "info" },
+  failure: { label: "Failure", severity: "warning" },
+  unstable: { label: "Unstable", severity: "warning" },
+  aborted: { label: "Aborted", severity: "warning" },
+  notBuilt: { label: "Not built", severity: "info" },
+  disabled: { label: "Disabled", severity: "info" },
+  unknown: { label: "Unknown", severity: "info" }
+} as const;
+
+const RESULT_STATUS_MAP: Record<string, CompletionStatus> = {
+  SUCCESS: COMPLETION_STATUSES.success,
+  FAILURE: COMPLETION_STATUSES.failure,
+  UNSTABLE: COMPLETION_STATUSES.unstable,
+  ABORTED: COMPLETION_STATUSES.aborted,
+  NOT_BUILT: COMPLETION_STATUSES.notBuilt
+};
+
+const COLOR_STATUS_MAP: Record<string, CompletionStatus> = {
+  blue: COMPLETION_STATUSES.success,
+  green: COMPLETION_STATUSES.success,
+  red: COMPLETION_STATUSES.failure,
+  yellow: COMPLETION_STATUSES.unstable,
+  aborted: COMPLETION_STATUSES.aborted,
+  notbuilt: COMPLETION_STATUSES.notBuilt,
+  disabled: COMPLETION_STATUSES.disabled,
+  grey: COMPLETION_STATUSES.disabled
+};
+
+const normalizeResult = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  return value.toUpperCase();
+};
+
+const normalizeColor = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  return value.toLowerCase().replace(/_anime$/, "");
+};
+
 export function formatCompletionStatus(
   result?: unknown,
   color?: unknown
-): { label: string; severity: "info" | "warning" } {
-  const normalizedResult = typeof result === "string" ? result.toUpperCase() : undefined;
-
+): { label: string; severity: CompletionSeverity } {
+  const normalizedResult = normalizeResult(result);
   if (normalizedResult) {
-    switch (normalizedResult) {
-      case "SUCCESS":
-        return { label: "Success", severity: "info" };
-      case "FAILURE":
-        return { label: "Failure", severity: "warning" };
-      case "UNSTABLE":
-        return { label: "Unstable", severity: "warning" };
-      case "ABORTED":
-        return { label: "Aborted", severity: "warning" };
-      case "NOT_BUILT":
-        return { label: "Not built", severity: "info" };
-      default:
-        break;
+    const status = RESULT_STATUS_MAP[normalizedResult];
+    if (status) {
+      return status;
     }
   }
 
-  const normalizedColor =
-    typeof color === "string" ? color.toLowerCase().replace(/_anime$/, "") : undefined;
-
+  const normalizedColor = normalizeColor(color);
   if (normalizedColor) {
-    switch (normalizedColor) {
-      case "blue":
-      case "green":
-        return { label: "Success", severity: "info" };
-      case "red":
-        return { label: "Failure", severity: "warning" };
-      case "yellow":
-        return { label: "Unstable", severity: "warning" };
-      case "aborted":
-        return { label: "Aborted", severity: "warning" };
-      case "notbuilt":
-        return { label: "Not built", severity: "info" };
-      case "disabled":
-      case "grey":
-        return { label: "Disabled", severity: "info" };
-      default:
-        break;
-    }
+    return COLOR_STATUS_MAP[normalizedColor] ?? COMPLETION_STATUSES.unknown;
   }
 
-  return { label: "Unknown", severity: "info" };
+  return COMPLETION_STATUSES.unknown;
 }

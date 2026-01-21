@@ -228,6 +228,10 @@ export class JenkinsClient {
     return this.jobsApi.getJobConfigXml(jobUrl);
   }
 
+  async updateJobConfigXml(jobUrl: string, xml: string): Promise<void> {
+    await this.jobsApi.updateJobConfigXml(jobUrl, xml);
+  }
+
   async cancelQueueItem(id: number): Promise<void> {
     await this.queueApi.cancelQueueItem(id);
   }

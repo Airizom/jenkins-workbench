@@ -497,6 +497,19 @@ export class JenkinsDataService {
     }
   }
 
+  async updateJobConfigXml(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    xml: string
+  ): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.updateJobConfigXml(jobUrl, xml);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
   async getJobParameters(
     environment: JenkinsEnvironmentRef,
     jobUrl: string

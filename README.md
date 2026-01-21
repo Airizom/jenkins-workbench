@@ -180,6 +180,8 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | Command | Description |
 |---------|-------------|
 | `Jenkins: View Job Config` | Open the selected job or pipeline's `config.xml` in a read-only preview |
+| `Jenkins: Update Job Config` | Open an editable draft of `config.xml`, show a diff, validate XML, and submit with confirmation |
+| `Jenkins: Submit Job Config` | Submit the active job config draft after validation and confirmation |
 
 ### Artifacts
 

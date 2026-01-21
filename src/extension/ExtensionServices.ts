@@ -6,6 +6,11 @@ import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
 import { ArtifactActionService } from "../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../services/ArtifactFilesystem";
 import {
+  JobConfigDraftFilesystem,
+  JOB_CONFIG_DRAFT_SCHEME
+} from "../services/JobConfigDraftFilesystem";
+import { JobConfigDraftManager } from "../services/JobConfigDraftManager";
+import {
   DefaultArtifactRetrievalService,
   type ArtifactRetrievalService
 } from "../services/ArtifactRetrievalService";
@@ -23,6 +28,7 @@ import {
 import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
 import { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
+import { JobConfigUpdateWorkflow } from "../commands/job/JobConfigUpdateWorkflow";
 import {
   DefaultArtifactActionHandler,
   type ArtifactActionHandler,
@@ -52,6 +58,8 @@ export interface ExtensionServices {
   artifactPreviewProvider: ArtifactPreviewProvider;
   buildLogPreviewer: BuildLogPreviewer;
   jobConfigPreviewer: JobConfigPreviewer;
+  jobConfigDraftManager: JobConfigDraftManager;
+  jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
@@ -115,6 +123,17 @@ export function createExtensionServices(
     MAX_CONSOLE_CHARS
   );
   const jobConfigPreviewer = new JobConfigPreviewer(artifactPreviewProvider);
+  const jobConfigDraftFilesystem = new JobConfigDraftFilesystem();
+  context.subscriptions.push(
+    vscode.workspace.registerFileSystemProvider(JOB_CONFIG_DRAFT_SCHEME, jobConfigDraftFilesystem)
+  );
+  const jobConfigDraftManager = new JobConfigDraftManager(jobConfigDraftFilesystem);
+  context.subscriptions.push(jobConfigDraftManager);
+  const jobConfigUpdateWorkflow = new JobConfigUpdateWorkflow(
+    dataService,
+    jobConfigPreviewer,
+    jobConfigDraftManager
+  );
   const artifactActionHandler = new DefaultArtifactActionHandler(
     artifactActionService,
     artifactPreviewer,
@@ -152,6 +171,8 @@ export function createExtensionServices(
     artifactPreviewProvider,
     buildLogPreviewer,
     jobConfigPreviewer,
+    jobConfigDraftManager,
+    jobConfigUpdateWorkflow,
     artifactActionHandler,
     watchStore,
     pinStore,

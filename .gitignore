@@ -4,3 +4,4 @@ out/
 
 *.vsix
 .vscode/settings.json
+.ck

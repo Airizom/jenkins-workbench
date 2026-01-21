@@ -17,4 +17,9 @@ export interface JenkinsClientContext {
   requestStream(url: string, options?: { maxBytes?: number }): Promise<JenkinsStreamResponse>;
   requestVoidWithCrumb(url: string, body?: string): Promise<void>;
   requestPostWithCrumb(url: string, body?: string): Promise<JenkinsPostResponse>;
+  requestPostWithCrumbRaw(
+    url: string,
+    body: string,
+    headers?: Record<string, string>
+  ): Promise<JenkinsPostResponse>;
 }

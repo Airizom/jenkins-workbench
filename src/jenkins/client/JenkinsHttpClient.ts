@@ -101,6 +101,43 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       contentHeaders["Content-Length"] = Buffer.byteLength(body).toString();
     }
 
+    return this.requestPostWithCrumbInternal(url, body, contentHeaders);
+  }
+
+  async requestPostWithCrumbRaw(
+    url: string,
+    body: string,
+    headers?: Record<string, string>
+  ): Promise<JenkinsPostResponse> {
+    const contentHeaders: Record<string, string> = { ...(headers ?? {}) };
+    if (!("Content-Length" in contentHeaders)) {
+      contentHeaders["Content-Length"] = Buffer.byteLength(body).toString();
+    }
+    return this.requestPostWithCrumbInternal(url, body, contentHeaders);
+  }
+
+  private async requestVoidWithLocation(
+    url: string,
+    options: {
+      method: "POST" | "GET";
+      headers?: Record<string, string>;
+      body?: string;
+      redirectCount?: number;
+    }
+  ): Promise<JenkinsPostResponse> {
+    return requestVoidWithLocationInternal(url, {
+      ...options,
+      headers: this.mergeHeaders(options.headers),
+      authHeader: this.authHeader,
+      timeoutMs: this.requestTimeoutMs
+    });
+  }
+
+  private async requestPostWithCrumbInternal(
+    url: string,
+    body: string | undefined,
+    contentHeaders: Record<string, string>
+  ): Promise<JenkinsPostResponse> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
     const headers = crumbHeader
       ? { ...contentHeaders, [crumbHeader.field]: crumbHeader.value }
@@ -130,23 +167,6 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       }
       throw error;
     }
-  }
-
-  private async requestVoidWithLocation(
-    url: string,
-    options: {
-      method: "POST" | "GET";
-      headers?: Record<string, string>;
-      body?: string;
-      redirectCount?: number;
-    }
-  ): Promise<JenkinsPostResponse> {
-    return requestVoidWithLocationInternal(url, {
-      ...options,
-      headers: this.mergeHeaders(options.headers),
-      authHeader: this.authHeader,
-      timeoutMs: this.requestTimeoutMs
-    });
   }
 
   private getRequestOptions(): {

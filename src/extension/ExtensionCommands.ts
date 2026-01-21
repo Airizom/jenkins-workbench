@@ -18,6 +18,8 @@ import type { PendingInputRefreshCoordinator } from "../services/PendingInputRef
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
+import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
+import type { JobConfigUpdateWorkflow } from "../commands/job/JobConfigUpdateWorkflow";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
@@ -35,6 +37,8 @@ export interface ExtensionCommandDependencies {
   artifactActionHandler: ArtifactActionHandler;
   buildLogPreviewer: BuildLogPreviewer;
   jobConfigPreviewer: JobConfigPreviewer;
+  jobConfigDraftManager: JobConfigDraftManager;
+  jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;
   consoleExporter: BuildConsoleExporter;
   queuedBuildWaiter: QueuedBuildWaiter;
   pendingInputCoordinator: PendingInputRefreshCoordinator;
@@ -95,7 +99,14 @@ export function registerExtensionCommands(
     refreshHost
   );
 
-  registerJobCommands(context, dependencies.dataService, dependencies.jobConfigPreviewer);
+  registerJobCommands(
+    context,
+    dependencies.dataService,
+    dependencies.jobConfigPreviewer,
+    refreshHost,
+    dependencies.jobConfigDraftManager,
+    dependencies.jobConfigUpdateWorkflow
+  );
 
   registerNodeCommands(context, dependencies.dataService);
 

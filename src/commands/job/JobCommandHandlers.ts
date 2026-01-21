@@ -3,6 +3,7 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
+import type { JobConfigUpdateWorkflow } from "./JobConfigUpdateWorkflow";
 
 export async function viewJobConfig(
   dataService: JenkinsDataService,
@@ -24,4 +25,19 @@ export async function viewJobConfig(
       `Unable to open config.xml for ${label}: ${formatActionError(error)}`
     );
   }
+}
+
+export async function updateJobConfig(
+  workflow: JobConfigUpdateWorkflow,
+  item?: JobTreeItem | PipelineTreeItem
+): Promise<void> {
+  await workflow.startUpdate(item);
+}
+
+export async function submitJobConfigDraft(
+  workflow: JobConfigUpdateWorkflow,
+  refreshHost: Parameters<JobConfigUpdateWorkflow["submitDraft"]>[0],
+  uri?: vscode.Uri
+): Promise<void> {
+  await workflow.submitDraft(refreshHost, uri);
 }
