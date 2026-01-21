@@ -105,7 +105,9 @@ export function registerExtensionCommands(
     dependencies.jobConfigPreviewer,
     refreshHost,
     dependencies.jobConfigDraftManager,
-    dependencies.jobConfigUpdateWorkflow
+    dependencies.jobConfigUpdateWorkflow,
+    dependencies.pinStore,
+    dependencies.watchStore
   );
 
   registerNodeCommands(context, dependencies.dataService);

@@ -1,5 +1,11 @@
 import type { JenkinsJob, JenkinsJobKind, JenkinsParameterDefinition } from "../types";
-import { buildActionUrl, buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
+import {
+  buildActionUrl,
+  buildApiUrlFromBase,
+  buildApiUrlFromItem,
+  buildJobUrl,
+  parseJobUrl
+} from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 import {
   type JenkinsJobParametersResponse,
@@ -69,6 +75,58 @@ export class JenkinsJobsApi {
     await this.context.requestPostWithCrumbRaw(url, xml, {
       "Content-Type": "application/xml; charset=utf-8"
     });
+  }
+
+  async enableJob(jobUrl: string): Promise<void> {
+    const url = buildActionUrl(jobUrl, "enable");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  async disableJob(jobUrl: string): Promise<void> {
+    const url = buildActionUrl(jobUrl, "disable");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  async renameJob(jobUrl: string, newName: string): Promise<{ newUrl: string }> {
+    const url = buildActionUrl(jobUrl, "doRename");
+    const body = `newName=${encodeURIComponent(newName)}`;
+    const response = await this.context.requestPostWithCrumb(url, body);
+
+    if (response.location) {
+      return { newUrl: response.location };
+    }
+
+    const parsed = parseJobUrl(jobUrl);
+    if (parsed) {
+      return { newUrl: buildJobUrl(parsed.parentUrl, newName) };
+    }
+
+    return { newUrl: jobUrl.replace(/\/[^/]+\/$/, `/${encodeURIComponent(newName)}/`) };
+  }
+
+  async deleteJob(jobUrl: string): Promise<void> {
+    const url = buildActionUrl(jobUrl, "doDelete");
+    await this.context.requestPostWithCrumb(url);
+  }
+
+  async copyJob(
+    parentUrl: string,
+    sourceName: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    const url = buildActionUrl(parentUrl, "createItem");
+    const params = new URLSearchParams();
+    params.set("name", newName);
+    params.set("mode", "copy");
+    params.set("from", sourceName);
+    const fullUrl = `${url}?${params.toString()}`;
+    const response = await this.context.requestPostWithCrumb(fullUrl);
+
+    if (response.location) {
+      return { newUrl: response.location };
+    }
+
+    return { newUrl: buildJobUrl(parentUrl, newName) };
   }
 
   private async fetchJobs(url: string): Promise<JenkinsJob[]> {

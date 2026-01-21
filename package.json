@@ -190,6 +190,31 @@
         "command": "jenkinsWorkbench.refresh",
         "title": "Jenkins: Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "jenkinsWorkbench.enableJob",
+        "title": "Jenkins: Enable Job",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "jenkinsWorkbench.disableJob",
+        "title": "Jenkins: Disable Job",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "jenkinsWorkbench.renameJob",
+        "title": "Jenkins: Rename Job",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jenkinsWorkbench.deleteJob",
+        "title": "Jenkins: Delete Job",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "jenkinsWorkbench.copyJob",
+        "title": "Jenkins: Copy Job",
+        "icon": "$(copy)"
       }
     ],
     "configuration": {
@@ -430,6 +455,31 @@
           "group": "1_actions@2"
         },
         {
+          "command": "jenkinsWorkbench.enableJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)disabled(\\s|$)/",
+          "group": "3_destructive@0"
+        },
+        {
+          "command": "jenkinsWorkbench.disableJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)enabled(\\s|$)/",
+          "group": "3_destructive@0"
+        },
+        {
+          "command": "jenkinsWorkbench.renameJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
+          "group": "3_destructive@1"
+        },
+        {
+          "command": "jenkinsWorkbench.copyJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
+          "group": "3_destructive@2"
+        },
+        {
+          "command": "jenkinsWorkbench.deleteJob",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
+          "group": "3_destructive@3"
+        },
+        {
           "command": "jenkinsWorkbench.watchJob",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)watched(\\s|$)/)",
           "group": "2_watch@0"
@@ -516,6 +566,26 @@
         {
           "command": "jenkinsWorkbench.submitJobConfig",
           "when": "resourceScheme == jenkins-config"
+        },
+        {
+          "command": "jenkinsWorkbench.enableJob",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.disableJob",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.renameJob",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.deleteJob",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.copyJob",
+          "when": "view == jenkinsWorkbench.tree"
         }
       ]
     },

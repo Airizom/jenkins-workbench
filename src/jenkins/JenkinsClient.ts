@@ -235,4 +235,28 @@ export class JenkinsClient {
   async cancelQueueItem(id: number): Promise<void> {
     await this.queueApi.cancelQueueItem(id);
   }
+
+  async enableJob(jobUrl: string): Promise<void> {
+    await this.jobsApi.enableJob(jobUrl);
+  }
+
+  async disableJob(jobUrl: string): Promise<void> {
+    await this.jobsApi.disableJob(jobUrl);
+  }
+
+  async renameJob(jobUrl: string, newName: string): Promise<{ newUrl: string }> {
+    return this.jobsApi.renameJob(jobUrl, newName);
+  }
+
+  async deleteJob(jobUrl: string): Promise<void> {
+    await this.jobsApi.deleteJob(jobUrl);
+  }
+
+  async copyJob(
+    parentUrl: string,
+    sourceName: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    return this.jobsApi.copyJob(parentUrl, sourceName, newName);
+  }
 }

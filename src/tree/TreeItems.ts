@@ -12,6 +12,7 @@ import {
   formatNodeDescription,
   formatWatchedDescription,
   formatQueueItemDescription,
+  isJobColorDisabled,
   jobIcon,
   normalizeQueueReason
 } from "./formatters";
@@ -106,6 +107,7 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
 export class JobTreeItem extends vscode.TreeItem {
   public readonly isWatched: boolean;
   public readonly isPinned: boolean;
+  public readonly isDisabled: boolean;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
@@ -118,7 +120,8 @@ export class JobTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.isWatched = isWatched;
     this.isPinned = isPinned;
-    this.contextValue = buildJobContextValue("jobItem", isWatched, isPinned);
+    this.isDisabled = isJobColorDisabled(color);
+    this.contextValue = buildJobContextValue("jobItem", isWatched, isPinned, this.isDisabled);
     this.description = formatWatchedDescription(formatJobColor(color), isWatched);
     this.iconPath = jobIcon("job", color);
   }
@@ -127,6 +130,7 @@ export class JobTreeItem extends vscode.TreeItem {
 export class PipelineTreeItem extends vscode.TreeItem {
   public readonly isWatched: boolean;
   public readonly isPinned: boolean;
+  public readonly isDisabled: boolean;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
@@ -139,7 +143,8 @@ export class PipelineTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.isWatched = isWatched;
     this.isPinned = isPinned;
-    this.contextValue = buildJobContextValue("pipelineItem", isWatched, isPinned);
+    this.isDisabled = isJobColorDisabled(color);
+    this.contextValue = buildJobContextValue("pipelineItem", isWatched, isPinned, this.isDisabled);
     this.description = formatWatchedDescription(formatJobColor(color), isWatched);
     this.iconPath = jobIcon("pipeline", color);
   }
@@ -148,7 +153,8 @@ export class PipelineTreeItem extends vscode.TreeItem {
 function buildJobContextValue(
   base: "jobItem" | "pipelineItem",
   isWatched: boolean,
-  isPinned: boolean
+  isPinned: boolean,
+  isDisabled: boolean
 ): string {
   const parts: string[] = [base];
   if (isPinned) {
@@ -156,6 +162,11 @@ function buildJobContextValue(
   }
   if (isWatched) {
     parts.push("watched");
+  }
+  if (isDisabled) {
+    parts.push("disabled");
+  } else {
+    parts.push("enabled");
   }
   return parts.join(" ");
 }

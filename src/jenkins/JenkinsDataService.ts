@@ -599,6 +599,60 @@ export class JenkinsDataService {
     }
   }
 
+  async enableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.enableJob(jobUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async disableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.disableJob(jobUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async renameJob(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.renameJob(jobUrl, newName);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async deleteJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.deleteJob(jobUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async copyJob(
+    environment: JenkinsEnvironmentRef,
+    parentUrl: string,
+    sourceName: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.copyJob(parentUrl, sourceName, newName);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
   private async buildCacheKey(
     environment: JenkinsEnvironmentRef,
     kind: string,

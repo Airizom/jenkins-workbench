@@ -265,13 +265,25 @@ function buildIconId(status: NormalizedStatus): string {
   }
 }
 
+function getBaseJobColor(color: string): string {
+  return color.endsWith("_anime") ? color.slice(0, -"_anime".length) : color;
+}
+
+export function isJobColorDisabled(color?: string): boolean {
+  if (!color) {
+    return false;
+  }
+  const baseColor = getBaseJobColor(color);
+  return baseColor === "disabled" || baseColor === "grey" || baseColor === "gray";
+}
+
 export function resolveJobStatus(color?: string): NormalizedStatus | undefined {
   if (!color) {
     return undefined;
   }
 
   const isRunning = color.endsWith("_anime");
-  const baseColor = isRunning ? color.slice(0, -"_anime".length) : color;
+  const baseColor = getBaseJobColor(color);
 
   let status: NormalizedStatus;
   switch (baseColor) {

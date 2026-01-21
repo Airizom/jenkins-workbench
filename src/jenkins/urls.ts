@@ -1,7 +1,64 @@
 import type { JenkinsNode } from "./types";
 
+export interface ParsedJobUrl {
+  parentUrl: string;
+  jobName: string;
+  fullPath: string[];
+}
+
 export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
+}
+
+export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
+  let url: URL;
+  try {
+    url = new URL(jobUrl);
+  } catch {
+    return undefined;
+  }
+  const pathParts = url.pathname.split("/").filter((p) => p.length > 0);
+
+  const firstJobIndex = pathParts.indexOf("job");
+
+  if (firstJobIndex < 0) {
+    return undefined;
+  }
+
+  const baseParts = pathParts.slice(0, firstJobIndex);
+  const segments: string[] = [];
+  for (let i = firstJobIndex; i < pathParts.length; i++) {
+    if (pathParts[i] === "job" && i + 1 < pathParts.length) {
+      segments.push(decodeURIComponent(pathParts[i + 1]));
+      i++;
+    }
+  }
+
+  if (segments.length === 0) {
+    return undefined;
+  }
+
+  const jobName = segments[segments.length - 1];
+  const parentSegments = segments.slice(0, -1);
+
+  const basePath = baseParts.length > 0 ? `/${baseParts.join("/")}` : "";
+  let parentPath = basePath;
+  for (const segment of parentSegments) {
+    parentPath += `/job/${encodeURIComponent(segment)}`;
+  }
+
+  const parentUrl = `${url.origin}${parentPath}/`;
+
+  return {
+    parentUrl,
+    jobName,
+    fullPath: segments
+  };
+}
+
+export function buildJobUrl(parentUrl: string, jobName: string): string {
+  const base = ensureTrailingSlash(parentUrl);
+  return `${base}job/${encodeURIComponent(jobName)}/`;
 }
 
 export function buildApiUrlFromBase(baseUrl: string, path: string, tree?: string): string {

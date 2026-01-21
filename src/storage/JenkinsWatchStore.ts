@@ -163,6 +163,37 @@ export class JenkinsWatchStore {
     }
   }
 
+  async updateWatchUrl(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldJobUrl: string,
+    newJobUrl: string,
+    newJobName?: string
+  ): Promise<boolean> {
+    const entries = await this.getWatches(scope);
+    let found = false;
+    const next: StoredWatchedJobEntry[] = [];
+
+    for (const entry of entries) {
+      if (entry.environmentId === environmentId && entry.jobUrl === oldJobUrl) {
+        found = true;
+        next.push({
+          ...entry,
+          jobUrl: newJobUrl,
+          jobName: newJobName ?? entry.jobName
+        });
+      } else {
+        next.push(entry);
+      }
+    }
+
+    if (found) {
+      await this.saveWatches(scope, next);
+    }
+
+    return found;
+  }
+
   private getWatches(scope: EnvironmentScope): Promise<StoredWatchedJobEntry[]> {
     const memento = this.getMemento(scope);
     const stored = memento.get<StoredWatchedJobEntry[]>(WATCHED_JOBS_KEY);

@@ -92,6 +92,37 @@ export class JenkinsPinStore {
     }
   }
 
+  async updatePinUrl(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldJobUrl: string,
+    newJobUrl: string,
+    newJobName?: string
+  ): Promise<boolean> {
+    const entries = await this.getPins(scope);
+    let found = false;
+    const next: StoredPinnedJobEntry[] = [];
+
+    for (const entry of entries) {
+      if (entry.environmentId === environmentId && entry.jobUrl === oldJobUrl) {
+        found = true;
+        next.push({
+          ...entry,
+          jobUrl: newJobUrl,
+          jobName: newJobName ?? entry.jobName
+        });
+      } else {
+        next.push(entry);
+      }
+    }
+
+    if (found) {
+      await this.savePins(scope, next);
+    }
+
+    return found;
+  }
+
   private getPins(scope: EnvironmentScope): Promise<StoredPinnedJobEntry[]> {
     const memento = this.getMemento(scope);
     const stored = memento.get<StoredPinnedJobEntry[]>(PINNED_JOBS_KEY);
