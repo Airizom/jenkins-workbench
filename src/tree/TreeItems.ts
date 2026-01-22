@@ -66,6 +66,7 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
     super("Jobs", vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = "jobs";
     this.iconPath = new vscode.ThemeIcon("folder");
+    this.tooltip = "Browse jobs, pipelines, and folders";
   }
 }
 
@@ -74,6 +75,7 @@ export class NodesFolderTreeItem extends vscode.TreeItem {
     super("Nodes", vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = "nodes";
     this.iconPath = new vscode.ThemeIcon("server");
+    this.tooltip = "View build agents and their status";
   }
 }
 
@@ -87,6 +89,7 @@ export class BuildQueueFolderTreeItem extends vscode.TreeItem {
     this.contextValue = "queueFolder";
     this.iconPath = new vscode.ThemeIcon("list-unordered");
     this.id = BuildQueueFolderTreeItem.buildId(environment);
+    this.tooltip = "Items waiting to be built";
   }
 }
 
@@ -235,8 +238,49 @@ export class ArtifactTreeItem extends vscode.TreeItem {
     this.contextValue = "artifactItem";
     this.description =
       fileName && relativePath && relativePath !== fileName ? relativePath : undefined;
-    this.iconPath = new vscode.ThemeIcon("file");
+    this.iconPath = resolveArtifactIcon(fileName, relativePath);
   }
+}
+
+function resolveArtifactIcon(fileName?: string, relativePath?: string): vscode.ThemeIcon {
+  const ext = getFileExtension(fileName, relativePath);
+  switch (ext) {
+    case ".jar":
+    case ".war":
+    case ".ear":
+    case ".zip":
+    case ".tar":
+    case ".gz":
+    case ".tgz":
+      return new vscode.ThemeIcon("file-zip");
+    case ".log":
+    case ".txt":
+      return new vscode.ThemeIcon("file-text");
+    case ".xml":
+    case ".json":
+    case ".yaml":
+    case ".yml":
+    case ".html":
+    case ".htm":
+      return new vscode.ThemeIcon("file-code");
+    case ".png":
+    case ".jpg":
+    case ".jpeg":
+    case ".gif":
+    case ".svg":
+    case ".webp":
+      return new vscode.ThemeIcon("file-media");
+    case ".pdf":
+      return new vscode.ThemeIcon("file-pdf");
+    default:
+      return new vscode.ThemeIcon("file");
+  }
+}
+
+function getFileExtension(fileName?: string, relativePath?: string): string {
+  const name = fileName || relativePath || "";
+  const lastDot = name.lastIndexOf(".");
+  return lastDot > 0 ? name.slice(lastDot).toLowerCase() : "";
 }
 
 export class NodeTreeItem extends vscode.TreeItem {
@@ -289,14 +333,17 @@ export class QueueItemTreeItem extends vscode.TreeItem {
     inQueueSince?: number;
     taskUrl?: string;
   }): string {
-    const parts: string[] = [`Queue item ${item.id}`];
+    const parts: string[] = [];
+    const normalizedReason = normalizeQueueReason(item.reason);
+    if (normalizedReason) {
+      parts.push(normalizedReason);
+    } else {
+      parts.push("Waiting in queue");
+    }
     if (item.taskUrl) {
       parts.push(item.taskUrl);
     }
-    const normalizedReason = normalizeQueueReason(item.reason);
-    if (normalizedReason) {
-      parts.push(`Reason: ${normalizedReason}`);
-    }
+    parts.push(`Queue ID: ${item.id}`);
     if (typeof item.inQueueSince === "number") {
       parts.push(`Queued since: ${new Date(item.inQueueSince).toLocaleString()}`);
     }
@@ -313,7 +360,7 @@ export class PlaceholderTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.None);
     this.contextValue = "placeholder";
     this.description = description;
-    this.tooltip = description;
+    this.tooltip = description ? `${label}\n${description}` : label;
     this.iconPath =
       kind === "error" ? new vscode.ThemeIcon("warning") : new vscode.ThemeIcon("info");
   }

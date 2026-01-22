@@ -154,10 +154,9 @@ export class JenkinsTreeChildrenLoader {
     const environments = await this.store.listEnvironmentsWithScope();
     if (environments.length === 0) {
       return [
-        new PlaceholderTreeItem(
+        this.createEmptyPlaceholder(
           "No Jenkins environments configured.",
-          "Use the + command to add one.",
-          "empty"
+          "Use the + command to add one."
         )
       ];
     }
@@ -209,11 +208,7 @@ export class JenkinsTreeChildrenLoader {
       );
       if (builds.length === 0) {
         return [
-          new PlaceholderTreeItem(
-            "No recent builds found.",
-            `Showing the latest ${this.buildLimit} builds.`,
-            "empty"
-          )
+          this.createEmptyPlaceholder("No builds found.", "This job has no build history yet.")
         ];
       }
       const runningBuilds = builds.filter((build) => Boolean(build.building) && build.url);
@@ -242,7 +237,9 @@ export class JenkinsTreeChildrenLoader {
     try {
       const nodes = await this.dataService.getNodes(environment);
       if (nodes.length === 0) {
-        return [new PlaceholderTreeItem("No nodes found.", undefined, "empty")];
+        return [
+          this.createEmptyPlaceholder("No nodes found.", "This instance has no build agents.")
+        ];
       }
       return nodes.map((node) => new NodeTreeItem(environment, node));
     } catch (error) {
@@ -257,7 +254,7 @@ export class JenkinsTreeChildrenLoader {
       const items = await this.dataService.getQueueItems(environment);
       if (items.length === 0) {
         return [
-          new PlaceholderTreeItem("Build queue is empty.", "No items are waiting to run.", "empty")
+          this.createEmptyPlaceholder("Build queue is empty.", "No items are waiting to run.")
         ];
       }
       return this.mapQueueItemsToTreeItems(environment, items);
@@ -275,7 +272,12 @@ export class JenkinsTreeChildrenLoader {
         folder.buildUrl
       );
       if (artifacts.length === 0) {
-        return [new PlaceholderTreeItem("No artifacts available.", undefined, "empty")];
+        return [
+          this.createEmptyPlaceholder(
+            "No artifacts available.",
+            "This build did not produce any artifacts."
+          )
+        ];
       }
       const items = artifacts
         .map((artifact) => {
@@ -296,7 +298,12 @@ export class JenkinsTreeChildrenLoader {
         .filter((item): item is ArtifactTreeItem => Boolean(item));
 
       if (items.length === 0) {
-        return [new PlaceholderTreeItem("No artifacts available.", undefined, "empty")];
+        return [
+          this.createEmptyPlaceholder(
+            "No artifacts available.",
+            "This build did not produce any artifacts."
+          )
+        ];
       }
 
       return items;
@@ -315,7 +322,12 @@ export class JenkinsTreeChildrenLoader {
     }
   ): Promise<WorkbenchTreeElement[]> {
     if (jobs.length === 0) {
-      return [new PlaceholderTreeItem("No jobs, folders, or pipelines found.", undefined, "empty")];
+      return [
+        this.createEmptyPlaceholder(
+          "No jobs, folders, or pipelines found.",
+          "This location is empty."
+        )
+      ];
     }
 
     const [watchedJobs, pinnedJobs] = await Promise.all([
@@ -330,7 +342,12 @@ export class JenkinsTreeChildrenLoader {
     );
 
     if (filteredJobs.length === 0) {
-      return [new PlaceholderTreeItem("No jobs match the current filters.", undefined, "empty")];
+      return [
+        this.createEmptyPlaceholder(
+          "No jobs match the current filters.",
+          "Adjust or clear filters via the filter menu."
+        )
+      ];
     }
 
     const orderedJobs = this.orderPinnedJobsFirst(filteredJobs, pinnedJobs);
@@ -421,6 +438,10 @@ export class JenkinsTreeChildrenLoader {
   private createErrorPlaceholder(label: string, error: unknown): PlaceholderTreeItem {
     const message = error instanceof Error ? error.message : "Unexpected error.";
     return new PlaceholderTreeItem(label, message, "error");
+  }
+
+  private createEmptyPlaceholder(label: string, description?: string): PlaceholderTreeItem {
+    return new PlaceholderTreeItem(label, description, "empty");
   }
 }
 

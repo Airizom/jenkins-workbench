@@ -124,6 +124,10 @@ export function formatRelativeTime(timestampMs: number): string | undefined {
   const hourMs = 3_600_000;
   const dayMs = 86_400_000;
 
+  if (diffMs < minuteMs) {
+    return "just now";
+  }
+
   if (diffMs < hourMs) {
     const minutes = Math.floor(diffMs / minuteMs);
     return `${minutes}m ago`;

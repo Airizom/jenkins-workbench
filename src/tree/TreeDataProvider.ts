@@ -95,6 +95,10 @@ export class JenkinsWorkbenchTreeDataProvider
   refresh(): void {
     const now = Date.now();
     if (now - this.lastManualRefreshAt < MANUAL_REFRESH_COOLDOWN_MS) {
+      vscode.window.setStatusBarMessage(
+        "$(sync) Refresh already in progress",
+        MANUAL_REFRESH_COOLDOWN_MS
+      );
       return;
     }
     this.lastManualRefreshAt = now;
