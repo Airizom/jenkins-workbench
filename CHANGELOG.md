@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-01-23
+
+### Added
+
+- feat: polish tree placeholders, tooltips, and artifact icons
+
 ## [1.19.0] - 2026-01-21
 
 ### Added
