@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-01-23
+
+### Added
+
+- feat: refresh build and node details webview layouts
+
 ## [1.20.0] - 2026-01-23
 
 ### Added
