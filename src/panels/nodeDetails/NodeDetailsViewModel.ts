@@ -147,34 +147,44 @@ function buildExecutorViewModel(
   const id = number !== undefined ? `#${number}` : fallbackLabel;
   const workItem = executor.currentExecutable ?? executor.currentWorkUnit;
   const workLabel = formatWorkLabel(workItem);
-  const statusLabel = resolveExecutorStatus(executor, Boolean(workItem));
-  const progressLabel = formatProgress(executor.progress);
+  const isIdle = resolveExecutorIdle(executor, Boolean(workItem));
+  const statusLabel = isIdle ? "Idle" : "Busy";
+  const progressPercent = normalizeProgressPercent(executor.progress);
+  const progressLabel = formatProgress(progressPercent);
 
   return {
     id,
     statusLabel,
+    isIdle,
+    progressPercent,
     progressLabel,
     workLabel,
     workUrl: workItem?.url
   };
 }
 
-function resolveExecutorStatus(executor: JenkinsNodeExecutor, hasWork: boolean): string {
+function resolveExecutorIdle(executor: JenkinsNodeExecutor, hasWork: boolean): boolean {
   if (executor.idle === true) {
-    return "Idle";
+    return true;
   }
   if (executor.idle === false) {
-    return "Busy";
+    return false;
   }
-  return hasWork ? "Busy" : "Idle";
+  return !hasWork;
 }
 
-function formatProgress(progress?: number): string | undefined {
+function normalizeProgressPercent(progress?: number): number | undefined {
   if (typeof progress !== "number" || !Number.isFinite(progress)) {
     return undefined;
   }
-  const clamped = Math.max(0, Math.min(100, Math.floor(progress)));
-  return `${clamped}%`;
+  return Math.max(0, Math.min(100, Math.floor(progress)));
+}
+
+function formatProgress(progressPercent?: number): string | undefined {
+  if (typeof progressPercent !== "number" || !Number.isFinite(progressPercent)) {
+    return undefined;
+  }
+  return `${progressPercent}%`;
 }
 
 function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {

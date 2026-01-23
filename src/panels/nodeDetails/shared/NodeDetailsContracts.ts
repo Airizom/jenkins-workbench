@@ -3,6 +3,8 @@ export type NodeStatusClass = "online" | "offline" | "idle" | "temporary" | "unk
 export interface NodeExecutorViewModel {
   id: string;
   statusLabel: string;
+  isIdle: boolean;
+  progressPercent?: number;
   progressLabel?: string;
   workLabel?: string;
   workUrl?: string;

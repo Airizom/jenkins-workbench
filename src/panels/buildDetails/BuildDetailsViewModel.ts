@@ -51,6 +51,7 @@ export type {
 
 export interface BuildDetailsViewModelInput {
   details?: JenkinsBuildDetails;
+  buildUrl?: string;
   pipelineRun?: PipelineRun;
   pipelineLoading?: boolean;
   testReport?: JenkinsTestReport;
@@ -74,6 +75,7 @@ export function buildBuildDetailsViewModel(
   input: BuildDetailsViewModelInput
 ): BuildDetailsViewModel {
   const details = input.details;
+  const buildUrl = details?.url ?? input.buildUrl;
   const truncated = truncateConsoleText(input.consoleTextResult?.text ?? "", input.maxConsoleChars);
   const consoleTruncated =
     Boolean(input.consoleHtmlResult?.truncated) ||
@@ -86,6 +88,7 @@ export function buildBuildDetailsViewModel(
 
   return {
     displayName: details?.fullDisplayName ?? details?.displayName ?? "Build Details",
+    buildUrl,
     resultLabel: details ? formatResult(details) : "Unknown",
     resultClass: details ? formatResultClass(details) : "neutral",
     durationLabel: details ? formatDuration(details.duration) : "Unknown",

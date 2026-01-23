@@ -254,6 +254,7 @@ export class BuildDetailsPanel {
 
     const viewModel = buildBuildDetailsViewModel({
       details,
+      buildUrl: this.state.currentBuildUrl,
       pipelineRun: this.state.currentPipelineRun,
       pipelineLoading: this.state.pipelineLoading,
       consoleTextResult,

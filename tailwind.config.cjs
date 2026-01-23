@@ -80,16 +80,33 @@ module.exports = {
         description: "var(--vscode-descriptionForeground)",
         focus: "var(--vscode-focusBorder)",
         editorWidget: "var(--vscode-editorWidget-background, var(--vscode-editor-background))",
-        success: "var(--vscode-testing-iconPassed, var(--vscode-editor-foreground))",
-        failure: "var(--vscode-testing-iconFailed, var(--vscode-editor-foreground))",
-        warning: "var(--vscode-testing-iconQueued, var(--vscode-editor-foreground))",
-        aborted: "var(--vscode-testing-iconSkipped, var(--vscode-editor-foreground))",
-        inputWarningBorder: "var(--vscode-inputValidation-warningBorder)",
-        inputWarningBg: "var(--vscode-inputValidation-warningBackground)",
-        inputWarningFg: "var(--vscode-inputValidation-warningForeground)",
-        inputErrorBorder: "var(--vscode-inputValidation-errorBorder)",
-        inputErrorBg: "var(--vscode-inputValidation-errorBackground)",
-        inputErrorFg: "var(--vscode-inputValidation-errorForeground)"
+        header: "var(--header-bg)",
+        toolbar: "var(--toolbar-bg)",
+        success: {
+          DEFAULT: "var(--success)",
+          foreground: "var(--success-foreground)"
+        },
+        failure: {
+          DEFAULT: "var(--failure)",
+          foreground: "var(--failure-foreground)"
+        },
+        warning: {
+          DEFAULT: "var(--warning)",
+          foreground: "var(--warning-foreground)"
+        },
+        aborted: {
+          DEFAULT: "var(--aborted)",
+          foreground: "var(--aborted-foreground)"
+        },
+        inputWarningBorder: "var(--inputWarningBorder)",
+        inputWarningBg: "var(--inputWarningBg)",
+        inputWarningFg: "var(--inputWarningFg)",
+        inputErrorBorder: "var(--inputErrorBorder)",
+        inputErrorBg: "var(--inputErrorBg)",
+        inputErrorFg: "var(--inputErrorFg)",
+        inputInfoBorder: "var(--inputInfoBorder)",
+        inputInfoBg: "var(--inputInfoBg)",
+        inputInfoFg: "var(--inputInfoFg)"
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -106,7 +123,7 @@ module.exports = {
       },
       boxShadow: {
         widget: "var(--vscode-widget-shadow, 0 2px 8px rgba(0, 0, 0, 0.15))"
-      }
+      },
     }
   }
 };

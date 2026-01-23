@@ -1,5 +1,5 @@
-import { Badge } from "../ui/badge";
-import { cn } from "../../lib/utils";
+import { Badge } from "../../../../shared/webview/components/ui/badge";
+import { cn } from "../../../../shared/webview/lib/utils";
 
 const STATUS_CLASS_MAP: Record<string, string> = {
   success: "border-success/50 text-success bg-success/10",

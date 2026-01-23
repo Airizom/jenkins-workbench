@@ -70,6 +70,7 @@ export interface PendingInputViewModel {
 
 export interface BuildDetailsViewModel {
   displayName: string;
+  buildUrl?: string;
   resultLabel: string;
   resultClass: string;
   durationLabel: string;
