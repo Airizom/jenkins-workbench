@@ -126,12 +126,7 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Unexpected error.";
-}
+export { formatError } from "../../formatters/ErrorFormatters";
 
 export function formatNumber(value: number): string {
   return value.toLocaleString();

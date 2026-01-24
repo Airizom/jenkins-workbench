@@ -13,6 +13,7 @@ type BuildDetailsIncomingMessage =
   | { type: "setConsoleHtml"; html?: string; truncated?: boolean }
   | { type: "setErrors"; errors?: string[] }
   | { type: "setFollowLog"; value?: unknown }
+  | { type: "setLoading"; value?: boolean }
   | BuildDetailsUpdateMessage;
 
 export type { BuildDetailsIncomingMessage };
@@ -28,6 +29,7 @@ export type BuildDetailsAction =
   | { type: "setConsoleHtml"; html: string; truncated: boolean }
   | { type: "setErrors"; errors: string[] }
   | { type: "setFollowLog"; value: boolean }
+  | { type: "setLoading"; value: boolean }
   | { type: "updateDetails"; payload: BuildDetailsUpdateMessage };
 
 export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
@@ -58,14 +60,16 @@ export const FALLBACK_STATE: BuildDetailsState = {
   consoleTruncated: false,
   consoleMaxChars: 0,
   errors: [],
-  followLog: true
+  followLog: true,
+  loading: true
 };
 
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
   const merged: BuildDetailsState = {
     ...FALLBACK_STATE,
     ...initialState,
-    consoleHtmlModel: undefined
+    consoleHtmlModel: undefined,
+    loading: initialState.loading ?? false
   };
   if (merged.consoleHtml) {
     return {
@@ -137,6 +141,9 @@ export function buildDetailsReducer(
     case "setFollowLog": {
       return { ...state, followLog: action.value };
     }
+    case "setLoading": {
+      return { ...state, loading: action.value };
+    }
     case "updateDetails": {
       const payload = action.payload;
       return {
@@ -166,7 +173,8 @@ export function getInitialState(): BuildDetailsViewModel {
     ...FALLBACK_STATE,
     ...candidate,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,
-    pendingInputs: candidate.pendingInputs ?? []
+    pendingInputs: candidate.pendingInputs ?? [],
+    loading: false
   };
 }
 

@@ -19,6 +19,8 @@
     "src/panels/buildDetails/shared/**/*.ts",
     "src/panels/nodeDetails/webview/**/*.ts",
     "src/panels/nodeDetails/webview/**/*.tsx",
-    "src/panels/nodeDetails/shared/**/*.ts"
+    "src/panels/nodeDetails/shared/**/*.ts",
+    "src/panels/shared/webview/**/*.ts",
+    "src/panels/shared/webview/**/*.tsx"
   ]
 }

@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "lib": ["ES2020"],
+    "lib": ["ES2020", "DOM"],
     "rootDir": "src",
     "outDir": "out",
     "sourceMap": true,
@@ -12,13 +12,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "esModuleInterop": true,
-    "types": ["node", "vscode"]
+    "jsx": "react-jsx"
   },
   "exclude": [
     "node_modules",
-    ".vscode-test",
-    "src/panels/buildDetails/webview",
-    "src/panels/nodeDetails/webview",
-    "src/panels/shared/webview"
+    ".vscode-test"
   ]
 }

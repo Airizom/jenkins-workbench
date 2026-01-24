@@ -87,6 +87,7 @@ export interface BuildDetailsViewModel {
   consoleError?: string;
   errors: string[];
   followLog: boolean;
+  loading?: boolean;
 }
 
 export interface BuildDetailsUpdateMessage {

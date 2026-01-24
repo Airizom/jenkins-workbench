@@ -76,41 +76,26 @@ export function formatBuildStatus(build: JenkinsBuild): string {
 export function formatBuildDescription(build: JenkinsBuild, awaitingInput = false): string {
   if (build.building) {
     const elapsedMs = resolveBuildElapsedMs(build);
-    const elapsedLabel = formatDurationLabel(elapsedMs);
     const estimatedMs = Number.isFinite(build.estimatedDuration)
       ? (build.estimatedDuration as number)
       : undefined;
-    const estimatedLabel =
-      estimatedMs && estimatedMs > 0 ? formatDurationLabel(estimatedMs) : undefined;
 
-    if (
-      elapsedLabel &&
-      estimatedLabel &&
-      Number.isFinite(elapsedMs) &&
-      typeof estimatedMs === "number"
-    ) {
+    if (Number.isFinite(elapsedMs) && typeof estimatedMs === "number" && estimatedMs > 0) {
       const progressPercentRaw = Math.floor(((elapsedMs as number) / estimatedMs) * 100);
       const progressPercent = Math.max(0, Math.min(100, progressPercentRaw));
-      const base = `${elapsedLabel} / ~${estimatedLabel} • Running (${progressPercent}%)`;
+      const progressBar = formatProgressBar(progressPercent, 10);
+      const base = `Running ${progressPercent}% ${progressBar}`;
       return awaitingInput ? `${base} • Awaiting input` : base;
     }
 
-    if (elapsedLabel) {
-      const base = `${elapsedLabel} • Running`;
-      return awaitingInput ? `${base} • Awaiting input` : base;
-    }
-
-    const runningLabel = "Running";
-    return awaitingInput ? `${runningLabel} • Awaiting input` : runningLabel;
+    const elapsedLabel = formatDurationLabel(elapsedMs);
+    const base = elapsedLabel ? `Running ${elapsedLabel}` : "Running";
+    return awaitingInput ? `${base} • Awaiting input` : base;
   }
 
   const status = formatBuildStatus(build);
   const durationLabel = formatDurationLabel(build.duration);
-  const completionTimestamp = resolveBuildCompletionTimestamp(build);
-  const relativeLabel = completionTimestamp ? formatRelativeTime(completionTimestamp) : undefined;
-
-  const base = durationLabel ? `${status} (${durationLabel})` : status;
-  return relativeLabel ? `${base} • ${relativeLabel}` : base;
+  return durationLabel ? `${status} • ${durationLabel}` : status;
 }
 
 export function formatRelativeTime(timestampMs: number): string | undefined {
@@ -176,27 +161,33 @@ export function buildIcon(build: JenkinsBuild, awaitingInput = false): vscode.Th
 }
 
 export function jobIcon(kind: "job" | "pipeline", color?: string): vscode.ThemeIcon {
-  const iconId = kind === "pipeline" ? "symbol-structure" : "tools";
+  const iconId = kind === "pipeline" ? "symbol-structure" : "gear";
   const status = resolveJobStatus(color);
   return new vscode.ThemeIcon(iconId, status ? STATUS_THEME_COLORS[status] : undefined);
 }
 
-export function formatWatchedDescription(status?: string, isWatched = false): string | undefined {
-  if (!isWatched) {
-    return status;
+export function formatJobDescription(options: {
+  status?: string;
+  isWatched?: boolean;
+  isPinned?: boolean;
+  isDisabled?: boolean;
+}): string | undefined {
+  const parts: string[] = [];
+  if (options.status) {
+    parts.push(options.isDisabled ? `$(circle-slash) ${options.status}` : options.status);
   }
-
-  if (!status) {
-    return "$(eye)";
+  if (options.isPinned) {
+    parts.push("$(pin)");
   }
-
-  return `${status} • $(eye)`;
+  if (options.isWatched) {
+    parts.push("$(eye)");
+  }
+  return parts.length > 0 ? parts.join(" • ") : undefined;
 }
 
 export function formatQueueItemDescription(
   position: number,
-  inQueueSince?: number,
-  reason?: string
+  inQueueSince?: number
 ): string | undefined {
   const parts: string[] = [];
 
@@ -207,11 +198,6 @@ export function formatQueueItemDescription(
   const duration = formatQueueDuration(inQueueSince);
   if (duration) {
     parts.push(`waiting ${duration}`);
-  }
-
-  const normalizedReason = normalizeQueueReason(reason);
-  if (normalizedReason) {
-    parts.push(`"${normalizedReason}"`);
   }
 
   return parts.length > 0 ? parts.join(" • ") : undefined;
@@ -319,19 +305,6 @@ export function resolveJobStatus(color?: string): NormalizedStatus | undefined {
   return isRunning ? "running" : status;
 }
 
-function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefined {
-  if (!Number.isFinite(build.timestamp)) {
-    return undefined;
-  }
-
-  const timestamp = build.timestamp as number;
-  if (Number.isFinite(build.duration)) {
-    return timestamp + (build.duration as number);
-  }
-
-  return timestamp;
-}
-
 function resolveBuildElapsedMs(build: JenkinsBuild): number | undefined {
   if (Number.isFinite(build.timestamp)) {
     return Math.max(0, Date.now() - (build.timestamp as number));
@@ -350,6 +323,16 @@ function formatDurationLabel(durationMs?: number): string | undefined {
   }
   return formatDurationMs(Math.max(0, durationMs as number));
 }
+
+function formatProgressBar(percent: number, width: number): string {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const filled = Math.round((clamped / 100) * width);
+  const empty = Math.max(0, width - filled);
+  const filledBar = "#".repeat(filled);
+  const emptyBar = "-".repeat(empty);
+  return `[${filledBar}${emptyBar}]`;
+}
+
 
 export function formatDurationMs(duration: number): string {
   if (!Number.isFinite(duration)) {

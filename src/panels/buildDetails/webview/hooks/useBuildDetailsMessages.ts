@@ -49,6 +49,9 @@ export function useBuildDetailsMessages(dispatch: Dispatch<BuildDetailsAction>):
         case "setFollowLog":
           dispatch({ type: "setFollowLog", value: Boolean(message.value) });
           break;
+        case "setLoading":
+          dispatch({ type: "setLoading", value: Boolean(message.value) });
+          break;
         default:
           break;
       }

@@ -5,7 +5,7 @@ import type {
   JenkinsBuildParameter,
   JenkinsChangeSetItem
 } from "../jenkins/JenkinsClient";
-import { formatDurationMs } from "./formatters";
+import { formatDurationMs, formatRelativeTime } from "./formatters";
 
 const DEFAULT_MAX_COMMIT_MESSAGE_LENGTH = 120;
 const DEFAULT_MAX_PARAMETER_COUNT = 5;
@@ -80,6 +80,12 @@ export function buildBuildTooltip(
       appendHeader("Parameters");
       tooltip.appendText(parameters);
     }
+  }
+
+  const timing = resolveTimingSummary(build);
+  if (timing) {
+    appendHeader(timing.label);
+    tooltip.appendText(timing.value);
   }
 
   const estimatedDuration = resolveEstimatedDurationLabel(build);
@@ -173,11 +179,14 @@ function resolveParameterSummary(
 }
 
 function resolveEstimatedDurationLabel(build: JenkinsBuild): string | undefined {
-  if (!build.building || !Number.isFinite(build.estimatedDuration)) {
+  if (!Number.isFinite(build.estimatedDuration)) {
     return undefined;
   }
 
   const estimatedLabel = formatDurationMs(build.estimatedDuration as number);
+  if (!build.building) {
+    return estimatedLabel;
+  }
   const elapsed = resolveBuildElapsedMs(build);
   if (!Number.isFinite(elapsed)) {
     return estimatedLabel;
@@ -185,6 +194,44 @@ function resolveEstimatedDurationLabel(build: JenkinsBuild): string | undefined 
 
   const elapsedLabel = formatDurationMs(Math.max(0, elapsed as number));
   return `Elapsed ${elapsedLabel} | Estimated ${estimatedLabel}`;
+}
+
+function resolveTimingSummary(
+  build: JenkinsBuild
+): { label: string; value: string } | undefined {
+  if (!Number.isFinite(build.timestamp)) {
+    return undefined;
+  }
+
+  if (build.building) {
+    const startLabel = formatTimestamp(build.timestamp as number, true);
+    return { label: "Started", value: startLabel };
+  }
+
+  const completionTimestamp = resolveBuildCompletionTimestamp(build);
+  const completedAt = completionTimestamp ?? (build.timestamp as number);
+  const completedLabel = formatTimestamp(completedAt, true);
+  return { label: "Completed", value: completedLabel };
+}
+
+function formatTimestamp(timestampMs: number, includeRelative: boolean): string {
+  const absolute = new Date(timestampMs).toLocaleString();
+  if (!includeRelative) {
+    return absolute;
+  }
+  const relative = formatRelativeTime(timestampMs);
+  return relative ? `${absolute} (${relative})` : absolute;
+}
+
+function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefined {
+  if (!Number.isFinite(build.timestamp)) {
+    return undefined;
+  }
+  const timestamp = build.timestamp as number;
+  if (Number.isFinite(build.duration)) {
+    return timestamp + (build.duration as number);
+  }
+  return timestamp;
 }
 
 function collectChangeItems(build: JenkinsBuild): JenkinsChangeSetItem[] {

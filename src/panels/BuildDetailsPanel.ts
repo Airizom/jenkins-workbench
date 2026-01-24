@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
-import { BuildActionError } from "../jenkins/errors";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import { handlePendingInputAction } from "../ui/PendingInputActions";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
@@ -625,11 +625,4 @@ export class BuildDetailsPanel {
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
   }
-}
-
-function formatActionError(error: unknown): string {
-  if (error instanceof BuildActionError) {
-    return error.message;
-  }
-  return error instanceof Error ? error.message : "Unexpected error.";
 }

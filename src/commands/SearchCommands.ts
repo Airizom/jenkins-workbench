@@ -11,6 +11,7 @@ import type {
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsViewStateStore, JobFilterMode } from "../storage/JenkinsViewStateStore";
+import { formatError } from "../formatters/ErrorFormatters";
 import { formatJobColor } from "../tree/formatters";
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import type { JenkinsTreeNavigator } from "../tree/TreeNavigator";
@@ -290,10 +291,6 @@ function toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironment
     url: environment.url,
     username: environment.username
   };
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : "Unexpected error.";
 }
 
 function getItemLabel(item: vscode.TreeItem): string {

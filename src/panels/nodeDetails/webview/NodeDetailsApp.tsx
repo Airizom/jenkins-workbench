@@ -10,6 +10,7 @@ import {
   CardTitle
 } from "../../shared/webview/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/webview/components/ui/collapsible";
+import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
 import {
@@ -87,6 +88,10 @@ export function NodeDetailsApp(): JSX.Element {
     }, 30_000);
     return () => clearInterval(intervalId);
   }, []);
+
+  if (state.loading && state.displayName === "Node Details") {
+    return <LoadingSkeleton variant="node" />;
+  }
 
   const handleRefresh = () => {
     postVsCodeMessage({ type: "refreshNodeDetails" });

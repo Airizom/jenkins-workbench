@@ -59,13 +59,8 @@ export class JenkinsWorkbenchTreeDataProvider
   ) {
     this.pendingInputCoordinator = pendingInputCoordinator;
     this.pendingInputUnsubscribe = this.pendingInputCoordinator.onSummaryChange((change) => {
-      const key = this.buildEnvironmentKey(change.environment);
-      const instance = this.instanceItems.get(key);
-      if (instance) {
-        this.refreshElement(instance);
-        return;
-      }
-      this.refreshView();
+      this.childrenLoader.clearBuildsCache(change.environment);
+      this.notifyElement(undefined);
     });
     this.childrenLoader = new JenkinsTreeChildrenLoader(
       store,
@@ -76,7 +71,9 @@ export class JenkinsWorkbenchTreeDataProvider
       BUILD_LIMIT,
       buildTooltipOptions,
       buildListFetchOptions,
-      pendingInputCoordinator
+      pendingInputCoordinator,
+      this.notifyElement.bind(this),
+      this.notifyEnvironment.bind(this)
     );
     this.revealResolver = new JenkinsTreeRevealResolver(this.getChildrenInternal.bind(this));
   }
@@ -105,28 +102,38 @@ export class JenkinsWorkbenchTreeDataProvider
     this.dataService.clearCache();
     this.childrenLoader.clearWatchCacheForEnvironment();
     this.childrenLoader.clearPinCacheForEnvironment();
+    this.childrenLoader.clearChildrenCacheForEnvironment();
     this._onDidChangeTreeData.fire(undefined);
   }
 
   refreshView(): void {
+    this.childrenLoader.clearChildrenCacheForEnvironment();
     this.scheduleRefresh(undefined);
   }
 
-  refreshElement(element: WorkbenchTreeElement): void {
+  refreshElement(element?: WorkbenchTreeElement): void {
+    this.childrenLoader.invalidateForElement(element);
+    this._onDidChangeTreeData.fire(element);
+  }
+
+  private notifyElement(element?: WorkbenchTreeElement): void {
     this._onDidChangeTreeData.fire(element);
   }
 
   refreshQueueFolder(environment: JenkinsEnvironmentRef): void {
+    this.childrenLoader.clearQueueCache(environment);
     const item = new BuildQueueFolderTreeItem(environment);
     this._onDidChangeTreeData.fire(item);
   }
 
   updateBuildTooltipOptions(options: BuildTooltipOptions): void {
     this.childrenLoader.updateBuildTooltipOptions(options);
+    this.childrenLoader.clearChildrenCacheForEnvironment();
   }
 
   updateBuildListFetchOptions(options: BuildListFetchOptions): void {
     this.childrenLoader.updateBuildListFetchOptions(options);
+    this.childrenLoader.clearChildrenCacheForEnvironment();
   }
 
   onEnvironmentChanged(environmentId?: string): void {
@@ -134,6 +141,7 @@ export class JenkinsWorkbenchTreeDataProvider
       this.dataService.clearCacheForEnvironment(environmentId);
       this.childrenLoader.clearWatchCacheForEnvironment(environmentId);
       this.childrenLoader.clearPinCacheForEnvironment(environmentId);
+      this.childrenLoader.clearChildrenCacheForEnvironment(environmentId);
       for (const key of this.instanceItems.keys()) {
         if (key.endsWith(`:${environmentId}`)) {
           this.instanceItems.delete(key);
@@ -143,12 +151,16 @@ export class JenkinsWorkbenchTreeDataProvider
       this.dataService.clearCache();
       this.childrenLoader.clearWatchCacheForEnvironment();
       this.childrenLoader.clearPinCacheForEnvironment();
+      this.childrenLoader.clearChildrenCacheForEnvironment();
       this.instanceItems.clear();
     }
     this.scheduleRefresh(undefined);
   }
 
   private scheduleRefresh(element: WorkbenchTreeElement | undefined): void {
+    if (element !== undefined) {
+      this.childrenLoader.invalidateForElement(element);
+    }
     if (this.pendingRefreshElement === undefined && element !== undefined) {
       this.pendingRefreshElement = element;
     } else {
@@ -212,5 +224,15 @@ export class JenkinsWorkbenchTreeDataProvider
 
   private buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
     return `${environment.scope}:${environment.environmentId}`;
+  }
+
+  private notifyEnvironment(environment: JenkinsEnvironmentRef): void {
+    const key = this.buildEnvironmentKey(environment);
+    const instance = this.instanceItems.get(key);
+    if (instance) {
+      this.notifyElement(instance);
+      return;
+    }
+    this.notifyElement(undefined);
   }
 }

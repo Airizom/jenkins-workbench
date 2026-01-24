@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { PendingInputAction } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { BuildActionError } from "../jenkins/errors";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import { promptForParameters } from "./ParameterPrompts";
 
 export interface PendingInputActionService {
@@ -131,11 +131,4 @@ async function resolvePendingInputAction(
   });
 
   return pick?.action;
-}
-
-function formatActionError(error: unknown): string {
-  if (error instanceof BuildActionError) {
-    return error.message;
-  }
-  return error instanceof Error ? error.message : "Unexpected error.";
 }

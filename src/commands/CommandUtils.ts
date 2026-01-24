@@ -1,11 +1,11 @@
 import type * as vscode from "vscode";
-import { BuildActionError } from "../jenkins/JenkinsDataService";
 import {
   BuildTreeItem,
   type JobTreeItem,
   NodeTreeItem,
   type PipelineTreeItem
 } from "../tree/TreeItems";
+export { formatActionError } from "../formatters/ErrorFormatters";
 
 export function getOpenUrl(
   item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem
@@ -31,12 +31,4 @@ export function getTreeItemLabel(item: vscode.TreeItem): string {
   }
 
   return item.label?.label ?? "item";
-}
-
-export function formatActionError(error: unknown): string {
-  if (error instanceof BuildActionError) {
-    return error.message;
-  }
-
-  return error instanceof Error ? error.message : "Unexpected error.";
 }

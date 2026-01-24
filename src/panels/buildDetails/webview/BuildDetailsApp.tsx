@@ -8,6 +8,7 @@ import { PipelineStagesSection } from "./components/buildDetails/PipelineStagesS
 import { StatusPill } from "./components/buildDetails/StatusPill";
 import { Alert, AlertDescription } from "../../shared/webview/components/ui/alert";
 import { Button } from "../../shared/webview/components/ui/button";
+import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
 import {
@@ -64,6 +65,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
       setSelectedTab(defaultTab);
     }
   }, [availableTabs, defaultTab, selectedTab]);
+
+  if (state.loading) {
+    return <LoadingSkeleton variant="build" />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import { JenkinsActionError } from "../jenkins/errors";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
   isCopyNodeJsonMessage,
@@ -52,6 +52,19 @@ export class NodeDetailsPanel {
           localResourceRoots: [vscode.Uri.joinPath(extensionUri, ...bundleRootSegments)]
         }
       );
+      const lightIconPath = vscode.Uri.joinPath(
+        extensionUri,
+        "resources",
+        "codicons",
+        "server-light.svg"
+      );
+      const darkIconPath = vscode.Uri.joinPath(
+        extensionUri,
+        "resources",
+        "codicons",
+        "server-dark.svg"
+      );
+      panel.iconPath = { light: lightIconPath, dark: darkIconPath };
       NodeDetailsPanel.currentPanel = new NodeDetailsPanel(panel, extensionUri);
     }
 
@@ -238,11 +251,4 @@ export class NodeDetailsPanel {
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
   }
-}
-
-function formatActionError(error: unknown): string {
-  if (error instanceof JenkinsActionError) {
-    return error.message;
-  }
-  return error instanceof Error ? error.message : "Unexpected error.";
 }

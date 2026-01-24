@@ -9,8 +9,8 @@ import {
   buildIcon,
   formatBuildDescription,
   formatJobColor,
+  formatJobDescription,
   formatNodeDescription,
-  formatWatchedDescription,
   formatQueueItemDescription,
   isJobColorDisabled,
   jobIcon,
@@ -23,6 +23,7 @@ export type WorkbenchTreeElement =
   | JobsFolderTreeItem
   | BuildQueueFolderTreeItem
   | NodesFolderTreeItem
+  | PinnedSectionTreeItem
   | JenkinsFolderTreeItem
   | JobTreeItem
   | PipelineTreeItem
@@ -32,6 +33,24 @@ export type WorkbenchTreeElement =
   | NodeTreeItem
   | QueueItemTreeItem
   | PlaceholderTreeItem;
+
+export interface JobsFolderSummary {
+  total: number;
+  jobs: number;
+  pipelines: number;
+  folders: number;
+  disabled: number;
+}
+
+export interface NodesFolderSummary {
+  total: number;
+  online: number;
+  offline: number;
+}
+
+export interface QueueFolderSummary {
+  total: number;
+}
 
 export class RootSectionTreeItem extends vscode.TreeItem {
   constructor(
@@ -44,38 +63,75 @@ export class RootSectionTreeItem extends vscode.TreeItem {
 }
 
 export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironmentRef {
+  static buildId(environment: JenkinsEnvironmentRef): string {
+    return `environment:${environment.scope}:${environment.environmentId}`;
+  }
+
   public readonly environmentId: string;
   public readonly scope: EnvironmentScope;
   public readonly url: string;
   public readonly username?: string;
 
   constructor(environment: JenkinsEnvironment & { scope: EnvironmentScope }) {
-    super(environment.url, vscode.TreeItemCollapsibleState.Collapsed);
+    const label = formatEnvironmentLabel(environment.url);
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.environmentId = environment.id;
     this.scope = environment.scope;
     this.url = environment.url;
     this.username = environment.username;
+    this.id = InstanceTreeItem.buildId({
+      environmentId: environment.id,
+      scope: environment.scope,
+      url: environment.url,
+      username: environment.username
+    });
     this.contextValue = "environment";
     this.description = formatScopeLabel(environment.scope);
     this.iconPath = new vscode.ThemeIcon("server-environment");
+    this.tooltip = buildEnvironmentTooltip(environment);
   }
 }
 
 export class JobsFolderTreeItem extends vscode.TreeItem {
-  constructor(public readonly environment: JenkinsEnvironmentRef) {
-    super("Jobs", vscode.TreeItemCollapsibleState.Collapsed);
+  static buildId(environment: JenkinsEnvironmentRef): string {
+    return `jobs:${environment.scope}:${environment.environmentId}`;
+  }
+
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    summary?: JobsFolderSummary
+  ) {
+    const label = summary ? `Jobs (${summary.total})` : "Jobs";
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.id = JobsFolderTreeItem.buildId(environment);
     this.contextValue = "jobs";
     this.iconPath = new vscode.ThemeIcon("folder");
-    this.tooltip = "Browse jobs, pipelines, and folders";
+    this.description = summary ? formatJobsSummaryDescription(summary) : undefined;
+    this.tooltip = summary
+      ? formatJobsSummaryTooltip(summary)
+      : "Browse jobs, pipelines, and folders";
   }
 }
 
 export class NodesFolderTreeItem extends vscode.TreeItem {
-  constructor(public readonly environment: JenkinsEnvironmentRef) {
-    super("Nodes", vscode.TreeItemCollapsibleState.Collapsed);
+  static buildId(environment: JenkinsEnvironmentRef): string {
+    return `nodes:${environment.scope}:${environment.environmentId}`;
+  }
+
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    summary?: NodesFolderSummary
+  ) {
+    const label = summary
+      ? `Nodes (${summary.online} online, ${summary.offline} offline)`
+      : "Nodes";
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.id = NodesFolderTreeItem.buildId(environment);
     this.contextValue = "nodes";
     this.iconPath = new vscode.ThemeIcon("server");
-    this.tooltip = "View build agents and their status";
+    this.tooltip = summary
+      ? `Online: ${summary.online}\nOffline: ${summary.offline}`
+      : "View build agents and their status";
   }
 }
 
@@ -84,16 +140,32 @@ export class BuildQueueFolderTreeItem extends vscode.TreeItem {
     return `queue:${environment.scope}:${environment.environmentId}`;
   }
 
-  constructor(public readonly environment: JenkinsEnvironmentRef) {
-    super("Build Queue", vscode.TreeItemCollapsibleState.Collapsed);
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    summary?: QueueFolderSummary
+  ) {
+    const label = summary ? `Build Queue (${summary.total})` : "Build Queue";
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = "queueFolder";
     this.iconPath = new vscode.ThemeIcon("list-unordered");
     this.id = BuildQueueFolderTreeItem.buildId(environment);
-    this.tooltip = "Items waiting to be built";
+    this.tooltip = summary ? `${summary.total} item(s) waiting` : "Items waiting to be built";
+  }
+}
+
+export class PinnedSectionTreeItem extends vscode.TreeItem {
+  constructor() {
+    super("Pinned", vscode.TreeItemCollapsibleState.None);
+    this.contextValue = "pinnedSection";
+    this.iconPath = new vscode.ThemeIcon("pinned");
   }
 }
 
 export class JenkinsFolderTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, folderUrl: string): string {
+    return `folder:${environment.scope}:${environment.environmentId}:${folderUrl}`;
+  }
+
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
@@ -101,13 +173,19 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
     public readonly folderKind: JenkinsJobKind
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.id = JenkinsFolderTreeItem.buildId(environment, folderUrl);
     this.contextValue = folderKind === "multibranch" ? "multibranchFolder" : "folder";
     this.description = folderKind === "multibranch" ? "Multibranch" : undefined;
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.iconPath =
+      folderKind === "multibranch" ? new vscode.ThemeIcon("git-branch") : new vscode.ThemeIcon("folder");
   }
 }
 
 export class JobTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, jobUrl: string): string {
+    return `job:${environment.scope}:${environment.environmentId}:${jobUrl}`;
+  }
+
   public readonly isWatched: boolean;
   public readonly isPinned: boolean;
   public readonly isDisabled: boolean;
@@ -124,13 +202,23 @@ export class JobTreeItem extends vscode.TreeItem {
     this.isWatched = isWatched;
     this.isPinned = isPinned;
     this.isDisabled = isJobColorDisabled(color);
+    this.id = JobTreeItem.buildId(environment, jobUrl);
     this.contextValue = buildJobContextValue("jobItem", isWatched, isPinned, this.isDisabled);
-    this.description = formatWatchedDescription(formatJobColor(color), isWatched);
+    this.description = formatJobDescription({
+      status: formatJobColor(color),
+      isWatched,
+      isPinned,
+      isDisabled: this.isDisabled
+    });
     this.iconPath = jobIcon("job", color);
   }
 }
 
 export class PipelineTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, jobUrl: string): string {
+    return `pipeline:${environment.scope}:${environment.environmentId}:${jobUrl}`;
+  }
+
   public readonly isWatched: boolean;
   public readonly isPinned: boolean;
   public readonly isDisabled: boolean;
@@ -147,8 +235,14 @@ export class PipelineTreeItem extends vscode.TreeItem {
     this.isWatched = isWatched;
     this.isPinned = isPinned;
     this.isDisabled = isJobColorDisabled(color);
+    this.id = PipelineTreeItem.buildId(environment, jobUrl);
     this.contextValue = buildJobContextValue("pipelineItem", isWatched, isPinned, this.isDisabled);
-    this.description = formatWatchedDescription(formatJobColor(color), isWatched);
+    this.description = formatJobDescription({
+      status: formatJobColor(color),
+      isWatched,
+      isPinned,
+      isDisabled: this.isDisabled
+    });
     this.iconPath = jobIcon("pipeline", color);
   }
 }
@@ -175,6 +269,10 @@ function buildJobContextValue(
 }
 
 export class BuildTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, buildUrl: string): string {
+    return `build:${environment.scope}:${environment.environmentId}:${buildUrl}`;
+  }
+
   public readonly buildUrl: string;
   public readonly buildNumber: number;
   public readonly isBuilding: boolean;
@@ -195,6 +293,7 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.isBuilding = Boolean(build.building);
     this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
+    this.id = BuildTreeItem.buildId(environment, build.url);
     const contextParts = [this.isBuilding ? "buildRunning" : "build"];
     if (this.awaitingInput) {
       contextParts.push("awaitingInput");
@@ -212,15 +311,29 @@ export class BuildTreeItem extends vscode.TreeItem {
 }
 
 export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, buildUrl: string): string {
+    return `buildArtifacts:${environment.scope}:${environment.environmentId}:${buildUrl}`;
+  }
+
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     public readonly buildUrl: string,
     public readonly buildNumber: number,
-    public readonly jobNameHint?: string
+    public readonly jobNameHint?: string,
+    artifactCount?: number
   ) {
-    super("Artifacts", vscode.TreeItemCollapsibleState.Collapsed);
+    const hasArtifacts = typeof artifactCount === "number" ? artifactCount > 0 : true;
+    super(
+      "Artifacts",
+      hasArtifacts ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+    );
+    this.id = BuildArtifactsFolderTreeItem.buildId(environment, buildUrl);
     this.contextValue = "artifactFolder";
     this.iconPath = new vscode.ThemeIcon("folder");
+    if (typeof artifactCount === "number") {
+      this.description =
+        artifactCount > 0 ? `${artifactCount} item${artifactCount === 1 ? "" : "s"}` : "No artifacts";
+    }
   }
 }
 
@@ -295,7 +408,7 @@ export class NodeTreeItem extends vscode.TreeItem {
     this.contextValue = node.nodeUrl ? "node nodeOpenable" : "node";
     this.description = formatNodeDescription(node);
     this.iconPath = node.offline
-      ? new vscode.ThemeIcon("debug-disconnect")
+      ? new vscode.ThemeIcon("plug", new vscode.ThemeColor("charts.gray"))
       : new vscode.ThemeIcon("server");
     this.command = {
       command: "jenkinsWorkbench.showNodeDetails",
@@ -322,7 +435,7 @@ export class QueueItemTreeItem extends vscode.TreeItem {
     super(item.name, vscode.TreeItemCollapsibleState.None);
     this.queueId = item.id;
     this.contextValue = "queueItem";
-    this.description = formatQueueItemDescription(item.position, item.inQueueSince, item.reason);
+    this.description = formatQueueItemDescription(item.position, item.inQueueSince);
     this.tooltip = this.buildTooltip(item);
     this.iconPath = new vscode.ThemeIcon("clock");
   }
@@ -355,13 +468,74 @@ export class PlaceholderTreeItem extends vscode.TreeItem {
   constructor(
     label: string,
     description?: string,
-    public readonly kind: "empty" | "error" = "empty"
+    public readonly kind: "empty" | "error" | "loading" = "empty"
   ) {
     super(label, vscode.TreeItemCollapsibleState.None);
     this.contextValue = "placeholder";
     this.description = description;
     this.tooltip = description ? `${label}\n${description}` : label;
     this.iconPath =
-      kind === "error" ? new vscode.ThemeIcon("warning") : new vscode.ThemeIcon("info");
+      kind === "error"
+        ? new vscode.ThemeIcon("warning")
+        : kind === "loading"
+          ? new vscode.ThemeIcon("sync~spin")
+          : new vscode.ThemeIcon("info");
   }
+}
+
+function formatEnvironmentLabel(rawUrl: string): string {
+  const parsed = tryParseUrl(rawUrl) ?? tryParseUrl(`https://${rawUrl}`);
+  if (!parsed) {
+    return rawUrl;
+  }
+  const host = parsed.host || parsed.hostname;
+  const path = parsed.pathname.replace(/\/+$/, "");
+  return path && path !== "/" ? `${host}${path}` : host || rawUrl;
+}
+
+function tryParseUrl(rawUrl: string): URL | undefined {
+  try {
+    return new URL(rawUrl);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildEnvironmentTooltip(environment: JenkinsEnvironment & { scope: EnvironmentScope }): string {
+  const scopeLabel = formatScopeLabel(environment.scope);
+  const parts = [`${environment.url}`, `Scope: ${scopeLabel}`];
+  if (environment.username) {
+    parts.push(`User: ${environment.username}`);
+  }
+  return parts.join("\n");
+}
+
+function formatJobsSummaryDescription(summary: JobsFolderSummary): string | undefined {
+  const parts: string[] = [];
+  if (summary.folders > 0) {
+    parts.push(`${summary.folders} folders`);
+  }
+  if (summary.pipelines > 0) {
+    parts.push(`${summary.pipelines} pipelines`);
+  }
+  if (summary.jobs > 0) {
+    parts.push(`${summary.jobs} jobs`);
+  }
+  if (summary.disabled > 0) {
+    parts.push(`${summary.disabled} disabled`);
+  }
+  return parts.length > 0 ? parts.join(" • ") : undefined;
+}
+
+function formatJobsSummaryTooltip(summary: JobsFolderSummary): string {
+  const parts = [
+    `Total: ${summary.total}`,
+    `Jobs: ${summary.jobs}`,
+    `Pipelines: ${summary.pipelines}`,
+    `Folders: ${summary.folders}`
+  ];
+  if (summary.disabled > 0) {
+    parts.push(`Disabled: ${summary.disabled}`);
+  }
+  return parts.join("\n");
 }
