@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import { registerExtensionCommands } from "./ExtensionCommands";
-import { syncNoEnvironmentsContext } from "./contextKeys";
+import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 import {
   getBuildListFetchOptions,
   getBuildTooltipOptions,
@@ -13,6 +13,7 @@ import {
   getArtifactPreviewCacheTtlMs,
   getArtifactMaxDownloadBytes,
   getExtensionConfiguration,
+  getJenkinsfileValidationConfig,
   getMaxCacheEntries,
   getPollIntervalSeconds,
   getQueuePollIntervalSeconds,
@@ -23,6 +24,9 @@ import { createExtensionServices } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
 import { VscodeStatusNotifier } from "./VscodeStatusNotifier";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
+import { JenkinsfileHoverProvider } from "../validation/editor/JenkinsfileHoverProvider";
+import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
+import { JenkinsfileValidationCodeLensProvider } from "../validation/editor/JenkinsfileValidationCodeLensProvider";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
@@ -37,6 +41,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const artifactPreviewCacheMaxEntries = getArtifactPreviewCacheMaxEntries(config);
   const artifactPreviewCacheMaxBytes = getArtifactPreviewCacheMaxBytes(config);
   const artifactPreviewCacheTtlMs = getArtifactPreviewCacheTtlMs(config);
+  const jenkinsfileValidationConfig = getJenkinsfileValidationConfig(config);
   const artifactActionOptionsProvider = (
     workspaceFolder: vscode.WorkspaceFolder
   ): { downloadRoot: string; maxBytes?: number } => {
@@ -60,7 +65,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       maxEntries: artifactPreviewCacheMaxEntries,
       maxTotalBytes: artifactPreviewCacheMaxBytes,
       ttlMs: artifactPreviewCacheTtlMs
-    }
+    },
+    jenkinsfileValidationConfig
   });
   try {
     await services.environmentStore.migrateLegacyAuthConfigs();
@@ -68,6 +74,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     console.warn("Failed to migrate legacy Jenkins auth config.", error);
   }
   await syncNoEnvironmentsContext(services.environmentStore);
+  void syncJenkinsfileContext(services.jenkinsfileMatcher);
   const notifier = new VscodeStatusNotifier();
   const poller = new JenkinsStatusPoller(
     services.environmentStore,
@@ -92,6 +99,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   poller.start();
   void services.viewStateStore.syncFilterContext();
+  services.jenkinsfileValidationCoordinator.start();
+
+  const jenkinsfileQuickFixProvider = new JenkinsfileQuickFixProvider(
+    services.jenkinsfileMatcher
+  );
+  const jenkinsfileHoverProvider = new JenkinsfileHoverProvider(
+    services.jenkinsfileMatcher,
+    services.jenkinsfileValidationCoordinator
+  );
+  const jenkinsfileCodeLensProvider = new JenkinsfileValidationCodeLensProvider(
+    services.jenkinsfileMatcher
+  );
 
   context.subscriptions.push(
     services.treeView,
@@ -102,6 +121,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       services.artifactPreviewProvider,
       { isReadonly: true }
     ),
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      void syncJenkinsfileContext(services.jenkinsfileMatcher, editor);
+    }),
+    vscode.workspace.onDidSaveTextDocument(() => {
+      void syncJenkinsfileContext(services.jenkinsfileMatcher);
+    }),
+    vscode.workspace.onDidRenameFiles(() => {
+      void syncJenkinsfileContext(services.jenkinsfileMatcher);
+    }),
     vscode.workspace.onDidCloseTextDocument((document) => {
       if (document.uri.scheme !== ARTIFACT_PREVIEW_SCHEME) {
         return;
@@ -109,7 +137,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       services.artifactPreviewProvider.release(document.uri);
     }),
     poller,
-    queuePoller
+    queuePoller,
+    services.jenkinsfileValidationCoordinator,
+    services.jenkinsfileValidationStatusBar,
+    vscode.languages.registerCodeActionsProvider(
+      [{ scheme: "file" }, { scheme: "untitled" }],
+      jenkinsfileQuickFixProvider,
+      { providedCodeActionKinds: JenkinsfileQuickFixProvider.providedCodeActionKinds }
+    ),
+    vscode.languages.registerHoverProvider(
+      [{ scheme: "file" }, { scheme: "untitled" }],
+      jenkinsfileHoverProvider
+    ),
+    vscode.languages.registerCodeLensProvider(
+      [{ scheme: "file" }, { scheme: "untitled" }],
+      jenkinsfileCodeLensProvider
+    )
   );
 
   registerExtensionSubscriptions(context, services, poller, queuePoller);
@@ -130,7 +173,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     viewStateStore: services.viewStateStore,
     treeNavigator: services.treeNavigator,
     treeDataProvider: services.treeDataProvider,
-    queuePoller
+    queuePoller,
+    jenkinsfileEnvironmentResolver: services.jenkinsfileEnvironmentResolver,
+    jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator
   });
 }
 

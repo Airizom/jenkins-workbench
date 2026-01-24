@@ -3,6 +3,7 @@ import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
+import { JenkinsPipelineValidationApi } from "./client/JenkinsPipelineValidationApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsRequestError } from "./errors";
@@ -68,6 +69,7 @@ export class JenkinsClient {
   private readonly jobsApi: JenkinsJobsApi;
   private readonly nodesApi: JenkinsNodesApi;
   private readonly queueApi: JenkinsQueueApi;
+  private readonly pipelineValidationApi: JenkinsPipelineValidationApi;
 
   constructor(options: JenkinsClientOptions) {
     const httpClient = new JenkinsHttpClient(options);
@@ -75,6 +77,7 @@ export class JenkinsClient {
     this.buildsApi = new JenkinsBuildsApi(httpClient);
     this.nodesApi = new JenkinsNodesApi(httpClient);
     this.queueApi = new JenkinsQueueApi(httpClient);
+    this.pipelineValidationApi = new JenkinsPipelineValidationApi(httpClient);
   }
 
   async getRootJobs(): Promise<JenkinsJob[]> {
@@ -258,5 +261,9 @@ export class JenkinsClient {
     newName: string
   ): Promise<{ newUrl: string }> {
     return this.jobsApi.copyJob(parentUrl, sourceName, newName);
+  }
+
+  async validateDeclarativeJenkinsfile(jenkinsfileText: string): Promise<string> {
+    return this.pipelineValidationApi.validateDeclarative(jenkinsfileText);
   }
 }

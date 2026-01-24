@@ -36,7 +36,9 @@
     "color": "#1a1a2e",
     "theme": "dark"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -215,6 +217,31 @@
         "command": "jenkinsWorkbench.copyJob",
         "title": "Jenkins: Copy Job",
         "icon": "$(copy)"
+      },
+      {
+        "command": "jenkinsWorkbench.jenkinsfile.validateActive",
+        "title": "Jenkins: Validate Jenkinsfile",
+        "icon": "$(check)"
+      },
+      {
+        "command": "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment",
+        "title": "Jenkins: Select Jenkinsfile Validation Environment"
+      },
+      {
+        "command": "jenkinsWorkbench.jenkinsfile.clearDiagnostics",
+        "title": "Jenkins: Clear Jenkinsfile Validation Diagnostics"
+      },
+      {
+        "command": "jenkinsWorkbench.jenkinsfile.showValidationOutput",
+        "title": "Jenkins: Show Jenkinsfile Validation Output"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "jenkinsWorkbench.jenkinsfile.validateActive",
+        "key": "ctrl+shift+j",
+        "mac": "cmd+shift+j",
+        "when": "editorTextFocus && jenkinsWorkbench.jenkinsfileActive"
       }
     ],
     "configuration": {
@@ -367,6 +394,34 @@
           "type": "string",
           "default": "[redacted]",
           "description": "Replacement text for masked parameter values."
+        },
+        "jenkinsWorkbench.jenkinsfileValidation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Jenkinsfile validation using the Jenkins declarative linter."
+        },
+        "jenkinsWorkbench.jenkinsfileValidation.runOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate Jenkinsfiles automatically on save."
+        },
+        "jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs": {
+          "type": "number",
+          "default": 500,
+          "minimum": 0,
+          "description": "Debounce delay in milliseconds before validating Jenkinsfiles on change (0 = immediate)."
+        },
+        "jenkinsWorkbench.jenkinsfileValidation.filePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/Jenkinsfile",
+            "**/*.jenkinsfile",
+            "**/Jenkinsfile.*"
+          ],
+          "description": "Glob patterns used to detect Jenkinsfile documents for validation."
         }
       }
     },
@@ -562,6 +617,13 @@
           "group": "navigation"
         }
       ],
+      "editor/context": [
+        {
+          "command": "jenkinsWorkbench.jenkinsfile.validateActive",
+          "when": "jenkinsWorkbench.jenkinsfileActive",
+          "group": "navigation@10"
+        }
+      ],
       "commandPalette": [
         {
           "command": "jenkinsWorkbench.submitJobConfig",
@@ -586,6 +648,18 @@
         {
           "command": "jenkinsWorkbench.copyJob",
           "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.jenkinsfile.validateActive"
+        },
+        {
+          "command": "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment"
+        },
+        {
+          "command": "jenkinsWorkbench.jenkinsfile.clearDiagnostics"
+        },
+        {
+          "command": "jenkinsWorkbench.jenkinsfile.showValidationOutput"
         }
       ]
     },

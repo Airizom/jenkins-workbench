@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
+import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
 
 export const CONFIG_SECTION = "jenkinsWorkbench";
 
@@ -26,6 +27,14 @@ const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
   "api_key",
   "credential",
   "passphrase"
+];
+const DEFAULT_JENKINSFILE_VALIDATION_ENABLED = true;
+const DEFAULT_JENKINSFILE_VALIDATION_RUN_ON_SAVE = true;
+const DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS = 500;
+const DEFAULT_JENKINSFILE_VALIDATION_FILE_PATTERNS = [
+  "**/Jenkinsfile",
+  "**/*.jenkinsfile",
+  "**/Jenkinsfile.*"
 ];
 
 export function getExtensionConfiguration(): vscode.WorkspaceConfiguration {
@@ -198,6 +207,59 @@ export function getBuildListFetchOptions(
   return {
     detailLevel: includeDetails ? "details" : "summary",
     includeParameters: getBuildTooltipParametersEnabled(config)
+  };
+}
+
+export function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfiguration): boolean {
+  return Boolean(
+    config.get<boolean>(
+      "jenkinsfileValidation.enabled",
+      DEFAULT_JENKINSFILE_VALIDATION_ENABLED
+    )
+  );
+}
+
+export function getJenkinsfileValidationRunOnSave(config: vscode.WorkspaceConfiguration): boolean {
+  return Boolean(
+    config.get<boolean>(
+      "jenkinsfileValidation.runOnSave",
+      DEFAULT_JENKINSFILE_VALIDATION_RUN_ON_SAVE
+    )
+  );
+}
+
+export function getJenkinsfileValidationChangeDebounceMs(
+  config: vscode.WorkspaceConfiguration
+): number {
+  const value = config.get<number>(
+    "jenkinsfileValidation.changeDebounceMs",
+    DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS
+  );
+  if (!Number.isFinite(value)) {
+    return DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS;
+  }
+  return Math.max(0, Math.floor(value));
+}
+
+export function getJenkinsfileValidationFilePatterns(
+  config: vscode.WorkspaceConfiguration
+): string[] {
+  const value = config.get<unknown>(
+    "jenkinsfileValidation.filePatterns",
+    DEFAULT_JENKINSFILE_VALIDATION_FILE_PATTERNS
+  );
+  const patterns = normalizeStringList(value);
+  return patterns.length > 0 ? patterns : DEFAULT_JENKINSFILE_VALIDATION_FILE_PATTERNS;
+}
+
+export function getJenkinsfileValidationConfig(
+  config: vscode.WorkspaceConfiguration
+): JenkinsfileValidationConfig {
+  return {
+    enabled: getJenkinsfileValidationEnabled(config),
+    runOnSave: getJenkinsfileValidationRunOnSave(config),
+    changeDebounceMs: getJenkinsfileValidationChangeDebounceMs(config),
+    filePatterns: getJenkinsfileValidationFilePatterns(config)
   };
 }
 

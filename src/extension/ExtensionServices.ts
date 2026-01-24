@@ -44,6 +44,11 @@ import { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
 import { JenkinsTreeFilter } from "../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../tree/TreeItems";
 import { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
+import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
+import { JenkinsfileEnvironmentResolver } from "../validation/JenkinsfileEnvironmentResolver";
+import { JenkinsfileMatcher } from "../validation/JenkinsfileMatcher";
+import { JenkinsfileValidationCoordinator } from "../validation/JenkinsfileValidationCoordinator";
+import { JenkinsfileValidationStatusBar } from "../validation/JenkinsfileValidationStatusBar";
 
 export interface ExtensionServices {
   environmentStore: JenkinsEnvironmentStore;
@@ -68,6 +73,10 @@ export interface ExtensionServices {
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
   treeView: vscode.TreeView<WorkbenchTreeElement>;
   treeNavigator: DefaultJenkinsTreeNavigator;
+  jenkinsfileMatcher: JenkinsfileMatcher;
+  jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
+  jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;
+  jenkinsfileValidationStatusBar: JenkinsfileValidationStatusBar;
 }
 
 export interface ExtensionServicesOptions {
@@ -79,6 +88,7 @@ export interface ExtensionServicesOptions {
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
   artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
   artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
+  jenkinsfileValidationConfig: JenkinsfileValidationConfig;
 }
 
 const VIEW_ID = "jenkinsWorkbench.tree";
@@ -157,6 +167,21 @@ export function createExtensionServices(
     treeDataProvider
   });
   const treeNavigator = new DefaultJenkinsTreeNavigator(treeView, treeDataProvider);
+  const jenkinsfileEnvironmentResolver = new JenkinsfileEnvironmentResolver(
+    context,
+    environmentStore
+  );
+  const jenkinsfileMatcher = new JenkinsfileMatcher(
+    options.jenkinsfileValidationConfig.filePatterns
+  );
+  const jenkinsfileValidationStatusBar = new JenkinsfileValidationStatusBar(jenkinsfileMatcher);
+  const jenkinsfileValidationCoordinator = new JenkinsfileValidationCoordinator(
+    clientProvider,
+    jenkinsfileEnvironmentResolver,
+    jenkinsfileValidationStatusBar,
+    jenkinsfileMatcher,
+    options.jenkinsfileValidationConfig
+  );
 
   return {
     environmentStore,
@@ -180,6 +205,10 @@ export function createExtensionServices(
     treeFilter,
     treeDataProvider,
     treeView,
-    treeNavigator
+    treeNavigator,
+    jenkinsfileMatcher,
+    jenkinsfileEnvironmentResolver,
+    jenkinsfileValidationCoordinator,
+    jenkinsfileValidationStatusBar
   };
 }

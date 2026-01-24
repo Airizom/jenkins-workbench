@@ -11,6 +11,7 @@ import {
   requestJson as requestJsonInternal,
   requestStream as requestStreamInternal,
   requestText as requestTextInternal,
+  requestTextWithOptions as requestTextWithOptionsInternal,
   requestTextWithHeaders as requestTextWithHeadersInternal,
   requestVoidWithLocation as requestVoidWithLocationInternal
 } from "../request";
@@ -116,6 +117,18 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     return this.requestPostWithCrumbInternal(url, body, contentHeaders);
   }
 
+  async requestPostTextWithCrumbRaw(
+    url: string,
+    body: string,
+    headers?: Record<string, string>
+  ): Promise<string> {
+    const contentHeaders: Record<string, string> = { ...(headers ?? {}) };
+    if (!("Content-Length" in contentHeaders)) {
+      contentHeaders["Content-Length"] = Buffer.byteLength(body).toString();
+    }
+    return this.requestPostTextWithCrumbInternal(url, body, contentHeaders);
+  }
+
   private async requestVoidWithLocation(
     url: string,
     options: {
@@ -126,6 +139,23 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     }
   ): Promise<JenkinsPostResponse> {
     return requestVoidWithLocationInternal(url, {
+      ...options,
+      headers: this.mergeHeaders(options.headers),
+      authHeader: this.authHeader,
+      timeoutMs: this.requestTimeoutMs
+    });
+  }
+
+  private async requestTextWithOptions(
+    url: string,
+    options: {
+      method: "POST" | "GET" | "HEAD";
+      headers?: Record<string, string>;
+      body?: string;
+      redirectCount?: number;
+    }
+  ): Promise<string> {
+    return requestTextWithOptionsInternal(url, {
       ...options,
       headers: this.mergeHeaders(options.headers),
       authHeader: this.authHeader,
@@ -163,6 +193,53 @@ export class JenkinsHttpClient implements JenkinsClientContext {
               body
             });
           }
+        }
+      }
+      throw error;
+    }
+  }
+
+  private async requestPostTextWithCrumbInternal(
+    url: string,
+    body: string,
+    contentHeaders: Record<string, string>
+  ): Promise<string> {
+    const crumbHeader = await this.crumbService.getCrumbHeader();
+    const headers = crumbHeader
+      ? { ...contentHeaders, [crumbHeader.field]: crumbHeader.value }
+      : contentHeaders;
+
+    try {
+      return await this.requestTextWithOptions(url, { method: "POST", headers, body });
+    } catch (error) {
+      if (error instanceof JenkinsRequestError) {
+        const statusCode = error.statusCode;
+        if (statusCode === 401 || statusCode === 403) {
+          this.crumbService.invalidate();
+        }
+        if (statusCode === 403) {
+          const refreshed = await this.crumbService.getCrumbHeader(true);
+          if (refreshed) {
+            const retryHeaders = {
+              ...contentHeaders,
+              [refreshed.field]: refreshed.value
+            };
+            return await this.requestTextWithOptions(url, {
+              method: "POST",
+              headers: retryHeaders,
+              body
+            });
+          }
+        }
+        if (
+          typeof error.responseText === "string" &&
+          statusCode !== undefined &&
+          statusCode >= 400 &&
+          statusCode < 600 &&
+          statusCode !== 401 &&
+          statusCode !== 403
+        ) {
+          return error.responseText;
         }
       }
       throw error;

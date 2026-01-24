@@ -2,10 +2,12 @@ import type { JenkinsActionErrorCode } from "./data/JenkinsDataTypes";
 
 export class JenkinsRequestError extends Error {
   readonly statusCode?: number;
+  readonly responseText?: string;
 
-  constructor(message: string, statusCode?: number) {
+  constructor(message: string, statusCode?: number, responseText?: string) {
     super(message);
     this.statusCode = statusCode;
+    this.responseText = responseText;
   }
 }
 

@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import { registerBuildCommands } from "../commands/BuildCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
 import { registerJobCommands } from "../commands/JobCommands";
+import { registerJenkinsfileCommands } from "../commands/JenkinsfileCommands";
 import { registerNodeCommands } from "../commands/NodeCommands";
 import { registerPinCommands } from "../commands/PinCommands";
 import { registerQueueCommands } from "../commands/QueueCommands";
@@ -26,6 +27,8 @@ import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
 import type { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
+import type { JenkinsfileEnvironmentResolver } from "../validation/JenkinsfileEnvironmentResolver";
+import type { JenkinsfileValidationCoordinator } from "../validation/JenkinsfileValidationCoordinator";
 import { syncNoEnvironmentsContext } from "./contextKeys";
 
 export interface ExtensionCommandDependencies {
@@ -46,6 +49,8 @@ export interface ExtensionCommandDependencies {
   treeNavigator: DefaultJenkinsTreeNavigator;
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
   queuePoller: JenkinsQueuePoller;
+  jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
+  jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;
 }
 
 export function registerExtensionCommands(
@@ -127,4 +132,11 @@ export function registerExtensionCommands(
   );
 
   registerRefreshCommands(context, dependencies.treeDataProvider);
+
+  registerJenkinsfileCommands(
+    context,
+    dependencies.jenkinsfileValidationCoordinator,
+    dependencies.jenkinsfileEnvironmentResolver,
+    dependencies.environmentStore
+  );
 }

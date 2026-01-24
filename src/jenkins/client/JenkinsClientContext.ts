@@ -22,4 +22,9 @@ export interface JenkinsClientContext {
     body: string,
     headers?: Record<string, string>
   ): Promise<JenkinsPostResponse>;
+  requestPostTextWithCrumbRaw(
+    url: string,
+    body: string,
+    headers?: Record<string, string>
+  ): Promise<string>;
 }

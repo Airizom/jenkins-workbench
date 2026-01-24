@@ -44,6 +44,16 @@ export interface JenkinsVoidRequestOptions {
   timeoutMs?: number;
 }
 
+export interface JenkinsTextRequestOptions {
+  method: "POST" | "GET" | "HEAD";
+  headers?: Record<string, string>;
+  body?: string;
+  redirectCount?: number;
+  authHeader?: string;
+  timeoutMs?: number;
+  maxBytes?: number;
+}
+
 export interface JenkinsSimpleRequestOptions {
   authHeader?: string;
   headers?: Record<string, string>;
@@ -73,6 +83,23 @@ export async function requestText(
     authHeader: options?.authHeader,
     headers: options?.headers,
     timeoutMs: options?.timeoutMs
+  });
+}
+
+export async function requestTextWithOptions(
+  url: string,
+  options: JenkinsTextRequestOptions
+): Promise<string> {
+  return request<string>(url, {
+    method: options.method,
+    parseJson: false,
+    returnText: true,
+    headers: options.headers,
+    body: options.body,
+    redirectCount: options.redirectCount,
+    authHeader: options.authHeader,
+    timeoutMs: options.timeoutMs,
+    maxBytes: options.maxBytes
   });
 }
 
@@ -554,10 +581,12 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
         });
         res.on("end", () => {
           if (statusCode < 200 || statusCode >= 300) {
+            const responseText = options.returnText ? raw : undefined;
             safeReject(
               new JenkinsRequestError(
                 `Jenkins API request failed (${statusCode} ${res.statusMessage ?? ""})`,
-                statusCode
+                statusCode,
+                responseText
               )
             );
             return;

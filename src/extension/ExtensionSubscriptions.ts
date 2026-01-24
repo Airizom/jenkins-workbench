@@ -2,12 +2,14 @@ import * as vscode from "vscode";
 import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { BuildQueueFolderTreeItem, InstanceTreeItem, RootSectionTreeItem } from "../tree/TreeItems";
 import type { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
+import { syncJenkinsfileContext } from "./contextKeys";
 import {
   buildConfigKey,
   getBuildListFetchOptions,
   getBuildTooltipOptions,
   getCacheTtlMs,
   getExtensionConfiguration,
+  getJenkinsfileValidationConfig,
   getPollIntervalSeconds,
   getQueuePollIntervalSeconds,
   getWatchErrorThreshold
@@ -49,6 +51,18 @@ export function registerExtensionSubscriptions(
     const affectsBuildTooltipMaskValue = event.affectsConfiguration(
       buildConfigKey("buildTooltips.parameters.maskValue")
     );
+    const affectsJenkinsfileValidation = event.affectsConfiguration(
+      buildConfigKey("jenkinsfileValidation.enabled")
+    );
+    const affectsJenkinsfileRunOnSave = event.affectsConfiguration(
+      buildConfigKey("jenkinsfileValidation.runOnSave")
+    );
+    const affectsJenkinsfileDebounce = event.affectsConfiguration(
+      buildConfigKey("jenkinsfileValidation.changeDebounceMs")
+    );
+    const affectsJenkinsfilePatterns = event.affectsConfiguration(
+      buildConfigKey("jenkinsfileValidation.filePatterns")
+    );
 
     if (
       !affectsCacheTtl &&
@@ -60,7 +74,11 @@ export function registerExtensionSubscriptions(
       !affectsBuildTooltipAllowList &&
       !affectsBuildTooltipDenyList &&
       !affectsBuildTooltipMaskPatterns &&
-      !affectsBuildTooltipMaskValue
+      !affectsBuildTooltipMaskValue &&
+      !affectsJenkinsfileValidation &&
+      !affectsJenkinsfileRunOnSave &&
+      !affectsJenkinsfileDebounce &&
+      !affectsJenkinsfilePatterns
     ) {
       return;
     }
@@ -100,6 +118,18 @@ export function registerExtensionSubscriptions(
         services.dataService.clearCache();
       }
       services.treeDataProvider.refreshView();
+    }
+
+    if (
+      affectsJenkinsfileValidation ||
+      affectsJenkinsfileRunOnSave ||
+      affectsJenkinsfileDebounce ||
+      affectsJenkinsfilePatterns
+    ) {
+      services.jenkinsfileValidationCoordinator.updateConfig(
+        getJenkinsfileValidationConfig(updatedConfig)
+      );
+      void syncJenkinsfileContext(services.jenkinsfileMatcher);
     }
   });
 
