@@ -319,13 +319,16 @@ export class JenkinsBuildsApi {
   }
 
   async replayBuild(buildUrl: string): Promise<void> {
-    const url = buildActionUrl(buildUrl, "replay");
+    const url = buildActionUrl(buildUrl, "replay/rebuild");
     await this.context.requestVoidWithCrumb(url);
   }
 
   async rebuildBuild(buildUrl: string): Promise<void> {
-    const url = buildActionUrl(buildUrl, "rebuild");
-    await this.context.requestVoidWithCrumb(url);
+    // The rebuild plugin expects a trailing slash for POSTs and supports the
+    // `autorebuild` parameter to bypass the parameter entry page.
+    const url = buildActionUrl(buildUrl, "rebuild/");
+    const body = new URLSearchParams({ autorebuild: "true" }).toString();
+    await this.context.requestVoidWithCrumb(url, body);
   }
 
   async proceedInput(
