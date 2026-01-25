@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-01-25
+
+### Fixed
+
+- fix: align replay and rebuild endpoints with plugin expectations
+
+### Documentation
+
+- docs: document Jenkinsfile validation and job management commands
+
 ## [1.24.0] - 2026-01-25
 
 ### Added
