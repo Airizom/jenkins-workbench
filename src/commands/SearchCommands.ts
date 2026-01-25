@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatError } from "../formatters/ErrorFormatters";
 import {
   CancellationError,
   type JenkinsDataService,
@@ -11,10 +12,9 @@ import type {
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsViewStateStore, JobFilterMode } from "../storage/JenkinsViewStateStore";
-import { formatError } from "../formatters/ErrorFormatters";
-import { formatJobColor } from "../tree/formatters";
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import type { JenkinsTreeNavigator } from "../tree/TreeNavigator";
+import { formatJobColor } from "../tree/formatters";
 
 type JobQuickPickItem = vscode.QuickPickItem & {
   environment: JenkinsEnvironmentRef;

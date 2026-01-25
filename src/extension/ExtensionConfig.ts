@@ -134,9 +134,7 @@ export function getArtifactMaxDownloadBytes(
   return Math.floor(value) * 1024 * 1024;
 }
 
-export function getArtifactPreviewCacheMaxEntries(
-  config: vscode.WorkspaceConfiguration
-): number {
+export function getArtifactPreviewCacheMaxEntries(config: vscode.WorkspaceConfiguration): number {
   const value = config.get<number>(
     "artifactPreviewCacheMaxEntries",
     DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES
@@ -147,9 +145,7 @@ export function getArtifactPreviewCacheMaxEntries(
   return Math.max(1, Math.floor(value));
 }
 
-export function getArtifactPreviewCacheMaxBytes(
-  config: vscode.WorkspaceConfiguration
-): number {
+export function getArtifactPreviewCacheMaxBytes(config: vscode.WorkspaceConfiguration): number {
   const value = config.get<number>(
     "artifactPreviewCacheMaxMb",
     DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB
@@ -160,9 +156,7 @@ export function getArtifactPreviewCacheMaxBytes(
   return Math.max(1, Math.floor(value)) * 1024 * 1024;
 }
 
-export function getArtifactPreviewCacheTtlMs(
-  config: vscode.WorkspaceConfiguration
-): number {
+export function getArtifactPreviewCacheTtlMs(config: vscode.WorkspaceConfiguration): number {
   const value = config.get<number>(
     "artifactPreviewCacheTtlSeconds",
     DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS
@@ -212,10 +206,7 @@ export function getBuildListFetchOptions(
 
 export function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
-    config.get<boolean>(
-      "jenkinsfileValidation.enabled",
-      DEFAULT_JENKINSFILE_VALIDATION_ENABLED
-    )
+    config.get<boolean>("jenkinsfileValidation.enabled", DEFAULT_JENKINSFILE_VALIDATION_ENABLED)
   );
 }
 

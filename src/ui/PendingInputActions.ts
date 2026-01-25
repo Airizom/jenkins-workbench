@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { PendingInputAction } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { formatActionError } from "../formatters/ErrorFormatters";
 import { promptForParameters } from "./ParameterPrompts";
 
 export interface PendingInputActionService {
@@ -45,12 +45,7 @@ export async function handlePendingInputAction(
       options.buildUrl,
       { mode: "refresh" }
     );
-    const action = await resolvePendingInputAction(
-      actions,
-      options.inputId,
-      label,
-      options.action
-    );
+    const action = await resolvePendingInputAction(actions, options.inputId, label, options.action);
     if (!action) {
       return false;
     }

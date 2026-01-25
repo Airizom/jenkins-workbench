@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
-import { formatActionError } from "../formatters/ErrorFormatters";
+import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import { handlePendingInputAction } from "../ui/PendingInputActions";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
@@ -14,7 +14,6 @@ import {
   getTestReportIncludeCaseLogsConfigKey
 } from "./buildDetails/BuildDetailsConfig";
 import { formatError, formatResult } from "./buildDetails/BuildDetailsFormatters";
-import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsPollingCallbacks";
 import {
   type BuildDetailsOutgoingMessage,
   isApproveInputMessage,
@@ -24,13 +23,14 @@ import {
   isRejectInputMessage,
   isToggleFollowLogMessage
 } from "./buildDetails/BuildDetailsMessages";
+import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
+import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsPollingCallbacks";
 import {
   type BuildDetailsDataService,
   type BuildDetailsInitialState,
-  type PendingInputActionProvider,
-  BuildDetailsPollingController
+  BuildDetailsPollingController,
+  type PendingInputActionProvider
 } from "./buildDetails/BuildDetailsPollingController";
-import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
 import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
 import { buildUpdateMessageFromState } from "./buildDetails/BuildDetailsUpdateBuilder";
 import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
@@ -520,11 +520,7 @@ export class BuildDetailsPanel {
     relativePath: string;
     fileName?: string;
   }): Promise<void> {
-    if (
-      !this.artifactActionHandler ||
-      !this.state.environment ||
-      !this.state.currentBuildUrl
-    ) {
+    if (!this.artifactActionHandler || !this.state.environment || !this.state.currentBuildUrl) {
       return;
     }
     const fileName =
@@ -588,9 +584,7 @@ export class BuildDetailsPanel {
         );
         return;
       }
-      void vscode.window.showInformationMessage(
-        `Saved console output to ${targetUri.fsPath}.`
-      );
+      void vscode.window.showInformationMessage(`Saved console output to ${targetUri.fsPath}.`);
     } catch (error) {
       void vscode.window.showErrorMessage(
         `Failed to export console output: ${formatActionError(error)}`

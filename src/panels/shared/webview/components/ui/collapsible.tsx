@@ -55,11 +55,7 @@ export function Collapsible({
         triggerId: `${baseId}-trigger`
       }}
     >
-      <div
-        data-state={open ? "open" : "closed"}
-        className={className}
-        {...props}
-      >
+      <div data-state={open ? "open" : "closed"} className={className} {...props}>
         {children}
       </div>
     </CollapsibleContext.Provider>
@@ -87,10 +83,7 @@ export const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, Collapsibl
         aria-controls={contentId}
         data-state={open ? "open" : "closed"}
         onClick={handleClick}
-        className={cn(
-          "flex w-full items-center justify-between text-left",
-          className
-        )}
+        className={cn("flex w-full items-center justify-between text-left", className)}
         {...props}
       >
         {children}

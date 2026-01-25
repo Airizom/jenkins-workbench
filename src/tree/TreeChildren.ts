@@ -1,3 +1,19 @@
+import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
+import type {
+  BuildListFetchOptions,
+  JenkinsDataService,
+  JenkinsJobInfo,
+  JenkinsQueueItemInfo
+} from "../jenkins/JenkinsDataService";
+import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
+import { ScopedCache } from "../services/ScopedCache";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
+import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import type { BuildTooltipOptions } from "./BuildTooltips";
+import { EnvironmentSummaryStore } from "./EnvironmentSummaryStore";
+import type { JenkinsTreeFilter } from "./TreeFilter";
 import {
   ArtifactTreeItem,
   BuildArtifactsFolderTreeItem,
@@ -16,23 +32,7 @@ import {
   RootSectionTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
-import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
-import type {
-  BuildListFetchOptions,
-  JenkinsDataService,
-  JenkinsJobInfo,
-  JenkinsQueueItemInfo
-} from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
-import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { BuildTooltipOptions } from "./BuildTooltips";
-import { EnvironmentSummaryStore } from "./EnvironmentSummaryStore";
-import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
-import type { JenkinsTreeFilter } from "./TreeFilter";
 import type { TreeChildrenOptions } from "./TreeTypes";
-import { ScopedCache } from "../services/ScopedCache";
 
 const CHILDREN_CACHE_MAX_ENTRIES = 200;
 const ARTIFACT_CACHE_MAX_ENTRIES = 200;
@@ -278,7 +278,9 @@ export class JenkinsTreeChildrenLoader {
     }
 
     if (element instanceof JenkinsFolderTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("folder", element.environment, element.folderUrl));
+      this.clearChildrenCache(
+        this.buildChildrenKey("folder", element.environment, element.folderUrl)
+      );
       return;
     }
 
@@ -288,14 +290,22 @@ export class JenkinsTreeChildrenLoader {
     }
 
     if (element instanceof BuildTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("build-artifacts", element.environment, element.buildUrl));
-      this.artifactCache.delete(this.buildChildrenKey("artifacts", element.environment, element.buildUrl));
+      this.clearChildrenCache(
+        this.buildChildrenKey("build-artifacts", element.environment, element.buildUrl)
+      );
+      this.artifactCache.delete(
+        this.buildChildrenKey("artifacts", element.environment, element.buildUrl)
+      );
       return;
     }
 
     if (element instanceof BuildArtifactsFolderTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("artifacts", element.environment, element.buildUrl));
-      this.artifactCache.delete(this.buildChildrenKey("artifacts", element.environment, element.buildUrl));
+      this.clearChildrenCache(
+        this.buildChildrenKey("artifacts", element.environment, element.buildUrl)
+      );
+      this.artifactCache.delete(
+        this.buildChildrenKey("artifacts", element.environment, element.buildUrl)
+      );
       return;
     }
 

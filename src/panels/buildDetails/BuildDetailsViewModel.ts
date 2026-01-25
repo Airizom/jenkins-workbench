@@ -1,3 +1,4 @@
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type {
   PipelineRun,
   PipelineStage,
@@ -9,18 +10,6 @@ import type {
   JenkinsTestReport,
   JenkinsTestSummaryAction
 } from "../../jenkins/types";
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
-import type {
-  BuildDetailsViewModel,
-  BuildFailureArtifact,
-  BuildFailureChangelogItem,
-  BuildFailureFailedTest,
-  BuildFailureInsightsViewModel,
-  PendingInputParameterViewModel,
-  PendingInputViewModel,
-  PipelineStageStepViewModel,
-  PipelineStageViewModel
-} from "./shared/BuildDetailsContracts";
 import {
   formatCulprits,
   formatDuration,
@@ -32,6 +21,17 @@ import {
   normalizePipelineStatus,
   truncateConsoleText
 } from "./BuildDetailsFormatters";
+import type {
+  BuildDetailsViewModel,
+  BuildFailureArtifact,
+  BuildFailureChangelogItem,
+  BuildFailureFailedTest,
+  BuildFailureInsightsViewModel,
+  PendingInputParameterViewModel,
+  PendingInputViewModel,
+  PipelineStageStepViewModel,
+  PipelineStageViewModel
+} from "./shared/BuildDetailsContracts";
 
 const INSIGHTS_LIST_LIMIT = 20;
 const MAX_TEST_CASE_LOG_CHARS = 8000;
@@ -133,13 +133,9 @@ export function buildPendingInputsViewModel(
     }));
     const parametersLabel =
       parameters.length > 0
-        ? `Parameters: ${parameters
-            .map((param) => `${param.name} (${param.kind})`)
-            .join(", ")}`
+        ? `Parameters: ${parameters.map((param) => `${param.name} (${param.kind})`).join(", ")}`
         : "No parameters";
-    const submitterLabel = action.submitter
-      ? `Submitter: ${action.submitter}`
-      : "Submitter: Any";
+    const submitterLabel = action.submitter ? `Submitter: ${action.submitter}` : "Submitter: Any";
 
     return {
       id: action.id,

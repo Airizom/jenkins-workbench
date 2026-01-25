@@ -3,7 +3,7 @@ import type {
   ArtifactActionOptions,
   ArtifactActionService
 } from "../services/ArtifactActionService";
-import { runArtifactAction, type ArtifactActionRequest } from "./ArtifactActions";
+import { type ArtifactActionRequest, runArtifactAction } from "./ArtifactActions";
 import type { ArtifactPreviewer } from "./ArtifactPreviewer";
 
 export interface ArtifactActionHandler {

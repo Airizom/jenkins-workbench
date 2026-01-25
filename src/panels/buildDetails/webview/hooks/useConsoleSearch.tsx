@@ -15,11 +15,7 @@ type ConsoleMatchState = {
   error?: string;
 };
 
-function buildConsoleMatches(
-  text: string,
-  query: string,
-  useRegex: boolean
-): ConsoleMatchState {
+function buildConsoleMatches(text: string, query: string, useRegex: boolean): ConsoleMatchState {
   if (!query) {
     return { matches: [], tooManyMatches: false };
   }

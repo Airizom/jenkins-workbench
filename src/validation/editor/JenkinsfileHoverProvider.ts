@@ -5,10 +5,10 @@ import {
   isValidationCode,
   resolveDiagnosticSuggestions
 } from "../JenkinsfileDiagnosticUtils";
-import { getDocsLinksForCode } from "../JenkinsfileValidationDocs";
 import type { JenkinsfileMatcher } from "../JenkinsfileMatcher";
-import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
 import type { JenkinsfileValidationCoordinator } from "../JenkinsfileValidationCoordinator";
+import { getDocsLinksForCode } from "../JenkinsfileValidationDocs";
+import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
 
 export class JenkinsfileHoverProvider implements vscode.HoverProvider {
   constructor(
@@ -27,8 +27,7 @@ export class JenkinsfileHoverProvider implements vscode.HoverProvider {
     const diagnostic = vscode.languages
       .getDiagnostics(document.uri)
       .find(
-        (entry) =>
-          entry.source === JENKINS_DIAGNOSTIC_SOURCE && entry.range.contains(position)
+        (entry) => entry.source === JENKINS_DIAGNOSTIC_SOURCE && entry.range.contains(position)
       );
     if (!diagnostic) {
       return;
@@ -88,12 +87,7 @@ function resolveDiagnosticCode(
   if (typeof code === "string") {
     return isValidationCode(code) ? code : undefined;
   }
-  if (
-    typeof code === "object" &&
-    code &&
-    "value" in code &&
-    typeof code.value === "string"
-  ) {
+  if (typeof code === "object" && code && "value" in code && typeof code.value === "string") {
     return isValidationCode(code.value) ? code.value : undefined;
   }
   return undefined;

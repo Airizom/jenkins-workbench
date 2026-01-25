@@ -29,8 +29,6 @@ export async function showNodeDetails(
       getTreeItemLabel(item)
     );
   } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Unable to open node details: ${formatActionError(error)}`
-    );
+    void vscode.window.showErrorMessage(`Unable to open node details: ${formatActionError(error)}`);
   }
 }

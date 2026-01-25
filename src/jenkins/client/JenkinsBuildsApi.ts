@@ -1,19 +1,19 @@
+import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
+import { JenkinsRequestError } from "../errors";
+import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type {
+  JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsPendingInputAction,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
-  JenkinsArtifact,
-  JenkinsPendingInputAction,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../types";
-import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import { buildActionUrl, buildApiUrlFromItem, buildArtifactDownloadUrl } from "../urls";
-import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
-import { JenkinsRequestError } from "../errors";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 
 export type JenkinsBuildTriggerMode = "build" | "buildWithParameters";
@@ -342,12 +342,7 @@ export class JenkinsBuildsApi {
       await this.context.requestVoidWithCrumb(url.toString(), body);
       return;
     }
-    const proceedUrl = this.resolveInputUrl(
-      buildUrl,
-      options?.proceedUrl,
-      inputId,
-      "proceedEmpty"
-    );
+    const proceedUrl = this.resolveInputUrl(buildUrl, options?.proceedUrl, inputId, "proceedEmpty");
     try {
       await this.context.requestVoidWithCrumb(proceedUrl);
     } catch (error) {
@@ -434,5 +429,4 @@ export class JenkinsBuildsApi {
     const trimmed = text.trim();
     return trimmed.length > 0 ? trimmed : undefined;
   }
-
 }

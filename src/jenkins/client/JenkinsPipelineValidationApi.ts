@@ -18,10 +18,7 @@ export class JenkinsPipelineValidationApi {
       this.context.baseUrl,
       "pipeline-model-converter/validateJenkinsfile"
     );
-    const url = buildApiUrlFromBase(
-      this.context.baseUrl,
-      "pipeline-model-converter/validate"
-    );
+    const url = buildApiUrlFromBase(this.context.baseUrl, "pipeline-model-converter/validate");
 
     const resolution = await this.endpointResolver.resolve(jsonUrl, body, headers);
     if (resolution.endpoint === "json") {

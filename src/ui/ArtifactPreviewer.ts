@@ -1,5 +1,5 @@
-import * as path from "node:path";
 import type { IncomingHttpHeaders } from "node:http";
+import * as path from "node:path";
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { ArtifactRetrievalService } from "../services/ArtifactRetrievalService";

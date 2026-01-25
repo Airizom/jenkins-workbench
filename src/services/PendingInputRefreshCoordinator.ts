@@ -1,8 +1,8 @@
 import type * as vscode from "vscode";
 import type {
+  JenkinsDataService,
   PendingInputAction,
-  PendingInputSummary,
-  JenkinsDataService
+  PendingInputSummary
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 
@@ -237,11 +237,10 @@ export class PendingInputRefreshCoordinator implements vscode.Disposable {
           continue;
         }
         this.inFlight += 1;
-        void this.refreshSummary(item.environment, item.buildUrl, item.previous)
-          .finally(() => {
-            this.inFlight -= 1;
-            void this.processQueue();
-          });
+        void this.refreshSummary(item.environment, item.buildUrl, item.previous).finally(() => {
+          this.inFlight -= 1;
+          void this.processQueue();
+        });
       }
     } finally {
       this.processing = false;

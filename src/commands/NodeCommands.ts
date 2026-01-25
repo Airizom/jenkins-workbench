@@ -8,9 +8,8 @@ export function registerNodeCommands(
   dataService: JenkinsDataService
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "jenkinsWorkbench.showNodeDetails",
-      (item?: NodeTreeItem) => showNodeDetails(dataService, context.extensionUri, item)
+    vscode.commands.registerCommand("jenkinsWorkbench.showNodeDetails", (item?: NodeTreeItem) =>
+      showNodeDetails(dataService, context.extensionUri, item)
     )
   );
 }

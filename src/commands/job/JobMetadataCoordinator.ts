@@ -1,6 +1,6 @@
+import type { EnvironmentScope } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
-import type { EnvironmentScope } from "../../storage/JenkinsEnvironmentStore";
 
 export interface JobMetadataStores {
   pinStore: JenkinsPinStore;

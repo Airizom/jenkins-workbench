@@ -1,7 +1,7 @@
 import type {
   JenkinsNodeDetails,
-  JenkinsNodeExecutor,
-  JenkinsNodeExecutable
+  JenkinsNodeExecutable,
+  JenkinsNodeExecutor
 } from "../../jenkins/types";
 import type {
   NodeDetailsViewModel,

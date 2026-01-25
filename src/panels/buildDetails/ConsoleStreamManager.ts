@@ -127,7 +127,10 @@ export class ConsoleStreamManager {
     consoleHtmlResult?: { html: string; truncated: boolean };
   }> {
     const result = await this.loadInitialConsole();
-    return { consoleTextResult: result.consoleTextResult, consoleHtmlResult: result.consoleHtmlResult };
+    return {
+      consoleTextResult: result.consoleTextResult,
+      consoleHtmlResult: result.consoleHtmlResult
+    };
   }
 
   async fetchNext(): Promise<ConsoleFetchResult> {
@@ -165,9 +168,7 @@ export class ConsoleStreamManager {
       }
       return;
     }
-    this.textConsoleStream.applyResult(
-      value as JenkinsProgressiveConsoleText | JenkinsConsoleText
-    );
+    this.textConsoleStream.applyResult(value as JenkinsProgressiveConsoleText | JenkinsConsoleText);
   }
 
   private async tryProbeHtmlStream(): Promise<boolean> {

@@ -1,4 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../shared/webview/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../../../../../shared/webview/components/ui/card";
 
 function InfoIcon() {
   return (
@@ -33,9 +39,7 @@ export function BuildFailureEmptyStateCard({ title }: { title: string }) {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <InfoIcon />
           </div>
-          <div className="text-sm text-muted-foreground">
-            Nothing to highlight for this run
-          </div>
+          <div className="text-sm text-muted-foreground">Nothing to highlight for this run</div>
         </div>
       </CardContent>
     </Card>

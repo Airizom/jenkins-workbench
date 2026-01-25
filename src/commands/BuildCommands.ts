@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import type { PendingInputActionProvider } from "../panels/buildDetails/BuildDetailsPollingController";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
-import type { PendingInputActionProvider } from "../panels/buildDetails/BuildDetailsPollingController";
 import type {
   ArtifactTreeItem,
   BuildTreeItem,
@@ -18,8 +18,8 @@ import {
   openInJenkins,
   openLastFailedBuild,
   previewBuildLog,
-  rejectInput,
   rebuildBuild,
+  rejectInput,
   replayBuild,
   showBuildDetails,
   stopBuild,

@@ -7,8 +7,8 @@ import type {
   ArtifactDownloadActionRequest
 } from "../services/ArtifactActionService";
 import { ArtifactStorageError } from "../services/ArtifactStorageService";
-import type { ArtifactPreviewer } from "./ArtifactPreviewer";
 import type { ArtifactActionOptionsProvider } from "./ArtifactActionHandler";
+import type { ArtifactPreviewer } from "./ArtifactPreviewer";
 
 export interface ArtifactActionRequest {
   action: "preview" | "download";

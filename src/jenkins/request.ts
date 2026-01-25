@@ -320,9 +320,7 @@ function requestStreamInternal(
         const maxBytes = normalizeMaxBytes(options.maxBytes);
         const contentLength = parseContentLength(res.headers["content-length"]);
         if (maxBytes !== undefined && contentLength !== undefined && contentLength > maxBytes) {
-          safeReject(
-            new JenkinsMaxBytesError(maxBytes, statusCode)
-          );
+          safeReject(new JenkinsMaxBytesError(maxBytes, statusCode));
           res.destroy();
           return;
         }
@@ -336,9 +334,7 @@ function requestStreamInternal(
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           receivedBytes += buffer.length;
           if (receivedBytes > maxBytes) {
-            stream.destroy(
-              new JenkinsMaxBytesError(maxBytes, statusCode)
-            );
+            stream.destroy(new JenkinsMaxBytesError(maxBytes, statusCode));
             res.destroy();
           }
         });
@@ -490,9 +486,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
                   contentLength !== undefined &&
                   contentLength > maxBytes
                 ) {
-                  safeReject(
-                    new JenkinsMaxBytesError(maxBytes, statusCode)
-                  );
+                  safeReject(new JenkinsMaxBytesError(maxBytes, statusCode));
                   res.destroy();
                   return;
                 }
@@ -505,9 +499,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
                     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
                     receivedBytes += buffer.length;
                     if (receivedBytes > maxLength) {
-                      safeReject(
-                        new JenkinsMaxBytesError(maxLength, statusCode)
-                      );
+                      safeReject(new JenkinsMaxBytesError(maxLength, statusCode));
                       res.destroy();
                       return;
                     }
@@ -552,9 +544,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
         const contentLength = parseContentLength(res.headers["content-length"]);
         if (options.returnBuffer && maxBytes !== undefined && contentLength !== undefined) {
           if (contentLength > maxBytes) {
-            safeReject(
-              new JenkinsMaxBytesError(maxBytes, statusCode)
-            );
+            safeReject(new JenkinsMaxBytesError(maxBytes, statusCode));
             res.destroy();
             return;
           }
@@ -568,9 +558,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
             const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
             receivedBytes += buffer.length;
             if (receivedBytes > maxLength) {
-              safeReject(
-                new JenkinsMaxBytesError(maxLength, statusCode)
-              );
+              safeReject(new JenkinsMaxBytesError(maxLength, statusCode));
               res.destroy();
               return;
             }

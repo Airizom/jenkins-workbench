@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { BuildQueueFolderTreeItem, InstanceTreeItem, RootSectionTreeItem } from "../tree/TreeItems";
 import type { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
-import { syncJenkinsfileContext } from "./contextKeys";
 import {
   buildConfigKey,
   getBuildListFetchOptions,
@@ -15,6 +14,7 @@ import {
   getWatchErrorThreshold
 } from "./ExtensionConfig";
 import type { ExtensionServices } from "./ExtensionServices";
+import { syncJenkinsfileContext } from "./contextKeys";
 
 export function registerExtensionSubscriptions(
   context: vscode.ExtensionContext,

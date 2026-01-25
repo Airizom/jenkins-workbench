@@ -2,8 +2,7 @@ import type { JenkinsfileValidationCode } from "./JenkinsfileValidationTypes";
 
 const MAX_SUGGESTIONS = 10;
 const MISSING_SECTION_PATTERN = /Missing required section ['"]([^'"]+)['"]/i;
-const INVALID_SECTION_DEFINITION_PATTERN =
-  /Not a valid section definition:\s*['"]([^'"]+)['"]/i;
+const INVALID_SECTION_DEFINITION_PATTERN = /Not a valid section definition:\s*['"]([^'"]+)['"]/i;
 const BLOCKED_STEP_PATTERN =
   /Invalid step ['"]?([A-Za-z0-9_-]+)['"]? used - not allowed in this context/i;
 const UNKNOWN_DSL_PATTERNS = [

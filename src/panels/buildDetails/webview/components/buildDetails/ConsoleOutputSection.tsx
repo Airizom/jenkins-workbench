@@ -1,14 +1,14 @@
 import * as React from "react";
 import type { ChangeEvent } from "react";
-import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { Alert, AlertDescription } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Card, CardContent, CardHeader } from "../../../../shared/webview/components/ui/card";
 import { Switch } from "../../../../shared/webview/components/ui/switch";
-import { ConsoleSearchToolbar } from "../ConsoleSearchToolbar";
-import { stripAnsi } from "../../lib/ansi";
-import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
 import { useConsoleSearch } from "../../hooks/useConsoleSearch";
+import { stripAnsi } from "../../lib/ansi";
+import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
+import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
+import { ConsoleSearchToolbar } from "../ConsoleSearchToolbar";
 
 const { useEffect, useMemo } = React;
 
@@ -166,7 +166,9 @@ export function ConsoleOutputSection({
               <div>
                 <h3 className="text-sm font-semibold">Console Output</h3>
                 {hasConsoleOutput ? (
-                  <p className="text-xs text-muted-foreground">{lineCount.toLocaleString()} lines</p>
+                  <p className="text-xs text-muted-foreground">
+                    {lineCount.toLocaleString()} lines
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -182,22 +184,16 @@ export function ConsoleOutputSection({
                 <SearchIcon />
                 <span className="hidden sm:inline">Search</span>
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportLogs}
-                className="gap-1.5"
-              >
+              <Button variant="outline" size="sm" onClick={handleExportLogs} className="gap-1.5">
                 <DownloadIcon />
                 <span className="hidden sm:inline">Export</span>
               </Button>
               <div className="flex items-center gap-2 rounded border border-border bg-muted/50 px-2.5 py-1">
-                <Switch
-                  id="follow-log"
-                  checked={followLog}
-                  onChange={handleFollowLogChange}
-                />
-                <label htmlFor="follow-log" className="text-xs text-muted-foreground select-none whitespace-nowrap">
+                <Switch id="follow-log" checked={followLog} onChange={handleFollowLogChange} />
+                <label
+                  htmlFor="follow-log"
+                  className="text-xs text-muted-foreground select-none whitespace-nowrap"
+                >
                   Follow
                 </label>
               </div>
@@ -223,7 +219,10 @@ export function ConsoleOutputSection({
           />
 
           {consoleNote ? (
-            <div id="console-note" className="flex items-center gap-2 rounded bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            <div
+              id="console-note"
+              className="flex items-center gap-2 rounded bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+            >
               <svg
                 aria-hidden="true"
                 className="h-3.5 w-3.5 shrink-0"

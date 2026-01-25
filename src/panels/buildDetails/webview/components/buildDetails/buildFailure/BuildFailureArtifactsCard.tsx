@@ -1,9 +1,9 @@
+import { Button } from "../../../../../shared/webview/components/ui/button";
+import { Card } from "../../../../../shared/webview/components/ui/card";
 import type {
   ArtifactAction,
   BuildFailureArtifact
 } from "../../../../shared/BuildDetailsContracts";
-import { Button } from "../../../../../shared/webview/components/ui/button";
-import { Card } from "../../../../../shared/webview/components/ui/card";
 import { OverflowText } from "./BuildFailureOverflowText";
 
 function FileIcon() {

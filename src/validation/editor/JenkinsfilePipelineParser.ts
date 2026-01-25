@@ -23,15 +23,11 @@ interface PipelineTextSource {
 
 const INDENT_FALLBACK = "  ";
 
-export function findPipelineBlock(
-  document: TextDocument
-): PipelineBlockContext | undefined {
+export function findPipelineBlock(document: TextDocument): PipelineBlockContext | undefined {
   return findPipelineBlockFromSource(createDocumentSource(document));
 }
 
-export function findPipelineBlockFromText(
-  text: string
-): PipelineBlockContext | undefined {
+export function findPipelineBlockFromText(text: string): PipelineBlockContext | undefined {
   return findPipelineBlockFromSource(createTextSource(text));
 }
 

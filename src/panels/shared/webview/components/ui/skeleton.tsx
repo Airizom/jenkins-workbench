@@ -3,15 +3,7 @@ import { cn } from "../../lib/utils";
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export function Skeleton({ className, ...props }: SkeletonProps) {
-  return (
-    <div
-      className={cn(
-        "animate-pulse rounded bg-muted",
-        className
-      )}
-      {...props}
-    />
-  );
+  return <div className={cn("animate-pulse rounded bg-muted", className)} {...props} />;
 }
 
 export interface SkeletonTextProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -43,13 +35,7 @@ export function SkeletonCard({
   ...props
 }: SkeletonCardProps) {
   return (
-    <div
-      className={cn(
-        "rounded border border-card-border bg-card p-4",
-        className
-      )}
-      {...props}
-    >
+    <div className={cn("rounded border border-card-border bg-card p-4", className)} {...props}>
       {hasHeader ? (
         <div className="mb-4 space-y-2">
           <Skeleton className="h-5 w-2/5" />

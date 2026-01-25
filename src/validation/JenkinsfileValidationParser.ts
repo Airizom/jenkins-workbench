@@ -77,9 +77,7 @@ export function parseDeclarativeValidationOutput(text: string): JenkinsfileValid
   return findings;
 }
 
-function parseJsonValidationOutput(
-  text: string
-): JenkinsfileValidationFinding[] | undefined {
+function parseJsonValidationOutput(text: string): JenkinsfileValidationFinding[] | undefined {
   const trimmed = text.trim();
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
     return undefined;
@@ -111,9 +109,7 @@ function parseJsonValidationOutput(
   }
 }
 
-function extractJsonErrors(
-  value: unknown
-): { errors: unknown[]; result?: string } | undefined {
+function extractJsonErrors(value: unknown): { errors: unknown[]; result?: string } | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
   }
@@ -124,8 +120,7 @@ function extractJsonErrors(
     (root.Data as Record<string, unknown> | undefined);
   const container = data ?? root;
   const errors =
-    (container.errors as unknown[] | undefined) ??
-    (container.Errors as unknown[] | undefined);
+    (container.errors as unknown[] | undefined) ?? (container.Errors as unknown[] | undefined);
   const result =
     (container.result as string | undefined) ??
     (container.Result as string | undefined) ??
@@ -230,8 +225,9 @@ function buildFinding(
 ): JenkinsfileValidationFinding {
   const code = deriveValidationCode(message);
   const suggestions = isSuggestionCode(code) ? extractSuggestionsFromText(message) : undefined;
-  const invalidStepToken =
-    isInvalidStepTokenCode(code) ? extractInvalidStepToken(message) : undefined;
+  const invalidStepToken = isInvalidStepTokenCode(code)
+    ? extractInvalidStepToken(message)
+    : undefined;
   return {
     message,
     line: Number.isFinite(line) ? line : undefined,

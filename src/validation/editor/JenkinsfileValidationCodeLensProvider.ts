@@ -55,8 +55,7 @@ export class JenkinsfileValidationCodeLensProvider
   private shouldRefresh(uri: vscode.Uri): boolean {
     return vscode.window.visibleTextEditors.some((editor) => {
       return (
-        editor.document.uri.toString() === uri.toString() &&
-        this.matcher.matches(editor.document)
+        editor.document.uri.toString() === uri.toString() && this.matcher.matches(editor.document)
       );
     });
   }

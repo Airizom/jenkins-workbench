@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
-import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
+import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 import type { JobCommandRefreshHost } from "./JobCommandTypes";
 
@@ -71,10 +71,7 @@ export class JobConfigUpdateWorkflow {
     );
   }
 
-  async submitDraft(
-    refreshHost: JobCommandRefreshHost,
-    uri?: vscode.Uri
-  ): Promise<void> {
+  async submitDraft(refreshHost: JobCommandRefreshHost, uri?: vscode.Uri): Promise<void> {
     let targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
     if (!targetUri) {
       void vscode.window.showInformationMessage("Open a job config draft to submit.");

@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com/)
 
-A powerful VS Code extension that brings Jenkins directly into your editor. Browse jobs, trigger builds, stream console logs, watch for status changes, and manage your CI/CD pipelines without leaving VS Code.
+VS Code extension that brings Jenkins into your editor. Browse jobs, trigger builds, stream console logs, watch for status changes, and manage CI/CD pipelines without leaving VS Code.
 
 ## Features
 
@@ -44,6 +44,12 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 - **Stage Load Feedback** — Inline loading states while pipeline stages resolve
 - **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
+
+### Jenkinsfile Validation
+
+- **Declarative Linting** — Validate Jenkinsfiles against the Jenkins declarative linter
+- **Run on Save** — Optionally validate automatically when you save
+- **Diagnostics & Quick Fixes** — See errors inline and apply guided fixes
 
 ### Watch Jobs
 
@@ -93,7 +99,7 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | Network | Access to your Jenkins instance(s) |
 | Jenkins API | JSON API must be accessible (`/api/json`) |
 | Permissions | Read access for browsing; write access for build actions |
-| Workspace | A folder-backed workspace is required for artifact preview/download |
+| Workspace | A file-based workspace folder is required to download artifacts; previews do not require a workspace folder |
 
 ## Extension Settings
 
@@ -150,6 +156,15 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `jenkinsWorkbench.artifactPreviewCacheMaxMb` | 200 | Maximum total size in megabytes for in-memory artifact previews. |
 | `jenkinsWorkbench.artifactPreviewCacheTtlSeconds` | 900 | Time-to-live in seconds for unused in-memory artifact previews. |
 
+### Jenkinsfile Validation
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.jenkinsfileValidation.enabled` | true | Enable Jenkinsfile validation using the Jenkins declarative linter. |
+| `jenkinsWorkbench.jenkinsfileValidation.runOnSave` | true | Validate Jenkinsfiles automatically on save. |
+| `jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs` | 500 | Debounce delay in milliseconds before validating Jenkinsfiles on change (0 = immediate). |
+| `jenkinsWorkbench.jenkinsfileValidation.filePatterns` | `["**/Jenkinsfile","**/*.jenkinsfile","**/Jenkinsfile.*"]` | Glob patterns used to detect Jenkinsfile documents for validation. |
+
 ## Commands
 
 ### Environment Management
@@ -182,6 +197,11 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `Jenkins: View Job Config` | Open the selected job or pipeline's `config.xml` in a read-only preview |
 | `Jenkins: Update Job Config` | Open an editable draft of `config.xml`, show a diff, validate XML, and submit with confirmation |
 | `Jenkins: Submit Job Config` | Submit the active job config draft after validation and confirmation |
+| `Jenkins: Enable Job` | Enable a disabled job or pipeline |
+| `Jenkins: Disable Job` | Disable an enabled job or pipeline |
+| `Jenkins: Rename Job` | Rename the selected job or pipeline |
+| `Jenkins: Copy Job` | Copy the selected job or pipeline |
+| `Jenkins: Delete Job` | Delete the selected job or pipeline |
 
 ### Artifacts
 
@@ -196,6 +216,12 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 |---------|-------------|
 | `Jenkins: Go to Job...` | Search and navigate to any job |
 | `Jenkins: Open in Jenkins` | Open the selected item in your browser |
+
+### Nodes
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins: View Node Details` | Open the node details panel |
 
 ### Filtering
 
@@ -222,15 +248,24 @@ A powerful VS Code extension that brings Jenkins directly into your editor. Brow
 | `Jenkins: Watch Job` | Watch a job for status changes |
 | `Jenkins: Unwatch Job` | Stop watching a job |
 
+### Jenkinsfile Validation
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins: Validate Jenkinsfile` | Validate the active Jenkinsfile |
+| `Jenkins: Select Jenkinsfile Validation Environment` | Choose which environment validates Jenkinsfiles |
+| `Jenkins: Clear Jenkinsfile Validation Diagnostics` | Clear Jenkinsfile validation diagnostics |
+| `Jenkins: Show Jenkinsfile Validation Output` | Show the Jenkinsfile validation output channel |
+
 ## Security
 
-Jenkins Workbench takes security seriously:
+Security notes:
 
-- **Secure Credential Storage** — API tokens, bearer tokens, cookie values, and custom headers are stored in VS Code's SecretStorage
-- **Auth Header Support** — Basic, Bearer, Cookie, and custom headers are sent on every request, including CSRF crumb acquisition
-- **CSRF Protection** — Full support for Jenkins crumb issuer when CSRF protection is enabled
-- **Network Security** — All API calls use the configured URL scheme; use HTTPS for production Jenkins instances
-- **No Interactive SSO** — The extension does not perform browser-based OAuth/SAML flows; supply cookies/tokens manually
+- **Credential storage** — API tokens, bearer tokens, cookie values, and custom headers are stored in VS Code SecretStorage
+- **Auth headers** — Basic, Bearer, Cookie, and custom headers are sent on every request, including CSRF crumb acquisition
+- **CSRF crumbs** — Supports the Jenkins crumb issuer when CSRF protection is enabled
+- **Transport** — Requests use the configured URL scheme; use HTTPS for production Jenkins instances
+- **SSO** — The extension does not run browser-based OAuth/SAML flows; supply cookies or tokens manually
 
 ### Recommended Setup
 

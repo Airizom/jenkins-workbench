@@ -1,9 +1,9 @@
-import * as path from "node:path";
 import type { IncomingHttpHeaders } from "node:http";
+import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { ArtifactRetrievalService } from "./ArtifactRetrievalService";
 import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactPathUtils";
+import type { ArtifactRetrievalService } from "./ArtifactRetrievalService";
 
 export interface ArtifactFilesystem {
   createDirectory(path: string): Thenable<void>;

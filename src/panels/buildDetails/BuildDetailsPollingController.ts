@@ -1,4 +1,6 @@
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsTestReportOptions } from "../../jenkins/JenkinsTestReportOptions";
 import type {
   JenkinsBuildDetails,
   JenkinsConsoleText,
@@ -8,12 +10,7 @@ import type {
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
-import type { JenkinsTestReportOptions } from "../../jenkins/JenkinsTestReportOptions";
-import {
-  ConsoleStreamManager,
-  type ConsoleSnapshotResult
-} from "./ConsoleStreamManager";
+import { type ConsoleSnapshotResult, ConsoleStreamManager } from "./ConsoleStreamManager";
 
 export interface BuildDetailsDataService {
   getBuildDetails(
@@ -168,11 +165,7 @@ export class BuildDetailsPollingController {
   }
 
   async fetchTestReport(): Promise<JenkinsTestReport | undefined> {
-    return this.dataService.getTestReport(
-      this.environment,
-      this.buildUrl,
-      this.testReportOptions
-    );
+    return this.dataService.getTestReport(this.environment, this.buildUrl, this.testReportOptions);
   }
 
   async fetchWorkflowRunWithCallbacks(_token: number): Promise<void> {

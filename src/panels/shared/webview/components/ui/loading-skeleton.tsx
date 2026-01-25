@@ -25,9 +25,7 @@ function LoadingSkeletonHeader({ variant }: { variant: "build" | "node" }) {
       <div className="mx-auto max-w-5xl px-6 py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            {variant === "node" ? (
-              <Skeleton className="h-12 w-12 shrink-0 rounded-lg" />
-            ) : null}
+            {variant === "node" ? <Skeleton className="h-12 w-12 shrink-0 rounded-lg" /> : null}
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-5 w-48" />
@@ -38,9 +36,7 @@ function LoadingSkeletonHeader({ variant }: { variant: "build" | "node" }) {
                 <Skeleton className="h-3.5 w-32" />
                 {variant === "build" ? <Skeleton className="h-3.5 w-20" /> : null}
               </div>
-              {variant === "node" ? (
-                <Skeleton className="h-3 w-40 mt-0.5" />
-              ) : null}
+              {variant === "node" ? <Skeleton className="h-3 w-40 mt-0.5" /> : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -66,9 +62,10 @@ function LoadingSkeletonContent({ variant }: { variant: "build" | "node" }) {
 }
 
 function LoadingSkeletonTabs({ variant }: { variant: "build" | "node" }) {
-  const tabs = variant === "build"
-    ? ["Console", "Build Summary"]
-    : ["Overview", "Executors", "Labels", "Advanced"];
+  const tabs =
+    variant === "build"
+      ? ["Console", "Build Summary"]
+      : ["Overview", "Executors", "Labels", "Advanced"];
 
   return (
     <div className="flex items-center gap-1 rounded-lg bg-muted/50 p-1 w-fit">
@@ -224,9 +221,7 @@ export function LoadingIndicator({ className, message }: { className?: string; m
   return (
     <div className={cn("flex flex-col items-center justify-center gap-3 py-12", className)}>
       <LoadingSpinner className="h-8 w-8" />
-      {message ? (
-        <p className="text-sm text-muted-foreground animate-pulse">{message}</p>
-      ) : null}
+      {message ? <p className="text-sm text-muted-foreground animate-pulse">{message}</p> : null}
     </div>
   );
 }

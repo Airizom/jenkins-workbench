@@ -12,7 +12,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
   outline: "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
   ghost: "hover:bg-accent hover:text-accent-foreground",
   link: "text-link underline-offset-4 hover:text-link-hover hover:underline p-0 h-auto",
-  destructive: "bg-destructive text-destructive-foreground border border-destructive-border hover:opacity-90"
+  destructive:
+    "bg-destructive text-destructive-foreground border border-destructive-border hover:opacity-90"
 };
 
 const buttonSizes: Record<ButtonSize, string> = {

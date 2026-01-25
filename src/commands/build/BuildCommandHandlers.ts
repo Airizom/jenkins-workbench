@@ -1,17 +1,17 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService, JobParameter } from "../../jenkins/JenkinsDataService";
-import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
-import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import type { PendingInputActionProvider } from "../../panels/buildDetails/BuildDetailsPollingController";
-import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
-import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
-import { handlePendingInputAction } from "../../ui/PendingInputActions";
+import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
+import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
-import { formatActionError, getOpenUrl, getTreeItemLabel } from "../CommandUtils";
+import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
+import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { promptForParameters } from "../../ui/ParameterPrompts";
+import { handlePendingInputAction } from "../../ui/PendingInputActions";
+import { formatActionError, getOpenUrl, getTreeItemLabel } from "../CommandUtils";
+import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 
 export async function triggerBuild(
   dataService: JenkinsDataService,
@@ -153,7 +153,6 @@ export async function rejectInput(
     onRefresh: () => refreshHost.refreshEnvironment(item.environment.environmentId)
   });
 }
-
 
 export async function replayBuild(
   dataService: JenkinsDataService,

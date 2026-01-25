@@ -1,17 +1,20 @@
 import * as vscode from "vscode";
 import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
+import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
+import { JenkinsfileHoverProvider } from "../validation/editor/JenkinsfileHoverProvider";
+import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
+import { JenkinsfileValidationCodeLensProvider } from "../validation/editor/JenkinsfileValidationCodeLensProvider";
 import { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import { registerExtensionCommands } from "./ExtensionCommands";
-import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 import {
-  getBuildListFetchOptions,
-  getBuildTooltipOptions,
-  getCacheTtlMs,
   getArtifactActionOptions,
+  getArtifactMaxDownloadBytes,
   getArtifactPreviewCacheMaxBytes,
   getArtifactPreviewCacheMaxEntries,
   getArtifactPreviewCacheTtlMs,
-  getArtifactMaxDownloadBytes,
+  getBuildListFetchOptions,
+  getBuildTooltipOptions,
+  getCacheTtlMs,
   getExtensionConfiguration,
   getJenkinsfileValidationConfig,
   getMaxCacheEntries,
@@ -23,10 +26,7 @@ import {
 import { createExtensionServices } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
 import { VscodeStatusNotifier } from "./VscodeStatusNotifier";
-import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
-import { JenkinsfileHoverProvider } from "../validation/editor/JenkinsfileHoverProvider";
-import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
-import { JenkinsfileValidationCodeLensProvider } from "../validation/editor/JenkinsfileValidationCodeLensProvider";
+import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
@@ -101,9 +101,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   void services.viewStateStore.syncFilterContext();
   services.jenkinsfileValidationCoordinator.start();
 
-  const jenkinsfileQuickFixProvider = new JenkinsfileQuickFixProvider(
-    services.jenkinsfileMatcher
-  );
+  const jenkinsfileQuickFixProvider = new JenkinsfileQuickFixProvider(services.jenkinsfileMatcher);
   const jenkinsfileHoverProvider = new JenkinsfileHoverProvider(
     services.jenkinsfileMatcher,
     services.jenkinsfileValidationCoordinator

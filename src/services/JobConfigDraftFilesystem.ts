@@ -63,7 +63,11 @@ export class JobConfigDraftFilesystem implements vscode.FileSystemProvider {
   }
 
   createDraft(label: string, content: string): vscode.Uri {
-    const safeLabel = label.trim().replace(/[^a-zA-Z0-9-_]+/g, "-").slice(0, 40) || "job";
+    const safeLabel =
+      label
+        .trim()
+        .replace(/[^a-zA-Z0-9-_]+/g, "-")
+        .slice(0, 40) || "job";
     const filename = `jenkins-${safeLabel}-config-${Date.now()}.xml`;
     const uri = vscode.Uri.from({ scheme: JOB_CONFIG_DRAFT_SCHEME, path: `/${filename}` });
 

@@ -113,11 +113,7 @@ export class BuildConsoleExporter {
         throw error;
       }
     }
-    return this.writeConsoleSnapshot(
-      options.targetPath,
-      options.environment,
-      options.buildUrl
-    );
+    return this.writeConsoleSnapshot(options.targetPath, options.environment, options.buildUrl);
   }
 
   private async writeConsoleProgressive(
@@ -230,6 +226,9 @@ export class BuildConsoleExporter {
 }
 
 function sanitizeFileName(value: string): string {
-  const sanitized = value.replace(/[\r\n]+/g, " ").replace(/[\\/:*?"<>|]/g, "_").trim();
+  const sanitized = value
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim();
   return sanitized.length > 0 ? sanitized : "jenkins-console";
 }

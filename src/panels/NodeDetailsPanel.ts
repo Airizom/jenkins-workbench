@@ -1,15 +1,14 @@
 import * as vscode from "vscode";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
-import { formatActionError } from "../formatters/ErrorFormatters";
-import { createNonce } from "./shared/webview/WebviewNonce";
 import {
+  type NodeDetailsOutgoingMessage,
   isCopyNodeJsonMessage,
   isLoadAdvancedNodeDetailsMessage,
   isOpenExternalMessage,
-  isRefreshNodeDetailsMessage,
-  type NodeDetailsOutgoingMessage
+  isRefreshNodeDetailsMessage
 } from "./nodeDetails/NodeDetailsMessages";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
@@ -17,6 +16,7 @@ import {
   NODE_DETAILS_WEBVIEW_BUNDLE_PATH,
   NODE_DETAILS_WEBVIEW_CSS_PATH
 } from "./nodeDetails/NodeDetailsWebviewAssets";
+import { createNonce } from "./shared/webview/WebviewNonce";
 
 export class NodeDetailsPanel {
   private static currentPanel: NodeDetailsPanel | undefined;
@@ -183,14 +183,10 @@ export class NodeDetailsPanel {
     }
     try {
       const detailLevel = options?.detailLevel ?? (this.advancedLoaded ? "advanced" : "basic");
-      const details = await this.dataService.getNodeDetails(
-        this.environment,
-        this.nodeUrl,
-        {
-          mode: options?.mode,
-          detailLevel
-        }
-      );
+      const details = await this.dataService.getNodeDetails(this.environment, this.nodeUrl, {
+        mode: options?.mode,
+        detailLevel
+      });
       if (!this.isTokenCurrent(token)) {
         return undefined;
       }

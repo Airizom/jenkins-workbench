@@ -25,7 +25,11 @@ const NODE_DETAILS_BASE_FIELDS = [
   "manualLaunchAllowed"
 ];
 
-const NODE_DETAILS_ADVANCED_FIELDS = [...NODE_DETAILS_BASE_FIELDS, "monitorData[*]", "loadStatistics[*]"];
+const NODE_DETAILS_ADVANCED_FIELDS = [
+  ...NODE_DETAILS_BASE_FIELDS,
+  "monitorData[*]",
+  "loadStatistics[*]"
+];
 
 const NODE_DETAILS_BASE_TREE = NODE_DETAILS_BASE_FIELDS.join(",");
 const NODE_DETAILS_ADVANCED_TREE = NODE_DETAILS_ADVANCED_FIELDS.join(",");

@@ -110,18 +110,11 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     throw vscode.FileSystemError.NoPermissions("Artifact previews are read-only.");
   }
 
-  rename(
-    _oldUri: vscode.Uri,
-    _newUri: vscode.Uri,
-    _options: { overwrite: boolean }
-  ): void {
+  rename(_oldUri: vscode.Uri, _newUri: vscode.Uri, _options: { overwrite: boolean }): void {
     throw vscode.FileSystemError.NoPermissions("Artifact previews are read-only.");
   }
 
-  watch(
-    _uri: vscode.Uri,
-    _options: { recursive: boolean; excludes: string[] }
-  ): vscode.Disposable {
+  watch(_uri: vscode.Uri, _options: { recursive: boolean; excludes: string[] }): vscode.Disposable {
     return new vscode.Disposable(() => undefined);
   }
 

@@ -63,7 +63,9 @@ export function BuildSummaryCard({
                 <ClockIcon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="flex flex-col">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">Duration</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Duration
+                </div>
                 <div className="text-sm font-medium">{durationLabel}</div>
               </div>
             </div>
@@ -73,7 +75,9 @@ export function BuildSummaryCard({
                 <CalendarIcon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="flex flex-col">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">Timestamp</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Timestamp
+                </div>
                 <div className="text-sm font-medium">{timestampLabel}</div>
               </div>
             </div>
@@ -83,7 +87,9 @@ export function BuildSummaryCard({
                 <UserIcon />
               </div>
               <div className="flex flex-col">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">Culprit(s)</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Culprit(s)
+                </div>
                 <div className="text-sm font-medium">{culpritsLabel}</div>
               </div>
             </div>

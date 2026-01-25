@@ -1,54 +1,54 @@
 import * as vscode from "vscode";
+import { JobConfigUpdateWorkflow } from "../commands/job/JobConfigUpdateWorkflow";
 import { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
-import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
+import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import { ArtifactActionService } from "../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../services/ArtifactFilesystem";
 import {
-  JobConfigDraftFilesystem,
-  JOB_CONFIG_DRAFT_SCHEME
-} from "../services/JobConfigDraftFilesystem";
-import { JobConfigDraftManager } from "../services/JobConfigDraftManager";
-import {
-  DefaultArtifactRetrievalService,
-  type ArtifactRetrievalService
+  type ArtifactRetrievalService,
+  DefaultArtifactRetrievalService
 } from "../services/ArtifactRetrievalService";
 import { ArtifactStorageService } from "../services/ArtifactStorageService";
-import { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
 } from "../services/BuildConsoleExporter";
 import { BuildLogService } from "../services/BuildLogService";
+import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
 import {
-  ArtifactPreviewProvider,
-  type ArtifactPreviewProviderOptions
-} from "../ui/ArtifactPreviewProvider";
-import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
-import { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
-import { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
-import { JobConfigUpdateWorkflow } from "../commands/job/JobConfigUpdateWorkflow";
-import {
-  DefaultArtifactActionHandler,
-  type ArtifactActionHandler,
-  type ArtifactActionOptionsProvider
-} from "../ui/ArtifactActionHandler";
+  JOB_CONFIG_DRAFT_SCHEME,
+  JobConfigDraftFilesystem
+} from "../services/JobConfigDraftFilesystem";
+import { JobConfigDraftManager } from "../services/JobConfigDraftManager";
+import { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
+import { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
 import { JenkinsTreeFilter } from "../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../tree/TreeItems";
 import { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
-import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
+import {
+  type ArtifactActionHandler,
+  type ArtifactActionOptionsProvider,
+  DefaultArtifactActionHandler
+} from "../ui/ArtifactActionHandler";
+import {
+  ArtifactPreviewProvider,
+  type ArtifactPreviewProviderOptions
+} from "../ui/ArtifactPreviewProvider";
+import { type ArtifactPreviewOptionsProvider, ArtifactPreviewer } from "../ui/ArtifactPreviewer";
+import { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
+import { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import { JenkinsfileEnvironmentResolver } from "../validation/JenkinsfileEnvironmentResolver";
 import { JenkinsfileMatcher } from "../validation/JenkinsfileMatcher";
 import { JenkinsfileValidationCoordinator } from "../validation/JenkinsfileValidationCoordinator";
 import { JenkinsfileValidationStatusBar } from "../validation/JenkinsfileValidationStatusBar";
+import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
 
 export interface ExtensionServices {
   environmentStore: JenkinsEnvironmentStore;

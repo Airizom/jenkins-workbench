@@ -1,5 +1,5 @@
-import type { BuildFailureChangelogItem } from "../../../../shared/BuildDetailsContracts";
 import { Card } from "../../../../../shared/webview/components/ui/card";
+import type { BuildFailureChangelogItem } from "../../../../shared/BuildDetailsContracts";
 import { OverflowText } from "./BuildFailureOverflowText";
 
 function GitCommitIcon() {
@@ -78,9 +78,7 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
           className="rounded border border-border bg-muted/30 px-3 py-2"
           key={`${item.message}-${index}`}
         >
-          <div className="text-sm font-medium text-foreground line-clamp-2">
-            {item.message}
-          </div>
+          <div className="text-sm font-medium text-foreground line-clamp-2">{item.message}</div>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <UserIcon />

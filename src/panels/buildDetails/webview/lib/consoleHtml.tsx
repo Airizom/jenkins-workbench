@@ -16,18 +16,7 @@ export type ConsoleHtmlModel = {
   text: string;
 };
 
-const ALLOWED_TAGS = new Set([
-  "a",
-  "span",
-  "b",
-  "strong",
-  "i",
-  "em",
-  "code",
-  "u",
-  "s",
-  "br"
-]);
+const ALLOWED_TAGS = new Set(["a", "span", "b", "strong", "i", "em", "code", "u", "s", "br"]);
 
 export function parseConsoleHtml(html: string): ConsoleHtmlModel {
   if (!html) {
@@ -97,18 +86,16 @@ function renderNodes(nodes: ConsoleHtmlNode[], context: RenderContext): React.Re
         };
       }
     }
-    rendered.push(
-      React.createElement(
-        node.tag,
-        props,
-        children
-      )
-    );
+    rendered.push(React.createElement(node.tag, props, children));
   }
   return rendered;
 }
 
-function renderTextNode(text: string, context: RenderContext, keyPrefix: string): React.ReactNode[] {
+function renderTextNode(
+  text: string,
+  context: RenderContext,
+  keyPrefix: string
+): React.ReactNode[] {
   if (!text) {
     return [];
   }

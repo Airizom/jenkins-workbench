@@ -42,10 +42,7 @@ const toActionError = <T extends JenkinsActionError>(
     return new ErrorType(error.message, "unknown", error.statusCode);
   }
 
-  return new ErrorType(
-    error instanceof Error ? error.message : "Unexpected error.",
-    "unknown"
-  );
+  return new ErrorType(error instanceof Error ? error.message : "Unexpected error.", "unknown");
 };
 
 export const toBuildActionError = (error: unknown): BuildActionError =>

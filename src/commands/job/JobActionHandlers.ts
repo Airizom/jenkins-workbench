@@ -5,12 +5,9 @@ import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
-import {
-  updateJobMetadataOnRename,
-  removeJobMetadataOnDelete
-} from "./JobMetadataCoordinator";
-import { getJobNameValidationError } from "./JobNameValidation";
 import type { JobCommandRefreshHost } from "./JobCommandTypes";
+import { removeJobMetadataOnDelete, updateJobMetadataOnRename } from "./JobMetadataCoordinator";
+import { getJobNameValidationError } from "./JobNameValidation";
 
 export interface JobActionDependencies {
   dataService: JenkinsDataService;

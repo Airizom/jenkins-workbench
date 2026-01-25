@@ -1,5 +1,5 @@
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../jenkins/request";
 
 export interface ArtifactRetrievalService {

@@ -20,11 +20,7 @@ export class BuildLogPreviewer {
     buildUrl: string,
     fileName: string
   ): Promise<BuildLogPreviewResult> {
-    const consoleText = await this.logService.getConsoleText(
-      environment,
-      buildUrl,
-      this.maxChars
-    );
+    const consoleText = await this.logService.getConsoleText(environment, buildUrl, this.maxChars);
     const data = Buffer.from(consoleText.text, "utf8");
     const uri = this.previewProvider.registerArtifact(data, fileName);
     await openTextPreview(this.previewProvider, uri);

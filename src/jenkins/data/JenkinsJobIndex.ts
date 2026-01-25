@@ -1,9 +1,9 @@
 import type { JenkinsJob, JenkinsJobKind } from "../JenkinsClient";
 import type { JenkinsClientProvider } from "../JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
+import { CancellationError } from "../errors";
 import { AsyncQueue, JobQueue } from "./AsyncQueue";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
-import { CancellationError } from "../errors";
 import type {
   CancellationInput,
   JenkinsJobInfo,

@@ -4,7 +4,7 @@ import type { JenkinsBuild, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsNodeInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
-import { buildBuildTooltip, type BuildTooltipOptions } from "./BuildTooltips";
+import { type BuildTooltipOptions, buildBuildTooltip } from "./BuildTooltips";
 import {
   buildIcon,
   formatBuildDescription,
@@ -177,7 +177,9 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
     this.contextValue = folderKind === "multibranch" ? "multibranchFolder" : "folder";
     this.description = folderKind === "multibranch" ? "Multibranch" : undefined;
     this.iconPath =
-      folderKind === "multibranch" ? new vscode.ThemeIcon("git-branch") : new vscode.ThemeIcon("folder");
+      folderKind === "multibranch"
+        ? new vscode.ThemeIcon("git-branch")
+        : new vscode.ThemeIcon("folder");
   }
 }
 
@@ -325,14 +327,18 @@ export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
     const hasArtifacts = typeof artifactCount === "number" ? artifactCount > 0 : true;
     super(
       "Artifacts",
-      hasArtifacts ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+      hasArtifacts
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None
     );
     this.id = BuildArtifactsFolderTreeItem.buildId(environment, buildUrl);
     this.contextValue = "artifactFolder";
     this.iconPath = new vscode.ThemeIcon("folder");
     if (typeof artifactCount === "number") {
       this.description =
-        artifactCount > 0 ? `${artifactCount} item${artifactCount === 1 ? "" : "s"}` : "No artifacts";
+        artifactCount > 0
+          ? `${artifactCount} item${artifactCount === 1 ? "" : "s"}`
+          : "No artifacts";
     }
   }
 }
@@ -501,7 +507,9 @@ function tryParseUrl(rawUrl: string): URL | undefined {
   }
 }
 
-function buildEnvironmentTooltip(environment: JenkinsEnvironment & { scope: EnvironmentScope }): string {
+function buildEnvironmentTooltip(
+  environment: JenkinsEnvironment & { scope: EnvironmentScope }
+): string {
   const scopeLabel = formatScopeLabel(environment.scope);
   const parts = [`${environment.url}`, `Scope: ${scopeLabel}`];
   if (environment.username) {

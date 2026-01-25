@@ -61,7 +61,10 @@
     --checkbox-foreground: var(--vscode-checkbox-foreground);
     --checkbox-border: var(--vscode-checkbox-border);
     --checkbox-checked: var(--vscode-checkbox-selectBackground, var(--vscode-button-background));
-    --checkbox-checked-foreground: var(--vscode-checkbox-selectForeground, var(--vscode-button-foreground));
+    --checkbox-checked-foreground: var(
+      --vscode-checkbox-selectForeground,
+      var(--vscode-button-foreground)
+    );
 
     --success: var(--vscode-testing-iconPassed, #4ec9b0);
     --success-foreground: var(--vscode-editor-foreground);
@@ -166,7 +169,8 @@
   }
 
   @keyframes pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {
@@ -175,7 +179,8 @@
   }
 
   @keyframes ping {
-    75%, 100% {
+    75%,
+    100% {
       transform: scale(2);
       opacity: 0;
     }

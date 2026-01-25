@@ -7,15 +7,15 @@ import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import {
   type JobActionDependencies,
-  enableJob,
-  disableJob,
-  renameJob,
+  copyJob,
   deleteJob,
-  copyJob
+  disableJob,
+  enableJob,
+  renameJob
 } from "./job/JobActionHandlers";
 import { submitJobConfigDraft, updateJobConfig, viewJobConfig } from "./job/JobCommandHandlers";
-import type { JobConfigUpdateWorkflow } from "./job/JobConfigUpdateWorkflow";
 import type { JobCommandRefreshHost } from "./job/JobCommandTypes";
+import type { JobConfigUpdateWorkflow } from "./job/JobConfigUpdateWorkflow";
 
 export function registerJobCommands(
   context: vscode.ExtensionContext,

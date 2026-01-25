@@ -11,8 +11,8 @@ import {
   requestJson as requestJsonInternal,
   requestStream as requestStreamInternal,
   requestText as requestTextInternal,
-  requestTextWithOptions as requestTextWithOptionsInternal,
   requestTextWithHeaders as requestTextWithHeadersInternal,
+  requestTextWithOptions as requestTextWithOptionsInternal,
   requestVoidWithLocation as requestVoidWithLocationInternal
 } from "../request";
 import type { JenkinsClientOptions } from "../types";

@@ -7,10 +7,7 @@ export class ScopedCache {
   private readonly maxEntries: number;
   private readonly pruneThreshold: number;
 
-  constructor(
-    ttlMs: number,
-    maxEntries: number
-  ) {
+  constructor(ttlMs: number, maxEntries: number) {
     this.cache = new JenkinsDataCache(ttlMs, maxEntries);
     this.maxEntries = Math.max(1, maxEntries);
     this.pruneThreshold = this.maxEntries * 2;

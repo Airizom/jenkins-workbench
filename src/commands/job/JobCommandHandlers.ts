@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
-import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
+import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 import type { JobConfigUpdateWorkflow } from "./JobConfigUpdateWorkflow";
 

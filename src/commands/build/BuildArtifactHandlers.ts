@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import type { ArtifactTreeItem } from "../../tree/TreeItems";
+import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 
 export async function previewArtifact(
   artifactActionHandler: ArtifactActionHandler,

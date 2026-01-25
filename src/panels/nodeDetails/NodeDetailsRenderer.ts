@@ -1,8 +1,8 @@
 import { renderLoadingSkeletonHtml } from "../shared/webview/LoadingSkeletonHtml";
 import {
+  type WebviewRenderOptions,
   renderWebviewShell,
-  serializeForScript,
-  type WebviewRenderOptions
+  serializeForScript
 } from "../shared/webview/WebviewHtml";
 import type { NodeDetailsViewModel } from "./NodeDetailsViewModel";
 

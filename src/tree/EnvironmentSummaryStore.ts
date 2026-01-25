@@ -4,8 +4,8 @@ import type {
   JenkinsQueueItemInfo
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JobsFolderSummary, NodesFolderSummary, QueueFolderSummary } from "./TreeItems";
 import type { ScopedCache } from "../services/ScopedCache";
+import type { JobsFolderSummary, NodesFolderSummary, QueueFolderSummary } from "./TreeItems";
 import { isJobColorDisabled } from "./formatters";
 
 export type EnvironmentSummary = {
@@ -100,10 +100,7 @@ function buildNodesSummary(nodes: JenkinsNodeInfo[]): NodesFolderSummary {
   return summary;
 }
 
-function areSummariesEqual(
-  left?: EnvironmentSummary,
-  right?: EnvironmentSummary
-): boolean {
+function areSummariesEqual(left?: EnvironmentSummary, right?: EnvironmentSummary): boolean {
   return (
     areJobSummariesEqual(left?.jobs, right?.jobs) &&
     areNodeSummariesEqual(left?.nodes, right?.nodes) &&
@@ -111,10 +108,7 @@ function areSummariesEqual(
   );
 }
 
-function areJobSummariesEqual(
-  left?: JobsFolderSummary,
-  right?: JobsFolderSummary
-): boolean {
+function areJobSummariesEqual(left?: JobsFolderSummary, right?: JobsFolderSummary): boolean {
   if (!left && !right) {
     return true;
   }
@@ -130,10 +124,7 @@ function areJobSummariesEqual(
   );
 }
 
-function areNodeSummariesEqual(
-  left?: NodesFolderSummary,
-  right?: NodesFolderSummary
-): boolean {
+function areNodeSummariesEqual(left?: NodesFolderSummary, right?: NodesFolderSummary): boolean {
   if (!left && !right) {
     return true;
   }
@@ -141,16 +132,11 @@ function areNodeSummariesEqual(
     return false;
   }
   return (
-    left.total === right.total &&
-    left.online === right.online &&
-    left.offline === right.offline
+    left.total === right.total && left.online === right.online && left.offline === right.offline
   );
 }
 
-function areQueueSummariesEqual(
-  left?: QueueFolderSummary,
-  right?: QueueFolderSummary
-): boolean {
+function areQueueSummariesEqual(left?: QueueFolderSummary, right?: QueueFolderSummary): boolean {
   if (!left && !right) {
     return true;
   }

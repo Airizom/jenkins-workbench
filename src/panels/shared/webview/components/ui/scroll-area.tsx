@@ -15,15 +15,7 @@ export const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
     };
 
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "relative",
-          overflowClasses[orientation],
-          className
-        )}
-        {...props}
-      >
+      <div ref={ref} className={cn("relative", overflowClasses[orientation], className)} {...props}>
         {children}
       </div>
     );

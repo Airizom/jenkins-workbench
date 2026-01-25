@@ -1,8 +1,6 @@
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
-import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
-import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import {
   formatCulprits,
   formatDuration,
@@ -10,7 +8,9 @@ import {
   formatResultClass,
   formatTimestamp
 } from "./BuildDetailsFormatters";
+import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsUpdateMessage } from "./BuildDetailsMessages";
+import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import {
   buildBuildFailureInsights,
   buildPendingInputsViewModel,

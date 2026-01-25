@@ -5,12 +5,12 @@ import type {
   JobSearchEntry
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
-import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import type { BuildTooltipOptions } from "./BuildTooltips";
+import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import {
   BuildQueueFolderTreeItem,
@@ -27,7 +27,10 @@ const REFRESH_DEBOUNCE_MS = 150;
 const MANUAL_REFRESH_COOLDOWN_MS = 2000;
 
 export class JenkinsWorkbenchTreeDataProvider
-  implements vscode.TreeDataProvider<WorkbenchTreeElement>, JenkinsTreeRevealProvider, vscode.Disposable
+  implements
+    vscode.TreeDataProvider<WorkbenchTreeElement>,
+    JenkinsTreeRevealProvider,
+    vscode.Disposable
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     WorkbenchTreeElement | undefined

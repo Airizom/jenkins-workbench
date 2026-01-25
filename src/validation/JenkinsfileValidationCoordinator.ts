@@ -3,12 +3,11 @@ import * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsfileEnvironmentResolver } from "./JenkinsfileEnvironmentResolver";
-import { JENKINS_DIAGNOSTIC_SOURCE } from "./JenkinsfileDiagnosticUtils";
 import { setDiagnosticMetadata } from "./JenkinsfileDiagnosticMetadata";
+import { JENKINS_DIAGNOSTIC_SOURCE } from "./JenkinsfileDiagnosticUtils";
+import type { JenkinsfileEnvironmentResolver } from "./JenkinsfileEnvironmentResolver";
 import type { JenkinsfileMatcher } from "./JenkinsfileMatcher";
 import { parseDeclarativeValidationOutput } from "./JenkinsfileValidationParser";
-import { findTokenOccurrence, isTokenChar } from "./JenkinsfileValidationUtils";
 import type { JenkinsfileValidationStatusBar } from "./JenkinsfileValidationStatusBar";
 import type {
   JenkinsfileValidationStatusProvider,
@@ -18,6 +17,7 @@ import type {
   JenkinsfileValidationConfig,
   JenkinsfileValidationFinding
 } from "./JenkinsfileValidationTypes";
+import { findTokenOccurrence, isTokenChar } from "./JenkinsfileValidationUtils";
 
 type ValidationReason = "save" | "command" | "change" | "open";
 
@@ -164,9 +164,7 @@ export class JenkinsfileValidationCoordinator
     return state.environment;
   }
 
-  getValidationState(
-    document: vscode.TextDocument
-  ): JenkinsfileValidationStatusState | undefined {
+  getValidationState(document: vscode.TextDocument): JenkinsfileValidationStatusState | undefined {
     const state = this.lastStatusState.get(document.uri.toString());
     if (!state) {
       return undefined;
@@ -299,13 +297,11 @@ export class JenkinsfileValidationCoordinator
 
     const token = this.nextToken(key);
     this.statusBar.setValidating(document);
-    const cancellationSubscription = options.cancellationToken?.onCancellationRequested(
-      () => {
-        if (this.isActiveToken(key, token)) {
-          this.restoreStatusBar(document);
-        }
+    const cancellationSubscription = options.cancellationToken?.onCancellationRequested(() => {
+      if (this.isActiveToken(key, token)) {
+        this.restoreStatusBar(document);
       }
-    );
+    });
 
     try {
       const canceledBeforeLookup = this.getCancellationOutcome(document, options);
@@ -755,11 +751,7 @@ function resolveFindingRange(
   return buildLineRange(clampedLine, lineText);
 }
 
-function resolveRangeFromColumn(
-  lineIndex: number,
-  lineText: string,
-  column: number
-): vscode.Range {
+function resolveRangeFromColumn(lineIndex: number, lineText: string, column: number): vscode.Range {
   const lineLength = lineText.length;
   if (lineLength === 0) {
     return buildLineRange(lineIndex, lineText);
@@ -796,9 +788,7 @@ function buildLineRange(lineIndex: number, lineText: string): vscode.Range {
 }
 
 function deriveTokenHint(message: string): string | undefined {
-  const missingSectionMatch = message.match(
-    /Missing required section ['"]([^'"]+)['"]/i
-  );
+  const missingSectionMatch = message.match(/Missing required section ['"]([^'"]+)['"]/i);
   if (missingSectionMatch) {
     const section = missingSectionMatch[1].trim().toLowerCase();
     if (section === "stages" || section === "agent") {
@@ -814,9 +804,7 @@ function deriveTokenHint(message: string): string | undefined {
     return invalidSectionMatch[1].trim().toLowerCase();
   }
 
-  const unknownSectionMatch = message.match(
-    /Unknown section ['"]?([A-Za-z0-9_-]+)['"]?/i
-  );
+  const unknownSectionMatch = message.match(/Unknown section ['"]?([A-Za-z0-9_-]+)['"]?/i);
   if (unknownSectionMatch) {
     return unknownSectionMatch[1].trim().toLowerCase();
   }

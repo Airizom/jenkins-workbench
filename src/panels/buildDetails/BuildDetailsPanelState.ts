@@ -1,7 +1,7 @@
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { BuildDetailsInitialState } from "./BuildDetailsPollingController";
 
 export class BuildDetailsPanelState {

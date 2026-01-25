@@ -315,7 +315,14 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         maxAgeMs: this.pollIntervalMs,
         notify: false
       });
-      this.handlePendingInputSummary(summary, pendingKey, entry, environment.url, buildUrl, jobName);
+      this.handlePendingInputSummary(
+        summary,
+        pendingKey,
+        entry,
+        environment.url,
+        buildUrl,
+        jobName
+      );
     } catch {
       return;
     }

@@ -6,14 +6,15 @@ import type {
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNodeDetails,
+  JenkinsParameterDefinition,
   JenkinsPendingInputAction,
   JenkinsPendingInputParameterDefinition,
-  JenkinsParameterDefinition,
   JenkinsQueueItem,
   JenkinsWorkflowRun
 } from "./JenkinsClient";
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
+import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsDataCache } from "./data/JenkinsDataCache";
 import { toBuildActionError, toJenkinsActionError } from "./data/JenkinsDataErrors";
 import type {
@@ -24,18 +25,17 @@ import type {
   JenkinsQueueItemInfo,
   JobParameter,
   JobParameterKind,
-  PendingInputAction,
-  PendingInputSummary,
   JobSearchEntry,
   JobSearchOptions,
+  PendingInputAction,
+  PendingInputSummary,
   ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult
 } from "./data/JenkinsDataTypes";
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
 import { JenkinsRequestError } from "./errors";
-import type { JenkinsTestReport } from "./types";
-import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
+import type { JenkinsTestReport } from "./types";
 import { resolveNodeUrl } from "./urls";
 
 export type {
@@ -446,11 +446,7 @@ export class JenkinsDataService {
     options?: { mode?: "refresh"; detailLevel?: "basic" | "advanced" }
   ): Promise<JenkinsNodeDetails> {
     const detailLevel = options?.detailLevel ?? "basic";
-    const cacheKey = await this.buildCacheKey(
-      environment,
-      `node-details-${detailLevel}`,
-      nodeUrl
-    );
+    const cacheKey = await this.buildCacheKey(environment, `node-details-${detailLevel}`, nodeUrl);
     const cached =
       options?.mode !== "refresh" ? this.cache.get<JenkinsNodeDetails>(cacheKey) : undefined;
     if (cached) {
@@ -827,7 +823,10 @@ export class JenkinsDataService {
     const normalizedType = (parameter.type ?? "").toLowerCase();
     let kind: JobParameterKind = "string";
 
-    if (normalizedType.includes("booleanparameterdefinition") || normalizedType.includes("boolean")) {
+    if (
+      normalizedType.includes("booleanparameterdefinition") ||
+      normalizedType.includes("boolean")
+    ) {
       kind = "boolean";
     } else if (
       normalizedType.includes("choiceparameterdefinition") ||
@@ -857,9 +856,7 @@ export class JenkinsDataService {
     };
   }
 
-  private formatParameterDefaultValue(
-    value: unknown
-  ): string | number | boolean | undefined {
+  private formatParameterDefaultValue(value: unknown): string | number | boolean | undefined {
     switch (typeof value) {
       case "string":
       case "number":

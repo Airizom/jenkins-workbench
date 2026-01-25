@@ -1,7 +1,7 @@
-import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
+import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
 
 function AlertCircleIcon() {
   return (
@@ -132,11 +132,7 @@ export function PendingInputsSection({
             ) : null}
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() => onApprove(input.id)}
-                className="gap-1.5"
-              >
+              <Button size="sm" onClick={() => onApprove(input.id)} className="gap-1.5">
                 <CheckIcon />
                 Approve
               </Button>

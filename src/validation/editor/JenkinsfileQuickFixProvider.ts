@@ -1,31 +1,28 @@
 import * as vscode from "vscode";
-import type { JenkinsfileMatcher } from "../JenkinsfileMatcher";
-import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
-import {
-  buildAgentInsertText,
-  buildStagesInsertText,
-  findPipelineBlock,
-  hasTopLevelSection,
-  resolveInsertLocation,
-  type PipelineBlockContext
-} from "./JenkinsfilePipelineParser";
 import { getDiagnosticMetadata } from "../JenkinsfileDiagnosticMetadata";
 import {
   JENKINS_DIAGNOSTIC_SOURCE,
   isValidationCode,
   resolveDiagnosticSuggestions
 } from "../JenkinsfileDiagnosticUtils";
+import type { JenkinsfileMatcher } from "../JenkinsfileMatcher";
+import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
 import {
   deriveValidationCode,
   extractInvalidStepToken,
   findTokenOccurrences,
   isTokenChar
 } from "../JenkinsfileValidationUtils";
+import {
+  type PipelineBlockContext,
+  buildAgentInsertText,
+  buildStagesInsertText,
+  findPipelineBlock,
+  hasTopLevelSection,
+  resolveInsertLocation
+} from "./JenkinsfilePipelineParser";
 
-const STEP_REPLACEMENT_CODES: JenkinsfileValidationCode[] = [
-  "invalid-step",
-  "unknown-dsl-method"
-];
+const STEP_REPLACEMENT_CODES: JenkinsfileValidationCode[] = ["invalid-step", "unknown-dsl-method"];
 
 export class JenkinsfileQuickFixProvider implements vscode.CodeActionProvider {
   static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
@@ -65,12 +62,7 @@ export class JenkinsfileQuickFixProvider implements vscode.CodeActionProvider {
           continue;
         }
         actions.push(
-          ...createMissingSectionActions(
-            document,
-            diagnostic,
-            pipelineContext,
-            missingSection
-          )
+          ...createMissingSectionActions(document, diagnostic, pipelineContext, missingSection)
         );
         continue;
       }
@@ -93,7 +85,9 @@ export class JenkinsfileQuickFixProvider implements vscode.CodeActionProvider {
   }
 }
 
-function resolveDiagnosticCode(diagnostic: vscode.Diagnostic): JenkinsfileValidationCode | undefined {
+function resolveDiagnosticCode(
+  diagnostic: vscode.Diagnostic
+): JenkinsfileValidationCode | undefined {
   const metadata = getDiagnosticMetadata(diagnostic);
   if (metadata?.code) {
     return metadata.code;
@@ -107,9 +101,7 @@ function resolveDiagnosticCode(diagnostic: vscode.Diagnostic): JenkinsfileValida
   return deriveValidationCode(diagnostic.message);
 }
 
-function resolveMissingSection(
-  code: JenkinsfileValidationCode
-): "agent" | "stages" | undefined {
+function resolveMissingSection(code: JenkinsfileValidationCode): "agent" | "stages" | undefined {
   if (code === "missing-agent") {
     return "agent";
   }
@@ -138,8 +130,8 @@ function createMissingSectionActions(
 ): vscode.CodeAction[] {
   if (section === "agent") {
     return [
-      createInsertAgentAction(document, diagnostic, context, "any", "Insert \"agent any\""),
-      createInsertAgentAction(document, diagnostic, context, "none", "Insert \"agent none\"")
+      createInsertAgentAction(document, diagnostic, context, "any", 'Insert "agent any"'),
+      createInsertAgentAction(document, diagnostic, context, "none", 'Insert "agent none"')
     ];
   }
   return [createInsertStagesAction(document, diagnostic, context)];
@@ -195,7 +187,7 @@ function createInsertStagesAction(
     context,
     "stages",
     insertText,
-    "Insert \"stages\" block"
+    'Insert "stages" block'
   );
 }
 
@@ -282,7 +274,10 @@ function resolveReplacementRange(
   return diagnosticRange;
 }
 
-function findTokenRange(lineText: string, index: number): { start: number; end: number } | undefined {
+function findTokenRange(
+  lineText: string,
+  index: number
+): { start: number; end: number } | undefined {
   if (lineText.length === 0) {
     return undefined;
   }
@@ -328,9 +323,7 @@ function findTokenInLineRange(
   end: number
 ): number | undefined {
   const occurrences = findTokenOccurrences(lineText, token);
-  return occurrences.find(
-    (matchIndex) => matchIndex >= start && matchIndex + token.length <= end
-  );
+  return occurrences.find((matchIndex) => matchIndex >= start && matchIndex + token.length <= end);
 }
 
 function isTokenMatch(value: string, token: string): boolean {

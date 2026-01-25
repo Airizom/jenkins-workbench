@@ -51,9 +51,7 @@ export class JenkinsPipelineValidationEndpointResolver {
       return { endpoint: "json", response };
     }
 
-    throw new JenkinsRequestError(
-      "Unexpected response from Jenkins validateJenkinsfile endpoint."
-    );
+    throw new JenkinsRequestError("Unexpected response from Jenkins validateJenkinsfile endpoint.");
   }
 }
 

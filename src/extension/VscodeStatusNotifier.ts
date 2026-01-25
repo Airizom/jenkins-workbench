@@ -34,12 +34,10 @@ export class VscodeStatusNotifier implements StatusNotifier {
     const details = notification.inputMessage ? ` Prompt: ${notification.inputMessage}` : "";
     const message = `${base}${details}`;
     const action = "Open in Jenkins";
-    void vscode.window
-      .showInformationMessage(message, action)
-      .then((selection) => {
-        if (selection === action) {
-          void vscode.env.openExternal(vscode.Uri.parse(notification.buildUrl));
-        }
-      });
+    void vscode.window.showInformationMessage(message, action).then((selection) => {
+      if (selection === action) {
+        void vscode.env.openExternal(vscode.Uri.parse(notification.buildUrl));
+      }
+    });
   }
 }

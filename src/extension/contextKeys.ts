@@ -17,10 +17,6 @@ export async function syncJenkinsfileContext(
   editor: vscode.TextEditor | undefined = vscode.window.activeTextEditor
 ): Promise<boolean> {
   const isJenkinsfile = editor ? matcher.matches(editor.document) : false;
-  await vscode.commands.executeCommand(
-    "setContext",
-    JENKINSFILE_ACTIVE_CONTEXT_KEY,
-    isJenkinsfile
-  );
+  await vscode.commands.executeCommand("setContext", JENKINSFILE_ACTIVE_CONTEXT_KEY, isJenkinsfile);
   return isJenkinsfile;
 }

@@ -1,7 +1,11 @@
-import type { BuildFailureFailedTest } from "../../../../shared/BuildDetailsContracts";
 import { Badge } from "../../../../../shared/webview/components/ui/badge";
 import { Card } from "../../../../../shared/webview/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../../../shared/webview/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from "../../../../../shared/webview/components/ui/collapsible";
+import type { BuildFailureFailedTest } from "../../../../shared/BuildDetailsContracts";
 import { OverflowText } from "./BuildFailureOverflowText";
 
 function TestTubeIcon() {
@@ -116,9 +120,7 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
                   {item.name || "Unnamed test"}
                 </div>
                 {item.className ? (
-                  <div className="text-xs text-muted-foreground truncate">
-                    {item.className}
-                  </div>
+                  <div className="text-xs text-muted-foreground truncate">{item.className}</div>
                 ) : null}
               </div>
             </div>
@@ -136,17 +138,13 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
               ) : null}
             </div>
           </div>
-          {(item.errorStackTrace || item.stdout || item.stderr) ? (
+          {item.errorStackTrace || item.stdout || item.stderr ? (
             <div className="border-t border-border px-3 py-2 space-y-2">
               {item.errorStackTrace ? (
                 <FailedTestDetail label="Stack trace" value={item.errorStackTrace} />
               ) : null}
-              {item.stdout ? (
-                <FailedTestDetail label="Stdout" value={item.stdout} />
-              ) : null}
-              {item.stderr ? (
-                <FailedTestDetail label="Stderr" value={item.stderr} />
-              ) : null}
+              {item.stdout ? <FailedTestDetail label="Stdout" value={item.stdout} /> : null}
+              {item.stderr ? <FailedTestDetail label="Stderr" value={item.stderr} /> : null}
             </div>
           ) : null}
         </li>

@@ -8,8 +8,5 @@ export function stripAnsi(value: string): string {
   if (!value) {
     return value;
   }
-  return value
-    .replace(OSC_PATTERN, "")
-    .replace(CSI_PATTERN, "")
-    .replace(JENKINS_NOTE_PATTERN, "");
+  return value.replace(OSC_PATTERN, "").replace(CSI_PATTERN, "").replace(JENKINS_NOTE_PATTERN, "");
 }

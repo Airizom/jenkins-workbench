@@ -1,15 +1,19 @@
 import * as React from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { Button } from "../../../../shared/webview/components/ui/button";
+import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from "../../../../shared/webview/components/ui/collapsible";
+import { Skeleton } from "../../../../shared/webview/components/ui/skeleton";
+import { cn } from "../../../../shared/webview/lib/utils";
 import type {
   PipelineStageStepViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
-import { Button } from "../../../../shared/webview/components/ui/button";
-import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../../shared/webview/components/ui/collapsible";
-import { Skeleton } from "../../../../shared/webview/components/ui/skeleton";
-import { cn } from "../../../../shared/webview/lib/utils";
-import { getStatusClass, StatusPill } from "./StatusPill";
+import { StatusPill, getStatusClass } from "./StatusPill";
 
 const { useEffect, useMemo, useState } = React;
 
@@ -50,12 +54,7 @@ function XIcon() {
 
 function PlayIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3 ml-0.5"
-      fill="currentColor"
-      viewBox="0 0 24 24"
-    >
+    <svg aria-hidden="true" className="h-3 w-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
       <polygon points="5 3 19 12 5 21 5 3" />
     </svg>
   );
@@ -81,12 +80,7 @@ function AlertIcon() {
 
 function StopIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3"
-      fill="currentColor"
-      viewBox="0 0 24 24"
-    >
+    <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
       <rect x="6" y="6" width="12" height="12" rx="1" />
     </svg>
   );
@@ -110,7 +104,8 @@ function getStageIcon(statusClass?: string) {
 }
 
 function getStageNodeStyle(statusClass?: string): string {
-  const baseStyles = "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors";
+  const baseStyles =
+    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors";
   switch (statusClass) {
     case "success":
       return cn(baseStyles, "border-success bg-success/10 text-success");
@@ -234,9 +229,7 @@ function StageNode({
     <div className="relative flex" data-stage-key={stage.key}>
       <div className="flex flex-col items-center mr-4">
         <div className={nodeStyle}>{stageIcon}</div>
-        {!isLast ? (
-          <div className={cn("w-0.5 flex-1 min-h-[24px]", connectorStyle)} />
-        ) : null}
+        {!isLast ? <div className={cn("w-0.5 flex-1 min-h-[24px]", connectorStyle)} /> : null}
       </div>
 
       <div className={cn("flex-1 pb-6", isLast && "pb-0")}>
@@ -246,7 +239,9 @@ function StageNode({
               <div className="flex items-center justify-between gap-3 p-3">
                 <div className="flex flex-col items-start gap-1">
                   <div className="text-sm font-medium">{stage.name || "Stage"}</div>
-                  <div className="text-xs text-muted-foreground">{stage.durationLabel || "Unknown"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {stage.durationLabel || "Unknown"}
+                  </div>
                 </div>
                 <StatusPill
                   label={stage.statusLabel || "Unknown"}
@@ -330,7 +325,12 @@ function BranchCard({
       <div className="rounded border border-border bg-muted/30">
         <CollapsibleTrigger className="w-full p-0 hover:bg-accent/30 transition-colors rounded">
           <div className="flex items-center gap-2 p-2.5">
-            <div className={cn("flex h-5 w-5 items-center justify-center rounded-full text-xs", statusClass)}>
+            <div
+              className={cn(
+                "flex h-5 w-5 items-center justify-center rounded-full text-xs",
+                statusClass
+              )}
+            >
               {branchIcon}
             </div>
             <div className="flex-1 text-left">
@@ -351,7 +351,10 @@ function BranchCard({
   );
 }
 
-function StepsList({ steps, compact = false }: { steps: PipelineStageStepViewModel[]; compact?: boolean }) {
+function StepsList({
+  steps,
+  compact = false
+}: { steps: PipelineStageStepViewModel[]; compact?: boolean }) {
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
       {steps.map((step, index) => {
@@ -365,14 +368,21 @@ function StepsList({ steps, compact = false }: { steps: PipelineStageStepViewMod
             key={`${step.name}-${index}`}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <div className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]", statusClass)}>
+              <div
+                className={cn(
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
+                  statusClass
+                )}
+              >
                 {getStageIcon(step.statusClass)}
               </div>
               <span className={cn("truncate", compact ? "text-xs" : "text-xs font-medium")}>
                 {step.name || "Step"}
               </span>
             </div>
-            <span className="text-xs text-muted-foreground shrink-0">{step.durationLabel || "Unknown"}</span>
+            <span className="text-xs text-muted-foreground shrink-0">
+              {step.durationLabel || "Unknown"}
+            </span>
           </li>
         );
       })}
@@ -427,7 +437,10 @@ function collectStageKeys(stages: PipelineStageViewModel[], keys = new Set<strin
   return keys;
 }
 
-function pruneStageState(prev: Record<string, boolean>, validKeys: Set<string>): Record<string, boolean> {
+function pruneStageState(
+  prev: Record<string, boolean>,
+  validKeys: Set<string>
+): Record<string, boolean> {
   const next: Record<string, boolean> = {};
   for (const [key, value] of Object.entries(prev)) {
     if (validKeys.has(key)) {

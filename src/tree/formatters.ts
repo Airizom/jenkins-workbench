@@ -333,7 +333,6 @@ function formatProgressBar(percent: number, width: number): string {
   return `[${filledBar}${emptyBar}]`;
 }
 
-
 export function formatDurationMs(duration: number): string {
   if (!Number.isFinite(duration)) {
     return "Unknown";

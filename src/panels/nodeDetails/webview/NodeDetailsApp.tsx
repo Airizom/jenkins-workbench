@@ -9,7 +9,11 @@ import {
   CardHeader,
   CardTitle
 } from "../../shared/webview/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../shared/webview/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from "../../shared/webview/components/ui/collapsible";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
@@ -29,8 +33,8 @@ import {
   TagIcon
 } from "../../shared/webview/icons";
 import type { NodeMonitorViewModel, NodeStatusClass } from "../shared/NodeDetailsContracts";
-import { postVsCodeMessage } from "./lib/vscodeApi";
 import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
+import { postVsCodeMessage } from "./lib/vscodeApi";
 import {
   type NodeDetailsState,
   getInitialState,
@@ -73,7 +77,10 @@ export function NodeDetailsApp(): JSX.Element {
 
   const overviewRows = useMemo(() => buildOverviewRows(state), [state]);
   const updatedAtDate = useMemo(() => parseDate(state.updatedAt), [state.updatedAt]);
-  const updatedAtLabel = useMemo(() => formatRelativeTime(updatedAtDate, now), [updatedAtDate, now]);
+  const updatedAtLabel = useMemo(
+    () => formatRelativeTime(updatedAtDate, now),
+    [updatedAtDate, now]
+  );
   const updatedAtTitle = useMemo(
     () => (updatedAtDate ? updatedAtDate.toLocaleString() : "Unknown"),
     [updatedAtDate]
@@ -122,13 +129,13 @@ export function NodeDetailsApp(): JSX.Element {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="sticky-header">
-        {state.loading ? (
-          <Progress indeterminate className="h-0.5 rounded-none" />
-        ) : null}
+        {state.loading ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
         <div className="mx-auto max-w-5xl px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-4">
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}>
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}
+              >
                 <ServerIcon />
               </div>
               <div className="space-y-1">
@@ -138,7 +145,10 @@ export function NodeDetailsApp(): JSX.Element {
                     {state.statusLabel}
                   </Badge>
                   {isStale ? (
-                    <Badge variant="outline" className="border-warning/50 text-warning bg-warning/10">
+                    <Badge
+                      variant="outline"
+                      className="border-warning/50 text-warning bg-warning/10"
+                    >
                       Stale
                     </Badge>
                   ) : null}
@@ -226,12 +236,17 @@ export function NodeDetailsApp(): JSX.Element {
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {overviewRows.map((row) => (
-                    <div key={row.label} className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                    <div
+                      key={row.label}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
+                    >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                         {row.icon}
                       </div>
                       <div>
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground">{row.label}</div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                          {row.label}
+                        </div>
                         <div className="text-sm font-medium">{row.value}</div>
                       </div>
                     </div>
@@ -433,9 +448,7 @@ function ExecutorRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
           </Badge>
         ) : null}
       </div>
-      {hasProgress && !isIdle ? (
-        <Progress value={progressValue} className="h-1.5" />
-      ) : null}
+      {hasProgress && !isIdle ? <Progress value={progressValue} className="h-1.5" /> : null}
     </div>
   );
 }
@@ -504,7 +517,11 @@ function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
     rows.push({ label: "JNLP Agent", value: state.jnlpAgentLabel, icon: <LaunchIcon /> });
   }
   if (state.launchSupportedLabel) {
-    rows.push({ label: "Launch Supported", value: state.launchSupportedLabel, icon: <LaunchIcon /> });
+    rows.push({
+      label: "Launch Supported",
+      value: state.launchSupportedLabel,
+      icon: <LaunchIcon />
+    });
   }
   if (state.manualLaunchLabel) {
     rows.push({ label: "Manual Launch", value: state.manualLaunchLabel, icon: <LaunchIcon /> });

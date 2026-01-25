@@ -32,10 +32,7 @@ function buildSelector(patterns: string[]): vscode.DocumentSelector {
 
   const selectors: vscode.DocumentFilter[] = [];
   for (const pattern of patterns) {
-    selectors.push(
-      { scheme: "file", pattern },
-      { scheme: "untitled", pattern }
-    );
+    selectors.push({ scheme: "file", pattern }, { scheme: "untitled", pattern });
   }
   return selectors;
 }

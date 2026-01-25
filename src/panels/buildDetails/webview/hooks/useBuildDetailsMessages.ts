@@ -1,9 +1,6 @@
 import { useEffect } from "react";
 import type { Dispatch } from "react";
-import type {
-  BuildDetailsAction,
-  BuildDetailsIncomingMessage
-} from "../state/buildDetailsState";
+import type { BuildDetailsAction, BuildDetailsIncomingMessage } from "../state/buildDetailsState";
 
 export function useBuildDetailsMessages(dispatch: Dispatch<BuildDetailsAction>): void {
   useEffect(() => {

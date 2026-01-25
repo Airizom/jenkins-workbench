@@ -1,8 +1,5 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type {
-  JenkinsConsoleTextTail,
-  JenkinsProgressiveConsoleHtml
-} from "../../jenkins/types";
+import type { JenkinsConsoleTextTail, JenkinsProgressiveConsoleHtml } from "../../jenkins/types";
 
 const HTML_BUFFER_MULTIPLIER = 2;
 const HTML_RETRY_COOLDOWN_MS = 30000;

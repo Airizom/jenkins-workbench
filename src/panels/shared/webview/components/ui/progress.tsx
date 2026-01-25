@@ -15,10 +15,7 @@ export const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
     return (
       <div
         ref={ref}
-        className={cn(
-          "relative h-2 w-full overflow-hidden rounded-full bg-muted",
-          className
-        )}
+        className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted", className)}
         {...props}
       >
         <div
@@ -67,10 +64,7 @@ export const ProgressCircle = React.forwardRef<SVGSVGElement, ProgressCircleProp
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        className={cn(
-          indeterminate && "animate-spin",
-          className
-        )}
+        className={cn(indeterminate && "animate-spin", className)}
         {...props}
       >
         <circle

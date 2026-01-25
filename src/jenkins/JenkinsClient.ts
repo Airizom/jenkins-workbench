@@ -1,3 +1,4 @@
+import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
 import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
@@ -5,7 +6,6 @@ import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
 import { JenkinsPipelineValidationApi } from "./client/JenkinsPipelineValidationApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
-import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsRequestError } from "./errors";
 import type { JenkinsBufferResponse } from "./request";
 import type { JenkinsStreamResponse } from "./request";
@@ -20,8 +20,8 @@ import type {
   JenkinsJobKind,
   JenkinsNode,
   JenkinsNodeDetails,
-  JenkinsPendingInputAction,
   JenkinsParameterDefinition,
+  JenkinsPendingInputAction,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
   JenkinsQueueItem,
@@ -59,7 +59,10 @@ export type {
   JenkinsWorkflowRun
 } from "./types";
 
-export type { JenkinsBuildTriggerMode, JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
+export type {
+  JenkinsBuildTriggerMode,
+  JenkinsBuildTriggerOptions
+} from "./client/JenkinsBuildsApi";
 export type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 
 export { JenkinsRequestError };

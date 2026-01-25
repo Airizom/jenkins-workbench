@@ -26,10 +26,7 @@ export function getTestReportIncludeCaseLogs(
   config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(CONFIG_SECTION)
 ): boolean {
   return Boolean(
-    config.get<boolean>(
-      TEST_REPORT_INCLUDE_CASE_LOGS_KEY,
-      DEFAULT_TEST_REPORT_INCLUDE_CASE_LOGS
-    )
+    config.get<boolean>(TEST_REPORT_INCLUDE_CASE_LOGS_KEY, DEFAULT_TEST_REPORT_INCLUDE_CASE_LOGS)
   );
 }
 

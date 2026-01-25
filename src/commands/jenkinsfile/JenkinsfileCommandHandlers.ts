@@ -80,9 +80,7 @@ export async function selectValidationEnvironment(
   coordinator?.revalidateActiveDocument();
 }
 
-export function clearJenkinsfileDiagnostics(
-  coordinator: JenkinsfileValidationCoordinator
-): void {
+export function clearJenkinsfileDiagnostics(coordinator: JenkinsfileValidationCoordinator): void {
   coordinator.clearDiagnostics();
 }
 

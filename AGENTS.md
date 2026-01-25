@@ -5,7 +5,7 @@
 - VS Code extension that surfaces Jenkins instances, jobs, and build activity in an Activity Bar view.
 - Uses the Jenkins JSON API via `src/jenkins/` services; stores environment metadata in VS Code state.
 - Target VS Code version: `^1.85.0`
-- Includes pinned jobs/pipelines, artifact preview/download workflows, build log and job config previews, richer build tooltips, and a React-based build details panel with console search/export and failure insights cards.
+- Includes pinned jobs/pipelines, artifact preview/download workflows, build log and job config previews, richer build tooltips, job management actions (enable/disable/rename/copy/delete), Jenkinsfile validation with diagnostics/quick fixes, and React-based build and node details panels.
 
 ## Project Structure & Module Organization
 
@@ -732,10 +732,12 @@ The project uses Biome with these settings:
 3. Confirm jobs/nodes load and that removing an environment clears it from the tree
 4. If auth is needed, verify token storage and reloading works after reload
 5. Trigger a build and verify the notification and tree refresh
-6. Watch a job and confirm polling notifications work
-7. Open build details and verify log streaming for running builds
-8. Preview or download a build artifact from the tree
-9. Pin and unpin a job or pipeline and confirm ordering
+6. Run job management actions (enable/disable/rename/copy/delete) and confirm the tree refreshes correctly
+7. Open a Jenkinsfile and validate it (on save and via command); confirm diagnostics and quick fixes appear
+8. Watch a job and confirm polling notifications work
+9. Open build details and verify log streaming for running builds
+10. Preview an artifact without a workspace folder, then download one from a file-based workspace folder
+11. Pin and unpin a job or pipeline and confirm ordering
 
 ## Commit & Pull Request Guidelines
 
@@ -758,6 +760,7 @@ The project uses Biome with these settings:
 - API tokens are stored in VS Code SecretStorage (encrypted by VS Code)
 - All network requests go through `JenkinsHttpClient` with proper auth headers
 - CSRF crumbs are handled automatically with retry logic
+- Artifact downloads require a file-based workspace folder; previews do not require a workspace folder
 
 ## Adding New Features
 

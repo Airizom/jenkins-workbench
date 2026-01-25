@@ -85,12 +85,7 @@ export function ConsoleSearchToolbar({
         >
           Next
         </Button>
-        <Button
-          disabled={query.length === 0 && !error}
-          onClick={onClear}
-          size="sm"
-          variant="ghost"
-        >
+        <Button disabled={query.length === 0 && !error} onClick={onClear} size="sm" variant="ghost">
           Clear
         </Button>
       </div>

@@ -1,4 +1,10 @@
 import * as React from "react";
+import { Alert, AlertDescription } from "../../shared/webview/components/ui/alert";
+import { Button } from "../../shared/webview/components/ui/button";
+import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
+import { Progress } from "../../shared/webview/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
+import { ArrowUpIcon, CalendarIcon, ClockIcon, ExternalLinkIcon } from "../../shared/webview/icons";
 import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
 import { BuildFailureInsightsSection } from "./components/buildDetails/BuildFailureInsightsSection";
 import { BuildSummaryCard } from "./components/buildDetails/BuildSummaryCard";
@@ -6,21 +12,14 @@ import { ConsoleOutputSection } from "./components/buildDetails/ConsoleOutputSec
 import { PendingInputsSection } from "./components/buildDetails/PendingInputsSection";
 import { PipelineStagesSection } from "./components/buildDetails/PipelineStagesSection";
 import { StatusPill } from "./components/buildDetails/StatusPill";
-import { Alert, AlertDescription } from "../../shared/webview/components/ui/alert";
-import { Button } from "../../shared/webview/components/ui/button";
-import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
-import { Progress } from "../../shared/webview/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
-import {
-  ArrowUpIcon,
-  CalendarIcon,
-  ClockIcon,
-  ExternalLinkIcon
-} from "../../shared/webview/icons";
 import { useBuildDetailsInteractions } from "./hooks/useBuildDetailsInteractions";
 import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
 import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
-import { buildDetailsReducer, buildInitialState, DEFAULT_INSIGHTS } from "./state/buildDetailsState";
+import {
+  DEFAULT_INSIGHTS,
+  buildDetailsReducer,
+  buildInitialState
+} from "./state/buildDetailsState";
 
 const { useEffect, useReducer, useMemo, useState } = React;
 
@@ -73,9 +72,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky-header">
-        {isRunning ? (
-          <Progress indeterminate className="h-0.5 rounded-none" />
-        ) : null}
+        {isRunning ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
         <div className="mx-auto max-w-5xl px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex flex-col gap-2">
@@ -138,11 +135,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           </Alert>
         ) : null}
 
-        <Tabs
-          value={selectedTab}
-          onValueChange={setSelectedTab}
-          className="space-y-4"
-        >
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
           <TabsList className="w-full justify-start">
             {hasPendingInputs ? (
               <TabsTrigger value="inputs" className="relative">

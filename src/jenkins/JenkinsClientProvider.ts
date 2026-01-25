@@ -1,7 +1,7 @@
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import { buildAuthSignature } from "./auth";
 import { JenkinsClient } from "./JenkinsClient";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
+import { buildAuthSignature } from "./auth";
 
 export interface JenkinsClientProviderOptions {
   requestTimeoutMs?: number;

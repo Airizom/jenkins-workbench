@@ -196,9 +196,7 @@ function resolveEstimatedDurationLabel(build: JenkinsBuild): string | undefined 
   return `Elapsed ${elapsedLabel} | Estimated ${estimatedLabel}`;
 }
 
-function resolveTimingSummary(
-  build: JenkinsBuild
-): { label: string; value: string } | undefined {
+function resolveTimingSummary(build: JenkinsBuild): { label: string; value: string } | undefined {
   if (!Number.isFinite(build.timestamp)) {
     return undefined;
   }
