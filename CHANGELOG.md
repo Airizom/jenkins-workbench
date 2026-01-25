@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-01-25
+
+### Added
+
+- feat: surface validation status in Jenkinsfile CodeLens
+
 ## [1.23.0] - 2026-01-25
 
 ### Added
