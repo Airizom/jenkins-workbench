@@ -11,6 +11,10 @@ import { parseDeclarativeValidationOutput } from "./JenkinsfileValidationParser"
 import { findTokenOccurrence, isTokenChar } from "./JenkinsfileValidationUtils";
 import type { JenkinsfileValidationStatusBar } from "./JenkinsfileValidationStatusBar";
 import type {
+  JenkinsfileValidationStatusProvider,
+  JenkinsfileValidationStatusState
+} from "./JenkinsfileValidationStatusProvider";
+import type {
   JenkinsfileValidationConfig,
   JenkinsfileValidationFinding
 } from "./JenkinsfileValidationTypes";
@@ -28,32 +32,24 @@ interface ValidationCacheEntry {
   environmentKey: string;
 }
 
-type ValidationStatusState =
-  | {
-      kind: "result";
-      errorCount: number;
-      environment?: JenkinsEnvironmentRef;
-      stale?: boolean;
-    }
-  | {
-      kind: "no-environment";
-    };
-
 type ValidationOutcome =
   | { status: "skipped" }
   | { status: "canceled" }
   | { status: "completed"; kind: "result"; errorCount: number }
   | { status: "completed"; kind: "no-environment" };
 
-export class JenkinsfileValidationCoordinator implements vscode.Disposable {
+export class JenkinsfileValidationCoordinator
+  implements vscode.Disposable, JenkinsfileValidationStatusProvider
+{
   private readonly diagnostics = vscode.languages.createDiagnosticCollection("Jenkinsfile");
   private readonly outputChannel = vscode.window.createOutputChannel("Jenkinsfile Validation");
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly lastValidatedState = new Map<string, ValidationCacheEntry>();
-  private readonly lastStatusState = new Map<string, ValidationStatusState>();
+  private readonly lastStatusState = new Map<string, JenkinsfileValidationStatusState>();
   private readonly activeTokens = new Map<string, number>();
   private readonly pendingChangeTimers = new Map<string, NodeJS.Timeout>();
   private readonly changeTokenSources = new Map<string, vscode.CancellationTokenSource>();
+  private readonly statusEmitter = new vscode.EventEmitter<vscode.Uri>();
   private config: JenkinsfileValidationConfig;
   private tokenCounter = 0;
 
@@ -66,6 +62,8 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
   ) {
     this.config = config;
   }
+
+  readonly onDidChangeValidationStatus = this.statusEmitter.event;
 
   start(): void {
     this.subscriptions.push(
@@ -166,6 +164,24 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
     return state.environment;
   }
 
+  getValidationState(
+    document: vscode.TextDocument
+  ): JenkinsfileValidationStatusState | undefined {
+    const state = this.lastStatusState.get(document.uri.toString());
+    if (!state) {
+      return undefined;
+    }
+    if (state.kind === "no-environment") {
+      return { kind: "no-environment" };
+    }
+    return {
+      kind: "result",
+      errorCount: state.errorCount,
+      environment: state.environment,
+      stale: state.stale
+    };
+  }
+
   async validateActiveEditor(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -219,12 +235,16 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
   }
 
   clearDiagnostics(): void {
+    const documents = this.getStatusUris();
     this.diagnostics.clear();
     this.lastValidatedState.clear();
     this.lastStatusState.clear();
     this.activeTokens.clear();
     this.cancelAllChangeValidations();
     this.statusBar.clearAll();
+    for (const uri of documents) {
+      this.statusEmitter.fire(uri);
+    }
   }
 
   clearWorkspaceState(workspaceFolder: vscode.WorkspaceFolder): void {
@@ -257,6 +277,7 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
     this.diagnostics.dispose();
     this.outputChannel.dispose();
     this.cancelAllChangeValidations();
+    this.statusEmitter.dispose();
     for (const subscription of this.subscriptions) {
       subscription.dispose();
     }
@@ -302,8 +323,7 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
         this.logNoEnvironment(document, options.reason);
         const diagnostic = buildNoEnvironmentDiagnostic(document);
         this.diagnostics.set(document.uri, [diagnostic]);
-        this.statusBar.setNoEnvironment(document);
-        this.lastStatusState.set(key, { kind: "no-environment" });
+        this.setNoEnvironmentState(document);
         return { status: "completed", kind: "no-environment" };
       }
 
@@ -417,10 +437,15 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
     environment?: JenkinsEnvironmentRef,
     stale = false
   ): void {
-    const key = document.uri.toString();
-    const nextState: ValidationStatusState = { kind: "result", errorCount, environment, stale };
-    this.lastStatusState.set(key, nextState);
+    const nextState: JenkinsfileValidationStatusState = {
+      kind: "result",
+      errorCount,
+      environment,
+      stale
+    };
+    const changed = this.updateStatusState(document, nextState);
     this.statusBar.setResult(document, errorCount, environment, stale);
+    this.emitStatusChangeIfNeeded(document, changed);
   }
 
   private setResultStaleState(document: vscode.TextDocument, stale: boolean): void {
@@ -434,6 +459,13 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
       return;
     }
     this.setResultState(document, lastState.errorCount, lastState.environment, stale);
+  }
+
+  private setNoEnvironmentState(document: vscode.TextDocument): void {
+    const nextState: JenkinsfileValidationStatusState = { kind: "no-environment" };
+    const changed = this.updateStatusState(document, nextState);
+    this.statusBar.setNoEnvironment(document);
+    this.emitStatusChangeIfNeeded(document, changed);
   }
 
   private scheduleChangeValidation(document: vscode.TextDocument): void {
@@ -516,10 +548,11 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
     this.cancelChangeValidation(document);
     const key = document.uri.toString();
     this.lastValidatedState.delete(key);
-    this.lastStatusState.delete(key);
+    const changed = this.updateStatusState(document, undefined);
     this.activeTokens.delete(key);
     this.diagnostics.delete(document.uri);
     this.statusBar.clear(document);
+    this.emitStatusChangeIfNeeded(document, changed);
   }
 
   private restoreStatusBar(document: vscode.TextDocument): void {
@@ -597,6 +630,31 @@ export class JenkinsfileValidationCoordinator implements vscode.Disposable {
     }
     return this.getCancellationOutcome(document, options);
   }
+
+  private updateStatusState(
+    document: vscode.TextDocument,
+    nextState: JenkinsfileValidationStatusState | undefined
+  ): boolean {
+    const key = document.uri.toString();
+    const previous = this.lastStatusState.get(key);
+    if (nextState) {
+      this.lastStatusState.set(key, nextState);
+    } else {
+      this.lastStatusState.delete(key);
+    }
+    return !areStatusStatesEqual(previous, nextState);
+  }
+
+  private getStatusUris(): vscode.Uri[] {
+    return Array.from(this.lastStatusState.keys(), (key) => vscode.Uri.parse(key));
+  }
+
+  private emitStatusChangeIfNeeded(document: vscode.TextDocument, changed: boolean): void {
+    if (!changed) {
+      return;
+    }
+    this.statusEmitter.fire(document.uri);
+  }
 }
 
 function hashText(value: string): string {
@@ -617,6 +675,39 @@ function arePatternsEqual(left: string[], right: string[]): boolean {
     return false;
   }
   return left.every((value, index) => value === right[index]);
+}
+
+function areStatusStatesEqual(
+  left: JenkinsfileValidationStatusState | undefined,
+  right: JenkinsfileValidationStatusState | undefined
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if (left.kind === "no-environment" && right.kind === "no-environment") {
+    return true;
+  }
+  if (left.kind !== "result" || right.kind !== "result") {
+    return false;
+  }
+  return (
+    left.errorCount === right.errorCount &&
+    Boolean(left.stale) === Boolean(right.stale) &&
+    getEnvironmentSignature(left.environment) === getEnvironmentSignature(right.environment)
+  );
+}
+
+function getEnvironmentSignature(environment?: JenkinsEnvironmentRef): string | undefined {
+  if (!environment) {
+    return undefined;
+  }
+  return buildEnvironmentKey(environment);
 }
 
 function buildNoEnvironmentDiagnostic(document: vscode.TextDocument): vscode.Diagnostic {

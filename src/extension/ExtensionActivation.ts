@@ -109,13 +109,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     services.jenkinsfileValidationCoordinator
   );
   const jenkinsfileCodeLensProvider = new JenkinsfileValidationCodeLensProvider(
-    services.jenkinsfileMatcher
+    services.jenkinsfileMatcher,
+    services.jenkinsfileValidationCoordinator
   );
 
   context.subscriptions.push(
     services.treeView,
     services.treeDataProvider,
     services.pendingInputCoordinator,
+    jenkinsfileCodeLensProvider,
     vscode.workspace.registerFileSystemProvider(
       ARTIFACT_PREVIEW_SCHEME,
       services.artifactPreviewProvider,
