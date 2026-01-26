@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.2] - 2026-01-26
+
+### Changed
+
+- refactor: use text labels for job status badges
+
 ## [1.24.1] - 2026-01-25
 
 ### Fixed
