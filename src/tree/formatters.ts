@@ -174,13 +174,13 @@ export function formatJobDescription(options: {
 }): string | undefined {
   const parts: string[] = [];
   if (options.status) {
-    parts.push(options.isDisabled ? `$(circle-slash) ${options.status}` : options.status);
+    parts.push(options.status);
   }
   if (options.isPinned) {
-    parts.push("$(pin)");
+    parts.push("Pinned");
   }
   if (options.isWatched) {
-    parts.push("$(eye)");
+    parts.push("Watched");
   }
   return parts.length > 0 ? parts.join(" • ") : undefined;
 }
