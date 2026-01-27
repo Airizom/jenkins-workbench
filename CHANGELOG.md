@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-01-27
+
+### Added
+
+- feat: surface multibranch filters in folder labels
+- feat: enhance node details with executor timing and offline hints
+
 ## [1.24.2] - 2026-01-26
 
 ### Changed
