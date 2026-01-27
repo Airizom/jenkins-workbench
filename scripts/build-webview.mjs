@@ -18,7 +18,13 @@ const webviews = [
   {
     name: "buildDetails",
     configPath: path.join(repoRoot, "config", "buildDetailsWebview.json"),
-    assetsPath: path.join(repoRoot, "src", "panels", "buildDetails", "BuildDetailsWebviewAssets.ts"),
+    assetsPath: path.join(
+      repoRoot,
+      "src",
+      "panels",
+      "buildDetails",
+      "BuildDetailsWebviewAssets.ts"
+    ),
     bundleConst: "BUILD_DETAILS_WEBVIEW_BUNDLE_PATH",
     cssConst: "BUILD_DETAILS_WEBVIEW_CSS_PATH",
     cssBundlePath: "out/webview/buildDetails.css",

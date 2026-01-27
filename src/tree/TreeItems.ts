@@ -416,12 +416,33 @@ export class NodeTreeItem extends vscode.TreeItem {
     this.iconPath = node.offline
       ? new vscode.ThemeIcon("plug", new vscode.ThemeColor("charts.gray"))
       : new vscode.ThemeIcon("server");
+    const tooltip = buildNodeTooltip(node);
+    if (tooltip) {
+      this.tooltip = tooltip;
+    }
     this.command = {
       command: "jenkinsWorkbench.showNodeDetails",
       title: "View Node Details",
       arguments: [this]
     };
   }
+}
+
+function buildNodeTooltip(node: JenkinsNodeInfo): string | undefined {
+  if (!node.offline) {
+    return undefined;
+  }
+  const reason = formatNodeOfflineReason(node);
+  const statusLabel = node.temporarilyOffline ? "Temporarily offline" : "Offline";
+  return reason ? `${statusLabel}\n${reason}` : statusLabel;
+}
+
+function formatNodeOfflineReason(node: JenkinsNodeInfo): string | undefined {
+  const reason =
+    node.offlineCauseReason?.trim() ||
+    node.offlineCause?.description?.trim() ||
+    node.offlineCause?.shortDescription?.trim();
+  return reason && reason.length > 0 ? reason : undefined;
 }
 
 export class QueueItemTreeItem extends vscode.TreeItem {

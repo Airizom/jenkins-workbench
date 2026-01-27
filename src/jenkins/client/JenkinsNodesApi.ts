@@ -2,6 +2,16 @@ import type { JenkinsNode, JenkinsNodeDetails } from "../types";
 import { buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 
+const NODE_EXECUTABLE_FIELDS =
+  "number,url,fullDisplayName,displayName,result,timestamp,duration,estimatedDuration,building";
+const NODE_EXECUTOR_FIELDS = [
+  "number",
+  "progress",
+  "idle",
+  `currentExecutable[${NODE_EXECUTABLE_FIELDS}]`,
+  `currentWorkUnit[${NODE_EXECUTABLE_FIELDS}]`
+].join(",");
+
 const NODE_DETAILS_BASE_FIELDS = [
   "_class",
   "displayName",
@@ -18,8 +28,8 @@ const NODE_DETAILS_BASE_FIELDS = [
   "offlineCause",
   "numExecutors",
   "busyExecutors",
-  "executors[number,progress,idle,currentExecutable[number,url,fullDisplayName,displayName,result],currentWorkUnit[number,url,fullDisplayName,displayName,result]]",
-  "oneOffExecutors[number,progress,idle,currentExecutable[number,url,fullDisplayName,displayName,result],currentWorkUnit[number,url,fullDisplayName,displayName,result]]",
+  `executors[${NODE_EXECUTOR_FIELDS}]`,
+  `oneOffExecutors[${NODE_EXECUTOR_FIELDS}]`,
   "jnlpAgent",
   "launchSupported",
   "manualLaunchAllowed"
@@ -41,7 +51,7 @@ export class JenkinsNodesApi {
     const url = buildApiUrlFromBase(
       this.context.baseUrl,
       "computer/api/json",
-      "computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,numExecutors,busyExecutors]"
+      "computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,offlineCauseReason,offlineCause[description,shortDescription,name,timestamp],numExecutors,busyExecutors]"
     );
     const response = await this.context.requestJson<{ computer?: JenkinsNode[] }>(url);
     return Array.isArray(response.computer) ? response.computer : [];

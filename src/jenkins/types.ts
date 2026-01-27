@@ -219,6 +219,8 @@ export interface JenkinsNode {
   }>;
   offline: boolean;
   temporarilyOffline: boolean;
+  offlineCauseReason?: string;
+  offlineCause?: JenkinsNodeOfflineCause;
   numExecutors?: number;
   busyExecutors?: number;
 }
@@ -229,6 +231,10 @@ export interface JenkinsNodeExecutable {
   displayName?: string;
   fullDisplayName?: string;
   result?: string;
+  timestamp?: number;
+  duration?: number;
+  estimatedDuration?: number;
+  building?: boolean;
 }
 
 export interface JenkinsNodeExecutor {
@@ -253,8 +259,6 @@ export interface JenkinsNodeDetails extends JenkinsNode {
   icon?: string;
   iconClassName?: string;
   idle?: boolean;
-  offlineCauseReason?: string;
-  offlineCause?: JenkinsNodeOfflineCause;
   jnlpAgent?: boolean;
   launchSupported?: boolean;
   manualLaunchAllowed?: boolean;

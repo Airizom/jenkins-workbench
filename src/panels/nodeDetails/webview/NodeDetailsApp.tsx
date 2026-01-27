@@ -265,9 +265,9 @@ export function NodeDetailsApp(): JSX.Element {
           </TabsContent>
 
           <TabsContent value="executors" className="space-y-4">
-            <ExecutorsCard title="Executors" entries={state.executors} />
+            <ExecutorsTableCard title="Executors" entries={state.executors} />
             {state.oneOffExecutors.length > 0 ? (
-              <ExecutorsCard title="One-off Executors" entries={state.oneOffExecutors} />
+              <ExecutorsTableCard title="One-off Executors" entries={state.oneOffExecutors} />
             ) : null}
           </TabsContent>
 
@@ -361,7 +361,7 @@ export function NodeDetailsApp(): JSX.Element {
   );
 }
 
-function ExecutorsCard({
+function ExecutorsTableCard({
   title,
   entries
 }: {
@@ -399,10 +399,22 @@ function ExecutorsCard({
         <CardDescription>Work currently assigned to this node.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {entries.map((entry) => (
-            <ExecutorRow key={entry.id} entry={entry} />
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-2 py-2 text-left font-medium">Executor #</th>
+                <th className="px-2 py-2 text-left font-medium">Build</th>
+                <th className="px-2 py-2 text-left font-medium">Duration</th>
+                <th className="px-2 py-2 text-left font-medium">Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <ExecutorTableRow key={entry.id} entry={entry} />
+              ))}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
@@ -411,45 +423,38 @@ function ExecutorsCard({
 
 type ExecutorEntry = NodeDetailsState["executors"][number];
 
-function ExecutorRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
-  const progressValue = entry.progressPercent;
-  const hasProgress = typeof progressValue === "number" && Number.isFinite(progressValue);
-  const isIdle = entry.isIdle || !entry.workLabel;
-
+function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
+  const durationLabel = entry.workDurationLabel ?? "—";
+  const hasWork = Boolean(entry.workLabel);
+  const buildLabel = entry.workLabel ?? "Idle";
   return (
-    <div className="rounded-lg border border-border bg-muted/30 p-4">
-      <div className="flex items-start justify-between gap-4 mb-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted font-mono text-xs">
-            {entry.id}
-          </div>
-          <div>
-            <div className="text-sm font-medium">{entry.statusLabel}</div>
-            {entry.workLabel ? (
-              entry.workUrl ? (
-                <button
-                  type="button"
-                  className="text-xs text-link hover:text-link-hover hover:underline cursor-pointer border-0 bg-transparent p-0 text-left"
-                  onClick={() => postVsCodeMessage({ type: "openExternal", url: entry.workUrl })}
-                >
-                  {entry.workLabel}
-                </button>
-              ) : (
-                <div className="text-xs text-muted-foreground">{entry.workLabel}</div>
-              )
-            ) : (
-              <div className="text-xs text-muted-foreground">No work assigned</div>
-            )}
-          </div>
+    <tr className="border-t border-border">
+      <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{entry.id}</td>
+      <td className="px-2 py-2">
+        <div className="flex flex-col">
+          <span className={hasWork ? "text-foreground" : "text-muted-foreground"}>
+            {buildLabel}
+          </span>
+          {!hasWork ? (
+            <span className="text-xs text-muted-foreground">{entry.statusLabel}</span>
+          ) : null}
         </div>
-        {hasProgress ? (
-          <Badge variant="secondary" className="shrink-0">
-            {entry.progressLabel}
-          </Badge>
-        ) : null}
-      </div>
-      {hasProgress && !isIdle ? <Progress value={progressValue} className="h-1.5" /> : null}
-    </div>
+      </td>
+      <td className="px-2 py-2 text-muted-foreground">{durationLabel}</td>
+      <td className="px-2 py-2">
+        {entry.workUrl ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-link hover:text-link-hover hover:underline"
+            onClick={() => postVsCodeMessage({ type: "openExternal", url: entry.workUrl })}
+          >
+            Open
+          </button>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 

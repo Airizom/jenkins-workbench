@@ -17,10 +17,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Other",
-    "Visualization"
-  ],
+  "categories": ["Other", "Visualization"],
   "keywords": [
     "jenkins",
     "ci",
@@ -36,9 +33,7 @@
     "color": "#1a1a2e",
     "theme": "dark"
   },
-  "activationEvents": [
-    "onStartupFinished"
-  ],
+  "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -416,11 +411,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "**/Jenkinsfile",
-            "**/*.jenkinsfile",
-            "**/Jenkinsfile.*"
-          ],
+          "default": ["**/Jenkinsfile", "**/*.jenkinsfile", "**/Jenkinsfile.*"],
           "description": "Glob patterns used to detect Jenkinsfile documents for validation."
         }
       }

@@ -8,6 +8,8 @@ export interface NodeExecutorViewModel {
   progressLabel?: string;
   workLabel?: string;
   workUrl?: string;
+  workDurationLabel?: string;
+  workDurationMs?: number;
 }
 
 export interface NodeMonitorViewModel {

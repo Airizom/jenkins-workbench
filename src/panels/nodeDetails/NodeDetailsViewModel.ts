@@ -1,3 +1,4 @@
+import { formatDurationMs } from "../../formatters/DurationFormatters";
 import type {
   JenkinsNodeDetails,
   JenkinsNodeExecutable,
@@ -23,6 +24,7 @@ export interface NodeDetailsViewModelInput {
   updatedAt?: string;
   fallbackUrl?: string;
   advancedLoaded?: boolean;
+  nowMs?: number;
 }
 
 const UNKNOWN_LABEL = "Not available";
@@ -42,6 +44,11 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
   const executorsLabel = formatExecutorsSummary(details);
   const rawJson = details ? JSON.stringify(details, null, 2) : "";
   const advancedLoaded = input.advancedLoaded ?? false;
+  const nowMsCandidate =
+    typeof input.nowMs === "number" && Number.isFinite(input.nowMs)
+      ? input.nowMs
+      : Date.parse(updatedAt);
+  const nowMs = Number.isFinite(nowMsCandidate) ? nowMsCandidate : 0;
 
   return {
     displayName,
@@ -58,8 +65,8 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
     jnlpAgentLabel: formatBoolean(details?.jnlpAgent),
     launchSupportedLabel: formatBoolean(details?.launchSupported),
     manualLaunchLabel: formatBoolean(details?.manualLaunchAllowed),
-    executors: buildExecutors(details?.executors, "Executor"),
-    oneOffExecutors: buildExecutors(details?.oneOffExecutors, "One-off"),
+    executors: buildExecutors(details?.executors, "Executor", nowMs),
+    oneOffExecutors: buildExecutors(details?.oneOffExecutors, "One-off", nowMs),
     monitorData: buildMonitorEntries(details?.monitorData),
     loadStatistics: buildMonitorEntries(details?.loadStatistics),
     rawJson,
@@ -129,19 +136,21 @@ function formatBoolean(value?: boolean): string | undefined {
 
 function buildExecutors(
   executors: JenkinsNodeExecutor[] | undefined,
-  labelPrefix: string
+  labelPrefix: string,
+  nowMs: number
 ): NodeExecutorViewModel[] {
   if (!Array.isArray(executors) || executors.length === 0) {
     return [];
   }
   return executors.map((executor, index) =>
-    buildExecutorViewModel(executor, `${labelPrefix} ${index + 1}`)
+    buildExecutorViewModel(executor, `${labelPrefix} ${index + 1}`, nowMs)
   );
 }
 
 function buildExecutorViewModel(
   executor: JenkinsNodeExecutor,
-  fallbackLabel: string
+  fallbackLabel: string,
+  nowMs: number
 ): NodeExecutorViewModel {
   const number = Number.isFinite(executor.number) ? executor.number : undefined;
   const id = number !== undefined ? `#${number}` : fallbackLabel;
@@ -151,6 +160,7 @@ function buildExecutorViewModel(
   const statusLabel = isIdle ? "Idle" : "Busy";
   const progressPercent = normalizeProgressPercent(executor.progress);
   const progressLabel = formatProgress(progressPercent);
+  const workDuration = resolveWorkDuration(workItem, nowMs);
 
   return {
     id,
@@ -159,18 +169,14 @@ function buildExecutorViewModel(
     progressPercent,
     progressLabel,
     workLabel,
-    workUrl: workItem?.url
+    workUrl: workItem?.url,
+    workDurationLabel: workDuration.label,
+    workDurationMs: workDuration.ms
   };
 }
 
 function resolveExecutorIdle(executor: JenkinsNodeExecutor, hasWork: boolean): boolean {
-  if (executor.idle === true) {
-    return true;
-  }
-  if (executor.idle === false) {
-    return false;
-  }
-  return !hasWork;
+  return !hasWork && executor.idle !== false;
 }
 
 function normalizeProgressPercent(progress?: number): number | undefined {
@@ -201,6 +207,47 @@ function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
     return `${name} (${result})`;
   }
   return name;
+}
+
+function resolveWorkDuration(
+  work: JenkinsNodeExecutable | undefined,
+  nowMs: number
+): { label?: string; ms?: number } {
+  if (!work) {
+    return {};
+  }
+
+  const isBuilding = work.building === true;
+  const durationValue = normalizeDuration(work.duration);
+  if (durationValue !== undefined && (durationValue > 0 || !isBuilding)) {
+    return buildDurationResult(durationValue);
+  }
+
+  if (isBuilding) {
+    const timestamp = normalizeDuration(work.timestamp);
+    if (timestamp !== undefined) {
+      const elapsed = Math.max(0, nowMs - timestamp);
+      return buildDurationResult(elapsed);
+    }
+  }
+
+  const estimatedValue = normalizeDuration(work.estimatedDuration);
+  if (estimatedValue !== undefined && estimatedValue > 0) {
+    return buildDurationResult(estimatedValue, "Est. ");
+  }
+
+  return {};
+}
+
+function buildDurationResult(duration: number, prefix = ""): { label: string; ms: number } {
+  return { label: `${prefix}${formatDurationMs(duration)}`, ms: duration };
+}
+
+function normalizeDuration(value?: number): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+  return value;
 }
 
 function buildMonitorEntries(data?: Record<string, unknown>): NodeMonitorViewModel[] {

@@ -199,7 +199,8 @@ export class NodeDetailsPanel {
         errors: [],
         updatedAt: new Date().toISOString(),
         fallbackUrl: this.nodeUrl,
-        advancedLoaded: this.advancedLoaded
+        advancedLoaded: this.advancedLoaded,
+        nowMs: Date.now()
       });
     } catch (error) {
       if (!this.isTokenCurrent(token)) {
@@ -211,7 +212,8 @@ export class NodeDetailsPanel {
         errors: [message],
         updatedAt: new Date().toISOString(),
         fallbackUrl: this.nodeUrl,
-        advancedLoaded: this.advancedLoaded
+        advancedLoaded: this.advancedLoaded,
+        nowMs: Date.now()
       });
     }
   }
