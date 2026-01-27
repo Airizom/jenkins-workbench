@@ -252,7 +252,7 @@ async function promptBranchFilter(
   const existing =
     viewStateStore.getBranchFilter(item.environment.environmentId, item.folderUrl) ?? "";
   const input = await vscode.window.showInputBox({
-    prompt: `Filter branches in ${folderLabel}`,
+    prompt: `Filter branches in ${folderLabel} (leave blank to clear)`,
     placeHolder: "Type part of a branch name",
     value: existing
   });

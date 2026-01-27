@@ -4,6 +4,10 @@ import type { JenkinsBuild, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsNodeInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
+import {
+  formatMultibranchFolderDescription,
+  formatMultibranchFolderTooltip
+} from "./branchFilters";
 import { type BuildTooltipOptions, buildBuildTooltip } from "./BuildTooltips";
 import {
   buildIcon,
@@ -170,12 +174,22 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
     public readonly folderUrl: string,
-    public readonly folderKind: JenkinsJobKind
+    public readonly folderKind: JenkinsJobKind,
+    options?: {
+      branchFilter?: string;
+    }
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = JenkinsFolderTreeItem.buildId(environment, folderUrl);
     this.contextValue = folderKind === "multibranch" ? "multibranchFolder" : "folder";
-    this.description = folderKind === "multibranch" ? "Multibranch" : undefined;
+    this.description =
+      folderKind === "multibranch"
+        ? formatMultibranchFolderDescription(options?.branchFilter)
+        : undefined;
+    this.tooltip =
+      folderKind === "multibranch"
+        ? formatMultibranchFolderTooltip(options?.branchFilter)
+        : undefined;
     this.iconPath =
       folderKind === "multibranch"
         ? new vscode.ThemeIcon("git-branch")

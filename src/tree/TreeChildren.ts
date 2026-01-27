@@ -581,7 +581,12 @@ export class JenkinsTreeChildrenLoader {
       switch (job.kind) {
         case "folder":
         case "multibranch":
-          item = new JenkinsFolderTreeItem(environment, job.name, job.url, job.kind);
+          item = new JenkinsFolderTreeItem(environment, job.name, job.url, job.kind, {
+            branchFilter:
+              job.kind === "multibranch"
+                ? this.treeFilter.getBranchFilter(environment.environmentId, job.url)
+                : undefined
+          });
           break;
         case "pipeline":
           item = new PipelineTreeItem(
