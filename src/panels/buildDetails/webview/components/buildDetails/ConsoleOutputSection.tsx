@@ -198,7 +198,13 @@ export function ConsoleOutputSection({
                 <SearchIcon />
                 <span className="hidden sm:inline">Search</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleExportLogs} className="gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportLogs}
+                className="gap-1.5"
+                aria-label="Export console output"
+              >
                 <DownloadIcon />
                 <span className="hidden sm:inline">Export</span>
               </Button>

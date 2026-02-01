@@ -103,37 +103,42 @@ function ArtifactsList({
 }) {
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
-      {items.map((item, index) => (
-        <li
-          className="flex items-center justify-between gap-2 rounded border border-border bg-muted/30 px-3 py-2"
-          key={`${item.relativePath}-${index}`}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <FileIcon />
-            <span className="text-sm truncate">{item.name || "Artifact"}</span>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onArtifactAction("preview", item)}
-              className="h-7 w-7 p-0"
-              title="Preview"
-            >
-              <EyeIcon />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onArtifactAction("download", item)}
-              className="h-7 w-7 p-0"
-              title="Download"
-            >
-              <DownloadIcon />
-            </Button>
-          </div>
-        </li>
-      ))}
+      {items.map((item, index) => {
+        const artifactLabel = item.name ?? item.relativePath ?? "artifact";
+        return (
+          <li
+            className="flex items-center justify-between gap-2 rounded border border-border bg-muted/30 px-3 py-2"
+            key={`${item.relativePath}-${index}`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <FileIcon />
+              <span className="text-sm truncate">{item.name || "Artifact"}</span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onArtifactAction("preview", item)}
+                className="h-7 w-7 p-0"
+                aria-label={`Preview artifact: ${artifactLabel}`}
+                title="Preview"
+              >
+                <EyeIcon />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onArtifactAction("download", item)}
+                className="h-7 w-7 p-0"
+                aria-label={`Download artifact: ${artifactLabel}`}
+                title="Download"
+              >
+                <DownloadIcon />
+              </Button>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
