@@ -12,8 +12,6 @@ import { registerWatchCommands } from "../commands/WatchCommands";
 import type { JobConfigUpdateWorkflow } from "../commands/job/JobConfigUpdateWorkflow";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
@@ -29,7 +27,7 @@ import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import type { JenkinsfileEnvironmentResolver } from "../validation/JenkinsfileEnvironmentResolver";
 import type { JenkinsfileValidationCoordinator } from "../validation/JenkinsfileValidationCoordinator";
-import { syncNoEnvironmentsContext } from "./contextKeys";
+import type { ExtensionRefreshHost } from "./ExtensionRefreshHost";
 
 export interface ExtensionCommandDependencies {
   environmentStore: JenkinsEnvironmentStore;
@@ -48,41 +46,16 @@ export interface ExtensionCommandDependencies {
   viewStateStore: JenkinsViewStateStore;
   treeNavigator: DefaultJenkinsTreeNavigator;
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
-  queuePoller: JenkinsQueuePoller;
   jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
   jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;
+  refreshHost: ExtensionRefreshHost;
 }
 
 export function registerExtensionCommands(
   context: vscode.ExtensionContext,
   dependencies: ExtensionCommandDependencies
 ): void {
-  const updateQueueEnvironment = async (environmentId?: string): Promise<void> => {
-    if (!environmentId) {
-      return;
-    }
-    const environments = await dependencies.environmentStore.listEnvironmentsWithScope();
-    const environment = environments.find((entry) => entry.id === environmentId);
-    if (!environment) {
-      return;
-    }
-    dependencies.queuePoller.updateEnvironment({
-      environmentId: environment.id,
-      scope: environment.scope,
-      url: environment.url,
-      username: environment.username
-    });
-  };
-
-  const refreshHost = {
-    refreshEnvironment: (environmentId?: string) => {
-      dependencies.treeDataProvider.onEnvironmentChanged(environmentId);
-      void updateQueueEnvironment(environmentId);
-      void syncNoEnvironmentsContext(dependencies.environmentStore);
-    },
-    onEnvironmentRemoved: (environment: JenkinsEnvironmentRef) =>
-      dependencies.queuePoller.clearEnvironment(environment)
-  };
+  const refreshHost = dependencies.refreshHost;
 
   registerEnvironmentCommands(
     context,

@@ -37,10 +37,14 @@
     "theme": "dark"
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onUri"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "uriHandler": {
+      "scheme": "airizom.jenkins-workbench"
+    },
     "commands": [
       {
         "command": "jenkinsWorkbench.addEnvironment",

@@ -23,8 +23,12 @@ import {
   getRequestTimeoutMs,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
+import { createExtensionRefreshHost } from "./ExtensionRefreshHost";
 import { createExtensionServices } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
+import { JenkinsWorkbenchDeepLinkBuildHandler } from "./JenkinsWorkbenchDeepLinkBuildHandler";
+import { JenkinsWorkbenchDeepLinkJobHandler } from "./JenkinsWorkbenchDeepLinkJobHandler";
+import { JenkinsWorkbenchUriHandler } from "./JenkinsWorkbenchUriHandler";
 import { VscodeStatusNotifier } from "./VscodeStatusNotifier";
 import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 
@@ -99,6 +103,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     queuePollIntervalSeconds
   );
+  const refreshHost = createExtensionRefreshHost(
+    services.environmentStore,
+    services.treeDataProvider,
+    queuePoller
+  );
+  const buildDeepLinkHandler = new JenkinsWorkbenchDeepLinkBuildHandler(
+    services.dataService,
+    services.artifactActionHandler,
+    services.consoleExporter,
+    refreshHost,
+    services.pendingInputCoordinator,
+    context.extensionUri
+  );
+  const jobDeepLinkHandler = new JenkinsWorkbenchDeepLinkJobHandler(services.treeNavigator);
+  const uriHandler = new JenkinsWorkbenchUriHandler(
+    services.environmentStore,
+    buildDeepLinkHandler,
+    jobDeepLinkHandler
+  );
 
   poller.start();
   void services.viewStateStore.syncFilterContext();
@@ -118,6 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     services.treeView,
     services.treeDataProvider,
     services.pendingInputCoordinator,
+    vscode.window.registerUriHandler(uriHandler),
     jenkinsfileCodeLensProvider,
     vscode.workspace.registerFileSystemProvider(
       ARTIFACT_PREVIEW_SCHEME,
@@ -177,9 +201,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     viewStateStore: services.viewStateStore,
     treeNavigator: services.treeNavigator,
     treeDataProvider: services.treeDataProvider,
-    queuePoller,
     jenkinsfileEnvironmentResolver: services.jenkinsfileEnvironmentResolver,
-    jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator
+    jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator,
+    refreshHost
   });
 }
 
