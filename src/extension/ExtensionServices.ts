@@ -28,7 +28,7 @@ import { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
-import { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
+import { JenkinsWorkbenchTreeDataProvider, type TreeViewSummary } from "../tree/TreeDataProvider";
 import { JenkinsTreeFilter } from "../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../tree/TreeItems";
 import { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
@@ -166,6 +166,18 @@ export function createExtensionServices(
   const treeView = vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
     treeDataProvider
   });
+  const treeSummarySubscription = treeDataProvider.onDidChangeSummary((summary) => {
+    const hasCounts = summary.watchErrors > 0 || summary.running > 0 || summary.queue > 0;
+    if (!hasCounts) {
+      treeView.badge = undefined;
+      treeView.message = undefined;
+      return;
+    }
+    const message = formatTreeViewSummaryMessage(summary);
+    treeView.message = message;
+    const badgeValue = resolveTreeViewBadgeValue(summary);
+    treeView.badge = badgeValue > 0 ? { value: badgeValue, tooltip: message } : undefined;
+  });
   const treeNavigator = new DefaultJenkinsTreeNavigator(treeView, treeDataProvider);
   const jenkinsfileEnvironmentResolver = new JenkinsfileEnvironmentResolver(
     context,
@@ -182,6 +194,7 @@ export function createExtensionServices(
     jenkinsfileMatcher,
     options.jenkinsfileValidationConfig
   );
+  context.subscriptions.push(treeSummarySubscription);
 
   return {
     environmentStore,
@@ -211,4 +224,21 @@ export function createExtensionServices(
     jenkinsfileValidationCoordinator,
     jenkinsfileValidationStatusBar
   };
+}
+
+function formatTreeViewSummaryMessage(summary: TreeViewSummary): string {
+  return `Running: ${summary.running} | Queue: ${summary.queue} | Watch errors: ${summary.watchErrors}`;
+}
+
+function resolveTreeViewBadgeValue(summary: TreeViewSummary): number {
+  if (summary.watchErrors > 0) {
+    return summary.watchErrors;
+  }
+  if (summary.running > 0) {
+    return summary.running;
+  }
+  if (summary.queue > 0) {
+    return summary.queue;
+  }
+  return 0;
 }

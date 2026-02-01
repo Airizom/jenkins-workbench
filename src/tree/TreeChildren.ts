@@ -12,7 +12,7 @@ import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "./BuildTooltips";
-import { EnvironmentSummaryStore } from "./EnvironmentSummaryStore";
+import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import {
   ArtifactTreeItem,
@@ -84,6 +84,10 @@ export class JenkinsTreeChildrenLoader {
 
   updateBuildListFetchOptions(options: BuildListFetchOptions): void {
     this.buildListFetchOptions = options;
+  }
+
+  getSummaryTotals(): EnvironmentSummaryTotals {
+    return this.environmentSummaryStore.getTotals();
   }
 
   async getChildren(

@@ -1,4 +1,4 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import type { JenkinsDataService, PendingInputSummary } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { JenkinsRequestError } from "../jenkins/errors";
@@ -20,11 +20,16 @@ const DEFAULT_MAX_CONSECUTIVE_ERRORS = 3;
 export class JenkinsStatusPoller implements vscode.Disposable {
   private intervalId: NodeJS.Timeout | undefined;
   private isPolling = false;
+  private readonly _onDidChangeWatchErrorCount = new vscode.EventEmitter<number>();
   private readonly evaluator: JenkinsJobStatusEvaluator;
   private readonly failureCounts = new Map<string, number>();
   private readonly pendingInputSignatures = new Map<string, string>();
+  private readonly watchErrorKeys = new Set<string>();
   private pollIntervalMs: number;
   private maxConsecutiveErrors: number;
+  private lastWatchErrorCount = 0;
+
+  readonly onDidChangeWatchErrorCount = this._onDidChangeWatchErrorCount.event;
 
   constructor(
     private readonly store: JenkinsEnvironmentStore,
@@ -66,6 +71,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
 
     this.maxConsecutiveErrors = next;
     this.failureCounts.clear();
+    this.clearWatchErrors();
   }
 
   start(): void {
@@ -101,6 +107,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
     }
+    this._onDidChangeWatchErrorCount.dispose();
   }
 
   private async poll(): Promise<void> {
@@ -112,6 +119,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
     try {
       const watched = await this.watchStore.listWatchedJobs();
       if (watched.length === 0) {
+        this.clearWatchState();
         return;
       }
       const didChange = await this.checkWatchedJobs(watched);
@@ -139,8 +147,10 @@ export class JenkinsStatusPoller implements vscode.Disposable {
 
     const staleByScope = new Map<EnvironmentScope, Set<string>>();
     let didChange = false;
+    const activeFailureKeys = new Set<string>();
 
     for (const entry of watched) {
+      activeFailureKeys.add(this.buildFailureKey(entry));
       const environment = environmentMap.get(`${entry.scope}:${entry.environmentId}`);
       if (!environment) {
         this.trackStaleEnvironment(staleByScope, entry);
@@ -152,6 +162,8 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         didChange = true;
       }
     }
+
+    this.pruneInactiveFailures(activeFailureKeys);
 
     for (const [scope, environmentIds] of staleByScope) {
       for (const environmentId of environmentIds) {
@@ -228,7 +240,9 @@ export class JenkinsStatusPoller implements vscode.Disposable {
   ): Promise<boolean> {
     if (error instanceof JenkinsRequestError && error.statusCode === 404) {
       await this.watchStore.removeWatch(entry.scope, entry.environmentId, entry.jobUrl);
-      this.failureCounts.delete(this.buildFailureKey(entry));
+      const key = this.buildFailureKey(entry);
+      this.failureCounts.delete(key);
+      this.removeWatchErrorKey(key);
       this.clearPendingInputsForJob(entry);
       this.notifier.notifyWatchError(
         `${this.formatWatchLabel(entry)} was removed because Jenkins reported it missing in ${environment.url}.`
@@ -248,6 +262,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
       this.notifier.notifyWatchError(
         `Unable to poll ${this.formatWatchLabel(entry)} in ${environment.url} after ${this.maxConsecutiveErrors} attempts. Keeping the watch; check connectivity or credentials.`
       );
+      this.addWatchErrorKey(key);
     }
 
     return false;
@@ -258,7 +273,9 @@ export class JenkinsStatusPoller implements vscode.Disposable {
   }
 
   private resetFailureCount(entry: WatchedJobEntry): void {
-    this.failureCounts.delete(this.buildFailureKey(entry));
+    const key = this.buildFailureKey(entry);
+    this.failureCounts.delete(key);
+    this.removeWatchErrorKey(key);
   }
 
   private clearFailuresForEnvironment(scope: EnvironmentScope, environmentId: string): void {
@@ -267,6 +284,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         this.failureCounts.delete(key);
       }
     }
+    this.clearWatchErrorsForEnvironment(scope, environmentId);
   }
 
   private clearPendingInputsForEnvironment(scope: EnvironmentScope, environmentId: string): void {
@@ -295,6 +313,76 @@ export class JenkinsStatusPoller implements vscode.Disposable {
 
   private buildPendingInputKey(entry: WatchedJobEntry, buildUrl: string): string {
     return `${entry.scope}:${entry.environmentId}:${entry.jobUrl}:${buildUrl}`;
+  }
+
+  private pruneInactiveFailures(activeKeys: Set<string>): void {
+    for (const key of Array.from(this.failureCounts.keys())) {
+      if (!activeKeys.has(key)) {
+        this.failureCounts.delete(key);
+      }
+    }
+    let didChange = false;
+    for (const key of Array.from(this.watchErrorKeys.keys())) {
+      if (!activeKeys.has(key)) {
+        this.watchErrorKeys.delete(key);
+        didChange = true;
+      }
+    }
+    if (didChange) {
+      this.emitWatchErrorCount();
+    }
+  }
+
+  private clearWatchErrorsForEnvironment(scope: EnvironmentScope, environmentId: string): void {
+    const prefix = `${scope}:${environmentId}:`;
+    let didChange = false;
+    for (const key of Array.from(this.watchErrorKeys.keys())) {
+      if (key.startsWith(prefix)) {
+        this.watchErrorKeys.delete(key);
+        didChange = true;
+      }
+    }
+    if (didChange) {
+      this.emitWatchErrorCount();
+    }
+  }
+
+  private clearWatchState(): void {
+    this.failureCounts.clear();
+    this.pendingInputSignatures.clear();
+    this.clearWatchErrors();
+  }
+
+  private clearWatchErrors(): void {
+    if (this.watchErrorKeys.size === 0) {
+      return;
+    }
+    this.watchErrorKeys.clear();
+    this.emitWatchErrorCount();
+  }
+
+  private addWatchErrorKey(key: string): void {
+    if (this.watchErrorKeys.has(key)) {
+      return;
+    }
+    this.watchErrorKeys.add(key);
+    this.emitWatchErrorCount();
+  }
+
+  private removeWatchErrorKey(key: string): void {
+    if (!this.watchErrorKeys.delete(key)) {
+      return;
+    }
+    this.emitWatchErrorCount();
+  }
+
+  private emitWatchErrorCount(): void {
+    const next = this.watchErrorKeys.size;
+    if (next === this.lastWatchErrorCount) {
+      return;
+    }
+    this.lastWatchErrorCount = next;
+    this._onDidChangeWatchErrorCount.fire(next);
   }
 
   private async checkPendingInputs(

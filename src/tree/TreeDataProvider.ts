@@ -26,6 +26,13 @@ const BUILD_LIMIT = 20;
 const REFRESH_DEBOUNCE_MS = 150;
 const MANUAL_REFRESH_COOLDOWN_MS = 2000;
 
+export type TreeViewSummary = {
+  running: number;
+  queue: number;
+  watchErrors: number;
+  hasData: boolean;
+};
+
 export class JenkinsWorkbenchTreeDataProvider
   implements
     vscode.TreeDataProvider<WorkbenchTreeElement>,
@@ -35,6 +42,7 @@ export class JenkinsWorkbenchTreeDataProvider
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     WorkbenchTreeElement | undefined
   >();
+  private readonly _onDidChangeSummary = new vscode.EventEmitter<TreeViewSummary>();
   private readonly parentMap = new WeakMap<
     WorkbenchTreeElement,
     WorkbenchTreeElement | undefined
@@ -47,8 +55,11 @@ export class JenkinsWorkbenchTreeDataProvider
   private debounceTimer: NodeJS.Timeout | undefined;
   private pendingRefreshElement: WorkbenchTreeElement | undefined | null = null;
   private lastManualRefreshAt = 0;
+  private watchErrorCount = 0;
+  private lastSummary: TreeViewSummary | undefined;
 
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  readonly onDidChangeSummary = this._onDidChangeSummary.event;
 
   constructor(
     store: JenkinsEnvironmentStore,
@@ -107,11 +118,13 @@ export class JenkinsWorkbenchTreeDataProvider
     this.childrenLoader.clearPinCacheForEnvironment();
     this.childrenLoader.clearChildrenCacheForEnvironment();
     this._onDidChangeTreeData.fire(undefined);
+    this.emitSummary();
   }
 
   refreshView(): void {
     this.childrenLoader.clearChildrenCacheForEnvironment();
     this.scheduleRefresh(undefined);
+    this.emitSummary();
   }
 
   refreshElement(element?: WorkbenchTreeElement): void {
@@ -158,6 +171,7 @@ export class JenkinsWorkbenchTreeDataProvider
       this.instanceItems.clear();
     }
     this.scheduleRefresh(undefined);
+    this.emitSummary();
   }
 
   private scheduleRefresh(element: WorkbenchTreeElement | undefined): void {
@@ -186,6 +200,15 @@ export class JenkinsWorkbenchTreeDataProvider
     return element;
   }
 
+  setWatchErrorCount(count: number): void {
+    const next = Math.max(0, Math.floor(count));
+    if (next === this.watchErrorCount) {
+      return;
+    }
+    this.watchErrorCount = next;
+    this.emitSummary();
+  }
+
   getParent(element: WorkbenchTreeElement): vscode.ProviderResult<WorkbenchTreeElement> {
     return this.parentMap.get(element);
   }
@@ -206,7 +229,9 @@ export class JenkinsWorkbenchTreeDataProvider
     options?: TreeChildrenOptions
   ): Promise<WorkbenchTreeElement[]> {
     const items = await this.childrenLoader.getChildren(element, options);
-    return this.withParent(element, items);
+    const withParent = this.withParent(element, items);
+    this.emitSummary();
+    return withParent;
   }
 
   private withParent(
@@ -232,10 +257,31 @@ export class JenkinsWorkbenchTreeDataProvider
   private notifyEnvironment(environment: JenkinsEnvironmentRef): void {
     const key = this.buildEnvironmentKey(environment);
     const instance = this.instanceItems.get(key);
-    if (instance) {
-      this.notifyElement(instance);
+    this.notifyElement(instance);
+    this.emitSummary();
+  }
+
+  private emitSummary(): void {
+    const totals = this.childrenLoader.getSummaryTotals();
+    const summary: TreeViewSummary = {
+      running: totals.running,
+      queue: totals.queue,
+      watchErrors: this.watchErrorCount,
+      hasData: totals.hasData || this.watchErrorCount > 0
+    };
+    if (this.lastSummary && areTreeViewSummariesEqual(this.lastSummary, summary)) {
       return;
     }
-    this.notifyElement(undefined);
+    this.lastSummary = summary;
+    this._onDidChangeSummary.fire(summary);
   }
+}
+
+function areTreeViewSummariesEqual(left: TreeViewSummary, right: TreeViewSummary): boolean {
+  return (
+    left.running === right.running &&
+    left.queue === right.queue &&
+    left.watchErrors === right.watchErrors &&
+    left.hasData === right.hasData
+  );
 }

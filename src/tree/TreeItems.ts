@@ -44,6 +44,7 @@ export interface JobsFolderSummary {
   pipelines: number;
   folders: number;
   disabled: number;
+  running: number;
 }
 
 export interface NodesFolderSummary {
@@ -564,6 +565,9 @@ function formatJobsSummaryDescription(summary: JobsFolderSummary): string | unde
   if (summary.jobs > 0) {
     parts.push(`${summary.jobs} jobs`);
   }
+  if (summary.running > 0) {
+    parts.push(`${summary.running} running`);
+  }
   if (summary.disabled > 0) {
     parts.push(`${summary.disabled} disabled`);
   }
@@ -577,6 +581,9 @@ function formatJobsSummaryTooltip(summary: JobsFolderSummary): string {
     `Pipelines: ${summary.pipelines}`,
     `Folders: ${summary.folders}`
   ];
+  if (summary.running > 0) {
+    parts.push(`Running: ${summary.running}`);
+  }
   if (summary.disabled > 0) {
     parts.push(`Disabled: ${summary.disabled}`);
   }

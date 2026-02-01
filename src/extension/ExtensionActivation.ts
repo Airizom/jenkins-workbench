@@ -88,6 +88,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     pollIntervalSeconds,
     watchErrorThreshold
   );
+  const watchErrorSubscription = poller.onDidChangeWatchErrorCount((count) => {
+    services.treeDataProvider.setWatchErrorCount(count);
+  });
   const queuePoller = new JenkinsQueuePoller(
     {
       refreshQueueView: (environment) => {
@@ -138,6 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     poller,
     queuePoller,
+    watchErrorSubscription,
     services.jenkinsfileValidationCoordinator,
     services.jenkinsfileValidationStatusBar,
     vscode.languages.registerCodeActionsProvider(

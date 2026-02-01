@@ -14,6 +14,12 @@ export type EnvironmentSummary = {
   queue?: QueueFolderSummary;
 };
 
+export type EnvironmentSummaryTotals = {
+  running: number;
+  queue: number;
+  hasData: boolean;
+};
+
 export class EnvironmentSummaryStore {
   constructor(
     private readonly cache: ScopedCache,
@@ -48,6 +54,25 @@ export class EnvironmentSummaryStore {
     this.cache.clearForEnvironment(environmentId);
   }
 
+  getTotals(): EnvironmentSummaryTotals {
+    let running = 0;
+    let queue = 0;
+    let hasData = false;
+
+    for (const summary of this.cache.values<EnvironmentSummary>()) {
+      if (summary.jobs) {
+        running += summary.jobs.running;
+        hasData = true;
+      }
+      if (summary.queue) {
+        queue += summary.queue.total;
+        hasData = true;
+      }
+    }
+
+    return { running, queue, hasData };
+  }
+
   private update(environment: JenkinsEnvironmentRef, update: Partial<EnvironmentSummary>): void {
     const key = this.buildKey(environment);
     const current = this.cache.get<EnvironmentSummary>(key);
@@ -69,7 +94,8 @@ function buildJobsSummary(jobs: JenkinsJobInfo[]): JobsFolderSummary {
     jobs: 0,
     pipelines: 0,
     folders: 0,
-    disabled: 0
+    disabled: 0,
+    running: 0
   };
 
   for (const job of jobs) {
@@ -79,6 +105,9 @@ function buildJobsSummary(jobs: JenkinsJobInfo[]): JobsFolderSummary {
       summary.pipelines += 1;
     } else {
       summary.jobs += 1;
+    }
+    if (job.kind !== "folder" && job.kind !== "multibranch" && job.color?.endsWith("_anime")) {
+      summary.running += 1;
     }
     if (isJobColorDisabled(job.color)) {
       summary.disabled += 1;
@@ -120,7 +149,8 @@ function areJobSummariesEqual(left?: JobsFolderSummary, right?: JobsFolderSummar
     left.jobs === right.jobs &&
     left.pipelines === right.pipelines &&
     left.folders === right.folders &&
-    left.disabled === right.disabled
+    left.disabled === right.disabled &&
+    left.running === right.running
   );
 }
 

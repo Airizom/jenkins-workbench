@@ -29,6 +29,17 @@ export class ScopedCache {
     return value;
   }
 
+  values<T>(): T[] {
+    const values: T[] = [];
+    for (const key of this.keys) {
+      const value = this.get<T>(key);
+      if (value !== undefined) {
+        values.push(value);
+      }
+    }
+    return values;
+  }
+
   set<T>(key: string, value: T): void {
     this.cache.set(key, value);
     this.keys.add(key);
