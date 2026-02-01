@@ -91,6 +91,34 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
    - **Custom headers (JSON)** — JSON object of headers
 7. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
+## Tasks
+
+Jenkins jobs and pipelines appear in **Run Task...** under the Jenkins Workbench task type (up to 2000 per environment). Tasks run without prompts, and parameterized builds only use values provided in `tasks.json`.
+
+Example `tasks.json`:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Jenkins: Build API",
+      "type": "jenkinsWorkbench",
+      "environmentUrl": "https://jenkins.example.com/",
+      "environmentId": "workspace-jenkins",
+      "jobUrl": "job/api/job/build/",
+      "parameters": {
+        "BRANCH": "main",
+        "DEPLOY": true
+      }
+    }
+  ]
+}
+```
+
+Canceling a Jenkins task does not stop the Jenkins build.
+If multiple environments share the same URL, set `environmentId` to disambiguate.
+
 ## Requirements
 
 | Requirement | Details |

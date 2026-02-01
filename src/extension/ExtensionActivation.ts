@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
+import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
 import { JenkinsfileHoverProvider } from "../validation/editor/JenkinsfileHoverProvider";
 import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
@@ -205,6 +206,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator,
     refreshHost
   });
+  registerJenkinsTasks(
+    context,
+    services.environmentStore,
+    services.dataService,
+    refreshHost
+  );
 }
 
 export function deactivate(): void {

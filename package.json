@@ -240,6 +240,48 @@
         "title": "Jenkins: Show Jenkinsfile Validation Output"
       }
     ],
+    "taskDefinitions": [
+      {
+        "type": "jenkinsWorkbench",
+        "required": [
+          "environmentUrl",
+          "jobUrl"
+        ],
+        "properties": {
+          "environmentUrl": {
+            "type": "string",
+            "description": "Base Jenkins URL for the environment."
+          },
+          "jobUrl": {
+            "type": "string",
+            "description": "Job URL or path relative to environmentUrl (for example: job/folder/job/name/)."
+          },
+          "environmentId": {
+            "type": "string",
+            "description": "Optional environment id to disambiguate when multiple environments share a URL."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Optional build parameters passed to Jenkins.",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "array"
+              ],
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
     "keybindings": [
       {
         "command": "jenkinsWorkbench.jenkinsfile.validateActive",
