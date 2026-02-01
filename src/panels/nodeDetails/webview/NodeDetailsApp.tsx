@@ -130,17 +130,17 @@ export function NodeDetailsApp(): JSX.Element {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="sticky-header shadow-widget">
         {state.loading ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
-        <div className="mx-auto max-w-5xl px-6 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="mx-auto max-w-5xl px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="flex items-start gap-4">
               <div
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}
               >
-                <ServerIcon />
+                <ServerIcon className="h-5 w-5" />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-base font-semibold">{state.displayName}</h1>
+                  <h1 className="text-base font-semibold leading-tight">{state.displayName}</h1>
                   <Badge variant="outline" className={statusStyle.badge}>
                     {state.statusLabel}
                   </Badge>
@@ -153,11 +153,11 @@ export function NodeDetailsApp(): JSX.Element {
                     </Badge>
                   ) : null}
                 </div>
-                <div className="text-xs text-muted-foreground">{state.name}</div>
+                <div className="text-[13px] text-muted-foreground">{state.name}</div>
                 {state.description ? (
                   <div className="text-sm text-muted-foreground">{state.description}</div>
                 ) : null}
-                <div className="text-xs text-muted-foreground" title={updatedAtTitle}>
+                <div className="text-[13px] text-muted-foreground" title={updatedAtTitle}>
                   Last updated {updatedAtLabel}
                 </div>
               </div>
@@ -170,7 +170,7 @@ export function NodeDetailsApp(): JSX.Element {
                 disabled={state.loading}
                 className="gap-1.5"
               >
-                <RefreshIcon />
+                <RefreshIcon className="h-4 w-4" />
                 Refresh
               </Button>
               <Button
@@ -180,7 +180,7 @@ export function NodeDetailsApp(): JSX.Element {
                 disabled={!state.url}
                 className="gap-1.5"
               >
-                <ExternalLinkIcon />
+                <ExternalLinkIcon className="h-4 w-4" />
                 Open in Jenkins
               </Button>
             </div>
@@ -188,7 +188,7 @@ export function NodeDetailsApp(): JSX.Element {
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-6" aria-busy={state.loading}>
+      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-5" aria-busy={state.loading}>
         {showOfflineBanner ? (
           <Alert variant="warning" className="mb-6">
             <AlertTitle>{state.statusLabel}</AlertTitle>
@@ -211,12 +211,12 @@ export function NodeDetailsApp(): JSX.Element {
           </Alert>
         ) : null}
 
-        <Tabs defaultValue="overview" className="space-y-4">
+        <Tabs defaultValue="overview" className="space-y-5">
           <TabsList className="w-full justify-start">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="executors">
               Executors
-              <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-muted px-1.5 text-xs">
+              <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border border-border bg-muted-soft px-1.5 text-xs text-muted-foreground">
                 {state.executors.length + state.oneOffExecutors.length}
               </span>
             </TabsTrigger>
@@ -224,30 +224,32 @@ export function NodeDetailsApp(): JSX.Element {
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-4">
+          <TabsContent value="overview" className="space-y-5">
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <ActivityIcon />
+                  <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
+                    <ActivityIcon className="h-4 w-4" />
+                  </div>
                   <CardTitle>Status</CardTitle>
                 </div>
                 <CardDescription>Current state, executors, and connectivity.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {overviewRows.map((row) => (
                     <div
                       key={row.label}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3"
+                      className="flex items-center gap-3 rounded-lg border border-mutedBorder bg-muted-soft px-4 py-3"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                         {row.icon}
                       </div>
                       <div>
                         <div className="text-xs uppercase tracking-wide text-muted-foreground">
                           {row.label}
                         </div>
-                        <div className="text-sm font-medium">{row.value}</div>
+                        <div className="text-sm font-semibold">{row.value}</div>
                       </div>
                     </div>
                   ))}
@@ -264,18 +266,20 @@ export function NodeDetailsApp(): JSX.Element {
             </Card>
           </TabsContent>
 
-          <TabsContent value="executors" className="space-y-4">
+          <TabsContent value="executors" className="space-y-5">
             <ExecutorsTableCard title="Executors" entries={state.executors} />
             {state.oneOffExecutors.length > 0 ? (
               <ExecutorsTableCard title="One-off Executors" entries={state.oneOffExecutors} />
             ) : null}
           </TabsContent>
 
-          <TabsContent value="labels" className="space-y-4">
+          <TabsContent value="labels" className="space-y-5">
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <TagIcon />
+                  <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
+                    <TagIcon className="h-4 w-4" />
+                  </div>
                   <CardTitle>Labels</CardTitle>
                 </div>
                 <CardDescription>Assigned labels and capabilities.</CardDescription>
@@ -284,15 +288,15 @@ export function NodeDetailsApp(): JSX.Element {
                 {state.labels.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {state.labels.map((label) => (
-                      <Badge key={label} variant="secondary" className="text-sm">
+                      <Badge key={label} variant="secondary" className="text-xs">
                         {label}
                       </Badge>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border px-4 py-8 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-4 py-8 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                      <TagIcon />
+                      <TagIcon className="h-5 w-5" />
                     </div>
                     <div className="text-sm text-muted-foreground">No labels assigned</div>
                   </div>
@@ -301,15 +305,15 @@ export function NodeDetailsApp(): JSX.Element {
             </Card>
           </TabsContent>
 
-          <TabsContent value="advanced" className="space-y-4">
+          <TabsContent value="advanced" className="space-y-5">
             <details className="group" onToggle={handleAdvancedToggle}>
               <summary className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted-soft px-4 py-3 hover:bg-muted-strong transition-colors">
                 <span className="font-medium">Monitor Data & Diagnostics</span>
-                <ChevronDownIcon className="transition-transform group-open:rotate-180" />
+                <ChevronDownIcon className="h-4 w-4 transition-transform group-open:rotate-180" />
               </summary>
               <div className="mt-4 space-y-4">
                 {!state.advancedLoaded ? (
-                  <div className="rounded border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                  <div className="rounded border border-dashed border-border bg-muted-soft px-4 py-6 text-center text-sm text-muted-foreground">
                     {state.loading
                       ? "Loading advanced diagnostics..."
                       : "Advanced diagnostics load the first time you expand this section."}
@@ -346,7 +350,7 @@ export function NodeDetailsApp(): JSX.Element {
               </CardHeader>
               <CardContent>
                 {state.rawJson ? (
-                  <pre className="max-h-96 overflow-auto rounded border border-border bg-muted-strong p-4 text-xs font-mono">
+                  <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted-strong p-4 text-xs font-mono shadow-inner">
                     {state.rawJson}
                   </pre>
                 ) : (
@@ -373,14 +377,16 @@ function ExecutorsTableCard({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CpuIcon />
+            <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
+              <CpuIcon className="h-4 w-4" />
+            </div>
             <CardTitle>{title}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border px-4 py-8 text-center">
+          <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-4 py-8 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <CpuIcon />
+              <CpuIcon className="h-5 w-5" />
             </div>
             <div className="text-sm text-muted-foreground">No executor data available</div>
           </div>
@@ -393,23 +399,25 @@ function ExecutorsTableCard({
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <CpuIcon />
+          <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
+            <CpuIcon className="h-4 w-4" />
+          </div>
           <CardTitle>{title}</CardTitle>
         </div>
         <CardDescription>Work currently assigned to this node.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="bg-muted-soft">
               <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-2 py-2 text-left font-medium">Executor #</th>
-                <th className="px-2 py-2 text-left font-medium">Build</th>
-                <th className="px-2 py-2 text-left font-medium">Duration</th>
-                <th className="px-2 py-2 text-left font-medium">Link</th>
+                <th className="px-3 py-2.5 text-left font-medium">Executor #</th>
+                <th className="px-3 py-2.5 text-left font-medium">Build</th>
+                <th className="px-3 py-2.5 text-left font-medium">Duration</th>
+                <th className="px-3 py-2.5 text-left font-medium">Link</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {entries.map((entry) => (
                 <ExecutorTableRow key={entry.id} entry={entry} />
               ))}
@@ -428,9 +436,9 @@ function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
   const hasWork = Boolean(entry.workLabel);
   const buildLabel = entry.workLabel ?? "Idle";
   return (
-    <tr className="border-t border-border">
-      <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{entry.id}</td>
-      <td className="px-2 py-2">
+    <tr className="hover:bg-accent-soft transition-colors">
+      <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{entry.id}</td>
+      <td className="px-3 py-2.5">
         <div className="flex flex-col">
           <span className={hasWork ? "text-foreground" : "text-muted-foreground"}>
             {buildLabel}
@@ -440,12 +448,12 @@ function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
           ) : null}
         </div>
       </td>
-      <td className="px-2 py-2 text-muted-foreground">{durationLabel}</td>
-      <td className="px-2 py-2">
+      <td className="px-3 py-2.5 text-muted-foreground">{durationLabel}</td>
+      <td className="px-3 py-2.5">
         {entry.workUrl ? (
           <button
             type="button"
-            className="inline-flex items-center gap-1 text-link hover:text-link-hover hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-link hover:text-link-hover hover:underline"
             onClick={() => postVsCodeMessage({ type: "openExternal", url: entry.workUrl })}
           >
             Open
@@ -472,7 +480,9 @@ function MonitorCard({
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">No data available.</div>
+          <div className="rounded border border-dashed border-border bg-muted-soft px-4 py-6 text-center text-sm text-muted-foreground">
+            No data available.
+          </div>
         </CardContent>
       </Card>
     );
@@ -487,14 +497,14 @@ function MonitorCard({
       <CardContent className="space-y-2">
         {entries.map((entry) => (
           <Collapsible key={entry.key}>
-            <CollapsibleTrigger className="w-full rounded-lg border border-border bg-muted-soft px-4 py-2.5 hover:bg-muted-strong transition-colors">
+            <CollapsibleTrigger className="w-full rounded-lg border border-mutedBorder bg-muted-soft px-4 py-2.5 hover:bg-muted-strong transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-mono text-muted-foreground">{entry.key}</span>
                 <span className="text-sm font-medium">{entry.summary}</span>
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <pre className="mt-2 rounded border border-border bg-muted-strong p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64">
+              <pre className="mt-2 rounded-lg border border-border bg-muted-strong p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64 shadow-inner">
                 {formatJson(entry.raw)}
               </pre>
             </CollapsibleContent>
@@ -513,27 +523,43 @@ interface OverviewRow {
 
 function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
   const rows: OverviewRow[] = [
-    { label: "Status", value: state.statusLabel, icon: <StatusIcon /> },
-    { label: "Idle", value: state.idleLabel, icon: <IdleIcon /> },
-    { label: "Executors", value: state.executorsLabel, icon: <ExecutorsIcon /> }
+    { label: "Status", value: state.statusLabel, icon: <StatusIcon className="h-4 w-4" /> },
+    { label: "Idle", value: state.idleLabel, icon: <IdleIcon className="h-4 w-4" /> },
+    {
+      label: "Executors",
+      value: state.executorsLabel,
+      icon: <ExecutorsIcon className="h-4 w-4" />
+    }
   ];
 
   if (state.jnlpAgentLabel) {
-    rows.push({ label: "JNLP Agent", value: state.jnlpAgentLabel, icon: <LaunchIcon /> });
+    rows.push({
+      label: "JNLP Agent",
+      value: state.jnlpAgentLabel,
+      icon: <LaunchIcon className="h-4 w-4" />
+    });
   }
   if (state.launchSupportedLabel) {
     rows.push({
       label: "Launch Supported",
       value: state.launchSupportedLabel,
-      icon: <LaunchIcon />
+      icon: <LaunchIcon className="h-4 w-4" />
     });
   }
   if (state.manualLaunchLabel) {
-    rows.push({ label: "Manual Launch", value: state.manualLaunchLabel, icon: <LaunchIcon /> });
+    rows.push({
+      label: "Manual Launch",
+      value: state.manualLaunchLabel,
+      icon: <LaunchIcon className="h-4 w-4" />
+    });
   }
 
   if (!state.jnlpAgentLabel && !state.launchSupportedLabel && !state.manualLaunchLabel) {
-    rows.push({ label: "Launch", value: "Not available", icon: <LaunchIcon /> });
+    rows.push({
+      label: "Launch",
+      value: "Not available",
+      icon: <LaunchIcon className="h-4 w-4" />
+    });
   }
 
   return rows;

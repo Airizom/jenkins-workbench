@@ -25,7 +25,7 @@ function UserIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-3 w-3 text-muted-foreground"
+      className="h-3.5 w-3.5 text-muted-foreground"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -47,10 +47,10 @@ export function BuildFailureChangelogCard({
   overflowCount: number;
 }) {
   return (
-    <Card className="shadow-widget">
-      <div className="min-h-[120px] p-4 flex flex-col gap-3">
+    <Card>
+      <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-muted">
+          <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
             <GitCommitIcon />
           </div>
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -60,7 +60,7 @@ export function BuildFailureChangelogCard({
         {items.length > 0 ? (
           <ChangelogList items={items} />
         ) : (
-          <div className="flex items-center justify-center rounded border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-3 py-4 text-sm text-muted-foreground">
             No changes detected
           </div>
         )}
@@ -75,7 +75,7 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {items.map((item, index) => (
         <li
-          className="rounded border border-border bg-muted-soft px-3 py-2"
+          className="rounded border border-mutedBorder bg-muted-soft px-3 py-2"
           key={`${item.message}-${index}`}
         >
           <div className="text-sm font-medium text-foreground line-clamp-2">{item.message}</div>

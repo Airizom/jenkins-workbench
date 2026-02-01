@@ -16,7 +16,7 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
       <span
         className={cn(
           "h-[18px] w-9 rounded-full border-2 transition-colors",
-          "bg-transparent border-mutedBorder",
+          "bg-muted-strong border-mutedBorder shadow-inner",
           "peer-checked:bg-primary peer-checked:border-primary",
           "peer-focus-visible:ring-1 peer-focus-visible:ring-ring",
           "peer-disabled:opacity-50"

@@ -92,11 +92,13 @@ export const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>
         onClick={() => onValueChange(value)}
         className={cn(
           "relative inline-flex items-center justify-center whitespace-nowrap px-4 py-2 text-sm font-medium transition-all",
+          "after:absolute after:bottom-[-1px] after:left-2 after:right-2 after:h-[2px]",
+          "after:rounded-full after:bg-primary after:opacity-0 after:transition-opacity",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "disabled:pointer-events-none disabled:opacity-50",
           isSelected
-            ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent-soft",
+            ? "text-foreground after:opacity-100"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent-soft hover:after:opacity-50",
           className
         )}
         {...props}
@@ -129,7 +131,7 @@ export const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(
         data-state={isSelected ? "active" : "inactive"}
         hidden={!isSelected}
         className={cn(
-          "mt-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          "mt-5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           className
         )}
         {...props}

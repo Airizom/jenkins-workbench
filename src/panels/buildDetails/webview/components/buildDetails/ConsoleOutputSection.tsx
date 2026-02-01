@@ -170,11 +170,11 @@ export function ConsoleOutputSection({
 
   return (
     <Card>
-      <CardHeader className="space-y-0 pb-3">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+      <CardHeader className="space-y-0 border-b border-border bg-toolbar pb-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
                 <TerminalIcon />
               </div>
               <div>
@@ -208,7 +208,7 @@ export function ConsoleOutputSection({
                 <DownloadIcon />
                 <span className="hidden sm:inline">Export</span>
               </Button>
-              <div className="flex items-center gap-2 rounded border border-border bg-muted-strong px-2.5 py-1">
+              <div className="flex items-center gap-2 rounded-full border border-border bg-muted-soft px-3 py-1.5">
                 <Switch id="follow-log" checked={followLog} onChange={handleFollowLogChange} />
                 <label
                   htmlFor="follow-log"
@@ -241,7 +241,7 @@ export function ConsoleOutputSection({
           {consoleNote ? (
             <div
               id="console-note"
-              className="flex items-center gap-2 rounded bg-muted-strong px-3 py-2 text-xs text-muted-foreground"
+              className="flex items-center gap-2 rounded border border-warning-border bg-warning-surface px-3 py-2 text-xs text-muted-foreground"
             >
               <svg
                 aria-hidden="true"
@@ -275,7 +275,7 @@ export function ConsoleOutputSection({
             <pre
               id="console-output"
               ref={consoleSearch.consoleOutputRef}
-              className="console-output m-0 rounded border border-border bg-terminal px-4 py-3 font-mono text-terminal-foreground text-vscode-editor leading-relaxed whitespace-pre overflow-x-auto overflow-y-auto"
+              className="console-output m-0 rounded-lg border border-border bg-terminal px-4 py-3 font-mono text-terminal-foreground text-vscode-editor leading-relaxed shadow-inner whitespace-pre overflow-x-auto overflow-y-auto"
             >
               {consoleSegments}
             </pre>
@@ -285,7 +285,7 @@ export function ConsoleOutputSection({
         {!consoleError && !hasConsoleOutput ? (
           <div
             id="console-empty"
-            className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border px-4 py-8 text-center"
+            className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted-soft px-4 py-8 text-center"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
               <TerminalIcon />

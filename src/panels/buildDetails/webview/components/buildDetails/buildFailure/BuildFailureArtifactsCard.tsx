@@ -28,7 +28,7 @@ function EyeIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-3.5 w-3.5"
+      className="h-4 w-4"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -46,7 +46,7 @@ function DownloadIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-3.5 w-3.5"
+      className="h-4 w-4"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -71,10 +71,10 @@ export function BuildFailureArtifactsCard({
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
   return (
-    <Card className="shadow-widget">
-      <div className="min-h-[120px] p-4 flex flex-col gap-3">
+    <Card>
+      <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-muted">
+          <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
             <FileIcon />
           </div>
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -84,7 +84,7 @@ export function BuildFailureArtifactsCard({
         {items.length > 0 ? (
           <ArtifactsList items={items} onArtifactAction={onArtifactAction} />
         ) : (
-          <div className="flex items-center justify-center rounded border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-3 py-4 text-sm text-muted-foreground">
             No artifacts available
           </div>
         )}
@@ -113,7 +113,7 @@ function ArtifactsList({
         const artifactTooltip = relativePath || displayName;
         return (
           <li
-            className="flex items-center justify-between gap-2 rounded border border-border bg-muted-soft px-3 py-2"
+            className="flex items-center justify-between gap-2 rounded border border-mutedBorder bg-muted-soft px-3 py-2"
             key={`${item.relativePath}-${index}`}
           >
             <div className="flex items-center gap-2 min-w-0" title={artifactTooltip}>

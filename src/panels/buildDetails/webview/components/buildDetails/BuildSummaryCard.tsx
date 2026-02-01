@@ -14,15 +14,15 @@ import { StatusPill } from "./StatusPill";
 function getStatusIcon(resultClass?: string) {
   switch (resultClass) {
     case "success":
-      return <CheckCircleIcon />;
+      return <CheckCircleIcon className="h-5 w-5" />;
     case "failure":
-      return <XCircleIcon />;
+      return <XCircleIcon className="h-5 w-5" />;
     case "unstable":
-      return <AlertTriangleIcon />;
+      return <AlertTriangleIcon className="h-5 w-5" />;
     case "running":
-      return <PlayCircleIcon />;
+      return <PlayCircleIcon className="h-5 w-5" />;
     case "aborted":
-      return <StopCircleIcon />;
+      return <StopCircleIcon className="h-5 w-5" />;
     default:
       return null;
   }
@@ -49,17 +49,19 @@ export function BuildSummaryCard({
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         <div className="flex flex-col md:flex-row">
-          <div className="flex items-center gap-4 border-b border-border p-4 md:border-b-0 md:border-r md:p-6">
-            {statusIcon}
+          <div className="flex items-center gap-4 border-b border-border bg-muted-soft p-5 md:border-b-0 md:border-r">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+              {statusIcon}
+            </div>
             <div className="flex flex-col gap-1">
-              <div className="text-sm font-medium">{displayName}</div>
+              <div className="text-sm font-semibold">{displayName}</div>
               <StatusPill label={resultLabel} status={resultClass} />
             </div>
           </div>
 
           <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div className="flex items-center gap-3 p-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                 <ClockIcon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="flex flex-col">
@@ -70,8 +72,8 @@ export function BuildSummaryCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div className="flex items-center gap-3 p-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="flex flex-col">
@@ -82,9 +84,9 @@ export function BuildSummaryCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <UserIcon />
+            <div className="flex items-center gap-3 p-5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <UserIcon className="h-4 w-4" />
               </div>
               <div className="flex flex-col">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">

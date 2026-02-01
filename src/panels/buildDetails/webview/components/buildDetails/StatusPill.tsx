@@ -33,7 +33,7 @@ export function StatusPill({
     <Badge
       id={id}
       variant="outline"
-      className={cn("border text-xs font-medium", statusClass, className)}
+      className={cn("text-xs font-semibold", statusClass, className)}
     >
       {label}
     </Badge>

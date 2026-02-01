@@ -50,7 +50,7 @@ function ClockIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-3 w-3 text-muted-foreground"
+      className="h-4 w-4 text-muted-foreground"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -76,11 +76,11 @@ export function BuildFailureFailedTestsCard({
   emptyMessage: string;
 }) {
   return (
-    <Card className="shadow-widget">
-      <div className="min-h-[120px] p-4 flex flex-col gap-3">
+    <Card>
+      <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-muted">
+            <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
               <TestTubeIcon />
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -94,7 +94,7 @@ export function BuildFailureFailedTestsCard({
         {items.length > 0 ? (
           <FailedTestsList items={items} />
         ) : (
-          <div className="flex items-center justify-center rounded border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-3 py-4 text-sm text-muted-foreground">
             {emptyMessage}
           </div>
         )}
@@ -109,7 +109,7 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {items.map((item, index) => (
         <li
-          className="rounded border border-border bg-muted-soft overflow-hidden"
+          className="rounded border border-mutedBorder bg-muted-soft overflow-hidden"
           key={`${item.name}-${index}`}
         >
           <div className="px-3 py-2">
@@ -138,7 +138,7 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
               ) : null}
             </div>
           </div>
-          {item.errorStackTrace || item.stdout || item.stderr ? (
+            {item.errorStackTrace || item.stdout || item.stderr ? (
             <div className="border-t border-border px-3 py-2 space-y-2">
               {item.errorStackTrace ? (
                 <FailedTestDetail label="Stack trace" value={item.errorStackTrace} />
@@ -156,7 +156,7 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
 function FailedTestDetail({ label, value }: { label: string; value: string }) {
   return (
     <Collapsible>
-      <CollapsibleTrigger className="w-full rounded border border-border bg-muted-strong px-2 py-1.5 hover:bg-muted transition-colors">
+      <CollapsibleTrigger className="w-full rounded border border-mutedBorder bg-muted-strong px-2 py-1.5 hover:bg-muted transition-colors">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>

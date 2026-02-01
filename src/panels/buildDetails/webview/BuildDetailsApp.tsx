@@ -73,11 +73,11 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     <div className="min-h-screen flex flex-col">
       <header className="sticky-header shadow-widget">
         {isRunning ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
-        <div className="mx-auto max-w-5xl px-6 py-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex flex-col gap-2">
+        <div className="mx-auto max-w-5xl px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
-                <h1 className="text-base font-semibold" id="detail-title">
+                <h1 className="text-base font-semibold leading-tight" id="detail-title">
                   {state.displayName}
                 </h1>
                 <StatusPill
@@ -86,17 +86,17 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
                   status={state.resultClass}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5" id="detail-duration">
-                  <ClockIcon />
+              <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
+                <span className="inline-flex items-center gap-2" id="detail-duration">
+                  <ClockIcon className="h-4 w-4" />
                   {state.durationLabel}
                 </span>
-                <span className="inline-flex items-center gap-1.5" id="detail-timestamp">
-                  <CalendarIcon />
+                <span className="inline-flex items-center gap-2" id="detail-timestamp">
+                  <CalendarIcon className="h-4 w-4" />
                   {state.timestampLabel}
                 </span>
                 {state.culpritsLabel !== "—" && state.culpritsLabel !== "None" ? (
-                  <span className="inline-flex items-center gap-1.5" id="detail-culprits">
+                  <span className="inline-flex items-center gap-2" id="detail-culprits">
                     <span className="text-muted-foreground">by</span>
                     {state.culpritsLabel}
                   </span>
@@ -116,7 +116,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
                 disabled={!buildUrl}
                 className="gap-1.5"
               >
-                <ExternalLinkIcon className="h-3.5 w-3.5" />
+                <ExternalLinkIcon className="h-4 w-4" />
                 Open in Jenkins
               </Button>
             </div>
@@ -124,7 +124,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         </div>
       </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-6">
+      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-5">
         {state.errors.length > 0 ? (
           <Alert id="errors" variant="destructive" className="mb-6 flex flex-col gap-1.5">
             {state.errors.map((error) => (
@@ -135,7 +135,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           </Alert>
         ) : null}
 
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-5">
           <TabsList className="w-full justify-start">
             {hasPendingInputs ? (
               <TabsTrigger value="inputs" className="relative">

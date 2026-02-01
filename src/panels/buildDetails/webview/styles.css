@@ -24,63 +24,16 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .stage-timeline {
-    position: relative;
-  }
-
-  .stage-timeline::before {
-    content: "";
-    position: absolute;
-    left: 12px;
-    top: 24px;
-    bottom: 24px;
+  .stage-connector {
     width: 2px;
-    background: linear-gradient(to bottom, var(--border), var(--border));
-    border-radius: 1px;
-  }
-
-  .stage-node {
-    position: relative;
-    padding-left: 32px;
-  }
-
-  .stage-node::before {
-    content: "";
-    position: absolute;
-    left: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: var(--muted);
-    border: 2px solid var(--border);
-  }
-
-  .stage-node[data-status="success"]::before {
-    background-color: var(--success);
-    border-color: var(--success);
-  }
-
-  .stage-node[data-status="failure"]::before {
-    background-color: var(--failure);
-    border-color: var(--failure);
-  }
-
-  .stage-node[data-status="running"]::before {
-    background-color: var(--warning);
-    border-color: var(--warning);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
-
-  .stage-node[data-status="unstable"]::before {
-    background-color: var(--warning);
-    border-color: var(--warning);
-  }
-
-  .stage-node[data-status="aborted"]::before {
-    background-color: var(--aborted);
-    border-color: var(--aborted);
+    flex: 1;
+    min-height: 24px;
+    border-radius: 999px;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--stage-connector, var(--border)) 70%, transparent),
+      color-mix(in srgb, var(--stage-connector, var(--border)) 10%, transparent)
+    );
   }
 
   .build-progress-bar {

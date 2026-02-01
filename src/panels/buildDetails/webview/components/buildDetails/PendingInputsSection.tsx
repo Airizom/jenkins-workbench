@@ -2,12 +2,13 @@ import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
 import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
+import { StatusPill } from "./StatusPill";
 
 function AlertCircleIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-5 w-5"
+      className="h-4 w-4"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -61,7 +62,7 @@ function UserIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-3.5 w-3.5"
+      className="h-4 w-4"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -92,22 +93,29 @@ export function PendingInputsSection({
     <div className="space-y-3">
       {pendingInputs.map((input) => (
         <Card key={input.id} className="overflow-hidden border-warning-border">
-          <div className="flex items-center gap-3 border-b border-border bg-warning-surface px-4 py-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-warning-surface px-5 py-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
               <AlertCircleIcon />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{input.message}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold truncate">{input.message}</div>
               {input.submitterLabel ? (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <UserIcon />
                   {input.submitterLabel}
                 </div>
               ) : null}
             </div>
+            </div>
+            <StatusPill
+              label="Pending input"
+              status="running"
+              className="shrink-0"
+            />
           </div>
 
-          <CardContent className="p-4">
+          <CardContent className="pt-4">
             {input.parameters.length > 0 ? (
               <div className="mb-4">
                 <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

@@ -35,7 +35,7 @@ export function BuildFailureEmptyStateCard({ title }: { title: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-border px-4 py-8 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-border bg-muted-soft px-4 py-8 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <InfoIcon />
           </div>
