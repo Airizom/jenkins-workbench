@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.1] - 2026-02-01
+
+### Changed
+
+- refactor: refresh webview styling and layout polish
+- refactor: refine panel theming tokens and surface styles
+
 ## [1.26.0] - 2026-02-01
 
 ### Added
