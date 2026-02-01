@@ -219,6 +219,7 @@ function StageNode({
   onToggleShowAll: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
   const hasBranches = stage.parallelBranches.length > 0;
+  const hasBranchSteps = stage.parallelBranches.some((branch) => branch.hasSteps);
   const hasSteps = Boolean(stage.hasSteps);
   const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
   const stageIcon = getStageIcon(stage.statusClass);
@@ -255,8 +256,20 @@ function StageNode({
               <CardContent className="border-t border-border pt-3 space-y-3">
                 {hasBranches ? (
                   <div className="space-y-2">
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Parallel Branches
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Parallel Branches
+                      </div>
+                      {hasBranchSteps ? (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={onToggleShowAll}
+                          className="h-auto py-0 text-xs"
+                        >
+                          {showAll ? "Show failed only" : "Show all steps"}
+                        </Button>
+                      ) : null}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {stage.parallelBranches.map((branch, branchIndex) => (
