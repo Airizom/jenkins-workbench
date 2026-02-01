@@ -104,15 +104,21 @@ function ArtifactsList({
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {items.map((item, index) => {
-        const artifactLabel = item.name ?? item.relativePath ?? "artifact";
+        const displayName = item.name ?? "Artifact";
+        const relativePath = item.relativePath ?? displayName;
+        const artifactLabel =
+          relativePath && relativePath !== displayName
+            ? `${displayName} (${relativePath})`
+            : displayName;
+        const artifactTooltip = relativePath || displayName;
         return (
           <li
             className="flex items-center justify-between gap-2 rounded border border-border bg-muted/30 px-3 py-2"
             key={`${item.relativePath}-${index}`}
           >
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0" title={artifactTooltip}>
               <FileIcon />
-              <span className="text-sm truncate">{item.name || "Artifact"}</span>
+              <span className="text-sm truncate">{displayName}</span>
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <Button
