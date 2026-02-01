@@ -61,7 +61,10 @@ export const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
     <div
       ref={ref}
       role="tablist"
-      className={cn("inline-flex items-center gap-0.5 border-b border-border", className)}
+      className={cn(
+        "flex w-full flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-visible border-b border-border",
+        className
+      )}
       {...props}
     />
   )
