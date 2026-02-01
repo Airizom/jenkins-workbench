@@ -103,4 +103,8 @@
       var(--muted) 100%
     );
   }
+
+  .console-output {
+    max-height: max(240px, calc(100vh - 320px));
+  }
 }

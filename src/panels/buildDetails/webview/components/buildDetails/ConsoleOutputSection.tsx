@@ -275,7 +275,7 @@ export function ConsoleOutputSection({
             <pre
               id="console-output"
               ref={consoleSearch.consoleOutputRef}
-              className="m-0 rounded border border-border bg-muted px-4 py-3 font-mono text-vscode-editor leading-relaxed whitespace-pre overflow-x-auto max-h-[600px] overflow-y-auto"
+              className="console-output m-0 rounded border border-border bg-muted px-4 py-3 font-mono text-vscode-editor leading-relaxed whitespace-pre overflow-x-auto overflow-y-auto"
             >
               {consoleSegments}
             </pre>
