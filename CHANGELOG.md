@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-02-01
+
+### Added
+
+- feat: improve build details controls with clear aria labels
+- feat: add step toggle for parallel pipeline branches
+- feat: add Jenkins task provider for Run Task integration
+- feat: add deep link handling for build and job URLs
+- feat: surface tree summary badges for running, queue, and watch errors
+
+### Fixed
+
+- fix: clarify artifact labels and tooltips in build failures
+- fix: make console output height adapt to viewport
+- fix: make tabs list scrollable without wrapping
+- fix: scroll console output without jumping the whole page
+
+### Changed
+
+- refactor: centralize label parsing for nodes and tree items
+
 ## [1.25.0] - 2026-01-27
 
 ### Added
