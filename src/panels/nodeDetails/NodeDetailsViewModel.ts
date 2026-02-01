@@ -1,4 +1,5 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
+import { collectAssignedLabelNames } from "../../jenkins/labels";
 import type {
   JenkinsNodeDetails,
   JenkinsNodeExecutable,
@@ -34,9 +35,7 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
   const updatedAt = input.updatedAt ?? new Date().toISOString();
   const displayName = details?.displayName?.trim() || details?.name?.trim() || "Node Details";
   const name = details?.name?.trim() || details?.displayName?.trim() || "Unknown";
-  const labels = (details?.assignedLabels ?? [])
-    .map((label) => label.name?.trim())
-    .filter((label): label is string => Boolean(label));
+  const labels = collectAssignedLabelNames(details?.assignedLabels);
 
   const status = formatStatus(details);
   const offlineReason = formatOfflineReason(details);

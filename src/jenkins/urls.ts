@@ -1,3 +1,4 @@
+import { collectAssignedLabelNames } from "./labels";
 import type { JenkinsNode } from "./types";
 
 export interface ParsedJobUrl {
@@ -124,9 +125,7 @@ export function resolveNodeUrl(baseUrl: string, node: JenkinsNode): string | und
     return new URL(nodePath, base).toString();
   }
 
-  const labels = (node.assignedLabels ?? [])
-    .map((label) => label.name)
-    .filter((label): label is string => Boolean(label));
+  const labels = collectAssignedLabelNames(node.assignedLabels);
 
   if (labels.includes("built-in")) {
     return new URL("computer/(built-in)/", base).toString();

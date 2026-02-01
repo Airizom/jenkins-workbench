@@ -32,6 +32,7 @@ import {
   RootSectionTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
+import { resolveTreeItemLabel } from "./TreeItemLabels";
 import type { TreeChildrenOptions } from "./TreeTypes";
 
 const CHILDREN_CACHE_MAX_ENTRIES = 200;
@@ -153,7 +154,7 @@ export class JenkinsTreeChildrenLoader {
           this.loadBuildsForJob(
             element.environment,
             element.jobUrl,
-            getTreeItemLabel(element.label)
+            resolveTreeItemLabel(element)
           ),
         "Loading builds..."
       );
@@ -792,14 +793,4 @@ export class JenkinsTreeChildrenLoader {
       }
     });
   }
-}
-
-function getTreeItemLabel(label: string | { label: string } | undefined): string | undefined {
-  if (!label) {
-    return undefined;
-  }
-  if (typeof label === "string") {
-    return label;
-  }
-  return typeof label.label === "string" ? label.label : undefined;
 }

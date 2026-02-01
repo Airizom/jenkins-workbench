@@ -5,6 +5,7 @@ import {
   NodeTreeItem,
   type PipelineTreeItem
 } from "../tree/TreeItems";
+import { getTreeItemLabel as resolveTreeItemLabel } from "../tree/TreeItemLabels";
 export { formatActionError } from "../formatters/ErrorFormatters";
 
 export function getOpenUrl(
@@ -26,9 +27,5 @@ export function getOpenUrl(
 }
 
 export function getTreeItemLabel(item: vscode.TreeItem): string {
-  if (typeof item.label === "string") {
-    return item.label;
-  }
-
-  return item.label?.label ?? "item";
+  return resolveTreeItemLabel(item, "item");
 }
