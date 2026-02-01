@@ -10,7 +10,7 @@ import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
 import { ConsoleSearchToolbar } from "../ConsoleSearchToolbar";
 
-const { useEffect, useMemo } = React;
+const { useCallback, useEffect, useMemo } = React;
 
 function SearchIcon() {
   return (
@@ -117,14 +117,28 @@ export function ConsoleOutputSection({
     [consoleSourceText, consoleError]
   );
 
+  const scrollConsoleToBottom = useCallback(() => {
+    const output = consoleSearch.consoleOutputRef.current;
+    if (!output) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      const target = consoleSearch.consoleOutputRef.current;
+      if (!target) {
+        return;
+      }
+      target.scrollTo({ top: target.scrollHeight, behavior: "auto" });
+    });
+  }, [consoleSearch.consoleOutputRef]);
+
   useEffect(() => {
     if (!isActive || !followLog || consoleSearch.isSearchActive) {
       return;
     }
     if (consoleScrollKey || consoleScrollKey === "") {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "auto" });
+      scrollConsoleToBottom();
     }
-  }, [isActive, followLog, consoleScrollKey, consoleSearch.isSearchActive]);
+  }, [isActive, followLog, consoleScrollKey, consoleSearch.isSearchActive, scrollConsoleToBottom]);
 
   const consoleNote = useMemo(() => {
     if (!consoleTruncated) {
@@ -145,8 +159,8 @@ export function ConsoleOutputSection({
   const handleFollowLogChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.checked;
     onToggleFollowLog(nextValue);
-    if (nextValue && isActive) {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "auto" });
+    if (nextValue && isActive && !consoleSearch.isSearchActive) {
+      scrollConsoleToBottom();
     }
   };
 
