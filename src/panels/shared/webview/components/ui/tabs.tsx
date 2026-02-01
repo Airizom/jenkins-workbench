@@ -96,7 +96,7 @@ export const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>
           "disabled:pointer-events-none disabled:opacity-50",
           isSelected
             ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
+            : "text-muted-foreground hover:text-foreground hover:bg-accent-soft",
           className
         )}
         {...props}

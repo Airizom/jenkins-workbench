@@ -20,7 +20,7 @@ export const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       >
         <div
           className={cn(
-            "h-full rounded-full bg-primary transition-all duration-300",
+            "h-full rounded-full bg-progress transition-all duration-300",
             indeterminate && "animate-progress-indeterminate w-1/3"
           )}
           style={indeterminate ? undefined : { width: `${percentage}%` }}

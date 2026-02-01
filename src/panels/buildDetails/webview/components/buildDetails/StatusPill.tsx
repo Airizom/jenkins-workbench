@@ -2,11 +2,11 @@ import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { cn } from "../../../../shared/webview/lib/utils";
 
 const STATUS_CLASS_MAP: Record<string, string> = {
-  success: "border-success/50 text-success bg-success/10",
-  failure: "border-failure/50 text-failure bg-failure/10",
-  unstable: "border-warning/50 text-warning bg-warning/10",
-  aborted: "border-aborted/50 text-aborted bg-aborted/10",
-  running: "border-warning/50 text-warning bg-warning/10",
+  success: "border-success-border text-success bg-success-soft",
+  failure: "border-failure-border text-failure bg-failure-soft",
+  unstable: "border-warning-border text-warning bg-warning-soft",
+  aborted: "border-aborted-border text-aborted bg-aborted-soft",
+  running: "border-warning-border text-warning bg-warning-soft",
   neutral: "border-border text-foreground bg-muted"
 };
 

@@ -26,9 +26,17 @@
 
     --muted: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     --muted-foreground: var(--vscode-descriptionForeground);
+    --muted-soft: color-mix(in srgb, var(--muted) 30%, transparent);
+    --muted-strong: color-mix(in srgb, var(--muted) 50%, transparent);
+    --muted-foreground-border: color-mix(
+      in srgb,
+      var(--muted-foreground) 50%,
+      transparent
+    );
 
     --accent: var(--vscode-list-hoverBackground, var(--vscode-editor-background));
     --accent-foreground: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));
+    --accent-soft: color-mix(in srgb, var(--accent) 30%, transparent);
 
     --destructive: var(--vscode-inputValidation-errorBackground);
     --destructive-foreground: var(--vscode-inputValidation-errorForeground);
@@ -68,12 +76,24 @@
 
     --success: var(--vscode-testing-iconPassed, #4ec9b0);
     --success-foreground: var(--vscode-editor-foreground);
+    --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
+    --success-border: color-mix(in srgb, var(--success) 50%, transparent);
     --warning: var(--vscode-editorWarning-foreground, #cca700);
     --warning-foreground: var(--vscode-editor-foreground);
+    --warning-surface: color-mix(in srgb, var(--warning) 5%, transparent);
+    --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+    --warning-badge: color-mix(in srgb, var(--warning) 20%, transparent);
+    --warning-border: color-mix(in srgb, var(--warning) 50%, transparent);
     --failure: var(--vscode-testing-iconFailed, #f14c4c);
     --failure-foreground: var(--vscode-editor-foreground);
+    --failure-surface: color-mix(in srgb, var(--failure) 5%, transparent);
+    --failure-soft: color-mix(in srgb, var(--failure) 10%, transparent);
+    --failure-border: color-mix(in srgb, var(--failure) 50%, transparent);
+    --failure-border-subtle: color-mix(in srgb, var(--failure) 20%, transparent);
     --aborted: var(--vscode-descriptionForeground, #858585);
     --aborted-foreground: var(--vscode-editor-foreground);
+    --aborted-soft: color-mix(in srgb, var(--aborted) 10%, transparent);
+    --aborted-border: color-mix(in srgb, var(--aborted) 50%, transparent);
 
     --inputErrorBg: var(--vscode-inputValidation-errorBackground);
     --inputErrorFg: var(--vscode-inputValidation-errorForeground);
@@ -87,6 +107,9 @@
 
     --header-bg: var(--vscode-sideBar-background, var(--vscode-editor-background));
     --toolbar-bg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+    --progress: var(--vscode-progressBar-background, var(--primary));
+    --terminal-bg: var(--vscode-terminal-background, var(--background));
+    --terminal-foreground: var(--vscode-terminal-foreground, var(--foreground));
   }
 
   * {

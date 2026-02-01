@@ -45,19 +45,19 @@ const { useEffect, useMemo, useReducer, useState } = React;
 
 const STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string }> = {
   online: {
-    badge: "border-success/50 text-success bg-success/10",
+    badge: "border-success-border text-success bg-success-soft",
     icon: "text-success"
   },
   idle: {
-    badge: "border-warning/50 text-warning bg-warning/10",
+    badge: "border-warning-border text-warning bg-warning-soft",
     icon: "text-warning"
   },
   temporary: {
-    badge: "border-warning/50 text-warning bg-warning/10",
+    badge: "border-warning-border text-warning bg-warning-soft",
     icon: "text-warning"
   },
   offline: {
-    badge: "border-failure/50 text-failure bg-failure/10",
+    badge: "border-failure-border text-failure bg-failure-soft",
     icon: "text-failure"
   },
   unknown: {
@@ -128,7 +128,7 @@ export function NodeDetailsApp(): JSX.Element {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <header className="sticky-header">
+      <header className="sticky-header shadow-widget">
         {state.loading ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
         <div className="mx-auto max-w-5xl px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -147,7 +147,7 @@ export function NodeDetailsApp(): JSX.Element {
                   {isStale ? (
                     <Badge
                       variant="outline"
-                      className="border-warning/50 text-warning bg-warning/10"
+                      className="border-warning-border text-warning bg-warning-soft"
                     >
                       Stale
                     </Badge>
@@ -238,7 +238,7 @@ export function NodeDetailsApp(): JSX.Element {
                   {overviewRows.map((row) => (
                     <div
                       key={row.label}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
+                      className="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                         {row.icon}
@@ -303,7 +303,7 @@ export function NodeDetailsApp(): JSX.Element {
 
           <TabsContent value="advanced" className="space-y-4">
             <details className="group" onToggle={handleAdvancedToggle}>
-              <summary className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3 hover:bg-muted/50 transition-colors">
+              <summary className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted-soft px-4 py-3 hover:bg-muted-strong transition-colors">
                 <span className="font-medium">Monitor Data & Diagnostics</span>
                 <ChevronDownIcon className="transition-transform group-open:rotate-180" />
               </summary>
@@ -346,7 +346,7 @@ export function NodeDetailsApp(): JSX.Element {
               </CardHeader>
               <CardContent>
                 {state.rawJson ? (
-                  <pre className="max-h-96 overflow-auto rounded border border-border bg-muted/50 p-4 text-xs font-mono">
+                  <pre className="max-h-96 overflow-auto rounded border border-border bg-muted-strong p-4 text-xs font-mono">
                     {state.rawJson}
                   </pre>
                 ) : (
@@ -487,14 +487,14 @@ function MonitorCard({
       <CardContent className="space-y-2">
         {entries.map((entry) => (
           <Collapsible key={entry.key}>
-            <CollapsibleTrigger className="w-full rounded-lg border border-border bg-muted/30 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+            <CollapsibleTrigger className="w-full rounded-lg border border-border bg-muted-soft px-4 py-2.5 hover:bg-muted-strong transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-mono text-muted-foreground">{entry.key}</span>
                 <span className="text-sm font-medium">{entry.summary}</span>
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <pre className="mt-2 rounded border border-border bg-muted/50 p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64">
+              <pre className="mt-2 rounded border border-border bg-muted-strong p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64">
                 {formatJson(entry.raw)}
               </pre>
             </CollapsibleContent>

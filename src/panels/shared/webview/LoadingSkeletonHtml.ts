@@ -4,7 +4,7 @@ const BUILD_LOADING_SKELETON = `
   <div class="min-h-screen flex flex-col">
     <header class="border-b border-border bg-header">
       <div class="h-0.5 w-full overflow-hidden bg-muted">
-        <div class="h-full w-1/3 animate-progress-indeterminate bg-primary rounded-full"></div>
+        <div class="h-full w-1/3 animate-progress-indeterminate bg-progress rounded-full"></div>
       </div>
       <div class="mx-auto max-w-5xl px-6 py-4">
         <div class="flex flex-wrap items-start justify-between gap-4">
@@ -28,7 +28,7 @@ const BUILD_LOADING_SKELETON = `
       </div>
     </header>
     <main class="flex-1 mx-auto w-full max-w-5xl px-6 py-6">
-      <div class="flex items-center gap-1 rounded-lg bg-muted/50 p-1 w-fit">
+      <div class="flex items-center gap-1 rounded-lg bg-muted-strong p-1 w-fit">
         <div class="px-3 py-1.5 rounded-md text-sm bg-background shadow-sm">
           <div class="animate-pulse rounded bg-muted h-4 w-16"></div>
         </div>
@@ -44,21 +44,21 @@ const BUILD_LOADING_SKELETON = `
           </div>
           <div class="animate-pulse rounded bg-muted h-3 w-64"></div>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3">
               <div class="animate-pulse bg-muted h-10 w-10 shrink-0 rounded-lg"></div>
               <div class="space-y-1.5 flex-1">
                 <div class="animate-pulse rounded bg-muted h-2.5 w-16"></div>
                 <div class="animate-pulse rounded bg-muted h-4 w-24"></div>
               </div>
             </div>
-            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3">
               <div class="animate-pulse bg-muted h-10 w-10 shrink-0 rounded-lg"></div>
               <div class="space-y-1.5 flex-1">
                 <div class="animate-pulse rounded bg-muted h-2.5 w-16"></div>
                 <div class="animate-pulse rounded bg-muted h-4 w-24"></div>
               </div>
             </div>
-            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3">
               <div class="animate-pulse bg-muted h-10 w-10 shrink-0 rounded-lg"></div>
               <div class="space-y-1.5 flex-1">
                 <div class="animate-pulse rounded bg-muted h-2.5 w-16"></div>
@@ -68,7 +68,7 @@ const BUILD_LOADING_SKELETON = `
           </div>
         </div>
         <div class="rounded border border-card-border bg-card overflow-hidden">
-          <div class="flex items-center justify-between gap-4 px-4 py-3 border-b border-border bg-muted/30">
+          <div class="flex items-center justify-between gap-4 px-4 py-3 border-b border-border bg-muted-soft">
             <div class="flex items-center gap-3">
               <div class="animate-pulse bg-muted h-4 w-4 rounded"></div>
               <div class="animate-pulse rounded bg-muted h-4 w-28"></div>
@@ -99,7 +99,7 @@ const NODE_LOADING_SKELETON = `
   <div class="min-h-screen flex flex-col">
     <header class="border-b border-border bg-header">
       <div class="h-0.5 w-full overflow-hidden bg-muted">
-        <div class="h-full w-1/3 animate-progress-indeterminate bg-primary rounded-full"></div>
+        <div class="h-full w-1/3 animate-progress-indeterminate bg-progress rounded-full"></div>
       </div>
       <div class="mx-auto max-w-5xl px-6 py-4">
         <div class="flex flex-wrap items-start justify-between gap-4">
@@ -125,7 +125,7 @@ const NODE_LOADING_SKELETON = `
       </div>
     </header>
     <main class="flex-1 mx-auto w-full max-w-5xl px-6 py-6">
-      <div class="flex items-center gap-1 rounded-lg bg-muted/50 p-1 w-fit">
+      <div class="flex items-center gap-1 rounded-lg bg-muted-strong p-1 w-fit">
         <div class="px-3 py-1.5 rounded-md text-sm bg-background shadow-sm">
           <div class="animate-pulse rounded bg-muted h-4 w-16"></div>
         </div>
@@ -147,21 +147,21 @@ const NODE_LOADING_SKELETON = `
           </div>
           <div class="animate-pulse rounded bg-muted h-3 w-64"></div>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3">
               <div class="animate-pulse bg-muted h-10 w-10 shrink-0 rounded-lg"></div>
               <div class="space-y-1.5 flex-1">
                 <div class="animate-pulse rounded bg-muted h-2.5 w-16"></div>
                 <div class="animate-pulse rounded bg-muted h-4 w-24"></div>
               </div>
             </div>
-            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3">
               <div class="animate-pulse bg-muted h-10 w-10 shrink-0 rounded-lg"></div>
               <div class="space-y-1.5 flex-1">
                 <div class="animate-pulse rounded bg-muted h-2.5 w-16"></div>
                 <div class="animate-pulse rounded bg-muted h-4 w-24"></div>
               </div>
             </div>
-            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div class="flex items-center gap-3 rounded-lg border border-border bg-muted-soft px-4 py-3">
               <div class="animate-pulse bg-muted h-10 w-10 shrink-0 rounded-lg"></div>
               <div class="space-y-1.5 flex-1">
                 <div class="animate-pulse rounded bg-muted h-2.5 w-16"></div>
@@ -176,7 +176,7 @@ const NODE_LOADING_SKELETON = `
             <div class="animate-pulse rounded bg-muted h-4 w-24"></div>
           </div>
           <div class="space-y-3">
-            <div class="rounded-lg border border-border bg-muted/30 p-4">
+            <div class="rounded-lg border border-border bg-muted-soft p-4">
               <div class="flex items-start justify-between gap-4 mb-3">
                 <div class="flex items-center gap-3">
                   <div class="animate-pulse bg-muted h-8 w-8 shrink-0 rounded-lg"></div>
@@ -189,7 +189,7 @@ const NODE_LOADING_SKELETON = `
               </div>
               <div class="animate-pulse bg-muted h-1.5 w-full rounded-full"></div>
             </div>
-            <div class="rounded-lg border border-border bg-muted/30 p-4">
+            <div class="rounded-lg border border-border bg-muted-soft p-4">
               <div class="flex items-start justify-between gap-4 mb-3">
                 <div class="flex items-center gap-3">
                   <div class="animate-pulse bg-muted h-8 w-8 shrink-0 rounded-lg"></div>

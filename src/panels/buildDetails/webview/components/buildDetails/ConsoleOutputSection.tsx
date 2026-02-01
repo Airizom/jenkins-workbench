@@ -208,7 +208,7 @@ export function ConsoleOutputSection({
                 <DownloadIcon />
                 <span className="hidden sm:inline">Export</span>
               </Button>
-              <div className="flex items-center gap-2 rounded border border-border bg-muted/50 px-2.5 py-1">
+              <div className="flex items-center gap-2 rounded border border-border bg-muted-strong px-2.5 py-1">
                 <Switch id="follow-log" checked={followLog} onChange={handleFollowLogChange} />
                 <label
                   htmlFor="follow-log"
@@ -241,7 +241,7 @@ export function ConsoleOutputSection({
           {consoleNote ? (
             <div
               id="console-note"
-              className="flex items-center gap-2 rounded bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+              className="flex items-center gap-2 rounded bg-muted-strong px-3 py-2 text-xs text-muted-foreground"
             >
               <svg
                 aria-hidden="true"
@@ -275,7 +275,7 @@ export function ConsoleOutputSection({
             <pre
               id="console-output"
               ref={consoleSearch.consoleOutputRef}
-              className="console-output m-0 rounded border border-border bg-muted px-4 py-3 font-mono text-vscode-editor leading-relaxed whitespace-pre overflow-x-auto overflow-y-auto"
+              className="console-output m-0 rounded border border-border bg-terminal px-4 py-3 font-mono text-terminal-foreground text-vscode-editor leading-relaxed whitespace-pre overflow-x-auto overflow-y-auto"
             >
               {consoleSegments}
             </pre>

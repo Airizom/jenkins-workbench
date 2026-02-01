@@ -71,7 +71,7 @@ export function BuildFailureArtifactsCard({
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
   return (
-    <Card className="bg-background">
+    <Card className="shadow-widget">
       <div className="min-h-[120px] p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded bg-muted">
@@ -113,7 +113,7 @@ function ArtifactsList({
         const artifactTooltip = relativePath || displayName;
         return (
           <li
-            className="flex items-center justify-between gap-2 rounded border border-border bg-muted/30 px-3 py-2"
+            className="flex items-center justify-between gap-2 rounded border border-border bg-muted-soft px-3 py-2"
             key={`${item.relativePath}-${index}`}
           >
             <div className="flex items-center gap-2 min-w-0" title={artifactTooltip}>

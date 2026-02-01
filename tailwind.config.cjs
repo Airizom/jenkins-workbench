@@ -31,11 +31,14 @@ module.exports = {
         },
         muted: {
           DEFAULT: "var(--muted)",
-          foreground: "var(--muted-foreground)"
+          foreground: "var(--muted-foreground)",
+          soft: "var(--muted-soft)",
+          strong: "var(--muted-strong)"
         },
         accent: {
           DEFAULT: "var(--accent)",
-          foreground: "var(--accent-foreground)"
+          foreground: "var(--accent-foreground)",
+          soft: "var(--accent-soft)"
         },
         card: {
           DEFAULT: "var(--card)",
@@ -84,19 +87,37 @@ module.exports = {
         toolbar: "var(--toolbar-bg)",
         success: {
           DEFAULT: "var(--success)",
-          foreground: "var(--success-foreground)"
+          foreground: "var(--success-foreground)",
+          soft: "var(--success-soft)",
+          border: "var(--success-border)"
         },
         failure: {
           DEFAULT: "var(--failure)",
-          foreground: "var(--failure-foreground)"
+          foreground: "var(--failure-foreground)",
+          soft: "var(--failure-soft)",
+          surface: "var(--failure-surface)",
+          border: "var(--failure-border)",
+          "border-subtle": "var(--failure-border-subtle)"
         },
         warning: {
           DEFAULT: "var(--warning)",
-          foreground: "var(--warning-foreground)"
+          foreground: "var(--warning-foreground)",
+          soft: "var(--warning-soft)",
+          surface: "var(--warning-surface)",
+          badge: "var(--warning-badge)",
+          border: "var(--warning-border)"
         },
         aborted: {
           DEFAULT: "var(--aborted)",
-          foreground: "var(--aborted-foreground)"
+          foreground: "var(--aborted-foreground)",
+          soft: "var(--aborted-soft)",
+          border: "var(--aborted-border)"
+        },
+        mutedBorder: "var(--muted-foreground-border)",
+        progress: "var(--progress)",
+        terminal: {
+          DEFAULT: "var(--terminal-bg)",
+          foreground: "var(--terminal-foreground)"
         },
         inputWarningBorder: "var(--inputWarningBorder)",
         inputWarningBg: "var(--inputWarningBg)",

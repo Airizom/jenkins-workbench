@@ -47,7 +47,7 @@ export function BuildFailureChangelogCard({
   overflowCount: number;
 }) {
   return (
-    <Card className="bg-background">
+    <Card className="shadow-widget">
       <div className="min-h-[120px] p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded bg-muted">
@@ -75,7 +75,7 @@ function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
     <ul className="list-none m-0 p-0 flex flex-col gap-2">
       {items.map((item, index) => (
         <li
-          className="rounded border border-border bg-muted/30 px-3 py-2"
+          className="rounded border border-border bg-muted-soft px-3 py-2"
           key={`${item.message}-${index}`}
         >
           <div className="text-sm font-medium text-foreground line-clamp-2">{item.message}</div>

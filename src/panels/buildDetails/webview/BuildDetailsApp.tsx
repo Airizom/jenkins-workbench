@@ -71,7 +71,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky-header">
+      <header className="sticky-header shadow-widget">
         {isRunning ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
         <div className="mx-auto max-w-5xl px-6 py-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -140,7 +140,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             {hasPendingInputs ? (
               <TabsTrigger value="inputs" className="relative">
                 Pending Inputs
-                <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-warning/20 px-1.5 text-xs font-medium text-warning">
+                <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-warning-badge px-1.5 text-xs font-medium text-warning">
                   {state.pendingInputs.length}
                 </span>
               </TabsTrigger>
@@ -226,7 +226,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
       {showButton && !state.followLog ? (
         <Button
           aria-label="Scroll to top"
-          className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg"
+          className="fixed bottom-6 right-6 z-50 rounded-full shadow-widget"
           onClick={scrollToTop}
           size="icon"
           title="Scroll to top"

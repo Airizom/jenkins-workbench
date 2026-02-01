@@ -108,15 +108,15 @@ function getStageNodeStyle(statusClass?: string): string {
     "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors";
   switch (statusClass) {
     case "success":
-      return cn(baseStyles, "border-success bg-success/10 text-success");
+      return cn(baseStyles, "border-success bg-success-soft text-success");
     case "failure":
-      return cn(baseStyles, "border-failure bg-failure/10 text-failure");
+      return cn(baseStyles, "border-failure bg-failure-soft text-failure");
     case "unstable":
-      return cn(baseStyles, "border-warning bg-warning/10 text-warning");
+      return cn(baseStyles, "border-warning bg-warning-soft text-warning");
     case "running":
-      return cn(baseStyles, "border-warning bg-warning/10 text-warning animate-pulse");
+      return cn(baseStyles, "border-warning bg-warning-soft text-warning animate-pulse");
     case "aborted":
-      return cn(baseStyles, "border-aborted bg-aborted/10 text-aborted");
+      return cn(baseStyles, "border-aborted bg-aborted-soft text-aborted");
     default:
       return cn(baseStyles, "border-border bg-muted text-muted-foreground");
   }
@@ -236,7 +236,7 @@ function StageNode({
       <div className={cn("flex-1 pb-6", isLast && "pb-0")}>
         <Collapsible open={expanded} onOpenChange={onToggleExpanded}>
           <Card className="overflow-hidden">
-            <CollapsibleTrigger className="w-full p-0 hover:bg-accent/30 transition-colors">
+            <CollapsibleTrigger className="w-full p-0 hover:bg-accent-soft transition-colors">
               <div className="flex items-center justify-between gap-3 p-3">
                 <div className="flex flex-col items-start gap-1">
                   <div className="text-sm font-medium">{stage.name || "Stage"}</div>
@@ -335,8 +335,8 @@ function BranchCard({
 
   return (
     <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <div className="rounded border border-border bg-muted/30">
-        <CollapsibleTrigger className="w-full p-0 hover:bg-accent/30 transition-colors rounded">
+      <div className="rounded border border-border bg-muted-soft">
+        <CollapsibleTrigger className="w-full p-0 hover:bg-accent-soft transition-colors rounded">
           <div className="flex items-center gap-2 p-2.5">
             <div
               className={cn(

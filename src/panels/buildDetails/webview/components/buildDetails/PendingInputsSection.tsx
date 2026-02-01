@@ -91,9 +91,9 @@ export function PendingInputsSection({
   return (
     <div className="space-y-3">
       {pendingInputs.map((input) => (
-        <Card key={input.id} className="overflow-hidden border-warning/50">
-          <div className="flex items-center gap-3 border-b border-border bg-warning/5 px-4 py-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/10 text-warning">
+        <Card key={input.id} className="overflow-hidden border-warning-border">
+          <div className="flex items-center gap-3 border-b border-border bg-warning-surface px-4 py-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
               <AlertCircleIcon />
             </div>
             <div className="flex-1 min-w-0">

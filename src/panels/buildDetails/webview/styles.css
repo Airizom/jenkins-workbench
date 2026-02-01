@@ -22,16 +22,6 @@
     z-index: 10;
     background-color: var(--header-bg);
     border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(8px);
-  }
-
-  .sticky-header::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-color: var(--background);
-    opacity: 0.9;
-    z-index: -1;
   }
 
   .stage-timeline {
