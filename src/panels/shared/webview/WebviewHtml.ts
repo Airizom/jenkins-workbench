@@ -33,3 +33,19 @@ export function serializeForScript(value: unknown): string {
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
 }
+
+export function renderWebviewStateScript(state: unknown, nonce: string): string {
+  if (state === undefined) {
+    return "";
+  }
+  const serialized = serializeForScript(state);
+  return `
+    <script nonce="${nonce}">
+      const vscodeApi =
+        typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined;
+      if (vscodeApi && typeof vscodeApi.setState === "function") {
+        vscodeApi.setState(${serialized});
+      }
+    </script>
+  `;
+}

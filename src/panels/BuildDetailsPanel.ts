@@ -38,7 +38,50 @@ import {
   BUILD_DETAILS_WEBVIEW_BUNDLE_PATH,
   BUILD_DETAILS_WEBVIEW_CSS_PATH
 } from "./buildDetails/BuildDetailsWebviewAssets";
+import {
+  renderWebviewShell,
+  renderWebviewStateScript
+} from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
+import {
+  isSerializedEnvironmentState,
+  resolveEnvironmentRef,
+  type SerializedEnvironmentState
+} from "./shared/webview/WebviewPanelState";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+
+interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
+  buildUrl: string;
+}
+
+interface BuildDetailsPanelReviveOptions {
+  dataService: BuildDetailsDataService;
+  artifactActionHandler: ArtifactActionHandler;
+  consoleExporter: BuildConsoleExporter;
+  refreshHost: { refreshEnvironment(environmentId: string): void } | undefined;
+  pendingInputProvider: PendingInputActionProvider | undefined;
+  environmentStore: JenkinsEnvironmentStore;
+  extensionUri: vscode.Uri;
+}
+
+function isBuildDetailsPanelState(value: unknown): value is BuildDetailsPanelSerializedState {
+  if (!isSerializedEnvironmentState(value)) {
+    return false;
+  }
+  const record = value as { buildUrl?: unknown };
+  return typeof record.buildUrl === "string" && record.buildUrl.length > 0;
+}
+
+function createBuildDetailsPanelState(
+  environment: JenkinsEnvironmentRef,
+  buildUrl: string
+): BuildDetailsPanelSerializedState {
+  return {
+    environmentId: environment.environmentId,
+    scope: environment.scope,
+    buildUrl
+  };
+}
 
 export class BuildDetailsPanel {
   private static currentPanel: BuildDetailsPanel | undefined;
@@ -66,8 +109,6 @@ export class BuildDetailsPanel {
     extensionUri: vscode.Uri,
     label?: string
   ): Promise<void> {
-    const bundleSegments = BUILD_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
-    const bundleRootSegments = bundleSegments.slice(0, -1);
     if (!BuildDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
         "jenkinsWorkbench.buildDetails",
@@ -76,22 +117,10 @@ export class BuildDetailsPanel {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: [vscode.Uri.joinPath(extensionUri, ...bundleRootSegments)]
+          localResourceRoots: [BuildDetailsPanel.getWebviewRoot(extensionUri)]
         }
       );
-      const lightIconPath = vscode.Uri.joinPath(
-        extensionUri,
-        "resources",
-        "codicons",
-        "terminal-light.svg"
-      );
-      const darkIconPath = vscode.Uri.joinPath(
-        extensionUri,
-        "resources",
-        "codicons",
-        "terminal-dark.svg"
-      );
-      panel.iconPath = { light: lightIconPath, dark: darkIconPath };
+      BuildDetailsPanel.configurePanel(panel, extensionUri);
       BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel, extensionUri, consoleExporter);
     }
 
@@ -101,6 +130,44 @@ export class BuildDetailsPanel {
     activePanel.pendingInputProvider = pendingInputProvider;
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
+  }
+
+  static async revive(
+    panel: vscode.WebviewPanel,
+    state: unknown,
+    options: BuildDetailsPanelReviveOptions
+  ): Promise<void> {
+    BuildDetailsPanel.configurePanel(panel, options.extensionUri);
+    panel.title = "Build Details";
+
+    const revived = new BuildDetailsPanel(panel, options.extensionUri, options.consoleExporter);
+    BuildDetailsPanel.currentPanel = revived;
+    revived.consoleExporter = options.consoleExporter;
+    revived.refreshHost = options.refreshHost;
+    revived.pendingInputProvider = options.pendingInputProvider;
+
+    if (!isBuildDetailsPanelState(state)) {
+      revived.renderRestoreError(
+        "This build details view could not be restored. Reopen it from Jenkins Workbench."
+      );
+      return;
+    }
+
+    const environment = await resolveEnvironmentRef(options.environmentStore, state);
+    if (!environment) {
+      revived.renderRestoreError(
+        "This build details view could not be restored because its Jenkins environment was removed.",
+        state
+      );
+      return;
+    }
+
+    await revived.load(
+      options.dataService,
+      options.artifactActionHandler,
+      environment,
+      state.buildUrl
+    );
   }
 
   private constructor(
@@ -196,6 +263,7 @@ export class BuildDetailsPanel {
     this.dataService = dataService;
     this.artifactActionHandler = artifactActionHandler;
     this.state.resetForLoad(environment, buildUrl, createNonce());
+    const panelState = createBuildDetailsPanelState(environment, buildUrl);
     const styleSegments = BUILD_DETAILS_WEBVIEW_CSS_PATH.split("/");
     const styleUri = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, ...styleSegments)
@@ -204,7 +272,8 @@ export class BuildDetailsPanel {
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,
       nonce: this.state.currentNonce,
-      styleUri: styleUri.toString()
+      styleUri: styleUri.toString(),
+      panelState
     });
 
     this.pollingController = new BuildDetailsPollingController({
@@ -272,7 +341,8 @@ export class BuildDetailsPanel {
       cspSource: this.panel.webview.cspSource,
       nonce: this.state.currentNonce,
       scriptUri: scriptUri.toString(),
-      styleUri: styleUri.toString()
+      styleUri: styleUri.toString(),
+      panelState
     });
 
     if (details && !details.building && initialState.workflowError) {
@@ -618,5 +688,75 @@ export class BuildDetailsPanel {
 
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
+  }
+
+  private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
+    panel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [BuildDetailsPanel.getWebviewRoot(extensionUri)]
+    };
+    panel.iconPath = BuildDetailsPanel.getIconPaths(extensionUri);
+  }
+
+  private static getWebviewRoot(extensionUri: vscode.Uri): vscode.Uri {
+    const bundleSegments = BUILD_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
+    const bundleRootSegments = bundleSegments.slice(0, -1);
+    return vscode.Uri.joinPath(extensionUri, ...bundleRootSegments);
+  }
+
+  private static getIconPaths(
+    extensionUri: vscode.Uri
+  ): { light: vscode.Uri; dark: vscode.Uri } {
+    const lightIconPath = vscode.Uri.joinPath(
+      extensionUri,
+      "resources",
+      "codicons",
+      "terminal-light.svg"
+    );
+    const darkIconPath = vscode.Uri.joinPath(
+      extensionUri,
+      "resources",
+      "codicons",
+      "terminal-dark.svg"
+    );
+    return { light: lightIconPath, dark: darkIconPath };
+  }
+
+  private renderRestoreError(message: string, panelState?: BuildDetailsPanelSerializedState): void {
+    const nonce = createNonce();
+    const styleUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, ...BUILD_DETAILS_WEBVIEW_CSS_PATH.split("/"))
+    );
+    const stateScript = renderWebviewStateScript(panelState, nonce);
+    this.panel.webview.html = renderWebviewShell(
+      `
+        ${stateScript}
+        <main class="jenkins-workbench-panel-message">
+          <h1>Build Details</h1>
+          <p>${message}</p>
+          <p>Open the build again from Jenkins Workbench to continue.</p>
+        </main>
+        <style nonce="${nonce}">
+          .jenkins-workbench-panel-message {
+            color: var(--vscode-foreground);
+            font-family: var(--vscode-font-family);
+            line-height: 1.5;
+            margin: 32px;
+          }
+          .jenkins-workbench-panel-message h1 {
+            font-size: 20px;
+            margin: 0 0 12px;
+          }
+          .jenkins-workbench-panel-message p {
+            margin: 0 0 8px;
+          }
+        </style>
+      `,
+      {
+        cspSource: this.panel.webview.cspSource,
+        nonce,
+        styleUri: styleUri.toString()
+      }
+    );
   }
 }

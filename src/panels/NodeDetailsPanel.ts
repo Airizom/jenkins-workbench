@@ -16,7 +16,46 @@ import {
   NODE_DETAILS_WEBVIEW_BUNDLE_PATH,
   NODE_DETAILS_WEBVIEW_CSS_PATH
 } from "./nodeDetails/NodeDetailsWebviewAssets";
+import {
+  renderWebviewShell,
+  renderWebviewStateScript
+} from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
+import {
+  isSerializedEnvironmentState,
+  resolveEnvironmentRef,
+  type SerializedEnvironmentState
+} from "./shared/webview/WebviewPanelState";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+
+interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
+  nodeUrl: string;
+}
+
+interface NodeDetailsPanelReviveOptions {
+  dataService: JenkinsDataService;
+  environmentStore: JenkinsEnvironmentStore;
+  extensionUri: vscode.Uri;
+}
+
+function isNodeDetailsPanelState(value: unknown): value is NodeDetailsPanelSerializedState {
+  if (!isSerializedEnvironmentState(value)) {
+    return false;
+  }
+  const record = value as { nodeUrl?: unknown };
+  return typeof record.nodeUrl === "string" && record.nodeUrl.length > 0;
+}
+
+function createNodeDetailsPanelState(
+  environment: JenkinsEnvironmentRef,
+  nodeUrl: string
+): NodeDetailsPanelSerializedState {
+  return {
+    environmentId: environment.environmentId,
+    scope: environment.scope,
+    nodeUrl
+  };
+}
 
 export class NodeDetailsPanel {
   private static currentPanel: NodeDetailsPanel | undefined;
@@ -39,8 +78,6 @@ export class NodeDetailsPanel {
     extensionUri: vscode.Uri,
     label?: string
   ): Promise<void> {
-    const bundleSegments = NODE_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
-    const bundleRootSegments = bundleSegments.slice(0, -1);
     if (!NodeDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
         "jenkinsWorkbench.nodeDetails",
@@ -49,22 +86,10 @@ export class NodeDetailsPanel {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: [vscode.Uri.joinPath(extensionUri, ...bundleRootSegments)]
+          localResourceRoots: [NodeDetailsPanel.getWebviewRoot(extensionUri)]
         }
       );
-      const lightIconPath = vscode.Uri.joinPath(
-        extensionUri,
-        "resources",
-        "codicons",
-        "server-light.svg"
-      );
-      const darkIconPath = vscode.Uri.joinPath(
-        extensionUri,
-        "resources",
-        "codicons",
-        "server-dark.svg"
-      );
-      panel.iconPath = { light: lightIconPath, dark: darkIconPath };
+      NodeDetailsPanel.configurePanel(panel, extensionUri);
       NodeDetailsPanel.currentPanel = new NodeDetailsPanel(panel, extensionUri);
     }
 
@@ -75,6 +100,39 @@ export class NodeDetailsPanel {
     activePanel.panel.title = label ? `Node Details: ${label}` : "Node Details";
     activePanel.panel.reveal(undefined, true);
     await activePanel.load();
+  }
+
+  static async revive(
+    panel: vscode.WebviewPanel,
+    state: unknown,
+    options: NodeDetailsPanelReviveOptions
+  ): Promise<void> {
+    NodeDetailsPanel.configurePanel(panel, options.extensionUri);
+    panel.title = "Node Details";
+
+    const revived = new NodeDetailsPanel(panel, options.extensionUri);
+    NodeDetailsPanel.currentPanel = revived;
+    revived.dataService = options.dataService;
+
+    if (!isNodeDetailsPanelState(state)) {
+      revived.renderRestoreError(
+        "This node details view could not be restored. Reopen it from Jenkins Workbench."
+      );
+      return;
+    }
+
+    const environment = await resolveEnvironmentRef(options.environmentStore, state);
+    if (!environment) {
+      revived.renderRestoreError(
+        "This node details view could not be restored because its Jenkins environment was removed.",
+        state
+      );
+      return;
+    }
+
+    revived.environment = environment;
+    revived.nodeUrl = state.nodeUrl;
+    await revived.load();
   }
 
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
@@ -119,6 +177,10 @@ export class NodeDetailsPanel {
     this.nonce = createNonce();
     this.lastDetails = undefined;
     this.advancedLoaded = false;
+    const panelState =
+      this.environment && this.nodeUrl
+        ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
+        : undefined;
 
     const styleUri = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, ...NODE_DETAILS_WEBVIEW_CSS_PATH.split("/"))
@@ -126,7 +188,8 @@ export class NodeDetailsPanel {
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,
       nonce: this.nonce,
-      styleUri: styleUri.toString()
+      styleUri: styleUri.toString(),
+      panelState
     });
 
     const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel: "basic" });
@@ -142,7 +205,8 @@ export class NodeDetailsPanel {
       cspSource: this.panel.webview.cspSource,
       nonce: this.nonce,
       scriptUri: scriptUri.toString(),
-      styleUri: styleUri.toString()
+      styleUri: styleUri.toString(),
+      panelState
     });
     this.hasRendered = true;
   }
@@ -248,5 +312,75 @@ export class NodeDetailsPanel {
 
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
+  }
+
+  private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
+    panel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [NodeDetailsPanel.getWebviewRoot(extensionUri)]
+    };
+    panel.iconPath = NodeDetailsPanel.getIconPaths(extensionUri);
+  }
+
+  private static getWebviewRoot(extensionUri: vscode.Uri): vscode.Uri {
+    const bundleSegments = NODE_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
+    const bundleRootSegments = bundleSegments.slice(0, -1);
+    return vscode.Uri.joinPath(extensionUri, ...bundleRootSegments);
+  }
+
+  private static getIconPaths(
+    extensionUri: vscode.Uri
+  ): { light: vscode.Uri; dark: vscode.Uri } {
+    const lightIconPath = vscode.Uri.joinPath(
+      extensionUri,
+      "resources",
+      "codicons",
+      "server-light.svg"
+    );
+    const darkIconPath = vscode.Uri.joinPath(
+      extensionUri,
+      "resources",
+      "codicons",
+      "server-dark.svg"
+    );
+    return { light: lightIconPath, dark: darkIconPath };
+  }
+
+  private renderRestoreError(message: string, panelState?: NodeDetailsPanelSerializedState): void {
+    const nonce = createNonce();
+    const styleUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, ...NODE_DETAILS_WEBVIEW_CSS_PATH.split("/"))
+    );
+    const stateScript = renderWebviewStateScript(panelState, nonce);
+    this.panel.webview.html = renderWebviewShell(
+      `
+        ${stateScript}
+        <main class="jenkins-workbench-panel-message">
+          <h1>Node Details</h1>
+          <p>${message}</p>
+          <p>Open the node again from Jenkins Workbench to continue.</p>
+        </main>
+        <style nonce="${nonce}">
+          .jenkins-workbench-panel-message {
+            color: var(--vscode-foreground);
+            font-family: var(--vscode-font-family);
+            line-height: 1.5;
+            margin: 32px;
+          }
+          .jenkins-workbench-panel-message h1 {
+            font-size: 20px;
+            margin: 0 0 12px;
+          }
+          .jenkins-workbench-panel-message p {
+            margin: 0 0 8px;
+          }
+        </style>
+      `,
+      {
+        cspSource: this.panel.webview.cspSource,
+        nonce,
+        styleUri: styleUri.toString()
+      }
+    );
   }
 }

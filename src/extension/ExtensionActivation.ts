@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { BuildDetailsPanel } from "../panels/BuildDetailsPanel";
+import { NodeDetailsPanel } from "../panels/NodeDetailsPanel";
 import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
@@ -123,6 +125,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     buildDeepLinkHandler,
     jobDeepLinkHandler
   );
+  const buildDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
+    "jenkinsWorkbench.buildDetails",
+    {
+      deserializeWebviewPanel: async (panel, state) => {
+        await BuildDetailsPanel.revive(panel, state, {
+          dataService: services.dataService,
+          artifactActionHandler: services.artifactActionHandler,
+          consoleExporter: services.consoleExporter,
+          refreshHost,
+          pendingInputProvider: services.pendingInputCoordinator,
+          environmentStore: services.environmentStore,
+          extensionUri: context.extensionUri
+        });
+      }
+    }
+  );
+  const nodeDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
+    "jenkinsWorkbench.nodeDetails",
+    {
+      deserializeWebviewPanel: async (panel, state) => {
+        await NodeDetailsPanel.revive(panel, state, {
+          dataService: services.dataService,
+          environmentStore: services.environmentStore,
+          extensionUri: context.extensionUri
+        });
+      }
+    }
+  );
 
   poller.start();
   void services.viewStateStore.syncFilterContext();
@@ -142,6 +172,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     services.treeView,
     services.treeDataProvider,
     services.pendingInputCoordinator,
+    buildDetailsSerializer,
+    nodeDetailsSerializer,
     vscode.window.registerUriHandler(uriHandler),
     jenkinsfileCodeLensProvider,
     vscode.workspace.registerFileSystemProvider(
