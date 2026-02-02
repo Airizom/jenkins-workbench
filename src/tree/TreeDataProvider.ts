@@ -15,6 +15,7 @@ import type { JenkinsTreeFilter } from "./TreeFilter";
 import {
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
+  PlaceholderTreeItem,
   RootSectionTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
@@ -33,10 +34,30 @@ export type TreeViewSummary = {
   hasData: boolean;
 };
 
+export type TreeExpansionPath = string[];
+
+export type TreeExpansionResolveResult = {
+  element?: WorkbenchTreeElement;
+  pending: boolean;
+};
+
+export interface TreeExpansionResolver {
+  buildExpansionPath(element: WorkbenchTreeElement): Promise<TreeExpansionPath | undefined>;
+  resolveExpansionPath(path: TreeExpansionPath): Promise<TreeExpansionResolveResult>;
+  onDidChangeTreeData: vscode.Event<WorkbenchTreeElement | undefined>;
+}
+
+export type TreeRefreshWaiter = {
+  token: number;
+  promise: Promise<void>;
+  dispose: () => void;
+};
+
 export class JenkinsWorkbenchTreeDataProvider
   implements
     vscode.TreeDataProvider<WorkbenchTreeElement>,
     JenkinsTreeRevealProvider,
+    TreeExpansionResolver,
     vscode.Disposable
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
@@ -57,6 +78,9 @@ export class JenkinsWorkbenchTreeDataProvider
   private lastManualRefreshAt = 0;
   private watchErrorCount = 0;
   private lastSummary: TreeViewSummary | undefined;
+  private refreshWaiterToken = 0;
+  private readonly refreshWaiters = new Map<number, () => void>();
+  private readonly pendingRefreshWaiters = new Set<number>();
 
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   readonly onDidChangeSummary = this._onDidChangeSummary.event;
@@ -103,22 +127,46 @@ export class JenkinsWorkbenchTreeDataProvider
     }
   }
 
-  refresh(): void {
+  createRefreshWaiter(): TreeRefreshWaiter {
+    this.refreshWaiterToken += 1;
+    const token = this.refreshWaiterToken;
+    let resolve: (() => void) | undefined;
+    const promise = new Promise<void>((resolveFn) => {
+      resolve = resolveFn;
+    });
+    this.refreshWaiters.set(token, () => {
+      resolve?.();
+      resolve = undefined;
+    });
+    return {
+      token,
+      promise,
+      dispose: () => {
+        this.resolveRefreshWaiter(token);
+      }
+    };
+  }
+
+  refresh(refreshToken?: number): boolean {
     const now = Date.now();
     if (now - this.lastManualRefreshAt < MANUAL_REFRESH_COOLDOWN_MS) {
       vscode.window.setStatusBarMessage(
         "$(sync) Refresh already in progress",
         MANUAL_REFRESH_COOLDOWN_MS
       );
-      return;
+      return false;
     }
     this.lastManualRefreshAt = now;
     this.dataService.clearCache();
     this.childrenLoader.clearWatchCacheForEnvironment();
     this.childrenLoader.clearPinCacheForEnvironment();
     this.childrenLoader.clearChildrenCacheForEnvironment();
-    this._onDidChangeTreeData.fire(undefined);
+    if (typeof refreshToken === "number") {
+      this.pendingRefreshWaiters.add(refreshToken);
+    }
+    this.notifyTreeChange(undefined);
     this.emitSummary();
+    return true;
   }
 
   refreshView(): void {
@@ -152,7 +200,7 @@ export class JenkinsWorkbenchTreeDataProvider
     this.childrenLoader.clearChildrenCacheForEnvironment();
   }
 
-  onEnvironmentChanged(environmentId?: string): void {
+  onEnvironmentChanged(environmentId?: string, refreshToken?: number): void {
     if (environmentId) {
       this.dataService.clearCacheForEnvironment(environmentId);
       this.childrenLoader.clearWatchCacheForEnvironment(environmentId);
@@ -170,11 +218,14 @@ export class JenkinsWorkbenchTreeDataProvider
       this.childrenLoader.clearChildrenCacheForEnvironment();
       this.instanceItems.clear();
     }
-    this.scheduleRefresh(undefined);
+    this.scheduleRefresh(undefined, refreshToken);
     this.emitSummary();
   }
 
-  private scheduleRefresh(element: WorkbenchTreeElement | undefined): void {
+  private scheduleRefresh(
+    element: WorkbenchTreeElement | undefined,
+    refreshToken?: number
+  ): void {
     if (element !== undefined) {
       this.childrenLoader.invalidateForElement(element);
     }
@@ -188,11 +239,15 @@ export class JenkinsWorkbenchTreeDataProvider
       clearTimeout(this.debounceTimer);
     }
 
+    if (typeof refreshToken === "number") {
+      this.pendingRefreshWaiters.add(refreshToken);
+    }
+
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
       const elementToRefresh = this.pendingRefreshElement;
       this.pendingRefreshElement = null;
-      this._onDidChangeTreeData.fire(elementToRefresh === null ? undefined : elementToRefresh);
+      this.notifyTreeChange(elementToRefresh === null ? undefined : elementToRefresh);
     }, REFRESH_DEBOUNCE_MS);
   }
 
@@ -211,6 +266,43 @@ export class JenkinsWorkbenchTreeDataProvider
 
   getParent(element: WorkbenchTreeElement): vscode.ProviderResult<WorkbenchTreeElement> {
     return this.parentMap.get(element);
+  }
+
+  async buildExpansionPath(
+    element: WorkbenchTreeElement
+  ): Promise<TreeExpansionPath | undefined> {
+    const path: string[] = [];
+    let current: WorkbenchTreeElement | undefined = element;
+
+    while (current) {
+      const id = getElementId(current);
+      if (!id) {
+        return undefined;
+      }
+      path.unshift(id);
+      const parent = await this.getParent(current);
+      current = parent ?? undefined;
+    }
+
+    return path.length > 0 ? path : undefined;
+  }
+
+  async resolveExpansionPath(path: TreeExpansionPath): Promise<TreeExpansionResolveResult> {
+    let parent: WorkbenchTreeElement | undefined = undefined;
+
+    for (const id of path) {
+      const children = await this.getChildrenInternal(parent);
+      const match = children.find((child) => getElementId(child) === id);
+      if (!match) {
+        return {
+          element: undefined,
+          pending: children.some((child) => isLoadingPlaceholder(child))
+        };
+      }
+      parent = match;
+    }
+
+    return { element: parent, pending: false };
   }
 
   async resolveJobElement(
@@ -261,6 +353,13 @@ export class JenkinsWorkbenchTreeDataProvider
     this.emitSummary();
   }
 
+  private notifyTreeChange(element?: WorkbenchTreeElement): void {
+    this._onDidChangeTreeData.fire(element);
+    queueMicrotask(() => {
+      this.resolvePendingRefreshWaiters();
+    });
+  }
+
   private emitSummary(): void {
     const totals = this.childrenLoader.getSummaryTotals();
     const summary: TreeViewSummary = {
@@ -275,6 +374,30 @@ export class JenkinsWorkbenchTreeDataProvider
     this.lastSummary = summary;
     this._onDidChangeSummary.fire(summary);
   }
+
+  private resolveRefreshWaiter(refreshToken?: number): void {
+    if (typeof refreshToken !== "number") {
+      return;
+    }
+    const waiter = this.refreshWaiters.get(refreshToken);
+    if (!waiter) {
+      return;
+    }
+    this.refreshWaiters.delete(refreshToken);
+    this.pendingRefreshWaiters.delete(refreshToken);
+    waiter();
+  }
+
+  private resolvePendingRefreshWaiters(): void {
+    if (this.pendingRefreshWaiters.size === 0) {
+      return;
+    }
+    const tokens = Array.from(this.pendingRefreshWaiters);
+    this.pendingRefreshWaiters.clear();
+    for (const token of tokens) {
+      this.resolveRefreshWaiter(token);
+    }
+  }
 }
 
 function areTreeViewSummariesEqual(left: TreeViewSummary, right: TreeViewSummary): boolean {
@@ -284,4 +407,12 @@ function areTreeViewSummariesEqual(left: TreeViewSummary, right: TreeViewSummary
     left.watchErrors === right.watchErrors &&
     left.hasData === right.hasData
   );
+}
+
+function getElementId(element: WorkbenchTreeElement): string | undefined {
+  return typeof element.id === "string" && element.id.length > 0 ? element.id : undefined;
+}
+
+function isLoadingPlaceholder(element: WorkbenchTreeElement): boolean {
+  return element instanceof PlaceholderTreeItem && element.kind === "loading";
 }

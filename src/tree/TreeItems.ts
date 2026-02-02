@@ -59,11 +59,16 @@ export interface QueueFolderSummary {
 }
 
 export class RootSectionTreeItem extends vscode.TreeItem {
+  static buildId(section: "instances"): string {
+    return `root:${section}`;
+  }
+
   constructor(
     label: string,
     public readonly section: "instances"
   ) {
     super(label, vscode.TreeItemCollapsibleState.Expanded);
+    this.id = RootSectionTreeItem.buildId(section);
     this.contextValue = section;
   }
 }

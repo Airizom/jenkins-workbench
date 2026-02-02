@@ -21,6 +21,7 @@ import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
+import type { TreeExpansionState } from "../tree/TreeExpansionState";
 import type { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
@@ -46,6 +47,7 @@ export interface ExtensionCommandDependencies {
   viewStateStore: JenkinsViewStateStore;
   treeNavigator: DefaultJenkinsTreeNavigator;
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
+  treeExpansionState: TreeExpansionState;
   jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
   jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;
   refreshHost: ExtensionRefreshHost;
@@ -104,7 +106,12 @@ export function registerExtensionCommands(
     dependencies.treeNavigator
   );
 
-  registerRefreshCommands(context, dependencies.treeDataProvider, refreshHost);
+  registerRefreshCommands(
+    context,
+    dependencies.treeDataProvider,
+    dependencies.treeExpansionState,
+    refreshHost
+  );
 
   registerJenkinsfileCommands(
     context,

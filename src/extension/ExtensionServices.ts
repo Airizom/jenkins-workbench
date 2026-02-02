@@ -29,6 +29,7 @@ import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import { JenkinsWorkbenchTreeDataProvider, type TreeViewSummary } from "../tree/TreeDataProvider";
+import { TreeExpansionState } from "../tree/TreeExpansionState";
 import { JenkinsTreeFilter } from "../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../tree/TreeItems";
 import { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
@@ -72,6 +73,7 @@ export interface ExtensionServices {
   treeFilter: JenkinsTreeFilter;
   treeDataProvider: JenkinsWorkbenchTreeDataProvider;
   treeView: vscode.TreeView<WorkbenchTreeElement>;
+  treeExpansionState: TreeExpansionState;
   treeNavigator: DefaultJenkinsTreeNavigator;
   jenkinsfileMatcher: JenkinsfileMatcher;
   jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
@@ -166,6 +168,7 @@ export function createExtensionServices(
   const treeView = vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
     treeDataProvider
   });
+  const treeExpansionState = new TreeExpansionState(treeView, treeDataProvider);
   const treeSummarySubscription = treeDataProvider.onDidChangeSummary((summary) => {
     const hasCounts = summary.watchErrors > 0 || summary.running > 0 || summary.queue > 0;
     if (!hasCounts) {
@@ -218,6 +221,7 @@ export function createExtensionServices(
     treeFilter,
     treeDataProvider,
     treeView,
+    treeExpansionState,
     treeNavigator,
     jenkinsfileMatcher,
     jenkinsfileEnvironmentResolver,

@@ -172,6 +172,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     services.treeView,
     services.treeDataProvider,
+    services.treeExpansionState,
     services.pendingInputCoordinator,
     buildDetailsSerializer,
     nodeDetailsSerializer,
@@ -235,6 +236,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     viewStateStore: services.viewStateStore,
     treeNavigator: services.treeNavigator,
     treeDataProvider: services.treeDataProvider,
+    treeExpansionState: services.treeExpansionState,
     jenkinsfileEnvironmentResolver: services.jenkinsfileEnvironmentResolver,
     jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator,
     refreshHost
