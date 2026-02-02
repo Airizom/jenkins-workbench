@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-02-02
+
+### Added
+
+- feat: restore build and node detail panels on reload
+
 ## [1.26.1] - 2026-02-01
 
 ### Changed
