@@ -14,6 +14,18 @@ export interface LoadAdvancedNodeDetailsMessage {
   type: "loadAdvancedNodeDetails";
 }
 
+export interface TakeNodeOfflineMessage {
+  type: "takeNodeOffline";
+}
+
+export interface BringNodeOnlineMessage {
+  type: "bringNodeOnline";
+}
+
+export interface LaunchNodeAgentMessage {
+  type: "launchNodeAgent";
+}
+
 export interface OpenExternalMessage {
   type: "openExternal";
   url: string;
@@ -27,6 +39,9 @@ export interface CopyNodeJsonMessage {
 export type NodeDetailsIncomingMessage =
   | RefreshNodeDetailsMessage
   | LoadAdvancedNodeDetailsMessage
+  | TakeNodeOfflineMessage
+  | BringNodeOnlineMessage
+  | LaunchNodeAgentMessage
   | OpenExternalMessage
   | CopyNodeJsonMessage;
 
@@ -45,6 +60,18 @@ export function isLoadAdvancedNodeDetailsMessage(
 export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
   const record = asRecord(message);
   return record?.type === "openExternal" && typeof record.url === "string";
+}
+
+export function isTakeNodeOfflineMessage(message: unknown): message is TakeNodeOfflineMessage {
+  return asRecord(message)?.type === "takeNodeOffline";
+}
+
+export function isBringNodeOnlineMessage(message: unknown): message is BringNodeOnlineMessage {
+  return asRecord(message)?.type === "bringNodeOnline";
+}
+
+export function isLaunchNodeAgentMessage(message: unknown): message is LaunchNodeAgentMessage {
+  return asRecord(message)?.type === "launchNodeAgent";
 }
 
 export function isCopyNodeJsonMessage(message: unknown): message is CopyNodeJsonMessage {

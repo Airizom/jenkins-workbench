@@ -88,7 +88,7 @@ export function registerExtensionCommands(
     dependencies.watchStore
   );
 
-  registerNodeCommands(context, dependencies.dataService);
+  registerNodeCommands(context, dependencies.dataService, refreshHost);
 
   registerQueueCommands(context, dependencies.dataService, refreshHost);
 
@@ -104,7 +104,7 @@ export function registerExtensionCommands(
     dependencies.treeNavigator
   );
 
-  registerRefreshCommands(context, dependencies.treeDataProvider);
+  registerRefreshCommands(context, dependencies.treeDataProvider, refreshHost);
 
   registerJenkinsfileCommands(
     context,

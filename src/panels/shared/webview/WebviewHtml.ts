@@ -42,7 +42,11 @@ export function renderWebviewStateScript(state: unknown, nonce: string): string 
   return `
     <script nonce="${nonce}">
       const vscodeApi =
-        typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined;
+        window.__vscodeApi__ ??
+        (typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined);
+      if (vscodeApi) {
+        window.__vscodeApi__ = vscodeApi;
+      }
       if (vscodeApi && typeof vscodeApi.setState === "function") {
         vscodeApi.setState(${serialized});
       }

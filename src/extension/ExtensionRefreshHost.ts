@@ -1,3 +1,4 @@
+import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -7,6 +8,8 @@ import { syncNoEnvironmentsContext } from "./contextKeys";
 export interface ExtensionRefreshHost {
   refreshEnvironment(environmentId?: string): void;
   onEnvironmentRemoved?(environment: JenkinsEnvironmentRef): void;
+  onDidRefreshEnvironment?: vscode.Event<string | undefined>;
+  signalEnvironmentRefresh?(environmentId?: string): void;
 }
 
 export function createExtensionRefreshHost(
@@ -14,6 +17,7 @@ export function createExtensionRefreshHost(
   treeDataProvider: JenkinsWorkbenchTreeDataProvider,
   queuePoller: JenkinsQueuePoller
 ): ExtensionRefreshHost {
+  const refreshEmitter = new vscode.EventEmitter<string | undefined>();
   const updateQueueEnvironment = async (environmentId?: string): Promise<void> => {
     if (!environmentId) {
       return;
@@ -36,6 +40,11 @@ export function createExtensionRefreshHost(
       treeDataProvider.onEnvironmentChanged(environmentId);
       void updateQueueEnvironment(environmentId);
       void syncNoEnvironmentsContext(environmentStore);
+      refreshEmitter.fire(environmentId);
+    },
+    onDidRefreshEnvironment: refreshEmitter.event,
+    signalEnvironmentRefresh: (environmentId?: string) => {
+      refreshEmitter.fire(environmentId);
     },
     onEnvironmentRemoved: (environment: JenkinsEnvironmentRef) =>
       queuePoller.clearEnvironment(environment)

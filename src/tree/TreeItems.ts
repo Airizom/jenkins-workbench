@@ -3,6 +3,7 @@ import { formatScopeLabel } from "../formatters/ScopeFormatters";
 import type { JenkinsBuild, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsNodeInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { buildNodeActionCapabilities } from "../jenkins/nodeActionCapabilities";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
 import {
   formatMultibranchFolderDescription,
@@ -426,7 +427,21 @@ export class NodeTreeItem extends vscode.TreeItem {
   ) {
     super(node.displayName, vscode.TreeItemCollapsibleState.None);
     this.nodeUrl = node.nodeUrl;
-    this.contextValue = node.nodeUrl ? "node nodeOpenable" : "node";
+    const contextValues = ["node"];
+    const capabilities = buildNodeActionCapabilities(node);
+    if (node.nodeUrl) {
+      contextValues.push("nodeOpenable");
+    }
+    if (capabilities.canTakeOffline) {
+      contextValues.push("nodeOnline");
+    }
+    if (capabilities.isTemporarilyOffline) {
+      contextValues.push("nodeTemporarilyOffline");
+    }
+    if (capabilities.canLaunchAgent) {
+      contextValues.push("nodeLaunchable");
+    }
+    this.contextValue = contextValues.join(" ");
     this.description = formatNodeDescription(node);
     this.iconPath = node.offline
       ? new vscode.ThemeIcon("plug", new vscode.ThemeColor("charts.gray"))

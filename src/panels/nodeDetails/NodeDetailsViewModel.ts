@@ -1,5 +1,6 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
 import { collectAssignedLabelNames } from "../../jenkins/labels";
+import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import type {
   JenkinsNodeDetails,
   JenkinsNodeExecutable,
@@ -38,6 +39,13 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
   const labels = collectAssignedLabelNames(details?.assignedLabels);
 
   const status = formatStatus(details);
+  const capabilities = buildNodeActionCapabilities(details);
+  const isOffline = capabilities.isOffline;
+  const isTemporarilyOffline = capabilities.isTemporarilyOffline;
+  const canTakeOffline = capabilities.canTakeOffline;
+  const canBringOnline = capabilities.canBringOnline;
+  const canLaunchAgent = capabilities.canLaunchAgent;
+  const canOpenAgentInstructions = capabilities.canOpenAgentInstructions;
   const offlineReason = formatOfflineReason(details);
   const idleLabel = formatIdle(details);
   const executorsLabel = formatExecutorsSummary(details);
@@ -57,6 +65,12 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
     updatedAt,
     statusLabel: status.label,
     statusClass: status.className,
+    isOffline,
+    isTemporarilyOffline,
+    canTakeOffline,
+    canBringOnline,
+    canLaunchAgent,
+    canOpenAgentInstructions,
     offlineReason,
     idleLabel,
     executorsLabel,

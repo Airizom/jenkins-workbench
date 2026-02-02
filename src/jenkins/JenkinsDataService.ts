@@ -70,6 +70,20 @@ export interface BuildListFetchOptions {
   includeParameters?: boolean;
 }
 
+type NodeOfflineToggleStatus = "toggled" | "no_change" | "not_temporarily_offline";
+
+interface NodeOfflineToggleResult {
+  status: NodeOfflineToggleStatus;
+  details: JenkinsNodeDetails;
+}
+
+type NodeLaunchStatus = "launched" | "no_change" | "not_launchable" | "temporarily_offline";
+
+interface NodeLaunchResult {
+  status: NodeLaunchStatus;
+  details: JenkinsNodeDetails;
+}
+
 const PENDING_INPUT_ACTIONS_TTL_MS = 5000;
 const PENDING_INPUT_SUMMARY_TTL_MS = 60_000;
 const PENDING_INPUT_UNSUPPORTED_TTL_MS = 5 * 60 * 1000;
@@ -457,6 +471,82 @@ export class JenkinsDataService {
       const details = await client.getNodeDetails(nodeUrl, { detailLevel });
       this.cache.set(cacheKey, details, this.cacheTtlMs);
       return details;
+    } catch (error) {
+      throw toJenkinsActionError(error);
+    }
+  }
+
+  async setNodeTemporarilyOffline(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string,
+    targetOffline: boolean,
+    reason?: string
+  ): Promise<NodeOfflineToggleResult> {
+    try {
+      const details = await this.getNodeDetails(environment, nodeUrl, {
+        mode: "refresh",
+        detailLevel: "basic"
+      });
+      const isOffline = details.offline === true;
+      const isTemporarilyOffline = details.temporarilyOffline === true;
+
+      if (targetOffline) {
+        if (isTemporarilyOffline || isOffline) {
+          return { status: "no_change", details };
+        }
+        this.clearCacheForEnvironment(environment.environmentId);
+        const client = await this.clientProvider.getClient(environment);
+        await client.toggleNodeTemporarilyOffline(nodeUrl, reason);
+        const refreshed = await this.getNodeDetails(environment, nodeUrl, {
+          mode: "refresh",
+          detailLevel: "basic"
+        });
+        return { status: "toggled", details: refreshed };
+      }
+
+      if (!isTemporarilyOffline) {
+        return { status: isOffline ? "not_temporarily_offline" : "no_change", details };
+      }
+      this.clearCacheForEnvironment(environment.environmentId);
+      const client = await this.clientProvider.getClient(environment);
+      await client.toggleNodeTemporarilyOffline(nodeUrl);
+      const refreshed = await this.getNodeDetails(environment, nodeUrl, {
+        mode: "refresh",
+        detailLevel: "basic"
+      });
+      return { status: "toggled", details: refreshed };
+    } catch (error) {
+      throw toJenkinsActionError(error);
+    }
+  }
+
+  async launchNodeAgent(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string
+  ): Promise<NodeLaunchResult> {
+    try {
+      const details = await this.getNodeDetails(environment, nodeUrl, {
+        mode: "refresh",
+        detailLevel: "basic"
+      });
+      const canLaunch = details.launchSupported === true;
+      if (!details.offline) {
+        return { status: "no_change", details };
+      }
+      if (details.temporarilyOffline) {
+        return { status: "temporarily_offline", details };
+      }
+      if (!canLaunch) {
+        return { status: "not_launchable", details };
+      }
+      this.clearCacheForEnvironment(environment.environmentId);
+      const client = await this.clientProvider.getClient(environment);
+      await client.launchNodeAgent(nodeUrl);
+      const refreshed = await this.getNodeDetails(environment, nodeUrl, {
+        mode: "refresh",
+        detailLevel: "basic"
+      });
+      return { status: "launched", details: refreshed };
     } catch (error) {
       throw toJenkinsActionError(error);
     }

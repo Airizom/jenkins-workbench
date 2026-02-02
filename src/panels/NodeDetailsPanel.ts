@@ -6,9 +6,12 @@ import type { JenkinsNodeDetails } from "../jenkins/types";
 import {
   type NodeDetailsOutgoingMessage,
   isCopyNodeJsonMessage,
+  isBringNodeOnlineMessage,
+  isLaunchNodeAgentMessage,
   isLoadAdvancedNodeDetailsMessage,
   isOpenExternalMessage,
-  isRefreshNodeDetailsMessage
+  isRefreshNodeDetailsMessage,
+  isTakeNodeOfflineMessage
 } from "./nodeDetails/NodeDetailsMessages";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
@@ -27,6 +30,8 @@ import {
   type SerializedEnvironmentState
 } from "./shared/webview/WebviewPanelState";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { ExtensionRefreshHost } from "../extension/ExtensionRefreshHost";
+import { NodeActionService } from "../services/NodeActionService";
 
 interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
   nodeUrl: string;
@@ -36,6 +41,7 @@ interface NodeDetailsPanelReviveOptions {
   dataService: JenkinsDataService;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
+  refreshHost?: ExtensionRefreshHost;
 }
 
 function isNodeDetailsPanelState(value: unknown): value is NodeDetailsPanelSerializedState {
@@ -62,7 +68,10 @@ export class NodeDetailsPanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private readonly disposables: vscode.Disposable[] = [];
+  private refreshSubscription?: vscode.Disposable;
+  private refreshHost?: ExtensionRefreshHost;
   private dataService?: JenkinsDataService;
+  private nodeActionService?: NodeActionService;
   private environment?: JenkinsEnvironmentRef;
   private nodeUrl?: string;
   private lastDetails?: JenkinsNodeDetails;
@@ -76,7 +85,8 @@ export class NodeDetailsPanel {
     environment: JenkinsEnvironmentRef,
     nodeUrl: string,
     extensionUri: vscode.Uri,
-    label?: string
+    label?: string,
+    refreshHost?: ExtensionRefreshHost
   ): Promise<void> {
     if (!NodeDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
@@ -95,8 +105,10 @@ export class NodeDetailsPanel {
 
     const activePanel = NodeDetailsPanel.currentPanel;
     activePanel.dataService = dataService;
+    activePanel.nodeActionService = new NodeActionService(dataService);
     activePanel.environment = environment;
     activePanel.nodeUrl = nodeUrl;
+    activePanel.setRefreshHost(refreshHost);
     activePanel.panel.title = label ? `Node Details: ${label}` : "Node Details";
     activePanel.panel.reveal(undefined, true);
     await activePanel.load();
@@ -113,6 +125,8 @@ export class NodeDetailsPanel {
     const revived = new NodeDetailsPanel(panel, options.extensionUri);
     NodeDetailsPanel.currentPanel = revived;
     revived.dataService = options.dataService;
+    revived.nodeActionService = new NodeActionService(options.dataService);
+    revived.setRefreshHost(options.refreshHost);
 
     if (!isNodeDetailsPanelState(state)) {
       revived.renderRestoreError(
@@ -140,6 +154,15 @@ export class NodeDetailsPanel {
     this.extensionUri = extensionUri;
 
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.panel.onDidChangeViewState(
+      () => {
+        if (this.panel.visible) {
+          void this.handlePanelVisible();
+        }
+      },
+      null,
+      this.disposables
+    );
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
         if (isRefreshNodeDetailsMessage(message)) {
@@ -148,6 +171,18 @@ export class NodeDetailsPanel {
         }
         if (isLoadAdvancedNodeDetailsMessage(message)) {
           void this.loadAdvancedDetails();
+          return;
+        }
+        if (isTakeNodeOfflineMessage(message)) {
+          void this.handleNodeAction("takeNodeOffline");
+          return;
+        }
+        if (isBringNodeOnlineMessage(message)) {
+          void this.handleNodeAction("bringNodeOnline");
+          return;
+        }
+        if (isLaunchNodeAgentMessage(message)) {
+          void this.handleNodeAction("launchNodeAgent");
           return;
         }
         if (isOpenExternalMessage(message)) {
@@ -165,6 +200,10 @@ export class NodeDetailsPanel {
 
   private dispose(): void {
     NodeDetailsPanel.currentPanel = undefined;
+    if (this.refreshSubscription) {
+      this.refreshSubscription.dispose();
+      this.refreshSubscription = undefined;
+    }
     while (this.disposables.length > 0) {
       const disposable = this.disposables.pop();
       disposable?.dispose();
@@ -227,15 +266,63 @@ export class NodeDetailsPanel {
     await this.refreshDetailsWith("advanced");
   }
 
-  private async refreshDetailsWith(detailLevel: "basic" | "advanced"): Promise<void> {
-    const token = this.loadToken;
-    this.postMessage({ type: "setLoading", value: true });
-    const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel });
-    if (!model || !this.isTokenCurrent(token)) {
+  private async refreshDetailsWith(
+    detailLevel: "basic" | "advanced",
+    options?: { skipLoading?: boolean }
+  ): Promise<void> {
+    const token = ++this.loadToken;
+    const shouldToggleLoading = !options?.skipLoading;
+    if (shouldToggleLoading) {
+      this.postMessage({ type: "setLoading", value: true });
+    }
+    try {
+      const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel });
+      if (!model || !this.isTokenCurrent(token)) {
+        return;
+      }
+      this.postMessage({ type: "updateNodeDetails", payload: model });
+    } finally {
+      if (shouldToggleLoading && this.isTokenCurrent(token)) {
+        this.postMessage({ type: "setLoading", value: false });
+      }
+    }
+  }
+
+  private async handleNodeAction(
+    action: "takeNodeOffline" | "bringNodeOnline" | "launchNodeAgent"
+  ): Promise<void> {
+    if (!this.nodeActionService || !this.environment || !this.nodeUrl) {
       return;
     }
-    this.postMessage({ type: "updateNodeDetails", payload: model });
-    this.postMessage({ type: "setLoading", value: false });
+    const label = this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node";
+    const target = { environment: this.environment, nodeUrl: this.nodeUrl, label };
+    const refreshHost = this.refreshHost
+      ? {
+          refreshEnvironment: (environmentId: string) => {
+            this.refreshHost?.refreshEnvironment(environmentId);
+          }
+        }
+      : undefined;
+    this.postMessage({ type: "setLoading", value: true });
+    try {
+      let didToggle = false;
+      if (action === "takeNodeOffline") {
+        didToggle = await this.nodeActionService.takeNodeOffline(target, refreshHost);
+      } else if (action === "bringNodeOnline") {
+        didToggle = await this.nodeActionService.bringNodeOnline(target, refreshHost);
+      } else {
+        didToggle = await this.nodeActionService.launchNodeAgent(target, refreshHost);
+      }
+      if (didToggle) {
+        await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic", {
+          skipLoading: true
+        });
+      }
+    } catch (error) {
+      void vscode.window.showErrorMessage(formatActionError(error));
+    } finally {
+      this.postMessage({ type: "setLoading", value: false });
+    }
   }
 
   private async fetchNodeDetails(
@@ -312,6 +399,48 @@ export class NodeDetailsPanel {
 
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
+  }
+
+  private setRefreshHost(refreshHost?: ExtensionRefreshHost): void {
+    this.refreshHost = refreshHost;
+    if (this.refreshSubscription) {
+      this.refreshSubscription.dispose();
+      this.refreshSubscription = undefined;
+    }
+    if (!refreshHost?.onDidRefreshEnvironment) {
+      return;
+    }
+    this.refreshSubscription = refreshHost.onDidRefreshEnvironment((environmentId) => {
+      void this.handleEnvironmentRefresh(environmentId);
+    });
+  }
+
+  private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
+    if (!this.environment || !this.nodeUrl || !this.hasRendered) {
+      return;
+    }
+    if (environmentId && this.environment.environmentId !== environmentId) {
+      return;
+    }
+    if (!this.panel.visible) {
+      return;
+    }
+    await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic", {
+      skipLoading: true
+    });
+  }
+
+  private async handlePanelVisible(): Promise<void> {
+    if (!this.environment || !this.nodeUrl) {
+      return;
+    }
+    if (!this.hasRendered) {
+      await this.load();
+      return;
+    }
+    await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic", {
+      skipLoading: true
+    });
   }
 
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {

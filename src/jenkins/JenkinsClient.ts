@@ -183,6 +183,14 @@ export class JenkinsClient {
     return this.nodesApi.getNodeDetails(nodeUrl, options);
   }
 
+  async toggleNodeTemporarilyOffline(nodeUrl: string, offlineMessage?: string): Promise<void> {
+    await this.nodesApi.toggleNodeTemporarilyOffline(nodeUrl, offlineMessage);
+  }
+
+  async launchNodeAgent(nodeUrl: string): Promise<void> {
+    await this.nodesApi.launchNodeAgent(nodeUrl);
+  }
+
   async getQueue(): Promise<JenkinsQueueItem[]> {
     return this.queueApi.getQueue();
   }

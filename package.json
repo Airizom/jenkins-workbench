@@ -133,6 +133,21 @@
         "title": "Jenkins: View Node Details"
       },
       {
+        "command": "jenkinsWorkbench.takeNodeOffline",
+        "title": "Jenkins: Take Node Offline...",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "jenkinsWorkbench.bringNodeOnline",
+        "title": "Jenkins: Bring Node Online",
+        "icon": "$(debug-connect)"
+      },
+      {
+        "command": "jenkinsWorkbench.launchNodeAgent",
+        "title": "Jenkins: Launch Node Agent",
+        "icon": "$(debug-start)"
+      },
+      {
         "command": "jenkinsWorkbench.previewBuildLog",
         "title": "Jenkins: Preview Build Logs",
         "icon": "$(terminal)"
@@ -529,6 +544,21 @@
           "command": "jenkinsWorkbench.showNodeDetails",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)node(\\s|$)/",
           "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.takeNodeOffline",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOnline(\\s|$)/ && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "jenkinsWorkbench.bringNodeOnline",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeTemporarilyOffline(\\s|$)/ && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "jenkinsWorkbench.launchNodeAgent",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeLaunchable(\\s|$)/ && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
+          "group": "1_actions@2"
         },
         {
           "command": "jenkinsWorkbench.pinJob",

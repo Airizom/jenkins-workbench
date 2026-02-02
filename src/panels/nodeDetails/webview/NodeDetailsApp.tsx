@@ -88,6 +88,17 @@ export function NodeDetailsApp(): JSX.Element {
   const isStale = useMemo(() => isStaleUpdatedAt(updatedAtDate, now), [updatedAtDate, now]);
   const showOfflineBanner = state.statusClass === "offline" || state.statusClass === "temporary";
   const statusStyle = STATUS_STYLES[state.statusClass];
+  const nodeAction = useMemo(() => {
+    if (state.canTakeOffline) {
+      return { type: "takeNodeOffline" as const, label: "Take Offline..." };
+    }
+    if (state.canBringOnline) {
+      return { type: "bringNodeOnline" as const, label: "Bring Online" };
+    }
+    return undefined;
+  }, [state.canTakeOffline, state.canBringOnline]);
+  const canLaunchAgent = state.canLaunchAgent;
+  const canOpenAgentInstructions = state.canOpenAgentInstructions;
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -102,6 +113,20 @@ export function NodeDetailsApp(): JSX.Element {
 
   const handleRefresh = () => {
     postVsCodeMessage({ type: "refreshNodeDetails" });
+  };
+
+  const handleNodeAction = () => {
+    if (!nodeAction) {
+      return;
+    }
+    postVsCodeMessage({ type: nodeAction.type });
+  };
+
+  const handleLaunchAgent = () => {
+    if (!canLaunchAgent) {
+      return;
+    }
+    postVsCodeMessage({ type: "launchNodeAgent" });
   };
 
   const handleOpen = () => {
@@ -173,6 +198,29 @@ export function NodeDetailsApp(): JSX.Element {
                 <RefreshIcon className="h-4 w-4" />
                 Refresh
               </Button>
+              {nodeAction ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNodeAction}
+                  disabled={state.loading}
+                  className="gap-1.5"
+                >
+                  {nodeAction.label}
+                </Button>
+              ) : null}
+              {canLaunchAgent ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLaunchAgent}
+                  disabled={state.loading}
+                  className="gap-1.5"
+                >
+                  <LaunchIcon className="h-4 w-4" />
+                  Launch Agent
+                </Button>
+              ) : null}
               <Button
                 variant="secondary"
                 size="sm"
@@ -181,7 +229,7 @@ export function NodeDetailsApp(): JSX.Element {
                 className="gap-1.5"
               >
                 <ExternalLinkIcon className="h-4 w-4" />
-                Open in Jenkins
+                {canOpenAgentInstructions ? "Agent Instructions" : "Open in Jenkins"}
               </Button>
             </div>
           </div>

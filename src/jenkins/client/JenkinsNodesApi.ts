@@ -1,5 +1,5 @@
 import type { JenkinsNode, JenkinsNodeDetails } from "../types";
-import { buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
+import { buildActionUrl, buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 
 const NODE_EXECUTABLE_FIELDS =
@@ -51,7 +51,7 @@ export class JenkinsNodesApi {
     const url = buildApiUrlFromBase(
       this.context.baseUrl,
       "computer/api/json",
-      "computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,offlineCauseReason,offlineCause[description,shortDescription,name,timestamp],numExecutors,busyExecutors]"
+      "computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,offlineCauseReason,offlineCause[description,shortDescription,name,timestamp],numExecutors,busyExecutors,jnlpAgent,launchSupported,manualLaunchAllowed]"
     );
     const response = await this.context.requestJson<{ computer?: JenkinsNode[] }>(url);
     return Array.isArray(response.computer) ? response.computer : [];
@@ -65,5 +65,17 @@ export class JenkinsNodesApi {
       options?.detailLevel === "advanced" ? NODE_DETAILS_ADVANCED_TREE : NODE_DETAILS_BASE_TREE;
     const url = buildApiUrlFromItem(nodeUrl, tree);
     return this.context.requestJson<JenkinsNodeDetails>(url);
+  }
+
+  async toggleNodeTemporarilyOffline(nodeUrl: string, offlineMessage?: string): Promise<void> {
+    const url = buildActionUrl(nodeUrl, "toggleOffline");
+    const trimmed = offlineMessage?.trim();
+    const body = trimmed ? new URLSearchParams({ offlineMessage: trimmed }).toString() : undefined;
+    await this.context.requestVoidWithCrumb(url, body);
+  }
+
+  async launchNodeAgent(nodeUrl: string): Promise<void> {
+    const url = buildActionUrl(nodeUrl, "launchSlaveAgent");
+    await this.context.requestVoidWithCrumb(url);
   }
 }

@@ -148,7 +148,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await NodeDetailsPanel.revive(panel, state, {
           dataService: services.dataService,
           environmentStore: services.environmentStore,
-          extensionUri: context.extensionUri
+          extensionUri: context.extensionUri,
+          refreshHost
         });
       }
     }

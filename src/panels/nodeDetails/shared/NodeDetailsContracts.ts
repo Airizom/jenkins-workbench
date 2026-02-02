@@ -26,6 +26,12 @@ export interface NodeDetailsViewModel {
   updatedAt: string;
   statusLabel: string;
   statusClass: NodeStatusClass;
+  isOffline: boolean;
+  isTemporarilyOffline: boolean;
+  canTakeOffline: boolean;
+  canBringOnline: boolean;
+  canLaunchAgent: boolean;
+  canOpenAgentInstructions: boolean;
   offlineReason?: string;
   idleLabel: string;
   executorsLabel: string;

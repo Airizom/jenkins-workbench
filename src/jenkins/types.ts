@@ -221,6 +221,9 @@ export interface JenkinsNode {
   temporarilyOffline: boolean;
   offlineCauseReason?: string;
   offlineCause?: JenkinsNodeOfflineCause;
+  jnlpAgent?: boolean;
+  launchSupported?: boolean;
+  manualLaunchAllowed?: boolean;
   numExecutors?: number;
   busyExecutors?: number;
 }
