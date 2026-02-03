@@ -236,6 +236,24 @@ export function PlayCircleIcon({ className, ...props }: IconProps) {
   );
 }
 
+export function ChevronDownIcon({ className, ...props }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn("h-4 w-4", className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 export function StopCircleIcon({ className, ...props }: IconProps) {
   return (
     <svg
@@ -411,22 +429,6 @@ export function LaunchIcon({ className, ...props }: IconProps) {
     >
       <path d="M22 2L11 13" />
       <path d="M22 2L15 22 11 13 2 9 22 2z" />
-    </svg>
-  );
-}
-
-export function ChevronDownIcon({ className, ...props }: IconProps) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={cn("h-4 w-4 text-muted-foreground", className)}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-      {...props}
-    >
-      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }

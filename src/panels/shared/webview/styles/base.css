@@ -228,21 +228,25 @@
     from {
       height: 0;
       opacity: 0;
+      transform: translateY(-2px);
     }
     to {
-      height: var(--collapsible-content-height, auto);
+      height: var(--radix-collapsible-content-height, auto);
       opacity: 1;
+      transform: translateY(0);
     }
   }
 
   @keyframes collapsible-up {
     from {
-      height: var(--collapsible-content-height, auto);
+      height: var(--radix-collapsible-content-height, auto);
       opacity: 1;
+      transform: translateY(0);
     }
     to {
       height: 0;
       opacity: 0;
+      transform: translateY(-2px);
     }
   }
 
@@ -310,6 +314,13 @@
 
   .animate-collapsible-up {
     animation: collapsible-up 200ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-collapsible-down,
+    .animate-collapsible-up {
+      animation: none;
+    }
   }
 
   .animate-in {

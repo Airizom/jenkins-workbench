@@ -8,6 +8,7 @@ import {
   CollapsibleTrigger
 } from "../../../../shared/webview/components/ui/collapsible";
 import { Skeleton } from "../../../../shared/webview/components/ui/skeleton";
+import { ChevronDownIcon } from "../../../../shared/webview/icons";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type {
   PipelineStageStepViewModel,
@@ -244,22 +245,30 @@ function StageNode({
       </div>
 
       <div className={cn("flex-1 pb-6", isLast && "pb-0")}>
-        <Collapsible open={expanded} onOpenChange={onToggleExpanded}>
-          <Card className="overflow-hidden">
-            <CollapsibleTrigger className="w-full p-0 hover:bg-accent-soft transition-colors">
-              <div className="flex items-center justify-between gap-3 p-4">
+        <Collapsible open={expanded} onOpenChange={onToggleExpanded} className="group">
+          <Card className="overflow-hidden border-mutedBorder bg-card transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
+            <CollapsibleTrigger asChild className="gap-4 px-4 py-4 hover:bg-accent-soft">
+              <button type="button">
                 <div className="flex flex-col items-start gap-1">
                   <div className="text-sm font-medium">{stage.name || "Stage"}</div>
                   <div className="text-xs text-muted-foreground">
                     {stage.durationLabel || "Unknown"}
                   </div>
                 </div>
-                <StatusPill
-                  label={stage.statusLabel || "Unknown"}
-                  status={stage.statusClass}
-                  className="text-xs"
-                />
-              </div>
+                <div className="flex items-center gap-3">
+                  <StatusPill
+                    label={stage.statusLabel || "Unknown"}
+                    status={stage.statusClass}
+                    className="text-xs"
+                  />
+                  <ChevronDownIcon
+                    className={cn(
+                      "text-muted-foreground transition-transform duration-200",
+                      "group-data-[state=open]:rotate-180 group-data-[state=open]:text-foreground"
+                    )}
+                  />
+                </div>
+              </button>
             </CollapsibleTrigger>
 
             <CollapsibleContent>
@@ -344,29 +353,37 @@ function BranchCard({
   const statusClass = getStatusClass(branch.statusClass);
 
   return (
-    <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <div className="rounded border border-mutedBorder bg-muted-soft">
-        <CollapsibleTrigger className="w-full p-0 hover:bg-accent-soft transition-colors rounded">
-          <div className="flex items-center gap-2 p-3">
-            <div
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full border text-xs",
-                statusClass
-              )}
-            >
-              {branchIcon}
+    <Collapsible open={expanded} onOpenChange={setExpanded} className="group">
+      <div className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
+        <CollapsibleTrigger asChild className="gap-3 px-3 py-3 hover:bg-accent-soft">
+          <button type="button">
+            <div className="flex items-center gap-2">
+              <div
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full border text-xs",
+                  statusClass
+                )}
+              >
+                {branchIcon}
+              </div>
+              <div className="text-left">
+                <div className="text-xs font-medium">{branch.name || "Branch"}</div>
+              </div>
             </div>
-            <div className="flex-1 text-left">
-              <div className="text-xs font-medium">{branch.name || "Branch"}</div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{branch.durationLabel}</span>
+              <ChevronDownIcon
+                className={cn(
+                  "text-muted-foreground transition-transform duration-200",
+                  "group-data-[state=open]:rotate-180 group-data-[state=open]:text-foreground"
+                )}
+              />
             </div>
-            <div className="text-xs text-muted-foreground">{branch.durationLabel}</div>
-          </div>
+          </button>
         </CollapsibleTrigger>
         {hasSteps ? (
-          <CollapsibleContent>
-            <div className="border-t border-border p-3 pt-2">
-              <StepsList steps={steps} compact />
-            </div>
+          <CollapsibleContent className="border-t border-border px-3 pb-3 pt-2">
+            <StepsList steps={steps} compact />
           </CollapsibleContent>
         ) : null}
       </div>

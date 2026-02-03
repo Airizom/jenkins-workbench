@@ -544,15 +544,18 @@ function MonitorCard({
       </CardHeader>
       <CardContent className="space-y-2">
         {entries.map((entry) => (
-          <Collapsible key={entry.key}>
-            <CollapsibleTrigger className="w-full rounded-lg border border-mutedBorder bg-muted-soft px-4 py-2.5 hover:bg-muted-strong transition-colors">
+          <Collapsible
+            key={entry.key}
+            className="overflow-hidden rounded-lg border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong"
+          >
+            <CollapsibleTrigger className="w-full px-4 py-2.5 hover:bg-accent-soft">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-mono text-muted-foreground">{entry.key}</span>
                 <span className="text-sm font-medium">{entry.summary}</span>
               </div>
             </CollapsibleTrigger>
-            <CollapsibleContent>
-              <pre className="mt-2 rounded-lg border border-border bg-muted-strong p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64 shadow-inner">
+            <CollapsibleContent className="border-t border-border px-4 pb-4 pt-3">
+              <pre className="rounded-lg border border-border bg-muted-strong p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64 shadow-inner">
                 {formatJson(entry.raw)}
               </pre>
             </CollapsibleContent>

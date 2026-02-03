@@ -1,100 +1,46 @@
+import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-const { createContext, useContext, useState, useId } = React;
+export type CollapsibleProps = React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Root>;
 
-interface CollapsibleContextValue {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  contentId: string;
-  triggerId: string;
-}
+export const Collapsible = CollapsiblePrimitive.Root;
 
-const CollapsibleContext = createContext<CollapsibleContextValue | null>(null);
-
-function useCollapsibleContext(): CollapsibleContextValue {
-  const context = useContext(CollapsibleContext);
-  if (!context) {
-    throw new Error("Collapsible components must be used within a Collapsible provider");
-  }
-  return context;
-}
-
-export interface CollapsibleProps extends React.HTMLAttributes<HTMLDivElement> {
-  open?: boolean;
-  defaultOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}
-
-export function Collapsible({
-  open: controlledOpen,
-  defaultOpen = false,
-  onOpenChange,
-  className,
-  children,
-  ...props
-}: CollapsibleProps) {
-  const [internalOpen, setInternalOpen] = useState(defaultOpen);
-  const open = controlledOpen ?? internalOpen;
-  const baseId = useId();
-
-  const handleOpenChange = (newOpen: boolean) => {
-    if (controlledOpen === undefined) {
-      setInternalOpen(newOpen);
-    }
-    onOpenChange?.(newOpen);
-  };
-
-  return (
-    <CollapsibleContext.Provider
-      value={{
-        open,
-        onOpenChange: handleOpenChange,
-        contentId: `${baseId}-content`,
-        triggerId: `${baseId}-trigger`
-      }}
-    >
-      <div data-state={open ? "open" : "closed"} className={className} {...props}>
-        {children}
-      </div>
-    </CollapsibleContext.Provider>
-  );
-}
-
-export interface CollapsibleTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<
+  typeof CollapsiblePrimitive.Trigger
+> & {
   asChild?: boolean;
-}
+};
 
-export const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTriggerProps>(
-  ({ className, children, asChild = false, ...props }, ref) => {
-    const { open, onOpenChange, contentId, triggerId } = useCollapsibleContext();
-
-    const handleClick = () => {
-      onOpenChange(!open);
-    };
-
-    return (
-      <button
-        ref={ref}
-        type="button"
-        id={triggerId}
-        aria-expanded={open}
-        aria-controls={contentId}
-        data-state={open ? "open" : "closed"}
-        onClick={handleClick}
-        className={cn("flex w-full items-center justify-between text-left", className)}
-        {...props}
-      >
+export const CollapsibleTrigger = React.forwardRef<
+  React.ElementRef<typeof CollapsiblePrimitive.Trigger>,
+  CollapsibleTriggerProps
+>(({ className, children, asChild = false, ...props }, ref) => (
+  <CollapsiblePrimitive.Trigger
+    ref={ref}
+    asChild={asChild}
+    className={cn(
+      "group flex w-full items-center justify-between text-left transition-colors cursor-pointer",
+      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      "disabled:pointer-events-none disabled:opacity-50",
+      className
+    )}
+    {...props}
+  >
+    {asChild ? (
+      children
+    ) : (
+      <>
         {children}
-        <ChevronIcon open={open} />
-      </button>
-    );
-  }
-);
+        <ChevronIcon />
+      </>
+    )}
+  </CollapsiblePrimitive.Trigger>
+));
 CollapsibleTrigger.displayName = "CollapsibleTrigger";
 
-function ChevronIcon({ open }: { open: boolean }) {
+function ChevronIcon({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
@@ -107,8 +53,10 @@ function ChevronIcon({ open }: { open: boolean }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={cn(
-        "shrink-0 text-muted-foreground transition-transform duration-200",
-        open && "rotate-180"
+        "mr-2 shrink-0 text-muted-foreground transition-transform duration-200",
+        "group-data-[state=open]:rotate-180",
+        "group-data-[state=open]:text-foreground",
+        className
       )}
     >
       <path d="M4 6l4 4 4-4" />
@@ -116,35 +64,23 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-export interface CollapsibleContentProps extends React.HTMLAttributes<HTMLElement> {
-  forceMount?: boolean;
-}
+export type CollapsibleContentProps = React.ComponentPropsWithoutRef<
+  typeof CollapsiblePrimitive.Content
+>;
 
-export const CollapsibleContent = React.forwardRef<HTMLElement, CollapsibleContentProps>(
-  ({ className, children, forceMount = false, ...props }, ref) => {
-    const { open, contentId, triggerId } = useCollapsibleContext();
-
-    if (!forceMount && !open) {
-      return null;
-    }
-
-    return (
-      <section
-        ref={ref}
-        id={contentId}
-        aria-labelledby={triggerId}
-        data-state={open ? "open" : "closed"}
-        hidden={!open}
-        className={cn(
-          "overflow-hidden",
-          open ? "animate-collapsible-down" : "animate-collapsible-up",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </section>
-    );
-  }
-);
+export const CollapsibleContent = React.forwardRef<
+  React.ElementRef<typeof CollapsiblePrimitive.Content>,
+  CollapsibleContentProps
+>(({ className, children, ...props }, ref) => (
+  <CollapsiblePrimitive.Content
+    ref={ref}
+    className={cn(
+      "overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down",
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </CollapsiblePrimitive.Content>
+));
 CollapsibleContent.displayName = "CollapsibleContent";

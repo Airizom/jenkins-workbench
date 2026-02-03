@@ -155,12 +155,14 @@ function FailedTestsList({ items }: { items: BuildFailureFailedTest[] }) {
 
 function FailedTestDetail({ label, value }: { label: string; value: string }) {
   return (
-    <Collapsible>
-      <CollapsibleTrigger className="w-full rounded border border-mutedBorder bg-muted-strong px-2 py-1.5 hover:bg-muted transition-colors">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <Collapsible className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong">
+      <CollapsibleTrigger className="w-full px-3 py-2 hover:bg-accent-soft">
+        <span className="text-xs font-medium text-muted-foreground group-data-[state=open]:text-foreground">
+          {label}
+        </span>
       </CollapsibleTrigger>
-      <CollapsibleContent>
-        <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background px-2 py-1.5 text-xs font-mono leading-relaxed">
+      <CollapsibleContent className="border-t border-border px-3 pb-2 pt-2">
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background px-2 py-1.5 text-xs font-mono leading-relaxed">
           {value}
         </pre>
       </CollapsibleContent>
