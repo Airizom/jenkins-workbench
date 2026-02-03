@@ -1,30 +1,31 @@
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
 
-type AlertVariant = "default" | "destructive" | "warning" | "info";
+const alertVariants = cva("relative w-full rounded border p-3 text-sm", {
+  variants: {
+    variant: {
+      default: "border-border bg-muted text-foreground",
+      destructive: "border-inputErrorBorder bg-inputErrorBg text-inputErrorFg",
+      warning: "border-inputWarningBorder bg-inputWarningBg text-inputWarningFg",
+      info: "border-ring bg-muted text-foreground"
+    }
+  },
+  defaultVariants: {
+    variant: "default"
+  }
+});
 
-const alertVariants: Record<AlertVariant, string> = {
-  default: "border-border bg-muted text-foreground",
-  destructive: "border-inputErrorBorder bg-inputErrorBg text-inputErrorFg",
-  warning: "border-inputWarningBorder bg-inputWarningBg text-inputWarningFg",
-  info: "border-ring bg-muted text-foreground"
-};
-
-export type AlertProps = React.HTMLAttributes<HTMLDivElement> & {
-  variant?: AlertVariant;
-};
+export type AlertProps = React.HTMLAttributes<HTMLDivElement> &
+  VariantProps<typeof alertVariants>;
 
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant = "default", ...props }, ref) => (
+  ({ className, variant, ...props }, ref) => (
     <div
       ref={ref}
       role="alert"
-      className={cn(
-        "relative w-full rounded border p-3 text-sm",
-        alertVariants[variant],
-        className
-      )}
+      className={cn(alertVariants({ variant }), className)}
       {...props}
     />
   )

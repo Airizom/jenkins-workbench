@@ -1,5 +1,6 @@
 import type * as React from "react";
 import { Button } from "../../../shared/webview/components/ui/button";
+import { Input } from "../../../shared/webview/components/ui/input";
 import { cn } from "../../../shared/webview/lib/utils";
 
 export interface ConsoleSearchToolbarProps {
@@ -38,16 +39,14 @@ export function ConsoleSearchToolbar({
   onClear
 }: ConsoleSearchToolbarProps) {
   const searchInputClassName = cn(
-    "flex-1 min-w-[220px] h-7 rounded border px-2 text-xs",
-    "bg-input-background text-input-foreground",
-    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+    "flex-1 min-w-[220px]",
     error ? "border-inputErrorBorder" : "border-input"
   );
 
   return (
     <div className="flex flex-col gap-1.5" hidden={!visible}>
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <Input
           ref={inputRef}
           aria-label="Search console output"
           className={searchInputClassName}

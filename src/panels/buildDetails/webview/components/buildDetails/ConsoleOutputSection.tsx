@@ -1,5 +1,4 @@
 import * as React from "react";
-import type { ChangeEvent } from "react";
 import { Alert, AlertDescription } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Card, CardContent, CardHeader } from "../../../../shared/webview/components/ui/card";
@@ -156,10 +155,9 @@ export function ConsoleOutputSection({
     return consoleSourceText.split("\n").length;
   }, [consoleSourceText, hasConsoleOutput]);
 
-  const handleFollowLogChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextValue = event.target.checked;
-    onToggleFollowLog(nextValue);
-    if (nextValue && isActive && !consoleSearch.isSearchActive) {
+  const handleFollowLogChange = (checked: boolean) => {
+    onToggleFollowLog(checked);
+    if (checked && isActive && !consoleSearch.isSearchActive) {
       scrollConsoleToBottom();
     }
   };
@@ -209,7 +207,11 @@ export function ConsoleOutputSection({
                 <span className="hidden sm:inline">Export</span>
               </Button>
               <div className="flex items-center gap-2 rounded-full border border-border bg-muted-soft px-3 py-1.5">
-                <Switch id="follow-log" checked={followLog} onChange={handleFollowLogChange} />
+                <Switch
+                  id="follow-log"
+                  checked={followLog}
+                  onCheckedChange={handleFollowLogChange}
+                />
                 <label
                   htmlFor="follow-log"
                   className="text-xs text-muted-foreground select-none whitespace-nowrap"
