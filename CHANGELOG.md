@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-02-03
+
+### Added
+
+- feat: migrate webview UI primitives to Radix and cva
+- feat: adopt Radix collapsible for richer panel toggles
+
 ## [1.29.0] - 2026-02-02
 
 ### Added
