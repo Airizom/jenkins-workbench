@@ -14,5 +14,14 @@
     "esModuleInterop": true,
     "jsx": "react-jsx"
   },
-  "exclude": ["node_modules", ".vscode-test"]
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "vite.config.ts",
+    "src/panels/buildDetails/webview/**",
+    "src/panels/nodeDetails/webview/**",
+    "src/panels/shared/webview/components/**",
+    "src/panels/shared/webview/icons/**",
+    "src/panels/shared/webview/lib/**"
+  ]
 }

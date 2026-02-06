@@ -10,6 +10,8 @@ out/**/*.map
 .nvmrc
 biome.json
 tsconfig.json
+vite.config.ts
+postcss.config.cjs
+tailwind.config.cjs
 AGENTS.md
 **/*.ts
-

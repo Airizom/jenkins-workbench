@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { postVsCodeMessage } from "../lib/vscodeApi";
+import { postVsCodeMessage } from "../../../shared/webview/lib/vscodeApi";
 
 export type BuildDetailsPostMessage = (message: unknown) => void;
 

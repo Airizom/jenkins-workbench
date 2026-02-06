@@ -3,13 +3,24 @@ import { Alert, AlertDescription } from "../../../../shared/webview/components/u
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Card, CardContent, CardHeader } from "../../../../shared/webview/components/ui/card";
 import { Switch } from "../../../../shared/webview/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "../../../../shared/webview/components/ui/tooltip";
+import { ArrowUpIcon } from "../../../../shared/webview/icons";
 import { useConsoleSearch } from "../../hooks/useConsoleSearch";
 import { stripAnsi } from "../../lib/ansi";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
 import { ConsoleSearchToolbar } from "../ConsoleSearchToolbar";
 
-const { useCallback, useEffect, useMemo } = React;
+const { useCallback, useEffect, useMemo, useState } = React;
+
+const CONSOLE_SCROLL_THRESHOLD_PX = 24;
+
+const prefersReducedMotion = () =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 function SearchIcon() {
   return (
@@ -92,6 +103,7 @@ export function ConsoleOutputSection({
   const displayConsoleText = useMemo(() => stripAnsi(consoleText), [consoleText]);
   const consoleSourceText = consoleHtmlModel?.text ?? displayConsoleText;
   const consoleSearch = useConsoleSearch(consoleSourceText);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   const consoleSegments = useMemo(() => {
     if (consoleHtmlModel) {
@@ -116,6 +128,37 @@ export function ConsoleOutputSection({
     [consoleSourceText, consoleError]
   );
 
+  const updateConsoleScrollState = useCallback(() => {
+    const output = consoleSearch.consoleOutputRef.current;
+    if (!output) {
+      setShowScrollToTop(false);
+      return;
+    }
+    const { scrollTop, clientHeight, scrollHeight } = output;
+    const isScrollable = scrollHeight - clientHeight > 1;
+    const isScrolledDown = scrollTop > CONSOLE_SCROLL_THRESHOLD_PX;
+    setShowScrollToTop(isScrollable && isScrolledDown);
+  }, [consoleSearch.consoleOutputRef]);
+
+  useEffect(() => {
+    const output = consoleSearch.consoleOutputRef.current;
+    if (!output) {
+      return undefined;
+    }
+    updateConsoleScrollState();
+
+    const handleScroll = () => updateConsoleScrollState();
+    const handleResize = () => updateConsoleScrollState();
+
+    output.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      output.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [consoleSearch.consoleOutputRef, consoleScrollKey, updateConsoleScrollState]);
+
   const scrollConsoleToBottom = useCallback(() => {
     const output = consoleSearch.consoleOutputRef.current;
     if (!output) {
@@ -130,6 +173,15 @@ export function ConsoleOutputSection({
     });
   }, [consoleSearch.consoleOutputRef]);
 
+  const scrollConsoleToTop = useCallback(() => {
+    const output = consoleSearch.consoleOutputRef.current;
+    if (!output) {
+      return;
+    }
+    const behavior = prefersReducedMotion() ? "auto" : "smooth";
+    output.scrollTo({ top: 0, behavior });
+  }, [consoleSearch.consoleOutputRef]);
+
   useEffect(() => {
     if (!isActive || !followLog || consoleSearch.isSearchActive) {
       return;
@@ -137,7 +189,13 @@ export function ConsoleOutputSection({
     if (consoleScrollKey || consoleScrollKey === "") {
       scrollConsoleToBottom();
     }
-  }, [isActive, followLog, consoleScrollKey, consoleSearch.isSearchActive, scrollConsoleToBottom]);
+  }, [
+    isActive,
+    followLog,
+    consoleScrollKey,
+    consoleSearch.isSearchActive,
+    scrollConsoleToBottom
+  ]);
 
   const consoleNote = useMemo(() => {
     if (!consoleTruncated) {
@@ -152,7 +210,13 @@ export function ConsoleOutputSection({
     if (!hasConsoleOutput) {
       return 0;
     }
-    return consoleSourceText.split("\n").length;
+    let count = 1;
+    for (let index = 0; index < consoleSourceText.length; index += 1) {
+      if (consoleSourceText.charCodeAt(index) === 10) {
+        count += 1;
+      }
+    }
+    return count;
   }, [consoleSourceText, hasConsoleOutput]);
 
   const handleFollowLogChange = (checked: boolean) => {
@@ -185,17 +249,21 @@ export function ConsoleOutputSection({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                aria-label="Search console output"
-                onClick={consoleSearch.openSearchToolbar}
-                size="sm"
-                variant="outline"
-                title="Search (Cmd/Ctrl+F)"
-                className="gap-1.5"
-              >
-                <SearchIcon />
-                <span className="hidden sm:inline">Search</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Search console output"
+                    onClick={consoleSearch.openSearchToolbar}
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                  >
+                    <SearchIcon />
+                    <span className="hidden sm:inline">Search</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Search (Cmd/Ctrl+F)</TooltipContent>
+              </Tooltip>
               <Button
                 variant="outline"
                 size="sm"
@@ -281,6 +349,22 @@ export function ConsoleOutputSection({
             >
               {consoleSegments}
             </pre>
+            {showScrollToTop && !followLog ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label="Scroll console to top"
+                    className="absolute bottom-3 right-3 z-10 rounded-full shadow-widget"
+                    onClick={scrollConsoleToTop}
+                    size="icon"
+                    variant="secondary"
+                  >
+                    <ArrowUpIcon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Scroll to top</TooltipContent>
+              </Tooltip>
+            ) : null}
           </div>
         ) : null}
 

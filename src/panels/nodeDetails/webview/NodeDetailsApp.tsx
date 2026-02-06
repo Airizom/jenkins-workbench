@@ -1,5 +1,11 @@
 import * as React from "react";
 import { Alert, AlertDescription, AlertTitle } from "../../shared/webview/components/ui/alert";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "../../shared/webview/components/ui/accordion";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
 import {
@@ -9,18 +15,39 @@ import {
   CardHeader,
   CardTitle
 } from "../../shared/webview/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from "../../shared/webview/components/ui/collapsible";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Progress } from "../../shared/webview/components/ui/progress";
+import { ScrollArea } from "../../shared/webview/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../../shared/webview/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../../shared/webview/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
+import { Toaster } from "../../shared/webview/components/ui/toaster";
+import {
+  ToggleGroup,
+  ToggleGroupItem
+} from "../../shared/webview/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "../../shared/webview/components/ui/tooltip";
 import {
   ActivityIcon,
-  CheckIcon,
-  ChevronDownIcon,
+  ClockIcon,
   CopyIcon,
   CpuIcon,
   ExecutorsIcon,
@@ -32,9 +59,11 @@ import {
   StatusIcon,
   TagIcon
 } from "../../shared/webview/icons";
+import { cn } from "../../shared/webview/lib/utils";
+import { toast } from "../../shared/webview/hooks/useToast";
 import type { NodeMonitorViewModel, NodeStatusClass } from "../shared/NodeDetailsContracts";
 import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
-import { postVsCodeMessage } from "./lib/vscodeApi";
+import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import {
   type NodeDetailsState,
   getInitialState,
@@ -66,11 +95,18 @@ const STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string }> = 
   }
 };
 
+const STATUS_ACCENT: Record<NodeStatusClass, string> = {
+  online: "bg-success",
+  idle: "bg-warning",
+  temporary: "bg-warning",
+  offline: "bg-failure",
+  unknown: "bg-border"
+};
+
 const STALE_AFTER_MS = 5 * 60 * 1000;
 
 export function NodeDetailsApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeDetailsReducer, undefined, getInitialState);
-  const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   useNodeDetailsMessages(dispatch);
@@ -141,102 +177,120 @@ export function NodeDetailsApp(): JSX.Element {
       return;
     }
     postVsCodeMessage({ type: "copyNodeJson", content: state.rawJson });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    toast({
+      title: "Copied",
+      description: "Node JSON copied to clipboard.",
+      variant: "success"
+    });
   };
 
-  const handleAdvancedToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
-    if (event.currentTarget.open && !state.advancedLoaded) {
+  const handleDiagnosticsToggle = (value: string) => {
+    if (value === "diagnostics" && !state.advancedLoaded) {
       postVsCodeMessage({ type: "loadAdvancedNodeDetails" });
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <header className="sticky-header shadow-widget">
-        {state.loading ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
-        <div className="mx-auto max-w-5xl px-6 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-5">
-            <div className="flex items-start gap-4">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}
-              >
-                <ServerIcon className="h-5 w-5" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base font-semibold leading-tight">{state.displayName}</h1>
-                  <Badge variant="outline" className={statusStyle.badge}>
-                    {state.statusLabel}
-                  </Badge>
-                  {isStale ? (
-                    <Badge
-                      variant="outline"
-                      className="border-warning-border text-warning bg-warning-soft"
-                    >
-                      Stale
+    <TooltipProvider>
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <header className="sticky-header">
+          {state.loading ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
+          <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
+            <div className="flex flex-wrap items-start justify-between gap-5">
+              <div className="flex items-start gap-4">
+                <div
+                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}
+                >
+                  <ServerIcon className="h-5 w-5" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-base font-semibold leading-tight tracking-tight">
+                      {state.displayName}
+                    </h1>
+                    <Badge variant="outline" className={statusStyle.badge}>
+                      {state.statusLabel}
                     </Badge>
-                  ) : null}
-                </div>
-                <div className="text-[13px] text-muted-foreground">{state.name}</div>
-                {state.description ? (
-                  <div className="text-sm text-muted-foreground">{state.description}</div>
-                ) : null}
-                <div className="text-[13px] text-muted-foreground" title={updatedAtTitle}>
-                  Last updated {updatedAtLabel}
+                    {isStale ? (
+                      <Badge
+                        variant="outline"
+                        className="border-warning-border text-warning bg-warning-soft"
+                      >
+                        Stale
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
+                    <span>{state.name}</span>
+                    {state.description ? (
+                      <>
+                        <span aria-hidden="true" className="opacity-30">·</span>
+                        <span>{state.description}</span>
+                      </>
+                    ) : null}
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                        <ClockIcon className="h-3.5 w-3.5" />
+                        Last updated {updatedAtLabel}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{updatedAtTitle}</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={state.loading}
-                className="gap-1.5"
-              >
-                <RefreshIcon className="h-4 w-4" />
-                Refresh
-              </Button>
-              {nodeAction ? (
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleNodeAction}
+                  onClick={handleRefresh}
                   disabled={state.loading}
                   className="gap-1.5"
                 >
-                  {nodeAction.label}
+                  <RefreshIcon className="h-4 w-4" />
+                  Refresh
                 </Button>
-              ) : null}
-              {canLaunchAgent ? (
+                {nodeAction ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNodeAction}
+                    disabled={state.loading}
+                    className="gap-1.5"
+                  >
+                    {nodeAction.label}
+                  </Button>
+                ) : null}
+                {canLaunchAgent ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLaunchAgent}
+                    disabled={state.loading}
+                    className="gap-1.5"
+                  >
+                    <LaunchIcon className="h-4 w-4" />
+                    Launch Agent
+                  </Button>
+                ) : null}
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  onClick={handleLaunchAgent}
-                  disabled={state.loading}
+                  onClick={handleOpen}
+                  disabled={!state.url}
                   className="gap-1.5"
                 >
-                  <LaunchIcon className="h-4 w-4" />
-                  Launch Agent
+                  <ExternalLinkIcon className="h-4 w-4" />
+                  {canOpenAgentInstructions ? "Agent Instructions" : "Open in Jenkins"}
                 </Button>
-              ) : null}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleOpen}
-                disabled={!state.url}
-                className="gap-1.5"
-              >
-                <ExternalLinkIcon className="h-4 w-4" />
-                {canOpenAgentInstructions ? "Agent Instructions" : "Open in Jenkins"}
-              </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+          <div className={cn("h-0.5", STATUS_ACCENT[state.statusClass])} />
+        </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-5" aria-busy={state.loading}>
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-5" aria-busy={state.loading}>
         {showOfflineBanner ? (
           <Alert variant="warning" className="mb-6">
             <AlertTitle>{state.statusLabel}</AlertTitle>
@@ -354,26 +408,34 @@ export function NodeDetailsApp(): JSX.Element {
           </TabsContent>
 
           <TabsContent value="advanced" className="space-y-5">
-            <details className="group" onToggle={handleAdvancedToggle}>
-              <summary className="flex cursor-pointer items-center justify-between rounded-lg border border-border bg-muted-soft px-4 py-3 hover:bg-muted-strong transition-colors">
-                <span className="font-medium">Monitor Data & Diagnostics</span>
-                <ChevronDownIcon className="h-4 w-4 transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="mt-4 space-y-4">
-                {!state.advancedLoaded ? (
-                  <div className="rounded border border-dashed border-border bg-muted-soft px-4 py-6 text-center text-sm text-muted-foreground">
-                    {state.loading
-                      ? "Loading advanced diagnostics..."
-                      : "Advanced diagnostics load the first time you expand this section."}
+            <Accordion
+              type="single"
+              collapsible
+              onValueChange={handleDiagnosticsToggle}
+              className="rounded-lg border border-border bg-muted-soft"
+            >
+              <AccordionItem value="diagnostics">
+                <AccordionTrigger className="w-full px-4 py-3 hover:bg-muted-strong transition-colors">
+                  <span className="font-medium">Monitor Data & Diagnostics</span>
+                </AccordionTrigger>
+                <AccordionContent className="border-t border-border px-4 pb-4 pt-3">
+                  <div className="space-y-4">
+                    {!state.advancedLoaded ? (
+                      <div className="rounded border border-dashed border-border bg-muted-soft px-4 py-6 text-center text-sm text-muted-foreground">
+                        {state.loading
+                          ? "Loading advanced diagnostics..."
+                          : "Advanced diagnostics load the first time you expand this section."}
+                      </div>
+                    ) : (
+                      <>
+                        <MonitorCard title="Monitors" entries={state.monitorData} />
+                        <MonitorCard title="Load Statistics" entries={state.loadStatistics} />
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <MonitorCard title="Monitors" entries={state.monitorData} />
-                    <MonitorCard title="Load Statistics" entries={state.loadStatistics} />
-                  </>
-                )}
-              </div>
-            </details>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -392,15 +454,20 @@ export function NodeDetailsApp(): JSX.Element {
                   disabled={!state.rawJson}
                   className="gap-1.5"
                 >
-                  {copied ? <CheckIcon /> : <CopyIcon />}
-                  {copied ? "Copied" : "Copy"}
+                  <CopyIcon />
+                  Copy
                 </Button>
               </CardHeader>
               <CardContent>
                 {state.rawJson ? (
-                  <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-muted-strong p-4 text-xs font-mono shadow-inner">
-                    {state.rawJson}
-                  </pre>
+                  <ScrollArea
+                    orientation="both"
+                    className="max-h-96 rounded-lg border border-border bg-muted-strong shadow-inner"
+                  >
+                    <pre className="m-0 p-4 text-xs font-mono whitespace-pre">
+                      {state.rawJson}
+                    </pre>
+                  </ScrollArea>
                 ) : (
                   <div className="text-sm text-muted-foreground">No JSON payload available.</div>
                 )}
@@ -409,7 +476,10 @@ export function NodeDetailsApp(): JSX.Element {
           </TabsContent>
         </Tabs>
       </main>
-    </div>
+
+        <Toaster />
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -443,34 +513,91 @@ function ExecutorsTableCard({
     );
   }
 
+  const [filter, setFilter] = useState<ExecutorFilter>("all");
+  const filteredEntries = useMemo(() => {
+    if (filter === "all") {
+      return entries;
+    }
+    if (filter === "busy") {
+      return entries.filter((entry) => Boolean(entry.workLabel));
+    }
+    return entries.filter((entry) => !entry.workLabel);
+  }, [entries, filter]);
+
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-            <CpuIcon className="h-4 w-4" />
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
+              <CpuIcon className="h-4 w-4" />
+            </div>
+            <CardTitle>{title}</CardTitle>
           </div>
-          <CardTitle>{title}</CardTitle>
+          <CardDescription>Work currently assigned to this node.</CardDescription>
         </div>
-        <CardDescription>Work currently assigned to this node.</CardDescription>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {filteredEntries.length.toLocaleString()} shown
+          </span>
+          <div className="hidden sm:block">
+            <ToggleGroup
+              type="single"
+              value={filter}
+              onValueChange={(value) => {
+                if (!value) {
+                  return;
+                }
+                setFilter(value as ExecutorFilter);
+              }}
+              aria-label="Executor filter"
+            >
+              <ToggleGroupItem value="all">All</ToggleGroupItem>
+              <ToggleGroupItem value="busy">Busy</ToggleGroupItem>
+              <ToggleGroupItem value="idle">Idle</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          <div className="sm:hidden w-[150px]">
+            <Select value={filter} onValueChange={(value) => setFilter(value as ExecutorFilter)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All executors</SelectItem>
+                <SelectItem value="busy">Busy</SelectItem>
+                <SelectItem value="idle">Idle</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted-soft">
-              <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5 text-left font-medium">Executor #</th>
-                <th className="px-3 py-2.5 text-left font-medium">Build</th>
-                <th className="px-3 py-2.5 text-left font-medium">Duration</th>
-                <th className="px-3 py-2.5 text-left font-medium">Link</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {entries.map((entry) => (
-                <ExecutorTableRow key={entry.id} entry={entry} />
-              ))}
-            </tbody>
-          </table>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-muted-soft">
+                <TableHead>Executor #</TableHead>
+                <TableHead>Build</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Progress</TableHead>
+                <TableHead>Link</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredEntries.length > 0 ? (
+                filteredEntries.map((entry) => <ExecutorTableRow key={entry.id} entry={entry} />)
+              ) : (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={5}
+                    className="py-6 text-center text-sm text-muted-foreground"
+                  >
+                    No executors match this filter.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       </CardContent>
     </Card>
@@ -479,14 +606,20 @@ function ExecutorsTableCard({
 
 type ExecutorEntry = NodeDetailsState["executors"][number];
 
+type ExecutorFilter = "all" | "busy" | "idle";
+
 function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
   const durationLabel = entry.workDurationLabel ?? "—";
   const hasWork = Boolean(entry.workLabel);
   const buildLabel = entry.workLabel ?? "Idle";
+  const progressPercent =
+    typeof entry.progressPercent === "number" ? entry.progressPercent : undefined;
+  const progressLabel =
+    entry.progressLabel ?? (progressPercent !== undefined ? `${progressPercent}%` : undefined);
   return (
-    <tr className="hover:bg-accent-soft transition-colors">
-      <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{entry.id}</td>
-      <td className="px-3 py-2.5">
+    <TableRow>
+      <TableCell className="font-mono text-xs text-muted-foreground">{entry.id}</TableCell>
+      <TableCell>
         <div className="flex flex-col">
           <span className={hasWork ? "text-foreground" : "text-muted-foreground"}>
             {buildLabel}
@@ -495,9 +628,24 @@ function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
             <span className="text-xs text-muted-foreground">{entry.statusLabel}</span>
           ) : null}
         </div>
-      </td>
-      <td className="px-3 py-2.5 text-muted-foreground">{durationLabel}</td>
-      <td className="px-3 py-2.5">
+      </TableCell>
+      <TableCell className="text-muted-foreground">{durationLabel}</TableCell>
+      <TableCell>
+        {progressPercent !== undefined ? (
+          <div className="flex items-center gap-2">
+            <div className="executor-progress-track w-24">
+              <div
+                className="executor-progress-bar"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">{progressLabel}</span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell>
         {entry.workUrl ? (
           <button
             type="button"
@@ -509,8 +657,8 @@ function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -542,25 +690,33 @@ function MonitorCard({
         <CardTitle>{title}</CardTitle>
         <CardDescription>Health checks and diagnostic data from Jenkins monitors.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {entries.map((entry) => (
-          <Collapsible
-            key={entry.key}
-            className="overflow-hidden rounded-lg border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong"
-          >
-            <CollapsibleTrigger className="w-full px-4 py-2.5 hover:bg-accent-soft">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-mono text-muted-foreground">{entry.key}</span>
-                <span className="text-sm font-medium">{entry.summary}</span>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="border-t border-border px-4 pb-4 pt-3">
-              <pre className="rounded-lg border border-border bg-muted-strong p-3 text-xs font-mono text-muted-foreground overflow-auto max-h-64 shadow-inner">
-                {formatJson(entry.raw)}
-              </pre>
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
+      <CardContent>
+        <Accordion type="multiple" className="space-y-2">
+          {entries.map((entry) => (
+            <AccordionItem
+              key={entry.key}
+              value={entry.key}
+              className="overflow-hidden rounded-lg border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong"
+            >
+              <AccordionTrigger className="w-full px-4 py-2.5 hover:bg-accent-soft">
+                <div className="flex flex-1 items-center justify-between gap-2">
+                  <span className="text-xs font-mono text-muted-foreground">{entry.key}</span>
+                  <span className="text-sm font-medium">{entry.summary}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="border-t border-border px-4 pb-4 pt-3">
+                <ScrollArea
+                  orientation="both"
+                  className="max-h-64 rounded-lg border border-border bg-muted-strong shadow-inner"
+                >
+                  <pre className="m-0 p-3 text-xs font-mono text-muted-foreground whitespace-pre">
+                    {formatJson(entry.raw)}
+                  </pre>
+                </ScrollArea>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </CardContent>
     </Card>
   );

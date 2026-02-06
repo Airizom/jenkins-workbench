@@ -28,7 +28,7 @@ export function renderNodeDetailsHtml(
       <script nonce="${options.nonce}">
         window.__INITIAL_STATE__ = ${initialState};
       </script>
-      <script nonce="${options.nonce}" src="${scriptUri}"></script>
+      <script type="module" nonce="${options.nonce}" src="${scriptUri}"></script>
     `,
     options
   );

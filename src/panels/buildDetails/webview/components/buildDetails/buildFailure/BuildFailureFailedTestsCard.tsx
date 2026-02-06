@@ -5,6 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from "../../../../../shared/webview/components/ui/collapsible";
+import { ScrollArea } from "../../../../../shared/webview/components/ui/scroll-area";
 import type { BuildFailureFailedTest } from "../../../../shared/BuildDetailsContracts";
 import { OverflowText } from "./BuildFailureOverflowText";
 
@@ -162,9 +163,11 @@ function FailedTestDetail({ label, value }: { label: string; value: string }) {
         </span>
       </CollapsibleTrigger>
       <CollapsibleContent className="border-t border-border px-3 pb-2 pt-2">
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded border border-border bg-background px-2 py-1.5 text-xs font-mono leading-relaxed">
-          {value}
-        </pre>
+        <ScrollArea className="max-h-48 rounded border border-border bg-background">
+          <pre className="m-0 px-2 py-1.5 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words">
+            {value}
+          </pre>
+        </ScrollArea>
       </CollapsibleContent>
     </Collapsible>
   );

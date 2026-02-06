@@ -4,7 +4,26 @@ import { Button } from "../../shared/webview/components/ui/button";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../shared/webview/components/ui/tabs";
-import { ArrowUpIcon, CalendarIcon, ClockIcon, ExternalLinkIcon } from "../../shared/webview/icons";
+import { Toaster } from "../../shared/webview/components/ui/toaster";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "../../shared/webview/components/ui/tooltip";
+import {
+  AlertTriangleIcon,
+  ArrowUpIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ExternalLinkIcon,
+  PlayCircleIcon,
+  StopCircleIcon,
+  UserIcon,
+  XCircleIcon
+} from "../../shared/webview/icons";
+import { cn } from "../../shared/webview/lib/utils";
 import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
 import { BuildFailureInsightsSection } from "./components/buildDetails/BuildFailureInsightsSection";
 import { BuildSummaryCard } from "./components/buildDetails/BuildSummaryCard";
@@ -22,6 +41,37 @@ import {
 } from "./state/buildDetailsState";
 
 const { useEffect, useReducer, useMemo, useState } = React;
+
+const STATUS_ACCENT: Record<string, string> = {
+  success: "bg-success",
+  failure: "bg-failure",
+  unstable: "bg-warning",
+  aborted: "bg-aborted",
+  running: "bg-warning",
+  neutral: "bg-border"
+};
+
+function getStatusAccent(status: string): string {
+  return STATUS_ACCENT[status] ?? STATUS_ACCENT.neutral;
+}
+
+function HeaderStatusIcon({ status }: { status: string }) {
+  const size = "h-6 w-6";
+  switch (status) {
+    case "success":
+      return <CheckCircleIcon className={size} />;
+    case "failure":
+      return <XCircleIcon className={size} />;
+    case "unstable":
+      return <AlertTriangleIcon className={size} />;
+    case "aborted":
+      return <StopCircleIcon className={size} />;
+    case "running":
+      return <PlayCircleIcon className={size} />;
+    default:
+      return null;
+  }
+}
 
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
@@ -70,61 +120,72 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky-header shadow-widget">
-        {isRunning ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
-        <div className="mx-auto max-w-5xl px-6 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-5">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <h1 className="text-base font-semibold leading-tight" id="detail-title">
-                  {state.displayName}
-                </h1>
-                <StatusPill
-                  id="detail-result"
-                  label={state.resultLabel}
-                  status={state.resultClass}
-                />
+    <TooltipProvider>
+      <div className="min-h-screen flex flex-col">
+        <header className="sticky-header">
+          {isRunning ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
+          <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
+            <div className="flex items-start gap-4">
+              <div className="mt-0.5 flex-shrink-0">
+                <HeaderStatusIcon status={state.resultClass} />
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
-                <span className="inline-flex items-center gap-2" id="detail-duration">
-                  <ClockIcon className="h-4 w-4" />
-                  {state.durationLabel}
-                </span>
-                <span className="inline-flex items-center gap-2" id="detail-timestamp">
-                  <CalendarIcon className="h-4 w-4" />
-                  {state.timestampLabel}
-                </span>
-                {state.culpritsLabel !== "—" && state.culpritsLabel !== "None" ? (
-                  <span className="inline-flex items-center gap-2" id="detail-culprits">
-                    <span className="text-muted-foreground">by</span>
-                    {state.culpritsLabel}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-base font-semibold leading-tight tracking-tight" id="detail-title">
+                        {state.displayName}
+                      </h1>
+                      <StatusPill
+                        id="detail-result"
+                        label={state.resultLabel}
+                        status={state.resultClass}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!buildUrl) {
+                        return;
+                      }
+                      postMessage({ type: "openExternal", url: buildUrl });
+                    }}
+                    disabled={!buildUrl}
+                    className="gap-1.5"
+                  >
+                    <ExternalLinkIcon className="h-4 w-4" />
+                    Open in Jenkins
+                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5" id="detail-duration">
+                    <ClockIcon className="h-3.5 w-3.5" />
+                    {state.durationLabel}
                   </span>
-                ) : null}
+                  <span aria-hidden="true" className="opacity-30">·</span>
+                  <span className="inline-flex items-center gap-1.5" id="detail-timestamp">
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    {state.timestampLabel}
+                  </span>
+                  {state.culpritsLabel !== "—" && state.culpritsLabel !== "None" ? (
+                    <>
+                      <span aria-hidden="true" className="opacity-30">·</span>
+                      <span className="inline-flex items-center gap-1.5" id="detail-culprits">
+                        <UserIcon className="h-3.5 w-3.5" />
+                        {state.culpritsLabel}
+                      </span>
+                    </>
+                  ) : null}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (!buildUrl) {
-                    return;
-                  }
-                  postMessage({ type: "openExternal", url: buildUrl });
-                }}
-                disabled={!buildUrl}
-                className="gap-1.5"
-              >
-                <ExternalLinkIcon className="h-4 w-4" />
-                Open in Jenkins
-              </Button>
             </div>
           </div>
-        </div>
-      </header>
+          <div className={cn("h-0.5", getStatusAccent(state.resultClass))} />
+        </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-6 py-5">
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
         {state.errors.length > 0 ? (
           <Alert id="errors" variant="destructive" className="mb-6 flex flex-col gap-1.5">
             {state.errors.map((error) => (
@@ -223,18 +284,25 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         </Tabs>
       </main>
 
-      {showButton && !state.followLog ? (
-        <Button
-          aria-label="Scroll to top"
-          className="fixed bottom-6 right-6 z-50 rounded-full shadow-widget"
-          onClick={scrollToTop}
-          size="icon"
-          title="Scroll to top"
-          variant="secondary"
-        >
-          <ArrowUpIcon />
-        </Button>
-      ) : null}
-    </div>
+        {showButton && !state.followLog ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                aria-label="Scroll to top"
+                className="fixed bottom-6 right-6 z-50 rounded-full shadow-widget"
+                onClick={scrollToTop}
+                size="icon"
+                variant="secondary"
+              >
+                <ArrowUpIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Scroll to top</TooltipContent>
+          </Tooltip>
+        ) : null}
+
+        <Toaster />
+      </div>
+    </TooltipProvider>
   );
 }

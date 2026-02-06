@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
+    "moduleResolution": "Bundler",
     "lib": ["DOM", "ES2020"],
     "jsx": "react-jsx",
     "strict": true,
@@ -14,13 +15,14 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/panels/buildDetails/webview/**/*.ts",
-    "src/panels/buildDetails/webview/**/*.tsx",
-    "src/panels/buildDetails/shared/**/*.ts",
-    "src/panels/nodeDetails/webview/**/*.ts",
-    "src/panels/nodeDetails/webview/**/*.tsx",
-    "src/panels/nodeDetails/shared/**/*.ts",
-    "src/panels/shared/webview/**/*.ts",
-    "src/panels/shared/webview/**/*.tsx"
+    "buildDetails/webview/**/*.ts",
+    "buildDetails/webview/**/*.tsx",
+    "buildDetails/shared/**/*.ts",
+    "nodeDetails/webview/**/*.ts",
+    "nodeDetails/webview/**/*.tsx",
+    "nodeDetails/shared/**/*.ts",
+    "shared/webview/**/*.ts",
+    "shared/webview/**/*.tsx"
   ]
 }
+

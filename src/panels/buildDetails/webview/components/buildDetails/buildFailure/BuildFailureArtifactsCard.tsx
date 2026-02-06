@@ -1,5 +1,10 @@
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Card } from "../../../../../shared/webview/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "../../../../../shared/webview/components/ui/tooltip";
 import type {
   ArtifactAction,
   BuildFailureArtifact
@@ -116,31 +121,44 @@ function ArtifactsList({
             className="flex items-center justify-between gap-2 rounded border border-mutedBorder bg-muted-soft px-3 py-2"
             key={`${item.relativePath}-${index}`}
           >
-            <div className="flex items-center gap-2 min-w-0" title={artifactTooltip}>
-              <FileIcon />
-              <span className="text-sm truncate">{displayName}</span>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileIcon />
+                  <span className="text-sm truncate">{displayName}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm break-words">{artifactTooltip}</TooltipContent>
+            </Tooltip>
             <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onArtifactAction("preview", item)}
-                className="h-7 w-7 p-0"
-                aria-label={`Preview artifact: ${artifactLabel}`}
-                title="Preview"
-              >
-                <EyeIcon />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onArtifactAction("download", item)}
-                className="h-7 w-7 p-0"
-                aria-label={`Download artifact: ${artifactLabel}`}
-                title="Download"
-              >
-                <DownloadIcon />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onArtifactAction("preview", item)}
+                    className="h-7 w-7 p-0"
+                    aria-label={`Preview artifact: ${artifactLabel}`}
+                  >
+                    <EyeIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Preview</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onArtifactAction("download", item)}
+                    className="h-7 w-7 p-0"
+                    aria-label={`Download artifact: ${artifactLabel}`}
+                  >
+                    <DownloadIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Download</TooltipContent>
+              </Tooltip>
             </div>
           </li>
         );

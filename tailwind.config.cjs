@@ -144,7 +144,65 @@ module.exports = {
       },
       boxShadow: {
         widget: "var(--vscode-widget-shadow, 0 2px 8px rgba(0, 0, 0, 0.15))"
+      },
+      // Needed so Tailwind can generate state variants like:
+      // `data-[state=open]:animate-accordion-down` and `data-[state=open]:animate-in`.
+      animation: {
+        in: "enter 200ms ease-out both",
+        out: "exit 200ms ease-out both",
+        "accordion-down": "accordion-down 200ms ease-out",
+        "accordion-up": "accordion-up 200ms ease-out",
+        "collapsible-down": "collapsible-down 200ms ease-out",
+        "collapsible-up": "collapsible-up 200ms ease-out"
+      },
+      keyframes: {
+        // shadcn-style enter/exit animations via CSS vars so fade+zoom+slide can compose.
+        enter: {
+          from: {
+            opacity: "var(--tw-enter-opacity, 1)",
+            transform:
+              "translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1)"
+          },
+          to: {
+            opacity: "1",
+            transform: "translate3d(0, 0, 0) scale3d(1, 1, 1)"
+          }
+        },
+        exit: {
+          from: {
+            opacity: "1",
+            transform: "translate3d(0, 0, 0) scale3d(1, 1, 1)"
+          },
+          to: {
+            opacity: "var(--tw-exit-opacity, 1)",
+            transform:
+              "translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1)"
+          }
+        }
       }
     }
-  }
+  },
+  plugins: [
+    // Minimal subset of `tailwindcss-animate` (kept local to avoid adding deps).
+    // Provides utilities like `fade-in-0` that we use with Radix `data-[state=...]` variants.
+    ({ addUtilities }) => {
+      addUtilities({
+        ".fade-in-0": { "--tw-enter-opacity": "0" },
+        ".fade-out-0": { "--tw-exit-opacity": "0" },
+
+        ".zoom-in-95": { "--tw-enter-scale": ".95" },
+        ".zoom-out-95": { "--tw-exit-scale": ".95" },
+
+        ".slide-in-from-top-1": { "--tw-enter-translate-y": "calc(var(--spacing) * -1)" },
+        ".slide-in-from-bottom-1": { "--tw-enter-translate-y": "calc(var(--spacing) * 1)" },
+        ".slide-in-from-left-1": { "--tw-enter-translate-x": "calc(var(--spacing) * -1)" },
+        ".slide-in-from-right-1": { "--tw-enter-translate-x": "calc(var(--spacing) * 1)" },
+
+        ".slide-out-to-top-1": { "--tw-exit-translate-y": "calc(var(--spacing) * -1)" },
+        ".slide-out-to-bottom-1": { "--tw-exit-translate-y": "calc(var(--spacing) * 1)" },
+        ".slide-out-to-left-1": { "--tw-exit-translate-x": "calc(var(--spacing) * -1)" },
+        ".slide-out-to-right-1": { "--tw-exit-translate-x": "calc(var(--spacing) * 1)" }
+      });
+    }
+  ]
 };

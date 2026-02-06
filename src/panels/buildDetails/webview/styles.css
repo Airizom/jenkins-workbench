@@ -1,5 +1,3 @@
-@import "../../shared/webview/styles/base.css";
-
 @layer base {
   .console-match {
     background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 220, 0, 0.2));
@@ -21,7 +19,6 @@
     top: 0;
     z-index: 10;
     background-color: var(--header-bg);
-    border-bottom: 1px solid var(--border);
   }
 
   .stage-connector {

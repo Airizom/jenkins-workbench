@@ -1,6 +1,11 @@
 import * as React from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { Button } from "../../../../shared/webview/components/ui/button";
+import { Toggle } from "../../../../shared/webview/components/ui/toggle";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "../../../../shared/webview/components/ui/accordion";
 import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
 import {
   Collapsible,
@@ -152,17 +157,21 @@ export function PipelineStagesSection({
   stages: PipelineStageViewModel[];
   loading: boolean;
 }) {
-  const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>({});
+  const [openStages, setOpenStages] = useState<string[]>([]);
   const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
 
-  const stageKeys = useMemo(() => collectStageKeys(stages), [stages]);
+  const stageIds = useMemo(
+    () => stages.map((stage, index) => getStageId(stage, index)),
+    [stages]
+  );
+  const stageIdSet = useMemo(() => new Set(stageIds), [stageIds]);
   const hasStages = stages.length > 0;
   const showPlaceholder = loading && !hasStages;
 
   useEffect(() => {
-    setExpandedStages((prev) => pruneStageState(prev, stageKeys));
-    setShowAllStages((prev) => pruneStageState(prev, stageKeys));
-  }, [stageKeys]);
+    setOpenStages((prev) => prev.filter((id) => stageIdSet.has(id)));
+    setShowAllStages((prev) => pruneStageFlags(prev, stageIdSet));
+  }, [stageIdSet]);
 
   if (!loading && !hasStages) {
     return null;
@@ -174,55 +183,45 @@ export function PipelineStagesSection({
       {showPlaceholder ? (
         <PipelineStagesPlaceholder />
       ) : (
-        <div className="space-y-0">
+        <Accordion type="multiple" value={openStages} onValueChange={setOpenStages}>
           {stages.map((stage, index) => {
-            const stageKey = typeof stage.key === "string" ? stage.key : "";
-            const expanded = expandedStages[stageKey] ?? false;
-            const showAll = showAllStages[stageKey] ?? false;
+            const stageId = stageIds[index];
+            const showAll = showAllStages[stageId] ?? false;
             const isLast = index === stages.length - 1;
             return (
               <StageNode
-                key={stageKey || `stage-${index}`}
+                key={stageId}
+                stageId={stageId}
                 stage={stage}
-                expanded={expanded}
                 showAll={showAll}
                 isLast={isLast}
-                onToggleExpanded={() =>
-                  setExpandedStages((prev) => ({
-                    ...prev,
-                    [stageKey]: !expanded
-                  }))
-                }
-                onToggleShowAll={(event) => {
-                  event.stopPropagation();
+                onShowAllChange={(next) =>
                   setShowAllStages((prev) => ({
                     ...prev,
-                    [stageKey]: !showAll
-                  }));
-                }}
+                    [stageId]: next
+                  }))
+                }
               />
             );
           })}
-        </div>
+        </Accordion>
       )}
     </div>
   );
 }
 
 function StageNode({
+  stageId,
   stage,
-  expanded,
   showAll,
   isLast,
-  onToggleExpanded,
-  onToggleShowAll
+  onShowAllChange
 }: {
+  stageId: string;
   stage: PipelineStageViewModel;
-  expanded: boolean;
   showAll: boolean;
   isLast: boolean;
-  onToggleExpanded: () => void;
-  onToggleShowAll: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onShowAllChange: (next: boolean) => void;
 }) {
   const hasBranches = stage.parallelBranches.length > 0;
   const hasBranchSteps = stage.parallelBranches.some((branch) => branch.hasSteps);
@@ -245,9 +244,9 @@ function StageNode({
       </div>
 
       <div className={cn("flex-1 pb-6", isLast && "pb-0")}>
-        <Collapsible open={expanded} onOpenChange={onToggleExpanded} className="group">
+        <AccordionItem value={stageId} className="group border-b-0">
           <Card className="overflow-hidden border-mutedBorder bg-card transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
-            <CollapsibleTrigger asChild className="gap-4 px-4 py-4 hover:bg-accent-soft">
+            <AccordionTrigger asChild className="gap-4 px-4 py-4 hover:bg-accent-soft">
               <button type="button">
                 <div className="flex flex-col items-start gap-1">
                   <div className="text-sm font-medium">{stage.name || "Stage"}</div>
@@ -269,9 +268,9 @@ function StageNode({
                   />
                 </div>
               </button>
-            </CollapsibleTrigger>
+            </AccordionTrigger>
 
-            <CollapsibleContent>
+            <AccordionContent>
               <CardContent className="border-t border-border pt-4 space-y-4">
                 {hasBranches ? (
                   <div className="space-y-3">
@@ -280,14 +279,14 @@ function StageNode({
                         Parallel Branches
                       </div>
                       {hasBranchSteps ? (
-                        <Button
-                          variant="link"
+                        <Toggle
+                          pressed={showAll}
+                          onPressedChange={(pressed) => onShowAllChange(pressed)}
                           size="sm"
-                          onClick={onToggleShowAll}
-                          className="h-auto py-0 text-xs"
+                          aria-label={showAll ? "Show failed steps only" : "Show all steps"}
                         >
-                          {showAll ? "Show failed only" : "Show all steps"}
-                        </Button>
+                          {showAll ? "Failed only" : "All steps"}
+                        </Toggle>
                       ) : null}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -308,14 +307,14 @@ function StageNode({
                       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         Steps
                       </div>
-                      <Button
-                        variant="link"
+                      <Toggle
+                        pressed={showAll}
+                        onPressedChange={(pressed) => onShowAllChange(pressed)}
                         size="sm"
-                        onClick={onToggleShowAll}
-                        className="h-auto py-0 text-xs"
+                        aria-label={showAll ? "Show failed steps only" : "Show all steps"}
                       >
-                        {showAll ? "Show failed only" : "Show all steps"}
-                      </Button>
+                        {showAll ? "Failed only" : "All steps"}
+                      </Toggle>
                     </div>
                     {steps.length > 0 ? (
                       <StepsList steps={steps} />
@@ -331,9 +330,9 @@ function StageNode({
                   </div>
                 ) : null}
               </CardContent>
-            </CollapsibleContent>
+            </AccordionContent>
           </Card>
-        </Collapsible>
+        </AccordionItem>
       </div>
     </div>
   );
@@ -465,19 +464,17 @@ function LoadingBanner(): JSX.Element {
   );
 }
 
-function collectStageKeys(stages: PipelineStageViewModel[], keys = new Set<string>()): Set<string> {
-  for (const stage of stages) {
-    if (typeof stage.key === "string") {
-      keys.add(stage.key);
-    }
-    if (Array.isArray(stage.parallelBranches)) {
-      collectStageKeys(stage.parallelBranches, keys);
-    }
+function getStageId(stage: PipelineStageViewModel, index: number): string {
+  if (typeof stage.key === "string" && stage.key.length > 0) {
+    return stage.key;
   }
-  return keys;
+  if (typeof stage.name === "string" && stage.name.length > 0) {
+    return `${stage.name}-${index}`;
+  }
+  return `stage-${index}`;
 }
 
-function pruneStageState(
+function pruneStageFlags(
   prev: Record<string, boolean>,
   validKeys: Set<string>
 ): Record<string, boolean> {

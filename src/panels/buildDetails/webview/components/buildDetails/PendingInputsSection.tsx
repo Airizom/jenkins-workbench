@@ -1,8 +1,13 @@
+import * as React from "react";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
 import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
 import { StatusPill } from "./StatusPill";
+
+const { useEffect, useRef, useState } = React;
+
+const PROCESSING_TIMEOUT_MS = 5000;
 
 function AlertCircleIcon() {
   return (
@@ -85,6 +90,76 @@ export function PendingInputsSection({
   onApprove: (inputId: string) => void;
   onReject: (inputId: string) => void;
 }) {
+  const [processingIds, setProcessingIds] = useState<Record<string, boolean>>({});
+  const [processingActions, setProcessingActions] = useState<
+    Record<string, "approve" | "reject">
+  >({});
+  const processingTimers = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    setProcessingIds((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const input of pendingInputs) {
+        if (prev[input.id]) {
+          next[input.id] = true;
+        }
+      }
+      return next;
+    });
+    setProcessingActions((prev) => {
+      const next: Record<string, "approve" | "reject"> = {};
+      for (const input of pendingInputs) {
+        const action = prev[input.id];
+        if (action) {
+          next[input.id] = action;
+        }
+      }
+      return next;
+    });
+
+    const activeIds = new Set(pendingInputs.map((input) => input.id));
+    for (const id of Object.keys(processingTimers.current)) {
+      if (!activeIds.has(id)) {
+        window.clearTimeout(processingTimers.current[id]);
+        delete processingTimers.current[id];
+      }
+    }
+  }, [pendingInputs]);
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of Object.values(processingTimers.current)) {
+        window.clearTimeout(timeoutId);
+      }
+      processingTimers.current = {};
+    };
+  }, []);
+
+  const markProcessing = (inputId: string, action: "approve" | "reject") => {
+    setProcessingIds((prev) => ({ ...prev, [inputId]: true }));
+    setProcessingActions((prev) => ({ ...prev, [inputId]: action }));
+    if (processingTimers.current[inputId]) {
+      window.clearTimeout(processingTimers.current[inputId]);
+    }
+    processingTimers.current[inputId] = window.setTimeout(() => {
+      setProcessingIds((prev) => {
+        if (!prev[inputId]) {
+          return prev;
+        }
+        const { [inputId]: _, ...rest } = prev;
+        return rest;
+      });
+      setProcessingActions((prev) => {
+        if (!prev[inputId]) {
+          return prev;
+        }
+        const { [inputId]: _, ...rest } = prev;
+        return rest;
+      });
+      delete processingTimers.current[inputId];
+    }, PROCESSING_TIMEOUT_MS);
+  };
+
   if (pendingInputs.length === 0) {
     return null;
   }
@@ -92,21 +167,25 @@ export function PendingInputsSection({
   return (
     <div className="space-y-3">
       {pendingInputs.map((input) => (
-        <Card key={input.id} className="overflow-hidden border-warning-border">
+        <Card
+          key={input.id}
+          className="overflow-hidden border-warning-border"
+          aria-busy={Boolean(processingIds[input.id])}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-warning-surface px-5 py-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
-              <AlertCircleIcon />
-            </div>
+                <AlertCircleIcon />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate">{input.message}</div>
-              {input.submitterLabel ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <UserIcon />
-                  {input.submitterLabel}
-                </div>
-              ) : null}
-            </div>
+                {input.submitterLabel ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <UserIcon />
+                    {input.submitterLabel}
+                  </div>
+                ) : null}
+              </div>
             </div>
             <StatusPill
               label="Pending input"
@@ -140,18 +219,36 @@ export function PendingInputsSection({
             ) : null}
 
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => onApprove(input.id)} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (processingIds[input.id]) {
+                    return;
+                  }
+                  markProcessing(input.id, "approve");
+                  onApprove(input.id);
+                }}
+                className="gap-1.5"
+                disabled={Boolean(processingIds[input.id])}
+              >
                 <CheckIcon />
-                Approve
+                {processingActions[input.id] === "approve" ? "Approving..." : "Approve"}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onReject(input.id)}
+                onClick={() => {
+                  if (processingIds[input.id]) {
+                    return;
+                  }
+                  markProcessing(input.id, "reject");
+                  onReject(input.id);
+                }}
                 className="gap-1.5"
+                disabled={Boolean(processingIds[input.id])}
               >
                 <XIcon />
-                Reject
+                {processingActions[input.id] === "reject" ? "Rejecting..." : "Reject"}
               </Button>
             </div>
           </CardContent>

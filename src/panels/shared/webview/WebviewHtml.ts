@@ -2,7 +2,7 @@ export interface WebviewRenderOptions {
   cspSource: string;
   nonce: string;
   scriptUri?: string;
-  styleUri: string;
+  styleUris: string[];
 }
 
 export function renderWebviewShell(content: string, options: WebviewRenderOptions): string {
@@ -11,13 +11,16 @@ export function renderWebviewShell(content: string, options: WebviewRenderOption
     `style-src ${options.cspSource} 'nonce-${options.nonce}'`,
     `script-src ${options.cspSource} 'nonce-${options.nonce}'`
   ].join("; ");
+  const styleLinks = options.styleUris
+    .map((href) => `  <link rel="stylesheet" href="${href}" />`)
+    .join("\n");
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
-  <link rel="stylesheet" href="${options.styleUri}" />
+${styleLinks}
 </head>
 <body>
   ${content}

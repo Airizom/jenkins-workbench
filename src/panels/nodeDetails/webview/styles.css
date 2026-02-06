@@ -1,12 +1,9 @@
-@import "../../shared/webview/styles/base.css";
-
 @layer components {
   .sticky-header {
     position: sticky;
     top: 0;
     z-index: 10;
     background-color: var(--header-bg);
-    border-bottom: 1px solid var(--border);
   }
 
   .executor-progress-track {

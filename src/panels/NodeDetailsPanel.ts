@@ -16,13 +16,13 @@ import {
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
 import {
-  NODE_DETAILS_WEBVIEW_BUNDLE_PATH,
-  NODE_DETAILS_WEBVIEW_CSS_PATH
-} from "./nodeDetails/NodeDetailsWebviewAssets";
-import {
   renderWebviewShell,
   renderWebviewStateScript
 } from "./shared/webview/WebviewHtml";
+import {
+  getWebviewAssetsRoot,
+  resolveWebviewAssets
+} from "./shared/webview/WebviewAssets";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
   isSerializedEnvironmentState,
@@ -96,7 +96,7 @@ export class NodeDetailsPanel {
         {
           enableScripts: true,
           retainContextWhenHidden: true,
-          localResourceRoots: [NodeDetailsPanel.getWebviewRoot(extensionUri)]
+          localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
         }
       );
       NodeDetailsPanel.configurePanel(panel, extensionUri);
@@ -221,13 +221,25 @@ export class NodeDetailsPanel {
         ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
         : undefined;
 
-    const styleUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, ...NODE_DETAILS_WEBVIEW_CSS_PATH.split("/"))
-    );
+    let scriptUri: string;
+    let styleUris: string[];
+    try {
+      ({ scriptUri, styleUris } = resolveWebviewAssets(
+        this.panel.webview,
+        this.extensionUri,
+        "nodeDetails"
+      ));
+    } catch {
+      this.renderRestoreError(
+        "Node details webview assets are missing. Run the extension build (npm run compile) and try again.",
+        panelState
+      );
+      return;
+    }
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,
       nonce: this.nonce,
-      styleUri: styleUri.toString(),
+      styleUris,
       panelState
     });
 
@@ -236,15 +248,11 @@ export class NodeDetailsPanel {
       return;
     }
 
-    const scriptUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, ...NODE_DETAILS_WEBVIEW_BUNDLE_PATH.split("/"))
-    );
-
     this.panel.webview.html = renderNodeDetailsHtml(model, {
       cspSource: this.panel.webview.cspSource,
       nonce: this.nonce,
-      scriptUri: scriptUri.toString(),
-      styleUri: styleUri.toString(),
+      scriptUri,
+      styleUris,
       panelState
     });
     this.hasRendered = true;
@@ -389,7 +397,6 @@ export class NodeDetailsPanel {
   private async copyJson(content: string): Promise<void> {
     try {
       await vscode.env.clipboard.writeText(content);
-      void vscode.window.showInformationMessage("Node details JSON copied to clipboard.");
     } catch (error) {
       void vscode.window.showErrorMessage(
         `Failed to copy node details: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -446,15 +453,9 @@ export class NodeDetailsPanel {
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
     panel.webview.options = {
       enableScripts: true,
-      localResourceRoots: [NodeDetailsPanel.getWebviewRoot(extensionUri)]
+      localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
     };
     panel.iconPath = NodeDetailsPanel.getIconPaths(extensionUri);
-  }
-
-  private static getWebviewRoot(extensionUri: vscode.Uri): vscode.Uri {
-    const bundleSegments = NODE_DETAILS_WEBVIEW_BUNDLE_PATH.split("/");
-    const bundleRootSegments = bundleSegments.slice(0, -1);
-    return vscode.Uri.joinPath(extensionUri, ...bundleRootSegments);
   }
 
   private static getIconPaths(
@@ -477,9 +478,12 @@ export class NodeDetailsPanel {
 
   private renderRestoreError(message: string, panelState?: NodeDetailsPanelSerializedState): void {
     const nonce = createNonce();
-    const styleUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, ...NODE_DETAILS_WEBVIEW_CSS_PATH.split("/"))
-    );
+    let styleUris: string[] = [];
+    try {
+      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "nodeDetails").styleUris;
+    } catch {
+      styleUris = [];
+    }
     const stateScript = renderWebviewStateScript(panelState, nonce);
     this.panel.webview.html = renderWebviewShell(
       `
@@ -508,7 +512,7 @@ export class NodeDetailsPanel {
       {
         cspSource: this.panel.webview.cspSource,
         nonce,
-        styleUri: styleUri.toString()
+        styleUris
       }
     );
   }

@@ -1,11 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../../../../tailwind.config.cjs";
 
 @layer base {
-  :root {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
     color-scheme: light dark;
 
+    /* Define our theme tokens on `body` so they can reference VS Code vars regardless of where
+     * VS Code injects them (some hosts set `--vscode-*` on `:root`, others on `body`). */
     --background: var(--vscode-editor-background);
     --foreground: var(--vscode-editor-foreground);
 
@@ -110,13 +115,7 @@
     --progress: var(--vscode-progressBar-background, var(--primary));
     --terminal-bg: var(--vscode-terminal-background, var(--background));
     --terminal-foreground: var(--vscode-terminal-foreground, var(--foreground));
-  }
 
-  * {
-    border-color: var(--border);
-  }
-
-  body {
     margin: 0;
     padding: 0;
     font-family: var(--vscode-font-family);
@@ -250,45 +249,29 @@
     }
   }
 
-  @keyframes fade-in {
+  @keyframes accordion-down {
     from {
+      height: 0;
       opacity: 0;
+      transform: translateY(-2px);
     }
     to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes zoom-in {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  @keyframes slide-in-from-top {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-    to {
+      height: var(--radix-accordion-content-height, auto);
       opacity: 1;
       transform: translateY(0);
     }
   }
 
-  @keyframes slide-in-from-bottom {
+  @keyframes accordion-up {
     from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-    to {
+      height: var(--radix-accordion-content-height, auto);
       opacity: 1;
       transform: translateY(0);
+    }
+    to {
+      height: 0;
+      opacity: 0;
+      transform: translateY(-2px);
     }
   }
 
@@ -316,32 +299,31 @@
     animation: collapsible-up 200ms ease-out;
   }
 
+  .animate-accordion-down {
+    animation: accordion-down 200ms ease-out;
+  }
+
+  .animate-accordion-up {
+    animation: accordion-up 200ms ease-out;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-collapsible-down,
     .animate-collapsible-up {
       animation: none;
     }
-  }
 
-  .animate-in {
-    animation-duration: 200ms;
-    animation-timing-function: ease-out;
-    animation-fill-mode: both;
+    .animate-accordion-down,
+    .animate-accordion-up {
+      animation: none;
+    }
   }
+}
 
-  .fade-in-0 {
-    animation-name: fade-in;
-  }
-
-  .zoom-in-95 {
-    animation-name: zoom-in;
-  }
-
-  .slide-in-from-top-1 {
-    animation-name: slide-in-from-top;
-  }
-
-  .slide-in-from-bottom-1 {
-    animation-name: slide-in-from-bottom;
-  }
+/* VS Code's webview default stylesheet uses unlayered `body` styles (notably `padding: 0 20px`)
+ * which will override Tailwind's layered rules. We want a full-bleed canvas and apply any
+ * layout gutters inside the React apps instead. */
+body {
+  padding: 0 !important;
+  background-color: var(--background) !important;
 }

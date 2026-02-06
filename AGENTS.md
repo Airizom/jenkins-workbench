@@ -665,7 +665,7 @@ function isOpenExternalMessage(msg: unknown): msg is OpenExternalMessage {
 | `npm install` | Install dev dependencies |
 | `npm run compile` | Build webview bundle then TypeScript into `out/` |
 | `npm run watch` | Watch webview bundle + `tsc -watch` |
-| `npm run build:webview` | Bundle the React build details webview via `scripts/build-webview.mjs` |
+| `npm run build:webview` | Build the React webview bundles (Build Details + Node Details) via Vite into `out/webview/` |
 | `npm run watch:webview` | Watch mode for webview assets |
 | `npm run lint` | Run Biome linter for `src/` |
 | `npm run lint:fix` | Apply Biome lint autofixes |
