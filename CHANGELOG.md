@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-02-09
+
+### Added
+
+- feat: migrate build/node webviews to Vite ESM bundles
+
 ## [1.30.0] - 2026-02-03
 
 ### Added
