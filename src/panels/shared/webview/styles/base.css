@@ -1,25 +1,323 @@
 @import "tailwindcss";
-@config "../../../../../tailwind.config.cjs";
+
+@source "../../../buildDetails/webview/**/*.{ts,tsx}";
+@source "../../../buildDetails/BuildDetailsRenderer.ts";
+@source "../../../nodeDetails/webview/**/*.{ts,tsx}";
+@source "../../../nodeDetails/NodeDetailsRenderer.ts";
+@source "../**/*.{ts,tsx}";
+
+@theme inline {
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-input-foreground: var(--input-foreground);
+  --color-input-placeholder: var(--input-placeholder);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted-soft: var(--muted-soft);
+  --color-muted-strong: var(--muted-strong);
+  --color-muted-foreground-border: var(--muted-foreground-border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-card-border: var(--card-border);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-border: var(--destructive-border);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-badge: var(--badge);
+  --color-badge-foreground: var(--badge-foreground);
+  --color-checkbox: var(--checkbox);
+  --color-checkbox-foreground: var(--checkbox-foreground);
+  --color-checkbox-border: var(--checkbox-border);
+  --color-checkbox-checked: var(--checkbox-checked);
+  --color-checkbox-checked-foreground: var(--checkbox-checked-foreground);
+  --color-list-active: var(--list-active);
+  --color-list-active-foreground: var(--list-active-foreground);
+  --color-list-hover: var(--list-hover);
+  --color-list-hover-foreground: var(--list-hover-foreground);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
+  --color-panel-border: var(--vscode-panel-border);
+  --color-description: var(--vscode-descriptionForeground);
+  --color-focus: var(--vscode-focusBorder);
+  --color-editor-widget: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --color-header: var(--header-bg);
+  --color-toolbar: var(--toolbar-bg);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-failure: var(--failure);
+  --color-failure-foreground: var(--failure-foreground);
+  --color-failure-soft: var(--failure-soft);
+  --color-failure-surface: var(--failure-surface);
+  --color-failure-border: var(--failure-border);
+  --color-failure-border-subtle: var(--failure-border-subtle);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-badge: var(--warning-badge);
+  --color-warning-border: var(--warning-border);
+  --color-aborted: var(--aborted);
+  --color-aborted-foreground: var(--aborted-foreground);
+  --color-aborted-soft: var(--aborted-soft);
+  --color-aborted-border: var(--aborted-border);
+  --color-muted-border: var(--muted-foreground-border);
+  --color-progress: var(--progress);
+  --color-terminal: var(--terminal-bg);
+  --color-terminal-foreground: var(--terminal-foreground);
+  --color-input-warning-border: var(--inputWarningBorder);
+  --color-input-warning-bg: var(--inputWarningBg);
+  --color-input-warning-fg: var(--inputWarningFg);
+  --color-input-error-border: var(--inputErrorBorder);
+  --color-input-error-bg: var(--inputErrorBg);
+  --color-input-error-fg: var(--inputErrorFg);
+  --color-input-info-border: var(--inputInfoBorder);
+  --color-input-info-bg: var(--inputInfoBg);
+  --color-input-info-fg: var(--inputInfoFg);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-body: var(--vscode-font-family);
+  --font-mono: var(--vscode-editor-font-family, "Consolas", "Courier New", monospace);
+
+  --text-vscode: var(--vscode-font-size);
+  --text-vscode-editor: var(--vscode-editor-font-size, 13px);
+
+  --shadow-widget: var(--vscode-widget-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+
+  --animate-in: enter 200ms ease-out both;
+  --animate-out: exit 200ms ease-out both;
+  --animate-accordion-down: accordion-down 200ms ease-out;
+  --animate-accordion-up: accordion-up 200ms ease-out;
+  --animate-collapsible-down: collapsible-down 200ms ease-out;
+  --animate-collapsible-up: collapsible-up 200ms ease-out;
+  --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@utility fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+
+@utility fade-out-0 {
+  --tw-exit-opacity: 0;
+}
+
+@utility zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+
+@utility zoom-out-95 {
+  --tw-exit-scale: 0.95;
+}
+
+@utility slide-in-from-top-1 {
+  --tw-enter-translate-y: calc(var(--spacing) * -1);
+}
+
+@utility slide-in-from-bottom-1 {
+  --tw-enter-translate-y: calc(var(--spacing) * 1);
+}
+
+@utility slide-in-from-left-1 {
+  --tw-enter-translate-x: calc(var(--spacing) * -1);
+}
+
+@utility slide-in-from-right-1 {
+  --tw-enter-translate-x: calc(var(--spacing) * 1);
+}
+
+@utility slide-out-to-top-1 {
+  --tw-exit-translate-y: calc(var(--spacing) * -1);
+}
+
+@utility slide-out-to-bottom-1 {
+  --tw-exit-translate-y: calc(var(--spacing) * 1);
+}
+
+@utility slide-out-to-left-1 {
+  --tw-exit-translate-x: calc(var(--spacing) * -1);
+}
+
+@utility slide-out-to-right-1 {
+  --tw-exit-translate-x: calc(var(--spacing) * 1);
+}
+
+@utility border-mutedBorder {
+  border-color: var(--muted-foreground-border);
+}
+
+@utility text-list-activeForeground {
+  color: var(--list-active-foreground);
+}
+
+@utility text-list-hoverForeground {
+  color: var(--list-hover-foreground);
+}
+
+@utility text-checkbox-checkedForeground {
+  color: var(--checkbox-checked-foreground);
+}
+
+@utility border-inputErrorBorder {
+  border-color: var(--inputErrorBorder);
+}
+
+@utility bg-inputErrorBg {
+  background-color: var(--inputErrorBg);
+}
+
+@utility text-inputErrorFg {
+  color: var(--inputErrorFg);
+}
+
+@utility border-inputWarningBorder {
+  border-color: var(--inputWarningBorder);
+}
+
+@utility bg-inputWarningBg {
+  background-color: var(--inputWarningBg);
+}
+
+@utility text-inputWarningFg {
+  color: var(--inputWarningFg);
+}
+
+@utility border-inputInfoBorder {
+  border-color: var(--inputInfoBorder);
+}
+
+@utility bg-inputInfoBg {
+  background-color: var(--inputInfoBg);
+}
+
+@utility text-inputInfoFg {
+  color: var(--inputInfoFg);
+}
+
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+@keyframes exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
+      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
+  }
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    height: var(--radix-collapsible-content-height, auto);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height, auto);
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    height: var(--radix-accordion-content-height, auto);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height, auto);
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
 
 @layer base {
   * {
     border-color: var(--border);
   }
 
+  :root,
   body {
     color-scheme: light dark;
 
-    /* Define our theme tokens on `body` so they can reference VS Code vars regardless of where
-     * VS Code injects them (some hosts set `--vscode-*` on `:root`, others on `body`). */
+    /* Define theme tokens on both `:root` and `body` so they resolve no matter where
+     * VS Code injects `--vscode-*` variables in the host. */
     --background: var(--vscode-editor-background);
-    --foreground: var(--vscode-editor-foreground);
+    --foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
 
     --card: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-    --card-foreground: var(--vscode-editor-foreground);
+    --card-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
     --card-border: var(--vscode-editorWidget-border, var(--vscode-panel-border));
 
     --popover: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-    --popover-foreground: var(--vscode-editor-foreground);
+    --popover-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
 
     --primary: var(--vscode-button-background);
     --primary-foreground: var(--vscode-button-foreground);
@@ -84,19 +382,19 @@
     --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
     --success-border: color-mix(in srgb, var(--success) 50%, transparent);
     --warning: var(--vscode-editorWarning-foreground, #cca700);
-    --warning-foreground: var(--vscode-editor-foreground);
+    --warning-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
     --warning-surface: color-mix(in srgb, var(--warning) 5%, transparent);
     --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
     --warning-badge: color-mix(in srgb, var(--warning) 20%, transparent);
     --warning-border: color-mix(in srgb, var(--warning) 50%, transparent);
     --failure: var(--vscode-testing-iconFailed, #f14c4c);
-    --failure-foreground: var(--vscode-editor-foreground);
+    --failure-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
     --failure-surface: color-mix(in srgb, var(--failure) 5%, transparent);
     --failure-soft: color-mix(in srgb, var(--failure) 10%, transparent);
     --failure-border: color-mix(in srgb, var(--failure) 50%, transparent);
     --failure-border-subtle: color-mix(in srgb, var(--failure) 20%, transparent);
     --aborted: var(--vscode-descriptionForeground, #858585);
-    --aborted-foreground: var(--vscode-editor-foreground);
+    --aborted-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
     --aborted-soft: color-mix(in srgb, var(--aborted) 10%, transparent);
     --aborted-border: color-mix(in srgb, var(--aborted) 50%, transparent);
 
@@ -115,7 +413,9 @@
     --progress: var(--vscode-progressBar-background, var(--primary));
     --terminal-bg: var(--vscode-terminal-background, var(--background));
     --terminal-foreground: var(--vscode-terminal-foreground, var(--foreground));
+  }
 
+  body {
     margin: 0;
     padding: 0;
     font-family: var(--vscode-font-family);
@@ -182,137 +482,9 @@
 }
 
 @layer utilities {
-  .text-vscode-editor {
-    font-size: var(--vscode-editor-font-size, 13px);
-  }
-
-  .font-mono {
-    font-family: var(--vscode-editor-font-family, "Consolas", "Courier New", monospace);
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
-  }
-
-  @keyframes ping {
-    75%,
-    100% {
-      transform: scale(2);
-      opacity: 0;
-    }
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes progress-indeterminate {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(400%);
-    }
-  }
-
-  @keyframes collapsible-down {
-    from {
-      height: 0;
-      opacity: 0;
-      transform: translateY(-2px);
-    }
-    to {
-      height: var(--radix-collapsible-content-height, auto);
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes collapsible-up {
-    from {
-      height: var(--radix-collapsible-content-height, auto);
-      opacity: 1;
-      transform: translateY(0);
-    }
-    to {
-      height: 0;
-      opacity: 0;
-      transform: translateY(-2px);
-    }
-  }
-
-  @keyframes accordion-down {
-    from {
-      height: 0;
-      opacity: 0;
-      transform: translateY(-2px);
-    }
-    to {
-      height: var(--radix-accordion-content-height, auto);
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes accordion-up {
-    from {
-      height: var(--radix-accordion-content-height, auto);
-      opacity: 1;
-      transform: translateY(0);
-    }
-    to {
-      height: 0;
-      opacity: 0;
-      transform: translateY(-2px);
-    }
-  }
-
-  .animate-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  .animate-ping {
-    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
-  }
-
-  .animate-spin {
-    animation: spin 1s linear infinite;
-  }
-
-  .animate-progress-indeterminate {
-    animation: progress-indeterminate 1.5s ease-in-out infinite;
-  }
-
-  .animate-collapsible-down {
-    animation: collapsible-down 200ms ease-out;
-  }
-
-  .animate-collapsible-up {
-    animation: collapsible-up 200ms ease-out;
-  }
-
-  .animate-accordion-down {
-    animation: accordion-down 200ms ease-out;
-  }
-
-  .animate-accordion-up {
-    animation: accordion-up 200ms ease-out;
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .animate-collapsible-down,
-    .animate-collapsible-up {
-      animation: none;
-    }
-
+    .animate-collapsible-up,
     .animate-accordion-down,
     .animate-accordion-up {
       animation: none;

@@ -24,7 +24,7 @@
   .stage-connector {
     width: 2px;
     flex: 1;
-    min-height: 24px;
+    min-height: 16px;
     border-radius: 999px;
     background: linear-gradient(
       to bottom,
@@ -34,7 +34,7 @@
   }
 
   .build-progress-bar {
-    height: 3px;
+    height: 2px;
     background: linear-gradient(
       90deg,
       var(--primary) 0%,
@@ -45,6 +45,6 @@
   }
 
   .console-output {
-    max-height: max(240px, calc(100vh - 320px));
+    max-height: max(200px, calc(100vh - 260px));
   }
 }

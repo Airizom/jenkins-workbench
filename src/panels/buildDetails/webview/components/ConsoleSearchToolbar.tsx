@@ -2,16 +2,6 @@ import type * as React from "react";
 import { Button } from "../../../shared/webview/components/ui/button";
 import { Checkbox } from "../../../shared/webview/components/ui/checkbox";
 import { Input } from "../../../shared/webview/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from "../../../shared/webview/components/ui/popover";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from "../../../shared/webview/components/ui/tooltip";
 import { cn } from "../../../shared/webview/lib/utils";
 
 export interface ConsoleSearchToolbarProps {
@@ -50,59 +40,44 @@ export function ConsoleSearchToolbar({
   onClear
 }: ConsoleSearchToolbarProps) {
   const searchInputClassName = cn(
-    "flex-1 min-w-[220px]",
+    "flex-1 min-w-[160px] h-7 text-xs",
     error ? "border-inputErrorBorder" : "border-input"
   );
 
   return (
-    <div className="flex flex-col gap-1.5" hidden={!visible}>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-1" hidden={!visible}>
+      <div className="flex flex-wrap items-center gap-1.5">
         <Input
           ref={inputRef}
           aria-label="Search console output"
           className={searchInputClassName}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          placeholder="Search console output"
+          placeholder="Search..."
           spellCheck={false}
           type="text"
           value={query}
         />
-        <Popover>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <Button size="sm" variant="outline">
-                  Options
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Search options</TooltipContent>
-          </Tooltip>
-          <PopoverContent className="w-56 p-3" align="start">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="console-search-regex"
-                  checked={useRegex}
-                  onCheckedChange={() => onToggleRegex()}
-                />
-                <label
-                  htmlFor="console-search-regex"
-                  className={cn("text-xs select-none", "text-muted-foreground")}
-                >
-                  Regex
-                </label>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-        <span className="text-xs text-muted-foreground">{matchCountLabel}</span>
+        <div className="flex items-center gap-1">
+          <Checkbox
+            id="console-search-regex"
+            checked={useRegex}
+            onCheckedChange={() => onToggleRegex()}
+          />
+          <label
+            htmlFor="console-search-regex"
+            className="text-[11px] text-muted-foreground select-none"
+          >
+            Regex
+          </label>
+        </div>
+        <span className="text-[11px] text-muted-foreground">{matchCountLabel}</span>
         <Button
           disabled={!isSearchActive || matchCount === 0}
           onClick={onPrev}
           size="sm"
-          variant="outline"
+          variant="ghost"
+          className="h-6 px-1.5 text-[11px]"
         >
           Prev
         </Button>
@@ -110,17 +85,24 @@ export function ConsoleSearchToolbar({
           disabled={!isSearchActive || matchCount === 0}
           onClick={onNext}
           size="sm"
-          variant="outline"
+          variant="ghost"
+          className="h-6 px-1.5 text-[11px]"
         >
           Next
         </Button>
-        <Button disabled={query.length === 0 && !error} onClick={onClear} size="sm" variant="ghost">
+        <Button
+          disabled={query.length === 0 && !error}
+          onClick={onClear}
+          size="sm"
+          variant="ghost"
+          className="h-6 px-1.5 text-[11px]"
+        >
           Clear
         </Button>
       </div>
-      {error ? <div className="text-xs text-inputErrorFg">{error}</div> : null}
+      {error ? <div className="text-[11px] text-inputErrorFg">{error}</div> : null}
       {tooManyMatchesLabel ? (
-        <div className="text-xs text-muted-foreground">{tooManyMatchesLabel}</div>
+        <div className="text-[11px] text-muted-foreground">{tooManyMatchesLabel}</div>
       ) : null}
     </div>
   );

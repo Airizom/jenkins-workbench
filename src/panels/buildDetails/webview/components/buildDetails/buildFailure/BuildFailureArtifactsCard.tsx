@@ -1,5 +1,4 @@
 import { Button } from "../../../../../shared/webview/components/ui/button";
-import { Card } from "../../../../../shared/webview/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
@@ -76,26 +75,22 @@ export function BuildFailureArtifactsCard({
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
   return (
-    <Card>
-      <div className="p-5 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-            <FileIcon />
-          </div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Artifacts
-          </div>
-        </div>
-        {items.length > 0 ? (
-          <ArtifactsList items={items} onArtifactAction={onArtifactAction} />
-        ) : (
-          <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-3 py-4 text-sm text-muted-foreground">
-            No artifacts available
-          </div>
-        )}
-        <OverflowText value={overflowCount} />
+    <div className="rounded border border-border p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <FileIcon />
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Artifacts
+        </span>
       </div>
-    </Card>
+      {items.length > 0 ? (
+        <ArtifactsList items={items} onArtifactAction={onArtifactAction} />
+      ) : (
+        <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 text-xs text-muted-foreground">
+          No artifacts available
+        </div>
+      )}
+      <OverflowText value={overflowCount} />
+    </div>
   );
 }
 
@@ -107,7 +102,7 @@ function ArtifactsList({
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
   return (
-    <ul className="list-none m-0 p-0 flex flex-col gap-2">
+    <ul className="list-none m-0 p-0 flex flex-col gap-1">
       {items.map((item, index) => {
         const displayName = item.name ?? "Artifact";
         const relativePath = item.relativePath ?? displayName;
@@ -118,26 +113,26 @@ function ArtifactsList({
         const artifactTooltip = relativePath || displayName;
         return (
           <li
-            className="flex items-center justify-between gap-2 rounded border border-mutedBorder bg-muted-soft px-3 py-2"
+            className="flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-muted-soft px-2 py-1.5"
             key={`${item.relativePath}-${index}`}
           >
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <FileIcon />
-                  <span className="text-sm truncate">{displayName}</span>
+                  <span className="text-xs truncate">{displayName}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="max-w-sm break-words">{artifactTooltip}</TooltipContent>
+              <TooltipContent className="max-w-sm wrap-break-word">{artifactTooltip}</TooltipContent>
             </Tooltip>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => onArtifactAction("preview", item)}
-                    className="h-7 w-7 p-0"
+                    className="h-6 w-6 p-0"
                     aria-label={`Preview artifact: ${artifactLabel}`}
                   >
                     <EyeIcon />
@@ -151,7 +146,7 @@ function ArtifactsList({
                     variant="ghost"
                     size="sm"
                     onClick={() => onArtifactAction("download", item)}
-                    className="h-7 w-7 p-0"
+                    className="h-6 w-6 p-0"
                     aria-label={`Download artifact: ${artifactLabel}`}
                   >
                     <DownloadIcon />

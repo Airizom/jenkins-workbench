@@ -1,21 +1,13 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "../../../../../shared/webview/components/ui/card";
-
 function InfoIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-8 w-8 text-muted-foreground"
+      className="h-6 w-6 text-muted-foreground"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth="2"
+      strokeWidth="1.5"
       viewBox="0 0 24 24"
     >
       <circle cx="12" cy="12" r="10" />
@@ -27,21 +19,14 @@ function InfoIcon() {
 
 export function BuildFailureEmptyStateCard({ title }: { title: string }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          No changelog, failed tests, or artifacts were reported for this build.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col items-center justify-center gap-3 rounded border border-dashed border-border bg-muted-soft px-4 py-8 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <InfoIcon />
-          </div>
-          <div className="text-sm text-muted-foreground">Nothing to highlight for this run</div>
+    <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
+      <div className="flex flex-col items-center gap-2">
+        <InfoIcon />
+        <div className="text-xs font-medium text-muted-foreground">{title}</div>
+        <div className="text-[11px] text-muted-foreground">
+          No changelog, failed tests, or artifacts reported.
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

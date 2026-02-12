@@ -1,9 +1,8 @@
-import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
 import {
-  AlertTriangleIcon,
   CalendarIcon,
   CheckCircleIcon,
   ClockIcon,
+  AlertTriangleIcon,
   PlayCircleIcon,
   StopCircleIcon,
   UserIcon,
@@ -14,15 +13,15 @@ import { StatusPill } from "./StatusPill";
 function getStatusIcon(resultClass?: string) {
   switch (resultClass) {
     case "success":
-      return <CheckCircleIcon className="h-5 w-5" />;
+      return <CheckCircleIcon className="h-4 w-4" />;
     case "failure":
-      return <XCircleIcon className="h-5 w-5" />;
+      return <XCircleIcon className="h-4 w-4" />;
     case "unstable":
-      return <AlertTriangleIcon className="h-5 w-5" />;
+      return <AlertTriangleIcon className="h-4 w-4" />;
     case "running":
-      return <PlayCircleIcon className="h-5 w-5" />;
+      return <PlayCircleIcon className="h-4 w-4" />;
     case "aborted":
-      return <StopCircleIcon className="h-5 w-5" />;
+      return <StopCircleIcon className="h-4 w-4" />;
     default:
       return null;
   }
@@ -46,58 +45,26 @@ export function BuildSummaryCard({
   const statusIcon = getStatusIcon(resultClass);
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-0">
-        <div className="flex flex-col md:flex-row">
-          <div className="flex items-center gap-4 border-b border-border bg-muted-soft p-5 md:border-b-0 md:border-r">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-              {statusIcon}
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-sm font-semibold">{displayName}</div>
-              <StatusPill label={resultLabel} status={resultClass} />
-            </div>
-          </div>
-
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-            <div className="flex items-center gap-3 p-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <ClockIcon className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex flex-col">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Duration
-                </div>
-                <div className="text-sm font-medium">{durationLabel}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex flex-col">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Timestamp
-                </div>
-                <div className="text-sm font-medium">{timestampLabel}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <UserIcon className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Culprit(s)
-                </div>
-                <div className="text-sm font-medium">{culpritsLabel}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded border border-border bg-muted-soft px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        {statusIcon}
+        <span className="text-xs font-semibold">{displayName}</span>
+        <StatusPill label={resultLabel} status={resultClass} className="text-[10px]" />
+      </div>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <ClockIcon className="h-3 w-3" />
+          {durationLabel}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <CalendarIcon className="h-3 w-3" />
+          {timestampLabel}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <UserIcon className="h-3 w-3" />
+          {culpritsLabel}
+        </span>
+      </div>
+    </div>
   );
 }

@@ -8,13 +8,6 @@ import {
 } from "../../shared/webview/components/ui/accordion";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "../../shared/webview/components/ui/card";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { ScrollArea } from "../../shared/webview/components/ui/scroll-area";
@@ -46,7 +39,6 @@ import {
   TooltipTrigger
 } from "../../shared/webview/components/ui/tooltip";
 import {
-  ActivityIcon,
   ClockIcon,
   CopyIcon,
   CpuIcon,
@@ -194,70 +186,76 @@ export function NodeDetailsApp(): JSX.Element {
     <TooltipProvider>
       <div className="min-h-screen flex flex-col bg-background text-foreground">
         <header className="sticky-header">
-          {state.loading ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
-          <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
-            <div className="flex flex-wrap items-start justify-between gap-5">
-              <div className="flex items-start gap-4">
+          {state.loading ? <Progress indeterminate className="h-px rounded-none" /> : null}
+          <div className="mx-auto max-w-6xl px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <div
-                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted ${statusStyle.icon}`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted ${statusStyle.icon}`}
                 >
-                  <ServerIcon className="h-5 w-5" />
+                  <ServerIcon className="h-3.5 w-3.5" />
                 </div>
-                <div className="space-y-1.5">
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h1 className="text-base font-semibold leading-tight tracking-tight">
+                    <h1 className="text-sm font-semibold leading-tight truncate">
                       {state.displayName}
                     </h1>
-                    <Badge variant="outline" className={statusStyle.badge}>
+                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusStyle.badge)}>
                       {state.statusLabel}
                     </Badge>
                     {isStale ? (
                       <Badge
                         variant="outline"
-                        className="border-warning-border text-warning bg-warning-soft"
+                        className="text-[10px] px-1.5 py-0 border-warning-border text-warning bg-warning-soft"
                       >
                         Stale
                       </Badge>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span>{state.name}</span>
                     {state.description ? (
                       <>
                         <span aria-hidden="true" className="opacity-30">·</span>
-                        <span>{state.description}</span>
+                        <span className="truncate">{state.description}</span>
                       </>
                     ) : null}
+                    <span aria-hidden="true" className="opacity-30">·</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1">
+                          <ClockIcon className="h-3 w-3" />
+                          {updatedAtLabel}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{updatedAtTitle}</TooltipContent>
+                    </Tooltip>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                        <ClockIcon className="h-3.5 w-3.5" />
-                        Last updated {updatedAtLabel}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>{updatedAtTitle}</TooltipContent>
-                  </Tooltip>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={state.loading}
-                  className="gap-1.5"
-                >
-                  <RefreshIcon className="h-4 w-4" />
-                  Refresh
-                </Button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefresh}
+                      disabled={state.loading}
+                      aria-label="Refresh node details"
+                      className="h-7 w-7 p-0"
+                    >
+                      <RefreshIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Refresh</TooltipContent>
+                </Tooltip>
                 {nodeAction ? (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleNodeAction}
                     disabled={state.loading}
-                    className="gap-1.5"
+                    className="h-7 px-2 text-xs"
                   >
                     {nodeAction.label}
                   </Button>
@@ -268,43 +266,45 @@ export function NodeDetailsApp(): JSX.Element {
                     size="sm"
                     onClick={handleLaunchAgent}
                     disabled={state.loading}
-                    className="gap-1.5"
+                    className="gap-1 h-7 px-2 text-xs"
                   >
-                    <LaunchIcon className="h-4 w-4" />
-                    Launch Agent
+                    <LaunchIcon className="h-3.5 w-3.5" />
+                    Launch
                   </Button>
                 ) : null}
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={handleOpen}
                   disabled={!state.url}
-                  className="gap-1.5"
+                  className="gap-1 h-7 px-2 text-xs"
                 >
-                  <ExternalLinkIcon className="h-4 w-4" />
-                  {canOpenAgentInstructions ? "Agent Instructions" : "Open in Jenkins"}
+                  <ExternalLinkIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">
+                    {canOpenAgentInstructions ? "Instructions" : "Jenkins"}
+                  </span>
                 </Button>
               </div>
             </div>
           </div>
-          <div className={cn("h-0.5", STATUS_ACCENT[state.statusClass])} />
+          <div className={cn("h-px", STATUS_ACCENT[state.statusClass])} />
         </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-5" aria-busy={state.loading}>
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
         {showOfflineBanner ? (
-          <Alert variant="warning" className="mb-6">
-            <AlertTitle>{state.statusLabel}</AlertTitle>
-            <AlertDescription>
+          <Alert variant="warning" className="mb-3 py-2">
+            <AlertTitle className="text-xs">{state.statusLabel}</AlertTitle>
+            <AlertDescription className="text-xs">
               {state.offlineReason ?? "Jenkins reported this node as offline."}
             </AlertDescription>
           </Alert>
         ) : null}
 
         {state.errors.length > 0 ? (
-          <Alert variant="destructive" className="mb-6">
-            <AlertTitle>Unable to load full node details</AlertTitle>
+          <Alert variant="destructive" className="mb-3 py-2">
+            <AlertTitle className="text-xs">Unable to load full node details</AlertTitle>
             <AlertDescription>
-              <ul className="list-disc space-y-1 pl-4">
+              <ul className="list-disc space-y-0.5 pl-4 text-xs">
                 {state.errors.map((error) => (
                   <li key={error}>{error}</li>
                 ))}
@@ -313,118 +313,90 @@ export function NodeDetailsApp(): JSX.Element {
           </Alert>
         ) : null}
 
-        <Tabs defaultValue="overview" className="space-y-5">
+        <Tabs defaultValue="overview" className="space-y-3">
           <TabsList className="w-full justify-start">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="executors">
+            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
+            <TabsTrigger value="executors" className="text-xs">
               Executors
-              <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border border-border bg-muted-soft px-1.5 text-xs text-muted-foreground">
+              <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border border-border bg-muted-soft px-1 text-[10px] text-muted-foreground">
                 {state.executors.length + state.oneOffExecutors.length}
               </span>
             </TabsTrigger>
-            <TabsTrigger value="labels">Labels</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="labels" className="text-xs">Labels</TabsTrigger>
+            <TabsTrigger value="advanced" className="text-xs">Advanced</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-5">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-                    <ActivityIcon className="h-4 w-4" />
+          <TabsContent value="overview" className="space-y-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {overviewRows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex items-center gap-2.5 rounded border border-mutedBorder bg-muted-soft px-3 py-2"
+                >
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                    {row.icon}
                   </div>
-                  <CardTitle>Status</CardTitle>
-                </div>
-                <CardDescription>Current state, executors, and connectivity.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {overviewRows.map((row) => (
-                    <div
-                      key={row.label}
-                      className="flex items-center gap-3 rounded-lg border border-mutedBorder bg-muted-soft px-4 py-3"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        {row.icon}
-                      </div>
-                      <div>
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                          {row.label}
-                        </div>
-                        <div className="text-sm font-semibold">{row.value}</div>
-                      </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {row.label}
                     </div>
-                  ))}
+                    <div className="text-xs font-semibold">{row.value}</div>
+                  </div>
                 </div>
-                {state.offlineReason ? (
-                  <Alert variant="warning" className="mt-4">
-                    <AlertDescription>
-                      <span className="font-semibold">Offline reason: </span>
-                      {state.offlineReason}
-                    </AlertDescription>
-                  </Alert>
-                ) : null}
-              </CardContent>
-            </Card>
+              ))}
+            </div>
+            {state.offlineReason ? (
+              <Alert variant="warning" className="py-2">
+                <AlertDescription className="text-xs">
+                  <span className="font-semibold">Offline reason: </span>
+                  {state.offlineReason}
+                </AlertDescription>
+              </Alert>
+            ) : null}
           </TabsContent>
 
-          <TabsContent value="executors" className="space-y-5">
+          <TabsContent value="executors" className="space-y-3">
             <ExecutorsTableCard title="Executors" entries={state.executors} />
             {state.oneOffExecutors.length > 0 ? (
               <ExecutorsTableCard title="One-off Executors" entries={state.oneOffExecutors} />
             ) : null}
           </TabsContent>
 
-          <TabsContent value="labels" className="space-y-5">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-                    <TagIcon className="h-4 w-4" />
-                  </div>
-                  <CardTitle>Labels</CardTitle>
-                </div>
-                <CardDescription>Assigned labels and capabilities.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {state.labels.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {state.labels.map((label) => (
-                      <Badge key={label} variant="secondary" className="text-xs">
-                        {label}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-4 py-8 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                      <TagIcon className="h-5 w-5" />
-                    </div>
-                    <div className="text-sm text-muted-foreground">No labels assigned</div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <TabsContent value="labels" className="space-y-3">
+            {state.labels.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {state.labels.map((label) => (
+                  <Badge key={label} variant="secondary" className="text-[11px] px-1.5 py-0">
+                    {label}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
+                <TagIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">No labels assigned</span>
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="advanced" className="space-y-5">
+          <TabsContent value="advanced" className="space-y-3">
             <Accordion
               type="single"
               collapsible
               onValueChange={handleDiagnosticsToggle}
-              className="rounded-lg border border-border bg-muted-soft"
+              className="rounded border border-border bg-muted-soft"
             >
               <AccordionItem value="diagnostics">
-                <AccordionTrigger className="w-full px-4 py-3 hover:bg-muted-strong transition-colors">
-                  <span className="font-medium">Monitor Data & Diagnostics</span>
+                <AccordionTrigger className="w-full px-3 py-2 hover:bg-muted-strong transition-colors">
+                  <span className="text-xs font-medium">Monitor Data & Diagnostics</span>
                 </AccordionTrigger>
-                <AccordionContent className="border-t border-border px-4 pb-4 pt-3">
-                  <div className="space-y-4">
+                <AccordionContent className="border-t border-border px-3 pb-3 pt-2">
+                  <div className="space-y-2">
                     {!state.advancedLoaded ? (
-                      <div className="rounded border border-dashed border-border bg-muted-soft px-4 py-6 text-center text-sm text-muted-foreground">
+                      <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-4 text-center text-xs text-muted-foreground">
                         {state.loading
-                          ? "Loading advanced diagnostics..."
-                          : "Advanced diagnostics load the first time you expand this section."}
+                          ? "Loading diagnostics..."
+                          : "Expand to load diagnostics."}
                       </div>
                     ) : (
                       <>
@@ -437,42 +409,38 @@ export function NodeDetailsApp(): JSX.Element {
               </AccordionItem>
             </Accordion>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div className="rounded border border-border">
+              <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-border bg-muted-soft">
                 <div>
-                  <CardTitle>Raw JSON</CardTitle>
-                  <CardDescription>
-                    {state.advancedLoaded
-                      ? "Full payload for auditing or troubleshooting."
-                      : "Payload returned for the current detail level."}
-                  </CardDescription>
+                  <div className="text-xs font-medium">Raw JSON</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {state.advancedLoaded ? "Full payload." : "Current detail level."}
+                  </div>
                 </div>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={handleCopyJson}
                   disabled={!state.rawJson}
-                  className="gap-1.5"
+                  className="gap-1 h-6 px-2 text-[11px]"
                 >
-                  <CopyIcon />
+                  <CopyIcon className="h-3.5 w-3.5" />
                   Copy
                 </Button>
-              </CardHeader>
-              <CardContent>
-                {state.rawJson ? (
-                  <ScrollArea
-                    orientation="both"
-                    className="max-h-96 rounded-lg border border-border bg-muted-strong shadow-inner"
-                  >
-                    <pre className="m-0 p-4 text-xs font-mono whitespace-pre">
-                      {state.rawJson}
-                    </pre>
-                  </ScrollArea>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No JSON payload available.</div>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+              {state.rawJson ? (
+                <ScrollArea
+                  orientation="both"
+                  className="max-h-72"
+                >
+                  <pre className="m-0 px-3 py-2 text-[11px] font-mono whitespace-pre">
+                    {state.rawJson}
+                  </pre>
+                </ScrollArea>
+              ) : (
+                <div className="px-3 py-3 text-xs text-muted-foreground">No JSON payload available.</div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
       </main>
@@ -492,24 +460,10 @@ function ExecutorsTableCard({
 }): JSX.Element {
   if (!entries || entries.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-              <CpuIcon className="h-4 w-4" />
-            </div>
-            <CardTitle>{title}</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-4 py-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <CpuIcon className="h-5 w-5" />
-            </div>
-            <div className="text-sm text-muted-foreground">No executor data available</div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
+        <CpuIcon className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">No {title.toLowerCase()} data available</span>
+      </div>
     );
   }
 
@@ -525,21 +479,16 @@ function ExecutorsTableCard({
   }, [entries, filter]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-              <CpuIcon className="h-4 w-4" />
-            </div>
-            <CardTitle>{title}</CardTitle>
-          </div>
-          <CardDescription>Work currently assigned to this node.</CardDescription>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            {filteredEntries.length.toLocaleString()} shown
+    <div className="rounded border border-border overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted-soft border-b border-border">
+        <div className="flex items-center gap-1.5">
+          <CpuIcon className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium">{title}</span>
+          <span className="text-[11px] text-muted-foreground">
+            ({filteredEntries.length})
           </span>
+        </div>
+        <div className="flex items-center gap-1.5">
           <div className="hidden sm:block">
             <ToggleGroup
               type="single"
@@ -557,50 +506,48 @@ function ExecutorsTableCard({
               <ToggleGroupItem value="idle">Idle</ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div className="sm:hidden w-[150px]">
+          <div className="sm:hidden w-[120px]">
             <Select value={filter} onValueChange={(value) => setFilter(value as ExecutorFilter)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Filter" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All executors</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="busy">Busy</SelectItem>
                 <SelectItem value="idle">Idle</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-muted-soft">
-                <TableHead>Executor #</TableHead>
-                <TableHead>Build</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Link</TableHead>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-muted-soft">
+              <TableHead className="text-[11px] py-1.5 px-3">#</TableHead>
+              <TableHead className="text-[11px] py-1.5 px-3">Build</TableHead>
+              <TableHead className="text-[11px] py-1.5 px-3">Duration</TableHead>
+              <TableHead className="text-[11px] py-1.5 px-3">Progress</TableHead>
+              <TableHead className="text-[11px] py-1.5 px-3">Link</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredEntries.length > 0 ? (
+              filteredEntries.map((entry) => <ExecutorTableRow key={entry.id} entry={entry} />)
+            ) : (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={5}
+                  className="py-4 text-center text-xs text-muted-foreground"
+                >
+                  No executors match this filter.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEntries.length > 0 ? (
-                filteredEntries.map((entry) => <ExecutorTableRow key={entry.id} entry={entry} />)
-              ) : (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={5}
-                    className="py-6 text-center text-sm text-muted-foreground"
-                  >
-                    No executors match this filter.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 
@@ -618,44 +565,44 @@ function ExecutorTableRow({ entry }: { entry: ExecutorEntry }): JSX.Element {
     entry.progressLabel ?? (progressPercent !== undefined ? `${progressPercent}%` : undefined);
   return (
     <TableRow>
-      <TableCell className="font-mono text-xs text-muted-foreground">{entry.id}</TableCell>
-      <TableCell>
+      <TableCell className="font-mono text-[11px] text-muted-foreground py-1.5 px-3">{entry.id}</TableCell>
+      <TableCell className="py-1.5 px-3">
         <div className="flex flex-col">
-          <span className={hasWork ? "text-foreground" : "text-muted-foreground"}>
+          <span className={cn("text-xs", hasWork ? "text-foreground" : "text-muted-foreground")}>
             {buildLabel}
           </span>
           {!hasWork ? (
-            <span className="text-xs text-muted-foreground">{entry.statusLabel}</span>
+            <span className="text-[11px] text-muted-foreground">{entry.statusLabel}</span>
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="text-muted-foreground">{durationLabel}</TableCell>
-      <TableCell>
+      <TableCell className="text-xs text-muted-foreground py-1.5 px-3">{durationLabel}</TableCell>
+      <TableCell className="py-1.5 px-3">
         {progressPercent !== undefined ? (
-          <div className="flex items-center gap-2">
-            <div className="executor-progress-track w-24">
+          <div className="flex items-center gap-1.5">
+            <div className="executor-progress-track w-20">
               <div
                 className="executor-progress-bar"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <span className="text-xs text-muted-foreground">{progressLabel}</span>
+            <span className="text-[11px] text-muted-foreground">{progressLabel}</span>
           </div>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-xs text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className="py-1.5 px-3">
         {entry.workUrl ? (
           <button
             type="button"
-            className="inline-flex items-center gap-1 text-xs text-link hover:text-link-hover hover:underline"
+            className="inline-flex items-center gap-0.5 text-[11px] text-link hover:text-link-hover hover:underline"
             onClick={() => postVsCodeMessage({ type: "openExternal", url: entry.workUrl })}
           >
             Open
           </button>
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-xs text-muted-foreground">—</span>
         )}
       </TableCell>
     </TableRow>
@@ -671,54 +618,42 @@ function MonitorCard({
 }): JSX.Element {
   if (!entries || entries.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded border border-dashed border-border bg-muted-soft px-4 py-6 text-center text-sm text-muted-foreground">
-            No data available.
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-3 text-center text-xs text-muted-foreground">
+        No {title.toLowerCase()} data available.
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>Health checks and diagnostic data from Jenkins monitors.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Accordion type="multiple" className="space-y-2">
-          {entries.map((entry) => (
-            <AccordionItem
-              key={entry.key}
-              value={entry.key}
-              className="overflow-hidden rounded-lg border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong"
-            >
-              <AccordionTrigger className="w-full px-4 py-2.5 hover:bg-accent-soft">
-                <div className="flex flex-1 items-center justify-between gap-2">
-                  <span className="text-xs font-mono text-muted-foreground">{entry.key}</span>
-                  <span className="text-sm font-medium">{entry.summary}</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="border-t border-border px-4 pb-4 pt-3">
-                <ScrollArea
-                  orientation="both"
-                  className="max-h-64 rounded-lg border border-border bg-muted-strong shadow-inner"
-                >
-                  <pre className="m-0 p-3 text-xs font-mono text-muted-foreground whitespace-pre">
-                    {formatJson(entry.raw)}
-                  </pre>
-                </ScrollArea>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </CardContent>
-    </Card>
+    <div className="space-y-1.5">
+      <div className="text-[11px] font-medium text-muted-foreground">{title}</div>
+      <Accordion type="multiple" className="space-y-1">
+        {entries.map((entry) => (
+          <AccordionItem
+            key={entry.key}
+            value={entry.key}
+            className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong"
+          >
+            <AccordionTrigger className="w-full px-3 py-1.5 hover:bg-accent-soft">
+              <div className="flex flex-1 items-center justify-between gap-2">
+                <span className="text-[11px] font-mono text-muted-foreground">{entry.key}</span>
+                <span className="text-xs font-medium">{entry.summary}</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="border-t border-border px-3 pb-2 pt-2">
+              <ScrollArea
+                orientation="both"
+                className="max-h-48 rounded border border-border bg-muted-strong"
+              >
+                <pre className="m-0 px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground whitespace-pre">
+                  {formatJson(entry.raw)}
+                </pre>
+              </ScrollArea>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </div>
   );
 }
 
@@ -730,12 +665,12 @@ interface OverviewRow {
 
 function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
   const rows: OverviewRow[] = [
-    { label: "Status", value: state.statusLabel, icon: <StatusIcon className="h-4 w-4" /> },
-    { label: "Idle", value: state.idleLabel, icon: <IdleIcon className="h-4 w-4" /> },
+    { label: "Status", value: state.statusLabel, icon: <StatusIcon className="h-3.5 w-3.5" /> },
+    { label: "Idle", value: state.idleLabel, icon: <IdleIcon className="h-3.5 w-3.5" /> },
     {
       label: "Executors",
       value: state.executorsLabel,
-      icon: <ExecutorsIcon className="h-4 w-4" />
+      icon: <ExecutorsIcon className="h-3.5 w-3.5" />
     }
   ];
 
@@ -743,21 +678,21 @@ function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
     rows.push({
       label: "JNLP Agent",
       value: state.jnlpAgentLabel,
-      icon: <LaunchIcon className="h-4 w-4" />
+      icon: <LaunchIcon className="h-3.5 w-3.5" />
     });
   }
   if (state.launchSupportedLabel) {
     rows.push({
       label: "Launch Supported",
       value: state.launchSupportedLabel,
-      icon: <LaunchIcon className="h-4 w-4" />
+      icon: <LaunchIcon className="h-3.5 w-3.5" />
     });
   }
   if (state.manualLaunchLabel) {
     rows.push({
       label: "Manual Launch",
       value: state.manualLaunchLabel,
-      icon: <LaunchIcon className="h-4 w-4" />
+      icon: <LaunchIcon className="h-3.5 w-3.5" />
     });
   }
 
@@ -765,7 +700,7 @@ function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
     rows.push({
       label: "Launch",
       value: "Not available",
-      icon: <LaunchIcon className="h-4 w-4" />
+      icon: <LaunchIcon className="h-3.5 w-3.5" />
     });
   }
 

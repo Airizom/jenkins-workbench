@@ -56,7 +56,7 @@ function getStatusAccent(status: string): string {
 }
 
 function HeaderStatusIcon({ status }: { status: string }) {
-  const size = "h-6 w-6";
+  const size = "h-4 w-4";
   switch (status) {
     case "success":
       return <CheckCircleIcon className={size} />;
@@ -123,107 +123,122 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     <TooltipProvider>
       <div className="min-h-screen flex flex-col">
         <header className="sticky-header">
-          {isRunning ? <Progress indeterminate className="h-0.5 rounded-none" /> : null}
-          <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
-            <div className="flex items-start gap-4">
-              <div className="mt-0.5 flex-shrink-0">
+          {isRunning ? <Progress indeterminate className="h-px rounded-none" /> : null}
+          <div className="mx-auto max-w-6xl px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <HeaderStatusIcon status={state.resultClass} />
+                <h1 className="text-sm font-semibold leading-tight truncate" id="detail-title">
+                  {state.displayName}
+                </h1>
+                <StatusPill
+                  id="detail-result"
+                  label={state.resultLabel}
+                  status={state.resultClass}
+                />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-3">
-                      <h1 className="text-base font-semibold leading-tight tracking-tight" id="detail-title">
-                        {state.displayName}
-                      </h1>
-                      <StatusPill
-                        id="detail-result"
-                        label={state.resultLabel}
-                        status={state.resultClass}
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (!buildUrl) {
-                        return;
-                      }
-                      postMessage({ type: "openExternal", url: buildUrl });
-                    }}
-                    disabled={!buildUrl}
-                    className="gap-1.5"
-                  >
-                    <ExternalLinkIcon className="h-4 w-4" />
-                    Open in Jenkins
-                  </Button>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5" id="detail-duration">
-                    <ClockIcon className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1" id="detail-duration">
+                    <ClockIcon className="h-3 w-3" />
                     {state.durationLabel}
                   </span>
-                  <span aria-hidden="true" className="opacity-30">·</span>
-                  <span className="inline-flex items-center gap-1.5" id="detail-timestamp">
-                    <CalendarIcon className="h-3.5 w-3.5" />
+                  <span aria-hidden="true" className="opacity-30">|</span>
+                  <span className="inline-flex items-center gap-1" id="detail-timestamp">
+                    <CalendarIcon className="h-3 w-3" />
                     {state.timestampLabel}
                   </span>
                   {state.culpritsLabel !== "—" && state.culpritsLabel !== "None" ? (
                     <>
-                      <span aria-hidden="true" className="opacity-30">·</span>
-                      <span className="inline-flex items-center gap-1.5" id="detail-culprits">
-                        <UserIcon className="h-3.5 w-3.5" />
+                      <span aria-hidden="true" className="opacity-30">|</span>
+                      <span className="inline-flex items-center gap-1" id="detail-culprits">
+                        <UserIcon className="h-3 w-3" />
                         {state.culpritsLabel}
                       </span>
                     </>
                   ) : null}
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (!buildUrl) {
+                      return;
+                    }
+                    postMessage({ type: "openExternal", url: buildUrl });
+                  }}
+                  disabled={!buildUrl}
+                  aria-label="Open in Jenkins"
+                  className="gap-1 h-7 px-2 text-xs"
+                >
+                  <ExternalLinkIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Jenkins</span>
+                </Button>
               </div>
             </div>
+            <div className="sm:hidden flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1" id="detail-duration-sm">
+                <ClockIcon className="h-3 w-3" />
+                {state.durationLabel}
+              </span>
+              <span aria-hidden="true" className="opacity-30">|</span>
+              <span className="inline-flex items-center gap-1" id="detail-timestamp-sm">
+                <CalendarIcon className="h-3 w-3" />
+                {state.timestampLabel}
+              </span>
+              {state.culpritsLabel !== "—" && state.culpritsLabel !== "None" ? (
+                <>
+                  <span aria-hidden="true" className="opacity-30">|</span>
+                  <span className="inline-flex items-center gap-1" id="detail-culprits-sm">
+                    <UserIcon className="h-3 w-3" />
+                    {state.culpritsLabel}
+                  </span>
+                </>
+              ) : null}
+            </div>
           </div>
-          <div className={cn("h-0.5", getStatusAccent(state.resultClass))} />
+          <div className={cn("h-px", getStatusAccent(state.resultClass))} />
         </header>
 
-      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
         {state.errors.length > 0 ? (
-          <Alert id="errors" variant="destructive" className="mb-6 flex flex-col gap-1.5">
+          <Alert id="errors" variant="destructive" className="mb-3 flex flex-col gap-1">
             {state.errors.map((error) => (
-              <AlertDescription className="text-[13px]" key={error}>
+              <AlertDescription className="text-xs" key={error}>
                 {error}
               </AlertDescription>
             ))}
           </Alert>
         ) : null}
 
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-5">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-3">
           <TabsList className="w-full justify-start">
             {hasPendingInputs ? (
-              <TabsTrigger value="inputs" className="relative">
-                Pending Inputs
-                <span className="ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-warning-badge px-1.5 text-xs font-medium text-warning">
+              <TabsTrigger value="inputs" className="relative text-xs">
+                Inputs
+                <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-warning-badge px-1 text-[10px] font-medium text-warning">
                   {state.pendingInputs.length}
                 </span>
               </TabsTrigger>
             ) : null}
             {hasPipelineStages ? (
-              <TabsTrigger value="pipeline">
+              <TabsTrigger value="pipeline" className="text-xs">
                 Pipeline
                 {state.pipelineStagesLoading ? (
-                  <span className="ml-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                  <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
                 ) : null}
               </TabsTrigger>
             ) : null}
-            <TabsTrigger value="console">Console</TabsTrigger>
-            <TabsTrigger value="insights">
+            <TabsTrigger value="console" className="text-xs">Console</TabsTrigger>
+            <TabsTrigger value="insights" className="text-xs">
               {state.resultClass === "failure" || state.resultClass === "unstable"
-                ? "Failure Analysis"
-                : "Build Summary"}
+                ? "Analysis"
+                : "Summary"}
             </TabsTrigger>
           </TabsList>
 
           {hasPendingInputs ? (
-            <TabsContent value="inputs" className="space-y-4">
+            <TabsContent value="inputs" className="space-y-2">
               <PendingInputsSection
                 pendingInputs={state.pendingInputs}
                 onApprove={(inputId) => postMessage({ type: "approveInput", inputId })}
@@ -233,7 +248,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           ) : null}
 
           {hasPipelineStages ? (
-            <TabsContent value="pipeline" className="space-y-4" forceMount>
+            <TabsContent value="pipeline" className="space-y-2" forceMount>
               <PipelineStagesSection
                 stages={state.pipelineStages}
                 loading={state.pipelineStagesLoading}
@@ -241,7 +256,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             </TabsContent>
           ) : null}
 
-          <TabsContent value="console" className="space-y-4" forceMount>
+          <TabsContent value="console" className="space-y-2" forceMount>
             <ConsoleOutputSection
               consoleText={state.consoleText}
               consoleHtmlModel={state.consoleHtmlModel}
@@ -259,7 +274,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             />
           </TabsContent>
 
-          <TabsContent value="insights" className="space-y-4" forceMount>
+          <TabsContent value="insights" className="space-y-3" forceMount>
             <BuildSummaryCard
               displayName={state.displayName}
               resultLabel={state.resultLabel}
@@ -289,12 +304,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             <TooltipTrigger asChild>
               <Button
                 aria-label="Scroll to top"
-                className="fixed bottom-6 right-6 z-50 rounded-full shadow-widget"
+                className="fixed bottom-4 right-4 z-50 rounded-full shadow-widget h-8 w-8"
                 onClick={scrollToTop}
                 size="icon"
                 variant="secondary"
               >
-                <ArrowUpIcon />
+                <ArrowUpIcon className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Scroll to top</TooltipContent>

@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Alert, AlertDescription } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
-import { Card, CardContent, CardHeader } from "../../../../shared/webview/components/ui/card";
 import { Switch } from "../../../../shared/webview/components/ui/switch";
 import {
   Tooltip,
@@ -22,11 +21,11 @@ const CONSOLE_SCROLL_THRESHOLD_PX = 24;
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-function SearchIcon() {
+function SearchIcon({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className={className ?? "h-4 w-4"}
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -34,17 +33,17 @@ function SearchIcon() {
       strokeWidth="2"
       viewBox="0 0 24 24"
     >
-      <circle cx="11" cy="11" r="6" />
-      <line x1="15.5" y1="15.5" x2="20" y2="20" />
+      <circle cx="11" cy="11" r="7" />
+      <line x1="16.5" y1="16.5" x2="21" y2="21" />
     </svg>
   );
 }
 
-function DownloadIcon() {
+function DownloadIcon({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className={className ?? "h-4 w-4"}
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -59,11 +58,11 @@ function DownloadIcon() {
   );
 }
 
-function TerminalIcon() {
+function TerminalIcon({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className={className ?? "h-4 w-4"}
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -202,7 +201,7 @@ export function ConsoleOutputSection({
       return "";
     }
     const maxChars = Number.isFinite(consoleMaxChars) ? consoleMaxChars : 0;
-    return `Showing last ${maxChars.toLocaleString()} characters of console output.`;
+    return `Showing last ${maxChars.toLocaleString()} characters.`;
   }, [consoleTruncated, consoleMaxChars]);
 
   const hasConsoleOutput = consoleSourceText.length > 0;
@@ -231,155 +230,136 @@ export function ConsoleOutputSection({
   };
 
   return (
-    <Card>
-      <CardHeader className="space-y-0 border-b border-border bg-toolbar pb-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                <TerminalIcon />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold">Console Output</h3>
-                {hasConsoleOutput ? (
-                  <p className="text-xs text-muted-foreground">
-                    {lineCount.toLocaleString()} lines
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Search console output"
-                    onClick={consoleSearch.openSearchToolbar}
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5"
-                  >
-                    <SearchIcon />
-                    <span className="hidden sm:inline">Search</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Search (Cmd/Ctrl+F)</TooltipContent>
-              </Tooltip>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportLogs}
-                className="gap-1.5"
-                aria-label="Export console output"
-              >
-                <DownloadIcon />
-                <span className="hidden sm:inline">Export</span>
-              </Button>
-              <div className="flex items-center gap-2 rounded-full border border-border bg-muted-soft px-3 py-1.5">
-                <Switch
-                  id="follow-log"
-                  checked={followLog}
-                  onCheckedChange={handleFollowLogChange}
-                />
-                <label
-                  htmlFor="follow-log"
-                  className="text-xs text-muted-foreground select-none whitespace-nowrap"
-                >
-                  Follow
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <ConsoleSearchToolbar
-            visible={consoleSearch.showSearchToolbar}
-            query={consoleSearch.searchQuery}
-            useRegex={consoleSearch.useRegex}
-            matchCountLabel={consoleSearch.matchCountLabel}
-            matchCount={consoleSearch.matchCount}
-            isSearchActive={consoleSearch.isSearchActive}
-            error={consoleSearch.searchError}
-            tooManyMatchesLabel={consoleSearch.tooManyMatchesLabel}
-            inputRef={consoleSearch.searchInputRef}
-            onChange={consoleSearch.handleSearchChange}
-            onKeyDown={consoleSearch.handleSearchKeyDown}
-            onToggleRegex={() => consoleSearch.setUseRegex((prev) => !prev)}
-            onPrev={() => consoleSearch.handleSearchStep("prev")}
-            onNext={() => consoleSearch.handleSearchStep("next")}
-            onClear={consoleSearch.handleClearSearch}
-          />
-
-          {consoleNote ? (
-            <div
-              id="console-note"
-              className="flex items-center gap-2 rounded border border-warning-border bg-warning-surface px-3 py-2 text-xs text-muted-foreground"
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <TerminalIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">
+            Console
+            {hasConsoleOutput ? ` · ${lineCount.toLocaleString()} lines` : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button
+            aria-label="Search console output"
+            onClick={consoleSearch.openSearchToolbar}
+            size="sm"
+            variant="outline"
+            className="gap-1.5 h-7 px-2 text-xs"
+          >
+            <SearchIcon className="h-3.5 w-3.5" />
+            Search
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportLogs}
+            className="gap-1.5 h-7 px-2 text-xs"
+            aria-label="Export console output"
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+            Export
+          </Button>
+          <div className="flex items-center gap-1.5 ml-0.5 pl-1.5 border-l border-border">
+            <Switch
+              id="follow-log"
+              checked={followLog}
+              onCheckedChange={handleFollowLogChange}
+            />
+            <label
+              htmlFor="follow-log"
+              className="text-xs text-muted-foreground select-none whitespace-nowrap"
             >
-              <svg
-                aria-hidden="true"
-                className="h-3.5 w-3.5 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              {consoleNote}
-            </div>
+              Follow
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <ConsoleSearchToolbar
+        visible={consoleSearch.showSearchToolbar}
+        query={consoleSearch.searchQuery}
+        useRegex={consoleSearch.useRegex}
+        matchCountLabel={consoleSearch.matchCountLabel}
+        matchCount={consoleSearch.matchCount}
+        isSearchActive={consoleSearch.isSearchActive}
+        error={consoleSearch.searchError}
+        tooManyMatchesLabel={consoleSearch.tooManyMatchesLabel}
+        inputRef={consoleSearch.searchInputRef}
+        onChange={consoleSearch.handleSearchChange}
+        onKeyDown={consoleSearch.handleSearchKeyDown}
+        onToggleRegex={() => consoleSearch.setUseRegex((prev) => !prev)}
+        onPrev={() => consoleSearch.handleSearchStep("prev")}
+        onNext={() => consoleSearch.handleSearchStep("next")}
+        onClear={consoleSearch.handleClearSearch}
+      />
+
+      {consoleNote ? (
+        <div
+          id="console-note"
+          className="flex items-center gap-1.5 rounded border border-warning-border bg-warning-surface px-2.5 py-1.5 text-xs text-muted-foreground"
+        >
+          <svg
+            aria-hidden="true"
+            className="h-3.5 w-3.5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          {consoleNote}
+        </div>
+      ) : null}
+
+      {consoleError ? (
+        <Alert id="console-error" variant="warning" className="py-2">
+          <AlertDescription className="text-xs">{consoleError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {!consoleError && hasConsoleOutput ? (
+        <div className="relative">
+          <pre
+            id="console-output"
+            ref={consoleSearch.consoleOutputRef}
+            className="console-output m-0 rounded border border-border bg-terminal px-3 py-2 font-mono text-terminal-foreground text-vscode-editor leading-relaxed shadow-inner whitespace-pre overflow-x-auto overflow-y-auto"
+          >
+            {consoleSegments}
+          </pre>
+          {showScrollToTop && !followLog ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label="Scroll console to top"
+                  className="absolute bottom-2 right-2 z-10 rounded-full shadow-widget h-7 w-7"
+                  onClick={scrollConsoleToTop}
+                  size="icon"
+                  variant="secondary"
+                >
+                  <ArrowUpIcon className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Scroll to top</TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
-      </CardHeader>
+      ) : null}
 
-      <CardContent className="pt-0">
-        {consoleError ? (
-          <Alert id="console-error" variant="warning">
-            <AlertDescription className="text-[13px]">{consoleError}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        {!consoleError && hasConsoleOutput ? (
-          <div className="relative">
-            <pre
-              id="console-output"
-              ref={consoleSearch.consoleOutputRef}
-              className="console-output m-0 rounded-lg border border-border bg-terminal px-4 py-3 font-mono text-terminal-foreground text-vscode-editor leading-relaxed shadow-inner whitespace-pre overflow-x-auto overflow-y-auto"
-            >
-              {consoleSegments}
-            </pre>
-            {showScrollToTop && !followLog ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label="Scroll console to top"
-                    className="absolute bottom-3 right-3 z-10 rounded-full shadow-widget"
-                    onClick={scrollConsoleToTop}
-                    size="icon"
-                    variant="secondary"
-                  >
-                    <ArrowUpIcon className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Scroll to top</TooltipContent>
-              </Tooltip>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!consoleError && !hasConsoleOutput ? (
-          <div
-            id="console-empty"
-            className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted-soft px-4 py-8 text-center"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <TerminalIcon />
-            </div>
-            <div className="text-sm text-muted-foreground">No console output available</div>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      {!consoleError && !hasConsoleOutput ? (
+        <div
+          id="console-empty"
+          className="flex items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center"
+        >
+          <TerminalIcon />
+          <span className="text-xs text-muted-foreground">No console output available</span>
+        </div>
+      ) : null}
+    </div>
   );
 }

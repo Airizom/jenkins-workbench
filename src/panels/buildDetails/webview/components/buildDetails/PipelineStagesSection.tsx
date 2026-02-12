@@ -6,7 +6,6 @@ import {
   AccordionItem,
   AccordionTrigger
 } from "../../../../shared/webview/components/ui/accordion";
-import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -27,7 +26,7 @@ function CheckIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className="h-3 w-3"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -44,7 +43,7 @@ function XIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className="h-3 w-3"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -62,7 +61,7 @@ function PlayIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4 ml-0.5"
+      className="h-3 w-3 ml-0.5"
       fill="currentColor"
       viewBox="0 0 24 24"
     >
@@ -75,7 +74,7 @@ function AlertIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className="h-3 w-3"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -91,7 +90,7 @@ function AlertIcon() {
 
 function StopIcon() {
   return (
-    <svg aria-hidden="true" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+    <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
       <rect x="6" y="6" width="12" height="12" rx="1" />
     </svg>
   );
@@ -116,7 +115,7 @@ function getStageIcon(statusClass?: string) {
 
 function getStageNodeStyle(statusClass?: string): string {
   const baseStyles =
-    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 shadow-sm transition-colors";
+    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors";
   switch (statusClass) {
     case "success":
       return cn(baseStyles, "border-success-border bg-success-soft text-success");
@@ -233,7 +232,7 @@ function StageNode({
 
   return (
     <div className="relative flex" data-stage-key={stage.key}>
-      <div className="flex flex-col items-center mr-5">
+      <div className="flex flex-col items-center mr-3">
         <div className={nodeStyle}>{stageIcon}</div>
         {!isLast ? (
           <div
@@ -243,22 +242,22 @@ function StageNode({
         ) : null}
       </div>
 
-      <div className={cn("flex-1 pb-6", isLast && "pb-0")}>
+      <div className={cn("flex-1 pb-3", isLast && "pb-0")}>
         <AccordionItem value={stageId} className="group border-b-0">
-          <Card className="overflow-hidden border-mutedBorder bg-card transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
-            <AccordionTrigger asChild className="gap-4 px-4 py-4 hover:bg-accent-soft">
+          <div className="overflow-hidden rounded border border-mutedBorder bg-card transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
+            <AccordionTrigger asChild className="gap-3 px-3 py-2 hover:bg-accent-soft">
               <button type="button">
-                <div className="flex flex-col items-start gap-1">
-                  <div className="text-sm font-medium">{stage.name || "Stage"}</div>
-                  <div className="text-xs text-muted-foreground">
+                <div className="flex flex-col items-start gap-0.5">
+                  <div className="text-xs font-medium">{stage.name || "Stage"}</div>
+                  <div className="text-[11px] text-muted-foreground">
                     {stage.durationLabel || "Unknown"}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <StatusPill
                     label={stage.statusLabel || "Unknown"}
                     status={stage.statusClass}
-                    className="text-xs"
+                    className="text-[10px]"
                   />
                   <ChevronDownIcon
                     className={cn(
@@ -271,11 +270,11 @@ function StageNode({
             </AccordionTrigger>
 
             <AccordionContent>
-              <CardContent className="border-t border-border pt-4 space-y-4">
+              <div className="border-t border-border px-3 py-2.5 space-y-2.5">
                 {hasBranches ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Parallel Branches
                       </div>
                       {hasBranchSteps ? (
@@ -289,7 +288,7 @@ function StageNode({
                         </Toggle>
                       ) : null}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-2 sm:grid-cols-2">
                       {stage.parallelBranches.map((branch, branchIndex) => (
                         <BranchCard
                           key={`${branch.key}-${branchIndex}`}
@@ -302,9 +301,9 @@ function StageNode({
                 ) : null}
 
                 {hasSteps && !hasBranches ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Steps
                       </div>
                       <Toggle
@@ -325,13 +324,13 @@ function StageNode({
                 ) : null}
 
                 {!hasSteps && !hasBranches ? (
-                  <div className="text-sm text-muted-foreground">
-                    No step details available for this stage.
+                  <div className="text-xs text-muted-foreground">
+                    No step details available.
                   </div>
                 ) : null}
-              </CardContent>
+              </div>
             </AccordionContent>
-          </Card>
+          </div>
         </AccordionItem>
       </div>
     </div>
@@ -354,26 +353,24 @@ function BranchCard({
   return (
     <Collapsible open={expanded} onOpenChange={setExpanded} className="group">
       <div className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
-        <CollapsibleTrigger asChild className="gap-3 px-3 py-3 hover:bg-accent-soft">
+        <CollapsibleTrigger asChild className="gap-2 px-2.5 py-2 hover:bg-accent-soft">
           <button type="button">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full border text-xs",
+                  "flex h-5 w-5 items-center justify-center rounded-full border text-[9px]",
                   statusClass
                 )}
               >
                 {branchIcon}
               </div>
-              <div className="text-left">
-                <div className="text-xs font-medium">{branch.name || "Branch"}</div>
-              </div>
+              <span className="text-[11px] font-medium">{branch.name || "Branch"}</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <span>{branch.durationLabel}</span>
               <ChevronDownIcon
                 className={cn(
-                  "text-muted-foreground transition-transform duration-200",
+                  "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
                   "group-data-[state=open]:rotate-180 group-data-[state=open]:text-foreground"
                 )}
               />
@@ -381,7 +378,7 @@ function BranchCard({
           </button>
         </CollapsibleTrigger>
         {hasSteps ? (
-          <CollapsibleContent className="border-t border-border px-3 pb-3 pt-2">
+          <CollapsibleContent className="border-t border-border px-2.5 pb-2 pt-1.5">
             <StepsList steps={steps} compact />
           </CollapsibleContent>
         ) : null}
@@ -395,32 +392,30 @@ function StepsList({
   compact = false
 }: { steps: PipelineStageStepViewModel[]; compact?: boolean }) {
   return (
-    <ul className="list-none m-0 p-0 flex flex-col gap-2">
+    <ul className="list-none m-0 p-0 flex flex-col gap-1">
       {steps.map((step, index) => {
         const statusClass = getStatusClass(step.statusClass);
         return (
           <li
             className={cn(
-              "flex items-center justify-between gap-2 rounded border border-mutedBorder bg-background",
-              compact ? "px-2 py-1.5" : "px-3 py-2"
+              "flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-background",
+              compact ? "px-2 py-1" : "px-2.5 py-1.5"
             )}
             key={`${step.name}-${index}`}
           >
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
               <div
                 className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[8px]",
                   statusClass
                 )}
               >
                 {getStageIcon(step.statusClass)}
               </div>
-              <span className={cn("truncate", compact ? "text-xs" : "text-xs font-medium")}>
-                {step.name || "Step"}
-              </span>
+              <span className="text-[11px] truncate">{step.name || "Step"}</span>
             </div>
-            <span className="text-xs text-muted-foreground shrink-0">
-              {step.durationLabel || "Unknown"}
+            <span className="text-[11px] text-muted-foreground shrink-0">
+              {step.durationLabel || "—"}
             </span>
           </li>
         );
@@ -431,7 +426,7 @@ function StepsList({
 
 function EmptyStepsMessage({ showAll }: { showAll: boolean }) {
   return (
-    <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-2 text-sm text-muted-foreground">
+    <div className="rounded border border-dashed border-border bg-muted-soft px-2.5 py-1.5 text-xs text-muted-foreground">
       {showAll ? "No steps available." : "No failed steps."}
     </div>
   );
@@ -439,15 +434,15 @@ function EmptyStepsMessage({ showAll }: { showAll: boolean }) {
 
 function PipelineStagesPlaceholder(): JSX.Element {
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {[1, 2, 3].map((i) => (
         <div key={`skeleton-${i}`} className="flex">
-          <div className="flex flex-col items-center mr-4">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            {i < 3 ? <Skeleton className="w-0.5 flex-1 min-h-[24px]" /> : null}
+          <div className="flex flex-col items-center mr-3">
+            <Skeleton className="h-6 w-6 rounded-full" />
+            {i < 3 ? <Skeleton className="w-0.5 flex-1 min-h-[16px]" /> : null}
           </div>
-          <div className="flex-1 pb-6">
-            <Skeleton className="h-16 w-full rounded" />
+          <div className="flex-1 pb-3">
+            <Skeleton className="h-12 w-full rounded" />
           </div>
         </div>
       ))}
@@ -457,8 +452,8 @@ function PipelineStagesPlaceholder(): JSX.Element {
 
 function LoadingBanner(): JSX.Element {
   return (
-    <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-      <span className="inline-block h-2 w-2 rounded-full bg-primary animate-ping" aria-hidden />
+    <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-ping" aria-hidden />
       Refreshing stages...
     </div>
   );

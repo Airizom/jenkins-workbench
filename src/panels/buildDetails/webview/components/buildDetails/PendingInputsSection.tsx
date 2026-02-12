@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
-import { Card, CardContent } from "../../../../shared/webview/components/ui/card";
 import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
 import { StatusPill } from "./StatusPill";
 
@@ -13,7 +12,7 @@ function AlertCircleIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className="h-4 w-4 text-warning"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -67,7 +66,7 @@ function UserIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className="h-3.5 w-3.5"
       fill="none"
       stroke="currentColor"
       strokeLinecap="round"
@@ -165,60 +164,49 @@ export function PendingInputsSection({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {pendingInputs.map((input) => (
-        <Card
+        <div
           key={input.id}
-          className="overflow-hidden border-warning-border"
+          className="rounded border border-warning-border overflow-hidden"
           aria-busy={Boolean(processingIds[input.id])}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-warning-surface px-5 py-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
-                <AlertCircleIcon />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{input.message}</div>
-                {input.submitterLabel ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <UserIcon />
-                    {input.submitterLabel}
-                  </div>
-                ) : null}
-              </div>
+          <div className="flex items-center justify-between gap-2 bg-warning-surface px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertCircleIcon />
+              <span className="text-xs font-medium truncate">{input.message}</span>
+              {input.submitterLabel ? (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
+                  <UserIcon />
+                  {input.submitterLabel}
+                </span>
+              ) : null}
             </div>
-            <StatusPill
-              label="Pending input"
-              status="running"
-              className="shrink-0"
-            />
+            <StatusPill label="Pending" status="running" className="text-[10px] shrink-0" />
           </div>
 
-          <CardContent className="pt-4">
-            {input.parameters.length > 0 ? (
-              <div className="mb-4">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Parameters
-                </div>
-                <div className="flex flex-wrap gap-2">
+          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-card">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {input.parameters.length > 0 ? (
+                <>
                   {input.parameters.map((param) => (
                     <Badge
                       key={`${input.id}-${param.name}`}
                       variant="secondary"
-                      className="font-mono text-xs"
+                      className="font-mono text-[10px] px-1.5 py-0"
                     >
                       {param.name}
-                      <span className="ml-1 text-muted-foreground">({param.kind})</span>
                     </Badge>
                   ))}
-                </div>
-                {input.parametersLabel ? (
-                  <div className="mt-2 text-xs text-muted-foreground">{input.parametersLabel}</div>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2">
+                  {input.parametersLabel ? (
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {input.parametersLabel}
+                    </span>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
               <Button
                 size="sm"
                 onClick={() => {
@@ -228,11 +216,11 @@ export function PendingInputsSection({
                   markProcessing(input.id, "approve");
                   onApprove(input.id);
                 }}
-                className="gap-1.5"
+                className="gap-1 h-6 px-2 text-[11px]"
                 disabled={Boolean(processingIds[input.id])}
               >
                 <CheckIcon />
-                {processingActions[input.id] === "approve" ? "Approving..." : "Approve"}
+                {processingActions[input.id] === "approve" ? "..." : "Approve"}
               </Button>
               <Button
                 variant="outline"
@@ -244,15 +232,15 @@ export function PendingInputsSection({
                   markProcessing(input.id, "reject");
                   onReject(input.id);
                 }}
-                className="gap-1.5"
+                className="gap-1 h-6 px-2 text-[11px]"
                 disabled={Boolean(processingIds[input.id])}
               >
                 <XIcon />
-                {processingActions[input.id] === "reject" ? "Rejecting..." : "Reject"}
+                {processingActions[input.id] === "reject" ? "..." : "Reject"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   );

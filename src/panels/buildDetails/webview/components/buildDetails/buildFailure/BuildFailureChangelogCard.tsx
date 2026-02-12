@@ -1,4 +1,3 @@
-import { Card } from "../../../../../shared/webview/components/ui/card";
 import type { BuildFailureChangelogItem } from "../../../../shared/BuildDetailsContracts";
 import { OverflowText } from "./BuildFailureOverflowText";
 
@@ -47,39 +46,35 @@ export function BuildFailureChangelogCard({
   overflowCount: number;
 }) {
   return (
-    <Card>
-      <div className="p-5 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-muted">
-            <GitCommitIcon />
-          </div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Changelog
-          </div>
-        </div>
-        {items.length > 0 ? (
-          <ChangelogList items={items} />
-        ) : (
-          <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-3 py-4 text-sm text-muted-foreground">
-            No changes detected
-          </div>
-        )}
-        <OverflowText value={overflowCount} />
+    <div className="rounded border border-border p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <GitCommitIcon />
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Changelog
+        </span>
       </div>
-    </Card>
+      {items.length > 0 ? (
+        <ChangelogList items={items} />
+      ) : (
+        <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 text-xs text-muted-foreground">
+          No changes detected
+        </div>
+      )}
+      <OverflowText value={overflowCount} />
+    </div>
   );
 }
 
 function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
   return (
-    <ul className="list-none m-0 p-0 flex flex-col gap-2">
+    <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
       {items.map((item, index) => (
         <li
-          className="rounded border border-mutedBorder bg-muted-soft px-3 py-2"
+          className="rounded border border-mutedBorder bg-muted-soft px-2.5 py-1.5"
           key={`${item.message}-${index}`}
         >
-          <div className="text-sm font-medium text-foreground line-clamp-2">{item.message}</div>
-          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="text-xs text-foreground line-clamp-2">{item.message}</div>
+          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <UserIcon />
               {item.author}
