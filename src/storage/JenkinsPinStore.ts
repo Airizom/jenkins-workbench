@@ -2,18 +2,11 @@ import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { JenkinsScopedJobStore, type ScopedJobStoreEntry } from "./ScopedJobStore";
 
-export interface StoredPinnedJobEntry {
-  environmentId: string;
-  jobUrl: string;
-  jobName?: string;
-  jobKind?: "job" | "pipeline";
-}
+export interface StoredPinnedJobEntry extends ScopedJobStoreEntry {}
 
 export interface PinnedJobEntry extends StoredPinnedJobEntry {
   scope: EnvironmentScope;
 }
-
-export interface StoredPinnedJobEntry extends ScopedJobStoreEntry {}
 
 const PINNED_JOBS_KEY = "jenkinsWorkbench.pinnedJobs";
 

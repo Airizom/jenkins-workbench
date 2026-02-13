@@ -72,50 +72,35 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
       jobName?: string;
     }
   ): Promise<void> {
-    const entries = await this.getEntries(scope);
-    let changed = false;
-    const next: StoredWatchedJobEntry[] = [];
-    for (const entry of entries) {
-      if (entry.environmentId !== environmentId || entry.jobUrl !== jobUrl) {
-        next.push(entry);
-        continue;
-      }
-
-      const updated: StoredWatchedJobEntry = { ...entry };
+    await this.updateJob(scope, environmentId, jobUrl, (entry) => {
       const shouldUpdateCompleted = typeof update.lastCompletedBuildNumber === "number";
       const shouldUpdateBuilding = typeof update.lastIsBuilding === "boolean";
 
-      if (update.lastStatus !== undefined) {
-        updated.lastStatus = update.lastStatus;
+      const nextStatus = update.lastStatus ?? entry.lastStatus;
+      const nextCompleted = shouldUpdateCompleted
+        ? update.lastCompletedBuildNumber
+        : entry.lastCompletedBuildNumber;
+      const nextBuilding = shouldUpdateBuilding ? update.lastIsBuilding : entry.lastIsBuilding;
+      const nextJobName = update.jobName ?? entry.jobName;
+
+      const changed =
+        nextStatus !== entry.lastStatus ||
+        nextCompleted !== entry.lastCompletedBuildNumber ||
+        nextBuilding !== entry.lastIsBuilding ||
+        nextJobName !== entry.jobName;
+
+      if (!changed) {
+        return undefined;
       }
 
-      if (shouldUpdateCompleted) {
-        updated.lastCompletedBuildNumber = update.lastCompletedBuildNumber;
-      }
-
-      if (shouldUpdateBuilding) {
-        updated.lastIsBuilding = update.lastIsBuilding;
-      }
-
-      if (update.jobName !== undefined) {
-        updated.jobName = update.jobName;
-      }
-
-      const entryChanged =
-        updated.lastStatus !== entry.lastStatus ||
-        updated.lastCompletedBuildNumber !== entry.lastCompletedBuildNumber ||
-        updated.lastIsBuilding !== entry.lastIsBuilding ||
-        updated.jobName !== entry.jobName;
-      if (entryChanged) {
-        changed = true;
-      }
-
-      next.push(updated);
-    }
-
-    if (changed) {
-      await this.saveEntries(scope, next);
-    }
+      return {
+        ...entry,
+        lastStatus: nextStatus,
+        lastCompletedBuildNumber: nextCompleted,
+        lastIsBuilding: nextBuilding,
+        jobName: nextJobName
+      };
+    });
   }
 
   async updateWatchUrl(

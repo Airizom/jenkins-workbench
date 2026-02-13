@@ -18,8 +18,8 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     toScoped: (scope: EnvironmentScope, entry: TEntry) => TPublic
   ): Promise<TPublic[]> {
     const [workspace, global] = await Promise.all([
-      this.getStoredEntries("workspace"),
-      this.getStoredEntries("global")
+      this.readEntries("workspace"),
+      this.readEntries("global")
     ]);
     return [
       ...workspace.map((entry) => toScoped("workspace", entry)),
@@ -31,7 +31,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     scope: EnvironmentScope,
     environmentId: string
   ): Promise<Set<string>> {
-    const entries = await this.getStoredEntries(scope);
+    const entries = await this.readEntries(scope);
     return new Set(
       entries
         .filter((entry) => entry.environmentId === environmentId)
@@ -44,7 +44,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     environmentId: string,
     jobUrl: string
   ): Promise<boolean> {
-    const entries = await this.getStoredEntries(scope);
+    const entries = await this.readEntries(scope);
     return entries.some((entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl);
   }
 
@@ -53,7 +53,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     entry: TEntry,
     merge: (existing: TEntry, incoming: TEntry) => TEntry
   ): Promise<void> {
-    const entries = await this.getStoredEntries(scope);
+    const entries = await this.readEntries(scope);
     const index = entries.findIndex((item) => this.isSameJob(item, entry));
 
     if (index >= 0) {
@@ -63,15 +63,41 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
       entries.push(entry);
     }
 
-    await this.saveStoredEntries(scope, entries);
+    await this.writeEntries(scope, entries);
   }
 
-  protected async getEntries(scope: EnvironmentScope): Promise<TEntry[]> {
-    return this.getStoredEntries(scope);
-  }
+  protected async updateJob(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    update: (entry: TEntry) => TEntry | undefined
+  ): Promise<boolean> {
+    const entries = await this.readEntries(scope);
+    let changed = false;
+    const next: TEntry[] = [];
 
-  protected async saveEntries(scope: EnvironmentScope, entries: TEntry[]): Promise<void> {
-    await this.saveStoredEntries(scope, entries);
+    for (const entry of entries) {
+      if (!this.isSameJob(entry, { environmentId, jobUrl })) {
+        next.push(entry);
+        continue;
+      }
+
+      const updated = update(entry);
+      if (!updated) {
+        next.push(entry);
+        continue;
+      }
+
+      changed = true;
+      next.push(updated);
+    }
+
+    if (!changed) {
+      return false;
+    }
+
+    await this.writeEntries(scope, next);
+    return true;
   }
 
   protected async remove(
@@ -79,12 +105,12 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     environmentId: string,
     jobUrl: string
   ): Promise<boolean> {
-    const entries = await this.getStoredEntries(scope);
+    const entries = await this.readEntries(scope);
     const next = entries.filter((entry) => !this.isSameJob(entry, { environmentId, jobUrl }));
     if (next.length === entries.length) {
       return false;
     }
-    await this.saveStoredEntries(scope, next);
+    await this.writeEntries(scope, next);
     return true;
   }
 
@@ -92,12 +118,12 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     scope: EnvironmentScope,
     environmentId: string
   ): Promise<void> {
-    const entries = await this.getStoredEntries(scope);
+    const entries = await this.readEntries(scope);
     const next = entries.filter((entry) => entry.environmentId !== environmentId);
     if (next.length === entries.length) {
       return;
     }
-    await this.saveStoredEntries(scope, next);
+    await this.writeEntries(scope, next);
   }
 
   protected async updateUrl(
@@ -107,7 +133,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     newJobUrl: string,
     newJobName?: string
   ): Promise<boolean> {
-    const entries = await this.getStoredEntries(scope);
+    const entries = await this.readEntries(scope);
     let found = false;
     const next: TEntry[] = [];
 
@@ -124,7 +150,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
       return false;
     }
 
-    await this.saveStoredEntries(scope, next);
+    await this.writeEntries(scope, next);
     return true;
   }
 
@@ -132,13 +158,13 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     return entry.environmentId === other.environmentId && entry.jobUrl === other.jobUrl;
   }
 
-  protected getStoredEntries(scope: EnvironmentScope): Promise<TEntry[]> {
+  private readEntries(scope: EnvironmentScope): Promise<TEntry[]> {
     const memento = this.getMemento(scope);
     const stored = memento.get<TEntry[]>(this.storageKey);
     return Promise.resolve(Array.isArray(stored) ? stored : []);
   }
 
-  protected async saveStoredEntries(scope: EnvironmentScope, entries: TEntry[]): Promise<void> {
+  private async writeEntries(scope: EnvironmentScope, entries: TEntry[]): Promise<void> {
     const memento = this.getMemento(scope);
     await memento.update(this.storageKey, entries);
   }
