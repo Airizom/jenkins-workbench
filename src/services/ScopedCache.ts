@@ -58,30 +58,12 @@ export class ScopedCache {
 
   clearForEnvironment(environmentId: string): void {
     const prefix = `${environmentId}:`;
-    for (const key of this.keys) {
-      if (!this.cache.has(key)) {
-        this.keys.delete(key);
-        continue;
-      }
-      if (key.startsWith(prefix)) {
-        this.cache.delete(key);
-        this.keys.delete(key);
-      }
-    }
+    this.clearKeysWithPrefix(prefix);
   }
 
   clearForEnvironmentKind(environment: JenkinsEnvironmentRef, kind: string): void {
     const prefix = `${this.buildEnvironmentKey(environment)}:${kind}:`;
-    for (const key of this.keys) {
-      if (!this.cache.has(key)) {
-        this.keys.delete(key);
-        continue;
-      }
-      if (key.startsWith(prefix)) {
-        this.cache.delete(key);
-        this.keys.delete(key);
-      }
-    }
+    this.clearKeysWithPrefix(prefix);
   }
 
   private pruneIfNeeded(): void {
@@ -96,6 +78,20 @@ export class ScopedCache {
       if (!this.cache.has(key)) {
         this.keys.delete(key);
       }
+    }
+  }
+
+  private clearKeysWithPrefix(prefix: string): void {
+    for (const key of this.keys) {
+      if (!this.cache.has(key)) {
+        this.keys.delete(key);
+        continue;
+      }
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+      this.cache.delete(key);
+      this.keys.delete(key);
     }
   }
 }

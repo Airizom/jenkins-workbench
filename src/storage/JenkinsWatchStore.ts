@@ -1,13 +1,10 @@
 import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
+import { JenkinsScopedJobStore, type ScopedJobStoreEntry } from "./ScopedJobStore";
 
 export type WatchStatusKind = "success" | "failure" | "other" | "unknown";
 
-export interface StoredWatchedJobEntry {
-  environmentId: string;
-  jobUrl: string;
-  jobName?: string;
-  jobKind?: "job" | "pipeline";
+export interface StoredWatchedJobEntry extends ScopedJobStoreEntry {
   lastStatus?: WatchStatusKind;
   lastCompletedBuildNumber?: number;
   lastIsBuilding?: boolean;
@@ -19,31 +16,21 @@ export interface WatchedJobEntry extends StoredWatchedJobEntry {
 
 const WATCHED_JOBS_KEY = "jenkinsWorkbench.watchedJobs";
 
-export class JenkinsWatchStore {
-  constructor(private readonly context: vscode.ExtensionContext) {}
+type WatchUpdateInput = Omit<StoredWatchedJobEntry, "lastStatus"> & {
+  lastStatus?: WatchStatusKind;
+};
+
+export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEntry> {
+  constructor(context: vscode.ExtensionContext) {
+    super(context, WATCHED_JOBS_KEY);
+  }
 
   async listWatchedJobs(): Promise<WatchedJobEntry[]> {
-    const [workspace, global] = await Promise.all([
-      this.getWatches("workspace"),
-      this.getWatches("global")
-    ]);
-    return [
-      ...workspace.map((entry) => ({
-        ...entry,
-        scope: "workspace" as const
-      })),
-      ...global.map((entry) => ({
-        ...entry,
-        scope: "global" as const
-      }))
-    ];
+    return this.listWithScope((scope, entry) => ({ ...entry, scope }));
   }
 
   async getWatchedJobUrls(scope: EnvironmentScope, environmentId: string): Promise<Set<string>> {
-    const entries = await this.getWatches(scope);
-    return new Set(
-      entries.filter((entry) => entry.environmentId === environmentId).map((entry) => entry.jobUrl)
-    );
+    return this.getJobUrls(scope, environmentId);
   }
 
   async isWatched(
@@ -51,35 +38,15 @@ export class JenkinsWatchStore {
     environmentId: string,
     jobUrl: string
   ): Promise<boolean> {
-    const entries = await this.getWatches(scope);
-    return entries.some(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
+    return this.isTracked(scope, environmentId, jobUrl);
   }
 
-  async addWatch(
-    scope: EnvironmentScope,
-    entry: Omit<StoredWatchedJobEntry, "lastStatus"> & {
-      lastStatus?: WatchStatusKind;
-    }
-  ): Promise<void> {
-    const entries = await this.getWatches(scope);
-    const index = entries.findIndex(
-      (item) => item.environmentId === entry.environmentId && item.jobUrl === entry.jobUrl
-    );
-
-    if (index >= 0) {
-      const existing = entries[index];
-      entries[index] = {
-        ...existing,
-        jobName: entry.jobName ?? existing.jobName,
-        jobKind: entry.jobKind ?? existing.jobKind
-      };
-    } else {
-      entries.push(entry);
-    }
-
-    await this.saveWatches(scope, entries);
+  async addWatch(scope: EnvironmentScope, entry: WatchUpdateInput): Promise<void> {
+    await this.addOrUpdate(scope, entry, (existing, incoming) => ({
+      ...existing,
+      jobName: incoming.jobName ?? existing.jobName,
+      jobKind: incoming.jobKind ?? existing.jobKind
+    }));
   }
 
   async removeWatch(
@@ -87,15 +54,11 @@ export class JenkinsWatchStore {
     environmentId: string,
     jobUrl: string
   ): Promise<boolean> {
-    const entries = await this.getWatches(scope);
-    const next = entries.filter(
-      (entry) => entry.environmentId !== environmentId || entry.jobUrl !== jobUrl
-    );
-    if (next.length === entries.length) {
-      return false;
-    }
-    await this.saveWatches(scope, next);
-    return true;
+    return this.remove(scope, environmentId, jobUrl);
+  }
+
+  async removeWatchesForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
+    await this.removeForEnvironment(scope, environmentId);
   }
 
   async updateWatchStatus(
@@ -109,7 +72,7 @@ export class JenkinsWatchStore {
       jobName?: string;
     }
   ): Promise<void> {
-    const entries = await this.getWatches(scope);
+    const entries = await this.getEntries(scope);
     let changed = false;
     const next: StoredWatchedJobEntry[] = [];
     for (const entry of entries) {
@@ -151,15 +114,7 @@ export class JenkinsWatchStore {
     }
 
     if (changed) {
-      await this.saveWatches(scope, next);
-    }
-  }
-
-  async removeWatchesForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
-    const entries = await this.getWatches(scope);
-    const next = entries.filter((entry) => entry.environmentId !== environmentId);
-    if (next.length !== entries.length) {
-      await this.saveWatches(scope, next);
+      await this.saveEntries(scope, next);
     }
   }
 
@@ -170,45 +125,6 @@ export class JenkinsWatchStore {
     newJobUrl: string,
     newJobName?: string
   ): Promise<boolean> {
-    const entries = await this.getWatches(scope);
-    let found = false;
-    const next: StoredWatchedJobEntry[] = [];
-
-    for (const entry of entries) {
-      if (entry.environmentId === environmentId && entry.jobUrl === oldJobUrl) {
-        found = true;
-        next.push({
-          ...entry,
-          jobUrl: newJobUrl,
-          jobName: newJobName ?? entry.jobName
-        });
-      } else {
-        next.push(entry);
-      }
-    }
-
-    if (found) {
-      await this.saveWatches(scope, next);
-    }
-
-    return found;
-  }
-
-  private getWatches(scope: EnvironmentScope): Promise<StoredWatchedJobEntry[]> {
-    const memento = this.getMemento(scope);
-    const stored = memento.get<StoredWatchedJobEntry[]>(WATCHED_JOBS_KEY);
-    return Promise.resolve(Array.isArray(stored) ? stored : []);
-  }
-
-  private async saveWatches(
-    scope: EnvironmentScope,
-    entries: StoredWatchedJobEntry[]
-  ): Promise<void> {
-    const memento = this.getMemento(scope);
-    await memento.update(WATCHED_JOBS_KEY, entries);
-  }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
+    return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName);
   }
 }

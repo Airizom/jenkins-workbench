@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
+import { JenkinsScopedJobStore, type ScopedJobStoreEntry } from "./ScopedJobStore";
 
 export interface StoredPinnedJobEntry {
   environmentId: string;
@@ -12,60 +13,33 @@ export interface PinnedJobEntry extends StoredPinnedJobEntry {
   scope: EnvironmentScope;
 }
 
+export interface StoredPinnedJobEntry extends ScopedJobStoreEntry {}
+
 const PINNED_JOBS_KEY = "jenkinsWorkbench.pinnedJobs";
 
-export class JenkinsPinStore {
-  constructor(private readonly context: vscode.ExtensionContext) {}
+export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry> {
+  constructor(context: vscode.ExtensionContext) {
+    super(context, PINNED_JOBS_KEY);
+  }
 
   async listPinnedJobs(): Promise<PinnedJobEntry[]> {
-    const [workspace, global] = await Promise.all([
-      this.getPins("workspace"),
-      this.getPins("global")
-    ]);
-    return [
-      ...workspace.map((entry) => ({
-        ...entry,
-        scope: "workspace" as const
-      })),
-      ...global.map((entry) => ({
-        ...entry,
-        scope: "global" as const
-      }))
-    ];
+    return this.listWithScope((scope, entry) => ({ ...entry, scope }));
   }
 
   async getPinnedJobUrls(scope: EnvironmentScope, environmentId: string): Promise<Set<string>> {
-    const entries = await this.getPins(scope);
-    return new Set(
-      entries.filter((entry) => entry.environmentId === environmentId).map((entry) => entry.jobUrl)
-    );
+    return this.getJobUrls(scope, environmentId);
   }
 
   async isPinned(scope: EnvironmentScope, environmentId: string, jobUrl: string): Promise<boolean> {
-    const entries = await this.getPins(scope);
-    return entries.some(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
+    return this.isTracked(scope, environmentId, jobUrl);
   }
 
   async addPin(scope: EnvironmentScope, entry: StoredPinnedJobEntry): Promise<void> {
-    const entries = await this.getPins(scope);
-    const index = entries.findIndex(
-      (item) => item.environmentId === entry.environmentId && item.jobUrl === entry.jobUrl
-    );
-
-    if (index >= 0) {
-      const existing = entries[index];
-      entries[index] = {
-        ...existing,
-        jobName: entry.jobName ?? existing.jobName,
-        jobKind: entry.jobKind ?? existing.jobKind
-      };
-    } else {
-      entries.push(entry);
-    }
-
-    await this.savePins(scope, entries);
+    await this.addOrUpdate(scope, entry, (existing, incoming) => ({
+      ...existing,
+      jobName: incoming.jobName ?? existing.jobName,
+      jobKind: incoming.jobKind ?? existing.jobKind
+    }));
   }
 
   async removePin(
@@ -73,23 +47,11 @@ export class JenkinsPinStore {
     environmentId: string,
     jobUrl: string
   ): Promise<boolean> {
-    const entries = await this.getPins(scope);
-    const next = entries.filter(
-      (entry) => entry.environmentId !== environmentId || entry.jobUrl !== jobUrl
-    );
-    if (next.length === entries.length) {
-      return false;
-    }
-    await this.savePins(scope, next);
-    return true;
+    return this.remove(scope, environmentId, jobUrl);
   }
 
   async removePinsForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
-    const entries = await this.getPins(scope);
-    const next = entries.filter((entry) => entry.environmentId !== environmentId);
-    if (next.length !== entries.length) {
-      await this.savePins(scope, next);
-    }
+    await this.removeForEnvironment(scope, environmentId);
   }
 
   async updatePinUrl(
@@ -99,42 +61,6 @@ export class JenkinsPinStore {
     newJobUrl: string,
     newJobName?: string
   ): Promise<boolean> {
-    const entries = await this.getPins(scope);
-    let found = false;
-    const next: StoredPinnedJobEntry[] = [];
-
-    for (const entry of entries) {
-      if (entry.environmentId === environmentId && entry.jobUrl === oldJobUrl) {
-        found = true;
-        next.push({
-          ...entry,
-          jobUrl: newJobUrl,
-          jobName: newJobName ?? entry.jobName
-        });
-      } else {
-        next.push(entry);
-      }
-    }
-
-    if (found) {
-      await this.savePins(scope, next);
-    }
-
-    return found;
-  }
-
-  private getPins(scope: EnvironmentScope): Promise<StoredPinnedJobEntry[]> {
-    const memento = this.getMemento(scope);
-    const stored = memento.get<StoredPinnedJobEntry[]>(PINNED_JOBS_KEY);
-    return Promise.resolve(Array.isArray(stored) ? stored : []);
-  }
-
-  private async savePins(scope: EnvironmentScope, entries: StoredPinnedJobEntry[]): Promise<void> {
-    const memento = this.getMemento(scope);
-    await memento.update(PINNED_JOBS_KEY, entries);
-  }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
+    return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName);
   }
 }

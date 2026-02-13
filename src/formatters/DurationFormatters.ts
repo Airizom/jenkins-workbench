@@ -1,11 +1,12 @@
-export function formatDurationMs(duration: number): string {
-  if (!Number.isFinite(duration)) {
+export function formatDurationMs(duration?: number): string {
+  if (duration === undefined || !Number.isFinite(duration)) {
     return "Unknown";
   }
-  if (duration < 1000) {
-    return `${Math.max(0, Math.floor(duration))} ms`;
+  const normalizedDuration = Math.max(0, Math.floor(duration));
+  if (normalizedDuration < 1000) {
+    return `${normalizedDuration} ms`;
   }
-  const totalSeconds = Math.floor(duration / 1000);
+  const totalSeconds = Math.floor(normalizedDuration / 1000);
   const seconds = totalSeconds % 60;
   const minutes = Math.floor(totalSeconds / 60) % 60;
   const hours = Math.floor(totalSeconds / 3600) % 24;
