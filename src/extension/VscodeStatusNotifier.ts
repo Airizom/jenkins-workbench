@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { formatCompletionStatus } from "../formatters/CompletionFormatters";
+import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 import type {
   CompletionNotification,
   PendingInputNotification,
@@ -36,7 +37,10 @@ export class VscodeStatusNotifier implements StatusNotifier {
     const action = "Open in Jenkins";
     void vscode.window.showInformationMessage(message, action).then((selection) => {
       if (selection === action) {
-        void vscode.env.openExternal(vscode.Uri.parse(notification.buildUrl));
+        void openExternalHttpUrlWithWarning(notification.buildUrl, {
+          targetLabel: "Jenkins build URL",
+          sourceLabel: "notification"
+        });
       }
     });
   }

@@ -32,6 +32,7 @@ import {
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ExtensionRefreshHost } from "../extension/ExtensionRefreshHost";
 import { NodeActionService } from "../services/NodeActionService";
+import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 
 interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
   nodeUrl: string;
@@ -382,16 +383,10 @@ export class NodeDetailsPanel {
   }
 
   private async openExternalUrl(url: string): Promise<void> {
-    let parsed: vscode.Uri;
-    try {
-      parsed = vscode.Uri.parse(url);
-    } catch {
-      return;
-    }
-    if (parsed.scheme !== "http" && parsed.scheme !== "https") {
-      return;
-    }
-    await vscode.env.openExternal(parsed);
+    await openExternalHttpUrlWithWarning(url, {
+      targetLabel: "Jenkins URL",
+      sourceLabel: "Node Details"
+    });
   }
 
   private async copyJson(content: string): Promise<void> {

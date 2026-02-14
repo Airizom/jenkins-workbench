@@ -15,6 +15,7 @@ import type { JenkinsViewStateStore, JobFilterMode } from "../storage/JenkinsVie
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import type { JenkinsTreeNavigator } from "../tree/TreeNavigator";
 import { formatJobColor } from "../tree/formatters";
+import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 
 type JobQuickPickItem = vscode.QuickPickItem & {
   environment: JenkinsEnvironmentRef;
@@ -90,7 +91,9 @@ async function goToJob(
     quickPick.hide();
     const revealed = await revealJobInTree(navigator, selection.environment, selection.entry);
     if (!revealed) {
-      await vscode.env.openExternal(vscode.Uri.parse(selection.entry.url));
+      await openExternalHttpUrlWithWarning(selection.entry.url, {
+        targetLabel: "selected Jenkins job URL"
+      });
     }
   });
 

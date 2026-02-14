@@ -8,6 +8,7 @@ import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
+import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
 import { promptForParameters } from "../../ui/ParameterPrompts";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { formatActionError, getOpenUrl, getTreeItemLabel } from "../CommandUtils";
@@ -214,7 +215,9 @@ export async function openInJenkins(
     return;
   }
 
-  await vscode.env.openExternal(vscode.Uri.parse(url));
+  await openExternalHttpUrlWithWarning(url, {
+    targetLabel: "Jenkins URL"
+  });
 }
 
 export async function showBuildDetails(

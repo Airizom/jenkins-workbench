@@ -147,7 +147,12 @@ export function resolveNodeUrl(baseUrl: string, node: JenkinsNode): string | und
 }
 
 export function isAuthRedirect(location: string, baseUrl: string): boolean {
-  const target = new URL(location, baseUrl);
+  let target: URL;
+  try {
+    target = new URL(location, baseUrl);
+  } catch {
+    return false;
+  }
   const path = target.pathname.toLowerCase();
 
   return (

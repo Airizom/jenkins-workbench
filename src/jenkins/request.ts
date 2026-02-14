@@ -5,6 +5,111 @@ import { JenkinsMaxBytesError, JenkinsRequestError } from "./errors";
 import { isAuthRedirect } from "./urls";
 
 const DEFAULT_TIMEOUT_MS = 30000;
+const MAX_REDIRECTS = 5;
+
+function resolveRedirectLocation(
+  location: string | string[] | undefined,
+  baseUrl: string
+): string | undefined {
+  const rawLocation = Array.isArray(location) ? location.at(0) : location;
+  if (!rawLocation) {
+    return undefined;
+  }
+  try {
+    return new URL(rawLocation, baseUrl).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+type RedirectDecision =
+  | {
+      type: "none";
+    }
+  | {
+      type: "follow";
+      nextUrl: string;
+      redirectCount: number;
+    }
+  | {
+      type: "cannotFollow";
+    }
+  | {
+      type: "reject";
+      error: JenkinsRequestError;
+    };
+
+interface RedirectDecisionInput {
+  statusCode: number;
+  method: "GET" | "POST" | "HEAD";
+  location: string | string[] | undefined;
+  currentUrl: string;
+  redirectCount: number;
+}
+
+function decideRedirect({
+  statusCode,
+  method,
+  location,
+  currentUrl,
+  redirectCount
+}: RedirectDecisionInput): RedirectDecision {
+  if (statusCode < 300 || statusCode >= 400) {
+    return { type: "none" };
+  }
+
+  const canFollowRedirect = method === "GET" || method === "HEAD";
+  if (location === undefined) {
+    if (canFollowRedirect) {
+      return { type: "none" };
+    }
+    return {
+      type: "reject",
+      error: new JenkinsRequestError(
+        "Jenkins returned a redirect without a location header.",
+        statusCode
+      )
+    };
+  }
+
+  const nextUrl = resolveRedirectLocation(location, currentUrl);
+  if (!nextUrl) {
+    return {
+      type: "reject",
+      error: new JenkinsRequestError(
+        "Jenkins returned an invalid redirect location header.",
+        statusCode
+      )
+    };
+  }
+
+  if (isAuthRedirect(nextUrl, currentUrl)) {
+    return {
+      type: "reject",
+      error: new JenkinsRequestError(
+        "Jenkins redirected to login. Check credentials or CSRF settings.",
+        statusCode
+      )
+    };
+  }
+
+  if (!canFollowRedirect) {
+    return { type: "cannotFollow" };
+  }
+
+  if (redirectCount >= MAX_REDIRECTS) {
+    return {
+      type: "reject",
+      error: new JenkinsRequestError("Too many redirects from Jenkins API.")
+    };
+  }
+
+  return {
+    type: "follow",
+    nextUrl,
+    redirectCount: redirectCount + 1
+  };
+}
 
 export interface JenkinsRequestOptions {
   method?: "GET" | "POST" | "HEAD";
@@ -192,6 +297,232 @@ interface JenkinsStreamRequestOptions {
   maxBytes?: number;
 }
 
+interface JenkinsCollectedResponseBody {
+  text?: string;
+  buffer?: Buffer;
+}
+
+function collectResponseBody(
+  res: http.IncomingMessage,
+  statusCode: number,
+  options: JenkinsRequestOptions
+): Promise<JenkinsCollectedResponseBody> {
+  const collectBuffer = options.returnBuffer === true;
+  const maxBytes = collectBuffer ? normalizeMaxBytes(options.maxBytes) : undefined;
+  const contentLength = parseContentLength(res.headers["content-length"]);
+  if (maxBytes !== undefined && contentLength !== undefined && contentLength > maxBytes) {
+    res.destroy();
+    return Promise.reject(new JenkinsMaxBytesError(maxBytes, statusCode));
+  }
+
+  return new Promise<JenkinsCollectedResponseBody>((resolve, reject) => {
+    let settled = false;
+    const safeResolve = (value: JenkinsCollectedResponseBody): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(value);
+    };
+    const safeReject = (error: Error): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
+
+    if (collectBuffer) {
+      const maxLength = maxBytes ?? Number.POSITIVE_INFINITY;
+      const chunks: Buffer[] = [];
+      let receivedBytes = 0;
+      res.on("data", (chunk) => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        receivedBytes += buffer.length;
+        if (receivedBytes > maxLength) {
+          safeReject(new JenkinsMaxBytesError(maxLength, statusCode));
+          res.destroy();
+          return;
+        }
+        chunks.push(buffer);
+      });
+      res.on("end", () => {
+        safeResolve({ buffer: Buffer.concat(chunks) });
+      });
+      res.on("error", (error) => {
+        safeReject(error instanceof Error ? error : new Error(String(error)));
+      });
+      return;
+    }
+
+    let text = "";
+    res.setEncoding("utf8");
+    res.on("data", (chunk) => {
+      text += chunk;
+    });
+    res.on("end", () => {
+      safeResolve({ text });
+    });
+    res.on("error", (error) => {
+      safeReject(error instanceof Error ? error : new Error(String(error)));
+    });
+  });
+}
+
+function materializeResponse<T>(
+  options: JenkinsRequestOptions,
+  res: http.IncomingMessage,
+  body: JenkinsCollectedResponseBody
+): T {
+  if (options.returnHeaders) {
+    if (options.returnBuffer) {
+      return { data: body.buffer ?? Buffer.alloc(0), headers: res.headers } as T;
+    }
+    if (options.returnText) {
+      return { text: body.text ?? "", headers: res.headers } as T;
+    }
+    return res.headers as T;
+  }
+
+  if (!options.parseJson) {
+    if (options.returnBuffer) {
+      return (body.buffer ?? Buffer.alloc(0)) as T;
+    }
+    if (options.returnText) {
+      return (body.text ?? "") as T;
+    }
+    return undefined as T;
+  }
+
+  return JSON.parse(body.text ?? "") as T;
+}
+
+function getResponseTextForError(
+  options: JenkinsRequestOptions,
+  body: JenkinsCollectedResponseBody
+): string | undefined {
+  if (!options.returnText || options.returnBuffer) {
+    return undefined;
+  }
+  return body.text ?? "";
+}
+
+type RequestResponseStatusPolicy = "requireSuccessStatus" | "skipStatusCheck";
+
+type RequestResponsePlan =
+  | {
+      type: "resolveImmediately";
+    }
+  | {
+      type: "collectAndMaterialize";
+      statusPolicy: RequestResponseStatusPolicy;
+    };
+
+type RequestRedirectResolution =
+  | {
+      type: "reject";
+      error: JenkinsRequestError;
+    }
+  | {
+      type: "follow";
+      nextUrl: string;
+      redirectCount: number;
+    }
+  | {
+      type: "continue";
+    };
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function isSuccessStatusCode(statusCode: number): boolean {
+  return statusCode >= 200 && statusCode < 300;
+}
+
+function buildStatusCodeError(
+  statusCode: number,
+  statusMessage: string | undefined,
+  responseText?: string
+): JenkinsRequestError {
+  return new JenkinsRequestError(
+    `Jenkins API request failed (${statusCode} ${statusMessage ?? ""})`,
+    statusCode,
+    responseText
+  );
+}
+
+function resolveRequestRedirect(redirectDecision: RedirectDecision): RequestRedirectResolution {
+  if (redirectDecision.type === "reject") {
+    return {
+      type: "reject",
+      error: redirectDecision.error
+    };
+  }
+  if (redirectDecision.type === "follow") {
+    return {
+      type: "follow",
+      nextUrl: redirectDecision.nextUrl,
+      redirectCount: redirectDecision.redirectCount
+    };
+  }
+  return { type: "continue" };
+}
+
+function resolveResponseStatusPolicy(
+  options: JenkinsRequestOptions,
+  redirectDecision: RedirectDecision
+): RequestResponseStatusPolicy {
+  if (
+    redirectDecision.type === "cannotFollow" &&
+    !options.parseJson &&
+    (options.returnHeaders || options.returnText || options.returnBuffer)
+  ) {
+    return "skipStatusCheck";
+  }
+  return "requireSuccessStatus";
+}
+
+function buildRequestResponsePlan(
+  options: JenkinsRequestOptions,
+  redirectDecision: RedirectDecision
+): RequestResponsePlan {
+  const statusPolicy = resolveResponseStatusPolicy(options, redirectDecision);
+  if (
+    redirectDecision.type === "cannotFollow" &&
+    statusPolicy === "requireSuccessStatus" &&
+    !options.parseJson
+  ) {
+    return { type: "resolveImmediately" };
+  }
+  return {
+    type: "collectAndMaterialize",
+    statusPolicy
+  };
+}
+
+async function decodeAndMaterializeResponse<T>(
+  res: http.IncomingMessage,
+  statusCode: number,
+  options: JenkinsRequestOptions,
+  statusPolicy: RequestResponseStatusPolicy
+): Promise<T> {
+  const body = await collectResponseBody(res, statusCode, options);
+  if (statusPolicy === "requireSuccessStatus" && !isSuccessStatusCode(statusCode)) {
+    throw buildStatusCodeError(
+      statusCode,
+      res.statusMessage,
+      getResponseTextForError(options, body)
+    );
+  }
+
+  try {
+    return materializeResponse<T>(options, res, body);
+  } catch (error) {
+    throw new JenkinsRequestError(`Failed to parse Jenkins response: ${toError(error).message}`);
+  }
+}
+
 function requestStreamInternal(
   url: string,
   options: JenkinsStreamRequestOptions
@@ -211,7 +542,6 @@ function requestStreamInternal(
 
   return new Promise<JenkinsStreamResponse>((resolve, reject) => {
     const method = options.method ?? "GET";
-    const canFollowRedirect = method === "GET" || method === "HEAD";
     let timeoutId: NodeJS.Timeout | undefined;
     let settled = false;
 
@@ -251,59 +581,30 @@ function requestStreamInternal(
       },
       (res) => {
         const statusCode = res.statusCode ?? 0;
-        if (statusCode >= 300 && statusCode < 400) {
-          const location = res.headers.location;
-          if (location && canFollowRedirect) {
-            if (isAuthRedirect(location, url)) {
-              safeReject(
-                new JenkinsRequestError(
-                  "Jenkins redirected to login. Check credentials or CSRF settings.",
-                  statusCode
-                )
-              );
-              return;
-            }
-            if ((options.redirectCount ?? 0) >= 5) {
-              safeReject(new JenkinsRequestError("Too many redirects from Jenkins API."));
-              return;
-            }
-            clearTimer();
-            const nextUrl = new URL(location, url).toString();
-            requestStreamInternal(nextUrl, {
-              ...options,
-              redirectCount: (options.redirectCount ?? 0) + 1
-            })
-              .then(resolve)
-              .catch(reject);
-            return;
-          }
-
-          if (!canFollowRedirect) {
-            if (!location) {
-              safeReject(
-                new JenkinsRequestError(
-                  "Jenkins returned a redirect without a location header.",
-                  statusCode
-                )
-              );
-              return;
-            }
-
-            if (isAuthRedirect(location, url)) {
-              safeReject(
-                new JenkinsRequestError(
-                  "Jenkins redirected to login. Check credentials or CSRF settings.",
-                  statusCode
-                )
-              );
-              return;
-            }
-
-            safeReject(
-              new JenkinsRequestError("Jenkins returned a redirect that cannot be followed.")
-            );
-            return;
-          }
+        const redirectDecision = decideRedirect({
+          statusCode,
+          method,
+          location: res.headers.location,
+          currentUrl: url,
+          redirectCount: options.redirectCount ?? 0
+        });
+        if (redirectDecision.type === "reject") {
+          safeReject(redirectDecision.error);
+          return;
+        }
+        if (redirectDecision.type === "follow") {
+          clearTimer();
+          requestStreamInternal(redirectDecision.nextUrl, {
+            ...options,
+            redirectCount: redirectDecision.redirectCount
+          })
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+        if (redirectDecision.type === "cannotFollow") {
+          safeReject(new JenkinsRequestError("Jenkins returned a redirect that cannot be followed."));
+          return;
         }
 
         if (statusCode < 200 || statusCode >= 300) {
@@ -386,7 +687,6 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
 
   return new Promise<T>((resolve, reject) => {
     const method = options.method ?? "GET";
-    const canFollowRedirect = method === "GET" || method === "HEAD";
     let timeoutId: NodeJS.Timeout | undefined;
     let settled = false;
 
@@ -426,201 +726,46 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
       },
       (res) => {
         const statusCode = res.statusCode ?? 0;
-        if (statusCode >= 300 && statusCode < 400) {
-          const location = res.headers.location;
-          if (location && canFollowRedirect) {
-            if (isAuthRedirect(location, url)) {
-              safeReject(
-                new JenkinsRequestError(
-                  "Jenkins redirected to login. Check credentials or CSRF settings.",
-                  statusCode
-                )
-              );
-              return;
-            }
-            if ((options.redirectCount ?? 0) >= 5) {
-              safeReject(new JenkinsRequestError("Too many redirects from Jenkins API."));
-              return;
-            }
-            clearTimer();
-            const nextUrl = new URL(location, url).toString();
-            request<T>(nextUrl, {
-              ...options,
-              redirectCount: (options.redirectCount ?? 0) + 1
-            })
-              .then(resolve)
-              .catch(reject);
-            return;
-          }
-
-          if (!canFollowRedirect) {
-            if (!location) {
-              safeReject(
-                new JenkinsRequestError(
-                  "Jenkins returned a redirect without a location header.",
-                  statusCode
-                )
-              );
-              return;
-            }
-
-            if (isAuthRedirect(location, url)) {
-              safeReject(
-                new JenkinsRequestError(
-                  "Jenkins redirected to login. Check credentials or CSRF settings.",
-                  statusCode
-                )
-              );
-              return;
-            }
-
-            if (!options.parseJson) {
-              if (options.returnHeaders || options.returnText || options.returnBuffer) {
-                let raw = "";
-                const maxBytes = normalizeMaxBytes(options.maxBytes);
-                const maxLength = maxBytes ?? Number.POSITIVE_INFINITY;
-                let receivedBytes = 0;
-                const contentLength = parseContentLength(res.headers["content-length"]);
-                if (
-                  maxBytes !== undefined &&
-                  contentLength !== undefined &&
-                  contentLength > maxBytes
-                ) {
-                  safeReject(new JenkinsMaxBytesError(maxBytes, statusCode));
-                  res.destroy();
-                  return;
-                }
-                const chunks: Buffer[] = [];
-                if (options.returnText) {
-                  res.setEncoding("utf8");
-                }
-                res.on("data", (chunk) => {
-                  if (options.returnBuffer) {
-                    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-                    receivedBytes += buffer.length;
-                    if (receivedBytes > maxLength) {
-                      safeReject(new JenkinsMaxBytesError(maxLength, statusCode));
-                      res.destroy();
-                      return;
-                    }
-                    chunks.push(buffer);
-                  } else if (options.returnText) {
-                    raw += chunk;
-                  }
-                });
-                res.on("end", () => {
-                  if (options.returnHeaders) {
-                    if (options.returnBuffer) {
-                      safeResolve({ data: Buffer.concat(chunks), headers: res.headers } as T);
-                      return;
-                    }
-                    if (options.returnText) {
-                      safeResolve({ text: raw, headers: res.headers } as T);
-                      return;
-                    }
-                    safeResolve(res.headers as T);
-                    return;
-                  }
-                  if (options.returnBuffer) {
-                    safeResolve(Buffer.concat(chunks) as T);
-                    return;
-                  }
-                  safeResolve(raw as T);
-                });
-                return;
-              }
-
-              safeResolve(undefined as T);
-              return;
-            }
-          }
-        }
-
-        let raw = "";
-        const chunks: Buffer[] = [];
-        const maxBytes = normalizeMaxBytes(options.maxBytes);
-        const maxLength = maxBytes ?? Number.POSITIVE_INFINITY;
-        let receivedBytes = 0;
-        const contentLength = parseContentLength(res.headers["content-length"]);
-        if (options.returnBuffer && maxBytes !== undefined && contentLength !== undefined) {
-          if (contentLength > maxBytes) {
-            safeReject(new JenkinsMaxBytesError(maxBytes, statusCode));
-            res.destroy();
-            return;
-          }
-        }
-
-        if (!options.returnBuffer) {
-          res.setEncoding("utf8");
-        }
-        res.on("data", (chunk) => {
-          if (options.returnBuffer) {
-            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-            receivedBytes += buffer.length;
-            if (receivedBytes > maxLength) {
-              safeReject(new JenkinsMaxBytesError(maxLength, statusCode));
-              res.destroy();
-              return;
-            }
-            chunks.push(buffer);
-            return;
-          }
-          raw += chunk;
+        const redirectDecision = decideRedirect({
+          statusCode,
+          method,
+          location: res.headers.location,
+          currentUrl: url,
+          redirectCount: options.redirectCount ?? 0
         });
-        res.on("end", () => {
-          if (statusCode < 200 || statusCode >= 300) {
-            const responseText = options.returnText ? raw : undefined;
-            safeReject(
-              new JenkinsRequestError(
-                `Jenkins API request failed (${statusCode} ${res.statusMessage ?? ""})`,
-                statusCode,
-                responseText
-              )
-            );
-            return;
-          }
+        const redirectResolution = resolveRequestRedirect(redirectDecision);
+        if (redirectResolution.type === "reject") {
+          safeReject(redirectResolution.error);
+          return;
+        }
+        if (redirectResolution.type === "follow") {
+          clearTimer();
+          request<T>(redirectResolution.nextUrl, {
+            ...options,
+            redirectCount: redirectResolution.redirectCount
+          })
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+        const responsePlan = buildRequestResponsePlan(options, redirectDecision);
+        if (responsePlan.type === "resolveImmediately") {
+          safeResolve(undefined as T);
+          return;
+        }
 
-          if (options.returnHeaders) {
-            if (options.returnBuffer) {
-              safeResolve({ data: Buffer.concat(chunks), headers: res.headers } as T);
-              return;
-            }
-            if (options.returnText) {
-              safeResolve({ text: raw, headers: res.headers } as T);
-              return;
-            }
-            safeResolve(res.headers as T);
-            return;
-          }
-
-          if (!options.parseJson) {
-            if (options.returnBuffer) {
-              safeResolve(Buffer.concat(chunks) as T);
-              return;
-            }
-            if (options.returnText) {
-              safeResolve(raw as T);
-              return;
-            }
-            safeResolve(undefined as T);
-            return;
-          }
-
-          try {
-            safeResolve(JSON.parse(raw) as T);
-          } catch (error) {
-            safeReject(
-              new JenkinsRequestError(
-                `Failed to parse Jenkins response: ${(error as Error).message}`
-              )
-            );
-          }
-        });
+        decodeAndMaterializeResponse<T>(res, statusCode, options, responsePlan.statusPolicy)
+          .then((result) => {
+            safeResolve(result);
+          })
+          .catch((error) => {
+            safeReject(toError(error));
+          });
       }
     );
 
     req.on("error", (error) => {
-      safeReject(error instanceof Error ? error : new Error(String(error)));
+      safeReject(toError(error));
     });
 
     req.on("timeout", () => {

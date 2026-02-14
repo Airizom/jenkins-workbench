@@ -5,6 +5,7 @@ import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 import { handlePendingInputAction } from "../ui/PendingInputActions";
 import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
 import {
@@ -538,7 +539,7 @@ export class BuildDetailsPanel {
       action
     );
     if (selection === action && this.state.currentBuildUrl) {
-      await vscode.env.openExternal(vscode.Uri.parse(this.state.currentBuildUrl));
+      await this.openExternalUrl(this.state.currentBuildUrl);
     }
   }
 
@@ -670,16 +671,10 @@ export class BuildDetailsPanel {
   }
 
   private async openExternalUrl(url: string): Promise<void> {
-    let parsed: vscode.Uri;
-    try {
-      parsed = vscode.Uri.parse(url);
-    } catch {
-      return;
-    }
-    if (parsed.scheme !== "http" && parsed.scheme !== "https") {
-      return;
-    }
-    await vscode.env.openExternal(parsed);
+    await openExternalHttpUrlWithWarning(url, {
+      targetLabel: "Jenkins URL",
+      sourceLabel: "Build Details"
+    });
   }
 
   private postMessage(message: BuildDetailsOutgoingMessage): void {
