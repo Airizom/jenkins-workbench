@@ -9,6 +9,7 @@ export type NodeDetailsIncomingMessage =
 
 export type NodeDetailsState = NodeDetailsViewModel & {
   loading: boolean;
+  hasLoaded: boolean;
 };
 
 export type NodeDetailsAction =
@@ -45,7 +46,8 @@ export const FALLBACK_STATE: NodeDetailsState = {
   rawJson: "",
   errors: [],
   advancedLoaded: false,
-  loading: true
+  loading: true,
+  hasLoaded: false
 };
 
 export function buildInitialState(initialState: NodeDetailsViewModel): NodeDetailsState {
@@ -59,7 +61,8 @@ export function buildInitialState(initialState: NodeDetailsViewModel): NodeDetai
     loadStatistics: initialState.loadStatistics ?? [],
     errors: initialState.errors ?? [],
     advancedLoaded: initialState.advancedLoaded ?? false,
-    loading: false
+    loading: false,
+    hasLoaded: true
   };
 }
 
@@ -70,8 +73,13 @@ export function nodeDetailsReducer(
   switch (action.type) {
     case "setLoading":
       return { ...state, loading: action.value };
-    case "updateNodeDetails":
-      return buildInitialState(action.payload.payload);
+    case "updateNodeDetails": {
+      const nextState = buildInitialState(action.payload.payload);
+      return {
+        ...nextState,
+        loading: state.loading
+      };
+    }
     default:
       return state;
   }

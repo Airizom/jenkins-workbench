@@ -8,7 +8,8 @@ export type BuildDetailsOutgoingMessage =
   | { type: "appendConsoleHtml"; html: string }
   | { type: "setConsole"; text: string; truncated: boolean }
   | { type: "setConsoleHtml"; html: string; truncated: boolean }
-  | { type: "setErrors"; errors: string[] };
+  | { type: "setErrors"; errors: string[] }
+  | { type: "setLoading"; value: boolean };
 
 export interface ToggleFollowLogMessage {
   type: "toggleFollowLog";

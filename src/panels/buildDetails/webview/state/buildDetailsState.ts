@@ -20,6 +20,7 @@ export type { BuildDetailsIncomingMessage };
 
 export type BuildDetailsState = BuildDetailsViewModel & {
   consoleHtmlModel?: ConsoleHtmlModel;
+  hasLoaded: boolean;
 };
 
 export type BuildDetailsAction =
@@ -61,7 +62,8 @@ export const FALLBACK_STATE: BuildDetailsState = {
   consoleMaxChars: 0,
   errors: [],
   followLog: true,
-  loading: true
+  loading: true,
+  hasLoaded: false
 };
 
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
@@ -69,7 +71,8 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
     ...FALLBACK_STATE,
     ...initialState,
     consoleHtmlModel: undefined,
-    loading: initialState.loading ?? false
+    loading: initialState.loading ?? false,
+    hasLoaded: !(initialState.loading ?? false)
   };
   if (merged.consoleHtml) {
     return {
@@ -156,7 +159,8 @@ export function buildDetailsReducer(
         pipelineStagesLoading: payload.pipelineStagesLoading,
         insights: payload.insights,
         pipelineStages: payload.pipelineStages,
-        pendingInputs: payload.pendingInputs ?? []
+        pendingInputs: payload.pendingInputs ?? [],
+        hasLoaded: true
       };
     }
     default:
@@ -174,7 +178,7 @@ export function getInitialState(): BuildDetailsViewModel {
     ...candidate,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,
     pendingInputs: candidate.pendingInputs ?? [],
-    loading: false
+    loading: candidate.loading ?? false
   };
 }
 

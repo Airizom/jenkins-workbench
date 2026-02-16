@@ -35,14 +35,8 @@ import {
 import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
 import { buildUpdateMessageFromState } from "./buildDetails/BuildDetailsUpdateBuilder";
 import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
-import {
-  renderWebviewShell,
-  renderWebviewStateScript
-} from "./shared/webview/WebviewHtml";
-import {
-  getWebviewAssetsRoot,
-  resolveWebviewAssets
-} from "./shared/webview/WebviewAssets";
+import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
+import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
   isSerializedEnvironmentState,
@@ -98,6 +92,7 @@ export class BuildDetailsPanel {
   private pollingController?: BuildDetailsPollingController;
   private refreshHost?: { refreshEnvironment(environmentId: string): void };
   private pendingInputProvider?: PendingInputActionProvider;
+  private loadingRequests = 0;
 
   static async show(
     dataService: BuildDetailsDataService,
@@ -243,6 +238,7 @@ export class BuildDetailsPanel {
     this.pollingController?.dispose();
     this.pollingController = undefined;
     this.stopCompletionPolling();
+    this.loadingRequests = 0;
     BuildDetailsPanel.currentPanel = undefined;
     while (this.disposables.length > 0) {
       const disposable = this.disposables.pop();
@@ -263,6 +259,7 @@ export class BuildDetailsPanel {
     this.stopCompletionPolling();
     this.dataService = dataService;
     this.artifactActionHandler = artifactActionHandler;
+    this.loadingRequests = 0;
     this.state.resetForLoad(environment, buildUrl, createNonce());
     const panelState = createBuildDetailsPanelState(environment, buildUrl);
     let scriptUri: string;
@@ -378,17 +375,22 @@ export class BuildDetailsPanel {
   }
 
   private async handlePanelVisible(): Promise<void> {
+    this.beginLoading();
     this.stopCompletionPolling();
-    await this.refreshBuildStatus(this.loadToken);
-    if (this.state.lastDetailsBuilding) {
-      this.pollingController?.start();
-    } else {
-      await Promise.all([
-        this.refreshConsoleSnapshot(this.loadToken),
-        this.refreshTestReport(this.loadToken),
-        this.refreshWorkflowRun(this.loadToken),
-        this.pollingController?.refreshPendingInputs()
-      ]);
+    try {
+      await this.refreshBuildStatus(this.loadToken);
+      if (this.state.lastDetailsBuilding) {
+        this.pollingController?.start();
+      } else {
+        await Promise.all([
+          this.refreshConsoleSnapshot(this.loadToken),
+          this.refreshTestReport(this.loadToken),
+          this.refreshWorkflowRun(this.loadToken),
+          this.pollingController?.refreshPendingInputs()
+        ]);
+      }
+    } finally {
+      this.endLoading();
     }
   }
 
@@ -688,6 +690,23 @@ export class BuildDetailsPanel {
     }
   }
 
+  private beginLoading(): void {
+    this.loadingRequests += 1;
+    if (this.loadingRequests === 1) {
+      this.postMessage({ type: "setLoading", value: true });
+    }
+  }
+
+  private endLoading(): void {
+    if (this.loadingRequests === 0) {
+      return;
+    }
+    this.loadingRequests -= 1;
+    if (this.loadingRequests === 0) {
+      this.postMessage({ type: "setLoading", value: false });
+    }
+  }
+
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
   }
@@ -700,9 +719,7 @@ export class BuildDetailsPanel {
     panel.iconPath = BuildDetailsPanel.getIconPaths(extensionUri);
   }
 
-  private static getIconPaths(
-    extensionUri: vscode.Uri
-  ): { light: vscode.Uri; dark: vscode.Uri } {
+  private static getIconPaths(extensionUri: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
     const lightIconPath = vscode.Uri.joinPath(
       extensionUri,
       "resources",
@@ -722,7 +739,11 @@ export class BuildDetailsPanel {
     const nonce = createNonce();
     let styleUris: string[] = [];
     try {
-      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "buildDetails").styleUris;
+      styleUris = resolveWebviewAssets(
+        this.panel.webview,
+        this.extensionUri,
+        "buildDetails"
+      ).styleUris;
     } catch {
       styleUris = [];
     }

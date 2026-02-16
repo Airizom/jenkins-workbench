@@ -15,14 +15,8 @@ import {
 } from "./nodeDetails/NodeDetailsMessages";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
-import {
-  renderWebviewShell,
-  renderWebviewStateScript
-} from "./shared/webview/WebviewHtml";
-import {
-  getWebviewAssetsRoot,
-  resolveWebviewAssets
-} from "./shared/webview/WebviewAssets";
+import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
+import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
   isSerializedEnvironmentState,
@@ -80,6 +74,7 @@ export class NodeDetailsPanel {
   private hasRendered = false;
   private nonce = createNonce();
   private advancedLoaded = false;
+  private loadingRequests = 0;
 
   static async show(
     dataService: JenkinsDataService,
@@ -201,6 +196,7 @@ export class NodeDetailsPanel {
 
   private dispose(): void {
     NodeDetailsPanel.currentPanel = undefined;
+    this.loadingRequests = 0;
     if (this.refreshSubscription) {
       this.refreshSubscription.dispose();
       this.refreshSubscription = undefined;
@@ -217,6 +213,7 @@ export class NodeDetailsPanel {
     this.nonce = createNonce();
     this.lastDetails = undefined;
     this.advancedLoaded = false;
+    this.loadingRequests = 0;
     const panelState =
       this.environment && this.nodeUrl
         ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
@@ -282,7 +279,7 @@ export class NodeDetailsPanel {
     const token = ++this.loadToken;
     const shouldToggleLoading = !options?.skipLoading;
     if (shouldToggleLoading) {
-      this.postMessage({ type: "setLoading", value: true });
+      this.beginLoading();
     }
     try {
       const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel });
@@ -291,8 +288,8 @@ export class NodeDetailsPanel {
       }
       this.postMessage({ type: "updateNodeDetails", payload: model });
     } finally {
-      if (shouldToggleLoading && this.isTokenCurrent(token)) {
-        this.postMessage({ type: "setLoading", value: false });
+      if (shouldToggleLoading) {
+        this.endLoading();
       }
     }
   }
@@ -312,7 +309,7 @@ export class NodeDetailsPanel {
           }
         }
       : undefined;
-    this.postMessage({ type: "setLoading", value: true });
+    this.beginLoading();
     try {
       let didToggle = false;
       if (action === "takeNodeOffline") {
@@ -330,7 +327,7 @@ export class NodeDetailsPanel {
     } catch (error) {
       void vscode.window.showErrorMessage(formatActionError(error));
     } finally {
-      this.postMessage({ type: "setLoading", value: false });
+      this.endLoading();
     }
   }
 
@@ -440,9 +437,24 @@ export class NodeDetailsPanel {
       await this.load();
       return;
     }
-    await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic", {
-      skipLoading: true
-    });
+    await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic");
+  }
+
+  private beginLoading(): void {
+    this.loadingRequests += 1;
+    if (this.loadingRequests === 1) {
+      this.postMessage({ type: "setLoading", value: true });
+    }
+  }
+
+  private endLoading(): void {
+    if (this.loadingRequests === 0) {
+      return;
+    }
+    this.loadingRequests -= 1;
+    if (this.loadingRequests === 0) {
+      this.postMessage({ type: "setLoading", value: false });
+    }
   }
 
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
@@ -453,9 +465,7 @@ export class NodeDetailsPanel {
     panel.iconPath = NodeDetailsPanel.getIconPaths(extensionUri);
   }
 
-  private static getIconPaths(
-    extensionUri: vscode.Uri
-  ): { light: vscode.Uri; dark: vscode.Uri } {
+  private static getIconPaths(extensionUri: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
     const lightIconPath = vscode.Uri.joinPath(
       extensionUri,
       "resources",
@@ -475,7 +485,11 @@ export class NodeDetailsPanel {
     const nonce = createNonce();
     let styleUris: string[] = [];
     try {
-      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "nodeDetails").styleUris;
+      styleUris = resolveWebviewAssets(
+        this.panel.webview,
+        this.extensionUri,
+        "nodeDetails"
+      ).styleUris;
     } catch {
       styleUris = [];
     }
