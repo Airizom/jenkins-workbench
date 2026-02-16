@@ -3,6 +3,7 @@ import type {
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsBuildTriggerOptions,
+  JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNodeDetails,
@@ -16,7 +17,11 @@ import type { JenkinsClientProvider } from "./JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsDataCache } from "./data/JenkinsDataCache";
-import { toBuildActionError, toJenkinsActionError } from "./data/JenkinsDataErrors";
+import {
+  toBuildActionError,
+  toJenkinsActionError,
+  toJobManagementActionError
+} from "./data/JenkinsDataErrors";
 import type {
   ConsoleTextResult,
   ConsoleTextTailResult,
@@ -58,7 +63,7 @@ export type {
   JobSearchEntry,
   JobSearchOptions
 } from "./data/JenkinsDataTypes";
-export { BuildActionError, CancellationError } from "./errors";
+export { BuildActionError, CancellationError, JobManagementActionError } from "./errors";
 
 export interface JenkinsDataServiceOptions {
   cacheTtlMs?: number;
@@ -712,7 +717,7 @@ export class JenkinsDataService {
     try {
       return await client.renameJob(jobUrl, newName);
     } catch (error) {
-      throw toBuildActionError(error);
+      throw toJobManagementActionError(error);
     }
   }
 
@@ -721,7 +726,7 @@ export class JenkinsDataService {
     try {
       await client.deleteJob(jobUrl);
     } catch (error) {
-      throw toBuildActionError(error);
+      throw toJobManagementActionError(error);
     }
   }
 
@@ -735,7 +740,21 @@ export class JenkinsDataService {
     try {
       return await client.copyJob(parentUrl, sourceName, newName);
     } catch (error) {
-      throw toBuildActionError(error);
+      throw toJobManagementActionError(error);
+    }
+  }
+
+  async createItem(
+    kind: JenkinsItemCreateKind,
+    environment: JenkinsEnvironmentRef,
+    parentUrl: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.createItem(kind, parentUrl, newName);
+    } catch (error) {
+      throw toJobManagementActionError(error);
     }
   }
 

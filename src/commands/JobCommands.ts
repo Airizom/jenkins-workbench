@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
@@ -11,15 +12,19 @@ import {
   deleteJob,
   disableJob,
   enableJob,
+  newItem,
   renameJob
 } from "./job/JobActionHandlers";
 import { submitJobConfigDraft, updateJobConfig, viewJobConfig } from "./job/JobCommandHandlers";
 import type { JobCommandRefreshHost } from "./job/JobCommandTypes";
 import type { JobConfigUpdateWorkflow } from "./job/JobConfigUpdateWorkflow";
+import { JobNewItemTargetResolver, type JobNewItemTreeTarget } from "./job/JobNewItemTargetResolver";
+import { JobNewItemWorkflow } from "./job/JobNewItemWorkflow";
 
 export function registerJobCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
+  environmentStore: JenkinsEnvironmentStore,
   jobConfigPreviewer: JobConfigPreviewer,
   refreshHost: JobCommandRefreshHost,
   draftManager: JobConfigDraftManager,
@@ -27,8 +32,19 @@ export function registerJobCommands(
   pinStore: JenkinsPinStore,
   watchStore: JenkinsWatchStore
 ): void {
+  const newItemTargetResolver = new JobNewItemTargetResolver(environmentStore);
+  const newItemWorkflow = new JobNewItemWorkflow({
+    dataService,
+    onEnvironmentChanged: (environmentId) => {
+      dataService.clearCacheForEnvironment(environmentId);
+      refreshHost.refreshEnvironment(environmentId);
+    }
+  });
+
   const actionDeps: JobActionDependencies = {
     dataService,
+    newItemTargetResolver,
+    newItemWorkflow,
     pinStore,
     watchStore,
     refreshHost
@@ -46,6 +62,10 @@ export function registerJobCommands(
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.submitJobConfig", (uri?: vscode.Uri) =>
       submitJobConfigDraft(workflow, refreshHost, uri)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.newItem",
+      (item?: JobNewItemTreeTarget) => newItem(actionDeps, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.enableJob",

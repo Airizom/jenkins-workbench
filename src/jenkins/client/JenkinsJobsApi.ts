@@ -1,4 +1,9 @@
-import type { JenkinsJob, JenkinsJobKind, JenkinsParameterDefinition } from "../types";
+import type {
+  JenkinsItemCreateKind,
+  JenkinsJob,
+  JenkinsJobKind,
+  JenkinsParameterDefinition
+} from "../types";
 import {
   buildActionUrl,
   buildApiUrlFromBase,
@@ -15,6 +20,10 @@ import {
 const JOB_LIST_TREE = "jobs[name,url,_class,color]";
 const JOB_DETAIL_TREE =
   "name,url,_class,color,lastCompletedBuild[number,result,timestamp],lastBuild[number,url,result,building,timestamp]";
+const CREATE_ITEM_MODES: Record<JenkinsItemCreateKind, string> = {
+  job: "hudson.model.FreeStyleProject",
+  pipeline: "org.jenkinsci.plugins.workflow.job.WorkflowJob"
+};
 
 const JOB_CLASSIFIERS: Array<{ kind: JenkinsJobKind; tokens: string[] }> = [
   { kind: "folder", tokens: ["organizationfolder", "folder"] },
@@ -129,8 +138,35 @@ export class JenkinsJobsApi {
     return { newUrl: buildJobUrl(parentUrl, newName) };
   }
 
+  async createItem(
+    kind: JenkinsItemCreateKind,
+    parentUrl: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    return this.createItemWithMode(parentUrl, newName, CREATE_ITEM_MODES[kind]);
+  }
+
   private async fetchJobs(url: string): Promise<JenkinsJob[]> {
     const response = await this.context.requestJson<{ jobs?: JenkinsJob[] }>(url);
     return Array.isArray(response.jobs) ? response.jobs : [];
+  }
+
+  private async createItemWithMode(
+    parentUrl: string,
+    newName: string,
+    mode: string
+  ): Promise<{ newUrl: string }> {
+    const url = buildActionUrl(parentUrl, "createItem");
+    const params = new URLSearchParams();
+    params.set("name", newName);
+    params.set("mode", mode);
+    const fullUrl = `${url}?${params.toString()}`;
+    const response = await this.context.requestPostWithCrumb(fullUrl, "");
+
+    if (response.location) {
+      return { newUrl: response.location };
+    }
+
+    return { newUrl: buildJobUrl(parentUrl, newName) };
   }
 }

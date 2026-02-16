@@ -16,6 +16,7 @@ import type {
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
@@ -39,6 +40,7 @@ export type {
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsItemCreateKind,
   JenkinsChangeSet,
   JenkinsChangeSetItem,
   JenkinsJob,
@@ -272,6 +274,14 @@ export class JenkinsClient {
     newName: string
   ): Promise<{ newUrl: string }> {
     return this.jobsApi.copyJob(parentUrl, sourceName, newName);
+  }
+
+  async createItem(
+    kind: JenkinsItemCreateKind,
+    parentUrl: string,
+    newName: string
+  ): Promise<{ newUrl: string }> {
+    return this.jobsApi.createItem(kind, parentUrl, newName);
   }
 
   async validateDeclarativeJenkinsfile(jenkinsfileText: string): Promise<string> {

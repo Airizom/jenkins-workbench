@@ -238,6 +238,11 @@
         "icon": "$(copy)"
       },
       {
+        "command": "jenkinsWorkbench.newItem",
+        "title": "Jenkins: New Item",
+        "icon": "$(new-file)"
+      },
+      {
         "command": "jenkinsWorkbench.jenkinsfile.validateActive",
         "title": "Jenkins: Validate Jenkinsfile",
         "icon": "$(check)"
@@ -526,6 +531,21 @@
           "group": "navigation"
         },
         {
+          "command": "jenkinsWorkbench.newItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "navigation@0"
+        },
+        {
+          "command": "jenkinsWorkbench.newItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem == jobs",
+          "group": "navigation@0"
+        },
+        {
+          "command": "jenkinsWorkbench.newItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem == folder",
+          "group": "navigation@0"
+        },
+        {
           "command": "jenkinsWorkbench.triggerBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "inline@0"
@@ -704,6 +724,9 @@
         {
           "command": "jenkinsWorkbench.submitJobConfig",
           "when": "resourceScheme == jenkins-config"
+        },
+        {
+          "command": "jenkinsWorkbench.newItem"
         },
         {
           "command": "jenkinsWorkbench.enableJob",

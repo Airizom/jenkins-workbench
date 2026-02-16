@@ -1,4 +1,9 @@
-import { BuildActionError, JenkinsActionError, JenkinsRequestError } from "../errors";
+import {
+  BuildActionError,
+  JenkinsActionError,
+  JenkinsRequestError,
+  JobManagementActionError
+} from "../errors";
 
 type ActionErrorConstructor<T extends JenkinsActionError> = new (
   message: string,
@@ -47,6 +52,9 @@ const toActionError = <T extends JenkinsActionError>(
 
 export const toBuildActionError = (error: unknown): BuildActionError =>
   toActionError(error, BuildActionError);
+
+export const toJobManagementActionError = (error: unknown): JobManagementActionError =>
+  toActionError(error, JobManagementActionError);
 
 export const toJenkinsActionError = (error: unknown): JenkinsActionError =>
   toActionError(error, JenkinsActionError);

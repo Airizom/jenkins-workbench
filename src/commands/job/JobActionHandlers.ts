@@ -8,9 +8,13 @@ import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 import type { JobCommandRefreshHost } from "./JobCommandTypes";
 import { removeJobMetadataOnDelete, updateJobMetadataOnRename } from "./JobMetadataCoordinator";
 import { getJobNameValidationError } from "./JobNameValidation";
+import type { JobNewItemTargetResolver, JobNewItemTreeTarget } from "./JobNewItemTargetResolver";
+import type { JobNewItemWorkflow } from "./JobNewItemWorkflow";
 
 export interface JobActionDependencies {
   dataService: JenkinsDataService;
+  newItemTargetResolver: JobNewItemTargetResolver;
+  newItemWorkflow: JobNewItemWorkflow;
   pinStore: JenkinsPinStore;
   watchStore: JenkinsWatchStore;
   refreshHost: JobCommandRefreshHost;
@@ -19,6 +23,20 @@ export interface JobActionDependencies {
 function refreshEnvironment(deps: JobActionDependencies, environmentId: string): void {
   deps.dataService.clearCacheForEnvironment(environmentId);
   deps.refreshHost.refreshEnvironment(environmentId);
+}
+
+export async function newItem(
+  deps: JobActionDependencies,
+  item?: JobNewItemTreeTarget
+): Promise<void> {
+  const target = item
+    ? deps.newItemTargetResolver.resolveFromTreeItem(item)
+    : await deps.newItemTargetResolver.resolveFromEnvironmentPicker();
+  if (!target) {
+    return;
+  }
+
+  await deps.newItemWorkflow.run(target);
 }
 
 export async function enableJob(

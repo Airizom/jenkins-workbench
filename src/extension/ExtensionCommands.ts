@@ -82,6 +82,7 @@ export function registerExtensionCommands(
   registerJobCommands(
     context,
     dependencies.dataService,
+    dependencies.environmentStore,
     dependencies.jobConfigPreviewer,
     refreshHost,
     dependencies.jobConfigDraftManager,

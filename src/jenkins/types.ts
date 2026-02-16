@@ -301,4 +301,5 @@ export interface JenkinsParameterDefinition {
   description?: string;
 }
 
+export type JenkinsItemCreateKind = "job" | "pipeline";
 export type JenkinsJobKind = "folder" | "multibranch" | "pipeline" | "job" | "unknown";

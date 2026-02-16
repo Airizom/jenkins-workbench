@@ -225,6 +225,7 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | `Jenkins: View Job Config` | Open the selected job or pipeline's `config.xml` in a read-only preview |
 | `Jenkins: Update Job Config` | Open an editable draft of `config.xml`, show a diff, validate XML, and submit with confirmation |
 | `Jenkins: Submit Job Config` | Submit the active job config draft after validation and confirmation |
+| `Jenkins: New Item` | Create a Freestyle job or Pipeline at an environment root or regular folder |
 | `Jenkins: Enable Job` | Enable a disabled job or pipeline |
 | `Jenkins: Disable Job` | Disable an enabled job or pipeline |
 | `Jenkins: Rename Job` | Rename the selected job or pipeline |

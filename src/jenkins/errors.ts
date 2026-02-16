@@ -32,6 +32,7 @@ export class JenkinsActionError extends Error {
 }
 
 export class BuildActionError extends JenkinsActionError {}
+export class JobManagementActionError extends JenkinsActionError {}
 
 export class CancellationError extends Error {
   constructor() {
