@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-02-16
+
+### Added
+
+- feat: add Jenkins new item workflow for jobs and pipelines
+
+### Fixed
+
+- fix: stabilize panel loading state and refresh webview skeletons
+- fix: harden Jenkins redirect handling and external URL opens
+
+### Changed
+
+- refactor: centralize scoped job store updates
+- refactor: extract scoped job store and normalize duration formatting
+
 ## [1.32.0] - 2026-02-12
 
 ### Added
