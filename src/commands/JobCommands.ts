@@ -4,7 +4,7 @@ import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
+import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import {
   type JobActionDependencies,
@@ -13,7 +13,8 @@ import {
   disableJob,
   enableJob,
   newItem,
-  renameJob
+  renameJob,
+  scanMultibranch
 } from "./job/JobActionHandlers";
 import { submitJobConfigDraft, updateJobConfig, viewJobConfig } from "./job/JobCommandHandlers";
 import type { JobCommandRefreshHost } from "./job/JobCommandTypes";
@@ -66,6 +67,10 @@ export function registerJobCommands(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.newItem",
       (item?: JobNewItemTreeTarget) => newItem(actionDeps, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.scanMultibranch",
+      (item?: JenkinsFolderTreeItem) => scanMultibranch(actionDeps, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.enableJob",

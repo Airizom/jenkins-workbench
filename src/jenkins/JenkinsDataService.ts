@@ -12,6 +12,7 @@ import type {
   JenkinsPendingInputParameterDefinition,
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
+  ScanMultibranchResult,
   JenkinsWorkflowRun
 } from "./JenkinsClient";
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
@@ -729,6 +730,18 @@ export class JenkinsDataService {
     const client = await this.clientProvider.getClient(environment);
     try {
       await client.disableJob(jobUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async scanMultibranch(
+    environment: JenkinsEnvironmentRef,
+    folderUrl: string
+  ): Promise<ScanMultibranchResult> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.scanMultibranch(folderUrl);
     } catch (error) {
       throw toBuildActionError(error);
     }

@@ -2,7 +2,8 @@ import type {
   JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
-  JenkinsParameterDefinition
+  JenkinsParameterDefinition,
+  ScanMultibranchResult
 } from "../types";
 import {
   buildActionUrl,
@@ -94,6 +95,12 @@ export class JenkinsJobsApi {
   async disableJob(jobUrl: string): Promise<void> {
     const url = buildActionUrl(jobUrl, "disable");
     await this.context.requestVoidWithCrumb(url);
+  }
+
+  async scanMultibranch(folderUrl: string): Promise<ScanMultibranchResult> {
+    const url = buildActionUrl(folderUrl, "build");
+    const response = await this.context.requestPostWithCrumb(url);
+    return { queueLocation: response.location };
   }
 
   async renameJob(jobUrl: string, newName: string): Promise<{ newUrl: string }> {

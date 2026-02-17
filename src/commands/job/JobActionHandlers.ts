@@ -3,7 +3,7 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { parseJobUrl } from "../../jenkins/urls";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
-import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
+import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 import type { JobCommandRefreshHost } from "./JobCommandTypes";
 import { removeJobMetadataOnDelete, updateJobMetadataOnRename } from "./JobMetadataCoordinator";
@@ -37,6 +37,30 @@ export async function newItem(
   }
 
   await deps.newItemWorkflow.run(target);
+}
+
+export async function scanMultibranch(
+  deps: JobActionDependencies,
+  item?: JenkinsFolderTreeItem
+): Promise<void> {
+  if (!item || item.folderKind !== "multibranch") {
+    void vscode.window.showInformationMessage("Select a multibranch folder to scan.");
+    return;
+  }
+
+  const label = getTreeItemLabel(item);
+  const environmentId = item.environment.environmentId;
+
+  try {
+    const result = await deps.dataService.scanMultibranch(item.environment, item.folderUrl);
+    const message = result.queueLocation
+      ? `Scan started for ${label}. Queued at ${result.queueLocation}`
+      : `Scan started for ${label}.`;
+    void vscode.window.showInformationMessage(message);
+    refreshEnvironment(deps, environmentId);
+  } catch (error) {
+    void vscode.window.showErrorMessage(`Failed to scan ${label}: ${formatActionError(error)}`);
+  }
 }
 
 export async function enableJob(

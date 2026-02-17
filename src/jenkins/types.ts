@@ -6,6 +6,10 @@ export interface JenkinsClientOptions {
   requestTimeoutMs?: number;
 }
 
+export type ScanMultibranchResult = {
+  queueLocation?: string;
+};
+
 export type JenkinsAuthType = "none" | "basic" | "bearer" | "cookie" | "headers";
 
 export type JenkinsAuthConfig =

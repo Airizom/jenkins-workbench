@@ -27,6 +27,7 @@ import type {
   JenkinsProgressiveConsoleText,
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
+  ScanMultibranchResult,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "./types";
@@ -58,6 +59,7 @@ export type {
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
   JenkinsRestartFromStageInfo,
+  ScanMultibranchResult,
   JenkinsTestReport,
   JenkinsTestSummaryAction,
   JenkinsWorkflowRun
@@ -268,6 +270,10 @@ export class JenkinsClient {
 
   async disableJob(jobUrl: string): Promise<void> {
     await this.jobsApi.disableJob(jobUrl);
+  }
+
+  async scanMultibranch(folderUrl: string): Promise<ScanMultibranchResult> {
+    return this.jobsApi.scanMultibranch(folderUrl);
   }
 
   async renameJob(jobUrl: string, newName: string): Promise<{ newUrl: string }> {

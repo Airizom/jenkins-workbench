@@ -186,6 +186,11 @@
         "title": "Jenkins: Filter Branches"
       },
       {
+        "command": "jenkinsWorkbench.scanMultibranch",
+        "title": "Jenkins: Scan Repository Now",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "jenkinsWorkbench.clearBranchFilter",
         "title": "Jenkins: Clear Branch Filter"
       },
@@ -696,14 +701,19 @@
           "group": "2_rebuild@1"
         },
         {
-          "command": "jenkinsWorkbench.filterBranches",
+          "command": "jenkinsWorkbench.scanMultibranch",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
           "group": "navigation@0"
         },
         {
-          "command": "jenkinsWorkbench.clearBranchFilter",
+          "command": "jenkinsWorkbench.filterBranches",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
           "group": "navigation@1"
+        },
+        {
+          "command": "jenkinsWorkbench.clearBranchFilter",
+          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "group": "navigation@2"
         }
       ],
       "editor/title": [
