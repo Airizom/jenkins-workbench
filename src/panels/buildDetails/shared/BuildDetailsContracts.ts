@@ -58,7 +58,7 @@ export interface PendingInputParameterViewModel {
   kind: string;
   description?: string;
   choices?: string[];
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
 }
 
 export interface PendingInputViewModel {

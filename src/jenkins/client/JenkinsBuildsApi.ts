@@ -1,4 +1,5 @@
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
+import type { PreparedBuildParametersRequest } from "../data/JenkinsDataTypes";
 import { JenkinsRequestError } from "../errors";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type {
@@ -24,7 +25,7 @@ export type JenkinsBuildTriggerOptions =
   | { mode: "build" }
   | {
       mode: "buildWithParameters";
-      params?: URLSearchParams;
+      prepared?: PreparedBuildParametersRequest;
       allowEmptyParams?: boolean;
     };
 
@@ -291,7 +292,8 @@ export class JenkinsBuildsApi {
     options: JenkinsBuildTriggerOptions
   ): Promise<{ queueLocation?: string }> {
     if (options.mode === "buildWithParameters") {
-      const hasParams = options.params ? Array.from(options.params.keys()).length > 0 : false;
+      const prepared = options.prepared ?? { hasParameters: false };
+      const hasParams = prepared.hasParameters;
       const allowEmptyParams = options.allowEmptyParams === true;
       if (!hasParams && !allowEmptyParams) {
         const fallbackUrl = buildActionUrl(jobUrl, "build");
@@ -299,9 +301,11 @@ export class JenkinsBuildsApi {
         return { queueLocation: fallbackResponse.location };
       }
       const url = buildActionUrl(jobUrl, "buildWithParameters");
-      const body = options.params ? options.params.toString() : undefined;
+      const request = prepared.request;
       try {
-        const response = await this.context.requestPostWithCrumb(url, body);
+        const response = request
+          ? await this.context.requestPostWithCrumbRaw(url, request.body, request.headers)
+          : await this.context.requestPostWithCrumb(url);
         return { queueLocation: response.location };
       } catch (error) {
         if (allowEmptyParams && !hasParams && error instanceof JenkinsRequestError) {
@@ -446,5 +450,4 @@ export class JenkinsBuildsApi {
     const trimmed = text.trim();
     return trimmed.length > 0 ? trimmed : undefined;
   }
-
 }

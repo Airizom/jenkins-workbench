@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { parseJobUrl } from "../../jenkins/urls";
+import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
@@ -15,6 +16,7 @@ export interface JobActionDependencies {
   dataService: JenkinsDataService;
   newItemTargetResolver: JobNewItemTargetResolver;
   newItemWorkflow: JobNewItemWorkflow;
+  presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;
   watchStore: JenkinsWatchStore;
   refreshHost: JobCommandRefreshHost;
@@ -160,7 +162,7 @@ export async function renameJob(
     const { newUrl } = await deps.dataService.renameJob(item.environment, item.jobUrl, newName);
 
     await updateJobMetadataOnRename(
-      { pinStore: deps.pinStore, watchStore: deps.watchStore },
+      { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore },
       {
         scope: item.environment.scope,
         environmentId,
@@ -217,7 +219,7 @@ export async function deleteJob(
     await deps.dataService.deleteJob(item.environment, item.jobUrl);
 
     await removeJobMetadataOnDelete(
-      { pinStore: deps.pinStore, watchStore: deps.watchStore },
+      { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore },
       {
         scope: item.environment.scope,
         environmentId,

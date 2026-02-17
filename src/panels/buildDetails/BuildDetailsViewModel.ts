@@ -70,8 +70,13 @@ export interface BuildDetailsViewModelInput {
 const PARAMETER_KIND_LABELS: Record<string, string> = {
   boolean: "Boolean",
   choice: "Choice",
+  credentials: "Credentials",
+  file: "File",
+  multiChoice: "Multi Choice",
   password: "Password",
-  string: "String"
+  run: "Run",
+  string: "String",
+  text: "Text"
 };
 
 export function buildBuildDetailsViewModel(

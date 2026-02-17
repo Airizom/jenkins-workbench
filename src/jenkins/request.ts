@@ -114,7 +114,7 @@ function decideRedirect({
 export interface JenkinsRequestOptions {
   method?: "GET" | "POST" | "HEAD";
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
   parseJson: boolean;
   returnText?: boolean;
   returnBuffer?: boolean;
@@ -143,7 +143,7 @@ export interface JenkinsStreamResponse {
 export interface JenkinsVoidRequestOptions {
   method: "POST" | "GET";
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
@@ -152,7 +152,7 @@ export interface JenkinsVoidRequestOptions {
 export interface JenkinsTextRequestOptions {
   method: "POST" | "GET" | "HEAD";
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
@@ -290,7 +290,7 @@ export async function requestVoidWithLocation(
 interface JenkinsStreamRequestOptions {
   method?: "GET" | "POST" | "HEAD";
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | Uint8Array;
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
@@ -603,7 +603,9 @@ function requestStreamInternal(
           return;
         }
         if (redirectDecision.type === "cannotFollow") {
-          safeReject(new JenkinsRequestError("Jenkins returned a redirect that cannot be followed."));
+          safeReject(
+            new JenkinsRequestError("Jenkins returned a redirect that cannot be followed.")
+          );
           return;
         }
 

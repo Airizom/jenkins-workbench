@@ -1,8 +1,10 @@
 import type { EnvironmentScope } from "../../storage/JenkinsEnvironmentStore";
+import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 
 export interface JobMetadataStores {
+  presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;
   watchStore: JenkinsWatchStore;
 }
@@ -20,6 +22,12 @@ export async function updateJobMetadataOnRename(
   newJobName: string
 ): Promise<void> {
   await Promise.all([
+    stores.presetStore.updatePresetUrl(
+      context.scope,
+      context.environmentId,
+      context.jobUrl,
+      newJobUrl
+    ),
     stores.pinStore.updatePinUrl(
       context.scope,
       context.environmentId,
@@ -42,6 +50,7 @@ export async function removeJobMetadataOnDelete(
   context: JobMetadataContext
 ): Promise<void> {
   await Promise.all([
+    stores.presetStore.removePresetsForJob(context.scope, context.environmentId, context.jobUrl),
     stores.pinStore.removePin(context.scope, context.environmentId, context.jobUrl),
     stores.watchStore.removeWatch(context.scope, context.environmentId, context.jobUrl)
   ]);

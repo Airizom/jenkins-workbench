@@ -71,9 +71,18 @@ export async function promptForParameterValue(
   return input;
 }
 
-export function normalizeBoolean(value?: string | number | boolean): boolean | undefined {
+export function normalizeBoolean(
+  value?: string | number | boolean | string[]
+): boolean | undefined {
   if (value === undefined) {
     return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return undefined;
+    }
+    return normalizeBoolean(value[0]);
   }
 
   if (typeof value === "boolean") {

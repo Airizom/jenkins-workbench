@@ -15,16 +15,16 @@ export interface JenkinsClientContext {
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse>;
   requestStream(url: string, options?: { maxBytes?: number }): Promise<JenkinsStreamResponse>;
-  requestVoidWithCrumb(url: string, body?: string): Promise<void>;
-  requestPostWithCrumb(url: string, body?: string): Promise<JenkinsPostResponse>;
+  requestVoidWithCrumb(url: string, body?: string | Uint8Array): Promise<void>;
+  requestPostWithCrumb(url: string, body?: string | Uint8Array): Promise<JenkinsPostResponse>;
   requestPostWithCrumbRaw(
     url: string,
-    body: string,
+    body: string | Uint8Array,
     headers?: Record<string, string>
   ): Promise<JenkinsPostResponse>;
   requestPostTextWithCrumbRaw(
     url: string,
-    body: string,
+    body: string | Uint8Array,
     headers?: Record<string, string>
   ): Promise<string>;
 }

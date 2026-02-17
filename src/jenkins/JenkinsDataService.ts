@@ -12,8 +12,8 @@ import type {
   JenkinsPendingInputParameterDefinition,
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
-  ScanMultibranchResult,
-  JenkinsWorkflowRun
+  JenkinsWorkflowRun,
+  ScanMultibranchResult
 } from "./JenkinsClient";
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
@@ -25,6 +25,8 @@ import {
   toJobManagementActionError
 } from "./data/JenkinsDataErrors";
 import type {
+  BuildParameterPayload,
+  BuildParameterRequestPreparer,
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobInfo,
@@ -47,6 +49,7 @@ import { resolveNodeUrl } from "./urls";
 
 export type {
   BuildActionErrorCode,
+  BuildParameterPayload,
   CancellationChecker,
   CancellationInput,
   CancellationSignal,
@@ -68,6 +71,7 @@ export type {
 export { BuildActionError, CancellationError, JobManagementActionError } from "./errors";
 
 export interface JenkinsDataServiceOptions {
+  buildParameterRequestPreparer: BuildParameterRequestPreparer;
   cacheTtlMs?: number;
   maxCacheEntries?: number;
 }
@@ -98,14 +102,16 @@ const PENDING_INPUT_UNSUPPORTED_TTL_MS = 5 * 60 * 1000;
 export class JenkinsDataService {
   private readonly cache: JenkinsDataCache;
   private readonly jobIndex: JenkinsJobIndex;
+  private readonly buildParameterRequestPreparer: BuildParameterRequestPreparer;
   private cacheTtlMs?: number;
 
   constructor(
     private readonly clientProvider: JenkinsClientProvider,
-    options?: JenkinsDataServiceOptions
+    options: JenkinsDataServiceOptions
   ) {
     this.cache = new JenkinsDataCache(undefined, options?.maxCacheEntries);
     this.jobIndex = new JenkinsJobIndex(this.cache, clientProvider);
+    this.buildParameterRequestPreparer = options.buildParameterRequestPreparer;
     this.cacheTtlMs = options?.cacheTtlMs;
   }
 
@@ -633,12 +639,13 @@ export class JenkinsDataService {
   async triggerBuildWithParameters(
     environment: JenkinsEnvironmentRef,
     jobUrl: string,
-    params?: URLSearchParams,
+    params?: URLSearchParams | BuildParameterPayload,
     options?: { allowEmptyParams?: boolean }
   ): Promise<{ queueLocation?: string }> {
+    const prepared = await this.buildParameterRequestPreparer.prepareBuildParameters(params);
     return this.triggerBuildInternal(environment, jobUrl, {
       mode: "buildWithParameters",
-      params,
+      prepared,
       allowEmptyParams: options?.allowEmptyParams
     });
   }
@@ -858,26 +865,21 @@ export class JenkinsDataService {
   }
 
   private mapJobParameter(parameter: JenkinsParameterDefinition): JobParameter {
-    const normalizedType = (parameter.type ?? "").toLowerCase();
-    let kind: JobParameterKind = "string";
-
-    if (normalizedType.includes("booleanparameterdefinition")) {
-      kind = "boolean";
-    } else if (
-      normalizedType.includes("choiceparameterdefinition") ||
-      (parameter.choices && parameter.choices.length > 0)
-    ) {
-      kind = "choice";
-    } else if (normalizedType.includes("passwordparameterdefinition")) {
-      kind = "password";
-    }
+    const classification = this.classifyParameterKind(parameter.type, {
+      choices: parameter.choices
+    });
 
     return {
       name: parameter.name,
-      kind,
+      kind: classification.kind,
       defaultValue: parameter.defaultValue,
       choices: parameter.choices,
-      description: parameter.description
+      description: parameter.description,
+      rawType: parameter.type,
+      isSensitive: classification.isSensitive,
+      runProjectName: parameter.projectName,
+      multiSelectDelimiter: parameter.multiSelectDelimiter,
+      allowsMultiple: classification.allowsMultiple
     };
   }
 
@@ -968,43 +970,34 @@ export class JenkinsDataService {
   private mapPendingInputParameter(
     parameter: JenkinsPendingInputParameterDefinition
   ): JobParameter {
-    const normalizedType = (parameter.type ?? "").toLowerCase();
-    let kind: JobParameterKind = "string";
-
-    if (
-      normalizedType.includes("booleanparameterdefinition") ||
-      normalizedType.includes("boolean")
-    ) {
-      kind = "boolean";
-    } else if (
-      normalizedType.includes("choiceparameterdefinition") ||
-      normalizedType.includes("choice") ||
-      (Array.isArray(parameter.choices) && parameter.choices.length > 0)
-    ) {
-      kind = "choice";
-    } else if (
-      normalizedType.includes("passwordparameterdefinition") ||
-      normalizedType.includes("password")
-    ) {
-      kind = "password";
-    }
-
-    const rawDefault = parameter.defaultParameterValue?.value ?? parameter.defaultValue;
-    const defaultValue = this.formatParameterDefaultValue(rawDefault);
     const choices = Array.isArray(parameter.choices)
       ? parameter.choices.map((choice) => String(choice))
       : undefined;
+    const classification = this.classifyParameterKind(parameter.type, {
+      choices,
+      includeLooseTokens: true
+    });
+
+    const rawDefault = parameter.defaultParameterValue?.value ?? parameter.defaultValue;
+    const defaultValue = this.formatParameterDefaultValue(rawDefault);
 
     return {
       name: parameter.name ?? "parameter",
-      kind,
+      kind: classification.kind,
       defaultValue,
       choices,
-      description: parameter.description
+      description: parameter.description,
+      rawType: parameter.type,
+      isSensitive: classification.isSensitive,
+      runProjectName: parameter.projectName,
+      multiSelectDelimiter: parameter.multiSelectDelimiter,
+      allowsMultiple: classification.allowsMultiple
     };
   }
 
-  private formatParameterDefaultValue(value: unknown): string | number | boolean | undefined {
+  private formatParameterDefaultValue(
+    value: unknown
+  ): string | number | boolean | string[] | undefined {
     switch (typeof value) {
       case "string":
       case "number":
@@ -1022,6 +1015,9 @@ export class JenkinsDataService {
         if (value === null) {
           return undefined;
         }
+        if (Array.isArray(value)) {
+          return value.map((entry) => String(entry));
+        }
         try {
           return JSON.stringify(value);
         } catch {
@@ -1030,6 +1026,55 @@ export class JenkinsDataService {
       default:
         return undefined;
     }
+  }
+
+  private classifyParameterKind(
+    rawType: string | undefined,
+    options?: { choices?: string[]; includeLooseTokens?: boolean }
+  ): { kind: JobParameterKind; isSensitive: boolean; allowsMultiple: boolean } {
+    const normalizedType = (rawType ?? "").toLowerCase();
+    const hasChoices = Boolean(options?.choices && options.choices.length > 0);
+    const includeLooseTokens = options?.includeLooseTokens === true;
+
+    if (normalizedType.includes("credentialsparameterdefinition")) {
+      return { kind: "credentials", isSensitive: true, allowsMultiple: false };
+    }
+    if (normalizedType.includes("runparameterdefinition")) {
+      return { kind: "run", isSensitive: false, allowsMultiple: false };
+    }
+    if (normalizedType.includes("fileparameterdefinition")) {
+      return { kind: "file", isSensitive: false, allowsMultiple: false };
+    }
+    if (normalizedType.includes("textparameterdefinition")) {
+      return { kind: "text", isSensitive: false, allowsMultiple: false };
+    }
+    if (
+      normalizedType.includes("extendedchoice") ||
+      normalizedType.includes("multiselect") ||
+      normalizedType.includes("multichoice")
+    ) {
+      return { kind: "multiChoice", isSensitive: false, allowsMultiple: true };
+    }
+    if (
+      normalizedType.includes("booleanparameterdefinition") ||
+      (includeLooseTokens && normalizedType.includes("boolean"))
+    ) {
+      return { kind: "boolean", isSensitive: false, allowsMultiple: false };
+    }
+    if (
+      normalizedType.includes("choiceparameterdefinition") ||
+      (includeLooseTokens && normalizedType.includes("choice")) ||
+      hasChoices
+    ) {
+      return { kind: "choice", isSensitive: false, allowsMultiple: false };
+    }
+    if (
+      normalizedType.includes("passwordparameterdefinition") ||
+      (includeLooseTokens && normalizedType.includes("password"))
+    ) {
+      return { kind: "password", isSensitive: true, allowsMultiple: false };
+    }
+    return { kind: "string", isSensitive: false, allowsMultiple: false };
   }
 
   private normalizeString(value?: string): string | undefined {

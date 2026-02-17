@@ -1,21 +1,27 @@
 import * as vscode from "vscode";
-import type { JenkinsDataService, JobParameter } from "../../jenkins/JenkinsDataService";
+import type {
+  BuildParameterPayload,
+  JenkinsDataService,
+  JobParameter
+} from "../../jenkins/JenkinsDataService";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import type { PendingInputActionProvider } from "../../panels/buildDetails/BuildDetailsPollingController";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
+import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
+import { promptForBuildParameters } from "../../ui/BuildParameterPrompts";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
-import { promptForParameters } from "../../ui/ParameterPrompts";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { formatActionError, getOpenUrl, getTreeItemLabel } from "../CommandUtils";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 
 export async function triggerBuild(
   dataService: JenkinsDataService,
+  presetStore: JenkinsParameterPresetStore,
   queuedBuildWaiter: QueuedBuildWaiter,
   refreshHost: BuildCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
@@ -54,13 +60,22 @@ export async function triggerBuild(
     allowEmptyParams = useParameters;
   }
 
-  let payload: URLSearchParams | undefined;
+  let payload: URLSearchParams | BuildParameterPayload | undefined;
   if (parameters.length > 0) {
-    payload = await promptForParameters(parameters);
-    if (!payload) {
+    const promptResult = await promptForBuildParameters({
+      dataService,
+      presetStore,
+      environment: item.environment,
+      jobUrl: item.jobUrl,
+      jobLabel: label,
+      parameters
+    });
+    if (!promptResult) {
       return;
     }
+    payload = promptResult.payload;
     useParameters = true;
+    allowEmptyParams = promptResult.allowEmptyParams;
   }
 
   try {

@@ -15,6 +15,7 @@ import {
   createNodeBuildConsoleFilesystem
 } from "../services/BuildConsoleExporter";
 import { BuildLogService } from "../services/BuildLogService";
+import { BuildParameterRequestPreparerService } from "../services/BuildParameterRequestPreparerService";
 import { MAX_CONSOLE_CHARS } from "../services/ConsoleOutputConfig";
 import {
   JOB_CONFIG_DRAFT_SCHEME,
@@ -24,6 +25,7 @@ import { JobConfigDraftManager } from "../services/JobConfigDraftManager";
 import { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
@@ -68,6 +70,7 @@ export interface ExtensionServices {
   jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
+  presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;
   viewStateStore: JenkinsViewStateStore;
   treeFilter: JenkinsTreeFilter;
@@ -103,9 +106,11 @@ export function createExtensionServices(
   const clientProvider = new JenkinsClientProvider(environmentStore, {
     requestTimeoutMs: options.requestTimeoutMs
   });
+  const buildParameterRequestPreparer = new BuildParameterRequestPreparerService();
   const dataService = new JenkinsDataService(clientProvider, {
     cacheTtlMs: options.cacheTtlMs,
-    maxCacheEntries: options.maxCacheEntries
+    maxCacheEntries: options.maxCacheEntries,
+    buildParameterRequestPreparer
   });
   const pendingInputCoordinator = new PendingInputRefreshCoordinator(dataService);
   const queuedBuildWaiter = new QueuedBuildWaiter(dataService);
@@ -152,6 +157,7 @@ export function createExtensionServices(
     options.artifactActionOptionsProvider
   );
   const watchStore = new JenkinsWatchStore(context);
+  const presetStore = new JenkinsParameterPresetStore(context);
   const pinStore = new JenkinsPinStore(context);
   const viewStateStore = new JenkinsViewStateStore(context);
   const treeFilter = new JenkinsTreeFilter(viewStateStore);
@@ -216,6 +222,7 @@ export function createExtensionServices(
     jobConfigUpdateWorkflow,
     artifactActionHandler,
     watchStore,
+    presetStore,
     pinStore,
     viewStateStore,
     treeFilter,

@@ -17,6 +17,7 @@ import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
@@ -32,6 +33,7 @@ import type { ExtensionRefreshHost } from "./ExtensionRefreshHost";
 
 export interface ExtensionCommandDependencies {
   environmentStore: JenkinsEnvironmentStore;
+  presetStore: JenkinsParameterPresetStore;
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
   clientProvider: JenkinsClientProvider;
@@ -62,6 +64,7 @@ export function registerExtensionCommands(
   registerEnvironmentCommands(
     context,
     dependencies.environmentStore,
+    dependencies.presetStore,
     dependencies.watchStore,
     dependencies.pinStore,
     dependencies.clientProvider,
@@ -71,6 +74,7 @@ export function registerExtensionCommands(
   registerBuildCommands(
     context,
     dependencies.dataService,
+    dependencies.presetStore,
     dependencies.artifactActionHandler,
     dependencies.buildLogPreviewer,
     dependencies.consoleExporter,
@@ -87,6 +91,7 @@ export function registerExtensionCommands(
     refreshHost,
     dependencies.jobConfigDraftManager,
     dependencies.jobConfigUpdateWorkflow,
+    dependencies.presetStore,
     dependencies.pinStore,
     dependencies.watchStore
   );

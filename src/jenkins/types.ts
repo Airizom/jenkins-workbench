@@ -138,6 +138,8 @@ export interface JenkinsPendingInputParameterDefinition {
   defaultValue?: unknown;
   choices?: unknown;
   description?: string;
+  projectName?: string;
+  multiSelectDelimiter?: string;
 }
 
 export interface JenkinsPendingInputAction {
@@ -311,9 +313,11 @@ export interface JenkinsQueueItem {
 export interface JenkinsParameterDefinition {
   name: string;
   type?: string;
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
   choices?: string[];
   description?: string;
+  projectName?: string;
+  multiSelectDelimiter?: string;
 }
 
 export type JenkinsItemCreateKind = "job" | "pipeline";

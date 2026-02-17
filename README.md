@@ -22,7 +22,8 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 
 ### Build Management
 
-- **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords)
+- **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords, credentials, run, file, text, multi-choice)
+- **Reusable Parameter Presets** — Save named per-job presets and reuse them when triggering builds
 - **Stop Builds** — Abort running builds directly from the tree
 - **Replay & Rebuild** — Re-run builds with the same or modified configuration
 - **Preview Build Logs** — Open console output in a lightweight preview editor
@@ -96,6 +97,8 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 
 Jenkins jobs and pipelines appear in **Run Task...** under the Jenkins Workbench task type (up to 2000 per environment). Tasks run without prompts, and parameterized builds only use values provided in `tasks.json`.
 
+Advanced parameter forms and reusable presets apply to the **Trigger Build** flow. They are not used by pending-input prompts or `tasks.json` in this version.
+
 Example `tasks.json`:
 
 ```json
@@ -119,6 +122,13 @@ Example `tasks.json`:
 
 Canceling a Jenkins task does not stop the Jenkins build.
 If multiple environments share the same URL, set `environmentId` to disambiguate.
+
+## Parameter Presets & Secrets
+
+- Presets are stored per job and per environment scope (workspace/global).
+- Secret-like parameters are **not** persisted by default.
+- You can explicitly opt in to save individual secret values in VS Code `SecretStorage`.
+- File parameter presets store local file path references, not file contents.
 
 ## Requirements
 

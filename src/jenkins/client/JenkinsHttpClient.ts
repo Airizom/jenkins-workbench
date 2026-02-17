@@ -91,15 +91,20 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     );
   }
 
-  async requestVoidWithCrumb(url: string, body?: string): Promise<void> {
+  async requestVoidWithCrumb(url: string, body?: string | Uint8Array): Promise<void> {
     await this.requestPostWithCrumb(url, body);
   }
 
-  async requestPostWithCrumb(url: string, body?: string): Promise<JenkinsPostResponse> {
+  async requestPostWithCrumb(
+    url: string,
+    body?: string | Uint8Array
+  ): Promise<JenkinsPostResponse> {
     const contentHeaders: Record<string, string> = {};
     if (body !== undefined) {
-      contentHeaders["Content-Type"] = "application/x-www-form-urlencoded";
-      contentHeaders["Content-Length"] = Buffer.byteLength(body).toString();
+      if (typeof body === "string") {
+        contentHeaders["Content-Type"] = "application/x-www-form-urlencoded";
+      }
+      contentHeaders["Content-Length"] = this.getBodyLength(body).toString();
     }
 
     return this.requestPostWithCrumbInternal(url, body, contentHeaders);
@@ -107,24 +112,24 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   async requestPostWithCrumbRaw(
     url: string,
-    body: string,
+    body: string | Uint8Array,
     headers?: Record<string, string>
   ): Promise<JenkinsPostResponse> {
     const contentHeaders: Record<string, string> = { ...(headers ?? {}) };
     if (!("Content-Length" in contentHeaders)) {
-      contentHeaders["Content-Length"] = Buffer.byteLength(body).toString();
+      contentHeaders["Content-Length"] = this.getBodyLength(body).toString();
     }
     return this.requestPostWithCrumbInternal(url, body, contentHeaders);
   }
 
   async requestPostTextWithCrumbRaw(
     url: string,
-    body: string,
+    body: string | Uint8Array,
     headers?: Record<string, string>
   ): Promise<string> {
     const contentHeaders: Record<string, string> = { ...(headers ?? {}) };
     if (!("Content-Length" in contentHeaders)) {
-      contentHeaders["Content-Length"] = Buffer.byteLength(body).toString();
+      contentHeaders["Content-Length"] = this.getBodyLength(body).toString();
     }
     return this.requestPostTextWithCrumbInternal(url, body, contentHeaders);
   }
@@ -134,7 +139,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options: {
       method: "POST" | "GET";
       headers?: Record<string, string>;
-      body?: string;
+      body?: string | Uint8Array;
       redirectCount?: number;
     }
   ): Promise<JenkinsPostResponse> {
@@ -151,7 +156,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options: {
       method: "POST" | "GET" | "HEAD";
       headers?: Record<string, string>;
-      body?: string;
+      body?: string | Uint8Array;
       redirectCount?: number;
     }
   ): Promise<string> {
@@ -165,7 +170,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   private async requestPostWithCrumbInternal(
     url: string,
-    body: string | undefined,
+    body: string | Uint8Array | undefined,
     contentHeaders: Record<string, string>
   ): Promise<JenkinsPostResponse> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
@@ -201,7 +206,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   private async requestPostTextWithCrumbInternal(
     url: string,
-    body: string,
+    body: string | Uint8Array,
     contentHeaders: Record<string, string>
   ): Promise<string> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
@@ -301,5 +306,9 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       }
       throw error;
     }
+  }
+
+  private getBodyLength(body: string | Uint8Array): number {
+    return typeof body === "string" ? Buffer.byteLength(body) : body.byteLength;
   }
 }

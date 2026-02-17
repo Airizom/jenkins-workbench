@@ -10,14 +10,60 @@ import type {
 export type JenkinsActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
 export type BuildActionErrorCode = JenkinsActionErrorCode;
 
-export type JobParameterKind = "boolean" | "choice" | "password" | "string";
+export type JobParameterKind =
+  | "boolean"
+  | "choice"
+  | "password"
+  | "string"
+  | "credentials"
+  | "run"
+  | "file"
+  | "text"
+  | "multiChoice";
 
 export interface JobParameter {
   name: string;
   kind: JobParameterKind;
-  defaultValue?: string | number | boolean;
+  defaultValue?: string | number | boolean | string[];
   choices?: string[];
   description?: string;
+  rawType?: string;
+  isSensitive?: boolean;
+  runProjectName?: string;
+  multiSelectDelimiter?: string;
+  allowsMultiple?: boolean;
+}
+
+export interface BuildParameterPayloadField {
+  name: string;
+  value: string;
+}
+
+export interface BuildParameterPayloadFile {
+  name: string;
+  filePath: string;
+  fileName: string;
+}
+
+export interface BuildParameterPayload {
+  fields: BuildParameterPayloadField[];
+  files: BuildParameterPayloadFile[];
+}
+
+export interface BuildWithParametersRequest {
+  body: string | Uint8Array;
+  headers: Record<string, string>;
+}
+
+export interface PreparedBuildParametersRequest {
+  hasParameters: boolean;
+  request?: BuildWithParametersRequest;
+}
+
+export interface BuildParameterRequestPreparer {
+  prepareBuildParameters(
+    params: URLSearchParams | BuildParameterPayload | undefined
+  ): Promise<PreparedBuildParametersRequest>;
 }
 
 export interface PendingInputAction {

@@ -3,6 +3,7 @@ import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { PendingInputActionProvider } from "../panels/buildDetails/BuildDetailsPollingController";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
+import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type {
   ArtifactTreeItem,
   BuildTreeItem,
@@ -30,6 +31,7 @@ import type { BuildCommandRefreshHost } from "./build/BuildCommandTypes";
 export function registerBuildCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
+  presetStore: JenkinsParameterPresetStore,
   artifactActionHandler: ArtifactActionHandler,
   buildLogPreviewer: BuildLogPreviewer,
   consoleExporter: BuildConsoleExporter,
@@ -41,7 +43,7 @@ export function registerBuildCommands(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.triggerBuild",
       (item?: JobTreeItem | PipelineTreeItem) =>
-        triggerBuild(dataService, queuedBuildWaiter, refreshHost, item)
+        triggerBuild(dataService, presetStore, queuedBuildWaiter, refreshHost, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.abortBuild", (item?: BuildTreeItem) =>
       stopBuild(dataService, refreshHost, item)

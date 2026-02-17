@@ -8,6 +8,8 @@ type JenkinsParameterContainer = {
     defaultValue?: unknown;
     choices?: unknown;
     description?: string;
+    projectName?: unknown;
+    multiSelectDelimiter?: unknown;
   }>;
 } | null;
 
@@ -21,7 +23,7 @@ export function extractParameterDefinitions(
 ): JenkinsParameterDefinition[] {
   const definitions: JenkinsParameterDefinition[] = [];
   const seen = new Set<string>();
-  const formatDefaultValue = (value: unknown): string | number | boolean | undefined => {
+  const formatDefaultValue = (value: unknown): string | number | boolean | string[] | undefined => {
     switch (typeof value) {
       case "string":
       case "number":
@@ -38,6 +40,9 @@ export function extractParameterDefinitions(
       case "object":
         if (value === null) {
           return undefined;
+        }
+        if (Array.isArray(value)) {
+          return value.map((entry) => String(entry));
         }
         try {
           return JSON.stringify(value);
@@ -71,7 +76,13 @@ export function extractParameterDefinitions(
           type: definition.type,
           defaultValue,
           choices,
-          description: definition.description
+          description: definition.description,
+          projectName:
+            typeof definition.projectName === "string" ? definition.projectName : undefined,
+          multiSelectDelimiter:
+            typeof definition.multiSelectDelimiter === "string"
+              ? definition.multiSelectDelimiter
+              : undefined
         });
         seen.add(definition.name);
       }

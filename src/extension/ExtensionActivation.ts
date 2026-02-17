@@ -221,6 +221,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerExtensionSubscriptions(context, services, poller, queuePoller);
   registerExtensionCommands(context, {
     environmentStore: services.environmentStore,
+    presetStore: services.presetStore,
     watchStore: services.watchStore,
     pinStore: services.pinStore,
     clientProvider: services.clientProvider,
@@ -241,12 +242,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator,
     refreshHost
   });
-  registerJenkinsTasks(
-    context,
-    services.environmentStore,
-    services.dataService,
-    refreshHost
-  );
+  registerJenkinsTasks(context, services.environmentStore, services.dataService, refreshHost);
 }
 
 export function deactivate(): void {

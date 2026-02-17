@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
@@ -19,7 +20,10 @@ import {
 import { submitJobConfigDraft, updateJobConfig, viewJobConfig } from "./job/JobCommandHandlers";
 import type { JobCommandRefreshHost } from "./job/JobCommandTypes";
 import type { JobConfigUpdateWorkflow } from "./job/JobConfigUpdateWorkflow";
-import { JobNewItemTargetResolver, type JobNewItemTreeTarget } from "./job/JobNewItemTargetResolver";
+import {
+  JobNewItemTargetResolver,
+  type JobNewItemTreeTarget
+} from "./job/JobNewItemTargetResolver";
 import { JobNewItemWorkflow } from "./job/JobNewItemWorkflow";
 
 export function registerJobCommands(
@@ -30,6 +34,7 @@ export function registerJobCommands(
   refreshHost: JobCommandRefreshHost,
   draftManager: JobConfigDraftManager,
   workflow: JobConfigUpdateWorkflow,
+  presetStore: JenkinsParameterPresetStore,
   pinStore: JenkinsPinStore,
   watchStore: JenkinsWatchStore
 ): void {
@@ -46,6 +51,7 @@ export function registerJobCommands(
     dataService,
     newItemTargetResolver,
     newItemWorkflow,
+    presetStore,
     pinStore,
     watchStore,
     refreshHost
@@ -64,9 +70,8 @@ export function registerJobCommands(
     vscode.commands.registerCommand("jenkinsWorkbench.submitJobConfig", (uri?: vscode.Uri) =>
       submitJobConfigDraft(workflow, refreshHost, uri)
     ),
-    vscode.commands.registerCommand(
-      "jenkinsWorkbench.newItem",
-      (item?: JobNewItemTreeTarget) => newItem(actionDeps, item)
+    vscode.commands.registerCommand("jenkinsWorkbench.newItem", (item?: JobNewItemTreeTarget) =>
+      newItem(actionDeps, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.scanMultibranch",
