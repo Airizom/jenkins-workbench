@@ -21,6 +21,7 @@ import {
   normalizePipelineStatus,
   truncateConsoleText
 } from "./BuildDetailsFormatters";
+import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 import type {
   BuildDetailsViewModel,
   BuildFailureArtifact,
@@ -62,6 +63,8 @@ export interface BuildDetailsViewModelInput {
   maxConsoleChars: number;
   followLog?: boolean;
   pendingInputs?: PendingInputAction[];
+  pipelineRestartEnabled?: boolean;
+  pipelineRestartableStages?: string[];
 }
 
 const PARAMETER_KIND_LABELS: Record<string, string> = {
@@ -95,7 +98,11 @@ export function buildBuildDetailsViewModel(
     timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown",
     culpritsLabel: details ? formatCulprits(details.culprits) : "Unknown",
     pipelineStagesLoading: Boolean(input.pipelineLoading),
-    pipelineStages: buildPipelineStagesViewModel(input.pipelineRun),
+    pipelineStages: buildPipelineStagesViewModel(input.pipelineRun, {
+      details,
+      restartEnabled: Boolean(input.pipelineRestartEnabled),
+      restartableStages: input.pipelineRestartableStages ?? []
+    }),
     insights: buildBuildFailureInsights(details, input.testReport),
     pendingInputs: buildPendingInputsViewModel(input.pendingInputs),
     consoleText: truncated.text,
@@ -343,27 +350,48 @@ function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {
   return items;
 }
 
-export function buildPipelineStagesViewModel(pipelineRun?: PipelineRun): PipelineStageViewModel[] {
+interface PipelineStageRestartContext {
+  details?: JenkinsBuildDetails;
+  restartEnabled: boolean;
+  restartableStages: string[];
+}
+
+interface PipelineStageRestartState {
+  enabled: boolean;
+  restartableStages: Set<string>;
+}
+
+export function buildPipelineStagesViewModel(
+  pipelineRun?: PipelineRun,
+  restartContext?: PipelineStageRestartContext
+): PipelineStageViewModel[] {
   const stages = pipelineRun?.stages;
   if (!Array.isArray(stages) || stages.length === 0) {
     return [];
   }
-  return stages.map((stage) => mapPipelineStage(stage));
+  const restartState = createPipelineStageRestartState(restartContext);
+  return stages.map((stage) => mapPipelineStage(stage, restartState));
 }
 
 interface PipelineStepDraft extends PipelineStageStepViewModel {
   isFailed: boolean;
 }
 
-function mapPipelineStage(stage: PipelineStage): PipelineStageViewModel {
+function mapPipelineStage(
+  stage: PipelineStage,
+  restartState: PipelineStageRestartState
+): PipelineStageViewModel {
   const key = stage.key;
   const status = normalizePipelineStatus(stage.status);
   const durationLabel = formatDuration(stage.durationMillis);
   const steps = stage.steps.map((step) => mapPipelineStep(step));
   const stepsFailedOnly = steps.filter((step) => step.isFailed);
   const stepsAll = steps.map((step) => stripFailure(step));
-  const parallelBranches = mapParallelBranches(stage);
+  const parallelBranches = mapParallelBranches(stage, restartState);
   const hasSteps = stepsAll.length > 0 || parallelBranches.some((branch) => branch.hasSteps);
+  const stageName = stage.name.trim();
+  const canRestartFromStage =
+    restartState.enabled && stageName.length > 0 && restartState.restartableStages.has(stageName);
 
   return {
     key,
@@ -371,6 +399,7 @@ function mapPipelineStage(stage: PipelineStage): PipelineStageViewModel {
     statusLabel: status.label,
     statusClass: status.className,
     durationLabel,
+    canRestartFromStage,
     hasSteps,
     stepsFailedOnly: stepsFailedOnly.map((step) => stripFailure(step)),
     stepsAll,
@@ -378,12 +407,32 @@ function mapPipelineStage(stage: PipelineStage): PipelineStageViewModel {
   };
 }
 
-function mapParallelBranches(stage: PipelineStage): PipelineStageViewModel[] {
+function mapParallelBranches(
+  stage: PipelineStage,
+  restartState: PipelineStageRestartState
+): PipelineStageViewModel[] {
   const branches = stage.parallelBranches;
   if (branches.length === 0) {
     return [];
   }
-  return branches.map((branch) => mapPipelineStage(branch));
+  return branches.map((branch) => mapPipelineStage(branch, restartState));
+}
+
+function createPipelineStageRestartState(
+  context: PipelineStageRestartContext | undefined
+): PipelineStageRestartState {
+  if (!context || !isPipelineRestartEligible(context.details) || !context.restartEnabled) {
+    return { enabled: false, restartableStages: new Set<string>() };
+  }
+  const restartableStages = new Set<string>();
+  for (const stage of context.restartableStages) {
+    const trimmed = stage.trim();
+    if (trimmed.length === 0) {
+      continue;
+    }
+    restartableStages.add(trimmed);
+  }
+  return { enabled: restartableStages.size > 0, restartableStages };
 }
 
 function mapPipelineStep(step: PipelineStep): PipelineStepDraft {

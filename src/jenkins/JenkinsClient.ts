@@ -26,6 +26,7 @@ import type {
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
   JenkinsQueueItem,
+  JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "./types";
@@ -56,6 +57,7 @@ export type {
   JenkinsProgressiveConsoleHtml,
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
+  JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsTestSummaryAction,
   JenkinsWorkflowRun
@@ -222,6 +224,14 @@ export class JenkinsClient {
 
   async rebuildBuild(buildUrl: string): Promise<void> {
     await this.buildsApi.rebuildBuild(buildUrl);
+  }
+
+  async getRestartFromStageInfo(buildUrl: string): Promise<JenkinsRestartFromStageInfo> {
+    return this.buildsApi.getRestartFromStageInfo(buildUrl);
+  }
+
+  async restartPipelineFromStage(buildUrl: string, stageName: string): Promise<void> {
+    await this.buildsApi.restartPipelineFromStage(buildUrl, stageName);
   }
 
   async proceedInput(

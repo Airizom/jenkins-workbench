@@ -42,6 +42,11 @@ export interface RejectInputMessage {
   inputId: string;
 }
 
+export interface RestartPipelineFromStageMessage {
+  type: "restartPipelineFromStage";
+  stageName: string;
+}
+
 export function isToggleFollowLogMessage(message: unknown): message is ToggleFollowLogMessage {
   if (!isRecord(message)) {
     return false;
@@ -98,6 +103,19 @@ export function isRejectInputMessage(message: unknown): message is RejectInputMe
   }
   const inputId = (message as Record<string, unknown>).inputId;
   return typeof inputId === "string" && inputId.length > 0;
+}
+
+export function isRestartPipelineFromStageMessage(
+  message: unknown
+): message is RestartPipelineFromStageMessage {
+  if (!isRecord(message)) {
+    return false;
+  }
+  if (message.type !== "restartPipelineFromStage") {
+    return false;
+  }
+  const stageName = (message as Record<string, unknown>).stageName;
+  return typeof stageName === "string" && stageName.trim().length > 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

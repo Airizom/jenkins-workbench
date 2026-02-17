@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Toggle } from "../../../../shared/webview/components/ui/toggle";
+import { Button } from "../../../../shared/webview/components/ui/button";
 import {
   Accordion,
   AccordionContent,
@@ -151,10 +152,12 @@ function getConnectorColor(statusClass?: string): string {
 
 export function PipelineStagesSection({
   stages,
-  loading
+  loading,
+  onRestartStage
 }: {
   stages: PipelineStageViewModel[];
   loading: boolean;
+  onRestartStage: (stageName: string) => void;
 }) {
   const [openStages, setOpenStages] = useState<string[]>([]);
   const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
@@ -194,6 +197,7 @@ export function PipelineStagesSection({
                 stage={stage}
                 showAll={showAll}
                 isLast={isLast}
+                onRestartStage={onRestartStage}
                 onShowAllChange={(next) =>
                   setShowAllStages((prev) => ({
                     ...prev,
@@ -214,12 +218,14 @@ function StageNode({
   stage,
   showAll,
   isLast,
+  onRestartStage,
   onShowAllChange
 }: {
   stageId: string;
   stage: PipelineStageViewModel;
   showAll: boolean;
   isLast: boolean;
+  onRestartStage: (stageName: string) => void;
   onShowAllChange: (next: boolean) => void;
 }) {
   const hasBranches = stage.parallelBranches.length > 0;
@@ -229,6 +235,8 @@ function StageNode({
   const stageIcon = getStageIcon(stage.statusClass);
   const nodeStyle = getStageNodeStyle(stage.statusClass);
   const connectorColor = getConnectorColor(stage.statusClass);
+  const stageName = stage.name.trim();
+  const canRestartStage = stage.canRestartFromStage && stageName.length > 0;
 
   return (
     <div className="relative flex" data-stage-key={stage.key}>
@@ -271,6 +279,21 @@ function StageNode({
 
             <AccordionContent>
               <div className="border-t border-border px-3 py-2.5 space-y-2.5">
+                {canRestartStage ? (
+                  <div className="flex items-center justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRestartStage(stageName);
+                      }}
+                    >
+                      Restart from this stage
+                    </Button>
+                  </div>
+                ) : null}
                 {hasBranches ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

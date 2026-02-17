@@ -41,6 +41,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 
 - **Live Console Streaming** — Watch build output in real-time with automatic scrolling
 - **Pipeline Visualization** — View stage-by-stage progress for Pipeline jobs
+- **Restart From Stage** — Restart failed/unstable Declarative runs from eligible stages
 - **Stage Load Feedback** — Inline loading states while pipeline stages resolve
 - **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
@@ -328,6 +329,7 @@ Security notes:
 - Some actions require Jenkins plugins:
   - **Replay** requires the Workflow Plugin
   - **Rebuild** requires the Rebuild Plugin
+  - **Restart from Stage** requires Declarative Pipeline support from Pipeline: Model Definition
 - Check that the plugins are installed and the user has permissions
 
 ### Artifact Downloads

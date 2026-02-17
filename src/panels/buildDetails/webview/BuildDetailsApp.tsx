@@ -264,6 +264,9 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
                 <PipelineStagesSection
                   stages={state.pipelineStages}
                   loading={state.pipelineStagesLoading}
+                  onRestartStage={(stageName) =>
+                    postMessage({ type: "restartPipelineFromStage", stageName })
+                  }
                 />
               </TabsContent>
             ) : null}

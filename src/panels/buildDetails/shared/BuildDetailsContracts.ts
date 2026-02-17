@@ -35,6 +35,7 @@ export interface PipelineStageViewModel {
   statusLabel: string;
   statusClass: string;
   durationLabel: string;
+  canRestartFromStage: boolean;
   hasSteps: boolean;
   stepsFailedOnly: PipelineStageStepViewModel[];
   stepsAll: PipelineStageStepViewModel[];

@@ -22,6 +22,7 @@ import {
   isExportConsoleMessage,
   isOpenExternalMessage,
   isRejectInputMessage,
+  isRestartPipelineFromStageMessage,
   isToggleFollowLogMessage
 } from "./buildDetails/BuildDetailsMessages";
 import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
@@ -35,6 +36,7 @@ import {
 import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
 import { buildUpdateMessageFromState } from "./buildDetails/BuildDetailsUpdateBuilder";
 import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
+import { isPipelineRestartEligible } from "./buildDetails/PipelineRestartEligibility";
 import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { createNonce } from "./shared/webview/WebviewNonce";
@@ -215,6 +217,10 @@ export class BuildDetailsPanel {
           void this.handleRejectInput(message);
           return;
         }
+        if (isRestartPipelineFromStageMessage(message)) {
+          void this.handleRestartPipelineFromStage(message);
+          return;
+        }
         if (isToggleFollowLogMessage(message)) {
           this.state.setFollowLog(Boolean(message.value));
         }
@@ -340,7 +346,9 @@ export class BuildDetailsPanel {
       errors: this.state.currentErrors,
       maxConsoleChars: MAX_CONSOLE_CHARS,
       followLog: this.state.followLog,
-      pendingInputs: this.state.currentPendingInputs
+      pendingInputs: this.state.currentPendingInputs,
+      pipelineRestartEnabled: this.state.pipelineRestartEnabled,
+      pipelineRestartableStages: this.state.pipelineRestartableStages
     });
     this.panel.webview.html = renderBuildDetailsHtml(viewModel, {
       cspSource: this.panel.webview.cspSource,
@@ -349,6 +357,7 @@ export class BuildDetailsPanel {
       styleUris,
       panelState
     });
+    void this.refreshRestartFromStageInfo(token, { postUpdate: true });
 
     if (details && !details.building && initialState.workflowError) {
       if (this.panel.visible) {
@@ -388,6 +397,7 @@ export class BuildDetailsPanel {
           this.refreshWorkflowRun(this.loadToken),
           this.pollingController?.refreshPendingInputs()
         ]);
+        void this.refreshRestartFromStageInfo(this.loadToken, { postUpdate: true });
       }
     } finally {
       this.endLoading();
@@ -524,6 +534,7 @@ export class BuildDetailsPanel {
       }
     }
     if (wasBuilding && !isBuilding) {
+      void this.refreshRestartFromStageInfo(this.loadToken, { postUpdate: true });
       void this.showCompletionToast(details);
       void this.refreshTestReport(this.loadToken);
     }
@@ -593,6 +604,74 @@ export class BuildDetailsPanel {
         this.refreshHost?.refreshEnvironment(environmentId);
       }
     });
+  }
+
+  private async handleRestartPipelineFromStage(message: { stageName: string }): Promise<void> {
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+      void vscode.window.showErrorMessage(
+        "Build details are not ready to restart a pipeline from stage."
+      );
+      return;
+    }
+    const details = this.state.currentDetails;
+    if (!details) {
+      void vscode.window.showErrorMessage(
+        "Build details are still loading. Try restarting from stage again."
+      );
+      return;
+    }
+    if (details.building) {
+      void vscode.window.showInformationMessage(
+        "This build is still running. Restart from stage is available after it completes."
+      );
+      return;
+    }
+    if (!isPipelineRestartEligible(details)) {
+      void vscode.window.showInformationMessage(
+        "Restart from stage is only available for failed or unstable completed builds."
+      );
+      return;
+    }
+    if (this.state.pipelineRestartAvailability === "unsupported") {
+      void vscode.window.showInformationMessage(
+        "Restart from stage is not available on this Jenkins instance."
+      );
+      return;
+    }
+    const stageName = message.stageName.trim();
+    if (!stageName) {
+      void vscode.window.showErrorMessage("Select a valid stage to restart from.");
+      return;
+    }
+    const isRestartable =
+      this.state.pipelineRestartEnabled && this.state.pipelineRestartableStages.includes(stageName);
+    if (!isRestartable) {
+      void vscode.window.showErrorMessage(
+        `Stage "${stageName}" is not restartable for this build. Refresh pipeline details and try again.`
+      );
+      return;
+    }
+
+    const environmentId = this.state.environment.environmentId;
+    const label = details.fullDisplayName ?? details.displayName ?? `#${details.number}`;
+    this.beginLoading();
+    try {
+      await this.dataService.restartPipelineFromStage(
+        this.state.environment,
+        this.state.currentBuildUrl,
+        stageName
+      );
+      void vscode.window.showInformationMessage(
+        `Requested restart from stage "${stageName}" for ${label}.`
+      );
+      this.refreshHost?.refreshEnvironment(environmentId);
+    } catch (error) {
+      void vscode.window.showErrorMessage(
+        `Failed to restart ${label} from stage "${stageName}": ${formatActionError(error)}`
+      );
+    } finally {
+      this.endLoading();
+    }
   }
 
   private async handleArtifactAction(message: {
@@ -681,6 +760,54 @@ export class BuildDetailsPanel {
 
   private postMessage(message: BuildDetailsOutgoingMessage): void {
     void this.panel.webview.postMessage(message);
+  }
+
+  private async refreshRestartFromStageInfo(
+    token: number,
+    options?: { postUpdate?: boolean }
+  ): Promise<void> {
+    if (!this.isTokenCurrent(token)) {
+      return;
+    }
+    const details = this.state.currentDetails;
+    if (!isPipelineRestartEligible(details)) {
+      const changed = this.state.setPipelineRestartInfo(false, [], "unknown");
+      if (changed && options?.postUpdate && this.panel.visible) {
+        const updateMessage = buildUpdateMessageFromState(this.state);
+        if (updateMessage) {
+          this.postMessage(updateMessage);
+        }
+      }
+      return;
+    }
+    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
+      return;
+    }
+    try {
+      const restartInfo = await this.dataService.getRestartFromStageInfo(
+        this.state.environment,
+        this.state.currentBuildUrl
+      );
+      if (!this.isTokenCurrent(token)) {
+        return;
+      }
+      const changed = this.state.setPipelineRestartInfo(
+        restartInfo.restartEnabled,
+        restartInfo.restartableStages,
+        restartInfo.availability
+      );
+      if (changed && options?.postUpdate && this.panel.visible) {
+        const updateMessage = buildUpdateMessageFromState(this.state);
+        if (updateMessage) {
+          this.postMessage(updateMessage);
+        }
+      }
+    } catch {
+      if (!this.isTokenCurrent(token)) {
+        return;
+      }
+      // Preserve the last known capability on transient failures.
+    }
   }
 
   private publishErrors(): void {

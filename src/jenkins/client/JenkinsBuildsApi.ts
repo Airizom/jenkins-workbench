@@ -10,11 +10,13 @@ import type {
   JenkinsPendingInputAction,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
+  JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../types";
 import { buildActionUrl, buildApiUrlFromItem, buildArtifactDownloadUrl } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
+import { RestartFromStageClient } from "./RestartFromStageClient";
 
 export type JenkinsBuildTriggerMode = "build" | "buildWithParameters";
 
@@ -27,7 +29,11 @@ export type JenkinsBuildTriggerOptions =
     };
 
 export class JenkinsBuildsApi {
-  constructor(private readonly context: JenkinsClientContext) {}
+  private readonly restartFromStageClient: RestartFromStageClient;
+
+  constructor(private readonly context: JenkinsClientContext) {
+    this.restartFromStageClient = new RestartFromStageClient(context);
+  }
 
   async getBuilds(
     jobUrl: string,
@@ -331,6 +337,14 @@ export class JenkinsBuildsApi {
     await this.context.requestVoidWithCrumb(url, body);
   }
 
+  async getRestartFromStageInfo(buildUrl: string): Promise<JenkinsRestartFromStageInfo> {
+    return this.restartFromStageClient.getRestartFromStageInfo(buildUrl);
+  }
+
+  async restartPipelineFromStage(buildUrl: string, stageName: string): Promise<void> {
+    await this.restartFromStageClient.restartPipelineFromStage(buildUrl, stageName);
+  }
+
   async proceedInput(
     buildUrl: string,
     inputId: string,
@@ -432,4 +446,5 @@ export class JenkinsBuildsApi {
     const trimmed = text.trim();
     return trimmed.length > 0 ? trimmed : undefined;
   }
+
 }

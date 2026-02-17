@@ -186,6 +186,17 @@ export interface JenkinsWorkflowRun {
   stages?: JenkinsWorkflowStage[];
 }
 
+export interface JenkinsRestartFromStageInfo {
+  availability: "supported" | "unsupported";
+  restartEnabled: boolean;
+  restartableStages: string[];
+}
+
+export interface JenkinsRestartFromStageActionResponse {
+  success?: boolean | string;
+  message?: string;
+}
+
 export interface JenkinsConsoleText {
   text: string;
   truncated: boolean;

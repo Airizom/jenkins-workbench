@@ -11,6 +11,7 @@ import type {
   JenkinsPendingInputAction,
   JenkinsPendingInputParameterDefinition,
   JenkinsQueueItem,
+  JenkinsRestartFromStageInfo,
   JenkinsWorkflowRun
 } from "./JenkinsClient";
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
@@ -676,6 +677,31 @@ export class JenkinsDataService {
     const client = await this.clientProvider.getClient(environment);
     try {
       await client.rebuildBuild(buildUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async getRestartFromStageInfo(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsRestartFromStageInfo> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      return await client.getRestartFromStageInfo(buildUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async restartPipelineFromStage(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    stageName: string
+  ): Promise<void> {
+    const client = await this.clientProvider.getClient(environment);
+    try {
+      await client.restartPipelineFromStage(buildUrl, stageName);
     } catch (error) {
       throw toBuildActionError(error);
     }

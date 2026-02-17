@@ -4,6 +4,8 @@ import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
 import type { BuildDetailsInitialState } from "./BuildDetailsPollingController";
 
+export type PipelineRestartAvailability = "unknown" | "supported" | "unsupported";
+
 export class BuildDetailsPanelState {
   private environmentValue: JenkinsEnvironmentRef | undefined;
   private currentBuildUrlValue: string | undefined;
@@ -14,6 +16,9 @@ export class BuildDetailsPanelState {
   private baseErrorsValue: string[] = [];
   private pipelineErrorValue: string | undefined;
   private currentPendingInputsValue: PendingInputAction[] = [];
+  private pipelineRestartAvailabilityValue: PipelineRestartAvailability = "unknown";
+  private pipelineRestartEnabledValue = false;
+  private pipelineRestartableStagesValue: string[] = [];
   private followLogValue = true;
   private completionToastShownValue = false;
   private currentNonceValue = "";
@@ -48,6 +53,18 @@ export class BuildDetailsPanelState {
     return this.currentPendingInputsValue;
   }
 
+  get pipelineRestartAvailability(): PipelineRestartAvailability {
+    return this.pipelineRestartAvailabilityValue;
+  }
+
+  get pipelineRestartEnabled(): boolean {
+    return this.pipelineRestartEnabledValue;
+  }
+
+  get pipelineRestartableStages(): string[] {
+    return this.pipelineRestartableStagesValue;
+  }
+
   get followLog(): boolean {
     return this.followLogValue;
   }
@@ -74,6 +91,9 @@ export class BuildDetailsPanelState {
     this.baseErrorsValue = [];
     this.pipelineErrorValue = undefined;
     this.currentPendingInputsValue = [];
+    this.pipelineRestartAvailabilityValue = "unknown";
+    this.pipelineRestartEnabledValue = false;
+    this.pipelineRestartableStagesValue = [];
     this.completionToastShownValue = false;
     this.currentNonceValue = nonce;
     this.lastDetailsBuildingValue = false;
@@ -91,6 +111,9 @@ export class BuildDetailsPanelState {
     this.baseErrorsValue = initialState.errors;
     this.pipelineErrorValue = pipelineError;
     this.currentPendingInputsValue = initialState.pendingInputs ?? [];
+    this.pipelineRestartAvailabilityValue = "unknown";
+    this.pipelineRestartEnabledValue = false;
+    this.pipelineRestartableStagesValue = [];
     this.lastDetailsBuildingValue = initialState.details?.building ?? false;
     this.pipelineLoadingValue = false;
     this.currentErrorsValue = composeErrors(this.baseErrorsValue, this.pipelineErrorValue);
@@ -133,6 +156,31 @@ export class BuildDetailsPanelState {
 
   setPendingInputs(pendingInputs: PendingInputAction[]): void {
     this.currentPendingInputsValue = pendingInputs;
+  }
+
+  setPipelineRestartInfo(
+    restartEnabled: boolean,
+    restartableStages: string[],
+    availability: PipelineRestartAvailability
+  ): boolean {
+    const normalizedStages: string[] = [];
+    for (const stage of restartableStages) {
+      const trimmed = stage.trim();
+      if (!trimmed || normalizedStages.includes(trimmed)) {
+        continue;
+      }
+      normalizedStages.push(trimmed);
+    }
+    const availabilityChanged = this.pipelineRestartAvailabilityValue !== availability;
+    const restartEnabledChanged = this.pipelineRestartEnabledValue !== restartEnabled;
+    const stagesChanged = !areErrorsEqual(normalizedStages, this.pipelineRestartableStagesValue);
+    if (!availabilityChanged && !restartEnabledChanged && !stagesChanged) {
+      return false;
+    }
+    this.pipelineRestartAvailabilityValue = availability;
+    this.pipelineRestartEnabledValue = restartEnabled;
+    this.pipelineRestartableStagesValue = normalizedStages;
+    return true;
   }
 
   setFollowLog(value: boolean): void {

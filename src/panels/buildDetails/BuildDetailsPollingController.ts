@@ -7,6 +7,7 @@ import type {
   JenkinsConsoleTextTail,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
+  JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
@@ -62,6 +63,15 @@ export interface BuildDetailsDataService {
     buildUrl: string,
     inputId: string,
     abortUrl?: string
+  ): Promise<void>;
+  getRestartFromStageInfo(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsRestartFromStageInfo>;
+  restartPipelineFromStage(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    stageName: string
   ): Promise<void>;
 }
 

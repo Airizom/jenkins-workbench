@@ -22,7 +22,9 @@ export function buildDetailsUpdateMessage(
   testReport?: JenkinsTestReport,
   pipelineRun?: PipelineRun,
   pendingInputs?: PendingInputAction[],
-  pipelineLoading?: boolean
+  pipelineLoading?: boolean,
+  pipelineRestartEnabled?: boolean,
+  pipelineRestartableStages?: string[]
 ): BuildDetailsUpdateMessage {
   return {
     type: "updateDetails",
@@ -33,7 +35,11 @@ export function buildDetailsUpdateMessage(
     culpritsLabel: formatCulprits(details.culprits),
     pipelineStagesLoading: Boolean(pipelineLoading),
     insights: buildBuildFailureInsights(details, testReport),
-    pipelineStages: buildPipelineStagesViewModel(pipelineRun),
+    pipelineStages: buildPipelineStagesViewModel(pipelineRun, {
+      details,
+      restartEnabled: Boolean(pipelineRestartEnabled),
+      restartableStages: pipelineRestartableStages ?? []
+    }),
     pendingInputs: buildPendingInputsViewModel(pendingInputs)
   };
 }
@@ -47,7 +53,9 @@ export function buildUpdateMessageFromState(
       state.currentTestReport,
       state.currentPipelineRun,
       state.currentPendingInputs,
-      state.pipelineLoading
+      state.pipelineLoading,
+      state.pipelineRestartEnabled,
+      state.pipelineRestartableStages
     );
   }
 
@@ -59,7 +67,11 @@ export function buildUpdateMessageFromState(
     timestampLabel: "Unknown",
     culpritsLabel: "Unknown",
     insights: buildBuildFailureInsights(undefined, state.currentTestReport),
-    pipelineStages: buildPipelineStagesViewModel(state.currentPipelineRun),
+    pipelineStages: buildPipelineStagesViewModel(state.currentPipelineRun, {
+      details: state.currentDetails,
+      restartEnabled: state.pipelineRestartEnabled,
+      restartableStages: state.pipelineRestartableStages
+    }),
     pendingInputs: buildPendingInputsViewModel(state.currentPendingInputs),
     pipelineStagesLoading: state.pipelineLoading
   };
