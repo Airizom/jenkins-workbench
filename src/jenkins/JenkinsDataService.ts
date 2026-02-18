@@ -2,14 +2,9 @@ import type {
   JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
-  JenkinsBuildTriggerOptions,
   JenkinsItemCreateKind,
   JenkinsJob,
-  JenkinsJobKind,
   JenkinsNodeDetails,
-  JenkinsParameterDefinition,
-  JenkinsPendingInputAction,
-  JenkinsPendingInputParameterDefinition,
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
   JenkinsWorkflowRun,
@@ -18,12 +13,8 @@ import type {
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
-import { JenkinsDataCache } from "./data/JenkinsDataCache";
-import {
-  toBuildActionError,
-  toJenkinsActionError,
-  toJobManagementActionError
-} from "./data/JenkinsDataErrors";
+import { JenkinsBuildDataOperations } from "./data/JenkinsBuildDataOperations";
+import { JenkinsDataRuntimeContext } from "./data/JenkinsDataRuntimeContext";
 import type {
   BuildParameterPayload,
   BuildParameterRequestPreparer,
@@ -33,7 +24,6 @@ import type {
   JenkinsNodeInfo,
   JenkinsQueueItemInfo,
   JobParameter,
-  JobParameterKind,
   JobSearchEntry,
   JobSearchOptions,
   PendingInputAction,
@@ -41,11 +31,14 @@ import type {
   ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult
 } from "./data/JenkinsDataTypes";
+import { JenkinsJobDataOperations } from "./data/JenkinsJobDataOperations";
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
-import { JenkinsRequestError } from "./errors";
+import { JenkinsNodeDataOperations } from "./data/JenkinsNodeDataOperations";
+import type { NodeLaunchResult, NodeOfflineToggleResult } from "./data/JenkinsNodeDataOperations";
+import { JenkinsPendingInputDataOperations } from "./data/JenkinsPendingInputDataOperations";
+import { JenkinsQueueAndJobManagementOperations } from "./data/JenkinsQueueAndJobManagementOperations";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type { JenkinsTestReport } from "./types";
-import { resolveNodeUrl } from "./urls";
 
 export type {
   BuildActionErrorCode,
@@ -81,84 +74,52 @@ export interface BuildListFetchOptions {
   includeParameters?: boolean;
 }
 
-type NodeOfflineToggleStatus = "toggled" | "no_change" | "not_temporarily_offline";
-
-interface NodeOfflineToggleResult {
-  status: NodeOfflineToggleStatus;
-  details: JenkinsNodeDetails;
-}
-
-type NodeLaunchStatus = "launched" | "no_change" | "not_launchable" | "temporarily_offline";
-
-interface NodeLaunchResult {
-  status: NodeLaunchStatus;
-  details: JenkinsNodeDetails;
-}
-
-const PENDING_INPUT_ACTIONS_TTL_MS = 5000;
-const PENDING_INPUT_SUMMARY_TTL_MS = 60_000;
-const PENDING_INPUT_UNSUPPORTED_TTL_MS = 5 * 60 * 1000;
-
 export class JenkinsDataService {
-  private readonly cache: JenkinsDataCache;
+  private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
-  private readonly buildParameterRequestPreparer: BuildParameterRequestPreparer;
-  private cacheTtlMs?: number;
+  private readonly buildOperations: JenkinsBuildDataOperations;
+  private readonly pendingInputOperations: JenkinsPendingInputDataOperations;
+  private readonly nodeOperations: JenkinsNodeDataOperations;
+  private readonly jobOperations: JenkinsJobDataOperations;
+  private readonly queueAndJobManagementOperations: JenkinsQueueAndJobManagementOperations;
 
-  constructor(
-    private readonly clientProvider: JenkinsClientProvider,
-    options: JenkinsDataServiceOptions
-  ) {
-    this.cache = new JenkinsDataCache(undefined, options?.maxCacheEntries);
-    this.jobIndex = new JenkinsJobIndex(this.cache, clientProvider);
-    this.buildParameterRequestPreparer = options.buildParameterRequestPreparer;
-    this.cacheTtlMs = options?.cacheTtlMs;
-  }
-
-  clearCache(): void {
-    this.cache.clear();
-  }
-
-  clearCacheForEnvironment(environmentId: string): void {
-    this.cache.clearForEnvironment(environmentId);
-  }
-
-  updateCacheTtlMs(cacheTtlMs?: number): void {
-    this.cacheTtlMs = cacheTtlMs;
-  }
-
-  async getJobsForEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsJobInfo[]> {
-    const cacheKey = await this.buildCacheKey(environment, "jobs");
-    return this.cache.getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.clientProvider.getClient(environment);
-        const jobs = await client.getRootJobs();
-        return this.mapJobs(client, jobs);
-      },
-      this.cacheTtlMs
+  constructor(clientProvider: JenkinsClientProvider, options: JenkinsDataServiceOptions) {
+    this.runtimeContext = new JenkinsDataRuntimeContext(clientProvider, options);
+    this.jobIndex = new JenkinsJobIndex(this.runtimeContext.getCache(), clientProvider);
+    this.buildOperations = new JenkinsBuildDataOperations(this.runtimeContext);
+    this.pendingInputOperations = new JenkinsPendingInputDataOperations(this.runtimeContext);
+    this.nodeOperations = new JenkinsNodeDataOperations(this.runtimeContext);
+    this.jobOperations = new JenkinsJobDataOperations(this.runtimeContext);
+    this.queueAndJobManagementOperations = new JenkinsQueueAndJobManagementOperations(
+      this.runtimeContext
     );
   }
 
+  clearCache(): void {
+    this.runtimeContext.clearCache();
+  }
+
+  clearCacheForEnvironment(environmentId: string): void {
+    this.runtimeContext.clearCacheForEnvironment(environmentId);
+  }
+
+  updateCacheTtlMs(cacheTtlMs?: number): void {
+    this.runtimeContext.setCacheTtlMs(cacheTtlMs);
+  }
+
+  async getJobsForEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsJobInfo[]> {
+    return this.jobOperations.getJobsForEnvironment(environment);
+  }
+
   async getJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<JenkinsJob> {
-    const client = await this.clientProvider.getClient(environment);
-    return client.getJob(jobUrl);
+    return this.jobOperations.getJob(environment, jobUrl);
   }
 
   async getJobsForFolder(
     environment: JenkinsEnvironmentRef,
     folderUrl: string
   ): Promise<JenkinsJobInfo[]> {
-    const cacheKey = await this.buildCacheKey(environment, "folder", folderUrl);
-    return this.cache.getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.clientProvider.getClient(environment);
-        const jobs = await client.getFolderJobs(folderUrl);
-        return this.mapJobs(client, jobs);
-      },
-      this.cacheTtlMs
-    );
+    return this.jobOperations.getJobsForFolder(environment, folderUrl);
   }
 
   async getAllJobsForEnvironment(
@@ -183,73 +144,28 @@ export class JenkinsDataService {
     limit: number,
     options?: BuildListFetchOptions
   ): Promise<JenkinsBuild[]> {
-    const detailLevel = options?.detailLevel ?? "summary";
-    const includeParameters = options?.includeParameters ?? false;
-    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}`;
-    const cacheKey = await this.buildCacheKey(environment, cacheKind, jobUrl);
-    return this.cache.getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.clientProvider.getClient(environment);
-        return client.getBuilds(jobUrl, limit, {
-          includeDetails: detailLevel === "details",
-          includeParameters
-        });
-      },
-      this.cacheTtlMs
-    );
+    return this.buildOperations.getBuildsForJob(environment, jobUrl, limit, options);
   }
 
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsBuildDetails> {
-    const cacheKey = await this.buildCacheKey(environment, "build-details", buildUrl);
-    const cached = this.cache.get<JenkinsBuildDetails>(cacheKey);
-    if (cached && !cached.building) {
-      return cached;
-    }
-
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      const details = await client.getBuildDetails(buildUrl);
-      if (!details.building) {
-        this.cache.set(cacheKey, details, this.cacheTtlMs);
-      } else {
-        this.cache.delete(cacheKey);
-      }
-      return details;
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getBuildDetails(environment, buildUrl);
   }
 
   async getBuildArtifacts(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsArtifact[]> {
-    const client = await this.clientProvider.getClient(environment);
-    return client.getBuildArtifacts(buildUrl);
+    return this.buildOperations.getBuildArtifacts(environment, buildUrl);
   }
 
   async getWorkflowRun(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsWorkflowRun | undefined> {
-    const unsupportedKey = await this.buildCacheKey(environment, "wfapi-unsupported", buildUrl);
-    if (this.cache.has(unsupportedKey)) {
-      return undefined;
-    }
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getWorkflowRun(buildUrl);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        this.cache.set(unsupportedKey, true, this.cacheTtlMs);
-        return undefined;
-      }
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getWorkflowRun(environment, buildUrl);
   }
 
   async getPendingInputActions(
@@ -257,28 +173,7 @@ export class JenkinsDataService {
     buildUrl: string,
     options?: { mode?: "cached" | "refresh" }
   ): Promise<PendingInputAction[]> {
-    const cacheKey = await this.buildCacheKey(environment, "pending-inputs", buildUrl);
-    const summaryKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
-    const unsupportedKey = await this.buildCacheKey(
-      environment,
-      "pending-inputs-unsupported",
-      buildUrl
-    );
-    if (this.cache.has(unsupportedKey)) {
-      return [];
-    }
-    const cached = this.cache.get<PendingInputAction[]>(cacheKey);
-    if (options?.mode === "cached") {
-      return cached ?? [];
-    }
-    if (cached && options?.mode !== "refresh") {
-      return cached;
-    }
-    return this.fetchPendingInputActions(environment, buildUrl, {
-      cacheKey,
-      summaryKey,
-      unsupportedKey
-    });
+    return this.pendingInputOperations.getPendingInputActions(environment, buildUrl, options);
   }
 
   async getPendingInputSummary(
@@ -286,36 +181,14 @@ export class JenkinsDataService {
     buildUrl: string,
     options?: { mode?: "cached" | "refresh"; maxAgeMs?: number }
   ): Promise<PendingInputSummary> {
-    const cacheKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
-    const cached = this.cache.get<PendingInputSummary>(cacheKey);
-    if (options?.mode === "cached") {
-      return cached ?? this.buildPendingInputSummary([], 0);
-    }
-    if (cached && options?.mode !== "refresh") {
-      const maxAgeMs = options?.maxAgeMs;
-      if (!Number.isFinite(maxAgeMs) || typeof maxAgeMs !== "number") {
-        return cached;
-      }
-      const ageMs = Date.now() - cached.fetchedAt;
-      if (ageMs <= maxAgeMs) {
-        return cached;
-      }
-    }
-    const summary = await this.refreshPendingInputSummary(environment, buildUrl);
-    return summary;
+    return this.pendingInputOperations.getPendingInputSummary(environment, buildUrl, options);
   }
 
   async refreshPendingInputSummary(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<PendingInputSummary> {
-    const actions = await this.getPendingInputActions(environment, buildUrl, {
-      mode: "refresh"
-    });
-    const summary = this.buildPendingInputSummary(actions);
-    const cacheKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
-    this.cache.set(cacheKey, summary, PENDING_INPUT_SUMMARY_TTL_MS);
-    return summary;
+    return this.pendingInputOperations.refreshPendingInputSummary(environment, buildUrl);
   }
 
   async approveInput(
@@ -324,14 +197,7 @@ export class JenkinsDataService {
     inputId: string,
     options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
   ): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.proceedInput(buildUrl, inputId, options);
-    } catch (error) {
-      throw toBuildActionError(error);
-    } finally {
-      await this.clearPendingInputCache(environment, buildUrl);
-    }
+    return this.pendingInputOperations.approveInput(environment, buildUrl, inputId, options);
   }
 
   async rejectInput(
@@ -340,14 +206,7 @@ export class JenkinsDataService {
     inputId: string,
     abortUrl?: string
   ): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.abortInput(buildUrl, inputId, abortUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    } finally {
-      await this.clearPendingInputCache(environment, buildUrl);
-    }
+    return this.pendingInputOperations.rejectInput(environment, buildUrl, inputId, abortUrl);
   }
 
   async getArtifact(
@@ -356,8 +215,7 @@ export class JenkinsDataService {
     relativePath: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse> {
-    const client = await this.clientProvider.getClient(environment);
-    return client.getArtifact(buildUrl, relativePath, options);
+    return this.buildOperations.getArtifact(environment, buildUrl, relativePath, options);
   }
 
   async getArtifactStream(
@@ -366,8 +224,7 @@ export class JenkinsDataService {
     relativePath: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
-    const client = await this.clientProvider.getClient(environment);
-    return client.getArtifactStream(buildUrl, relativePath, options);
+    return this.buildOperations.getArtifactStream(environment, buildUrl, relativePath, options);
   }
 
   async getConsoleText(
@@ -375,12 +232,7 @@ export class JenkinsDataService {
     buildUrl: string,
     maxChars?: number
   ): Promise<ConsoleTextResult> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getConsoleText(buildUrl, maxChars);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getConsoleText(environment, buildUrl, maxChars);
   }
 
   async getConsoleTextTail(
@@ -388,12 +240,7 @@ export class JenkinsDataService {
     buildUrl: string,
     maxChars: number
   ): Promise<ConsoleTextTailResult> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getConsoleTextTail(buildUrl, maxChars);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getConsoleTextTail(environment, buildUrl, maxChars);
   }
 
   async getConsoleTextProgressive(
@@ -401,12 +248,7 @@ export class JenkinsDataService {
     buildUrl: string,
     start: number
   ): Promise<ProgressiveConsoleTextResult> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getConsoleTextProgressive(buildUrl, start);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getConsoleTextProgressive(environment, buildUrl, start);
   }
 
   async getConsoleHtmlProgressive(
@@ -415,24 +257,14 @@ export class JenkinsDataService {
     start: number,
     annotator?: string
   ): Promise<ProgressiveConsoleHtmlResult> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getConsoleHtmlProgressive(buildUrl, start, annotator);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getConsoleHtmlProgressive(environment, buildUrl, start, annotator);
   }
 
   async getLastFailedBuild(
     environment: JenkinsEnvironmentRef,
     jobUrl: string
   ): Promise<JenkinsBuild | undefined> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getLastFailedBuild(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getLastFailedBuild(environment, jobUrl);
   }
 
   async getTestReport(
@@ -440,31 +272,11 @@ export class JenkinsDataService {
     buildUrl: string,
     options?: JenkinsTestReportOptions
   ): Promise<JenkinsTestReport | undefined> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getTestReport(buildUrl, options);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        return undefined;
-      }
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getTestReport(environment, buildUrl, options);
   }
 
   async getNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNodeInfo[]> {
-    const cacheKey = await this.buildCacheKey(environment, "nodes");
-    return this.cache.getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.clientProvider.getClient(environment);
-        const nodes = await client.getNodes();
-        return nodes.map((node) => ({
-          ...node,
-          nodeUrl: resolveNodeUrl(environment.url, node)
-        }));
-      },
-      this.cacheTtlMs
-    );
+    return this.nodeOperations.getNodes(environment);
   }
 
   async getNodeDetails(
@@ -472,21 +284,7 @@ export class JenkinsDataService {
     nodeUrl: string,
     options?: { mode?: "refresh"; detailLevel?: "basic" | "advanced" }
   ): Promise<JenkinsNodeDetails> {
-    const detailLevel = options?.detailLevel ?? "basic";
-    const cacheKey = await this.buildCacheKey(environment, `node-details-${detailLevel}`, nodeUrl);
-    const cached =
-      options?.mode !== "refresh" ? this.cache.get<JenkinsNodeDetails>(cacheKey) : undefined;
-    if (cached) {
-      return cached;
-    }
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      const details = await client.getNodeDetails(nodeUrl, { detailLevel });
-      this.cache.set(cacheKey, details, this.cacheTtlMs);
-      return details;
-    } catch (error) {
-      throw toJenkinsActionError(error);
-    }
+    return this.nodeOperations.getNodeDetails(environment, nodeUrl, options);
   }
 
   async setNodeTemporarilyOffline(
@@ -495,105 +293,34 @@ export class JenkinsDataService {
     targetOffline: boolean,
     reason?: string
   ): Promise<NodeOfflineToggleResult> {
-    try {
-      const details = await this.getNodeDetails(environment, nodeUrl, {
-        mode: "refresh",
-        detailLevel: "basic"
-      });
-      const isOffline = details.offline === true;
-      const isTemporarilyOffline = details.temporarilyOffline === true;
-
-      if (targetOffline) {
-        if (isTemporarilyOffline || isOffline) {
-          return { status: "no_change", details };
-        }
-        this.clearCacheForEnvironment(environment.environmentId);
-        const client = await this.clientProvider.getClient(environment);
-        await client.toggleNodeTemporarilyOffline(nodeUrl, reason);
-        const refreshed = await this.getNodeDetails(environment, nodeUrl, {
-          mode: "refresh",
-          detailLevel: "basic"
-        });
-        return { status: "toggled", details: refreshed };
-      }
-
-      if (!isTemporarilyOffline) {
-        return { status: isOffline ? "not_temporarily_offline" : "no_change", details };
-      }
-      this.clearCacheForEnvironment(environment.environmentId);
-      const client = await this.clientProvider.getClient(environment);
-      await client.toggleNodeTemporarilyOffline(nodeUrl);
-      const refreshed = await this.getNodeDetails(environment, nodeUrl, {
-        mode: "refresh",
-        detailLevel: "basic"
-      });
-      return { status: "toggled", details: refreshed };
-    } catch (error) {
-      throw toJenkinsActionError(error);
-    }
+    return this.nodeOperations.setNodeTemporarilyOffline(
+      environment,
+      nodeUrl,
+      targetOffline,
+      reason
+    );
   }
 
   async launchNodeAgent(
     environment: JenkinsEnvironmentRef,
     nodeUrl: string
   ): Promise<NodeLaunchResult> {
-    try {
-      const details = await this.getNodeDetails(environment, nodeUrl, {
-        mode: "refresh",
-        detailLevel: "basic"
-      });
-      const canLaunch = details.launchSupported === true;
-      if (!details.offline) {
-        return { status: "no_change", details };
-      }
-      if (details.temporarilyOffline) {
-        return { status: "temporarily_offline", details };
-      }
-      if (!canLaunch) {
-        return { status: "not_launchable", details };
-      }
-      this.clearCacheForEnvironment(environment.environmentId);
-      const client = await this.clientProvider.getClient(environment);
-      await client.launchNodeAgent(nodeUrl);
-      const refreshed = await this.getNodeDetails(environment, nodeUrl, {
-        mode: "refresh",
-        detailLevel: "basic"
-      });
-      return { status: "launched", details: refreshed };
-    } catch (error) {
-      throw toJenkinsActionError(error);
-    }
+    return this.nodeOperations.launchNodeAgent(environment, nodeUrl);
   }
 
   async getQueueItems(environment: JenkinsEnvironmentRef): Promise<JenkinsQueueItemInfo[]> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      const items = await client.getQueue();
-      return this.mapQueueItems(items);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.queueAndJobManagementOperations.getQueueItems(environment);
   }
 
   async getQueueItem(
     environment: JenkinsEnvironmentRef,
     queueId: number
   ): Promise<JenkinsQueueItem> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getQueueItem(queueId);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.queueAndJobManagementOperations.getQueueItem(environment, queueId);
   }
 
   async getJobConfigXml(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<string> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getJobConfigXml(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.jobOperations.getJobConfigXml(environment, jobUrl);
   }
 
   async updateJobConfigXml(
@@ -601,39 +328,21 @@ export class JenkinsDataService {
     jobUrl: string,
     xml: string
   ): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.updateJobConfigXml(jobUrl, xml);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.jobOperations.updateJobConfigXml(environment, jobUrl, xml);
   }
 
   async getJobParameters(
     environment: JenkinsEnvironmentRef,
     jobUrl: string
   ): Promise<JobParameter[]> {
-    const cacheKey = await this.buildCacheKey(environment, "parameters", jobUrl);
-    return this.cache.getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.clientProvider.getClient(environment);
-        try {
-          const parameters = await client.getJobParameters(jobUrl);
-          return parameters.map((parameter) => this.mapJobParameter(parameter));
-        } catch (error) {
-          throw toBuildActionError(error);
-        }
-      },
-      this.cacheTtlMs
-    );
+    return this.jobOperations.getJobParameters(environment, jobUrl);
   }
 
   async triggerBuild(
     environment: JenkinsEnvironmentRef,
     jobUrl: string
   ): Promise<{ queueLocation?: string }> {
-    return this.triggerBuildInternal(environment, jobUrl, { mode: "build" });
+    return this.buildOperations.triggerBuild(environment, jobUrl);
   }
 
   async triggerBuildWithParameters(
@@ -642,64 +351,26 @@ export class JenkinsDataService {
     params?: URLSearchParams | BuildParameterPayload,
     options?: { allowEmptyParams?: boolean }
   ): Promise<{ queueLocation?: string }> {
-    const prepared = await this.buildParameterRequestPreparer.prepareBuildParameters(params);
-    return this.triggerBuildInternal(environment, jobUrl, {
-      mode: "buildWithParameters",
-      prepared,
-      allowEmptyParams: options?.allowEmptyParams
-    });
-  }
-
-  private async triggerBuildInternal(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    options: JenkinsBuildTriggerOptions
-  ): Promise<{ queueLocation?: string }> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.triggerBuild(jobUrl, options);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.triggerBuildWithParameters(environment, jobUrl, params, options);
   }
 
   async stopBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.stopBuild(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.stopBuild(environment, buildUrl);
   }
 
   async replayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.replayBuild(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.replayBuild(environment, buildUrl);
   }
 
   async rebuildBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.rebuildBuild(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.rebuildBuild(environment, buildUrl);
   }
 
   async getRestartFromStageInfo(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsRestartFromStageInfo> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.getRestartFromStageInfo(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.getRestartFromStageInfo(environment, buildUrl);
   }
 
   async restartPipelineFromStage(
@@ -707,51 +378,26 @@ export class JenkinsDataService {
     buildUrl: string,
     stageName: string
   ): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.restartPipelineFromStage(buildUrl, stageName);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.buildOperations.restartPipelineFromStage(environment, buildUrl, stageName);
   }
 
   async cancelQueueItem(environment: JenkinsEnvironmentRef, queueId: number): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.cancelQueueItem(queueId);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.queueAndJobManagementOperations.cancelQueueItem(environment, queueId);
   }
 
   async enableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.enableJob(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.queueAndJobManagementOperations.enableJob(environment, jobUrl);
   }
 
   async disableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.disableJob(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.queueAndJobManagementOperations.disableJob(environment, jobUrl);
   }
 
   async scanMultibranch(
     environment: JenkinsEnvironmentRef,
     folderUrl: string
   ): Promise<ScanMultibranchResult> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.scanMultibranch(folderUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.queueAndJobManagementOperations.scanMultibranch(environment, folderUrl);
   }
 
   async renameJob(
@@ -759,21 +405,11 @@ export class JenkinsDataService {
     jobUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.renameJob(jobUrl, newName);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
+    return this.queueAndJobManagementOperations.renameJob(environment, jobUrl, newName);
   }
 
   async deleteJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      await client.deleteJob(jobUrl);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
+    return this.queueAndJobManagementOperations.deleteJob(environment, jobUrl);
   }
 
   async copyJob(
@@ -782,12 +418,12 @@ export class JenkinsDataService {
     sourceName: string,
     newName: string
   ): Promise<{ newUrl: string }> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.copyJob(parentUrl, sourceName, newName);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
+    return this.queueAndJobManagementOperations.copyJob(
+      environment,
+      parentUrl,
+      sourceName,
+      newName
+    );
   }
 
   async createItem(
@@ -796,321 +432,6 @@ export class JenkinsDataService {
     parentUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      return await client.createItem(kind, parentUrl, newName);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
-  }
-
-  private async buildCacheKey(
-    environment: JenkinsEnvironmentRef,
-    kind: string,
-    path?: string
-  ): Promise<string> {
-    const authSignature = await this.clientProvider.getAuthSignature(environment);
-    return this.cache.buildKey(environment, kind, path, authSignature);
-  }
-
-  private async clearPendingInputCache(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<void> {
-    const cacheKey = await this.buildCacheKey(environment, "pending-inputs", buildUrl);
-    const summaryKey = await this.buildCacheKey(environment, "pending-input-summary", buildUrl);
-    const unsupportedKey = await this.buildCacheKey(
-      environment,
-      "pending-inputs-unsupported",
-      buildUrl
-    );
-    this.cache.delete(cacheKey);
-    this.cache.delete(summaryKey);
-    this.cache.delete(unsupportedKey);
-  }
-
-  private async fetchPendingInputActions(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    keys: { cacheKey: string; summaryKey: string; unsupportedKey: string }
-  ): Promise<PendingInputAction[]> {
-    const client = await this.clientProvider.getClient(environment);
-    try {
-      const actions = await client.getPendingInputActions(buildUrl);
-      const mapped = this.mapPendingInputActions(actions);
-      this.cache.set(keys.cacheKey, mapped, PENDING_INPUT_ACTIONS_TTL_MS);
-      this.cache.set(
-        keys.summaryKey,
-        this.buildPendingInputSummary(mapped),
-        PENDING_INPUT_SUMMARY_TTL_MS
-      );
-      return mapped;
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        this.cache.set(
-          keys.unsupportedKey,
-          true,
-          this.cacheTtlMs ?? PENDING_INPUT_UNSUPPORTED_TTL_MS
-        );
-        this.cache.set(keys.cacheKey, [], PENDING_INPUT_ACTIONS_TTL_MS);
-        this.cache.set(
-          keys.summaryKey,
-          this.buildPendingInputSummary([]),
-          PENDING_INPUT_SUMMARY_TTL_MS
-        );
-        return [];
-      }
-      throw toBuildActionError(error);
-    }
-  }
-
-  private mapJobParameter(parameter: JenkinsParameterDefinition): JobParameter {
-    const classification = this.classifyParameterKind(parameter.type, {
-      choices: parameter.choices
-    });
-
-    return {
-      name: parameter.name,
-      kind: classification.kind,
-      defaultValue: parameter.defaultValue,
-      choices: parameter.choices,
-      description: parameter.description,
-      rawType: parameter.type,
-      isSensitive: classification.isSensitive,
-      runProjectName: parameter.projectName,
-      multiSelectDelimiter: parameter.multiSelectDelimiter,
-      allowsMultiple: classification.allowsMultiple
-    };
-  }
-
-  private mapPendingInputActions(actions: JenkinsPendingInputAction[]): PendingInputAction[] {
-    const results: PendingInputAction[] = [];
-    for (const action of actions) {
-      const id = (action.id ?? action.inputId ?? "").trim();
-      if (!id) {
-        continue;
-      }
-      const message = (action.message ?? "").trim() || "Input required";
-      const submitter = this.normalizeString(action.submitter);
-      const proceedText = this.normalizeString(action.proceedText);
-      const proceedUrl = this.normalizeString(action.proceedUrl);
-      const abortUrl = this.normalizeString(action.abortUrl);
-      const parameters = this.mapPendingInputParameters(action);
-      results.push({
-        id,
-        message,
-        submitter,
-        proceedText,
-        proceedUrl,
-        abortUrl,
-        parameters
-      });
-    }
-    return results;
-  }
-
-  private buildPendingInputSummary(
-    actions: PendingInputAction[],
-    fetchedAt = Date.now()
-  ): PendingInputSummary {
-    const signature = this.buildPendingInputSignature(actions);
-    const message = actions[0]?.message;
-    return {
-      awaitingInput: actions.length > 0,
-      count: actions.length,
-      signature,
-      message,
-      fetchedAt
-    };
-  }
-
-  private buildPendingInputSignature(actions: PendingInputAction[]): string | undefined {
-    const normalizedActions = actions.map((action) => ({
-      id: action.id.trim(),
-      message: action.message,
-      submitter: action.submitter ?? "",
-      proceedText: action.proceedText ?? "",
-      parameters: [...action.parameters]
-        .map((param) => ({
-          name: param.name,
-          kind: param.kind,
-          description: param.description ?? "",
-          defaultValue: param.defaultValue ?? "",
-          choices: Array.isArray(param.choices) ? [...param.choices].sort() : []
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind))
-    }));
-
-    normalizedActions.sort(
-      (a, b) => a.id.localeCompare(b.id) || a.message.localeCompare(b.message)
-    );
-
-    const parts = normalizedActions
-      .map((action) => JSON.stringify(action))
-      .filter((part) => part.length > 0);
-    return parts.length > 0 ? parts.join("|") : undefined;
-  }
-
-  private mapPendingInputParameters(action: JenkinsPendingInputAction): JobParameter[] {
-    const rawParameters = Array.isArray(action.parameters)
-      ? action.parameters
-      : Array.isArray(action.inputs)
-        ? action.inputs
-        : [];
-    const results: JobParameter[] = [];
-    for (const parameter of rawParameters) {
-      if (!parameter || !parameter.name) {
-        continue;
-      }
-      results.push(this.mapPendingInputParameter(parameter));
-    }
-    return results;
-  }
-
-  private mapPendingInputParameter(
-    parameter: JenkinsPendingInputParameterDefinition
-  ): JobParameter {
-    const choices = Array.isArray(parameter.choices)
-      ? parameter.choices.map((choice) => String(choice))
-      : undefined;
-    const classification = this.classifyParameterKind(parameter.type, {
-      choices,
-      includeLooseTokens: true
-    });
-
-    const rawDefault = parameter.defaultParameterValue?.value ?? parameter.defaultValue;
-    const defaultValue = this.formatParameterDefaultValue(rawDefault);
-
-    return {
-      name: parameter.name ?? "parameter",
-      kind: classification.kind,
-      defaultValue,
-      choices,
-      description: parameter.description,
-      rawType: parameter.type,
-      isSensitive: classification.isSensitive,
-      runProjectName: parameter.projectName,
-      multiSelectDelimiter: parameter.multiSelectDelimiter,
-      allowsMultiple: classification.allowsMultiple
-    };
-  }
-
-  private formatParameterDefaultValue(
-    value: unknown
-  ): string | number | boolean | string[] | undefined {
-    switch (typeof value) {
-      case "string":
-      case "number":
-      case "boolean":
-        return value;
-      case "undefined":
-        return undefined;
-      case "bigint":
-        return value.toString();
-      case "symbol":
-        return value.description ?? value.toString();
-      case "function":
-        return value.name ? `[function ${value.name}]` : "[function]";
-      case "object":
-        if (value === null) {
-          return undefined;
-        }
-        if (Array.isArray(value)) {
-          return value.map((entry) => String(entry));
-        }
-        try {
-          return JSON.stringify(value);
-        } catch {
-          return "[object]";
-        }
-      default:
-        return undefined;
-    }
-  }
-
-  private classifyParameterKind(
-    rawType: string | undefined,
-    options?: { choices?: string[]; includeLooseTokens?: boolean }
-  ): { kind: JobParameterKind; isSensitive: boolean; allowsMultiple: boolean } {
-    const normalizedType = (rawType ?? "").toLowerCase();
-    const hasChoices = Boolean(options?.choices && options.choices.length > 0);
-    const includeLooseTokens = options?.includeLooseTokens === true;
-
-    if (normalizedType.includes("credentialsparameterdefinition")) {
-      return { kind: "credentials", isSensitive: true, allowsMultiple: false };
-    }
-    if (normalizedType.includes("runparameterdefinition")) {
-      return { kind: "run", isSensitive: false, allowsMultiple: false };
-    }
-    if (normalizedType.includes("fileparameterdefinition")) {
-      return { kind: "file", isSensitive: false, allowsMultiple: false };
-    }
-    if (normalizedType.includes("textparameterdefinition")) {
-      return { kind: "text", isSensitive: false, allowsMultiple: false };
-    }
-    if (
-      normalizedType.includes("extendedchoice") ||
-      normalizedType.includes("multiselect") ||
-      normalizedType.includes("multichoice")
-    ) {
-      return { kind: "multiChoice", isSensitive: false, allowsMultiple: true };
-    }
-    if (
-      normalizedType.includes("booleanparameterdefinition") ||
-      (includeLooseTokens && normalizedType.includes("boolean"))
-    ) {
-      return { kind: "boolean", isSensitive: false, allowsMultiple: false };
-    }
-    if (
-      normalizedType.includes("choiceparameterdefinition") ||
-      (includeLooseTokens && normalizedType.includes("choice")) ||
-      hasChoices
-    ) {
-      return { kind: "choice", isSensitive: false, allowsMultiple: false };
-    }
-    if (
-      normalizedType.includes("passwordparameterdefinition") ||
-      (includeLooseTokens && normalizedType.includes("password"))
-    ) {
-      return { kind: "password", isSensitive: true, allowsMultiple: false };
-    }
-    return { kind: "string", isSensitive: false, allowsMultiple: false };
-  }
-
-  private normalizeString(value?: string): string | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }
-
-  private mapJobs(
-    client: { classifyJob(job: JenkinsJob): JenkinsJobKind },
-    jobs: JenkinsJob[]
-  ): JenkinsJobInfo[] {
-    return jobs.map((job) => ({
-      name: job.name,
-      url: job.url,
-      color: job.color,
-      kind: client.classifyJob(job)
-    }));
-  }
-
-  private mapQueueItems(items: JenkinsQueueItem[]): JenkinsQueueItemInfo[] {
-    return items.map((item, index) => {
-      const name =
-        typeof item.task?.name === "string" && item.task.name.trim().length > 0
-          ? item.task.name.trim()
-          : `Queue item ${item.id}`;
-      return {
-        id: item.id,
-        name,
-        position: index + 1,
-        reason: typeof item.why === "string" ? item.why.trim() || undefined : undefined,
-        inQueueSince: typeof item.inQueueSince === "number" ? item.inQueueSince : undefined,
-        taskUrl: item.task?.url
-      };
-    });
+    return this.queueAndJobManagementOperations.createItem(kind, environment, parentUrl, newName);
   }
 }

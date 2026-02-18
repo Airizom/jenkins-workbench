@@ -1,51 +1,27 @@
 import * as vscode from "vscode";
-import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { toPipelineRun } from "../jenkins/pipeline/JenkinsPipelineAdapter";
-import type { JenkinsBuildDetails } from "../jenkins/types";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
-import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
-import { handlePendingInputAction } from "../ui/PendingInputActions";
-import { BuildDetailsCompletionPoller } from "./buildDetails/BuildDetailsCompletionPoller";
+import { getTestReportIncludeCaseLogsConfigKey } from "./buildDetails/BuildDetailsConfig";
+import { BuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageRouter";
+import { BuildDetailsPanelActions } from "./buildDetails/BuildDetailsPanelActions";
 import {
-  MAX_CONSOLE_CHARS,
-  getBuildDetailsRefreshIntervalMs,
-  getTestReportIncludeCaseLogs,
-  getTestReportIncludeCaseLogsConfigKey
-} from "./buildDetails/BuildDetailsConfig";
-import { formatError, formatResult } from "./buildDetails/BuildDetailsFormatters";
-import {
-  type BuildDetailsOutgoingMessage,
-  isApproveInputMessage,
-  isArtifactActionMessage,
-  isExportConsoleMessage,
-  isOpenExternalMessage,
-  isRejectInputMessage,
-  isRestartPipelineFromStageMessage,
-  isToggleFollowLogMessage
-} from "./buildDetails/BuildDetailsMessages";
-import { BuildDetailsPanelState } from "./buildDetails/BuildDetailsPanelState";
-import { createBuildDetailsPollingCallbacks } from "./buildDetails/BuildDetailsPollingCallbacks";
-import {
-  type BuildDetailsDataService,
-  type BuildDetailsInitialState,
-  BuildDetailsPollingController,
-  type PendingInputActionProvider
+  BuildDetailsPanelController,
+  type BuildDetailsPanelLoadResult
+} from "./buildDetails/BuildDetailsPanelController";
+import type {
+  BuildDetailsDataService,
+  PendingInputActionProvider
 } from "./buildDetails/BuildDetailsPollingController";
-import { renderBuildDetailsHtml, renderLoadingHtml } from "./buildDetails/BuildDetailsRenderer";
-import { buildUpdateMessageFromState } from "./buildDetails/BuildDetailsUpdateBuilder";
-import { buildBuildDetailsViewModel } from "./buildDetails/BuildDetailsViewModel";
-import { isPipelineRestartEligible } from "./buildDetails/PipelineRestartEligibility";
-import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
+import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
+  type SerializedEnvironmentState,
   isSerializedEnvironmentState,
-  resolveEnvironmentRef,
-  type SerializedEnvironmentState
+  resolveEnvironmentRef
 } from "./shared/webview/WebviewPanelState";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 
 interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
   buildUrl: string;
@@ -85,16 +61,12 @@ export class BuildDetailsPanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private consoleExporter: BuildConsoleExporter;
+  private readonly controller: BuildDetailsPanelController;
+  private readonly actions: BuildDetailsPanelActions;
+  private readonly messageRouter: BuildDetailsMessageRouter;
   private readonly disposables: vscode.Disposable[] = [];
-  private readonly completionPoller: BuildDetailsCompletionPoller;
-  private readonly state = new BuildDetailsPanelState();
-  private loadToken = 0;
-  private dataService?: BuildDetailsDataService;
   private artifactActionHandler?: ArtifactActionHandler;
-  private pollingController?: BuildDetailsPollingController;
   private refreshHost?: { refreshEnvironment(environmentId: string): void };
-  private pendingInputProvider?: PendingInputActionProvider;
-  private loadingRequests = 0;
 
   static async show(
     dataService: BuildDetailsDataService,
@@ -125,7 +97,7 @@ export class BuildDetailsPanel {
     const activePanel = BuildDetailsPanel.currentPanel;
     activePanel.consoleExporter = consoleExporter;
     activePanel.refreshHost = refreshHost;
-    activePanel.pendingInputProvider = pendingInputProvider;
+    activePanel.controller.setPendingInputProvider(pendingInputProvider);
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
@@ -142,7 +114,7 @@ export class BuildDetailsPanel {
     BuildDetailsPanel.currentPanel = revived;
     revived.consoleExporter = options.consoleExporter;
     revived.refreshHost = options.refreshHost;
-    revived.pendingInputProvider = options.pendingInputProvider;
+    revived.controller.setPendingInputProvider(options.pendingInputProvider);
 
     if (!isBuildDetailsPanelState(state)) {
       revived.renderRestoreError(
@@ -176,20 +148,44 @@ export class BuildDetailsPanel {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.consoleExporter = consoleExporter;
-    this.completionPoller = new BuildDetailsCompletionPoller({
-      getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
-      fetchBuildDetails: (token) => this.fetchBuildDetails(token),
-      isTokenCurrent: (token) => this.isTokenCurrent(token),
-      shouldPoll: () => this.state.lastDetailsBuilding,
-      onDetailsUpdate: (details) => this.applyDetailsUpdate(details, false)
+    this.controller = new BuildDetailsPanelController(panel, extensionUri);
+    this.actions = new BuildDetailsPanelActions({
+      controller: this.controller,
+      getArtifactActionHandler: () => this.artifactActionHandler,
+      getConsoleExporter: () => this.consoleExporter,
+      getRefreshHost: () => this.refreshHost
     });
+    this.messageRouter = new BuildDetailsMessageRouter({
+      onArtifactAction: (message) => {
+        void this.actions.handleArtifactAction(message);
+      },
+      onOpenExternal: (url) => {
+        void this.actions.openExternalUrl(url);
+      },
+      onExportConsole: () => {
+        void this.actions.handleExportConsole();
+      },
+      onApproveInput: (message) => {
+        void this.actions.handleApproveInput(message);
+      },
+      onRejectInput: (message) => {
+        void this.actions.handleRejectInput(message);
+      },
+      onRestartPipelineFromStage: (message) => {
+        void this.actions.handleRestartPipelineFromStage(message);
+      },
+      onToggleFollowLog: (value) => {
+        this.controller.setFollowLog(Boolean(value));
+      }
+    });
+
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.onDidChangeViewState(
       () => {
         if (this.panel.visible) {
-          void this.handlePanelVisible();
+          void this.controller.handlePanelVisible();
         } else {
-          this.handlePanelHidden();
+          this.controller.handlePanelHidden();
         }
       },
       null,
@@ -197,33 +193,7 @@ export class BuildDetailsPanel {
     );
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
-        if (isArtifactActionMessage(message)) {
-          void this.handleArtifactAction(message);
-          return;
-        }
-        if (isOpenExternalMessage(message)) {
-          void this.openExternalUrl(message.url);
-          return;
-        }
-        if (isExportConsoleMessage(message)) {
-          void this.handleExportConsole();
-          return;
-        }
-        if (isApproveInputMessage(message)) {
-          void this.handleApproveInput(message);
-          return;
-        }
-        if (isRejectInputMessage(message)) {
-          void this.handleRejectInput(message);
-          return;
-        }
-        if (isRestartPipelineFromStageMessage(message)) {
-          void this.handleRestartPipelineFromStage(message);
-          return;
-        }
-        if (isToggleFollowLogMessage(message)) {
-          this.state.setFollowLog(Boolean(message.value));
-        }
+        this.messageRouter.route(message);
       },
       null,
       this.disposables
@@ -233,18 +203,13 @@ export class BuildDetailsPanel {
         if (!event.affectsConfiguration(getTestReportIncludeCaseLogsConfigKey())) {
           return;
         }
-        this.pollingController?.setTestReportOptions({
-          includeCaseLogs: getTestReportIncludeCaseLogs()
-        });
+        this.controller.updateTestReportOptions();
       })
     );
   }
 
   private dispose(): void {
-    this.pollingController?.dispose();
-    this.pollingController = undefined;
-    this.stopCompletionPolling();
-    this.loadingRequests = 0;
+    this.controller.dispose();
     BuildDetailsPanel.currentPanel = undefined;
     while (this.disposables.length > 0) {
       const disposable = this.disposables.pop();
@@ -259,583 +224,24 @@ export class BuildDetailsPanel {
     buildUrl: string,
     label?: string
   ): Promise<void> {
-    const token = ++this.loadToken;
-    this.pollingController?.dispose();
-    this.pollingController = undefined;
-    this.stopCompletionPolling();
-    this.dataService = dataService;
     this.artifactActionHandler = artifactActionHandler;
-    this.loadingRequests = 0;
-    this.state.resetForLoad(environment, buildUrl, createNonce());
     const panelState = createBuildDetailsPanelState(environment, buildUrl);
-    let scriptUri: string;
-    let styleUris: string[];
-    try {
-      ({ scriptUri, styleUris } = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "buildDetails"
-      ));
-    } catch {
+    const result: BuildDetailsPanelLoadResult = await this.controller.load(
+      dataService,
+      environment,
+      buildUrl,
+      {
+        label,
+        panelState
+      }
+    );
+
+    if (result.status === "missingAssets") {
       this.renderRestoreError(
         "Build details webview assets are missing. Run the extension build (npm run compile) and try again.",
         panelState
       );
-      return;
     }
-
-    this.panel.webview.html = renderLoadingHtml({
-      cspSource: this.panel.webview.cspSource,
-      nonce: this.state.currentNonce,
-      styleUris,
-      panelState
-    });
-
-    this.pollingController = new BuildDetailsPollingController({
-      dataService,
-      pendingInputProvider: this.pendingInputProvider,
-      environment,
-      buildUrl,
-      maxConsoleChars: MAX_CONSOLE_CHARS,
-      getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
-      testReportOptions: { includeCaseLogs: getTestReportIncludeCaseLogs() },
-      formatError,
-      callbacks: createBuildDetailsPollingCallbacks(this.state, token, {
-        postMessage: (message) => this.postMessage(message),
-        setTitle: (title) => {
-          this.panel.title = `Build Details - ${title}`;
-        },
-        publishErrors: () => this.publishErrors(),
-        isTokenCurrent: (currentToken) => this.isTokenCurrent(currentToken),
-        showCompletionToast: (details) => {
-          void this.showCompletionToast(details);
-        },
-        onPipelineLoading: (currentToken) => this.handlePipelineLoading(currentToken)
-      })
-    });
-
-    const initialState: BuildDetailsInitialState = await this.pollingController.loadInitial();
-
-    if (token !== this.loadToken) {
-      return;
-    }
-
-    const consoleTextResult = initialState.consoleTextResult;
-    const consoleHtmlResult = initialState.consoleHtmlResult;
-    const pipelineRun = toPipelineRun(initialState.workflowRun);
-    const pipelineError = initialState.workflowError
-      ? `Pipeline stages: ${formatError(initialState.workflowError)}`
-      : undefined;
-    this.state.applyInitialState(initialState, pipelineRun, pipelineError);
-
-    const details = this.state.currentDetails;
-    const title = details?.fullDisplayName ?? details?.displayName ?? label;
-    if (title) {
-      this.panel.title = `Build Details - ${title}`;
-    } else {
-      this.panel.title = "Build Details";
-    }
-
-    const viewModel = buildBuildDetailsViewModel({
-      details,
-      buildUrl: this.state.currentBuildUrl,
-      pipelineRun: this.state.currentPipelineRun,
-      pipelineLoading: this.state.pipelineLoading,
-      consoleTextResult,
-      consoleHtmlResult,
-      errors: this.state.currentErrors,
-      maxConsoleChars: MAX_CONSOLE_CHARS,
-      followLog: this.state.followLog,
-      pendingInputs: this.state.currentPendingInputs,
-      pipelineRestartEnabled: this.state.pipelineRestartEnabled,
-      pipelineRestartableStages: this.state.pipelineRestartableStages
-    });
-    this.panel.webview.html = renderBuildDetailsHtml(viewModel, {
-      cspSource: this.panel.webview.cspSource,
-      nonce: this.state.currentNonce,
-      scriptUri,
-      styleUris,
-      panelState
-    });
-    void this.refreshRestartFromStageInfo(token, { postUpdate: true });
-
-    if (details && !details.building && initialState.workflowError) {
-      if (this.panel.visible) {
-        this.pollingController.start();
-      }
-    }
-
-    if (details && !details.building) {
-      await this.refreshTestReport(token);
-    }
-
-    if (details?.building) {
-      if (this.panel.visible) {
-        this.pollingController.start();
-      } else {
-        this.startCompletionPolling(token);
-      }
-    }
-  }
-
-  private handlePanelHidden(): void {
-    this.pollingController?.stop();
-    this.startCompletionPolling(this.loadToken);
-  }
-
-  private async handlePanelVisible(): Promise<void> {
-    this.beginLoading();
-    this.stopCompletionPolling();
-    try {
-      await this.refreshBuildStatus(this.loadToken);
-      if (this.state.lastDetailsBuilding) {
-        this.pollingController?.start();
-      } else {
-        await Promise.all([
-          this.refreshConsoleSnapshot(this.loadToken),
-          this.refreshTestReport(this.loadToken),
-          this.refreshWorkflowRun(this.loadToken),
-          this.pollingController?.refreshPendingInputs()
-        ]);
-        void this.refreshRestartFromStageInfo(this.loadToken, { postUpdate: true });
-      }
-    } finally {
-      this.endLoading();
-    }
-  }
-
-  private startCompletionPolling(token: number): void {
-    if (!this.state.lastDetailsBuilding || !this.isTokenCurrent(token)) {
-      return;
-    }
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      return;
-    }
-    this.completionPoller.start(token);
-  }
-
-  private stopCompletionPolling(): void {
-    this.completionPoller.stop();
-  }
-
-  private async refreshBuildStatus(token: number): Promise<void> {
-    const details = await this.fetchBuildDetails(token);
-    if (!details) {
-      return;
-    }
-    this.applyDetailsUpdate(details, true);
-  }
-
-  private async refreshWorkflowRun(token: number): Promise<void> {
-    await this.pollingController?.fetchWorkflowRunWithCallbacks(token);
-  }
-
-  private async fetchBuildDetails(token: number): Promise<JenkinsBuildDetails | undefined> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      return undefined;
-    }
-    try {
-      const details = await this.dataService.getBuildDetails(
-        this.state.environment,
-        this.state.currentBuildUrl
-      );
-      if (!this.isTokenCurrent(token)) {
-        return undefined;
-      }
-      return details;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private handlePipelineLoading(token: number): void {
-    if (!this.isTokenCurrent(token)) {
-      return;
-    }
-    const loadingChanged = this.state.setPipelineLoading(true);
-    if (loadingChanged && this.panel.visible) {
-      const updateMessage = buildUpdateMessageFromState(this.state);
-      if (updateMessage) {
-        this.postMessage(updateMessage);
-      }
-    }
-  }
-
-  private async refreshConsoleSnapshot(token: number): Promise<void> {
-    if (!this.panel.visible) {
-      return;
-    }
-    if (
-      !this.pollingController ||
-      !this.dataService ||
-      !this.state.environment ||
-      !this.state.currentBuildUrl
-    ) {
-      return;
-    }
-    try {
-      const snapshot = await this.pollingController.refreshConsoleSnapshot();
-      if (!this.isTokenCurrent(token)) {
-        return;
-      }
-      if (snapshot.consoleHtmlResult) {
-        this.postMessage({
-          type: "setConsoleHtml",
-          html: snapshot.consoleHtmlResult.html,
-          truncated: snapshot.consoleHtmlResult.truncated
-        });
-        return;
-      }
-      if (!snapshot.consoleTextResult) {
-        return;
-      }
-      this.postMessage({
-        type: "setConsole",
-        text: snapshot.consoleTextResult.text,
-        truncated: snapshot.consoleTextResult.truncated
-      });
-    } catch {
-      // Swallow failures to avoid blocking the panel resume flow.
-    }
-  }
-
-  private async refreshTestReport(token: number): Promise<void> {
-    if (!this.pollingController || !this.state.environment || !this.state.currentBuildUrl) {
-      return;
-    }
-    if (this.state.currentDetails?.building) {
-      return;
-    }
-    try {
-      const testReport = await this.pollingController.fetchTestReport();
-      if (!this.isTokenCurrent(token)) {
-        return;
-      }
-      this.state.setTestReport(testReport);
-      const updateMessage = buildUpdateMessageFromState(this.state);
-      if (updateMessage) {
-        this.postMessage(updateMessage);
-      }
-    } catch {
-      // Swallow failures to keep the panel responsive.
-    }
-  }
-
-  private applyDetailsUpdate(details: JenkinsBuildDetails, updateUi: boolean): void {
-    const { wasBuilding, isBuilding } = this.state.updateDetails(details);
-    if (updateUi && this.panel.visible) {
-      const updateMessage = buildUpdateMessageFromState(this.state);
-      if (updateMessage) {
-        this.postMessage(updateMessage);
-      }
-      const title = details.fullDisplayName ?? details.displayName;
-      if (title) {
-        this.panel.title = `Build Details - ${title}`;
-      }
-    }
-    if (wasBuilding && !isBuilding) {
-      void this.refreshRestartFromStageInfo(this.loadToken, { postUpdate: true });
-      void this.showCompletionToast(details);
-      void this.refreshTestReport(this.loadToken);
-    }
-  }
-
-  private async showCompletionToast(details: JenkinsBuildDetails): Promise<void> {
-    if (!this.state.takeCompletionToastSlot()) {
-      return;
-    }
-    const title = details.fullDisplayName ?? details.displayName ?? "Build";
-    const resultLabel = formatResult(details);
-    const action = "Open in Jenkins";
-    const selection = await vscode.window.showInformationMessage(
-      `${title} finished with status ${resultLabel}.`,
-      action
-    );
-    if (selection === action && this.state.currentBuildUrl) {
-      await this.openExternalUrl(this.state.currentBuildUrl);
-    }
-  }
-
-  private async handleApproveInput(message: { inputId: string }): Promise<void> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      void vscode.window.showErrorMessage("Build details are not ready for input approval.");
-      return;
-    }
-    const environmentId = this.state.environment.environmentId;
-    const label =
-      this.state.currentDetails?.fullDisplayName ??
-      this.state.currentDetails?.displayName ??
-      "build";
-    await handlePendingInputAction({
-      dataService: this.dataService,
-      environment: this.state.environment,
-      buildUrl: this.state.currentBuildUrl,
-      label,
-      inputId: message.inputId,
-      action: "approve",
-      onRefresh: async () => {
-        await this.pollingController?.refreshPendingInputs();
-        await this.refreshBuildStatus(this.loadToken);
-        this.refreshHost?.refreshEnvironment(environmentId);
-      }
-    });
-  }
-
-  private async handleRejectInput(message: { inputId: string }): Promise<void> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      void vscode.window.showErrorMessage("Build details are not ready for input rejection.");
-      return;
-    }
-    const environmentId = this.state.environment.environmentId;
-    const label =
-      this.state.currentDetails?.fullDisplayName ??
-      this.state.currentDetails?.displayName ??
-      "build";
-    await handlePendingInputAction({
-      dataService: this.dataService,
-      environment: this.state.environment,
-      buildUrl: this.state.currentBuildUrl,
-      label,
-      inputId: message.inputId,
-      action: "reject",
-      onRefresh: async () => {
-        await this.pollingController?.refreshPendingInputs();
-        await this.refreshBuildStatus(this.loadToken);
-        this.refreshHost?.refreshEnvironment(environmentId);
-      }
-    });
-  }
-
-  private async handleRestartPipelineFromStage(message: { stageName: string }): Promise<void> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      void vscode.window.showErrorMessage(
-        "Build details are not ready to restart a pipeline from stage."
-      );
-      return;
-    }
-    const details = this.state.currentDetails;
-    if (!details) {
-      void vscode.window.showErrorMessage(
-        "Build details are still loading. Try restarting from stage again."
-      );
-      return;
-    }
-    if (details.building) {
-      void vscode.window.showInformationMessage(
-        "This build is still running. Restart from stage is available after it completes."
-      );
-      return;
-    }
-    if (!isPipelineRestartEligible(details)) {
-      void vscode.window.showInformationMessage(
-        "Restart from stage is only available for failed or unstable completed builds."
-      );
-      return;
-    }
-    if (this.state.pipelineRestartAvailability === "unsupported") {
-      void vscode.window.showInformationMessage(
-        "Restart from stage is not available on this Jenkins instance."
-      );
-      return;
-    }
-    const stageName = message.stageName.trim();
-    if (!stageName) {
-      void vscode.window.showErrorMessage("Select a valid stage to restart from.");
-      return;
-    }
-    const isRestartable =
-      this.state.pipelineRestartEnabled && this.state.pipelineRestartableStages.includes(stageName);
-    if (!isRestartable) {
-      void vscode.window.showErrorMessage(
-        `Stage "${stageName}" is not restartable for this build. Refresh pipeline details and try again.`
-      );
-      return;
-    }
-
-    const environmentId = this.state.environment.environmentId;
-    const label = details.fullDisplayName ?? details.displayName ?? `#${details.number}`;
-    this.beginLoading();
-    try {
-      await this.dataService.restartPipelineFromStage(
-        this.state.environment,
-        this.state.currentBuildUrl,
-        stageName
-      );
-      void vscode.window.showInformationMessage(
-        `Requested restart from stage "${stageName}" for ${label}.`
-      );
-      this.refreshHost?.refreshEnvironment(environmentId);
-    } catch (error) {
-      void vscode.window.showErrorMessage(
-        `Failed to restart ${label} from stage "${stageName}": ${formatActionError(error)}`
-      );
-    } finally {
-      this.endLoading();
-    }
-  }
-
-  private async handleArtifactAction(message: {
-    action: "preview" | "download";
-    relativePath: string;
-    fileName?: string;
-  }): Promise<void> {
-    if (!this.artifactActionHandler || !this.state.environment || !this.state.currentBuildUrl) {
-      return;
-    }
-    const fileName =
-      typeof message.fileName === "string" && message.fileName.length > 0
-        ? message.fileName
-        : undefined;
-    const jobNameHint =
-      this.state.currentDetails?.fullDisplayName?.trim() ||
-      this.state.currentDetails?.displayName?.trim() ||
-      undefined;
-    await this.artifactActionHandler.handle({
-      action: message.action,
-      environment: this.state.environment,
-      buildUrl: this.state.currentBuildUrl,
-      buildNumber: this.state.currentDetails?.number,
-      relativePath: message.relativePath,
-      fileName,
-      jobNameHint
-    });
-  }
-
-  private async handleExportConsole(): Promise<void> {
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      void vscode.window.showErrorMessage("Build details are not ready to export console output.");
-      return;
-    }
-
-    const defaultFileName = this.consoleExporter.getDefaultFileName(this.state.currentDetails);
-    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-    const defaultUri = workspaceUri
-      ? vscode.Uri.joinPath(workspaceUri, defaultFileName)
-      : undefined;
-    const targetUri = await vscode.window.showSaveDialog({
-      title: "Export Jenkins Console Output",
-      saveLabel: "Export Logs",
-      defaultUri,
-      filters: {
-        "Log files": ["log", "txt"]
-      }
-    });
-
-    if (!targetUri) {
-      return;
-    }
-    if (!targetUri.fsPath) {
-      void vscode.window.showErrorMessage("Export logs requires a file system path.");
-      return;
-    }
-
-    try {
-      const result = await this.consoleExporter.exportToFile({
-        environment: this.state.environment,
-        buildUrl: this.state.currentBuildUrl,
-        targetPath: targetUri.fsPath
-      });
-      if (result.mode === "tail" || result.truncated) {
-        void vscode.window.showWarningMessage(
-          `Saved last ${MAX_CONSOLE_CHARS.toLocaleString()} characters of console output to ${
-            targetUri.fsPath
-          }.`
-        );
-        return;
-      }
-      void vscode.window.showInformationMessage(`Saved console output to ${targetUri.fsPath}.`);
-    } catch (error) {
-      void vscode.window.showErrorMessage(
-        `Failed to export console output: ${formatActionError(error)}`
-      );
-    }
-  }
-
-  private async openExternalUrl(url: string): Promise<void> {
-    await openExternalHttpUrlWithWarning(url, {
-      targetLabel: "Jenkins URL",
-      sourceLabel: "Build Details"
-    });
-  }
-
-  private postMessage(message: BuildDetailsOutgoingMessage): void {
-    void this.panel.webview.postMessage(message);
-  }
-
-  private async refreshRestartFromStageInfo(
-    token: number,
-    options?: { postUpdate?: boolean }
-  ): Promise<void> {
-    if (!this.isTokenCurrent(token)) {
-      return;
-    }
-    const details = this.state.currentDetails;
-    if (!isPipelineRestartEligible(details)) {
-      const changed = this.state.setPipelineRestartInfo(false, [], "unknown");
-      if (changed && options?.postUpdate && this.panel.visible) {
-        const updateMessage = buildUpdateMessageFromState(this.state);
-        if (updateMessage) {
-          this.postMessage(updateMessage);
-        }
-      }
-      return;
-    }
-    if (!this.dataService || !this.state.environment || !this.state.currentBuildUrl) {
-      return;
-    }
-    try {
-      const restartInfo = await this.dataService.getRestartFromStageInfo(
-        this.state.environment,
-        this.state.currentBuildUrl
-      );
-      if (!this.isTokenCurrent(token)) {
-        return;
-      }
-      const changed = this.state.setPipelineRestartInfo(
-        restartInfo.restartEnabled,
-        restartInfo.restartableStages,
-        restartInfo.availability
-      );
-      if (changed && options?.postUpdate && this.panel.visible) {
-        const updateMessage = buildUpdateMessageFromState(this.state);
-        if (updateMessage) {
-          this.postMessage(updateMessage);
-        }
-      }
-    } catch {
-      if (!this.isTokenCurrent(token)) {
-        return;
-      }
-      // Preserve the last known capability on transient failures.
-    }
-  }
-
-  private publishErrors(): void {
-    const nextErrors = this.state.updateErrors();
-    if (nextErrors) {
-      this.postMessage({ type: "setErrors", errors: nextErrors });
-    }
-  }
-
-  private beginLoading(): void {
-    this.loadingRequests += 1;
-    if (this.loadingRequests === 1) {
-      this.postMessage({ type: "setLoading", value: true });
-    }
-  }
-
-  private endLoading(): void {
-    if (this.loadingRequests === 0) {
-      return;
-    }
-    this.loadingRequests -= 1;
-    if (this.loadingRequests === 0) {
-      this.postMessage({ type: "setLoading", value: false });
-    }
-  }
-
-  private isTokenCurrent(token: number): boolean {
-    return token === this.loadToken;
   }
 
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
