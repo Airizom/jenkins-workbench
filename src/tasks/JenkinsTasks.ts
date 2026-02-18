@@ -1,16 +1,16 @@
 import * as vscode from "vscode";
-import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type { ExtensionContainer } from "../extension/container/ExtensionContainer";
 import { JenkinsTaskProvider } from "./JenkinsTaskProvider";
-import type { JenkinsTaskRefreshHost } from "./JenkinsTaskRefreshHost";
 import { JENKINS_TASK_TYPE } from "./JenkinsTaskTypes";
 
 export function registerJenkinsTasks(
   context: vscode.ExtensionContext,
-  environmentStore: JenkinsEnvironmentStore,
-  dataService: JenkinsDataService,
-  refreshHost: JenkinsTaskRefreshHost
+  container: ExtensionContainer
 ): void {
-  const provider = new JenkinsTaskProvider(environmentStore, dataService, refreshHost);
+  const provider = new JenkinsTaskProvider(
+    container.get("environmentStore"),
+    container.get("dataService"),
+    container.get("refreshHost")
+  );
   context.subscriptions.push(vscode.tasks.registerTaskProvider(JENKINS_TASK_TYPE, provider));
 }

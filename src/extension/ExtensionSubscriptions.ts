@@ -1,7 +1,5 @@
 import * as vscode from "vscode";
-import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import { BuildQueueFolderTreeItem, InstanceTreeItem, RootSectionTreeItem } from "../tree/TreeItems";
-import type { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
 import {
   buildConfigKey,
   getBuildListFetchOptions,
@@ -13,17 +11,24 @@ import {
   getQueuePollIntervalSeconds,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
-import type { ExtensionServices } from "./ExtensionServices";
+import type { ExtensionContainer } from "./container/ExtensionContainer";
 import { syncJenkinsfileContext } from "./contextKeys";
 
 export function registerExtensionSubscriptions(
   context: vscode.ExtensionContext,
-  services: ExtensionServices,
-  poller: JenkinsStatusPoller,
-  queuePoller: JenkinsQueuePoller
+  container: ExtensionContainer
 ): void {
-  const viewStateSubscription = services.viewStateStore.onDidChange(() => {
-    services.treeDataProvider.refreshView();
+  const viewStateStore = container.get("viewStateStore");
+  const treeDataProvider = container.get("treeDataProvider");
+  const treeView = container.get("treeView");
+  const dataService = container.get("dataService");
+  const poller = container.get("poller");
+  const queuePoller = container.get("queuePoller");
+  const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
+  const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
+
+  const viewStateSubscription = viewStateStore.onDidChange(() => {
+    treeDataProvider.refreshView();
   });
 
   const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
@@ -86,8 +91,8 @@ export function registerExtensionSubscriptions(
     const updatedConfig = getExtensionConfiguration();
 
     if (affectsCacheTtl) {
-      services.dataService.updateCacheTtlMs(getCacheTtlMs(updatedConfig));
-      services.treeDataProvider.refresh();
+      dataService.updateCacheTtlMs(getCacheTtlMs(updatedConfig));
+      treeDataProvider.refresh();
     }
 
     if (affectsPollInterval) {
@@ -110,14 +115,12 @@ export function registerExtensionSubscriptions(
       affectsBuildTooltipMaskPatterns ||
       affectsBuildTooltipMaskValue
     ) {
-      services.treeDataProvider.updateBuildTooltipOptions(getBuildTooltipOptions(updatedConfig));
-      services.treeDataProvider.updateBuildListFetchOptions(
-        getBuildListFetchOptions(updatedConfig)
-      );
+      treeDataProvider.updateBuildTooltipOptions(getBuildTooltipOptions(updatedConfig));
+      treeDataProvider.updateBuildListFetchOptions(getBuildListFetchOptions(updatedConfig));
       if (affectsBuildTooltipDetails || affectsBuildTooltipParameters) {
-        services.dataService.clearCache();
+        dataService.clearCache();
       }
-      services.treeDataProvider.refreshView();
+      treeDataProvider.refreshView();
     }
 
     if (
@@ -126,20 +129,18 @@ export function registerExtensionSubscriptions(
       affectsJenkinsfileDebounce ||
       affectsJenkinsfilePatterns
     ) {
-      services.jenkinsfileValidationCoordinator.updateConfig(
-        getJenkinsfileValidationConfig(updatedConfig)
-      );
-      void syncJenkinsfileContext(services.jenkinsfileMatcher);
+      jenkinsfileValidationCoordinator.updateConfig(getJenkinsfileValidationConfig(updatedConfig));
+      void syncJenkinsfileContext(jenkinsfileMatcher);
     }
   });
 
-  const expandSubscription = services.treeView.onDidExpandElement((event) => {
+  const expandSubscription = treeView.onDidExpandElement((event) => {
     if (event.element instanceof BuildQueueFolderTreeItem) {
       queuePoller.trackExpanded(event.element.environment);
     }
   });
 
-  const collapseSubscription = services.treeView.onDidCollapseElement((event) => {
+  const collapseSubscription = treeView.onDidCollapseElement((event) => {
     if (event.element instanceof BuildQueueFolderTreeItem) {
       queuePoller.trackCollapsed(event.element.environment);
       return;

@@ -9,120 +9,76 @@ import { registerQueueCommands } from "../commands/QueueCommands";
 import { registerRefreshCommands } from "../commands/RefreshCommands";
 import { registerSearchCommands } from "../commands/SearchCommands";
 import { registerWatchCommands } from "../commands/WatchCommands";
-import type { JobConfigUpdateWorkflow } from "../commands/job/JobConfigUpdateWorkflow";
-import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
-import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
-import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
-import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
-import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
-import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
-import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
-import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
-import type { TreeExpansionState } from "../tree/TreeExpansionState";
-import type { DefaultJenkinsTreeNavigator } from "../tree/TreeNavigator";
-import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
-import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
-import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
-import type { JenkinsfileEnvironmentResolver } from "../validation/JenkinsfileEnvironmentResolver";
-import type { JenkinsfileValidationCoordinator } from "../validation/JenkinsfileValidationCoordinator";
-import type { ExtensionRefreshHost } from "./ExtensionRefreshHost";
-
-export interface ExtensionCommandDependencies {
-  environmentStore: JenkinsEnvironmentStore;
-  presetStore: JenkinsParameterPresetStore;
-  watchStore: JenkinsWatchStore;
-  pinStore: JenkinsPinStore;
-  clientProvider: JenkinsClientProvider;
-  dataService: JenkinsDataService;
-  artifactActionHandler: ArtifactActionHandler;
-  buildLogPreviewer: BuildLogPreviewer;
-  jobConfigPreviewer: JobConfigPreviewer;
-  jobConfigDraftManager: JobConfigDraftManager;
-  jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;
-  consoleExporter: BuildConsoleExporter;
-  queuedBuildWaiter: QueuedBuildWaiter;
-  pendingInputCoordinator: PendingInputRefreshCoordinator;
-  viewStateStore: JenkinsViewStateStore;
-  treeNavigator: DefaultJenkinsTreeNavigator;
-  treeDataProvider: JenkinsWorkbenchTreeDataProvider;
-  treeExpansionState: TreeExpansionState;
-  jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
-  jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;
-  refreshHost: ExtensionRefreshHost;
-}
+import type { ExtensionContainer } from "./container/ExtensionContainer";
 
 export function registerExtensionCommands(
   context: vscode.ExtensionContext,
-  dependencies: ExtensionCommandDependencies
+  container: ExtensionContainer
 ): void {
-  const refreshHost = dependencies.refreshHost;
+  const refreshHost = container.get("refreshHost");
 
   registerEnvironmentCommands(
     context,
-    dependencies.environmentStore,
-    dependencies.presetStore,
-    dependencies.watchStore,
-    dependencies.pinStore,
-    dependencies.clientProvider,
+    container.get("environmentStore"),
+    container.get("presetStore"),
+    container.get("watchStore"),
+    container.get("pinStore"),
+    container.get("clientProvider"),
     refreshHost
   );
 
   registerBuildCommands(
     context,
-    dependencies.dataService,
-    dependencies.presetStore,
-    dependencies.artifactActionHandler,
-    dependencies.buildLogPreviewer,
-    dependencies.consoleExporter,
-    dependencies.queuedBuildWaiter,
-    dependencies.pendingInputCoordinator,
+    container.get("dataService"),
+    container.get("presetStore"),
+    container.get("artifactActionHandler"),
+    container.get("buildLogPreviewer"),
+    container.get("consoleExporter"),
+    container.get("queuedBuildWaiter"),
+    container.get("pendingInputCoordinator"),
     refreshHost
   );
 
   registerJobCommands(
     context,
-    dependencies.dataService,
-    dependencies.environmentStore,
-    dependencies.jobConfigPreviewer,
+    container.get("dataService"),
+    container.get("environmentStore"),
+    container.get("jobConfigPreviewer"),
     refreshHost,
-    dependencies.jobConfigDraftManager,
-    dependencies.jobConfigUpdateWorkflow,
-    dependencies.presetStore,
-    dependencies.pinStore,
-    dependencies.watchStore
+    container.get("jobConfigDraftManager"),
+    container.get("jobConfigUpdateWorkflow"),
+    container.get("presetStore"),
+    container.get("pinStore"),
+    container.get("watchStore")
   );
 
-  registerNodeCommands(context, dependencies.dataService, refreshHost);
+  registerNodeCommands(context, container.get("dataService"), refreshHost);
 
-  registerQueueCommands(context, dependencies.dataService, refreshHost);
+  registerQueueCommands(context, container.get("dataService"), refreshHost);
 
-  registerWatchCommands(context, dependencies.watchStore, refreshHost);
+  registerWatchCommands(context, container.get("watchStore"), refreshHost);
 
-  registerPinCommands(context, dependencies.pinStore, refreshHost);
+  registerPinCommands(context, container.get("pinStore"), refreshHost);
 
   registerSearchCommands(
     context,
-    dependencies.environmentStore,
-    dependencies.dataService,
-    dependencies.viewStateStore,
-    dependencies.treeNavigator
+    container.get("environmentStore"),
+    container.get("dataService"),
+    container.get("viewStateStore"),
+    container.get("treeNavigator")
   );
 
   registerRefreshCommands(
     context,
-    dependencies.treeDataProvider,
-    dependencies.treeExpansionState,
+    container.get("treeDataProvider"),
+    container.get("treeExpansionState"),
     refreshHost
   );
 
   registerJenkinsfileCommands(
     context,
-    dependencies.jenkinsfileValidationCoordinator,
-    dependencies.jenkinsfileEnvironmentResolver,
-    dependencies.environmentStore
+    container.get("jenkinsfileValidationCoordinator"),
+    container.get("jenkinsfileEnvironmentResolver"),
+    container.get("environmentStore")
   );
 }

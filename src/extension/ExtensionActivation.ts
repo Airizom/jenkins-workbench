@@ -1,14 +1,4 @@
 import * as vscode from "vscode";
-import { BuildDetailsPanel } from "../panels/BuildDetailsPanel";
-import { NodeDetailsPanel } from "../panels/NodeDetailsPanel";
-import { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
-import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
-import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
-import { JenkinsfileHoverProvider } from "../validation/editor/JenkinsfileHoverProvider";
-import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
-import { JenkinsfileValidationCodeLensProvider } from "../validation/editor/JenkinsfileValidationCodeLensProvider";
-import { JenkinsStatusPoller } from "../watch/JenkinsStatusPoller";
-import { registerExtensionCommands } from "./ExtensionCommands";
 import {
   getArtifactActionOptions,
   getArtifactMaxDownloadBytes,
@@ -26,14 +16,7 @@ import {
   getRequestTimeoutMs,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
-import { createExtensionRefreshHost } from "./ExtensionRefreshHost";
-import { createExtensionServices } from "./ExtensionServices";
-import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
-import { JenkinsWorkbenchDeepLinkBuildHandler } from "./JenkinsWorkbenchDeepLinkBuildHandler";
-import { JenkinsWorkbenchDeepLinkJobHandler } from "./JenkinsWorkbenchDeepLinkJobHandler";
-import { JenkinsWorkbenchUriHandler } from "./JenkinsWorkbenchUriHandler";
-import { VscodeStatusNotifier } from "./VscodeStatusNotifier";
-import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
+import { activateRuntime } from "./ExtensionRuntime";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
@@ -60,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return { maxBytes: getArtifactMaxDownloadBytes(previewConfig) };
   };
 
-  const services = createExtensionServices(context, {
+  await activateRuntime(context, {
     cacheTtlMs,
     maxCacheEntries,
     requestTimeoutMs,
@@ -73,176 +56,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       maxTotalBytes: artifactPreviewCacheMaxBytes,
       ttlMs: artifactPreviewCacheTtlMs
     },
-    jenkinsfileValidationConfig
-  });
-  try {
-    await services.environmentStore.migrateLegacyAuthConfigs();
-  } catch (error) {
-    console.warn("Failed to migrate legacy Jenkins auth config.", error);
-  }
-  await syncNoEnvironmentsContext(services.environmentStore);
-  void syncJenkinsfileContext(services.jenkinsfileMatcher);
-  const notifier = new VscodeStatusNotifier();
-  const poller = new JenkinsStatusPoller(
-    services.environmentStore,
-    services.dataService,
-    services.pendingInputCoordinator,
-    services.watchStore,
-    notifier,
-    {
-      refreshTree: () => services.treeDataProvider.onEnvironmentChanged()
-    },
+    jenkinsfileValidationConfig,
+    extensionUri: context.extensionUri,
     pollIntervalSeconds,
-    watchErrorThreshold
-  );
-  const watchErrorSubscription = poller.onDidChangeWatchErrorCount((count) => {
-    services.treeDataProvider.setWatchErrorCount(count);
-  });
-  const queuePoller = new JenkinsQueuePoller(
-    {
-      refreshQueueView: (environment) => {
-        services.treeDataProvider.refreshQueueFolder(environment);
-      }
-    },
+    watchErrorThreshold,
     queuePollIntervalSeconds
-  );
-  const refreshHost = createExtensionRefreshHost(
-    services.environmentStore,
-    services.treeDataProvider,
-    queuePoller
-  );
-  const buildDeepLinkHandler = new JenkinsWorkbenchDeepLinkBuildHandler(
-    services.dataService,
-    services.artifactActionHandler,
-    services.consoleExporter,
-    refreshHost,
-    services.pendingInputCoordinator,
-    context.extensionUri
-  );
-  const jobDeepLinkHandler = new JenkinsWorkbenchDeepLinkJobHandler(services.treeNavigator);
-  const uriHandler = new JenkinsWorkbenchUriHandler(
-    services.environmentStore,
-    buildDeepLinkHandler,
-    jobDeepLinkHandler
-  );
-  const buildDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
-    "jenkinsWorkbench.buildDetails",
-    {
-      deserializeWebviewPanel: async (panel, state) => {
-        await BuildDetailsPanel.revive(panel, state, {
-          dataService: services.dataService,
-          artifactActionHandler: services.artifactActionHandler,
-          consoleExporter: services.consoleExporter,
-          refreshHost,
-          pendingInputProvider: services.pendingInputCoordinator,
-          environmentStore: services.environmentStore,
-          extensionUri: context.extensionUri
-        });
-      }
-    }
-  );
-  const nodeDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
-    "jenkinsWorkbench.nodeDetails",
-    {
-      deserializeWebviewPanel: async (panel, state) => {
-        await NodeDetailsPanel.revive(panel, state, {
-          dataService: services.dataService,
-          environmentStore: services.environmentStore,
-          extensionUri: context.extensionUri,
-          refreshHost
-        });
-      }
-    }
-  );
-
-  poller.start();
-  void services.viewStateStore.syncFilterContext();
-  services.jenkinsfileValidationCoordinator.start();
-
-  const jenkinsfileQuickFixProvider = new JenkinsfileQuickFixProvider(services.jenkinsfileMatcher);
-  const jenkinsfileHoverProvider = new JenkinsfileHoverProvider(
-    services.jenkinsfileMatcher,
-    services.jenkinsfileValidationCoordinator
-  );
-  const jenkinsfileCodeLensProvider = new JenkinsfileValidationCodeLensProvider(
-    services.jenkinsfileMatcher,
-    services.jenkinsfileValidationCoordinator
-  );
-
-  context.subscriptions.push(
-    services.treeView,
-    services.treeDataProvider,
-    services.treeExpansionState,
-    services.pendingInputCoordinator,
-    buildDetailsSerializer,
-    nodeDetailsSerializer,
-    vscode.window.registerUriHandler(uriHandler),
-    jenkinsfileCodeLensProvider,
-    vscode.workspace.registerFileSystemProvider(
-      ARTIFACT_PREVIEW_SCHEME,
-      services.artifactPreviewProvider,
-      { isReadonly: true }
-    ),
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      void syncJenkinsfileContext(services.jenkinsfileMatcher, editor);
-    }),
-    vscode.workspace.onDidSaveTextDocument(() => {
-      void syncJenkinsfileContext(services.jenkinsfileMatcher);
-    }),
-    vscode.workspace.onDidRenameFiles(() => {
-      void syncJenkinsfileContext(services.jenkinsfileMatcher);
-    }),
-    vscode.workspace.onDidCloseTextDocument((document) => {
-      if (document.uri.scheme !== ARTIFACT_PREVIEW_SCHEME) {
-        return;
-      }
-      services.artifactPreviewProvider.release(document.uri);
-    }),
-    poller,
-    queuePoller,
-    watchErrorSubscription,
-    services.jenkinsfileValidationCoordinator,
-    services.jenkinsfileValidationStatusBar,
-    vscode.languages.registerCodeActionsProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }],
-      jenkinsfileQuickFixProvider,
-      { providedCodeActionKinds: JenkinsfileQuickFixProvider.providedCodeActionKinds }
-    ),
-    vscode.languages.registerHoverProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }],
-      jenkinsfileHoverProvider
-    ),
-    vscode.languages.registerCodeLensProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }],
-      jenkinsfileCodeLensProvider
-    )
-  );
-
-  registerExtensionSubscriptions(context, services, poller, queuePoller);
-  registerExtensionCommands(context, {
-    environmentStore: services.environmentStore,
-    presetStore: services.presetStore,
-    watchStore: services.watchStore,
-    pinStore: services.pinStore,
-    clientProvider: services.clientProvider,
-    dataService: services.dataService,
-    artifactActionHandler: services.artifactActionHandler,
-    buildLogPreviewer: services.buildLogPreviewer,
-    jobConfigPreviewer: services.jobConfigPreviewer,
-    jobConfigDraftManager: services.jobConfigDraftManager,
-    jobConfigUpdateWorkflow: services.jobConfigUpdateWorkflow,
-    consoleExporter: services.consoleExporter,
-    queuedBuildWaiter: services.queuedBuildWaiter,
-    pendingInputCoordinator: services.pendingInputCoordinator,
-    viewStateStore: services.viewStateStore,
-    treeNavigator: services.treeNavigator,
-    treeDataProvider: services.treeDataProvider,
-    treeExpansionState: services.treeExpansionState,
-    jenkinsfileEnvironmentResolver: services.jenkinsfileEnvironmentResolver,
-    jenkinsfileValidationCoordinator: services.jenkinsfileValidationCoordinator,
-    refreshHost
   });
-  registerJenkinsTasks(context, services.environmentStore, services.dataService, refreshHost);
 }
 
 export function deactivate(): void {
