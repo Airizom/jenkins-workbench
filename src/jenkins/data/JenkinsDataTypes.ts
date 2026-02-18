@@ -4,7 +4,8 @@ import type {
   JenkinsJobKind,
   JenkinsNode,
   JenkinsProgressiveConsoleHtml,
-  JenkinsProgressiveConsoleText
+  JenkinsProgressiveConsoleText,
+  JenkinsView
 } from "../JenkinsClient";
 
 export type JenkinsActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
@@ -98,6 +99,26 @@ export interface JenkinsJobInfo {
 
 export interface JenkinsNodeInfo extends JenkinsNode {
   nodeUrl?: string;
+}
+
+export interface JenkinsViewInfo extends JenkinsView {}
+
+export interface JenkinsRootJobCollectionScope {
+  kind: "root";
+}
+
+export interface JenkinsViewJobCollectionScope {
+  kind: "view";
+  viewUrl: string;
+}
+
+export type JenkinsJobCollectionScope =
+  | JenkinsRootJobCollectionScope
+  | JenkinsViewJobCollectionScope;
+
+export interface JenkinsJobCollectionRequest {
+  scope: JenkinsJobCollectionScope;
+  folderUrl?: string;
 }
 
 export interface JenkinsQueueItemInfo {

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { QueueItemTreeItem } from "../../tree/TreeItems";
-import { formatActionError, getTreeItemLabel } from "../CommandUtils";
+import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 import type { QueueCommandRefreshHost } from "./QueueCommandTypes";
 
 export async function cancelQueueItem(
@@ -9,18 +9,15 @@ export async function cancelQueueItem(
   refreshHost: QueueCommandRefreshHost,
   item?: QueueItemTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a queued item to cancel.");
+  const selected = requireSelection(item, "Select a queued item to cancel.");
+  if (!selected) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-
-  try {
-    await dataService.cancelQueueItem(item.environment, item.queueId);
+  const label = getTreeItemLabel(selected);
+  await withActionErrorMessage(`Failed to cancel ${label}`, async () => {
+    await dataService.cancelQueueItem(selected.environment, selected.queueId);
     void vscode.window.showInformationMessage(`Cancelled ${label}.`);
-    refreshHost.refreshEnvironment(item.environment.environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to cancel ${label}: ${formatActionError(error)}`);
-  }
+    refreshHost.fullEnvironmentRefresh({ environmentId: selected.environment.environmentId });
+  });
 }

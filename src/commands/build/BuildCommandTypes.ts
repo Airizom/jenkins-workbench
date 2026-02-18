@@ -1,3 +1,3 @@
-export interface BuildCommandRefreshHost {
-  refreshEnvironment(environmentId: string): void;
-}
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
+
+export interface BuildCommandRefreshHost extends EnvironmentScopedRefreshHost {}

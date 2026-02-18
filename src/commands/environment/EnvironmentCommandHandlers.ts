@@ -14,27 +14,142 @@ import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
 import {
+  type EnvironmentAuthMode,
   promptAuthMode,
   promptHeadersJson,
   promptRequiredInput,
   promptScope
 } from "./EnvironmentPrompts";
 
-function normalizeJenkinsUrl(url: string): string {
-  let normalized = url.trim();
-  if (!normalized.endsWith("/")) {
-    normalized = `${normalized}/`;
+type EnvironmentTarget = {
+  id: string;
+  url: string;
+  scope: EnvironmentScope;
+};
+
+function parseHttpUrl(url: string): URL | undefined {
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return undefined;
+    }
+    return parsed;
+  } catch {
+    return undefined;
   }
-  return normalized;
 }
 
-function isValidJenkinsUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
+function normalizeJenkinsUrl(url: string): string {
+  const parsed = parseHttpUrl(url);
+  if (!parsed) {
+    const trimmed = url.trim();
+    return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
   }
+
+  if (!parsed.pathname.endsWith("/")) {
+    parsed.pathname = `${parsed.pathname}/`;
+  }
+
+  return parsed.toString();
+}
+
+async function promptAuthConfig(
+  authMode: EnvironmentAuthMode
+): Promise<JenkinsAuthConfig | undefined> {
+  switch (authMode) {
+    case "none":
+      return { type: "none" };
+    case "basic": {
+      const authUsername = await promptRequiredInput("Username");
+      if (!authUsername) {
+        return undefined;
+      }
+      const authToken = await promptRequiredInput("API Token", undefined, true);
+      if (!authToken) {
+        return undefined;
+      }
+      return {
+        type: "basic",
+        username: authUsername,
+        token: authToken
+      };
+    }
+    case "bearer": {
+      const token = await promptRequiredInput("Bearer Token", undefined, true);
+      if (!token) {
+        return undefined;
+      }
+      return {
+        type: "bearer",
+        token
+      };
+    }
+    case "cookie": {
+      const cookie = await promptRequiredInput("Cookie Header Value", undefined, true);
+      if (!cookie) {
+        return undefined;
+      }
+      return {
+        type: "cookie",
+        cookie
+      };
+    }
+    case "headers": {
+      const headers = await promptHeadersJson();
+      if (!headers) {
+        return undefined;
+      }
+      return {
+        type: "headers",
+        headers
+      };
+    }
+    default:
+      return undefined;
+  }
+}
+
+function toEnvironmentTarget(
+  environment:
+    | JenkinsEnvironmentRef
+    | {
+        id: string;
+        url: string;
+        scope: EnvironmentScope;
+      }
+): EnvironmentTarget {
+  if ("environmentId" in environment) {
+    return {
+      id: environment.environmentId,
+      url: environment.url,
+      scope: environment.scope
+    };
+  }
+
+  return environment;
+}
+
+async function promptEnvironmentRemovalTarget(
+  store: JenkinsEnvironmentStore
+): Promise<EnvironmentTarget | undefined> {
+  const environments = await store.listEnvironmentsWithScope();
+  if (environments.length === 0) {
+    void vscode.window.showInformationMessage("No environments are available to remove.");
+    return undefined;
+  }
+
+  const picks = environments.map((environment) => ({
+    label: environment.url,
+    description: formatScopeLabel(environment.scope),
+    target: toEnvironmentTarget(environment)
+  }));
+
+  const pick = await vscode.window.showQuickPick(picks, {
+    placeHolder: "Select an environment to remove",
+    matchOnDescription: true
+  });
+
+  return pick?.target;
 }
 
 export async function addEnvironment(
@@ -51,7 +166,7 @@ export async function addEnvironment(
     return;
   }
 
-  if (!isValidJenkinsUrl(rawUrl)) {
+  if (!parseHttpUrl(rawUrl)) {
     void vscode.window.showErrorMessage(
       "Invalid Jenkins URL. Please enter a valid HTTP or HTTPS URL."
     );
@@ -76,51 +191,9 @@ export async function addEnvironment(
     return;
   }
 
-  let authConfig: JenkinsAuthConfig | undefined;
-
-  if (authMode === "basic") {
-    const authUsername = await promptRequiredInput("Username");
-    if (!authUsername) {
-      return;
-    }
-    const authToken = await promptRequiredInput("API Token", undefined, true);
-    if (!authToken) {
-      return;
-    }
-    authConfig = {
-      type: "basic",
-      username: authUsername,
-      token: authToken
-    };
-  } else if (authMode === "bearer") {
-    const token = await promptRequiredInput("Bearer Token", undefined, true);
-    if (!token) {
-      return;
-    }
-    authConfig = {
-      type: "bearer",
-      token
-    };
-  } else if (authMode === "cookie") {
-    const cookie = await promptRequiredInput("Cookie Header Value", undefined, true);
-    if (!cookie) {
-      return;
-    }
-    authConfig = {
-      type: "cookie",
-      cookie
-    };
-  } else if (authMode === "headers") {
-    const headers = await promptHeadersJson();
-    if (!headers) {
-      return;
-    }
-    authConfig = {
-      type: "headers",
-      headers
-    };
-  } else {
-    authConfig = { type: "none" };
+  const authConfig = await promptAuthConfig(authMode);
+  if (!authConfig) {
+    return;
   }
 
   const environment: JenkinsEnvironment = {
@@ -129,10 +202,8 @@ export async function addEnvironment(
   };
 
   await store.addEnvironment(scope, environment);
-  if (authConfig) {
-    await store.setAuthConfig(scope, environment.id, authConfig);
-  }
-  refreshHost.refreshEnvironment(environment.id);
+  await store.setAuthConfig(scope, environment.id, authConfig);
+  refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
 }
 
 export async function removeEnvironment(
@@ -144,60 +215,27 @@ export async function removeEnvironment(
   refreshHost: EnvironmentCommandRefreshHost,
   item?: JenkinsEnvironmentRef
 ): Promise<void> {
-  let target:
-    | {
-        id: string;
-        url: string;
-        scope: EnvironmentScope;
-      }
-    | undefined;
-
-  if (item) {
-    target = {
-      id: item.environmentId,
-      url: item.url,
-      scope: item.scope
-    };
-  } else {
-    const environments = await store.listEnvironmentsWithScope();
-    if (environments.length === 0) {
-      void vscode.window.showInformationMessage("No environments are available to remove.");
-      return;
-    }
-
-    const picks = environments.map((environment) => ({
-      label: environment.url,
-      description: formatScopeLabel(environment.scope),
-      target: {
-        id: environment.id,
-        url: environment.url,
-        scope: environment.scope
-      }
-    }));
-
-    const pick = await vscode.window.showQuickPick(picks, {
-      placeHolder: "Select an environment to remove",
-      matchOnDescription: true
-    });
-
-    if (!pick) {
-      return;
-    }
-
-    target = pick.target;
+  const target = item ? toEnvironmentTarget(item) : await promptEnvironmentRemovalTarget(store);
+  if (!target) {
+    return;
   }
 
   const removed = await store.removeEnvironment(target.scope, target.id);
-  if (removed) {
-    await presetStore.removePresetsForEnvironment(target.scope, target.id);
-    await watchStore.removeWatchesForEnvironment(target.scope, target.id);
-    await pinStore.removePinsForEnvironment(target.scope, target.id);
-    clientProvider.invalidateClient(target.scope, target.id);
-    refreshHost.onEnvironmentRemoved?.({
-      environmentId: target.id,
-      scope: target.scope,
-      url: target.url
-    });
-    refreshHost.refreshEnvironment(target.id);
+  if (!removed) {
+    void vscode.window.showWarningMessage("The selected environment no longer exists.");
+    return;
   }
+
+  await Promise.all([
+    presetStore.removePresetsForEnvironment(target.scope, target.id),
+    watchStore.removeWatchesForEnvironment(target.scope, target.id),
+    pinStore.removePinsForEnvironment(target.scope, target.id)
+  ]);
+  clientProvider.invalidateClient(target.scope, target.id);
+  refreshHost.onEnvironmentRemoved?.({
+    environmentId: target.id,
+    scope: target.scope,
+    url: target.url
+  });
+  refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
 }

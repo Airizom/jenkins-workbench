@@ -1,15 +1,21 @@
 import type * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
+import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { ArtifactActionOptionsProvider } from "../ui/ArtifactActionHandler";
 import type { ArtifactPreviewProviderOptions } from "../ui/ArtifactPreviewProvider";
 import type { ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
-import type { ExtensionContainer } from "./container/ExtensionContainer";
-import { registerCoreProviders } from "./providers/CoreProviders";
-import { registerRuntimeProviders } from "./providers/RuntimeProviders";
-import { registerTreeProviders } from "./providers/TreeProviders";
-import { registerValidationProviders } from "./providers/ValidationProviders";
+import {
+  type ExtensionContainer,
+  type ExtensionProviderCatalog,
+  composeProviderCatalog,
+  registerProviderCatalog
+} from "./container/ExtensionContainer";
+import { createCoreProviderCatalog } from "./providers/CoreProviders";
+import { createRuntimeProviderCatalog } from "./providers/RuntimeProviders";
+import { createTreeProviderCatalog } from "./providers/TreeProviders";
+import { createValidationProviderCatalog } from "./providers/ValidationProviders";
 
 export interface ExtensionServicesOptions {
   cacheTtlMs: number;
@@ -17,6 +23,7 @@ export interface ExtensionServicesOptions {
   requestTimeoutMs: number;
   buildTooltipOptions: BuildTooltipOptions;
   buildListFetchOptions: BuildListFetchOptions;
+  treeViewCurationOptions: TreeViewCurationOptions;
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
   artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
   artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
@@ -35,7 +42,7 @@ export function registerExtensionProviders(
   context: vscode.ExtensionContext,
   options: ExtensionRuntimeOptions
 ): void {
-  registerCoreProviders(container, {
+  const coreCatalog = createCoreProviderCatalog({
     context,
     cacheTtlMs: options.cacheTtlMs,
     maxCacheEntries: options.maxCacheEntries,
@@ -45,20 +52,29 @@ export function registerExtensionProviders(
     artifactPreviewCacheOptions: options.artifactPreviewCacheOptions
   });
 
-  registerTreeProviders(container, {
+  const treeCatalog = createTreeProviderCatalog({
     buildTooltipOptions: options.buildTooltipOptions,
-    buildListFetchOptions: options.buildListFetchOptions
+    buildListFetchOptions: options.buildListFetchOptions,
+    treeViewCurationOptions: options.treeViewCurationOptions
   });
 
-  registerValidationProviders(container, {
+  const validationCatalog = createValidationProviderCatalog({
     context,
     jenkinsfileValidationConfig: options.jenkinsfileValidationConfig
   });
 
-  registerRuntimeProviders(container, {
+  const runtimeCatalog = createRuntimeProviderCatalog({
     extensionUri: options.extensionUri,
     pollIntervalSeconds: options.pollIntervalSeconds,
     watchErrorThreshold: options.watchErrorThreshold,
     queuePollIntervalSeconds: options.queuePollIntervalSeconds
   });
+
+  const composedCatalog = composeProviderCatalog([
+    coreCatalog,
+    treeCatalog,
+    validationCatalog,
+    runtimeCatalog
+  ]);
+  registerProviderCatalog(container, composedCatalog as ExtensionProviderCatalog);
 }

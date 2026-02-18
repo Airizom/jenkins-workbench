@@ -23,17 +23,17 @@ export class JenkinsWorkbenchDeepLinkBuildHandler {
     buildUrl: string
   ): Promise<void> {
     try {
-      await BuildDetailsPanel.show(
-        this.dataService,
-        this.artifactActionHandler,
-        this.consoleExporter,
-        this.refreshHost,
-        this.pendingInputCoordinator,
+      await BuildDetailsPanel.show({
+        dataService: this.dataService,
+        artifactActionHandler: this.artifactActionHandler,
+        consoleExporter: this.consoleExporter,
+        refreshHost: this.refreshHost,
+        pendingInputProvider: this.pendingInputCoordinator,
         environment,
         buildUrl,
-        this.extensionUri,
-        this.deriveBuildLabel(buildUrl)
-      );
+        extensionUri: this.extensionUri,
+        label: this.deriveBuildLabel(buildUrl)
+      });
     } catch (error) {
       void vscode.window.showErrorMessage(
         `Unable to open build details: ${formatActionError(error)}`

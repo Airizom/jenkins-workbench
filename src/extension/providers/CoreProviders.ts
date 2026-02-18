@@ -4,10 +4,7 @@ import { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { ArtifactActionService } from "../../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../../services/ArtifactFilesystem";
-import {
-  type ArtifactRetrievalService,
-  DefaultArtifactRetrievalService
-} from "../../services/ArtifactRetrievalService";
+import { DefaultArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
 import { ArtifactStorageService } from "../../services/ArtifactStorageService";
 import {
   BuildConsoleExporter,
@@ -26,7 +23,6 @@ import { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import { JenkinsViewStateStore } from "../../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import {
-  type ArtifactActionHandler,
   type ArtifactActionOptionsProvider,
   DefaultArtifactActionHandler
 } from "../../ui/ArtifactActionHandler";
@@ -37,7 +33,7 @@ import {
 import { type ArtifactPreviewOptionsProvider, ArtifactPreviewer } from "../../ui/ArtifactPreviewer";
 import { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
-import type { ExtensionContainer } from "../container/ExtensionContainer";
+import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 
 export interface CoreProviderOptions {
   context: vscode.ExtensionContext;
@@ -49,119 +45,74 @@ export interface CoreProviderOptions {
   artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
 }
 
-export function registerCoreProviders(
-  container: ExtensionContainer,
-  options: CoreProviderOptions
-): void {
-  container.register("environmentStore", () => new JenkinsEnvironmentStore(options.context));
-
-  container.register(
-    "clientProvider",
-    () =>
+export function createCoreProviderCatalog(options: CoreProviderOptions) {
+  return {
+    environmentStore: (_container) => new JenkinsEnvironmentStore(options.context),
+    clientProvider: (container) =>
       new JenkinsClientProvider(container.get("environmentStore"), {
         requestTimeoutMs: options.requestTimeoutMs
-      })
-  );
-
-  container.register("dataService", () => {
-    const buildParameterRequestPreparer = new BuildParameterRequestPreparerService();
-    return new JenkinsDataService(container.get("clientProvider"), {
-      cacheTtlMs: options.cacheTtlMs,
-      maxCacheEntries: options.maxCacheEntries,
-      buildParameterRequestPreparer
-    });
-  });
-
-  container.register(
-    "pendingInputCoordinator",
-    () => new PendingInputRefreshCoordinator(container.get("dataService"))
-  );
-
-  container.register(
-    "queuedBuildWaiter",
-    () => new QueuedBuildWaiter(container.get("dataService"))
-  );
-
-  container.register(
-    "consoleExporter",
-    () =>
+      }),
+    dataService: (container) => {
+      const buildParameterRequestPreparer = new BuildParameterRequestPreparerService();
+      return new JenkinsDataService(container.get("clientProvider"), {
+        cacheTtlMs: options.cacheTtlMs,
+        maxCacheEntries: options.maxCacheEntries,
+        buildParameterRequestPreparer
+      });
+    },
+    pendingInputCoordinator: (container) =>
+      new PendingInputRefreshCoordinator(container.get("dataService")),
+    queuedBuildWaiter: (container) => new QueuedBuildWaiter(container.get("dataService")),
+    consoleExporter: (container) =>
       new BuildConsoleExporter(container.get("dataService"), createNodeBuildConsoleFilesystem(), {
         maxConsoleChars: MAX_CONSOLE_CHARS
-      })
-  );
-
-  container.register("buildLogService", () => new BuildLogService(container.get("dataService")));
-
-  container.register(
-    "artifactRetrievalService",
-    () => new DefaultArtifactRetrievalService(container.get("dataService"))
-  );
-
-  container.register(
-    "artifactStorageService",
-    () =>
+      }),
+    buildLogService: (container) => new BuildLogService(container.get("dataService")),
+    artifactRetrievalService: (container) =>
+      new DefaultArtifactRetrievalService(container.get("dataService")),
+    artifactStorageService: (container) =>
       new ArtifactStorageService(
-        container.get("artifactRetrievalService") as ArtifactRetrievalService,
+        container.get("artifactRetrievalService"),
         createFileArtifactFilesystem()
-      )
-  );
-
-  container.register(
-    "artifactPreviewProvider",
-    () => new ArtifactPreviewProvider(options.artifactPreviewCacheOptions)
-  );
-
-  container.register(
-    "buildLogPreviewer",
-    () =>
+      ),
+    artifactPreviewProvider: (_container) =>
+      new ArtifactPreviewProvider(options.artifactPreviewCacheOptions),
+    buildLogPreviewer: (container) =>
       new BuildLogPreviewer(
         container.get("buildLogService"),
         container.get("artifactPreviewProvider"),
         MAX_CONSOLE_CHARS
-      )
-  );
-
-  container.register(
-    "jobConfigPreviewer",
-    () => new JobConfigPreviewer(container.get("artifactPreviewProvider"))
-  );
-
-  container.register("jobConfigDraftFilesystem", () => new JobConfigDraftFilesystem());
-
-  container.register(
-    "jobConfigDraftManager",
-    () => new JobConfigDraftManager(container.get("jobConfigDraftFilesystem"))
-  );
-
-  container.register(
-    "jobConfigUpdateWorkflow",
-    () =>
+      ),
+    jobConfigPreviewer: (container) =>
+      new JobConfigPreviewer(container.get("artifactPreviewProvider")),
+    jobConfigDraftFilesystem: (_container) => new JobConfigDraftFilesystem(),
+    jobConfigDraftManager: (container) =>
+      new JobConfigDraftManager(container.get("jobConfigDraftFilesystem")),
+    jobConfigUpdateWorkflow: (container) =>
       new JobConfigUpdateWorkflow(
         container.get("dataService"),
         container.get("jobConfigPreviewer"),
         container.get("jobConfigDraftManager")
-      )
-  );
+      ),
+    artifactActionHandler: (container) => {
+      const artifactActionService = new ArtifactActionService(
+        container.get("artifactStorageService")
+      );
+      const artifactPreviewer = new ArtifactPreviewer(
+        container.get("artifactRetrievalService"),
+        container.get("artifactPreviewProvider"),
+        options.artifactPreviewOptionsProvider
+      );
 
-  container.register("artifactActionHandler", () => {
-    const artifactActionService = new ArtifactActionService(
-      container.get("artifactStorageService")
-    );
-    const artifactPreviewer = new ArtifactPreviewer(
-      container.get("artifactRetrievalService") as ArtifactRetrievalService,
-      container.get("artifactPreviewProvider"),
-      options.artifactPreviewOptionsProvider
-    );
-
-    return new DefaultArtifactActionHandler(
-      artifactActionService,
-      artifactPreviewer,
-      options.artifactActionOptionsProvider
-    ) as ArtifactActionHandler;
-  });
-
-  container.register("watchStore", () => new JenkinsWatchStore(options.context));
-  container.register("presetStore", () => new JenkinsParameterPresetStore(options.context));
-  container.register("pinStore", () => new JenkinsPinStore(options.context));
-  container.register("viewStateStore", () => new JenkinsViewStateStore(options.context));
+      return new DefaultArtifactActionHandler(
+        artifactActionService,
+        artifactPreviewer,
+        options.artifactActionOptionsProvider
+      );
+    },
+    watchStore: (_container) => new JenkinsWatchStore(options.context),
+    presetStore: (_container) => new JenkinsParameterPresetStore(options.context),
+    pinStore: (_container) => new JenkinsPinStore(options.context),
+    viewStateStore: (_container) => new JenkinsViewStateStore(options.context)
+  } satisfies PartialExtensionProviderCatalog;
 }

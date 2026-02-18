@@ -9,10 +9,10 @@ import type {
 } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsTaskRefreshHost } from "./JenkinsTaskRefreshHost";
 import {
+  type JenkinsTaskDefinition,
   normalizeEnvironmentUrl,
   normalizeTaskDefinition,
-  parseTaskParameters,
-  type JenkinsTaskDefinition
+  parseTaskParameters
 } from "./JenkinsTaskTypes";
 
 export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
@@ -137,7 +137,7 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
         void vscode.window.showErrorMessage(`Failed to trigger Jenkins build: ${message}`);
       }
     } finally {
-      this.refreshHost.refreshEnvironment(environment.environmentId);
+      this.refreshHost.fullEnvironmentRefresh({ environmentId: environment.environmentId });
       this.signalClose();
     }
   }
@@ -189,9 +189,8 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
         const normalized = normalizeEnvironmentUrl(environment.url);
         return normalized ? { environment, normalized } : undefined;
       })
-      .filter(
-        (match): match is { environment: EnvironmentWithScope; normalized: string } =>
-          Boolean(match)
+      .filter((match): match is { environment: EnvironmentWithScope; normalized: string } =>
+        Boolean(match)
       )
       .filter((match) => match.normalized === target);
 

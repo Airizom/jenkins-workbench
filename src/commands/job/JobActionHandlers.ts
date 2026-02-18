@@ -5,7 +5,7 @@ import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameter
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { formatActionError, getTreeItemLabel } from "../CommandUtils";
+import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 import type { JobCommandRefreshHost } from "./JobCommandTypes";
 import { removeJobMetadataOnDelete, updateJobMetadataOnRename } from "./JobMetadataCoordinator";
 import { getJobNameValidationError } from "./JobNameValidation";
@@ -22,9 +22,57 @@ export interface JobActionDependencies {
   refreshHost: JobCommandRefreshHost;
 }
 
+type JobActionTreeItem = JobTreeItem | PipelineTreeItem;
+
+interface JobSelectionContext {
+  selected: JobActionTreeItem;
+  label: string;
+  environmentId: string;
+}
+
 function refreshEnvironment(deps: JobActionDependencies, environmentId: string): void {
-  deps.dataService.clearCacheForEnvironment(environmentId);
-  deps.refreshHost.refreshEnvironment(environmentId);
+  deps.refreshHost.fullEnvironmentRefresh({ environmentId });
+}
+
+function getJobSelectionContext(
+  item: JobActionTreeItem | undefined,
+  missingSelectionMessage: string
+): JobSelectionContext | undefined {
+  const selected = requireSelection(item, missingSelectionMessage);
+  if (!selected) {
+    return undefined;
+  }
+
+  return {
+    selected,
+    label: getTreeItemLabel(selected),
+    environmentId: selected.environment.environmentId
+  };
+}
+
+async function confirmModalAction(prompt: string, actionLabel: string): Promise<boolean> {
+  const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, actionLabel);
+  return choice === actionLabel;
+}
+
+function getMetadataStores(deps: JobActionDependencies): {
+  presetStore: JenkinsParameterPresetStore;
+  pinStore: JenkinsPinStore;
+  watchStore: JenkinsWatchStore;
+} {
+  return { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore };
+}
+
+async function runJobActionWithRefresh(
+  deps: JobActionDependencies,
+  context: JobSelectionContext,
+  errorMessage: string,
+  action: () => Promise<void>
+): Promise<void> {
+  await withActionErrorMessage(errorMessage, async () => {
+    await action();
+    refreshEnvironment(deps, context.environmentId);
+  });
 }
 
 export async function newItem(
@@ -53,208 +101,175 @@ export async function scanMultibranch(
   const label = getTreeItemLabel(item);
   const environmentId = item.environment.environmentId;
 
-  try {
+  await withActionErrorMessage(`Failed to scan ${label}`, async () => {
     const result = await deps.dataService.scanMultibranch(item.environment, item.folderUrl);
     const message = result.queueLocation
       ? `Scan started for ${label}. Queued at ${result.queueLocation}`
       : `Scan started for ${label}.`;
     void vscode.window.showInformationMessage(message);
     refreshEnvironment(deps, environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to scan ${label}: ${formatActionError(error)}`);
-  }
+  });
 }
 
 export async function enableJob(
   deps: JobActionDependencies,
-  item?: JobTreeItem | PipelineTreeItem
+  item?: JobActionTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to enable.");
+  const context = getJobSelectionContext(item, "Select a job or pipeline to enable.");
+  if (!context) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-  const environmentId = item.environment.environmentId;
-
-  const confirm = await vscode.window.showWarningMessage(
-    `Are you sure you want to enable "${label}"?`,
-    { modal: true },
+  const confirmed = await confirmModalAction(
+    `Are you sure you want to enable "${context.label}"?`,
     "Enable"
   );
-  if (confirm !== "Enable") {
+  if (!confirmed) {
     return;
   }
 
-  try {
-    await deps.dataService.enableJob(item.environment, item.jobUrl);
-    void vscode.window.showInformationMessage(`Enabled "${label}".`);
-    refreshEnvironment(deps, environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to enable "${label}": ${formatActionError(error)}`);
-  }
+  await runJobActionWithRefresh(deps, context, `Failed to enable "${context.label}"`, async () => {
+    await deps.dataService.enableJob(context.selected.environment, context.selected.jobUrl);
+    void vscode.window.showInformationMessage(`Enabled "${context.label}".`);
+  });
 }
 
 export async function disableJob(
   deps: JobActionDependencies,
-  item?: JobTreeItem | PipelineTreeItem
+  item?: JobActionTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to disable.");
+  const context = getJobSelectionContext(item, "Select a job or pipeline to disable.");
+  if (!context) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-  const environmentId = item.environment.environmentId;
-
-  const confirm = await vscode.window.showWarningMessage(
-    `Are you sure you want to disable "${label}"? Disabled jobs cannot be built until re-enabled.`,
-    { modal: true },
+  const confirmed = await confirmModalAction(
+    `Are you sure you want to disable "${context.label}"? Disabled jobs cannot be built until re-enabled.`,
     "Disable"
   );
-  if (confirm !== "Disable") {
+  if (!confirmed) {
     return;
   }
 
-  try {
-    await deps.dataService.disableJob(item.environment, item.jobUrl);
-    void vscode.window.showInformationMessage(`Disabled "${label}".`);
-    refreshEnvironment(deps, environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Failed to disable "${label}": ${formatActionError(error)}`
-    );
-  }
+  await runJobActionWithRefresh(deps, context, `Failed to disable "${context.label}"`, async () => {
+    await deps.dataService.disableJob(context.selected.environment, context.selected.jobUrl);
+    void vscode.window.showInformationMessage(`Disabled "${context.label}".`);
+  });
 }
 
 export async function renameJob(
   deps: JobActionDependencies,
-  item?: JobTreeItem | PipelineTreeItem
+  item?: JobActionTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to rename.");
+  const context = getJobSelectionContext(item, "Select a job or pipeline to rename.");
+  if (!context) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-  const environmentId = item.environment.environmentId;
-
   const newName = await vscode.window.showInputBox({
-    prompt: `Enter a new name for "${label}"`,
-    value: label,
+    prompt: `Enter a new name for "${context.label}"`,
+    value: context.label,
     validateInput: (value) => getJobNameValidationError(value)
   });
 
-  if (!newName || newName === label) {
+  if (!newName || newName === context.label) {
     return;
   }
 
-  const confirm = await vscode.window.showWarningMessage(
-    `Are you sure you want to rename "${label}" to "${newName}"?`,
-    { modal: true },
+  const confirmed = await confirmModalAction(
+    `Are you sure you want to rename "${context.label}" to "${newName}"?`,
     "Rename"
   );
-  if (confirm !== "Rename") {
+  if (!confirmed) {
     return;
   }
 
-  try {
-    const { newUrl } = await deps.dataService.renameJob(item.environment, item.jobUrl, newName);
+  await runJobActionWithRefresh(deps, context, `Failed to rename "${context.label}"`, async () => {
+    const { newUrl } = await deps.dataService.renameJob(
+      context.selected.environment,
+      context.selected.jobUrl,
+      newName
+    );
 
     await updateJobMetadataOnRename(
-      { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore },
+      getMetadataStores(deps),
       {
-        scope: item.environment.scope,
-        environmentId,
-        jobUrl: item.jobUrl
+        scope: context.selected.environment.scope,
+        environmentId: context.environmentId,
+        jobUrl: context.selected.jobUrl
       },
       newUrl,
       newName
     );
 
-    void vscode.window.showInformationMessage(`Renamed "${label}" to "${newName}".`);
-    refreshEnvironment(deps, environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to rename "${label}": ${formatActionError(error)}`);
-  }
+    void vscode.window.showInformationMessage(`Renamed "${context.label}" to "${newName}".`);
+  });
 }
 
 export async function deleteJob(
   deps: JobActionDependencies,
-  item?: JobTreeItem | PipelineTreeItem
+  item?: JobActionTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to delete.");
+  const context = getJobSelectionContext(item, "Select a job or pipeline to delete.");
+  if (!context) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-  const environmentId = item.environment.environmentId;
-
   const typedName = await vscode.window.showInputBox({
-    prompt: `Type "${label}" to confirm deletion. This action cannot be undone!`,
-    placeHolder: label,
+    prompt: `Type "${context.label}" to confirm deletion. This action cannot be undone!`,
+    placeHolder: context.label,
     validateInput: (value) => {
-      if (value !== label) {
-        return `Please type the exact job name "${label}" to confirm.`;
+      if (value !== context.label) {
+        return `Please type the exact job name "${context.label}" to confirm.`;
       }
       return undefined;
     }
   });
 
-  if (typedName !== label) {
+  if (typedName !== context.label) {
     return;
   }
 
-  const confirm = await vscode.window.showWarningMessage(
-    `FINAL CONFIRMATION: Delete "${label}" permanently? This cannot be undone!`,
-    { modal: true },
+  const confirmed = await confirmModalAction(
+    `FINAL CONFIRMATION: Delete "${context.label}" permanently? This cannot be undone!`,
     "Delete Permanently"
   );
-  if (confirm !== "Delete Permanently") {
+  if (!confirmed) {
     return;
   }
 
-  try {
-    await deps.dataService.deleteJob(item.environment, item.jobUrl);
+  await runJobActionWithRefresh(deps, context, `Failed to delete "${context.label}"`, async () => {
+    await deps.dataService.deleteJob(context.selected.environment, context.selected.jobUrl);
 
-    await removeJobMetadataOnDelete(
-      { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore },
-      {
-        scope: item.environment.scope,
-        environmentId,
-        jobUrl: item.jobUrl
-      }
-    );
+    await removeJobMetadataOnDelete(getMetadataStores(deps), {
+      scope: context.selected.environment.scope,
+      environmentId: context.environmentId,
+      jobUrl: context.selected.jobUrl
+    });
 
-    void vscode.window.showInformationMessage(`Deleted "${label}".`);
-    refreshEnvironment(deps, environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to delete "${label}": ${formatActionError(error)}`);
-  }
+    void vscode.window.showInformationMessage(`Deleted "${context.label}".`);
+  });
 }
 
 export async function copyJob(
   deps: JobActionDependencies,
-  item?: JobTreeItem | PipelineTreeItem
+  item?: JobActionTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to copy.");
+  const context = getJobSelectionContext(item, "Select a job or pipeline to copy.");
+  if (!context) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-  const environmentId = item.environment.environmentId;
-  const parsed = parseJobUrl(item.jobUrl);
+  const parsed = parseJobUrl(context.selected.jobUrl);
 
   if (!parsed) {
-    void vscode.window.showErrorMessage(`Unable to parse job URL for "${label}".`);
+    void vscode.window.showErrorMessage(`Unable to parse job URL for "${context.label}".`);
     return;
   }
 
   const newName = await vscode.window.showInputBox({
-    prompt: `Enter a name for the copy of "${label}"`,
-    value: `${label}-copy`,
+    prompt: `Enter a name for the copy of "${context.label}"`,
+    value: `${context.label}-copy`,
     validateInput: (value) => getJobNameValidationError(value)
   });
 
@@ -262,28 +277,24 @@ export async function copyJob(
     return;
   }
 
-  const confirm = await vscode.window.showWarningMessage(
-    `Create a copy of "${label}" named "${newName}"?`,
-    { modal: true },
+  const confirmed = await confirmModalAction(
+    `Create a copy of "${context.label}" named "${newName}"?`,
     "Copy"
   );
-  if (confirm !== "Copy") {
+  if (!confirmed) {
     return;
   }
 
-  try {
+  await runJobActionWithRefresh(deps, context, `Failed to copy "${context.label}"`, async () => {
     const { newUrl } = await deps.dataService.copyJob(
-      item.environment,
+      context.selected.environment,
       parsed.parentUrl,
       parsed.jobName,
       newName
     );
 
     void vscode.window.showInformationMessage(
-      `Copied "${label}" to "${newName}".${newUrl ? ` New job URL: ${newUrl}` : ""}`
+      `Copied "${context.label}" to "${newName}".${newUrl ? ` New job URL: ${newUrl}` : ""}`
     );
-    refreshEnvironment(deps, environmentId);
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Failed to copy "${label}": ${formatActionError(error)}`);
-  }
+  });
 }

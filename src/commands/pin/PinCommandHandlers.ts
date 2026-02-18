@@ -1,7 +1,6 @@
-import * as vscode from "vscode";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import { type JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { getTreeItemLabel } from "../CommandUtils";
+import { addJobScopedState, getTreeItemLabel, removeJobScopedState } from "../CommandUtils";
 import type { PinCommandRefreshHost } from "./PinCommandTypes";
 
 export async function pinJob(
@@ -9,32 +8,29 @@ export async function pinJob(
   refreshHost: PinCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to pin.");
-    return;
-  }
-
-  const label = getTreeItemLabel(item);
-  const isPinned = await pinStore.isPinned(
-    item.environment.scope,
-    item.environment.environmentId,
-    item.jobUrl
-  );
-
-  if (isPinned) {
-    void vscode.window.showInformationMessage(`${label} is already pinned.`);
-    return;
-  }
-
-  await pinStore.addPin(item.environment.scope, {
-    environmentId: item.environment.environmentId,
-    jobUrl: item.jobUrl,
-    jobName: label,
-    jobKind: item instanceof PipelineTreeItem ? "pipeline" : "job"
+  await addJobScopedState({
+    item,
+    missingSelectionMessage: "Select a job or pipeline to pin.",
+    getLabel: (selected) => getTreeItemLabel(selected),
+    alreadyPresentMessage: (label) => `${label} is already pinned.`,
+    addedMessage: (label) => `Pinned ${label}.`,
+    isPresent: async (selected) =>
+      pinStore.isPinned(
+        selected.environment.scope,
+        selected.environment.environmentId,
+        selected.jobUrl
+      ),
+    add: async (selected, label) =>
+      pinStore.addPin(selected.environment.scope, {
+        environmentId: selected.environment.environmentId,
+        jobUrl: selected.jobUrl,
+        jobName: label,
+        jobKind: selected instanceof PipelineTreeItem ? "pipeline" : "job"
+      }),
+    refreshEnvironment: (environmentId) => {
+      refreshHost.fullEnvironmentRefresh({ environmentId: environmentId });
+    }
   });
-
-  void vscode.window.showInformationMessage(`Pinned ${label}.`);
-  refreshHost.refreshEnvironment(item.environment.environmentId);
 }
 
 export async function unpinJob(
@@ -42,23 +38,20 @@ export async function unpinJob(
   refreshHost: PinCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to unpin.");
-    return;
-  }
-
-  const label = getTreeItemLabel(item);
-  const removed = await pinStore.removePin(
-    item.environment.scope,
-    item.environment.environmentId,
-    item.jobUrl
-  );
-
-  if (!removed) {
-    void vscode.window.showInformationMessage(`${label} is not currently pinned.`);
-    return;
-  }
-
-  void vscode.window.showInformationMessage(`Unpinned ${label}.`);
-  refreshHost.refreshEnvironment(item.environment.environmentId);
+  await removeJobScopedState({
+    item,
+    missingSelectionMessage: "Select a job or pipeline to unpin.",
+    getLabel: (selected) => getTreeItemLabel(selected),
+    missingStateMessage: (label) => `${label} is not currently pinned.`,
+    removedMessage: (label) => `Unpinned ${label}.`,
+    remove: async (selected) =>
+      pinStore.removePin(
+        selected.environment.scope,
+        selected.environment.environmentId,
+        selected.jobUrl
+      ),
+    refreshEnvironment: (environmentId) => {
+      refreshHost.fullEnvironmentRefresh({ environmentId: environmentId });
+    }
+  });
 }

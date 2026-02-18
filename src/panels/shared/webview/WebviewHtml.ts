@@ -37,6 +37,49 @@ export function serializeForScript(value: unknown): string {
     .replace(/\u2029/g, "\\u2029");
 }
 
+export interface PanelRestoreErrorOptions {
+  nonce: string;
+  title: string;
+  message: string;
+  hint: string;
+  styleUris: string[];
+  panelState?: unknown;
+}
+
+export function renderPanelRestoreErrorHtml(
+  cspSource: string,
+  options: PanelRestoreErrorOptions
+): string {
+  const { nonce, title, message, hint, styleUris, panelState } = options;
+  const stateScript = renderWebviewStateScript(panelState, nonce);
+  return renderWebviewShell(
+    `
+      ${stateScript}
+      <main class="jenkins-workbench-panel-message">
+        <h1>${title}</h1>
+        <p>${message}</p>
+        <p>${hint}</p>
+      </main>
+      <style nonce="${nonce}">
+        .jenkins-workbench-panel-message {
+          color: var(--vscode-foreground);
+          font-family: var(--vscode-font-family);
+          line-height: 1.5;
+          margin: 32px;
+        }
+        .jenkins-workbench-panel-message h1 {
+          font-size: 20px;
+          margin: 0 0 12px;
+        }
+        .jenkins-workbench-panel-message p {
+          margin: 0 0 8px;
+        }
+      </style>
+    `,
+    { cspSource, nonce, styleUris }
+  );
+}
+
 export function renderWebviewStateScript(state: unknown, nonce: string): string {
   if (state === undefined) {
     return "";

@@ -21,7 +21,9 @@ import {
 } from "./TreeItems";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
+import type { TreeJobScope } from "./TreeJobScope";
 import type { TreeChildrenOptions } from "./TreeTypes";
+import type { TreeViewCurationOptions } from "./TreeViewCuration";
 
 const BUILD_LIMIT = 20;
 const REFRESH_DEBOUNCE_MS = 150;
@@ -51,6 +53,23 @@ export type TreeRefreshWaiter = {
   token: number;
   promise: Promise<void>;
   dispose: () => void;
+};
+
+export type FullEnvironmentRefreshRequest = {
+  environmentId?: string;
+  trigger?: "manual" | "system";
+  refreshToken?: number;
+};
+
+export type RefreshViewOnlyRequest = {
+  clearDataCache?: boolean;
+};
+
+export type InvalidateBuildArtifactsRequest = {
+  environment: JenkinsEnvironmentRef;
+  buildUrl: string;
+  jobScope?: TreeJobScope;
+  refreshTree?: boolean;
 };
 
 export class JenkinsWorkbenchTreeDataProvider
@@ -93,6 +112,7 @@ export class JenkinsWorkbenchTreeDataProvider
     treeFilter: JenkinsTreeFilter,
     buildTooltipOptions: BuildTooltipOptions,
     buildListFetchOptions: BuildListFetchOptions,
+    viewCurationOptions: TreeViewCurationOptions,
     pendingInputCoordinator: PendingInputRefreshCoordinator
   ) {
     this.pendingInputCoordinator = pendingInputCoordinator;
@@ -106,6 +126,7 @@ export class JenkinsWorkbenchTreeDataProvider
       watchStore,
       pinStore,
       treeFilter,
+      viewCurationOptions,
       BUILD_LIMIT,
       buildTooltipOptions,
       buildListFetchOptions,
@@ -169,10 +190,33 @@ export class JenkinsWorkbenchTreeDataProvider
     return true;
   }
 
+  fullEnvironmentRefresh(request?: FullEnvironmentRefreshRequest): boolean {
+    const environmentId = request?.environmentId;
+    const refreshToken = request?.refreshToken;
+    if (environmentId) {
+      this.onEnvironmentChanged(environmentId, refreshToken);
+      return true;
+    }
+
+    if (request?.trigger === "manual") {
+      return this.refresh(refreshToken);
+    }
+
+    this.onEnvironmentChanged(undefined, refreshToken);
+    return true;
+  }
+
   refreshView(): void {
     this.childrenLoader.clearChildrenCacheForEnvironment();
     this.scheduleRefresh(undefined);
     this.emitSummary();
+  }
+
+  refreshViewOnly(request?: RefreshViewOnlyRequest): void {
+    if (request?.clearDataCache) {
+      this.dataService.clearCache();
+    }
+    this.refreshView();
   }
 
   refreshElement(element?: WorkbenchTreeElement): void {
@@ -184,10 +228,26 @@ export class JenkinsWorkbenchTreeDataProvider
     this._onDidChangeTreeData.fire(element);
   }
 
-  refreshQueueFolder(environment: JenkinsEnvironmentRef): void {
+  refreshQueueOnly(environment: JenkinsEnvironmentRef): void {
     this.childrenLoader.clearQueueCache(environment);
     const item = new BuildQueueFolderTreeItem(environment);
     this._onDidChangeTreeData.fire(item);
+  }
+
+  refreshQueueFolder(environment: JenkinsEnvironmentRef): void {
+    this.refreshQueueOnly(environment);
+  }
+
+  invalidateBuildArtifacts(request: InvalidateBuildArtifactsRequest): void {
+    this.childrenLoader.invalidateBuildArtifacts(
+      request.environment,
+      request.buildUrl,
+      request.jobScope
+    );
+    if (request.refreshTree ?? true) {
+      this.scheduleRefresh(undefined);
+    }
+    this.emitSummary();
   }
 
   updateBuildTooltipOptions(options: BuildTooltipOptions): void {
@@ -197,6 +257,11 @@ export class JenkinsWorkbenchTreeDataProvider
 
   updateBuildListFetchOptions(options: BuildListFetchOptions): void {
     this.childrenLoader.updateBuildListFetchOptions(options);
+    this.childrenLoader.clearChildrenCacheForEnvironment();
+  }
+
+  updateViewCurationOptions(options: TreeViewCurationOptions): void {
+    this.childrenLoader.updateViewCurationOptions(options);
     this.childrenLoader.clearChildrenCacheForEnvironment();
   }
 
@@ -222,10 +287,7 @@ export class JenkinsWorkbenchTreeDataProvider
     this.emitSummary();
   }
 
-  private scheduleRefresh(
-    element: WorkbenchTreeElement | undefined,
-    refreshToken?: number
-  ): void {
+  private scheduleRefresh(element: WorkbenchTreeElement | undefined, refreshToken?: number): void {
     if (element !== undefined) {
       this.childrenLoader.invalidateForElement(element);
     }
@@ -268,9 +330,7 @@ export class JenkinsWorkbenchTreeDataProvider
     return this.parentMap.get(element);
   }
 
-  async buildExpansionPath(
-    element: WorkbenchTreeElement
-  ): Promise<TreeExpansionPath | undefined> {
+  async buildExpansionPath(element: WorkbenchTreeElement): Promise<TreeExpansionPath | undefined> {
     const path: string[] = [];
     let current: WorkbenchTreeElement | undefined = element;
 

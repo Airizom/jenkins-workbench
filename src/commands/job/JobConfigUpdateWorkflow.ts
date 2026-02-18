@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
-import type { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
+import type { JobConfigDraft, JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
@@ -72,39 +72,14 @@ export class JobConfigUpdateWorkflow {
   }
 
   async submitDraft(refreshHost: JobCommandRefreshHost, uri?: vscode.Uri): Promise<void> {
-    let targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
-    if (!targetUri) {
-      void vscode.window.showInformationMessage("Open a job config draft to submit.");
+    const resolved = await this.resolveDraftForSubmit(
+      uri ?? vscode.window.activeTextEditor?.document.uri
+    );
+    if (!resolved) {
       return;
     }
 
-    let draft = this.draftManager.getDraft(targetUri);
-    if (!draft) {
-      const visibleDrafts = this.draftManager.getVisibleDrafts();
-      if (visibleDrafts.length === 1) {
-        targetUri = visibleDrafts[0].uri;
-        draft = this.draftManager.getDraft(targetUri);
-      } else if (visibleDrafts.length > 1) {
-        const items = visibleDrafts.map((entry) => ({
-          label: entry.label,
-          description: "config.xml",
-          uri: entry.uri
-        }));
-        const selected = await vscode.window.showQuickPick(items, {
-          placeHolder: "Select which job config to submit"
-        });
-        if (!selected) {
-          return;
-        }
-        targetUri = selected.uri;
-        draft = this.draftManager.getDraft(targetUri);
-      }
-    }
-
-    if (!draft) {
-      void vscode.window.showInformationMessage("This document is not a Jenkins job config draft.");
-      return;
-    }
+    const { draft, targetUri } = resolved;
 
     const document = await vscode.workspace.openTextDocument(targetUri);
     const editedXml = document.getText();
@@ -131,7 +106,7 @@ export class JobConfigUpdateWorkflow {
         () => this.dataService.updateJobConfigXml(draft.environment, draft.jobUrl, editedXml)
       );
       void vscode.window.showInformationMessage(`Updated config.xml for ${draft.label}.`);
-      refreshHost.refreshEnvironment(draft.environment.environmentId);
+      refreshHost.fullEnvironmentRefresh({ environmentId: draft.environment.environmentId });
       const closed = await this.closeDraftEditor(targetUri);
       if (closed) {
         this.draftManager.discardDraft(targetUri);
@@ -182,19 +157,60 @@ export class JobConfigUpdateWorkflow {
       description: "Continue editing"
     };
 
-    const items: vscode.QuickPickItem[] = [submitItem, cancelItem];
+    const placeholder =
+      errorCount > 0
+        ? `$(warning) ${errorCount} XML error${errorCount === 1 ? "" : "s"} detected — Submit config.xml for ${label} anyway?`
+        : `Submit config.xml for ${label}?`;
 
-    let placeholder = `Submit config.xml for ${label}?`;
-    if (errorCount > 0) {
-      placeholder = `$(warning) ${errorCount} XML error${errorCount > 1 ? "s" : ""} detected — Submit config.xml for ${label} anyway?`;
-    }
-
-    const selected = await vscode.window.showQuickPick(items, {
+    const selected = await vscode.window.showQuickPick([submitItem, cancelItem], {
       placeHolder: placeholder,
       title: "Jenkins: Submit Job Config"
     });
 
     return selected === submitItem;
+  }
+
+  private async resolveDraftForSubmit(
+    uri: vscode.Uri | undefined
+  ): Promise<{ draft: JobConfigDraft; targetUri: vscode.Uri } | null> {
+    if (!uri) {
+      void vscode.window.showInformationMessage("Open a job config draft to submit.");
+      return null;
+    }
+
+    const draft = this.draftManager.getDraft(uri);
+    if (draft) {
+      return { draft, targetUri: uri };
+    }
+
+    const visibleDrafts = this.draftManager.getVisibleDrafts();
+    if (visibleDrafts.length === 1) {
+      const single = this.draftManager.getDraft(visibleDrafts[0].uri);
+      if (single) {
+        return { draft: single, targetUri: visibleDrafts[0].uri };
+      }
+    }
+
+    if (visibleDrafts.length > 1) {
+      const selected = await vscode.window.showQuickPick(
+        visibleDrafts.map((entry) => ({
+          label: entry.label,
+          description: "config.xml",
+          uri: entry.uri
+        })),
+        { placeHolder: "Select which job config to submit" }
+      );
+      if (!selected) {
+        return null;
+      }
+      const chosen = this.draftManager.getDraft(selected.uri);
+      if (chosen) {
+        return { draft: chosen, targetUri: selected.uri };
+      }
+    }
+
+    void vscode.window.showInformationMessage("This document is not a Jenkins job config draft.");
+    return null;
   }
 
   private async createDraftDocument(
@@ -225,9 +241,7 @@ export class JobConfigUpdateWorkflow {
 
   private async countXmlErrors(uri: vscode.Uri): Promise<number> {
     const diagnostics = await this.waitForDiagnostics(uri, 1500);
-    return diagnostics.filter((diagnostic) => {
-      return diagnostic.severity === vscode.DiagnosticSeverity.Error;
-    }).length;
+    return diagnostics.filter((d) => d.severity === vscode.DiagnosticSeverity.Error).length;
   }
 
   private async waitForDiagnostics(
@@ -240,22 +254,29 @@ export class JobConfigUpdateWorkflow {
     }
 
     return new Promise<vscode.Diagnostic[]>((resolve) => {
+      let settled = false;
+      const settle = (result: vscode.Diagnostic[]) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        subscription.dispose();
+        resolve(result);
+      };
+
       const subscription = vscode.languages.onDidChangeDiagnostics((event) => {
-        if (!event.uris.some((changed) => changed.toString() === uri.toString())) {
+        if (!event.uris.some((u) => u.toString() === uri.toString())) {
           return;
         }
         const updated = vscode.languages.getDiagnostics(uri);
-        if (updated.length === 0) {
-          return;
+        if (updated.length > 0) {
+          settle(updated);
         }
-        clearTimeout(timer);
-        subscription.dispose();
-        resolve(updated);
       });
 
       const timer = setTimeout(() => {
-        subscription.dispose();
-        resolve(vscode.languages.getDiagnostics(uri));
+        settle(vscode.languages.getDiagnostics(uri));
       }, timeoutMs);
     });
   }

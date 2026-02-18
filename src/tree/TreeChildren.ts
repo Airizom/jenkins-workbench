@@ -2,6 +2,7 @@ import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type {
   BuildListFetchOptions,
   JenkinsDataService,
+  JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
   JenkinsJobInfo,
   JenkinsQueueItemInfo
 } from "../jenkins/JenkinsDataService";
@@ -15,12 +16,22 @@ import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import {
+  ROOT_TREE_JOB_SCOPE,
+  buildTreeJobScopeKey,
+  getTreeJobCollectionCacheParts,
+  type TreeJobCollectionRequest,
+  type TreeJobScope
+} from "./TreeJobScope";
+import { resolveTreeItemLabel } from "./TreeItemLabels";
+import { curateTreeViews, type TreeViewCurationOptions } from "./TreeViewCuration";
+import {
   ArtifactTreeItem,
   BuildArtifactsFolderTreeItem,
   BuildQueueFolderTreeItem,
   BuildTreeItem,
   InstanceTreeItem,
   JenkinsFolderTreeItem,
+  JenkinsViewTreeItem,
   JobTreeItem,
   JobsFolderTreeItem,
   NodeTreeItem,
@@ -30,9 +41,9 @@ import {
   PlaceholderTreeItem,
   QueueItemTreeItem,
   RootSectionTreeItem,
+  ViewsFolderTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
-import { resolveTreeItemLabel } from "./TreeItemLabels";
 import type { TreeChildrenOptions } from "./TreeTypes";
 
 const CHILDREN_CACHE_MAX_ENTRIES = 200;
@@ -43,6 +54,8 @@ const CHILDREN_CACHE_TTL_MS = 30_000;
 const ARTIFACT_CACHE_TTL_MS = 5 * 60_000;
 const ENVIRONMENT_SUMMARY_TTL_MS = 60_000;
 const CHILDREN_LOAD_TIMEOUT_MS = 35_000;
+
+type JobCollectionTreeElement = JobsFolderTreeItem | JenkinsViewTreeItem | JenkinsFolderTreeItem;
 
 export class JenkinsTreeChildrenLoader {
   private readonly watchedUrlsCache = new Map<string, Set<string>>();
@@ -65,6 +78,7 @@ export class JenkinsTreeChildrenLoader {
     private readonly watchStore: JenkinsWatchStore,
     private readonly pinStore: JenkinsPinStore,
     private readonly treeFilter: JenkinsTreeFilter,
+    private viewCurationOptions: TreeViewCurationOptions,
     private readonly buildLimit: number,
     private buildTooltipOptions: BuildTooltipOptions,
     private buildListFetchOptions: BuildListFetchOptions,
@@ -84,6 +98,10 @@ export class JenkinsTreeChildrenLoader {
 
   updateBuildListFetchOptions(options: BuildListFetchOptions): void {
     this.buildListFetchOptions = options;
+  }
+
+  updateViewCurationOptions(options: TreeViewCurationOptions): void {
+    this.viewCurationOptions = options;
   }
 
   getSummaryTotals(): EnvironmentSummaryTotals {
@@ -109,55 +127,56 @@ export class JenkinsTreeChildrenLoader {
     if (element instanceof InstanceTreeItem) {
       const summary = this.environmentSummaryStore.get(element);
       return [
+        new ViewsFolderTreeItem(element),
         new JobsFolderTreeItem(element, summary?.jobs),
         new BuildQueueFolderTreeItem(element, summary?.queue),
         new NodesFolderTreeItem(element, summary?.nodes)
       ];
     }
 
-    if (element instanceof JobsFolderTreeItem) {
-      if (options?.overrideKeys && options.overrideKeys.size > 0) {
-        return await this.loadJobsForEnvironment(element.environment, options.overrideKeys);
-      }
+    if (element instanceof ViewsFolderTreeItem) {
       return await this.getOrLoadChildren(
-        this.buildChildrenKey("jobs", element.environment),
+        this.buildChildrenKey("views", element.environment),
         element,
-        () => this.loadJobsForEnvironment(element.environment, options?.overrideKeys),
-        "Loading jobs..."
+        () => this.loadViewsForEnvironment(element.environment),
+        "Loading views..."
       );
     }
 
-    if (element instanceof JenkinsFolderTreeItem) {
+    const jobCollectionElement = this.getJobCollectionElement(element);
+    if (jobCollectionElement) {
+      const request = this.getJobCollectionRequest(jobCollectionElement);
+      const parentFolderKind =
+        jobCollectionElement instanceof JenkinsFolderTreeItem
+          ? jobCollectionElement.folderKind
+          : undefined;
       if (options?.overrideKeys && options.overrideKeys.size > 0) {
-        return await this.loadJobsForFolder(
-          element.environment,
-          element.folderUrl,
-          element.folderKind,
-          options.overrideKeys
-        );
+        return await this.loadJobsForCollection(jobCollectionElement.environment, request, {
+          parentFolderKind,
+          overrideKeys: options.overrideKeys
+        });
       }
       return await this.getOrLoadChildren(
-        this.buildChildrenKey("folder", element.environment, element.folderUrl),
-        element,
+        this.buildJobCollectionChildrenKey(jobCollectionElement.environment, request),
+        jobCollectionElement,
         () =>
-          this.loadJobsForFolder(
-            element.environment,
-            element.folderUrl,
-            element.folderKind,
-            options?.overrideKeys
-          ),
-        "Loading folder items..."
+          this.loadJobsForCollection(jobCollectionElement.environment, request, {
+            parentFolderKind,
+            overrideKeys: options?.overrideKeys
+          }),
+        this.buildJobCollectionLoadingLabel(request)
       );
     }
 
     if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
       return await this.getOrLoadChildren(
-        this.buildChildrenKey("builds", element.environment, element.jobUrl),
+        this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope),
         element,
         () =>
           this.loadBuildsForJob(
             element.environment,
             element.jobUrl,
+            element.jobScope,
             resolveTreeItemLabel(element)
           ),
         "Loading builds..."
@@ -166,7 +185,7 @@ export class JenkinsTreeChildrenLoader {
 
     if (element instanceof BuildTreeItem) {
       return await this.getOrLoadChildren(
-        this.buildChildrenKey("build-artifacts", element.environment, element.buildUrl),
+        this.buildBuildArtifactsKey(element.environment, element.buildUrl, element.jobScope),
         element,
         () => this.loadArtifactsSummaryForBuild(element),
         "Loading artifacts..."
@@ -175,7 +194,7 @@ export class JenkinsTreeChildrenLoader {
 
     if (element instanceof BuildArtifactsFolderTreeItem) {
       return await this.getOrLoadChildren(
-        this.buildChildrenKey("artifacts", element.environment, element.buildUrl),
+        this.buildArtifactChildrenKey(element.environment, element.buildUrl, element.jobScope),
         element,
         () => this.loadArtifactsForBuild(element),
         "Loading artifacts..."
@@ -261,6 +280,15 @@ export class JenkinsTreeChildrenLoader {
     this.clearChildrenCacheForKind(environment, "builds");
   }
 
+  invalidateBuildArtifacts(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE
+  ): void {
+    this.clearChildrenCache(this.buildBuildArtifactsKey(environment, buildUrl, jobScope));
+    this.artifactCache.delete(this.buildArtifactChildrenKey(environment, buildUrl, jobScope));
+  }
+
   invalidateForElement(element?: WorkbenchTreeElement): void {
     if (!element) {
       this.clearChildrenCacheForEnvironment();
@@ -277,39 +305,38 @@ export class JenkinsTreeChildrenLoader {
       return;
     }
 
-    if (element instanceof JobsFolderTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("jobs", element.environment));
+    if (element instanceof ViewsFolderTreeItem) {
+      this.clearChildrenCache(this.buildChildrenKey("views", element.environment));
       return;
     }
 
-    if (element instanceof JenkinsFolderTreeItem) {
+    const jobCollectionElement = this.getJobCollectionElement(element);
+    if (jobCollectionElement) {
       this.clearChildrenCache(
-        this.buildChildrenKey("folder", element.environment, element.folderUrl)
+        this.buildJobCollectionChildrenKey(
+          jobCollectionElement.environment,
+          this.getJobCollectionRequest(jobCollectionElement)
+        )
       );
       return;
     }
 
     if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("builds", element.environment, element.jobUrl));
+      this.clearChildrenCache(
+        this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope)
+      );
       return;
     }
 
     if (element instanceof BuildTreeItem) {
-      this.clearChildrenCache(
-        this.buildChildrenKey("build-artifacts", element.environment, element.buildUrl)
-      );
-      this.artifactCache.delete(
-        this.buildChildrenKey("artifacts", element.environment, element.buildUrl)
-      );
+      this.invalidateBuildArtifacts(element.environment, element.buildUrl, element.jobScope);
       return;
     }
 
     if (element instanceof BuildArtifactsFolderTreeItem) {
+      this.invalidateBuildArtifacts(element.environment, element.buildUrl, element.jobScope);
       this.clearChildrenCache(
-        this.buildChildrenKey("artifacts", element.environment, element.buildUrl)
-      );
-      this.artifactCache.delete(
-        this.buildChildrenKey("artifacts", element.environment, element.buildUrl)
+        this.buildArtifactChildrenKey(element.environment, element.buildUrl, element.jobScope)
       );
       return;
     }
@@ -370,40 +397,60 @@ export class JenkinsTreeChildrenLoader {
     return environments.map((environment) => new InstanceTreeItem(environment));
   }
 
-  private async loadJobsForEnvironment(
-    environment: JenkinsEnvironmentRef,
-    overrideKeys?: Set<string>
+  private async loadViewsForEnvironment(
+    environment: JenkinsEnvironmentRef
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const jobs = await this.dataService.getJobsForEnvironment(environment);
-      this.environmentSummaryStore.updateFromJobs(environment, jobs);
-      return await this.mapJobsToTreeItems(environment, jobs, { overrideKeys });
+      const views = curateTreeViews(
+        await this.dataService.getViewsForEnvironment(environment),
+        this.viewCurationOptions
+      );
+      if (views.length === 0) {
+        return [
+          this.createEmptyPlaceholder(
+            "No curated views found.",
+            "This instance has no curated Jenkins views."
+          )
+        ];
+      }
+
+      return views.map((view) => new JenkinsViewTreeItem(environment, view.name, view.url));
     } catch (error) {
-      return [this.createErrorPlaceholder("Unable to load jobs.", error)];
+      return [this.createErrorPlaceholder("Unable to load views.", error)];
     }
   }
 
-  private async loadJobsForFolder(
+  private async loadJobsForCollection(
     environment: JenkinsEnvironmentRef,
-    folderUrl: string,
-    folderKind?: JenkinsJobKind,
-    overrideKeys?: Set<string>
+    request: TreeJobCollectionRequest,
+    options?: {
+      parentFolderKind?: JenkinsJobKind;
+      overrideKeys?: Set<string>;
+    }
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const jobs = await this.dataService.getJobsForFolder(environment, folderUrl);
+      const jobs = await this.dataService.getJobCollection(
+        environment,
+        this.toJenkinsJobCollectionRequest(request)
+      );
+      if (!request.folderUrl && request.scope.kind === "root") {
+        this.environmentSummaryStore.updateFromJobs(environment, jobs);
+      }
       return await this.mapJobsToTreeItems(environment, jobs, {
-        parentFolderKind: folderKind,
-        parentFolderUrl: folderUrl,
-        overrideKeys
+        parentFolderKind: options?.parentFolderKind,
+        parentFolderUrl: request.folderUrl,
+        overrideKeys: options?.overrideKeys,
+        jobScope: request.scope
       });
     } catch (error) {
-      return [this.createErrorPlaceholder("Unable to load folder items.", error)];
+      return [this.createErrorPlaceholder("Unable to load jobs.", error)];
     }
   }
 
   private async loadBuildsForJob(
     environment: JenkinsEnvironmentRef,
     jobUrl: string,
+    jobScope: TreeJobScope,
     jobNameHint?: string
   ): Promise<WorkbenchTreeElement[]> {
     try {
@@ -430,6 +477,7 @@ export class JenkinsTreeChildrenLoader {
         return new BuildTreeItem(
           environment,
           build,
+          jobScope,
           this.buildTooltipOptions,
           jobNameHint,
           summary?.awaitingInput ?? false
@@ -476,12 +524,17 @@ export class JenkinsTreeChildrenLoader {
     build: BuildTreeItem
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const artifacts = await this.getArtifactsForBuild(build.environment, build.buildUrl);
+      const artifacts = await this.getArtifactsForBuild(
+        build.environment,
+        build.buildUrl,
+        build.jobScope
+      );
       return [
         new BuildArtifactsFolderTreeItem(
           build.environment,
           build.buildUrl,
           build.buildNumber,
+          build.jobScope,
           build.jobNameHint,
           artifacts.length
         )
@@ -495,7 +548,11 @@ export class JenkinsTreeChildrenLoader {
     folder: BuildArtifactsFolderTreeItem
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const artifacts = await this.getArtifactsForBuild(folder.environment, folder.buildUrl);
+      const artifacts = await this.getArtifactsForBuild(
+        folder.environment,
+        folder.buildUrl,
+        folder.jobScope
+      );
       if (artifacts.length === 0) {
         return [
           this.createEmptyPlaceholder(
@@ -544,6 +601,7 @@ export class JenkinsTreeChildrenLoader {
       parentFolderKind?: JenkinsJobKind;
       parentFolderUrl?: string;
       overrideKeys?: Set<string>;
+      jobScope?: TreeJobScope;
     }
   ): Promise<WorkbenchTreeElement[]> {
     if (jobs.length === 0) {
@@ -586,25 +644,29 @@ export class JenkinsTreeChildrenLoader {
       switch (job.kind) {
         case "folder":
         case "multibranch":
-          item = new JenkinsFolderTreeItem(environment, job.name, job.url, job.kind, {
-            branchFilter:
-              job.kind === "multibranch"
-                ? this.treeFilter.getBranchFilter(environment.environmentId, job.url)
-                : undefined
-          });
+          item = this.createFolderTreeItem(environment, job, options?.jobScope);
           break;
         case "pipeline":
           item = new PipelineTreeItem(
             environment,
             job.name,
             job.url,
+            options?.jobScope,
             job.color,
             isWatched,
             isPinned
           );
           break;
         default:
-          item = new JobTreeItem(environment, job.name, job.url, job.color, isWatched, isPinned);
+          item = new JobTreeItem(
+            environment,
+            job.name,
+            job.url,
+            options?.jobScope,
+            job.color,
+            isWatched,
+            isPinned
+          );
           break;
       }
       if (isPinned && (item instanceof JobTreeItem || item instanceof PipelineTreeItem)) {
@@ -682,6 +744,90 @@ export class JenkinsTreeChildrenLoader {
     return items.map((item) => new QueueItemTreeItem(environment, item));
   }
 
+  private createFolderTreeItem(
+    environment: JenkinsEnvironmentRef,
+    job: JenkinsJobInfo,
+    scope: TreeJobScope = ROOT_TREE_JOB_SCOPE
+  ): JenkinsFolderTreeItem {
+    const branchFilter =
+      job.kind === "multibranch"
+        ? this.treeFilter.getBranchFilter(environment.environmentId, job.url)
+        : undefined;
+    return new JenkinsFolderTreeItem(environment, job.name, job.url, job.kind, scope, {
+      branchFilter
+    });
+  }
+
+  private getJobCollectionElement(
+    element: WorkbenchTreeElement
+  ): JobCollectionTreeElement | undefined {
+    if (
+      element instanceof JobsFolderTreeItem ||
+      element instanceof JenkinsViewTreeItem ||
+      element instanceof JenkinsFolderTreeItem
+    ) {
+      return element;
+    }
+
+    return undefined;
+  }
+
+  private getJobCollectionRequest(
+    element: JobCollectionTreeElement
+  ): TreeJobCollectionRequest {
+    if (element instanceof JenkinsFolderTreeItem) {
+      return {
+        scope: element.jobScope,
+        folderUrl: element.folderUrl
+      };
+    }
+
+    return {
+      scope: element.jobScope
+    };
+  }
+
+  private buildJobCollectionChildrenKey(
+    environment: JenkinsEnvironmentRef,
+    request: TreeJobCollectionRequest
+  ): string {
+    const cacheParts = getTreeJobCollectionCacheParts(request);
+    return this.buildChildrenKey(cacheParts.kind, environment, cacheParts.extra);
+  }
+
+  private buildJobCollectionLoadingLabel(request: TreeJobCollectionRequest): string {
+    if (request.folderUrl) {
+      return "Loading folder items...";
+    }
+
+    if (request.scope.kind === "view") {
+      return "Loading view items...";
+    }
+
+    return "Loading jobs...";
+  }
+
+  private toJenkinsJobCollectionRequest(
+    request: TreeJobCollectionRequest
+  ): JenkinsDataJobCollectionRequest {
+    if (request.scope.kind === "view") {
+      return {
+        scope: {
+          kind: "view",
+          viewUrl: request.scope.viewUrl
+        },
+        folderUrl: request.folderUrl
+      };
+    }
+
+    return {
+      scope: {
+        kind: "root"
+      },
+      folderUrl: request.folderUrl
+    };
+  }
+
   private async getOrLoadChildren(
     key: string,
     element: WorkbenchTreeElement,
@@ -734,9 +880,10 @@ export class JenkinsTreeChildrenLoader {
 
   private async getArtifactsForBuild(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE
   ): Promise<JenkinsArtifact[]> {
-    const key = this.buildChildrenKey("artifacts", environment, buildUrl);
+    const key = this.buildArtifactChildrenKey(environment, buildUrl, jobScope);
     const cached = this.artifactCache.get<JenkinsArtifact[]>(key);
     if (cached) {
       return cached;
@@ -744,6 +891,42 @@ export class JenkinsTreeChildrenLoader {
     const artifacts = await this.dataService.getBuildArtifacts(environment, buildUrl);
     this.artifactCache.set(key, artifacts);
     return artifacts;
+  }
+
+  private buildBuildsChildrenKey(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return this.buildChildrenKey("builds", environment, this.buildScopedTreeExtra(jobScope, jobUrl));
+  }
+
+  private buildBuildArtifactsKey(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return this.buildChildrenKey(
+      "build-artifacts",
+      environment,
+      this.buildScopedTreeExtra(jobScope, buildUrl)
+    );
+  }
+
+  private buildArtifactChildrenKey(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return this.buildChildrenKey(
+      "artifacts",
+      environment,
+      this.buildScopedTreeExtra(jobScope, buildUrl)
+    );
+  }
+
+  private buildScopedTreeExtra(scope: TreeJobScope, resourceUrl: string): string {
+    return `${buildTreeJobScopeKey(scope)}::${resourceUrl}`;
   }
 
   private buildChildrenKey(

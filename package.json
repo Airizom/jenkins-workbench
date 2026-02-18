@@ -466,6 +466,16 @@
           "default": "[redacted]",
           "description": "Replacement text for masked parameter values."
         },
+        "jenkinsWorkbench.treeViews.excludedNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "all"
+          ],
+          "description": "Case-insensitive Jenkins view names to hide from the Views section."
+        },
         "jenkinsWorkbench.jenkinsfileValidation.enabled": {
           "type": "boolean",
           "default": true,

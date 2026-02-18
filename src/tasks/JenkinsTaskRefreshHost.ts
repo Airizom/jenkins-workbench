@@ -1,3 +1,3 @@
-export interface JenkinsTaskRefreshHost {
-  refreshEnvironment(environmentId?: string): void;
-}
+import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHost";
+
+export interface JenkinsTaskRefreshHost extends FullEnvironmentRefreshHost {}

@@ -36,6 +36,15 @@ export async function activateRuntime(
   const refreshHost = container.get("refreshHost");
   const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
+  const dataService = container.get("dataService");
+  const artifactActionHandler = container.get("artifactActionHandler");
+  const consoleExporter = container.get("consoleExporter");
+  const pendingInputCoordinator = container.get("pendingInputCoordinator");
+  const artifactPreviewProvider = container.get("artifactPreviewProvider");
+  const uriHandler = container.get("uriHandler");
+  const treeExpansionState = container.get("treeExpansionState");
+  const jobConfigDraftManager = container.get("jobConfigDraftManager");
+  const jobConfigDraftFilesystem = container.get("jobConfigDraftFilesystem");
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
@@ -53,11 +62,11 @@ export async function activateRuntime(
     {
       deserializeWebviewPanel: async (panel, state) => {
         await BuildDetailsPanel.revive(panel, state, {
-          dataService: container.get("dataService"),
-          artifactActionHandler: container.get("artifactActionHandler"),
-          consoleExporter: container.get("consoleExporter"),
+          dataService,
+          artifactActionHandler,
+          consoleExporter,
           refreshHost,
-          pendingInputProvider: container.get("pendingInputCoordinator"),
+          pendingInputProvider: pendingInputCoordinator,
           environmentStore,
           extensionUri: context.extensionUri
         });
@@ -70,7 +79,7 @@ export async function activateRuntime(
     {
       deserializeWebviewPanel: async (panel, state) => {
         await NodeDetailsPanel.revive(panel, state, {
-          dataService: container.get("dataService"),
+          dataService,
           environmentStore,
           extensionUri: context.extensionUri,
           refreshHost
@@ -81,7 +90,7 @@ export async function activateRuntime(
 
   const jobConfigDraftFilesystemRegistration = vscode.workspace.registerFileSystemProvider(
     JOB_CONFIG_DRAFT_SCHEME,
-    container.get("jobConfigDraftFilesystem")
+    jobConfigDraftFilesystem
   );
 
   poller.start();
@@ -95,18 +104,18 @@ export async function activateRuntime(
   context.subscriptions.push(
     treeView,
     treeDataProvider,
-    container.get("treeExpansionState"),
-    container.get("pendingInputCoordinator"),
-    container.get("jobConfigDraftManager"),
+    treeExpansionState,
+    pendingInputCoordinator,
+    jobConfigDraftManager,
     treeSummarySubscription,
     jobConfigDraftFilesystemRegistration,
     buildDetailsSerializer,
     nodeDetailsSerializer,
-    vscode.window.registerUriHandler(container.get("uriHandler")),
+    vscode.window.registerUriHandler(uriHandler),
     jenkinsfileCodeLensProvider,
     vscode.workspace.registerFileSystemProvider(
       ARTIFACT_PREVIEW_SCHEME,
-      container.get("artifactPreviewProvider"),
+      artifactPreviewProvider,
       { isReadonly: true }
     ),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
@@ -122,7 +131,7 @@ export async function activateRuntime(
       if (document.uri.scheme !== ARTIFACT_PREVIEW_SCHEME) {
         return;
       }
-      container.get("artifactPreviewProvider").release(document.uri);
+      artifactPreviewProvider.release(document.uri);
     }),
     poller,
     queuePoller,

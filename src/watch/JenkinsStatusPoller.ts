@@ -9,7 +9,7 @@ import { JenkinsJobStatusEvaluator } from "./JenkinsJobStatusEvaluator";
 import type { StatusNotifier } from "./StatusNotifier";
 
 export interface JenkinsStatusPollerHost {
-  refreshTree(): void;
+  fullEnvironmentRefresh(): void;
 }
 
 const DEFAULT_POLL_INTERVAL_SECONDS = 60;
@@ -124,7 +124,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
       }
       const didChange = await this.checkWatchedJobs(watched);
       if (didChange) {
-        this.host.refreshTree();
+        this.host.fullEnvironmentRefresh();
       }
     } finally {
       this.isPolling = false;

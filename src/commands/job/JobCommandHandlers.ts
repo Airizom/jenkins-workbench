@@ -1,8 +1,8 @@
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
-import { formatActionError, getTreeItemLabel } from "../CommandUtils";
+import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 import type { JobConfigUpdateWorkflow } from "./JobConfigUpdateWorkflow";
 
 export async function viewJobConfig(
@@ -10,21 +10,16 @@ export async function viewJobConfig(
   previewer: JobConfigPreviewer,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to view its config.");
+  const selected = requireSelection(item, "Select a job or pipeline to view its config.");
+  if (!selected) {
     return;
   }
 
-  const label = getTreeItemLabel(item);
-
-  try {
-    const configXml = await dataService.getJobConfigXml(item.environment, item.jobUrl);
+  const label = getTreeItemLabel(selected);
+  await withActionErrorMessage(`Unable to open config.xml for ${label}`, async () => {
+    const configXml = await dataService.getJobConfigXml(selected.environment, selected.jobUrl);
     await previewer.preview(configXml);
-  } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Unable to open config.xml for ${label}: ${formatActionError(error)}`
-    );
-  }
+  });
 }
 
 export async function updateJobConfig(

@@ -6,24 +6,21 @@ import { TreeExpansionState } from "../../tree/TreeExpansionState";
 import { JenkinsTreeFilter } from "../../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../../tree/TreeItems";
 import { DefaultJenkinsTreeNavigator } from "../../tree/TreeNavigator";
-import type { ExtensionContainer } from "../container/ExtensionContainer";
+import type { TreeViewCurationOptions } from "../../tree/TreeViewCuration";
+import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 
 const VIEW_ID = "jenkinsWorkbench.tree";
 
 export interface TreeProviderOptions {
   buildTooltipOptions: BuildTooltipOptions;
   buildListFetchOptions: BuildListFetchOptions;
+  treeViewCurationOptions: TreeViewCurationOptions;
 }
 
-export function registerTreeProviders(
-  container: ExtensionContainer,
-  options: TreeProviderOptions
-): void {
-  container.register("treeFilter", () => new JenkinsTreeFilter(container.get("viewStateStore")));
-
-  container.register(
-    "treeDataProvider",
-    () =>
+export function createTreeProviderCatalog(options: TreeProviderOptions) {
+  return {
+    treeFilter: (container) => new JenkinsTreeFilter(container.get("viewStateStore")),
+    treeDataProvider: (container) =>
       new JenkinsWorkbenchTreeDataProvider(
         container.get("environmentStore"),
         container.get("dataService"),
@@ -32,24 +29,16 @@ export function registerTreeProviders(
         container.get("treeFilter"),
         options.buildTooltipOptions,
         options.buildListFetchOptions,
+        options.treeViewCurationOptions,
         container.get("pendingInputCoordinator")
-      )
-  );
-
-  container.register("treeView", () =>
-    vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
-      treeDataProvider: container.get("treeDataProvider")
-    })
-  );
-
-  container.register(
-    "treeExpansionState",
-    () => new TreeExpansionState(container.get("treeView"), container.get("treeDataProvider"))
-  );
-
-  container.register(
-    "treeNavigator",
-    () =>
+      ),
+    treeView: (container) =>
+      vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
+        treeDataProvider: container.get("treeDataProvider")
+      }),
+    treeExpansionState: (container) =>
+      new TreeExpansionState(container.get("treeView"), container.get("treeDataProvider")),
+    treeNavigator: (container) =>
       new DefaultJenkinsTreeNavigator(container.get("treeView"), container.get("treeDataProvider"))
-  );
+  } satisfies PartialExtensionProviderCatalog;
 }

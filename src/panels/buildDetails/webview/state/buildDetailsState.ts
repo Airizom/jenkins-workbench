@@ -6,18 +6,6 @@ import type {
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
 import { parseConsoleHtml } from "../lib/consoleHtml";
 
-type BuildDetailsIncomingMessage =
-  | { type: "appendConsole"; text?: string }
-  | { type: "appendConsoleHtml"; html?: string }
-  | { type: "setConsole"; text?: string; truncated?: boolean }
-  | { type: "setConsoleHtml"; html?: string; truncated?: boolean }
-  | { type: "setErrors"; errors?: string[] }
-  | { type: "setFollowLog"; value?: unknown }
-  | { type: "setLoading"; value?: boolean }
-  | BuildDetailsUpdateMessage;
-
-export type { BuildDetailsIncomingMessage };
-
 export type BuildDetailsState = BuildDetailsViewModel & {
   consoleHtmlModel?: ConsoleHtmlModel;
   hasLoaded: boolean;

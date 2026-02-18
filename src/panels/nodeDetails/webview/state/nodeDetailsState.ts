@@ -3,10 +3,6 @@ import type {
   NodeDetailsViewModel
 } from "../../shared/NodeDetailsContracts";
 
-export type NodeDetailsIncomingMessage =
-  | { type: "setLoading"; value?: boolean }
-  | NodeDetailsUpdateMessage;
-
 export type NodeDetailsState = NodeDetailsViewModel & {
   loading: boolean;
   hasLoaded: boolean;

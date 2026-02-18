@@ -5,11 +5,17 @@ import type { JenkinsNodeInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { buildNodeActionCapabilities } from "../jenkins/nodeActionCapabilities";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
+import { type BuildTooltipOptions, buildBuildTooltip } from "./BuildTooltips";
 import {
   formatMultibranchFolderDescription,
   formatMultibranchFolderTooltip
 } from "./branchFilters";
-import { type BuildTooltipOptions, buildBuildTooltip } from "./BuildTooltips";
+import {
+  ROOT_TREE_JOB_SCOPE,
+  buildTreeJobScopeKey,
+  createViewTreeJobScope,
+  type TreeJobScope
+} from "./TreeJobScope";
 import {
   buildIcon,
   formatBuildDescription,
@@ -25,9 +31,11 @@ import {
 export type WorkbenchTreeElement =
   | RootSectionTreeItem
   | InstanceTreeItem
+  | ViewsFolderTreeItem
   | JobsFolderTreeItem
   | BuildQueueFolderTreeItem
   | NodesFolderTreeItem
+  | JenkinsViewTreeItem
   | PinnedSectionTreeItem
   | JenkinsFolderTreeItem
   | JobTreeItem
@@ -56,6 +64,20 @@ export interface NodesFolderSummary {
 
 export interface QueueFolderSummary {
   total: number;
+}
+
+export class ViewsFolderTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef): string {
+    return `views:${environment.scope}:${environment.environmentId}`;
+  }
+
+  constructor(public readonly environment: JenkinsEnvironmentRef) {
+    super("Views", vscode.TreeItemCollapsibleState.Collapsed);
+    this.id = ViewsFolderTreeItem.buildId(environment);
+    this.contextValue = "views";
+    this.iconPath = new vscode.ThemeIcon("folder");
+    this.tooltip = "Browse curated Jenkins views";
+  }
 }
 
 export class RootSectionTreeItem extends vscode.TreeItem {
@@ -107,6 +129,8 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
     return `jobs:${environment.scope}:${environment.environmentId}`;
   }
+
+  public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
@@ -172,9 +196,34 @@ export class PinnedSectionTreeItem extends vscode.TreeItem {
   }
 }
 
+export class JenkinsViewTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, viewUrl: string): string {
+    return `view:${environment.scope}:${environment.environmentId}:${viewUrl}`;
+  }
+
+  public readonly jobScope: TreeJobScope;
+
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    label: string,
+    public readonly viewUrl: string
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.jobScope = createViewTreeJobScope(viewUrl);
+    this.id = JenkinsViewTreeItem.buildId(environment, viewUrl);
+    this.contextValue = "view";
+    this.iconPath = new vscode.ThemeIcon("eye");
+    this.tooltip = `Browse jobs in view "${label}"`;
+  }
+}
+
 export class JenkinsFolderTreeItem extends vscode.TreeItem {
-  static buildId(environment: JenkinsEnvironmentRef, folderUrl: string): string {
-    return `folder:${environment.scope}:${environment.environmentId}:${folderUrl}`;
+  static buildId(
+    environment: JenkinsEnvironmentRef,
+    folderUrl: string,
+    scope: TreeJobScope
+  ): string {
+    return `folder:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(scope)}:${folderUrl}`;
   }
 
   constructor(
@@ -182,12 +231,13 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
     label: string,
     public readonly folderUrl: string,
     public readonly folderKind: JenkinsJobKind,
+    public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
     options?: {
       branchFilter?: string;
     }
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
-    this.id = JenkinsFolderTreeItem.buildId(environment, folderUrl);
+    this.id = JenkinsFolderTreeItem.buildId(environment, folderUrl, jobScope);
     this.contextValue = folderKind === "multibranch" ? "multibranchFolder" : "folder";
     this.description =
       folderKind === "multibranch"
@@ -205,8 +255,12 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
 }
 
 export class JobTreeItem extends vscode.TreeItem {
-  static buildId(environment: JenkinsEnvironmentRef, jobUrl: string): string {
-    return `job:${environment.scope}:${environment.environmentId}:${jobUrl}`;
+  static buildId(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return `job:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${jobUrl}`;
   }
 
   public readonly isWatched: boolean;
@@ -217,6 +271,7 @@ export class JobTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
     public readonly jobUrl: string,
+    public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
     color?: string,
     isWatched = false,
     isPinned = false
@@ -225,7 +280,7 @@ export class JobTreeItem extends vscode.TreeItem {
     this.isWatched = isWatched;
     this.isPinned = isPinned;
     this.isDisabled = isJobColorDisabled(color);
-    this.id = JobTreeItem.buildId(environment, jobUrl);
+    this.id = JobTreeItem.buildId(environment, jobUrl, jobScope);
     this.contextValue = buildJobContextValue("jobItem", isWatched, isPinned, this.isDisabled);
     this.description = formatJobDescription({
       status: formatJobColor(color),
@@ -238,8 +293,12 @@ export class JobTreeItem extends vscode.TreeItem {
 }
 
 export class PipelineTreeItem extends vscode.TreeItem {
-  static buildId(environment: JenkinsEnvironmentRef, jobUrl: string): string {
-    return `pipeline:${environment.scope}:${environment.environmentId}:${jobUrl}`;
+  static buildId(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return `pipeline:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${jobUrl}`;
   }
 
   public readonly isWatched: boolean;
@@ -250,6 +309,7 @@ export class PipelineTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
     public readonly jobUrl: string,
+    public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
     color?: string,
     isWatched = false,
     isPinned = false
@@ -258,7 +318,7 @@ export class PipelineTreeItem extends vscode.TreeItem {
     this.isWatched = isWatched;
     this.isPinned = isPinned;
     this.isDisabled = isJobColorDisabled(color);
-    this.id = PipelineTreeItem.buildId(environment, jobUrl);
+    this.id = PipelineTreeItem.buildId(environment, jobUrl, jobScope);
     this.contextValue = buildJobContextValue("pipelineItem", isWatched, isPinned, this.isDisabled);
     this.description = formatJobDescription({
       status: formatJobColor(color),
@@ -292,8 +352,12 @@ function buildJobContextValue(
 }
 
 export class BuildTreeItem extends vscode.TreeItem {
-  static buildId(environment: JenkinsEnvironmentRef, buildUrl: string): string {
-    return `build:${environment.scope}:${environment.environmentId}:${buildUrl}`;
+  static buildId(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return `build:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${buildUrl}`;
   }
 
   public readonly buildUrl: string;
@@ -305,6 +369,7 @@ export class BuildTreeItem extends vscode.TreeItem {
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     build: JenkinsBuild,
+    public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
     tooltipOptions?: BuildTooltipOptions,
     jobNameHint?: string,
     awaitingInput = false
@@ -316,7 +381,7 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.isBuilding = Boolean(build.building);
     this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
-    this.id = BuildTreeItem.buildId(environment, build.url);
+    this.id = BuildTreeItem.buildId(environment, build.url, jobScope);
     const contextParts = [this.isBuilding ? "buildRunning" : "build"];
     if (this.awaitingInput) {
       contextParts.push("awaitingInput");
@@ -334,14 +399,19 @@ export class BuildTreeItem extends vscode.TreeItem {
 }
 
 export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
-  static buildId(environment: JenkinsEnvironmentRef, buildUrl: string): string {
-    return `buildArtifacts:${environment.scope}:${environment.environmentId}:${buildUrl}`;
+  static buildId(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return `buildArtifacts:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${buildUrl}`;
   }
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
     public readonly buildUrl: string,
     public readonly buildNumber: number,
+    public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
     public readonly jobNameHint?: string,
     artifactCount?: number
   ) {
@@ -352,7 +422,7 @@ export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
         ? vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None
     );
-    this.id = BuildArtifactsFolderTreeItem.buildId(environment, buildUrl);
+    this.id = BuildArtifactsFolderTreeItem.buildId(environment, buildUrl, jobScope);
     this.contextValue = "artifactFolder";
     this.iconPath = new vscode.ThemeIcon("folder");
     if (typeof artifactCount === "number") {

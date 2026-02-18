@@ -2,14 +2,30 @@ import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
+import type {
+  FullEnvironmentRefreshRequest,
+  InvalidateBuildArtifactsRequest,
+  JenkinsWorkbenchTreeDataProvider,
+  RefreshViewOnlyRequest
+} from "../tree/TreeDataProvider";
 import { syncNoEnvironmentsContext } from "./contextKeys";
 
-export interface ExtensionRefreshHost {
-  refreshEnvironment(environmentId?: string): void;
+export type RefreshExecutionResult = { executed: boolean };
+export type FullEnvironmentRefreshHost = {
+  fullEnvironmentRefresh(request?: FullEnvironmentRefreshRequest): RefreshExecutionResult;
+};
+export type EnvironmentScopedRefreshHost = {
+  fullEnvironmentRefresh(request: { environmentId: string }): RefreshExecutionResult;
+};
+
+export type HostInvalidateBuildArtifactsRequest = InvalidateBuildArtifactsRequest;
+
+export interface ExtensionRefreshHost extends FullEnvironmentRefreshHost {
+  refreshQueueOnly(environment: JenkinsEnvironmentRef): void;
+  invalidateBuildArtifacts(request: HostInvalidateBuildArtifactsRequest): void;
+  refreshViewOnly(request?: RefreshViewOnlyRequest): void;
   onEnvironmentRemoved?(environment: JenkinsEnvironmentRef): void;
   onDidRefreshEnvironment?: vscode.Event<string | undefined>;
-  signalEnvironmentRefresh?(environmentId?: string): void;
 }
 
 export function createExtensionRefreshHost(
@@ -36,16 +52,26 @@ export function createExtensionRefreshHost(
   };
 
   return {
-    refreshEnvironment: (environmentId?: string) => {
-      treeDataProvider.onEnvironmentChanged(environmentId);
-      void updateQueueEnvironment(environmentId);
+    fullEnvironmentRefresh: (request?: FullEnvironmentRefreshRequest) => {
+      const executed = treeDataProvider.fullEnvironmentRefresh(request);
+      if (!executed) {
+        return { executed: false };
+      }
+      void updateQueueEnvironment(request?.environmentId);
       void syncNoEnvironmentsContext(environmentStore);
-      refreshEmitter.fire(environmentId);
+      refreshEmitter.fire(request?.environmentId);
+      return { executed: true };
+    },
+    refreshQueueOnly: (environment) => {
+      treeDataProvider.refreshQueueOnly(environment);
+    },
+    invalidateBuildArtifacts: (request) => {
+      treeDataProvider.invalidateBuildArtifacts(request);
+    },
+    refreshViewOnly: (request?: RefreshViewOnlyRequest) => {
+      treeDataProvider.refreshViewOnly(request);
     },
     onDidRefreshEnvironment: refreshEmitter.event,
-    signalEnvironmentRefresh: (environmentId?: string) => {
-      refreshEmitter.fire(environmentId);
-    },
     onEnvironmentRemoved: (environment: JenkinsEnvironmentRef) =>
       queuePoller.clearEnvironment(environment)
   };

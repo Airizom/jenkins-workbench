@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import { formatActionError } from "../../formatters/ErrorFormatters";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
@@ -12,16 +13,14 @@ interface BuildDetailsPanelActionsOptions {
   controller: BuildDetailsPanelControllerAccess;
   getArtifactActionHandler: () => ArtifactActionHandler | undefined;
   getConsoleExporter: () => BuildConsoleExporter;
-  getRefreshHost: () => { refreshEnvironment(environmentId: string): void } | undefined;
+  getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
 }
 
 export class BuildDetailsPanelActions {
   private readonly controller: BuildDetailsPanelControllerAccess;
   private readonly getArtifactActionHandler: () => ArtifactActionHandler | undefined;
   private readonly getConsoleExporter: () => BuildConsoleExporter;
-  private readonly getRefreshHost: () =>
-    | { refreshEnvironment(environmentId: string): void }
-    | undefined;
+  private readonly getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
 
   constructor(options: BuildDetailsPanelActionsOptions) {
     this.controller = options.controller;
@@ -51,7 +50,7 @@ export class BuildDetailsPanelActions {
       onRefresh: async () => {
         await this.controller.refreshPendingInputs();
         await this.controller.refreshBuildStatus(this.controller.getLoadToken());
-        this.getRefreshHost()?.refreshEnvironment(environmentId);
+        this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
       }
     });
   }
@@ -77,7 +76,7 @@ export class BuildDetailsPanelActions {
       onRefresh: async () => {
         await this.controller.refreshPendingInputs();
         await this.controller.refreshBuildStatus(this.controller.getLoadToken());
-        this.getRefreshHost()?.refreshEnvironment(environmentId);
+        this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
       }
     });
   }
@@ -141,7 +140,7 @@ export class BuildDetailsPanelActions {
       void vscode.window.showInformationMessage(
         `Requested restart from stage "${stageName}" for ${label}.`
       );
-      this.getRefreshHost()?.refreshEnvironment(environmentId);
+      this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
     } catch (error) {
       void vscode.window.showErrorMessage(
         `Failed to restart ${label} from stage "${stageName}": ${formatActionError(error)}`

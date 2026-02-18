@@ -2,7 +2,7 @@ import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 
 export interface JenkinsQueuePollerHost {
-  refreshQueueView(environment: JenkinsEnvironmentRef): void;
+  refreshQueueOnly(environment: JenkinsEnvironmentRef): void;
 }
 
 const DEFAULT_POLL_INTERVAL_SECONDS = 10;
@@ -111,7 +111,7 @@ export class JenkinsQueuePoller implements vscode.Disposable {
     this.isPolling = true;
     try {
       for (const environment of this.expandedEnvironments.values()) {
-        this.host.refreshQueueView(environment);
+        this.host.refreshQueueOnly(environment);
       }
     } finally {
       this.isPolling = false;

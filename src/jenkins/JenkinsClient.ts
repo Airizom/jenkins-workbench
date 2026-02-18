@@ -27,9 +27,10 @@ import type {
   JenkinsProgressiveConsoleText,
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
-  ScanMultibranchResult,
   JenkinsTestReport,
-  JenkinsWorkflowRun
+  JenkinsView,
+  JenkinsWorkflowRun,
+  ScanMultibranchResult
 } from "./types";
 
 export type {
@@ -59,10 +60,11 @@ export type {
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
   JenkinsRestartFromStageInfo,
-  ScanMultibranchResult,
   JenkinsTestReport,
+  JenkinsView,
   JenkinsTestSummaryAction,
-  JenkinsWorkflowRun
+  JenkinsWorkflowRun,
+  ScanMultibranchResult
 } from "./types";
 
 export type {
@@ -93,8 +95,20 @@ export class JenkinsClient {
     return this.jobsApi.getRootJobs();
   }
 
+  async getViews(): Promise<JenkinsView[]> {
+    return this.jobsApi.getViews();
+  }
+
   async getFolderJobs(folderUrl: string): Promise<JenkinsJob[]> {
     return this.jobsApi.getFolderJobs(folderUrl);
+  }
+
+  async getFolderJobsInView(folderUrl: string, viewUrl: string): Promise<JenkinsJob[]> {
+    return this.jobsApi.getFolderJobsInView(folderUrl, viewUrl);
+  }
+
+  async getViewJobs(viewUrl: string): Promise<JenkinsJob[]> {
+    return this.jobsApi.getViewJobs(viewUrl);
   }
 
   async getJob(jobUrl: string): Promise<JenkinsJob> {

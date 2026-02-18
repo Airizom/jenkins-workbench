@@ -15,70 +15,79 @@ export function registerExtensionCommands(
   context: vscode.ExtensionContext,
   container: ExtensionContainer
 ): void {
+  const environmentStore = container.get("environmentStore");
+  const presetStore = container.get("presetStore");
+  const watchStore = container.get("watchStore");
+  const pinStore = container.get("pinStore");
+  const clientProvider = container.get("clientProvider");
+  const dataService = container.get("dataService");
+  const artifactActionHandler = container.get("artifactActionHandler");
+  const buildLogPreviewer = container.get("buildLogPreviewer");
+  const consoleExporter = container.get("consoleExporter");
+  const queuedBuildWaiter = container.get("queuedBuildWaiter");
+  const pendingInputCoordinator = container.get("pendingInputCoordinator");
+  const viewStateStore = container.get("viewStateStore");
+  const treeNavigator = container.get("treeNavigator");
+  const treeDataProvider = container.get("treeDataProvider");
+  const treeExpansionState = container.get("treeExpansionState");
+  const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
+  const jenkinsfileEnvironmentResolver = container.get("jenkinsfileEnvironmentResolver");
+  const jobConfigPreviewer = container.get("jobConfigPreviewer");
+  const jobConfigDraftManager = container.get("jobConfigDraftManager");
+  const jobConfigUpdateWorkflow = container.get("jobConfigUpdateWorkflow");
   const refreshHost = container.get("refreshHost");
 
   registerEnvironmentCommands(
     context,
-    container.get("environmentStore"),
-    container.get("presetStore"),
-    container.get("watchStore"),
-    container.get("pinStore"),
-    container.get("clientProvider"),
+    environmentStore,
+    presetStore,
+    watchStore,
+    pinStore,
+    clientProvider,
     refreshHost
   );
 
   registerBuildCommands(
     context,
-    container.get("dataService"),
-    container.get("presetStore"),
-    container.get("artifactActionHandler"),
-    container.get("buildLogPreviewer"),
-    container.get("consoleExporter"),
-    container.get("queuedBuildWaiter"),
-    container.get("pendingInputCoordinator"),
+    dataService,
+    presetStore,
+    artifactActionHandler,
+    buildLogPreviewer,
+    consoleExporter,
+    queuedBuildWaiter,
+    pendingInputCoordinator,
     refreshHost
   );
 
   registerJobCommands(
     context,
-    container.get("dataService"),
-    container.get("environmentStore"),
-    container.get("jobConfigPreviewer"),
+    dataService,
+    environmentStore,
+    jobConfigPreviewer,
     refreshHost,
-    container.get("jobConfigDraftManager"),
-    container.get("jobConfigUpdateWorkflow"),
-    container.get("presetStore"),
-    container.get("pinStore"),
-    container.get("watchStore")
+    jobConfigDraftManager,
+    jobConfigUpdateWorkflow,
+    presetStore,
+    pinStore,
+    watchStore
   );
 
-  registerNodeCommands(context, container.get("dataService"), refreshHost);
+  registerNodeCommands(context, dataService, refreshHost);
 
-  registerQueueCommands(context, container.get("dataService"), refreshHost);
+  registerQueueCommands(context, dataService, refreshHost);
 
-  registerWatchCommands(context, container.get("watchStore"), refreshHost);
+  registerWatchCommands(context, watchStore, refreshHost);
 
-  registerPinCommands(context, container.get("pinStore"), refreshHost);
+  registerPinCommands(context, pinStore, refreshHost);
 
-  registerSearchCommands(
-    context,
-    container.get("environmentStore"),
-    container.get("dataService"),
-    container.get("viewStateStore"),
-    container.get("treeNavigator")
-  );
+  registerSearchCommands(context, environmentStore, dataService, viewStateStore, treeNavigator);
 
-  registerRefreshCommands(
-    context,
-    container.get("treeDataProvider"),
-    container.get("treeExpansionState"),
-    refreshHost
-  );
+  registerRefreshCommands(context, treeDataProvider, treeExpansionState, refreshHost);
 
   registerJenkinsfileCommands(
     context,
-    container.get("jenkinsfileValidationCoordinator"),
-    container.get("jenkinsfileEnvironmentResolver"),
-    container.get("environmentStore")
+    jenkinsfileValidationCoordinator,
+    jenkinsfileEnvironmentResolver,
+    environmentStore
   );
 }

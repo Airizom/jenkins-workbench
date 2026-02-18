@@ -1,17 +1,18 @@
 import { useEffect } from "react";
 import type { Dispatch } from "react";
-import type { NodeDetailsAction, NodeDetailsIncomingMessage } from "../state/nodeDetailsState";
+import { parseNodeDetailsOutgoingMessage } from "../../shared/NodeDetailsPanelMessages";
+import type { NodeDetailsAction } from "../state/nodeDetailsState";
 
 export function useNodeDetailsMessages(dispatch: Dispatch<NodeDetailsAction>): void {
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>) => {
-      const message = event.data as NodeDetailsIncomingMessage | null;
-      if (!message || typeof message !== "object") {
+      const message = parseNodeDetailsOutgoingMessage(event.data);
+      if (!message) {
         return;
       }
       switch (message.type) {
         case "setLoading":
-          dispatch({ type: "setLoading", value: Boolean(message.value) });
+          dispatch({ type: "setLoading", value: message.value });
           break;
         case "updateNodeDetails":
           dispatch({ type: "updateNodeDetails", payload: message });

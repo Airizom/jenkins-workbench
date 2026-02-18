@@ -1,7 +1,10 @@
-import type {
-  JenkinsRestartFromStageActionResponse,
-  JenkinsRestartFromStageInfo
-} from "../types";
+import type { JenkinsRestartFromStageActionResponse, JenkinsRestartFromStageInfo } from "../types";
+
+type RestartFromStagePayload = JenkinsRestartFromStageActionResponse & {
+  restartEnabled?: unknown;
+  restartableStages?: unknown;
+  status?: unknown;
+};
 
 export interface RestartPipelineAttemptResult {
   success: boolean;
@@ -10,6 +13,22 @@ export interface RestartPipelineAttemptResult {
 }
 
 export class RestartFromStageResponseParser {
+  private static readonly MISSING_ENDPOINT_MESSAGE = "The restart endpoint is unavailable.";
+  private static readonly UNEXPECTED_RESPONSE_MESSAGE =
+    "Unexpected response from Jenkins restart endpoint.";
+  private static readonly REJECTED_RESPONSE_MESSAGE = "Jenkins rejected the restart request.";
+  private static readonly OK_STATUSES = new Set(["ok", "success"]);
+  private static readonly FAILURE_MARKERS = [
+    "error",
+    "exception",
+    "not found",
+    "forbidden",
+    "unauthorized",
+    "access denied",
+    "invalid",
+    "csrf"
+  ];
+
   parseRestartFromStageInfo(response: unknown): JenkinsRestartFromStageInfo {
     const payload = this.unwrapJenkinsResponse(response);
     const restartableStages = this.parseStringArray(payload.restartableStages);
@@ -22,65 +41,62 @@ export class RestartFromStageResponseParser {
   }
 
   parseRestartPipelineResponse(responseText: string): RestartPipelineAttemptResult {
-    if (this.isMissingRestartEndpointResponse(responseText)) {
-      return {
-        success: false,
-        message: "The restart endpoint is unavailable.",
-        missingEndpoint: true
-      };
+    const trimmedResponse = responseText.trim();
+    if (this.isMissingRestartEndpointResponse(trimmedResponse)) {
+      return this.failureResult(RestartFromStageResponseParser.MISSING_ENDPOINT_MESSAGE, true);
     }
-    const parsed = this.tryParseJson(responseText);
-    if (!parsed) {
-      const message = responseText.trim();
-      if (this.isLikelySuccessfulRestartResponse(message)) {
-        return {
-          success: true,
-          message: message.length > 0 ? message : undefined,
-          missingEndpoint: false
-        };
-      }
-      return {
-        success: false,
-        message: message.length > 0 ? message : "Unexpected response from Jenkins restart endpoint.",
-        missingEndpoint: false
-      };
+
+    const parsed = this.tryParseJson(trimmedResponse);
+    if (parsed === undefined) {
+      return this.parsePlainTextRestartResponse(trimmedResponse);
     }
+
     const response = this.unwrapJenkinsResponse(parsed);
     const success = this.parseBoolean(response.success);
     const message = this.parseString(response.message);
     if (success === true) {
-      return { success: true, message, missingEndpoint: false };
+      return this.successResult(message);
     }
     if (success === false) {
-      return {
-        success: false,
-        message: message ?? "Jenkins rejected the restart request.",
-        missingEndpoint: false
-      };
+      return this.failureResult(
+        message ?? RestartFromStageResponseParser.REJECTED_RESPONSE_MESSAGE
+      );
     }
-    const status = this.parseString(this.asRecord(parsed)?.status);
-    if (status && status.toLowerCase() === "ok" && (!message || message.toLowerCase() === "ok")) {
-      return { success: true, message, missingEndpoint: false };
+
+    const status = this.parseString(response.status);
+    if (this.isSuccessStatus(status) && (!message || this.isSuccessStatus(message))) {
+      return this.successResult(message);
     }
-    return {
-      success: false,
-      message: message ?? "Unexpected response from Jenkins restart endpoint.",
-      missingEndpoint: false
-    };
+
+    return this.failureResult(
+      message ?? RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE
+    );
   }
 
-  private unwrapJenkinsResponse(value: unknown): JenkinsRestartFromStageActionResponse & {
-    restartEnabled?: unknown;
-    restartableStages?: unknown;
-  } {
+  private parsePlainTextRestartResponse(responseText: string): RestartPipelineAttemptResult {
+    const message = responseText || undefined;
+    if (this.isLikelySuccessfulRestartResponse(responseText)) {
+      return this.successResult(message);
+    }
+    return this.failureResult(
+      message ?? RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE
+    );
+  }
+
+  private unwrapJenkinsResponse(value: unknown): RestartFromStagePayload {
     const record = this.asRecord(value);
     if (!record) {
       return {};
     }
+
     const wrapped = this.asRecord(record.data);
     if (wrapped) {
-      return wrapped;
+      return {
+        ...record,
+        ...wrapped
+      };
     }
+
     return record;
   }
 
@@ -112,15 +128,17 @@ export class RestartFromStageResponseParser {
     if (!Array.isArray(value)) {
       return [];
     }
+    const seen = new Set<string>();
     const stages: string[] = [];
     for (const entry of value) {
       if (typeof entry !== "string") {
         continue;
       }
       const trimmed = entry.trim();
-      if (trimmed.length === 0 || stages.includes(trimmed)) {
+      if (trimmed.length === 0 || seen.has(trimmed)) {
         continue;
       }
+      seen.add(trimmed);
       stages.push(trimmed);
     }
     return stages;
@@ -134,53 +152,69 @@ export class RestartFromStageResponseParser {
   }
 
   private tryParseJson(value: string): unknown | undefined {
-    const trimmed = value.trim();
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    if (!value.startsWith("{") && !value.startsWith("[")) {
       return undefined;
     }
     try {
-      return JSON.parse(trimmed);
+      return JSON.parse(value);
     } catch {
       return undefined;
     }
   }
 
   private isMissingRestartEndpointResponse(responseText: string): boolean {
-    const trimmed = responseText.trim();
-    if (!trimmed) {
+    if (!responseText) {
       return false;
     }
-    const lower = trimmed.toLowerCase();
-    const hasHtml = lower.startsWith("<!doctype") || lower.startsWith("<html");
-    const has404 = /\b404\b/.test(lower);
-    const hasNotFound = lower.includes("not found");
-    const hasHttpError = lower.includes("http error");
-    return hasHtml && has404 ? true : (has404 && hasNotFound) || (has404 && hasHttpError);
+
+    const normalized = responseText.toLowerCase();
+    const hasHtml = this.isHtmlDocument(normalized);
+    const has404 = /\b404\b/.test(normalized);
+    const hasNotFound = normalized.includes("not found");
+    const hasHttpError = normalized.includes("http error");
+    return (hasHtml && has404) || (has404 && (hasNotFound || hasHttpError));
   }
 
   private isLikelySuccessfulRestartResponse(trimmedResponse: string): boolean {
     if (!trimmedResponse) {
       return true;
     }
+
     const normalized = trimmedResponse.toLowerCase();
-    if (normalized === "ok" || normalized === "success") {
+    if (this.isSuccessStatus(normalized)) {
       return true;
     }
-    const isHtmlResponse =
-      normalized.startsWith("<!doctype") || normalized.startsWith("<html");
-    if (!isHtmlResponse) {
+
+    if (!this.isHtmlDocument(normalized)) {
       return false;
     }
-    const failureMarkers = [
-      "error",
-      "exception",
-      "not found",
-      "forbidden",
-      "unauthorized",
-      "access denied",
-      "invalid",
-      "csrf"
-    ];
-    return !failureMarkers.some((marker) => normalized.includes(marker));
+
+    return !RestartFromStageResponseParser.FAILURE_MARKERS.some((marker) =>
+      normalized.includes(marker)
+    );
+  }
+
+  private isHtmlDocument(value: string): boolean {
+    return value.startsWith("<!doctype") || value.startsWith("<html");
+  }
+
+  private isSuccessStatus(value: string | undefined): boolean {
+    return value ? RestartFromStageResponseParser.OK_STATUSES.has(value.toLowerCase()) : false;
+  }
+
+  private successResult(message?: string): RestartPipelineAttemptResult {
+    return {
+      success: true,
+      message,
+      missingEndpoint: false
+    };
+  }
+
+  private failureResult(message: string, missingEndpoint = false): RestartPipelineAttemptResult {
+    return {
+      success: false,
+      message,
+      missingEndpoint
+    };
   }
 }

@@ -77,6 +77,7 @@ async function goToJob(
   const cancellationSource = new vscode.CancellationTokenSource();
   const picks: JobQuickPickItem[] = [];
   let pending = environments.length;
+  let loadFailedCount = 0;
 
   quickPick.placeholder = "Search jobs across all Jenkins environments";
   quickPick.matchOnDescription = true;
@@ -84,7 +85,7 @@ async function goToJob(
   quickPick.busy = true;
 
   quickPick.onDidAccept(async () => {
-    const selection = quickPick.selectedItems.at(0);
+    const selection = quickPick.selectedItems[0];
     if (!selection) {
       return;
     }
@@ -105,6 +106,25 @@ async function goToJob(
   quickPick.show();
 
   const searchOptions = getJobSearchTuningOptions();
+  const onLoadCompleted = (): void => {
+    pending -= 1;
+    if (cancellationSource.token.isCancellationRequested || pending > 0) {
+      return;
+    }
+
+    quickPick.busy = false;
+
+    if (picks.length === 0) {
+      void vscode.window.showInformationMessage("No jobs found with current search settings.");
+      return;
+    }
+
+    if (loadFailedCount > 0) {
+      void vscode.window.showWarningMessage(
+        `Failed to load jobs from ${loadFailedCount} Jenkins environment(s).`
+      );
+    }
+  };
 
   for (const environment of environments) {
     const envRef = toEnvironmentRef(environment);
@@ -133,26 +153,16 @@ async function goToJob(
       quickPick.items = picks;
     };
     void loadEnvironmentJobs(dataService, envRef, cancellationToken, searchOptions, appendEntries)
-      .then((entries) => {
-        appendEntries(entries);
-      })
       .catch((error) => {
         if (error instanceof CancellationError || error instanceof vscode.CancellationError) {
           return;
         }
+        loadFailedCount += 1;
         void vscode.window.showWarningMessage(
           `Unable to load jobs for ${envRef.url}: ${formatError(error)}`
         );
       })
-      .finally(() => {
-        pending -= 1;
-        if (cancellationSource.token.isCancellationRequested) {
-          return;
-        }
-        if (pending <= 0) {
-          quickPick.busy = false;
-        }
-      });
+      .finally(onLoadCompleted);
   }
 }
 
@@ -162,8 +172,7 @@ async function loadEnvironmentJobs(
   cancellation: vscode.CancellationToken,
   searchOptions: JobSearchOptions,
   onBatch: (entries: JobSearchEntry[]) => void
-): Promise<JobSearchEntry[]> {
-  const entries: JobSearchEntry[] = [];
+): Promise<void> {
   for await (const batch of dataService.iterateJobsForEnvironment(environment, {
     cancellation,
     maxResults: MAX_JOB_RESULTS,
@@ -171,9 +180,7 @@ async function loadEnvironmentJobs(
     ...searchOptions
   })) {
     onBatch(batch);
-    entries.push(...batch);
   }
-  return entries;
 }
 
 function getJobSearchTuningOptions(): JobSearchOptions {

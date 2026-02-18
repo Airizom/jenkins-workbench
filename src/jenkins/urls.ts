@@ -62,6 +62,19 @@ export function buildJobUrl(parentUrl: string, jobName: string): string {
   return `${base}job/${encodeURIComponent(jobName)}/`;
 }
 
+export function buildViewScopedJobUrl(viewUrl: string, jobUrl: string): string {
+  const parsed = parseJobUrl(jobUrl);
+  if (!parsed) {
+    return jobUrl;
+  }
+
+  let scopedUrl = viewUrl;
+  for (const segment of parsed.fullPath) {
+    scopedUrl = buildJobUrl(scopedUrl, segment);
+  }
+  return scopedUrl;
+}
+
 export function buildApiUrlFromBase(baseUrl: string, path: string, tree?: string): string {
   const base = ensureTrailingSlash(baseUrl);
   const url = new URL(path, base);

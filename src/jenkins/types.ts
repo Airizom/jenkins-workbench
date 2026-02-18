@@ -28,6 +28,11 @@ export interface JenkinsJob {
   lastBuild?: JenkinsBuildSummary;
 }
 
+export interface JenkinsView {
+  name: string;
+  url: string;
+}
+
 export interface JenkinsBuildSummary {
   number: number;
   url?: string;

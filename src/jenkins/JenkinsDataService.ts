@@ -20,9 +20,11 @@ import type {
   BuildParameterRequestPreparer,
   ConsoleTextResult,
   ConsoleTextTailResult,
+  JenkinsJobCollectionRequest,
   JenkinsJobInfo,
   JenkinsNodeInfo,
   JenkinsQueueItemInfo,
+  JenkinsViewInfo,
   JobParameter,
   JobSearchEntry,
   JobSearchOptions,
@@ -48,9 +50,11 @@ export type {
   CancellationSignal,
   ConsoleTextResult,
   ConsoleTextTailResult,
+  JenkinsJobCollectionRequest,
   JenkinsJobInfo,
   JenkinsNodeInfo,
   JenkinsQueueItemInfo,
+  JenkinsViewInfo,
   JobParameter,
   JobParameterKind,
   PendingInputAction,
@@ -120,6 +124,32 @@ export class JenkinsDataService {
     folderUrl: string
   ): Promise<JenkinsJobInfo[]> {
     return this.jobOperations.getJobsForFolder(environment, folderUrl);
+  }
+
+  async getJobCollection(
+    environment: JenkinsEnvironmentRef,
+    request: JenkinsJobCollectionRequest
+  ): Promise<JenkinsJobInfo[]> {
+    return this.jobOperations.getJobCollection(environment, request);
+  }
+
+  async getViewsForEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsViewInfo[]> {
+    return this.jobOperations.getViewsForEnvironment(environment);
+  }
+
+  async getJobsForView(
+    environment: JenkinsEnvironmentRef,
+    viewUrl: string
+  ): Promise<JenkinsJobInfo[]> {
+    return this.jobOperations.getJobsForView(environment, viewUrl);
+  }
+
+  async getJobsForFolderInView(
+    environment: JenkinsEnvironmentRef,
+    folderUrl: string,
+    viewUrl: string
+  ): Promise<JenkinsJobInfo[]> {
+    return this.jobOperations.getJobsForFolderInView(environment, folderUrl, viewUrl);
   }
 
   async getAllJobsForEnvironment(

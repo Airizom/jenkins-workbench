@@ -14,6 +14,7 @@ import {
   getPollIntervalSeconds,
   getQueuePollIntervalSeconds,
   getRequestTimeoutMs,
+  getTreeViewCurationOptions,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
 import { activateRuntime } from "./ExtensionRuntime";
@@ -28,6 +29,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const requestTimeoutMs = getRequestTimeoutMs(config);
   const buildTooltipOptions = getBuildTooltipOptions(config);
   const buildListFetchOptions = getBuildListFetchOptions(config);
+  const treeViewCurationOptions = getTreeViewCurationOptions(config);
   const artifactPreviewCacheMaxEntries = getArtifactPreviewCacheMaxEntries(config);
   const artifactPreviewCacheMaxBytes = getArtifactPreviewCacheMaxBytes(config);
   const artifactPreviewCacheTtlMs = getArtifactPreviewCacheTtlMs(config);
@@ -49,6 +51,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     requestTimeoutMs,
     buildTooltipOptions,
     buildListFetchOptions,
+    treeViewCurationOptions,
     artifactActionOptionsProvider,
     artifactPreviewOptionsProvider,
     artifactPreviewCacheOptions: {

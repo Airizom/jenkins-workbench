@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
-import { formatActionError } from "../formatters/ErrorFormatters";
 
 export type NodeActionTarget = {
   environment: JenkinsEnvironmentRef;
@@ -10,9 +11,7 @@ export type NodeActionTarget = {
   label: string;
 };
 
-export interface NodeActionRefreshHost {
-  refreshEnvironment(environmentId: string): void;
-}
+export interface NodeActionRefreshHost extends EnvironmentScopedRefreshHost {}
 
 export class NodeActionService {
   constructor(private readonly dataService: JenkinsDataService) {}
@@ -47,7 +46,7 @@ export class NodeActionService {
             `${target.label} did not enter a temporary offline state.`
           );
         }
-        refreshHost?.refreshEnvironment(target.environment.environmentId);
+        refreshHost?.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
         return true;
       }
       void vscode.window.showInformationMessage(`${target.label} is already offline.`);
@@ -84,7 +83,7 @@ export class NodeActionService {
         } else {
           void vscode.window.showInformationMessage(`Brought ${target.label} online.`);
         }
-        refreshHost?.refreshEnvironment(target.environment.environmentId);
+        refreshHost?.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
         return true;
       }
       if (result.status === "not_temporarily_offline") {
@@ -121,7 +120,7 @@ export class NodeActionService {
         } else {
           void vscode.window.showInformationMessage(`Launched ${target.label}.`);
         }
-        refreshHost?.refreshEnvironment(target.environment.environmentId);
+        refreshHost?.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
         return true;
       }
       if (result.status === "not_launchable") {

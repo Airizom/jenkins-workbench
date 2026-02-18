@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { NodeDetailsPanel } from "../../panels/NodeDetailsPanel";
-import { NodeTreeItem } from "../../tree/TreeItems";
-import { formatActionError, getTreeItemLabel } from "../CommandUtils";
-import type { NodeCommandRefreshHost, NodeCommandTarget } from "./NodeCommandTypes";
 import { NodeActionService, type NodeActionTarget } from "../../services/NodeActionService";
+import { NodeTreeItem } from "../../tree/TreeItems";
+import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
+import type { NodeCommandRefreshHost, NodeCommandTarget } from "./NodeCommandTypes";
 
 export async function showNodeDetails(
   dataService: JenkinsDataService,
@@ -12,29 +12,28 @@ export async function showNodeDetails(
   extensionUri: vscode.Uri,
   item?: NodeTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a node to view details.");
+  const selected = requireSelection(item, "Select a node to view details.");
+  if (!selected) {
     return;
   }
-  if (!item.nodeUrl) {
+  if (!selected.nodeUrl) {
     void vscode.window.showInformationMessage(
       "That node does not expose a stable URL in the Jenkins API."
     );
     return;
   }
+  const nodeUrl = selected.nodeUrl;
 
-  try {
-    await NodeDetailsPanel.show(
+  await withActionErrorMessage("Unable to open node details", async () => {
+    await NodeDetailsPanel.show({
       dataService,
-      item.environment,
-      item.nodeUrl,
+      environment: selected.environment,
+      nodeUrl,
       extensionUri,
-      getTreeItemLabel(item),
+      label: getTreeItemLabel(selected),
       refreshHost
-    );
-  } catch (error) {
-    void vscode.window.showErrorMessage(`Unable to open node details: ${formatActionError(error)}`);
-  }
+    });
+  });
 }
 
 export async function takeNodeOffline(
@@ -80,37 +79,35 @@ function resolveNodeActionTarget(
   item: NodeTreeItem | NodeCommandTarget | undefined,
   actionLabel: string
 ): NodeActionTarget | undefined {
-  if (!item) {
+  const selected = requireSelection(item, `Select a node to ${actionLabel}.`);
+  if (!selected) {
+    return undefined;
+  }
+
+  if (!isNodeCommandTarget(selected)) {
     void vscode.window.showInformationMessage(`Select a node to ${actionLabel}.`);
     return undefined;
   }
-  if (item instanceof NodeTreeItem) {
-    if (!item.nodeUrl) {
-      void vscode.window.showInformationMessage(
-        "That node does not expose a stable URL in the Jenkins API."
-      );
-      return undefined;
-    }
-    return {
-      label: getTreeItemLabel(item),
-      nodeUrl: item.nodeUrl,
-      environment: item.environment
-    };
-  }
-  if (!isNodeCommandTarget(item)) {
-    void vscode.window.showInformationMessage(`Select a node to ${actionLabel}.`);
-    return undefined;
-  }
-  if (!item.nodeUrl) {
+
+  if (!selected.nodeUrl) {
     void vscode.window.showInformationMessage(
       "That node does not expose a stable URL in the Jenkins API."
     );
     return undefined;
   }
+
+  if (selected instanceof NodeTreeItem) {
+    return {
+      label: getTreeItemLabel(selected),
+      nodeUrl: selected.nodeUrl,
+      environment: selected.environment
+    };
+  }
+
   return {
-    label: item.label?.trim() || item.nodeUrl,
-    nodeUrl: item.nodeUrl,
-    environment: item.environment
+    label: selected.label?.trim() || selected.nodeUrl,
+    nodeUrl: selected.nodeUrl,
+    environment: selected.environment
   };
 }
 

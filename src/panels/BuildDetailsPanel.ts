@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -15,7 +16,7 @@ import type {
   PendingInputActionProvider
 } from "./buildDetails/BuildDetailsPollingController";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
+import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
   type SerializedEnvironmentState,
@@ -27,11 +28,23 @@ interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
   buildUrl: string;
 }
 
+interface BuildDetailsPanelShowOptions {
+  dataService: BuildDetailsDataService;
+  artifactActionHandler: ArtifactActionHandler;
+  consoleExporter: BuildConsoleExporter;
+  refreshHost: EnvironmentScopedRefreshHost | undefined;
+  pendingInputProvider: PendingInputActionProvider | undefined;
+  environment: JenkinsEnvironmentRef;
+  buildUrl: string;
+  extensionUri: vscode.Uri;
+  label?: string;
+}
+
 interface BuildDetailsPanelReviveOptions {
   dataService: BuildDetailsDataService;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
-  refreshHost: { refreshEnvironment(environmentId: string): void } | undefined;
+  refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: PendingInputActionProvider | undefined;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
@@ -66,19 +79,11 @@ export class BuildDetailsPanel {
   private readonly messageRouter: BuildDetailsMessageRouter;
   private readonly disposables: vscode.Disposable[] = [];
   private artifactActionHandler?: ArtifactActionHandler;
-  private refreshHost?: { refreshEnvironment(environmentId: string): void };
+  private refreshHost?: EnvironmentScopedRefreshHost;
 
-  static async show(
-    dataService: BuildDetailsDataService,
-    artifactActionHandler: ArtifactActionHandler,
-    consoleExporter: BuildConsoleExporter,
-    refreshHost: { refreshEnvironment(environmentId: string): void } | undefined,
-    pendingInputProvider: PendingInputActionProvider | undefined,
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    extensionUri: vscode.Uri,
-    label?: string
-  ): Promise<void> {
+  static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
+    const { dataService, artifactActionHandler, consoleExporter, refreshHost, pendingInputProvider, environment, buildUrl, extensionUri, label } = options;
+
     if (!BuildDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
         "jenkinsWorkbench.buildDetails",
@@ -95,9 +100,7 @@ export class BuildDetailsPanel {
     }
 
     const activePanel = BuildDetailsPanel.currentPanel;
-    activePanel.consoleExporter = consoleExporter;
-    activePanel.refreshHost = refreshHost;
-    activePanel.controller.setPendingInputProvider(pendingInputProvider);
+    activePanel.configure(consoleExporter, refreshHost, pendingInputProvider);
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
@@ -112,9 +115,7 @@ export class BuildDetailsPanel {
 
     const revived = new BuildDetailsPanel(panel, options.extensionUri, options.consoleExporter);
     BuildDetailsPanel.currentPanel = revived;
-    revived.consoleExporter = options.consoleExporter;
-    revived.refreshHost = options.refreshHost;
-    revived.controller.setPendingInputProvider(options.pendingInputProvider);
+    revived.configure(options.consoleExporter, options.refreshHost, options.pendingInputProvider);
 
     if (!isBuildDetailsPanelState(state)) {
       revived.renderRestoreError(
@@ -217,6 +218,16 @@ export class BuildDetailsPanel {
     }
   }
 
+  private configure(
+    consoleExporter: BuildConsoleExporter,
+    refreshHost: EnvironmentScopedRefreshHost | undefined,
+    pendingInputProvider: PendingInputActionProvider | undefined
+  ): void {
+    this.consoleExporter = consoleExporter;
+    this.refreshHost = refreshHost;
+    this.controller.setPendingInputProvider(pendingInputProvider);
+  }
+
   private async load(
     dataService: BuildDetailsDataService,
     artifactActionHandler: ArtifactActionHandler,
@@ -272,44 +283,18 @@ export class BuildDetailsPanel {
     const nonce = createNonce();
     let styleUris: string[] = [];
     try {
-      styleUris = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "buildDetails"
-      ).styleUris;
+      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "buildDetails")
+        .styleUris;
     } catch {
-      styleUris = [];
+      // keep empty
     }
-    const stateScript = renderWebviewStateScript(panelState, nonce);
-    this.panel.webview.html = renderWebviewShell(
-      `
-        ${stateScript}
-        <main class="jenkins-workbench-panel-message">
-          <h1>Build Details</h1>
-          <p>${message}</p>
-          <p>Open the build again from Jenkins Workbench to continue.</p>
-        </main>
-        <style nonce="${nonce}">
-          .jenkins-workbench-panel-message {
-            color: var(--vscode-foreground);
-            font-family: var(--vscode-font-family);
-            line-height: 1.5;
-            margin: 32px;
-          }
-          .jenkins-workbench-panel-message h1 {
-            font-size: 20px;
-            margin: 0 0 12px;
-          }
-          .jenkins-workbench-panel-message p {
-            margin: 0 0 8px;
-          }
-        </style>
-      `,
-      {
-        cspSource: this.panel.webview.cspSource,
-        nonce,
-        styleUris
-      }
-    );
+    this.panel.webview.html = renderPanelRestoreErrorHtml(this.panel.webview.cspSource, {
+      nonce,
+      title: "Build Details",
+      message,
+      hint: "Open the build again from Jenkins Workbench to continue.",
+      styleUris,
+      panelState
+    });
   }
 }

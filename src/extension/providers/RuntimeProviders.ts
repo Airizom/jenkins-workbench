@@ -9,7 +9,7 @@ import { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLin
 import { JenkinsWorkbenchDeepLinkJobHandler } from "../JenkinsWorkbenchDeepLinkJobHandler";
 import { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
 import { VscodeStatusNotifier } from "../VscodeStatusNotifier";
-import type { ExtensionContainer } from "../container/ExtensionContainer";
+import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 
 export interface RuntimeProviderOptions {
   extensionUri: vscode.Uri;
@@ -18,15 +18,10 @@ export interface RuntimeProviderOptions {
   queuePollIntervalSeconds: number;
 }
 
-export function registerRuntimeProviders(
-  container: ExtensionContainer,
-  options: RuntimeProviderOptions
-): void {
-  container.register("statusNotifier", () => new VscodeStatusNotifier());
-
-  container.register(
-    "poller",
-    () =>
+export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
+  return {
+    statusNotifier: (_container) => new VscodeStatusNotifier(),
+    poller: (container) =>
       new JenkinsStatusPoller(
         container.get("environmentStore"),
         container.get("dataService"),
@@ -34,37 +29,29 @@ export function registerRuntimeProviders(
         container.get("watchStore"),
         container.get("statusNotifier"),
         {
-          refreshTree: () => container.get("treeDataProvider").onEnvironmentChanged()
+          fullEnvironmentRefresh: () => {
+            container.get("refreshHost").fullEnvironmentRefresh({ trigger: "system" });
+          }
         },
         options.pollIntervalSeconds,
         options.watchErrorThreshold
-      )
-  );
-
-  container.register(
-    "queuePoller",
-    () =>
+      ),
+    queuePoller: (container) =>
       new JenkinsQueuePoller(
         {
-          refreshQueueView: (environment) => {
-            container.get("treeDataProvider").refreshQueueFolder(environment);
+          refreshQueueOnly: (environment) => {
+            container.get("refreshHost").refreshQueueOnly(environment);
           }
         },
         options.queuePollIntervalSeconds
-      )
-  );
-
-  container.register("refreshHost", () =>
-    createExtensionRefreshHost(
-      container.get("environmentStore"),
-      container.get("treeDataProvider"),
-      container.get("queuePoller")
-    )
-  );
-
-  container.register(
-    "buildDeepLinkHandler",
-    () =>
+      ),
+    refreshHost: (container) =>
+      createExtensionRefreshHost(
+        container.get("environmentStore"),
+        container.get("treeDataProvider"),
+        container.get("queuePoller")
+      ),
+    buildDeepLinkHandler: (container) =>
       new JenkinsWorkbenchDeepLinkBuildHandler(
         container.get("dataService"),
         container.get("artifactActionHandler"),
@@ -72,44 +59,26 @@ export function registerRuntimeProviders(
         container.get("refreshHost"),
         container.get("pendingInputCoordinator"),
         options.extensionUri
-      )
-  );
-
-  container.register(
-    "jobDeepLinkHandler",
-    () => new JenkinsWorkbenchDeepLinkJobHandler(container.get("treeNavigator"))
-  );
-
-  container.register(
-    "uriHandler",
-    () =>
+      ),
+    jobDeepLinkHandler: (container) =>
+      new JenkinsWorkbenchDeepLinkJobHandler(container.get("treeNavigator")),
+    uriHandler: (container) =>
       new JenkinsWorkbenchUriHandler(
         container.get("environmentStore"),
         container.get("buildDeepLinkHandler"),
         container.get("jobDeepLinkHandler")
-      )
-  );
-
-  container.register(
-    "jenkinsfileQuickFixProvider",
-    () => new JenkinsfileQuickFixProvider(container.get("jenkinsfileMatcher"))
-  );
-
-  container.register(
-    "jenkinsfileHoverProvider",
-    () =>
+      ),
+    jenkinsfileQuickFixProvider: (container) =>
+      new JenkinsfileQuickFixProvider(container.get("jenkinsfileMatcher")),
+    jenkinsfileHoverProvider: (container) =>
       new JenkinsfileHoverProvider(
         container.get("jenkinsfileMatcher"),
         container.get("jenkinsfileValidationCoordinator")
-      )
-  );
-
-  container.register(
-    "jenkinsfileCodeLensProvider",
-    () =>
+      ),
+    jenkinsfileCodeLensProvider: (container) =>
       new JenkinsfileValidationCodeLensProvider(
         container.get("jenkinsfileMatcher"),
         container.get("jenkinsfileValidationCoordinator")
       )
-  );
+  } satisfies PartialExtensionProviderCatalog;
 }

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
+import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
 
 export const CONFIG_SECTION = "jenkinsWorkbench";
@@ -19,6 +20,7 @@ const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES = 50;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB = 200;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS = 900;
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE = "[redacted]";
+const DEFAULT_TREE_VIEW_CURATION_EXCLUDED_NAMES = ["all"];
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
   "password",
   "token",
@@ -201,6 +203,19 @@ export function getBuildListFetchOptions(
   return {
     detailLevel: includeDetails ? "details" : "summary",
     includeParameters: getBuildTooltipParametersEnabled(config)
+  };
+}
+
+export function getTreeViewCurationOptions(
+  config: vscode.WorkspaceConfiguration
+): TreeViewCurationOptions {
+  const configuredValue = config.get<unknown>("treeViews.excludedNames");
+  const excludedNames =
+    typeof configuredValue === "undefined"
+      ? DEFAULT_TREE_VIEW_CURATION_EXCLUDED_NAMES
+      : normalizeStringList(configuredValue);
+  return {
+    excludedNames
   };
 }
 

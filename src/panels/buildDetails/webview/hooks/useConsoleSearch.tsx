@@ -1,77 +1,17 @@
 import * as React from "react";
+import {
+  MAX_CONSOLE_MATCHES,
+  buildConsoleMatches,
+  buildConsoleSegments,
+  createConsoleSearchKeyDownHandler,
+  getNextActiveMatchIndex,
+  scrollActiveConsoleMatchIntoView
+} from "./consoleSearch";
+import type { ConsoleMatch, SearchDirection } from "./consoleSearch";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
-const MAX_CONSOLE_MATCHES = 2000;
-
-export type ConsoleMatch = {
-  start: number;
-  end: number;
-};
-
-type ConsoleMatchState = {
-  matches: ConsoleMatch[];
-  tooManyMatches: boolean;
-  error?: string;
-};
-
-function buildConsoleMatches(text: string, query: string, useRegex: boolean): ConsoleMatchState {
-  if (!query) {
-    return { matches: [], tooManyMatches: false };
-  }
-
-  if (useRegex) {
-    let regex: RegExp;
-    try {
-      regex = new RegExp(query, "g");
-    } catch (error) {
-      return {
-        matches: [],
-        tooManyMatches: false,
-        error: error instanceof Error ? error.message : "Invalid regular expression."
-      };
-    }
-
-    const matches: ConsoleMatch[] = [];
-    let tooManyMatches = false;
-    let match = regex.exec(text);
-    while (match) {
-      const matchText = match[0] ?? "";
-      if (matchText.length === 0) {
-        const safeIndex = match.index + 1;
-        regex.lastIndex = safeIndex;
-        match = regex.exec(text);
-        continue;
-      }
-      matches.push({ start: match.index, end: match.index + matchText.length });
-      if (matches.length >= MAX_CONSOLE_MATCHES) {
-        tooManyMatches = true;
-        break;
-      }
-      match = regex.exec(text);
-    }
-    return { matches, tooManyMatches };
-  }
-
-  const matches: ConsoleMatch[] = [];
-  const normalizedText = text.toLowerCase();
-  const normalizedQuery = query.toLowerCase();
-  let startIndex = 0;
-  let tooManyMatches = false;
-  while (startIndex < normalizedText.length) {
-    const nextIndex = normalizedText.indexOf(normalizedQuery, startIndex);
-    if (nextIndex === -1) {
-      break;
-    }
-    matches.push({ start: nextIndex, end: nextIndex + normalizedQuery.length });
-    if (matches.length >= MAX_CONSOLE_MATCHES) {
-      tooManyMatches = true;
-      break;
-    }
-    startIndex = nextIndex + Math.max(1, normalizedQuery.length);
-  }
-  return { matches, tooManyMatches };
-}
+export type { ConsoleMatch };
 
 export type ConsoleSearchState = {
   searchQuery: string;
@@ -133,67 +73,44 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
   }, [isSearchActive, matchCount]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      if ((event.metaKey || event.ctrlKey) && key === "f") {
-        event.preventDefault();
-        openSearchToolbar();
-        return;
-      }
-      if (event.key === "Escape" && (searchVisible || searchQuery.length > 0)) {
-        event.preventDefault();
+    const handleKeyDown = createConsoleSearchKeyDownHandler({
+      openSearchToolbar,
+      canCloseSearch: searchVisible || searchQuery.length > 0,
+      onCloseSearch: () => {
         setSearchQuery("");
         setSearchVisible(false);
       }
-    };
+    });
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [openSearchToolbar, searchQuery, searchVisible]);
 
   const consoleSegments = useMemo(() => {
-    if (!isSearchActive || matchCount === 0) {
-      return [consoleText];
-    }
-    const segments: React.ReactNode[] = [];
-    let lastIndex = 0;
-    for (let index = 0; index < consoleSearchState.matches.length; index += 1) {
-      const match = consoleSearchState.matches[index];
-      if (match.start > lastIndex) {
-        segments.push(consoleText.slice(lastIndex, match.start));
-      }
-      const matchText = consoleText.slice(match.start, match.end);
-      segments.push(
-        <mark
-          className={`console-match${index === activeMatchIndex ? " console-match--active" : ""}`}
-          data-match-index={index}
-          key={`console-match-${match.start}-${match.end}`}
-        >
-          {matchText}
-        </mark>
-      );
-      lastIndex = match.end;
-    }
-    if (lastIndex < consoleText.length) {
-      segments.push(consoleText.slice(lastIndex));
-    }
-    return segments;
+    return buildConsoleSegments(
+      consoleText,
+      consoleSearchState.matches,
+      activeMatchIndex,
+      isSearchActive
+    );
   }, [consoleText, consoleSearchState.matches, isSearchActive, matchCount, activeMatchIndex]);
 
   useEffect(() => {
     if (!isSearchActive || activeMatchIndex < 0) {
       return;
     }
-    const output = consoleOutputRef.current;
-    if (!output) {
-      return;
-    }
-    const match = output.querySelector(
-      `[data-match-index="${activeMatchIndex}"]`
-    ) as HTMLElement | null;
-    if (match) {
-      match.scrollIntoView({ block: "center", inline: "nearest" });
-    }
+    scrollActiveConsoleMatchIntoView(consoleOutputRef.current, activeMatchIndex);
   }, [activeMatchIndex, isSearchActive, searchQuery, useRegex, consoleText]);
+
+  const stepActiveMatch = (direction: SearchDirection) => {
+    setActiveMatchIndex((previousIndex) =>
+      getNextActiveMatchIndex({
+        previousIndex,
+        direction,
+        isSearchActive,
+        matchCount
+      })
+    );
+  };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextValue = event.target.value;
@@ -208,30 +125,11 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
       return;
     }
     event.preventDefault();
-    const direction = event.shiftKey ? "prev" : "next";
-    setActiveMatchIndex((prev) => {
-      if (!isSearchActive || matchCount === 0) {
-        return -1;
-      }
-      if (prev < 0) {
-        return direction === "next" ? 0 : matchCount - 1;
-      }
-      const delta = direction === "next" ? 1 : -1;
-      return (prev + delta + matchCount) % matchCount;
-    });
+    stepActiveMatch(event.shiftKey ? "prev" : "next");
   };
 
   const handleSearchStep = (direction: "next" | "prev") => {
-    setActiveMatchIndex((prev) => {
-      if (!isSearchActive || matchCount === 0) {
-        return -1;
-      }
-      if (prev < 0) {
-        return direction === "next" ? 0 : matchCount - 1;
-      }
-      const delta = direction === "next" ? 1 : -1;
-      return (prev + delta + matchCount) % matchCount;
-    });
+    stepActiveMatch(direction);
   };
 
   const handleClearSearch = () => {

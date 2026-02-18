@@ -30,89 +30,146 @@ export interface NodeDetailsViewModelInput {
 }
 
 const UNKNOWN_LABEL = "Not available";
+const MONITOR_STRING_KEYS = ["message", "status", "state", "description", "name"] as const;
+const MONITOR_NUMBER_KEYS = ["size", "count", "total"] as const;
+const STATUS_DESCRIPTORS = {
+  unknown: { label: "Unknown", className: "unknown" },
+  temporary: { label: "Temporarily Offline", className: "temporary" },
+  offline: { label: "Offline", className: "offline" },
+  idle: { label: "Idle", className: "idle" },
+  online: { label: "Online", className: "online" }
+} as const satisfies Record<string, NodeStatusDescriptor>;
+
+interface NodeStatusDescriptor {
+  label: string;
+  className: NodeStatusClass;
+}
+
+interface DurationResult {
+  label?: string;
+  ms?: number;
+}
+
+type NodeIdentityFields = Pick<
+  NodeDetailsViewModel,
+  "displayName" | "name" | "description" | "url" | "updatedAt"
+>;
+
+type NodeStatusFields = Pick<
+  NodeDetailsViewModel,
+  | "statusLabel"
+  | "statusClass"
+  | "isOffline"
+  | "isTemporarilyOffline"
+  | "canTakeOffline"
+  | "canBringOnline"
+  | "canLaunchAgent"
+  | "canOpenAgentInstructions"
+  | "offlineReason"
+>;
+
+type NodeOverviewFields = Pick<
+  NodeDetailsViewModel,
+  | "idleLabel"
+  | "executorsLabel"
+  | "labels"
+  | "jnlpAgentLabel"
+  | "launchSupportedLabel"
+  | "manualLaunchLabel"
+>;
+
+type NodeRuntimeFields = Pick<
+  NodeDetailsViewModel,
+  "executors" | "oneOffExecutors" | "monitorData" | "loadStatistics" | "rawJson"
+>;
 
 export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): NodeDetailsViewModel {
   const details = input.details;
   const updatedAt = input.updatedAt ?? new Date().toISOString();
-  const displayName = details?.displayName?.trim() || details?.name?.trim() || "Node Details";
-  const name = details?.name?.trim() || details?.displayName?.trim() || "Unknown";
-  const labels = collectAssignedLabelNames(details?.assignedLabels);
-
-  const status = formatStatus(details);
-  const capabilities = buildNodeActionCapabilities(details);
-  const isOffline = capabilities.isOffline;
-  const isTemporarilyOffline = capabilities.isTemporarilyOffline;
-  const canTakeOffline = capabilities.canTakeOffline;
-  const canBringOnline = capabilities.canBringOnline;
-  const canLaunchAgent = capabilities.canLaunchAgent;
-  const canOpenAgentInstructions = capabilities.canOpenAgentInstructions;
-  const offlineReason = formatOfflineReason(details);
-  const idleLabel = formatIdle(details);
-  const executorsLabel = formatExecutorsSummary(details);
-  const rawJson = details ? JSON.stringify(details, null, 2) : "";
-  const advancedLoaded = input.advancedLoaded ?? false;
-  const nowMsCandidate =
-    typeof input.nowMs === "number" && Number.isFinite(input.nowMs)
-      ? input.nowMs
-      : Date.parse(updatedAt);
-  const nowMs = Number.isFinite(nowMsCandidate) ? nowMsCandidate : 0;
+  const nowMs = resolveNowMs(input.nowMs, updatedAt);
 
   return {
-    displayName,
-    name,
-    description: details?.description?.trim() || undefined,
-    url: details?.url ?? input.fallbackUrl,
-    updatedAt,
+    ...buildNodeIdentity(details, input.fallbackUrl, updatedAt),
+    ...buildNodeStatus(details),
+    ...buildNodeOverview(details),
+    ...buildNodeRuntimeFields(details, nowMs),
+    errors: [...input.errors],
+    advancedLoaded: Boolean(input.advancedLoaded)
+  };
+}
+
+function buildNodeIdentity(
+  details: JenkinsNodeDetails | undefined,
+  fallbackUrl: string | undefined,
+  updatedAt: string
+): NodeIdentityFields {
+  return {
+    displayName: firstNonEmpty(details?.displayName, details?.name) ?? "Node Details",
+    name: firstNonEmpty(details?.name, details?.displayName) ?? "Unknown",
+    description: trimToUndefined(details?.description),
+    url: firstNonEmpty(details?.url, fallbackUrl),
+    updatedAt
+  };
+}
+
+function buildNodeStatus(details?: JenkinsNodeDetails): NodeStatusFields {
+  const status = formatStatus(details);
+  const capabilities = buildNodeActionCapabilities(details);
+
+  return {
     statusLabel: status.label,
     statusClass: status.className,
-    isOffline,
-    isTemporarilyOffline,
-    canTakeOffline,
-    canBringOnline,
-    canLaunchAgent,
-    canOpenAgentInstructions,
-    offlineReason,
-    idleLabel,
-    executorsLabel,
-    labels,
+    ...capabilities,
+    offlineReason: formatOfflineReason(details)
+  };
+}
+
+function buildNodeOverview(details?: JenkinsNodeDetails): NodeOverviewFields {
+  return {
+    idleLabel: formatIdle(details),
+    executorsLabel: formatExecutorsSummary(details),
+    labels: collectAssignedLabelNames(details?.assignedLabels),
     jnlpAgentLabel: formatBoolean(details?.jnlpAgent),
     launchSupportedLabel: formatBoolean(details?.launchSupported),
-    manualLaunchLabel: formatBoolean(details?.manualLaunchAllowed),
+    manualLaunchLabel: formatBoolean(details?.manualLaunchAllowed)
+  };
+}
+
+function buildNodeRuntimeFields(
+  details: JenkinsNodeDetails | undefined,
+  nowMs: number
+): NodeRuntimeFields {
+  return {
     executors: buildExecutors(details?.executors, "Executor", nowMs),
     oneOffExecutors: buildExecutors(details?.oneOffExecutors, "One-off", nowMs),
     monitorData: buildMonitorEntries(details?.monitorData),
     loadStatistics: buildMonitorEntries(details?.loadStatistics),
-    rawJson,
-    errors: input.errors,
-    advancedLoaded
+    rawJson: stringifyNodeDetails(details)
   };
 }
 
-function formatStatus(details?: JenkinsNodeDetails): { label: string; className: NodeStatusClass } {
+function formatStatus(details?: JenkinsNodeDetails): NodeStatusDescriptor {
   if (!details) {
-    return { label: "Unknown", className: "unknown" };
+    return STATUS_DESCRIPTORS.unknown;
   }
-  if (details.offline) {
-    if (details.temporarilyOffline) {
-      return { label: "Temporarily Offline", className: "temporary" };
-    }
-    return { label: "Offline", className: "offline" };
+  if (details.offline === true) {
+    return details.temporarilyOffline ? STATUS_DESCRIPTORS.temporary : STATUS_DESCRIPTORS.offline;
   }
   if (details.idle === true) {
-    return { label: "Idle", className: "idle" };
+    return STATUS_DESCRIPTORS.idle;
   }
   if (details.offline === false) {
-    return { label: "Online", className: "online" };
+    return STATUS_DESCRIPTORS.online;
   }
-  return { label: "Unknown", className: "unknown" };
+  return STATUS_DESCRIPTORS.unknown;
 }
 
 function formatOfflineReason(details?: JenkinsNodeDetails): string | undefined {
-  const reason =
-    details?.offlineCauseReason?.trim() ||
-    details?.offlineCause?.description?.trim() ||
-    details?.offlineCause?.shortDescription?.trim();
-  return reason && reason.length > 0 ? reason : undefined;
+  return firstNonEmpty(
+    details?.offlineCauseReason,
+    details?.offlineCause?.description,
+    details?.offlineCause?.shortDescription
+  );
 }
 
 function formatIdle(details?: JenkinsNodeDetails): string {
@@ -131,10 +188,10 @@ function formatIdle(details?: JenkinsNodeDetails): string {
 function formatExecutorsSummary(details?: JenkinsNodeDetails): string {
   const total = details?.numExecutors;
   const busy = details?.busyExecutors;
-  if (Number.isFinite(total) && Number.isFinite(busy)) {
+  if (isFiniteNumber(total) && isFiniteNumber(busy)) {
     return `Busy ${busy}/${total}`;
   }
-  if (Number.isFinite(total)) {
+  if (isFiniteNumber(total)) {
     return `${total} total`;
   }
   return UNKNOWN_LABEL;
@@ -152,12 +209,14 @@ function buildExecutors(
   labelPrefix: string,
   nowMs: number
 ): NodeExecutorViewModel[] {
-  if (!Array.isArray(executors) || executors.length === 0) {
+  if (!Array.isArray(executors)) {
     return [];
   }
-  return executors.map((executor, index) =>
-    buildExecutorViewModel(executor, `${labelPrefix} ${index + 1}`, nowMs)
-  );
+
+  return executors.map((executor, index) => {
+    const fallbackLabel = `${labelPrefix} ${index + 1}`;
+    return buildExecutorViewModel(executor, fallbackLabel, nowMs);
+  });
 }
 
 function buildExecutorViewModel(
@@ -165,42 +224,44 @@ function buildExecutorViewModel(
   fallbackLabel: string,
   nowMs: number
 ): NodeExecutorViewModel {
-  const number = Number.isFinite(executor.number) ? executor.number : undefined;
-  const id = number !== undefined ? `#${number}` : fallbackLabel;
   const workItem = executor.currentExecutable ?? executor.currentWorkUnit;
-  const workLabel = formatWorkLabel(workItem);
-  const isIdle = resolveExecutorIdle(executor, Boolean(workItem));
-  const statusLabel = isIdle ? "Idle" : "Busy";
+  const isIdle = resolveExecutorIdle(executor, workItem);
   const progressPercent = normalizeProgressPercent(executor.progress);
-  const progressLabel = formatProgress(progressPercent);
   const workDuration = resolveWorkDuration(workItem, nowMs);
 
   return {
-    id,
-    statusLabel,
+    id: formatExecutorId(executor.number, fallbackLabel),
+    statusLabel: isIdle ? "Idle" : "Busy",
     isIdle,
     progressPercent,
-    progressLabel,
-    workLabel,
-    workUrl: workItem?.url,
+    progressLabel: formatProgress(progressPercent),
+    workLabel: formatWorkLabel(workItem),
+    workUrl: trimToUndefined(workItem?.url),
     workDurationLabel: workDuration.label,
     workDurationMs: workDuration.ms
   };
 }
 
-function resolveExecutorIdle(executor: JenkinsNodeExecutor, hasWork: boolean): boolean {
-  return !hasWork && executor.idle !== false;
+function formatExecutorId(number: number | undefined, fallbackLabel: string): string {
+  return isFiniteNumber(number) ? `#${number}` : fallbackLabel;
+}
+
+function resolveExecutorIdle(
+  executor: JenkinsNodeExecutor,
+  workItem: JenkinsNodeExecutable | undefined
+): boolean {
+  return !workItem && executor.idle !== false;
 }
 
 function normalizeProgressPercent(progress?: number): number | undefined {
-  if (typeof progress !== "number" || !Number.isFinite(progress)) {
+  if (!isFiniteNumber(progress)) {
     return undefined;
   }
   return Math.max(0, Math.min(100, Math.floor(progress)));
 }
 
 function formatProgress(progressPercent?: number): string | undefined {
-  if (typeof progressPercent !== "number" || !Number.isFinite(progressPercent)) {
+  if (!isFiniteNumber(progressPercent)) {
     return undefined;
   }
   return `${progressPercent}%`;
@@ -210,12 +271,13 @@ function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
   if (!work) {
     return undefined;
   }
+
   const name =
-    work.fullDisplayName?.trim() ||
-    work.displayName?.trim() ||
-    (Number.isFinite(work.number) ? `#${work.number}` : undefined) ||
-    work.url;
-  const result = work.result?.trim();
+    firstNonEmpty(work.fullDisplayName, work.displayName) ??
+    (isFiniteNumber(work.number) ? `#${work.number}` : undefined) ??
+    trimToUndefined(work.url);
+  const result = trimToUndefined(work.result);
+
   if (name && result) {
     return `${name} (${result})`;
   }
@@ -225,26 +287,25 @@ function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
 function resolveWorkDuration(
   work: JenkinsNodeExecutable | undefined,
   nowMs: number
-): { label?: string; ms?: number } {
+): DurationResult {
   if (!work) {
     return {};
   }
 
   const isBuilding = work.building === true;
-  const durationValue = normalizeDuration(work.duration);
+  const durationValue = toValidMs(work.duration);
   if (durationValue !== undefined && (durationValue > 0 || !isBuilding)) {
     return buildDurationResult(durationValue);
   }
 
   if (isBuilding) {
-    const timestamp = normalizeDuration(work.timestamp);
+    const timestamp = toValidMs(work.timestamp);
     if (timestamp !== undefined) {
-      const elapsed = Math.max(0, nowMs - timestamp);
-      return buildDurationResult(elapsed);
+      return buildDurationResult(Math.max(0, nowMs - timestamp));
     }
   }
 
-  const estimatedValue = normalizeDuration(work.estimatedDuration);
+  const estimatedValue = toValidMs(work.estimatedDuration);
   if (estimatedValue !== undefined && estimatedValue > 0) {
     return buildDurationResult(estimatedValue, "Est. ");
   }
@@ -252,26 +313,29 @@ function resolveWorkDuration(
   return {};
 }
 
-function buildDurationResult(duration: number, prefix = ""): { label: string; ms: number } {
+function buildDurationResult(duration: number, prefix = ""): DurationResult {
   return { label: `${prefix}${formatDurationMs(duration)}`, ms: duration };
 }
 
-function normalizeDuration(value?: number): number | undefined {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+function toValidMs(value?: number): number | undefined {
+  if (!isFiniteNumber(value) || value < 0) {
     return undefined;
   }
   return value;
 }
 
 function buildMonitorEntries(data?: Record<string, unknown>): NodeMonitorViewModel[] {
-  if (!data || typeof data !== "object") {
+  if (!isRecord(data)) {
     return [];
   }
-  return Object.entries(data).map(([key, value]) => ({
-    key,
-    summary: summarizeMonitorValue(value),
-    raw: value
-  }));
+
+  return Object.entries(data)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([key, value]) => ({
+      key,
+      summary: summarizeMonitorValue(value),
+      raw: value
+    }));
 }
 
 function summarizeMonitorValue(value: unknown): string {
@@ -284,36 +348,90 @@ function summarizeMonitorValue(value: unknown): string {
   if (Array.isArray(value)) {
     return value.length > 0 ? `${value.length} items` : "Empty list";
   }
-  if (typeof value === "object") {
-    const record = value as Record<string, unknown>;
+  if (isRecord(value)) {
     const candidate =
-      pickString(record, ["message", "status", "state", "description", "name"]) ??
-      pickNumber(record, ["size", "count", "total"]);
-    if (candidate) {
+      pickString(value, MONITOR_STRING_KEYS) ?? pickNumber(value, MONITOR_NUMBER_KEYS);
+    if (candidate !== undefined) {
       return candidate;
     }
-    const keys = Object.keys(record);
+    const keys = Object.keys(value);
     return keys.length > 0 ? `${keys.length} fields` : "Empty object";
   }
   return UNKNOWN_LABEL;
 }
 
-function pickString(record: Record<string, unknown>, keys: string[]): string | undefined {
+function pickString(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
   for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
+    const value = trimToUndefined(record[key]);
+    if (value !== undefined) {
+      return value;
     }
   }
   return undefined;
 }
 
-function pickNumber(record: Record<string, unknown>, keys: string[]): string | undefined {
+function pickNumber(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
-    if (typeof value === "number" && Number.isFinite(value)) {
+    if (isFiniteNumber(value)) {
       return String(value);
     }
   }
   return undefined;
+}
+
+function stringifyNodeDetails(details?: JenkinsNodeDetails): string {
+  if (!details) {
+    return "";
+  }
+
+  const seen = new WeakSet<object>();
+  return JSON.stringify(
+    details,
+    (_key, value) => {
+      if (!isRecord(value)) {
+        return value;
+      }
+      if (seen.has(value)) {
+        return "[Circular]";
+      }
+      seen.add(value);
+      return value;
+    },
+    2
+  );
+}
+
+function resolveNowMs(nowMs: number | undefined, updatedAt: string): number {
+  if (isFiniteNumber(nowMs)) {
+    return nowMs;
+  }
+  const parsedUpdatedAt = Date.parse(updatedAt);
+  return Number.isFinite(parsedUpdatedAt) ? parsedUpdatedAt : Date.now();
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = trimToUndefined(value);
+    if (trimmed !== undefined) {
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
+function trimToUndefined(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

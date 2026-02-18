@@ -1,3 +1,3 @@
-export interface JobCommandRefreshHost {
-  refreshEnvironment(environmentId: string): void;
-}
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
+
+export interface JobCommandRefreshHost extends EnvironmentScopedRefreshHost {}

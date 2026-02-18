@@ -1,12 +1,19 @@
 import * as vscode from "vscode";
+import type {
+  EnvironmentScopedRefreshHost,
+  ExtensionRefreshHost
+} from "../extension/ExtensionRefreshHost";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
+import { NodeActionService } from "../services/NodeActionService";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 import {
   type NodeDetailsOutgoingMessage,
-  isCopyNodeJsonMessage,
   isBringNodeOnlineMessage,
+  isCopyNodeJsonMessage,
   isLaunchNodeAgentMessage,
   isLoadAdvancedNodeDetailsMessage,
   isOpenExternalMessage,
@@ -15,28 +22,36 @@ import {
 } from "./nodeDetails/NodeDetailsMessages";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
-import { renderWebviewShell, renderWebviewStateScript } from "./shared/webview/WebviewHtml";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
+import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import {
+  type SerializedEnvironmentState,
   isSerializedEnvironmentState,
-  resolveEnvironmentRef,
-  type SerializedEnvironmentState
+  resolveEnvironmentRef
 } from "./shared/webview/WebviewPanelState";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { ExtensionRefreshHost } from "../extension/ExtensionRefreshHost";
-import { NodeActionService } from "../services/NodeActionService";
-import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 
 interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
   nodeUrl: string;
+}
+
+type NodeDetailsRefreshHost = EnvironmentScopedRefreshHost &
+  Pick<ExtensionRefreshHost, "onDidRefreshEnvironment">;
+
+interface NodeDetailsPanelShowOptions {
+  dataService: JenkinsDataService;
+  environment: JenkinsEnvironmentRef;
+  nodeUrl: string;
+  extensionUri: vscode.Uri;
+  label?: string;
+  refreshHost?: NodeDetailsRefreshHost;
 }
 
 interface NodeDetailsPanelReviveOptions {
   dataService: JenkinsDataService;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
-  refreshHost?: ExtensionRefreshHost;
+  refreshHost?: NodeDetailsRefreshHost;
 }
 
 function isNodeDetailsPanelState(value: unknown): value is NodeDetailsPanelSerializedState {
@@ -64,7 +79,7 @@ export class NodeDetailsPanel {
   private readonly extensionUri: vscode.Uri;
   private readonly disposables: vscode.Disposable[] = [];
   private refreshSubscription?: vscode.Disposable;
-  private refreshHost?: ExtensionRefreshHost;
+  private refreshHost?: NodeDetailsRefreshHost;
   private dataService?: JenkinsDataService;
   private nodeActionService?: NodeActionService;
   private environment?: JenkinsEnvironmentRef;
@@ -76,14 +91,9 @@ export class NodeDetailsPanel {
   private advancedLoaded = false;
   private loadingRequests = 0;
 
-  static async show(
-    dataService: JenkinsDataService,
-    environment: JenkinsEnvironmentRef,
-    nodeUrl: string,
-    extensionUri: vscode.Uri,
-    label?: string,
-    refreshHost?: ExtensionRefreshHost
-  ): Promise<void> {
+  static async show(options: NodeDetailsPanelShowOptions): Promise<void> {
+    const { dataService, environment, nodeUrl, extensionUri, label, refreshHost } = options;
+
     if (!NodeDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
         "jenkinsWorkbench.nodeDetails",
@@ -196,7 +206,6 @@ export class NodeDetailsPanel {
 
   private dispose(): void {
     NodeDetailsPanel.currentPanel = undefined;
-    this.loadingRequests = 0;
     if (this.refreshSubscription) {
       this.refreshSubscription.dispose();
       this.refreshSubscription = undefined;
@@ -261,8 +270,7 @@ export class NodeDetailsPanel {
       await this.load();
       return;
     }
-    const detailLevel = this.advancedLoaded ? "advanced" : "basic";
-    await this.refreshDetailsWith(detailLevel);
+    await this.refreshDetailsWith(this.currentDetailLevel);
   }
 
   private async loadAdvancedDetails(): Promise<void> {
@@ -302,27 +310,17 @@ export class NodeDetailsPanel {
     }
     const label = this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node";
     const target = { environment: this.environment, nodeUrl: this.nodeUrl, label };
-    const refreshHost = this.refreshHost
-      ? {
-          refreshEnvironment: (environmentId: string) => {
-            this.refreshHost?.refreshEnvironment(environmentId);
-          }
-        }
-      : undefined;
     this.beginLoading();
     try {
-      let didToggle = false;
-      if (action === "takeNodeOffline") {
-        didToggle = await this.nodeActionService.takeNodeOffline(target, refreshHost);
-      } else if (action === "bringNodeOnline") {
-        didToggle = await this.nodeActionService.bringNodeOnline(target, refreshHost);
-      } else {
-        didToggle = await this.nodeActionService.launchNodeAgent(target, refreshHost);
-      }
+      const { nodeActionService, refreshHost } = this;
+      const actions = {
+        takeNodeOffline: () => nodeActionService.takeNodeOffline(target, refreshHost),
+        bringNodeOnline: () => nodeActionService.bringNodeOnline(target, refreshHost),
+        launchNodeAgent: () => nodeActionService.launchNodeAgent(target, refreshHost)
+      };
+      const didToggle = await actions[action]();
       if (didToggle) {
-        await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic", {
-          skipLoading: true
-        });
+        await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });
       }
     } catch (error) {
       void vscode.window.showErrorMessage(formatActionError(error));
@@ -339,7 +337,7 @@ export class NodeDetailsPanel {
       return undefined;
     }
     try {
-      const detailLevel = options?.detailLevel ?? (this.advancedLoaded ? "advanced" : "basic");
+      const detailLevel = options?.detailLevel ?? this.currentDetailLevel;
       const details = await this.dataService.getNodeDetails(this.environment, this.nodeUrl, {
         mode: options?.mode,
         detailLevel
@@ -396,11 +394,15 @@ export class NodeDetailsPanel {
     }
   }
 
+  private get currentDetailLevel(): "basic" | "advanced" {
+    return this.advancedLoaded ? "advanced" : "basic";
+  }
+
   private isTokenCurrent(token: number): boolean {
     return token === this.loadToken;
   }
 
-  private setRefreshHost(refreshHost?: ExtensionRefreshHost): void {
+  private setRefreshHost(refreshHost?: NodeDetailsRefreshHost): void {
     this.refreshHost = refreshHost;
     if (this.refreshSubscription) {
       this.refreshSubscription.dispose();
@@ -424,9 +426,7 @@ export class NodeDetailsPanel {
     if (!this.panel.visible) {
       return;
     }
-    await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic", {
-      skipLoading: true
-    });
+    await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });
   }
 
   private async handlePanelVisible(): Promise<void> {
@@ -437,7 +437,7 @@ export class NodeDetailsPanel {
       await this.load();
       return;
     }
-    await this.refreshDetailsWith(this.advancedLoaded ? "advanced" : "basic");
+    await this.refreshDetailsWith(this.currentDetailLevel);
   }
 
   private beginLoading(): void {
@@ -485,44 +485,18 @@ export class NodeDetailsPanel {
     const nonce = createNonce();
     let styleUris: string[] = [];
     try {
-      styleUris = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "nodeDetails"
-      ).styleUris;
+      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "nodeDetails")
+        .styleUris;
     } catch {
       styleUris = [];
     }
-    const stateScript = renderWebviewStateScript(panelState, nonce);
-    this.panel.webview.html = renderWebviewShell(
-      `
-        ${stateScript}
-        <main class="jenkins-workbench-panel-message">
-          <h1>Node Details</h1>
-          <p>${message}</p>
-          <p>Open the node again from Jenkins Workbench to continue.</p>
-        </main>
-        <style nonce="${nonce}">
-          .jenkins-workbench-panel-message {
-            color: var(--vscode-foreground);
-            font-family: var(--vscode-font-family);
-            line-height: 1.5;
-            margin: 32px;
-          }
-          .jenkins-workbench-panel-message h1 {
-            font-size: 20px;
-            margin: 0 0 12px;
-          }
-          .jenkins-workbench-panel-message p {
-            margin: 0 0 8px;
-          }
-        </style>
-      `,
-      {
-        cspSource: this.panel.webview.cspSource,
-        nonce,
-        styleUris
-      }
-    );
+    this.panel.webview.html = renderPanelRestoreErrorHtml(this.panel.webview.cspSource, {
+      nonce,
+      title: "Node Details",
+      message,
+      hint: "Open the node again from Jenkins Workbench to continue.",
+      styleUris,
+      panelState
+    });
   }
 }

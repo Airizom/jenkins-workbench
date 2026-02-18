@@ -42,8 +42,7 @@ export function registerJobCommands(
   const newItemWorkflow = new JobNewItemWorkflow({
     dataService,
     onEnvironmentChanged: (environmentId) => {
-      dataService.clearCacheForEnvironment(environmentId);
-      refreshHost.refreshEnvironment(environmentId);
+      refreshHost.fullEnvironmentRefresh({ environmentId });
     }
   });
 

@@ -1,7 +1,6 @@
-import * as vscode from "vscode";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import { type JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { getTreeItemLabel } from "../CommandUtils";
+import { addJobScopedState, getTreeItemLabel, removeJobScopedState } from "../CommandUtils";
 import type { WatchCommandRefreshHost } from "./WatchCommandTypes";
 
 export async function watchJob(
@@ -9,32 +8,29 @@ export async function watchJob(
   refreshHost: WatchCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to watch.");
-    return;
-  }
-
-  const label = getTreeItemLabel(item);
-  const isWatched = await watchStore.isWatched(
-    item.environment.scope,
-    item.environment.environmentId,
-    item.jobUrl
-  );
-
-  if (isWatched) {
-    void vscode.window.showInformationMessage(`${label} is already being watched.`);
-    return;
-  }
-
-  await watchStore.addWatch(item.environment.scope, {
-    environmentId: item.environment.environmentId,
-    jobUrl: item.jobUrl,
-    jobName: label,
-    jobKind: item instanceof PipelineTreeItem ? "pipeline" : "job"
+  await addJobScopedState({
+    item,
+    missingSelectionMessage: "Select a job or pipeline to watch.",
+    getLabel: (selected) => getTreeItemLabel(selected),
+    alreadyPresentMessage: (label) => `${label} is already being watched.`,
+    addedMessage: (label) => `Watching ${label}.`,
+    isPresent: async (selected) =>
+      watchStore.isWatched(
+        selected.environment.scope,
+        selected.environment.environmentId,
+        selected.jobUrl
+      ),
+    add: async (selected, label) =>
+      watchStore.addWatch(selected.environment.scope, {
+        environmentId: selected.environment.environmentId,
+        jobUrl: selected.jobUrl,
+        jobName: label,
+        jobKind: selected instanceof PipelineTreeItem ? "pipeline" : "job"
+      }),
+    refreshEnvironment: (environmentId) => {
+      refreshHost.fullEnvironmentRefresh({ environmentId: environmentId });
+    }
   });
-
-  void vscode.window.showInformationMessage(`Watching ${label}.`);
-  refreshHost.refreshEnvironment(item.environment.environmentId);
 }
 
 export async function unwatchJob(
@@ -42,23 +38,20 @@ export async function unwatchJob(
   refreshHost: WatchCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
-  if (!item) {
-    void vscode.window.showInformationMessage("Select a job or pipeline to unwatch.");
-    return;
-  }
-
-  const label = getTreeItemLabel(item);
-  const removed = await watchStore.removeWatch(
-    item.environment.scope,
-    item.environment.environmentId,
-    item.jobUrl
-  );
-
-  if (!removed) {
-    void vscode.window.showInformationMessage(`${label} is not currently watched.`);
-    return;
-  }
-
-  void vscode.window.showInformationMessage(`Stopped watching ${label}.`);
-  refreshHost.refreshEnvironment(item.environment.environmentId);
+  await removeJobScopedState({
+    item,
+    missingSelectionMessage: "Select a job or pipeline to unwatch.",
+    getLabel: (selected) => getTreeItemLabel(selected),
+    missingStateMessage: (label) => `${label} is not currently watched.`,
+    removedMessage: (label) => `Stopped watching ${label}.`,
+    remove: async (selected) =>
+      watchStore.removeWatch(
+        selected.environment.scope,
+        selected.environment.environmentId,
+        selected.jobUrl
+      ),
+    refreshEnvironment: (environmentId) => {
+      refreshHost.fullEnvironmentRefresh({ environmentId: environmentId });
+    }
+  });
 }

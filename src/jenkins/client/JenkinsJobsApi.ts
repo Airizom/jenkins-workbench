@@ -3,6 +3,7 @@ import type {
   JenkinsJob,
   JenkinsJobKind,
   JenkinsParameterDefinition,
+  JenkinsView,
   ScanMultibranchResult
 } from "../types";
 import {
@@ -10,6 +11,7 @@ import {
   buildApiUrlFromBase,
   buildApiUrlFromItem,
   buildJobUrl,
+  buildViewScopedJobUrl,
   parseJobUrl
 } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
@@ -21,6 +23,7 @@ import {
 const JOB_LIST_TREE = "jobs[name,url,_class,color]";
 const JOB_DETAIL_TREE =
   "name,url,_class,color,lastCompletedBuild[number,result,timestamp],lastBuild[number,url,result,building,timestamp]";
+const VIEW_LIST_TREE = "views[name,url]";
 const CREATE_ITEM_MODES: Record<JenkinsItemCreateKind, string> = {
   job: "hudson.model.FreeStyleProject",
   pipeline: "org.jenkinsci.plugins.workflow.job.WorkflowJob"
@@ -41,8 +44,22 @@ export class JenkinsJobsApi {
     return this.fetchJobs(url);
   }
 
+  async getViews(): Promise<JenkinsView[]> {
+    const url = buildApiUrlFromBase(this.context.baseUrl, "api/json", VIEW_LIST_TREE);
+    return this.fetchViews(url);
+  }
+
   async getFolderJobs(folderUrl: string): Promise<JenkinsJob[]> {
     const url = buildApiUrlFromItem(folderUrl, JOB_LIST_TREE);
+    return this.fetchJobs(url);
+  }
+
+  async getFolderJobsInView(folderUrl: string, viewUrl: string): Promise<JenkinsJob[]> {
+    return this.getFolderJobs(buildViewScopedJobUrl(viewUrl, folderUrl));
+  }
+
+  async getViewJobs(viewUrl: string): Promise<JenkinsJob[]> {
+    const url = buildApiUrlFromItem(viewUrl, JOB_LIST_TREE);
     return this.fetchJobs(url);
   }
 
@@ -156,6 +173,11 @@ export class JenkinsJobsApi {
   private async fetchJobs(url: string): Promise<JenkinsJob[]> {
     const response = await this.context.requestJson<{ jobs?: JenkinsJob[] }>(url);
     return Array.isArray(response.jobs) ? response.jobs : [];
+  }
+
+  private async fetchViews(url: string): Promise<JenkinsView[]> {
+    const response = await this.context.requestJson<{ views?: JenkinsView[] }>(url);
+    return Array.isArray(response.views) ? response.views : [];
   }
 
   private async createItemWithMode(

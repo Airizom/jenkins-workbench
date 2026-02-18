@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
+import type { ExtensionRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsWorkbenchTreeDataProvider } from "../tree/TreeDataProvider";
 import type { TreeExpansionState } from "../tree/TreeExpansionState";
-import type { ExtensionRefreshHost } from "../extension/ExtensionRefreshHost";
 
 export function registerRefreshCommands(
   context: vscode.ExtensionContext,
   provider: JenkinsWorkbenchTreeDataProvider,
   expansionState: TreeExpansionState,
-  refreshHost?: ExtensionRefreshHost
+  refreshHost: ExtensionRefreshHost
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -18,16 +18,21 @@ export function registerRefreshCommands(
         const refreshWaiter = provider.createRefreshWaiter();
 
         if (item) {
-          provider.onEnvironmentChanged(item.environmentId, refreshWaiter.token);
-          refreshHost?.signalEnvironmentRefresh?.(item.environmentId);
+          refreshHost.fullEnvironmentRefresh({
+            environmentId: item.environmentId,
+            trigger: "manual",
+            refreshToken: refreshWaiter.token
+          });
           await refreshWaiter.promise;
           await expansionState.restore(snapshot);
           return;
         }
 
-        const didRefresh = provider.refresh(refreshWaiter.token);
-        refreshHost?.signalEnvironmentRefresh?.(undefined);
-        if (!didRefresh) {
+        const result = refreshHost.fullEnvironmentRefresh({
+          trigger: "manual",
+          refreshToken: refreshWaiter.token
+        });
+        if (!result.executed) {
           refreshWaiter.dispose();
           return;
         }
