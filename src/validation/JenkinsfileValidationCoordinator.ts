@@ -68,7 +68,7 @@ export class JenkinsfileValidationCoordinator
   start(): void {
     this.subscriptions.push(
       vscode.workspace.onDidSaveTextDocument((document) => {
-        if (!this.config.enabled || !this.config.runOnSave) {
+        if (!this.shouldRunAutomaticValidation()) {
           return;
         }
         if (!this.matcher.matches(document)) {
@@ -78,7 +78,7 @@ export class JenkinsfileValidationCoordinator
         void this.validateDocument(document, { reason: "save" });
       }),
       vscode.workspace.onDidOpenTextDocument((document) => {
-        if (!this.config.enabled) {
+        if (!this.shouldRunAutomaticValidation()) {
           return;
         }
         if (!this.matcher.matches(document)) {
@@ -98,6 +98,9 @@ export class JenkinsfileValidationCoordinator
           return;
         }
         this.setResultStaleState(document, true);
+        if (!this.config.runOnSave) {
+          return;
+        }
         this.scheduleChangeValidation(document);
       }),
       vscode.workspace.onDidCloseTextDocument((document) => {
@@ -316,6 +319,7 @@ export class JenkinsfileValidationCoordinator
       }
 
       if (!environment) {
+        this.lastValidatedState.delete(key);
         this.logNoEnvironment(document, options.reason);
         const diagnostic = buildNoEnvironmentDiagnostic(document);
         this.diagnostics.set(document.uri, [diagnostic]);
@@ -353,11 +357,6 @@ export class JenkinsfileValidationCoordinator
         return activeAfterRequest;
       }
 
-      if (requestFailed) {
-        this.lastValidatedState.delete(key);
-      } else {
-        this.lastValidatedState.set(key, { hash, environmentKey });
-      }
       this.logValidation(document, environment, output, options.reason);
 
       const activeBeforeApply = this.getActiveOutcome(document, options, key, token);
@@ -377,6 +376,11 @@ export class JenkinsfileValidationCoordinator
       }
 
       this.setResultState(document, findings.length, environment);
+      if (requestFailed) {
+        this.lastValidatedState.delete(key);
+      } else {
+        this.lastValidatedState.set(key, { hash, environmentKey });
+      }
       return { status: "completed", kind: "result", errorCount: findings.length };
     } finally {
       cancellationSubscription?.dispose();
@@ -650,6 +654,10 @@ export class JenkinsfileValidationCoordinator
       return;
     }
     this.statusEmitter.fire(document.uri);
+  }
+
+  private shouldRunAutomaticValidation(): boolean {
+    return this.config.enabled && this.config.runOnSave;
   }
 }
 

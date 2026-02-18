@@ -474,13 +474,13 @@
         "jenkinsWorkbench.jenkinsfileValidation.runOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Validate Jenkinsfiles automatically on save."
+          "description": "Run Jenkinsfile validation automatically on open, change, and save."
         },
         "jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs": {
           "type": "number",
           "default": 500,
           "minimum": 0,
-          "description": "Debounce delay in milliseconds before validating Jenkinsfiles on change (0 = immediate)."
+          "description": "Debounce delay in milliseconds before validating Jenkinsfiles on change when automatic validation is enabled (0 = immediate)."
         },
         "jenkinsWorkbench.jenkinsfileValidation.filePatterns": {
           "type": "array",
