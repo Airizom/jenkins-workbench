@@ -51,7 +51,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 ### Jenkinsfile Validation
 
 - **Declarative Linting** — Validate Jenkinsfiles against the Jenkins declarative linter
-- **Run on Save** — Optionally validate automatically when you save
+- **Automatic Validation** — Optionally validate Jenkinsfiles on open, change, and save
 - **Diagnostics & Quick Fixes** — See errors inline and apply guided fixes
 
 ### Watch Jobs
@@ -207,7 +207,7 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `jenkinsWorkbench.jenkinsfileValidation.enabled` | true | Enable Jenkinsfile validation using the Jenkins declarative linter. |
-| `jenkinsWorkbench.jenkinsfileValidation.runOnSave` | true | Validate Jenkinsfiles automatically on save. |
+| `jenkinsWorkbench.jenkinsfileValidation.runOnSave` | true | Enable automatic Jenkinsfile validation on open, change, and save. |
 | `jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs` | 500 | Debounce delay in milliseconds before validating Jenkinsfiles on change (0 = immediate). |
 | `jenkinsWorkbench.jenkinsfileValidation.filePatterns` | `["**/Jenkinsfile","**/*.jenkinsfile","**/Jenkinsfile.*"]` | Glob patterns used to detect Jenkinsfile documents for validation. |
 

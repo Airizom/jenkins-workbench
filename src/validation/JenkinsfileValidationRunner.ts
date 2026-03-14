@@ -1,16 +1,16 @@
 import * as crypto from "node:crypto";
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsfileEnvironmentResolver } from "./JenkinsfileEnvironmentResolver";
-import { parseDeclarativeValidationOutput } from "./JenkinsfileValidationParser";
 import type {
   ValidationOutcome,
   ValidationRequestOptions
 } from "./JenkinsfileValidationCoordinatorTypes";
-import { JenkinsfileValidationOutputLogger } from "./JenkinsfileValidationOutputLogger";
-import { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
+import type { JenkinsfileValidationOutputLogger } from "./JenkinsfileValidationOutputLogger";
+import { parseDeclarativeValidationOutput } from "./JenkinsfileValidationParser";
+import type { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
 
 export interface JenkinsfileValidationRunnerCallbacks {
   onValidationStart(): void;
@@ -73,13 +73,22 @@ export class JenkinsfileValidationRunner {
       }
 
       let output = "";
-      let requestFailed = false;
       try {
         const client = await this.clientProvider.getClient(environment);
         output = await client.validateDeclarativeJenkinsfile(text);
       } catch (error) {
-        requestFailed = true;
-        output = `Validation request failed: ${formatError(error)}`;
+        const message = `Validation request failed: ${formatError(error)}`;
+        this.logger.logValidation(document, environment, message, options.reason);
+        const activeAfterFailure = this.getActiveOutcome(document, options, key, token, callbacks);
+        if (activeAfterFailure) {
+          return activeAfterFailure;
+        }
+        return {
+          status: "completed",
+          kind: "request-failed",
+          environment,
+          message
+        };
       }
 
       const activeAfterRequest = this.getActiveOutcome(document, options, key, token, callbacks);
@@ -106,8 +115,7 @@ export class JenkinsfileValidationRunner {
         findings,
         environment,
         hash,
-        environmentKey,
-        requestFailed
+        environmentKey
       };
     } finally {
       cancellationSubscription?.dispose();

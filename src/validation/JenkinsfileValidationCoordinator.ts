@@ -3,24 +3,25 @@ import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsfileEnvironmentResolver } from "./JenkinsfileEnvironmentResolver";
 import type { JenkinsfileMatcher } from "./JenkinsfileMatcher";
+import type {
+  ValidationOutcome,
+  ValidationReason,
+  ValidationRequestOptions
+} from "./JenkinsfileValidationCoordinatorTypes";
+import {
+  buildNoEnvironmentDiagnostic,
+  buildRequestFailedDiagnostic,
+  buildValidationDiagnostics
+} from "./JenkinsfileValidationDiagnostics";
+import { JenkinsfileValidationOutputLogger } from "./JenkinsfileValidationOutputLogger";
+import { JenkinsfileValidationRunner } from "./JenkinsfileValidationRunner";
+import { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
 import type { JenkinsfileValidationStatusBar } from "./JenkinsfileValidationStatusBar";
 import type {
   JenkinsfileValidationStatusProvider,
   JenkinsfileValidationStatusState
 } from "./JenkinsfileValidationStatusProvider";
 import type { JenkinsfileValidationConfig } from "./JenkinsfileValidationTypes";
-import {
-  type ValidationOutcome,
-  type ValidationReason,
-  type ValidationRequestOptions
-} from "./JenkinsfileValidationCoordinatorTypes";
-import {
-  buildNoEnvironmentDiagnostic,
-  buildValidationDiagnostics
-} from "./JenkinsfileValidationDiagnostics";
-import { JenkinsfileValidationOutputLogger } from "./JenkinsfileValidationOutputLogger";
-import { JenkinsfileValidationRunner } from "./JenkinsfileValidationRunner";
-import { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
 
 export class JenkinsfileValidationCoordinator
   implements vscode.Disposable, JenkinsfileValidationStatusProvider
@@ -183,6 +184,10 @@ export class JenkinsfileValidationCoordinator
           return;
         }
         this.showOutputChannel();
+        if (outcome.status === "completed" && outcome.kind === "request-failed") {
+          void vscode.window.showWarningMessage(outcome.message);
+          return;
+        }
         if (
           outcome.status !== "completed" ||
           outcome.kind !== "result" ||
@@ -238,6 +243,16 @@ export class JenkinsfileValidationCoordinator
     }
   }
 
+  revalidateWorkspaceState(workspaceFolder: vscode.WorkspaceFolder): void {
+    this.revalidateMatchingDocuments((documentFolder) => {
+      return documentFolder?.uri.toString() === workspaceFolder.uri.toString();
+    });
+  }
+
+  revalidateFallbackState(): void {
+    this.revalidateMatchingDocuments((documentFolder) => !documentFolder);
+  }
+
   dispose(): void {
     this.diagnostics.dispose();
     this.outputChannel.dispose();
@@ -287,6 +302,14 @@ export class JenkinsfileValidationCoordinator
       return outcome;
     }
 
+    if (outcome.kind === "request-failed") {
+      const diagnostic = buildRequestFailedDiagnostic(document, outcome.message);
+      this.diagnostics.set(document.uri, [diagnostic]);
+      this.stateStore.clearCachedValidation(document);
+      this.setRequestFailedState(document, outcome.message, outcome.environment);
+      return outcome;
+    }
+
     const diagnostics = buildValidationDiagnostics(document, outcome.findings);
     if (document.isClosed) {
       return { status: "skipped", reason: "closed" };
@@ -298,14 +321,10 @@ export class JenkinsfileValidationCoordinator
     }
 
     this.setResultState(document, outcome.errorCount, outcome.environment);
-    if (outcome.requestFailed) {
-      this.stateStore.clearCachedValidation(document);
-    } else {
-      this.stateStore.updateCachedValidation(document, {
-        hash: outcome.hash,
-        environmentKey: outcome.environmentKey
-      });
-    }
+    this.stateStore.updateCachedValidation(document, {
+      hash: outcome.hash,
+      environmentKey: outcome.environmentKey
+    });
     return outcome;
   }
 
@@ -341,6 +360,20 @@ export class JenkinsfileValidationCoordinator
   private setNoEnvironmentState(document: vscode.TextDocument): void {
     const changed = this.stateStore.setNoEnvironmentState(document);
     this.statusBar.setNoEnvironment(document);
+    this.emitStatusChangeIfNeeded(document, changed);
+  }
+
+  private setRequestFailedState(
+    document: vscode.TextDocument,
+    message: string,
+    environment?: JenkinsEnvironmentRef
+  ): void {
+    const { changed, state } = this.stateStore.setRequestFailedState(
+      document,
+      message,
+      environment
+    );
+    this.statusBar.setRequestFailed(document, state.message, state.environment);
     this.emitStatusChangeIfNeeded(document, changed);
   }
 
@@ -397,7 +430,26 @@ export class JenkinsfileValidationCoordinator
       this.statusBar.setNoEnvironment(document);
       return;
     }
+    if (lastState?.kind === "request-failed") {
+      this.statusBar.setRequestFailed(document, lastState.message, lastState.environment);
+      return;
+    }
     this.statusBar.clear(document);
+  }
+
+  private revalidateMatchingDocuments(
+    predicate: (workspaceFolder: vscode.WorkspaceFolder | undefined) => boolean
+  ): void {
+    for (const document of vscode.workspace.textDocuments) {
+      if (!this.matcher.matches(document) || document.isClosed) {
+        continue;
+      }
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+      if (!predicate(workspaceFolder)) {
+        continue;
+      }
+      this.revalidateDocument(document);
+    }
   }
 
   private emitStatusChangeIfNeeded(document: vscode.TextDocument, changed: boolean): void {

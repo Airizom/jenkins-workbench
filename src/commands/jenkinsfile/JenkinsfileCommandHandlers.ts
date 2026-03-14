@@ -77,7 +77,11 @@ export async function selectValidationEnvironment(
   void vscode.window.showInformationMessage(
     `Jenkinsfile validation will use ${selected.url} (${formatScopeLabel(selected.scope)}).`
   );
-  coordinator?.revalidateActiveDocument();
+  if (workspaceFolder) {
+    coordinator?.revalidateWorkspaceState(workspaceFolder);
+  } else {
+    coordinator?.revalidateFallbackState();
+  }
 }
 
 export function clearJenkinsfileDiagnostics(coordinator: JenkinsfileValidationCoordinator): void {

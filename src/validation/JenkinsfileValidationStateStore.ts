@@ -1,12 +1,16 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsfileValidationStatusState } from "./JenkinsfileValidationStatusProvider";
 import type {
   ValidationCacheEntry,
   ValidationRequestOptions
 } from "./JenkinsfileValidationCoordinatorTypes";
+import type { JenkinsfileValidationStatusState } from "./JenkinsfileValidationStatusProvider";
 
 type ResultValidationState = Extract<JenkinsfileValidationStatusState, { kind: "result" }>;
+type RequestFailedValidationState = Extract<
+  JenkinsfileValidationStatusState,
+  { kind: "request-failed" }
+>;
 
 export class JenkinsfileValidationStateStore {
   private readonly lastValidatedState = new Map<string, ValidationCacheEntry>();
@@ -36,6 +40,13 @@ export class JenkinsfileValidationStateStore {
     }
     if (state.kind === "no-environment") {
       return { kind: "no-environment" };
+    }
+    if (state.kind === "request-failed") {
+      return {
+        kind: "request-failed",
+        environment: state.environment,
+        message: state.message
+      };
     }
     return {
       kind: "result",
@@ -81,6 +92,20 @@ export class JenkinsfileValidationStateStore {
 
   setNoEnvironmentState(document: vscode.TextDocument): boolean {
     return this.updateStatusState(document, { kind: "no-environment" });
+  }
+
+  setRequestFailedState(
+    document: vscode.TextDocument,
+    message: string,
+    environment?: JenkinsEnvironmentRef
+  ): { changed: boolean; state: RequestFailedValidationState } {
+    const nextState: RequestFailedValidationState = {
+      kind: "request-failed",
+      environment,
+      message
+    };
+    const changed = this.updateStatusState(document, nextState);
+    return { changed, state: nextState };
   }
 
   clearDocumentState(document: vscode.TextDocument): boolean {
@@ -157,9 +182,10 @@ export class JenkinsfileValidationStateStore {
     this.pendingChangeTimers.set(key, timer);
   }
 
-  beginChangeValidation(
-    document: vscode.TextDocument
-  ): { key: string; tokenSource: vscode.CancellationTokenSource } {
+  beginChangeValidation(document: vscode.TextDocument): {
+    key: string;
+    tokenSource: vscode.CancellationTokenSource;
+  } {
     const key = this.getDocumentKey(document);
     const tokenSource = new vscode.CancellationTokenSource();
     this.changeTokenSources.set(key, tokenSource);
@@ -237,6 +263,12 @@ function areStatusStatesEqual(
   }
   if (left.kind === "no-environment" && right.kind === "no-environment") {
     return true;
+  }
+  if (left.kind === "request-failed" && right.kind === "request-failed") {
+    return (
+      left.message === right.message &&
+      getEnvironmentSignature(left.environment) === getEnvironmentSignature(right.environment)
+    );
   }
   if (left.kind !== "result" || right.kind !== "result") {
     return false;

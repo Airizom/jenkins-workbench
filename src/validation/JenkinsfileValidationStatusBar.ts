@@ -8,6 +8,11 @@ type JenkinsfileValidationState =
       environment?: JenkinsEnvironmentRef;
     }
   | {
+      kind: "request-failed";
+      environment?: JenkinsEnvironmentRef;
+      message: string;
+    }
+  | {
       kind: "no-environment";
     }
   | {
@@ -57,6 +62,17 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
       return;
     }
     this.updateState(document, { kind: "no-environment" });
+  }
+
+  setRequestFailed(
+    document: vscode.TextDocument,
+    message: string,
+    environment?: JenkinsEnvironmentRef
+  ): void {
+    if (!this.matcher.matches(document)) {
+      return;
+    }
+    this.updateState(document, { kind: "request-failed", message, environment });
   }
 
   clear(document: vscode.TextDocument): void {
@@ -127,6 +143,19 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
       return;
     }
 
+    if (state.kind === "request-failed") {
+      this.item.text = "$(warning) Validation unavailable";
+      this.item.color = new vscode.ThemeColor("statusBarItem.warningForeground");
+      this.item.tooltip = this.buildTooltip(
+        "Validation unavailable",
+        state.environment,
+        state.message
+      );
+      this.item.command = "jenkinsWorkbench.jenkinsfile.showValidationOutput";
+      this.item.show();
+      return;
+    }
+
     const isStale = Boolean(state.stale);
     const stateSuffix = isStale ? " (stale)" : "";
     const stateLabel =
@@ -145,11 +174,18 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
     this.item.show();
   }
 
-  private buildTooltip(stateLabel: string, environment?: JenkinsEnvironmentRef): string {
+  private buildTooltip(
+    stateLabel: string,
+    environment?: JenkinsEnvironmentRef,
+    detail?: string
+  ): string {
     const lines = [`Jenkinsfile validation: ${stateLabel}`];
     if (environment) {
       const environmentLabel = `${environment.url} (${environment.scope}, ${environment.environmentId})`;
       lines.push(`Environment: ${environmentLabel}`);
+    }
+    if (detail) {
+      lines.push(detail);
     }
     return lines.join("\n");
   }

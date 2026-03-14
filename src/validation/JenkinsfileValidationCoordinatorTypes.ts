@@ -26,6 +26,11 @@ export type ValidationOutcome =
       environment: JenkinsEnvironmentRef;
       hash: string;
       environmentKey: string;
-      requestFailed: boolean;
+    }
+  | {
+      status: "completed";
+      kind: "request-failed";
+      environment: JenkinsEnvironmentRef;
+      message: string;
     }
   | { status: "completed"; kind: "no-environment" };

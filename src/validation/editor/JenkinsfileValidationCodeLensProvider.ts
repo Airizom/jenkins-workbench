@@ -76,6 +76,13 @@ export class JenkinsfileValidationCodeLensProvider
       };
     }
 
+    if (state.kind === "request-failed") {
+      return {
+        title: "$(warning) Validation unavailable",
+        command: validateCommandId
+      };
+    }
+
     const staleSuffix = state.stale ? " (stale)" : "";
     if (state.errorCount > 0) {
       return {

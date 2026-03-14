@@ -9,6 +9,11 @@ export type JenkinsfileValidationStatusState =
       stale?: boolean;
     }
   | {
+      kind: "request-failed";
+      environment?: JenkinsEnvironmentRef;
+      message: string;
+    }
+  | {
       kind: "no-environment";
     };
 

@@ -5,6 +5,7 @@ export type JenkinsfileValidationCode =
   | "blocked-step"
   | "unknown-dsl-method"
   | "invalid-step"
+  | "request-failed"
   | "no-environment";
 
 export interface JenkinsfileValidationFinding {

@@ -484,7 +484,7 @@
         "jenkinsWorkbench.jenkinsfileValidation.runOnSave": {
           "type": "boolean",
           "default": true,
-          "description": "Run Jenkinsfile validation automatically on open, change, and save."
+          "description": "Enable automatic Jenkinsfile validation on open, change, and save."
         },
         "jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs": {
           "type": "number",

@@ -12,6 +12,7 @@ const VALIDATION_CODES = new Set<JenkinsfileValidationCode>([
   "blocked-step",
   "unknown-dsl-method",
   "invalid-step",
+  "request-failed",
   "no-environment"
 ]);
 
