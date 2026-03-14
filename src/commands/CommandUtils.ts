@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { getTreeItemLabel as resolveTreeItemLabel } from "../tree/TreeItemLabels";
 import {
   BuildTreeItem,
   type JobTreeItem,
   NodeTreeItem,
   type PipelineTreeItem
 } from "../tree/TreeItems";
-import { formatActionError } from "../formatters/ErrorFormatters";
-import { getTreeItemLabel as resolveTreeItemLabel } from "../tree/TreeItemLabels";
 export { formatActionError };
 
 export function getOpenUrl(

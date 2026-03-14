@@ -90,9 +90,9 @@ export function PendingInputsSection({
   onReject: (inputId: string) => void;
 }) {
   const [processingIds, setProcessingIds] = useState<Record<string, boolean>>({});
-  const [processingActions, setProcessingActions] = useState<
-    Record<string, "approve" | "reject">
-  >({});
+  const [processingActions, setProcessingActions] = useState<Record<string, "approve" | "reject">>(
+    {}
+  );
   const processingTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {

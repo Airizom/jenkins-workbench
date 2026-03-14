@@ -11,15 +11,16 @@ export const ToggleGroup = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToggleGroupPrimitive.Root
     ref={ref}
-    className={cn("inline-flex items-center gap-1 rounded border border-border bg-muted-soft p-1", className)}
+    className={cn(
+      "inline-flex items-center gap-1 rounded border border-border bg-muted-soft p-1",
+      className
+    )}
     {...props}
   />
 ));
 ToggleGroup.displayName = "ToggleGroup";
 
-export type ToggleGroupItemProps = React.ComponentPropsWithoutRef<
-  typeof ToggleGroupPrimitive.Item
->;
+export type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item>;
 
 export const ToggleGroupItem = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Item>,
@@ -39,4 +40,3 @@ export const ToggleGroupItem = React.forwardRef<
   />
 ));
 ToggleGroupItem.displayName = "ToggleGroupItem";
-

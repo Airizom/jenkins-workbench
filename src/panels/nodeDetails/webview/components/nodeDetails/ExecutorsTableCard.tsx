@@ -1,7 +1,23 @@
 import * as React from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../shared/webview/components/ui/select";
-import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from "../../../../shared/webview/components/ui/table";
-import { ToggleGroup, ToggleGroupItem } from "../../../../shared/webview/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../../../../shared/webview/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../../../../shared/webview/components/ui/table";
+import {
+  ToggleGroup,
+  ToggleGroupItem
+} from "../../../../shared/webview/components/ui/toggle-group";
 import { CpuIcon } from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorTableRow } from "./ExecutorTableRow";

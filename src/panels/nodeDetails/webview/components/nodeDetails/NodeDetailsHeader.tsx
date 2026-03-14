@@ -1,8 +1,11 @@
+import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../shared/webview/components/ui/progress";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../../../../shared/webview/components/ui/tooltip";
-import { Badge } from "../../../../shared/webview/components/ui/badge";
-import { cn } from "../../../../shared/webview/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "../../../../shared/webview/components/ui/tooltip";
 import {
   ClockIcon,
   ExternalLinkIcon,
@@ -10,6 +13,7 @@ import {
   RefreshIcon,
   ServerIcon
 } from "../../../../shared/webview/icons";
+import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeStatusClass } from "../../../shared/NodeDetailsContracts";
 
 const STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string }> = {
@@ -35,10 +39,12 @@ const STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string }> = 
   }
 };
 
-export type NodeAction = { type: "takeNodeOffline"; label: "Take Offline..." } | {
-  type: "bringNodeOnline";
-  label: "Bring Online";
-};
+export type NodeAction =
+  | { type: "takeNodeOffline"; label: "Take Offline..." }
+  | {
+      type: "bringNodeOnline";
+      label: "Bring Online";
+    };
 
 type NodeDetailsHeaderProps = {
   displayName: string;

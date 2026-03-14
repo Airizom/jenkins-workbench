@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Accordion } from "../../../../shared/webview/components/ui/accordion";
 import type { PipelineStageViewModel } from "../../../shared/BuildDetailsContracts";
-import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
+import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 import { StageNode } from "./pipelineStages/StageNode";
 import { getStageId, pruneStageFlags } from "./pipelineStages/pipelineStagesUtils";
 
@@ -20,10 +20,7 @@ export function PipelineStagesSection({
   const [openStages, setOpenStages] = useState<string[]>([]);
   const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
 
-  const stageIds = useMemo(
-    () => stages.map((stage, index) => getStageId(stage, index)),
-    [stages]
-  );
+  const stageIds = useMemo(() => stages.map((stage, index) => getStageId(stage, index)), [stages]);
   const stageIdSet = useMemo(() => new Set(stageIds), [stageIds]);
   const hasStages = stages.length > 0;
   const showPlaceholder = loading && !hasStages;

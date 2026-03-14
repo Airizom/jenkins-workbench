@@ -485,8 +485,11 @@ export class NodeDetailsPanel {
     const nonce = createNonce();
     let styleUris: string[] = [];
     try {
-      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "nodeDetails")
-        .styleUris;
+      styleUris = resolveWebviewAssets(
+        this.panel.webview,
+        this.extensionUri,
+        "nodeDetails"
+      ).styleUris;
     } catch {
       styleUris = [];
     }

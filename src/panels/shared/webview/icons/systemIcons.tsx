@@ -1,13 +1,9 @@
-import type { IconProps } from "./types";
 import { IconBase } from "./IconBase";
+import type { IconProps } from "./types";
 
 export function UserIcon({ className, ...props }: IconProps) {
   return (
-    <IconBase
-      className={className}
-      defaultClassName="h-4 w-4 text-muted-foreground"
-      {...props}
-    >
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </IconBase>
@@ -61,11 +57,7 @@ export function ActivityIcon({ className, ...props }: IconProps) {
 
 export function ExecutorsIcon({ className, ...props }: IconProps) {
   return (
-    <IconBase
-      className={className}
-      defaultClassName="h-4 w-4 text-muted-foreground"
-      {...props}
-    >
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
       <rect x="9" y="9" width="6" height="6" />
     </IconBase>

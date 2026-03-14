@@ -103,4 +103,3 @@ export function useToast(): {
 
   return { toasts, toast, dismissToast, removeToast };
 }
-

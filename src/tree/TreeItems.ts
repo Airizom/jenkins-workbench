@@ -7,15 +7,15 @@ import { buildNodeActionCapabilities } from "../jenkins/nodeActionCapabilities";
 import type { EnvironmentScope, JenkinsEnvironment } from "../storage/JenkinsEnvironmentStore";
 import { type BuildTooltipOptions, buildBuildTooltip } from "./BuildTooltips";
 import {
+  ROOT_TREE_JOB_SCOPE,
+  type TreeJobScope,
+  buildTreeJobScopeKey,
+  createViewTreeJobScope
+} from "./TreeJobScope";
+import {
   formatMultibranchFolderDescription,
   formatMultibranchFolderTooltip
 } from "./branchFilters";
-import {
-  ROOT_TREE_JOB_SCOPE,
-  buildTreeJobScopeKey,
-  createViewTreeJobScope,
-  type TreeJobScope
-} from "./TreeJobScope";
 import {
   buildIcon,
   formatBuildDescription,

@@ -1,7 +1,7 @@
 import { cn } from "../../../../../shared/webview/lib/utils";
+import type { PipelineStageStepViewModel } from "../../../../shared/BuildDetailsContracts";
 import { getStatusClass } from "../StatusPill";
 import { getStageIcon } from "./PipelineStageIcons";
-import type { PipelineStageStepViewModel } from "../../../../shared/BuildDetailsContracts";
 
 export function StepsList({
   steps,

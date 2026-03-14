@@ -9,9 +9,7 @@ export function curateTreeViews(
   options: TreeViewCurationOptions
 ): JenkinsViewInfo[] {
   const excludedNames = new Set(
-    options.excludedNames
-      .map((name) => name.trim().toLowerCase())
-      .filter((name) => name.length > 0)
+    options.excludedNames.map((name) => name.trim().toLowerCase()).filter((name) => name.length > 0)
   );
 
   return views.flatMap((view) => {

@@ -1,13 +1,13 @@
 import * as React from "react";
-import { ChevronDownIcon } from "../../../../../shared/webview/icons";
-import { cn } from "../../../../../shared/webview/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger
 } from "../../../../../shared/webview/components/ui/collapsible";
-import { getStatusClass } from "../StatusPill";
+import { ChevronDownIcon } from "../../../../../shared/webview/icons";
+import { cn } from "../../../../../shared/webview/lib/utils";
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
+import { getStatusClass } from "../StatusPill";
 import { getStageIcon } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
 

@@ -24,13 +24,11 @@ export function registerNodeCommands(
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.bringNodeOnline",
-      (item?: NodeTreeItem | NodeCommandTarget) =>
-        bringNodeOnline(dataService, refreshHost, item)
+      (item?: NodeTreeItem | NodeCommandTarget) => bringNodeOnline(dataService, refreshHost, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.launchNodeAgent",
-      (item?: NodeTreeItem | NodeCommandTarget) =>
-        launchNodeAgent(dataService, refreshHost, item)
+      (item?: NodeTreeItem | NodeCommandTarget) => launchNodeAgent(dataService, refreshHost, item)
     )
   );
 }

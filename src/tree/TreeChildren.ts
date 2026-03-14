@@ -1,8 +1,8 @@
 import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type {
   BuildListFetchOptions,
-  JenkinsDataService,
   JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
+  JenkinsDataService,
   JenkinsJobInfo,
   JenkinsQueueItemInfo
 } from "../jenkins/JenkinsDataService";
@@ -15,15 +15,7 @@ import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
-import {
-  ROOT_TREE_JOB_SCOPE,
-  buildTreeJobScopeKey,
-  getTreeJobCollectionCacheParts,
-  type TreeJobCollectionRequest,
-  type TreeJobScope
-} from "./TreeJobScope";
 import { resolveTreeItemLabel } from "./TreeItemLabels";
-import { curateTreeViews, type TreeViewCurationOptions } from "./TreeViewCuration";
 import {
   ArtifactTreeItem,
   BuildArtifactsFolderTreeItem,
@@ -44,7 +36,15 @@ import {
   ViewsFolderTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
+import {
+  ROOT_TREE_JOB_SCOPE,
+  type TreeJobCollectionRequest,
+  type TreeJobScope,
+  buildTreeJobScopeKey,
+  getTreeJobCollectionCacheParts
+} from "./TreeJobScope";
 import type { TreeChildrenOptions } from "./TreeTypes";
+import { type TreeViewCurationOptions, curateTreeViews } from "./TreeViewCuration";
 
 const CHILDREN_CACHE_MAX_ENTRIES = 200;
 const ARTIFACT_CACHE_MAX_ENTRIES = 200;
@@ -772,9 +772,7 @@ export class JenkinsTreeChildrenLoader {
     return undefined;
   }
 
-  private getJobCollectionRequest(
-    element: JobCollectionTreeElement
-  ): TreeJobCollectionRequest {
+  private getJobCollectionRequest(element: JobCollectionTreeElement): TreeJobCollectionRequest {
     if (element instanceof JenkinsFolderTreeItem) {
       return {
         scope: element.jobScope,
@@ -898,7 +896,11 @@ export class JenkinsTreeChildrenLoader {
     jobUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return this.buildChildrenKey("builds", environment, this.buildScopedTreeExtra(jobScope, jobUrl));
+    return this.buildChildrenKey(
+      "builds",
+      environment,
+      this.buildScopedTreeExtra(jobScope, jobUrl)
+    );
   }
 
   private buildBuildArtifactsKey(

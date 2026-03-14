@@ -1,3 +1,4 @@
+import type { ReactNode, RefObject } from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
   Tooltip,
@@ -5,7 +6,6 @@ import {
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
 import { ArrowUpIcon } from "../../../../../shared/webview/icons";
-import type { ReactNode, RefObject } from "react";
 
 type ConsoleOutputViewportProps = {
   consoleOutputRef: RefObject<HTMLPreElement>;

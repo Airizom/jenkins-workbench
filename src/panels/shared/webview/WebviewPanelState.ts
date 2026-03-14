@@ -15,9 +15,7 @@ export function isEnvironmentScope(value: unknown): value is EnvironmentScope {
   return VALID_SCOPES.has(value as EnvironmentScope);
 }
 
-export function isSerializedEnvironmentState(
-  value: unknown
-): value is SerializedEnvironmentState {
+export function isSerializedEnvironmentState(value: unknown): value is SerializedEnvironmentState {
   if (!value || typeof value !== "object") {
     return false;
   }

@@ -1,6 +1,5 @@
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../shared/webview/components/ui/progress";
-import { StatusPill } from "./StatusPill";
 import {
   AlertTriangleIcon,
   CalendarIcon,
@@ -13,6 +12,7 @@ import {
   XCircleIcon
 } from "../../../../shared/webview/icons";
 import { cn } from "../../../../shared/webview/lib/utils";
+import { StatusPill } from "./StatusPill";
 
 type BuildDetailsHeaderProps = {
   displayName: string;

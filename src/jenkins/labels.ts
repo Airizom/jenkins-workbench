@@ -2,9 +2,7 @@ export type JenkinsAssignedLabel = {
   name?: string | null;
 };
 
-export function collectAssignedLabelNames(
-  labels?: ReadonlyArray<JenkinsAssignedLabel>
-): string[] {
+export function collectAssignedLabelNames(labels?: ReadonlyArray<JenkinsAssignedLabel>): string[] {
   if (!Array.isArray(labels) || labels.length === 0) {
     return [];
   }

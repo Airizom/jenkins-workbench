@@ -1,10 +1,15 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../shared/webview/components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from "../../../../shared/webview/components/ui/tabs";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
-import type { OverviewRow } from "./nodeDetailsUtils";
 import { NodeDetailsAdvancedSection } from "./NodeDetailsAdvancedSection";
 import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
 import { NodeDetailsLabelsSection } from "./NodeDetailsLabelsSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
+import type { OverviewRow } from "./nodeDetailsUtils";
 
 type NodeDetailsTabsProps = {
   state: NodeDetailsState;

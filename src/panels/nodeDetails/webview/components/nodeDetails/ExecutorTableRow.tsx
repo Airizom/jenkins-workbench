@@ -1,5 +1,5 @@
-import { cn } from "../../../../shared/webview/lib/utils";
 import { TableCell, TableRow } from "../../../../shared/webview/components/ui/table";
+import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 
 type ExecutorEntry = NodeDetailsState["executors"][number];

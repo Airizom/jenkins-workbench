@@ -1,5 +1,5 @@
 import * as ToastPrimitive from "@radix-ui/react-toast";
-import { cva, type VariantProps } from "class-variance-authority";
+import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
@@ -68,7 +68,9 @@ export const ToastTitle = React.forwardRef<
 ));
 ToastTitle.displayName = "ToastTitle";
 
-export type ToastDescriptionProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Description>;
+export type ToastDescriptionProps = React.ComponentPropsWithoutRef<
+  typeof ToastPrimitive.Description
+>;
 
 export const ToastDescription = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Description>,

@@ -14,10 +14,10 @@ import { JenkinsTaskTerminal } from "./JenkinsTaskTerminal";
 import {
   JENKINS_TASK_SOURCE,
   JENKINS_TASK_TYPE,
+  type JenkinsTaskDefinition,
   isJenkinsTaskDefinition,
   normalizeEnvironmentUrl,
-  normalizeJobUrl,
-  type JenkinsTaskDefinition
+  normalizeJobUrl
 } from "./JenkinsTaskTypes";
 
 const MAX_JOB_RESULTS = 2000;

@@ -18,10 +18,7 @@ export class JenkinsWorkbenchDeepLinkBuildHandler {
     private readonly extensionUri: vscode.Uri
   ) {}
 
-  async openBuildDetails(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<void> {
+  async openBuildDetails(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     try {
       await BuildDetailsPanel.show({
         dataService: this.dataService,

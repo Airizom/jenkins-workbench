@@ -1,10 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { JenkinsMaxBytesError, JenkinsRequestError } from "../errors";
 import type { RedirectDecision } from "./redirects";
-import type {
-  JenkinsCollectedResponseBody,
-  JenkinsRequestOptions
-} from "./types";
+import type { JenkinsCollectedResponseBody, JenkinsRequestOptions } from "./types";
 
 export type RequestResponseStatusPolicy = "requireSuccessStatus" | "skipStatusCheck";
 

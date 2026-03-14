@@ -57,4 +57,3 @@ export type TableCaptionProps = React.HTMLAttributes<HTMLTableCaptionElement>;
 export function TableCaption({ className, ...props }: TableCaptionProps) {
   return <caption className={cn("mt-4 text-xs text-muted-foreground", className)} {...props} />;
 }
-

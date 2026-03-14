@@ -113,11 +113,9 @@ export async function activateRuntime(
     nodeDetailsSerializer,
     vscode.window.registerUriHandler(uriHandler),
     jenkinsfileCodeLensProvider,
-    vscode.workspace.registerFileSystemProvider(
-      ARTIFACT_PREVIEW_SCHEME,
-      artifactPreviewProvider,
-      { isReadonly: true }
-    ),
+    vscode.workspace.registerFileSystemProvider(ARTIFACT_PREVIEW_SCHEME, artifactPreviewProvider, {
+      isReadonly: true
+    }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       void syncJenkinsfileContext(jenkinsfileMatcher, editor);
     }),

@@ -1,9 +1,4 @@
-import {
-  ExecutorsIcon,
-  IdleIcon,
-  LaunchIcon,
-  StatusIcon
-} from "../../../../shared/webview/icons";
+import { ExecutorsIcon, IdleIcon, LaunchIcon, StatusIcon } from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 
 export const STALE_AFTER_MS = 5 * 60 * 1000;

@@ -49,7 +49,11 @@ export class RestartFromStageClient {
     headers: Record<string, string>
   ): Promise<{ success: boolean; message?: string; missingEndpoint: boolean }> {
     try {
-      const responseText = await this.context.requestPostTextWithCrumbRaw(restartUrl, body, headers);
+      const responseText = await this.context.requestPostTextWithCrumbRaw(
+        restartUrl,
+        body,
+        headers
+      );
       return this.parser.parseRestartPipelineResponse(responseText);
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {

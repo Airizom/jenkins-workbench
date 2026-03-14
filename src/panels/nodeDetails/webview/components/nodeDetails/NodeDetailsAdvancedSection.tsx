@@ -1,4 +1,9 @@
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../../../../shared/webview/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "../../../../shared/webview/components/ui/accordion";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { ScrollArea } from "../../../../shared/webview/components/ui/scroll-area";
 import { CopyIcon } from "../../../../shared/webview/icons";

@@ -5,22 +5,22 @@ import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { toast } from "../../shared/webview/hooks/useToast";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
-import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
-import {
-  type NodeDetailsState,
-  getInitialState,
-  nodeDetailsReducer
-} from "./state/nodeDetailsState";
+import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
+import { NodeDetailsHeader } from "./components/nodeDetails/NodeDetailsHeader";
+import type { NodeAction } from "./components/nodeDetails/NodeDetailsHeader";
+import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
 import {
   buildOverviewRows,
   formatRelativeTime,
   isStaleUpdatedAt,
   parseDate
 } from "./components/nodeDetails/nodeDetailsUtils";
-import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
-import { NodeDetailsHeader } from "./components/nodeDetails/NodeDetailsHeader";
-import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
-import type { NodeAction } from "./components/nodeDetails/NodeDetailsHeader";
+import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
+import {
+  type NodeDetailsState,
+  getInitialState,
+  nodeDetailsReducer
+} from "./state/nodeDetailsState";
 
 const { useEffect, useMemo, useReducer, useState } = React;
 

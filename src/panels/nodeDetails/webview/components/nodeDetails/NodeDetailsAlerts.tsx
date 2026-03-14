@@ -1,4 +1,8 @@
-import { Alert, AlertDescription, AlertTitle } from "../../../../shared/webview/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle
+} from "../../../../shared/webview/components/ui/alert";
 
 type NodeDetailsAlertsProps = {
   showOfflineBanner: boolean;
@@ -42,4 +46,3 @@ export function NodeDetailsAlerts({
     </>
   );
 }
-

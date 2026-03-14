@@ -1,6 +1,6 @@
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Switch } from "../../../../../shared/webview/components/ui/switch";
-import { TerminalIcon, SearchIcon, DownloadIcon } from "./ConsoleOutputIcons";
+import { DownloadIcon, SearchIcon, TerminalIcon } from "./ConsoleOutputIcons";
 
 type ConsoleOutputHeaderProps = {
   hasConsoleOutput: boolean;

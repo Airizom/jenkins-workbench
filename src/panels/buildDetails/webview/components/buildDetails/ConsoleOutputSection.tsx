@@ -1,14 +1,10 @@
 import * as React from "react";
+import { useConsoleOutputScroll } from "../../hooks/useConsoleOutputScroll";
 import { useConsoleSearch } from "../../hooks/useConsoleSearch";
 import { stripAnsi } from "../../lib/ansi";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
 import { ConsoleSearchToolbar } from "../ConsoleSearchToolbar";
-import { useConsoleOutputScroll } from "../../hooks/useConsoleOutputScroll";
-import {
-  buildConsoleTruncationNote,
-  countConsoleLines
-} from "./consoleOutput/consoleOutputUtils";
 import {
   ConsoleOutputEmptyState,
   ConsoleOutputErrorNotice,
@@ -16,6 +12,7 @@ import {
   ConsoleOutputNotice,
   ConsoleOutputViewport
 } from "./consoleOutput";
+import { buildConsoleTruncationNote, countConsoleLines } from "./consoleOutput/consoleOutputUtils";
 
 const { useEffect, useMemo } = React;
 
@@ -81,13 +78,7 @@ export function ConsoleOutputSection({
     if (consoleScrollKey || consoleScrollKey === "") {
       scrollConsoleToBottom();
     }
-  }, [
-    isActive,
-    followLog,
-    consoleScrollKey,
-    consoleSearch.isSearchActive,
-    scrollConsoleToBottom
-  ]);
+  }, [isActive, followLog, consoleScrollKey, consoleSearch.isSearchActive, scrollConsoleToBottom]);
 
   const consoleNote = useMemo(
     () => buildConsoleTruncationNote(consoleTruncated, consoleMaxChars),
@@ -150,9 +141,7 @@ export function ConsoleOutputSection({
         />
       ) : null}
 
-      {!consoleError && !hasConsoleOutput ? (
-        <ConsoleOutputEmptyState />
-      ) : null}
+      {!consoleError && !hasConsoleOutput ? <ConsoleOutputEmptyState /> : null}
     </div>
   );
 }

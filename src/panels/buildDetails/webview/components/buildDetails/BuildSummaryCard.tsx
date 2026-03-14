@@ -1,8 +1,8 @@
 import {
+  AlertTriangleIcon,
   CalendarIcon,
   CheckCircleIcon,
   ClockIcon,
-  AlertTriangleIcon,
   PlayCircleIcon,
   StopCircleIcon,
   UserIcon,

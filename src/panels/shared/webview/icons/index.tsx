@@ -7,14 +7,14 @@ export {
   CopyIcon,
   ExternalLinkIcon,
   RefreshIcon,
-  LaunchIcon,
+  LaunchIcon
 } from "./actionIcons";
 
 export {
   CalendarIcon,
   ClockIcon,
   IdleIcon,
-  StatusIcon,
+  StatusIcon
 } from "./timeIcons";
 
 export {
@@ -22,7 +22,7 @@ export {
   CheckCircleIcon,
   PlayCircleIcon,
   StopCircleIcon,
-  XCircleIcon,
+  XCircleIcon
 } from "./statusIcons";
 
 export {
@@ -31,5 +31,5 @@ export {
   ExecutorsIcon,
   ServerIcon,
   TagIcon,
-  UserIcon,
+  UserIcon
 } from "./systemIcons";

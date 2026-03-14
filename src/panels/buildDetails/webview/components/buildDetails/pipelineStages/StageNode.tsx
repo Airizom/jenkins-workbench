@@ -1,16 +1,18 @@
 import * as React from "react";
+import {
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "../../../../../shared/webview/components/ui/accordion";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Toggle } from "../../../../../shared/webview/components/ui/toggle";
-import { cn } from "../../../../../shared/webview/lib/utils";
 import { ChevronDownIcon } from "../../../../../shared/webview/icons";
-import { AccordionContent, AccordionItem, AccordionTrigger } from "../../../../../shared/webview/components/ui/accordion";
-import type {
-  PipelineStageViewModel
-} from "../../../../shared/BuildDetailsContracts";
+import { cn } from "../../../../../shared/webview/lib/utils";
+import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 import { StatusPill } from "../StatusPill";
-import { getConnectorColor, getStageIcon, getStageNodeStyle } from "./PipelineStageIcons";
 import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
+import { getConnectorColor, getStageIcon, getStageNodeStyle } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
 
 export function StageNode({
@@ -138,7 +140,11 @@ export function StageNode({
                         {showAll ? "Failed only" : "All steps"}
                       </Toggle>
                     </div>
-            {steps.length > 0 ? <StepsList steps={steps} /> : <EmptyStepsMessage showAll={showAll} />}
+                    {steps.length > 0 ? (
+                      <StepsList steps={steps} />
+                    ) : (
+                      <EmptyStepsMessage showAll={showAll} />
+                    )}
                   </div>
                 ) : null}
 

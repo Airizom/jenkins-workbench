@@ -78,7 +78,9 @@ export function requestStream(
           return;
         }
         if (redirectDecision.type === "cannotFollow") {
-          safeReject(new JenkinsRequestError("Jenkins returned a redirect that cannot be followed."));
+          safeReject(
+            new JenkinsRequestError("Jenkins returned a redirect that cannot be followed.")
+          );
           return;
         }
 

@@ -123,7 +123,9 @@ function ArtifactsList({
                   <span className="text-xs truncate">{displayName}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent className="max-w-sm wrap-break-word">{artifactTooltip}</TooltipContent>
+              <TooltipContent className="max-w-sm wrap-break-word">
+                {artifactTooltip}
+              </TooltipContent>
             </Tooltip>
             <div className="flex items-center gap-0.5 shrink-0">
               <Tooltip>

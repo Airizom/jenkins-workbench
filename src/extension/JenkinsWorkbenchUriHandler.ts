@@ -62,8 +62,7 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
 
   private parseAction(uri: vscode.Uri): "build" | "job" | undefined {
     const segments = uri.path.split("/").filter((segment) => segment.length > 0);
-    const actionCandidate =
-      segments.length > 0 ? segments[0] : uri.authority?.trim() || undefined;
+    const actionCandidate = segments.length > 0 ? segments[0] : uri.authority?.trim() || undefined;
     if (!actionCandidate) {
       return undefined;
     }

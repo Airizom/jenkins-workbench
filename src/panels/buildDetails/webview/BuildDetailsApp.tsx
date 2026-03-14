@@ -1,7 +1,7 @@
 import * as React from "react";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
-import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
+import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
 import { BuildDetailsErrorList } from "./components/buildDetails/BuildDetailsErrorList";
 import { BuildDetailsHeader } from "./components/buildDetails/BuildDetailsHeader";
@@ -62,18 +62,18 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col">
-          <BuildDetailsHeader
-            displayName={state.displayName}
-            resultLabel={state.resultLabel}
-            resultClass={state.resultClass}
-            durationLabel={state.durationLabel}
-            timestampLabel={state.timestampLabel}
-            culpritsLabel={state.culpritsLabel}
-            loading={Boolean(state.loading)}
-            isRunning={isRunning}
-            buildUrl={buildUrl}
-            onOpenBuild={handleOpenBuild}
-          />
+        <BuildDetailsHeader
+          displayName={state.displayName}
+          resultLabel={state.resultLabel}
+          resultClass={state.resultClass}
+          durationLabel={state.durationLabel}
+          timestampLabel={state.timestampLabel}
+          culpritsLabel={state.culpritsLabel}
+          loading={Boolean(state.loading)}
+          isRunning={isRunning}
+          buildUrl={buildUrl}
+          onOpenBuild={handleOpenBuild}
+        />
 
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
           <BuildDetailsErrorList errors={state.errors} />
@@ -118,7 +118,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           />
         </main>
 
-        <BuildDetailsScrollToTopButton show={showButton && !state.followLog} onScrollToTop={scrollToTop} />
+        <BuildDetailsScrollToTopButton
+          show={showButton && !state.followLog}
+          onScrollToTop={scrollToTop}
+        />
 
         <Toaster />
       </div>

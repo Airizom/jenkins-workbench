@@ -21,4 +21,3 @@ export function NodeDetailsLabelsSection({ labels }: NodeDetailsLabelsSectionPro
     </div>
   );
 }
-

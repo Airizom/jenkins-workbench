@@ -1,5 +1,5 @@
-import type { IconProps } from "./types";
 import { IconBase } from "./IconBase";
+import type { IconProps } from "./types";
 
 export function ClockIcon({ className, ...props }: IconProps) {
   return (
@@ -23,11 +23,7 @@ export function CalendarIcon({ className, ...props }: IconProps) {
 
 export function StatusIcon({ className, ...props }: IconProps) {
   return (
-    <IconBase
-      className={className}
-      defaultClassName="h-4 w-4 text-muted-foreground"
-      {...props}
-    >
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </IconBase>
   );
@@ -35,11 +31,7 @@ export function StatusIcon({ className, ...props }: IconProps) {
 
 export function IdleIcon({ className, ...props }: IconProps) {
   return (
-    <IconBase
-      className={className}
-      defaultClassName="h-4 w-4 text-muted-foreground"
-      {...props}
-    >
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <circle cx="12" cy="12" r="10" />
       <polyline points="12 6 12 12 16 14" />
     </IconBase>

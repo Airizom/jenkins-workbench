@@ -37,12 +37,7 @@ function XIcon() {
 
 function PlayIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3 ml-0.5"
-      fill="currentColor"
-      viewBox="0 0 24 24"
-    >
+    <svg aria-hidden="true" className="h-3 w-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
       <polygon points="5 3 19 12 5 21 5 3" />
     </svg>
   );
@@ -102,10 +97,7 @@ export function getStageNodeStyle(statusClass?: string): string {
     case "unstable":
       return cn(baseStyles, "border-warning-border bg-warning-soft text-warning");
     case "running":
-      return cn(
-        baseStyles,
-        "border-warning-border bg-warning-soft text-warning animate-pulse"
-      );
+      return cn(baseStyles, "border-warning-border bg-warning-soft text-warning animate-pulse");
     case "aborted":
       return cn(baseStyles, "border-aborted-border bg-aborted-soft text-aborted");
     default:

@@ -5,9 +5,7 @@ export const JENKINS_TASK_TYPE = "jenkinsWorkbench";
 export const JENKINS_TASK_SOURCE = "Jenkins Workbench";
 
 export type JenkinsTaskParameterValue = string | number | boolean;
-export type JenkinsTaskParameterValues =
-  | JenkinsTaskParameterValue
-  | JenkinsTaskParameterValue[];
+export type JenkinsTaskParameterValues = JenkinsTaskParameterValue | JenkinsTaskParameterValue[];
 export type JenkinsTaskParameters = Record<string, JenkinsTaskParameterValues>;
 
 export interface JenkinsTaskParameterEntry {

@@ -1,6 +1,6 @@
-import * as vscode from "vscode";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import * as vscode from "vscode";
 
 export type WebviewEntryName = "buildDetails" | "nodeDetails";
 
@@ -107,7 +107,9 @@ function toWebviewAssetUri(
   extensionUri: vscode.Uri,
   assetPath: string
 ): vscode.Uri {
-  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "out", "webview", ...assetPath.split("/")));
+  return webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, "out", "webview", ...assetPath.split("/"))
+  );
 }
 
 export function resolveWebviewAssets(

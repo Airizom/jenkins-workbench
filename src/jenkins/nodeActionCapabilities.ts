@@ -22,8 +22,7 @@ export function buildNodeActionCapabilities(
   const isTemporarilyOffline = input?.temporarilyOffline === true;
   const canTakeOffline = input?.offline === false && !isTemporarilyOffline;
   const canBringOnline = isTemporarilyOffline;
-  const canLaunchAgent =
-    isOffline && !isTemporarilyOffline && input?.launchSupported === true;
+  const canLaunchAgent = isOffline && !isTemporarilyOffline && input?.launchSupported === true;
   const canOpenAgentInstructions =
     isOffline &&
     !isTemporarilyOffline &&

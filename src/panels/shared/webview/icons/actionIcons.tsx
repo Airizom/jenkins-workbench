@@ -1,5 +1,5 @@
-import type { IconProps } from "./types";
 import { IconBase } from "./IconBase";
+import type { IconProps } from "./types";
 
 export function ArrowUpIcon({ className, ...props }: IconProps) {
   return (
@@ -57,11 +57,7 @@ export function ChevronDownIcon({ className, ...props }: IconProps) {
 
 export function LaunchIcon({ className, ...props }: IconProps) {
   return (
-    <IconBase
-      className={className}
-      defaultClassName="h-4 w-4 text-muted-foreground"
-      {...props}
-    >
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M22 2L11 13" />
       <path d="M22 2L15 22 11 13 2 9 22 2z" />
     </IconBase>

@@ -27,7 +27,9 @@ function ConsoleOutputAlertIcon() {
   );
 }
 
-export function ConsoleOutputTruncationNotice({ note }: ConsoleOutputNoticeProps): JSX.Element | null {
+export function ConsoleOutputTruncationNotice({
+  note
+}: ConsoleOutputNoticeProps): JSX.Element | null {
   if (!note) {
     return null;
   }
@@ -42,7 +44,9 @@ export function ConsoleOutputTruncationNotice({ note }: ConsoleOutputNoticeProps
   );
 }
 
-export function ConsoleOutputErrorNotice({ error }: ConsoleOutputErrorNoticeProps): JSX.Element | null {
+export function ConsoleOutputErrorNotice({
+  error
+}: ConsoleOutputErrorNoticeProps): JSX.Element | null {
   if (!error) {
     return null;
   }

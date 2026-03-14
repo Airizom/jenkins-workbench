@@ -331,11 +331,7 @@
     --muted-foreground: var(--vscode-descriptionForeground);
     --muted-soft: color-mix(in srgb, var(--muted) 30%, transparent);
     --muted-strong: color-mix(in srgb, var(--muted) 50%, transparent);
-    --muted-foreground-border: color-mix(
-      in srgb,
-      var(--muted-foreground) 50%,
-      transparent
-    );
+    --muted-foreground-border: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
 
     --accent: var(--vscode-list-hoverBackground, var(--vscode-editor-background));
     --accent-foreground: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));

@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
-import { choosePreset } from "./buildParameterPrompts/PresetSelectionPrompts";
-import { promptParameterValues } from "./buildParameterPrompts/ParameterValuePrompts";
-import { handlePresetSave, selectTriggerMode } from "./buildParameterPrompts/PresetSavePrompts";
 import type {
   BuildParameterPromptOptions,
   BuildParameterPromptResult
 } from "./buildParameterPrompts/BuildParameterPromptTypes";
+import { promptParameterValues } from "./buildParameterPrompts/ParameterValuePrompts";
+import { handlePresetSave, selectTriggerMode } from "./buildParameterPrompts/PresetSavePrompts";
+import { choosePreset } from "./buildParameterPrompts/PresetSelectionPrompts";
 
 export type { BuildParameterPromptResult } from "./buildParameterPrompts/BuildParameterPromptTypes";
 

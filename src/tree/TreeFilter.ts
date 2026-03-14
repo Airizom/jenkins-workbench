@@ -2,8 +2,8 @@ import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsJobInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
-import { normalizeBranchFilter } from "./branchFilters";
 import { buildOverrideKey } from "./TreeFilterKeys";
+import { normalizeBranchFilter } from "./branchFilters";
 
 interface TreeFilterOptions {
   parentFolderKind?: JenkinsJobKind;

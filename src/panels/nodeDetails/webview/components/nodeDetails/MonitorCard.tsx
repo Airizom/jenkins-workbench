@@ -1,4 +1,9 @@
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../../../../shared/webview/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "../../../../shared/webview/components/ui/accordion";
 import { ScrollArea } from "../../../../shared/webview/components/ui/scroll-area";
 import type { NodeMonitorViewModel } from "../../../shared/NodeDetailsContracts";
 import { formatJson } from "./nodeDetailsUtils";

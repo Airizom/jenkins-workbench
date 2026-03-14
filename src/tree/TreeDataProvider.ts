@@ -19,9 +19,9 @@ import {
   RootSectionTreeItem,
   type WorkbenchTreeElement
 } from "./TreeItems";
+import type { TreeJobScope } from "./TreeJobScope";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
-import type { TreeJobScope } from "./TreeJobScope";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
 

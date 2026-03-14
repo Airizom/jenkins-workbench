@@ -1,18 +1,23 @@
-import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from "../../../../shared/webview/components/ui/tabs";
 import type {
   ArtifactAction,
   BuildFailureArtifact,
   BuildFailureInsightsViewModel,
-  PipelineStageViewModel,
-  PendingInputViewModel
+  PendingInputViewModel,
+  PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../shared/webview/components/ui/tabs";
+import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
+import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { BuildFailureInsightsSection } from "./BuildFailureInsightsSection";
 import { BuildSummaryCard } from "./BuildSummaryCard";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineStagesSection } from "./PipelineStagesSection";
-import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
 
 type BuildDetailsTabsProps = {
   selectedTab: BuildDetailsTab;
@@ -76,7 +81,11 @@ export function BuildDetailsTabs({
   onArtifactAction
 }: BuildDetailsTabsProps): JSX.Element {
   return (
-    <Tabs value={selectedTab} onValueChange={(value) => onTabChange(value as BuildDetailsTab)} className="space-y-3">
+    <Tabs
+      value={selectedTab}
+      onValueChange={(value) => onTabChange(value as BuildDetailsTab)}
+      className="space-y-3"
+    >
       <TabsList className="w-full justify-start">
         {hasPendingInputs ? (
           <TabsTrigger value="inputs" className="relative text-xs">

@@ -27,15 +27,10 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     ];
   }
 
-  protected async getJobUrls(
-    scope: EnvironmentScope,
-    environmentId: string
-  ): Promise<Set<string>> {
+  protected async getJobUrls(scope: EnvironmentScope, environmentId: string): Promise<Set<string>> {
     const entries = await this.readEntries(scope);
     return new Set(
-      entries
-        .filter((entry) => entry.environmentId === environmentId)
-        .map((entry) => entry.jobUrl)
+      entries.filter((entry) => entry.environmentId === environmentId).map((entry) => entry.jobUrl)
     );
   }
 
@@ -45,7 +40,9 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     jobUrl: string
   ): Promise<boolean> {
     const entries = await this.readEntries(scope);
-    return entries.some((entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl);
+    return entries.some(
+      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
+    );
   }
 
   protected async addOrUpdate(

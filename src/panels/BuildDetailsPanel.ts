@@ -82,7 +82,17 @@ export class BuildDetailsPanel {
   private refreshHost?: EnvironmentScopedRefreshHost;
 
   static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
-    const { dataService, artifactActionHandler, consoleExporter, refreshHost, pendingInputProvider, environment, buildUrl, extensionUri, label } = options;
+    const {
+      dataService,
+      artifactActionHandler,
+      consoleExporter,
+      refreshHost,
+      pendingInputProvider,
+      environment,
+      buildUrl,
+      extensionUri,
+      label
+    } = options;
 
     if (!BuildDetailsPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
@@ -283,8 +293,11 @@ export class BuildDetailsPanel {
     const nonce = createNonce();
     let styleUris: string[] = [];
     try {
-      styleUris = resolveWebviewAssets(this.panel.webview, this.extensionUri, "buildDetails")
-        .styleUris;
+      styleUris = resolveWebviewAssets(
+        this.panel.webview,
+        this.extensionUri,
+        "buildDetails"
+      ).styleUris;
     } catch {
       // keep empty
     }

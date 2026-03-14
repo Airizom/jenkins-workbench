@@ -1,5 +1,5 @@
-import { ExecutorsTableCard } from "./ExecutorsTableCard";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
+import { ExecutorsTableCard } from "./ExecutorsTableCard";
 
 type NodeDetailsExecutorsSectionProps = {
   executors: NodeDetailsState["executors"];
@@ -16,7 +16,11 @@ export function NodeDetailsExecutorsSection({
     <>
       <ExecutorsTableCard title="Executors" entries={executors} onOpenExternal={onOpenExternal} />
       {oneOffExecutors.length > 0 ? (
-        <ExecutorsTableCard title="One-off Executors" entries={oneOffExecutors} onOpenExternal={onOpenExternal} />
+        <ExecutorsTableCard
+          title="One-off Executors"
+          entries={oneOffExecutors}
+          onOpenExternal={onOpenExternal}
+        />
       ) : null}
     </>
   );

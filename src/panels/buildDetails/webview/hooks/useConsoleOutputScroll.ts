@@ -29,7 +29,9 @@ export function useConsoleOutputScroll(
 
     const { isScrollable, isScrolledDown } = readConsoleScrollState(output);
     const nextShowScrollToTop = isScrollable && isScrolledDown;
-    setShowScrollToTop((previous) => (previous === nextShowScrollToTop ? previous : nextShowScrollToTop));
+    setShowScrollToTop((previous) =>
+      previous === nextShowScrollToTop ? previous : nextShowScrollToTop
+    );
   }, [consoleOutputRef]);
 
   useEffect(() => {
