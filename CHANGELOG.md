@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.1] - 2026-03-14
+
+### Fixed
+
+- fix: surface Jenkinsfile validation request failures
+
+### Documentation
+
+- docs: document curated Jenkins views and node actions
+
+### Changed
+
+- chore: format ui, tree, and command runtime source files
+
 ## [1.34.0] - 2026-03-13
 
 ### Added
