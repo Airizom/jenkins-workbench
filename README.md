@@ -16,6 +16,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Activity Bar View** — Dedicated Jenkins sidebar with a hierarchical tree view
 - **Multi-Environment Support** — Connect to multiple Jenkins instances with workspace or global scope
 - **Browse Everything** — Explore folders, multibranch pipelines, jobs, builds, and nodes
+- **Curated Jenkins Views** — Browse Jenkins views in a dedicated section and hide noisy defaults
 - **Go to Job...** — Quick search across all configured Jenkins environments
 - **Pin Jobs & Pipelines** — Keep critical items at the top of the tree for quick access
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
@@ -169,6 +170,12 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | `jenkinsWorkbench.jobSearchBackoffMaxMs` | 2000 | Maximum delay for adaptive backoff. |
 | `jenkinsWorkbench.jobSearchMaxRetries` | 2 | Retries for transient errors (429/5xx). |
 
+### Tree Views
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.treeViews.excludedNames` | `["all"]` | Case-insensitive Jenkins view names to hide from the curated Views section. |
+
 ### Build Tooltips
 
 | Setting | Default | Description |
@@ -242,6 +249,7 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | `Jenkins: Rename Job` | Rename the selected job or pipeline |
 | `Jenkins: Copy Job` | Copy the selected job or pipeline |
 | `Jenkins: Delete Job` | Delete the selected job or pipeline |
+| `Jenkins: Scan Repository Now` | Trigger a multibranch scan for the selected multibranch folder |
 
 ### Artifacts
 
@@ -262,6 +270,9 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | Command | Description |
 |---------|-------------|
 | `Jenkins: View Node Details` | Open the node details panel |
+| `Jenkins: Take Node Offline...` | Mark the selected Jenkins node temporarily offline |
+| `Jenkins: Bring Node Online` | Return a temporarily offline node to service |
+| `Jenkins: Launch Node Agent` | Ask Jenkins to launch the selected node agent |
 
 ### Filtering
 
@@ -344,7 +355,7 @@ Security notes:
 
 ### Artifact Downloads
 
-- Artifact preview/downloads require a folder-backed workspace
+- Artifact downloads require a folder-backed workspace; previews do not
 - If downloads fail, check the `jenkinsWorkbench.artifactMaxDownloadMb` limit
 
 ### Slow Job Search
@@ -372,29 +383,36 @@ Contributions are welcome! Please follow these guidelines:
 # Install dependencies
 npm install
 
-# Compile webview + TypeScript
+# Compile the webview bundle, typecheck it, then compile the extension
 npm run compile
 
 # Watch mode for development
 npm run watch
 
-# Lint and format
+# Check source files without modifying them
+npm run check
+
+# Lint and format with fixes
 npm run check:fix
 
 # Launch Extension Development Host
 # Press F5 in VS Code
 ```
 
+`npm run compile` is the canonical sync point for the project. It rebuilds the webview bundle, typechecks the webview code, and then runs the extension TypeScript compile so the runtime webview manifest stays aligned with the backend.
+
 ### Manual Testing Checklist
 
-1. Run `npm run compile`, then press F5 to launch the Extension Development Host
+1. Run `npm run compile` and `npm run check`, then press F5 to launch the Extension Development Host
 2. Add a workspace and a global environment
 3. Verify jobs, builds, and nodes load correctly
 4. Test build actions (trigger, stop, replay, rebuild)
 5. Verify watch notifications work
-6. Confirm removing an environment clears it from the tree
-7. Preview or download a build artifact
-8. Pin and unpin a job or pipeline
+6. Test node actions and node details
+7. Trigger a multibranch scan and verify branch filtering still works
+8. Confirm removing an environment clears it from the tree
+9. Preview or download a build artifact
+10. Pin and unpin a job or pipeline
 
 ## License
 
