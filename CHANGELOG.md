@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-03-13
+
+### Added
+
+- feat: add curated Jenkins views and scope-aware tree caching
+- feat: add advanced build parameters with reusable presets
+- feat: add multibranch scan command to trigger repository indexing
+- feat: add pipeline restart-from-stage flow in build details
+
+### Fixed
+
+- fix: respect auto-validation toggle and state tracking
+
+### Changed
+
+- refactor: split extension startup into container-driven runtime modules
+- refactor: split data service and build details into focused modules
+
 ## [1.33.0] - 2026-02-16
 
 ### Added
