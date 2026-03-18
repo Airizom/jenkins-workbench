@@ -1,8 +1,8 @@
 import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type {
   BuildListFetchOptions,
-  JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
   JenkinsDataService,
+  JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
   JenkinsJobInfo,
   JenkinsQueueItemInfo
 } from "../jenkins/JenkinsDataService";
@@ -28,7 +28,6 @@ import {
   JobsFolderTreeItem,
   NodeTreeItem,
   NodesFolderTreeItem,
-  PinnedSectionTreeItem,
   PipelineTreeItem,
   PlaceholderTreeItem,
   QueueItemTreeItem,
@@ -39,12 +38,24 @@ import {
 import {
   ROOT_TREE_JOB_SCOPE,
   type TreeJobCollectionRequest,
-  type TreeJobScope,
-  buildTreeJobScopeKey,
-  getTreeJobCollectionCacheParts
+  type TreeJobScope
 } from "./TreeJobScope";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import { type TreeViewCurationOptions, curateTreeViews } from "./TreeViewCuration";
+import { TreeChildrenCacheManager } from "./loader/TreeChildrenCacheManager";
+import {
+  type JobCollectionTreeElement,
+  buildArtifactChildrenKey,
+  buildBuildArtifactsKey,
+  buildBuildsChildrenKey,
+  buildJobCollectionChildrenKey,
+  getJobCollectionElement,
+  getJobCollectionRequest,
+  getJobCollectionLoadingLabel,
+  mapJobsToTreeItems,
+  mapQueueItemsToTreeItems,
+  toJenkinsJobCollectionRequest
+} from "./loader/TreeChildrenMapping";
 
 const CHILDREN_CACHE_MAX_ENTRIES = 200;
 const ARTIFACT_CACHE_MAX_ENTRIES = 200;
@@ -55,21 +66,16 @@ const ARTIFACT_CACHE_TTL_MS = 5 * 60_000;
 const ENVIRONMENT_SUMMARY_TTL_MS = 60_000;
 const CHILDREN_LOAD_TIMEOUT_MS = 35_000;
 
-type JobCollectionTreeElement = JobsFolderTreeItem | JenkinsViewTreeItem | JenkinsFolderTreeItem;
-
 export class JenkinsTreeChildrenLoader {
-  private readonly watchedUrlsCache = new Map<string, Set<string>>();
-  private readonly pinnedUrlsCache = new Map<string, Set<string>>();
   private readonly childrenCache = new ScopedCache(
     CHILDREN_CACHE_TTL_MS,
     CHILDREN_CACHE_MAX_ENTRIES
   );
-  private readonly pendingLoads = new Map<string, Promise<void>>();
-  private readonly loadTokens = new Map<string, number>();
   private readonly artifactCache = new ScopedCache(
     ARTIFACT_CACHE_TTL_MS,
     ARTIFACT_CACHE_MAX_ENTRIES
   );
+  private readonly cacheManager: TreeChildrenCacheManager;
   private readonly environmentSummaryStore: EnvironmentSummaryStore;
 
   constructor(
@@ -86,6 +92,14 @@ export class JenkinsTreeChildrenLoader {
     private readonly notify: (element?: WorkbenchTreeElement) => void,
     private readonly notifyEnvironment: (environment: JenkinsEnvironmentRef) => void
   ) {
+    this.cacheManager = new TreeChildrenCacheManager(
+      this.childrenCache,
+      this.artifactCache,
+      this.notify,
+      CHILDREN_LOAD_TIMEOUT_MS,
+      this.createLoadingPlaceholder.bind(this),
+      this.createErrorPlaceholder.bind(this)
+    );
     this.environmentSummaryStore = new EnvironmentSummaryStore(
       new ScopedCache(ENVIRONMENT_SUMMARY_TTL_MS, ENVIRONMENT_SUMMARY_CACHE_MAX_ENTRIES),
       this.notifyEnvironment
@@ -223,61 +237,29 @@ export class JenkinsTreeChildrenLoader {
   }
 
   clearWatchCacheForEnvironment(environmentId?: string): void {
-    if (!environmentId) {
-      this.watchedUrlsCache.clear();
-      return;
-    }
-    for (const key of this.watchedUrlsCache.keys()) {
-      if (key.endsWith(`:${environmentId}`)) {
-        this.watchedUrlsCache.delete(key);
-      }
-    }
+    this.cacheManager.clearWatchCacheForEnvironment(environmentId);
   }
 
   clearPinCacheForEnvironment(environmentId?: string): void {
-    if (!environmentId) {
-      this.pinnedUrlsCache.clear();
-      return;
-    }
-    for (const key of this.pinnedUrlsCache.keys()) {
-      if (key.endsWith(`:${environmentId}`)) {
-        this.pinnedUrlsCache.delete(key);
-      }
-    }
+    this.cacheManager.clearPinCacheForEnvironment(environmentId);
   }
 
   clearChildrenCacheForEnvironment(environmentId?: string): void {
+    this.cacheManager.clearChildrenCacheForEnvironment(environmentId);
     if (!environmentId) {
-      this.childrenCache.clear();
-      this.pendingLoads.clear();
-      this.loadTokens.clear();
-      this.artifactCache.clear();
       this.environmentSummaryStore.clearAll();
       return;
     }
-    const prefix = `${environmentId}:`;
-    for (const key of this.pendingLoads.keys()) {
-      if (key.startsWith(prefix)) {
-        this.clearChildrenCache(key);
-      }
-    }
-    for (const key of this.loadTokens.keys()) {
-      if (key.startsWith(prefix) && !this.pendingLoads.has(key)) {
-        this.loadTokens.delete(key);
-      }
-    }
-    this.childrenCache.clearForEnvironment(environmentId);
-    this.artifactCache.clearForEnvironment(environmentId);
     this.environmentSummaryStore.clearForEnvironment(environmentId);
   }
 
   clearQueueCache(environment: JenkinsEnvironmentRef): void {
     const key = this.buildChildrenKey("queue", environment);
-    this.clearChildrenCache(key);
+    this.cacheManager.clearChildrenCache(key);
   }
 
   clearBuildsCache(environment: JenkinsEnvironmentRef): void {
-    this.clearChildrenCacheForKind(environment, "builds");
+    this.cacheManager.clearChildrenCacheForKind(environment, "builds");
   }
 
   invalidateBuildArtifacts(
@@ -285,8 +267,8 @@ export class JenkinsTreeChildrenLoader {
     buildUrl: string,
     jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE
   ): void {
-    this.clearChildrenCache(this.buildBuildArtifactsKey(environment, buildUrl, jobScope));
-    this.artifactCache.delete(this.buildArtifactChildrenKey(environment, buildUrl, jobScope));
+    this.cacheManager.clearChildrenCache(this.buildBuildArtifactsKey(environment, buildUrl, jobScope));
+    this.cacheManager.deleteArtifact(this.buildArtifactChildrenKey(environment, buildUrl, jobScope));
   }
 
   invalidateForElement(element?: WorkbenchTreeElement): void {
@@ -306,13 +288,13 @@ export class JenkinsTreeChildrenLoader {
     }
 
     if (element instanceof ViewsFolderTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("views", element.environment));
+      this.cacheManager.clearChildrenCache(this.buildChildrenKey("views", element.environment));
       return;
     }
 
     const jobCollectionElement = this.getJobCollectionElement(element);
     if (jobCollectionElement) {
-      this.clearChildrenCache(
+      this.cacheManager.clearChildrenCache(
         this.buildJobCollectionChildrenKey(
           jobCollectionElement.environment,
           this.getJobCollectionRequest(jobCollectionElement)
@@ -322,7 +304,7 @@ export class JenkinsTreeChildrenLoader {
     }
 
     if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
-      this.clearChildrenCache(
+      this.cacheManager.clearChildrenCache(
         this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope)
       );
       return;
@@ -335,19 +317,19 @@ export class JenkinsTreeChildrenLoader {
 
     if (element instanceof BuildArtifactsFolderTreeItem) {
       this.invalidateBuildArtifacts(element.environment, element.buildUrl, element.jobScope);
-      this.clearChildrenCache(
+      this.cacheManager.clearChildrenCache(
         this.buildArtifactChildrenKey(element.environment, element.buildUrl, element.jobScope)
       );
       return;
     }
 
     if (element instanceof NodesFolderTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("nodes", element.environment));
+      this.cacheManager.clearChildrenCache(this.buildChildrenKey("nodes", element.environment));
       return;
     }
 
     if (element instanceof NodeTreeItem) {
-      this.clearChildrenCache(this.buildChildrenKey("nodes", element.environment));
+      this.cacheManager.clearChildrenCache(this.buildChildrenKey("nodes", element.environment));
       return;
     }
 
@@ -360,27 +342,6 @@ export class JenkinsTreeChildrenLoader {
       this.clearQueueCache(element.environment);
       return;
     }
-  }
-
-  private clearChildrenCache(key: string): void {
-    const hadPending = this.pendingLoads.has(key);
-    this.childrenCache.delete(key);
-    this.pendingLoads.delete(key);
-    if (hadPending) {
-      this.bumpLoadToken(key);
-    } else {
-      this.loadTokens.delete(key);
-    }
-  }
-
-  private clearChildrenCacheForKind(environment: JenkinsEnvironmentRef, kind: string): void {
-    const prefix = `${this.childrenCache.buildEnvironmentKey(environment)}:${kind}:`;
-    for (const key of this.pendingLoads.keys()) {
-      if (key.startsWith(prefix)) {
-        this.clearChildrenCache(key);
-      }
-    }
-    this.childrenCache.clearForEnvironmentKind(environment, kind);
   }
 
   private async getInstanceItems(): Promise<WorkbenchTreeElement[]> {
@@ -604,88 +565,23 @@ export class JenkinsTreeChildrenLoader {
       jobScope?: TreeJobScope;
     }
   ): Promise<WorkbenchTreeElement[]> {
-    if (jobs.length === 0) {
-      return [
-        this.createEmptyPlaceholder(
-          "No jobs, folders, or pipelines found.",
-          "This location is empty."
-        )
-      ];
-    }
-
     const [watchedJobs, pinnedJobs] = await Promise.all([
       this.getWatchedJobUrls(environment),
       this.getPinnedJobUrls(environment)
     ]);
-    const filteredJobs = this.treeFilter.filterJobs(
+    return mapJobsToTreeItems(
       environment,
       jobs,
-      options,
-      options?.overrideKeys
+      this.treeFilter,
+      options ?? {},
+      watchedJobs,
+      pinnedJobs,
+      (label, description) => this.createEmptyPlaceholder(label, description)
     );
-
-    if (filteredJobs.length === 0) {
-      return [
-        this.createEmptyPlaceholder(
-          "No jobs match the current filters.",
-          "Adjust or clear filters via the filter menu."
-        )
-      ];
-    }
-
-    const orderedJobs = this.orderPinnedJobsFirst(filteredJobs, pinnedJobs);
-    const pinnedItems: WorkbenchTreeElement[] = [];
-    const unpinnedItems: WorkbenchTreeElement[] = [];
-
-    for (const job of orderedJobs) {
-      const isWatched = watchedJobs.has(job.url);
-      const isPinned = pinnedJobs.has(job.url);
-      let item: WorkbenchTreeElement;
-      switch (job.kind) {
-        case "folder":
-        case "multibranch":
-          item = this.createFolderTreeItem(environment, job, options?.jobScope);
-          break;
-        case "pipeline":
-          item = new PipelineTreeItem(
-            environment,
-            job.name,
-            job.url,
-            options?.jobScope,
-            job.color,
-            isWatched,
-            isPinned
-          );
-          break;
-        default:
-          item = new JobTreeItem(
-            environment,
-            job.name,
-            job.url,
-            options?.jobScope,
-            job.color,
-            isWatched,
-            isPinned
-          );
-          break;
-      }
-      if (isPinned && (item instanceof JobTreeItem || item instanceof PipelineTreeItem)) {
-        pinnedItems.push(item);
-      } else {
-        unpinnedItems.push(item);
-      }
-    }
-
-    if (pinnedItems.length > 0) {
-      return [new PinnedSectionTreeItem(), ...pinnedItems, ...unpinnedItems];
-    }
-
-    return [...pinnedItems, ...unpinnedItems];
   }
 
   private async getWatchedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
-    const key = `${environment.scope}:${environment.environmentId}`;
-    const cached = this.watchedUrlsCache.get(key);
+    const cached = this.cacheManager.getCachedWatchedJobs(environment);
     if (cached) {
       return cached;
     }
@@ -694,13 +590,12 @@ export class JenkinsTreeChildrenLoader {
       environment.scope,
       environment.environmentId
     );
-    this.watchedUrlsCache.set(key, watched);
+    this.cacheManager.setCachedWatchedJobs(environment, watched);
     return watched;
   }
 
   private async getPinnedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
-    const key = `${environment.scope}:${environment.environmentId}`;
-    const cached = this.pinnedUrlsCache.get(key);
+    const cached = this.cacheManager.getCachedPinnedJobs(environment);
     if (cached) {
       return cached;
     }
@@ -709,121 +604,42 @@ export class JenkinsTreeChildrenLoader {
       environment.scope,
       environment.environmentId
     );
-    this.pinnedUrlsCache.set(key, pinned);
+    this.cacheManager.setCachedPinnedJobs(environment, pinned);
     return pinned;
-  }
-
-  private orderPinnedJobsFirst(jobs: JenkinsJobInfo[], pinnedJobs: Set<string>): JenkinsJobInfo[] {
-    if (pinnedJobs.size === 0) {
-      return jobs;
-    }
-
-    const pinned: JenkinsJobInfo[] = [];
-    const unpinned: JenkinsJobInfo[] = [];
-
-    for (const job of jobs) {
-      const isPinnable = job.kind === "job" || job.kind === "pipeline";
-      if (isPinnable && pinnedJobs.has(job.url)) {
-        pinned.push(job);
-      } else {
-        unpinned.push(job);
-      }
-    }
-
-    if (pinned.length === 0) {
-      return jobs;
-    }
-
-    return [...pinned, ...unpinned];
   }
 
   private mapQueueItemsToTreeItems(
     environment: JenkinsEnvironmentRef,
     items: JenkinsQueueItemInfo[]
   ): WorkbenchTreeElement[] {
-    return items.map((item) => new QueueItemTreeItem(environment, item));
-  }
-
-  private createFolderTreeItem(
-    environment: JenkinsEnvironmentRef,
-    job: JenkinsJobInfo,
-    scope: TreeJobScope = ROOT_TREE_JOB_SCOPE
-  ): JenkinsFolderTreeItem {
-    const branchFilter =
-      job.kind === "multibranch"
-        ? this.treeFilter.getBranchFilter(environment.environmentId, job.url)
-        : undefined;
-    return new JenkinsFolderTreeItem(environment, job.name, job.url, job.kind, scope, {
-      branchFilter
-    });
+    return mapQueueItemsToTreeItems(environment, items);
   }
 
   private getJobCollectionElement(
     element: WorkbenchTreeElement
   ): JobCollectionTreeElement | undefined {
-    if (
-      element instanceof JobsFolderTreeItem ||
-      element instanceof JenkinsViewTreeItem ||
-      element instanceof JenkinsFolderTreeItem
-    ) {
-      return element;
-    }
-
-    return undefined;
+    return getJobCollectionElement(element);
   }
 
   private getJobCollectionRequest(element: JobCollectionTreeElement): TreeJobCollectionRequest {
-    if (element instanceof JenkinsFolderTreeItem) {
-      return {
-        scope: element.jobScope,
-        folderUrl: element.folderUrl
-      };
-    }
-
-    return {
-      scope: element.jobScope
-    };
+    return getJobCollectionRequest(element);
   }
 
   private buildJobCollectionChildrenKey(
     environment: JenkinsEnvironmentRef,
     request: TreeJobCollectionRequest
   ): string {
-    const cacheParts = getTreeJobCollectionCacheParts(request);
-    return this.buildChildrenKey(cacheParts.kind, environment, cacheParts.extra);
+    return buildJobCollectionChildrenKey(this.buildChildrenKey.bind(this), environment, request);
   }
 
   private buildJobCollectionLoadingLabel(request: TreeJobCollectionRequest): string {
-    if (request.folderUrl) {
-      return "Loading folder items...";
-    }
-
-    if (request.scope.kind === "view") {
-      return "Loading view items...";
-    }
-
-    return "Loading jobs...";
+    return getJobCollectionLoadingLabel(request);
   }
 
   private toJenkinsJobCollectionRequest(
     request: TreeJobCollectionRequest
   ): JenkinsDataJobCollectionRequest {
-    if (request.scope.kind === "view") {
-      return {
-        scope: {
-          kind: "view",
-          viewUrl: request.scope.viewUrl
-        },
-        folderUrl: request.folderUrl
-      };
-    }
-
-    return {
-      scope: {
-        kind: "root"
-      },
-      folderUrl: request.folderUrl
-    };
+    return toJenkinsJobCollectionRequest(request);
   }
 
   private async getOrLoadChildren(
@@ -832,48 +648,7 @@ export class JenkinsTreeChildrenLoader {
     loader: () => Promise<WorkbenchTreeElement[]>,
     loadingLabel: string
   ): Promise<WorkbenchTreeElement[]> {
-    const cached = this.childrenCache.get<WorkbenchTreeElement[]>(key);
-    if (cached) {
-      return cached;
-    }
-
-    if (this.pendingLoads.has(key)) {
-      return [this.createLoadingPlaceholder(loadingLabel)];
-    }
-
-    const token = this.nextLoadToken(key);
-    const pending = this.withTimeout(
-      loader(),
-      CHILDREN_LOAD_TIMEOUT_MS,
-      "Loading timed out. Try refreshing the tree."
-    )
-      .then((items) => {
-        if (!this.isCurrentLoadToken(key, token)) {
-          return;
-        }
-        this.childrenCache.set(key, items);
-      })
-      .catch((error) => {
-        if (!this.isCurrentLoadToken(key, token)) {
-          return;
-        }
-        const items = [this.createErrorPlaceholder("Unable to load data.", error)];
-        this.childrenCache.set(key, items);
-      })
-      .finally(() => {
-        if (this.pendingLoads.get(key) === pending) {
-          this.pendingLoads.delete(key);
-        }
-        if (this.isCurrentLoadToken(key, token)) {
-          this.notify(element);
-        }
-        if (!this.pendingLoads.has(key)) {
-          this.loadTokens.delete(key);
-        }
-      });
-
-    this.pendingLoads.set(key, pending);
-    return [this.createLoadingPlaceholder(loadingLabel)];
+    return this.cacheManager.getOrLoadChildren(key, element, loader, loadingLabel);
   }
 
   private async getArtifactsForBuild(
@@ -882,12 +657,12 @@ export class JenkinsTreeChildrenLoader {
     jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE
   ): Promise<JenkinsArtifact[]> {
     const key = this.buildArtifactChildrenKey(environment, buildUrl, jobScope);
-    const cached = this.artifactCache.get<JenkinsArtifact[]>(key);
+    const cached = this.cacheManager.getCachedArtifacts<JenkinsArtifact[]>(key);
     if (cached) {
       return cached;
     }
     const artifacts = await this.dataService.getBuildArtifacts(environment, buildUrl);
-    this.artifactCache.set(key, artifacts);
+    this.cacheManager.setCachedArtifacts(key, artifacts);
     return artifacts;
   }
 
@@ -896,11 +671,7 @@ export class JenkinsTreeChildrenLoader {
     jobUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return this.buildChildrenKey(
-      "builds",
-      environment,
-      this.buildScopedTreeExtra(jobScope, jobUrl)
-    );
+    return buildBuildsChildrenKey(this.buildChildrenKey.bind(this), environment, jobUrl, jobScope);
   }
 
   private buildBuildArtifactsKey(
@@ -908,10 +679,11 @@ export class JenkinsTreeChildrenLoader {
     buildUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return this.buildChildrenKey(
-      "build-artifacts",
+    return buildBuildArtifactsKey(
+      this.buildChildrenKey.bind(this),
       environment,
-      this.buildScopedTreeExtra(jobScope, buildUrl)
+      buildUrl,
+      jobScope
     );
   }
 
@@ -920,15 +692,12 @@ export class JenkinsTreeChildrenLoader {
     buildUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return this.buildChildrenKey(
-      "artifacts",
+    return buildArtifactChildrenKey(
+      this.buildChildrenKey.bind(this),
       environment,
-      this.buildScopedTreeExtra(jobScope, buildUrl)
+      buildUrl,
+      jobScope
     );
-  }
-
-  private buildScopedTreeExtra(scope: TreeJobScope, resourceUrl: string): string {
-    return `${buildTreeJobScopeKey(scope)}::${resourceUrl}`;
   }
 
   private buildChildrenKey(
@@ -937,20 +706,6 @@ export class JenkinsTreeChildrenLoader {
     extra?: string
   ): string {
     return this.childrenCache.buildKey(environment, kind, extra);
-  }
-
-  private nextLoadToken(key: string): number {
-    const next = (this.loadTokens.get(key) ?? 0) + 1;
-    this.loadTokens.set(key, next);
-    return next;
-  }
-
-  private bumpLoadToken(key: string): void {
-    this.nextLoadToken(key);
-  }
-
-  private isCurrentLoadToken(key: string, token: number): boolean {
-    return this.loadTokens.get(key) === token;
   }
 
   private createLoadingPlaceholder(label: string): PlaceholderTreeItem {
@@ -964,22 +719,5 @@ export class JenkinsTreeChildrenLoader {
 
   private createEmptyPlaceholder(label: string, description?: string): PlaceholderTreeItem {
     return new PlaceholderTreeItem(label, description, "empty");
-  }
-
-  private withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-      return promise;
-    }
-    let timeoutId: NodeJS.Timeout | undefined;
-    const timeoutPromise = new Promise<T>((_resolve, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error(message));
-      }, timeoutMs);
-    });
-    return Promise.race([promise, timeoutPromise]).finally(() => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    });
   }
 }
