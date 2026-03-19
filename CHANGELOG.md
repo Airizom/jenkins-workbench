@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.2] - 2026-03-19
+
+### Fixed
+
+- refactor: split tree children cache/mapping modules for maintainability
+
+### Documentation
+
+- docs: clarify first-run Jenkins welcome prompt
+
 ## [1.34.1] - 2026-03-14
 
 ### Fixed
