@@ -802,7 +802,7 @@
     "viewsWelcome": [
       {
         "view": "jenkinsWorkbench.tree",
-        "contents": "No Jenkins environments configured.\\n[Add Environment](command:jenkinsWorkbench.addEnvironment)",
+        "contents": "**Connect your first Jenkins environment**\n\nAdd a Jenkins server to browse jobs, builds, queue activity, and nodes from this view.\n\n[Add Environment](command:jenkinsWorkbench.addEnvironment)",
         "when": "jenkinsWorkbench.noEnvironments"
       }
     ]
