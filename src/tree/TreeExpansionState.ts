@@ -3,7 +3,7 @@ import type {
   TreeExpansionPath,
   TreeExpansionResolveResult,
   TreeExpansionResolver
-} from "./TreeDataProvider";
+} from "./TreeDataProviderTypes";
 import type { WorkbenchTreeElement } from "./TreeItems";
 
 type TreeRevealOptions = {
