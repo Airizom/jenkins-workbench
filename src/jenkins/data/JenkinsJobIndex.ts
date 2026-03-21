@@ -27,7 +27,26 @@ interface JobIndexCacheEntry {
   complete: boolean;
 }
 
+interface JobSearchTraversalStrategy {
+  cacheSegment: string;
+  shouldInclude(job: JenkinsJobInfo): boolean;
+  shouldTraverse(job: JenkinsJobInfo): boolean;
+}
+
 const JOB_INDEX_TTL_MS = 5 * 60 * 1000;
+
+const FULL_JOB_SEARCH_STRATEGY: JobSearchTraversalStrategy = {
+  cacheSegment: "job-index",
+  shouldInclude: (job) => job.kind !== "folder" && job.kind !== "multibranch",
+  shouldTraverse: (job) => job.kind === "folder" || job.kind === "multibranch"
+};
+
+const MULTIBRANCH_JOB_SEARCH_STRATEGY: JobSearchTraversalStrategy = {
+  cacheSegment: "multibranch-index",
+  shouldInclude: (job) => job.kind === "multibranch",
+  shouldTraverse: (job) => job.kind === "folder"
+};
+
 interface JobQueueItem {
   job: JenkinsJobInfo;
   path: JobPathSegment[];
@@ -50,32 +69,76 @@ export class JenkinsJobIndex {
     return entries;
   }
 
+  async getMultibranchJobsForEnvironment(
+    environment: JenkinsEnvironmentRef,
+    options?: JobSearchOptions
+  ): Promise<JobSearchEntry[]> {
+    return this.getCachedOrCollectEntries(environment, options, MULTIBRANCH_JOB_SEARCH_STRATEGY);
+  }
+
   async *iterateJobsForEnvironment(
     environment: JenkinsEnvironmentRef,
     options?: JobSearchOptions
   ): AsyncIterable<JobSearchEntry[]> {
+    for await (const batch of this.iterateSearchEntriesForEnvironment(
+      environment,
+      options,
+      FULL_JOB_SEARCH_STRATEGY
+    )) {
+      yield batch;
+    }
+  }
+
+  private async getCachedOrCollectEntries(
+    environment: JenkinsEnvironmentRef,
+    options: JobSearchOptions | undefined,
+    strategy: JobSearchTraversalStrategy
+  ): Promise<JobSearchEntry[]> {
+    const entries: JobSearchEntry[] = [];
+    for await (const batch of this.iterateSearchEntriesForEnvironment(
+      environment,
+      options,
+      strategy
+    )) {
+      entries.push(...batch);
+    }
+    return entries;
+  }
+
+  private async *iterateSearchEntriesForEnvironment(
+    environment: JenkinsEnvironmentRef,
+    options: JobSearchOptions | undefined,
+    strategy: JobSearchTraversalStrategy
+  ): AsyncIterable<JobSearchEntry[]> {
     const authSignature = await this.clientProvider.getAuthSignature(environment);
-    const cacheKey = this.cache.buildKey(environment, "job-index", undefined, authSignature);
-    const cached = this.cache.get<JobIndexCacheEntry | JobSearchEntry[]>(cacheKey);
-    if (cached) {
-      if (Array.isArray(cached)) {
-        if (cached.length > 0) {
-          yield cached;
-        }
-        return;
-      }
-      if (Date.now() - cached.timestamp < JOB_INDEX_TTL_MS) {
-        const maxResults = options?.maxResults;
-        if (cached.complete) {
-          const entries = maxResults ? cached.entries.slice(0, maxResults) : cached.entries;
-          if (entries.length > 0) {
-            yield entries;
+    const cacheKey = this.cache.buildKey(
+      environment,
+      strategy.cacheSegment,
+      undefined,
+      authSignature
+    );
+    if (options?.mode !== "refresh") {
+      const cached = this.cache.get<JobIndexCacheEntry | JobSearchEntry[]>(cacheKey);
+      if (cached) {
+        if (Array.isArray(cached)) {
+          if (cached.length > 0) {
+            yield cached;
           }
           return;
         }
-        if (maxResults && cached.entries.length >= maxResults) {
-          yield cached.entries.slice(0, maxResults);
-          return;
+        if (Date.now() - cached.timestamp < JOB_INDEX_TTL_MS) {
+          const maxResults = options?.maxResults;
+          if (cached.complete) {
+            const entries = maxResults ? cached.entries.slice(0, maxResults) : cached.entries;
+            if (entries.length > 0) {
+              yield entries;
+            }
+            return;
+          }
+          if (maxResults && cached.entries.length >= maxResults) {
+            yield cached.entries.slice(0, maxResults);
+            return;
+          }
         }
       }
     }
@@ -165,14 +228,8 @@ export class JenkinsJobIndex {
           markLimitReached();
           return true;
         }
-        const entry: JobSearchEntry = {
-          name: job.name,
-          url: job.url,
-          color: job.color,
-          kind: job.kind,
-          fullName: path.map((segment) => segment.name).join(" / "),
-          path
-        };
+
+        const entry = this.toSearchEntry(job, path);
         results.push(entry);
         batch.push(entry);
         if (batch.length >= batchSize) {
@@ -185,7 +242,9 @@ export class JenkinsJobIndex {
       };
 
       for (const job of rootInfos) {
-        enqueue(job, [this.toPathSegment(job)]);
+        if (strategy.shouldInclude(job) || strategy.shouldTraverse(job)) {
+          enqueue(job, [this.toPathSegment(job)]);
+        }
       }
 
       if (maxResults <= 0) {
@@ -194,11 +253,10 @@ export class JenkinsJobIndex {
 
       if (pendingJobs === 0) {
         flushBatch();
-        const complete = !limitReached;
         this.cache.set(cacheKey, {
           timestamp: Date.now(),
           entries: results,
-          complete
+          complete: !limitReached
         });
         output.close();
         return;
@@ -219,20 +277,23 @@ export class JenkinsJobIndex {
               continue;
             }
 
-            if (job.kind !== "folder" && job.kind !== "multibranch") {
-              addEntry(job, path);
+            if (strategy.shouldInclude(job) && addEntry(job, path)) {
+              continue;
+            }
+
+            if (!strategy.shouldTraverse(job)) {
               continue;
             }
 
             const children = await fetchWithRetry(() => client.getFolderJobs(job.url));
             const childInfos = this.mapJobs(client, children);
             for (const child of childInfos) {
-              const childPath = [...path, this.toPathSegment(child)];
-              if (child.kind === "folder" || child.kind === "multibranch") {
-                enqueue(child, childPath);
-              } else if (addEntry(child, childPath)) {
-                break;
+              if (!strategy.shouldInclude(child) && !strategy.shouldTraverse(child)) {
+                continue;
               }
+
+              const childPath = [...path, this.toPathSegment(child)];
+              enqueue(child, childPath);
             }
           } finally {
             pendingJobs -= 1;
@@ -263,14 +324,11 @@ export class JenkinsJobIndex {
       }
 
       flushBatch();
-
-      const complete = !limitReached;
       this.cache.set(cacheKey, {
         timestamp: Date.now(),
         entries: results,
-        complete
+        complete: !limitReached
       });
-
       output.close();
     })().catch((error) => {
       output.fail(error);
@@ -298,6 +356,17 @@ export class JenkinsJobIndex {
       name: job.name,
       url: job.url,
       kind: job.kind
+    };
+  }
+
+  private toSearchEntry(job: JenkinsJobInfo, path: JobPathSegment[]): JobSearchEntry {
+    return {
+      name: job.name,
+      url: job.url,
+      color: job.color,
+      kind: job.kind,
+      fullName: path.map((segment) => segment.name).join(" / "),
+      path
     };
   }
 

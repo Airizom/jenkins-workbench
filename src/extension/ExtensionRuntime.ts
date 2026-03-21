@@ -22,16 +22,23 @@ export async function activateRuntime(
   });
 
   const environmentStore = container.get("environmentStore");
+  const repositoryLinkStore = container.get("repositoryLinkStore");
   try {
     await environmentStore.migrateLegacyAuthConfigs();
   } catch (error) {
     console.warn("Failed to migrate legacy Jenkins auth config.", error);
+  }
+  try {
+    await repositoryLinkStore.migrateLegacyWorkspaceLinks();
+  } catch (error) {
+    console.warn("Failed to migrate legacy Jenkins repository links.", error);
   }
 
   const treeDataProvider = container.get("treeDataProvider");
   const treeView = container.get("treeView");
   const poller = container.get("poller");
   const queuePoller = container.get("queuePoller");
+  const statusRefreshService = container.get("statusRefreshService");
   const viewStateStore = container.get("viewStateStore");
   const refreshHost = container.get("refreshHost");
   const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
@@ -45,6 +52,8 @@ export async function activateRuntime(
   const treeExpansionState = container.get("treeExpansionState");
   const jobConfigDraftManager = container.get("jobConfigDraftManager");
   const jobConfigDraftFilesystem = container.get("jobConfigDraftFilesystem");
+  const currentBranchService = container.get("currentBranchService");
+  const currentBranchStatusBar = container.get("currentBranchStatusBar");
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
@@ -93,7 +102,11 @@ export async function activateRuntime(
     jobConfigDraftFilesystem
   );
 
+  void currentBranchService.start().catch((error) => {
+    console.warn("Failed to initialize current-branch state.", error);
+  });
   poller.start();
+  statusRefreshService.start();
   void viewStateStore.syncFilterContext();
   jenkinsfileValidationCoordinator.start();
 
@@ -133,7 +146,10 @@ export async function activateRuntime(
     }),
     poller,
     queuePoller,
+    statusRefreshService,
     watchErrorSubscription,
+    currentBranchService,
+    currentBranchStatusBar,
     jenkinsfileValidationCoordinator,
     container.get("jenkinsfileValidationStatusBar"),
     vscode.languages.registerCodeActionsProvider(

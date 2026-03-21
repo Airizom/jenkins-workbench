@@ -1,33 +1,33 @@
+import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type {
   JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
   JenkinsJobInfo,
   JenkinsQueueItemInfo
 } from "../../jenkins/JenkinsDataService";
-import {
-  buildTreeJobScopeKey,
-  type TreeJobCollectionRequest,
-  type TreeJobScope,
-  getTreeJobCollectionCacheParts,
-  ROOT_TREE_JOB_SCOPE
-} from "../TreeJobScope";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsTreeFilter } from "../TreeFilter";
 import {
   JenkinsFolderTreeItem,
   JenkinsViewTreeItem,
   JobTreeItem,
   JobsFolderTreeItem,
-  PipelineTreeItem,
   PinnedSectionTreeItem,
-  QueueItemTreeItem,
+  PipelineTreeItem,
+  QueueItemTreeItem
 } from "../TreeItems";
-import type {
-  PlaceholderTreeItem,
-  WorkbenchTreeElement
-} from "../TreeItems";
+import type { PlaceholderTreeItem, WorkbenchTreeElement } from "../TreeItems";
+import {
+  ROOT_TREE_JOB_SCOPE,
+  type TreeJobCollectionRequest,
+  type TreeJobScope,
+  buildTreeJobScopeKey,
+  getTreeJobCollectionCacheParts
+} from "../TreeJobScope";
 
-export type JobCollectionTreeElement = JobsFolderTreeItem | JenkinsViewTreeItem | JenkinsFolderTreeItem;
+export type JobCollectionTreeElement =
+  | JobsFolderTreeItem
+  | JenkinsViewTreeItem
+  | JenkinsFolderTreeItem;
 
 export function getJobCollectionElement(
   element: WorkbenchTreeElement
@@ -43,7 +43,9 @@ export function getJobCollectionElement(
   return undefined;
 }
 
-export function getJobCollectionRequest(element: JobCollectionTreeElement): TreeJobCollectionRequest {
+export function getJobCollectionRequest(
+  element: JobCollectionTreeElement
+): TreeJobCollectionRequest {
   if (element instanceof JenkinsFolderTreeItem) {
     return {
       scope: element.jobScope,

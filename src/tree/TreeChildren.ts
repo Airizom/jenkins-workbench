@@ -1,8 +1,8 @@
 import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type {
   BuildListFetchOptions,
-  JenkinsDataService,
   JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
+  JenkinsDataService,
   JenkinsJobInfo,
   JenkinsQueueItemInfo
 } from "../jenkins/JenkinsDataService";
@@ -50,8 +50,8 @@ import {
   buildBuildsChildrenKey,
   buildJobCollectionChildrenKey,
   getJobCollectionElement,
-  getJobCollectionRequest,
   getJobCollectionLoadingLabel,
+  getJobCollectionRequest,
   mapJobsToTreeItems,
   mapQueueItemsToTreeItems,
   toJenkinsJobCollectionRequest
@@ -267,8 +267,12 @@ export class JenkinsTreeChildrenLoader {
     buildUrl: string,
     jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE
   ): void {
-    this.cacheManager.clearChildrenCache(this.buildBuildArtifactsKey(environment, buildUrl, jobScope));
-    this.cacheManager.deleteArtifact(this.buildArtifactChildrenKey(environment, buildUrl, jobScope));
+    this.cacheManager.clearChildrenCache(
+      this.buildBuildArtifactsKey(environment, buildUrl, jobScope)
+    );
+    this.cacheManager.deleteArtifact(
+      this.buildArtifactChildrenKey(environment, buildUrl, jobScope)
+    );
   }
 
   invalidateForElement(element?: WorkbenchTreeElement): void {

@@ -218,6 +218,35 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "jenkinsWorkbench.linkCurrentRepository",
+        "title": "Jenkins: Link Current Repository to Multibranch Pipeline",
+        "icon": "$(link)"
+      },
+      {
+        "command": "jenkinsWorkbench.linkRepositoryHere",
+        "title": "Jenkins: Link Repository Here",
+        "icon": "$(link)"
+      },
+      {
+        "command": "jenkinsWorkbench.unlinkCurrentRepository",
+        "title": "Jenkins: Unlink Current Repository from Jenkins",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "jenkinsWorkbench.currentBranchActions",
+        "title": "Jenkins: Current Branch Actions"
+      },
+      {
+        "command": "jenkinsWorkbench.openCurrentBranchInJenkins",
+        "title": "Jenkins: Open Current Branch in Jenkins",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "jenkinsWorkbench.triggerCurrentBranchBuild",
+        "title": "Jenkins: Trigger Current Branch Build",
+        "icon": "$(play)"
+      },
+      {
         "command": "jenkinsWorkbench.enableJob",
         "title": "Jenkins: Enable Job",
         "icon": "$(play-circle)"
@@ -328,7 +357,7 @@
           "type": "number",
           "default": 60,
           "minimum": 5,
-          "description": "Polling interval in seconds for watched jobs."
+          "description": "Polling interval in seconds for shared Jenkins status refreshes, including watched jobs and current-branch status."
         },
         "jenkinsWorkbench.queuePollIntervalSeconds": {
           "type": "number",
@@ -711,19 +740,24 @@
           "group": "2_rebuild@1"
         },
         {
-          "command": "jenkinsWorkbench.scanMultibranch",
+          "command": "jenkinsWorkbench.linkRepositoryHere",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
           "group": "navigation@0"
         },
         {
-          "command": "jenkinsWorkbench.filterBranches",
+          "command": "jenkinsWorkbench.scanMultibranch",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
           "group": "navigation@1"
         },
         {
-          "command": "jenkinsWorkbench.clearBranchFilter",
+          "command": "jenkinsWorkbench.filterBranches",
           "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
           "group": "navigation@2"
+        },
+        {
+          "command": "jenkinsWorkbench.clearBranchFilter",
+          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "group": "navigation@3"
         }
       ],
       "editor/title": [

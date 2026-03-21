@@ -11,26 +11,26 @@ import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
+import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
+import { TreeDataProviderHierarchyState } from "./TreeDataProviderHierarchyState";
+import { TreeDataProviderRefreshCoordinator } from "./TreeDataProviderRefreshCoordinator";
+import type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
+import { TreeDataProviderSummaryState } from "./TreeDataProviderSummaryState";
+import type {
+  FullEnvironmentRefreshRequest,
+  InvalidateBuildArtifactsRequest,
+  RefreshViewOnlyRequest,
+  TreeExpansionPath,
+  TreeExpansionResolveResult,
+  TreeExpansionResolver,
+  TreeViewSummary
+} from "./TreeDataProviderTypes";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { BuildQueueFolderTreeItem, type WorkbenchTreeElement } from "./TreeItems";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
-import { TreeDataProviderHierarchyState } from "./TreeDataProviderHierarchyState";
-import { TreeDataProviderRefreshCoordinator } from "./TreeDataProviderRefreshCoordinator";
-import type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
-import type {
-  FullEnvironmentRefreshRequest,
-  InvalidateBuildArtifactsRequest,
-  RefreshViewOnlyRequest,
-  TreeExpansionPath,
-  TreeExpansionResolver,
-  TreeExpansionResolveResult,
-  TreeViewSummary
-} from "./TreeDataProviderTypes";
-import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
-import { TreeDataProviderSummaryState } from "./TreeDataProviderSummaryState";
 
 export type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
 export type {

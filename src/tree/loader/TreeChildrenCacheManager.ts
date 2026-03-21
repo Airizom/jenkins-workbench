@@ -1,5 +1,5 @@
-import type { ScopedCache } from "../../services/ScopedCache";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { ScopedCache } from "../../services/ScopedCache";
 import type { PlaceholderTreeItem, WorkbenchTreeElement } from "../TreeItems";
 
 export class TreeChildrenCacheManager {

@@ -1,5 +1,5 @@
-import { areTreeViewSummariesEqual } from "./TreeDataProviderUtils";
 import type { TreeViewSummary } from "./TreeDataProviderTypes";
+import { areTreeViewSummariesEqual } from "./TreeDataProviderUtils";
 
 type TreeSummaryTotals = {
   running: number;
@@ -20,10 +20,7 @@ export class TreeDataProviderSummaryState {
     return true;
   }
 
-  emitSummary(
-    totals: TreeSummaryTotals,
-    emit: (summary: TreeViewSummary) => void
-  ): void {
+  emitSummary(totals: TreeSummaryTotals, emit: (summary: TreeViewSummary) => void): void {
     const nextSummary: TreeViewSummary = {
       running: totals.running,
       queue: totals.queue,
@@ -39,4 +36,3 @@ export class TreeDataProviderSummaryState {
     emit(nextSummary);
   }
 }
-

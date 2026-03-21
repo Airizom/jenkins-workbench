@@ -7,8 +7,8 @@ import {
   getCacheTtlMs,
   getExtensionConfiguration,
   getJenkinsfileValidationConfig,
-  getPollIntervalSeconds,
   getQueuePollIntervalSeconds,
+  getStatusRefreshIntervalSeconds,
   getTreeViewCurationOptions,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
@@ -17,7 +17,7 @@ import type { ExtensionTokenMap } from "./container/ExtensionTokenMap";
 import { syncJenkinsfileContext } from "./contextKeys";
 
 const CACHE_TTL_CONFIG_KEY = "cacheTtlSeconds";
-const POLL_INTERVAL_CONFIG_KEY = "pollIntervalSeconds";
+const STATUS_REFRESH_INTERVAL_CONFIG_KEY = "pollIntervalSeconds";
 const WATCH_ERROR_THRESHOLD_CONFIG_KEY = "watchErrorThreshold";
 const QUEUE_POLL_INTERVAL_CONFIG_KEY = "queuePollIntervalSeconds";
 const BUILD_TOOLTIP_DETAILS_CONFIG_KEY = "buildTooltips.includeDetails";
@@ -52,7 +52,7 @@ type BuildTooltipConfigKey = (typeof BUILD_TOOLTIP_CONFIG_KEYS)[number];
 type JenkinsfileValidationConfigKey = (typeof JENKINSFILE_VALIDATION_CONFIG_KEYS)[number];
 type ConfigReactionKey =
   | typeof CACHE_TTL_CONFIG_KEY
-  | typeof POLL_INTERVAL_CONFIG_KEY
+  | typeof STATUS_REFRESH_INTERVAL_CONFIG_KEY
   | typeof WATCH_ERROR_THRESHOLD_CONFIG_KEY
   | typeof QUEUE_POLL_INTERVAL_CONFIG_KEY
   | typeof TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY
@@ -64,6 +64,7 @@ interface ConfigReactionContext {
   dataService: ExtensionTokenMap["dataService"];
   refreshHost: ExtensionTokenMap["refreshHost"];
   treeDataProvider: ExtensionTokenMap["treeDataProvider"];
+  statusRefreshService: ExtensionTokenMap["statusRefreshService"];
   poller: ExtensionTokenMap["poller"];
   queuePoller: ExtensionTokenMap["queuePoller"];
   jenkinsfileValidationCoordinator: ExtensionTokenMap["jenkinsfileValidationCoordinator"];
@@ -111,6 +112,7 @@ export function registerExtensionSubscriptions(
   const treeView = container.get("treeView");
   const dataService = container.get("dataService");
   const refreshHost = container.get("refreshHost");
+  const statusRefreshService = container.get("statusRefreshService");
   const poller = container.get("poller");
   const queuePoller = container.get("queuePoller");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
@@ -125,10 +127,10 @@ export function registerExtensionSubscriptions(
       }
     },
     {
-      keys: [POLL_INTERVAL_CONFIG_KEY],
+      keys: [STATUS_REFRESH_INTERVAL_CONFIG_KEY],
       run: (reactionContext) => {
-        reactionContext.poller.updatePollIntervalSeconds(
-          getPollIntervalSeconds(reactionContext.config)
+        reactionContext.statusRefreshService.updateRefreshIntervalSeconds(
+          getStatusRefreshIntervalSeconds(reactionContext.config)
         );
       }
     },
@@ -199,6 +201,7 @@ export function registerExtensionSubscriptions(
       config: getExtensionConfiguration(),
       dataService,
       refreshHost,
+      statusRefreshService,
       treeDataProvider,
       poller,
       queuePoller,

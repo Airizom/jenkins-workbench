@@ -4,6 +4,7 @@ import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 import type {
   JenkinsJobCollectionRequest,
+  JenkinsJobFetchOptions,
   JenkinsJobInfo,
   JenkinsViewInfo,
   JobParameter
@@ -33,9 +34,18 @@ export class JenkinsJobDataOperations {
 
   async getJobsForFolder(
     environment: JenkinsEnvironmentRef,
-    folderUrl: string
+    folderUrl: string,
+    options?: JenkinsJobFetchOptions
   ): Promise<JenkinsJobInfo[]> {
     const cacheKey = await this.context.buildCacheKey(environment, "folder", folderUrl);
+    if (options?.mode === "refresh") {
+      const client = await this.context.getClient(environment);
+      const jobs = await client.getFolderJobs(folderUrl);
+      const mappedJobs = this.mapJobs(client, jobs);
+      this.context.getCache().set(cacheKey, mappedJobs, this.context.getCacheTtlMs());
+      return mappedJobs;
+    }
+
     return this.context.getCache().getOrLoad(
       cacheKey,
       async () => {

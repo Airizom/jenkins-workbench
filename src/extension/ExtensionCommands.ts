@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import { registerBuildCommands } from "../commands/BuildCommands";
+import { registerCurrentBranchCommands } from "../commands/CurrentBranchCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
 import { registerJenkinsfileCommands } from "../commands/JenkinsfileCommands";
 import { registerJobCommands } from "../commands/JobCommands";
@@ -36,6 +37,7 @@ export function registerExtensionCommands(
   const jobConfigDraftManager = container.get("jobConfigDraftManager");
   const jobConfigUpdateWorkflow = container.get("jobConfigUpdateWorkflow");
   const refreshHost = container.get("refreshHost");
+  const currentBranchWorkflowService = container.get("currentBranchWorkflowService");
 
   registerEnvironmentCommands(
     context,
@@ -58,6 +60,8 @@ export function registerExtensionCommands(
     pendingInputCoordinator,
     refreshHost
   );
+
+  registerCurrentBranchCommands(context, currentBranchWorkflowService);
 
   registerJobCommands(
     context,

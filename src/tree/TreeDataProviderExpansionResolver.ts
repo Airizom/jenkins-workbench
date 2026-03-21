@@ -1,9 +1,6 @@
 import type * as vscode from "vscode";
-import {
-  getWorkbenchTreeElementId,
-  isLoadingPlaceholder
-} from "./TreeDataProviderUtils";
 import type { TreeExpansionPath, TreeExpansionResolveResult } from "./TreeDataProviderTypes";
+import { getWorkbenchTreeElementId, isLoadingPlaceholder } from "./TreeDataProviderUtils";
 import type { WorkbenchTreeElement } from "./TreeItems";
 
 type TreeParentResolver = (
@@ -13,7 +10,9 @@ type TreeParentResolver = (
 export class TreeDataProviderExpansionResolver {
   constructor(
     private readonly getParent: TreeParentResolver,
-    private readonly getChildren: (element?: WorkbenchTreeElement) => Promise<WorkbenchTreeElement[]>
+    private readonly getChildren: (
+      element?: WorkbenchTreeElement
+    ) => Promise<WorkbenchTreeElement[]>
   ) {}
 
   async buildExpansionPath(element: WorkbenchTreeElement): Promise<TreeExpansionPath | undefined> {

@@ -11,9 +11,9 @@ import {
   getExtensionConfiguration,
   getJenkinsfileValidationConfig,
   getMaxCacheEntries,
-  getPollIntervalSeconds,
   getQueuePollIntervalSeconds,
   getRequestTimeoutMs,
+  getStatusRefreshIntervalSeconds,
   getTreeViewCurationOptions,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
@@ -22,7 +22,7 @@ import { activateRuntime } from "./ExtensionRuntime";
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
   const cacheTtlMs = getCacheTtlMs(config);
-  const pollIntervalSeconds = getPollIntervalSeconds(config);
+  const statusRefreshIntervalSeconds = getStatusRefreshIntervalSeconds(config);
   const watchErrorThreshold = getWatchErrorThreshold(config);
   const queuePollIntervalSeconds = getQueuePollIntervalSeconds(config);
   const maxCacheEntries = getMaxCacheEntries(config);
@@ -61,7 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     jenkinsfileValidationConfig,
     extensionUri: context.extensionUri,
-    pollIntervalSeconds,
+    statusRefreshIntervalSeconds,
     watchErrorThreshold,
     queuePollIntervalSeconds
   });

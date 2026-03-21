@@ -1,4 +1,4 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { parseAuthConfig } from "../jenkins/auth";
 import type { JenkinsAuthConfig } from "../jenkins/types";
 
@@ -19,6 +19,9 @@ const AUTH_CONFIG_KEY = "jenkinsWorkbench.envAuthConfig";
 
 export class JenkinsEnvironmentStore {
   private readonly authConfigRevisions = new Map<string, number>();
+  private readonly emitter = new vscode.EventEmitter<void>();
+
+  readonly onDidChange = this.emitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -34,6 +37,7 @@ export class JenkinsEnvironmentStore {
   ): Promise<void> {
     const memento = this.getMemento(scope);
     await memento.update(ENVIRONMENTS_KEY, environments);
+    this.emitter.fire();
   }
 
   async addEnvironment(
@@ -104,11 +108,13 @@ export class JenkinsEnvironmentStore {
   ): Promise<void> {
     this.bumpAuthConfigRevision(scope, id);
     await this.context.secrets.store(this.getAuthConfigKey(scope, id), JSON.stringify(authConfig));
+    this.emitter.fire();
   }
 
   async deleteAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
     this.bumpAuthConfigRevision(scope, id);
     await this.context.secrets.delete(this.getAuthConfigKey(scope, id));
+    this.emitter.fire();
   }
 
   async getAuthConfig(scope: EnvironmentScope, id: string): Promise<JenkinsAuthConfig | undefined> {

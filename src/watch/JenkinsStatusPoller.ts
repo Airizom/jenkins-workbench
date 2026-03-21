@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsDataService, PendingInputSummary } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { JenkinsRequestError } from "../jenkins/errors";
+import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { EnvironmentScope, JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWatchStore, WatchedJobEntry } from "../storage/JenkinsWatchStore";
@@ -12,20 +13,16 @@ export interface JenkinsStatusPollerHost {
   fullEnvironmentRefresh(): void;
 }
 
-const DEFAULT_POLL_INTERVAL_SECONDS = 60;
-const MIN_POLL_INTERVAL_SECONDS = 5;
-const DEFAULT_POLL_INTERVAL_MS = DEFAULT_POLL_INTERVAL_SECONDS * 1000;
 const DEFAULT_MAX_CONSECUTIVE_ERRORS = 3;
 
 export class JenkinsStatusPoller implements vscode.Disposable {
-  private intervalId: NodeJS.Timeout | undefined;
+  private tickSubscription: vscode.Disposable | undefined;
   private isPolling = false;
   private readonly _onDidChangeWatchErrorCount = new vscode.EventEmitter<number>();
   private readonly evaluator: JenkinsJobStatusEvaluator;
   private readonly failureCounts = new Map<string, number>();
   private readonly pendingInputSignatures = new Map<string, string>();
   private readonly watchErrorKeys = new Set<string>();
-  private pollIntervalMs: number;
   private maxConsecutiveErrors: number;
   private lastWatchErrorCount = 0;
 
@@ -34,32 +31,15 @@ export class JenkinsStatusPoller implements vscode.Disposable {
   constructor(
     private readonly store: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
+    private readonly statusRefreshService: JenkinsStatusRefreshService,
     private readonly pendingInputCoordinator: PendingInputRefreshCoordinator,
     private readonly watchStore: JenkinsWatchStore,
     private readonly notifier: StatusNotifier,
     private readonly host: JenkinsStatusPollerHost,
-    pollIntervalSeconds = DEFAULT_POLL_INTERVAL_SECONDS,
     maxConsecutiveErrors = DEFAULT_MAX_CONSECUTIVE_ERRORS
   ) {
-    this.pollIntervalMs = this.normalizePollIntervalSeconds(pollIntervalSeconds);
     this.maxConsecutiveErrors = this.normalizeMaxConsecutiveErrors(maxConsecutiveErrors);
     this.evaluator = new JenkinsJobStatusEvaluator(this.notifier);
-  }
-
-  updatePollIntervalSeconds(pollIntervalSeconds: number): void {
-    const next = this.normalizePollIntervalSeconds(pollIntervalSeconds);
-
-    if (next === this.pollIntervalMs) {
-      return;
-    }
-
-    this.pollIntervalMs = next;
-
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = undefined;
-      this.start();
-    }
   }
 
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void {
@@ -75,25 +55,14 @@ export class JenkinsStatusPoller implements vscode.Disposable {
   }
 
   start(): void {
-    if (this.intervalId) {
+    if (this.tickSubscription) {
       return;
     }
 
-    const interval = this.pollIntervalMs;
-    this.intervalId = setInterval(() => {
+    this.tickSubscription = this.statusRefreshService.onDidTick(() => {
       void this.poll();
-    }, interval);
-
+    });
     void this.poll();
-  }
-
-  private normalizePollIntervalSeconds(pollIntervalSeconds: number): number {
-    if (!Number.isFinite(pollIntervalSeconds)) {
-      return DEFAULT_POLL_INTERVAL_MS;
-    }
-
-    const clampedSeconds = Math.max(MIN_POLL_INTERVAL_SECONDS, pollIntervalSeconds);
-    return clampedSeconds * 1000;
   }
 
   private normalizeMaxConsecutiveErrors(maxConsecutiveErrors: number): number {
@@ -103,9 +72,9 @@ export class JenkinsStatusPoller implements vscode.Disposable {
   }
 
   dispose(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = undefined;
+    if (this.tickSubscription) {
+      this.tickSubscription.dispose();
+      this.tickSubscription = undefined;
     }
     this._onDidChangeWatchErrorCount.dispose();
   }
@@ -400,7 +369,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
     try {
       const pendingKey = this.buildPendingInputKey(entry, buildUrl);
       const summary = await this.pendingInputCoordinator.getSummary(environment, buildUrl, {
-        maxAgeMs: this.pollIntervalMs,
+        maxAgeMs: this.statusRefreshService.getRefreshIntervalMs(),
         notify: false
       });
       this.handlePendingInputSummary(

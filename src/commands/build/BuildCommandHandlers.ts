@@ -4,6 +4,7 @@ import type {
   JenkinsDataService,
   JobParameter
 } from "../../jenkins/JenkinsDataService";
+import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import type { PendingInputActionProvider } from "../../panels/buildDetails/BuildDetailsPollingController";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
@@ -31,66 +32,18 @@ type BuildTriggerOptions = {
   allowEmptyParams: boolean;
 };
 
-function refreshEnvironment(refreshHost: BuildCommandRefreshHost, environmentId: string): void {
-  refreshHost.fullEnvironmentRefresh({ environmentId });
+export interface JenkinsJobTarget {
+  environment: JenkinsEnvironmentRef;
+  jobUrl: string;
+  label: string;
 }
 
-async function resolveBuildTriggerOptions(
-  dataService: JenkinsDataService,
-  presetStore: JenkinsParameterPresetStore,
-  selected: JobTreeItem | PipelineTreeItem,
-  label: string
-): Promise<BuildTriggerOptions | undefined> {
-  let parameters: JobParameter[] = [];
-  let useParameters = false;
-  let allowEmptyParams = false;
+export interface TriggerBuildForTargetOptions {
+  onQueuedBuildWaitSettled?: () => Promise<unknown> | undefined;
+}
 
-  try {
-    parameters = await dataService.getJobParameters(selected.environment, selected.jobUrl);
-  } catch (error) {
-    const buildWithDefaultsLabel = "Try default parameters";
-    const buildWithoutParametersLabel = "Run without parameters";
-    const decision = await vscode.window.showWarningMessage(
-      `Unable to load parameters for ${label}: ${formatActionError(
-        error
-      )}. Choose how to trigger the build.`,
-      buildWithDefaultsLabel,
-      buildWithoutParametersLabel,
-      "Cancel"
-    );
-
-    if (!decision || decision === "Cancel") {
-      return;
-    }
-
-    useParameters = decision === buildWithDefaultsLabel;
-    allowEmptyParams = useParameters;
-  }
-
-  if (parameters.length === 0) {
-    return {
-      useParameters,
-      allowEmptyParams
-    };
-  }
-
-  const promptResult = await promptForBuildParameters({
-    dataService,
-    presetStore,
-    environment: selected.environment,
-    jobUrl: selected.jobUrl,
-    jobLabel: label,
-    parameters
-  });
-  if (!promptResult) {
-    return;
-  }
-
-  return {
-    payload: promptResult.payload,
-    useParameters: true,
-    allowEmptyParams: promptResult.allowEmptyParams
-  };
+function refreshEnvironment(refreshHost: BuildCommandRefreshHost, environmentId: string): void {
+  refreshHost.fullEnvironmentRefresh({ environmentId });
 }
 
 async function runBuildAction(
@@ -139,38 +92,70 @@ export async function triggerBuild(
     return;
   }
 
-  const label = getTreeItemLabel(selected);
-  const triggerOptions = await resolveBuildTriggerOptions(
+  await triggerBuildForTarget(dataService, presetStore, queuedBuildWaiter, refreshHost, {
+    environment: selected.environment,
+    jobUrl: selected.jobUrl,
+    label: getTreeItemLabel(selected)
+  });
+}
+
+export async function triggerBuildForTarget(
+  dataService: JenkinsDataService,
+  presetStore: JenkinsParameterPresetStore,
+  queuedBuildWaiter: QueuedBuildWaiter,
+  refreshHost: BuildCommandRefreshHost,
+  target: JenkinsJobTarget,
+  options?: TriggerBuildForTargetOptions
+): Promise<void> {
+  const triggerOptions = await resolveBuildTriggerOptionsForTarget(
     dataService,
     presetStore,
-    selected,
-    label
+    target
   );
   if (!triggerOptions) {
     return;
   }
 
-  await withActionErrorMessage(`Failed to trigger build for ${label}`, async () => {
+  await withActionErrorMessage(`Failed to trigger build for ${target.label}`, async () => {
     const result = triggerOptions.useParameters
       ? await dataService.triggerBuildWithParameters(
-          selected.environment,
-          selected.jobUrl,
+          target.environment,
+          target.jobUrl,
           triggerOptions.payload,
           {
             allowEmptyParams: triggerOptions.allowEmptyParams
           }
         )
-      : await dataService.triggerBuild(selected.environment, selected.jobUrl);
+      : await dataService.triggerBuild(target.environment, target.jobUrl);
     const message = result.queueLocation
-      ? `Triggered build for ${label}. Queued at ${result.queueLocation}`
-      : `Triggered build for ${label}.`;
+      ? `Triggered build for ${target.label}. Queued at ${result.queueLocation}`
+      : `Triggered build for ${target.label}.`;
     void vscode.window.showInformationMessage(message);
-    void queuedBuildWaiter
-      .awaitQueuedBuildStart(selected.environment, result.queueLocation)
-      .finally(() => {
-        refreshEnvironment(refreshHost, selected.environment.environmentId);
-      });
+    void waitForQueuedBuildAndRefresh(
+      queuedBuildWaiter,
+      refreshHost,
+      target,
+      result.queueLocation,
+      options?.onQueuedBuildWaitSettled
+    ).catch((error) => {
+      console.warn(`Failed to refresh queued build state for ${target.label}.`, error);
+    });
   });
+}
+
+async function waitForQueuedBuildAndRefresh(
+  queuedBuildWaiter: QueuedBuildWaiter,
+  refreshHost: BuildCommandRefreshHost,
+  target: JenkinsJobTarget,
+  queueLocation: string | undefined,
+  onQueuedBuildWaitSettled?: () => Promise<unknown> | undefined
+): Promise<void> {
+  try {
+    await queuedBuildWaiter.awaitQueuedBuildStart(target.environment, queueLocation);
+  } finally {
+    refreshEnvironment(refreshHost, target.environment.environmentId);
+    await onQueuedBuildWaitSettled?.();
+  }
 }
 
 export async function stopBuild(
@@ -330,32 +315,58 @@ export async function openLastFailedBuild(
     return;
   }
 
-  const label = getTreeItemLabel(selected);
-  await withActionErrorMessage(`Unable to open the last failed build for ${label}`, async () => {
-    const lastFailed = await dataService.getLastFailedBuild(selected.environment, selected.jobUrl);
-    if (!lastFailed) {
-      void vscode.window.showInformationMessage(`No failed builds found for ${label}.`);
-      return;
-    }
-    if (!lastFailed.url) {
-      void vscode.window.showInformationMessage(
-        `The last failed build for ${label} is missing a URL.`
-      );
-      return;
-    }
-
-    await BuildDetailsPanel.show({
-      dataService,
-      artifactActionHandler,
-      consoleExporter,
-      refreshHost,
-      pendingInputProvider,
+  await openLastFailedBuildForTarget(
+    dataService,
+    artifactActionHandler,
+    consoleExporter,
+    refreshHost,
+    pendingInputProvider,
+    extensionUri,
+    {
       environment: selected.environment,
-      buildUrl: lastFailed.url,
-      extensionUri,
-      label: `#${lastFailed.number}`
-    });
-  });
+      jobUrl: selected.jobUrl,
+      label: getTreeItemLabel(selected)
+    }
+  );
+}
+
+export async function openLastFailedBuildForTarget(
+  dataService: JenkinsDataService,
+  artifactActionHandler: ArtifactActionHandler,
+  consoleExporter: BuildConsoleExporter,
+  refreshHost: BuildCommandRefreshHost,
+  pendingInputProvider: PendingInputActionProvider,
+  extensionUri: vscode.Uri,
+  target: JenkinsJobTarget
+): Promise<void> {
+  await withActionErrorMessage(
+    `Unable to open the last failed build for ${target.label}`,
+    async () => {
+      const lastFailed = await dataService.getLastFailedBuild(target.environment, target.jobUrl);
+      if (!lastFailed) {
+        void vscode.window.showInformationMessage(`No failed builds found for ${target.label}.`);
+        return;
+      }
+      if (!lastFailed.url) {
+        void vscode.window.showInformationMessage(
+          `The last failed build for ${target.label} is missing a URL.`
+        );
+        return;
+      }
+
+      await BuildDetailsPanel.show({
+        dataService,
+        artifactActionHandler,
+        consoleExporter,
+        refreshHost,
+        pendingInputProvider,
+        environment: target.environment,
+        buildUrl: lastFailed.url,
+        extensionUri,
+        label: `#${lastFailed.number}`
+      });
+    }
+  );
 }
 
 export async function previewBuildLog(
@@ -378,4 +389,61 @@ export async function previewBuildLog(
       );
     }
   });
+}
+
+async function resolveBuildTriggerOptionsForTarget(
+  dataService: JenkinsDataService,
+  presetStore: JenkinsParameterPresetStore,
+  target: JenkinsJobTarget
+): Promise<BuildTriggerOptions | undefined> {
+  let parameters: JobParameter[] = [];
+  let useParameters = false;
+  let allowEmptyParams = false;
+
+  try {
+    parameters = await dataService.getJobParameters(target.environment, target.jobUrl);
+  } catch (error) {
+    const buildWithDefaultsLabel = "Try default parameters";
+    const buildWithoutParametersLabel = "Run without parameters";
+    const decision = await vscode.window.showWarningMessage(
+      `Unable to load parameters for ${target.label}: ${formatActionError(
+        error
+      )}. Choose how to trigger the build.`,
+      buildWithDefaultsLabel,
+      buildWithoutParametersLabel,
+      "Cancel"
+    );
+
+    if (!decision || decision === "Cancel") {
+      return;
+    }
+
+    useParameters = decision === buildWithDefaultsLabel;
+    allowEmptyParams = useParameters;
+  }
+
+  if (parameters.length === 0) {
+    return {
+      useParameters,
+      allowEmptyParams
+    };
+  }
+
+  const promptResult = await promptForBuildParameters({
+    dataService,
+    presetStore,
+    environment: target.environment,
+    jobUrl: target.jobUrl,
+    jobLabel: target.label,
+    parameters
+  });
+  if (!promptResult) {
+    return;
+  }
+
+  return {
+    payload: promptResult.payload,
+    useParameters: true,
+    allowEmptyParams: promptResult.allowEmptyParams
+  };
 }

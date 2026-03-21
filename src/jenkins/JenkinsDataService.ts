@@ -21,6 +21,7 @@ import type {
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobCollectionRequest,
+  JenkinsJobFetchOptions,
   JenkinsJobInfo,
   JenkinsNodeInfo,
   JenkinsQueueItemInfo,
@@ -51,6 +52,7 @@ export type {
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobCollectionRequest,
+  JenkinsJobFetchOptions,
   JenkinsJobInfo,
   JenkinsNodeInfo,
   JenkinsQueueItemInfo,
@@ -121,9 +123,10 @@ export class JenkinsDataService {
 
   async getJobsForFolder(
     environment: JenkinsEnvironmentRef,
-    folderUrl: string
+    folderUrl: string,
+    options?: JenkinsJobFetchOptions
   ): Promise<JenkinsJobInfo[]> {
-    return this.jobOperations.getJobsForFolder(environment, folderUrl);
+    return this.jobOperations.getJobsForFolder(environment, folderUrl, options);
   }
 
   async getJobCollection(
@@ -157,6 +160,13 @@ export class JenkinsDataService {
     options?: JobSearchOptions
   ): Promise<JobSearchEntry[]> {
     return this.jobIndex.getAllJobsForEnvironment(environment, options);
+  }
+
+  async getMultibranchJobsForEnvironment(
+    environment: JenkinsEnvironmentRef,
+    options?: JobSearchOptions
+  ): Promise<JobSearchEntry[]> {
+    return this.jobIndex.getMultibranchJobsForEnvironment(environment, options);
   }
 
   async *iterateJobsForEnvironment(

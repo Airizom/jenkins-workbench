@@ -7,7 +7,7 @@ import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValid
 export const CONFIG_SECTION = "jenkinsWorkbench";
 
 const DEFAULT_CACHE_TTL_SECONDS = 300;
-const DEFAULT_POLL_INTERVAL_SECONDS = 60;
+const DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS = 60;
 const DEFAULT_WATCH_ERROR_THRESHOLD = 3;
 const DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 10;
 const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
@@ -54,12 +54,14 @@ export function getCacheTtlMs(config: vscode.WorkspaceConfiguration): number {
     : DEFAULT_CACHE_TTL_SECONDS * 1000;
 }
 
-export function getPollIntervalSeconds(config: vscode.WorkspaceConfiguration): number {
-  const pollIntervalSeconds = config.get<number>(
+export function getStatusRefreshIntervalSeconds(config: vscode.WorkspaceConfiguration): number {
+  const refreshIntervalSeconds = config.get<number>(
     "pollIntervalSeconds",
-    DEFAULT_POLL_INTERVAL_SECONDS
+    DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS
   );
-  return Number.isFinite(pollIntervalSeconds) ? pollIntervalSeconds : DEFAULT_POLL_INTERVAL_SECONDS;
+  return Number.isFinite(refreshIntervalSeconds)
+    ? refreshIntervalSeconds
+    : DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS;
 }
 
 export function getWatchErrorThreshold(config: vscode.WorkspaceConfiguration): number {

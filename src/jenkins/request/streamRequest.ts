@@ -1,9 +1,9 @@
 import { PassThrough } from "node:stream";
 import { JenkinsMaxBytesError, JenkinsRequestError } from "../errors";
+import { executeRequestLifecycle } from "./requestLifecycle";
 import { normalizeMaxBytes, parseContentLength } from "./responses";
 import { buildRequestHeaders } from "./transport";
 import type { JenkinsStreamRequestOptions, JenkinsStreamResponse } from "./types";
-import { executeRequestLifecycle } from "./requestLifecycle";
 
 export function requestStream(
   url: string,

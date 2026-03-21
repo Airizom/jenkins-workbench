@@ -121,6 +121,10 @@ export interface JenkinsJobCollectionRequest {
   folderUrl?: string;
 }
 
+export interface JenkinsJobFetchOptions {
+  mode?: "cached" | "refresh";
+}
+
 export interface JenkinsQueueItemInfo {
   id: number;
   name: string;
@@ -154,6 +158,7 @@ export interface CancellationSignal {
 export type CancellationInput = CancellationChecker | CancellationSignal;
 
 export interface JobSearchOptions {
+  mode?: "cached" | "refresh";
   cancellation?: CancellationInput;
   maxResults?: number;
   batchSize?: number;

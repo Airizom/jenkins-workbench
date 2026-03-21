@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { TreeJobScope } from "./TreeJobScope";
 import type { WorkbenchTreeElement } from "./TreeItems";
+import type { TreeJobScope } from "./TreeJobScope";
 
 export type TreeViewSummary = {
   running: number;
@@ -39,4 +39,3 @@ export type InvalidateBuildArtifactsRequest = {
   jobScope?: TreeJobScope;
   refreshTree?: boolean;
 };
-

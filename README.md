@@ -21,6 +21,13 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Pin Jobs & Pipelines** — Keep critical items at the top of the tree for quick access
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
 
+### Current Branch Workflow
+
+- **Repository Linking** — Link a local Git repository to a Jenkins multibranch pipeline
+- **Persistent Repository Links** — Repository links follow the same local checkout across workspaces on this machine
+- **Status Bar Summary** — See current-branch Jenkins status in the VS Code status bar
+- **Current Branch Actions** — Open Jenkins, trigger builds, inspect the latest build, or relink without browsing the tree
+
 ### Build Management
 
 - **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords, credentials, run, file, text, multi-choice)
@@ -151,11 +158,11 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | `jenkinsWorkbench.maxCacheEntries` | 1000 | Maximum cache entries before eviction. |
 | `jenkinsWorkbench.requestTimeoutSeconds` | 30 | Timeout for Jenkins API requests. |
 
-### Polling & Watches
+### Polling & Refresh
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for watched jobs. |
+| `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for shared Jenkins status refreshes, including watched jobs and current-branch status. |
 | `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
 | `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
@@ -264,6 +271,17 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 |---------|-------------|
 | `Jenkins: Go to Job...` | Search and navigate to any job |
 | `Jenkins: Open in Jenkins` | Open the selected item in your browser |
+
+### Current Branch
+
+| Command | Description |
+|---------|-------------|
+| `Jenkins: Link Current Repository to Multibranch Pipeline` | Link the active Git repository to a Jenkins multibranch pipeline |
+| `Jenkins: Link Repository Here` | Link a Git repository directly from a selected multibranch folder in the tree |
+| `Jenkins: Unlink Current Repository from Jenkins` | Remove the stored Jenkins link for a Git repository |
+| `Jenkins: Current Branch Actions` | Open the action picker for the active repository's current branch |
+| `Jenkins: Open Current Branch in Jenkins` | Open the resolved current-branch Jenkins job |
+| `Jenkins: Trigger Current Branch Build` | Trigger a build for the resolved current-branch Jenkins job |
 
 ### Nodes
 

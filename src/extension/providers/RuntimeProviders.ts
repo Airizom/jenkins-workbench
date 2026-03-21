@@ -1,5 +1,16 @@
 import type * as vscode from "vscode";
+import { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
+import { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
+import { CurrentBranchJenkinsService } from "../../currentBranch/CurrentBranchJenkinsService";
+import { CurrentBranchLinkResolver } from "../../currentBranch/CurrentBranchLinkResolver";
+import { CurrentBranchLinkWorkflowService } from "../../currentBranch/CurrentBranchLinkWorkflowService";
+import { CurrentBranchRefreshCoordinator } from "../../currentBranch/CurrentBranchRefreshCoordinator";
+import { CurrentBranchRepositoryResolver } from "../../currentBranch/CurrentBranchRepositoryResolver";
+import { CurrentBranchStatusBar } from "../../currentBranch/CurrentBranchStatusBar";
+import { CurrentBranchStatusResolver } from "../../currentBranch/CurrentBranchStatusResolver";
+import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
+import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
 import { JenkinsfileQuickFixProvider } from "../../validation/editor/JenkinsfileQuickFixProvider";
 import { JenkinsfileValidationCodeLensProvider } from "../../validation/editor/JenkinsfileValidationCodeLensProvider";
@@ -13,18 +24,65 @@ import type { PartialExtensionProviderCatalog } from "../container/ExtensionCont
 
 export interface RuntimeProviderOptions {
   extensionUri: vscode.Uri;
-  pollIntervalSeconds: number;
+  statusRefreshIntervalSeconds: number;
   watchErrorThreshold: number;
   queuePollIntervalSeconds: number;
 }
 
 export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
   return {
+    statusRefreshService: (_container) =>
+      new JenkinsStatusRefreshService(options.statusRefreshIntervalSeconds),
     statusNotifier: (_container) => new VscodeStatusNotifier(),
+    currentBranchRepositoryResolver: (_container) => new CurrentBranchRepositoryResolver(),
+    currentBranchLinkResolver: (container) =>
+      new CurrentBranchLinkResolver(
+        container.get("environmentStore"),
+        container.get("repositoryLinkStore")
+      ),
+    currentBranchRefreshCoordinator: (_container) => new CurrentBranchRefreshCoordinator(),
+    currentBranchStatusResolver: (container) =>
+      new CurrentBranchStatusResolver(container.get("dataService")),
+    currentBranchLinkWorkflowService: (container) =>
+      new CurrentBranchLinkWorkflowService(
+        container.get("environmentStore"),
+        container.get("dataService"),
+        container.get("repositoryLinkStore")
+      ),
+    currentBranchCommandMapper: (_container) => new CurrentBranchCommandMapper(),
+    currentBranchActionExecutor: (container) =>
+      new CurrentBranchActionExecutor(
+        container.get("dataService"),
+        container.get("presetStore"),
+        container.get("queuedBuildWaiter"),
+        container.get("artifactActionHandler"),
+        container.get("consoleExporter"),
+        container.get("pendingInputCoordinator"),
+        container.get("refreshHost")
+      ),
+    currentBranchService: (container) =>
+      new CurrentBranchJenkinsService(
+        container.get("currentBranchRepositoryResolver"),
+        container.get("environmentStore"),
+        container.get("currentBranchLinkResolver"),
+        container.get("currentBranchStatusResolver"),
+        container.get("currentBranchRefreshCoordinator"),
+        container.get("statusRefreshService")
+      ),
+    currentBranchWorkflowService: (container) =>
+      new CurrentBranchWorkflowService(
+        container.get("currentBranchService"),
+        container.get("currentBranchLinkWorkflowService"),
+        container.get("currentBranchCommandMapper"),
+        container.get("currentBranchActionExecutor")
+      ),
+    currentBranchStatusBar: (container) =>
+      new CurrentBranchStatusBar(container.get("currentBranchService")),
     poller: (container) =>
       new JenkinsStatusPoller(
         container.get("environmentStore"),
         container.get("dataService"),
+        container.get("statusRefreshService"),
         container.get("pendingInputCoordinator"),
         container.get("watchStore"),
         container.get("statusNotifier"),
@@ -33,7 +91,6 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
             container.get("refreshHost").fullEnvironmentRefresh({ trigger: "system" });
           }
         },
-        options.pollIntervalSeconds,
         options.watchErrorThreshold
       ),
     queuePoller: (container) =>

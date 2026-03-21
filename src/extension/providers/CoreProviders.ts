@@ -20,6 +20,7 @@ import { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import { JenkinsPinStore } from "../../storage/JenkinsPinStore";
+import { JenkinsRepositoryLinkStore } from "../../storage/JenkinsRepositoryLinkStore";
 import { JenkinsViewStateStore } from "../../storage/JenkinsViewStateStore";
 import { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import {
@@ -113,6 +114,7 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
     watchStore: (_container) => new JenkinsWatchStore(options.context),
     presetStore: (_container) => new JenkinsParameterPresetStore(options.context),
     pinStore: (_container) => new JenkinsPinStore(options.context),
+    repositoryLinkStore: (_container) => new JenkinsRepositoryLinkStore(options.context),
     viewStateStore: (_container) => new JenkinsViewStateStore(options.context)
   } satisfies PartialExtensionProviderCatalog;
 }

@@ -3,7 +3,10 @@ import type { WorkbenchTreeElement } from "./TreeItems";
 import { InstanceTreeItem, RootSectionTreeItem } from "./TreeItems";
 
 export class TreeDataProviderHierarchyState {
-  private readonly parentMap = new WeakMap<WorkbenchTreeElement, WorkbenchTreeElement | undefined>();
+  private readonly parentMap = new WeakMap<
+    WorkbenchTreeElement,
+    WorkbenchTreeElement | undefined
+  >();
   private readonly instanceItems = new Map<string, InstanceTreeItem>();
 
   getParent(element: WorkbenchTreeElement): WorkbenchTreeElement | undefined {

@@ -32,7 +32,7 @@ export interface ExtensionServicesOptions {
 
 export interface ExtensionRuntimeOptions extends ExtensionServicesOptions {
   extensionUri: vscode.Uri;
-  pollIntervalSeconds: number;
+  statusRefreshIntervalSeconds: number;
   watchErrorThreshold: number;
   queuePollIntervalSeconds: number;
 }
@@ -65,7 +65,7 @@ export function registerExtensionProviders(
 
   const runtimeCatalog = createRuntimeProviderCatalog({
     extensionUri: options.extensionUri,
-    pollIntervalSeconds: options.pollIntervalSeconds,
+    statusRefreshIntervalSeconds: options.statusRefreshIntervalSeconds,
     watchErrorThreshold: options.watchErrorThreshold,
     queuePollIntervalSeconds: options.queuePollIntervalSeconds
   });
