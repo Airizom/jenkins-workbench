@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-03-21
+
+### Added
+
+- feat: add current-branch Jenkins workflow with shared status refresh
+
+### Changed
+
+- refactor: extract request lifecycle and tree state helpers
+
 ## [1.34.2] - 2026-03-19
 
 ### Fixed
