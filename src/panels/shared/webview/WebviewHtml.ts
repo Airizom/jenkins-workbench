@@ -1,3 +1,5 @@
+import { type LoadingSkeletonVariant, renderLoadingSkeletonHtml } from "./LoadingSkeletonHtml";
+
 export interface WebviewRenderOptions {
   cspSource: string;
   nonce: string;
@@ -77,6 +79,36 @@ export function renderPanelRestoreErrorHtml(
       </style>
     `,
     { cspSource, nonce, styleUris }
+  );
+}
+
+export type PanelDetailsRenderOptions = WebviewRenderOptions & { panelState?: unknown };
+
+export function renderPanelLoadingHtml(
+  options: PanelDetailsRenderOptions,
+  skeletonVariant: LoadingSkeletonVariant
+): string {
+  const stateScript = renderWebviewStateScript(options.panelState, options.nonce);
+  return renderWebviewShell(`${stateScript}${renderLoadingSkeletonHtml(skeletonVariant)}`, options);
+}
+
+export function renderPanelAppHtml(
+  initialModel: unknown,
+  options: PanelDetailsRenderOptions
+): string {
+  const initialState = serializeForScript(initialModel);
+  const scriptUri = options.scriptUri ?? "";
+  const stateScript = renderWebviewStateScript(options.panelState, options.nonce);
+  return renderWebviewShell(
+    `
+      ${stateScript}
+      <div id="root"></div>
+      <script nonce="${options.nonce}">
+        window.__INITIAL_STATE__ = ${initialState};
+      </script>
+      <script type="module" nonce="${options.nonce}" src="${scriptUri}"></script>
+    `,
+    options
   );
 }
 

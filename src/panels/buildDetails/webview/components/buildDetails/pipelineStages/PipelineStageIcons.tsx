@@ -1,86 +1,24 @@
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  PlayIcon,
+  StopSquareIcon,
+  XIcon
+} from "../../../../../shared/webview/icons";
 import { cn } from "../../../../../shared/webview/lib/utils";
-
-function CheckIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2.5"
-      viewBox="0 0 24 24"
-    >
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2.5"
-      viewBox="0 0 24 24"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function PlayIcon() {
-  return (
-    <svg aria-hidden="true" className="h-3 w-3 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-      <polygon points="5 3 19 12 5 21 5 3" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-3 w-3"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2.5"
-      viewBox="0 0 24 24"
-    >
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  );
-}
-
-function StopIcon() {
-  return (
-    <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-      <rect x="6" y="6" width="12" height="12" rx="1" />
-    </svg>
-  );
-}
 
 export function getStageIcon(statusClass?: string) {
   switch (statusClass) {
     case "success":
-      return <CheckIcon />;
+      return <CheckIcon className="h-3 w-3" />;
     case "failure":
-      return <XIcon />;
+      return <XIcon className="h-3 w-3" />;
     case "unstable":
-      return <AlertIcon />;
+      return <AlertTriangleIcon className="h-3 w-3 text-current" />;
     case "running":
-      return <PlayIcon />;
+      return <PlayIcon className="h-3 w-3 ml-0.5 text-current" />;
     case "aborted":
-      return <StopIcon />;
+      return <StopSquareIcon className="h-3 w-3 text-current" />;
     default:
       return null;
   }

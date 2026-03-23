@@ -1,4 +1,4 @@
-import type { WorkbenchTreeElement } from "./TreeItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type TreeRefreshWaiter = {
   token: number;

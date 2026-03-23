@@ -1,3 +1,4 @@
+import { formatParameterDefaultValue } from "../parameterDefaultValueFormat";
 import type { JenkinsParameterDefinition } from "../types";
 
 type JenkinsParameterContainer = {
@@ -23,36 +24,6 @@ export function extractParameterDefinitions(
 ): JenkinsParameterDefinition[] {
   const definitions: JenkinsParameterDefinition[] = [];
   const seen = new Set<string>();
-  const formatDefaultValue = (value: unknown): string | number | boolean | string[] | undefined => {
-    switch (typeof value) {
-      case "string":
-      case "number":
-      case "boolean":
-        return value;
-      case "undefined":
-        return undefined;
-      case "bigint":
-        return value.toString();
-      case "symbol":
-        return value.description ?? value.toString();
-      case "function":
-        return value.name ? `[function ${value.name}]` : "[function]";
-      case "object":
-        if (value === null) {
-          return undefined;
-        }
-        if (Array.isArray(value)) {
-          return value.map((entry) => String(entry));
-        }
-        try {
-          return JSON.stringify(value);
-        } catch {
-          return "[object]";
-        }
-      default:
-        return undefined;
-    }
-  };
 
   const collectDefinitions = (containers?: JenkinsParameterContainer[]): void => {
     for (const container of containers ?? []) {
@@ -69,7 +40,7 @@ export function extractParameterDefinitions(
           ? definition.choices.map((choice) => String(choice))
           : undefined;
         const rawDefault = definition.defaultParameterValue?.value ?? definition.defaultValue;
-        const defaultValue = formatDefaultValue(rawDefault);
+        const defaultValue = formatParameterDefaultValue(rawDefault);
 
         definitions.push({
           name: definition.name,

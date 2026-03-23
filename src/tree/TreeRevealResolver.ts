@@ -1,16 +1,10 @@
 import type { JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { buildOverrideKey } from "./TreeFilterKeys";
-import {
-  InstanceTreeItem,
-  JenkinsFolderTreeItem,
-  JobTreeItem,
-  JobsFolderTreeItem,
-  PipelineTreeItem,
-  RootSectionTreeItem,
-  type WorkbenchTreeElement
-} from "./TreeItems";
 import type { TreeChildrenOptions } from "./TreeTypes";
+import { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
+import { InstanceTreeItem, JobsFolderTreeItem, RootSectionTreeItem } from "./items/TreeRootItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 type GetChildrenInternal = (
   element?: WorkbenchTreeElement,

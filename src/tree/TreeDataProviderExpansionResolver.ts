@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
 import type { TreeExpansionPath, TreeExpansionResolveResult } from "./TreeDataProviderTypes";
 import { getWorkbenchTreeElementId, isLoadingPlaceholder } from "./TreeDataProviderUtils";
-import type { WorkbenchTreeElement } from "./TreeItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 type TreeParentResolver = (
   element: WorkbenchTreeElement

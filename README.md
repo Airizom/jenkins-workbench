@@ -18,7 +18,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Browse Everything** — Explore folders, multibranch pipelines, jobs, builds, and nodes
 - **Curated Jenkins Views** — Browse Jenkins views in a dedicated section and hide noisy defaults
 - **Go to Job...** — Quick search across all configured Jenkins environments
-- **Pin Jobs & Pipelines** — Keep critical items at the top of the tree for quick access
+- **Pin Jobs & Pipelines** — Keep critical items in a top-level pinned section for quick access
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
 
 ### Current Branch Workflow
@@ -307,8 +307,9 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 
 | Command | Description |
 |---------|-------------|
-| `Jenkins: Pin Job` | Pin a job or pipeline to the top of the tree |
+| `Jenkins: Pin Job` | Pin a job or pipeline into the pinned section at the top of an instance |
 | `Jenkins: Unpin Job` | Remove a pinned job or pipeline |
+| `Jenkins: Remove Missing Pins` | Remove stale pinned entries that no longer exist in Jenkins |
 
 ### Watch
 
@@ -430,7 +431,7 @@ npm run check:fix
 7. Trigger a multibranch scan and verify branch filtering still works
 8. Confirm removing an environment clears it from the tree
 9. Preview or download a build artifact
-10. Pin and unpin a job or pipeline
+10. Pin and unpin a job or pipeline, then verify the pinned section and remove any missing pins
 
 ## License
 

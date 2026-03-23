@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { WorkbenchTreeElement } from "./TreeItems";
 import type { TreeJobScope } from "./TreeJobScope";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type TreeViewSummary = {
   running: number;

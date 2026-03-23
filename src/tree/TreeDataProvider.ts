@@ -26,11 +26,12 @@ import type {
   TreeViewSummary
 } from "./TreeDataProviderTypes";
 import type { JenkinsTreeFilter } from "./TreeFilter";
-import { BuildQueueFolderTreeItem, type WorkbenchTreeElement } from "./TreeItems";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
+import { BuildQueueFolderTreeItem } from "./items/TreeRootItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
 export type {

@@ -1,5 +1,5 @@
-import type { WorkbenchTreeElement } from "./TreeItems";
-import { PlaceholderTreeItem } from "./TreeItems";
+import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type TreeViewSummaryShape = {
   running: number;

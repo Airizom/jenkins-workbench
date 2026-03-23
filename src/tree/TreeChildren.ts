@@ -7,34 +7,17 @@ import type {
   JenkinsQueueItemInfo
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { JenkinsActionError, JenkinsRequestError } from "../jenkins/errors";
+import { canonicalizeJobUrlForEnvironment } from "../jenkins/urls";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import { ScopedCache } from "../services/ScopedCache";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
+import type { JenkinsPinStore, StoredPinnedJobEntry } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { resolveTreeItemLabel } from "./TreeItemLabels";
-import {
-  ArtifactTreeItem,
-  BuildArtifactsFolderTreeItem,
-  BuildQueueFolderTreeItem,
-  BuildTreeItem,
-  InstanceTreeItem,
-  JenkinsFolderTreeItem,
-  JenkinsViewTreeItem,
-  JobTreeItem,
-  JobsFolderTreeItem,
-  NodeTreeItem,
-  NodesFolderTreeItem,
-  PipelineTreeItem,
-  PlaceholderTreeItem,
-  QueueItemTreeItem,
-  RootSectionTreeItem,
-  ViewsFolderTreeItem,
-  type WorkbenchTreeElement
-} from "./TreeItems";
 import {
   ROOT_TREE_JOB_SCOPE,
   type TreeJobCollectionRequest,
@@ -42,6 +25,33 @@ import {
 } from "./TreeJobScope";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import { type TreeViewCurationOptions, curateTreeViews } from "./TreeViewCuration";
+import {
+  ArtifactTreeItem,
+  BuildArtifactsFolderTreeItem,
+  BuildTreeItem
+} from "./items/TreeBuildItems";
+import {
+  JenkinsFolderTreeItem,
+  JenkinsViewTreeItem,
+  JobTreeItem,
+  PipelineTreeItem,
+  QuickAccessJobTreeItem,
+  QuickAccessPipelineTreeItem,
+  StalePinnedJobTreeItem
+} from "./items/TreeJobItems";
+import { NodeTreeItem } from "./items/TreeNodeItems";
+import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
+import { QueueItemTreeItem } from "./items/TreeQueueItems";
+import {
+  BuildQueueFolderTreeItem,
+  InstanceTreeItem,
+  JobsFolderTreeItem,
+  NodesFolderTreeItem,
+  PinnedJobsFolderTreeItem,
+  RootSectionTreeItem,
+  ViewsFolderTreeItem
+} from "./items/TreeRootItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { TreeChildrenCacheManager } from "./loader/TreeChildrenCacheManager";
 import {
   type JobCollectionTreeElement,
@@ -65,6 +75,7 @@ const CHILDREN_CACHE_TTL_MS = 30_000;
 const ARTIFACT_CACHE_TTL_MS = 5 * 60_000;
 const ENVIRONMENT_SUMMARY_TTL_MS = 60_000;
 const CHILDREN_LOAD_TIMEOUT_MS = 35_000;
+const PINNED_ITEM_LOOKUP_CONCURRENCY = 4;
 
 export class JenkinsTreeChildrenLoader {
   private readonly childrenCache = new ScopedCache(
@@ -140,12 +151,28 @@ export class JenkinsTreeChildrenLoader {
 
     if (element instanceof InstanceTreeItem) {
       const summary = this.environmentSummaryStore.get(element);
+      const pinnedEntries = await this.pinStore.listPinnedJobsForEnvironment(
+        element.scope,
+        element.environmentId
+      );
       return [
+        ...(pinnedEntries.length > 0
+          ? [new PinnedJobsFolderTreeItem(element, pinnedEntries.length)]
+          : []),
         new ViewsFolderTreeItem(element),
         new JobsFolderTreeItem(element, summary?.jobs),
         new BuildQueueFolderTreeItem(element, summary?.queue),
         new NodesFolderTreeItem(element, summary?.nodes)
       ];
+    }
+
+    if (element instanceof PinnedJobsFolderTreeItem) {
+      return await this.getOrLoadChildren(
+        this.buildChildrenKey("pinned-root", element.environment),
+        element,
+        () => this.loadPinnedItemsForEnvironment(element.environment),
+        "Loading pinned jobs..."
+      );
     }
 
     if (element instanceof ViewsFolderTreeItem) {
@@ -296,6 +323,13 @@ export class JenkinsTreeChildrenLoader {
       return;
     }
 
+    if (element instanceof PinnedJobsFolderTreeItem) {
+      this.cacheManager.clearChildrenCache(
+        this.buildChildrenKey("pinned-root", element.environment)
+      );
+      return;
+    }
+
     const jobCollectionElement = this.getJobCollectionElement(element);
     if (jobCollectionElement) {
       this.cacheManager.clearChildrenCache(
@@ -310,6 +344,13 @@ export class JenkinsTreeChildrenLoader {
     if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
       this.cacheManager.clearChildrenCache(
         this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope)
+      );
+      return;
+    }
+
+    if (element instanceof StalePinnedJobTreeItem) {
+      this.cacheManager.clearChildrenCache(
+        this.buildChildrenKey("pinned-root", element.environment)
       );
       return;
     }
@@ -409,6 +450,31 @@ export class JenkinsTreeChildrenLoader {
       });
     } catch (error) {
       return [this.createErrorPlaceholder("Unable to load jobs.", error)];
+    }
+  }
+
+  private async loadPinnedItemsForEnvironment(
+    environment: JenkinsEnvironmentRef
+  ): Promise<WorkbenchTreeElement[]> {
+    try {
+      const [pinnedEntries, watchedJobs, pinnedJobs] = await Promise.all([
+        this.pinStore.listPinnedJobsForEnvironment(environment.scope, environment.environmentId),
+        this.getWatchedJobUrls(environment),
+        this.getPinnedJobUrls(environment)
+      ]);
+
+      if (pinnedEntries.length === 0) {
+        return [
+          this.createEmptyPlaceholder(
+            "No pinned jobs or pipelines.",
+            "Pin a job or pipeline to keep it here for quick access."
+          )
+        ];
+      }
+
+      return await this.loadPinnedItems(environment, pinnedEntries, watchedJobs, pinnedJobs);
+    } catch (error) {
+      return [this.createErrorPlaceholder("Unable to load pinned jobs.", error)];
     }
   }
 
@@ -604,12 +670,135 @@ export class JenkinsTreeChildrenLoader {
       return cached;
     }
 
-    const pinned = await this.pinStore.getPinnedJobUrls(
+    const pinnedEntries = await this.pinStore.listPinnedJobsForEnvironment(
       environment.scope,
       environment.environmentId
     );
+    const pinned = new Set(
+      pinnedEntries.map((entry) => this.getCanonicalPinnedJobUrl(environment, entry.jobUrl))
+    );
     this.cacheManager.setCachedPinnedJobs(environment, pinned);
     return pinned;
+  }
+
+  private async loadPinnedItem(
+    environment: JenkinsEnvironmentRef,
+    entry: StoredPinnedJobEntry,
+    watchedJobs: Set<string>,
+    pinnedJobs: Set<string>
+  ): Promise<WorkbenchTreeElement> {
+    const canonicalJobUrl = this.getCanonicalPinnedJobUrl(environment, entry.jobUrl);
+
+    try {
+      const current = await this.dataService.getJobInfo(environment, canonicalJobUrl);
+      if (current.kind !== "job" && current.kind !== "pipeline") {
+        return this.createStalePinnedItem(environment, entry);
+      }
+
+      await this.updatePinnedEntryUrlIfNeeded(environment, entry, canonicalJobUrl);
+
+      const isWatched = watchedJobs.has(canonicalJobUrl);
+      const isPinned = pinnedJobs.has(canonicalJobUrl);
+
+      return current.kind === "pipeline"
+        ? new QuickAccessPipelineTreeItem(
+            environment,
+            current.name,
+            canonicalJobUrl,
+            ROOT_TREE_JOB_SCOPE,
+            current.color,
+            isWatched,
+            isPinned
+          )
+        : new QuickAccessJobTreeItem(
+            environment,
+            current.name,
+            canonicalJobUrl,
+            ROOT_TREE_JOB_SCOPE,
+            current.color,
+            isWatched,
+            isPinned
+          );
+    } catch (error) {
+      if (this.isMissingPinnedItemError(error)) {
+        return this.createStalePinnedItem(environment, entry);
+      }
+
+      return this.createPinnedItemErrorPlaceholder(entry, error);
+    }
+  }
+
+  private createStalePinnedItem(
+    environment: JenkinsEnvironmentRef,
+    entry: StoredPinnedJobEntry
+  ): StalePinnedJobTreeItem {
+    return new StalePinnedJobTreeItem(
+      environment,
+      entry.jobName ?? entry.jobUrl,
+      entry.jobUrl,
+      entry.jobKind ?? "job"
+    );
+  }
+
+  private createPinnedItemErrorPlaceholder(
+    entry: StoredPinnedJobEntry,
+    error: unknown
+  ): PlaceholderTreeItem {
+    const label = `Unable to load ${entry.jobName ?? entry.jobUrl}`;
+    return this.createErrorPlaceholder(label, error);
+  }
+
+  private isMissingPinnedItemError(error: unknown): boolean {
+    if (error instanceof JenkinsActionError) {
+      return error.code === "not_found";
+    }
+
+    return error instanceof JenkinsRequestError && error.statusCode === 404;
+  }
+
+  private async loadPinnedItems(
+    environment: JenkinsEnvironmentRef,
+    pinnedEntries: StoredPinnedJobEntry[],
+    watchedJobs: Set<string>,
+    pinnedJobs: Set<string>
+  ): Promise<WorkbenchTreeElement[]> {
+    const items: WorkbenchTreeElement[] = [];
+
+    for (let index = 0; index < pinnedEntries.length; index += PINNED_ITEM_LOOKUP_CONCURRENCY) {
+      const batch = pinnedEntries.slice(index, index + PINNED_ITEM_LOOKUP_CONCURRENCY);
+      const loaded = await Promise.all(
+        batch.map((entry) => this.loadPinnedItem(environment, entry, watchedJobs, pinnedJobs))
+      );
+      items.push(...loaded);
+    }
+
+    return items;
+  }
+
+  private getCanonicalPinnedJobUrl(environment: JenkinsEnvironmentRef, jobUrl: string): string {
+    return canonicalizeJobUrlForEnvironment(environment.url, jobUrl) ?? jobUrl;
+  }
+
+  private async updatePinnedEntryUrlIfNeeded(
+    environment: JenkinsEnvironmentRef,
+    entry: StoredPinnedJobEntry,
+    canonicalJobUrl: string
+  ): Promise<void> {
+    if (canonicalJobUrl === entry.jobUrl) {
+      return;
+    }
+
+    try {
+      await this.pinStore.updatePinUrl(
+        environment.scope,
+        environment.environmentId,
+        entry.jobUrl,
+        canonicalJobUrl,
+        entry.jobName
+      );
+    } catch {
+      // Keep rendering the pinned item even if persisting the canonical URL fails.
+    }
   }
 
   private mapQueueItemsToTreeItems(

@@ -5,8 +5,12 @@ import type {
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { ScopedCache } from "../services/ScopedCache";
-import type { JobsFolderSummary, NodesFolderSummary, QueueFolderSummary } from "./TreeItems";
 import { isJobColorDisabled } from "./formatters";
+import type {
+  JobsFolderSummary,
+  NodesFolderSummary,
+  QueueFolderSummary
+} from "./items/TreeItemSummaries";
 
 export type EnvironmentSummary = {
   jobs?: JobsFolderSummary;

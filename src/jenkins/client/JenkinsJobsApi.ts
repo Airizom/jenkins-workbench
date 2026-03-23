@@ -80,7 +80,10 @@ export class JenkinsJobsApi {
         return classifier.kind;
       }
     }
-    return "unknown";
+
+    // Jenkins exposes many concrete job subclasses that are still job-like
+    // from the tree's perspective, such as FreeStyleProject and MatrixProject.
+    return "job";
   }
 
   async getJobParameters(jobUrl: string): Promise<JenkinsParameterDefinition[]> {

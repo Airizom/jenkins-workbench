@@ -30,6 +30,26 @@ export function AlertTriangleIcon({ className, ...props }: IconProps) {
   );
 }
 
+export function AlertCircleIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4 text-warning" {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </IconBase>
+  );
+}
+
+export function InfoIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </IconBase>
+  );
+}
+
 export function PlayCircleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase
@@ -39,6 +59,20 @@ export function PlayCircleIcon({ className, ...props }: IconProps) {
     >
       <circle cx="12" cy="12" r="10" />
       <polygon points="10 8 16 12 10 16 10 8" />
+    </IconBase>
+  );
+}
+
+export function StopSquareIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase
+      className={className}
+      defaultClassName="h-4 w-4"
+      fill="currentColor"
+      stroke="none"
+      {...props}
+    >
+      <rect x="6" y="6" width="12" height="12" rx="1" />
     </IconBase>
   );
 }

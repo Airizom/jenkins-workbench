@@ -75,6 +75,23 @@ export function buildViewScopedJobUrl(viewUrl: string, jobUrl: string): string {
   return scopedUrl;
 }
 
+export function canonicalizeJobUrlForEnvironment(
+  environmentUrl: string,
+  jobUrl: string
+): string | undefined {
+  const parsed = parseJobUrl(jobUrl);
+  if (!parsed) {
+    return undefined;
+  }
+
+  let canonicalUrl = ensureTrailingSlash(environmentUrl);
+  for (const segment of parsed.fullPath) {
+    canonicalUrl = buildJobUrl(canonicalUrl, segment);
+  }
+
+  return canonicalUrl;
+}
+
 export function buildApiUrlFromBase(baseUrl: string, path: string, tree?: string): string {
   const base = ensureTrailingSlash(baseUrl);
   const url = new URL(path, base);

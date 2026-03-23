@@ -1,11 +1,18 @@
 import * as vscode from "vscode";
+import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
-import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
-import { pinJob, unpinJob } from "./pin/PinCommandHandlers";
+import type {
+  JobTreeItem,
+  PinnedJobsFolderTreeItem,
+  PipelineTreeItem,
+  StalePinnedJobTreeItem
+} from "../tree/TreeItems";
+import { pinJob, removeMissingPins, unpinJob } from "./pin/PinCommandHandlers";
 import type { PinCommandRefreshHost } from "./pin/PinCommandTypes";
 
 export function registerPinCommands(
   context: vscode.ExtensionContext,
+  dataService: JenkinsDataService,
   pinStore: JenkinsPinStore,
   refreshHost: PinCommandRefreshHost
 ): void {
@@ -16,7 +23,13 @@ export function registerPinCommands(
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.unpinJob",
-      (item?: JobTreeItem | PipelineTreeItem) => unpinJob(pinStore, refreshHost, item)
+      (item?: JobTreeItem | PipelineTreeItem | StalePinnedJobTreeItem) =>
+        unpinJob(pinStore, refreshHost, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.removeMissingPins",
+      (item?: PinnedJobsFolderTreeItem) =>
+        removeMissingPins(dataService, pinStore, refreshHost, item)
     )
   );
 }

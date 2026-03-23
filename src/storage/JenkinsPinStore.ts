@@ -19,6 +19,16 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
     return this.listWithScope((scope, entry) => ({ ...entry, scope }));
   }
 
+  async listPinnedJobsForEnvironment(
+    scope: EnvironmentScope,
+    environmentId: string
+  ): Promise<StoredPinnedJobEntry[]> {
+    const entries = await this.listPinnedJobs();
+    return entries.filter(
+      (entry) => entry.scope === scope && entry.environmentId === environmentId
+    );
+  }
+
   async getPinnedJobUrls(scope: EnvironmentScope, environmentId: string): Promise<Set<string>> {
     return this.getJobUrls(scope, environmentId);
   }
@@ -45,6 +55,22 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
 
   async removePinsForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
     await this.removeForEnvironment(scope, environmentId);
+  }
+
+  async removeMissingPins(
+    scope: EnvironmentScope,
+    environmentId: string,
+    validUrls: Set<string>
+  ): Promise<number> {
+    const entries = await this.listPinnedJobsForEnvironment(scope, environmentId);
+    const missing = entries.filter((entry) => !validUrls.has(entry.jobUrl));
+
+    if (missing.length === 0) {
+      return 0;
+    }
+
+    await Promise.all(missing.map((entry) => this.remove(scope, environmentId, entry.jobUrl)));
+    return missing.length;
   }
 
   async updatePinUrl(

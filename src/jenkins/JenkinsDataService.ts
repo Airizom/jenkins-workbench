@@ -121,6 +121,10 @@ export class JenkinsDataService {
     return this.jobOperations.getJob(environment, jobUrl);
   }
 
+  async getJobInfo(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<JenkinsJobInfo> {
+    return this.jobOperations.getJobInfo(environment, jobUrl);
+  }
+
   async getJobsForFolder(
     environment: JenkinsEnvironmentRef,
     folderUrl: string,

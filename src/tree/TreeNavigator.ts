@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
 import type { JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { WorkbenchTreeElement } from "./TreeItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export interface JenkinsTreeNavigator {
   revealJobPath(environment: JenkinsEnvironmentRef, entry: JobSearchEntry): Promise<boolean>;

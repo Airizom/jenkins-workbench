@@ -4,7 +4,7 @@ import type {
   TreeExpansionResolveResult,
   TreeExpansionResolver
 } from "./TreeDataProviderTypes";
-import type { WorkbenchTreeElement } from "./TreeItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 type TreeRevealOptions = {
   expand: boolean;

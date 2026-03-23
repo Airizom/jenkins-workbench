@@ -1,6 +1,7 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { ScopedCache } from "../../services/ScopedCache";
-import type { PlaceholderTreeItem, WorkbenchTreeElement } from "../TreeItems";
+import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
+import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
 
 export class TreeChildrenCacheManager {
   private readonly watchedUrlsCache = new Map<string, Set<string>>();

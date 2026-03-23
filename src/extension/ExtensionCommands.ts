@@ -82,7 +82,7 @@ export function registerExtensionCommands(
 
   registerWatchCommands(context, watchStore, refreshHost);
 
-  registerPinCommands(context, pinStore, refreshHost);
+  registerPinCommands(context, dataService, pinStore, refreshHost);
 
   registerSearchCommands(context, environmentStore, dataService, viewStateStore, treeNavigator);
 

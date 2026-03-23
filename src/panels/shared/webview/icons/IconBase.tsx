@@ -11,18 +11,24 @@ export function IconBase({
   className,
   defaultClassName = "h-4 w-4",
   children,
+  fill = "none",
+  stroke = "currentColor",
+  strokeLinecap = "round",
+  strokeLinejoin = "round",
+  strokeWidth = "2",
+  viewBox = "0 0 24 24",
   ...props
 }: IconBaseProps) {
   return (
     <svg
       aria-hidden="true"
       className={cn(defaultClassName, className)}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
+      fill={fill}
+      stroke={stroke}
+      strokeLinecap={strokeLinecap}
+      strokeLinejoin={strokeLinejoin}
+      strokeWidth={strokeWidth}
+      viewBox={viewBox}
       {...props}
     >
       {children}

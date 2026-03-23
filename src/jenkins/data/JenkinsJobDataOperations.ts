@@ -32,6 +32,24 @@ export class JenkinsJobDataOperations {
     return client.getJob(jobUrl);
   }
 
+  async getJobInfo(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<JenkinsJobInfo> {
+    const cacheKey = await this.context.buildCacheKey(environment, "job", jobUrl);
+    return this.context.getCache().getOrLoad(
+      cacheKey,
+      async () => {
+        const client = await this.context.getClient(environment);
+        const job = await client.getJob(jobUrl);
+        return {
+          name: job.name,
+          url: job.url,
+          color: job.color,
+          kind: client.classifyJob(job)
+        };
+      },
+      this.context.getCacheTtlMs()
+    );
+  }
+
   async getJobsForFolder(
     environment: JenkinsEnvironmentRef,
     folderUrl: string,

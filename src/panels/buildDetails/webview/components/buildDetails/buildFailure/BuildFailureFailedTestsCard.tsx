@@ -5,64 +5,9 @@ import {
   CollapsibleTrigger
 } from "../../../../../shared/webview/components/ui/collapsible";
 import { ScrollArea } from "../../../../../shared/webview/components/ui/scroll-area";
+import { ClockIcon, TestTubeIcon, XCircleIcon } from "../../../../../shared/webview/icons";
 import type { BuildFailureFailedTest } from "../../../../shared/BuildDetailsContracts";
 import { OverflowText } from "./BuildFailureOverflowText";
-
-function TestTubeIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4 text-muted-foreground shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5h0c-1.4 0-2.5-1.1-2.5-2.5V2" />
-      <path d="M8.5 2h7" />
-      <path d="M14.5 16h-5" />
-    </svg>
-  );
-}
-
-function XCircleIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4 text-failure shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="15" y1="9" x2="9" y2="15" />
-      <line x1="9" y1="9" x2="15" y2="15" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-3.5 w-3.5 text-muted-foreground"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
 
 export function BuildFailureFailedTestsCard({
   items,
@@ -79,7 +24,7 @@ export function BuildFailureFailedTestsCard({
     <div className="rounded border border-border p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <TestTubeIcon />
+          <TestTubeIcon className="h-4 w-4 shrink-0" />
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Tests
           </span>

@@ -1,6 +1,6 @@
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { WorkbenchTreeElement } from "./TreeItems";
-import { InstanceTreeItem, RootSectionTreeItem } from "./TreeItems";
+import { InstanceTreeItem, RootSectionTreeItem } from "./items/TreeRootItems";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export class TreeDataProviderHierarchyState {
   private readonly parentMap = new WeakMap<

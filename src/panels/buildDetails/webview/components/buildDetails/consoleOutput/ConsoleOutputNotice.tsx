@@ -1,4 +1,5 @@
 import { Alert, AlertDescription } from "../../../../../shared/webview/components/ui/alert";
+import { AlertCircleIcon } from "../../../../../shared/webview/icons";
 
 type ConsoleOutputNoticeProps = {
   note: string;
@@ -7,25 +8,6 @@ type ConsoleOutputNoticeProps = {
 type ConsoleOutputErrorNoticeProps = {
   error?: string;
 };
-
-function ConsoleOutputAlertIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-3.5 w-3.5 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="16" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12.01" y2="8" />
-    </svg>
-  );
-}
 
 export function ConsoleOutputTruncationNotice({
   note
@@ -38,7 +20,7 @@ export function ConsoleOutputTruncationNotice({
       id="console-note"
       className="flex items-center gap-1.5 rounded border border-warning-border bg-warning-surface px-2.5 py-1.5 text-xs text-muted-foreground"
     >
-      <ConsoleOutputAlertIcon />
+      <AlertCircleIcon className="h-3.5 w-3.5 shrink-0" />
       {note}
     </div>
   );

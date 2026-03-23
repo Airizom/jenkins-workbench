@@ -1,12 +1,4 @@
-export function formatDurationMs(duration?: number): string {
-  if (duration === undefined || !Number.isFinite(duration)) {
-    return "Unknown";
-  }
-  const normalizedDuration = Math.max(0, Math.floor(duration));
-  if (normalizedDuration < 1000) {
-    return `${normalizedDuration} ms`;
-  }
-  const totalSeconds = Math.floor(normalizedDuration / 1000);
+export function formatCompactDurationFromTotalSeconds(totalSeconds: number): string {
   const seconds = totalSeconds % 60;
   const minutes = Math.floor(totalSeconds / 60) % 60;
   const hours = Math.floor(totalSeconds / 3600) % 24;
@@ -25,4 +17,16 @@ export function formatDurationMs(duration?: number): string {
     parts.push(`${seconds}s`);
   }
   return parts.join(" ");
+}
+
+export function formatDurationMs(duration?: number): string {
+  if (duration === undefined || !Number.isFinite(duration)) {
+    return "Unknown";
+  }
+  const normalizedDuration = Math.max(0, Math.floor(duration));
+  if (normalizedDuration < 1000) {
+    return `${normalizedDuration} ms`;
+  }
+  const totalSeconds = Math.floor(normalizedDuration / 1000);
+  return formatCompactDurationFromTotalSeconds(totalSeconds);
 }

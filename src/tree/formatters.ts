@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { formatDurationMs } from "../formatters/DurationFormatters";
 import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
+import { parseJobUrl } from "../jenkins/urls";
 
 type NormalizedStatus =
   | "success"
@@ -183,6 +184,35 @@ export function formatJobDescription(options: {
     parts.push("Watched");
   }
   return parts.length > 0 ? parts.join(" • ") : undefined;
+}
+
+export function formatPinnedJobPathContext(jobUrl: string): string | undefined {
+  const parsed = parseJobUrl(jobUrl);
+  if (!parsed || parsed.fullPath.length <= 1) {
+    return undefined;
+  }
+
+  return parsed.fullPath.slice(0, -1).join(" / ");
+}
+
+export function formatPinnedJobTooltip(
+  label: string,
+  jobUrl: string,
+  details?: string
+): string | undefined {
+  const parsed = parseJobUrl(jobUrl);
+  const fullPath = parsed?.fullPath.join(" / ");
+  const lines = [label];
+
+  if (fullPath && fullPath !== label) {
+    lines.push(fullPath);
+  }
+
+  if (details) {
+    lines.push(details);
+  }
+
+  return lines.length > 0 ? lines.join("\n") : undefined;
 }
 
 export function formatQueueItemDescription(

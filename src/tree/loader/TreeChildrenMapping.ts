@@ -7,22 +7,22 @@ import type {
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsTreeFilter } from "../TreeFilter";
 import {
-  JenkinsFolderTreeItem,
-  JenkinsViewTreeItem,
-  JobTreeItem,
-  JobsFolderTreeItem,
-  PinnedSectionTreeItem,
-  PipelineTreeItem,
-  QueueItemTreeItem
-} from "../TreeItems";
-import type { PlaceholderTreeItem, WorkbenchTreeElement } from "../TreeItems";
-import {
   ROOT_TREE_JOB_SCOPE,
   type TreeJobCollectionRequest,
   type TreeJobScope,
   buildTreeJobScopeKey,
   getTreeJobCollectionCacheParts
 } from "../TreeJobScope";
+import {
+  JenkinsFolderTreeItem,
+  JenkinsViewTreeItem,
+  JobTreeItem,
+  PipelineTreeItem
+} from "../items/TreeJobItems";
+import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
+import { QueueItemTreeItem } from "../items/TreeQueueItems";
+import { JobsFolderTreeItem, PinnedSectionTreeItem } from "../items/TreeRootItems";
+import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
 
 export type JobCollectionTreeElement =
   | JobsFolderTreeItem
