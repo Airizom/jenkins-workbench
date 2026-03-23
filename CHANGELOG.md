@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-03-23
+
+### Added
+
+- feat: add missing-pins cleanup and canonical pin matching
+
 ## [1.35.0] - 2026-03-21
 
 ### Added
