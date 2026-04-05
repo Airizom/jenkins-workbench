@@ -1,13 +1,17 @@
 import type * as vscode from "vscode";
 import { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
+import { VscodeCurrentBranchGitHubPullRequestAdapter } from "../../currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import { CurrentBranchJenkinsService } from "../../currentBranch/CurrentBranchJenkinsService";
 import { CurrentBranchLinkResolver } from "../../currentBranch/CurrentBranchLinkResolver";
 import { CurrentBranchLinkWorkflowService } from "../../currentBranch/CurrentBranchLinkWorkflowService";
+import { CurrentBranchPullRequestJobNameMatcher } from "../../currentBranch/CurrentBranchPullRequestJobMatcher";
+import { CurrentBranchPullRequestService } from "../../currentBranch/CurrentBranchPullRequestService";
 import { CurrentBranchRefreshCoordinator } from "../../currentBranch/CurrentBranchRefreshCoordinator";
 import { CurrentBranchRepositoryResolver } from "../../currentBranch/CurrentBranchRepositoryResolver";
 import { CurrentBranchStatusBar } from "../../currentBranch/CurrentBranchStatusBar";
 import { CurrentBranchStatusResolver } from "../../currentBranch/CurrentBranchStatusResolver";
+import { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBranchTargetResolver";
 import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
@@ -24,6 +28,7 @@ import type { PartialExtensionProviderCatalog } from "../container/ExtensionCont
 
 export interface RuntimeProviderOptions {
   extensionUri: vscode.Uri;
+  currentBranchPullRequestJobNamePatterns: readonly string[];
   statusRefreshIntervalSeconds: number;
   watchErrorThreshold: number;
   queuePollIntervalSeconds: number;
@@ -40,9 +45,24 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("environmentStore"),
         container.get("repositoryLinkStore")
       ),
+    currentBranchGitHubPullRequestAdapter: (_container) =>
+      new VscodeCurrentBranchGitHubPullRequestAdapter(),
+    currentBranchPullRequestService: (container) =>
+      new CurrentBranchPullRequestService(container.get("currentBranchGitHubPullRequestAdapter")),
+    currentBranchPullRequestJobMatcher: (_container) =>
+      new CurrentBranchPullRequestJobNameMatcher(options.currentBranchPullRequestJobNamePatterns),
     currentBranchRefreshCoordinator: (_container) => new CurrentBranchRefreshCoordinator(),
+    currentBranchTargetResolver: (container) =>
+      new CurrentBranchTargetResolver(
+        container.get("dataService"),
+        container.get("currentBranchPullRequestService"),
+        container.get("currentBranchPullRequestJobMatcher")
+      ),
     currentBranchStatusResolver: (container) =>
-      new CurrentBranchStatusResolver(container.get("dataService")),
+      new CurrentBranchStatusResolver(
+        container.get("dataService"),
+        container.get("currentBranchTargetResolver")
+      ),
     currentBranchLinkWorkflowService: (container) =>
       new CurrentBranchLinkWorkflowService(
         container.get("environmentStore"),

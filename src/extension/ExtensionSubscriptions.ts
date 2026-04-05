@@ -5,6 +5,7 @@ import {
   getBuildListFetchOptions,
   getBuildTooltipOptions,
   getCacheTtlMs,
+  getCurrentBranchPullRequestJobNamePatterns,
   getExtensionConfiguration,
   getJenkinsfileValidationConfig,
   getQueuePollIntervalSeconds,
@@ -20,6 +21,8 @@ const CACHE_TTL_CONFIG_KEY = "cacheTtlSeconds";
 const STATUS_REFRESH_INTERVAL_CONFIG_KEY = "pollIntervalSeconds";
 const WATCH_ERROR_THRESHOLD_CONFIG_KEY = "watchErrorThreshold";
 const QUEUE_POLL_INTERVAL_CONFIG_KEY = "queuePollIntervalSeconds";
+const CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY =
+  "currentBranch.pullRequestJobNamePatterns";
 const BUILD_TOOLTIP_DETAILS_CONFIG_KEY = "buildTooltips.includeDetails";
 const BUILD_TOOLTIP_PARAMETERS_ENABLED_CONFIG_KEY = "buildTooltips.parameters.enabled";
 const BUILD_TOOLTIP_PARAMETERS_ALLOW_LIST_CONFIG_KEY = "buildTooltips.parameters.allowList";
@@ -55,6 +58,7 @@ type ConfigReactionKey =
   | typeof STATUS_REFRESH_INTERVAL_CONFIG_KEY
   | typeof WATCH_ERROR_THRESHOLD_CONFIG_KEY
   | typeof QUEUE_POLL_INTERVAL_CONFIG_KEY
+  | typeof CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY
   | typeof TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY
   | BuildTooltipConfigKey
   | JenkinsfileValidationConfigKey;
@@ -67,6 +71,8 @@ interface ConfigReactionContext {
   statusRefreshService: ExtensionTokenMap["statusRefreshService"];
   poller: ExtensionTokenMap["poller"];
   queuePoller: ExtensionTokenMap["queuePoller"];
+  currentBranchPullRequestJobMatcher: ExtensionTokenMap["currentBranchPullRequestJobMatcher"];
+  currentBranchService: ExtensionTokenMap["currentBranchService"];
   jenkinsfileValidationCoordinator: ExtensionTokenMap["jenkinsfileValidationCoordinator"];
   jenkinsfileMatcher: ExtensionTokenMap["jenkinsfileMatcher"];
 }
@@ -115,6 +121,8 @@ export function registerExtensionSubscriptions(
   const statusRefreshService = container.get("statusRefreshService");
   const poller = container.get("poller");
   const queuePoller = container.get("queuePoller");
+  const currentBranchPullRequestJobMatcher = container.get("currentBranchPullRequestJobMatcher");
+  const currentBranchService = container.get("currentBranchService");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
   const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
 
@@ -148,6 +156,15 @@ export function registerExtensionSubscriptions(
         reactionContext.queuePoller.updatePollIntervalSeconds(
           getQueuePollIntervalSeconds(reactionContext.config)
         );
+      }
+    },
+    {
+      keys: [CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY],
+      run: (reactionContext) => {
+        reactionContext.currentBranchPullRequestJobMatcher.updatePatterns(
+          getCurrentBranchPullRequestJobNamePatterns(reactionContext.config)
+        );
+        void reactionContext.currentBranchService.refresh({ force: true });
       }
     },
     {
@@ -205,6 +222,8 @@ export function registerExtensionSubscriptions(
       treeDataProvider,
       poller,
       queuePoller,
+      currentBranchPullRequestJobMatcher,
+      currentBranchService,
       jenkinsfileValidationCoordinator,
       jenkinsfileMatcher
     };

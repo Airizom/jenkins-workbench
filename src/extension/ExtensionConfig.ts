@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS } from "../currentBranch/CurrentBranchPullRequestJobPatterns";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
@@ -219,6 +220,19 @@ export function getTreeViewCurationOptions(
   return {
     excludedNames
   };
+}
+
+export function getCurrentBranchPullRequestJobNamePatterns(
+  config: vscode.WorkspaceConfiguration
+): string[] {
+  const configuredValue = config.get<unknown>("currentBranch.pullRequestJobNamePatterns");
+  const patterns =
+    typeof configuredValue === "undefined"
+      ? DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS
+      : normalizeStringList(configuredValue);
+  return [
+    ...(patterns.length > 0 ? patterns : DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS)
+  ];
 }
 
 export function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfiguration): boolean {

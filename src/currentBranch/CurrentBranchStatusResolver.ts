@@ -1,9 +1,15 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import { toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
 import type {
+  CurrentBranchResolvedTarget,
+  CurrentBranchTargetResolver
+} from "./CurrentBranchTargetResolver";
+import type {
+  CurrentBranchBuildInfo,
   CurrentBranchLinkedContext,
   CurrentBranchRefreshOptions,
   CurrentBranchRemoteResolvedState,
+  CurrentBranchSelectedTargetInfo,
   CurrentBranchState
 } from "./CurrentBranchTypes";
 
@@ -17,78 +23,52 @@ const REMOTE_RESOLUTION_CACHE_TTL_MS = 5_000;
 export class CurrentBranchStatusResolver {
   private readonly remoteStateCache = new Map<string, CachedRemoteResolvedState>();
 
-  constructor(private readonly dataService: JenkinsDataService) {}
+  constructor(
+    private readonly dataService: JenkinsDataService,
+    private readonly targetResolver: CurrentBranchTargetResolver
+  ) {}
 
   dispose(): void {
     this.remoteStateCache.clear();
+    this.targetResolver.dispose();
   }
 
   async resolve(
     localState: CurrentBranchLinkedContext,
     options: CurrentBranchRefreshOptions
   ): Promise<CurrentBranchState> {
-    const cacheKey = buildRemoteStateCacheKey(localState);
-    if (!options.force) {
-      const cached = this.remoteStateCache.get(cacheKey);
-      if (cached && cached.expiresAt > Date.now()) {
-        return this.materializeRemoteState(localState, cached.state);
-      }
-    }
-
-    const resolved = await this.fetchRemoteState(localState);
-    this.remoteStateCache.set(cacheKey, {
-      expiresAt: Date.now() + REMOTE_RESOLUTION_CACHE_TTL_MS,
-      state: resolved
-    });
-    return this.materializeRemoteState(localState, resolved);
-  }
-
-  private async fetchRemoteState(
-    localState: CurrentBranchLinkedContext
-  ): Promise<CurrentBranchRemoteResolvedState> {
     try {
-      const jobs = await this.dataService.getJobsForFolder(
-        localState.environment,
-        localState.link.multibranchFolderUrl,
-        { mode: "refresh" }
-      );
-      const match = jobs.find((job) => matchesBranchName(job.name, localState.branchName));
-      if (!match) {
-        return {
-          kind: "branchMissing",
-          branchName: localState.branchName,
-          link: localState.link,
-          environment: localState.environment
-        };
+      const targetResolution = await this.targetResolver.resolve(localState, options);
+      const cacheKey = targetResolution.cacheKey;
+      if (!options.force) {
+        const cached = this.remoteStateCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          return this.materializeRemoteState(localState, cached.state);
+        }
       }
 
-      const jobDetails = await this.dataService.getJob(localState.environment, match.url);
-      return {
-        kind: "matched",
-        branchName: localState.branchName,
-        link: localState.link,
-        environment: localState.environment,
-        jobName: decodeJenkinsJobName(match.name),
-        jobUrl: match.url,
-        jobColor: match.color,
-        lastBuild: jobDetails.lastBuild
-          ? {
-              url: jobDetails.lastBuild.url,
-              number: jobDetails.lastBuild.number,
-              result: jobDetails.lastBuild.result,
-              building: jobDetails.lastBuild.building,
-              timestamp: jobDetails.lastBuild.timestamp
-            }
-          : undefined
-      };
+      const resolved =
+        targetResolution.kind === "selected"
+          ? await this.hydrateSelectedTarget(targetResolution.target)
+          : {
+              kind: "branchMissing" as const,
+              branchName: targetResolution.branchName,
+              link: targetResolution.link,
+              environment: targetResolution.environment
+            };
+      this.remoteStateCache.set(cacheKey, {
+        expiresAt: Date.now() + REMOTE_RESOLUTION_CACHE_TTL_MS,
+        state: resolved
+      });
+      return this.materializeRemoteState(localState, resolved);
     } catch (error) {
-      return {
+      return this.materializeRemoteState(localState, {
         kind: "requestFailed",
         branchName: localState.branchName,
         link: localState.link,
         environment: localState.environment,
-        message: error instanceof Error ? error.message : "Unable to resolve current branch."
-      };
+        message: toResolutionErrorMessage(error)
+      });
     }
   }
 
@@ -101,27 +81,74 @@ export class CurrentBranchStatusResolver {
       repository: toRepositoryInfo(localState.repository)
     };
   }
-}
 
-function buildRemoteStateCacheKey(localState: CurrentBranchLinkedContext): string {
-  return [
-    localState.repository.repositoryUriString,
-    localState.environment.scope,
-    localState.environment.environmentId,
-    localState.environment.url,
-    localState.link.multibranchFolderUrl,
-    localState.branchName
-  ].join("::");
-}
-
-function matchesBranchName(jobName: string, branchName: string): boolean {
-  return jobName === branchName || decodeJenkinsJobName(jobName) === branchName;
-}
-
-function decodeJenkinsJobName(jobName: string): string {
-  try {
-    return decodeURIComponent(jobName);
-  } catch {
-    return jobName;
+  private async hydrateSelectedTarget(
+    target: CurrentBranchResolvedTarget
+  ): Promise<CurrentBranchRemoteResolvedState> {
+    try {
+      const jobDetails = await this.dataService.getJob(
+        target.environment,
+        target.selectedTarget.jobUrl
+      );
+      return {
+        kind: "matched",
+        branchName: target.branchName,
+        link: target.link,
+        environment: target.environment,
+        resolvedTargetKind: target.selectedTarget.kind,
+        jobName: target.selectedTarget.jobName,
+        jobUrl: target.selectedTarget.jobUrl,
+        jobColor: target.selectedTarget.jobColor,
+        lastBuild: toLastBuildInfo(jobDetails.lastBuild),
+        pullRequest: target.selectedTarget.pullRequest
+      };
+    } catch (error) {
+      return {
+        kind: "requestFailed",
+        branchName: target.branchName,
+        link: target.link,
+        environment: target.environment,
+        message: buildSelectedTargetHydrationErrorMessage(target.selectedTarget, error),
+        selectedTarget: target.selectedTarget
+      };
+    }
   }
+}
+
+function toLastBuildInfo(
+  lastBuild:
+    | {
+        url?: string;
+        number?: number;
+        result?: string;
+        building?: boolean;
+        timestamp?: number;
+      }
+    | undefined
+): CurrentBranchBuildInfo | undefined {
+  return lastBuild
+    ? {
+        url: lastBuild.url,
+        number: lastBuild.number,
+        result: lastBuild.result,
+        building: lastBuild.building,
+        timestamp: lastBuild.timestamp
+      }
+    : undefined;
+}
+
+function toResolutionErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unable to resolve current branch.";
+}
+
+function buildSelectedTargetHydrationErrorMessage(
+  target: CurrentBranchSelectedTargetInfo,
+  error: unknown
+): string {
+  const detail = toResolutionErrorMessage(error);
+  if (target.kind === "pullRequest" && target.pullRequest) {
+    return `Unable to load Jenkins PR #${target.pullRequest.number}: ${detail}`;
+  }
+
+  return `Unable to load Jenkins branch job "${target.jobName}": ${detail}`;
 }

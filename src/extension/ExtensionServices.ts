@@ -32,6 +32,7 @@ export interface ExtensionServicesOptions {
 
 export interface ExtensionRuntimeOptions extends ExtensionServicesOptions {
   extensionUri: vscode.Uri;
+  currentBranchPullRequestJobNamePatterns: readonly string[];
   statusRefreshIntervalSeconds: number;
   watchErrorThreshold: number;
   queuePollIntervalSeconds: number;
@@ -65,6 +66,7 @@ export function registerExtensionProviders(
 
   const runtimeCatalog = createRuntimeProviderCatalog({
     extensionUri: options.extensionUri,
+    currentBranchPullRequestJobNamePatterns: options.currentBranchPullRequestJobNamePatterns,
     statusRefreshIntervalSeconds: options.statusRefreshIntervalSeconds,
     watchErrorThreshold: options.watchErrorThreshold,
     queuePollIntervalSeconds: options.queuePollIntervalSeconds

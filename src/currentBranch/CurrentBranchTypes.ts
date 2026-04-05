@@ -22,6 +22,23 @@ export interface CurrentBranchBuildInfo {
   timestamp?: number;
 }
 
+export interface CurrentBranchPullRequestInfo {
+  number: number;
+  title?: string;
+  url?: string;
+  headBranch?: string;
+}
+
+export type CurrentBranchTargetKind = "pullRequest" | "branch";
+
+export interface CurrentBranchSelectedTargetInfo {
+  kind: CurrentBranchTargetKind;
+  jobName: string;
+  jobUrl: string;
+  jobColor?: string;
+  pullRequest?: CurrentBranchPullRequestInfo;
+}
+
 type CurrentBranchBaseState = {
   repository?: CurrentBranchRepositoryInfo;
   branchName?: string;
@@ -51,6 +68,7 @@ export type CurrentBranchState =
       link?: JenkinsRepositoryLink;
       environment?: JenkinsEnvironmentRef;
       message: string;
+      selectedTarget?: CurrentBranchSelectedTargetInfo;
     })
   | (CurrentBranchBaseState & {
       kind: "matched";
@@ -58,10 +76,12 @@ export type CurrentBranchState =
       branchName: string;
       link: JenkinsRepositoryLink;
       environment: JenkinsEnvironmentRef;
+      resolvedTargetKind: CurrentBranchTargetKind;
       jobName: string;
       jobUrl: string;
       jobColor?: string;
       lastBuild?: CurrentBranchBuildInfo;
+      pullRequest?: CurrentBranchPullRequestInfo;
     });
 
 export interface CurrentBranchLinkedContext {
@@ -85,16 +105,19 @@ export type CurrentBranchRemoteResolvedState =
       link: JenkinsRepositoryLink;
       environment: JenkinsEnvironmentRef;
       message: string;
+      selectedTarget?: CurrentBranchSelectedTargetInfo;
     }
   | {
       kind: "matched";
       branchName: string;
       link: JenkinsRepositoryLink;
       environment: JenkinsEnvironmentRef;
+      resolvedTargetKind: CurrentBranchTargetKind;
       jobName: string;
       jobUrl: string;
       jobColor?: string;
       lastBuild?: CurrentBranchBuildInfo;
+      pullRequest?: CurrentBranchPullRequestInfo;
     };
 
 export type CurrentBranchRefreshOptions = {

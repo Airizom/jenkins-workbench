@@ -1,9 +1,16 @@
 import { formatJobColor, formatRelativeTime } from "../tree/formatters";
 import type { CurrentBranchState } from "./CurrentBranchJenkinsService";
+import type { CurrentBranchPullRequestInfo } from "./CurrentBranchTypes";
 
 export function formatCurrentBranchJobLabel(
   state: Extract<CurrentBranchState, { kind: "matched" | "branchMissing" }>
 ): string {
+  const pullRequestLabel =
+    state.kind === "matched" ? formatPullRequestLabel(state.pullRequest) : undefined;
+  if (state.kind === "matched" && state.resolvedTargetKind === "pullRequest" && pullRequestLabel) {
+    return `${state.link.multibranchLabel} / ${pullRequestLabel}`;
+  }
+
   const branch = state.branchName?.trim();
   return branch ? `${state.link.multibranchLabel} / ${branch}` : state.link.multibranchLabel;
 }
@@ -36,6 +43,7 @@ export function formatCurrentBranchTooltip(
         ...(state.link ? [`Linked multibranch: ${state.link.multibranchLabel}`] : []),
         ...(state.repository ? [`Repository: ${state.repository.repositoryLabel}`] : []),
         ...(state.branchName ? [`Branch: ${state.branchName}`] : []),
+        ...formatSelectedTargetLines(state.selectedTarget),
         `Error: ${state.message}`
       ].join("\n");
     case "detachedHead":
@@ -60,6 +68,11 @@ function formatMatchedTooltip(state: Extract<CurrentBranchState, { kind: "matche
     `Branch: ${state.branchName}`,
     `Job: ${state.jobName}`
   ];
+
+  const pullRequestSummary = formatPullRequestSummary(state.pullRequest);
+  if (pullRequestSummary) {
+    lines.splice(3, 0, pullRequestSummary);
+  }
 
   const statusLabel = formatJobColor(state.jobColor);
   if (statusLabel) {
@@ -99,4 +112,41 @@ function formatLastBuildSummary(
   }
 
   return parts.length > 0 ? parts.join(" • ") : undefined;
+}
+
+function formatPullRequestSummary(
+  pullRequest: CurrentBranchPullRequestInfo | undefined
+): string | undefined {
+  if (!pullRequest) {
+    return undefined;
+  }
+
+  const pullRequestLabel = formatPullRequestLabel(pullRequest);
+  return pullRequest.title ? `${pullRequestLabel}: ${pullRequest.title}` : pullRequestLabel;
+}
+
+function formatSelectedTargetLines(
+  selectedTarget: Extract<CurrentBranchState, { kind: "requestFailed" }>["selectedTarget"]
+): string[] {
+  if (!selectedTarget) {
+    return [];
+  }
+
+  const lines = [
+    selectedTarget.kind === "pullRequest" ? "Target: Pull request job" : "Target: Branch job"
+  ];
+  if (selectedTarget.kind === "pullRequest" && selectedTarget.pullRequest) {
+    const summary = formatPullRequestSummary(selectedTarget.pullRequest);
+    if (summary) {
+      lines.push(summary);
+    }
+  }
+  lines.push(`Job: ${selectedTarget.jobName}`);
+  return lines;
+}
+
+function formatPullRequestLabel(
+  pullRequest: CurrentBranchPullRequestInfo | undefined
+): string | undefined {
+  return pullRequest ? `PR #${pullRequest.number}` : undefined;
 }

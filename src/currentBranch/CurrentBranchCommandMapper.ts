@@ -106,7 +106,10 @@ export class CurrentBranchCommandMapper {
       return {
         kind: "openExternal",
         url: state.jobUrl,
-        targetLabel: "Jenkins branch job URL"
+        targetLabel:
+          state.resolvedTargetKind === "pullRequest"
+            ? "Jenkins pull request job URL"
+            : "Jenkins branch job URL"
       };
     }
 

@@ -510,6 +510,16 @@
           ],
           "description": "Case-insensitive Jenkins view names to hide from the Views section."
         },
+        "jenkinsWorkbench.currentBranch.pullRequestJobNamePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "pr-{number}"
+          ],
+          "description": "Job-name patterns to use when resolving current-branch pull request jobs. Use {number} as the pull request number placeholder."
+        },
         "jenkinsWorkbench.jenkinsfileValidation.enabled": {
           "type": "boolean",
           "default": true,

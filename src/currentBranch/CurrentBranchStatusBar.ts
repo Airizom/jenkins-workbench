@@ -4,6 +4,7 @@ import type {
   CurrentBranchState
 } from "./CurrentBranchJenkinsService";
 import { formatCurrentBranchTooltip, isCurrentBranchBuilding } from "./CurrentBranchPresentation";
+import type { CurrentBranchPullRequestInfo } from "./CurrentBranchTypes";
 
 const ACTION_COMMAND = "jenkinsWorkbench.currentBranchActions";
 
@@ -58,7 +59,7 @@ function getStatusBarPresentation(
       return undefined;
     case "matched":
       return {
-        text: `${isCurrentBranchBuilding(state) ? "$(sync~spin)" : iconForMatchedState(state)} Jenkins: ${state.branchName}`,
+        text: `${isCurrentBranchBuilding(state) ? "$(sync~spin)" : iconForMatchedState(state)} Jenkins: ${formatMatchedStatusLabel(state)}`,
         color: colorForMatchedState(state),
         tooltip: formatCurrentBranchTooltip(state)
       };
@@ -70,7 +71,7 @@ function getStatusBarPresentation(
       };
     case "requestFailed":
       return {
-        text: `$(warning) Jenkins${state.branchName ? `: ${state.branchName}` : ""}`,
+        text: `$(warning) Jenkins: ${formatFailedStatusLabel(state)}`,
         color: new vscode.ThemeColor("statusBarItem.warningForeground"),
         tooltip: formatCurrentBranchTooltip(state)
       };
@@ -122,4 +123,30 @@ function colorForMatchedState(
     default:
       return undefined;
   }
+}
+
+function formatMatchedStatusLabel(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
+  const pullRequestLabel = formatPullRequestStatusLabel(state.pullRequest);
+  if (state.resolvedTargetKind === "pullRequest" && pullRequestLabel) {
+    return pullRequestLabel;
+  }
+
+  return state.branchName;
+}
+
+function formatFailedStatusLabel(
+  state: Extract<CurrentBranchState, { kind: "requestFailed" }>
+): string {
+  const pullRequestLabel = formatPullRequestStatusLabel(state.selectedTarget?.pullRequest);
+  if (state.selectedTarget?.kind === "pullRequest" && pullRequestLabel) {
+    return pullRequestLabel;
+  }
+
+  return state.branchName ?? "Current Branch";
+}
+
+function formatPullRequestStatusLabel(
+  pullRequest: CurrentBranchPullRequestInfo | undefined
+): string | undefined {
+  return pullRequest ? `PR #${pullRequest.number}` : undefined;
 }

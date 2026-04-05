@@ -405,8 +405,8 @@ function buildActionPicks(state: CurrentBranchState): CurrentBranchActionPick[] 
   const commonActions = createCommonActionPicks();
   if (state.kind === "matched") {
     return [
-      createActionPick("Open Current Branch in Jenkins", "openBranch"),
-      createActionPick("Trigger Current Branch Build", "triggerBuild"),
+      createActionPick("Open Current Jenkins Job", "openBranch"),
+      createActionPick("Trigger Current Jenkins Build", "triggerBuild"),
       ...(state.lastBuild?.url
         ? [createActionPick("Open Latest Build Details", "openLatestBuild")]
         : []),

@@ -25,8 +25,9 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 
 - **Repository Linking** — Link a local Git repository to a Jenkins multibranch pipeline
 - **Persistent Repository Links** — Repository links follow the same local checkout across workspaces on this machine
+- **PR-Aware Resolution** — Prefer the active GitHub pull request job (for example `PR-123`) when the GitHub Pull Requests extension can resolve one
 - **Status Bar Summary** — See current-branch Jenkins status in the VS Code status bar
-- **Current Branch Actions** — Open Jenkins, trigger builds, inspect the latest build, or relink without browsing the tree
+- **Current Branch Actions** — Open the resolved Jenkins job, trigger builds, inspect the latest build, or relink without browsing the tree
 
 ### Build Management
 
@@ -183,6 +184,12 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 |---------|---------|-------------|
 | `jenkinsWorkbench.treeViews.excludedNames` | `["all"]` | Case-insensitive Jenkins view names to hide from the curated Views section. |
 
+### Current Branch
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.currentBranch.pullRequestJobNamePatterns` | `["pr-{number}"]` | Job-name patterns used to resolve current-branch PR jobs. Use `{number}` as the PR number placeholder. |
+
 ### Build Tooltips
 
 | Setting | Default | Description |
@@ -282,6 +289,8 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | `Jenkins: Current Branch Actions` | Open the action picker for the active repository's current branch |
 | `Jenkins: Open Current Branch in Jenkins` | Open the resolved current-branch Jenkins job |
 | `Jenkins: Trigger Current Branch Build` | Trigger a build for the resolved current-branch Jenkins job |
+
+Current-branch PR awareness is optional and uses the GitHub Pull Requests extension when it is installed and can identify an active pull request for the checked-out repository. Otherwise Jenkins Workbench falls back to branch-based resolution.
 
 ### Nodes
 
