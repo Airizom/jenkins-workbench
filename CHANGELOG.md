@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-04-05
+
+### Added
+
+- feat: add PR-aware current-branch target resolution
+
 ## [1.36.0] - 2026-03-23
 
 ### Added
