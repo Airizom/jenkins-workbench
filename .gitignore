@@ -5,3 +5,4 @@ out/
 *.vsix
 .vscode/settings.json
 .ck
+.pi/settings.json
