@@ -9,6 +9,8 @@
 
 VS Code extension that brings Jenkins into your editor. Browse jobs, trigger builds, stream console logs, watch for status changes, and manage CI/CD pipelines without leaving VS Code.
 
+[Changelog](CHANGELOG.md) · [Report an Issue](https://github.com/Airizom/jenkins-workbench/issues)
+
 ## Features
 
 ### Browse & Navigate
@@ -20,11 +22,13 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Go to Job...** — Quick search across all configured Jenkins environments
 - **Pin Jobs & Pipelines** — Keep critical items in a top-level pinned section for quick access
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
+- **Deep Links** — Open builds and jobs directly in VS Code via `airizom.jenkins-workbench://` URIs
+- **Summary Badges** — Running, queued, and watch-error counts displayed on tree sections
 
 ### Current Branch Workflow
 
 - **Repository Linking** — Link a local Git repository to a Jenkins multibranch pipeline
-- **Persistent Repository Links** — Repository links follow the same local checkout across workspaces on this machine
+- **Persistent Repository Links** — Links are keyed to the repository path and stored on the local machine, so the same checkout reuses its link in any workspace
 - **PR-Aware Resolution** — Prefer the active GitHub pull request job (for example `PR-123`) when the GitHub Pull Requests extension can resolve one
 - **Status Bar Summary** — See current-branch Jenkins status in the VS Code status bar
 - **Current Branch Actions** — Open the resolved Jenkins job, trigger builds, inspect the latest build, or relink without browsing the tree
@@ -34,7 +38,8 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords, credentials, run, file, text, multi-choice)
 - **Reusable Parameter Presets** — Save named per-job presets and reuse them when triggering builds
 - **Stop Builds** — Abort running builds directly from the tree
-- **Replay & Rebuild** — Re-run builds with the same or modified configuration
+- **Replay Build** — Edit the Pipeline script in a draft editor and re-run with changes, or quick-replay with the original script
+- **Rebuild** — Re-run a build with the same parameters
 - **Preview Build Logs** — Open console output in a lightweight preview editor
 - **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds
 - **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
@@ -61,6 +66,8 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Declarative Linting** — Validate Jenkinsfiles against the Jenkins declarative linter
 - **Automatic Validation** — Optionally validate Jenkinsfiles on open, change, and save
 - **Diagnostics & Quick Fixes** — See errors inline and apply guided fixes
+- **CodeLens** — Inline validation status above the pipeline block
+- **Keyboard Shortcut** — Validate the active Jenkinsfile with `Cmd+Shift+J` (macOS) or `Ctrl+Shift+J`
 
 ### Watch Jobs
 
@@ -241,7 +248,9 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 |---------|-------------|
 | `Jenkins: Trigger Build` | Start a new build for the selected job |
 | `Jenkins: Abort/Stop Build` | Stop a running build |
-| `Jenkins: Replay Build` | Replay a Pipeline build |
+| `Jenkins: Replay Build` | Open an editable draft of the Pipeline script and replay with changes |
+| `Jenkins: Quick Replay Build` | Replay a Pipeline build immediately using the original script |
+| `Jenkins: Run Replay Draft` | Submit an edited replay draft from the editor |
 | `Jenkins: Rebuild` | Rebuild with the same parameters |
 | `Jenkins: Preview Build Logs` | Open console output in a read-only preview |
 | `Jenkins: View Build Details` | Open the build details panel |
@@ -343,7 +352,7 @@ Security notes:
 - **Credential storage** — API tokens, bearer tokens, cookie values, and custom headers are stored in VS Code SecretStorage
 - **Auth headers** — Basic, Bearer, Cookie, and custom headers are sent on every request, including CSRF crumb acquisition
 - **CSRF crumbs** — Supports the Jenkins crumb issuer when CSRF protection is enabled
-- **Transport** — Requests use the configured URL scheme; use HTTPS for production Jenkins instances
+- **Transport** — The extension does not enforce HTTPS; credentials will be sent in cleartext if an `http://` URL is configured. Always use `https://` for production instances
 - **SSO** — The extension does not run browser-based OAuth/SAML flows; supply cookies or tokens manually
 
 ### Recommended Setup
@@ -407,6 +416,10 @@ Contributions are welcome! Please follow these guidelines:
 
 ### Development Setup
 
+The extension backend is TypeScript. The webview panels (Build Details, Node Details) are a separate Vite bundle using React, Tailwind CSS, and Radix UI. [Biome](https://biomejs.dev/) is used for linting and formatting (not ESLint/Prettier).
+
+**Prerequisites:** Node 24 or later.
+
 ```bash
 # Install dependencies
 npm install
@@ -417,10 +430,10 @@ npm run compile
 # Watch mode for development
 npm run watch
 
-# Check source files without modifying them
+# Check source files without modifying them (Biome)
 npm run check
 
-# Lint and format with fixes
+# Lint and format with fixes (Biome)
 npm run check:fix
 
 # Launch Extension Development Host
