@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
+import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { ArtifactActionOptionsProvider } from "../ui/ArtifactActionHandler";
@@ -27,6 +28,7 @@ export interface ExtensionServicesOptions {
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
   artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
   artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
+  jenkinsfileIntelligenceConfig: JenkinsfileIntelligenceConfig;
   jenkinsfileValidationConfig: JenkinsfileValidationConfig;
 }
 
@@ -61,6 +63,7 @@ export function registerExtensionProviders(
 
   const validationCatalog = createValidationProviderCatalog({
     context,
+    jenkinsfileIntelligenceConfig: options.jenkinsfileIntelligenceConfig,
     jenkinsfileValidationConfig: options.jenkinsfileValidationConfig
   });
 

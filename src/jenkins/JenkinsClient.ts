@@ -4,6 +4,7 @@ import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
+import { JenkinsPipelineSyntaxApi } from "./client/JenkinsPipelineSyntaxApi";
 import { JenkinsPipelineValidationApi } from "./client/JenkinsPipelineValidationApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
 import { JenkinsRequestError } from "./errors";
@@ -88,6 +89,7 @@ export class JenkinsClient {
   private readonly nodesApi: JenkinsNodesApi;
   private readonly queueApi: JenkinsQueueApi;
   private readonly pipelineValidationApi: JenkinsPipelineValidationApi;
+  private readonly pipelineSyntaxApi: JenkinsPipelineSyntaxApi;
 
   constructor(options: JenkinsClientOptions) {
     const httpClient = new JenkinsHttpClient(options);
@@ -96,6 +98,7 @@ export class JenkinsClient {
     this.nodesApi = new JenkinsNodesApi(httpClient);
     this.queueApi = new JenkinsQueueApi(httpClient);
     this.pipelineValidationApi = new JenkinsPipelineValidationApi(httpClient);
+    this.pipelineSyntaxApi = new JenkinsPipelineSyntaxApi(httpClient);
   }
 
   async getRootJobs(): Promise<JenkinsJob[]> {
@@ -334,5 +337,9 @@ export class JenkinsClient {
 
   async validateDeclarativeJenkinsfile(jenkinsfileText: string): Promise<string> {
     return this.pipelineValidationApi.validateDeclarative(jenkinsfileText);
+  }
+
+  async fetchPipelineSyntaxGdsl(): Promise<string> {
+    return this.pipelineSyntaxApi.fetchGdsl();
   }
 }

@@ -1,107 +1,94 @@
 import * as vscode from "vscode";
-import { getDiagnosticMetadata } from "../JenkinsfileDiagnosticMetadata";
-import {
-  JENKINS_DIAGNOSTIC_SOURCE,
-  isValidationCode,
-  resolveDiagnosticSuggestions
-} from "../JenkinsfileDiagnosticUtils";
-import type { JenkinsfileMatcher } from "../JenkinsfileMatcher";
-import type { JenkinsfileValidationCoordinator } from "../JenkinsfileValidationCoordinator";
-import { getDocsLinksForCode } from "../JenkinsfileValidationDocs";
-import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
 
 export class JenkinsfileHoverProvider implements vscode.HoverProvider {
   constructor(
-    private readonly matcher: JenkinsfileMatcher,
-    private readonly coordinator: JenkinsfileValidationCoordinator
+    private readonly validationHoverProvider: vscode.HoverProvider,
+    private readonly stepHoverProvider: vscode.HoverProvider
   ) {}
 
-  provideHover(
+  async provideHover(
     document: vscode.TextDocument,
-    position: vscode.Position
-  ): vscode.ProviderResult<vscode.Hover> {
-    if (!this.matcher.matches(document)) {
-      return;
-    }
+    position: vscode.Position,
+    token: vscode.CancellationToken
+  ): Promise<vscode.Hover | undefined> {
+    const [validationHover, stepHover] = await Promise.all([
+      this.validationHoverProvider.provideHover(document, position, token),
+      this.stepHoverProvider.provideHover(document, position, token)
+    ]);
 
-    const diagnostic = vscode.languages
-      .getDiagnostics(document.uri)
-      .find(
-        (entry) => entry.source === JENKINS_DIAGNOSTIC_SOURCE && entry.range.contains(position)
-      );
-    if (!diagnostic) {
-      return;
-    }
-
-    const code = resolveDiagnosticCode(diagnostic);
-    const suggestions = resolveDiagnosticSuggestions(diagnostic);
-    const markdown = new vscode.MarkdownString(undefined, true);
-    markdown.isTrusted = true;
-
-    markdown.appendMarkdown("**Jenkinsfile validation**\n\n");
-    markdown.appendText(diagnostic.message);
-    markdown.appendMarkdown("\n\n");
-
-    const details = resolveDetails(diagnostic);
-    if (details.length > 0) {
-      markdown.appendMarkdown("**Details**\n");
-      appendBulletList(markdown, details);
-      markdown.appendMarkdown("\n");
-    }
-
-    if (suggestions.length > 0) {
-      markdown.appendMarkdown("**Suggestions**\n");
-      appendBulletList(markdown, suggestions);
-      markdown.appendMarkdown("\n");
-    }
-
-    const docsLinks = getDocsLinksForCode(code);
-    if (docsLinks.length > 0) {
-      markdown.appendMarkdown("**Jenkins docs**\n");
-      for (const link of docsLinks) {
-        markdown.appendMarkdown(`- [${link.label}](${link.url})\n`);
-      }
-      markdown.appendMarkdown("\n");
-    }
-
-    const environment = this.coordinator.getLastValidationEnvironment(document);
-    const environmentLabel = environment
-      ? `${environment.url} (${environment.scope}, ${environment.environmentId})`
-      : "Not configured";
-    markdown.appendMarkdown("**Validation environment**\n");
-    markdown.appendText(environmentLabel);
-
-    return new vscode.Hover(markdown, diagnostic.range);
+    return mergeHovers(position, [validationHover, stepHover]);
   }
 }
 
-function resolveDiagnosticCode(
-  diagnostic: vscode.Diagnostic
-): JenkinsfileValidationCode | undefined {
-  const metadata = getDiagnosticMetadata(diagnostic);
-  if (metadata?.code) {
-    return metadata.code;
+function mergeHovers(
+  position: vscode.Position,
+  hovers: ReadonlyArray<vscode.Hover | null | undefined>
+): vscode.Hover | undefined {
+  const matching = collectMatchingHovers(hovers, position);
+  if (matching.length === 0) {
+    return undefined;
+  }
+  if (matching.length === 1) {
+    return matching[0];
   }
 
-  const code = diagnostic.code;
-  if (typeof code === "string") {
-    return isValidationCode(code) ? code : undefined;
-  }
-  if (typeof code === "object" && code && "value" in code && typeof code.value === "string") {
-    return isValidationCode(code.value) ? code.value : undefined;
-  }
-  return undefined;
+  const contents = matching.flatMap((hover, index) => {
+    const entries = normalizeHoverContents(hover.contents);
+    if (index === 0 || entries.length === 0) {
+      return entries;
+    }
+    return [new vscode.MarkdownString("---"), ...entries];
+  });
+
+  return new vscode.Hover(contents, mergeHoverRange(position, matching));
 }
 
-function resolveDetails(diagnostic: vscode.Diagnostic): string[] {
-  const related = diagnostic.relatedInformation ?? [];
-  return related.map((info) => info.message).filter((message) => message.trim().length > 0);
+function collectMatchingHovers(
+  hovers: ReadonlyArray<vscode.Hover | null | undefined>,
+  position: vscode.Position
+): vscode.Hover[] {
+  return hovers.filter(
+    (hover): hover is vscode.Hover =>
+      hover !== undefined && hover !== null && hoverMatches(hover, position)
+  );
 }
 
-function appendBulletList(markdown: vscode.MarkdownString, items: string[]): void {
-  for (const item of items) {
-    markdown.appendMarkdown("- ");
-    markdown.appendText(item);
-    markdown.appendMarkdown("\n");
-  }
+function hoverMatches(hover: vscode.Hover, position: vscode.Position): boolean {
+  return !hover.range || hover.range.contains(position);
+}
+
+function mergeHoverRange(
+  position: vscode.Position,
+  hovers: ReadonlyArray<vscode.Hover>
+): vscode.Range | undefined {
+  const containingRanges = hovers
+    .map((hover) => hover.range)
+    .filter((range): range is vscode.Range => range?.contains(position) === true);
+  return containingRanges.reduce<vscode.Range | undefined>((smallestRange, currentRange) => {
+    if (!smallestRange || rangeSpan(currentRange) < rangeSpan(smallestRange)) {
+      return currentRange;
+    }
+    return smallestRange;
+  }, undefined);
+}
+
+function normalizeHoverContents(contents: vscode.Hover["contents"]): vscode.MarkdownString[] {
+  const entries = Array.isArray(contents) ? contents : [contents];
+  return entries.map((entry) => {
+    if (entry instanceof vscode.MarkdownString) {
+      return entry;
+    }
+    if (typeof entry === "string") {
+      return new vscode.MarkdownString(entry);
+    }
+    const language = entry.language?.trim();
+    const value = language ? `\`\`\`${language}\n${entry.value}\n\`\`\`` : `\`${entry.value}\``;
+    return new vscode.MarkdownString(value);
+  });
+}
+
+function rangeSpan(range: vscode.Range): number {
+  return (
+    (range.end.line - range.start.line) * 1_000_000 + (range.end.character - range.start.character)
+  );
 }

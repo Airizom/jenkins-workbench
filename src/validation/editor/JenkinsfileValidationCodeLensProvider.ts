@@ -71,7 +71,7 @@ export class JenkinsfileValidationCodeLensProvider
 
     if (state.kind === "no-environment") {
       return {
-        title: "$(warning) Select validation environment",
+        title: "$(warning) Select Jenkinsfile environment",
         command: "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment"
       };
     }

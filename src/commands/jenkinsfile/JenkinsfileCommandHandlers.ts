@@ -2,6 +2,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsfileEnvironmentResolver } from "../../validation/JenkinsfileEnvironmentResolver";
 import type { JenkinsfileValidationCoordinator } from "../../validation/JenkinsfileValidationCoordinator";
@@ -15,7 +16,8 @@ export async function validateActiveJenkinsfile(
 export async function selectValidationEnvironment(
   resolver: JenkinsfileEnvironmentResolver,
   store: JenkinsEnvironmentStore,
-  coordinator?: JenkinsfileValidationCoordinator
+  coordinator?: JenkinsfileValidationCoordinator,
+  stepCatalogService?: JenkinsfileStepCatalogService
 ): Promise<void> {
   const workspaceFolder = await pickWorkspaceFolder();
   if (workspaceFolder === undefined) {
@@ -37,14 +39,14 @@ export async function selectValidationEnvironment(
   const workspaceLabel = workspaceFolder?.name ?? "this window";
   const clearPick = {
     label: "Clear selection",
-    description: "Prompt again on next Jenkinsfile validation",
+    description: "Prompt again the next time Jenkinsfile features need an environment",
     detail: workspaceLabel,
     environment: undefined
   };
   const pick = await vscode.window.showQuickPick([...picks, clearPick], {
     placeHolder: workspaceFolder
-      ? `Select a Jenkins environment for ${workspaceFolder.name} Jenkinsfile validation`
-      : "Select a Jenkins environment for Jenkinsfile validation",
+      ? `Select a Jenkins environment for ${workspaceFolder.name} Jenkinsfile features`
+      : "Select a Jenkins environment for Jenkinsfile features",
     matchOnDescription: true,
     ignoreFocusOut: true
   });
@@ -57,7 +59,7 @@ export async function selectValidationEnvironment(
   if (!selected) {
     await resolver.setWorkspaceFolderOverride(workspaceFolder ?? undefined, undefined);
     void vscode.window.showInformationMessage(
-      `Cleared Jenkinsfile validation environment for ${workspaceLabel}.`
+      `Cleared Jenkinsfile environment for ${workspaceLabel}.`
     );
     if (workspaceFolder) {
       coordinator?.clearWorkspaceState(workspaceFolder);
@@ -74,8 +76,9 @@ export async function selectValidationEnvironment(
     username: selected.username
   };
   await resolver.setWorkspaceFolderOverride(workspaceFolder ?? undefined, ref);
+  stepCatalogService?.invalidateEnvironment(ref);
   void vscode.window.showInformationMessage(
-    `Jenkinsfile validation will use ${selected.url} (${formatScopeLabel(selected.scope)}).`
+    `Jenkinsfile features will use ${selected.url} (${formatScopeLabel(selected.scope)}).`
   );
   if (workspaceFolder) {
     coordinator?.revalidateWorkspaceState(workspaceFolder);

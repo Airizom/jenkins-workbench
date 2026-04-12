@@ -64,6 +64,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 ### Jenkinsfile Validation
 
 - **Declarative Linting** — Validate Jenkinsfiles against the Jenkins declarative linter
+- **Step Intelligence** — Get step autocompletion, hover docs, and parameter hints for Jenkinsfiles
 - **Automatic Validation** — Optionally validate Jenkinsfiles on open, change, and save
 - **Diagnostics & Quick Fixes** — See errors inline and apply guided fixes
 - **CodeLens** — Inline validation status above the pipeline block
@@ -228,9 +229,10 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `jenkinsWorkbench.jenkinsfileValidation.enabled` | true | Enable Jenkinsfile validation using the Jenkins declarative linter. |
+| `jenkinsWorkbench.jenkinsfile.intelligence.enabled` | true | Enable Jenkinsfile step completions, hover docs, and parameter hints. |
 | `jenkinsWorkbench.jenkinsfileValidation.runOnSave` | true | Enable automatic Jenkinsfile validation on open, change, and save. |
 | `jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs` | 500 | Debounce delay in milliseconds before validating Jenkinsfiles on change (0 = immediate). |
-| `jenkinsWorkbench.jenkinsfileValidation.filePatterns` | `["**/Jenkinsfile","**/*.jenkinsfile","**/Jenkinsfile.*"]` | Glob patterns used to detect Jenkinsfile documents for validation. |
+| `jenkinsWorkbench.jenkinsfileValidation.filePatterns` | `["**/Jenkinsfile","**/*.jenkinsfile","**/Jenkinsfile.*"]` | Glob patterns used to detect Jenkinsfile documents for validation and language intelligence. |
 
 ## Commands
 
@@ -341,7 +343,7 @@ Current-branch PR awareness is optional and uses the GitHub Pull Requests extens
 | Command | Description |
 |---------|-------------|
 | `Jenkins: Validate Jenkinsfile` | Validate the active Jenkinsfile |
-| `Jenkins: Select Jenkinsfile Validation Environment` | Choose which environment validates Jenkinsfiles |
+| `Jenkins: Select Jenkinsfile Environment` | Choose which environment powers Jenkinsfile validation and language intelligence |
 | `Jenkins: Clear Jenkinsfile Validation Diagnostics` | Clear Jenkinsfile validation diagnostics |
 | `Jenkins: Show Jenkinsfile Validation Output` | Show the Jenkinsfile validation output channel |
 

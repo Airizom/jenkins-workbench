@@ -17,6 +17,10 @@ import type { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBra
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/JenkinsfileIntelligenceConfigState";
+import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
+import type { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
+import type { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import type { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import type { ArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
 import type { ArtifactStorageService } from "../../services/ArtifactStorageService";
@@ -106,6 +110,8 @@ export interface ExtensionTokenMap {
   jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
   jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;
   jenkinsfileValidationStatusBar: JenkinsfileValidationStatusBar;
+  jenkinsfileIntelligenceConfigState: JenkinsfileIntelligenceConfigState;
+  jenkinsfileStepCatalogService: JenkinsfileStepCatalogService;
   statusRefreshService: JenkinsStatusRefreshService;
   statusNotifier: VscodeStatusNotifier;
   poller: JenkinsStatusPoller;
@@ -117,6 +123,8 @@ export interface ExtensionTokenMap {
   jenkinsfileQuickFixProvider: JenkinsfileQuickFixProvider;
   jenkinsfileHoverProvider: JenkinsfileHoverProvider;
   jenkinsfileCodeLensProvider: JenkinsfileValidationCodeLensProvider;
+  jenkinsfileCompletionProvider: JenkinsfileCompletionProvider;
+  jenkinsfileSignatureHelpProvider: JenkinsfileSignatureHelpProvider;
 }
 
 export type ExtensionToken = keyof ExtensionTokenMap;

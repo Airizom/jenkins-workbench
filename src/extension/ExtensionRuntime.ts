@@ -14,6 +14,14 @@ import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
 import { createExtensionContainer } from "./container/ExtensionContainer";
 import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 
+const JENKINSFILE_DOCUMENT_SELECTORS = [
+  { scheme: "file" },
+  { scheme: "untitled" },
+  { scheme: REPLAY_DRAFT_SCHEME }
+] as const;
+
+const JENKINSFILE_SIGNATURE_TRIGGER_CHARACTERS = ["(", ",", " ", ":", "'", '"'] as const;
+
 export async function activateRuntime(
   context: vscode.ExtensionContext,
   options: ExtensionRuntimeOptions
@@ -120,6 +128,8 @@ export async function activateRuntime(
   const jenkinsfileQuickFixProvider = container.get("jenkinsfileQuickFixProvider");
   const jenkinsfileHoverProvider = container.get("jenkinsfileHoverProvider");
   const jenkinsfileCodeLensProvider = container.get("jenkinsfileCodeLensProvider");
+  const jenkinsfileCompletionProvider = container.get("jenkinsfileCompletionProvider");
+  const jenkinsfileSignatureHelpProvider = container.get("jenkinsfileSignatureHelpProvider");
 
   context.subscriptions.push(
     treeView,
@@ -162,16 +172,25 @@ export async function activateRuntime(
     jenkinsfileValidationCoordinator,
     container.get("jenkinsfileValidationStatusBar"),
     vscode.languages.registerCodeActionsProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }, { scheme: REPLAY_DRAFT_SCHEME }],
+      JENKINSFILE_DOCUMENT_SELECTORS,
       jenkinsfileQuickFixProvider,
       { providedCodeActionKinds: JenkinsfileQuickFixProvider.providedCodeActionKinds }
     ),
     vscode.languages.registerHoverProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }, { scheme: REPLAY_DRAFT_SCHEME }],
+      JENKINSFILE_DOCUMENT_SELECTORS,
       jenkinsfileHoverProvider
     ),
+    vscode.languages.registerCompletionItemProvider(
+      JENKINSFILE_DOCUMENT_SELECTORS,
+      jenkinsfileCompletionProvider
+    ),
+    vscode.languages.registerSignatureHelpProvider(
+      JENKINSFILE_DOCUMENT_SELECTORS,
+      jenkinsfileSignatureHelpProvider,
+      ...JENKINSFILE_SIGNATURE_TRIGGER_CHARACTERS
+    ),
     vscode.languages.registerCodeLensProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }, { scheme: REPLAY_DRAFT_SCHEME }],
+      JENKINSFILE_DOCUMENT_SELECTORS,
       jenkinsfileCodeLensProvider
     )
   );

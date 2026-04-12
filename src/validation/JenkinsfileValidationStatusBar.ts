@@ -135,9 +135,9 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
     }
 
     if (state.kind === "no-environment") {
-      this.item.text = "$(warning) Select validation environment";
+      this.item.text = "$(warning) Select Jenkinsfile environment";
       this.item.color = new vscode.ThemeColor("statusBarItem.warningForeground");
-      this.item.tooltip = "Jenkinsfile validation: environment not configured";
+      this.item.tooltip = "Jenkinsfile features: environment not configured";
       this.item.command = "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment";
       this.item.show();
       return;
@@ -182,7 +182,7 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
     const lines = [`Jenkinsfile validation: ${stateLabel}`];
     if (environment) {
       const environmentLabel = `${environment.url} (${environment.scope}, ${environment.environmentId})`;
-      lines.push(`Environment: ${environmentLabel}`);
+      lines.push(`Jenkinsfile environment: ${environmentLabel}`);
     }
     if (detail) {
       lines.push(detail);

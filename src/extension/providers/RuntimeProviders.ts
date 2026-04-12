@@ -13,11 +13,15 @@ import { CurrentBranchStatusBar } from "../../currentBranch/CurrentBranchStatusB
 import { CurrentBranchStatusResolver } from "../../currentBranch/CurrentBranchStatusResolver";
 import { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBranchTargetResolver";
 import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
+import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
+import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
+import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
 import { JenkinsfileQuickFixProvider } from "../../validation/editor/JenkinsfileQuickFixProvider";
 import { JenkinsfileValidationCodeLensProvider } from "../../validation/editor/JenkinsfileValidationCodeLensProvider";
+import { JenkinsfileValidationHoverProvider } from "../../validation/editor/JenkinsfileValidationHoverProvider";
 import { JenkinsStatusPoller } from "../../watch/JenkinsStatusPoller";
 import { createExtensionRefreshHost } from "../ExtensionRefreshHost";
 import { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLinkBuildHandler";
@@ -149,13 +153,32 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       new JenkinsfileQuickFixProvider(container.get("jenkinsfileMatcher")),
     jenkinsfileHoverProvider: (container) =>
       new JenkinsfileHoverProvider(
-        container.get("jenkinsfileMatcher"),
-        container.get("jenkinsfileValidationCoordinator")
+        new JenkinsfileValidationHoverProvider(
+          container.get("jenkinsfileMatcher"),
+          container.get("jenkinsfileValidationCoordinator")
+        ),
+        new JenkinsfileStepHoverProvider(
+          container.get("jenkinsfileIntelligenceConfigState"),
+          container.get("jenkinsfileMatcher"),
+          container.get("jenkinsfileStepCatalogService")
+        )
       ),
     jenkinsfileCodeLensProvider: (container) =>
       new JenkinsfileValidationCodeLensProvider(
         container.get("jenkinsfileMatcher"),
         container.get("jenkinsfileValidationCoordinator")
+      ),
+    jenkinsfileCompletionProvider: (container) =>
+      new JenkinsfileCompletionProvider(
+        container.get("jenkinsfileIntelligenceConfigState"),
+        container.get("jenkinsfileMatcher"),
+        container.get("jenkinsfileStepCatalogService")
+      ),
+    jenkinsfileSignatureHelpProvider: (container) =>
+      new JenkinsfileSignatureHelpProvider(
+        container.get("jenkinsfileIntelligenceConfigState"),
+        container.get("jenkinsfileMatcher"),
+        container.get("jenkinsfileStepCatalogService")
       )
   } satisfies PartialExtensionProviderCatalog;
 }

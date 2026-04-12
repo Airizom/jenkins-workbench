@@ -34,6 +34,7 @@ export function registerExtensionCommands(
   const treeExpansionState = container.get("treeExpansionState");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
   const jenkinsfileEnvironmentResolver = container.get("jenkinsfileEnvironmentResolver");
+  const jenkinsfileStepCatalogService = container.get("jenkinsfileStepCatalogService");
   const jobConfigPreviewer = container.get("jobConfigPreviewer");
   const jobConfigDraftManager = container.get("jobConfigDraftManager");
   const jobConfigUpdateWorkflow = container.get("jobConfigUpdateWorkflow");
@@ -94,6 +95,7 @@ export function registerExtensionCommands(
     context,
     jenkinsfileValidationCoordinator,
     jenkinsfileEnvironmentResolver,
-    environmentStore
+    environmentStore,
+    jenkinsfileStepCatalogService
   );
 }

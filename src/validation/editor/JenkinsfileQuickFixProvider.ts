@@ -139,12 +139,12 @@ function createMissingSectionActions(
 
 function createSelectEnvironmentAction(diagnostic: vscode.Diagnostic): vscode.CodeAction {
   const action = new vscode.CodeAction(
-    "Select Validation Environment",
+    "Select Jenkinsfile Environment",
     vscode.CodeActionKind.QuickFix
   );
   action.command = {
     command: "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment",
-    title: "Select Validation Environment"
+    title: "Select Jenkinsfile Environment"
   };
   action.diagnostics = [diagnostic];
   return action;

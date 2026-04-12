@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { JenkinsEnvironmentStoreChange } from "../storage/JenkinsEnvironmentStore";
 import { BuildQueueFolderTreeItem, InstanceTreeItem, RootSectionTreeItem } from "../tree/TreeItems";
 import {
   buildConfigKey,
@@ -7,6 +8,7 @@ import {
   getCacheTtlMs,
   getCurrentBranchPullRequestJobNamePatterns,
   getExtensionConfiguration,
+  getJenkinsfileIntelligenceConfig,
   getJenkinsfileValidationConfig,
   getQueuePollIntervalSeconds,
   getStatusRefreshIntervalSeconds,
@@ -34,6 +36,7 @@ const JENKINSFILE_VALIDATION_ENABLED_CONFIG_KEY = "jenkinsfileValidation.enabled
 const JENKINSFILE_VALIDATION_RUN_ON_SAVE_CONFIG_KEY = "jenkinsfileValidation.runOnSave";
 const JENKINSFILE_VALIDATION_CHANGE_DEBOUNCE_CONFIG_KEY = "jenkinsfileValidation.changeDebounceMs";
 const JENKINSFILE_VALIDATION_FILE_PATTERNS_CONFIG_KEY = "jenkinsfileValidation.filePatterns";
+const JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY = "jenkinsfile.intelligence.enabled";
 
 const BUILD_TOOLTIP_CONFIG_KEYS = [
   BUILD_TOOLTIP_DETAILS_CONFIG_KEY,
@@ -60,6 +63,7 @@ type ConfigReactionKey =
   | typeof QUEUE_POLL_INTERVAL_CONFIG_KEY
   | typeof CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY
   | typeof TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY
+  | typeof JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY
   | BuildTooltipConfigKey
   | JenkinsfileValidationConfigKey;
 
@@ -73,6 +77,7 @@ interface ConfigReactionContext {
   queuePoller: ExtensionTokenMap["queuePoller"];
   currentBranchPullRequestJobMatcher: ExtensionTokenMap["currentBranchPullRequestJobMatcher"];
   currentBranchService: ExtensionTokenMap["currentBranchService"];
+  jenkinsfileIntelligenceConfigState: ExtensionTokenMap["jenkinsfileIntelligenceConfigState"];
   jenkinsfileValidationCoordinator: ExtensionTokenMap["jenkinsfileValidationCoordinator"];
   jenkinsfileMatcher: ExtensionTokenMap["jenkinsfileMatcher"];
 }
@@ -114,6 +119,7 @@ export function registerExtensionSubscriptions(
   container: ExtensionContainer
 ): void {
   const viewStateStore = container.get("viewStateStore");
+  const environmentStore = container.get("environmentStore");
   const treeDataProvider = container.get("treeDataProvider");
   const treeView = container.get("treeView");
   const dataService = container.get("dataService");
@@ -124,7 +130,9 @@ export function registerExtensionSubscriptions(
   const currentBranchPullRequestJobMatcher = container.get("currentBranchPullRequestJobMatcher");
   const currentBranchService = container.get("currentBranchService");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
+  const jenkinsfileIntelligenceConfigState = container.get("jenkinsfileIntelligenceConfigState");
   const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
+  const jenkinsfileStepCatalogService = container.get("jenkinsfileStepCatalogService");
 
   const configReactions: ConfigReaction[] = [
     {
@@ -194,6 +202,14 @@ export function registerExtensionSubscriptions(
       }
     },
     {
+      keys: [JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY],
+      run: (reactionContext) => {
+        reactionContext.jenkinsfileIntelligenceConfigState.updateConfig(
+          getJenkinsfileIntelligenceConfig(reactionContext.config)
+        );
+      }
+    },
+    {
       keys: JENKINSFILE_VALIDATION_CONFIG_KEYS,
       run: (reactionContext) => {
         reactionContext.jenkinsfileValidationCoordinator.updateConfig(
@@ -206,6 +222,10 @@ export function registerExtensionSubscriptions(
 
   const viewStateSubscription = viewStateStore.onDidChange(() => {
     refreshHost.refreshViewOnly();
+  });
+
+  const environmentStoreSubscription = environmentStore.onDidChange((change) => {
+    invalidateJenkinsfileStepCatalog(jenkinsfileStepCatalogService, change);
   });
 
   const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
@@ -224,6 +244,7 @@ export function registerExtensionSubscriptions(
       queuePoller,
       currentBranchPullRequestJobMatcher,
       currentBranchService,
+      jenkinsfileIntelligenceConfigState,
       jenkinsfileValidationCoordinator,
       jenkinsfileMatcher
     };
@@ -255,8 +276,29 @@ export function registerExtensionSubscriptions(
 
   context.subscriptions.push(
     viewStateSubscription,
+    environmentStoreSubscription,
     configSubscription,
     expandSubscription,
     collapseSubscription
   );
+}
+
+function invalidateJenkinsfileStepCatalog(
+  jenkinsfileStepCatalogService: ExtensionTokenMap["jenkinsfileStepCatalogService"],
+  change: JenkinsEnvironmentStoreChange
+): void {
+  switch (change.kind) {
+    case "bulk-update":
+      jenkinsfileStepCatalogService.invalidateAll();
+      return;
+    case "environment-added":
+    case "environment-removed":
+    case "auth-config-updated":
+    case "auth-config-deleted":
+      jenkinsfileStepCatalogService.invalidateEnvironment({
+        scope: change.scope,
+        environmentId: change.environmentId
+      });
+      return;
+  }
 }

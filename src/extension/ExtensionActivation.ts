@@ -10,6 +10,7 @@ import {
   getCacheTtlMs,
   getCurrentBranchPullRequestJobNamePatterns,
   getExtensionConfiguration,
+  getJenkinsfileIntelligenceConfig,
   getJenkinsfileValidationConfig,
   getMaxCacheEntries,
   getQueuePollIntervalSeconds,
@@ -36,6 +37,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const artifactPreviewCacheTtlMs = getArtifactPreviewCacheTtlMs(config);
   const currentBranchPullRequestJobNamePatterns =
     getCurrentBranchPullRequestJobNamePatterns(config);
+  const jenkinsfileIntelligenceConfig = getJenkinsfileIntelligenceConfig(config);
   const jenkinsfileValidationConfig = getJenkinsfileValidationConfig(config);
   const artifactActionOptionsProvider = (
     workspaceFolder: vscode.WorkspaceFolder
@@ -62,6 +64,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       maxTotalBytes: artifactPreviewCacheMaxBytes,
       ttlMs: artifactPreviewCacheTtlMs
     },
+    jenkinsfileIntelligenceConfig,
     jenkinsfileValidationConfig,
     currentBranchPullRequestJobNamePatterns,
     extensionUri: context.extensionUri,

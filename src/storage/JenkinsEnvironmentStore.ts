@@ -14,12 +14,29 @@ export interface EnvironmentWithScope extends JenkinsEnvironment {
   scope: EnvironmentScope;
 }
 
+type JenkinsEnvironmentStoreScopedChangeKind =
+  | "environment-added"
+  | "environment-removed"
+  | "auth-config-updated"
+  | "auth-config-deleted";
+
+export type JenkinsEnvironmentStoreChange =
+  | {
+      kind: JenkinsEnvironmentStoreScopedChangeKind;
+      scope: EnvironmentScope;
+      environmentId: string;
+    }
+  | {
+      kind: "bulk-update";
+      scope?: EnvironmentScope;
+    };
+
 const ENVIRONMENTS_KEY = "jenkinsWorkbench.environments";
 const AUTH_CONFIG_KEY = "jenkinsWorkbench.envAuthConfig";
 
 export class JenkinsEnvironmentStore {
   private readonly authConfigRevisions = new Map<string, number>();
-  private readonly emitter = new vscode.EventEmitter<void>();
+  private readonly emitter = new vscode.EventEmitter<JenkinsEnvironmentStoreChange>();
 
   readonly onDidChange = this.emitter.event;
 
@@ -33,11 +50,12 @@ export class JenkinsEnvironmentStore {
 
   async saveEnvironments(
     scope: EnvironmentScope,
-    environments: JenkinsEnvironment[]
+    environments: JenkinsEnvironment[],
+    change: JenkinsEnvironmentStoreChange = { kind: "bulk-update", scope }
   ): Promise<void> {
     const memento = this.getMemento(scope);
     await memento.update(ENVIRONMENTS_KEY, environments);
-    this.emitter.fire();
+    this.emitter.fire(change);
   }
 
   async addEnvironment(
@@ -47,7 +65,11 @@ export class JenkinsEnvironmentStore {
   ): Promise<void> {
     const environments = await this.getEnvironments(scope);
     environments.push(environment);
-    await this.saveEnvironments(scope, environments);
+    await this.saveEnvironments(
+      scope,
+      environments,
+      createScopedChange("environment-added", scope, environment.id)
+    );
     if (token && token.length > 0) {
       await this.setToken(scope, environment.id, token);
     }
@@ -59,7 +81,7 @@ export class JenkinsEnvironmentStore {
     if (next.length === environments.length) {
       return false;
     }
-    await this.saveEnvironments(scope, next);
+    await this.saveEnvironments(scope, next, createScopedChange("environment-removed", scope, id));
     await this.deleteToken(scope, id);
     await this.deleteAuthConfig(scope, id);
     return true;
@@ -108,13 +130,13 @@ export class JenkinsEnvironmentStore {
   ): Promise<void> {
     this.bumpAuthConfigRevision(scope, id);
     await this.context.secrets.store(this.getAuthConfigKey(scope, id), JSON.stringify(authConfig));
-    this.emitter.fire();
+    this.fireEnvironmentChange("auth-config-updated", scope, id);
   }
 
   async deleteAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
     this.bumpAuthConfigRevision(scope, id);
     await this.context.secrets.delete(this.getAuthConfigKey(scope, id));
-    this.emitter.fire();
+    this.fireEnvironmentChange("auth-config-deleted", scope, id);
   }
 
   async getAuthConfig(scope: EnvironmentScope, id: string): Promise<JenkinsAuthConfig | undefined> {
@@ -212,4 +234,23 @@ export class JenkinsEnvironmentStore {
     const current = this.authConfigRevisions.get(key) ?? 0;
     this.authConfigRevisions.set(key, current + 1);
   }
+
+  private fireEnvironmentChange(
+    kind: Extract<
+      JenkinsEnvironmentStoreScopedChangeKind,
+      "auth-config-updated" | "auth-config-deleted"
+    >,
+    scope: EnvironmentScope,
+    environmentId: string
+  ): void {
+    this.emitter.fire(createScopedChange(kind, scope, environmentId));
+  }
+}
+
+function createScopedChange(
+  kind: JenkinsEnvironmentStoreScopedChangeKind,
+  scope: EnvironmentScope,
+  environmentId: string
+): JenkinsEnvironmentStoreChange {
+  return { kind, scope, environmentId };
 }

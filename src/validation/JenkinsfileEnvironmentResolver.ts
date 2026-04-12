@@ -30,6 +30,19 @@ export class JenkinsfileEnvironmentResolver {
   async resolveForDocument(
     document: vscode.TextDocument
   ): Promise<JenkinsEnvironmentRef | undefined> {
+    return this.resolveForDocumentInternal(document, true);
+  }
+
+  async resolveForDocumentSilently(
+    document: vscode.TextDocument
+  ): Promise<JenkinsEnvironmentRef | undefined> {
+    return this.resolveForDocumentInternal(document, false);
+  }
+
+  private async resolveForDocumentInternal(
+    document: vscode.TextDocument,
+    allowPrompt: boolean
+  ): Promise<JenkinsEnvironmentRef | undefined> {
     const replayEnvironment = this.replayDraftManager?.getSessionForUri(document.uri)?.environment;
     if (replayEnvironment) {
       return replayEnvironment;
@@ -56,6 +69,10 @@ export class JenkinsfileEnvironmentResolver {
       const resolved = toEnvironmentRef(environments[0]);
       await this.setStoredSelection(workspaceKey, resolved);
       return resolved;
+    }
+
+    if (!allowPrompt) {
+      return undefined;
     }
 
     const pick = await this.promptForEnvironment(environments, workspaceFolder);
@@ -118,8 +135,8 @@ export class JenkinsfileEnvironmentResolver {
     }));
     const pick = await vscode.window.showQuickPick(picks, {
       placeHolder: workspaceFolder
-        ? `Select a Jenkins environment for ${workspaceFolder.name} Jenkinsfile validation`
-        : "Select a Jenkins environment for Jenkinsfile validation",
+        ? `Select a Jenkins environment for ${workspaceFolder.name} Jenkinsfile features`
+        : "Select a Jenkins environment for Jenkinsfile features",
       matchOnDescription: true,
       ignoreFocusOut: true
     });

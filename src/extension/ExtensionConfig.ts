@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS } from "../currentBranch/CurrentBranchPullRequestJobPatterns";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
+import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
@@ -34,6 +35,7 @@ const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
 const DEFAULT_JENKINSFILE_VALIDATION_ENABLED = true;
 const DEFAULT_JENKINSFILE_VALIDATION_RUN_ON_SAVE = true;
 const DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS = 500;
+const DEFAULT_JENKINSFILE_INTELLIGENCE_ENABLED = true;
 const DEFAULT_JENKINSFILE_VALIDATION_FILE_PATTERNS = [
   "**/Jenkinsfile",
   "**/*.jenkinsfile",
@@ -241,6 +243,15 @@ export function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfigur
   );
 }
 
+export function getJenkinsfileIntelligenceEnabled(config: vscode.WorkspaceConfiguration): boolean {
+  return Boolean(
+    config.get<boolean>(
+      "jenkinsfile.intelligence.enabled",
+      DEFAULT_JENKINSFILE_INTELLIGENCE_ENABLED
+    )
+  );
+}
+
 export function getJenkinsfileValidationRunOnSave(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>(
@@ -282,6 +293,14 @@ export function getJenkinsfileValidationConfig(
     runOnSave: getJenkinsfileValidationRunOnSave(config),
     changeDebounceMs: getJenkinsfileValidationChangeDebounceMs(config),
     filePatterns: getJenkinsfileValidationFilePatterns(config)
+  };
+}
+
+export function getJenkinsfileIntelligenceConfig(
+  config: vscode.WorkspaceConfiguration
+): JenkinsfileIntelligenceConfig {
+  return {
+    enabled: getJenkinsfileIntelligenceEnabled(config)
   };
 }
 

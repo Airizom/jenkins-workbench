@@ -297,7 +297,7 @@
       },
       {
         "command": "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment",
-        "title": "Jenkins: Select Jenkinsfile Validation Environment"
+        "title": "Jenkins: Select Jenkinsfile Environment"
       },
       {
         "command": "jenkinsWorkbench.jenkinsfile.clearDiagnostics",
@@ -534,6 +534,11 @@
           "default": true,
           "description": "Enable Jenkinsfile validation using the Jenkins declarative linter."
         },
+        "jenkinsWorkbench.jenkinsfile.intelligence.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Jenkinsfile step completions, hover docs, and parameter hints."
+        },
         "jenkinsWorkbench.jenkinsfileValidation.runOnSave": {
           "type": "boolean",
           "default": true,
@@ -555,7 +560,7 @@
             "**/*.jenkinsfile",
             "**/Jenkinsfile.*"
           ],
-          "description": "Glob patterns used to detect Jenkinsfile documents for validation."
+          "description": "Glob patterns used to detect Jenkinsfile documents for validation and language intelligence."
         }
       }
     },
