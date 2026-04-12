@@ -41,7 +41,12 @@ import type { NodeLaunchResult, NodeOfflineToggleResult } from "./data/JenkinsNo
 import { JenkinsPendingInputDataOperations } from "./data/JenkinsPendingInputDataOperations";
 import { JenkinsQueueAndJobManagementOperations } from "./data/JenkinsQueueAndJobManagementOperations";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
-import type { JenkinsTestReport } from "./types";
+import type {
+  JenkinsReplayDefinition,
+  JenkinsReplayResult,
+  JenkinsReplaySubmissionPayload,
+  JenkinsTestReport
+} from "./types";
 
 export type {
   BuildActionErrorCode,
@@ -67,6 +72,12 @@ export type {
   JobSearchEntry,
   JobSearchOptions
 } from "./data/JenkinsDataTypes";
+export type {
+  JenkinsReplayDefinition,
+  JenkinsReplayLoadedScript,
+  JenkinsReplayResult,
+  JenkinsReplaySubmissionPayload
+} from "./types";
 export { BuildActionError, CancellationError, JobManagementActionError } from "./errors";
 
 export interface JenkinsDataServiceOptions {
@@ -402,8 +413,23 @@ export class JenkinsDataService {
     return this.buildOperations.stopBuild(environment, buildUrl);
   }
 
-  async replayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    return this.buildOperations.replayBuild(environment, buildUrl);
+  async quickReplayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
+    return this.buildOperations.quickReplayBuild(environment, buildUrl);
+  }
+
+  async getReplayDefinition(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsReplayDefinition> {
+    return this.buildOperations.getReplayDefinition(environment, buildUrl);
+  }
+
+  async runReplay(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    payload: JenkinsReplaySubmissionPayload
+  ): Promise<JenkinsReplayResult> {
+    return this.buildOperations.runReplay(environment, buildUrl, payload);
   }
 
   async rebuildBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {

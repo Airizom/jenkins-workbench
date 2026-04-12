@@ -86,6 +86,15 @@
         "title": "Jenkins: Replay Build"
       },
       {
+        "command": "jenkinsWorkbench.quickReplayBuild",
+        "title": "Jenkins: Quick Replay Build"
+      },
+      {
+        "command": "jenkinsWorkbench.runReplayDraft",
+        "title": "Jenkins: Run Replay Draft",
+        "icon": "$(play)"
+      },
+      {
         "command": "jenkinsWorkbench.rebuildBuild",
         "title": "Jenkins: Rebuild"
       },
@@ -760,9 +769,14 @@
           "group": "2_rebuild@0"
         },
         {
-          "command": "jenkinsWorkbench.rebuildBuild",
+          "command": "jenkinsWorkbench.quickReplayBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "2_rebuild@1"
+        },
+        {
+          "command": "jenkinsWorkbench.rebuildBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "2_rebuild@2"
         },
         {
           "command": "jenkinsWorkbench.linkRepositoryHere",
@@ -790,6 +804,11 @@
           "command": "jenkinsWorkbench.submitJobConfig",
           "when": "resourceScheme == jenkins-config",
           "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.runReplayDraft",
+          "when": "resourceScheme == jenkins-replay",
+          "group": "navigation"
         }
       ],
       "editor/context": [
@@ -803,6 +822,10 @@
         {
           "command": "jenkinsWorkbench.submitJobConfig",
           "when": "resourceScheme == jenkins-config"
+        },
+        {
+          "command": "jenkinsWorkbench.runReplayDraft",
+          "when": "resourceScheme == jenkins-replay"
         },
         {
           "command": "jenkinsWorkbench.newItem"

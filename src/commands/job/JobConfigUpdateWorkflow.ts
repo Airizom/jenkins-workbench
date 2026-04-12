@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import { DraftEditorService } from "../../services/DraftEditorService";
 import type { JobConfigDraft, JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
@@ -12,7 +13,8 @@ export class JobConfigUpdateWorkflow {
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly previewer: JobConfigPreviewer,
-    private readonly draftManager: JobConfigDraftManager
+    private readonly draftManager: JobConfigDraftManager,
+    private readonly editorService: DraftEditorService = new DraftEditorService()
   ) {}
 
   async startUpdate(item?: JobTreeItem | PipelineTreeItem): Promise<void> {
@@ -119,31 +121,7 @@ export class JobConfigUpdateWorkflow {
   }
 
   private async closeDraftEditor(uri: vscode.Uri): Promise<boolean> {
-    const uriString = uri.toString();
-    const tabsToClose: vscode.Tab[] = [];
-    for (const group of vscode.window.tabGroups.all) {
-      for (const tab of group.tabs) {
-        const tabUri = this.getTabUri(tab);
-        if (tabUri?.toString() === uriString) {
-          tabsToClose.push(tab);
-        }
-      }
-    }
-    if (tabsToClose.length === 0) {
-      return true;
-    }
-    return await vscode.window.tabGroups.close(tabsToClose);
-  }
-
-  private getTabUri(tab: vscode.Tab): vscode.Uri | undefined {
-    const input = tab.input;
-    if (input instanceof vscode.TabInputText) {
-      return input.uri;
-    }
-    if (input instanceof vscode.TabInputTextDiff) {
-      return input.modified;
-    }
-    return undefined;
+    return await this.editorService.closeUris([uri]);
   }
 
   private async showSubmitConfirmation(label: string, errorCount: number): Promise<boolean> {

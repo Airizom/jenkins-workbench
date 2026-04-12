@@ -27,6 +27,7 @@ export function registerExtensionCommands(
   const consoleExporter = container.get("consoleExporter");
   const queuedBuildWaiter = container.get("queuedBuildWaiter");
   const pendingInputCoordinator = container.get("pendingInputCoordinator");
+  const replayBuildWorkflow = container.get("replayBuildWorkflow");
   const viewStateStore = container.get("viewStateStore");
   const treeNavigator = container.get("treeNavigator");
   const treeDataProvider = container.get("treeDataProvider");
@@ -58,6 +59,7 @@ export function registerExtensionCommands(
     consoleExporter,
     queuedBuildWaiter,
     pendingInputCoordinator,
+    replayBuildWorkflow,
     refreshHost
   );
 

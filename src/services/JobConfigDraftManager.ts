@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { DraftEditorService } from "./DraftEditorService";
 import { JOB_CONFIG_DRAFT_SCHEME } from "./JobConfigDraftFilesystem";
 import type { JobConfigDraftFilesystem } from "./JobConfigDraftFilesystem";
 
@@ -18,7 +19,10 @@ export class JobConfigDraftManager implements vscode.Disposable {
   private readonly submitEmitter = new vscode.EventEmitter<vscode.Uri>();
   readonly onDidRequestSubmit = this.submitEmitter.event;
 
-  constructor(private readonly filesystem: JobConfigDraftFilesystem) {
+  constructor(
+    private readonly filesystem: JobConfigDraftFilesystem,
+    private readonly editorService: DraftEditorService = new DraftEditorService()
+  ) {
     this.subscriptions.push(
       vscode.workspace.onWillSaveTextDocument((event) => {
         if (!this.isDraftDocument(event.document)) {
@@ -59,33 +63,34 @@ export class JobConfigDraftManager implements vscode.Disposable {
 
   createDraft(label: string, content: string, draft: JobConfigDraft): vscode.Uri {
     const uri = this.filesystem.createDraft(label, content);
-    this.drafts.set(uri.toString(), draft);
+    this.drafts.set(getUriKey(uri), draft);
     return uri;
   }
 
   getDraft(uri: vscode.Uri): JobConfigDraft | undefined {
-    return this.drafts.get(uri.toString());
+    return this.drafts.get(getUriKey(uri));
   }
 
   hasDraft(uri: vscode.Uri): boolean {
-    return this.drafts.has(uri.toString());
+    return this.drafts.has(getUriKey(uri));
   }
 
   discardDraft(uri: vscode.Uri): void {
-    this.drafts.delete(uri.toString());
-    this.manualSaveQueue.delete(uri.toString());
+    const key = getUriKey(uri);
+    this.drafts.delete(key);
+    this.manualSaveQueue.delete(key);
     if (this.filesystem.hasDraft(uri)) {
       this.filesystem.removeDraft(uri);
     }
   }
 
   getVisibleDrafts(): Array<{ uri: vscode.Uri; label: string }> {
-    return vscode.window.visibleTextEditors
-      .filter((editor) => this.hasDraft(editor.document.uri))
-      .map((editor) => {
-        const draft = this.getDraft(editor.document.uri);
+    return this.editorService
+      .getVisibleUris((uri) => this.hasDraft(uri))
+      .map((uri) => {
+        const draft = this.getDraft(uri);
         return {
-          uri: editor.document.uri,
+          uri,
           label: draft?.label ?? "Unknown"
         };
       });
@@ -94,4 +99,8 @@ export class JobConfigDraftManager implements vscode.Disposable {
   private isDraftDocument(document: vscode.TextDocument): boolean {
     return document.uri.scheme === JOB_CONFIG_DRAFT_SCHEME || this.hasDraft(document.uri);
   }
+}
+
+function getUriKey(uri: vscode.Uri): string {
+  return uri.toString();
 }

@@ -3,6 +3,9 @@ import type {
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsBuildTriggerOptions,
+  JenkinsReplayDefinition,
+  JenkinsReplayResult,
+  JenkinsReplaySubmissionPayload,
   JenkinsRestartFromStageInfo,
   JenkinsWorkflowRun
 } from "../JenkinsClient";
@@ -247,10 +250,35 @@ export class JenkinsBuildDataOperations {
     }
   }
 
-  async replayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
+  async quickReplayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     const client = await this.context.getClient(environment);
     try {
-      await client.replayBuild(buildUrl);
+      await client.quickReplayBuild(buildUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async getReplayDefinition(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsReplayDefinition> {
+    const client = await this.context.getClient(environment);
+    try {
+      return await client.getReplayDefinition(buildUrl);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async runReplay(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    payload: JenkinsReplaySubmissionPayload
+  ): Promise<JenkinsReplayResult> {
+    const client = await this.context.getClient(environment);
+    try {
+      return await client.runReplay(buildUrl, payload);
     } catch (error) {
       throw toBuildActionError(error);
     }

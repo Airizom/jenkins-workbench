@@ -1,4 +1,5 @@
 import type * as vscode from "vscode";
+import type { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import type { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import type { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import type { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
@@ -26,6 +27,8 @@ import type { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFile
 import type { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
+import type { ReplayDraftFilesystem } from "../../services/ReplayDraftFilesystem";
+import type { ReplayDraftManager } from "../../services/ReplayDraftManager";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -71,6 +74,9 @@ export interface ExtensionTokenMap {
   jobConfigDraftFilesystem: JobConfigDraftFilesystem;
   jobConfigDraftManager: JobConfigDraftManager;
   jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;
+  replayDraftFilesystem: ReplayDraftFilesystem;
+  replayDraftManager: ReplayDraftManager;
+  replayBuildWorkflow: ReplayBuildWorkflow;
   artifactActionHandler: ArtifactActionHandler;
   watchStore: JenkinsWatchStore;
   presetStore: JenkinsParameterPresetStore;

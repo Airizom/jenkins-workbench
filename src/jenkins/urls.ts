@@ -7,6 +7,11 @@ export interface ParsedJobUrl {
   fullPath: string[];
 }
 
+export interface ParsedBuildUrl {
+  jobUrl: string;
+  buildNumber: number;
+}
+
 export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
@@ -90,6 +95,55 @@ export function canonicalizeJobUrlForEnvironment(
   }
 
   return canonicalUrl;
+}
+
+export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
+  let url: URL;
+  try {
+    url = new URL(buildUrl);
+  } catch {
+    return undefined;
+  }
+
+  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
+  const buildNumberPart = pathParts.at(-1);
+  if (!buildNumberPart || !/^\d+$/.test(buildNumberPart)) {
+    return undefined;
+  }
+
+  const buildNumber = Number.parseInt(buildNumberPart, 10);
+  if (!Number.isFinite(buildNumber)) {
+    return undefined;
+  }
+
+  const jobPathParts = pathParts.slice(0, -1);
+  const jobPath = jobPathParts.length > 0 ? `/${jobPathParts.join("/")}/` : "/";
+  const jobUrl = `${url.origin}${jobPath}`;
+  if (!parseJobUrl(jobUrl)) {
+    return undefined;
+  }
+
+  return {
+    jobUrl,
+    buildNumber
+  };
+}
+
+export function canonicalizeBuildUrlForEnvironment(
+  environmentUrl: string,
+  buildUrl: string
+): string | undefined {
+  const parsed = parseBuildUrl(buildUrl);
+  if (!parsed) {
+    return undefined;
+  }
+
+  const canonicalJobUrl = canonicalizeJobUrlForEnvironment(environmentUrl, parsed.jobUrl);
+  if (!canonicalJobUrl) {
+    return undefined;
+  }
+
+  return new URL(`${parsed.buildNumber}/`, ensureTrailingSlash(canonicalJobUrl)).toString();
 }
 
 export function buildApiUrlFromBase(baseUrl: string, path: string, tree?: string): string {

@@ -2,15 +2,17 @@ import * as vscode from "vscode";
 
 export class JenkinsfileMatcher {
   private patterns: string[] = [];
+  private schemes: string[] = [];
   private selector: vscode.DocumentSelector = [];
 
-  constructor(patterns: string[]) {
+  constructor(patterns: string[], schemes: string[] = ["file", "untitled"]) {
+    this.schemes = [...schemes];
     this.updatePatterns(patterns);
   }
 
   updatePatterns(patterns: string[]): void {
     this.patterns = [...patterns];
-    this.selector = buildSelector(this.patterns);
+    this.selector = buildSelector(this.patterns, this.schemes);
   }
 
   matches(document: vscode.TextDocument): boolean {
@@ -25,14 +27,16 @@ export class JenkinsfileMatcher {
   }
 }
 
-function buildSelector(patterns: string[]): vscode.DocumentSelector {
+function buildSelector(patterns: string[], schemes: string[]): vscode.DocumentSelector {
   if (patterns.length === 0) {
     return [];
   }
 
   const selectors: vscode.DocumentFilter[] = [];
   for (const pattern of patterns) {
-    selectors.push({ scheme: "file", pattern }, { scheme: "untitled", pattern });
+    for (const scheme of schemes) {
+      selectors.push({ scheme, pattern });
+    }
   }
   return selectors;
 }

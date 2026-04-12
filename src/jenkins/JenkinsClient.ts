@@ -26,6 +26,9 @@ import type {
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
   JenkinsQueueItem,
+  JenkinsReplayDefinition,
+  JenkinsReplayResult,
+  JenkinsReplaySubmissionPayload,
   JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsView,
@@ -59,6 +62,10 @@ export type {
   JenkinsProgressiveConsoleHtml,
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
+  JenkinsReplayDefinition,
+  JenkinsReplayLoadedScript,
+  JenkinsReplayResult,
+  JenkinsReplaySubmissionPayload,
   JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsView,
@@ -234,8 +241,19 @@ export class JenkinsClient {
     await this.buildsApi.stopBuild(buildUrl);
   }
 
-  async replayBuild(buildUrl: string): Promise<void> {
-    await this.buildsApi.replayBuild(buildUrl);
+  async quickReplayBuild(buildUrl: string): Promise<void> {
+    await this.buildsApi.quickReplayBuild(buildUrl);
+  }
+
+  async getReplayDefinition(buildUrl: string): Promise<JenkinsReplayDefinition> {
+    return this.buildsApi.getReplayDefinition(buildUrl);
+  }
+
+  async runReplay(
+    buildUrl: string,
+    payload: JenkinsReplaySubmissionPayload
+  ): Promise<JenkinsReplayResult> {
+    return this.buildsApi.runReplay(buildUrl, payload);
   }
 
   async rebuildBuild(buildUrl: string): Promise<void> {

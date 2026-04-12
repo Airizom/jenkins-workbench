@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { BuildDetailsPanel } from "../panels/BuildDetailsPanel";
 import { NodeDetailsPanel } from "../panels/NodeDetailsPanel";
 import { JOB_CONFIG_DRAFT_SCHEME } from "../services/JobConfigDraftFilesystem";
+import { REPLAY_DRAFT_SCHEME } from "../services/ReplayDraftFilesystem";
 import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import type { TreeViewSummary } from "../tree/TreeDataProvider";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
@@ -54,6 +55,8 @@ export async function activateRuntime(
   const jobConfigDraftFilesystem = container.get("jobConfigDraftFilesystem");
   const currentBranchService = container.get("currentBranchService");
   const currentBranchStatusBar = container.get("currentBranchStatusBar");
+  const replayDraftManager = container.get("replayDraftManager");
+  const replayDraftFilesystem = container.get("replayDraftFilesystem");
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
@@ -101,6 +104,10 @@ export async function activateRuntime(
     JOB_CONFIG_DRAFT_SCHEME,
     jobConfigDraftFilesystem
   );
+  const replayDraftFilesystemRegistration = vscode.workspace.registerFileSystemProvider(
+    REPLAY_DRAFT_SCHEME,
+    replayDraftFilesystem
+  );
 
   void currentBranchService.start().catch((error) => {
     console.warn("Failed to initialize current-branch state.", error);
@@ -120,8 +127,10 @@ export async function activateRuntime(
     treeExpansionState,
     pendingInputCoordinator,
     jobConfigDraftManager,
+    replayDraftManager,
     treeSummarySubscription,
     jobConfigDraftFilesystemRegistration,
+    replayDraftFilesystemRegistration,
     buildDetailsSerializer,
     nodeDetailsSerializer,
     vscode.window.registerUriHandler(uriHandler),
@@ -153,16 +162,16 @@ export async function activateRuntime(
     jenkinsfileValidationCoordinator,
     container.get("jenkinsfileValidationStatusBar"),
     vscode.languages.registerCodeActionsProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }],
+      [{ scheme: "file" }, { scheme: "untitled" }, { scheme: REPLAY_DRAFT_SCHEME }],
       jenkinsfileQuickFixProvider,
       { providedCodeActionKinds: JenkinsfileQuickFixProvider.providedCodeActionKinds }
     ),
     vscode.languages.registerHoverProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }],
+      [{ scheme: "file" }, { scheme: "untitled" }, { scheme: REPLAY_DRAFT_SCHEME }],
       jenkinsfileHoverProvider
     ),
     vscode.languages.registerCodeLensProvider(
-      [{ scheme: "file" }, { scheme: "untitled" }],
+      [{ scheme: "file" }, { scheme: "untitled" }, { scheme: REPLAY_DRAFT_SCHEME }],
       jenkinsfileCodeLensProvider
     )
   );

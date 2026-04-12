@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../formatters/ScopeFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { ReplayDraftManager } from "../services/ReplayDraftManager";
 import type {
   EnvironmentScope,
   EnvironmentWithScope,
@@ -22,12 +23,18 @@ const FALLBACK_WORKSPACE_KEY = "__noWorkspace__";
 export class JenkinsfileEnvironmentResolver {
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly environmentStore: JenkinsEnvironmentStore
+    private readonly environmentStore: JenkinsEnvironmentStore,
+    private readonly replayDraftManager?: ReplayDraftManager
   ) {}
 
   async resolveForDocument(
     document: vscode.TextDocument
   ): Promise<JenkinsEnvironmentRef | undefined> {
+    const replayEnvironment = this.replayDraftManager?.getSessionForUri(document.uri)?.environment;
+    if (replayEnvironment) {
+      return replayEnvironment;
+    }
+
     const environments = await this.environmentStore.listEnvironmentsWithScope();
     if (environments.length === 0) {
       return undefined;

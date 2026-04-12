@@ -208,6 +208,31 @@ export interface JenkinsRestartFromStageActionResponse {
   message?: string;
 }
 
+export interface JenkinsReplayLoadedScript {
+  displayName: string;
+  postField: string;
+  script: string;
+}
+
+export interface JenkinsReplayDefinition {
+  mainScript: string;
+  loadedScripts: JenkinsReplayLoadedScript[];
+}
+
+export interface JenkinsReplaySubmissionPayload {
+  mainScript: string;
+  loadedScripts: Array<{
+    postField: string;
+    script: string;
+  }>;
+}
+
+export interface JenkinsReplayResult {
+  location?: string;
+  queueLocation?: string;
+  buildLocation?: string;
+}
+
 export interface JenkinsConsoleText {
   text: string;
   truncated: boolean;

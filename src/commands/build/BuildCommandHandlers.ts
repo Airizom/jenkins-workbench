@@ -25,6 +25,7 @@ import {
   withActionErrorMessage
 } from "../CommandUtils";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
+import type { ReplayBuildWorkflow } from "./ReplayBuildWorkflow";
 
 type BuildTriggerOptions = {
   payload?: URLSearchParams | BuildParameterPayload;
@@ -208,6 +209,22 @@ export async function rejectInput(
 }
 
 export async function replayBuild(
+  workflow: ReplayBuildWorkflow,
+  item?: BuildTreeItem
+): Promise<void> {
+  const selected = requireSelection(item, "Select a build to replay.");
+  if (!selected) {
+    return;
+  }
+
+  await workflow.openReplay({
+    environment: selected.environment,
+    buildUrl: selected.buildUrl,
+    label: getTreeItemLabel(selected)
+  });
+}
+
+export async function quickReplayBuild(
   dataService: JenkinsDataService,
   refreshHost: BuildCommandRefreshHost,
   item?: BuildTreeItem
@@ -221,8 +238,16 @@ export async function replayBuild(
   await runBuildAction(refreshHost, selected, {
     errorMessage: `Failed to replay build ${label}`,
     successMessage: `Replay requested for ${label}.`,
-    action: (environment, buildUrl) => dataService.replayBuild(environment, buildUrl)
+    action: (environment, buildUrl) => dataService.quickReplayBuild(environment, buildUrl)
   });
+}
+
+export async function runReplayDraft(
+  workflow: ReplayBuildWorkflow,
+  refreshHost: BuildCommandRefreshHost,
+  uri?: vscode.Uri
+): Promise<void> {
+  await workflow.runDraft(refreshHost, uri);
 }
 
 export async function rebuildBuild(

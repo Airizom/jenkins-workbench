@@ -19,14 +19,17 @@ import {
   openInJenkins,
   openLastFailedBuild,
   previewBuildLog,
+  quickReplayBuild,
   rebuildBuild,
   rejectInput,
   replayBuild,
+  runReplayDraft,
   showBuildDetails,
   stopBuild,
   triggerBuild
 } from "./build/BuildCommandHandlers";
 import type { BuildCommandRefreshHost } from "./build/BuildCommandTypes";
+import type { ReplayBuildWorkflow } from "./build/ReplayBuildWorkflow";
 
 export function registerBuildCommands(
   context: vscode.ExtensionContext,
@@ -37,6 +40,7 @@ export function registerBuildCommands(
   consoleExporter: BuildConsoleExporter,
   queuedBuildWaiter: QueuedBuildWaiter,
   pendingInputProvider: PendingInputActionProvider,
+  replayBuildWorkflow: ReplayBuildWorkflow,
   refreshHost: BuildCommandRefreshHost
 ): void {
   context.subscriptions.push(
@@ -55,7 +59,13 @@ export function registerBuildCommands(
       rejectInput(dataService, refreshHost, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.replayBuild", (item?: BuildTreeItem) =>
-      replayBuild(dataService, refreshHost, item)
+      replayBuild(replayBuildWorkflow, item)
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.quickReplayBuild", (item?: BuildTreeItem) =>
+      quickReplayBuild(dataService, refreshHost, item)
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.runReplayDraft", (uri?: vscode.Uri) =>
+      runReplayDraft(replayBuildWorkflow, refreshHost, uri)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.rebuildBuild", (item?: BuildTreeItem) =>
       rebuildBuild(dataService, refreshHost, item)
