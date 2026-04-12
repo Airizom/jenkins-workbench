@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-04-12
+
+### Added
+
+- feat: add Jenkinsfile step intelligence
+
+### Documentation
+
+- docs: update feature list and development notes
+
 ## [1.38.0] - 2026-04-12
 
 ### Added
