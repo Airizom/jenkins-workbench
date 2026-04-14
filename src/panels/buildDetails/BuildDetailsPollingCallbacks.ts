@@ -12,6 +12,7 @@ export interface BuildDetailsPollingCallbackHooks {
   publishErrors: () => void;
   isTokenCurrent: (token: number) => boolean;
   showCompletionToast: (details: JenkinsBuildDetails) => void;
+  canOpenSource?: (className?: string) => boolean;
   onPipelineLoading?: (token: number) => void;
 }
 
@@ -26,7 +27,9 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       state.updateDetails(details);
-      const message = buildUpdateMessageFromState(state);
+      const message = buildUpdateMessageFromState(state, {
+        canOpenSource: hooks.canOpenSource
+      });
       if (message) {
         hooks.postMessage(message);
       }
@@ -43,7 +46,9 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setPipelineRun(toPipelineRun(workflowRun));
       hooks.publishErrors();
-      const message = buildUpdateMessageFromState(state);
+      const message = buildUpdateMessageFromState(state, {
+        canOpenSource: hooks.canOpenSource
+      });
       if (message) {
         hooks.postMessage(message);
       }
@@ -54,7 +59,9 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setPipelineError(`Pipeline stages: ${formatError(error)}`);
       hooks.publishErrors();
-      const message = buildUpdateMessageFromState(state);
+      const message = buildUpdateMessageFromState(state, {
+        canOpenSource: hooks.canOpenSource
+      });
       if (message) {
         hooks.postMessage(message);
       }
@@ -109,7 +116,9 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       state.setPendingInputs(pendingInputs);
-      const message = buildUpdateMessageFromState(state);
+      const message = buildUpdateMessageFromState(state, {
+        canOpenSource: hooks.canOpenSource
+      });
       if (message) {
         hooks.postMessage(message);
       }

@@ -21,6 +21,7 @@ import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/Jenki
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
 import type { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
+import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import type { ArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
 import type { ArtifactStorageService } from "../../services/ArtifactStorageService";
@@ -33,6 +34,11 @@ import type { PendingInputRefreshCoordinator } from "../../services/PendingInput
 import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import type { ReplayDraftFilesystem } from "../../services/ReplayDraftFilesystem";
 import type { ReplayDraftManager } from "../../services/ReplayDraftManager";
+import type { TestSourceFileMatchConfig } from "../../services/TestSourceFileMatchConfig";
+import type { TestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
+import type { TestSourceNavigationService } from "../../services/TestSourceNavigationService";
+import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
+import type { TestSourceResolver } from "../../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -80,8 +86,14 @@ export interface ExtensionTokenMap {
   jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;
   replayDraftFilesystem: ReplayDraftFilesystem;
   replayDraftManager: ReplayDraftManager;
+  testSourceFileMatchConfig: TestSourceFileMatchConfig;
+  testSourceFileMatchStrategy: TestSourceFileMatchStrategy;
+  testSourceResolver: TestSourceResolver;
+  testSourceNavigationService: TestSourceNavigationService;
+  testSourceNavigationUiService: TestSourceNavigationUiService;
   replayBuildWorkflow: ReplayBuildWorkflow;
   artifactActionHandler: ArtifactActionHandler;
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher;
   watchStore: JenkinsWatchStore;
   presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;

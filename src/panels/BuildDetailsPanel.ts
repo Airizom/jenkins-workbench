@@ -2,6 +2,9 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import type { TestSourceNavigationService } from "../services/TestSourceNavigationService";
+import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
+import { buildTestSourceNavigationContext } from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import { getTestReportIncludeCaseLogsConfigKey } from "./buildDetails/BuildDetailsConfig";
@@ -15,6 +18,7 @@ import type {
   BuildDetailsDataService,
   PendingInputActionProvider
 } from "./buildDetails/BuildDetailsPollingController";
+import type { BuildDetailsCanOpenTestSource } from "./buildDetails/BuildDetailsTestSource";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
@@ -34,6 +38,8 @@ interface BuildDetailsPanelShowOptions {
   consoleExporter: BuildConsoleExporter;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: PendingInputActionProvider | undefined;
+  testSourceNavigationService?: TestSourceNavigationService;
+  testSourceNavigationUiService?: TestSourceNavigationUiService;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   extensionUri: vscode.Uri;
@@ -46,6 +52,8 @@ interface BuildDetailsPanelReviveOptions {
   consoleExporter: BuildConsoleExporter;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: PendingInputActionProvider | undefined;
+  testSourceNavigationService?: TestSourceNavigationService;
+  testSourceNavigationUiService?: TestSourceNavigationUiService;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
 }
@@ -80,6 +88,9 @@ export class BuildDetailsPanel {
   private readonly disposables: vscode.Disposable[] = [];
   private artifactActionHandler?: ArtifactActionHandler;
   private refreshHost?: EnvironmentScopedRefreshHost;
+  private testSourceNavigationService?: TestSourceNavigationService;
+  private testSourceNavigationUiService?: TestSourceNavigationUiService;
+  private readonly canOpenTestSource: BuildDetailsCanOpenTestSource;
 
   static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
     const {
@@ -88,6 +99,8 @@ export class BuildDetailsPanel {
       consoleExporter,
       refreshHost,
       pendingInputProvider,
+      testSourceNavigationService,
+      testSourceNavigationUiService,
       environment,
       buildUrl,
       extensionUri,
@@ -106,11 +119,23 @@ export class BuildDetailsPanel {
         }
       );
       BuildDetailsPanel.configurePanel(panel, extensionUri);
-      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(panel, extensionUri, consoleExporter);
+      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(
+        panel,
+        extensionUri,
+        consoleExporter,
+        testSourceNavigationService,
+        testSourceNavigationUiService
+      );
     }
 
     const activePanel = BuildDetailsPanel.currentPanel;
-    activePanel.configure(consoleExporter, refreshHost, pendingInputProvider);
+    activePanel.configure(
+      consoleExporter,
+      refreshHost,
+      pendingInputProvider,
+      testSourceNavigationService,
+      testSourceNavigationUiService
+    );
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
   }
@@ -123,9 +148,21 @@ export class BuildDetailsPanel {
     BuildDetailsPanel.configurePanel(panel, options.extensionUri);
     panel.title = "Build Details";
 
-    const revived = new BuildDetailsPanel(panel, options.extensionUri, options.consoleExporter);
+    const revived = new BuildDetailsPanel(
+      panel,
+      options.extensionUri,
+      options.consoleExporter,
+      options.testSourceNavigationService,
+      options.testSourceNavigationUiService
+    );
     BuildDetailsPanel.currentPanel = revived;
-    revived.configure(options.consoleExporter, options.refreshHost, options.pendingInputProvider);
+    revived.configure(
+      options.consoleExporter,
+      options.refreshHost,
+      options.pendingInputProvider,
+      options.testSourceNavigationService,
+      options.testSourceNavigationUiService
+    );
 
     if (!isBuildDetailsPanelState(state)) {
       revived.renderRestoreError(
@@ -154,17 +191,30 @@ export class BuildDetailsPanel {
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    consoleExporter: BuildConsoleExporter
+    consoleExporter: BuildConsoleExporter,
+    testSourceNavigationService?: TestSourceNavigationService,
+    testSourceNavigationUiService?: TestSourceNavigationUiService
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.consoleExporter = consoleExporter;
-    this.controller = new BuildDetailsPanelController(panel, extensionUri);
+    this.testSourceNavigationService = testSourceNavigationService;
+    this.testSourceNavigationUiService = testSourceNavigationUiService;
+    this.canOpenTestSource = (environment, buildUrl, className) =>
+      Boolean(
+        environment &&
+          this.testSourceNavigationService?.canNavigate(
+            buildTestSourceNavigationContext(environment, buildUrl),
+            className
+          )
+      );
+    this.controller = new BuildDetailsPanelController(panel, extensionUri, this.canOpenTestSource);
     this.actions = new BuildDetailsPanelActions({
       controller: this.controller,
       getArtifactActionHandler: () => this.artifactActionHandler,
       getConsoleExporter: () => this.consoleExporter,
-      getRefreshHost: () => this.refreshHost
+      getRefreshHost: () => this.refreshHost,
+      getTestSourceNavigationUiService: () => this.testSourceNavigationUiService
     });
     this.messageRouter = new BuildDetailsMessageRouter({
       onArtifactAction: (message) => {
@@ -184,6 +234,12 @@ export class BuildDetailsPanel {
       },
       onRestartPipelineFromStage: (message) => {
         void this.actions.handleRestartPipelineFromStage(message);
+      },
+      onReloadTestReport: (message) => {
+        void this.actions.handleReloadTestReport(message);
+      },
+      onOpenTestSource: (message) => {
+        void this.actions.handleOpenTestSource(message);
       },
       onToggleFollowLog: (value) => {
         this.controller.setFollowLog(Boolean(value));
@@ -231,10 +287,14 @@ export class BuildDetailsPanel {
   private configure(
     consoleExporter: BuildConsoleExporter,
     refreshHost: EnvironmentScopedRefreshHost | undefined,
-    pendingInputProvider: PendingInputActionProvider | undefined
+    pendingInputProvider: PendingInputActionProvider | undefined,
+    testSourceNavigationService?: TestSourceNavigationService,
+    testSourceNavigationUiService?: TestSourceNavigationUiService
   ): void {
     this.consoleExporter = consoleExporter;
     this.refreshHost = refreshHost;
+    this.testSourceNavigationService = testSourceNavigationService;
+    this.testSourceNavigationUiService = testSourceNavigationUiService;
     this.controller.setPendingInputProvider(pendingInputProvider);
   }
 

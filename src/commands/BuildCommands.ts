@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { PendingInputActionProvider } from "../panels/buildDetails/BuildDetailsPollingController";
-import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type {
@@ -37,9 +36,8 @@ export function registerBuildCommands(
   presetStore: JenkinsParameterPresetStore,
   artifactActionHandler: ArtifactActionHandler,
   buildLogPreviewer: BuildLogPreviewer,
-  consoleExporter: BuildConsoleExporter,
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
   queuedBuildWaiter: QueuedBuildWaiter,
-  pendingInputProvider: PendingInputActionProvider,
   replayBuildWorkflow: ReplayBuildWorkflow,
   refreshHost: BuildCommandRefreshHost
 ): void {
@@ -75,28 +73,12 @@ export function registerBuildCommands(
       (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.showBuildDetails", (item?: BuildTreeItem) =>
-      showBuildDetails(
-        dataService,
-        artifactActionHandler,
-        consoleExporter,
-        refreshHost,
-        pendingInputProvider,
-        context.extensionUri,
-        item
-      )
+      showBuildDetails(buildDetailsPanelLauncher, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.openLastFailedBuild",
       (item?: JobTreeItem | PipelineTreeItem) =>
-        openLastFailedBuild(
-          dataService,
-          artifactActionHandler,
-          consoleExporter,
-          refreshHost,
-          pendingInputProvider,
-          context.extensionUri,
-          item
-        )
+        openLastFailedBuild(dataService, buildDetailsPanelLauncher, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.previewBuildLog", (item?: BuildTreeItem) =>
       previewBuildLog(buildLogPreviewer, item)

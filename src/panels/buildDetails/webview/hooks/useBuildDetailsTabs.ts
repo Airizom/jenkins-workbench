@@ -2,11 +2,12 @@ import * as React from "react";
 
 const { useEffect, useMemo, useState } = React;
 
-export type BuildDetailsTab = "inputs" | "pipeline" | "console" | "insights";
+export type BuildDetailsTab = "inputs" | "pipeline" | "console" | "tests" | "insights";
 
 type UseBuildDetailsTabsParams = {
   hasPendingInputs: boolean;
   hasPipelineStages: boolean;
+  hasTests: boolean;
 };
 
 type UseBuildDetailsTabsResult = {
@@ -18,7 +19,8 @@ type UseBuildDetailsTabsResult = {
 
 export function useBuildDetailsTabs({
   hasPendingInputs,
-  hasPipelineStages
+  hasPipelineStages,
+  hasTests
 }: UseBuildDetailsTabsParams): UseBuildDetailsTabsResult {
   const defaultTab: BuildDetailsTab = useMemo(() => {
     if (hasPendingInputs) {
@@ -27,8 +29,11 @@ export function useBuildDetailsTabs({
     if (hasPipelineStages) {
       return "pipeline";
     }
+    if (hasTests) {
+      return "tests";
+    }
     return "console";
-  }, [hasPendingInputs, hasPipelineStages]);
+  }, [hasPendingInputs, hasPipelineStages, hasTests]);
 
   const availableTabs: BuildDetailsTab[] = useMemo(() => {
     const tabs: BuildDetailsTab[] = [];
@@ -38,9 +43,13 @@ export function useBuildDetailsTabs({
     if (hasPipelineStages) {
       tabs.push("pipeline");
     }
-    tabs.push("console", "insights");
+    tabs.push("console");
+    if (hasTests) {
+      tabs.push("tests");
+    }
+    tabs.push("insights");
     return tabs;
-  }, [hasPendingInputs, hasPipelineStages]);
+  }, [hasPendingInputs, hasPipelineStages, hasTests]);
 
   const [selectedTab, setSelectedTab] = useState<BuildDetailsTab>(defaultTab);
 

@@ -1,34 +1,16 @@
 import * as vscode from "vscode";
-import type { BuildCommandRefreshHost } from "../commands/build/BuildCommandTypes";
 import { formatActionError } from "../formatters/ErrorFormatters";
-import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { BuildDetailsPanel } from "../panels/BuildDetailsPanel";
-import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
-import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
-import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 
 export class JenkinsWorkbenchDeepLinkBuildHandler {
-  constructor(
-    private readonly dataService: JenkinsDataService,
-    private readonly artifactActionHandler: ArtifactActionHandler,
-    private readonly consoleExporter: BuildConsoleExporter,
-    private readonly refreshHost: BuildCommandRefreshHost,
-    private readonly pendingInputCoordinator: PendingInputRefreshCoordinator,
-    private readonly extensionUri: vscode.Uri
-  ) {}
+  constructor(private readonly buildDetailsPanelLauncher: BuildDetailsPanelLauncher) {}
 
   async openBuildDetails(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     try {
-      await BuildDetailsPanel.show({
-        dataService: this.dataService,
-        artifactActionHandler: this.artifactActionHandler,
-        consoleExporter: this.consoleExporter,
-        refreshHost: this.refreshHost,
-        pendingInputProvider: this.pendingInputCoordinator,
+      await this.buildDetailsPanelLauncher.show({
         environment,
         buildUrl,
-        extensionUri: this.extensionUri,
         label: this.deriveBuildLabel(buildUrl)
       });
     } catch (error) {

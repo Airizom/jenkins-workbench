@@ -16,6 +16,9 @@ export class BuildDetailsPanelState {
   private baseErrorsValue: string[] = [];
   private pipelineErrorValue: string | undefined;
   private currentPendingInputsValue: PendingInputAction[] = [];
+  private testReportFetchedValue = false;
+  private testReportLogsIncludedValue = false;
+  private testResultsLoadingValue = false;
   private pipelineRestartAvailabilityValue: PipelineRestartAvailability = "unknown";
   private pipelineRestartEnabledValue = false;
   private pipelineRestartableStagesValue: string[] = [];
@@ -51,6 +54,18 @@ export class BuildDetailsPanelState {
 
   get currentPendingInputs(): PendingInputAction[] {
     return this.currentPendingInputsValue;
+  }
+
+  get testReportFetched(): boolean {
+    return this.testReportFetchedValue;
+  }
+
+  get testReportLogsIncluded(): boolean {
+    return this.testReportLogsIncludedValue;
+  }
+
+  get testResultsLoading(): boolean {
+    return this.testResultsLoadingValue;
   }
 
   get pipelineRestartAvailability(): PipelineRestartAvailability {
@@ -91,6 +106,9 @@ export class BuildDetailsPanelState {
     this.baseErrorsValue = [];
     this.pipelineErrorValue = undefined;
     this.currentPendingInputsValue = [];
+    this.testReportFetchedValue = false;
+    this.testReportLogsIncludedValue = false;
+    this.testResultsLoadingValue = false;
     this.pipelineRestartAvailabilityValue = "unknown";
     this.pipelineRestartEnabledValue = false;
     this.pipelineRestartableStagesValue = [];
@@ -107,6 +125,9 @@ export class BuildDetailsPanelState {
   ): void {
     this.currentDetailsValue = initialState.details;
     this.currentTestReportValue = undefined;
+    this.testReportFetchedValue = false;
+    this.testReportLogsIncludedValue = false;
+    this.testResultsLoadingValue = false;
     this.currentPipelineRunValue = pipelineRun;
     this.baseErrorsValue = initialState.errors;
     this.pipelineErrorValue = pipelineError;
@@ -127,8 +148,25 @@ export class BuildDetailsPanelState {
     return { wasBuilding, isBuilding };
   }
 
-  setTestReport(testReport: JenkinsTestReport | undefined): void {
+  setTestReport(
+    testReport: JenkinsTestReport | undefined,
+    options?: { logsIncluded?: boolean }
+  ): void {
     this.currentTestReportValue = testReport;
+    this.testReportFetchedValue = true;
+    this.testReportLogsIncludedValue = Boolean(options?.logsIncluded);
+  }
+
+  markTestReportFetchAttempted(): void {
+    this.testReportFetchedValue = true;
+  }
+
+  setTestResultsLoading(value: boolean): boolean {
+    if (this.testResultsLoadingValue === value) {
+      return false;
+    }
+    this.testResultsLoadingValue = value;
+    return true;
   }
 
   setPipelineRun(pipelineRun: PipelineRun | undefined): void {

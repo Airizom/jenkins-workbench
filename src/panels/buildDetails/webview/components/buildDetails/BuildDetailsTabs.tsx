@@ -4,10 +4,14 @@ import {
   TabsList,
   TabsTrigger
 } from "../../../../shared/webview/components/ui/tabs";
+import { CheckCircleIcon } from "../../../../shared/webview/icons";
 import type {
   ArtifactAction,
   BuildFailureArtifact,
   BuildFailureInsightsViewModel,
+  BuildTestCaseViewModel,
+  BuildTestResultsViewModel,
+  BuildTestsSummaryViewModel,
   PendingInputViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
@@ -18,21 +22,26 @@ import { BuildSummaryCard } from "./BuildSummaryCard";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineStagesSection } from "./PipelineStagesSection";
+import { TestResultsSection } from "./TestResultsSection";
 
 type BuildDetailsTabsProps = {
   selectedTab: BuildDetailsTab;
   onTabChange: (tab: BuildDetailsTab) => void;
   hasPendingInputs: boolean;
   hasPipelineStages: boolean;
+  hasTests: boolean;
   pendingInputs: PendingInputViewModel[];
   pipelineStages: PipelineStageViewModel[];
   pipelineStagesLoading: boolean;
   displayName: string;
+  buildUrl?: string;
   resultClass: string;
   resultLabel: string;
   durationLabel: string;
   timestampLabel: string;
   culpritsLabel: string;
+  testsSummary: BuildTestsSummaryViewModel;
+  testResults: BuildTestResultsViewModel;
   insights: BuildFailureInsightsViewModel;
   consoleText: string;
   consoleHtmlModel?: ConsoleHtmlModel;
@@ -48,6 +57,8 @@ type BuildDetailsTabsProps = {
   onExportLogs: () => void;
   onOpenExternal: (url: string) => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
+  onReloadTestResults: () => void;
+  onOpenTestSource: (testCase: BuildTestCaseViewModel) => void;
 };
 
 export function BuildDetailsTabs({
@@ -55,15 +66,19 @@ export function BuildDetailsTabs({
   onTabChange,
   hasPendingInputs,
   hasPipelineStages,
+  hasTests,
   pendingInputs,
   pipelineStages,
   pipelineStagesLoading,
   displayName,
+  buildUrl,
   resultClass,
   resultLabel,
   durationLabel,
   timestampLabel,
   culpritsLabel,
+  testsSummary,
+  testResults,
   insights,
   consoleText,
   consoleHtmlModel,
@@ -78,7 +93,9 @@ export function BuildDetailsTabs({
   onToggleFollowLog,
   onExportLogs,
   onOpenExternal,
-  onArtifactAction
+  onArtifactAction,
+  onReloadTestResults,
+  onOpenTestSource
 }: BuildDetailsTabsProps): JSX.Element {
   return (
     <Tabs
@@ -106,6 +123,18 @@ export function BuildDetailsTabs({
         <TabsTrigger value="console" className="text-xs">
           Console
         </TabsTrigger>
+        {hasTests ? (
+          <TabsTrigger value="tests" className="relative text-xs">
+            Test Results
+            {testsSummary.failedCount > 0 ? (
+              <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-failure-soft px-1 text-[10px] font-medium text-failure">
+                {testsSummary.failedCount}
+              </span>
+            ) : testsSummary.hasAnyResults ? (
+              <CheckCircleIcon className="ml-1 h-3 w-3 text-success" />
+            ) : null}
+          </TabsTrigger>
+        ) : null}
         <TabsTrigger value="insights" className="text-xs">
           {resultClass === "failure" || resultClass === "unstable" ? "Analysis" : "Summary"}
         </TabsTrigger>
@@ -145,6 +174,18 @@ export function BuildDetailsTabs({
           onOpenExternal={onOpenExternal}
         />
       </TabsContent>
+
+      {hasTests ? (
+        <TabsContent value="tests" className="space-y-3" forceMount>
+          <TestResultsSection
+            buildUrl={buildUrl}
+            summary={testsSummary}
+            results={testResults}
+            onReloadWithLogs={onReloadTestResults}
+            onOpenSource={onOpenTestSource}
+          />
+        </TabsContent>
+      ) : null}
 
       <TabsContent value="insights" className="space-y-3" forceMount>
         <BuildSummaryCard

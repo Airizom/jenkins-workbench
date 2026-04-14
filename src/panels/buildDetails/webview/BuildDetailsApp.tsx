@@ -29,10 +29,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const isRunning = state.resultClass === "running";
   const hasPendingInputs = state.pendingInputs.length > 0;
   const hasPipelineStages = state.pipelineStages.length > 0 || state.pipelineStagesLoading;
+  const hasTests = state.testState.summary.hasAnyResults;
   const buildUrl = state.buildUrl;
   const { selectedTab, setSelectedTab } = useBuildDetailsTabs({
     hasPendingInputs,
-    hasPipelineStages
+    hasPipelineStages,
+    hasTests
   });
 
   const handleOpenExternal = (url: string) => {
@@ -82,15 +84,19 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             onTabChange={setSelectedTab}
             hasPendingInputs={hasPendingInputs}
             hasPipelineStages={hasPipelineStages}
+            hasTests={hasTests}
             pendingInputs={state.pendingInputs}
             pipelineStages={state.pipelineStages}
             pipelineStagesLoading={state.pipelineStagesLoading}
             displayName={state.displayName}
+            buildUrl={buildUrl}
             resultClass={state.resultClass}
             resultLabel={state.resultLabel}
             durationLabel={state.durationLabel}
             timestampLabel={state.timestampLabel}
             culpritsLabel={state.culpritsLabel}
+            testsSummary={state.testState.summary}
+            testResults={state.testState.results}
             insights={insights}
             consoleText={state.consoleText}
             consoleHtmlModel={state.consoleHtmlModel}
@@ -113,6 +119,20 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
                 action,
                 relativePath: artifact.relativePath,
                 fileName: artifact.fileName ?? undefined
+              })
+            }
+            onReloadTestResults={() =>
+              postMessage({
+                type: "reloadTestReport",
+                includeCaseLogs: true
+              })
+            }
+            onOpenTestSource={(testCase) =>
+              postMessage({
+                type: "openTestSource",
+                testName: testCase.name,
+                className: testCase.className,
+                suiteName: testCase.suiteName
               })
             }
           />

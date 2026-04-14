@@ -4,16 +4,6 @@ export interface BuildFailureChangelogItem {
   commitId?: string;
 }
 
-export interface BuildFailureFailedTest {
-  name: string;
-  className?: string;
-  errorDetails?: string;
-  errorStackTrace?: string;
-  stdout?: string;
-  stderr?: string;
-  durationLabel?: string;
-}
-
 export interface BuildFailureArtifact {
   name: string;
   fileName?: string;
@@ -46,11 +36,49 @@ export interface BuildFailureInsightsViewModel {
   changelogItems: BuildFailureChangelogItem[];
   changelogOverflow: number;
   testSummaryLabel: string;
-  failedTests: BuildFailureFailedTest[];
-  failedTestsOverflow: number;
-  failedTestsMessage: string;
+  testResultsHint?: string;
   artifacts: BuildFailureArtifact[];
   artifactsOverflow: number;
+}
+
+export type TestResultStatus = "passed" | "failed" | "skipped" | "other";
+
+export interface BuildTestsSummaryViewModel {
+  totalCount: number;
+  failedCount: number;
+  skippedCount: number;
+  passedCount: number;
+  summaryLabel: string;
+  hasAnyResults: boolean;
+  hasDetailedResults: boolean;
+  detailsUnavailable: boolean;
+  logsIncluded: boolean;
+  canLoadLogs: boolean;
+}
+
+export interface BuildTestCaseViewModel {
+  id: string;
+  name: string;
+  className?: string;
+  suiteName?: string;
+  status: TestResultStatus;
+  statusLabel: string;
+  durationLabel?: string;
+  errorDetails?: string;
+  errorStackTrace?: string;
+  stdout?: string;
+  stderr?: string;
+  canOpenSource: boolean;
+}
+
+export interface BuildTestResultsViewModel {
+  items: BuildTestCaseViewModel[];
+  loading: boolean;
+}
+
+export interface BuildDetailsTestStateViewModel {
+  summary: BuildTestsSummaryViewModel;
+  results: BuildTestResultsViewModel;
 }
 
 export interface PendingInputParameterViewModel {
@@ -79,6 +107,7 @@ export interface BuildDetailsViewModel {
   culpritsLabel: string;
   pipelineStagesLoading: boolean;
   pipelineStages: PipelineStageViewModel[];
+  testState: BuildDetailsTestStateViewModel;
   insights: BuildFailureInsightsViewModel;
   pendingInputs: PendingInputViewModel[];
   consoleText: string;
@@ -99,6 +128,7 @@ export interface BuildDetailsUpdateMessage {
   timestampLabel: string;
   culpritsLabel: string;
   pipelineStagesLoading: boolean;
+  testState: BuildDetailsTestStateViewModel;
   insights: BuildFailureInsightsViewModel;
   pipelineStages: PipelineStageViewModel[];
   pendingInputs: PendingInputViewModel[];

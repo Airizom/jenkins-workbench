@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { BuildDetailsPanel } from "../panels/BuildDetailsPanel";
 import { NodeDetailsPanel } from "../panels/NodeDetailsPanel";
 import { JOB_CONFIG_DRAFT_SCHEME } from "../services/JobConfigDraftFilesystem";
 import { REPLAY_DRAFT_SCHEME } from "../services/ReplayDraftFilesystem";
@@ -53,8 +52,6 @@ export async function activateRuntime(
   const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
   const dataService = container.get("dataService");
-  const artifactActionHandler = container.get("artifactActionHandler");
-  const consoleExporter = container.get("consoleExporter");
   const pendingInputCoordinator = container.get("pendingInputCoordinator");
   const artifactPreviewProvider = container.get("artifactPreviewProvider");
   const uriHandler = container.get("uriHandler");
@@ -65,6 +62,7 @@ export async function activateRuntime(
   const currentBranchStatusBar = container.get("currentBranchStatusBar");
   const replayDraftManager = container.get("replayDraftManager");
   const replayDraftFilesystem = container.get("replayDraftFilesystem");
+  const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
@@ -80,17 +78,7 @@ export async function activateRuntime(
   const buildDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
     "jenkinsWorkbench.buildDetails",
     {
-      deserializeWebviewPanel: async (panel, state) => {
-        await BuildDetailsPanel.revive(panel, state, {
-          dataService,
-          artifactActionHandler,
-          consoleExporter,
-          refreshHost,
-          pendingInputProvider: pendingInputCoordinator,
-          environmentStore,
-          extensionUri: context.extensionUri
-        });
-      }
+      deserializeWebviewPanel: (panel, state) => buildDetailsPanelLauncher.revive(panel, state)
     }
   );
 

@@ -19,6 +19,7 @@ import {
   BuildDetailsPollingController,
   type PendingInputActionProvider
 } from "./BuildDetailsPollingController";
+import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { buildBuildDetailsViewModel } from "./BuildDetailsViewModel";
 
 export interface BuildDetailsPanelLoadOptions {
@@ -45,6 +46,10 @@ export interface BuildDetailsPanelControllerAccess {
   getPipelineRestartEnabled(): boolean;
   getPipelineRestartableStages(): string[];
   refreshBuildStatus(token: number): Promise<void>;
+  refreshTestReport(
+    token: number,
+    options?: { includeCaseLogs?: boolean; showLoading?: boolean }
+  ): Promise<void>;
   refreshPendingInputs(): Promise<void>;
   beginLoading(): void;
   endLoading(): void;
@@ -54,13 +59,19 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private readonly state = new BuildDetailsPanelState();
   private readonly view: BuildDetailsPanelView;
   private readonly runtime: BuildDetailsPanelRuntime;
+  private readonly canOpenTestSource?: BuildDetailsCanOpenTestSource;
   private loadToken = 0;
   private dataService?: BuildDetailsDataService;
   private pollingController?: BuildDetailsPollingController;
   private pendingInputProvider?: PendingInputActionProvider;
   private loadingRequests = 0;
 
-  constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+  constructor(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    getCanOpenTestSource?: BuildDetailsCanOpenTestSource
+  ) {
+    this.canOpenTestSource = getCanOpenTestSource;
     this.view = new BuildDetailsPanelView(panel, extensionUri);
     this.runtime = new BuildDetailsPanelRuntime({
       state: this.state,
@@ -68,7 +79,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       getDataService: () => this.dataService,
       getPollingController: () => this.pollingController,
       getCurrentToken: () => this.loadToken,
-      isTokenCurrent: (token) => this.isTokenCurrent(token)
+      isTokenCurrent: (token) => this.isTokenCurrent(token),
+      canOpenTestSource: getCanOpenTestSource
     });
   }
 
@@ -133,6 +145,13 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     await this.runtime.refreshPendingInputs();
   }
 
+  async refreshTestReport(
+    token: number,
+    options?: { includeCaseLogs?: boolean; showLoading?: boolean }
+  ): Promise<void> {
+    await this.runtime.refreshTestReport(token, options);
+  }
+
   async load(
     dataService: BuildDetailsDataService,
     environment: JenkinsEnvironmentRef,
@@ -175,6 +194,9 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
         showCompletionToast: (details) => {
           void this.runtime.showCompletionToast(details);
         },
+        canOpenSource: (className) =>
+          this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
+          false,
         onPipelineLoading: (currentToken) => this.runtime.handlePipelineLoading(currentToken)
       })
     });
@@ -208,7 +230,13 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       followLog: this.state.followLog,
       pendingInputs: this.state.currentPendingInputs,
       pipelineRestartEnabled: this.state.pipelineRestartEnabled,
-      pipelineRestartableStages: this.state.pipelineRestartableStages
+      pipelineRestartableStages: this.state.pipelineRestartableStages,
+      testReportFetched: this.state.testReportFetched,
+      testReportLogsIncluded: this.state.testReportLogsIncluded,
+      testResultsLoading: this.state.testResultsLoading,
+      canOpenTestSource: (className) =>
+        this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
+        false
     });
     this.view.renderBuildDetails(viewModel, assets, {
       nonce: this.state.currentNonce,
@@ -223,7 +251,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     }
 
     if (details && !details.building) {
-      await this.runtime.refreshTestReport(token);
+      await this.runtime.refreshTestReport(token, { showLoading: true });
     }
 
     if (details?.building) {

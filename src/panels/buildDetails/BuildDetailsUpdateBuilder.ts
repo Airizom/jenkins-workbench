@@ -11,6 +11,7 @@ import {
 import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsUpdateMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
+import { buildTestStateViewModel, buildTestsSummary } from "./BuildDetailsViewModel";
 import {
   buildBuildFailureInsights,
   buildPendingInputsViewModel,
@@ -20,12 +21,22 @@ import {
 export function buildDetailsUpdateMessage(
   details: JenkinsBuildDetails,
   testReport?: JenkinsTestReport,
+  options?: {
+    testReportFetched?: boolean;
+    testReportLogsIncluded?: boolean;
+    testResultsLoading?: boolean;
+    canOpenSource?: (className?: string) => boolean;
+  },
   pipelineRun?: PipelineRun,
   pendingInputs?: PendingInputAction[],
   pipelineLoading?: boolean,
   pipelineRestartEnabled?: boolean,
   pipelineRestartableStages?: string[]
 ): BuildDetailsUpdateMessage {
+  const testsSummary = buildTestsSummary(details, testReport, {
+    testReportFetched: options?.testReportFetched,
+    logsIncluded: options?.testReportLogsIncluded
+  });
   return {
     type: "updateDetails",
     resultLabel: formatResult(details),
@@ -34,7 +45,13 @@ export function buildDetailsUpdateMessage(
     timestampLabel: formatTimestamp(details.timestamp),
     culpritsLabel: formatCulprits(details.culprits),
     pipelineStagesLoading: Boolean(pipelineLoading),
-    insights: buildBuildFailureInsights(details, testReport),
+    testState: buildTestStateViewModel(details, testReport, {
+      testReportFetched: options?.testReportFetched,
+      logsIncluded: options?.testReportLogsIncluded,
+      loading: options?.testResultsLoading,
+      canOpenSource: options?.canOpenSource
+    }),
+    insights: buildBuildFailureInsights(details, testsSummary),
     pipelineStages: buildPipelineStagesViewModel(pipelineRun, {
       details,
       restartEnabled: Boolean(pipelineRestartEnabled),
@@ -45,12 +62,19 @@ export function buildDetailsUpdateMessage(
 }
 
 export function buildUpdateMessageFromState(
-  state: BuildDetailsPanelState
+  state: BuildDetailsPanelState,
+  options?: { canOpenSource?: (className?: string) => boolean }
 ): BuildDetailsOutgoingMessage | undefined {
   if (state.currentDetails) {
     return buildDetailsUpdateMessage(
       state.currentDetails,
       state.currentTestReport,
+      {
+        testReportFetched: state.testReportFetched,
+        testReportLogsIncluded: state.testReportLogsIncluded,
+        testResultsLoading: state.testResultsLoading,
+        canOpenSource: options?.canOpenSource
+      },
       state.currentPipelineRun,
       state.currentPendingInputs,
       state.pipelineLoading,
@@ -66,7 +90,11 @@ export function buildUpdateMessageFromState(
     durationLabel: "Unknown",
     timestampLabel: "Unknown",
     culpritsLabel: "Unknown",
-    insights: buildBuildFailureInsights(undefined, state.currentTestReport),
+    testState: buildTestStateViewModel(undefined, undefined, {
+      loading: state.testResultsLoading,
+      canOpenSource: options?.canOpenSource
+    }),
+    insights: buildBuildFailureInsights(undefined),
     pipelineStages: buildPipelineStagesViewModel(state.currentPipelineRun, {
       details: state.currentDetails,
       restartEnabled: state.pipelineRestartEnabled,

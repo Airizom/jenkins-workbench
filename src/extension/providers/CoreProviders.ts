@@ -20,6 +20,11 @@ import { PendingInputRefreshCoordinator } from "../../services/PendingInputRefre
 import { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { ReplayDraftFilesystem } from "../../services/ReplayDraftFilesystem";
 import { ReplayDraftManager } from "../../services/ReplayDraftManager";
+import { WorkspaceTestSourceFileMatchConfig } from "../../services/TestSourceFileMatchConfig";
+import { DefaultTestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
+import { TestSourceNavigationService } from "../../services/TestSourceNavigationService";
+import { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
+import { TestSourceResolver } from "../../services/TestSourceResolver";
 import { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -101,6 +106,18 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
     replayDraftFilesystem: (_container) => new ReplayDraftFilesystem(),
     replayDraftManager: (container) =>
       new ReplayDraftManager(container.get("replayDraftFilesystem")),
+    testSourceFileMatchConfig: (_container) => new WorkspaceTestSourceFileMatchConfig(),
+    testSourceFileMatchStrategy: (container) =>
+      new DefaultTestSourceFileMatchStrategy(container.get("testSourceFileMatchConfig")),
+    testSourceResolver: (container) =>
+      new TestSourceResolver(
+        container.get("repositoryLinkStore"),
+        container.get("testSourceFileMatchStrategy")
+      ),
+    testSourceNavigationService: (container) =>
+      new TestSourceNavigationService(container.get("testSourceResolver")),
+    testSourceNavigationUiService: (container) =>
+      new TestSourceNavigationUiService(container.get("testSourceNavigationService")),
     replayBuildWorkflow: (container) =>
       new ReplayBuildWorkflow(
         container.get("dataService"),

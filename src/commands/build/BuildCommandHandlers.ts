@@ -5,14 +5,11 @@ import type {
   JobParameter
 } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
-import type { PendingInputActionProvider } from "../../panels/buildDetails/BuildDetailsPollingController";
-import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
+import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { promptForBuildParameters } from "../../ui/BuildParameterPrompts";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
@@ -295,12 +292,7 @@ export async function openInJenkins(
 }
 
 export async function showBuildDetails(
-  dataService: JenkinsDataService,
-  artifactActionHandler: ArtifactActionHandler,
-  consoleExporter: BuildConsoleExporter,
-  refreshHost: BuildCommandRefreshHost,
-  pendingInputProvider: PendingInputActionProvider,
-  extensionUri: vscode.Uri,
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
   item?: BuildTreeItem
 ): Promise<void> {
   const selected = requireSelection(item, "Select a build to view details.");
@@ -309,15 +301,9 @@ export async function showBuildDetails(
   }
 
   await withActionErrorMessage("Unable to open build details", async () => {
-    await BuildDetailsPanel.show({
-      dataService,
-      artifactActionHandler,
-      consoleExporter,
-      refreshHost,
-      pendingInputProvider,
+    await buildDetailsPanelLauncher.show({
       environment: selected.environment,
       buildUrl: selected.buildUrl,
-      extensionUri,
       label: getTreeItemLabel(selected)
     });
   });
@@ -325,11 +311,7 @@ export async function showBuildDetails(
 
 export async function openLastFailedBuild(
   dataService: JenkinsDataService,
-  artifactActionHandler: ArtifactActionHandler,
-  consoleExporter: BuildConsoleExporter,
-  refreshHost: BuildCommandRefreshHost,
-  pendingInputProvider: PendingInputActionProvider,
-  extensionUri: vscode.Uri,
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
   const selected = requireSelection(
@@ -340,28 +322,16 @@ export async function openLastFailedBuild(
     return;
   }
 
-  await openLastFailedBuildForTarget(
-    dataService,
-    artifactActionHandler,
-    consoleExporter,
-    refreshHost,
-    pendingInputProvider,
-    extensionUri,
-    {
-      environment: selected.environment,
-      jobUrl: selected.jobUrl,
-      label: getTreeItemLabel(selected)
-    }
-  );
+  await openLastFailedBuildForTarget(dataService, buildDetailsPanelLauncher, {
+    environment: selected.environment,
+    jobUrl: selected.jobUrl,
+    label: getTreeItemLabel(selected)
+  });
 }
 
 export async function openLastFailedBuildForTarget(
   dataService: JenkinsDataService,
-  artifactActionHandler: ArtifactActionHandler,
-  consoleExporter: BuildConsoleExporter,
-  refreshHost: BuildCommandRefreshHost,
-  pendingInputProvider: PendingInputActionProvider,
-  extensionUri: vscode.Uri,
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
   target: JenkinsJobTarget
 ): Promise<void> {
   await withActionErrorMessage(
@@ -379,15 +349,9 @@ export async function openLastFailedBuildForTarget(
         return;
       }
 
-      await BuildDetailsPanel.show({
-        dataService,
-        artifactActionHandler,
-        consoleExporter,
-        refreshHost,
-        pendingInputProvider,
+      await buildDetailsPanelLauncher.show({
         environment: target.environment,
         buildUrl: lastFailed.url,
-        extensionUri,
         label: `#${lastFailed.number}`
       });
     }

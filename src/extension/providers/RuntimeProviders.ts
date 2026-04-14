@@ -16,6 +16,7 @@ import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchW
 import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
 import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
+import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
@@ -74,14 +75,24 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("repositoryLinkStore")
       ),
     currentBranchCommandMapper: (_container) => new CurrentBranchCommandMapper(),
+    buildDetailsPanelLauncher: (container) =>
+      new BuildDetailsPanelLauncher({
+        dataService: container.get("dataService"),
+        artifactActionHandler: container.get("artifactActionHandler"),
+        consoleExporter: container.get("consoleExporter"),
+        testSourceNavigationService: container.get("testSourceNavigationService"),
+        testSourceNavigationUiService: container.get("testSourceNavigationUiService"),
+        refreshHost: container.get("refreshHost"),
+        pendingInputProvider: container.get("pendingInputCoordinator"),
+        environmentStore: container.get("environmentStore"),
+        extensionUri: options.extensionUri
+      }),
     currentBranchActionExecutor: (container) =>
       new CurrentBranchActionExecutor(
         container.get("dataService"),
         container.get("presetStore"),
         container.get("queuedBuildWaiter"),
-        container.get("artifactActionHandler"),
-        container.get("consoleExporter"),
-        container.get("pendingInputCoordinator"),
+        container.get("buildDetailsPanelLauncher"),
         container.get("refreshHost")
       ),
     currentBranchService: (container) =>
@@ -133,14 +144,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("queuePoller")
       ),
     buildDeepLinkHandler: (container) =>
-      new JenkinsWorkbenchDeepLinkBuildHandler(
-        container.get("dataService"),
-        container.get("artifactActionHandler"),
-        container.get("consoleExporter"),
-        container.get("refreshHost"),
-        container.get("pendingInputCoordinator"),
-        options.extensionUri
-      ),
+      new JenkinsWorkbenchDeepLinkBuildHandler(container.get("buildDetailsPanelLauncher")),
     jobDeepLinkHandler: (container) =>
       new JenkinsWorkbenchDeepLinkJobHandler(container.get("treeNavigator")),
     uriHandler: (container) =>

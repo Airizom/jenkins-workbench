@@ -10,6 +10,7 @@ import type {
   BuildDetailsDataService,
   BuildDetailsPollingController
 } from "./BuildDetailsPollingController";
+import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 
 interface BuildDetailsPanelRuntimeOptions {
@@ -19,6 +20,7 @@ interface BuildDetailsPanelRuntimeOptions {
   getPollingController: () => BuildDetailsPollingController | undefined;
   getCurrentToken: () => number;
   isTokenCurrent: (token: number) => boolean;
+  canOpenTestSource?: BuildDetailsCanOpenTestSource;
 }
 
 export class BuildDetailsPanelRuntime {
@@ -52,7 +54,7 @@ export class BuildDetailsPanelRuntime {
     }
     await Promise.all([
       this.refreshConsoleSnapshot(token),
-      this.refreshTestReport(token),
+      this.refreshTestReport(token, { showLoading: true }),
       this.refreshWorkflowRun(token),
       this.options.getPollingController()?.refreshPendingInputs()
     ]);
@@ -81,7 +83,7 @@ export class BuildDetailsPanelRuntime {
     }
     const loadingChanged = this.options.state.setPipelineLoading(true);
     if (loadingChanged && this.options.view.isVisible()) {
-      this.options.view.postStateUpdate(this.options.state);
+      this.postStateUpdate();
     }
   }
 
@@ -109,7 +111,10 @@ export class BuildDetailsPanelRuntime {
     }
   }
 
-  async refreshTestReport(token: number): Promise<void> {
+  async refreshTestReport(
+    token: number,
+    options?: { includeCaseLogs?: boolean; showLoading?: boolean }
+  ): Promise<void> {
     const pollingController = this.options.getPollingController();
     if (
       !pollingController ||
@@ -121,14 +126,46 @@ export class BuildDetailsPanelRuntime {
     if (this.options.state.currentDetails?.building) {
       return;
     }
+    if (
+      typeof options?.includeCaseLogs === "undefined" &&
+      this.options.state.testReportLogsIncluded &&
+      this.options.state.currentTestReport
+    ) {
+      return;
+    }
+    if (options?.showLoading) {
+      const changed = this.options.state.setTestResultsLoading(true);
+      if (changed && this.options.view.isVisible()) {
+        this.postStateUpdate();
+      }
+    }
     try {
-      const testReport = await pollingController.fetchTestReport();
+      const fetchOptions =
+        typeof options?.includeCaseLogs === "boolean"
+          ? { includeCaseLogs: options.includeCaseLogs }
+          : undefined;
+      const { report: testReport, effectiveOptions } =
+        await pollingController.fetchTestReport(fetchOptions);
       if (!this.options.isTokenCurrent(token)) {
         return;
       }
-      this.options.state.setTestReport(testReport);
-      this.options.view.postStateUpdate(this.options.state);
+      this.options.state.setTestReport(testReport, {
+        logsIncluded: Boolean(effectiveOptions?.includeCaseLogs)
+      });
+      this.options.state.setTestResultsLoading(false);
+      this.postStateUpdate();
     } catch {
+      if (this.options.isTokenCurrent(token)) {
+        this.options.state.markTestReportFetchAttempted();
+        if (options?.showLoading) {
+          const changed = this.options.state.setTestResultsLoading(false);
+          if (changed && this.options.view.isVisible()) {
+            this.postStateUpdate();
+          }
+        } else if (this.options.view.isVisible()) {
+          this.postStateUpdate();
+        }
+      }
       return;
     }
   }
@@ -144,7 +181,7 @@ export class BuildDetailsPanelRuntime {
     if (!isPipelineRestartEligible(details)) {
       const changed = this.options.state.setPipelineRestartInfo(false, [], "unknown");
       if (changed && options?.postUpdate && this.options.view.isVisible()) {
-        this.options.view.postStateUpdate(this.options.state);
+        this.postStateUpdate();
       }
       return;
     }
@@ -168,7 +205,7 @@ export class BuildDetailsPanelRuntime {
         restartInfo.availability
       );
       if (changed && options?.postUpdate && this.options.view.isVisible()) {
-        this.options.view.postStateUpdate(this.options.state);
+        this.postStateUpdate();
       }
     } catch {
       return;
@@ -234,14 +271,25 @@ export class BuildDetailsPanelRuntime {
   private applyDetailsUpdate(details: JenkinsBuildDetails, updateUi: boolean): void {
     const { wasBuilding, isBuilding } = this.options.state.updateDetails(details);
     if (updateUi && this.options.view.isVisible()) {
-      this.options.view.postStateUpdate(this.options.state);
+      this.postStateUpdate();
       this.options.view.setTitle(details.fullDisplayName ?? details.displayName);
     }
     if (wasBuilding && !isBuilding) {
       const token = this.options.getCurrentToken();
       void this.refreshRestartFromStageInfo(token, { postUpdate: true });
       void this.showCompletionToast(details);
-      void this.refreshTestReport(token);
+      void this.refreshTestReport(token, { showLoading: true });
     }
+  }
+
+  private postStateUpdate(): void {
+    this.options.view.postStateUpdate(this.options.state, {
+      canOpenSource: (className) =>
+        this.options.canOpenTestSource?.(
+          this.options.state.environment,
+          this.options.state.currentBuildUrl,
+          className
+        ) ?? false
+    });
   }
 }

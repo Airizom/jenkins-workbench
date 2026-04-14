@@ -1,7 +1,9 @@
 import type {
+  BuildDetailsTestStateViewModel,
   BuildDetailsUpdateMessage,
   BuildDetailsViewModel,
-  BuildFailureInsightsViewModel
+  BuildFailureInsightsViewModel,
+  BuildTestsSummaryViewModel
 } from "../../shared/BuildDetailsContracts";
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
 import { parseConsoleHtml } from "../lib/consoleHtml";
@@ -25,11 +27,30 @@ export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
   changelogOverflow: 0,
   testSummaryLabel: "No test results.",
-  failedTests: [],
-  failedTestsOverflow: 0,
-  failedTestsMessage: "No failed tests.",
+  testResultsHint: undefined,
   artifacts: [],
   artifactsOverflow: 0
+};
+
+export const DEFAULT_TESTS_SUMMARY: BuildTestsSummaryViewModel = {
+  totalCount: 0,
+  failedCount: 0,
+  skippedCount: 0,
+  passedCount: 0,
+  summaryLabel: "No test results.",
+  hasAnyResults: false,
+  hasDetailedResults: false,
+  detailsUnavailable: false,
+  logsIncluded: false,
+  canLoadLogs: false
+};
+
+export const DEFAULT_TEST_STATE: BuildDetailsTestStateViewModel = {
+  summary: DEFAULT_TESTS_SUMMARY,
+  results: {
+    items: [],
+    loading: false
+  }
 };
 
 export const FALLBACK_STATE: BuildDetailsState = {
@@ -41,6 +62,7 @@ export const FALLBACK_STATE: BuildDetailsState = {
   culpritsLabel: "Unknown",
   pipelineStagesLoading: false,
   pipelineStages: [],
+  testState: DEFAULT_TEST_STATE,
   insights: DEFAULT_INSIGHTS,
   pendingInputs: [],
   consoleText: "",
@@ -58,6 +80,9 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
   const merged: BuildDetailsState = {
     ...FALLBACK_STATE,
     ...initialState,
+    testState: initialState.testState ?? DEFAULT_TEST_STATE,
+    insights: initialState.insights ?? DEFAULT_INSIGHTS,
+    pendingInputs: initialState.pendingInputs ?? [],
     consoleHtmlModel: undefined,
     loading: initialState.loading ?? false,
     hasLoaded: !(initialState.loading ?? false)
@@ -145,6 +170,7 @@ export function buildDetailsReducer(
         timestampLabel: payload.timestampLabel,
         culpritsLabel: payload.culpritsLabel,
         pipelineStagesLoading: payload.pipelineStagesLoading,
+        testState: payload.testState,
         insights: payload.insights,
         pipelineStages: payload.pipelineStages,
         pendingInputs: payload.pendingInputs ?? [],
@@ -164,6 +190,7 @@ export function getInitialState(): BuildDetailsViewModel {
   return {
     ...FALLBACK_STATE,
     ...candidate,
+    testState: candidate.testState ?? DEFAULT_TEST_STATE,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,
     pendingInputs: candidate.pendingInputs ?? [],
     loading: candidate.loading ?? false

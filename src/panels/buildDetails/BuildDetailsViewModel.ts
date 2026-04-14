@@ -23,11 +23,14 @@ import {
 } from "./BuildDetailsFormatters";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 import type {
+  BuildDetailsTestStateViewModel,
   BuildDetailsViewModel,
   BuildFailureArtifact,
   BuildFailureChangelogItem,
-  BuildFailureFailedTest,
   BuildFailureInsightsViewModel,
+  BuildTestCaseViewModel,
+  BuildTestResultsViewModel,
+  BuildTestsSummaryViewModel,
   PendingInputParameterViewModel,
   PendingInputViewModel,
   PipelineStageStepViewModel,
@@ -39,10 +42,13 @@ const MAX_TEST_CASE_LOG_CHARS = 8000;
 const TEST_CASE_LOG_TRUNCATION_SUFFIX = "\n... (truncated)";
 
 export type {
+  BuildTestCaseViewModel,
+  BuildTestResultsViewModel,
+  BuildDetailsTestStateViewModel,
+  BuildTestsSummaryViewModel,
   BuildDetailsViewModel,
   BuildFailureArtifact,
   BuildFailureChangelogItem,
-  BuildFailureFailedTest,
   BuildFailureInsightsViewModel,
   PendingInputParameterViewModel,
   PendingInputViewModel,
@@ -56,6 +62,8 @@ export interface BuildDetailsViewModelInput {
   pipelineRun?: PipelineRun;
   pipelineLoading?: boolean;
   testReport?: JenkinsTestReport;
+  testReportFetched?: boolean;
+  testReportLogsIncluded?: boolean;
   consoleTextResult?: JenkinsConsoleText;
   consoleHtmlResult?: { html: string; truncated: boolean };
   consoleError?: string;
@@ -65,6 +73,8 @@ export interface BuildDetailsViewModelInput {
   pendingInputs?: PendingInputAction[];
   pipelineRestartEnabled?: boolean;
   pipelineRestartableStages?: string[];
+  testResultsLoading?: boolean;
+  canOpenTestSource?: (className?: string) => boolean;
 }
 
 const PARAMETER_KIND_LABELS: Record<string, string> = {
@@ -84,6 +94,12 @@ export function buildBuildDetailsViewModel(
 ): BuildDetailsViewModel {
   const details = input.details;
   const buildUrl = details?.url ?? input.buildUrl;
+  const testState = buildTestStateViewModel(details, input.testReport, {
+    testReportFetched: input.testReportFetched,
+    logsIncluded: input.testReportLogsIncluded,
+    loading: input.testResultsLoading,
+    canOpenSource: input.canOpenTestSource
+  });
   const truncated = truncateConsoleText(input.consoleTextResult?.text ?? "", input.maxConsoleChars);
   const consoleTruncated =
     Boolean(input.consoleHtmlResult?.truncated) ||
@@ -108,7 +124,8 @@ export function buildBuildDetailsViewModel(
       restartEnabled: Boolean(input.pipelineRestartEnabled),
       restartableStages: input.pipelineRestartableStages ?? []
     }),
-    insights: buildBuildFailureInsights(details, input.testReport),
+    testState,
+    insights: buildBuildFailureInsights(details, testState.summary),
     pendingInputs: buildPendingInputsViewModel(input.pendingInputs),
     consoleText: truncated.text,
     consoleHtml: input.consoleHtmlResult?.html,
@@ -161,7 +178,7 @@ export function buildPendingInputsViewModel(
 
 export function buildBuildFailureInsights(
   details?: JenkinsBuildDetails,
-  testReport?: JenkinsTestReport
+  testsSummary?: BuildTestsSummaryViewModel
 ): BuildFailureInsightsViewModel {
   const changelogItems = buildChangelog(details);
   const cappedChangelog = capList(changelogItems, INSIGHTS_LIST_LIMIT);
@@ -169,17 +186,13 @@ export function buildBuildFailureInsights(
   const artifacts = buildArtifacts(details);
   const cappedArtifacts = capList(artifacts, INSIGHTS_LIST_LIMIT);
 
-  const testSummary = buildTestSummary(details, testReport);
-  const failedTestsResult = buildFailedTests(testReport, testSummary.failed);
-  const cappedFailedTests = capList(failedTestsResult.items, INSIGHTS_LIST_LIMIT);
-
   return {
     changelogItems: cappedChangelog.items,
     changelogOverflow: cappedChangelog.overflow,
-    testSummaryLabel: testSummary.label,
-    failedTests: cappedFailedTests.items,
-    failedTestsOverflow: cappedFailedTests.overflow,
-    failedTestsMessage: failedTestsResult.message,
+    testSummaryLabel: testsSummary?.summaryLabel ?? "No test results.",
+    testResultsHint: testsSummary?.hasDetailedResults
+      ? "Browse detailed results in the Test Results tab."
+      : undefined,
     artifacts: cappedArtifacts.items,
     artifactsOverflow: cappedArtifacts.overflow
   };
@@ -223,17 +236,42 @@ function buildChangelog(details?: JenkinsBuildDetails): BuildFailureChangelogIte
   return results;
 }
 
-function buildTestSummary(
+interface BuildTestsSummaryOptions {
+  testReportFetched?: boolean;
+  logsIncluded?: boolean;
+}
+
+interface BuildTestStateOptions extends BuildTestsSummaryOptions {
+  loading?: boolean;
+  canOpenSource?: (className?: string) => boolean;
+}
+
+export function buildTestsSummary(
   details?: JenkinsBuildDetails,
-  testReport?: JenkinsTestReport
-): { failed?: number; total?: number; skipped?: number; label: string } {
+  testReport?: JenkinsTestReport,
+  options?: BuildTestsSummaryOptions
+): BuildTestsSummaryViewModel {
   const action = findTestSummaryAction(details?.actions ?? null);
   const failed = pickNumber(testReport?.failCount, action?.failCount);
   const total = pickNumber(testReport?.totalCount, action?.totalCount);
   const skipped = pickNumber(testReport?.skipCount, action?.skipCount);
+  const resolvedFailed = failed ?? 0;
+  const resolvedTotal = total ?? 0;
+  const resolvedSkipped = skipped ?? 0;
+  const passedCount = Math.max(0, resolvedTotal - resolvedFailed - resolvedSkipped);
+  const hasDetailedResults = Boolean(
+    testReport?.suites?.some((suite) => (suite.cases?.length ?? 0) > 0)
+  );
+  const hasAnyResults =
+    resolvedTotal > 0 || resolvedFailed > 0 || resolvedSkipped > 0 || hasDetailedResults;
+  const detailsUnavailable =
+    Boolean(options?.testReportFetched) && hasAnyResults && !hasDetailedResults;
+  const logsIncluded = Boolean(options?.logsIncluded && hasDetailedResults);
 
   let label = "No test results.";
-  if (typeof failed === "number" && typeof total === "number") {
+  if (!hasAnyResults) {
+    label = "No test results.";
+  } else if (typeof failed === "number" && typeof total === "number") {
     label = `Failed ${formatNumber(failed)} / ${formatNumber(total)}`;
     if (typeof skipped === "number") {
       label += ` • Skipped ${formatNumber(skipped)}`;
@@ -244,7 +282,34 @@ function buildTestSummary(
     label = `Failed ${formatNumber(failed)} tests`;
   }
 
-  return { failed, total, skipped, label };
+  return {
+    totalCount: resolvedTotal,
+    failedCount: resolvedFailed,
+    skippedCount: resolvedSkipped,
+    passedCount,
+    summaryLabel: label,
+    hasAnyResults,
+    hasDetailedResults,
+    detailsUnavailable,
+    logsIncluded,
+    canLoadLogs: hasDetailedResults && !logsIncluded
+  };
+}
+
+export function buildTestStateViewModel(
+  details?: JenkinsBuildDetails,
+  testReport?: JenkinsTestReport,
+  options?: BuildTestStateOptions
+): BuildDetailsTestStateViewModel {
+  const summary = buildTestsSummary(details, testReport, options);
+  const results = buildTestResultsViewModel(testReport, {
+    canOpenSource: options?.canOpenSource,
+    loading: options?.loading
+  });
+  return {
+    summary,
+    results
+  };
 }
 
 type BuildAction = NonNullable<NonNullable<JenkinsBuildDetails["actions"]>[number]>;
@@ -272,41 +337,50 @@ function findTestSummaryAction(
   return undefined;
 }
 
-function buildFailedTests(
-  testReport?: JenkinsTestReport,
-  failedCount?: number
-): { items: BuildFailureFailedTest[]; message: string } {
+export function buildTestResultsViewModel(
+  testReport: JenkinsTestReport | undefined,
+  options?: { canOpenSource?: (className?: string) => boolean; loading?: boolean }
+): BuildTestResultsViewModel {
   if (!testReport) {
-    if (typeof failedCount === "number" && failedCount > 0) {
-      return { items: [], message: "Failed test details unavailable." };
+    return buildEmptyTestResultsViewModel(options?.loading);
+  }
+
+  const items: BuildTestCaseViewModel[] = [];
+  for (const [suiteIndex, suite] of (testReport.suites ?? []).entries()) {
+    const suiteName = suite.name?.trim() || undefined;
+    for (const [caseIndex, testCase] of (suite.cases ?? []).entries()) {
+      const name = testCase.name?.trim() || testCase.className?.trim() || "Unnamed test";
+      const className = testCase.className?.trim() || undefined;
+      const status = normalizeTestStatus(testCase.status);
+      items.push({
+        id: buildTestCaseId(suiteName, className, name, suiteIndex, caseIndex),
+        name,
+        className,
+        suiteName,
+        status,
+        statusLabel: formatTestStatusLabel(status),
+        durationLabel: formatTestDuration(testCase.duration),
+        errorDetails: normalizeTestText(testCase.errorDetails, true),
+        errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
+        stdout: normalizeTestText(testCase.stdout, true),
+        stderr: normalizeTestText(testCase.stderr, true),
+        canOpenSource: Boolean(options?.canOpenSource?.(className))
+      });
     }
-    return { items: [], message: "Test report unavailable." };
   }
 
-  const items: BuildFailureFailedTest[] = [];
-  for (const suite of testReport.suites ?? []) {
-    for (const testCase of suite.cases ?? []) {
-      if (isFailedTestCase(testCase.status)) {
-        const name = testCase.name ?? testCase.className ?? "Unnamed test";
-        const className = testCase.name && testCase.className ? testCase.className : undefined;
-        items.push({
-          name,
-          className,
-          errorDetails: normalizeTestText(testCase.errorDetails, true),
-          errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
-          stdout: normalizeTestText(testCase.stdout, true),
-          stderr: normalizeTestText(testCase.stderr, true),
-          durationLabel: formatTestDuration(testCase.duration)
-        });
-      }
-    }
-  }
+  items.sort(compareTestCases);
+  return {
+    items,
+    loading: Boolean(options?.loading)
+  };
+}
 
-  if (items.length === 0 && typeof failedCount === "number" && failedCount > 0) {
-    return { items, message: "Failed test details unavailable." };
-  }
-
-  return { items, message: "No failed tests." };
+export function buildEmptyTestResultsViewModel(loading = false): BuildTestResultsViewModel {
+  return {
+    items: [],
+    loading
+  };
 }
 
 function isFailedTestCase(status?: string): boolean {
@@ -318,6 +392,75 @@ function isFailedTestCase(status?: string): boolean {
     return false;
   }
   return true;
+}
+
+function normalizeTestStatus(status?: string): BuildTestCaseViewModel["status"] {
+  const normalized = status?.trim().toUpperCase();
+  if (!normalized) {
+    return "other";
+  }
+  if (normalized === "PASSED" || normalized === "FIXED") {
+    return "passed";
+  }
+  if (normalized === "SKIPPED" || normalized === "REGRESSION_SKIPPED") {
+    return "skipped";
+  }
+  if (isFailedTestCase(normalized)) {
+    return "failed";
+  }
+  return "other";
+}
+
+function formatTestStatusLabel(status: BuildTestCaseViewModel["status"]): string {
+  switch (status) {
+    case "passed":
+      return "Passed";
+    case "failed":
+      return "Failed";
+    case "skipped":
+      return "Skipped";
+    default:
+      return "Other";
+  }
+}
+
+function buildTestCaseId(
+  suiteName: string | undefined,
+  className: string | undefined,
+  name: string,
+  suiteIndex: number,
+  caseIndex: number
+): string {
+  return [suiteName ?? "", className ?? "", name, String(suiteIndex), String(caseIndex)].join("::");
+}
+
+function compareTestCases(left: BuildTestCaseViewModel, right: BuildTestCaseViewModel): number {
+  const statusRank = getTestStatusSortRank(left.status) - getTestStatusSortRank(right.status);
+  if (statusRank !== 0) {
+    return statusRank;
+  }
+  const suiteRank = (left.suiteName ?? "").localeCompare(right.suiteName ?? "");
+  if (suiteRank !== 0) {
+    return suiteRank;
+  }
+  const classRank = (left.className ?? "").localeCompare(right.className ?? "");
+  if (classRank !== 0) {
+    return classRank;
+  }
+  return left.name.localeCompare(right.name);
+}
+
+function getTestStatusSortRank(status: BuildTestCaseViewModel["status"]): number {
+  switch (status) {
+    case "failed":
+      return 0;
+    case "skipped":
+      return 1;
+    case "passed":
+      return 2;
+    default:
+      return 3;
+  }
 }
 
 function normalizeTestText(value?: string, allowTruncation = false): string | undefined {

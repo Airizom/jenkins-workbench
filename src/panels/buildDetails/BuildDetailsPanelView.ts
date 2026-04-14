@@ -65,8 +65,11 @@ export class BuildDetailsPanelView {
     void this.panel.webview.postMessage(message);
   }
 
-  postStateUpdate(state: BuildDetailsPanelState): void {
-    const updateMessage = buildUpdateMessageFromState(state);
+  postStateUpdate(
+    state: BuildDetailsPanelState,
+    options?: { canOpenSource?: (className?: string) => boolean }
+  ): void {
+    const updateMessage = buildUpdateMessageFromState(state, options);
     if (updateMessage) {
       this.postMessage(updateMessage);
     }

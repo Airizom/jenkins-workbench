@@ -47,6 +47,18 @@ export interface RestartPipelineFromStageMessage {
   stageName: string;
 }
 
+export interface ReloadTestReportMessage {
+  type: "reloadTestReport";
+  includeCaseLogs?: boolean;
+}
+
+export interface OpenTestSourceMessage {
+  type: "openTestSource";
+  testName: string;
+  className?: string;
+  suiteName?: string;
+}
+
 export type BuildDetailsIncomingMessage =
   | ToggleFollowLogMessage
   | OpenExternalMessage
@@ -54,7 +66,9 @@ export type BuildDetailsIncomingMessage =
   | ArtifactActionMessage
   | ApproveInputMessage
   | RejectInputMessage
-  | RestartPipelineFromStageMessage;
+  | RestartPipelineFromStageMessage
+  | ReloadTestReportMessage
+  | OpenTestSourceMessage;
 
 export function parseBuildDetailsOutgoingMessage(
   message: unknown
@@ -163,6 +177,32 @@ export function isRestartPipelineFromStageMessage(
   }
   const { stageName } = message;
   return typeof stageName === "string" && stageName.trim().length > 0;
+}
+
+export function isReloadTestReportMessage(message: unknown): message is ReloadTestReportMessage {
+  if (!hasMessageType(message, "reloadTestReport")) {
+    return false;
+  }
+  return (
+    typeof message.includeCaseLogs === "undefined" || typeof message.includeCaseLogs === "boolean"
+  );
+}
+
+export function isOpenTestSourceMessage(message: unknown): message is OpenTestSourceMessage {
+  if (!hasMessageType(message, "openTestSource")) {
+    return false;
+  }
+  const { testName, className, suiteName } = message;
+  if (typeof testName !== "string" || testName.trim().length === 0) {
+    return false;
+  }
+  if (typeof className !== "undefined" && typeof className !== "string") {
+    return false;
+  }
+  if (typeof suiteName !== "undefined" && typeof suiteName !== "string") {
+    return false;
+  }
+  return true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { ensureTrailingSlash } from "../jenkins/urls";
 
 interface StoredRepositoryLink {
   environmentId: string;
@@ -69,6 +70,32 @@ export class JenkinsRepositoryLinkStore {
     }
 
     return this.toRepositoryLink(key, stored);
+  }
+
+  listLinks(): readonly JenkinsRepositoryLink[] {
+    return Object.entries(this.getState().links ?? {}).map(([repositoryUri, stored]) =>
+      this.toRepositoryLink(repositoryUri, stored)
+    );
+  }
+
+  findLinksForEnvironment(
+    environment: JenkinsRepositoryLinkEnvironment
+  ): readonly JenkinsRepositoryLink[] {
+    return this.listLinks().filter(
+      (link) =>
+        link.environment.environmentId === environment.environmentId &&
+        link.environment.scope === environment.scope
+    );
+  }
+
+  findLinksForMultibranch(
+    environment: JenkinsRepositoryLinkEnvironment,
+    multibranchFolderUrl: string
+  ): readonly JenkinsRepositoryLink[] {
+    const normalizedTarget = normalizeLinkUrl(multibranchFolderUrl);
+    return this.findLinksForEnvironment(environment).filter(
+      (link) => normalizeLinkUrl(link.multibranchFolderUrl) === normalizedTarget
+    );
   }
 
   async setLink(
@@ -201,4 +228,12 @@ function areLinkMapsEqual(
   right: Record<string, StoredRepositoryLink> | undefined
 ): boolean {
   return JSON.stringify(left ?? {}) === JSON.stringify(right ?? {});
+}
+
+function normalizeLinkUrl(value: string): string {
+  try {
+    return new URL(ensureTrailingSlash(value)).toString();
+  } catch {
+    return ensureTrailingSlash(value);
+  }
 }

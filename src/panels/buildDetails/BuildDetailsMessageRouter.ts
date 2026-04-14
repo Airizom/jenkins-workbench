@@ -1,13 +1,17 @@
 import {
   type ApproveInputMessage,
   type ArtifactActionMessage,
+  type OpenTestSourceMessage,
   type RejectInputMessage,
+  type ReloadTestReportMessage,
   type RestartPipelineFromStageMessage,
   isApproveInputMessage,
   isArtifactActionMessage,
   isExportConsoleMessage,
   isOpenExternalMessage,
+  isOpenTestSourceMessage,
   isRejectInputMessage,
+  isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isToggleFollowLogMessage
 } from "./BuildDetailsMessages";
@@ -19,6 +23,8 @@ export interface BuildDetailsMessageRouterHandlers {
   onApproveInput(message: ApproveInputMessage): void;
   onRejectInput(message: RejectInputMessage): void;
   onRestartPipelineFromStage(message: RestartPipelineFromStageMessage): void;
+  onReloadTestReport(message: ReloadTestReportMessage): void;
+  onOpenTestSource(message: OpenTestSourceMessage): void;
   onToggleFollowLog(value: unknown): void;
 }
 
@@ -48,6 +54,14 @@ export class BuildDetailsMessageRouter {
     }
     if (isRestartPipelineFromStageMessage(message)) {
       this.handlers.onRestartPipelineFromStage(message);
+      return;
+    }
+    if (isReloadTestReportMessage(message)) {
+      this.handlers.onReloadTestReport(message);
+      return;
+    }
+    if (isOpenTestSourceMessage(message)) {
+      this.handlers.onOpenTestSource(message);
       return;
     }
     if (isToggleFollowLogMessage(message)) {

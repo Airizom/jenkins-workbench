@@ -6,7 +6,7 @@ import type {
 import { BuildFailureArtifactsCard } from "./buildFailure/BuildFailureArtifactsCard";
 import { BuildFailureChangelogCard } from "./buildFailure/BuildFailureChangelogCard";
 import { BuildFailureEmptyStateCard } from "./buildFailure/BuildFailureEmptyStateCard";
-import { BuildFailureFailedTestsCard } from "./buildFailure/BuildFailureFailedTestsCard";
+import { BuildFailureTestsSummaryCard } from "./buildFailure/BuildFailureTestsSummaryCard";
 
 export function BuildFailureInsightsSection({
   insights,
@@ -20,9 +20,10 @@ export function BuildFailureInsightsSection({
   const isFailure = resultClass === "failure" || resultClass === "unstable";
   const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
   const hasChangelog = insights.changelogItems.length > 0 || insights.changelogOverflow > 0;
-  const hasFailedTests = insights.failedTests.length > 0 || insights.failedTestsOverflow > 0;
+  const hasTests =
+    Boolean(insights.testSummaryLabel) && insights.testSummaryLabel !== "No test results.";
   const hasArtifacts = insights.artifacts.length > 0 || insights.artifactsOverflow > 0;
-  const hasInsights = hasChangelog || hasFailedTests || hasArtifacts;
+  const hasInsights = hasChangelog || hasTests || hasArtifacts;
 
   if (!hasInsights) {
     return <BuildFailureEmptyStateCard title={sectionTitle} />;
@@ -34,11 +35,9 @@ export function BuildFailureInsightsSection({
         items={insights.changelogItems}
         overflowCount={insights.changelogOverflow}
       />
-      <BuildFailureFailedTestsCard
-        items={insights.failedTests}
-        overflowCount={insights.failedTestsOverflow}
+      <BuildFailureTestsSummaryCard
         summaryLabel={insights.testSummaryLabel}
-        emptyMessage={insights.failedTestsMessage}
+        hint={insights.testResultsHint}
       />
       <BuildFailureArtifactsCard
         items={insights.artifacts}

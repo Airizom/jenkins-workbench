@@ -119,6 +119,11 @@ export interface BuildDetailsInitialState {
   errors: string[];
 }
 
+export interface BuildDetailsTestReportFetchResult {
+  report: JenkinsTestReport | undefined;
+  effectiveOptions: JenkinsTestReportOptions | undefined;
+}
+
 const WORKFLOW_REFRESH_MULTIPLIER = 3;
 const MIN_WORKFLOW_REFRESH_MS = 5000;
 
@@ -174,8 +179,22 @@ export class BuildDetailsPollingController {
     return this.consoleStreamManager.refreshSnapshot();
   }
 
-  async fetchTestReport(): Promise<JenkinsTestReport | undefined> {
-    return this.dataService.getTestReport(this.environment, this.buildUrl, this.testReportOptions);
+  async fetchTestReport(
+    options?: JenkinsTestReportOptions
+  ): Promise<BuildDetailsTestReportFetchResult> {
+    const effectiveOptions = this.resolveTestReportOptions(options);
+    const report = await this.dataService.getTestReport(
+      this.environment,
+      this.buildUrl,
+      effectiveOptions
+    );
+    return { report, effectiveOptions };
+  }
+
+  resolveTestReportOptions(
+    options?: JenkinsTestReportOptions
+  ): JenkinsTestReportOptions | undefined {
+    return options ?? this.testReportOptions;
   }
 
   async fetchWorkflowRunWithCallbacks(_token: number): Promise<void> {

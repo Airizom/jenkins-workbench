@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import { formatActionError } from "../../formatters/ErrorFormatters";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
+import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
+import { buildTestSourceNavigationContext } from "../../services/TestSourceResolver";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
@@ -14,6 +16,7 @@ interface BuildDetailsPanelActionsOptions {
   getArtifactActionHandler: () => ArtifactActionHandler | undefined;
   getConsoleExporter: () => BuildConsoleExporter;
   getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
+  getTestSourceNavigationUiService: () => TestSourceNavigationUiService | undefined;
 }
 
 export class BuildDetailsPanelActions {
@@ -21,12 +24,16 @@ export class BuildDetailsPanelActions {
   private readonly getArtifactActionHandler: () => ArtifactActionHandler | undefined;
   private readonly getConsoleExporter: () => BuildConsoleExporter;
   private readonly getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
+  private readonly getTestSourceNavigationUiService: () =>
+    | TestSourceNavigationUiService
+    | undefined;
 
   constructor(options: BuildDetailsPanelActionsOptions) {
     this.controller = options.controller;
     this.getArtifactActionHandler = options.getArtifactActionHandler;
     this.getConsoleExporter = options.getConsoleExporter;
     this.getRefreshHost = options.getRefreshHost;
+    this.getTestSourceNavigationUiService = options.getTestSourceNavigationUiService;
   }
 
   async handleApproveInput(message: { inputId: string }): Promise<void> {
@@ -176,6 +183,39 @@ export class BuildDetailsPanelActions {
       relativePath: message.relativePath,
       fileName,
       jobNameHint
+    });
+  }
+
+  async handleReloadTestReport(message: { includeCaseLogs?: boolean }): Promise<void> {
+    const details = this.controller.getCurrentDetails();
+    if (!details || details.building) {
+      return;
+    }
+
+    await this.controller.refreshTestReport(this.controller.getLoadToken(), {
+      includeCaseLogs: message.includeCaseLogs,
+      showLoading: true
+    });
+  }
+
+  async handleOpenTestSource(message: {
+    testName: string;
+    className?: string;
+    suiteName?: string;
+  }): Promise<void> {
+    const environment = this.controller.getEnvironment();
+    const buildUrl = this.controller.getBuildUrl();
+    const service = this.getTestSourceNavigationUiService();
+    if (!environment || !buildUrl || !service) {
+      void vscode.window.showInformationMessage(
+        "Test source navigation is unavailable for this workspace."
+      );
+      return;
+    }
+    await service.openTestSource(buildTestSourceNavigationContext(environment, buildUrl), {
+      testName: message.testName,
+      className: message.className,
+      suiteName: message.suiteName
     });
   }
 

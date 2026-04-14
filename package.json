@@ -396,6 +396,46 @@
           "default": false,
           "description": "Include per-test stack traces and stdout/stderr when fetching test reports. Enabling this can increase payload size for large test suites."
         },
+        "jenkinsWorkbench.buildDetails.testSourceMatching.fileExtensions": {
+          "type": "array",
+          "default": ["java", "kt", "groovy", "scala", "js", "jsx", "ts", "tsx", "py", "rb", "php", "cs", "cc", "cpp", "cxx"],
+          "items": {
+            "type": "string"
+          },
+          "description": "File extensions considered when resolving test source files from Jenkins test results."
+        },
+        "jenkinsWorkbench.buildDetails.testSourceMatching.excludeGlob": {
+          "type": "string",
+          "default": "**/{node_modules,.git,out,dist,coverage}/**",
+          "description": "Workspace glob excluded while searching for matching test source files."
+        },
+        "jenkinsWorkbench.buildDetails.testSourceMatching.maxResultsPerPattern": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "description": "Maximum number of file matches to collect per search pattern when resolving test sources."
+        },
+        "jenkinsWorkbench.buildDetails.testSourceMatching.preferredPathScores": {
+          "type": "array",
+          "default": [
+            { "fragment": "/src/test/", "score": 10 },
+            { "fragment": "/test/", "score": 5 }
+          ],
+          "items": {
+            "type": "object",
+            "required": ["fragment", "score"],
+            "properties": {
+              "fragment": {
+                "type": "string"
+              },
+              "score": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Preferred path fragments and scoring applied when ranking candidate test source files."
+        },
         "jenkinsWorkbench.jobSearchConcurrency": {
           "type": "number",
           "default": 4,

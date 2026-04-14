@@ -24,9 +24,8 @@ export function registerExtensionCommands(
   const dataService = container.get("dataService");
   const artifactActionHandler = container.get("artifactActionHandler");
   const buildLogPreviewer = container.get("buildLogPreviewer");
-  const consoleExporter = container.get("consoleExporter");
+  const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
   const queuedBuildWaiter = container.get("queuedBuildWaiter");
-  const pendingInputCoordinator = container.get("pendingInputCoordinator");
   const replayBuildWorkflow = container.get("replayBuildWorkflow");
   const viewStateStore = container.get("viewStateStore");
   const treeNavigator = container.get("treeNavigator");
@@ -57,9 +56,8 @@ export function registerExtensionCommands(
     presetStore,
     artifactActionHandler,
     buildLogPreviewer,
-    consoleExporter,
+    buildDetailsPanelLauncher,
     queuedBuildWaiter,
-    pendingInputCoordinator,
     replayBuildWorkflow,
     refreshHost
   );
