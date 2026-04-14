@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-04-13
+
+### Added
+
+- feat: add build details test results tab and source navigation
+
 ## [1.39.0] - 2026-04-12
 
 ### Added
