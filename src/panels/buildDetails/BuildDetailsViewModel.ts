@@ -531,6 +531,7 @@ function mapPipelineStage(
 ): PipelineStageViewModel {
   const key = stage.key;
   const status = normalizePipelineStatus(stage.status);
+  const durationMs = normalizeDurationMillis(stage.durationMillis);
   const durationLabel = formatDuration(stage.durationMillis);
   const steps = stage.steps.map((step) => mapPipelineStep(step));
   const stepsFailedOnly = steps.filter((step) => step.isFailed);
@@ -547,6 +548,7 @@ function mapPipelineStage(
     statusLabel: status.label,
     statusClass: status.className,
     durationLabel,
+    durationMs,
     canRestartFromStage,
     hasSteps,
     stepsFailedOnly: stepsFailedOnly.map((step) => stripFailure(step)),
@@ -622,4 +624,11 @@ function pickNumber(primary?: number, fallback?: number): number | undefined {
     return fallback;
   }
   return undefined;
+}
+
+function normalizeDurationMillis(duration?: number): number | undefined {
+  if (typeof duration !== "number" || !Number.isFinite(duration)) {
+    return undefined;
+  }
+  return Math.max(0, Math.floor(duration));
 }

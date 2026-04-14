@@ -19,18 +19,16 @@ import type {
   PendingInputActionProvider
 } from "./buildDetails/BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./buildDetails/BuildDetailsTestSource";
+import {
+  type BuildDetailsPanelSerializedState,
+  isBuildDetailsPanelState,
+  mergeBuildDetailsPanelState,
+  withBuildDetailsPanelUiState
+} from "./buildDetails/shared/BuildDetailsPanelWebviewState";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
-import {
-  type SerializedEnvironmentState,
-  isSerializedEnvironmentState,
-  resolveEnvironmentRef
-} from "./shared/webview/WebviewPanelState";
-
-interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
-  buildUrl: string;
-}
+import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
 interface BuildDetailsPanelShowOptions {
   dataService: BuildDetailsDataService;
@@ -58,25 +56,6 @@ interface BuildDetailsPanelReviveOptions {
   extensionUri: vscode.Uri;
 }
 
-function isBuildDetailsPanelState(value: unknown): value is BuildDetailsPanelSerializedState {
-  if (!isSerializedEnvironmentState(value)) {
-    return false;
-  }
-  const record = value as { buildUrl?: unknown };
-  return typeof record.buildUrl === "string" && record.buildUrl.length > 0;
-}
-
-function createBuildDetailsPanelState(
-  environment: JenkinsEnvironmentRef,
-  buildUrl: string
-): BuildDetailsPanelSerializedState {
-  return {
-    environmentId: environment.environmentId,
-    scope: environment.scope,
-    buildUrl
-  };
-}
-
 export class BuildDetailsPanel {
   private static currentPanel: BuildDetailsPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
@@ -88,6 +67,7 @@ export class BuildDetailsPanel {
   private readonly disposables: vscode.Disposable[] = [];
   private artifactActionHandler?: ArtifactActionHandler;
   private refreshHost?: EnvironmentScopedRefreshHost;
+  private serializedState?: BuildDetailsPanelSerializedState;
   private testSourceNavigationService?: TestSourceNavigationService;
   private testSourceNavigationUiService?: TestSourceNavigationUiService;
   private readonly canOpenTestSource: BuildDetailsCanOpenTestSource;
@@ -170,6 +150,7 @@ export class BuildDetailsPanel {
       );
       return;
     }
+    revived.serializedState = state;
 
     const environment = await resolveEnvironmentRef(options.environmentStore, state);
     if (!environment) {
@@ -241,6 +222,12 @@ export class BuildDetailsPanel {
       onOpenTestSource: (message) => {
         void this.actions.handleOpenTestSource(message);
       },
+      onPersistUiState: (message) => {
+        if (!this.serializedState) {
+          return;
+        }
+        this.serializedState = withBuildDetailsPanelUiState(this.serializedState, message.uiState);
+      },
       onToggleFollowLog: (value) => {
         this.controller.setFollowLog(Boolean(value));
       }
@@ -306,7 +293,8 @@ export class BuildDetailsPanel {
     label?: string
   ): Promise<void> {
     this.artifactActionHandler = artifactActionHandler;
-    const panelState = createBuildDetailsPanelState(environment, buildUrl);
+    const panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
+    this.serializedState = panelState;
     const result: BuildDetailsPanelLoadResult = await this.controller.load(
       dataService,
       environment,
@@ -367,7 +355,7 @@ export class BuildDetailsPanel {
       message,
       hint: "Open the build again from Jenkins Workbench to continue.",
       styleUris,
-      panelState
+      panelState: panelState ?? this.serializedState
     });
   }
 }

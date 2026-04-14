@@ -21,7 +21,7 @@ import { BuildFailureInsightsSection } from "./BuildFailureInsightsSection";
 import { BuildSummaryCard } from "./BuildSummaryCard";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { PendingInputsSection } from "./PendingInputsSection";
-import { PipelineStagesSection } from "./PipelineStagesSection";
+import { PipelineSection } from "./PipelineSection";
 import { TestResultsSection } from "./TestResultsSection";
 
 type BuildDetailsTabsProps = {
@@ -152,7 +152,7 @@ export function BuildDetailsTabs({
 
       {hasPipelineStages ? (
         <TabsContent value="pipeline" className="space-y-2" forceMount>
-          <PipelineStagesSection
+          <PipelineSection
             stages={pipelineStages}
             loading={pipelineStagesLoading}
             onRestartStage={onRestartStage}

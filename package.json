@@ -398,7 +398,23 @@
         },
         "jenkinsWorkbench.buildDetails.testSourceMatching.fileExtensions": {
           "type": "array",
-          "default": ["java", "kt", "groovy", "scala", "js", "jsx", "ts", "tsx", "py", "rb", "php", "cs", "cc", "cpp", "cxx"],
+          "default": [
+            "java",
+            "kt",
+            "groovy",
+            "scala",
+            "js",
+            "jsx",
+            "ts",
+            "tsx",
+            "py",
+            "rb",
+            "php",
+            "cs",
+            "cc",
+            "cpp",
+            "cxx"
+          ],
           "items": {
             "type": "string"
           },
@@ -418,12 +434,21 @@
         "jenkinsWorkbench.buildDetails.testSourceMatching.preferredPathScores": {
           "type": "array",
           "default": [
-            { "fragment": "/src/test/", "score": 10 },
-            { "fragment": "/test/", "score": 5 }
+            {
+              "fragment": "/src/test/",
+              "score": 10
+            },
+            {
+              "fragment": "/test/",
+              "score": 5
+            }
           ],
           "items": {
             "type": "object",
-            "required": ["fragment", "score"],
+            "required": [
+              "fragment",
+              "score"
+            ],
             "properties": {
               "fragment": {
                 "type": "string"
@@ -970,13 +995,14 @@
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
     "@types/vscode": "^1.85.0",
+    "@vitejs/plugin-react": "^6.0.1",
     "class-variance-authority": "^0.7.1",
     "concurrently": "^8.2.2",
+    "elkjs": "^0.11.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.3.3",
-    "vite": "^8.0.2",
-    "@vitejs/plugin-react": "^6.0.1"
+    "vite": "^8.0.2"
   }
 }

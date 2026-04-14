@@ -1,4 +1,8 @@
 import type { ArtifactAction, BuildDetailsUpdateMessage } from "./BuildDetailsContracts";
+import {
+  type BuildDetailsPanelUiState,
+  normalizeBuildDetailsPanelUiState
+} from "./BuildDetailsPanelWebviewState";
 
 export type { BuildDetailsUpdateMessage } from "./BuildDetailsContracts";
 
@@ -59,6 +63,11 @@ export interface OpenTestSourceMessage {
   suiteName?: string;
 }
 
+export interface PersistUiStateMessage {
+  type: "persistUiState";
+  uiState: BuildDetailsPanelUiState;
+}
+
 export type BuildDetailsIncomingMessage =
   | ToggleFollowLogMessage
   | OpenExternalMessage
@@ -68,7 +77,8 @@ export type BuildDetailsIncomingMessage =
   | RejectInputMessage
   | RestartPipelineFromStageMessage
   | ReloadTestReportMessage
-  | OpenTestSourceMessage;
+  | OpenTestSourceMessage
+  | PersistUiStateMessage;
 
 export function parseBuildDetailsOutgoingMessage(
   message: unknown
@@ -203,6 +213,13 @@ export function isOpenTestSourceMessage(message: unknown): message is OpenTestSo
     return false;
   }
   return true;
+}
+
+export function isPersistUiStateMessage(message: unknown): message is PersistUiStateMessage {
+  if (!hasMessageType(message, "persistUiState")) {
+    return false;
+  }
+  return normalizeBuildDetailsPanelUiState(message.uiState) !== undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -2,6 +2,7 @@ import {
   type ApproveInputMessage,
   type ArtifactActionMessage,
   type OpenTestSourceMessage,
+  type PersistUiStateMessage,
   type RejectInputMessage,
   type ReloadTestReportMessage,
   type RestartPipelineFromStageMessage,
@@ -10,6 +11,7 @@ import {
   isExportConsoleMessage,
   isOpenExternalMessage,
   isOpenTestSourceMessage,
+  isPersistUiStateMessage,
   isRejectInputMessage,
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
@@ -25,6 +27,7 @@ export interface BuildDetailsMessageRouterHandlers {
   onRestartPipelineFromStage(message: RestartPipelineFromStageMessage): void;
   onReloadTestReport(message: ReloadTestReportMessage): void;
   onOpenTestSource(message: OpenTestSourceMessage): void;
+  onPersistUiState(message: PersistUiStateMessage): void;
   onToggleFollowLog(value: unknown): void;
 }
 
@@ -62,6 +65,10 @@ export class BuildDetailsMessageRouter {
     }
     if (isOpenTestSourceMessage(message)) {
       this.handlers.onOpenTestSource(message);
+      return;
+    }
+    if (isPersistUiStateMessage(message)) {
+      this.handlers.onPersistUiState(message);
       return;
     }
     if (isToggleFollowLogMessage(message)) {
