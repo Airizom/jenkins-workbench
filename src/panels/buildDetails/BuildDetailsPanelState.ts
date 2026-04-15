@@ -1,5 +1,9 @@
 import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
 import type { BuildDetailsInitialState } from "./BuildDetailsPollingController";
@@ -11,6 +15,10 @@ export class BuildDetailsPanelState {
   private currentBuildUrlValue: string | undefined;
   private currentDetailsValue: JenkinsBuildDetails | undefined;
   private currentTestReportValue: JenkinsTestReport | undefined;
+  private currentCoverageOverviewValue: JenkinsCoverageOverview | undefined;
+  private currentModifiedCoverageFilesValue: JenkinsModifiedCoverageFile[] | undefined;
+  private currentCoverageActionPathValue: string | undefined;
+  private currentCoverageErrorValue: string | undefined;
   private currentPipelineRunValue: PipelineRun | undefined;
   private currentErrorsValue: string[] = [];
   private baseErrorsValue: string[] = [];
@@ -19,6 +27,8 @@ export class BuildDetailsPanelState {
   private testReportFetchedValue = false;
   private testReportLogsIncludedValue = false;
   private testResultsLoadingValue = false;
+  private coverageFetchedValue = false;
+  private coverageLoadingValue = false;
   private pipelineRestartAvailabilityValue: PipelineRestartAvailability = "unknown";
   private pipelineRestartEnabledValue = false;
   private pipelineRestartableStagesValue: string[] = [];
@@ -44,6 +54,22 @@ export class BuildDetailsPanelState {
     return this.currentTestReportValue;
   }
 
+  get currentCoverageOverview(): JenkinsCoverageOverview | undefined {
+    return this.currentCoverageOverviewValue;
+  }
+
+  get currentModifiedCoverageFiles(): JenkinsModifiedCoverageFile[] | undefined {
+    return this.currentModifiedCoverageFilesValue;
+  }
+
+  get currentCoverageError(): string | undefined {
+    return this.currentCoverageErrorValue;
+  }
+
+  get currentCoverageActionPath(): string | undefined {
+    return this.currentCoverageActionPathValue;
+  }
+
   get currentPipelineRun(): PipelineRun | undefined {
     return this.currentPipelineRunValue;
   }
@@ -66,6 +92,14 @@ export class BuildDetailsPanelState {
 
   get testResultsLoading(): boolean {
     return this.testResultsLoadingValue;
+  }
+
+  get coverageFetched(): boolean {
+    return this.coverageFetchedValue;
+  }
+
+  get coverageLoading(): boolean {
+    return this.coverageLoadingValue;
   }
 
   get pipelineRestartAvailability(): PipelineRestartAvailability {
@@ -109,6 +143,7 @@ export class BuildDetailsPanelState {
     this.testReportFetchedValue = false;
     this.testReportLogsIncludedValue = false;
     this.testResultsLoadingValue = false;
+    this.resetCoverage();
     this.pipelineRestartAvailabilityValue = "unknown";
     this.pipelineRestartEnabledValue = false;
     this.pipelineRestartableStagesValue = [];
@@ -128,6 +163,7 @@ export class BuildDetailsPanelState {
     this.testReportFetchedValue = false;
     this.testReportLogsIncludedValue = false;
     this.testResultsLoadingValue = false;
+    this.resetCoverage();
     this.currentPipelineRunValue = pipelineRun;
     this.baseErrorsValue = initialState.errors;
     this.pipelineErrorValue = pipelineError;
@@ -166,6 +202,49 @@ export class BuildDetailsPanelState {
       return false;
     }
     this.testResultsLoadingValue = value;
+    return true;
+  }
+
+  setCoverage(
+    overview: JenkinsCoverageOverview | undefined,
+    modifiedFiles: JenkinsModifiedCoverageFile[] | undefined
+  ): void {
+    this.currentCoverageOverviewValue = overview;
+    this.currentModifiedCoverageFilesValue = modifiedFiles;
+    this.currentCoverageErrorValue = undefined;
+    this.coverageFetchedValue = true;
+  }
+
+  setCoverageActionPath(actionPath: string | undefined): boolean {
+    const normalized = actionPath?.trim() || undefined;
+    if (this.currentCoverageActionPathValue === normalized) {
+      return false;
+    }
+    this.currentCoverageActionPathValue = normalized;
+    return true;
+  }
+
+  setCoverageError(error: string): void {
+    this.currentCoverageOverviewValue = undefined;
+    this.currentModifiedCoverageFilesValue = undefined;
+    this.currentCoverageErrorValue = error;
+    this.coverageFetchedValue = true;
+  }
+
+  resetCoverage(): void {
+    this.currentCoverageOverviewValue = undefined;
+    this.currentModifiedCoverageFilesValue = undefined;
+    this.currentCoverageActionPathValue = undefined;
+    this.currentCoverageErrorValue = undefined;
+    this.coverageFetchedValue = false;
+    this.coverageLoadingValue = false;
+  }
+
+  setCoverageLoading(value: boolean): boolean {
+    if (this.coverageLoadingValue === value) {
+      return false;
+    }
+    this.coverageLoadingValue = value;
     return true;
   }
 

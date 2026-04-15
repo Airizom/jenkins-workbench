@@ -7,6 +7,7 @@ import {
 import { CheckCircleIcon } from "../../../../shared/webview/icons";
 import type {
   ArtifactAction,
+  BuildDetailsCoverageStateViewModel,
   BuildFailureArtifact,
   BuildFailureInsightsViewModel,
   BuildTestCaseViewModel,
@@ -42,6 +43,7 @@ type BuildDetailsTabsProps = {
   culpritsLabel: string;
   testsSummary: BuildTestsSummaryViewModel;
   testResults: BuildTestResultsViewModel;
+  coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
   consoleText: string;
   consoleHtmlModel?: ConsoleHtmlModel;
@@ -79,6 +81,7 @@ export function BuildDetailsTabs({
   culpritsLabel,
   testsSummary,
   testResults,
+  coverageState,
   insights,
   consoleText,
   consoleHtmlModel,
@@ -181,6 +184,7 @@ export function BuildDetailsTabs({
             buildUrl={buildUrl}
             summary={testsSummary}
             results={testResults}
+            coverageState={coverageState}
             onReloadWithLogs={onReloadTestResults}
             onOpenSource={onOpenTestSource}
           />

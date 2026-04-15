@@ -2,15 +2,16 @@ import type * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import type { TestSourceNavigationService } from "../services/TestSourceNavigationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import { BuildDetailsPanel } from "./BuildDetailsPanel";
 import type {
-  BuildDetailsDataService,
-  PendingInputActionProvider
-} from "./buildDetails/BuildDetailsPollingController";
+  BuildDetailsBackend,
+  BuildDetailsPendingInputProvider
+} from "./buildDetails/BuildDetailsBackend";
 
 export interface BuildDetailsPanelLaunchRequest {
   environment: JenkinsEnvironmentRef;
@@ -19,13 +20,14 @@ export interface BuildDetailsPanelLaunchRequest {
 }
 
 export interface BuildDetailsPanelLauncherOptions {
-  dataService: BuildDetailsDataService;
+  backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
+  coverageDecorationService: CoverageDecorationService;
   testSourceNavigationService: TestSourceNavigationService;
   testSourceNavigationUiService: TestSourceNavigationUiService;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
-  pendingInputProvider: PendingInputActionProvider | undefined;
+  pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
 }
@@ -53,9 +55,10 @@ export class BuildDetailsPanelLauncher {
 
   private getSharedPanelOptions() {
     return {
-      dataService: this.options.dataService,
+      backend: this.options.backend,
       artifactActionHandler: this.options.artifactActionHandler,
       consoleExporter: this.options.consoleExporter,
+      coverageDecorationService: this.options.coverageDecorationService,
       refreshHost: this.options.refreshHost,
       pendingInputProvider: this.options.pendingInputProvider,
       testSourceNavigationUiService: this.options.testSourceNavigationUiService,

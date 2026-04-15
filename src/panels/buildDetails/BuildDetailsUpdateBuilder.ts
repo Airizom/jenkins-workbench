@@ -1,4 +1,8 @@
 import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
+import type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
 import {
@@ -11,7 +15,11 @@ import {
 import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsUpdateMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
-import { buildTestStateViewModel, buildTestsSummary } from "./BuildDetailsViewModel";
+import {
+  buildCoverageStateViewModel,
+  buildTestStateViewModel,
+  buildTestsSummary
+} from "./BuildDetailsViewModel";
 import {
   buildBuildFailureInsights,
   buildPendingInputsViewModel,
@@ -25,6 +33,13 @@ export function buildDetailsUpdateMessage(
     testReportFetched?: boolean;
     testReportLogsIncluded?: boolean;
     testResultsLoading?: boolean;
+    coverageOverview?: JenkinsCoverageOverview;
+    modifiedCoverageFiles?: JenkinsModifiedCoverageFile[];
+    coverageActionPath?: string;
+    coverageFetched?: boolean;
+    coverageLoading?: boolean;
+    coverageError?: string;
+    coverageEnabled?: boolean;
     canOpenSource?: (className?: string) => boolean;
   },
   pipelineRun?: PipelineRun,
@@ -51,6 +66,14 @@ export function buildDetailsUpdateMessage(
       loading: options?.testResultsLoading,
       canOpenSource: options?.canOpenSource
     }),
+    coverageState: buildCoverageStateViewModel(details, options?.coverageOverview, {
+      modifiedFiles: options?.modifiedCoverageFiles,
+      actionPath: options?.coverageActionPath,
+      coverageFetched: options?.coverageFetched,
+      loading: options?.coverageLoading,
+      error: options?.coverageError,
+      enabled: options?.coverageEnabled
+    }),
     insights: buildBuildFailureInsights(details, testsSummary),
     pipelineStages: buildPipelineStagesViewModel(pipelineRun, {
       details,
@@ -63,7 +86,7 @@ export function buildDetailsUpdateMessage(
 
 export function buildUpdateMessageFromState(
   state: BuildDetailsPanelState,
-  options?: { canOpenSource?: (className?: string) => boolean }
+  options?: { canOpenSource?: (className?: string) => boolean; coverageEnabled?: boolean }
 ): BuildDetailsOutgoingMessage | undefined {
   if (state.currentDetails) {
     return buildDetailsUpdateMessage(
@@ -73,6 +96,13 @@ export function buildUpdateMessageFromState(
         testReportFetched: state.testReportFetched,
         testReportLogsIncluded: state.testReportLogsIncluded,
         testResultsLoading: state.testResultsLoading,
+        coverageOverview: state.currentCoverageOverview,
+        modifiedCoverageFiles: state.currentModifiedCoverageFiles,
+        coverageActionPath: state.currentCoverageActionPath,
+        coverageFetched: state.coverageFetched,
+        coverageLoading: state.coverageLoading,
+        coverageError: state.currentCoverageError,
+        coverageEnabled: options?.coverageEnabled,
         canOpenSource: options?.canOpenSource
       },
       state.currentPipelineRun,
@@ -93,6 +123,14 @@ export function buildUpdateMessageFromState(
     testState: buildTestStateViewModel(undefined, undefined, {
       loading: state.testResultsLoading,
       canOpenSource: options?.canOpenSource
+    }),
+    coverageState: buildCoverageStateViewModel(undefined, state.currentCoverageOverview, {
+      modifiedFiles: state.currentModifiedCoverageFiles,
+      actionPath: state.currentCoverageActionPath,
+      coverageFetched: state.coverageFetched,
+      loading: state.coverageLoading,
+      error: state.currentCoverageError,
+      enabled: options?.coverageEnabled
     }),
     insights: buildBuildFailureInsights(undefined),
     pipelineStages: buildPipelineStagesViewModel(state.currentPipelineRun, {

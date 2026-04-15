@@ -7,80 +7,17 @@ import type {
   JenkinsConsoleTextTail,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
-  JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
+import type {
+  BuildDetailsConsoleBackend,
+  BuildDetailsPendingInputProvider,
+  BuildDetailsPendingInputsBackend,
+  BuildDetailsStatusBackend,
+  BuildDetailsTestsBackend
+} from "./BuildDetailsBackend";
 import { type ConsoleSnapshotResult, ConsoleStreamManager } from "./ConsoleStreamManager";
-
-export interface BuildDetailsDataService {
-  getBuildDetails(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsBuildDetails>;
-  getWorkflowRun(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsWorkflowRun | undefined>;
-  getTestReport(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: JenkinsTestReportOptions
-  ): Promise<JenkinsTestReport | undefined>;
-  getConsoleText(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars?: number
-  ): Promise<JenkinsConsoleText>;
-  getConsoleTextTail(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars: number
-  ): Promise<JenkinsConsoleTextTail>;
-  getConsoleTextProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number
-  ): Promise<JenkinsProgressiveConsoleText>;
-  getConsoleHtmlProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number,
-    annotator?: string
-  ): Promise<JenkinsProgressiveConsoleHtml>;
-  getPendingInputActions(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<PendingInputAction[]>;
-  approveInput(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
-  ): Promise<void>;
-  rejectInput(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    inputId: string,
-    abortUrl?: string
-  ): Promise<void>;
-  getRestartFromStageInfo(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsRestartFromStageInfo>;
-  restartPipelineFromStage(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    stageName: string
-  ): Promise<void>;
-}
-
-export interface PendingInputActionProvider {
-  getPendingInputActions(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<PendingInputAction[]>;
-}
 
 export interface BuildDetailsPollingCallbacks {
   onWorkflowFetchStart?: () => void;
@@ -98,8 +35,11 @@ export interface BuildDetailsPollingCallbacks {
 }
 
 export interface BuildDetailsPollingOptions {
-  dataService: BuildDetailsDataService;
-  pendingInputProvider?: PendingInputActionProvider;
+  statusBackend: BuildDetailsStatusBackend;
+  testsBackend: BuildDetailsTestsBackend;
+  consoleBackend: BuildDetailsConsoleBackend;
+  pendingInputsBackend: BuildDetailsPendingInputsBackend;
+  pendingInputProvider?: BuildDetailsPendingInputProvider;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   maxConsoleChars: number;
@@ -128,8 +68,9 @@ const WORKFLOW_REFRESH_MULTIPLIER = 3;
 const MIN_WORKFLOW_REFRESH_MS = 5000;
 
 export class BuildDetailsPollingController {
-  private readonly dataService: BuildDetailsDataService;
-  private readonly pendingInputProvider: PendingInputActionProvider;
+  private readonly statusBackend: BuildDetailsStatusBackend;
+  private readonly testsBackend: BuildDetailsTestsBackend;
+  private readonly pendingInputProvider: BuildDetailsPendingInputProvider;
   private readonly environment: JenkinsEnvironmentRef;
   private readonly buildUrl: string;
   private readonly maxConsoleChars: number;
@@ -149,8 +90,9 @@ export class BuildDetailsPollingController {
   private lastPendingInputsCount = 0;
 
   constructor(options: BuildDetailsPollingOptions) {
-    this.dataService = options.dataService;
-    this.pendingInputProvider = options.pendingInputProvider ?? options.dataService;
+    this.statusBackend = options.statusBackend;
+    this.testsBackend = options.testsBackend;
+    this.pendingInputProvider = options.pendingInputProvider ?? options.pendingInputsBackend;
     this.environment = options.environment;
     this.buildUrl = options.buildUrl;
     this.maxConsoleChars = options.maxConsoleChars;
@@ -159,7 +101,7 @@ export class BuildDetailsPollingController {
     this.callbacks = options.callbacks;
     this.formatError = options.formatError;
     this.consoleStreamManager = new ConsoleStreamManager({
-      dataService: options.dataService,
+      dataService: options.consoleBackend,
       environment: this.environment,
       buildUrl: this.buildUrl,
       maxConsoleChars: this.maxConsoleChars,
@@ -183,7 +125,7 @@ export class BuildDetailsPollingController {
     options?: JenkinsTestReportOptions
   ): Promise<BuildDetailsTestReportFetchResult> {
     const effectiveOptions = this.resolveTestReportOptions(options);
-    const report = await this.dataService.getTestReport(
+    const report = await this.testsBackend.getTestReport(
       this.environment,
       this.buildUrl,
       effectiveOptions
@@ -203,7 +145,7 @@ export class BuildDetailsPollingController {
     }
     this.callbacks.onWorkflowFetchStart?.();
     try {
-      const workflowRun = await this.dataService.getWorkflowRun(this.environment, this.buildUrl);
+      const workflowRun = await this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
       if (this.disposed) {
         return;
       }
@@ -234,8 +176,8 @@ export class BuildDetailsPollingController {
   }
 
   async loadInitial(): Promise<BuildDetailsInitialState> {
-    const detailsPromise = this.dataService.getBuildDetails(this.environment, this.buildUrl);
-    const workflowPromise = this.dataService.getWorkflowRun(this.environment, this.buildUrl);
+    const detailsPromise = this.statusBackend.getBuildDetails(this.environment, this.buildUrl);
+    const workflowPromise = this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
     const consolePromise = this.consoleStreamManager.loadInitialConsole();
     const pendingInputsPromise = this.pendingInputProvider.getPendingInputActions(
       this.environment,
@@ -360,7 +302,7 @@ export class BuildDetailsPollingController {
     const pollGeneration = this.pollGeneration;
 
     try {
-      const detailsPromise = this.dataService.getBuildDetails(this.environment, this.buildUrl);
+      const detailsPromise = this.statusBackend.getBuildDetails(this.environment, this.buildUrl);
       const consolePromise = this.consoleStreamManager.fetchNext();
 
       let details: JenkinsBuildDetails | undefined;
@@ -452,7 +394,7 @@ export class BuildDetailsPollingController {
         }
         this.callbacks.onWorkflowFetchStart?.();
         try {
-          workflowRun = await this.dataService.getWorkflowRun(this.environment, this.buildUrl);
+          workflowRun = await this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
           this.callbacks.onWorkflowRun(workflowRun);
           this.workflowRetryPending = false;
         } catch (error) {

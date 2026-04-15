@@ -105,7 +105,7 @@ export class JenkinsBuildsApi {
     const includeCauses = Boolean(options?.includeDetails);
     const includeParameters = Boolean(options?.includeParameters);
     if (includeCauses || includeParameters) {
-      const actionParts = ["_class"];
+      const actionParts = ["_class", "urlName"];
       if (includeCauses) {
         actionParts.push("causes[shortDescription,userId,userName]");
       }
@@ -123,7 +123,7 @@ export class JenkinsBuildsApi {
     includeCauses?: boolean;
     includeParameters?: boolean;
   }): string {
-    const actionParts = ["_class", "failCount", "skipCount", "totalCount"];
+    const actionParts = ["_class", "urlName", "failCount", "skipCount", "totalCount"];
     if (options?.includeCauses) {
       actionParts.push("causes[shortDescription,userId,userName]");
     }

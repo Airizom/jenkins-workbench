@@ -2,22 +2,27 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import type { TestSourceNavigationService } from "../services/TestSourceNavigationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
 import { buildTestSourceNavigationContext } from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
-import { getTestReportIncludeCaseLogsConfigKey } from "./buildDetails/BuildDetailsConfig";
+import type {
+  BuildDetailsBackend,
+  BuildDetailsPendingInputProvider
+} from "./buildDetails/BuildDetailsBackend";
+import {
+  getBuildDetailsCoverageDecorationsEnabledConfigKey,
+  getBuildDetailsCoverageEnabledConfigKey,
+  getTestReportIncludeCaseLogsConfigKey
+} from "./buildDetails/BuildDetailsConfig";
 import { BuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageRouter";
 import { BuildDetailsPanelActions } from "./buildDetails/BuildDetailsPanelActions";
 import {
   BuildDetailsPanelController,
   type BuildDetailsPanelLoadResult
 } from "./buildDetails/BuildDetailsPanelController";
-import type {
-  BuildDetailsDataService,
-  PendingInputActionProvider
-} from "./buildDetails/BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./buildDetails/BuildDetailsTestSource";
 import {
   type BuildDetailsPanelSerializedState,
@@ -31,11 +36,12 @@ import { createNonce } from "./shared/webview/WebviewNonce";
 import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
 interface BuildDetailsPanelShowOptions {
-  dataService: BuildDetailsDataService;
+  backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
+  coverageDecorationService: CoverageDecorationService;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
-  pendingInputProvider: PendingInputActionProvider | undefined;
+  pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
   testSourceNavigationService?: TestSourceNavigationService;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   environment: JenkinsEnvironmentRef;
@@ -45,11 +51,12 @@ interface BuildDetailsPanelShowOptions {
 }
 
 interface BuildDetailsPanelReviveOptions {
-  dataService: BuildDetailsDataService;
+  backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
+  coverageDecorationService: CoverageDecorationService;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
-  pendingInputProvider: PendingInputActionProvider | undefined;
+  pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
   testSourceNavigationService?: TestSourceNavigationService;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   environmentStore: JenkinsEnvironmentStore;
@@ -74,11 +81,12 @@ export class BuildDetailsPanel {
 
   static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
     const {
-      dataService,
+      backend,
       artifactActionHandler,
       consoleExporter,
       refreshHost,
       pendingInputProvider,
+      coverageDecorationService,
       testSourceNavigationService,
       testSourceNavigationUiService,
       environment,
@@ -103,6 +111,7 @@ export class BuildDetailsPanel {
         panel,
         extensionUri,
         consoleExporter,
+        coverageDecorationService,
         testSourceNavigationService,
         testSourceNavigationUiService
       );
@@ -117,7 +126,7 @@ export class BuildDetailsPanel {
       testSourceNavigationUiService
     );
     activePanel.panel.reveal(undefined, true);
-    await activePanel.load(dataService, artifactActionHandler, environment, buildUrl, label);
+    await activePanel.load(backend, artifactActionHandler, environment, buildUrl, label);
   }
 
   static async revive(
@@ -132,6 +141,7 @@ export class BuildDetailsPanel {
       panel,
       options.extensionUri,
       options.consoleExporter,
+      options.coverageDecorationService,
       options.testSourceNavigationService,
       options.testSourceNavigationUiService
     );
@@ -161,18 +171,14 @@ export class BuildDetailsPanel {
       return;
     }
 
-    await revived.load(
-      options.dataService,
-      options.artifactActionHandler,
-      environment,
-      state.buildUrl
-    );
+    await revived.load(options.backend, options.artifactActionHandler, environment, state.buildUrl);
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     consoleExporter: BuildConsoleExporter,
+    coverageDecorationService: CoverageDecorationService,
     testSourceNavigationService?: TestSourceNavigationService,
     testSourceNavigationUiService?: TestSourceNavigationUiService
   ) {
@@ -189,7 +195,12 @@ export class BuildDetailsPanel {
             className
           )
       );
-    this.controller = new BuildDetailsPanelController(panel, extensionUri, this.canOpenTestSource);
+    this.controller = new BuildDetailsPanelController(
+      panel,
+      extensionUri,
+      coverageDecorationService,
+      this.canOpenTestSource
+    );
     this.actions = new BuildDetailsPanelActions({
       controller: this.controller,
       getArtifactActionHandler: () => this.artifactActionHandler,
@@ -254,10 +265,23 @@ export class BuildDetailsPanel {
     );
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (!event.affectsConfiguration(getTestReportIncludeCaseLogsConfigKey())) {
+        const affectsTestReport = event.affectsConfiguration(
+          getTestReportIncludeCaseLogsConfigKey()
+        );
+        const affectsCoverage =
+          event.affectsConfiguration(getBuildDetailsCoverageEnabledConfigKey()) ||
+          event.affectsConfiguration(getBuildDetailsCoverageDecorationsEnabledConfigKey());
+        if (!affectsTestReport && !affectsCoverage) {
           return;
         }
-        this.controller.updateTestReportOptions();
+        if (affectsTestReport) {
+          this.controller.updateTestReportOptions();
+        }
+        if (affectsCoverage) {
+          void this.controller.refreshCoverage(this.controller.getLoadToken(), {
+            showLoading: true
+          });
+        }
       })
     );
   }
@@ -274,7 +298,7 @@ export class BuildDetailsPanel {
   private configure(
     consoleExporter: BuildConsoleExporter,
     refreshHost: EnvironmentScopedRefreshHost | undefined,
-    pendingInputProvider: PendingInputActionProvider | undefined,
+    pendingInputProvider: BuildDetailsPendingInputProvider | undefined,
     testSourceNavigationService?: TestSourceNavigationService,
     testSourceNavigationUiService?: TestSourceNavigationUiService
   ): void {
@@ -286,7 +310,7 @@ export class BuildDetailsPanel {
   }
 
   private async load(
-    dataService: BuildDetailsDataService,
+    backend: BuildDetailsBackend,
     artifactActionHandler: ArtifactActionHandler,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
@@ -296,7 +320,7 @@ export class BuildDetailsPanel {
     const panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
     this.serializedState = panelState;
     const result: BuildDetailsPanelLoadResult = await this.controller.load(
-      dataService,
+      backend,
       environment,
       buildUrl,
       {

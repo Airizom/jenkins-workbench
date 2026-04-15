@@ -82,6 +82,35 @@ export interface BuildDetailsTestStateViewModel {
   results: BuildTestResultsViewModel;
 }
 
+export interface BuildCoverageQualityGateViewModel {
+  name: string;
+  statusLabel: string;
+  statusClass: string;
+  thresholdLabel?: string;
+  valueLabel?: string;
+}
+
+export interface BuildCoverageFileViewModel {
+  path: string;
+  coveredCount: number;
+  missedCount: number;
+  partialCount: number;
+}
+
+export interface BuildDetailsCoverageStateViewModel {
+  status: "disabled" | "idle" | "loading" | "unavailable" | "error" | "available";
+  showTab: boolean;
+  projectCoverage?: string;
+  modifiedFilesCoverage?: string;
+  modifiedLinesCoverage?: string;
+  overallQualityGateStatusLabel?: string;
+  overallQualityGateStatusClass?: string;
+  qualityGates: BuildCoverageQualityGateViewModel[];
+  modifiedFiles: BuildCoverageFileViewModel[];
+  summaryOnly: boolean;
+  errorMessage?: string;
+}
+
 export interface PendingInputParameterViewModel {
   name: string;
   kind: string;
@@ -109,6 +138,7 @@ export interface BuildDetailsViewModel {
   pipelineStagesLoading: boolean;
   pipelineStages: PipelineStageViewModel[];
   testState: BuildDetailsTestStateViewModel;
+  coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
   pendingInputs: PendingInputViewModel[];
   consoleText: string;
@@ -130,6 +160,7 @@ export interface BuildDetailsUpdateMessage {
   culpritsLabel: string;
   pipelineStagesLoading: boolean;
   testState: BuildDetailsTestStateViewModel;
+  coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
   pipelineStages: PipelineStageViewModel[];
   pendingInputs: PendingInputViewModel[];

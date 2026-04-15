@@ -67,7 +67,7 @@ export class BuildDetailsPanelView {
 
   postStateUpdate(
     state: BuildDetailsPanelState,
-    options?: { canOpenSource?: (className?: string) => boolean }
+    options?: { canOpenSource?: (className?: string) => boolean; coverageEnabled?: boolean }
   ): void {
     const updateMessage = buildUpdateMessageFromState(state, options);
     if (updateMessage) {

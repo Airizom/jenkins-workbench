@@ -17,7 +17,9 @@ import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/Jenkinsf
 import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
 import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
+import { BuildDetailsBackendAdapter } from "../../panels/buildDetails/BuildDetailsBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
+import { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
 import { JenkinsfileQuickFixProvider } from "../../validation/editor/JenkinsfileQuickFixProvider";
@@ -75,11 +77,17 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("repositoryLinkStore")
       ),
     currentBranchCommandMapper: (_container) => new CurrentBranchCommandMapper(),
+    coverageDecorationService: (container) =>
+      new CoverageDecorationService(container.get("repositoryLinkStore")),
     buildDetailsPanelLauncher: (container) =>
       new BuildDetailsPanelLauncher({
-        dataService: container.get("dataService"),
+        backend: new BuildDetailsBackendAdapter(
+          container.get("dataService"),
+          container.get("coverageService")
+        ),
         artifactActionHandler: container.get("artifactActionHandler"),
         consoleExporter: container.get("consoleExporter"),
+        coverageDecorationService: container.get("coverageDecorationService"),
         testSourceNavigationService: container.get("testSourceNavigationService"),
         testSourceNavigationUiService: container.get("testSourceNavigationUiService"),
         refreshHost: container.get("refreshHost"),

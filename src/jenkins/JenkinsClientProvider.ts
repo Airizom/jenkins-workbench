@@ -2,6 +2,8 @@ import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore
 import { JenkinsClient } from "./JenkinsClient";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import { buildAuthSignature } from "./auth";
+import type { JenkinsClientContext } from "./client/JenkinsClientContext";
+import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 
 export interface JenkinsClientProviderOptions {
   requestTimeoutMs?: number;
@@ -137,6 +139,20 @@ export class JenkinsClientProvider {
     });
 
     return client;
+  }
+
+  async createClientContext(environment: JenkinsEnvironmentRef): Promise<JenkinsClientContext> {
+    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
+    const token = authConfig
+      ? undefined
+      : await this.store.getToken(environment.scope, environment.environmentId);
+    return new JenkinsHttpClient({
+      baseUrl: environment.url,
+      username: environment.username,
+      token,
+      authConfig,
+      requestTimeoutMs: this.requestTimeoutMs
+    });
   }
 
   invalidateClient(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {

@@ -12,6 +12,7 @@ import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
 import { useBuildDetailsTabs } from "./hooks/useBuildDetailsTabs";
 import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
 import {
+  DEFAULT_COVERAGE_STATE,
   DEFAULT_INSIGHTS,
   buildDetailsReducer,
   buildInitialState
@@ -25,11 +26,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   useBuildDetailsMessages(dispatch);
   const { showButton, scrollToTop } = useScrollToTopButton();
 
+  const coverageState = state.coverageState ?? DEFAULT_COVERAGE_STATE;
   const insights = state.insights ?? DEFAULT_INSIGHTS;
   const isRunning = state.resultClass === "running";
   const hasPendingInputs = state.pendingInputs.length > 0;
   const hasPipelineStages = state.pipelineStages.length > 0 || state.pipelineStagesLoading;
-  const hasTests = state.testState.summary.hasAnyResults;
+  const hasTests = state.testState.summary.hasAnyResults || coverageState.showTab;
   const buildUrl = state.buildUrl;
   const { selectedTab, setSelectedTab } = useBuildDetailsTabs({
     hasPendingInputs,
@@ -97,6 +99,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             culpritsLabel={state.culpritsLabel}
             testsSummary={state.testState.summary}
             testResults={state.testState.results}
+            coverageState={coverageState}
             insights={insights}
             consoleText={state.consoleText}
             consoleHtmlModel={state.consoleHtmlModel}

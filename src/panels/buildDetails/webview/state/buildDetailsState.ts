@@ -1,4 +1,5 @@
 import type {
+  BuildDetailsCoverageStateViewModel,
   BuildDetailsTestStateViewModel,
   BuildDetailsUpdateMessage,
   BuildDetailsViewModel,
@@ -53,6 +54,14 @@ export const DEFAULT_TEST_STATE: BuildDetailsTestStateViewModel = {
   }
 };
 
+export const DEFAULT_COVERAGE_STATE: BuildDetailsCoverageStateViewModel = {
+  status: "disabled",
+  showTab: false,
+  qualityGates: [],
+  modifiedFiles: [],
+  summaryOnly: false
+};
+
 export const FALLBACK_STATE: BuildDetailsState = {
   displayName: "Build Details",
   resultLabel: "Unknown",
@@ -63,6 +72,7 @@ export const FALLBACK_STATE: BuildDetailsState = {
   pipelineStagesLoading: false,
   pipelineStages: [],
   testState: DEFAULT_TEST_STATE,
+  coverageState: DEFAULT_COVERAGE_STATE,
   insights: DEFAULT_INSIGHTS,
   pendingInputs: [],
   consoleText: "",
@@ -81,6 +91,7 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
     ...FALLBACK_STATE,
     ...initialState,
     testState: initialState.testState ?? DEFAULT_TEST_STATE,
+    coverageState: initialState.coverageState ?? DEFAULT_COVERAGE_STATE,
     insights: initialState.insights ?? DEFAULT_INSIGHTS,
     pendingInputs: initialState.pendingInputs ?? [],
     consoleHtmlModel: undefined,
@@ -171,6 +182,7 @@ export function buildDetailsReducer(
         culpritsLabel: payload.culpritsLabel,
         pipelineStagesLoading: payload.pipelineStagesLoading,
         testState: payload.testState,
+        coverageState: payload.coverageState,
         insights: payload.insights,
         pipelineStages: payload.pipelineStages,
         pendingInputs: payload.pendingInputs ?? [],
@@ -191,6 +203,7 @@ export function getInitialState(): BuildDetailsViewModel {
     ...FALLBACK_STATE,
     ...candidate,
     testState: candidate.testState ?? DEFAULT_TEST_STATE,
+    coverageState: candidate.coverageState ?? DEFAULT_COVERAGE_STATE,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,
     pendingInputs: candidate.pendingInputs ?? [],
     loading: candidate.loading ?? false

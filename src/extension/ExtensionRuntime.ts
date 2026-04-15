@@ -63,6 +63,7 @@ export async function activateRuntime(
   const replayDraftManager = container.get("replayDraftManager");
   const replayDraftFilesystem = container.get("replayDraftFilesystem");
   const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
+  const coverageDecorationService = container.get("coverageDecorationService");
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
@@ -126,6 +127,7 @@ export async function activateRuntime(
     pendingInputCoordinator,
     jobConfigDraftManager,
     replayDraftManager,
+    coverageDecorationService,
     treeSummarySubscription,
     jobConfigDraftFilesystemRegistration,
     replayDraftFilesystemRegistration,

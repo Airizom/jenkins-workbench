@@ -2,9 +2,12 @@ import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { createNonce } from "../shared/webview/WebviewNonce";
+import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
 import {
   MAX_CONSOLE_CHARS,
+  getBuildDetailsCoverageEnabled,
   getBuildDetailsRefreshIntervalMs,
   getTestReportIncludeCaseLogs
 } from "./BuildDetailsConfig";
@@ -14,10 +17,8 @@ import { BuildDetailsPanelState, type PipelineRestartAvailability } from "./Buil
 import { BuildDetailsPanelView } from "./BuildDetailsPanelView";
 import { createBuildDetailsPollingCallbacks } from "./BuildDetailsPollingCallbacks";
 import {
-  type BuildDetailsDataService,
   type BuildDetailsInitialState,
-  BuildDetailsPollingController,
-  type PendingInputActionProvider
+  BuildDetailsPollingController
 } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { buildBuildDetailsViewModel } from "./BuildDetailsViewModel";
@@ -36,7 +37,7 @@ export type BuildDetailsPanelLoadResult =
     };
 
 export interface BuildDetailsPanelControllerAccess {
-  getDataService(): BuildDetailsDataService | undefined;
+  getBackend(): BuildDetailsBackend | undefined;
   getEnvironment(): JenkinsEnvironmentRef | undefined;
   getBuildUrl(): string | undefined;
   getCurrentDetails(): JenkinsBuildDetails | undefined;
@@ -50,6 +51,7 @@ export interface BuildDetailsPanelControllerAccess {
     token: number,
     options?: { includeCaseLogs?: boolean; showLoading?: boolean }
   ): Promise<void>;
+  refreshCoverage(token: number, options?: { showLoading?: boolean }): Promise<void>;
   refreshPendingInputs(): Promise<void>;
   beginLoading(): void;
   endLoading(): void;
@@ -61,14 +63,15 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private readonly runtime: BuildDetailsPanelRuntime;
   private readonly canOpenTestSource?: BuildDetailsCanOpenTestSource;
   private loadToken = 0;
-  private dataService?: BuildDetailsDataService;
+  private backend?: BuildDetailsBackend;
   private pollingController?: BuildDetailsPollingController;
-  private pendingInputProvider?: PendingInputActionProvider;
+  private pendingInputProvider?: BuildDetailsPendingInputProvider;
   private loadingRequests = 0;
 
   constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
+    coverageDecorationService: CoverageDecorationService,
     getCanOpenTestSource?: BuildDetailsCanOpenTestSource
   ) {
     this.canOpenTestSource = getCanOpenTestSource;
@@ -76,7 +79,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.runtime = new BuildDetailsPanelRuntime({
       state: this.state,
       view: this.view,
-      getDataService: () => this.dataService,
+      coverageDecorationService,
+      getBackend: () => this.backend,
       getPollingController: () => this.pollingController,
       getCurrentToken: () => this.loadToken,
       isTokenCurrent: (token) => this.isTokenCurrent(token),
@@ -91,7 +95,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.loadingRequests = 0;
   }
 
-  setPendingInputProvider(provider: PendingInputActionProvider | undefined): void {
+  setPendingInputProvider(provider: BuildDetailsPendingInputProvider | undefined): void {
     this.pendingInputProvider = provider;
   }
 
@@ -105,8 +109,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.state.setFollowLog(value);
   }
 
-  getDataService(): BuildDetailsDataService | undefined {
-    return this.dataService;
+  getBackend(): BuildDetailsBackend | undefined {
+    return this.backend;
   }
 
   getEnvironment(): JenkinsEnvironmentRef | undefined {
@@ -152,8 +156,12 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     await this.runtime.refreshTestReport(token, options);
   }
 
+  async refreshCoverage(token: number, options?: { showLoading?: boolean }): Promise<void> {
+    await this.runtime.refreshCoverage(token, options);
+  }
+
   async load(
-    dataService: BuildDetailsDataService,
+    backend: BuildDetailsBackend,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     options?: BuildDetailsPanelLoadOptions
@@ -162,7 +170,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.pollingController?.dispose();
     this.pollingController = undefined;
     this.runtime.dispose();
-    this.dataService = dataService;
+    this.backend = backend;
     this.loadingRequests = 0;
     this.state.resetForLoad(environment, buildUrl, createNonce());
 
@@ -178,7 +186,10 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     });
 
     this.pollingController = new BuildDetailsPollingController({
-      dataService,
+      statusBackend: backend.status,
+      testsBackend: backend.tests,
+      consoleBackend: backend.console,
+      pendingInputsBackend: backend.pendingInputs,
       pendingInputProvider: this.pendingInputProvider,
       environment,
       buildUrl,
@@ -194,6 +205,10 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
         showCompletionToast: (details) => {
           void this.runtime.showCompletionToast(details);
         },
+        handleBuildCompleted: (details, currentToken) => {
+          this.runtime.handleBuildCompleted(details, currentToken);
+        },
+        getCoverageEnabled: () => getBuildDetailsCoverageEnabled(),
         canOpenSource: (className) =>
           this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
           false,
@@ -234,6 +249,13 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       testReportFetched: this.state.testReportFetched,
       testReportLogsIncluded: this.state.testReportLogsIncluded,
       testResultsLoading: this.state.testResultsLoading,
+      coverageOverview: this.state.currentCoverageOverview,
+      modifiedCoverageFiles: this.state.currentModifiedCoverageFiles,
+      coverageActionPath: this.state.currentCoverageActionPath,
+      coverageFetched: this.state.coverageFetched,
+      coverageLoading: this.state.coverageLoading,
+      coverageError: this.state.currentCoverageError,
+      coverageEnabled: getBuildDetailsCoverageEnabled(),
       canOpenTestSource: (className) =>
         this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
         false
@@ -251,7 +273,10 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     }
 
     if (details && !details.building) {
-      await this.runtime.refreshTestReport(token, { showLoading: true });
+      await Promise.all([
+        this.runtime.refreshTestReport(token, { showLoading: true }),
+        this.runtime.refreshCoverage(token, { showLoading: true })
+      ]);
     }
 
     if (details?.building) {

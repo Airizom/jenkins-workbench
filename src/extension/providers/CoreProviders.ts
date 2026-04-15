@@ -3,6 +3,7 @@ import { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import { JenkinsCoverageService } from "../../jenkins/coverage/JenkinsCoverageService";
 import { ArtifactActionService } from "../../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../../services/ArtifactFilesystem";
 import { DefaultArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
@@ -71,6 +72,11 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
         buildParameterRequestPreparer
       });
     },
+    coverageService: (_container) =>
+      new JenkinsCoverageService(_container.get("clientProvider"), {
+        cacheTtlMs: options.cacheTtlMs,
+        maxCacheEntries: options.maxCacheEntries
+      }),
     pendingInputCoordinator: (container) =>
       new PendingInputRefreshCoordinator(container.get("dataService")),
     queuedBuildWaiter: (container) => new QueuedBuildWaiter(container.get("dataService")),

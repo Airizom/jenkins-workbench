@@ -17,6 +17,7 @@ import type { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBra
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import type { JenkinsCoverageService } from "../../jenkins/coverage/JenkinsCoverageService";
 import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/JenkinsfileIntelligenceConfigState";
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
@@ -27,6 +28,7 @@ import type { ArtifactRetrievalService } from "../../services/ArtifactRetrievalS
 import type { ArtifactStorageService } from "../../services/ArtifactStorageService";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import type { BuildLogService } from "../../services/BuildLogService";
+import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import type { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import type { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
 import type { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
@@ -73,10 +75,12 @@ import type { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 export interface ExtensionTokenMap {
   environmentStore: JenkinsEnvironmentStore;
   clientProvider: JenkinsClientProvider;
+  coverageService: JenkinsCoverageService;
   dataService: JenkinsDataService;
   pendingInputCoordinator: PendingInputRefreshCoordinator;
   queuedBuildWaiter: QueuedBuildWaiter;
   consoleExporter: BuildConsoleExporter;
+  coverageDecorationService: CoverageDecorationService;
   buildLogService: BuildLogService;
   artifactRetrievalService: ArtifactRetrievalService;
   workspaceRetrievalService: WorkspaceRetrievalService;

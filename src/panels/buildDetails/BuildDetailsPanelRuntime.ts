@@ -1,22 +1,27 @@
 import * as vscode from "vscode";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
+import type { BuildDetailsBackend } from "./BuildDetailsBackend";
 import { BuildDetailsCompletionPoller } from "./BuildDetailsCompletionPoller";
-import { getBuildDetailsRefreshIntervalMs } from "./BuildDetailsConfig";
+import {
+  getBuildDetailsCoverageEnabled,
+  getBuildDetailsRefreshIntervalMs
+} from "./BuildDetailsConfig";
+import { BuildDetailsCoverageCoordinator } from "./BuildDetailsCoverageCoordinator";
+import { BuildDetailsCoverageDecorationsAdapter } from "./BuildDetailsCoverageDecorationsAdapter";
 import { formatResult } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import type { BuildDetailsPanelView } from "./BuildDetailsPanelView";
-import type {
-  BuildDetailsDataService,
-  BuildDetailsPollingController
-} from "./BuildDetailsPollingController";
+import type { BuildDetailsPollingController } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 
 interface BuildDetailsPanelRuntimeOptions {
   state: BuildDetailsPanelState;
   view: BuildDetailsPanelView;
-  getDataService: () => BuildDetailsDataService | undefined;
+  coverageDecorationService: CoverageDecorationService;
+  getBackend: () => BuildDetailsBackend | undefined;
   getPollingController: () => BuildDetailsPollingController | undefined;
   getCurrentToken: () => number;
   isTokenCurrent: (token: number) => boolean;
@@ -25,6 +30,7 @@ interface BuildDetailsPanelRuntimeOptions {
 
 export class BuildDetailsPanelRuntime {
   private readonly completionPoller: BuildDetailsCompletionPoller;
+  private readonly coverageCoordinator: BuildDetailsCoverageCoordinator;
 
   constructor(private readonly options: BuildDetailsPanelRuntimeOptions) {
     this.completionPoller = new BuildDetailsCompletionPoller({
@@ -34,18 +40,31 @@ export class BuildDetailsPanelRuntime {
       shouldPoll: () => this.options.state.lastDetailsBuilding,
       onDetailsUpdate: (details) => this.applyDetailsUpdate(details, false)
     });
+    this.coverageCoordinator = new BuildDetailsCoverageCoordinator({
+      state: this.options.state,
+      decorationsAdapter: new BuildDetailsCoverageDecorationsAdapter(
+        this.options.coverageDecorationService
+      ),
+      getCoverageBackend: () => this.options.getBackend()?.coverage,
+      isTokenCurrent: this.options.isTokenCurrent,
+      isViewVisible: () => this.options.view.isVisible(),
+      postStateUpdate: () => this.postStateUpdate()
+    });
   }
 
   dispose(): void {
     this.stopCompletionPolling();
+    this.coverageCoordinator.dispose();
   }
 
   handlePanelHidden(token: number): void {
+    this.coverageCoordinator.handlePanelHidden();
     this.options.getPollingController()?.stop();
     this.startCompletionPolling(token);
   }
 
   async handlePanelVisible(token: number): Promise<void> {
+    this.coverageCoordinator.handlePanelVisible();
     this.stopCompletionPolling();
     await this.refreshBuildStatus(token);
     if (this.options.state.lastDetailsBuilding) {
@@ -55,6 +74,7 @@ export class BuildDetailsPanelRuntime {
     await Promise.all([
       this.refreshConsoleSnapshot(token),
       this.refreshTestReport(token, { showLoading: true }),
+      this.refreshCoverage(token, { showLoading: true }),
       this.refreshWorkflowRun(token),
       this.options.getPollingController()?.refreshPendingInputs()
     ]);
@@ -94,7 +114,6 @@ export class BuildDetailsPanelRuntime {
     const pollingController = this.options.getPollingController();
     if (
       !pollingController ||
-      !this.options.getDataService() ||
       !this.options.state.environment ||
       !this.options.state.currentBuildUrl
     ) {
@@ -170,6 +189,10 @@ export class BuildDetailsPanelRuntime {
     }
   }
 
+  async refreshCoverage(token: number, options?: { showLoading?: boolean }): Promise<void> {
+    await this.coverageCoordinator.refresh(token, options);
+  }
+
   async refreshRestartFromStageInfo(
     token: number,
     options?: { postUpdate?: boolean }
@@ -186,13 +209,13 @@ export class BuildDetailsPanelRuntime {
       return;
     }
 
-    const dataService = this.options.getDataService();
-    if (!dataService || !this.options.state.environment || !this.options.state.currentBuildUrl) {
+    const restartBackend = this.options.getBackend()?.restart;
+    if (!restartBackend || !this.options.state.environment || !this.options.state.currentBuildUrl) {
       return;
     }
 
     try {
-      const restartInfo = await dataService.getRestartFromStageInfo(
+      const restartInfo = await restartBackend.getRestartFromStageInfo(
         this.options.state.environment,
         this.options.state.currentBuildUrl
       );
@@ -232,11 +255,18 @@ export class BuildDetailsPanelRuntime {
     });
   }
 
+  handleBuildCompleted(details: JenkinsBuildDetails, token: number): void {
+    void this.refreshRestartFromStageInfo(token, { postUpdate: true });
+    void this.showCompletionToast(details);
+    void this.refreshTestReport(token, { showLoading: true });
+    void this.refreshCoverage(token, { showLoading: true });
+  }
+
   private startCompletionPolling(token: number): void {
     if (!this.options.state.lastDetailsBuilding || !this.options.isTokenCurrent(token)) {
       return;
     }
-    if (!this.options.getDataService() || !this.options.state.environment) {
+    if (!this.options.getBackend()?.status || !this.options.state.environment) {
       return;
     }
     if (!this.options.state.currentBuildUrl) {
@@ -250,12 +280,12 @@ export class BuildDetailsPanelRuntime {
   }
 
   private async fetchBuildDetails(token: number): Promise<JenkinsBuildDetails | undefined> {
-    const dataService = this.options.getDataService();
-    if (!dataService || !this.options.state.environment || !this.options.state.currentBuildUrl) {
+    const statusBackend = this.options.getBackend()?.status;
+    if (!statusBackend || !this.options.state.environment || !this.options.state.currentBuildUrl) {
       return undefined;
     }
     try {
-      const details = await dataService.getBuildDetails(
+      const details = await statusBackend.getBuildDetails(
         this.options.state.environment,
         this.options.state.currentBuildUrl
       );
@@ -275,15 +305,13 @@ export class BuildDetailsPanelRuntime {
       this.options.view.setTitle(details.fullDisplayName ?? details.displayName);
     }
     if (wasBuilding && !isBuilding) {
-      const token = this.options.getCurrentToken();
-      void this.refreshRestartFromStageInfo(token, { postUpdate: true });
-      void this.showCompletionToast(details);
-      void this.refreshTestReport(token, { showLoading: true });
+      this.handleBuildCompleted(details, this.options.getCurrentToken());
     }
   }
 
   private postStateUpdate(): void {
     this.options.view.postStateUpdate(this.options.state, {
+      coverageEnabled: getBuildDetailsCoverageEnabled(),
       canOpenSource: (className) =>
         this.options.canOpenTestSource?.(
           this.options.state.environment,

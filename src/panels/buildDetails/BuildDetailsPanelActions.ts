@@ -37,18 +37,18 @@ export class BuildDetailsPanelActions {
   }
 
   async handleApproveInput(message: { inputId: string }): Promise<void> {
-    const dataService = this.controller.getDataService();
+    const pendingInputService = this.controller.getBackend()?.pendingInputs;
     const environment = this.controller.getEnvironment();
     const buildUrl = this.controller.getBuildUrl();
     const details = this.controller.getCurrentDetails();
-    if (!dataService || !environment || !buildUrl) {
+    if (!pendingInputService || !environment || !buildUrl) {
       void vscode.window.showErrorMessage("Build details are not ready for input approval.");
       return;
     }
     const environmentId = environment.environmentId;
     const label = details?.fullDisplayName ?? details?.displayName ?? "build";
     await handlePendingInputAction({
-      dataService,
+      dataService: pendingInputService,
       environment,
       buildUrl,
       label,
@@ -63,18 +63,18 @@ export class BuildDetailsPanelActions {
   }
 
   async handleRejectInput(message: { inputId: string }): Promise<void> {
-    const dataService = this.controller.getDataService();
+    const pendingInputService = this.controller.getBackend()?.pendingInputs;
     const environment = this.controller.getEnvironment();
     const buildUrl = this.controller.getBuildUrl();
     const details = this.controller.getCurrentDetails();
-    if (!dataService || !environment || !buildUrl) {
+    if (!pendingInputService || !environment || !buildUrl) {
       void vscode.window.showErrorMessage("Build details are not ready for input rejection.");
       return;
     }
     const environmentId = environment.environmentId;
     const label = details?.fullDisplayName ?? details?.displayName ?? "build";
     await handlePendingInputAction({
-      dataService,
+      dataService: pendingInputService,
       environment,
       buildUrl,
       label,
@@ -89,11 +89,11 @@ export class BuildDetailsPanelActions {
   }
 
   async handleRestartPipelineFromStage(message: { stageName: string }): Promise<void> {
-    const dataService = this.controller.getDataService();
+    const restartBackend = this.controller.getBackend()?.restart;
     const environment = this.controller.getEnvironment();
     const buildUrl = this.controller.getBuildUrl();
     const details = this.controller.getCurrentDetails();
-    if (!dataService || !environment || !buildUrl) {
+    if (!restartBackend || !environment || !buildUrl) {
       void vscode.window.showErrorMessage(
         "Build details are not ready to restart a pipeline from stage."
       );
@@ -143,7 +143,7 @@ export class BuildDetailsPanelActions {
     const label = details.fullDisplayName ?? details.displayName ?? `#${details.number}`;
     this.controller.beginLoading();
     try {
-      await dataService.restartPipelineFromStage(environment, buildUrl, stageName);
+      await restartBackend.restartPipelineFromStage(environment, buildUrl, stageName);
       void vscode.window.showInformationMessage(
         `Requested restart from stage "${stageName}" for ${label}.`
       );
@@ -220,11 +220,10 @@ export class BuildDetailsPanelActions {
   }
 
   async handleExportConsole(): Promise<void> {
-    const dataService = this.controller.getDataService();
     const environment = this.controller.getEnvironment();
     const buildUrl = this.controller.getBuildUrl();
     const details = this.controller.getCurrentDetails();
-    if (!dataService || !environment || !buildUrl) {
+    if (!environment || !buildUrl) {
       void vscode.window.showErrorMessage("Build details are not ready to export console output.");
       return;
     }

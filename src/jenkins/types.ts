@@ -84,6 +84,7 @@ export interface JenkinsChangeSet {
 
 export interface JenkinsTestSummaryAction {
   _class?: string;
+  urlName?: string;
   failCount?: number;
   skipCount?: number;
   totalCount?: number;
@@ -97,6 +98,7 @@ export interface JenkinsBuildCause {
 
 export interface JenkinsCauseAction {
   _class?: string;
+  urlName?: string;
   causes?: JenkinsBuildCause[];
 }
 
@@ -107,13 +109,20 @@ export interface JenkinsBuildParameter {
 
 export interface JenkinsParametersAction {
   _class?: string;
+  urlName?: string;
   parameters?: JenkinsBuildParameter[];
+}
+
+export interface JenkinsCoverageBuildAction {
+  _class?: string;
+  urlName?: string;
 }
 
 export type JenkinsBuildAction =
   | JenkinsCauseAction
   | JenkinsParametersAction
-  | JenkinsTestSummaryAction;
+  | JenkinsTestSummaryAction
+  | JenkinsCoverageBuildAction;
 
 export interface JenkinsTestReportCase {
   name?: string;

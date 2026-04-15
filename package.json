@@ -383,6 +383,16 @@
           "default": false,
           "description": "Include per-test stack traces and stdout/stderr when fetching test reports. Enabling this can increase payload size for large test suites."
         },
+        "jenkinsWorkbench.buildDetails.coverage.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Jenkins Coverage plugin summary and modified-file coverage details in the Build Details Tests tab for completed builds."
+        },
+        "jenkinsWorkbench.buildDetails.coverageDecorations.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply editor decorations for modified covered, missed, and partial lines from the active Build Details coverage context when linked workspace files are available."
+        },
         "jenkinsWorkbench.buildDetails.testSourceMatching.fileExtensions": {
           "type": "array",
           "default": [
