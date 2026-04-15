@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-04-15
+
+### Added
+
+- feat: add build coverage summary and coverage decorations
+
 ## [1.42.0] - 2026-04-14
 
 ### Added
