@@ -1,4 +1,8 @@
-import type { JenkinsArtifact, JenkinsJobKind } from "../jenkins/JenkinsClient";
+import type {
+  JenkinsArtifact,
+  JenkinsJobKind,
+  JenkinsWorkspaceEntry
+} from "../jenkins/JenkinsClient";
 import type {
   BuildListFetchOptions,
   JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
@@ -51,6 +55,11 @@ import {
   RootSectionTreeItem,
   ViewsFolderTreeItem
 } from "./items/TreeRootItems";
+import {
+  WorkspaceDirectoryTreeItem,
+  WorkspaceFileTreeItem,
+  WorkspaceRootTreeItem
+} from "./items/TreeWorkspaceItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { TreeChildrenCacheManager } from "./loader/TreeChildrenCacheManager";
 import {
@@ -59,6 +68,8 @@ import {
   buildBuildArtifactsKey,
   buildBuildsChildrenKey,
   buildJobCollectionChildrenKey,
+  buildWorkspaceDirectoryChildrenKey,
+  buildWorkspaceRootChildrenKey,
   getJobCollectionElement,
   getJobCollectionLoadingLabel,
   getJobCollectionRequest,
@@ -209,19 +220,12 @@ export class JenkinsTreeChildrenLoader {
       );
     }
 
-    if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
-      return await this.getOrLoadChildren(
-        this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope),
-        element,
-        () =>
-          this.loadBuildsForJob(
-            element.environment,
-            element.jobUrl,
-            element.jobScope,
-            resolveTreeItemLabel(element)
-          ),
-        "Loading builds..."
-      );
+    if (element instanceof JobTreeItem) {
+      return await this.loadJobChildrenWithWorkspace(element);
+    }
+
+    if (element instanceof PipelineTreeItem) {
+      return await this.loadBuildChildren(element);
     }
 
     if (element instanceof BuildTreeItem) {
@@ -230,6 +234,35 @@ export class JenkinsTreeChildrenLoader {
         element,
         () => this.loadArtifactsSummaryForBuild(element),
         "Loading artifacts..."
+      );
+    }
+
+    if (element instanceof WorkspaceRootTreeItem) {
+      return await this.getOrLoadChildren(
+        this.buildWorkspaceRootChildrenKey(element.environment, element.jobUrl, element.jobScope),
+        element,
+        () => this.loadWorkspaceDirectory(element.environment, element.jobUrl, element.jobScope),
+        "Loading workspace..."
+      );
+    }
+
+    if (element instanceof WorkspaceDirectoryTreeItem) {
+      return await this.getOrLoadChildren(
+        this.buildWorkspaceDirectoryChildrenKey(
+          element.environment,
+          element.jobUrl,
+          element.jobScope,
+          element.relativePath
+        ),
+        element,
+        () =>
+          this.loadWorkspaceDirectory(
+            element.environment,
+            element.jobUrl,
+            element.jobScope,
+            element.relativePath
+          ),
+        "Loading workspace folder..."
       );
     }
 
@@ -341,7 +374,15 @@ export class JenkinsTreeChildrenLoader {
       return;
     }
 
-    if (element instanceof JobTreeItem || element instanceof PipelineTreeItem) {
+    if (element instanceof JobTreeItem) {
+      this.cacheManager.clearChildrenCache(
+        this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope)
+      );
+      this.invalidateWorkspaceForJob(element.environment, element.jobUrl, element.jobScope);
+      return;
+    }
+
+    if (element instanceof PipelineTreeItem) {
       this.cacheManager.clearChildrenCache(
         this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope)
       );
@@ -364,6 +405,21 @@ export class JenkinsTreeChildrenLoader {
       this.invalidateBuildArtifacts(element.environment, element.buildUrl, element.jobScope);
       this.cacheManager.clearChildrenCache(
         this.buildArtifactChildrenKey(element.environment, element.buildUrl, element.jobScope)
+      );
+      return;
+    }
+
+    if (element instanceof WorkspaceRootTreeItem) {
+      this.invalidateWorkspaceForJob(element.environment, element.jobUrl, element.jobScope);
+      return;
+    }
+
+    if (element instanceof WorkspaceDirectoryTreeItem) {
+      this.cacheManager.clearWorkspaceDirectorySubtree(
+        element.environment,
+        element.jobUrl,
+        element.jobScope,
+        element.relativePath
       );
       return;
     }
@@ -517,6 +573,106 @@ export class JenkinsTreeChildrenLoader {
     } catch (error) {
       return [this.createErrorPlaceholder("Unable to load builds.", error)];
     }
+  }
+
+  private async loadJobChildrenWithWorkspace(
+    element: JobTreeItem
+  ): Promise<WorkbenchTreeElement[]> {
+    const workspaceRoot = new WorkspaceRootTreeItem(
+      element.environment,
+      element.jobUrl,
+      element.jobScope
+    );
+    const builds = await this.loadBuildChildren(element);
+    return [workspaceRoot, ...builds];
+  }
+
+  private async loadBuildChildren(
+    element: JobTreeItem | PipelineTreeItem
+  ): Promise<WorkbenchTreeElement[]> {
+    const builds = await this.getOrLoadChildren(
+      this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope),
+      element,
+      () =>
+        this.loadBuildsForJob(
+          element.environment,
+          element.jobUrl,
+          element.jobScope,
+          resolveTreeItemLabel(element)
+        ),
+      "Loading builds..."
+    );
+    return builds;
+  }
+
+  private async loadWorkspaceDirectory(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope,
+    relativePath?: string
+  ): Promise<WorkbenchTreeElement[]> {
+    try {
+      const entries = await this.dataService.getWorkspaceEntries(environment, jobUrl, relativePath);
+      if (entries.length === 0) {
+        return [
+          this.createEmptyPlaceholder(
+            relativePath ? "Folder is empty." : "Workspace is empty.",
+            relativePath
+              ? "This workspace directory has no files or folders."
+              : "This job workspace has no files or folders."
+          )
+        ];
+      }
+      return this.mapWorkspaceEntriesToTreeItems(environment, jobUrl, jobScope, entries);
+    } catch (error) {
+      const placeholder = this.createWorkspacePlaceholderForError(error, relativePath);
+      return [placeholder];
+    }
+  }
+
+  private mapWorkspaceEntriesToTreeItems(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope,
+    entries: JenkinsWorkspaceEntry[]
+  ): WorkbenchTreeElement[] {
+    return entries.map((entry) => {
+      if (entry.isDirectory) {
+        return new WorkspaceDirectoryTreeItem(
+          environment,
+          jobUrl,
+          entry.relativePath,
+          entry.name,
+          jobScope
+        );
+      }
+      return new WorkspaceFileTreeItem(
+        environment,
+        jobUrl,
+        entry.relativePath,
+        entry.name,
+        jobScope
+      );
+    });
+  }
+
+  private createWorkspacePlaceholderForError(
+    error: unknown,
+    relativePath?: string
+  ): PlaceholderTreeItem {
+    if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+      return this.createEmptyPlaceholder(
+        relativePath ? "Directory not found." : "Workspace unavailable.",
+        relativePath
+          ? "This workspace directory no longer exists in Jenkins."
+          : "Jenkins did not expose a current workspace for this job."
+      );
+    }
+
+    return this.createErrorPlaceholder(
+      relativePath ? "Unable to load workspace directory." : "Unable to load workspace.",
+      error
+    );
   }
 
   private async loadNodes(environment: JenkinsEnvironmentRef): Promise<WorkbenchTreeElement[]> {
@@ -891,6 +1047,42 @@ export class JenkinsTreeChildrenLoader {
       buildUrl,
       jobScope
     );
+  }
+
+  private buildWorkspaceRootChildrenKey(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope
+  ): string {
+    return buildWorkspaceRootChildrenKey(
+      this.buildChildrenKey.bind(this),
+      environment,
+      jobUrl,
+      jobScope
+    );
+  }
+
+  private buildWorkspaceDirectoryChildrenKey(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope,
+    relativePath: string
+  ): string {
+    return buildWorkspaceDirectoryChildrenKey(
+      this.buildChildrenKey.bind(this),
+      environment,
+      jobUrl,
+      jobScope,
+      relativePath
+    );
+  }
+
+  private invalidateWorkspaceForJob(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope
+  ): void {
+    this.cacheManager.clearWorkspaceChildrenForJob(environment, jobUrl, jobScope);
   }
 
   private buildChildrenKey(

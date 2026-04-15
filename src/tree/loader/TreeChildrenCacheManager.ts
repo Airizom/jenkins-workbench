@@ -1,7 +1,14 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { ScopedCache } from "../../services/ScopedCache";
+import type { TreeJobScope } from "../TreeJobScope";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import {
+  buildWorkspaceDirectoryChildrenKey,
+  buildWorkspaceDirectoryChildrenPrefix,
+  buildWorkspaceDirectorySubtreePrefix,
+  buildWorkspaceRootChildrenKey
+} from "./TreeChildrenMapping";
 
 export class TreeChildrenCacheManager {
   private readonly watchedUrlsCache = new Map<string, Set<string>>();
@@ -116,6 +123,69 @@ export class TreeChildrenCacheManager {
       }
     }
     this.childrenCache.clearForEnvironmentKind(environment, kind);
+  }
+
+  clearWorkspaceChildrenForJob(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope
+  ): void {
+    const buildChildrenKey = (
+      kind: string,
+      cacheEnvironment: JenkinsEnvironmentRef,
+      extra?: string
+    ) => this.childrenCache.buildKey(cacheEnvironment, kind, extra);
+    this.clearChildrenCache(
+      buildWorkspaceRootChildrenKey(buildChildrenKey, environment, jobUrl, jobScope)
+    );
+    this.clearChildrenCacheByPrefix(
+      buildWorkspaceDirectoryChildrenPrefix(buildChildrenKey, environment, jobUrl, jobScope)
+    );
+  }
+
+  clearWorkspaceDirectorySubtree(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    jobScope: TreeJobScope,
+    relativePath: string
+  ): void {
+    const buildChildrenKey = (
+      kind: string,
+      cacheEnvironment: JenkinsEnvironmentRef,
+      extra?: string
+    ) => this.childrenCache.buildKey(cacheEnvironment, kind, extra);
+    this.clearChildrenCache(
+      buildWorkspaceDirectoryChildrenKey(
+        buildChildrenKey,
+        environment,
+        jobUrl,
+        jobScope,
+        relativePath
+      )
+    );
+    this.clearChildrenCacheByPrefix(
+      buildWorkspaceDirectorySubtreePrefix(
+        buildChildrenKey,
+        environment,
+        jobUrl,
+        jobScope,
+        relativePath
+      )
+    );
+  }
+
+  private clearChildrenCacheByPrefix(prefix: string): void {
+    for (const key of Array.from(this.pendingLoads.keys())) {
+      if (key.startsWith(prefix)) {
+        this.clearChildrenCache(key);
+      }
+    }
+    for (const key of Array.from(this.loadTokens.keys())) {
+      if (key.startsWith(prefix) && !this.pendingLoads.has(key)) {
+        this.loadTokens.delete(key);
+      }
+    }
+    this.childrenCache.clearByPrefix(prefix);
   }
 
   clearChildrenCache(key: string): void {

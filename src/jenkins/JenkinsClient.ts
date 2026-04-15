@@ -7,6 +7,7 @@ import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
 import { JenkinsPipelineSyntaxApi } from "./client/JenkinsPipelineSyntaxApi";
 import { JenkinsPipelineValidationApi } from "./client/JenkinsPipelineValidationApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
+import { JenkinsWorkspaceApi } from "./client/JenkinsWorkspaceApi";
 import { JenkinsRequestError } from "./errors";
 import type { JenkinsBufferResponse } from "./request";
 import type { JenkinsStreamResponse } from "./request";
@@ -34,6 +35,7 @@ import type {
   JenkinsTestReport,
   JenkinsView,
   JenkinsWorkflowRun,
+  JenkinsWorkspaceEntry,
   ScanMultibranchResult
 } from "./types";
 
@@ -71,6 +73,7 @@ export type {
   JenkinsTestReport,
   JenkinsView,
   JenkinsTestSummaryAction,
+  JenkinsWorkspaceEntry,
   JenkinsWorkflowRun,
   ScanMultibranchResult
 } from "./types";
@@ -90,6 +93,7 @@ export class JenkinsClient {
   private readonly queueApi: JenkinsQueueApi;
   private readonly pipelineValidationApi: JenkinsPipelineValidationApi;
   private readonly pipelineSyntaxApi: JenkinsPipelineSyntaxApi;
+  private readonly workspaceApi: JenkinsWorkspaceApi;
 
   constructor(options: JenkinsClientOptions) {
     const httpClient = new JenkinsHttpClient(options);
@@ -99,6 +103,7 @@ export class JenkinsClient {
     this.queueApi = new JenkinsQueueApi(httpClient);
     this.pipelineValidationApi = new JenkinsPipelineValidationApi(httpClient);
     this.pipelineSyntaxApi = new JenkinsPipelineSyntaxApi(httpClient);
+    this.workspaceApi = new JenkinsWorkspaceApi(httpClient);
   }
 
   async getRootJobs(): Promise<JenkinsJob[]> {
@@ -200,6 +205,21 @@ export class JenkinsClient {
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
     return this.buildsApi.getArtifactStream(buildUrl, relativePath, options);
+  }
+
+  async getWorkspaceEntries(
+    jobUrl: string,
+    relativePath?: string
+  ): Promise<JenkinsWorkspaceEntry[]> {
+    return this.workspaceApi.getWorkspaceEntries(jobUrl, relativePath);
+  }
+
+  async getWorkspaceFile(
+    jobUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse> {
+    return this.workspaceApi.getWorkspaceFile(jobUrl, relativePath, options);
   }
 
   async getNodes(): Promise<JenkinsNode[]> {

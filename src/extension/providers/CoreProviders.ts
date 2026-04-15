@@ -25,6 +25,7 @@ import { DefaultTestSourceFileMatchStrategy } from "../../services/TestSourceFil
 import { TestSourceNavigationService } from "../../services/TestSourceNavigationService";
 import { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { TestSourceResolver } from "../../services/TestSourceResolver";
+import { DefaultWorkspaceRetrievalService } from "../../services/WorkspaceRetrievalService";
 import { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -42,6 +43,7 @@ import {
 import { type ArtifactPreviewOptionsProvider, ArtifactPreviewer } from "../../ui/ArtifactPreviewer";
 import { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
+import { WorkspacePreviewer } from "../../ui/WorkspacePreviewer";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 
 export interface CoreProviderOptions {
@@ -79,6 +81,8 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
     buildLogService: (container) => new BuildLogService(container.get("dataService")),
     artifactRetrievalService: (container) =>
       new DefaultArtifactRetrievalService(container.get("dataService")),
+    workspaceRetrievalService: (container) =>
+      new DefaultWorkspaceRetrievalService(container.get("dataService")),
     artifactStorageService: (container) =>
       new ArtifactStorageService(
         container.get("artifactRetrievalService"),
@@ -94,6 +98,12 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
       ),
     jobConfigPreviewer: (container) =>
       new JobConfigPreviewer(container.get("artifactPreviewProvider")),
+    workspacePreviewer: (container) =>
+      new WorkspacePreviewer(
+        container.get("workspaceRetrievalService"),
+        container.get("artifactPreviewProvider"),
+        options.artifactPreviewOptionsProvider
+      ),
     jobConfigDraftFilesystem: (_container) => new JobConfigDraftFilesystem(),
     jobConfigDraftManager: (container) =>
       new JobConfigDraftManager(container.get("jobConfigDraftFilesystem")),

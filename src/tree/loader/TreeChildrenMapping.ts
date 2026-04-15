@@ -110,6 +110,52 @@ export function buildArtifactChildrenKey(
   return buildChildrenKey("artifacts", environment, buildScopedTreeExtra(jobScope, buildUrl));
 }
 
+export function buildWorkspaceRootChildrenKey(
+  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  environment: JenkinsEnvironmentRef,
+  jobUrl: string,
+  jobScope: TreeJobScope
+): string {
+  return buildChildrenKey("workspace", environment, buildScopedTreeExtra(jobScope, jobUrl));
+}
+
+export function buildWorkspaceDirectoryChildrenKey(
+  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  environment: JenkinsEnvironmentRef,
+  jobUrl: string,
+  jobScope: TreeJobScope,
+  relativePath: string
+): string {
+  return buildChildrenKey(
+    "workspace-dir",
+    environment,
+    `${buildScopedTreeExtra(jobScope, jobUrl)}::${relativePath}`
+  );
+}
+
+export function buildWorkspaceDirectoryChildrenPrefix(
+  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  environment: JenkinsEnvironmentRef,
+  jobUrl: string,
+  jobScope: TreeJobScope
+): string {
+  return buildChildrenKey(
+    "workspace-dir",
+    environment,
+    `${buildScopedTreeExtra(jobScope, jobUrl)}::`
+  );
+}
+
+export function buildWorkspaceDirectorySubtreePrefix(
+  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  environment: JenkinsEnvironmentRef,
+  jobUrl: string,
+  jobScope: TreeJobScope,
+  relativePath: string
+): string {
+  return `${buildWorkspaceDirectoryChildrenKey(buildChildrenKey, environment, jobUrl, jobScope, relativePath)}/`;
+}
+
 export function toJenkinsJobCollectionRequest(
   request: TreeJobCollectionRequest
 ): JenkinsDataJobCollectionRequest {

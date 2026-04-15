@@ -8,6 +8,7 @@ import type {
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
   JenkinsWorkflowRun,
+  JenkinsWorkspaceEntry,
   ScanMultibranchResult
 } from "./JenkinsClient";
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
@@ -40,6 +41,7 @@ import { JenkinsNodeDataOperations } from "./data/JenkinsNodeDataOperations";
 import type { NodeLaunchResult, NodeOfflineToggleResult } from "./data/JenkinsNodeDataOperations";
 import { JenkinsPendingInputDataOperations } from "./data/JenkinsPendingInputDataOperations";
 import { JenkinsQueueAndJobManagementOperations } from "./data/JenkinsQueueAndJobManagementOperations";
+import { JenkinsWorkspaceDataOperations } from "./data/JenkinsWorkspaceDataOperations";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type {
   JenkinsReplayDefinition,
@@ -99,6 +101,7 @@ export class JenkinsDataService {
   private readonly nodeOperations: JenkinsNodeDataOperations;
   private readonly jobOperations: JenkinsJobDataOperations;
   private readonly queueAndJobManagementOperations: JenkinsQueueAndJobManagementOperations;
+  private readonly workspaceOperations: JenkinsWorkspaceDataOperations;
 
   constructor(clientProvider: JenkinsClientProvider, options: JenkinsDataServiceOptions) {
     this.runtimeContext = new JenkinsDataRuntimeContext(clientProvider, options);
@@ -110,6 +113,7 @@ export class JenkinsDataService {
     this.queueAndJobManagementOperations = new JenkinsQueueAndJobManagementOperations(
       this.runtimeContext
     );
+    this.workspaceOperations = new JenkinsWorkspaceDataOperations(this.runtimeContext);
   }
 
   clearCache(): void {
@@ -280,6 +284,23 @@ export class JenkinsDataService {
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
     return this.buildOperations.getArtifactStream(environment, buildUrl, relativePath, options);
+  }
+
+  async getWorkspaceEntries(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    relativePath?: string
+  ): Promise<JenkinsWorkspaceEntry[]> {
+    return this.workspaceOperations.getWorkspaceEntries(environment, jobUrl, relativePath);
+  }
+
+  async getWorkspaceFile(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse> {
+    return this.workspaceOperations.getWorkspaceFile(environment, jobUrl, relativePath, options);
   }
 
   async getConsoleText(

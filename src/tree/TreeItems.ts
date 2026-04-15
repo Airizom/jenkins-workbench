@@ -30,6 +30,11 @@ export {
   BuildArtifactsFolderTreeItem,
   BuildTreeItem
 } from "./items/TreeBuildItems";
+export {
+  WorkspaceDirectoryTreeItem,
+  WorkspaceFileTreeItem,
+  WorkspaceRootTreeItem
+} from "./items/TreeWorkspaceItems";
 export { NodeTreeItem } from "./items/TreeNodeItems";
 export { QueueItemTreeItem } from "./items/TreeQueueItems";
 export { PlaceholderTreeItem } from "./items/TreePlaceholderItem";

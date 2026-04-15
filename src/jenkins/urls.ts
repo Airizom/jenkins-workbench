@@ -190,6 +190,20 @@ export function buildArtifactViewUrl(buildUrl: string, relativePath: string): st
   return new URL(`artifact/${encodedPath}/*view*/`, base).toString();
 }
 
+export function buildWorkspaceDirectoryListingUrl(jobUrl: string, relativePath?: string): string {
+  const base = ensureTrailingSlash(jobUrl);
+  const workspacePath = relativePath
+    ? `ws/${encodePathSegments(relativePath)}/*plain*/`
+    : "ws/*plain*/";
+  return new URL(workspacePath, base).toString();
+}
+
+export function buildWorkspaceFileUrl(jobUrl: string, relativePath: string): string {
+  const base = ensureTrailingSlash(jobUrl);
+  const encodedPath = encodePathSegments(relativePath);
+  return new URL(`ws/${encodedPath}`, base).toString();
+}
+
 export function resolveNodeUrl(baseUrl: string, node: JenkinsNode): string | undefined {
   const base = ensureTrailingSlash(baseUrl);
   let resolvedUrl: string | undefined;

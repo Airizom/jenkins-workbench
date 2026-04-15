@@ -17,10 +17,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Other",
-    "Visualization"
-  ],
+  "categories": ["Other", "Visualization"],
   "keywords": [
     "jenkins",
     "ci",
@@ -36,10 +33,7 @@
     "color": "#1a1a2e",
     "theme": "dark"
   },
-  "activationEvents": [
-    "onStartupFinished",
-    "onUri"
-  ],
+  "activationEvents": ["onStartupFinished", "onUri"],
   "main": "./out/extension.js",
   "contributes": {
     "uriHandler": {
@@ -191,6 +185,11 @@
         "icon": "$(cloud-download)"
       },
       {
+        "command": "jenkinsWorkbench.previewWorkspaceFile",
+        "title": "Jenkins: Preview Workspace File",
+        "icon": "$(eye)"
+      },
+      {
         "command": "jenkinsWorkbench.filterBranches",
         "title": "Jenkins: Filter Branches"
       },
@@ -311,10 +310,7 @@
     "taskDefinitions": [
       {
         "type": "jenkinsWorkbench",
-        "required": [
-          "environmentUrl",
-          "jobUrl"
-        ],
+        "required": ["environmentUrl", "jobUrl"],
         "properties": {
           "environmentUrl": {
             "type": "string",
@@ -332,18 +328,9 @@
             "type": "object",
             "description": "Optional build parameters passed to Jenkins.",
             "additionalProperties": {
-              "type": [
-                "string",
-                "number",
-                "boolean",
-                "array"
-              ],
+              "type": ["string", "number", "boolean", "array"],
               "items": {
-                "type": [
-                  "string",
-                  "number",
-                  "boolean"
-                ]
+                "type": ["string", "number", "boolean"]
               }
             }
           }
@@ -445,10 +432,7 @@
           ],
           "items": {
             "type": "object",
-            "required": [
-              "fragment",
-              "score"
-            ],
+            "required": ["fragment", "score"],
             "properties": {
               "fragment": {
                 "type": "string"
@@ -579,9 +563,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "all"
-          ],
+          "default": ["all"],
           "description": "Case-insensitive Jenkins view names to hide from the Views section."
         },
         "jenkinsWorkbench.currentBranch.pullRequestJobNamePatterns": {
@@ -589,9 +571,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "pr-{number}"
-          ],
+          "default": ["pr-{number}"],
           "description": "Job-name patterns to use when resolving current-branch pull request jobs. Use {number} as the pull request number placeholder."
         },
         "jenkinsWorkbench.jenkinsfileValidation.enabled": {
@@ -620,11 +600,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "**/Jenkinsfile",
-            "**/*.jenkinsfile",
-            "**/Jenkinsfile.*"
-          ],
+          "default": ["**/Jenkinsfile", "**/*.jenkinsfile", "**/Jenkinsfile.*"],
           "description": "Glob patterns used to detect Jenkinsfile documents for validation and language intelligence."
         }
       }
@@ -822,6 +798,11 @@
           "command": "jenkinsWorkbench.downloadArtifact",
           "when": "view == jenkinsWorkbench.tree && viewItem == artifactItem",
           "group": "inline@1"
+        },
+        {
+          "command": "jenkinsWorkbench.previewWorkspaceFile",
+          "when": "view == jenkinsWorkbench.tree && viewItem == workspaceFile",
+          "group": "inline@0"
         },
         {
           "command": "jenkinsWorkbench.showBuildDetails",

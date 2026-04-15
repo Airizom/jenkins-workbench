@@ -25,6 +25,11 @@ import type {
   RootSectionTreeItem,
   ViewsFolderTreeItem
 } from "./TreeRootItems";
+import type {
+  WorkspaceDirectoryTreeItem,
+  WorkspaceFileTreeItem,
+  WorkspaceRootTreeItem
+} from "./TreeWorkspaceItems";
 
 export type WorkbenchTreeElement =
   | RootSectionTreeItem
@@ -45,6 +50,9 @@ export type WorkbenchTreeElement =
   | BuildTreeItem
   | BuildArtifactsFolderTreeItem
   | ArtifactTreeItem
+  | WorkspaceRootTreeItem
+  | WorkspaceDirectoryTreeItem
+  | WorkspaceFileTreeItem
   | NodeTreeItem
   | QueueItemTreeItem
   | PlaceholderTreeItem;

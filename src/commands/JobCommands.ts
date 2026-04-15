@@ -5,8 +5,14 @@ import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
-import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
+import type {
+  JenkinsFolderTreeItem,
+  JobTreeItem,
+  PipelineTreeItem,
+  WorkspaceFileTreeItem
+} from "../tree/TreeItems";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
+import type { WorkspacePreviewer } from "../ui/WorkspacePreviewer";
 import {
   type JobActionDependencies,
   copyJob,
@@ -25,12 +31,14 @@ import {
   type JobNewItemTreeTarget
 } from "./job/JobNewItemTargetResolver";
 import { JobNewItemWorkflow } from "./job/JobNewItemWorkflow";
+import { previewWorkspaceFile } from "./job/JobWorkspaceHandlers";
 
 export function registerJobCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
   environmentStore: JenkinsEnvironmentStore,
   jobConfigPreviewer: JobConfigPreviewer,
+  workspacePreviewer: WorkspacePreviewer,
   refreshHost: JobCommandRefreshHost,
   draftManager: JobConfigDraftManager,
   workflow: JobConfigUpdateWorkflow,
@@ -95,6 +103,10 @@ export function registerJobCommands(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.copyJob",
       (item?: JobTreeItem | PipelineTreeItem) => copyJob(actionDeps, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.previewWorkspaceFile",
+      (item?: WorkspaceFileTreeItem) => previewWorkspaceFile(workspacePreviewer, item)
     )
   );
 

@@ -63,6 +63,15 @@ export interface JenkinsArtifact {
   relativePath: string;
 }
 
+export interface JenkinsWorkspaceEntry {
+  name: string;
+  relativePath: string;
+  isDirectory: boolean;
+  size?: number;
+  lastModified?: number;
+  isReadable?: boolean;
+}
+
 export interface JenkinsChangeSetItem {
   commitId?: string;
   msg?: string;

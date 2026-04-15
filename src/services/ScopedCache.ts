@@ -66,6 +66,10 @@ export class ScopedCache {
     this.clearKeysWithPrefix(prefix);
   }
 
+  clearByPrefix(prefix: string): void {
+    this.clearKeysWithPrefix(prefix);
+  }
+
   private pruneIfNeeded(): void {
     if (this.keys.size <= this.pruneThreshold) {
       return;

@@ -35,6 +35,7 @@ export function registerExtensionCommands(
   const jenkinsfileEnvironmentResolver = container.get("jenkinsfileEnvironmentResolver");
   const jenkinsfileStepCatalogService = container.get("jenkinsfileStepCatalogService");
   const jobConfigPreviewer = container.get("jobConfigPreviewer");
+  const workspacePreviewer = container.get("workspacePreviewer");
   const jobConfigDraftManager = container.get("jobConfigDraftManager");
   const jobConfigUpdateWorkflow = container.get("jobConfigUpdateWorkflow");
   const refreshHost = container.get("refreshHost");
@@ -69,6 +70,7 @@ export function registerExtensionCommands(
     dataService,
     environmentStore,
     jobConfigPreviewer,
+    workspacePreviewer,
     refreshHost,
     jobConfigDraftManager,
     jobConfigUpdateWorkflow,

@@ -51,6 +51,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Console Search & Export** — Quickly search logs or export console output from build details
 - **Failure Insights** — Focused cards that summarize why a build failed, with empty states when no data is available
 - **Artifact Preview & Download** — Open images/text artifacts or download them to your workspace
+- **Workspace Browsing** — Browse a classic job's current Jenkins workspace and preview files without leaving VS Code
 
 ### Build Details Panel
 
@@ -282,6 +283,7 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 |---------|-------------|
 | `Jenkins: Preview Artifact` | Open an artifact (image/text) from a build |
 | `Jenkins: Download Artifact` | Download an artifact to the workspace |
+| `Jenkins: Preview Workspace File` | Open a file from the selected job workspace |
 
 ### Navigation & Search
 
@@ -397,6 +399,12 @@ Security notes:
 - Artifact downloads require a folder-backed workspace; previews do not
 - If downloads fail, check the `jenkinsWorkbench.artifactMaxDownloadMb` limit
 
+### Workspace Browsing
+
+- Workspace browsing reflects the current Jenkins classic job workspace, not a historical per-build snapshot
+- Pipeline jobs do not expose the same job-level workspace browser, so they do not show a `Workspace` branch
+- If a job has not created a workspace yet, the tree will show `Workspace unavailable` or an empty workspace state
+
 ### Slow Job Search
 
 - Adjust `jobSearchConcurrency` based on your Jenkins server capacity
@@ -455,7 +463,8 @@ npm run check:fix
 7. Trigger a multibranch scan and verify branch filtering still works
 8. Confirm removing an environment clears it from the tree
 9. Preview or download a build artifact
-10. Pin and unpin a job or pipeline, then verify the pinned section and remove any missing pins
+10. Browse a classic job workspace, expand nested folders, and preview a workspace file
+11. Pin and unpin a job or pipeline, then verify the pinned section and remove any missing pins
 
 ## License
 

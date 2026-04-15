@@ -39,6 +39,7 @@ import type { TestSourceFileMatchStrategy } from "../../services/TestSourceFileM
 import type { TestSourceNavigationService } from "../../services/TestSourceNavigationService";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import type { TestSourceResolver } from "../../services/TestSourceResolver";
+import type { WorkspaceRetrievalService } from "../../services/WorkspaceRetrievalService";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -54,6 +55,7 @@ import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import type { ArtifactPreviewProvider } from "../../ui/ArtifactPreviewProvider";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
+import type { WorkspacePreviewer } from "../../ui/WorkspacePreviewer";
 import type { JenkinsfileEnvironmentResolver } from "../../validation/JenkinsfileEnvironmentResolver";
 import type { JenkinsfileMatcher } from "../../validation/JenkinsfileMatcher";
 import type { JenkinsfileValidationCoordinator } from "../../validation/JenkinsfileValidationCoordinator";
@@ -77,10 +79,12 @@ export interface ExtensionTokenMap {
   consoleExporter: BuildConsoleExporter;
   buildLogService: BuildLogService;
   artifactRetrievalService: ArtifactRetrievalService;
+  workspaceRetrievalService: WorkspaceRetrievalService;
   artifactStorageService: ArtifactStorageService;
   artifactPreviewProvider: ArtifactPreviewProvider;
   buildLogPreviewer: BuildLogPreviewer;
   jobConfigPreviewer: JobConfigPreviewer;
+  workspacePreviewer: WorkspacePreviewer;
   jobConfigDraftFilesystem: JobConfigDraftFilesystem;
   jobConfigDraftManager: JobConfigDraftManager;
   jobConfigUpdateWorkflow: JobConfigUpdateWorkflow;

@@ -1,24 +1,8 @@
-import type { IncomingHttpHeaders } from "node:http";
 import * as path from "node:path";
-import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { ArtifactRetrievalService } from "../services/ArtifactRetrievalService";
 import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
-
-const IMAGE_EXTENSIONS = new Set([
-  ".apng",
-  ".avif",
-  ".bmp",
-  ".gif",
-  ".ico",
-  ".jpeg",
-  ".jpg",
-  ".png",
-  ".svg",
-  ".tif",
-  ".tiff",
-  ".webp"
-]);
+import { openBufferedContentPreview } from "./BufferedContentPreviewer";
 
 export interface ArtifactPreviewRequest {
   environment: JenkinsEnvironmentRef;
@@ -32,8 +16,6 @@ export interface ArtifactPreviewOptions {
 }
 
 export type ArtifactPreviewOptionsProvider = () => ArtifactPreviewOptions;
-
-type ArtifactPreviewKind = "image" | "text";
 
 export class ArtifactPreviewer {
   constructor(
@@ -54,20 +36,7 @@ export class ArtifactPreviewer {
       { maxBytes: options.maxBytes }
     );
 
-    const previewKind = resolvePreviewKind(response.headers, previewPath);
-    const uri = this.previewProvider.registerArtifact(response.data, fileName);
-    const trackUsage = previewKind === "text";
-    if (trackUsage) {
-      this.previewProvider.markInUse(uri);
-    }
-    try {
-      await openArtifactPreview(uri, previewKind);
-    } catch (error) {
-      if (trackUsage) {
-        this.previewProvider.release(uri);
-      }
-      throw error;
-    }
+    await openBufferedContentPreview(this.previewProvider, response, previewPath, fileName);
   }
 }
 
@@ -98,38 +67,4 @@ function normalizeOptionalName(value?: string): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function getHeaderValue(headers: IncomingHttpHeaders, name: string): string | undefined {
-  const value = headers[name.toLowerCase()];
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-  return typeof value === "string" ? value : undefined;
-}
-
-function isImageContentType(contentType?: string): boolean {
-  if (!contentType) {
-    return false;
-  }
-  const normalized = contentType.split(";")[0].trim().toLowerCase();
-  return normalized.startsWith("image/");
-}
-
-function resolvePreviewKind(
-  headers: IncomingHttpHeaders,
-  previewPath: string
-): ArtifactPreviewKind {
-  const contentType = getHeaderValue(headers, "content-type");
-  const extension = path.extname(previewPath).toLowerCase();
-  return isImageContentType(contentType) || IMAGE_EXTENSIONS.has(extension) ? "image" : "text";
-}
-
-async function openArtifactPreview(uri: vscode.Uri, kind: ArtifactPreviewKind): Promise<void> {
-  if (kind === "image") {
-    await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
-    return;
-  }
-
-  await vscode.window.showTextDocument(uri, { preview: true });
 }
