@@ -28,6 +28,12 @@ If you change one side, update the others in the same pass.
   - Frontend consumer: `src/panels/buildDetails/webview/state/buildDetailsState.ts` and hooks/components in `src/panels/buildDetails/webview/**`
   - Rule: add/remove message fields in the shared contract module and consume from both backend and webview.
 
+- Build Compare backend/frontend contract:
+  - Contract: `src/panels/buildCompare/shared/BuildCompareContracts.ts`, `src/panels/buildCompare/shared/BuildComparePanelMessages.ts`, `src/panels/buildCompare/shared/BuildComparePanelWebviewState.ts`
+  - Backend producer: `src/panels/buildCompare/BuildComparePanelController.ts`
+  - Frontend consumer: `src/panels/buildCompare/webview/state/buildCompareState.ts` and hooks/components in `src/panels/buildCompare/webview/**`
+  - Rule: add/remove view-model or message fields in the shared contract modules and consume them from both backend and webview.
+
 - Node Details backend/frontend contract:
   - Contract: `src/panels/nodeDetails/shared/NodeDetailsPanelMessages.ts`
   - Backend producer: `src/panels/NodeDetailsPanel.ts`
@@ -65,10 +71,10 @@ When adding a service, wire it through the appropriate provider catalog (`CorePr
 
 If you touch panel entrypoints, bundle naming, or Vite output:
 
-1. Confirm `vite.config.ts` still emits manifest entries for build/node details.
+1. Confirm `vite.config.ts` still emits manifest entries for build compare, build details, and node details.
 2. Run `npm run compile`.
 3. Verify `out/webview/manifest.json` includes expected entries.
-4. Launch Extension Development Host and open both Build Details and Node Details panels.
+4. Launch Extension Development Host and open the Build Compare, Build Details, and Node Details panels.
 
 If this is skipped, `resolveWebviewAssets(...)` throws and panel load fails.
 

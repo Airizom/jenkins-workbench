@@ -14,6 +14,12 @@ const buildDetailsEntry = path.join(
   "webview",
   "index.tsx"
 );
+const buildCompareEntry = path.join(
+  panelsRoot,
+  "buildCompare",
+  "webview",
+  "index.tsx"
+);
 const nodeDetailsEntry = path.join(panelsRoot, "nodeDetails", "webview", "index.tsx");
 
 export default defineConfig(() => {
@@ -29,6 +35,7 @@ export default defineConfig(() => {
       sourcemap: isWatch,
       rollupOptions: {
         input: {
+          buildCompare: buildCompareEntry,
           buildDetails: buildDetailsEntry,
           nodeDetails: nodeDetailsEntry
         },

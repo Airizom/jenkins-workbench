@@ -27,6 +27,7 @@ export interface JenkinsBufferResponse {
 export interface JenkinsStreamResponse {
   stream: NodeJS.ReadableStream;
   headers: IncomingHttpHeaders;
+  abort(): void;
 }
 
 export interface JenkinsVoidRequestOptions {

@@ -153,15 +153,20 @@ export class JenkinsClient {
     return this.buildsApi.getConsoleText(buildUrl, maxChars);
   }
 
+  async getConsoleTextHead(buildUrl: string, maxBytes: number): Promise<JenkinsConsoleText> {
+    return this.buildsApi.getConsoleTextHead(buildUrl, maxBytes);
+  }
+
   async getConsoleTextTail(buildUrl: string, maxChars: number): Promise<JenkinsConsoleTextTail> {
     return this.buildsApi.getConsoleTextTail(buildUrl, maxChars);
   }
 
   async getConsoleTextProgressive(
     buildUrl: string,
-    start: number
+    start: number,
+    maxBytes?: number
   ): Promise<JenkinsProgressiveConsoleText> {
-    return this.buildsApi.getConsoleTextProgressive(buildUrl, start);
+    return this.buildsApi.getConsoleTextProgressive(buildUrl, start, maxBytes);
   }
 
   async getConsoleHtmlProgressive(

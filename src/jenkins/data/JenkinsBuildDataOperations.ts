@@ -31,16 +31,27 @@ export class JenkinsBuildDataOperations {
     environment: JenkinsEnvironmentRef,
     jobUrl: string,
     limit: number,
-    options?: { detailLevel?: "summary" | "details"; includeParameters?: boolean }
+    options?: {
+      detailLevel?: "summary" | "details";
+      includeParameters?: boolean;
+      bypassCache?: boolean;
+    }
   ): Promise<JenkinsBuild[]> {
     const detailLevel = options?.detailLevel ?? "summary";
     const includeParameters = options?.includeParameters ?? false;
+    const bypassCache = options?.bypassCache ?? false;
+    const client = await this.context.getClient(environment);
+    if (bypassCache) {
+      return client.getBuilds(jobUrl, limit, {
+        includeDetails: detailLevel === "details",
+        includeParameters
+      });
+    }
     const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}`;
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, jobUrl);
     return this.context.getCache().getOrLoad(
       cacheKey,
       async () => {
-        const client = await this.context.getClient(environment);
         return client.getBuilds(jobUrl, limit, {
           includeDetails: detailLevel === "details",
           includeParameters
@@ -52,9 +63,14 @@ export class JenkinsBuildDataOperations {
 
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    options?: { includeParameters?: boolean }
   ): Promise<JenkinsBuildDetails> {
-    const cacheKey = await this.context.buildCacheKey(environment, "build-details", buildUrl);
+    const cacheKey = await this.context.buildCacheKey(
+      environment,
+      options?.includeParameters ? "build-details-params" : "build-details",
+      buildUrl
+    );
     const cached = this.context.getCache().get<JenkinsBuildDetails>(cacheKey);
     if (cached && !cached.building) {
       return cached;
@@ -62,7 +78,7 @@ export class JenkinsBuildDataOperations {
 
     const client = await this.context.getClient(environment);
     try {
-      const details = await client.getBuildDetails(buildUrl);
+      const details = await client.getBuildDetails(buildUrl, options);
       if (!details.building) {
         this.context.getCache().set(cacheKey, details, this.context.getCacheTtlMs());
       } else {
@@ -139,6 +155,19 @@ export class JenkinsBuildDataOperations {
     }
   }
 
+  async getConsoleTextHead(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    maxBytes: number
+  ): Promise<ConsoleTextResult> {
+    const client = await this.context.getClient(environment);
+    try {
+      return await client.getConsoleTextHead(buildUrl, maxBytes);
+    } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
   async getConsoleTextTail(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
@@ -155,11 +184,12 @@ export class JenkinsBuildDataOperations {
   async getConsoleTextProgressive(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    start: number
+    start: number,
+    maxBytes?: number
   ): Promise<ProgressiveConsoleTextResult> {
     const client = await this.context.getClient(environment);
     try {
-      return await client.getConsoleTextProgressive(buildUrl, start);
+      return await client.getConsoleTextProgressive(buildUrl, start, maxBytes);
     } catch (error) {
       throw toBuildActionError(error);
     }

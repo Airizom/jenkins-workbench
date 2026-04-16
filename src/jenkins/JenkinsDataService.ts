@@ -91,6 +91,7 @@ export interface JenkinsDataServiceOptions {
 export interface BuildListFetchOptions {
   detailLevel?: "summary" | "details";
   includeParameters?: boolean;
+  bypassCache?: boolean;
 }
 
 export class JenkinsDataService {
@@ -208,9 +209,10 @@ export class JenkinsDataService {
 
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    options?: { includeParameters?: boolean }
   ): Promise<JenkinsBuildDetails> {
-    return this.buildOperations.getBuildDetails(environment, buildUrl);
+    return this.buildOperations.getBuildDetails(environment, buildUrl, options);
   }
 
   async getBuildArtifacts(
@@ -311,6 +313,14 @@ export class JenkinsDataService {
     return this.buildOperations.getConsoleText(environment, buildUrl, maxChars);
   }
 
+  async getConsoleTextHead(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    maxBytes: number
+  ): Promise<ConsoleTextResult> {
+    return this.buildOperations.getConsoleTextHead(environment, buildUrl, maxBytes);
+  }
+
   async getConsoleTextTail(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
@@ -322,9 +332,10 @@ export class JenkinsDataService {
   async getConsoleTextProgressive(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    start: number
+    start: number,
+    maxBytes?: number
   ): Promise<ProgressiveConsoleTextResult> {
-    return this.buildOperations.getConsoleTextProgressive(environment, buildUrl, start);
+    return this.buildOperations.getConsoleTextProgressive(environment, buildUrl, start, maxBytes);
   }
 
   async getConsoleHtmlProgressive(

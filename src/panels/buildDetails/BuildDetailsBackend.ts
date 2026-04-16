@@ -1,7 +1,6 @@
 import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsTestReportOptions } from "../../jenkins/JenkinsTestReportOptions";
 import type {
   JenkinsCoverageRequestOptions,
   JenkinsCoverageService
@@ -10,35 +9,20 @@ import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
-import type {
-  JenkinsBuildDetails,
-  JenkinsConsoleText,
-  JenkinsConsoleTextTail,
-  JenkinsProgressiveConsoleHtml,
-  JenkinsProgressiveConsoleText,
-  JenkinsRestartFromStageInfo,
-  JenkinsTestReport,
-  JenkinsWorkflowRun
-} from "../../jenkins/types";
+import type { JenkinsRestartFromStageInfo } from "../../jenkins/types";
+import {
+  BuildInspectionBackendAdapter,
+  type BuildInspectionConsoleBackend,
+  type BuildInspectionStatusBackend,
+  type BuildInspectionTestsBackend
+} from "../shared/backend/BuildInspectionBackend";
 
-export interface BuildDetailsStatusBackend {
-  getBuildDetails(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsBuildDetails>;
-  getWorkflowRun(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsWorkflowRun | undefined>;
-}
-
-export interface BuildDetailsTestsBackend {
-  getTestReport(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: JenkinsTestReportOptions
-  ): Promise<JenkinsTestReport | undefined>;
-}
+export type {
+  BuildInspectionBackend as BuildDetailsInspectionBackend,
+  BuildInspectionConsoleBackend as BuildDetailsConsoleBackend,
+  BuildInspectionStatusBackend as BuildDetailsStatusBackend,
+  BuildInspectionTestsBackend as BuildDetailsTestsBackend
+} from "../shared/backend/BuildInspectionBackend";
 
 export interface BuildDetailsCoverageBackend {
   discoverCoverageActionPath(
@@ -56,30 +40,6 @@ export interface BuildDetailsCoverageBackend {
     buildUrl: string,
     options?: JenkinsCoverageRequestOptions
   ): Promise<JenkinsModifiedCoverageFile[] | undefined>;
-}
-
-export interface BuildDetailsConsoleBackend {
-  getConsoleText(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars?: number
-  ): Promise<JenkinsConsoleText>;
-  getConsoleTextTail(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars: number
-  ): Promise<JenkinsConsoleTextTail>;
-  getConsoleTextProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number
-  ): Promise<JenkinsProgressiveConsoleText>;
-  getConsoleHtmlProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number,
-    annotator?: string
-  ): Promise<JenkinsProgressiveConsoleHtml>;
 }
 
 export interface BuildDetailsPendingInputsBackend {
@@ -115,10 +75,10 @@ export interface BuildDetailsRestartBackend {
 }
 
 export interface BuildDetailsBackend {
-  status: BuildDetailsStatusBackend;
-  tests: BuildDetailsTestsBackend;
+  status: BuildInspectionStatusBackend;
+  tests: BuildInspectionTestsBackend;
   coverage: BuildDetailsCoverageBackend;
-  console: BuildDetailsConsoleBackend;
+  console: BuildInspectionConsoleBackend;
   pendingInputs: BuildDetailsPendingInputsBackend;
   restart: BuildDetailsRestartBackend;
 }
@@ -129,31 +89,22 @@ export type BuildDetailsPendingInputProvider = Pick<
 >;
 
 export class BuildDetailsBackendAdapter implements BuildDetailsBackend {
-  readonly status: BuildDetailsStatusBackend;
-  readonly tests: BuildDetailsTestsBackend;
+  readonly status: BuildInspectionStatusBackend;
+  readonly tests: BuildInspectionTestsBackend;
   readonly coverage: BuildDetailsCoverageBackend;
-  readonly console: BuildDetailsConsoleBackend;
+  readonly console: BuildInspectionConsoleBackend;
   readonly pendingInputs: BuildDetailsPendingInputsBackend;
   readonly restart: BuildDetailsRestartBackend;
 
   constructor(dataService: JenkinsDataService, coverageService: JenkinsCoverageService) {
-    this.status = {
-      getBuildDetails: (...args) => dataService.getBuildDetails(...args),
-      getWorkflowRun: (...args) => dataService.getWorkflowRun(...args)
-    };
-    this.tests = {
-      getTestReport: (...args) => dataService.getTestReport(...args)
-    };
+    const inspection = new BuildInspectionBackendAdapter(dataService);
+    this.status = inspection.status;
+    this.tests = inspection.tests;
+    this.console = inspection.console;
     this.coverage = {
       discoverCoverageActionPath: (...args) => coverageService.discoverCoverageActionPath(...args),
       getCoverageOverview: (...args) => coverageService.getCoverageOverview(...args),
       getModifiedCoverageFiles: (...args) => coverageService.getModifiedCoverageFiles(...args)
-    };
-    this.console = {
-      getConsoleText: (...args) => dataService.getConsoleText(...args),
-      getConsoleTextTail: (...args) => dataService.getConsoleTextTail(...args),
-      getConsoleTextProgressive: (...args) => dataService.getConsoleTextProgressive(...args),
-      getConsoleHtmlProgressive: (...args) => dataService.getConsoleHtmlProgressive(...args)
     };
     this.pendingInputs = {
       getPendingInputActions: (...args) => dataService.getPendingInputActions(...args),

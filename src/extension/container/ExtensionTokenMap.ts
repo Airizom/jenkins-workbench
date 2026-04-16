@@ -22,6 +22,7 @@ import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/Jenki
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
 import type { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
+import type { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
 import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import type { ArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
@@ -101,6 +102,7 @@ export interface ExtensionTokenMap {
   testSourceNavigationUiService: TestSourceNavigationUiService;
   replayBuildWorkflow: ReplayBuildWorkflow;
   artifactActionHandler: ArtifactActionHandler;
+  buildComparePanelLauncher: BuildComparePanelLauncher;
   buildDetailsPanelLauncher: BuildDetailsPanelLauncher;
   watchStore: JenkinsWatchStore;
   presetStore: JenkinsParameterPresetStore;

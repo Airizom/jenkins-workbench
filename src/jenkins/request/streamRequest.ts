@@ -59,7 +59,17 @@ export function requestStream(
       }
 
       const stream = new PassThrough();
+      let aborted = false;
       let receivedBytes = 0;
+      const abort = () => {
+        if (aborted) {
+          return;
+        }
+        aborted = true;
+        response.unpipe(stream);
+        response.destroy();
+        stream.destroy();
+      };
       response.on("data", (chunk) => {
         if (maxBytes === undefined) {
           return;
@@ -75,7 +85,7 @@ export function requestStream(
         stream.destroy(error instanceof Error ? error : new Error(String(error)));
       });
       response.pipe(stream);
-      return Promise.resolve({ stream, headers: response.headers });
+      return Promise.resolve({ stream, headers: response.headers, abort });
     }
   });
 }

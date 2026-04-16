@@ -5,6 +5,7 @@ import {
   getArtifactPreviewCacheMaxBytes,
   getArtifactPreviewCacheMaxEntries,
   getArtifactPreviewCacheTtlMs,
+  getBuildCompareOptions,
   getBuildListFetchOptions,
   getBuildTooltipOptions,
   getCacheTtlMs,
@@ -49,6 +50,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const previewConfig = getExtensionConfiguration();
     return { maxBytes: getArtifactMaxDownloadBytes(previewConfig) };
   };
+  const buildCompareOptionsProvider = () => getBuildCompareOptions(getExtensionConfiguration());
 
   await activateRuntime(context, {
     cacheTtlMs,
@@ -64,6 +66,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       maxTotalBytes: artifactPreviewCacheMaxBytes,
       ttlMs: artifactPreviewCacheTtlMs
     },
+    buildCompareOptionsProvider,
     jenkinsfileIntelligenceConfig,
     jenkinsfileValidationConfig,
     currentBranchPullRequestJobNamePatterns,

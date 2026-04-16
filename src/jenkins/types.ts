@@ -254,6 +254,7 @@ export interface JenkinsReplayResult {
 export interface JenkinsConsoleText {
   text: string;
   truncated: boolean;
+  bytesRead: number;
 }
 
 export interface JenkinsConsoleTextTail extends JenkinsConsoleText {
@@ -265,6 +266,7 @@ export interface JenkinsProgressiveConsoleText {
   text: string;
   textSize: number;
   moreData: boolean;
+  bytesRead: number;
 }
 
 export interface JenkinsProgressiveConsoleHtml {

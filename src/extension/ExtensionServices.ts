@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
+import type { BuildCompareOptions } from "../panels/buildCompare/BuildCompareOptions";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { ArtifactActionOptionsProvider } from "../ui/ArtifactActionHandler";
@@ -28,6 +29,7 @@ export interface ExtensionServicesOptions {
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
   artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
   artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
+  buildCompareOptionsProvider: () => BuildCompareOptions;
   jenkinsfileIntelligenceConfig: JenkinsfileIntelligenceConfig;
   jenkinsfileValidationConfig: JenkinsfileValidationConfig;
 }
@@ -69,6 +71,7 @@ export function registerExtensionProviders(
 
   const runtimeCatalog = createRuntimeProviderCatalog({
     extensionUri: options.extensionUri,
+    buildCompareOptionsProvider: options.buildCompareOptionsProvider,
     currentBranchPullRequestJobNamePatterns: options.currentBranchPullRequestJobNamePatterns,
     statusRefreshIntervalSeconds: options.statusRefreshIntervalSeconds,
     watchErrorThreshold: options.watchErrorThreshold,

@@ -16,7 +16,10 @@ import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchW
 import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
 import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
+import { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
 import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
+import { BuildCompareBackendAdapter } from "../../panels/buildCompare/BuildCompareBackend";
+import type { BuildCompareOptions } from "../../panels/buildCompare/BuildCompareOptions";
 import { BuildDetailsBackendAdapter } from "../../panels/buildDetails/BuildDetailsBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { CoverageDecorationService } from "../../services/CoverageDecorationService";
@@ -35,6 +38,7 @@ import type { PartialExtensionProviderCatalog } from "../container/ExtensionCont
 
 export interface RuntimeProviderOptions {
   extensionUri: vscode.Uri;
+  buildCompareOptionsProvider: () => BuildCompareOptions;
   currentBranchPullRequestJobNamePatterns: readonly string[];
   statusRefreshIntervalSeconds: number;
   watchErrorThreshold: number;
@@ -92,6 +96,14 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         testSourceNavigationUiService: container.get("testSourceNavigationUiService"),
         refreshHost: container.get("refreshHost"),
         pendingInputProvider: container.get("pendingInputCoordinator"),
+        environmentStore: container.get("environmentStore"),
+        extensionUri: options.extensionUri
+      }),
+    buildComparePanelLauncher: (container) =>
+      new BuildComparePanelLauncher({
+        backend: new BuildCompareBackendAdapter(container.get("dataService")),
+        buildDetailsPanelLauncher: container.get("buildDetailsPanelLauncher"),
+        getCompareOptions: options.buildCompareOptionsProvider,
         environmentStore: container.get("environmentStore"),
         extensionUri: options.extensionUri
       }),

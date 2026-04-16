@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import type { BuildComparePanelLauncher } from "../panels/BuildComparePanelLauncher";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
@@ -15,6 +16,7 @@ import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
 import { downloadArtifact, previewArtifact } from "./build/BuildArtifactHandlers";
 import {
   approveInput,
+  compareWithBuild,
   openInJenkins,
   openLastFailedBuild,
   previewBuildLog,
@@ -36,6 +38,7 @@ export function registerBuildCommands(
   presetStore: JenkinsParameterPresetStore,
   artifactActionHandler: ArtifactActionHandler,
   buildLogPreviewer: BuildLogPreviewer,
+  buildComparePanelLauncher: BuildComparePanelLauncher,
   buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
   queuedBuildWaiter: QueuedBuildWaiter,
   replayBuildWorkflow: ReplayBuildWorkflow,
@@ -71,6 +74,9 @@ export function registerBuildCommands(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.openInJenkins",
       (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.compareWithBuild", (item?: BuildTreeItem) =>
+      compareWithBuild(dataService, buildComparePanelLauncher, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.showBuildDetails", (item?: BuildTreeItem) =>
       showBuildDetails(buildDetailsPanelLauncher, item)

@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 import { DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS } from "../currentBranch/CurrentBranchPullRequestJobPatterns";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
+import type {
+  BuildCompareOptions,
+  BuildParameterRedactionOptions
+} from "../panels/buildCompare/BuildCompareOptions";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
@@ -21,6 +25,8 @@ const DEFAULT_ARTIFACT_MAX_DOWNLOAD_MB = 100;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES = 50;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB = 200;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS = 900;
+const DEFAULT_BUILD_COMPARE_CONSOLE_MAX_BYTES = 5 * 1024 * 1024;
+const DEFAULT_BUILD_COMPARE_CONSOLE_MAX_LINES = 50_000;
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE = "[redacted]";
 const DEFAULT_TREE_VIEW_CURATION_EXCLUDED_NAMES = ["all"];
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
@@ -176,29 +182,71 @@ export function getArtifactPreviewCacheTtlMs(config: vscode.WorkspaceConfigurati
 
 export function getBuildTooltipOptions(config: vscode.WorkspaceConfiguration): BuildTooltipOptions {
   const includeParameters = getBuildTooltipParametersEnabled(config);
-  const parameterAllowList = normalizeStringList(
-    config.get<unknown>("buildTooltips.parameters.allowList")
-  );
-  const parameterDenyList = normalizeStringList(
-    config.get<unknown>("buildTooltips.parameters.denyList")
-  );
-  const parameterMaskPatterns = normalizeStringList(
+  const parameterRedaction = getBuildParameterRedactionOptions(config);
+
+  return {
+    includeParameters,
+    parameterAllowList: parameterRedaction.allowList,
+    parameterDenyList: parameterRedaction.denyList,
+    parameterMaskPatterns: parameterRedaction.maskPatterns,
+    parameterMaskValue: parameterRedaction.maskValue
+  };
+}
+
+export function getBuildParameterRedactionOptions(
+  config: vscode.WorkspaceConfiguration
+): BuildParameterRedactionOptions {
+  const allowList = normalizeStringList(config.get<unknown>("buildTooltips.parameters.allowList"));
+  const denyList = normalizeStringList(config.get<unknown>("buildTooltips.parameters.denyList"));
+  const maskPatterns = normalizeStringList(
     config.get<unknown>(
       "buildTooltips.parameters.maskPatterns",
       DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS
     )
   );
-  const parameterMaskValue =
+  const maskValue =
     normalizeString(config.get<unknown>("buildTooltips.parameters.maskValue")) ??
     DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE;
 
   return {
-    includeParameters,
-    parameterAllowList,
-    parameterDenyList,
-    parameterMaskPatterns,
-    parameterMaskValue
+    allowList,
+    denyList,
+    maskPatterns,
+    maskValue
   };
+}
+
+export function getBuildCompareOptions(config: vscode.WorkspaceConfiguration): BuildCompareOptions {
+  return {
+    console: {
+      maxBytes: getBoundedIntegerConfigValue(
+        config,
+        "buildCompare.console.maxBytes",
+        DEFAULT_BUILD_COMPARE_CONSOLE_MAX_BYTES,
+        1024
+      ),
+      maxLines: getBoundedIntegerConfigValue(
+        config,
+        "buildCompare.console.maxLines",
+        DEFAULT_BUILD_COMPARE_CONSOLE_MAX_LINES,
+        100
+      )
+    },
+    parameterRedaction: getBuildParameterRedactionOptions(config)
+  };
+}
+
+function getBoundedIntegerConfigValue(
+  config: vscode.WorkspaceConfiguration,
+  key: string,
+  defaultValue: number,
+  minimumValue: number
+): number {
+  const value = config.get<number>(key, defaultValue);
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return defaultValue;
+  }
+  return Math.max(minimumValue, Math.floor(value));
 }
 
 export function getBuildListFetchOptions(

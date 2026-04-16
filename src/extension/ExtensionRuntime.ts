@@ -62,6 +62,7 @@ export async function activateRuntime(
   const currentBranchStatusBar = container.get("currentBranchStatusBar");
   const replayDraftManager = container.get("replayDraftManager");
   const replayDraftFilesystem = container.get("replayDraftFilesystem");
+  const buildComparePanelLauncher = container.get("buildComparePanelLauncher");
   const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
   const coverageDecorationService = container.get("coverageDecorationService");
 
@@ -94,6 +95,13 @@ export async function activateRuntime(
           refreshHost
         });
       }
+    }
+  );
+
+  const buildCompareSerializer = vscode.window.registerWebviewPanelSerializer(
+    "jenkinsWorkbench.buildCompare",
+    {
+      deserializeWebviewPanel: (panel, state) => buildComparePanelLauncher.revive(panel, state)
     }
   );
 
@@ -131,6 +139,7 @@ export async function activateRuntime(
     treeSummarySubscription,
     jobConfigDraftFilesystemRegistration,
     replayDraftFilesystemRegistration,
+    buildCompareSerializer,
     buildDetailsSerializer,
     nodeDetailsSerializer,
     vscode.window.registerUriHandler(uriHandler),

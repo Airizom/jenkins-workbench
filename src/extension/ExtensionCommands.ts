@@ -24,6 +24,7 @@ export function registerExtensionCommands(
   const dataService = container.get("dataService");
   const artifactActionHandler = container.get("artifactActionHandler");
   const buildLogPreviewer = container.get("buildLogPreviewer");
+  const buildComparePanelLauncher = container.get("buildComparePanelLauncher");
   const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
   const queuedBuildWaiter = container.get("queuedBuildWaiter");
   const replayBuildWorkflow = container.get("replayBuildWorkflow");
@@ -57,6 +58,7 @@ export function registerExtensionCommands(
     presetStore,
     artifactActionHandler,
     buildLogPreviewer,
+    buildComparePanelLauncher,
     buildDetailsPanelLauncher,
     queuedBuildWaiter,
     replayBuildWorkflow,

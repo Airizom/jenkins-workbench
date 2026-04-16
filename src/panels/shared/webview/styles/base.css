@@ -2,6 +2,8 @@
 
 @source "../../../buildDetails/webview/**/*.{ts,tsx}";
 @source "../../../buildDetails/BuildDetailsRenderer.ts";
+@source "../../../buildCompare/webview/**/*.{ts,tsx}";
+@source "../../../buildCompare/BuildCompareRenderer.ts";
 @source "../../../nodeDetails/webview/**/*.{ts,tsx}";
 @source "../../../nodeDetails/NodeDetailsRenderer.ts";
 @source "../**/*.{ts,tsx}";

@@ -128,6 +128,10 @@
         "icon": "$(filter-filled)"
       },
       {
+        "command": "jenkinsWorkbench.compareWithBuild",
+        "title": "Jenkins: Compare With Build"
+      },
+      {
         "command": "jenkinsWorkbench.showBuildDetails",
         "title": "Jenkins: View Build Details"
       },
@@ -392,6 +396,18 @@
           "type": "boolean",
           "default": true,
           "description": "Apply editor decorations for modified covered, missed, and partial lines from the active Build Details coverage context when linked workspace files are available."
+        },
+        "jenkinsWorkbench.buildCompare.console.maxBytes": {
+          "type": "number",
+          "default": 5242880,
+          "minimum": 1024,
+          "description": "Maximum number of console bytes to scan per build while locating the first divergence in Build Compare."
+        },
+        "jenkinsWorkbench.buildCompare.console.maxLines": {
+          "type": "number",
+          "default": 50000,
+          "minimum": 100,
+          "description": "Maximum number of console lines to scan per build while locating the first divergence in Build Compare."
         },
         "jenkinsWorkbench.buildDetails.testSourceMatching.fileExtensions": {
           "type": "array",
@@ -815,14 +831,19 @@
           "group": "inline@0"
         },
         {
+          "command": "jenkinsWorkbench.compareWithBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)build(\\s|$)/",
+          "group": "1_actions@0"
+        },
+        {
           "command": "jenkinsWorkbench.showBuildDetails",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "1_actions@0"
+          "group": "1_actions@1"
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "1_actions@1"
+          "group": "1_actions@2"
         },
         {
           "command": "jenkinsWorkbench.replayBuild",
