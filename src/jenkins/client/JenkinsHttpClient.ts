@@ -40,7 +40,13 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     });
     this.authHeader = authHeaders.authHeader;
     this.baseHeaders = authHeaders.headers;
-    this.crumbService = new JenkinsCrumbService(this.baseUrl, (url) => this.requestJson(url));
+    this.crumbService = new JenkinsCrumbService(this.baseUrl, async (url) => {
+      const { text, headers } = await this.requestTextWithHeaders(url);
+      return {
+        body: JSON.parse(text) as { crumbRequestField?: string; crumb?: string },
+        headers
+      };
+    });
   }
 
   async requestJson<T>(url: string): Promise<T> {
@@ -174,9 +180,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     contentHeaders: Record<string, string>
   ): Promise<JenkinsPostResponse> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = crumbHeader
-      ? { ...contentHeaders, [crumbHeader.field]: crumbHeader.value }
-      : contentHeaders;
+    const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
 
     try {
       return await this.requestVoidWithLocation(url, { method: "POST", headers, body });
@@ -188,10 +192,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
         if (error.statusCode === 403) {
           const refreshed = await this.crumbService.getCrumbHeader(true);
           if (refreshed) {
-            const retryHeaders = {
-              ...contentHeaders,
-              [refreshed.field]: refreshed.value
-            };
+            const retryHeaders = this.buildHeadersWithCrumb(contentHeaders, refreshed);
             return await this.requestVoidWithLocation(url, {
               method: "POST",
               headers: retryHeaders,
@@ -210,9 +211,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     contentHeaders: Record<string, string>
   ): Promise<string> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = crumbHeader
-      ? { ...contentHeaders, [crumbHeader.field]: crumbHeader.value }
-      : contentHeaders;
+    const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
 
     try {
       return await this.requestTextWithOptions(url, { method: "POST", headers, body });
@@ -225,10 +224,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
         if (statusCode === 403) {
           const refreshed = await this.crumbService.getCrumbHeader(true);
           if (refreshed) {
-            const retryHeaders = {
-              ...contentHeaders,
-              [refreshed.field]: refreshed.value
-            };
+            const retryHeaders = this.buildHeadersWithCrumb(contentHeaders, refreshed);
             return await this.requestTextWithOptions(url, {
               method: "POST",
               headers: retryHeaders,
@@ -275,6 +271,38 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       ...baseHeaders,
       ...headers
     };
+  }
+
+  private buildHeadersWithCrumb(
+    contentHeaders: Record<string, string>,
+    crumbHeader?: { field: string; value: string; cookie?: string }
+  ): Record<string, string> {
+    if (!crumbHeader) {
+      return contentHeaders;
+    }
+
+    const headers = {
+      ...contentHeaders,
+      [crumbHeader.field]: crumbHeader.value
+    };
+
+    if (
+      crumbHeader.cookie &&
+      !this.hasHeader(this.baseHeaders, "Cookie") &&
+      !this.hasHeader(contentHeaders, "Cookie")
+    ) {
+      headers.Cookie = crumbHeader.cookie;
+    }
+
+    return headers;
+  }
+
+  private hasHeader(headers: Record<string, string> | undefined, name: string): boolean {
+    if (!headers) {
+      return false;
+    }
+    const normalizedName = name.toLowerCase();
+    return Object.keys(headers).some((key) => key.toLowerCase() === normalizedName);
   }
 
   private async requestWithCrumbRetry<T>(
