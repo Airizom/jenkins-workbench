@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-05-01
+
+### Added
+
+- feat: add activity groups to environment tree
+
+### Fixed
+
+- fix: include crumb cookie in Jenkins POST headers
+
+### Changed
+
+- refactor: split Jenkins tree loading into handler modules
+- refactor: split JenkinsBuildsApi into focused client classes
+- refactor: split build details view-model into helper modules
+- refactor: extract build details test-results into modules
+- refactor: split build handlers into focused command modules
+
 ## [1.44.0] - 2026-04-15
 
 ### Added
