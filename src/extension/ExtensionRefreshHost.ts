@@ -72,7 +72,8 @@ export function createExtensionRefreshHost(
       treeDataProvider.refreshViewOnly(request);
     },
     onDidRefreshEnvironment: refreshEmitter.event,
-    onEnvironmentRemoved: (environment: JenkinsEnvironmentRef) =>
-      queuePoller.clearEnvironment(environment)
+    onEnvironmentRemoved: (environment: JenkinsEnvironmentRef) => {
+      queuePoller.clearEnvironment(environment);
+    }
   };
 }

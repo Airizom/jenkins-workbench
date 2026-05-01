@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentStoreChange } from "../storage/JenkinsEnvironmentStore";
-import { BuildQueueFolderTreeItem, InstanceTreeItem, RootSectionTreeItem } from "../tree/TreeItems";
+import {
+  ActivityFolderTreeItem,
+  BuildQueueFolderTreeItem,
+  InstanceTreeItem,
+  RootSectionTreeItem
+} from "../tree/TreeItems";
 import {
   buildConfigKey,
   getBuildListFetchOptions,
@@ -12,6 +17,7 @@ import {
   getJenkinsfileValidationConfig,
   getQueuePollIntervalSeconds,
   getStatusRefreshIntervalSeconds,
+  getTreeActivityOptions,
   getTreeViewCurationOptions,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
@@ -32,6 +38,15 @@ const BUILD_TOOLTIP_PARAMETERS_DENY_LIST_CONFIG_KEY = "buildTooltips.parameters.
 const BUILD_TOOLTIP_PARAMETERS_MASK_PATTERNS_CONFIG_KEY = "buildTooltips.parameters.maskPatterns";
 const BUILD_TOOLTIP_PARAMETERS_MASK_VALUE_CONFIG_KEY = "buildTooltips.parameters.maskValue";
 const TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY = "treeViews.excludedNames";
+const ACTIVITY_MAX_ITEMS_PER_GROUP_CONFIG_KEY = "activity.maxItemsPerGroup";
+const ACTIVITY_MAX_SCAN_RESULTS_CONFIG_KEY = "activity.maxScanResults";
+const ACTIVITY_JOB_SEARCH_BATCH_SIZE_CONFIG_KEY = "activity.jobSearchBatchSize";
+const ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT_CONFIG_KEY = "activity.pendingInputCandidateLimit";
+const ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY_CONFIG_KEY =
+  "activity.pendingInputLookupConcurrency";
+const ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT_CONFIG_KEY =
+  "activity.pendingInputBuildLookupLimit";
+const ACTIVITY_REFRESH_INTERVAL_SECONDS_CONFIG_KEY = "activity.refreshIntervalSeconds";
 const JENKINSFILE_VALIDATION_ENABLED_CONFIG_KEY = "jenkinsfileValidation.enabled";
 const JENKINSFILE_VALIDATION_RUN_ON_SAVE_CONFIG_KEY = "jenkinsfileValidation.runOnSave";
 const JENKINSFILE_VALIDATION_CHANGE_DEBOUNCE_CONFIG_KEY = "jenkinsfileValidation.changeDebounceMs";
@@ -54,8 +69,19 @@ const JENKINSFILE_VALIDATION_CONFIG_KEYS = [
   JENKINSFILE_VALIDATION_FILE_PATTERNS_CONFIG_KEY
 ] as const;
 
+const ACTIVITY_CONFIG_KEYS = [
+  ACTIVITY_MAX_ITEMS_PER_GROUP_CONFIG_KEY,
+  ACTIVITY_MAX_SCAN_RESULTS_CONFIG_KEY,
+  ACTIVITY_JOB_SEARCH_BATCH_SIZE_CONFIG_KEY,
+  ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT_CONFIG_KEY,
+  ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY_CONFIG_KEY,
+  ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT_CONFIG_KEY,
+  ACTIVITY_REFRESH_INTERVAL_SECONDS_CONFIG_KEY
+] as const;
+
 type BuildTooltipConfigKey = (typeof BUILD_TOOLTIP_CONFIG_KEYS)[number];
 type JenkinsfileValidationConfigKey = (typeof JENKINSFILE_VALIDATION_CONFIG_KEYS)[number];
+type ActivityConfigKey = (typeof ACTIVITY_CONFIG_KEYS)[number];
 type ConfigReactionKey =
   | typeof CACHE_TTL_CONFIG_KEY
   | typeof STATUS_REFRESH_INTERVAL_CONFIG_KEY
@@ -65,6 +91,7 @@ type ConfigReactionKey =
   | typeof TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY
   | typeof JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY
   | BuildTooltipConfigKey
+  | ActivityConfigKey
   | JenkinsfileValidationConfigKey;
 
 interface ConfigReactionContext {
@@ -74,6 +101,7 @@ interface ConfigReactionContext {
   refreshHost: ExtensionTokenMap["refreshHost"];
   treeDataProvider: ExtensionTokenMap["treeDataProvider"];
   statusRefreshService: ExtensionTokenMap["statusRefreshService"];
+  activityRefreshService: ExtensionTokenMap["activityRefreshService"];
   poller: ExtensionTokenMap["poller"];
   queuePoller: ExtensionTokenMap["queuePoller"];
   currentBranchPullRequestJobMatcher: ExtensionTokenMap["currentBranchPullRequestJobMatcher"];
@@ -127,6 +155,7 @@ export function registerExtensionSubscriptions(
   const coverageService = container.get("coverageService");
   const refreshHost = container.get("refreshHost");
   const statusRefreshService = container.get("statusRefreshService");
+  const activityRefreshService = container.get("activityRefreshService");
   const poller = container.get("poller");
   const queuePoller = container.get("queuePoller");
   const currentBranchPullRequestJobMatcher = container.get("currentBranchPullRequestJobMatcher");
@@ -205,6 +234,15 @@ export function registerExtensionSubscriptions(
       }
     },
     {
+      keys: ACTIVITY_CONFIG_KEYS,
+      run: (reactionContext) => {
+        const activityOptions = getTreeActivityOptions(reactionContext.config);
+        reactionContext.treeDataProvider.updateActivityOptions(activityOptions);
+        reactionContext.activityRefreshService.updateOptions(activityOptions);
+        reactionContext.refreshHost.refreshViewOnly();
+      }
+    },
+    {
       keys: [JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY],
       run: (reactionContext) => {
         reactionContext.jenkinsfileIntelligenceConfigState.updateConfig(
@@ -229,6 +267,7 @@ export function registerExtensionSubscriptions(
 
   const environmentStoreSubscription = environmentStore.onDidChange((change) => {
     invalidateJenkinsfileStepCatalog(jenkinsfileStepCatalogService, change);
+    activityRefreshService.handleEnvironmentStoreChange(change);
   });
 
   const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
@@ -243,6 +282,7 @@ export function registerExtensionSubscriptions(
       dataService,
       refreshHost,
       statusRefreshService,
+      activityRefreshService,
       treeDataProvider,
       poller,
       queuePoller,
@@ -259,23 +299,37 @@ export function registerExtensionSubscriptions(
   });
 
   const expandSubscription = treeView.onDidExpandElement((event) => {
+    if (event.element instanceof ActivityFolderTreeItem) {
+      activityRefreshService.handleActivityFolderExpanded(event.element.environment);
+      return;
+    }
     if (event.element instanceof BuildQueueFolderTreeItem) {
       queuePoller.trackExpanded(event.element.environment);
     }
   });
 
   const collapseSubscription = treeView.onDidCollapseElement((event) => {
+    if (event.element instanceof ActivityFolderTreeItem) {
+      activityRefreshService.handleActivityFolderCollapsed(event.element.environment);
+      return;
+    }
     if (event.element instanceof BuildQueueFolderTreeItem) {
       queuePoller.trackCollapsed(event.element.environment);
       return;
     }
     if (event.element instanceof InstanceTreeItem) {
       queuePoller.clearEnvironment(event.element);
+      activityRefreshService.handleEnvironmentCollapsed(event.element);
       return;
     }
     if (event.element instanceof RootSectionTreeItem && event.element.section === "instances") {
       queuePoller.clearAll();
+      activityRefreshService.handleAllEnvironmentsCollapsed();
     }
+  });
+
+  const activityRefreshSubscription = statusRefreshService.onDidTick(() => {
+    activityRefreshService.handleStatusTick();
   });
 
   context.subscriptions.push(
@@ -283,7 +337,8 @@ export function registerExtensionSubscriptions(
     environmentStoreSubscription,
     configSubscription,
     expandSubscription,
-    collapseSubscription
+    collapseSubscription,
+    activityRefreshSubscription
   );
 }
 

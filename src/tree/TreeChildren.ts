@@ -5,15 +5,18 @@ import { ScopedCache } from "../services/ScopedCache";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import type { TreeActivityOptions } from "./ActivityTypes";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "./TreeJobScope";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
+import { ActivityCollector } from "./activity/ActivityCollector";
 import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
 import { RootSectionTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import { TreeActivityChildrenLoader } from "./loader/TreeActivityChildrenLoader";
 import { TreeBuildChildrenLoader } from "./loader/TreeBuildChildrenLoader";
 import { TreeChildrenCacheManager } from "./loader/TreeChildrenCacheManager";
 import {
@@ -45,6 +48,7 @@ export class JenkinsTreeChildrenLoader {
   private readonly cacheManager: TreeChildrenCacheManager;
   private readonly environmentSummaryStore: EnvironmentSummaryStore;
   private readonly elementHandlers: TreeElementChildrenHandler[];
+  private readonly activityLoader: TreeActivityChildrenLoader;
   private readonly buildLoader: TreeBuildChildrenLoader;
 
   constructor(
@@ -54,6 +58,7 @@ export class JenkinsTreeChildrenLoader {
     pinStore: JenkinsPinStore,
     treeFilter: JenkinsTreeFilter,
     private viewCurationOptions: TreeViewCurationOptions,
+    private activityOptions: TreeActivityOptions,
     buildLimit: number,
     private buildTooltipOptions: BuildTooltipOptions,
     private buildListFetchOptions: BuildListFetchOptions,
@@ -80,12 +85,23 @@ export class JenkinsTreeChildrenLoader {
     };
     const buildChildrenKey = this.buildChildrenKey.bind(this);
     const jobUrlState = new TreeJobUrlStateLoader(this.cacheManager, watchStore, pinStore);
+    this.activityLoader = new TreeActivityChildrenLoader(
+      new ActivityCollector(dataService, pendingInputCoordinator),
+      this.cacheManager,
+      jobUrlState,
+      buildChildrenKey,
+      this.activityOptions,
+      () => this.buildListFetchOptions,
+      placeholders,
+      notifyEnvironment
+    );
     const environmentLoader = new TreeEnvironmentChildrenLoader(
       this.store,
       dataService,
       pinStore,
       this.environmentSummaryStore,
       () => this.viewCurationOptions,
+      (environment) => this.activityLoader.getSummary(environment),
       placeholders
     );
     const jobCollectionLoader = new TreeJobCollectionChildrenLoader(
@@ -122,6 +138,7 @@ export class JenkinsTreeChildrenLoader {
     this.elementHandlers = createTreeElementChildrenHandlers({
       cacheManager: this.cacheManager,
       environmentLoader,
+      activityLoader: this.activityLoader,
       jobCollectionLoader,
       buildLoader: this.buildLoader,
       workspaceLoader,
@@ -143,6 +160,11 @@ export class JenkinsTreeChildrenLoader {
 
   updateViewCurationOptions(options: TreeViewCurationOptions): void {
     this.viewCurationOptions = options;
+  }
+
+  updateActivityOptions(options: TreeActivityOptions): void {
+    this.activityOptions = options;
+    this.activityLoader.updateOptions(options);
   }
 
   getSummaryTotals(): EnvironmentSummaryTotals {
@@ -173,11 +195,19 @@ export class JenkinsTreeChildrenLoader {
     this.cacheManager.clearPinCacheForEnvironment(environmentId);
   }
 
-  clearChildrenCacheForEnvironment(environmentId?: string): void {
+  clearChildrenCacheForEnvironment(environment?: JenkinsEnvironmentRef | string): void {
+    const environmentId =
+      typeof environment === "string" ? environment : environment?.environmentId;
     this.cacheManager.clearChildrenCacheForEnvironment(environmentId);
-    if (!environmentId) {
+    if (!environment) {
+      this.activityLoader.clearActivityData();
       this.environmentSummaryStore.clearAll();
       return;
+    }
+    if (typeof environment === "string") {
+      this.activityLoader.clearActivityDataForEnvironmentIdAcrossScopes(environment);
+    } else {
+      this.activityLoader.clearActivityData(environment);
     }
     this.environmentSummaryStore.clearForEnvironment(environmentId);
   }
@@ -187,8 +217,21 @@ export class JenkinsTreeChildrenLoader {
     this.cacheManager.clearChildrenCache(key);
   }
 
+  clearActivityCache(environment: JenkinsEnvironmentRef): void {
+    this.activityLoader.clearActivityData(environment);
+  }
+
+  refreshActivityCache(environment: JenkinsEnvironmentRef): void {
+    this.activityLoader.refreshActivityData(environment);
+  }
+
   clearBuildsCache(environment: JenkinsEnvironmentRef): void {
     this.cacheManager.clearChildrenCacheForKind(environment, "builds");
+  }
+
+  clearPendingInputDependentCaches(environment: JenkinsEnvironmentRef): void {
+    this.clearBuildsCache(environment);
+    this.activityLoader.clearActivityData(environment);
   }
 
   invalidateBuildArtifacts(

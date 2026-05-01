@@ -18,6 +18,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Activity Bar View** — Dedicated Jenkins sidebar with a hierarchical tree view
 - **Multi-Environment Support** — Connect to multiple Jenkins instances with workspace or global scope
 - **Browse Everything** — Explore folders, multibranch pipelines, jobs, builds, and nodes
+- **Activity View** — See jobs awaiting input, failing, unstable, or running without digging through folders
 - **Curated Jenkins Views** — Browse Jenkins views in a dedicated section and hide noisy defaults
 - **Go to Job...** — Quick search across all configured Jenkins environments
 - **Pin Jobs & Pipelines** — Keep critical items in a top-level pinned section for quick access
@@ -79,6 +80,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 
 ### Filtering
 
+- **Activity Groups** — Expand Activity under an instance to see awaiting input, failing, unstable, and running jobs
 - **Job Status Filters** — Show all jobs, only failing jobs, or only running jobs
 - **Branch Filtering** — Filter branches within multibranch pipeline folders
 - **Quick Access** — Filter icons in the view title bar for one-click filtering
@@ -192,6 +194,13 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `jenkinsWorkbench.treeViews.excludedNames` | `["all"]` | Case-insensitive Jenkins view names to hide from the curated Views section. |
+| `jenkinsWorkbench.activity.maxItemsPerGroup` | 50 | Maximum jobs to show in each Activity group (clamped to 100). |
+| `jenkinsWorkbench.activity.maxScanResults` | 2000 | Maximum Jenkins jobs to scan while collecting Activity groups. |
+| `jenkinsWorkbench.activity.jobSearchBatchSize` | 50 | Jenkins job search batch size used while collecting Activity groups. |
+| `jenkinsWorkbench.activity.pendingInputCandidateLimit` | 100 | Maximum running jobs to enrich when checking Activity jobs for pending input. |
+| `jenkinsWorkbench.activity.pendingInputLookupConcurrency` | 4 | Maximum concurrent build lookups used when checking Activity jobs for pending input. |
+| `jenkinsWorkbench.activity.pendingInputBuildLookupLimit` | 5 | Maximum recent builds to inspect per running job when checking Activity jobs for pending input. |
+| `jenkinsWorkbench.activity.refreshIntervalSeconds` | 60 | Minimum seconds between automatic refreshes for expanded Activity folders. |
 
 ### Current Branch
 

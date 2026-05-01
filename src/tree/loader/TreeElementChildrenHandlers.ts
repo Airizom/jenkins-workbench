@@ -4,6 +4,8 @@ import { JobTreeItem, PipelineTreeItem, StalePinnedJobTreeItem } from "../items/
 import { NodeTreeItem } from "../items/TreeNodeItems";
 import { QueueItemTreeItem } from "../items/TreeQueueItems";
 import {
+  ActivityFolderTreeItem,
+  ActivityGroupTreeItem,
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
   NodesFolderTreeItem,
@@ -12,6 +14,7 @@ import {
   ViewsFolderTreeItem
 } from "../items/TreeRootItems";
 import { WorkspaceDirectoryTreeItem, WorkspaceRootTreeItem } from "../items/TreeWorkspaceItems";
+import type { TreeActivityChildrenLoader } from "./TreeActivityChildrenLoader";
 import type { TreeBuildChildrenLoader } from "./TreeBuildChildrenLoader";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 import { getJobCollectionElement } from "./TreeChildrenMapping";
@@ -24,12 +27,13 @@ import type { TreeWorkspaceChildrenLoader } from "./TreeWorkspaceChildrenLoader"
 export type TreeElementChildrenHandlerDependencies = {
   readonly cacheManager: TreeChildrenCacheManager;
   readonly environmentLoader: TreeEnvironmentChildrenLoader;
+  readonly activityLoader: TreeActivityChildrenLoader;
   readonly jobCollectionLoader: TreeJobCollectionChildrenLoader;
   readonly buildLoader: TreeBuildChildrenLoader;
   readonly workspaceLoader: TreeWorkspaceChildrenLoader;
   readonly pinnedLoader: TreePinnedChildrenLoader;
   readonly buildChildrenKey: BuildChildrenKey;
-  readonly clearChildrenCacheForEnvironment: (environmentId?: string) => void;
+  readonly clearChildrenCacheForEnvironment: (environment?: JenkinsEnvironmentRef | string) => void;
   readonly clearQueueCache: (environment: JenkinsEnvironmentRef) => void;
   readonly invalidateBuildArtifacts: (
     environment: JenkinsEnvironmentRef,
@@ -47,6 +51,7 @@ type BuildChildrenKey = (
 export function createTreeElementChildrenHandlers({
   cacheManager,
   environmentLoader,
+  activityLoader,
   jobCollectionLoader,
   buildLoader,
   workspaceLoader,
@@ -65,8 +70,40 @@ export function createTreeElementChildrenHandlers({
     {
       matches: (element) => element instanceof InstanceTreeItem,
       getChildren: (element) => environmentLoader.getInstanceChildren(element as InstanceTreeItem),
-      invalidate: (element) =>
-        clearChildrenCacheForEnvironment((element as InstanceTreeItem).environmentId)
+      invalidate: (element) => clearChildrenCacheForEnvironment(element as InstanceTreeItem)
+    },
+    {
+      matches: (element) => element instanceof ActivityFolderTreeItem,
+      getChildren: (element) => {
+        const folder = element as ActivityFolderTreeItem;
+        return cacheManager.getOrLoadChildren(
+          activityLoader.buildActivityRootChildrenKey(folder.environment),
+          folder,
+          (isCurrentLoad) => activityLoader.loadActivityGroups(folder, isCurrentLoad),
+          "Loading activity..."
+        );
+      },
+      invalidate: (element) => {
+        activityLoader.clearActivityData((element as ActivityFolderTreeItem).environment);
+      }
+    },
+    {
+      matches: (element) => element instanceof ActivityGroupTreeItem,
+      getChildren: (element) => {
+        const group = element as ActivityGroupTreeItem;
+        return cacheManager.getOrLoadChildren(
+          activityLoader.buildActivityGroupChildrenKey(group.environment, group.group),
+          group,
+          (isCurrentLoad) => activityLoader.loadActivityGroup(group, isCurrentLoad),
+          "Loading activity group..."
+        );
+      },
+      invalidate: (element) => {
+        const group = element as ActivityGroupTreeItem;
+        cacheManager.clearChildrenCache(
+          activityLoader.buildActivityGroupChildrenKey(group.environment, group.group)
+        );
+      }
     },
     {
       matches: (element) => element instanceof PinnedJobsFolderTreeItem,

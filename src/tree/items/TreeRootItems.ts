@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
+import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
+import { formatActivityGroupLabel } from "../ActivityTypes";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import type {
   JobsFolderSummary,
@@ -88,6 +90,51 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
     this.tooltip = summary
       ? formatJobsSummaryTooltip(summary)
       : "Browse jobs, pipelines, and folders";
+  }
+}
+
+export class ActivityFolderTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef): string {
+    return `activity:${environment.scope}:${environment.environmentId}`;
+  }
+
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    summary?: ActivityDisplaySummary
+  ) {
+    const label = summary
+      ? `Activity (${formatDisplayedCountLabel(summary.displayedTotal)})`
+      : "Activity";
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.id = ActivityFolderTreeItem.buildId(environment);
+    this.contextValue = "activity";
+    this.iconPath = new vscode.ThemeIcon("pulse");
+    this.description = summary ? formatActivitySummaryDescription(summary) : undefined;
+    this.tooltip = summary
+      ? formatActivitySummaryTooltip(summary)
+      : "Current Jenkins activity and jobs needing attention";
+  }
+}
+
+export class ActivityGroupTreeItem extends vscode.TreeItem {
+  static buildId(environment: JenkinsEnvironmentRef, group: ActivityGroupKind): string {
+    return `activity-group:${environment.scope}:${environment.environmentId}:${group}`;
+  }
+
+  constructor(
+    public readonly environment: JenkinsEnvironmentRef,
+    public readonly group: ActivityGroupKind,
+    displayedCount: number,
+    isTruncated = false
+  ) {
+    super(
+      `${formatActivityGroupLabel(group)} (${formatDisplayedCountLabel(displayedCount)})`,
+      vscode.TreeItemCollapsibleState.Collapsed
+    );
+    this.id = ActivityGroupTreeItem.buildId(environment, group);
+    this.contextValue = "activityGroup";
+    this.iconPath = resolveActivityGroupIcon(group);
+    this.tooltip = `${formatDisplayedCountTooltip(displayedCount, isTruncated)} ${formatActivityGroupLabel(group).toLowerCase()} job(s)`;
   }
 }
 
@@ -223,4 +270,48 @@ function formatJobsSummaryTooltip(summary: JobsFolderSummary): string {
     parts.push(`Disabled: ${summary.disabled}`);
   }
   return parts.join("\n");
+}
+
+function formatActivitySummaryDescription(summary: ActivityDisplaySummary): string | undefined {
+  const parts = summary.groups
+    .filter((group) => group.displayedCount > 0)
+    .map(
+      (group) =>
+        `${formatDisplayedCountLabel(group.displayedCount)} ${formatActivityGroupLabel(group.kind).toLowerCase()}`
+    );
+  return parts.length > 0 ? parts.join(" • ") : undefined;
+}
+
+function formatActivitySummaryTooltip(summary: ActivityDisplaySummary): string {
+  if (summary.displayedTotal === 0) {
+    return "No current activity.";
+  }
+  return summary.groups
+    .filter((group) => group.displayedCount > 0)
+    .map(
+      (group) =>
+        `${formatActivityGroupLabel(group.kind)}: ${formatDisplayedCountTooltip(group.displayedCount, group.isTruncated)}`
+    )
+    .join("\n");
+}
+
+function formatDisplayedCountLabel(count: number): string {
+  return `${count} shown`;
+}
+
+function formatDisplayedCountTooltip(count: number, isTruncated: boolean): string {
+  return isTruncated ? `${count} shown, more may exist` : `${count} shown`;
+}
+
+function resolveActivityGroupIcon(group: ActivityGroupKind): vscode.ThemeIcon {
+  switch (group) {
+    case "awaitingInput":
+      return new vscode.ThemeIcon("debug-pause", new vscode.ThemeColor("charts.blue"));
+    case "failing":
+      return new vscode.ThemeIcon("error", new vscode.ThemeColor("charts.red"));
+    case "unstable":
+      return new vscode.ThemeIcon("warning", new vscode.ThemeColor("charts.yellow"));
+    case "running":
+      return new vscode.ThemeIcon("sync~spin", new vscode.ThemeColor("charts.blue"));
+  }
 }

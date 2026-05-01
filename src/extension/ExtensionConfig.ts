@@ -6,6 +6,7 @@ import type {
   BuildCompareOptions,
   BuildParameterRedactionOptions
 } from "../panels/buildCompare/BuildCompareOptions";
+import type { TreeActivityOptions } from "../tree/ActivityTypes";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
@@ -29,6 +30,26 @@ const DEFAULT_BUILD_COMPARE_CONSOLE_MAX_BYTES = 5 * 1024 * 1024;
 const DEFAULT_BUILD_COMPARE_CONSOLE_MAX_LINES = 50_000;
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE = "[redacted]";
 const DEFAULT_TREE_VIEW_CURATION_EXCLUDED_NAMES = ["all"];
+const DEFAULT_ACTIVITY_MAX_ITEMS_PER_GROUP = 50;
+const MAX_ACTIVITY_ITEMS_PER_GROUP = 100;
+const MIN_ACTIVITY_SCAN_MAX_RESULTS = 100;
+const DEFAULT_ACTIVITY_SCAN_MAX_RESULTS = 2000;
+const MAX_ACTIVITY_SCAN_MAX_RESULTS = 10_000;
+const MIN_ACTIVITY_JOB_SEARCH_BATCH_SIZE = 10;
+const DEFAULT_ACTIVITY_JOB_SEARCH_BATCH_SIZE = 50;
+const MAX_ACTIVITY_JOB_SEARCH_BATCH_SIZE = 200;
+const MIN_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT = 0;
+const DEFAULT_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT = 100;
+const MAX_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT = 500;
+const MIN_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY = 1;
+const DEFAULT_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY = 4;
+const MAX_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY = 10;
+const MIN_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT = 1;
+const DEFAULT_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT = 5;
+const MAX_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT = 20;
+const MIN_ACTIVITY_REFRESH_INTERVAL_SECONDS = 5;
+const DEFAULT_ACTIVITY_REFRESH_INTERVAL_SECONDS = 60;
+const MAX_ACTIVITY_REFRESH_INTERVAL_SECONDS = 3600;
 const DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS = [
   "password",
   "token",
@@ -249,6 +270,20 @@ function getBoundedIntegerConfigValue(
   return Math.max(minimumValue, Math.floor(value));
 }
 
+function getClampedIntegerConfigValue(
+  config: vscode.WorkspaceConfiguration,
+  key: string,
+  defaultValue: number,
+  minimumValue: number,
+  maximumValue: number
+): number {
+  const value = config.get<number>(key, defaultValue);
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return defaultValue;
+  }
+  return Math.min(maximumValue, Math.max(minimumValue, Math.floor(value)));
+}
+
 export function getBuildListFetchOptions(
   config: vscode.WorkspaceConfiguration
 ): BuildListFetchOptions {
@@ -269,6 +304,63 @@ export function getTreeViewCurationOptions(
       : normalizeStringList(configuredValue);
   return {
     excludedNames
+  };
+}
+
+export function getTreeActivityOptions(config: vscode.WorkspaceConfiguration): TreeActivityOptions {
+  const refreshIntervalSeconds = getClampedIntegerConfigValue(
+    config,
+    "activity.refreshIntervalSeconds",
+    DEFAULT_ACTIVITY_REFRESH_INTERVAL_SECONDS,
+    MIN_ACTIVITY_REFRESH_INTERVAL_SECONDS,
+    MAX_ACTIVITY_REFRESH_INTERVAL_SECONDS
+  );
+  return {
+    maxItemsPerGroup: getClampedIntegerConfigValue(
+      config,
+      "activity.maxItemsPerGroup",
+      DEFAULT_ACTIVITY_MAX_ITEMS_PER_GROUP,
+      1,
+      MAX_ACTIVITY_ITEMS_PER_GROUP
+    ),
+    collection: {
+      maxScanResults: getClampedIntegerConfigValue(
+        config,
+        "activity.maxScanResults",
+        DEFAULT_ACTIVITY_SCAN_MAX_RESULTS,
+        MIN_ACTIVITY_SCAN_MAX_RESULTS,
+        MAX_ACTIVITY_SCAN_MAX_RESULTS
+      ),
+      jobSearchBatchSize: getClampedIntegerConfigValue(
+        config,
+        "activity.jobSearchBatchSize",
+        DEFAULT_ACTIVITY_JOB_SEARCH_BATCH_SIZE,
+        MIN_ACTIVITY_JOB_SEARCH_BATCH_SIZE,
+        MAX_ACTIVITY_JOB_SEARCH_BATCH_SIZE
+      ),
+      pendingInputCandidateLimit: getClampedIntegerConfigValue(
+        config,
+        "activity.pendingInputCandidateLimit",
+        DEFAULT_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT,
+        MIN_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT,
+        MAX_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT
+      ),
+      pendingInputLookupConcurrency: getClampedIntegerConfigValue(
+        config,
+        "activity.pendingInputLookupConcurrency",
+        DEFAULT_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY,
+        MIN_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY,
+        MAX_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY
+      ),
+      pendingInputBuildLookupLimit: getClampedIntegerConfigValue(
+        config,
+        "activity.pendingInputBuildLookupLimit",
+        DEFAULT_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT,
+        MIN_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT,
+        MAX_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT
+      ),
+      refreshMinIntervalMs: refreshIntervalSeconds * 1000
+    }
   };
 }
 

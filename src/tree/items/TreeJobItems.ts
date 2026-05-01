@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { ActivityGroupKind } from "../ActivityTypes";
 import {
   ROOT_TREE_JOB_SCOPE,
   type TreeJobScope,
@@ -199,6 +200,44 @@ export class QuickAccessPipelineTreeItem extends PipelineTreeItem {
   }
 }
 
+export class ActivityJobTreeItem extends JobTreeItem {
+  constructor(
+    environment: JenkinsEnvironmentRef,
+    label: string,
+    jobUrl: string,
+    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
+    color?: string,
+    isWatched = false,
+    isPinned = false,
+    group: ActivityGroupKind = "running",
+    pathContext?: string
+  ) {
+    super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
+    this.id = `activity:${group}:${this.id}`;
+    this.description = buildActivityDescription(pathContext, color, isWatched, isPinned);
+    this.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, this.description);
+  }
+}
+
+export class ActivityPipelineTreeItem extends PipelineTreeItem {
+  constructor(
+    environment: JenkinsEnvironmentRef,
+    label: string,
+    jobUrl: string,
+    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
+    color?: string,
+    isWatched = false,
+    isPinned = false,
+    group: ActivityGroupKind = "running",
+    pathContext?: string
+  ) {
+    super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
+    this.id = `activity:${group}:${this.id}`;
+    this.description = buildActivityDescription(pathContext, color, isWatched, isPinned);
+    this.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, this.description);
+  }
+}
+
 export class StalePinnedJobTreeItem extends vscode.TreeItem {
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
@@ -220,6 +259,44 @@ export class StalePinnedJobTreeItem extends vscode.TreeItem {
     );
     this.iconPath = new vscode.ThemeIcon("warning");
   }
+}
+
+function buildActivityDescription(
+  pathContext: string | undefined,
+  color: string | undefined,
+  isWatched: boolean,
+  isPinned: boolean
+): string | undefined {
+  const parts: string[] = [];
+  if (pathContext) {
+    parts.push(pathContext);
+  }
+  const statusDescription = formatJobDescription({
+    status: formatJobColor(color),
+    isWatched,
+    isPinned
+  });
+  if (statusDescription) {
+    parts.push(statusDescription);
+  }
+  return parts.length > 0 ? parts.join(" • ") : undefined;
+}
+
+function formatActivityJobTooltip(
+  label: string,
+  jobUrl: string,
+  pathContext?: string,
+  details?: string
+): string | undefined {
+  const lines = [label];
+  if (pathContext) {
+    lines.push(pathContext);
+  }
+  if (details && details !== pathContext) {
+    lines.push(details);
+  }
+  lines.push(jobUrl);
+  return lines.join("\n");
 }
 
 function buildPinnedQuickAccessDescription(

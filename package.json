@@ -592,6 +592,55 @@
           "default": ["all"],
           "description": "Case-insensitive Jenkins view names to hide from the Views section."
         },
+        "jenkinsWorkbench.activity.maxItemsPerGroup": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum number of jobs to show in each Activity group."
+        },
+        "jenkinsWorkbench.activity.maxScanResults": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 100,
+          "maximum": 10000,
+          "description": "Maximum Jenkins jobs to scan while collecting Activity groups."
+        },
+        "jenkinsWorkbench.activity.jobSearchBatchSize": {
+          "type": "number",
+          "default": 50,
+          "minimum": 10,
+          "maximum": 200,
+          "description": "Jenkins job search batch size used while collecting Activity groups."
+        },
+        "jenkinsWorkbench.activity.pendingInputCandidateLimit": {
+          "type": "number",
+          "default": 100,
+          "minimum": 0,
+          "maximum": 500,
+          "description": "Maximum running jobs to enrich when checking Activity jobs for pending input."
+        },
+        "jenkinsWorkbench.activity.pendingInputLookupConcurrency": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Maximum concurrent build lookups used when checking Activity jobs for pending input."
+        },
+        "jenkinsWorkbench.activity.pendingInputBuildLookupLimit": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum recent builds to inspect per running job when checking Activity jobs for pending input."
+        },
+        "jenkinsWorkbench.activity.refreshIntervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "maximum": 3600,
+          "description": "Minimum seconds between automatic refreshes for expanded Activity folders."
+        },
         "jenkinsWorkbench.currentBranch.pullRequestJobNamePatterns": {
           "type": "array",
           "items": {

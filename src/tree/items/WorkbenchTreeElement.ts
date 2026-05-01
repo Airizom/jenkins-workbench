@@ -4,6 +4,8 @@ import type {
   BuildTreeItem
 } from "./TreeBuildItems";
 import type {
+  ActivityJobTreeItem,
+  ActivityPipelineTreeItem,
   JenkinsFolderTreeItem,
   JenkinsViewTreeItem,
   JobTreeItem,
@@ -16,6 +18,8 @@ import type { NodeTreeItem } from "./TreeNodeItems";
 import type { PlaceholderTreeItem } from "./TreePlaceholderItem";
 import type { QueueItemTreeItem } from "./TreeQueueItems";
 import type {
+  ActivityFolderTreeItem,
+  ActivityGroupTreeItem,
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
   JobsFolderTreeItem,
@@ -34,6 +38,8 @@ import type {
 export type WorkbenchTreeElement =
   | RootSectionTreeItem
   | InstanceTreeItem
+  | ActivityFolderTreeItem
+  | ActivityGroupTreeItem
   | ViewsFolderTreeItem
   | JobsFolderTreeItem
   | BuildQueueFolderTreeItem
@@ -44,6 +50,8 @@ export type WorkbenchTreeElement =
   | JenkinsFolderTreeItem
   | JobTreeItem
   | PipelineTreeItem
+  | ActivityJobTreeItem
+  | ActivityPipelineTreeItem
   | QuickAccessJobTreeItem
   | QuickAccessPipelineTreeItem
   | StalePinnedJobTreeItem

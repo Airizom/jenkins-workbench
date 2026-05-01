@@ -5,6 +5,8 @@ export type {
 } from "./items/TreeItemSummaries";
 
 export {
+  ActivityFolderTreeItem,
+  ActivityGroupTreeItem,
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
   JobsFolderTreeItem,
@@ -16,6 +18,8 @@ export {
 } from "./items/TreeRootItems";
 
 export {
+  ActivityJobTreeItem,
+  ActivityPipelineTreeItem,
   JenkinsFolderTreeItem,
   JenkinsViewTreeItem,
   JobTreeItem,

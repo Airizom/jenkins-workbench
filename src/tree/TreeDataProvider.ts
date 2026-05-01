@@ -9,6 +9,7 @@ import type { PendingInputRefreshCoordinator } from "../services/PendingInputRef
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import type { TreeActivityOptions } from "./ActivityTypes";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
@@ -30,7 +31,7 @@ import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
 import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
-import { BuildQueueFolderTreeItem } from "./items/TreeRootItems";
+import { ActivityFolderTreeItem, BuildQueueFolderTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
@@ -79,6 +80,7 @@ export class JenkinsWorkbenchTreeDataProvider
     buildTooltipOptions: BuildTooltipOptions,
     buildListFetchOptions: BuildListFetchOptions,
     viewCurationOptions: TreeViewCurationOptions,
+    activityOptions: TreeActivityOptions,
     pendingInputCoordinator: PendingInputRefreshCoordinator
   ) {
     this.hierarchyState = new TreeDataProviderHierarchyState();
@@ -89,7 +91,7 @@ export class JenkinsWorkbenchTreeDataProvider
     );
 
     this.pendingInputUnsubscribe = pendingInputCoordinator.onSummaryChange((change) => {
-      this.childrenLoader.clearBuildsCache(change.environment);
+      this.childrenLoader.clearPendingInputDependentCaches(change.environment);
       this.notifyElement(undefined);
     });
 
@@ -100,6 +102,7 @@ export class JenkinsWorkbenchTreeDataProvider
       pinStore,
       treeFilter,
       viewCurationOptions,
+      activityOptions,
       BUILD_LIMIT,
       buildTooltipOptions,
       buildListFetchOptions,
@@ -193,6 +196,11 @@ export class JenkinsWorkbenchTreeDataProvider
     this.refreshQueueOnly(environment);
   }
 
+  refreshActivity(environment: JenkinsEnvironmentRef): void {
+    this.childrenLoader.refreshActivityCache(environment);
+    this._onDidChangeTreeData.fire(new ActivityFolderTreeItem(environment));
+  }
+
   invalidateBuildArtifacts(request: InvalidateBuildArtifactsRequest): void {
     this.childrenLoader.invalidateBuildArtifacts(
       request.environment,
@@ -222,6 +230,11 @@ export class JenkinsWorkbenchTreeDataProvider
 
   updateViewCurationOptions(options: TreeViewCurationOptions): void {
     this.childrenLoader.updateViewCurationOptions(options);
+    this.childrenLoader.clearChildrenCacheForEnvironment();
+  }
+
+  updateActivityOptions(options: TreeActivityOptions): void {
+    this.childrenLoader.updateActivityOptions(options);
     this.childrenLoader.clearChildrenCacheForEnvironment();
   }
 

@@ -202,7 +202,7 @@ export class TreeChildrenCacheManager {
   getOrLoadChildren(
     key: string,
     element: WorkbenchTreeElement | undefined,
-    loader: () => Promise<WorkbenchTreeElement[]>,
+    loader: (isCurrentLoad: () => boolean) => Promise<WorkbenchTreeElement[]>,
     loadingLabel: string
   ): Promise<WorkbenchTreeElement[]> {
     const cached = this.childrenCache.get<WorkbenchTreeElement[]>(key);
@@ -216,7 +216,7 @@ export class TreeChildrenCacheManager {
 
     const token = this.nextLoadToken(key);
     const pending = this.withTimeout(
-      loader(),
+      loader(() => this.isCurrentLoadToken(key, token)),
       this.timeoutMs,
       "Loading timed out. Try refreshing the tree."
     )

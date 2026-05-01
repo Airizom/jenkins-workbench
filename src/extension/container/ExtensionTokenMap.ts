@@ -54,6 +54,7 @@ import type { TreeExpansionState } from "../../tree/TreeExpansionState";
 import type { JenkinsTreeFilter } from "../../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../../tree/TreeItems";
 import type { DefaultJenkinsTreeNavigator } from "../../tree/TreeNavigator";
+import type { ActivityRefreshService } from "../../tree/activity/ActivityRefreshService";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import type { ArtifactPreviewProvider } from "../../ui/ArtifactPreviewProvider";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
@@ -128,6 +129,7 @@ export interface ExtensionTokenMap {
   treeView: vscode.TreeView<WorkbenchTreeElement>;
   treeExpansionState: TreeExpansionState;
   treeNavigator: DefaultJenkinsTreeNavigator;
+  activityRefreshService: ActivityRefreshService;
   jenkinsfileMatcher: JenkinsfileMatcher;
   jenkinsfileEnvironmentResolver: JenkinsfileEnvironmentResolver;
   jenkinsfileValidationCoordinator: JenkinsfileValidationCoordinator;

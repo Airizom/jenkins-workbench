@@ -2,11 +2,13 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
+import type { ActivityDisplaySummary } from "../ActivityTypes";
 import type { EnvironmentSummaryStore } from "../EnvironmentSummaryStore";
 import { type TreeViewCurationOptions, curateTreeViews } from "../TreeViewCuration";
 import { JenkinsViewTreeItem } from "../items/TreeJobItems";
 import { NodeTreeItem } from "../items/TreeNodeItems";
 import {
+  ActivityFolderTreeItem,
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
   JobsFolderTreeItem,
@@ -25,6 +27,9 @@ export class TreeEnvironmentChildrenLoader {
     private readonly pinStore: JenkinsPinStore,
     private readonly environmentSummaryStore: EnvironmentSummaryStore,
     private readonly getViewCurationOptions: () => TreeViewCurationOptions,
+    private readonly getActivitySummary: (
+      environment: JenkinsEnvironmentRef
+    ) => ActivityDisplaySummary | undefined,
     private readonly placeholders: TreePlaceholderFactory
   ) {}
 
@@ -52,6 +57,7 @@ export class TreeEnvironmentChildrenLoader {
       ...(pinnedEntries.length > 0
         ? [new PinnedJobsFolderTreeItem(element, pinnedEntries.length)]
         : []),
+      new ActivityFolderTreeItem(element, this.getActivitySummary(element)),
       new ViewsFolderTreeItem(element),
       new JobsFolderTreeItem(element, summary?.jobs),
       new BuildQueueFolderTreeItem(element, summary?.queue),

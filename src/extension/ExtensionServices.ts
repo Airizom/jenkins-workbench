@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
 import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
 import type { BuildCompareOptions } from "../panels/buildCompare/BuildCompareOptions";
+import type { TreeActivityOptions } from "../tree/ActivityTypes";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { ArtifactActionOptionsProvider } from "../ui/ArtifactActionHandler";
@@ -26,6 +27,7 @@ export interface ExtensionServicesOptions {
   buildTooltipOptions: BuildTooltipOptions;
   buildListFetchOptions: BuildListFetchOptions;
   treeViewCurationOptions: TreeViewCurationOptions;
+  activityOptions: TreeActivityOptions;
   artifactActionOptionsProvider: ArtifactActionOptionsProvider;
   artifactPreviewOptionsProvider: ArtifactPreviewOptionsProvider;
   artifactPreviewCacheOptions: ArtifactPreviewProviderOptions;
@@ -60,7 +62,8 @@ export function registerExtensionProviders(
   const treeCatalog = createTreeProviderCatalog({
     buildTooltipOptions: options.buildTooltipOptions,
     buildListFetchOptions: options.buildListFetchOptions,
-    treeViewCurationOptions: options.treeViewCurationOptions
+    treeViewCurationOptions: options.treeViewCurationOptions,
+    activityOptions: options.activityOptions
   });
 
   const validationCatalog = createValidationProviderCatalog({
