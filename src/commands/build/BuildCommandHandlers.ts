@@ -80,6 +80,27 @@ async function runPendingInputAction(
   });
 }
 
+function getSelectedBuildLabel(selected: BuildTreeItem): string {
+  return getTreeItemLabel(selected);
+}
+
+function createBuildActionConfig(
+  label: string,
+  verb: string,
+  successMessage: string,
+  action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>
+): {
+  errorMessage: string;
+  successMessage: string;
+  action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>;
+} {
+  return {
+    errorMessage: `Failed to ${verb} ${label}`,
+    successMessage,
+    action
+  };
+}
+
 export async function triggerBuild(
   dataService: JenkinsDataService,
   presetStore: JenkinsParameterPresetStore,
@@ -173,12 +194,17 @@ export async function stopBuild(
     return;
   }
 
-  const label = getTreeItemLabel(selected);
-  await runBuildAction(refreshHost, selected, {
-    errorMessage: `Failed to stop build ${label}`,
-    successMessage: `Stopped build ${label}.`,
-    action: (environment, buildUrl) => dataService.stopBuild(environment, buildUrl)
-  });
+  const label = getSelectedBuildLabel(selected);
+  await runBuildAction(
+    refreshHost,
+    selected,
+    createBuildActionConfig(
+      label,
+      "stop build",
+      `Stopped build ${label}.`,
+      (environment, buildUrl) => dataService.stopBuild(environment, buildUrl)
+    )
+  );
 }
 
 export async function approveInput(
@@ -233,12 +259,17 @@ export async function quickReplayBuild(
     return;
   }
 
-  const label = getTreeItemLabel(selected);
-  await runBuildAction(refreshHost, selected, {
-    errorMessage: `Failed to replay build ${label}`,
-    successMessage: `Replay requested for ${label}.`,
-    action: (environment, buildUrl) => dataService.quickReplayBuild(environment, buildUrl)
-  });
+  const label = getSelectedBuildLabel(selected);
+  await runBuildAction(
+    refreshHost,
+    selected,
+    createBuildActionConfig(
+      label,
+      "replay build",
+      `Replay requested for ${label}.`,
+      (environment, buildUrl) => dataService.quickReplayBuild(environment, buildUrl)
+    )
+  );
 }
 
 export async function runReplayDraft(
@@ -259,12 +290,17 @@ export async function rebuildBuild(
     return;
   }
 
-  const label = getTreeItemLabel(selected);
-  await runBuildAction(refreshHost, selected, {
-    errorMessage: `Failed to rebuild ${label}`,
-    successMessage: `Rebuild requested for ${label}.`,
-    action: (environment, buildUrl) => dataService.rebuildBuild(environment, buildUrl)
-  });
+  const label = getSelectedBuildLabel(selected);
+  await runBuildAction(
+    refreshHost,
+    selected,
+    createBuildActionConfig(
+      label,
+      "rebuild",
+      `Rebuild requested for ${label}.`,
+      (environment, buildUrl) => dataService.rebuildBuild(environment, buildUrl)
+    )
+  );
 }
 
 export async function openInJenkins(
@@ -417,10 +453,10 @@ async function promptForComparisonBuild(
   quickPick.matchOnDescription = true;
   quickPick.matchOnDetail = true;
   quickPick.title = "Compare With Build";
-  quickPick.placeholder = `Choose the baseline build for ${getTreeItemLabel(selected)}`;
+  quickPick.placeholder = `Choose the baseline build for ${getSelectedBuildLabel(selected)}`;
 
   const previousBuild = builds.find((build) => build.number < selected.buildNumber);
-  const suggestedBuild = previousBuild && createCompareBuildQuickPickItem(previousBuild);
+  const suggestedBuild = previousBuild ? createCompareBuildQuickPickItem(previousBuild) : undefined;
   const recentItems = builds
     .filter((build) => build.url !== previousBuild?.url)
     .map((build) => createCompareBuildQuickPickItem(build));

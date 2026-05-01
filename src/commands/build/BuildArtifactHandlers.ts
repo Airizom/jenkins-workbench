@@ -2,6 +2,17 @@ import type { ArtifactTreeItem } from "../../tree/TreeItems";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
 import { requireSelection } from "../CommandUtils";
 
+function getArtifactRequest(item: ArtifactTreeItem) {
+  return {
+    environment: item.environment,
+    buildUrl: item.buildUrl,
+    buildNumber: item.buildNumber,
+    relativePath: item.relativePath,
+    fileName: item.fileName,
+    jobNameHint: item.jobNameHint
+  };
+}
+
 export async function previewArtifact(
   artifactActionHandler: ArtifactActionHandler,
   item?: ArtifactTreeItem
@@ -13,12 +24,7 @@ export async function previewArtifact(
 
   await artifactActionHandler.handle({
     action: "preview",
-    environment: selected.environment,
-    buildUrl: selected.buildUrl,
-    buildNumber: selected.buildNumber,
-    relativePath: selected.relativePath,
-    fileName: selected.fileName,
-    jobNameHint: selected.jobNameHint
+    ...getArtifactRequest(selected)
   });
 }
 
@@ -33,11 +39,6 @@ export async function downloadArtifact(
 
   await artifactActionHandler.handle({
     action: "download",
-    environment: selected.environment,
-    buildUrl: selected.buildUrl,
-    buildNumber: selected.buildNumber,
-    relativePath: selected.relativePath,
-    fileName: selected.fileName,
-    jobNameHint: selected.jobNameHint
+    ...getArtifactRequest(selected)
   });
 }
