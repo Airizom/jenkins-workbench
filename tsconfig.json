@@ -12,6 +12,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "esModuleInterop": true,
+    "types": ["node", "vscode", "react", "react-dom"],
     "jsx": "react-jsx"
   },
   "exclude": [
