@@ -132,6 +132,10 @@ export interface JenkinsQueueItemInfo {
   reason?: string;
   inQueueSince?: number;
   taskUrl?: string;
+  assignedLabelName?: string;
+  blocked?: boolean;
+  buildable?: boolean;
+  stuck?: boolean;
 }
 
 export interface JobPathSegment {

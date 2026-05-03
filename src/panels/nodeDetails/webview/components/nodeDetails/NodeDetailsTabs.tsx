@@ -9,6 +9,7 @@ import { NodeDetailsAdvancedSection } from "./NodeDetailsAdvancedSection";
 import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
 import { NodeDetailsLabelsSection } from "./NodeDetailsLabelsSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
+import { NodeDetailsQueuedWorkSection } from "./NodeDetailsQueuedWorkSection";
 import type { OverviewRow } from "./nodeDetailsUtils";
 
 type NodeDetailsTabsProps = {
@@ -26,6 +27,8 @@ export function NodeDetailsTabs({
   onCopyJson,
   onOpenExternal
 }: NodeDetailsTabsProps): JSX.Element {
+  const queuedWorkCount = countQueuedWorkItems(state.queuedWork);
+
   return (
     <Tabs defaultValue="overview" className="space-y-3">
       <TabsList className="w-full justify-start">
@@ -40,6 +43,12 @@ export function NodeDetailsTabs({
         </TabsTrigger>
         <TabsTrigger value="labels" className="text-xs">
           Labels
+        </TabsTrigger>
+        <TabsTrigger value="queue" className="text-xs">
+          Queue
+          <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border border-border bg-muted-soft px-1 text-[10px] text-muted-foreground">
+            {queuedWorkCount}
+          </span>
         </TabsTrigger>
         <TabsTrigger value="advanced" className="text-xs">
           Advanced
@@ -62,6 +71,13 @@ export function NodeDetailsTabs({
         <NodeDetailsLabelsSection labels={state.labels} />
       </TabsContent>
 
+      <TabsContent value="queue" className="space-y-3">
+        <NodeDetailsQueuedWorkSection
+          queuedWork={state.queuedWork}
+          onOpenExternal={onOpenExternal}
+        />
+      </TabsContent>
+
       <TabsContent value="advanced" className="space-y-3">
         <NodeDetailsAdvancedSection
           advancedLoaded={state.advancedLoaded}
@@ -74,5 +90,13 @@ export function NodeDetailsTabs({
         />
       </TabsContent>
     </Tabs>
+  );
+}
+
+function countQueuedWorkItems(queuedWork: NodeDetailsState["queuedWork"]): number {
+  return (
+    queuedWork.matchingQueueItems.length +
+    queuedWork.anyQueueItems.length +
+    queuedWork.selfLabelQueueItems.length
   );
 }

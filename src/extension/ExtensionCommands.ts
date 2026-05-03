@@ -4,6 +4,7 @@ import { registerCurrentBranchCommands } from "../commands/CurrentBranchCommands
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
 import { registerJenkinsfileCommands } from "../commands/JenkinsfileCommands";
 import { registerJobCommands } from "../commands/JobCommands";
+import { registerNodeCapacityCommands } from "../commands/NodeCapacityCommands";
 import { registerNodeCommands } from "../commands/NodeCommands";
 import { registerPinCommands } from "../commands/PinCommands";
 import { registerQueueCommands } from "../commands/QueueCommands";
@@ -84,6 +85,7 @@ export function registerExtensionCommands(
   );
 
   registerNodeCommands(context, dataService, refreshHost);
+  registerNodeCapacityCommands(context, dataService, environmentStore, refreshHost);
 
   registerQueueCommands(context, dataService, refreshHost);
 

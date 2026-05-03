@@ -22,20 +22,28 @@ export interface NodeLaunchResult {
 export class JenkinsNodeDataOperations {
   constructor(private readonly context: JenkinsDataRuntimeContext) {}
 
-  async getNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNodeInfo[]> {
+  async getNodes(
+    environment: JenkinsEnvironmentRef,
+    options?: { mode?: "cached" | "refresh" }
+  ): Promise<JenkinsNodeInfo[]> {
     const cacheKey = await this.context.buildCacheKey(environment, "nodes");
-    return this.context.getCache().getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.context.getClient(environment);
-        const nodes = await client.getNodes();
-        return nodes.map((node) => ({
-          ...node,
-          nodeUrl: resolveNodeUrl(environment.url, node)
-        }));
-      },
-      this.context.getCacheTtlMs()
-    );
+    if (options?.mode === "refresh") {
+      const nodes = await this.loadNodes(environment);
+      this.context.getCache().set(cacheKey, nodes, this.context.getCacheTtlMs());
+      return nodes;
+    }
+    return this.context
+      .getCache()
+      .getOrLoad(cacheKey, () => this.loadNodes(environment), this.context.getCacheTtlMs());
+  }
+
+  private async loadNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNodeInfo[]> {
+    const client = await this.context.getClient(environment);
+    const nodes = await client.getNodes();
+    return nodes.map((node) => ({
+      ...node,
+      nodeUrl: resolveNodeUrl(environment.url, node)
+    }));
   }
 
   async getNodeDetails(

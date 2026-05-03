@@ -8,18 +8,9 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const panelsRoot = path.join(repoRoot, "src", "panels");
 
-const buildDetailsEntry = path.join(
-  panelsRoot,
-  "buildDetails",
-  "webview",
-  "index.tsx"
-);
-const buildCompareEntry = path.join(
-  panelsRoot,
-  "buildCompare",
-  "webview",
-  "index.tsx"
-);
+const buildDetailsEntry = path.join(panelsRoot, "buildDetails", "webview", "index.tsx");
+const buildCompareEntry = path.join(panelsRoot, "buildCompare", "webview", "index.tsx");
+const nodeCapacityEntry = path.join(panelsRoot, "nodeCapacity", "webview", "index.tsx");
 const nodeDetailsEntry = path.join(panelsRoot, "nodeDetails", "webview", "index.tsx");
 
 export default defineConfig(() => {
@@ -37,6 +28,7 @@ export default defineConfig(() => {
         input: {
           buildCompare: buildCompareEntry,
           buildDetails: buildDetailsEntry,
+          nodeCapacity: nodeCapacityEntry,
           nodeDetails: nodeDetailsEntry
         },
         output: {

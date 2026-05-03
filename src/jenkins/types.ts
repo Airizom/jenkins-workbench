@@ -304,6 +304,7 @@ export interface JenkinsNode {
   manualLaunchAllowed?: boolean;
   numExecutors?: number;
   busyExecutors?: number;
+  executors?: JenkinsNodeExecutor[];
 }
 
 export interface JenkinsNodeExecutable {
@@ -352,11 +353,16 @@ export interface JenkinsNodeDetails extends JenkinsNode {
 export interface JenkinsQueueTask {
   name?: string;
   url?: string;
+  labelExpression?: string;
 }
 
 export interface JenkinsQueueExecutable {
   number: number;
   url?: string;
+}
+
+export interface JenkinsQueueAssignedLabel {
+  name?: string;
 }
 
 export interface JenkinsQueueItem {
@@ -367,6 +373,7 @@ export interface JenkinsQueueItem {
   blocked?: boolean;
   buildable?: boolean;
   stuck?: boolean;
+  assignedLabel?: JenkinsQueueAssignedLabel;
   cancelled?: boolean;
   executable?: JenkinsQueueExecutable;
 }

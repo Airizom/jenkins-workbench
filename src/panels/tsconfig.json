@@ -18,9 +18,13 @@
     "buildDetails/webview/**/*.ts",
     "buildDetails/webview/**/*.tsx",
     "buildDetails/shared/**/*.ts",
+    "nodeCapacity/webview/**/*.ts",
+    "nodeCapacity/webview/**/*.tsx",
+    "nodeCapacity/shared/**/*.ts",
     "nodeDetails/webview/**/*.ts",
     "nodeDetails/webview/**/*.tsx",
     "nodeDetails/shared/**/*.ts",
+    "../shared/**/*.ts",
     "shared/webview/**/*.ts",
     "shared/webview/**/*.tsx"
   ]

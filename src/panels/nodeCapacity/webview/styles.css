@@ -1,0 +1,13 @@
+@layer components {
+  .capacity-pool summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .capacity-pool summary {
+    outline: none;
+  }
+
+  .capacity-pool summary:focus-visible {
+    box-shadow: 0 0 0 1px var(--ring);
+  }
+}

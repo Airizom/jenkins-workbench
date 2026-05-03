@@ -134,8 +134,39 @@ export class JenkinsQueueAndJobManagementOperations {
         position: index + 1,
         reason: typeof item.why === "string" ? item.why.trim() || undefined : undefined,
         inQueueSince: typeof item.inQueueSince === "number" ? item.inQueueSince : undefined,
-        taskUrl: item.task?.url
+        taskUrl: item.task?.url,
+        assignedLabelName:
+          trimToUndefined(item.assignedLabel?.name) ??
+          trimToUndefined(item.task?.labelExpression) ??
+          inferAssignedLabelFromQueueReason(item.why),
+        blocked: item.blocked === true,
+        buildable: item.buildable === true,
+        stuck: item.stuck === true
       };
     });
   }
+}
+
+function trimToUndefined(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function inferAssignedLabelFromQueueReason(value: unknown): string | undefined {
+  const reason = trimToUndefined(value);
+  if (!reason) {
+    return undefined;
+  }
+  return (
+    matchFirstGroup(reason, /All nodes of label ['‘"]([^'’"]+)['’"] are offline/i) ??
+    matchFirstGroup(reason, /There are no nodes with the label ['‘"]([^'’"]+)['’"]/i)
+  );
+}
+
+function matchFirstGroup(value: string, pattern: RegExp): string | undefined {
+  const match = pattern.exec(value);
+  return trimToUndefined(match?.[1]);
 }

@@ -37,6 +37,11 @@ export const FALLBACK_STATE: NodeDetailsState = {
   manualLaunchLabel: undefined,
   executors: [],
   oneOffExecutors: [],
+  queuedWork: {
+    matchingQueueItems: [],
+    anyQueueItems: [],
+    selfLabelQueueItems: []
+  },
   monitorData: [],
   loadStatistics: [],
   rawJson: "",
@@ -53,6 +58,7 @@ export function buildInitialState(initialState: NodeDetailsViewModel): NodeDetai
     labels: initialState.labels ?? [],
     executors: initialState.executors ?? [],
     oneOffExecutors: initialState.oneOffExecutors ?? [],
+    queuedWork: initialState.queuedWork ?? FALLBACK_STATE.queuedWork,
     monitorData: initialState.monitorData ?? [],
     loadStatistics: initialState.loadStatistics ?? [],
     errors: initialState.errors ?? [],

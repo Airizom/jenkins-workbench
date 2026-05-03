@@ -7,6 +7,7 @@ import type {
   JenkinsNodeExecutor
 } from "../../jenkins/types";
 import type {
+  NodeDetailsQueuedWorkViewModel,
   NodeDetailsViewModel,
   NodeExecutorViewModel,
   NodeMonitorViewModel,
@@ -15,6 +16,7 @@ import type {
 
 export type {
   NodeDetailsViewModel,
+  NodeDetailsQueuedWorkViewModel,
   NodeExecutorViewModel,
   NodeMonitorViewModel,
   NodeStatusClass
@@ -27,6 +29,7 @@ export interface NodeDetailsViewModelInput {
   fallbackUrl?: string;
   advancedLoaded?: boolean;
   nowMs?: number;
+  queuedWork?: NodeDetailsQueuedWorkViewModel;
 }
 
 const UNKNOWN_LABEL = "Not available";
@@ -93,8 +96,17 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
     ...buildNodeStatus(details),
     ...buildNodeOverview(details),
     ...buildNodeRuntimeFields(details, nowMs),
+    queuedWork: input.queuedWork ?? createEmptyQueuedWork(),
     errors: [...input.errors],
     advancedLoaded: Boolean(input.advancedLoaded)
+  };
+}
+
+function createEmptyQueuedWork(): NodeDetailsQueuedWorkViewModel {
+  return {
+    matchingQueueItems: [],
+    anyQueueItems: [],
+    selfLabelQueueItems: []
   };
 }
 

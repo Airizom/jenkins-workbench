@@ -51,7 +51,7 @@ export class JenkinsNodesApi {
     const url = buildApiUrlFromBase(
       this.context.baseUrl,
       "computer/api/json",
-      "computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,offlineCauseReason,offlineCause[description,shortDescription,name,timestamp],numExecutors,busyExecutors,jnlpAgent,launchSupported,manualLaunchAllowed]"
+      `computer[displayName,name,url,assignedLabels[name],offline,temporarilyOffline,offlineCauseReason,offlineCause[description,shortDescription,name,timestamp],numExecutors,busyExecutors,${`executors[${NODE_EXECUTOR_FIELDS}]`},jnlpAgent,launchSupported,manualLaunchAllowed]`
     );
     const response = await this.context.requestJson<{ computer?: JenkinsNode[] }>(url);
     return Array.isArray(response.computer) ? response.computer : [];

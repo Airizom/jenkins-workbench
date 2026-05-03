@@ -362,8 +362,11 @@ export class JenkinsDataService {
     return this.buildOperations.getTestReport(environment, buildUrl, options);
   }
 
-  async getNodes(environment: JenkinsEnvironmentRef): Promise<JenkinsNodeInfo[]> {
-    return this.nodeOperations.getNodes(environment);
+  async getNodes(
+    environment: JenkinsEnvironmentRef,
+    options?: { mode?: "cached" | "refresh" }
+  ): Promise<JenkinsNodeInfo[]> {
+    return this.nodeOperations.getNodes(environment, options);
   }
 
   async getNodeDetails(

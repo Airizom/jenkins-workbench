@@ -10,7 +10,8 @@ export class JenkinsQueueApi {
   constructor(private readonly context: JenkinsClientContext) {}
 
   async getQueue(): Promise<JenkinsQueueItem[]> {
-    const tree = "items[id,task[name,url],why,inQueueSince,blocked,buildable,stuck]";
+    const tree =
+      "items[id,task[name,url,labelExpression],why,inQueueSince,blocked,buildable,stuck,assignedLabel[name]]";
     const url = buildApiUrlFromBase(this.context.baseUrl, "queue/api/json", tree);
     const response = await this.context.requestJson<JenkinsQueueResponse>(url);
     return Array.isArray(response.items) ? response.items : [];
@@ -19,7 +20,7 @@ export class JenkinsQueueApi {
   async getQueueItem(id: number): Promise<JenkinsQueueItem> {
     const safeId = Math.max(0, Math.floor(id));
     const tree =
-      "id,task[name,url],why,inQueueSince,blocked,buildable,stuck,cancelled,executable[number,url]";
+      "id,task[name,url,labelExpression],why,inQueueSince,blocked,buildable,stuck,assignedLabel[name],cancelled,executable[number,url]";
     const url = buildApiUrlFromBase(this.context.baseUrl, `queue/item/${safeId}/api/json`, tree);
     return this.context.requestJson<JenkinsQueueItem>(url);
   }

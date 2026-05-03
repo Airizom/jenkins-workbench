@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { NodeCapacityPanel } from "../panels/NodeCapacityPanel";
 import { NodeDetailsPanel } from "../panels/NodeDetailsPanel";
 import { JOB_CONFIG_DRAFT_SCHEME } from "../services/JobConfigDraftFilesystem";
 import { REPLAY_DRAFT_SCHEME } from "../services/ReplayDraftFilesystem";
@@ -98,6 +99,20 @@ export async function activateRuntime(
     }
   );
 
+  const nodeCapacitySerializer = vscode.window.registerWebviewPanelSerializer(
+    "jenkinsWorkbench.nodeCapacity",
+    {
+      deserializeWebviewPanel: async (panel, state) => {
+        await NodeCapacityPanel.revive(panel, state, {
+          dataService,
+          environmentStore,
+          extensionUri: context.extensionUri,
+          refreshHost
+        });
+      }
+    }
+  );
+
   const buildCompareSerializer = vscode.window.registerWebviewPanelSerializer(
     "jenkinsWorkbench.buildCompare",
     {
@@ -141,6 +156,7 @@ export async function activateRuntime(
     replayDraftFilesystemRegistration,
     buildCompareSerializer,
     buildDetailsSerializer,
+    nodeCapacitySerializer,
     nodeDetailsSerializer,
     vscode.window.registerUriHandler(uriHandler),
     jenkinsfileCodeLensProvider,

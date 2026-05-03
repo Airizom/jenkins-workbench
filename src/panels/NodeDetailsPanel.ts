@@ -8,6 +8,7 @@ import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
 import { NodeActionService } from "../services/NodeActionService";
+import { NodeQueuedWorkService } from "../services/NodeQueuedWorkService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 import {
@@ -82,6 +83,7 @@ export class NodeDetailsPanel {
   private refreshHost?: NodeDetailsRefreshHost;
   private dataService?: JenkinsDataService;
   private nodeActionService?: NodeActionService;
+  private nodeQueuedWorkService?: NodeQueuedWorkService;
   private environment?: JenkinsEnvironmentRef;
   private nodeUrl?: string;
   private lastDetails?: JenkinsNodeDetails;
@@ -112,6 +114,7 @@ export class NodeDetailsPanel {
     const activePanel = NodeDetailsPanel.currentPanel;
     activePanel.dataService = dataService;
     activePanel.nodeActionService = new NodeActionService(dataService);
+    activePanel.nodeQueuedWorkService = new NodeQueuedWorkService(dataService);
     activePanel.environment = environment;
     activePanel.nodeUrl = nodeUrl;
     activePanel.setRefreshHost(refreshHost);
@@ -132,6 +135,7 @@ export class NodeDetailsPanel {
     NodeDetailsPanel.currentPanel = revived;
     revived.dataService = options.dataService;
     revived.nodeActionService = new NodeActionService(options.dataService);
+    revived.nodeQueuedWorkService = new NodeQueuedWorkService(options.dataService);
     revived.setRefreshHost(options.refreshHost);
 
     if (!isNodeDetailsPanelState(state)) {
@@ -349,12 +353,30 @@ export class NodeDetailsPanel {
         this.advancedLoaded = true;
       }
       this.lastDetails = details;
+      const errors: string[] = [];
+      let queuedWork:
+        | Awaited<ReturnType<NodeQueuedWorkService["getQueuedWorkForNode"]>>
+        | undefined;
+      if (this.nodeQueuedWorkService) {
+        try {
+          queuedWork = await this.nodeQueuedWorkService.getQueuedWorkForNode(
+            this.environment,
+            details
+          );
+        } catch (error) {
+          errors.push(`Unable to load queued work: ${formatActionError(error)}`);
+        }
+      }
+      if (!this.isTokenCurrent(token)) {
+        return undefined;
+      }
       return buildNodeDetailsViewModel({
         details,
-        errors: [],
+        errors,
         updatedAt: new Date().toISOString(),
         fallbackUrl: this.nodeUrl,
         advancedLoaded: this.advancedLoaded,
+        queuedWork,
         nowMs: Date.now()
       });
     } catch (error) {

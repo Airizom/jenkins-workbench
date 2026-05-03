@@ -145,6 +145,11 @@
         "title": "Jenkins: View Node Details"
       },
       {
+        "command": "jenkinsWorkbench.showNodeCapacity",
+        "title": "Jenkins: View Node Capacity",
+        "icon": "$(dashboard)"
+      },
+      {
         "command": "jenkinsWorkbench.takeNodeOffline",
         "title": "Jenkins: Take Node Offline...",
         "icon": "$(debug-disconnect)"
@@ -765,6 +770,16 @@
           "group": "1_actions@0"
         },
         {
+          "command": "jenkinsWorkbench.showNodeCapacity",
+          "when": "view == jenkinsWorkbench.tree && viewItem == nodes",
+          "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.showNodeCapacity",
+          "when": "view == jenkinsWorkbench.tree && viewItem == queueFolder",
+          "group": "1_actions@0"
+        },
+        {
           "command": "jenkinsWorkbench.takeNodeOffline",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOnline(\\s|$)/ && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
           "group": "1_actions@1"
@@ -990,6 +1005,9 @@
         {
           "command": "jenkinsWorkbench.copyJob",
           "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.showNodeCapacity"
         },
         {
           "command": "jenkinsWorkbench.jenkinsfile.validateActive"

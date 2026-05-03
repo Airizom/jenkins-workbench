@@ -4,6 +4,8 @@
 @source "../../../buildDetails/BuildDetailsRenderer.ts";
 @source "../../../buildCompare/webview/**/*.{ts,tsx}";
 @source "../../../buildCompare/BuildCompareRenderer.ts";
+@source "../../../nodeCapacity/webview/**/*.{ts,tsx}";
+@source "../../../nodeCapacity/NodeCapacityRenderer.ts";
 @source "../../../nodeDetails/webview/**/*.{ts,tsx}";
 @source "../../../nodeDetails/NodeDetailsRenderer.ts";
 @source "../**/*.{ts,tsx}";

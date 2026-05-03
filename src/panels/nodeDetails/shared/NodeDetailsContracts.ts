@@ -1,3 +1,5 @@
+import type { NodeQueuedWorkViewModel } from "../../../shared/queueWork/QueueWorkContracts";
+
 export type NodeStatusClass = "online" | "offline" | "idle" | "temporary" | "unknown";
 
 export interface NodeExecutorViewModel {
@@ -17,6 +19,8 @@ export interface NodeMonitorViewModel {
   summary: string;
   raw: unknown;
 }
+
+export type NodeDetailsQueuedWorkViewModel = NodeQueuedWorkViewModel;
 
 export interface NodeDetailsViewModel {
   displayName: string;
@@ -41,6 +45,7 @@ export interface NodeDetailsViewModel {
   manualLaunchLabel?: string;
   executors: NodeExecutorViewModel[];
   oneOffExecutors: NodeExecutorViewModel[];
+  queuedWork: NodeDetailsQueuedWorkViewModel;
   monitorData: NodeMonitorViewModel[];
   loadStatistics: NodeMonitorViewModel[];
   rawJson: string;
