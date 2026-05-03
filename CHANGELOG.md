@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.46.0] - 2026-05-03
+
+### Added
+
+- feat: add browser SSO sign-in and reauth flow
+
 ## [1.45.0] - 2026-05-01
 
 ### Added
