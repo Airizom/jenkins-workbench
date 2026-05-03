@@ -4,6 +4,7 @@ import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsAuthConfig } from "../../jenkins/types";
+import type { BrowserSsoAuthenticator } from "../../services/BrowserSsoAuthenticationService";
 import type {
   EnvironmentScope,
   JenkinsEnvironment,
@@ -16,6 +17,7 @@ import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
 import {
   type EnvironmentAuthMode,
   promptAuthMode,
+  promptBrowserSsoLoginUrl,
   promptHeadersJson,
   promptRequiredInput,
   promptScope
@@ -54,7 +56,9 @@ function normalizeJenkinsUrl(url: string): string {
 }
 
 async function promptAuthConfig(
-  authMode: EnvironmentAuthMode
+  authMode: EnvironmentAuthMode,
+  environmentUrl: string,
+  browserSsoAuthenticator: BrowserSsoAuthenticator
 ): Promise<JenkinsAuthConfig | undefined> {
   switch (authMode) {
     case "none":
@@ -103,6 +107,17 @@ async function promptAuthConfig(
         type: "headers",
         headers
       };
+    }
+    case "sso": {
+      const loginUrl = await promptBrowserSsoLoginUrl(environmentUrl);
+      if (!loginUrl) {
+        return undefined;
+      }
+      return browserSsoAuthenticator.authenticate({
+        environmentUrl,
+        loginUrl,
+        reason: "add"
+      });
     }
     default:
       return undefined;
@@ -154,6 +169,7 @@ async function promptEnvironmentRemovalTarget(
 
 export async function addEnvironment(
   store: JenkinsEnvironmentStore,
+  browserSsoAuthenticator: BrowserSsoAuthenticator,
   refreshHost: EnvironmentCommandRefreshHost
 ): Promise<void> {
   const scope = await promptScope();
@@ -191,7 +207,7 @@ export async function addEnvironment(
     return;
   }
 
-  const authConfig = await promptAuthConfig(authMode);
+  const authConfig = await promptAuthConfig(authMode, url, browserSsoAuthenticator);
   if (!authConfig) {
     return;
   }
@@ -204,6 +220,42 @@ export async function addEnvironment(
   await store.addEnvironment(scope, environment);
   await store.setAuthConfig(scope, environment.id, authConfig);
   refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
+}
+
+export async function signInWithBrowserSso(
+  store: JenkinsEnvironmentStore,
+  browserSsoAuthenticator: BrowserSsoAuthenticator,
+  clientProvider: JenkinsClientProvider,
+  refreshHost: EnvironmentCommandRefreshHost,
+  item?: JenkinsEnvironmentRef
+): Promise<void> {
+  const target = item ? toEnvironmentTarget(item) : await promptEnvironmentRemovalTarget(store);
+  if (!target) {
+    return;
+  }
+
+  const existingAuthConfig = await store.getAuthConfig(target.scope, target.id);
+  const loginUrl =
+    existingAuthConfig?.type === "sso"
+      ? existingAuthConfig.loginUrl
+      : await promptBrowserSsoLoginUrl(target.url);
+  if (!loginUrl) {
+    return;
+  }
+
+  const authConfig = await browserSsoAuthenticator.authenticate({
+    environmentUrl: target.url,
+    loginUrl,
+    currentAuthConfig: existingAuthConfig,
+    reason: "manual"
+  });
+  if (!authConfig) {
+    return;
+  }
+
+  await store.setAuthConfig(target.scope, target.id, authConfig);
+  clientProvider.invalidateClient(target.scope, target.id);
+  refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
 }
 
 export async function removeEnvironment(

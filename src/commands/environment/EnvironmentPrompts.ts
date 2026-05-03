@@ -53,6 +53,11 @@ export async function promptAuthMode(): Promise<EnvironmentAuthMode | undefined>
       label: "Custom headers (JSON)",
       description: "Send arbitrary headers (e.g., Cookie, X-Forwarded-User)",
       mode: "headers"
+    },
+    {
+      label: "Browser SSO",
+      description: "Open a browser sign-in flow and store returned session headers",
+      mode: "sso"
     }
   ];
 
@@ -125,4 +130,41 @@ export async function promptHeadersJson(): Promise<Record<string, string> | unde
 
   const parsed = parseHeadersJson(value.trim());
   return parsed.headers;
+}
+
+export async function promptBrowserSsoLoginUrl(
+  environmentUrl: string
+): Promise<string | undefined> {
+  const defaultLoginUrl = resolveDefaultBrowserSsoLoginUrl(environmentUrl);
+  const value = await vscode.window.showInputBox({
+    prompt: "Browser SSO sign-in URL",
+    placeHolder: defaultLoginUrl,
+    value: defaultLoginUrl,
+    ignoreFocusOut: true,
+    validateInput: (input) => {
+      const trimmed = input.trim();
+      if (trimmed.length === 0) {
+        return "Browser SSO sign-in URL is required.";
+      }
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          return "Enter an HTTP or HTTPS URL.";
+        }
+      } catch {
+        return "Enter a valid URL.";
+      }
+      return undefined;
+    }
+  });
+
+  return value?.trim();
+}
+
+function resolveDefaultBrowserSsoLoginUrl(environmentUrl: string): string {
+  try {
+    return new URL("__sso/login", environmentUrl).toString();
+  } catch {
+    return environmentUrl;
+  }
 }

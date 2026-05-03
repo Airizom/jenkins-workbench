@@ -25,12 +25,14 @@ function isSuccessStatusCode(statusCode: number): boolean {
 function buildStatusCodeError(
   statusCode: number,
   statusMessage: string | undefined,
-  responseText?: string
+  responseText?: string,
+  responseHeaders?: IncomingMessage["headers"]
 ): JenkinsRequestError {
   return new JenkinsRequestError(
     `Jenkins API request failed (${statusCode} ${statusMessage ?? ""})`,
     statusCode,
-    responseText
+    responseText,
+    responseHeaders
   );
 }
 
@@ -149,7 +151,7 @@ function getResponseTextForError(
   options: JenkinsRequestOptions,
   body: JenkinsCollectedResponseBody
 ): string | undefined {
-  if (!options.returnText || options.returnBuffer) {
+  if (options.returnBuffer) {
     return undefined;
   }
   return body.text ?? "";
@@ -198,7 +200,8 @@ export async function decodeAndMaterializeResponse<T>(
     throw buildStatusCodeError(
       statusCode,
       res.statusMessage,
-      getResponseTextForError(options, body)
+      getResponseTextForError(options, body),
+      res.headers
     );
   }
 

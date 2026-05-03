@@ -110,6 +110,43 @@ export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
       const headers = normalizeHeaders(stringHeaders);
       return Object.keys(headers).length > 0 ? { type: "headers", headers } : undefined;
     }
+    case "sso": {
+      if (typeof record.loginUrl !== "string") {
+        return undefined;
+      }
+      const loginUrl = record.loginUrl.trim();
+      if (loginUrl.length === 0) {
+        return undefined;
+      }
+
+      let headers: Record<string, string> | undefined;
+      if (record.headers !== undefined) {
+        if (
+          !record.headers ||
+          typeof record.headers !== "object" ||
+          Array.isArray(record.headers)
+        ) {
+          return undefined;
+        }
+        const rawHeaders = record.headers as Record<string, unknown>;
+        const stringHeaders: Record<string, string> = {};
+        for (const [key, value] of Object.entries(rawHeaders)) {
+          if (typeof value !== "string") {
+            return undefined;
+          }
+          stringHeaders[key] = value;
+        }
+        headers = normalizeHeaders(stringHeaders);
+      }
+
+      const expiresAt = typeof record.expiresAt === "number" ? record.expiresAt : undefined;
+      return {
+        type: "sso",
+        loginUrl,
+        headers,
+        expiresAt
+      };
+    }
     default:
       return undefined;
   }
@@ -157,6 +194,10 @@ function buildRawAuthSignature(
       return `cookie:${authConfig.cookie.trim()}`;
     case "headers":
       return `headers:${stableHeadersSignature(authConfig.headers)}`;
+    case "sso":
+      return `sso:${authConfig.loginUrl.trim()}:${stableHeadersSignature(authConfig.headers ?? {})}:${
+        authConfig.expiresAt ?? ""
+      }`;
     default:
       return "none";
   }
@@ -183,6 +224,8 @@ function buildHeadersFromConfig(authConfig: JenkinsAuthConfig): JenkinsAuthHeade
     }
     case "headers":
       return { headers: normalizeHeaders(authConfig.headers) };
+    case "sso":
+      return { headers: normalizeHeaders(authConfig.headers ?? {}) };
     default:
       return {};
   }

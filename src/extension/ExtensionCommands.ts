@@ -17,6 +17,7 @@ export function registerExtensionCommands(
   container: ExtensionContainer
 ): void {
   const environmentStore = container.get("environmentStore");
+  const browserSsoAuthenticator = container.get("browserSsoAuthenticator");
   const presetStore = container.get("presetStore");
   const watchStore = container.get("watchStore");
   const pinStore = container.get("pinStore");
@@ -45,6 +46,7 @@ export function registerExtensionCommands(
   registerEnvironmentCommands(
     context,
     environmentStore,
+    browserSsoAuthenticator,
     presetStore,
     watchStore,
     pinStore,

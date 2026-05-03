@@ -1,12 +1,15 @@
+import type { BrowserSsoAuthenticator } from "../services/BrowserSsoAuthenticationService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsClient } from "./JenkinsClient";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import { buildAuthSignature } from "./auth";
 import type { JenkinsClientContext } from "./client/JenkinsClientContext";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
+import type { JenkinsAuthConfig } from "./types";
 
 export interface JenkinsClientProviderOptions {
   requestTimeoutMs?: number;
+  browserSsoAuthenticator?: BrowserSsoAuthenticator;
 }
 
 export class JenkinsClientProvider {
@@ -31,12 +34,14 @@ export class JenkinsClientProvider {
     }
   >();
   private requestTimeoutMs?: number;
+  private readonly browserSsoAuthenticator?: BrowserSsoAuthenticator;
 
   constructor(
     private readonly store: JenkinsEnvironmentStore,
     options?: JenkinsClientProviderOptions
   ) {
     this.requestTimeoutMs = options?.requestTimeoutMs;
+    this.browserSsoAuthenticator = options?.browserSsoAuthenticator;
   }
 
   setRequestTimeoutMs(timeoutMs: number | undefined): void {
@@ -120,6 +125,8 @@ export class JenkinsClientProvider {
       username: environment.username,
       token,
       authConfig,
+      refreshAuthConfig: (currentAuthConfig) =>
+        this.refreshBrowserSsoAuthConfig(environment, currentAuthConfig),
       requestTimeoutMs: this.requestTimeoutMs
     });
 
@@ -151,6 +158,8 @@ export class JenkinsClientProvider {
       username: environment.username,
       token,
       authConfig,
+      refreshAuthConfig: (currentAuthConfig) =>
+        this.refreshBrowserSsoAuthConfig(environment, currentAuthConfig),
       requestTimeoutMs: this.requestTimeoutMs
     });
   }
@@ -159,5 +168,27 @@ export class JenkinsClientProvider {
     const cacheKey = `${scope}:${environmentId}`;
     this.clientCache.delete(cacheKey);
     this.authSignatureCache.delete(cacheKey);
+  }
+
+  private async refreshBrowserSsoAuthConfig(
+    environment: JenkinsEnvironmentRef,
+    currentAuthConfig: JenkinsAuthConfig
+  ): Promise<JenkinsAuthConfig | undefined> {
+    if (currentAuthConfig?.type !== "sso" || !this.browserSsoAuthenticator) {
+      return undefined;
+    }
+
+    const refreshed = await this.browserSsoAuthenticator.authenticate({
+      environmentUrl: environment.url,
+      loginUrl: currentAuthConfig.loginUrl,
+      currentAuthConfig,
+      reason: "reauth"
+    });
+    if (!refreshed) {
+      return undefined;
+    }
+
+    await this.store.setAuthConfig(environment.scope, environment.environmentId, refreshed);
+    return refreshed;
   }
 }

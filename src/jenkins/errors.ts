@@ -1,13 +1,21 @@
+import type { IncomingHttpHeaders } from "node:http";
 import type { JenkinsActionErrorCode } from "./data/JenkinsDataTypes";
 
 export class JenkinsRequestError extends Error {
   readonly statusCode?: number;
   readonly responseText?: string;
+  readonly responseHeaders?: IncomingHttpHeaders;
 
-  constructor(message: string, statusCode?: number, responseText?: string) {
+  constructor(
+    message: string,
+    statusCode?: number,
+    responseText?: string,
+    responseHeaders?: IncomingHttpHeaders
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.responseText = responseText;
+    this.responseHeaders = responseHeaders;
   }
 }
 

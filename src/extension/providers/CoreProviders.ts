@@ -8,6 +8,7 @@ import { ArtifactActionService } from "../../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../../services/ArtifactFilesystem";
 import { DefaultArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
 import { ArtifactStorageService } from "../../services/ArtifactStorageService";
+import { BrowserSsoAuthenticationService } from "../../services/BrowserSsoAuthenticationService";
 import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
@@ -60,8 +61,10 @@ export interface CoreProviderOptions {
 export function createCoreProviderCatalog(options: CoreProviderOptions) {
   return {
     environmentStore: (_container) => new JenkinsEnvironmentStore(options.context),
+    browserSsoAuthenticator: (_container) => new BrowserSsoAuthenticationService(),
     clientProvider: (container) =>
       new JenkinsClientProvider(container.get("environmentStore"), {
+        browserSsoAuthenticator: container.get("browserSsoAuthenticator"),
         requestTimeoutMs: options.requestTimeoutMs
       }),
     dataService: (container) => {

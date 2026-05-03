@@ -27,6 +27,7 @@ import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLa
 import type { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import type { ArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
 import type { ArtifactStorageService } from "../../services/ArtifactStorageService";
+import type { BrowserSsoAuthenticationService } from "../../services/BrowserSsoAuthenticationService";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import type { BuildLogService } from "../../services/BuildLogService";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
@@ -76,6 +77,7 @@ import type { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 
 export interface ExtensionTokenMap {
   environmentStore: JenkinsEnvironmentStore;
+  browserSsoAuthenticator: BrowserSsoAuthenticationService;
   clientProvider: JenkinsClientProvider;
   coverageService: JenkinsCoverageService;
   dataService: JenkinsDataService;

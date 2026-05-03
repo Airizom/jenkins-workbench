@@ -51,6 +51,11 @@
         "icon": "$(trash)"
       },
       {
+        "command": "jenkinsWorkbench.signInWithBrowserSso",
+        "title": "Jenkins: Sign in with Browser SSO",
+        "icon": "$(account)"
+      },
+      {
         "command": "jenkinsWorkbench.triggerBuild",
         "title": "Jenkins: Trigger Build",
         "icon": "$(play)"
@@ -720,6 +725,11 @@
           "group": "navigation"
         },
         {
+          "command": "jenkinsWorkbench.signInWithBrowserSso",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "navigation@1"
+        },
+        {
           "command": "jenkinsWorkbench.newItem",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
           "group": "navigation@0"
@@ -1027,6 +1037,8 @@
     "build:webview": "vite build",
     "watch:webview": "vite build --watch",
     "typecheck:webview": "tsc -p src/panels/tsconfig.json --noEmit",
+    "local:sso-proxy": "node scripts/local-sso-proxy.js",
+    "local:sso-proxy:smoke": "node scripts/local-sso-proxy.js --smoke",
     "lint": "biome lint src/",
     "lint:fix": "biome lint src/ --write",
     "format": "biome format --write .",

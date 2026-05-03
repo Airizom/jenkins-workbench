@@ -106,11 +106,13 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
    - **Bearer token** — `Authorization: Bearer <token>`
    - **Cookie header** — Send a `Cookie` header with every request
    - **Custom headers (JSON)** — Arbitrary headers (e.g., `{"Cookie":"JSESSIONID=...","X-Forwarded-User":"jenkins"}`)
+   - **Browser SSO** — Open a browser sign-in flow and store returned session headers
 6. **Provide credentials if prompted**:
    - **Basic** — Username + API token
    - **Bearer token** — Token value
    - **Cookie header** — Cookie string
    - **Custom headers (JSON)** — JSON object of headers
+   - **Browser SSO** — Sign in through your browser when prompted
 7. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
 ## Tasks
@@ -251,6 +253,7 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | Command | Description |
 |---------|-------------|
 | `Jenkins: Add Environment` | Add a new Jenkins environment |
+| `Jenkins: Sign in with Browser SSO` | Refresh a Browser SSO environment session |
 | `Jenkins: Remove Environment` | Remove the selected environment |
 | `Jenkins: Refresh` | Refresh the tree view and clear cache |
 
@@ -362,11 +365,11 @@ Current-branch PR awareness is optional and uses the GitHub Pull Requests extens
 
 Security notes:
 
-- **Credential storage** — API tokens, bearer tokens, cookie values, and custom headers are stored in VS Code SecretStorage
+- **Credential storage** — API tokens, bearer tokens, cookie values, custom headers, and Browser SSO session headers are stored in VS Code SecretStorage
 - **Auth headers** — Basic, Bearer, Cookie, and custom headers are sent on every request, including CSRF crumb acquisition
 - **CSRF crumbs** — Supports the Jenkins crumb issuer when CSRF protection is enabled
 - **Transport** — The extension does not enforce HTTPS; credentials will be sent in cleartext if an `http://` URL is configured. Always use `https://` for production instances
-- **SSO** — The extension does not run browser-based OAuth/SAML flows; supply cookies or tokens manually
+- **Browser SSO** — Browser SSO environments open your browser for sign-in and reuse the returned session headers. Cookie, Bearer, and Custom headers remain available when your gateway requires manually supplied credentials
 
 ### Recommended Setup
 
@@ -393,7 +396,7 @@ Security notes:
 - Verify your Jenkins user can access `/crumbIssuer/api/json`
 - Check that Jenkins security settings allow API access
 - Confirm you're using an API token or another supported header-based auth method
-- For SSO-backed Jenkins, capture a session cookie or token and use Cookie/Bearer/Custom headers
+- For Browser SSO environments, run `Jenkins: Sign in with Browser SSO` to refresh the session; use Cookie/Bearer/Custom headers only when your gateway cannot return session headers through the browser flow
 
 ### Missing Build Actions (404)
 

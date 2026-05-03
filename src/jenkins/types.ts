@@ -3,6 +3,7 @@ export interface JenkinsClientOptions {
   username?: string;
   token?: string;
   authConfig?: JenkinsAuthConfig;
+  refreshAuthConfig?: JenkinsAuthConfigRefresh;
   requestTimeoutMs?: number;
 }
 
@@ -10,14 +11,24 @@ export type ScanMultibranchResult = {
   queueLocation?: string;
 };
 
-export type JenkinsAuthType = "none" | "basic" | "bearer" | "cookie" | "headers";
+export type JenkinsAuthType = "none" | "basic" | "bearer" | "cookie" | "headers" | "sso";
 
 export type JenkinsAuthConfig =
   | { type: "none" }
   | { type: "basic"; username: string; token: string }
   | { type: "bearer"; token: string }
   | { type: "cookie"; cookie: string }
-  | { type: "headers"; headers: Record<string, string> };
+  | { type: "headers"; headers: Record<string, string> }
+  | {
+      type: "sso";
+      loginUrl: string;
+      headers?: Record<string, string>;
+      expiresAt?: number;
+    };
+
+export type JenkinsAuthConfigRefresh = (
+  currentAuthConfig: JenkinsAuthConfig
+) => Promise<JenkinsAuthConfig | undefined>;
 
 export interface JenkinsJob {
   name: string;
