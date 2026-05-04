@@ -14,6 +14,8 @@ import type {
   BuildTestResultsViewModel,
   BuildTestsSummaryViewModel,
   PendingInputViewModel,
+  PipelineLogTargetViewModel,
+  PipelineNodeLogViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
@@ -33,6 +35,8 @@ type BuildDetailsTabsProps = {
   hasTests: boolean;
   pendingInputs: PendingInputViewModel[];
   pipelineStages: PipelineStageViewModel[];
+  pipelineNodeLog: PipelineNodeLogViewModel;
+  pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   pipelineStagesLoading: boolean;
   displayName: string;
   buildUrl?: string;
@@ -55,6 +59,9 @@ type BuildDetailsTabsProps = {
   onApproveInput: (inputId: string) => void;
   onRejectInput: (inputId: string) => void;
   onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
+  onClearPipelineLog: () => void;
+  onExportPipelineLog: () => void;
   onToggleFollowLog: (value: boolean) => void;
   onExportLogs: () => void;
   onOpenExternal: (url: string) => void;
@@ -71,6 +78,8 @@ export function BuildDetailsTabs({
   hasTests,
   pendingInputs,
   pipelineStages,
+  pipelineNodeLog,
+  pipelineNodeLogHtmlModel,
   pipelineStagesLoading,
   displayName,
   buildUrl,
@@ -93,6 +102,9 @@ export function BuildDetailsTabs({
   onApproveInput,
   onRejectInput,
   onRestartStage,
+  onSelectPipelineLog,
+  onClearPipelineLog,
+  onExportPipelineLog,
   onToggleFollowLog,
   onExportLogs,
   onOpenExternal,
@@ -157,8 +169,15 @@ export function BuildDetailsTabs({
         <TabsContent value="pipeline" className="space-y-2" forceMount>
           <PipelineSection
             stages={pipelineStages}
+            pipelineNodeLog={pipelineNodeLog}
+            pipelineNodeLogHtmlModel={pipelineNodeLogHtmlModel}
             loading={pipelineStagesLoading}
             onRestartStage={onRestartStage}
+            onSelectPipelineLog={onSelectPipelineLog}
+            onClearPipelineLog={onClearPipelineLog}
+            onExportPipelineLog={onExportPipelineLog}
+            onOpenExternal={onOpenExternal}
+            isActive={selectedTab === "pipeline"}
           />
         </TabsContent>
       ) : null}

@@ -4,12 +4,18 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "../../../../shared/webview/components/ui/toggle-group";
-import type { PipelineStageViewModel } from "../../../shared/BuildDetailsContracts";
+import type {
+  PipelineLogTargetViewModel,
+  PipelineNodeLogViewModel,
+  PipelineStageViewModel
+} from "../../../shared/BuildDetailsContracts";
 import type { PipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
 import {
   getBuildDetailsPanelUiState,
   setBuildDetailsPanelUiState
 } from "../../lib/buildDetailsPanelState";
+import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
+import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
 import { PipelineStagesSection } from "./PipelineStagesSection";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
 import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
@@ -25,22 +31,40 @@ const LazyPipelineGraphSection = lazy(async () => {
 interface PersistedBuildDetailsState {
   pipelinePresentation?: PipelinePresentation;
   selectedGraphStageKey?: string;
+  selectedPipelineLogTarget?: PipelineLogTargetViewModel;
 }
 
 export function PipelineSection({
   stages,
+  pipelineNodeLog,
+  pipelineNodeLogHtmlModel,
   loading,
-  onRestartStage
+  onRestartStage,
+  onSelectPipelineLog,
+  onClearPipelineLog,
+  onExportPipelineLog,
+  onOpenExternal,
+  isActive
 }: {
   stages: PipelineStageViewModel[];
+  pipelineNodeLog: PipelineNodeLogViewModel;
+  pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   loading: boolean;
   onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
+  onClearPipelineLog: () => void;
+  onExportPipelineLog: () => void;
+  onOpenExternal: (url: string) => void;
+  isActive: boolean;
 }) {
   const [presentation, setPresentation] = useState<PipelinePresentation>(() =>
     readPresentationFromState()
   );
   const [selectedStageKey, setSelectedStageKey] = useState<string | undefined>(() =>
     readSelectedStageKeyFromState()
+  );
+  const [restoredLogTarget] = useState<PipelineLogTargetViewModel | undefined>(() =>
+    readSelectedPipelineLogTargetFromState()
   );
   const [fallbackNotice, setFallbackNotice] = useState<string | undefined>();
   const hasStages = stages.length > 0;
@@ -49,9 +73,17 @@ export function PipelineSection({
   useEffect(() => {
     persistBuildDetailsUiState({
       pipelinePresentation: presentation,
-      selectedGraphStageKey: selectedStageKey
+      selectedGraphStageKey: selectedStageKey,
+      selectedPipelineLogTarget: pipelineNodeLog.target
     });
-  }, [presentation, selectedStageKey]);
+  }, [presentation, selectedStageKey, pipelineNodeLog.target]);
+
+  useEffect(() => {
+    if (pipelineNodeLog.target || !restoredLogTarget) {
+      return;
+    }
+    onSelectPipelineLog(restoredLogTarget);
+  }, [pipelineNodeLog.target, restoredLogTarget, onSelectPipelineLog]);
 
   if (!loading && !hasStages) {
     return null;
@@ -94,32 +126,57 @@ export function PipelineSection({
       ) : null}
 
       {loading && hasStages ? <LoadingBanner /> : null}
-      {showPlaceholder ? (
-        <PipelineStagesPlaceholder />
-      ) : presentation === "graph" ? (
-        <Suspense
-          fallback={
-            <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-sm text-muted-foreground shadow-widget">
-              Loading graph tools…
-            </div>
-          }
-        >
-          <LazyPipelineGraphSection
-            stages={stages}
-            selectedStageKey={selectedStageKey}
-            onSelectStage={setSelectedStageKey}
-            onRestartStage={onRestartStage}
-            onGraphError={() => {
-              setFallbackNotice(
-                "Graph layout failed for the current pipeline. Showing list view instead."
-              );
-              setPresentation("list");
-            }}
-          />
-        </Suspense>
-      ) : (
-        <PipelineStagesSection stages={stages} loading={loading} onRestartStage={onRestartStage} />
-      )}
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.9fr)]">
+        <div className="min-w-0">
+          {showPlaceholder ? (
+            <PipelineStagesPlaceholder />
+          ) : presentation === "graph" ? (
+            <Suspense
+              fallback={
+                <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-sm text-muted-foreground shadow-widget">
+                  Loading graph tools…
+                </div>
+              }
+            >
+              <LazyPipelineGraphSection
+                stages={stages}
+                selectedStageKey={selectedStageKey}
+                onSelectStage={(stageKey) => {
+                  setSelectedStageKey(stageKey);
+                  const stage = stageKey ? findStageByKey(stages, stageKey) : undefined;
+                  const target = stage?.logTarget;
+                  if (target) {
+                    onSelectPipelineLog(target);
+                  }
+                }}
+                onRestartStage={onRestartStage}
+                onSelectPipelineLog={onSelectPipelineLog}
+                onGraphError={() => {
+                  setFallbackNotice(
+                    "Graph layout failed for the current pipeline. Showing list view instead."
+                  );
+                  setPresentation("list");
+                }}
+              />
+            </Suspense>
+          ) : (
+            <PipelineStagesSection
+              stages={stages}
+              loading={loading}
+              onRestartStage={onRestartStage}
+              onSelectPipelineLog={onSelectPipelineLog}
+            />
+          )}
+        </div>
+        <PipelineNodeLogPane
+          log={pipelineNodeLog}
+          htmlModel={pipelineNodeLogHtmlModel}
+          onClear={onClearPipelineLog}
+          onExport={onExportPipelineLog}
+          onOpenExternal={onOpenExternal}
+          isActive={isActive}
+        />
+      </div>
     </section>
   );
 }
@@ -136,9 +193,31 @@ function readSelectedStageKeyFromState(): string | undefined {
   return typeof key === "string" && key.trim().length > 0 ? key : undefined;
 }
 
+function readSelectedPipelineLogTargetFromState(): PipelineLogTargetViewModel | undefined {
+  const persisted = getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
+  return persisted.selectedPipelineLogTarget;
+}
+
 function persistBuildDetailsUiState(nextState: {
   pipelinePresentation: PipelinePresentation;
   selectedGraphStageKey?: string;
+  selectedPipelineLogTarget?: PipelineLogTargetViewModel;
 }): void {
   setBuildDetailsPanelUiState(nextState);
+}
+
+function findStageByKey(
+  stages: PipelineStageViewModel[],
+  key: string
+): PipelineStageViewModel | undefined {
+  for (const stage of stages) {
+    if (stage.key === key) {
+      return stage;
+    }
+    const branch = findStageByKey(stage.parallelBranches, key);
+    if (branch) {
+      return branch;
+    }
+  }
+  return undefined;
 }

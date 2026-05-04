@@ -20,6 +20,7 @@ function mapStage(stage: JenkinsWorkflowStage, index: number, parentKey?: string
   const branches = getStageBranches(stage);
   return {
     key,
+    nodeId: normalizeNodeId(stage.id),
     name: stage.name ?? "Stage",
     status: stage.status,
     durationMillis: pickNumber(stage.durationMillis, stage.execDurationMillis),
@@ -32,10 +33,16 @@ function mapStep(step: JenkinsWorkflowStep, index: number, parentKey: string): P
   const key = buildStageKey(step.id ?? step.name ?? "step", index, parentKey);
   return {
     key,
+    nodeId: normalizeNodeId(step.id),
     name: step.name ?? "Step",
     status: step.status,
     durationMillis: step.durationMillis
   };
+}
+
+function normalizeNodeId(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function getStageSteps(stage: JenkinsWorkflowStage): JenkinsWorkflowStep[] {

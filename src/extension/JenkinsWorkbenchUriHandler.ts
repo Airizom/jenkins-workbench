@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { ensureTrailingSlash } from "../jenkins/urls";
+import type { PipelineNodeSelection } from "../panels/BuildDetailsPanelLauncher";
 import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
@@ -51,7 +52,11 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
     }
 
     if (action === "build") {
-      await this.buildHandler.openBuildDetails(environment, targetUrl.toString());
+      await this.buildHandler.openBuildDetails(
+        environment,
+        targetUrl.toString(),
+        this.getPipelineNodeSelectionParam(uri)
+      );
       return;
     }
 
@@ -80,6 +85,22 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
     const params = new URLSearchParams(uri.query);
     const value = params.get("url")?.trim();
     return value && value.length > 0 ? value : undefined;
+  }
+
+  private getPipelineNodeSelectionParam(uri: vscode.Uri): PipelineNodeSelection | undefined {
+    const params = new URLSearchParams(uri.query);
+    const nodeId = params.get("nodeId")?.trim();
+    if (!nodeId) {
+      return undefined;
+    }
+    const kindParam = params.get("nodeKind")?.trim().toLowerCase();
+    const kind = kindParam === "step" ? "step" : "stage";
+    const name = params.get("nodeName")?.trim() || undefined;
+    return {
+      kind,
+      nodeId,
+      name
+    };
   }
 
   private parseHttpUrl(raw: string): URL | undefined {

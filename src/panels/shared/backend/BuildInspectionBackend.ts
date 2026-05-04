@@ -5,10 +5,12 @@ import type {
   JenkinsBuildDetails,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsFlowNodeLog,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
   JenkinsTestReport,
-  JenkinsWorkflowRun
+  JenkinsWorkflowRun,
+  JenkinsWorkflowStage
 } from "../../../jenkins/types";
 
 export interface BuildInspectionStatusBackend {
@@ -59,6 +61,23 @@ export interface BuildInspectionConsoleBackend {
     start: number,
     annotator?: string
   ): Promise<JenkinsProgressiveConsoleHtml>;
+  getFlowNodeLog(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string
+  ): Promise<JenkinsFlowNodeLog | undefined>;
+  getFlowNodeDetails(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string
+  ): Promise<JenkinsWorkflowStage | undefined>;
+  getFlowNodeLogHtmlProgressive(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string,
+    start: number,
+    annotator?: string
+  ): Promise<JenkinsProgressiveConsoleHtml | undefined>;
 }
 
 export interface BuildInspectionBackend {
@@ -85,7 +104,10 @@ export class BuildInspectionBackendAdapter implements BuildInspectionBackend {
       getConsoleTextHead: (...args) => dataService.getConsoleTextHead(...args),
       getConsoleTextTail: (...args) => dataService.getConsoleTextTail(...args),
       getConsoleTextProgressive: (...args) => dataService.getConsoleTextProgressive(...args),
-      getConsoleHtmlProgressive: (...args) => dataService.getConsoleHtmlProgressive(...args)
+      getConsoleHtmlProgressive: (...args) => dataService.getConsoleHtmlProgressive(...args),
+      getFlowNodeLog: (...args) => dataService.getFlowNodeLog(...args),
+      getFlowNodeDetails: (...args) => dataService.getFlowNodeDetails(...args),
+      getFlowNodeLogHtmlProgressive: (...args) => dataService.getFlowNodeLogHtmlProgressive(...args)
     };
   }
 }

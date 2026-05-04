@@ -25,6 +25,7 @@ import {
   buildPendingInputsViewModel,
   buildPipelineStagesViewModel
 } from "./BuildDetailsViewModel";
+import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 
 export function buildDetailsUpdateMessage(
   details: JenkinsBuildDetails,
@@ -46,7 +47,8 @@ export function buildDetailsUpdateMessage(
   pendingInputs?: PendingInputAction[],
   pipelineLoading?: boolean,
   pipelineRestartEnabled?: boolean,
-  pipelineRestartableStages?: string[]
+  pipelineRestartableStages?: string[],
+  pipelineNodeLog?: PipelineNodeLogViewModel
 ): BuildDetailsUpdateMessage {
   const testsSummary = buildTestsSummary(details, testReport, {
     testReportFetched: options?.testReportFetched,
@@ -80,6 +82,11 @@ export function buildDetailsUpdateMessage(
       restartEnabled: Boolean(pipelineRestartEnabled),
       restartableStages: pipelineRestartableStages ?? []
     }),
+    pipelineNodeLog: pipelineNodeLog ?? {
+      text: "",
+      truncated: false,
+      loading: false
+    },
     pendingInputs: buildPendingInputsViewModel(pendingInputs)
   };
 }
@@ -109,7 +116,8 @@ export function buildUpdateMessageFromState(
       state.currentPendingInputs,
       state.pipelineLoading,
       state.pipelineRestartEnabled,
-      state.pipelineRestartableStages
+      state.pipelineRestartableStages,
+      state.pipelineNodeLog
     );
   }
 
@@ -138,6 +146,7 @@ export function buildUpdateMessageFromState(
       restartEnabled: state.pipelineRestartEnabled,
       restartableStages: state.pipelineRestartableStages
     }),
+    pipelineNodeLog: state.pipelineNodeLog,
     pendingInputs: buildPendingInputsViewModel(state.currentPendingInputs),
     pipelineStagesLoading: state.pipelineLoading
   };

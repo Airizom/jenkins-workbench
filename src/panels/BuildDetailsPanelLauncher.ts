@@ -8,15 +8,19 @@ import type { TestSourceNavigationUiService } from "../services/TestSourceNaviga
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import { BuildDetailsPanel } from "./BuildDetailsPanel";
+import type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
 import type {
   BuildDetailsBackend,
   BuildDetailsPendingInputProvider
 } from "./buildDetails/BuildDetailsBackend";
 
+export type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
+
 export interface BuildDetailsPanelLaunchRequest {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   label?: string;
+  pipelineNodeSelection?: PipelineNodeSelection;
 }
 
 export interface BuildDetailsPanelLauncherOptions {
@@ -41,7 +45,8 @@ export class BuildDetailsPanelLauncher {
       environment: request.environment,
       buildUrl: request.buildUrl,
       extensionUri: this.options.extensionUri,
-      label: request.label
+      label: request.label,
+      pipelineNodeSelection: request.pipelineNodeSelection
     });
   }
 

@@ -1,4 +1,9 @@
-import type { ArtifactAction, BuildDetailsUpdateMessage } from "./BuildDetailsContracts";
+import type {
+  ArtifactAction,
+  BuildDetailsUpdateMessage,
+  PipelineLogTargetViewModel
+} from "./BuildDetailsContracts";
+import { normalizePipelineLogTarget } from "./BuildDetailsContracts";
 import {
   type BuildDetailsPanelUiState,
   normalizeBuildDetailsPanelUiState
@@ -12,8 +17,23 @@ export type BuildDetailsOutgoingMessage =
   | { type: "appendConsoleHtml"; html: string }
   | { type: "setConsole"; text: string; truncated: boolean }
   | { type: "setConsoleHtml"; html: string; truncated: boolean }
+  | { type: "setPipelineNodeLog"; log: PipelineNodeLogMessagePayload }
+  | { type: "appendPipelineNodeLogHtml"; targetKey: string; html: string }
+  | { type: "setPipelineNodeLogLoading"; targetKey?: string; loading: boolean }
+  | { type: "setPipelineNodeLogError"; targetKey?: string; error: string }
   | { type: "setErrors"; errors: string[] }
   | { type: "setLoading"; value: boolean };
+
+export interface PipelineNodeLogMessagePayload {
+  target?: PipelineLogTargetViewModel;
+  html?: string;
+  text: string;
+  truncated: boolean;
+  loading: boolean;
+  polling?: boolean;
+  error?: string;
+  consoleUrl?: string;
+}
 
 export interface ToggleFollowLogMessage {
   type: "toggleFollowLog";
@@ -51,6 +71,19 @@ export interface RestartPipelineFromStageMessage {
   stageName: string;
 }
 
+export interface SelectPipelineLogNodeMessage {
+  type: "selectPipelineLogNode";
+  target: PipelineLogTargetViewModel;
+}
+
+export interface ClearPipelineLogNodeMessage {
+  type: "clearPipelineLogNode";
+}
+
+export interface ExportPipelineNodeLogMessage {
+  type: "exportPipelineNodeLog";
+}
+
 export interface ReloadTestReportMessage {
   type: "reloadTestReport";
   includeCaseLogs?: boolean;
@@ -76,6 +109,9 @@ export type BuildDetailsIncomingMessage =
   | ApproveInputMessage
   | RejectInputMessage
   | RestartPipelineFromStageMessage
+  | SelectPipelineLogNodeMessage
+  | ClearPipelineLogNodeMessage
+  | ExportPipelineNodeLogMessage
   | ReloadTestReportMessage
   | OpenTestSourceMessage
   | PersistUiStateMessage;
@@ -115,6 +151,33 @@ export function parseBuildDetailsOutgoingMessage(
         type: "setConsoleHtml",
         html: typeof record.html === "string" ? record.html : "",
         truncated: Boolean(record.truncated)
+      };
+    }
+    case "setPipelineNodeLog": {
+      const log = parsePipelineNodeLogPayload(record.log);
+      return log ? { type: "setPipelineNodeLog", log } : undefined;
+    }
+    case "appendPipelineNodeLogHtml": {
+      const targetKey = record.targetKey;
+      const html = record.html;
+      if (typeof targetKey === "string" && typeof html === "string" && html.length > 0) {
+        return { type: "appendPipelineNodeLogHtml", targetKey, html };
+      }
+      return undefined;
+    }
+    case "setPipelineNodeLogLoading": {
+      return {
+        type: "setPipelineNodeLogLoading",
+        targetKey: typeof record.targetKey === "string" ? record.targetKey : undefined,
+        loading: Boolean(record.loading)
+      };
+    }
+    case "setPipelineNodeLogError": {
+      const error = record.error;
+      return {
+        type: "setPipelineNodeLogError",
+        targetKey: typeof record.targetKey === "string" ? record.targetKey : undefined,
+        error: typeof error === "string" ? error : "Pipeline log unavailable."
       };
     }
     case "updateDetails": {
@@ -189,6 +252,27 @@ export function isRestartPipelineFromStageMessage(
   return typeof stageName === "string" && stageName.trim().length > 0;
 }
 
+export function isSelectPipelineLogNodeMessage(
+  message: unknown
+): message is SelectPipelineLogNodeMessage {
+  if (!hasMessageType(message, "selectPipelineLogNode")) {
+    return false;
+  }
+  return normalizePipelineLogTarget(message.target) !== undefined;
+}
+
+export function isClearPipelineLogNodeMessage(
+  message: unknown
+): message is ClearPipelineLogNodeMessage {
+  return hasMessageType(message, "clearPipelineLogNode");
+}
+
+export function isExportPipelineNodeLogMessage(
+  message: unknown
+): message is ExportPipelineNodeLogMessage {
+  return hasMessageType(message, "exportPipelineNodeLog");
+}
+
 export function isReloadTestReportMessage(message: unknown): message is ReloadTestReportMessage {
   if (!hasMessageType(message, "reloadTestReport")) {
     return false;
@@ -235,4 +319,24 @@ function hasMessageType<TType extends string>(
   type: TType
 ): message is Record<string, unknown> & { type: TType } {
   return asRecord(message)?.type === type;
+}
+
+function parsePipelineNodeLogPayload(value: unknown): PipelineNodeLogMessagePayload | undefined {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+  const target =
+    typeof record.target === "undefined" ? undefined : normalizePipelineLogTarget(record.target);
+  const html = typeof record.html === "string" ? record.html : undefined;
+  return {
+    target,
+    html,
+    text: typeof record.text === "string" ? record.text : "",
+    truncated: Boolean(record.truncated),
+    loading: Boolean(record.loading),
+    polling: typeof record.polling === "undefined" ? undefined : Boolean(record.polling),
+    error: typeof record.error === "string" ? record.error : undefined,
+    consoleUrl: typeof record.consoleUrl === "string" ? record.consoleUrl : undefined
+  };
 }

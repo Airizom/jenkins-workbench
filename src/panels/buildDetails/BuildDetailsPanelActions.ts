@@ -10,6 +10,7 @@ import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { MAX_CONSOLE_CHARS } from "./BuildDetailsConfig";
 import type { BuildDetailsPanelControllerAccess } from "./BuildDetailsPanelController";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
+import type { PipelineLogTargetViewModel } from "./shared/BuildDetailsContracts";
 
 interface BuildDetailsPanelActionsOptions {
   controller: BuildDetailsPanelControllerAccess;
@@ -157,6 +158,14 @@ export class BuildDetailsPanelActions {
     }
   }
 
+  handleSelectPipelineLogNode(message: { target: PipelineLogTargetViewModel }): void {
+    this.controller.selectPipelineLogTarget(message.target);
+  }
+
+  handleClearPipelineLogNode(): void {
+    this.controller.clearPipelineLogTarget();
+  }
+
   async handleArtifactAction(message: {
     action: "preview" | "download";
     relativePath: string;
@@ -273,10 +282,57 @@ export class BuildDetailsPanelActions {
     }
   }
 
+  async handleExportPipelineNodeLog(): Promise<void> {
+    const log = this.controller.getCurrentPipelineNodeLog();
+    const target = log?.target;
+    if (!target) {
+      void vscode.window.showErrorMessage("Select a pipeline stage or step log before exporting.");
+      return;
+    }
+    if (!log.text.trim()) {
+      void vscode.window.showErrorMessage("The selected pipeline log is empty.");
+      return;
+    }
+
+    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const defaultFileName = `jenkins-${sanitizeFilePart(target.name)}-${target.kind}-log.txt`;
+    const defaultUri = workspaceUri
+      ? vscode.Uri.joinPath(workspaceUri, defaultFileName)
+      : undefined;
+    const targetUri = await vscode.window.showSaveDialog({
+      title: "Export Pipeline Node Log",
+      saveLabel: "Export Log",
+      defaultUri,
+      filters: {
+        "Log files": ["log", "txt"]
+      }
+    });
+    if (!targetUri) {
+      return;
+    }
+    try {
+      await vscode.workspace.fs.writeFile(targetUri, Buffer.from(log.text, "utf8"));
+      void vscode.window.showInformationMessage(`Saved ${target.name} log to ${targetUri.fsPath}.`);
+    } catch (error) {
+      void vscode.window.showErrorMessage(
+        `Failed to export ${target.name} log: ${formatActionError(error)}`
+      );
+    }
+  }
+
   async openExternalUrl(url: string): Promise<void> {
     await openExternalHttpUrlWithWarning(url, {
       targetLabel: "Jenkins URL",
       sourceLabel: "Build Details"
     });
   }
+}
+
+function sanitizeFilePart(value: string): string {
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return sanitized || "pipeline-node";
 }

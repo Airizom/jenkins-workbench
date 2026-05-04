@@ -1,12 +1,17 @@
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
 import type { SerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
 import { isSerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
+import {
+  type PipelineLogTargetViewModel,
+  normalizePipelineLogTarget
+} from "./BuildDetailsContracts";
 
 export type PipelinePresentation = "graph" | "list";
 
 export interface BuildDetailsPanelUiState {
   pipelinePresentation?: PipelinePresentation;
   selectedGraphStageKey?: string;
+  selectedPipelineLogTarget?: PipelineLogTargetViewModel;
 }
 
 export interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
@@ -61,14 +66,16 @@ export function normalizeBuildDetailsPanelUiState(
     record.selectedGraphStageKey.trim().length > 0
       ? record.selectedGraphStageKey.trim()
       : undefined;
+  const selectedPipelineLogTarget = normalizePipelineLogTarget(record.selectedPipelineLogTarget);
 
-  if (!pipelinePresentation && !selectedGraphStageKey) {
+  if (!pipelinePresentation && !selectedGraphStageKey && !selectedPipelineLogTarget) {
     return undefined;
   }
 
   return {
     pipelinePresentation,
-    selectedGraphStageKey
+    selectedGraphStageKey,
+    selectedPipelineLogTarget
   };
 }
 
@@ -90,7 +97,16 @@ export function mergeBuildDetailsPanelState(
   environment: JenkinsEnvironmentRef,
   buildUrl: string
 ): BuildDetailsPanelSerializedState {
-  return createBuildDetailsPanelState(environment, buildUrl, previousState?.buildDetailsUi);
+  const samePanelTarget =
+    previousState?.buildUrl === buildUrl &&
+    previousState.environmentId === environment.environmentId &&
+    previousState.scope === environment.scope;
+  const previousUiState = samePanelTarget
+    ? previousState.buildDetailsUi
+    : previousState?.buildDetailsUi?.pipelinePresentation
+      ? { pipelinePresentation: previousState.buildDetailsUi.pipelinePresentation }
+      : undefined;
+  return createBuildDetailsPanelState(environment, buildUrl, previousUiState);
 }
 
 function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelUiState {

@@ -20,6 +20,8 @@ import type {
   BuildParameterPayload,
   ConsoleTextResult,
   ConsoleTextTailResult,
+  FlowNodeDetailsResult,
+  FlowNodeLogResult,
   ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult
 } from "./JenkinsDataTypes";
@@ -205,6 +207,56 @@ export class JenkinsBuildDataOperations {
     try {
       return await client.getConsoleHtmlProgressive(buildUrl, start, annotator);
     } catch (error) {
+      throw toBuildActionError(error);
+    }
+  }
+
+  async getFlowNodeLog(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string
+  ): Promise<FlowNodeLogResult | undefined> {
+    const client = await this.context.getClient(environment);
+    try {
+      return await client.getFlowNodeLog(buildUrl, nodeId);
+    } catch (error) {
+      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+        return undefined;
+      }
+      throw toBuildActionError(error);
+    }
+  }
+
+  async getFlowNodeDetails(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string
+  ): Promise<FlowNodeDetailsResult | undefined> {
+    const client = await this.context.getClient(environment);
+    try {
+      return await client.getFlowNodeDetails(buildUrl, nodeId);
+    } catch (error) {
+      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+        return undefined;
+      }
+      throw toBuildActionError(error);
+    }
+  }
+
+  async getFlowNodeLogHtmlProgressive(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string,
+    start: number,
+    annotator?: string
+  ): Promise<ProgressiveConsoleHtmlResult | undefined> {
+    const client = await this.context.getClient(environment);
+    try {
+      return await client.getFlowNodeLogHtmlProgressive(buildUrl, nodeId, start, annotator);
+    } catch (error) {
+      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+        return undefined;
+      }
       throw toBuildActionError(error);
     }
   }

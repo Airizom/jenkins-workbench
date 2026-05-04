@@ -1,11 +1,13 @@
 import type {
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsFlowNodeLog,
   JenkinsJobKind,
   JenkinsNode,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
-  JenkinsView
+  JenkinsView,
+  JenkinsWorkflowStage
 } from "../JenkinsClient";
 
 export type JenkinsActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
@@ -89,6 +91,8 @@ export type ConsoleTextResult = JenkinsConsoleText;
 export type ConsoleTextTailResult = JenkinsConsoleTextTail;
 export type ProgressiveConsoleTextResult = JenkinsProgressiveConsoleText;
 export type ProgressiveConsoleHtmlResult = JenkinsProgressiveConsoleHtml;
+export type FlowNodeLogResult = JenkinsFlowNodeLog;
+export type FlowNodeDetailsResult = JenkinsWorkflowStage;
 
 export interface JenkinsJobInfo {
   name: string;

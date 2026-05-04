@@ -8,6 +8,7 @@ import type { TestSourceNavigationUiService } from "../services/TestSourceNaviga
 import { buildTestSourceNavigationContext } from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
+import type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
 import type {
   BuildDetailsBackend,
   BuildDetailsPendingInputProvider
@@ -24,6 +25,7 @@ import {
   type BuildDetailsPanelLoadResult
 } from "./buildDetails/BuildDetailsPanelController";
 import type { BuildDetailsCanOpenTestSource } from "./buildDetails/BuildDetailsTestSource";
+import type { PipelineLogTargetViewModel } from "./buildDetails/shared/BuildDetailsContracts";
 import {
   type BuildDetailsPanelSerializedState,
   isBuildDetailsPanelState,
@@ -48,6 +50,7 @@ interface BuildDetailsPanelShowOptions {
   buildUrl: string;
   extensionUri: vscode.Uri;
   label?: string;
+  pipelineNodeSelection?: PipelineNodeSelection;
 }
 
 interface BuildDetailsPanelReviveOptions {
@@ -92,7 +95,8 @@ export class BuildDetailsPanel {
       environment,
       buildUrl,
       extensionUri,
-      label
+      label,
+      pipelineNodeSelection
     } = options;
 
     if (!BuildDetailsPanel.currentPanel) {
@@ -126,7 +130,14 @@ export class BuildDetailsPanel {
       testSourceNavigationUiService
     );
     activePanel.panel.reveal(undefined, true);
-    await activePanel.load(backend, artifactActionHandler, environment, buildUrl, label);
+    await activePanel.load(
+      backend,
+      artifactActionHandler,
+      environment,
+      buildUrl,
+      label,
+      pipelineNodeSelection
+    );
   }
 
   static async revive(
@@ -227,6 +238,15 @@ export class BuildDetailsPanel {
       onRestartPipelineFromStage: (message) => {
         void this.actions.handleRestartPipelineFromStage(message);
       },
+      onSelectPipelineLogNode: (message) => {
+        this.actions.handleSelectPipelineLogNode(message);
+      },
+      onClearPipelineLogNode: () => {
+        this.actions.handleClearPipelineLogNode();
+      },
+      onExportPipelineNodeLog: () => {
+        void this.actions.handleExportPipelineNodeLog();
+      },
       onReloadTestReport: (message) => {
         void this.actions.handleReloadTestReport(message);
       },
@@ -314,10 +334,17 @@ export class BuildDetailsPanel {
     artifactActionHandler: ArtifactActionHandler,
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    label?: string
+    label?: string,
+    pipelineNodeSelection?: PipelineNodeSelection
   ): Promise<void> {
     this.artifactActionHandler = artifactActionHandler;
-    const panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
+    let panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
+    const pipelineLogTarget = toPipelineLogTargetViewModel(pipelineNodeSelection);
+    if (pipelineLogTarget) {
+      panelState = withBuildDetailsPanelUiState(panelState, {
+        selectedPipelineLogTarget: pipelineLogTarget
+      });
+    }
     this.serializedState = panelState;
     const result: BuildDetailsPanelLoadResult = await this.controller.load(
       backend,
@@ -382,4 +409,20 @@ export class BuildDetailsPanel {
       panelState: panelState ?? this.serializedState
     });
   }
+}
+
+function toPipelineLogTargetViewModel(
+  selection: PipelineNodeSelection | undefined
+): PipelineLogTargetViewModel | undefined {
+  const nodeId = selection?.nodeId.trim();
+  if (!selection || !nodeId) {
+    return undefined;
+  }
+  const name = selection.name?.trim() || (selection.kind === "step" ? "Step" : "Stage");
+  return {
+    key: `deeplink::${selection.kind}::${nodeId}`,
+    kind: selection.kind,
+    name,
+    nodeId
+  };
 }

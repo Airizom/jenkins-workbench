@@ -21,6 +21,8 @@ import type {
   BuildParameterRequestPreparer,
   ConsoleTextResult,
   ConsoleTextTailResult,
+  FlowNodeDetailsResult,
+  FlowNodeLogResult,
   JenkinsJobCollectionRequest,
   JenkinsJobFetchOptions,
   JenkinsJobInfo,
@@ -345,6 +347,38 @@ export class JenkinsDataService {
     annotator?: string
   ): Promise<ProgressiveConsoleHtmlResult> {
     return this.buildOperations.getConsoleHtmlProgressive(environment, buildUrl, start, annotator);
+  }
+
+  async getFlowNodeLog(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string
+  ): Promise<FlowNodeLogResult | undefined> {
+    return this.buildOperations.getFlowNodeLog(environment, buildUrl, nodeId);
+  }
+
+  async getFlowNodeDetails(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string
+  ): Promise<FlowNodeDetailsResult | undefined> {
+    return this.buildOperations.getFlowNodeDetails(environment, buildUrl, nodeId);
+  }
+
+  async getFlowNodeLogHtmlProgressive(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    nodeId: string,
+    start: number,
+    annotator?: string
+  ): Promise<ProgressiveConsoleHtmlResult | undefined> {
+    return this.buildOperations.getFlowNodeLogHtmlProgressive(
+      environment,
+      buildUrl,
+      nodeId,
+      start,
+      annotator
+    );
   }
 
   async getLastFailedBuild(

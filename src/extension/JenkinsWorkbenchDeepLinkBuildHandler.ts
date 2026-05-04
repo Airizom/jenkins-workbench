@@ -1,17 +1,25 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
+import type {
+  BuildDetailsPanelLauncher,
+  PipelineNodeSelection
+} from "../panels/BuildDetailsPanelLauncher";
 
 export class JenkinsWorkbenchDeepLinkBuildHandler {
   constructor(private readonly buildDetailsPanelLauncher: BuildDetailsPanelLauncher) {}
 
-  async openBuildDetails(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
+  async openBuildDetails(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    pipelineNodeSelection?: PipelineNodeSelection
+  ): Promise<void> {
     try {
       await this.buildDetailsPanelLauncher.show({
         environment,
         buildUrl,
-        label: this.deriveBuildLabel(buildUrl)
+        label: this.deriveBuildLabel(buildUrl),
+        pipelineNodeSelection
       });
     } catch (error) {
       void vscode.window.showErrorMessage(

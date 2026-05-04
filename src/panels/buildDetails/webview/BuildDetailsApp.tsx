@@ -89,6 +89,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             hasTests={hasTests}
             pendingInputs={state.pendingInputs}
             pipelineStages={state.pipelineStages}
+            pipelineNodeLog={state.pipelineNodeLog}
+            pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
             pipelineStagesLoading={state.pipelineStagesLoading}
             displayName={state.displayName}
             buildUrl={buildUrl}
@@ -113,6 +115,9 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             onRestartStage={(stageName) =>
               postMessage({ type: "restartPipelineFromStage", stageName })
             }
+            onSelectPipelineLog={(target) => postMessage({ type: "selectPipelineLogNode", target })}
+            onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
+            onExportPipelineLog={() => postMessage({ type: "exportPipelineNodeLog" })}
             onToggleFollowLog={handleToggleFollowLog}
             onExportLogs={handleExportConsole}
             onOpenExternal={handleOpenExternal}

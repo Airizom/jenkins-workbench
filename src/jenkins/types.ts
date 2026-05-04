@@ -196,6 +196,11 @@ export interface JenkinsWorkflowStep {
   startTimeMillis?: number;
   durationMillis?: number;
   pauseDurationMillis?: number;
+  stageFlowNodes?: JenkinsWorkflowStep[];
+  steps?: JenkinsWorkflowStep[];
+  parallelStages?: JenkinsWorkflowStage[];
+  branches?: JenkinsWorkflowStage[];
+  children?: JenkinsWorkflowStage[];
 }
 
 export interface JenkinsWorkflowStage {
@@ -286,6 +291,15 @@ export interface JenkinsProgressiveConsoleHtml {
   textSizeKnown: boolean;
   moreData: boolean;
   annotator?: string;
+}
+
+export interface JenkinsFlowNodeLog {
+  nodeId?: string;
+  nodeStatus?: string;
+  length?: number;
+  hasMore?: boolean;
+  text?: string;
+  consoleUrl?: string;
 }
 
 export interface JenkinsNode {

@@ -7,6 +7,7 @@ import type {
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
 import type { BuildDetailsInitialState } from "./BuildDetailsPollingController";
+import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 
 export type PipelineRestartAvailability = "unknown" | "supported" | "unsupported";
 
@@ -37,6 +38,7 @@ export class BuildDetailsPanelState {
   private currentNonceValue = "";
   private lastDetailsBuildingValue = false;
   private pipelineLoadingValue = false;
+  private pipelineNodeLogValue: PipelineNodeLogViewModel = createEmptyPipelineNodeLog();
 
   get environment(): JenkinsEnvironmentRef | undefined {
     return this.environmentValue;
@@ -130,6 +132,10 @@ export class BuildDetailsPanelState {
     return this.pipelineLoadingValue;
   }
 
+  get pipelineNodeLog(): PipelineNodeLogViewModel {
+    return this.pipelineNodeLogValue;
+  }
+
   resetForLoad(environment: JenkinsEnvironmentRef, buildUrl: string, nonce: string): void {
     this.environmentValue = environment;
     this.currentBuildUrlValue = buildUrl;
@@ -151,6 +157,7 @@ export class BuildDetailsPanelState {
     this.currentNonceValue = nonce;
     this.lastDetailsBuildingValue = false;
     this.pipelineLoadingValue = true;
+    this.pipelineNodeLogValue = createEmptyPipelineNodeLog();
   }
 
   applyInitialState(
@@ -271,6 +278,14 @@ export class BuildDetailsPanelState {
     return true;
   }
 
+  setPipelineNodeLog(log: PipelineNodeLogViewModel): void {
+    this.pipelineNodeLogValue = log;
+  }
+
+  clearPipelineNodeLog(): void {
+    this.pipelineNodeLogValue = createEmptyPipelineNodeLog();
+  }
+
   setPendingInputs(pendingInputs: PendingInputAction[]): void {
     this.currentPendingInputsValue = pendingInputs;
   }
@@ -335,4 +350,12 @@ function composeErrors(baseErrors: string[], pipelineError?: string): string[] {
     nextErrors.push(pipelineError);
   }
   return nextErrors;
+}
+
+function createEmptyPipelineNodeLog(): PipelineNodeLogViewModel {
+  return {
+    text: "",
+    truncated: false,
+    loading: false
+  };
 }

@@ -7,7 +7,11 @@ import {
   CardTitle
 } from "../../../../../shared/webview/components/ui/card";
 import { Toggle } from "../../../../../shared/webview/components/ui/toggle";
-import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
+import { TerminalIcon } from "../../../../../shared/webview/icons";
+import type {
+  PipelineLogTargetViewModel,
+  PipelineStageViewModel
+} from "../../../../shared/BuildDetailsContracts";
 import { StatusPill } from "../StatusPill";
 import { BranchCard } from "../pipelineStages/BranchCard";
 import { EmptyStepsMessage } from "../pipelineStages/EmptyStepsMessage";
@@ -17,10 +21,12 @@ const { useEffect, useState } = React;
 
 export function PipelineGraphInspector({
   stage,
-  onRestartStage
+  onRestartStage,
+  onSelectPipelineLog
 }: {
   stage?: PipelineStageViewModel;
   onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
 }) {
   const [showAllSteps, setShowAllSteps] = useState(false);
 
@@ -47,6 +53,7 @@ export function PipelineGraphInspector({
   const hasDirectSteps = stage.stepsAll.length > 0;
   const hasParallelBranches = stage.parallelBranches.length > 0;
   const hasBranchSteps = stage.parallelBranches.some((branch) => branch.hasSteps);
+  const stageLogTarget = stage.logTarget;
 
   return (
     <Card className="h-full">
@@ -78,6 +85,12 @@ export function PipelineGraphInspector({
               Restart from this stage
             </Button>
           ) : null}
+          {stageLogTarget ? (
+            <Button variant="outline" size="sm" onClick={() => onSelectPipelineLog(stageLogTarget)}>
+              <TerminalIcon className="mr-1 h-3.5 w-3.5" />
+              Log
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -101,7 +114,12 @@ export function PipelineGraphInspector({
             </div>
             <div className="grid gap-2 xl:grid-cols-2">
               {stage.parallelBranches.map((branch, index) => (
-                <BranchCard key={`${branch.key}-${index}`} branch={branch} showAll={showAllSteps} />
+                <BranchCard
+                  key={`${branch.key}-${index}`}
+                  branch={branch}
+                  showAll={showAllSteps}
+                  onSelectPipelineLog={onSelectPipelineLog}
+                />
               ))}
             </div>
           </section>
@@ -123,7 +141,7 @@ export function PipelineGraphInspector({
               </Toggle>
             </div>
             {steps.length > 0 ? (
-              <StepsList steps={steps} />
+              <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />
             ) : (
               <EmptyStepsMessage showAll={showAllSteps} />
             )}

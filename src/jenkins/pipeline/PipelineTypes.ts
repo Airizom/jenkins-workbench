@@ -5,6 +5,7 @@ export interface PipelineRun {
 
 export interface PipelineStage {
   key: string;
+  nodeId?: string;
   name: string;
   status?: string;
   durationMillis?: number;
@@ -14,6 +15,7 @@ export interface PipelineStage {
 
 export interface PipelineStep {
   key: string;
+  nodeId?: string;
   name: string;
   status?: string;
   durationMillis?: number;

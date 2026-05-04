@@ -35,7 +35,7 @@ export type ConsoleSearchState = {
   openSearchToolbar: () => void;
 };
 
-export function useConsoleSearch(consoleText: string): ConsoleSearchState {
+export function useConsoleSearch(consoleText: string, shortcutsEnabled = true): ConsoleSearchState {
   const [searchQuery, setSearchQuery] = useState("");
   const [useRegex, setUseRegex] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
@@ -73,6 +73,9 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
   }, [isSearchActive, matchCount]);
 
   useEffect(() => {
+    if (!shortcutsEnabled) {
+      return;
+    }
     const handleKeyDown = createConsoleSearchKeyDownHandler({
       openSearchToolbar,
       canCloseSearch: searchVisible || searchQuery.length > 0,
@@ -83,7 +86,7 @@ export function useConsoleSearch(consoleText: string): ConsoleSearchState {
     });
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [openSearchToolbar, searchQuery, searchVisible]);
+  }, [openSearchToolbar, searchQuery, searchVisible, shortcutsEnabled]);
 
   const consoleSegments = useMemo(() => {
     return buildConsoleSegments(

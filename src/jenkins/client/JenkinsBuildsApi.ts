@@ -8,6 +8,7 @@ import type {
   JenkinsBuildDetails,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsFlowNodeLog,
   JenkinsPendingInputAction,
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText,
@@ -16,9 +17,15 @@ import type {
   JenkinsReplaySubmissionPayload,
   JenkinsRestartFromStageInfo,
   JenkinsTestReport,
-  JenkinsWorkflowRun
+  JenkinsWorkflowRun,
+  JenkinsWorkflowStage
 } from "../types";
-import { buildActionUrl, buildApiUrlFromItem, buildArtifactDownloadUrl } from "../urls";
+import {
+  buildActionUrl,
+  buildApiUrlFromItem,
+  buildArtifactDownloadUrl,
+  ensureTrailingSlash
+} from "../urls";
 import { JenkinsBuildConsoleClient } from "./JenkinsBuildConsoleClient";
 import {
   buildBuildDetailsTree,
@@ -144,6 +151,51 @@ export class JenkinsBuildsApi {
     return this.consoleClient.getConsoleHtmlProgressive(buildUrl, start, annotator);
   }
 
+  async getFlowNodeLog(buildUrl: string, nodeId: string): Promise<JenkinsFlowNodeLog> {
+    const url = this.buildFlowNodeLogUrl(buildUrl, nodeId);
+    const snapshot = await this.context.requestJson<JenkinsFlowNodeLog>(url);
+    return {
+      ...snapshot,
+      consoleUrl: snapshot.consoleUrl
+        ? resolveFlowNodeConsoleUrl(buildUrl, snapshot.consoleUrl)
+        : undefined
+    };
+  }
+
+  async getFlowNodeDetails(buildUrl: string, nodeId: string): Promise<JenkinsWorkflowStage> {
+    const url = this.buildFlowNodeDescribeUrl(buildUrl, nodeId);
+    return this.context.requestJson<JenkinsWorkflowStage>(url);
+  }
+
+  async getFlowNodeLogHtmlProgressive(
+    buildUrl: string,
+    nodeId: string,
+    start: number,
+    annotator?: string
+  ): Promise<JenkinsProgressiveConsoleHtml> {
+    const snapshot = await this.getFlowNodeLog(buildUrl, nodeId);
+    if (!snapshot.consoleUrl) {
+      throw new JenkinsRequestError("Flow node console URL is unavailable.", 404);
+    }
+    const safeStart = Math.max(0, Math.floor(start));
+    const url = new URL("logText/progressiveHtml", ensureTrailingSlash(snapshot.consoleUrl));
+    url.searchParams.set("start", safeStart.toString());
+    const response = await this.context.requestTextWithHeaders(url.toString(), {
+      headers: annotator ? { "X-ConsoleAnnotator": annotator } : undefined
+    });
+    const textSize = parseHeaderInteger(response.headers["x-text-size"]);
+    const moreData = parseHeaderBoolean(response.headers["x-more-data"]);
+    const nextAnnotator = parseHeaderText(response.headers["x-console-annotator"]);
+    const textSizeKnown = Number.isFinite(textSize);
+    return {
+      html: response.text,
+      textSize: textSizeKnown ? textSize : safeStart,
+      textSizeKnown,
+      moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0,
+      annotator: nextAnnotator
+    };
+  }
+
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
     const tree = "lastFailedBuild[number,url,result,building,timestamp,duration]";
     const url = buildApiUrlFromItem(jobUrl, tree);
@@ -236,5 +288,47 @@ export class JenkinsBuildsApi {
 
   async abortInput(buildUrl: string, inputId: string, abortUrl?: string): Promise<void> {
     await this.pendingInputClient.abortInput(buildUrl, inputId, abortUrl);
+  }
+
+  private buildFlowNodeLogUrl(buildUrl: string, nodeId: string): string {
+    return buildActionUrl(
+      buildUrl,
+      `execution/node/${encodeURIComponent(nodeId.trim())}/wfapi/log`
+    );
+  }
+
+  private buildFlowNodeDescribeUrl(buildUrl: string, nodeId: string): string {
+    return buildActionUrl(
+      buildUrl,
+      `execution/node/${encodeURIComponent(nodeId.trim())}/wfapi/describe`
+    );
+  }
+}
+
+function parseHeaderInteger(value: string | string[] | undefined): number {
+  const text = Array.isArray(value) ? value[0] : value;
+  const parsed = text ? Number.parseInt(text, 10) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function parseHeaderBoolean(value: string | string[] | undefined): boolean | undefined {
+  const text = Array.isArray(value) ? value[0] : value;
+  if (!text) {
+    return undefined;
+  }
+  return text.toLowerCase() === "true";
+}
+
+function parseHeaderText(value: string | string[] | undefined): string | undefined {
+  const text = Array.isArray(value) ? value[0] : value;
+  const trimmed = text?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function resolveFlowNodeConsoleUrl(buildUrl: string, consoleUrl: string): string | undefined {
+  try {
+    return new URL(consoleUrl, ensureTrailingSlash(buildUrl)).toString();
+  } catch {
+    return undefined;
   }
 }

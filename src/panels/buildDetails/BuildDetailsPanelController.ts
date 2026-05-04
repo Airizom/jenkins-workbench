@@ -22,6 +22,11 @@ import {
 } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { buildBuildDetailsViewModel } from "./BuildDetailsViewModel";
+import { PipelineNodeLogManager } from "./PipelineNodeLogManager";
+import type {
+  PipelineLogTargetViewModel,
+  PipelineNodeLogViewModel
+} from "./shared/BuildDetailsContracts";
 
 export interface BuildDetailsPanelLoadOptions {
   label?: string;
@@ -46,6 +51,9 @@ export interface BuildDetailsPanelControllerAccess {
   getPipelineRestartAvailability(): PipelineRestartAvailability;
   getPipelineRestartEnabled(): boolean;
   getPipelineRestartableStages(): string[];
+  getCurrentPipelineNodeLog(): PipelineNodeLogViewModel | undefined;
+  selectPipelineLogTarget(target: PipelineLogTargetViewModel): void;
+  clearPipelineLogTarget(): void;
   refreshBuildStatus(token: number): Promise<void>;
   refreshTestReport(
     token: number,
@@ -65,6 +73,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private loadToken = 0;
   private backend?: BuildDetailsBackend;
   private pollingController?: BuildDetailsPollingController;
+  private pipelineNodeLogManager?: PipelineNodeLogManager;
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
   private loadingRequests = 0;
 
@@ -91,6 +100,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   dispose(): void {
     this.pollingController?.dispose();
     this.pollingController = undefined;
+    this.pipelineNodeLogManager?.dispose();
+    this.pipelineNodeLogManager = undefined;
     this.runtime.dispose();
     this.loadingRequests = 0;
   }
@@ -145,6 +156,23 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     return this.state.pipelineRestartableStages;
   }
 
+  getCurrentPipelineNodeLog(): PipelineNodeLogViewModel | undefined {
+    return this.pipelineNodeLogManager?.getActiveLog() ?? this.state.pipelineNodeLog;
+  }
+
+  selectPipelineLogTarget(target: PipelineLogTargetViewModel): void {
+    this.pipelineNodeLogManager?.selectTarget(target);
+  }
+
+  clearPipelineLogTarget(): void {
+    this.pipelineNodeLogManager?.clear();
+    this.state.clearPipelineNodeLog();
+    this.view.postMessage({
+      type: "setPipelineNodeLog",
+      log: this.state.pipelineNodeLog
+    });
+  }
+
   async refreshPendingInputs(): Promise<void> {
     await this.runtime.refreshPendingInputs();
   }
@@ -169,6 +197,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     const token = ++this.loadToken;
     this.pollingController?.dispose();
     this.pollingController = undefined;
+    this.pipelineNodeLogManager?.dispose();
+    this.pipelineNodeLogManager = undefined;
     this.runtime.dispose();
     this.backend = backend;
     this.loadingRequests = 0;
@@ -183,6 +213,39 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       nonce: this.state.currentNonce,
       styleUris: assets.styleUris,
       panelState: options?.panelState
+    });
+
+    this.pipelineNodeLogManager = new PipelineNodeLogManager({
+      backend: backend.console,
+      environment,
+      buildUrl,
+      getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
+      formatError,
+      callbacks: {
+        onSetLog: (log) => {
+          this.state.setPipelineNodeLog(log);
+          this.view.postMessage({ type: "setPipelineNodeLog", log });
+        },
+        onAppendHtml: (targetKey, html) => {
+          const activeLog = this.pipelineNodeLogManager?.getActiveLog();
+          if (activeLog) {
+            this.state.setPipelineNodeLog(activeLog);
+          }
+          this.view.postMessage({ type: "appendPipelineNodeLogHtml", targetKey, html });
+        },
+        onLoading: (targetKey, loading) => {
+          this.view.postMessage({ type: "setPipelineNodeLogLoading", targetKey, loading });
+        },
+        onError: (targetKey, error) => {
+          const nextLog = {
+            ...this.state.pipelineNodeLog,
+            loading: false,
+            error
+          };
+          this.state.setPipelineNodeLog(nextLog);
+          this.view.postMessage({ type: "setPipelineNodeLogError", targetKey, error });
+        }
+      }
     });
 
     this.pollingController = new BuildDetailsPollingController({
@@ -246,6 +309,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       pendingInputs: this.state.currentPendingInputs,
       pipelineRestartEnabled: this.state.pipelineRestartEnabled,
       pipelineRestartableStages: this.state.pipelineRestartableStages,
+      pipelineNodeLog: this.state.pipelineNodeLog,
       testReportFetched: this.state.testReportFetched,
       testReportLogsIncluded: this.state.testReportLogsIncluded,
       testResultsLoading: this.state.testResultsLoading,
@@ -291,6 +355,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   handlePanelHidden(): void {
+    this.pipelineNodeLogManager?.pause();
     this.runtime.handlePanelHidden(this.loadToken);
   }
 
@@ -298,6 +363,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.beginLoading();
     try {
       await this.runtime.handlePanelVisible(this.loadToken);
+      this.pipelineNodeLogManager?.resume();
     } finally {
       this.endLoading();
     }

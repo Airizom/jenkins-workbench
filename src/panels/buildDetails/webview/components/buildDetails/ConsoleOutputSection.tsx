@@ -41,7 +41,7 @@ export function ConsoleOutputSection({
 }) {
   const displayConsoleText = useMemo(() => stripAnsi(consoleText), [consoleText]);
   const consoleSourceText = consoleHtmlModel?.text ?? displayConsoleText;
-  const consoleSearch = useConsoleSearch(consoleSourceText);
+  const consoleSearch = useConsoleSearch(consoleSourceText, isActive);
 
   const consoleSegments = useMemo(() => {
     if (consoleHtmlModel) {

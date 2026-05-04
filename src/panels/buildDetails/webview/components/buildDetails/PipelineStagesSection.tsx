@@ -1,6 +1,9 @@
 import * as React from "react";
 import { Accordion } from "../../../../shared/webview/components/ui/accordion";
-import type { PipelineStageViewModel } from "../../../shared/BuildDetailsContracts";
+import type {
+  PipelineLogTargetViewModel,
+  PipelineStageViewModel
+} from "../../../shared/BuildDetailsContracts";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
 import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 import { StageNode } from "./pipelineStages/StageNode";
@@ -11,11 +14,13 @@ const { useEffect, useMemo, useState } = React;
 export function PipelineStagesSection({
   stages,
   loading,
-  onRestartStage
+  onRestartStage,
+  onSelectPipelineLog
 }: {
   stages: PipelineStageViewModel[];
   loading: boolean;
   onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
 }) {
   const [openStages, setOpenStages] = useState<string[]>([]);
   const [showAllStages, setShowAllStages] = useState<Record<string, boolean>>({});
@@ -53,6 +58,7 @@ export function PipelineStagesSection({
                 showAll={showAll}
                 isLast={isLast}
                 onRestartStage={onRestartStage}
+                onSelectPipelineLog={onSelectPipelineLog}
                 onShowAllChange={(next) =>
                   setShowAllStages((prev) => ({
                     ...prev,

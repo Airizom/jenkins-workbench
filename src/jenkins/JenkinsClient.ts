@@ -18,6 +18,7 @@ import type {
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsFlowNodeLog,
   JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
@@ -35,6 +36,7 @@ import type {
   JenkinsTestReport,
   JenkinsView,
   JenkinsWorkflowRun,
+  JenkinsWorkflowStage,
   JenkinsWorkspaceEntry,
   ScanMultibranchResult
 } from "./types";
@@ -49,6 +51,7 @@ export type {
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
+  JenkinsFlowNodeLog,
   JenkinsItemCreateKind,
   JenkinsChangeSet,
   JenkinsChangeSetItem,
@@ -74,6 +77,7 @@ export type {
   JenkinsView,
   JenkinsTestSummaryAction,
   JenkinsWorkspaceEntry,
+  JenkinsWorkflowStage,
   JenkinsWorkflowRun,
   ScanMultibranchResult
 } from "./types";
@@ -175,6 +179,23 @@ export class JenkinsClient {
     annotator?: string
   ): Promise<JenkinsProgressiveConsoleHtml> {
     return this.buildsApi.getConsoleHtmlProgressive(buildUrl, start, annotator);
+  }
+
+  async getFlowNodeLog(buildUrl: string, nodeId: string): Promise<JenkinsFlowNodeLog> {
+    return this.buildsApi.getFlowNodeLog(buildUrl, nodeId);
+  }
+
+  async getFlowNodeDetails(buildUrl: string, nodeId: string): Promise<JenkinsWorkflowStage> {
+    return this.buildsApi.getFlowNodeDetails(buildUrl, nodeId);
+  }
+
+  async getFlowNodeLogHtmlProgressive(
+    buildUrl: string,
+    nodeId: string,
+    start: number,
+    annotator?: string
+  ): Promise<JenkinsProgressiveConsoleHtml> {
+    return this.buildsApi.getFlowNodeLogHtmlProgressive(buildUrl, nodeId, start, annotator);
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {

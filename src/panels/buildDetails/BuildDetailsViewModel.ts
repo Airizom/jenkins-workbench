@@ -23,6 +23,7 @@ import { buildPendingInputsViewModel } from "./BuildDetailsPendingInputsViewMode
 import { buildPipelineStagesViewModel } from "./BuildDetailsPipelineViewModel";
 import { buildTestStateViewModel } from "./BuildDetailsTestsViewModel";
 import type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
+import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 
 export type {
   BuildCoverageFileViewModel,
@@ -77,6 +78,7 @@ export interface BuildDetailsViewModelInput {
   pendingInputs?: PendingInputAction[];
   pipelineRestartEnabled?: boolean;
   pipelineRestartableStages?: string[];
+  pipelineNodeLog?: PipelineNodeLogViewModel;
   testResultsLoading?: boolean;
   canOpenTestSource?: (className?: string) => boolean;
 }
@@ -124,6 +126,11 @@ export function buildBuildDetailsViewModel(
       restartEnabled: Boolean(input.pipelineRestartEnabled),
       restartableStages: input.pipelineRestartableStages ?? []
     }),
+    pipelineNodeLog: input.pipelineNodeLog ?? {
+      text: "",
+      truncated: false,
+      loading: false
+    },
     testState,
     coverageState,
     insights: buildBuildFailureInsights(details, testState.summary),

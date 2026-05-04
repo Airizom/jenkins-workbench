@@ -6,15 +6,19 @@ import {
   type RejectInputMessage,
   type ReloadTestReportMessage,
   type RestartPipelineFromStageMessage,
+  type SelectPipelineLogNodeMessage,
   isApproveInputMessage,
   isArtifactActionMessage,
+  isClearPipelineLogNodeMessage,
   isExportConsoleMessage,
+  isExportPipelineNodeLogMessage,
   isOpenExternalMessage,
   isOpenTestSourceMessage,
   isPersistUiStateMessage,
   isRejectInputMessage,
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
+  isSelectPipelineLogNodeMessage,
   isToggleFollowLogMessage
 } from "./BuildDetailsMessages";
 
@@ -25,6 +29,9 @@ export interface BuildDetailsMessageRouterHandlers {
   onApproveInput(message: ApproveInputMessage): void;
   onRejectInput(message: RejectInputMessage): void;
   onRestartPipelineFromStage(message: RestartPipelineFromStageMessage): void;
+  onSelectPipelineLogNode(message: SelectPipelineLogNodeMessage): void;
+  onClearPipelineLogNode(): void;
+  onExportPipelineNodeLog(): void;
   onReloadTestReport(message: ReloadTestReportMessage): void;
   onOpenTestSource(message: OpenTestSourceMessage): void;
   onPersistUiState(message: PersistUiStateMessage): void;
@@ -57,6 +64,18 @@ export class BuildDetailsMessageRouter {
     }
     if (isRestartPipelineFromStageMessage(message)) {
       this.handlers.onRestartPipelineFromStage(message);
+      return;
+    }
+    if (isSelectPipelineLogNodeMessage(message)) {
+      this.handlers.onSelectPipelineLogNode(message);
+      return;
+    }
+    if (isClearPipelineLogNodeMessage(message)) {
+      this.handlers.onClearPipelineLogNode();
+      return;
+    }
+    if (isExportPipelineNodeLogMessage(message)) {
+      this.handlers.onExportPipelineNodeLog();
       return;
     }
     if (isReloadTestReportMessage(message)) {

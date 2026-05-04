@@ -13,14 +13,20 @@ export interface BuildFailureArtifact {
 export type ArtifactAction = "preview" | "download";
 
 export interface PipelineStageStepViewModel {
+  key: string;
+  nodeId?: string;
+  logTarget?: PipelineLogTargetViewModel;
   name: string;
   statusLabel: string;
   statusClass: string;
   durationLabel: string;
+  canOpenLog: boolean;
 }
 
 export interface PipelineStageViewModel {
   key: string;
+  nodeId?: string;
+  logTarget?: PipelineLogTargetViewModel;
   name: string;
   statusLabel: string;
   statusClass: string;
@@ -31,6 +37,51 @@ export interface PipelineStageViewModel {
   stepsFailedOnly: PipelineStageStepViewModel[];
   stepsAll: PipelineStageStepViewModel[];
   parallelBranches: PipelineStageViewModel[];
+  canOpenLog: boolean;
+}
+
+export type PipelineLogTargetKind = "stage" | "step";
+
+export interface PipelineLogTargetViewModel {
+  key: string;
+  kind: PipelineLogTargetKind;
+  name: string;
+  nodeId?: string;
+  childNodeIds?: string[];
+}
+
+export function normalizePipelineLogTarget(value: unknown): PipelineLogTargetViewModel | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const key = typeof value.key === "string" ? value.key.trim() : "";
+  const kind = isPipelineLogTargetKind(value.kind) ? value.kind : undefined;
+  const name = typeof value.name === "string" ? value.name.trim() : "";
+  const nodeId = typeof value.nodeId === "string" ? value.nodeId.trim() || undefined : undefined;
+  const childNodeIds = Array.isArray(value.childNodeIds)
+    ? uniqueNonEmptyStrings(value.childNodeIds)
+    : undefined;
+  if (!key || !kind || !name || (!nodeId && (!childNodeIds || childNodeIds.length === 0))) {
+    return undefined;
+  }
+  return {
+    key,
+    kind,
+    name,
+    nodeId,
+    childNodeIds
+  };
+}
+
+export interface PipelineNodeLogViewModel {
+  target?: PipelineLogTargetViewModel;
+  html?: string;
+  text: string;
+  truncated: boolean;
+  loading: boolean;
+  polling?: boolean;
+  error?: string;
+  consoleUrl?: string;
 }
 
 export interface BuildFailureInsightsViewModel {
@@ -137,6 +188,7 @@ export interface BuildDetailsViewModel {
   culpritsLabel: string;
   pipelineStagesLoading: boolean;
   pipelineStages: PipelineStageViewModel[];
+  pipelineNodeLog: PipelineNodeLogViewModel;
   testState: BuildDetailsTestStateViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
@@ -163,5 +215,31 @@ export interface BuildDetailsUpdateMessage {
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
   pipelineStages: PipelineStageViewModel[];
+  pipelineNodeLog: PipelineNodeLogViewModel;
   pendingInputs: PendingInputViewModel[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isPipelineLogTargetKind(value: unknown): value is PipelineLogTargetKind {
+  return value === "stage" || value === "step";
+}
+
+function uniqueNonEmptyStrings(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
 }

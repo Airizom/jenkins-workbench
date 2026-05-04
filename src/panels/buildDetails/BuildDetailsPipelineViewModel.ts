@@ -7,6 +7,7 @@ import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatDuration, normalizePipelineStatus } from "./BuildDetailsFormatters";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 import type {
+  PipelineLogTargetViewModel,
   PipelineStageStepViewModel,
   PipelineStageViewModel
 } from "./shared/BuildDetailsContracts";
@@ -51,12 +52,15 @@ function mapPipelineStage(
   const stepsAll = steps.map((step) => stripFailure(step));
   const parallelBranches = mapParallelBranches(stage, restartState);
   const hasSteps = stepsAll.length > 0 || parallelBranches.some((branch) => branch.hasSteps);
+  const logTarget = buildStageLogTarget(stage);
   const stageName = stage.name.trim();
   const canRestartFromStage =
     restartState.enabled && stageName.length > 0 && restartState.restartableStages.has(stageName);
 
   return {
     key,
+    nodeId: stage.nodeId,
+    logTarget,
     name: stage.name,
     statusLabel: status.label,
     statusClass: status.className,
@@ -66,7 +70,8 @@ function mapPipelineStage(
     hasSteps,
     stepsFailedOnly: stepsFailedOnly.map((step) => stripFailure(step)),
     stepsAll,
-    parallelBranches
+    parallelBranches,
+    canOpenLog: Boolean(logTarget)
   };
 }
 
@@ -102,20 +107,70 @@ function mapPipelineStep(step: PipelineStep): PipelineStepDraft {
   const status = normalizePipelineStatus(step.status);
   const durationLabel = formatDuration(step.durationMillis);
   return {
+    key: step.key,
+    nodeId: step.nodeId,
+    logTarget: buildStepLogTarget(step),
     name: step.name,
     statusLabel: status.label,
     statusClass: status.className,
     durationLabel,
+    canOpenLog: Boolean(step.nodeId),
     isFailed: status.isFailed
   };
 }
 
 function stripFailure(step: PipelineStepDraft): PipelineStageStepViewModel {
   return {
+    key: step.key,
+    nodeId: step.nodeId,
+    logTarget: step.logTarget,
     name: step.name,
     statusLabel: step.statusLabel,
     statusClass: step.statusClass,
-    durationLabel: step.durationLabel
+    durationLabel: step.durationLabel,
+    canOpenLog: step.canOpenLog
+  };
+}
+
+function collectStageChildNodeIds(stage: PipelineStage): string[] {
+  const ids: string[] = [];
+  for (const step of stage.steps) {
+    if (step.nodeId) {
+      ids.push(step.nodeId);
+    }
+  }
+  for (const branch of stage.parallelBranches) {
+    if (branch.nodeId) {
+      ids.push(branch.nodeId);
+    }
+    ids.push(...collectStageChildNodeIds(branch));
+  }
+  return ids;
+}
+
+function buildStageLogTarget(stage: PipelineStage): PipelineLogTargetViewModel | undefined {
+  const childNodeIds = collectStageChildNodeIds(stage);
+  if (!stage.nodeId && childNodeIds.length === 0) {
+    return undefined;
+  }
+  return {
+    key: stage.key,
+    kind: "stage",
+    name: stage.name || "Stage",
+    nodeId: stage.nodeId,
+    childNodeIds
+  };
+}
+
+function buildStepLogTarget(step: PipelineStep): PipelineLogTargetViewModel | undefined {
+  if (!step.nodeId) {
+    return undefined;
+  }
+  return {
+    key: step.key,
+    kind: "step",
+    name: step.name || "Step",
+    nodeId: step.nodeId
   };
 }
 

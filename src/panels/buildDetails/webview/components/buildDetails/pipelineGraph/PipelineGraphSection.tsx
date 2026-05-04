@@ -1,5 +1,8 @@
 import * as React from "react";
-import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
+import type {
+  PipelineLogTargetViewModel,
+  PipelineStageViewModel
+} from "../../../../shared/BuildDetailsContracts";
 import { PipelineGraphCanvas } from "./PipelineGraphCanvas";
 import { PipelineGraphInspector } from "./PipelineGraphInspector";
 import type { PipelineGraphLayoutResult } from "./pipelineGraphTypes";
@@ -12,12 +15,14 @@ export function PipelineGraphSection({
   selectedStageKey,
   onSelectStage,
   onRestartStage,
+  onSelectPipelineLog,
   onGraphError
 }: {
   stages: PipelineStageViewModel[];
   selectedStageKey?: string;
   onSelectStage: (stageKey: string | undefined) => void;
   onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onGraphError: () => void;
 }) {
   const graphLayout = usePipelineGraphLayout(stages, true);
@@ -75,7 +80,11 @@ export function PipelineGraphSection({
         selectedStageKey={selectedStageKey}
         onSelectStage={(stageKey) => onSelectStage(stageKey)}
       />
-      <PipelineGraphInspector stage={selectedStage} onRestartStage={onRestartStage} />
+      <PipelineGraphInspector
+        stage={selectedStage}
+        onRestartStage={onRestartStage}
+        onSelectPipelineLog={onSelectPipelineLog}
+      />
     </div>
   );
 }

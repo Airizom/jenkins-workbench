@@ -31,6 +31,30 @@ export function useBuildDetailsMessages(dispatch: Dispatch<BuildDetailsAction>):
             truncated: message.truncated
           });
           break;
+        case "setPipelineNodeLog":
+          dispatch({ type: "setPipelineNodeLog", log: message.log });
+          break;
+        case "appendPipelineNodeLogHtml":
+          dispatch({
+            type: "appendPipelineNodeLogHtml",
+            targetKey: message.targetKey,
+            html: message.html
+          });
+          break;
+        case "setPipelineNodeLogLoading":
+          dispatch({
+            type: "setPipelineNodeLogLoading",
+            targetKey: message.targetKey,
+            loading: message.loading
+          });
+          break;
+        case "setPipelineNodeLogError":
+          dispatch({
+            type: "setPipelineNodeLogError",
+            targetKey: message.targetKey,
+            error: message.error
+          });
+          break;
         case "updateDetails":
           dispatch({ type: "updateDetails", payload: message });
           break;

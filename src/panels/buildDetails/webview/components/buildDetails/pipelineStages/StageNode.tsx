@@ -6,9 +6,12 @@ import {
 } from "../../../../../shared/webview/components/ui/accordion";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Toggle } from "../../../../../shared/webview/components/ui/toggle";
-import { ChevronDownIcon } from "../../../../../shared/webview/icons";
+import { ChevronDownIcon, TerminalIcon } from "../../../../../shared/webview/icons";
 import { cn } from "../../../../../shared/webview/lib/utils";
-import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
+import type {
+  PipelineLogTargetViewModel,
+  PipelineStageViewModel
+} from "../../../../shared/BuildDetailsContracts";
 import { StatusPill } from "../StatusPill";
 import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
@@ -21,6 +24,7 @@ export function StageNode({
   showAll,
   isLast,
   onRestartStage,
+  onSelectPipelineLog,
   onShowAllChange
 }: {
   stageId: string;
@@ -28,6 +32,7 @@ export function StageNode({
   showAll: boolean;
   isLast: boolean;
   onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onShowAllChange: (next: boolean) => void;
 }) {
   const hasBranches = stage.parallelBranches.length > 0;
@@ -39,6 +44,7 @@ export function StageNode({
   const connectorColor = getConnectorColor(stage.statusClass);
   const stageName = stage.name.trim();
   const canRestartStage = stage.canRestartFromStage && stageName.length > 0;
+  const stageLogTarget = stage.logTarget;
 
   return (
     <div className="relative flex" data-stage-key={stage.key}>
@@ -82,7 +88,21 @@ export function StageNode({
             <AccordionContent>
               <div className="border-t border-border px-3 py-2.5 space-y-2.5">
                 {canRestartStage ? (
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end gap-2">
+                    {stageLogTarget ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelectPipelineLog(stageLogTarget);
+                        }}
+                      >
+                        <TerminalIcon className="mr-1 h-3 w-3" />
+                        Log
+                      </Button>
+                    ) : null}
                     <Button
                       variant="outline"
                       size="sm"
@@ -93,6 +113,21 @@ export function StageNode({
                       }}
                     >
                       Restart from this stage
+                    </Button>
+                  </div>
+                ) : stageLogTarget ? (
+                  <div className="flex items-center justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelectPipelineLog(stageLogTarget);
+                      }}
+                    >
+                      <TerminalIcon className="mr-1 h-3 w-3" />
+                      Log
                     </Button>
                   </div>
                 ) : null}
@@ -119,6 +154,7 @@ export function StageNode({
                           key={`${branch.key}-${branchIndex}`}
                           branch={branch}
                           showAll={showAll}
+                          onSelectPipelineLog={onSelectPipelineLog}
                         />
                       ))}
                     </div>
@@ -141,7 +177,7 @@ export function StageNode({
                       </Toggle>
                     </div>
                     {steps.length > 0 ? (
-                      <StepsList steps={steps} />
+                      <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />
                     ) : (
                       <EmptyStepsMessage showAll={showAll} />
                     )}
