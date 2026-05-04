@@ -5,6 +5,7 @@ import type {
   JenkinsBuildParameter,
   JenkinsChangeSetItem
 } from "../jenkins/JenkinsClient";
+import { resolveBuildElapsedMs } from "./BuildTiming";
 import { formatDurationMs, formatRelativeTime } from "./formatters";
 
 const DEFAULT_MAX_COMMIT_MESSAGE_LENGTH = 120;
@@ -337,16 +338,6 @@ function isActionWithParameters(
   }
   const record = action as { parameters?: unknown };
   return Array.isArray(record.parameters);
-}
-
-function resolveBuildElapsedMs(build: JenkinsBuild): number | undefined {
-  if (Number.isFinite(build.timestamp)) {
-    return Math.max(0, Date.now() - (build.timestamp as number));
-  }
-  if (Number.isFinite(build.duration)) {
-    return Math.max(0, build.duration as number);
-  }
-  return undefined;
 }
 
 function normalizeWhitespace(value: string): string {

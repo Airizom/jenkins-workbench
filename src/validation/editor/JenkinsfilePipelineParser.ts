@@ -241,26 +241,26 @@ function findTopLevelSectionLine(
   context: PipelineBlockContext,
   token: string
 ): number | undefined {
-  for (let lineIndex = context.openLine + 1; lineIndex < context.closeLine; lineIndex += 1) {
-    const lineText = source.lineAt(lineIndex);
-    if (lineText.trim().length === 0) {
-      continue;
-    }
-    const indent = getIndent(lineText);
-    if (indent.length !== context.childIndent.length) {
-      continue;
-    }
+  return findMatchingTopLevelLine(source, context, (lineText, indent) => {
     const trimmed = lineText.slice(indent.length);
     if (new RegExp(`^${token}\\b`).test(trimmed)) {
-      return lineIndex;
+      return true;
     }
-  }
-  return undefined;
+    return false;
+  });
 }
 
 function findFirstTopLevelLine(
   source: PipelineTextSource,
   context: PipelineBlockContext
+): number | undefined {
+  return findMatchingTopLevelLine(source, context, () => true);
+}
+
+function findMatchingTopLevelLine(
+  source: PipelineTextSource,
+  context: PipelineBlockContext,
+  predicate: (lineText: string, indent: string) => boolean
 ): number | undefined {
   for (let lineIndex = context.openLine + 1; lineIndex < context.closeLine; lineIndex += 1) {
     const lineText = source.lineAt(lineIndex);
@@ -268,7 +268,7 @@ function findFirstTopLevelLine(
       continue;
     }
     const indent = getIndent(lineText);
-    if (indent.length === context.childIndent.length) {
+    if (indent.length === context.childIndent.length && predicate(lineText, indent)) {
       return lineIndex;
     }
   }

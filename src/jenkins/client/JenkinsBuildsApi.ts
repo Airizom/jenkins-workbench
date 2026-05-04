@@ -33,6 +33,7 @@ import {
   buildTestReportTree
 } from "./JenkinsBuildTreeBuilders";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
+import { buildProgressiveConsoleHtmlResult } from "./JenkinsConsoleStream";
 import { JenkinsPendingInputClient } from "./JenkinsPendingInputClient";
 import { JenkinsReplayClient } from "./JenkinsReplayClient";
 import { RestartFromStageClient } from "./RestartFromStageClient";
@@ -183,17 +184,7 @@ export class JenkinsBuildsApi {
     const response = await this.context.requestTextWithHeaders(url.toString(), {
       headers: annotator ? { "X-ConsoleAnnotator": annotator } : undefined
     });
-    const textSize = parseHeaderInteger(response.headers["x-text-size"]);
-    const moreData = parseHeaderBoolean(response.headers["x-more-data"]);
-    const nextAnnotator = parseHeaderText(response.headers["x-console-annotator"]);
-    const textSizeKnown = Number.isFinite(textSize);
-    return {
-      html: response.text,
-      textSize: textSizeKnown ? textSize : safeStart,
-      textSizeKnown,
-      moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0,
-      annotator: nextAnnotator
-    };
+    return buildProgressiveConsoleHtmlResult(response, safeStart);
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
@@ -303,26 +294,6 @@ export class JenkinsBuildsApi {
       `execution/node/${encodeURIComponent(nodeId.trim())}/wfapi/describe`
     );
   }
-}
-
-function parseHeaderInteger(value: string | string[] | undefined): number {
-  const text = Array.isArray(value) ? value[0] : value;
-  const parsed = text ? Number.parseInt(text, 10) : Number.NaN;
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
-}
-
-function parseHeaderBoolean(value: string | string[] | undefined): boolean | undefined {
-  const text = Array.isArray(value) ? value[0] : value;
-  if (!text) {
-    return undefined;
-  }
-  return text.toLowerCase() === "true";
-}
-
-function parseHeaderText(value: string | string[] | undefined): string | undefined {
-  const text = Array.isArray(value) ? value[0] : value;
-  const trimmed = text?.trim();
-  return trimmed ? trimmed : undefined;
 }
 
 function resolveFlowNodeConsoleUrl(buildUrl: string, consoleUrl: string): string | undefined {

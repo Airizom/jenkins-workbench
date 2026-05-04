@@ -2,27 +2,10 @@ import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { PendingInputAction } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { PendingInputActionService } from "../shared/PendingInputActionService";
 import { promptForParameters } from "./ParameterPrompts";
 
-export interface PendingInputActionService {
-  getPendingInputActions(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: { mode?: "cached" | "refresh" }
-  ): Promise<PendingInputAction[]>;
-  approveInput(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
-  ): Promise<void>;
-  rejectInput(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    inputId: string,
-    abortUrl?: string
-  ): Promise<void>;
-}
+export type { PendingInputActionService } from "../shared/PendingInputActionService";
 
 export interface PendingInputActionOptions {
   dataService: PendingInputActionService;

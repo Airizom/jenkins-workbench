@@ -1,7 +1,12 @@
 import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/types";
 import { formatNumber, formatTestDuration } from "../buildDetails/BuildDetailsFormatters";
+import {
+  type NormalizedTestStatus,
+  formatTestStatusLabel,
+  normalizeTestStatus
+} from "../buildDetails/TestStatusFormatters";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
-import { normalizeString } from "./BuildCompareSectionShared";
+import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {
   BuildCompareTestDiffItem,
   BuildCompareTestsSectionViewModel
@@ -12,7 +17,7 @@ interface NormalizedTestCase {
   name: string;
   className?: string;
   suiteName?: string;
-  status: "passed" | "failed" | "skipped" | "other";
+  status: NormalizedTestStatus;
   statusLabel: string;
   durationLabel?: string;
 }
@@ -210,36 +215,6 @@ function buildTestCaseOccurrenceKey(key: string, occurrence: number): string {
   return `${key}::${occurrence}`;
 }
 
-function normalizeTestStatus(status?: string): NormalizedTestCase["status"] {
-  const normalized = status?.trim().toUpperCase();
-  if (!normalized) {
-    return "other";
-  }
-  if (normalized === "PASSED" || normalized === "FIXED") {
-    return "passed";
-  }
-  if (normalized === "SKIPPED" || normalized === "REGRESSION_SKIPPED") {
-    return "skipped";
-  }
-  if (normalized === "FAILED" || normalized === "REGRESSION" || normalized === "ERROR") {
-    return "failed";
-  }
-  return "other";
-}
-
-function formatTestStatusLabel(status: NormalizedTestCase["status"]): string {
-  switch (status) {
-    case "passed":
-      return "Passed";
-    case "failed":
-      return "Failed";
-    case "skipped":
-      return "Skipped";
-    default:
-      return "Other";
-  }
-}
-
 function buildTestDiffItem(
   baseline: NormalizedTestCase,
   target: NormalizedTestCase
@@ -270,21 +245,4 @@ function buildSingleSideTestDiffItem(
     baselineDurationLabel: side === "removed" ? testCase.durationLabel : undefined,
     targetDurationLabel: side === "added" ? testCase.durationLabel : undefined
   };
-}
-
-function buildComparisonErrorDetail(
-  label: string,
-  baselineMessage?: string,
-  targetMessage?: string
-): string {
-  if (baselineMessage && targetMessage) {
-    return `Baseline ${label.toLowerCase()}: ${baselineMessage} Target ${label.toLowerCase()}: ${targetMessage}`;
-  }
-  if (baselineMessage) {
-    return `Baseline ${label.toLowerCase()}: ${baselineMessage}`;
-  }
-  if (targetMessage) {
-    return `Target ${label.toLowerCase()}: ${targetMessage}`;
-  }
-  return `${label} comparison failed.`;
 }

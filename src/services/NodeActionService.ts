@@ -70,21 +70,11 @@ export class NodeActionService {
         false
       );
       if (result.status === "toggled") {
-        if (result.details.temporarilyOffline) {
-          void vscode.window.showInformationMessage(
-            `${target.label} is still temporarily offline. Use Jenkins to update its status.`
-          );
-        } else if (result.details.offline) {
-          const offlineReason = this.formatOfflineReason(result.details);
-          const reasonLabel = offlineReason ? ` Reason: ${offlineReason}` : "";
-          void vscode.window.showInformationMessage(
-            `Cleared temporary offline for ${target.label}, but it is still offline.${reasonLabel}`
-          );
-        } else {
-          void vscode.window.showInformationMessage(`Brought ${target.label} online.`);
-        }
-        refreshHost?.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
-        return true;
+        return this.handleSuccessfulOnlineAction(target, result.details, refreshHost, {
+          stillTemporaryMessage: `${target.label} is still temporarily offline. Use Jenkins to update its status.`,
+          stillOfflineAction: "Cleared temporary offline",
+          onlineMessage: `Brought ${target.label} online.`
+        });
       }
       if (result.status === "not_temporarily_offline") {
         const offlineReason = this.formatOfflineReason(result.details);
@@ -111,17 +101,10 @@ export class NodeActionService {
     try {
       const result = await this.dataService.launchNodeAgent(target.environment, target.nodeUrl);
       if (result.status === "launched") {
-        const offlineReason = this.formatOfflineReason(result.details);
-        const reasonLabel = offlineReason ? ` Reason: ${offlineReason}` : "";
-        if (result.details.offline) {
-          void vscode.window.showInformationMessage(
-            `Launch requested for ${target.label}, but it is still offline.${reasonLabel}`
-          );
-        } else {
-          void vscode.window.showInformationMessage(`Launched ${target.label}.`);
-        }
-        refreshHost?.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
-        return true;
+        return this.handleSuccessfulOnlineAction(target, result.details, refreshHost, {
+          stillOfflineAction: "Launch requested",
+          onlineMessage: `Launched ${target.label}.`
+        });
       }
       if (result.status === "not_launchable") {
         if (result.details.manualLaunchAllowed) {
@@ -157,5 +140,38 @@ export class NodeActionService {
       details?.offlineCause?.description?.trim() ||
       details?.offlineCause?.shortDescription?.trim();
     return reason && reason.length > 0 ? reason : undefined;
+  }
+
+  private handleSuccessfulOnlineAction(
+    target: NodeActionTarget,
+    details: JenkinsNodeDetails,
+    refreshHost: NodeActionRefreshHost | undefined,
+    messages: {
+      stillTemporaryMessage?: string;
+      stillOfflineAction: string;
+      onlineMessage: string;
+    }
+  ): boolean {
+    if (details.temporarilyOffline && messages.stillTemporaryMessage) {
+      void vscode.window.showInformationMessage(messages.stillTemporaryMessage);
+    } else if (details.offline) {
+      void vscode.window.showInformationMessage(
+        this.formatStillOfflineMessage(messages.stillOfflineAction, target, details)
+      );
+    } else {
+      void vscode.window.showInformationMessage(messages.onlineMessage);
+    }
+    refreshHost?.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
+    return true;
+  }
+
+  private formatStillOfflineMessage(
+    actionLabel: string,
+    target: NodeActionTarget,
+    details: JenkinsNodeDetails
+  ): string {
+    const offlineReason = this.formatOfflineReason(details);
+    const reasonLabel = offlineReason ? ` Reason: ${offlineReason}` : "";
+    return `${actionLabel} for ${target.label}, but it is still offline.${reasonLabel}`;
   }
 }

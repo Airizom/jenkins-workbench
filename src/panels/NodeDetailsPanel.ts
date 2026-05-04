@@ -23,9 +23,17 @@ import {
 } from "./nodeDetails/NodeDetailsMessages";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
+import {
+  attachPanelLifecycle,
+  beginLoadingRequest,
+  bindEnvironmentRefresh,
+  disposePanelResources,
+  endLoadingRequest
+} from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
+import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
   type SerializedEnvironmentState,
   isSerializedEnvironmentState,
@@ -163,16 +171,12 @@ export class NodeDetailsPanel {
     this.panel = panel;
     this.extensionUri = extensionUri;
 
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-    this.panel.onDidChangeViewState(
-      () => {
-        if (this.panel.visible) {
-          void this.handlePanelVisible();
-        }
-      },
-      null,
-      this.disposables
-    );
+    attachPanelLifecycle(this.panel, this.disposables, {
+      onDispose: () => this.dispose(),
+      onVisible: () => {
+        void this.handlePanelVisible();
+      }
+    });
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
         if (isRefreshNodeDetailsMessage(message)) {
@@ -214,10 +218,7 @@ export class NodeDetailsPanel {
       this.refreshSubscription.dispose();
       this.refreshSubscription = undefined;
     }
-    while (this.disposables.length > 0) {
-      const disposable = this.disposables.pop();
-      disposable?.dispose();
-    }
+    disposePanelResources(this.disposables);
   }
 
   private async load(): Promise<void> {
@@ -426,16 +427,11 @@ export class NodeDetailsPanel {
 
   private setRefreshHost(refreshHost?: NodeDetailsRefreshHost): void {
     this.refreshHost = refreshHost;
-    if (this.refreshSubscription) {
-      this.refreshSubscription.dispose();
-      this.refreshSubscription = undefined;
-    }
-    if (!refreshHost?.onDidRefreshEnvironment) {
-      return;
-    }
-    this.refreshSubscription = refreshHost.onDidRefreshEnvironment((environmentId) => {
-      void this.handleEnvironmentRefresh(environmentId);
-    });
+    this.refreshSubscription = bindEnvironmentRefresh(
+      this.refreshSubscription,
+      refreshHost,
+      (environmentId) => this.handleEnvironmentRefresh(environmentId)
+    );
   }
 
   private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
@@ -463,44 +459,19 @@ export class NodeDetailsPanel {
   }
 
   private beginLoading(): void {
-    this.loadingRequests += 1;
-    if (this.loadingRequests === 1) {
-      this.postMessage({ type: "setLoading", value: true });
-    }
+    this.loadingRequests = beginLoadingRequest(this.loadingRequests, (value) =>
+      this.postMessage({ type: "setLoading", value })
+    );
   }
 
   private endLoading(): void {
-    if (this.loadingRequests === 0) {
-      return;
-    }
-    this.loadingRequests -= 1;
-    if (this.loadingRequests === 0) {
-      this.postMessage({ type: "setLoading", value: false });
-    }
+    this.loadingRequests = endLoadingRequest(this.loadingRequests, (value) =>
+      this.postMessage({ type: "setLoading", value })
+    );
   }
 
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    panel.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
-    };
-    panel.iconPath = NodeDetailsPanel.getIconPaths(extensionUri);
-  }
-
-  private static getIconPaths(extensionUri: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
-    const lightIconPath = vscode.Uri.joinPath(
-      extensionUri,
-      "resources",
-      "codicons",
-      "server-light.svg"
-    );
-    const darkIconPath = vscode.Uri.joinPath(
-      extensionUri,
-      "resources",
-      "codicons",
-      "server-dark.svg"
-    );
-    return { light: lightIconPath, dark: darkIconPath };
+    configureWebviewPanel(panel, extensionUri, "server");
   }
 
   private renderRestoreError(message: string, panelState?: NodeDetailsPanelSerializedState): void {

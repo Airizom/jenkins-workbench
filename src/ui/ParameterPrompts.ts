@@ -24,28 +24,13 @@ export async function promptForParameterValue(
   const description = parameter.description;
 
   if (parameter.kind === "boolean") {
-    const defaultValue = normalizeBoolean(parameter.defaultValue);
-    const pick = await vscode.window.showQuickPick(
-      [
-        { label: "true", picked: defaultValue === true },
-        { label: "false", picked: defaultValue === false }
-      ],
-      { placeHolder: prompt, ignoreFocusOut: true }
-    );
-    return pick?.label;
+    return promptBooleanParameterValue(prompt, parameter.defaultValue);
   }
 
   if (parameter.kind === "choice" && parameter.choices?.length) {
     const defaultValue =
       typeof parameter.defaultValue === "string" ? parameter.defaultValue : undefined;
-    const pick = await vscode.window.showQuickPick(
-      parameter.choices.map((choice) => ({
-        label: choice,
-        picked: choice === defaultValue
-      })),
-      { placeHolder: prompt, ignoreFocusOut: true }
-    );
-    return pick?.label;
+    return promptChoiceParameterValue(prompt, parameter.choices, defaultValue);
   }
 
   if (parameter.kind === "password") {
@@ -69,6 +54,36 @@ export async function promptForParameterValue(
   }
 
   return input;
+}
+
+export async function promptBooleanParameterValue(
+  prompt: string,
+  defaultInput?: string | number | boolean | string[]
+): Promise<string | undefined> {
+  const defaultValue = normalizeBoolean(defaultInput);
+  const pick = await vscode.window.showQuickPick(
+    [
+      { label: "true", picked: defaultValue === true },
+      { label: "false", picked: defaultValue === false }
+    ],
+    { placeHolder: prompt, ignoreFocusOut: true }
+  );
+  return pick?.label;
+}
+
+export async function promptChoiceParameterValue(
+  prompt: string,
+  choices: string[],
+  defaultValue?: string
+): Promise<string | undefined> {
+  const pick = await vscode.window.showQuickPick(
+    choices.map((choice) => ({
+      label: choice,
+      picked: choice === defaultValue
+    })),
+    { placeHolder: prompt, ignoreFocusOut: true }
+  );
+  return pick?.label;
 }
 
 export function normalizeBoolean(

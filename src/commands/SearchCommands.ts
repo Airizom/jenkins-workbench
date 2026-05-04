@@ -7,6 +7,7 @@ import {
   type JobSearchOptions
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { getJobSearchTuningOptions } from "../jenkins/data/JobSearchTuningOptions";
 import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
@@ -181,16 +182,6 @@ async function loadEnvironmentJobs(
   })) {
     onBatch(batch);
   }
-}
-
-function getJobSearchTuningOptions(): JobSearchOptions {
-  const configuration = vscode.workspace.getConfiguration("jenkinsWorkbench");
-  return {
-    concurrency: configuration.get<number>("jobSearchConcurrency"),
-    backoffBaseMs: configuration.get<number>("jobSearchBackoffBaseMs"),
-    backoffMaxMs: configuration.get<number>("jobSearchBackoffMaxMs"),
-    maxRetries: configuration.get<number>("jobSearchMaxRetries")
-  };
 }
 
 function revealJobInTree(

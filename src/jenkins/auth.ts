@@ -96,16 +96,9 @@ export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
       return cookie.length > 0 ? { type: "cookie", cookie } : undefined;
     }
     case "headers": {
-      if (!record.headers || typeof record.headers !== "object" || Array.isArray(record.headers)) {
+      const stringHeaders = parseStoredStringHeaders(record.headers);
+      if (!stringHeaders) {
         return undefined;
-      }
-      const rawHeaders = record.headers as Record<string, unknown>;
-      const stringHeaders: Record<string, string> = {};
-      for (const [key, value] of Object.entries(rawHeaders)) {
-        if (typeof value !== "string") {
-          return undefined;
-        }
-        stringHeaders[key] = value;
       }
       const headers = normalizeHeaders(stringHeaders);
       return Object.keys(headers).length > 0 ? { type: "headers", headers } : undefined;
@@ -121,20 +114,9 @@ export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
 
       let headers: Record<string, string> | undefined;
       if (record.headers !== undefined) {
-        if (
-          !record.headers ||
-          typeof record.headers !== "object" ||
-          Array.isArray(record.headers)
-        ) {
+        const stringHeaders = parseStoredStringHeaders(record.headers);
+        if (!stringHeaders) {
           return undefined;
-        }
-        const rawHeaders = record.headers as Record<string, unknown>;
-        const stringHeaders: Record<string, string> = {};
-        for (const [key, value] of Object.entries(rawHeaders)) {
-          if (typeof value !== "string") {
-            return undefined;
-          }
-          stringHeaders[key] = value;
         }
         headers = normalizeHeaders(stringHeaders);
       }
@@ -150,6 +132,20 @@ export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
     default:
       return undefined;
   }
+}
+
+function parseStoredStringHeaders(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const stringHeaders: Record<string, string> = {};
+  for (const [key, headerValue] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof headerValue !== "string") {
+      return undefined;
+    }
+    stringHeaders[key] = headerValue;
+  }
+  return stringHeaders;
 }
 
 export function buildAuthHeaders(

@@ -1,3 +1,4 @@
+import { pickFiniteNumber } from "../../shared/numbers";
 import type { JenkinsWorkflowRun, JenkinsWorkflowStage, JenkinsWorkflowStep } from "../types";
 import type { PipelineRun, PipelineStage, PipelineStep } from "./PipelineTypes";
 
@@ -23,7 +24,7 @@ function mapStage(stage: JenkinsWorkflowStage, index: number, parentKey?: string
     nodeId: normalizeNodeId(stage.id),
     name: stage.name ?? "Stage",
     status: stage.status,
-    durationMillis: pickNumber(stage.durationMillis, stage.execDurationMillis),
+    durationMillis: pickFiniteNumber(stage.durationMillis, stage.execDurationMillis),
     steps: steps.map((step, stepIndex) => mapStep(step, stepIndex, key)),
     parallelBranches: branches.map((branch, branchIndex) => mapStage(branch, branchIndex, key))
   };
@@ -72,14 +73,4 @@ function buildStageKey(base: string, index: number, parentKey?: string): string 
   const sanitized = base.trim() || "stage";
   const suffix = `${sanitized}-${index}`;
   return parentKey ? `${parentKey}::${suffix}` : `stage::${suffix}`;
-}
-
-function pickNumber(primary?: number, fallback?: number): number | undefined {
-  if (typeof primary === "number" && Number.isFinite(primary)) {
-    return primary;
-  }
-  if (typeof fallback === "number" && Number.isFinite(fallback)) {
-    return fallback;
-  }
-  return undefined;
 }

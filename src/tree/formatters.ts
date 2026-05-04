@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { formatDurationMs } from "../formatters/DurationFormatters";
 import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
 import { parseJobUrl } from "../jenkins/urls";
+import { resolveBuildElapsedMs } from "./BuildTiming";
 
 type NormalizedStatus =
   | "success"
@@ -333,18 +334,6 @@ export function resolveJobStatus(color?: string): NormalizedStatus | undefined {
   }
 
   return isRunning ? "running" : status;
-}
-
-function resolveBuildElapsedMs(build: JenkinsBuild): number | undefined {
-  if (Number.isFinite(build.timestamp)) {
-    return Math.max(0, Date.now() - (build.timestamp as number));
-  }
-
-  if (Number.isFinite(build.duration)) {
-    return Math.max(0, build.duration as number);
-  }
-
-  return undefined;
 }
 
 function formatDurationLabel(durationMs?: number): string | undefined {

@@ -1,4 +1,3 @@
-import type { JenkinsJob, JenkinsJobKind } from "../JenkinsClient";
 import type { JenkinsClientProvider } from "../JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { CancellationError } from "../errors";
@@ -11,6 +10,7 @@ import type {
   JobSearchEntry,
   JobSearchOptions
 } from "./JenkinsDataTypes";
+import { mapJenkinsJobs } from "./JenkinsJobMapping";
 import {
   AdaptiveBackoff,
   DEFAULT_BACKOFF_ERROR_MULTIPLIER,
@@ -187,7 +187,7 @@ export class JenkinsJobIndex {
       };
 
       const rootJobs = await fetchWithRetry(() => client.getRootJobs());
-      const rootInfos = this.mapJobs(client, rootJobs);
+      const rootInfos = mapJenkinsJobs(client, rootJobs);
       const queue = new JobQueue<JobQueueItem>();
       let pendingJobs = 0;
       let limitReached = false;
@@ -286,7 +286,7 @@ export class JenkinsJobIndex {
             }
 
             const children = await fetchWithRetry(() => client.getFolderJobs(job.url));
-            const childInfos = this.mapJobs(client, children);
+            const childInfos = mapJenkinsJobs(client, children);
             for (const child of childInfos) {
               if (!strategy.shouldInclude(child) && !strategy.shouldTraverse(child)) {
                 continue;
@@ -337,18 +337,6 @@ export class JenkinsJobIndex {
     for await (const batch of output) {
       yield batch;
     }
-  }
-
-  private mapJobs(
-    client: { classifyJob(job: JenkinsJob): JenkinsJobKind },
-    jobs: JenkinsJob[]
-  ): JenkinsJobInfo[] {
-    return jobs.map((job) => ({
-      name: job.name,
-      url: job.url,
-      color: job.color,
-      kind: client.classifyJob(job)
-    }));
   }
 
   private toPathSegment(job: JenkinsJobInfo): JobPathSegment {

@@ -1,4 +1,3 @@
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
@@ -10,6 +9,7 @@ import type {
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { JenkinsRestartFromStageInfo } from "../../jenkins/types";
+import type { PendingInputActionService } from "../../shared/PendingInputActionService";
 import {
   BuildInspectionBackendAdapter,
   type BuildInspectionConsoleBackend,
@@ -42,25 +42,7 @@ export interface BuildDetailsCoverageBackend {
   ): Promise<JenkinsModifiedCoverageFile[] | undefined>;
 }
 
-export interface BuildDetailsPendingInputsBackend {
-  getPendingInputActions(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: { mode?: "cached" | "refresh" }
-  ): Promise<PendingInputAction[]>;
-  approveInput(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
-  ): Promise<void>;
-  rejectInput(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    inputId: string,
-    abortUrl?: string
-  ): Promise<void>;
-}
+export type BuildDetailsPendingInputsBackend = PendingInputActionService;
 
 export interface BuildDetailsRestartBackend {
   getRestartFromStageInfo(

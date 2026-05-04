@@ -265,14 +265,13 @@ async function compareConsoleReaders(
         LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
       );
       const startLineNumber = Math.max(1, divergenceLine - countLineBreaks(leadingContext));
-      return {
-        status: "available",
-        summaryLabel: "First console divergence found",
-        detail: `Compared up to ${options.maxBytes.toLocaleString()} bytes and ${options.maxLines.toLocaleString()} lines per build.`,
-        divergenceLineLabel: `First difference at line ${divergenceLine.toLocaleString()}`,
-        baselineLines: toSnippetLines(baselineSnippet, startLineNumber, divergenceLine),
-        targetLines: toSnippetLines(targetSnippet, startLineNumber, divergenceLine)
-      };
+      return buildConsoleDivergenceResult(
+        options,
+        divergenceLine,
+        baselineSnippet,
+        targetSnippet,
+        startLineNumber
+      );
     }
 
     if (commonLength > 0) {
@@ -317,18 +316,34 @@ async function compareConsoleReaders(
         LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
       );
       const startLineNumber = Math.max(1, divergenceLine - countLineBreaks(sharedTail));
-      return {
-        status: "available",
-        summaryLabel: "First console divergence found",
-        detail: `Compared up to ${options.maxBytes.toLocaleString()} bytes and ${options.maxLines.toLocaleString()} lines per build.`,
-        divergenceLineLabel: `First difference at line ${divergenceLine.toLocaleString()}`,
-        baselineLines: toSnippetLines(baselineSnippet, startLineNumber, divergenceLine),
-        targetLines: toSnippetLines(targetSnippet, startLineNumber, divergenceLine)
-      };
+      return buildConsoleDivergenceResult(
+        options,
+        divergenceLine,
+        baselineSnippet,
+        targetSnippet,
+        startLineNumber
+      );
     }
 
     return buildConsoleTooLargeResult(options);
   }
+}
+
+function buildConsoleDivergenceResult(
+  options: BuildCompareConsoleOptions,
+  divergenceLine: number,
+  baselineSnippet: string,
+  targetSnippet: string,
+  startLineNumber: number
+): ConsoleComparisonResult {
+  return {
+    status: "available",
+    summaryLabel: "First console divergence found",
+    detail: `Compared up to ${options.maxBytes.toLocaleString()} bytes and ${options.maxLines.toLocaleString()} lines per build.`,
+    divergenceLineLabel: `First difference at line ${divergenceLine.toLocaleString()}`,
+    baselineLines: toSnippetLines(baselineSnippet, startLineNumber, divergenceLine),
+    targetLines: toSnippetLines(targetSnippet, startLineNumber, divergenceLine)
+  };
 }
 
 function buildConsoleTooLargeResult(options: BuildCompareConsoleOptions): ConsoleComparisonResult {

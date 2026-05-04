@@ -1,4 +1,5 @@
 import type { JenkinsStreamResponse } from "../request";
+import type { JenkinsProgressiveConsoleHtml } from "../types";
 
 export interface JenkinsTextPrefixResult {
   text: string;
@@ -14,6 +15,43 @@ export function parseHeaderNumber(value: string | string[] | undefined): number 
   }
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export function parseHeaderInteger(value: string | string[] | undefined): number {
+  const text = Array.isArray(value) ? value[0] : value;
+  const parsed = text ? Number.parseInt(text, 10) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+export function parseHeaderBoolean(value: string | string[] | undefined): boolean | undefined {
+  const text = Array.isArray(value) ? value[0] : value;
+  if (!text) {
+    return undefined;
+  }
+  return text.toLowerCase() === "true";
+}
+
+export function parseHeaderText(value: string | string[] | undefined): string | undefined {
+  const text = Array.isArray(value) ? value[0] : value;
+  const trimmed = text?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+export function buildProgressiveConsoleHtmlResult(
+  response: { text: string; headers: Record<string, string | string[] | undefined> },
+  safeStart: number
+): JenkinsProgressiveConsoleHtml {
+  const textSize = parseHeaderInteger(response.headers["x-text-size"]);
+  const moreData = parseHeaderBoolean(response.headers["x-more-data"]);
+  const nextAnnotator = parseHeaderText(response.headers["x-console-annotator"]);
+  const textSizeKnown = Number.isFinite(textSize);
+  return {
+    html: response.text,
+    textSize: textSizeKnown ? textSize : safeStart,
+    textSizeKnown,
+    moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0,
+    annotator: nextAnnotator
+  };
 }
 
 export async function readTextPrefixFromStream(

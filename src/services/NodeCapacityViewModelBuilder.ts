@@ -1,3 +1,4 @@
+import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsNodeInfo, JenkinsQueueItemInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails, JenkinsNodeExecutor } from "../jenkins/types";
@@ -11,6 +12,7 @@ import type {
   NodeCapacityViewModel
 } from "../shared/nodeCapacity/NodeCapacityContracts";
 import type { QueueWorkItemViewModel } from "../shared/queueWork/QueueWorkContracts";
+import { firstNonEmpty } from "../shared/stringValues";
 import { classifyNodeLabels, normalizeLabelKey } from "./NodeLabelClassification";
 import { buildNodeQueuedWorkViewModel, buildQueueWorkItems } from "./QueueWorkViewModel";
 
@@ -367,17 +369,6 @@ export function formatOfflineReason(node: JenkinsNodeInfo): string | undefined {
   );
 }
 
-export function formatEnvironmentLabel(rawUrl: string): string {
-  try {
-    const parsed = new URL(rawUrl);
-    return parsed.pathname && parsed.pathname !== "/"
-      ? `${parsed.host}${parsed.pathname.replace(/\/+$/, "")}`
-      : parsed.host;
-  } catch {
-    return rawUrl;
-  }
-}
-
 function sumBy<T>(items: T[], getValue: (item: T) => number): number {
   return items.reduce((sum, item) => sum + getValue(item), 0);
 }
@@ -405,22 +396,4 @@ function resolveBusyExecutors(node: JenkinsNodeInfo, totalExecutors: number): nu
         executor.idle === false
     ).length
   );
-}
-
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
-  for (const value of values) {
-    const trimmed = trimToUndefined(value);
-    if (trimmed) {
-      return trimmed;
-    }
-  }
-  return undefined;
-}
-
-function trimToUndefined(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }

@@ -35,6 +35,7 @@ import {
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
+import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
 interface BuildDetailsPanelShowOptions {
@@ -365,27 +366,7 @@ export class BuildDetailsPanel {
   }
 
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    panel.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
-    };
-    panel.iconPath = BuildDetailsPanel.getIconPaths(extensionUri);
-  }
-
-  private static getIconPaths(extensionUri: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
-    const lightIconPath = vscode.Uri.joinPath(
-      extensionUri,
-      "resources",
-      "codicons",
-      "terminal-light.svg"
-    );
-    const darkIconPath = vscode.Uri.joinPath(
-      extensionUri,
-      "resources",
-      "codicons",
-      "terminal-dark.svg"
-    );
-    return { light: lightIconPath, dark: darkIconPath };
+    configureWebviewPanel(panel, extensionUri, "terminal");
   }
 
   private renderRestoreError(message: string, panelState?: BuildDetailsPanelSerializedState): void {

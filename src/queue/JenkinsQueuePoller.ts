@@ -29,16 +29,14 @@ export class JenkinsQueuePoller implements vscode.Disposable {
   }
 
   trackCollapsed(environment: JenkinsEnvironmentRef): void {
-    const key = this.buildEnvironmentKey(environment);
-    if (!this.expandedEnvironments.delete(key)) {
-      return;
-    }
-    if (this.expandedEnvironments.size === 0) {
-      this.stop();
-    }
+    this.untrackEnvironment(environment);
   }
 
   clearEnvironment(environment: JenkinsEnvironmentRef): void {
+    this.untrackEnvironment(environment);
+  }
+
+  private untrackEnvironment(environment: JenkinsEnvironmentRef): void {
     const key = this.buildEnvironmentKey(environment);
     if (!this.expandedEnvironments.delete(key)) {
       return;

@@ -20,6 +20,16 @@ interface BuildDetailsPanelActionsOptions {
   getTestSourceNavigationUiService: () => TestSourceNavigationUiService | undefined;
 }
 
+interface PendingInputContext {
+  pendingInputService: NonNullable<
+    ReturnType<BuildDetailsPanelControllerAccess["getBackend"]>
+  >["pendingInputs"];
+  environment: NonNullable<ReturnType<BuildDetailsPanelControllerAccess["getEnvironment"]>>;
+  buildUrl: string;
+  environmentId: string;
+  label: string;
+}
+
 export class BuildDetailsPanelActions {
   private readonly controller: BuildDetailsPanelControllerAccess;
   private readonly getArtifactActionHandler: () => ArtifactActionHandler | undefined;
@@ -38,55 +48,60 @@ export class BuildDetailsPanelActions {
   }
 
   async handleApproveInput(message: { inputId: string }): Promise<void> {
-    const pendingInputService = this.controller.getBackend()?.pendingInputs;
-    const environment = this.controller.getEnvironment();
-    const buildUrl = this.controller.getBuildUrl();
-    const details = this.controller.getCurrentDetails();
-    if (!pendingInputService || !environment || !buildUrl) {
+    const context = this.getPendingInputContext();
+    if (!context) {
       void vscode.window.showErrorMessage("Build details are not ready for input approval.");
       return;
     }
-    const environmentId = environment.environmentId;
-    const label = details?.fullDisplayName ?? details?.displayName ?? "build";
     await handlePendingInputAction({
-      dataService: pendingInputService,
-      environment,
-      buildUrl,
-      label,
+      dataService: context.pendingInputService,
+      environment: context.environment,
+      buildUrl: context.buildUrl,
+      label: context.label,
       inputId: message.inputId,
       action: "approve",
-      onRefresh: async () => {
-        await this.controller.refreshPendingInputs();
-        await this.controller.refreshBuildStatus(this.controller.getLoadToken());
-        this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
-      }
+      onRefresh: () => this.refreshAfterPendingInputAction(context.environmentId)
     });
   }
 
   async handleRejectInput(message: { inputId: string }): Promise<void> {
-    const pendingInputService = this.controller.getBackend()?.pendingInputs;
-    const environment = this.controller.getEnvironment();
-    const buildUrl = this.controller.getBuildUrl();
-    const details = this.controller.getCurrentDetails();
-    if (!pendingInputService || !environment || !buildUrl) {
+    const context = this.getPendingInputContext();
+    if (!context) {
       void vscode.window.showErrorMessage("Build details are not ready for input rejection.");
       return;
     }
-    const environmentId = environment.environmentId;
-    const label = details?.fullDisplayName ?? details?.displayName ?? "build";
     await handlePendingInputAction({
-      dataService: pendingInputService,
-      environment,
-      buildUrl,
-      label,
+      dataService: context.pendingInputService,
+      environment: context.environment,
+      buildUrl: context.buildUrl,
+      label: context.label,
       inputId: message.inputId,
       action: "reject",
-      onRefresh: async () => {
-        await this.controller.refreshPendingInputs();
-        await this.controller.refreshBuildStatus(this.controller.getLoadToken());
-        this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
-      }
+      onRefresh: () => this.refreshAfterPendingInputAction(context.environmentId)
     });
+  }
+
+  private async refreshAfterPendingInputAction(environmentId: string): Promise<void> {
+    await this.controller.refreshPendingInputs();
+    await this.controller.refreshBuildStatus(this.controller.getLoadToken());
+    this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId });
+  }
+
+  private getPendingInputContext(): PendingInputContext | undefined {
+    const pendingInputService = this.controller.getBackend()?.pendingInputs;
+    const environment = this.controller.getEnvironment();
+    const buildUrl = this.controller.getBuildUrl();
+    if (!pendingInputService || !environment || !buildUrl) {
+      return undefined;
+    }
+    const details = this.controller.getCurrentDetails();
+    return {
+      pendingInputService,
+      environment,
+      buildUrl,
+      environmentId: environment.environmentId,
+      label: details?.fullDisplayName ?? details?.displayName ?? "build"
+    };
   }
 
   async handleRestartPipelineFromStage(message: { stageName: string }): Promise<void> {

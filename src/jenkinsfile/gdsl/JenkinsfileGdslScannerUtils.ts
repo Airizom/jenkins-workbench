@@ -57,12 +57,9 @@ export function findMatchingDelimiter(
       index = skipString(text, index);
       continue;
     }
-    if (character === "/" && text[index + 1] === "/") {
-      index = skipLineComment(text, index);
-      continue;
-    }
-    if (character === "/" && text[index + 1] === "*") {
-      index = skipBlockComment(text, index);
+    const nextIndex = skipGdslComment(text, index);
+    if (nextIndex !== undefined) {
+      index = nextIndex;
       continue;
     }
     if (character === openChar) {
@@ -161,6 +158,16 @@ export function readIdentifierBackward(text: string, end: number): string | unde
     start -= 1;
   }
   return text.slice(start, end + 1);
+}
+
+export function skipGdslComment(text: string, index: number): number | undefined {
+  if (text[index] === "/" && text[index + 1] === "/") {
+    return skipLineComment(text, index);
+  }
+  if (text[index] === "/" && text[index + 1] === "*") {
+    return skipBlockComment(text, index);
+  }
+  return undefined;
 }
 
 function isIdentifierBoundary(text: string, index: number): boolean {

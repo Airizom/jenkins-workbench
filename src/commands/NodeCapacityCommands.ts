@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
+import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { NodeCapacityPanel } from "../panels/NodeCapacityPanel";
@@ -115,15 +116,4 @@ function isEnvironmentRef(value: unknown): value is JenkinsEnvironmentRef {
     typeof candidate.scope === "string" &&
     typeof candidate.url === "string"
   );
-}
-
-function formatEnvironmentLabel(rawUrl: string): string {
-  try {
-    const parsed = new URL(rawUrl);
-    return parsed.pathname && parsed.pathname !== "/"
-      ? `${parsed.host}${parsed.pathname.replace(/\/+$/, "")}`
-      : parsed.host;
-  } catch {
-    return rawUrl;
-  }
 }

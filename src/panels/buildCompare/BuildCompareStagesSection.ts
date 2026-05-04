@@ -10,7 +10,7 @@ import {
   normalizePipelineStatus
 } from "../buildDetails/BuildDetailsFormatters";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
-import { normalizeString } from "./BuildCompareSectionShared";
+import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {
   BuildCompareStageDiffItem,
   BuildCompareStagesSectionViewModel
@@ -166,21 +166,4 @@ function formatDurationDelta(
   }
   const prefix = delta > 0 ? "+" : "-";
   return `${prefix}${formatDuration(Math.abs(delta))}`;
-}
-
-function buildComparisonErrorDetail(
-  label: string,
-  baselineMessage?: string,
-  targetMessage?: string
-): string {
-  if (baselineMessage && targetMessage) {
-    return `Baseline ${label.toLowerCase()}: ${baselineMessage} Target ${label.toLowerCase()}: ${targetMessage}`;
-  }
-  if (baselineMessage) {
-    return `Baseline ${label.toLowerCase()}: ${baselineMessage}`;
-  }
-  if (targetMessage) {
-    return `Target ${label.toLowerCase()}: ${targetMessage}`;
-  }
-  return `${label} comparison failed.`;
 }

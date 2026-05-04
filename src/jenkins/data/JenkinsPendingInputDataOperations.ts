@@ -9,6 +9,12 @@ const PENDING_INPUT_ACTIONS_TTL_MS = 5000;
 const PENDING_INPUT_SUMMARY_TTL_MS = 60_000;
 const PENDING_INPUT_UNSUPPORTED_TTL_MS = 5 * 60 * 1000;
 
+interface PendingInputCacheKeys {
+  cacheKey: string;
+  summaryKey: string;
+  unsupportedKey: string;
+}
+
 export class JenkinsPendingInputDataOperations {
   constructor(private readonly context: JenkinsDataRuntimeContext) {}
 
@@ -17,21 +23,11 @@ export class JenkinsPendingInputDataOperations {
     buildUrl: string,
     options?: { mode?: "cached" | "refresh" }
   ): Promise<PendingInputAction[]> {
-    const cacheKey = await this.context.buildCacheKey(environment, "pending-inputs", buildUrl);
-    const summaryKey = await this.context.buildCacheKey(
-      environment,
-      "pending-input-summary",
-      buildUrl
-    );
-    const unsupportedKey = await this.context.buildCacheKey(
-      environment,
-      "pending-inputs-unsupported",
-      buildUrl
-    );
-    if (this.context.getCache().has(unsupportedKey)) {
+    const keys = await this.buildPendingInputCacheKeys(environment, buildUrl);
+    if (this.context.getCache().has(keys.unsupportedKey)) {
       return [];
     }
-    const cached = this.context.getCache().get<PendingInputAction[]>(cacheKey);
+    const cached = this.context.getCache().get<PendingInputAction[]>(keys.cacheKey);
     if (options?.mode === "cached") {
       return cached ?? [];
     }
@@ -39,9 +35,9 @@ export class JenkinsPendingInputDataOperations {
       return cached;
     }
     return this.fetchPendingInputActions(environment, buildUrl, {
-      cacheKey,
-      summaryKey,
-      unsupportedKey
+      cacheKey: keys.cacheKey,
+      summaryKey: keys.summaryKey,
+      unsupportedKey: keys.unsupportedKey
     });
   }
 
@@ -126,26 +122,16 @@ export class JenkinsPendingInputDataOperations {
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<void> {
-    const cacheKey = await this.context.buildCacheKey(environment, "pending-inputs", buildUrl);
-    const summaryKey = await this.context.buildCacheKey(
-      environment,
-      "pending-input-summary",
-      buildUrl
-    );
-    const unsupportedKey = await this.context.buildCacheKey(
-      environment,
-      "pending-inputs-unsupported",
-      buildUrl
-    );
-    this.context.getCache().delete(cacheKey);
-    this.context.getCache().delete(summaryKey);
-    this.context.getCache().delete(unsupportedKey);
+    const keys = await this.buildPendingInputCacheKeys(environment, buildUrl);
+    this.context.getCache().delete(keys.cacheKey);
+    this.context.getCache().delete(keys.summaryKey);
+    this.context.getCache().delete(keys.unsupportedKey);
   }
 
   private async fetchPendingInputActions(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    keys: { cacheKey: string; summaryKey: string; unsupportedKey: string }
+    keys: PendingInputCacheKeys
   ): Promise<PendingInputAction[]> {
     const client = await this.context.getClient(environment);
     try {
@@ -173,6 +159,24 @@ export class JenkinsPendingInputDataOperations {
       }
       throw toBuildActionError(error);
     }
+  }
+
+  private async buildPendingInputCacheKeys(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<PendingInputCacheKeys> {
+    const cacheKey = await this.context.buildCacheKey(environment, "pending-inputs", buildUrl);
+    const summaryKey = await this.context.buildCacheKey(
+      environment,
+      "pending-input-summary",
+      buildUrl
+    );
+    const unsupportedKey = await this.context.buildCacheKey(
+      environment,
+      "pending-inputs-unsupported",
+      buildUrl
+    );
+    return { cacheKey, summaryKey, unsupportedKey };
   }
 
   private buildPendingInputSummary(

@@ -25,3 +25,20 @@ export function buildBuildViewModel(
 export function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
+
+export function buildComparisonErrorDetail(
+  label: string,
+  baselineMessage?: string,
+  targetMessage?: string
+): string {
+  if (baselineMessage && targetMessage) {
+    return `Baseline ${label.toLowerCase()}: ${baselineMessage} Target ${label.toLowerCase()}: ${targetMessage}`;
+  }
+  if (baselineMessage) {
+    return `Baseline ${label.toLowerCase()}: ${baselineMessage}`;
+  }
+  if (targetMessage) {
+    return `Target ${label.toLowerCase()}: ${targetMessage}`;
+  }
+  return `${label} comparison failed.`;
+}

@@ -1,4 +1,4 @@
-import type { JenkinsJob, JenkinsJobKind, JenkinsView } from "../JenkinsClient";
+import type { JenkinsJob, JenkinsView } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
@@ -9,6 +9,7 @@ import type {
   JenkinsViewInfo,
   JobParameter
 } from "./JenkinsDataTypes";
+import { mapJenkinsJobs } from "./JenkinsJobMapping";
 import { mapJobParameter } from "./JenkinsParameterMapping";
 
 export class JenkinsJobDataOperations {
@@ -21,7 +22,7 @@ export class JenkinsJobDataOperations {
       async () => {
         const client = await this.context.getClient(environment);
         const jobs = await client.getRootJobs();
-        return this.mapJobs(client, jobs);
+        return mapJenkinsJobs(client, jobs);
       },
       this.context.getCacheTtlMs()
     );
@@ -59,7 +60,7 @@ export class JenkinsJobDataOperations {
     if (options?.mode === "refresh") {
       const client = await this.context.getClient(environment);
       const jobs = await client.getFolderJobs(folderUrl);
-      const mappedJobs = this.mapJobs(client, jobs);
+      const mappedJobs = mapJenkinsJobs(client, jobs);
       this.context.getCache().set(cacheKey, mappedJobs, this.context.getCacheTtlMs());
       return mappedJobs;
     }
@@ -69,7 +70,7 @@ export class JenkinsJobDataOperations {
       async () => {
         const client = await this.context.getClient(environment);
         const jobs = await client.getFolderJobs(folderUrl);
-        return this.mapJobs(client, jobs);
+        return mapJenkinsJobs(client, jobs);
       },
       this.context.getCacheTtlMs()
     );
@@ -121,7 +122,7 @@ export class JenkinsJobDataOperations {
       async () => {
         const client = await this.context.getClient(environment);
         const jobs = await client.getViewJobs(viewUrl);
-        return this.mapJobs(client, jobs);
+        return mapJenkinsJobs(client, jobs);
       },
       this.context.getCacheTtlMs()
     );
@@ -142,7 +143,7 @@ export class JenkinsJobDataOperations {
       async () => {
         const client = await this.context.getClient(environment);
         const jobs = await client.getFolderJobsInView(folderUrl, viewUrl);
-        return this.mapJobs(client, jobs);
+        return mapJenkinsJobs(client, jobs);
       },
       this.context.getCacheTtlMs()
     );
@@ -188,18 +189,6 @@ export class JenkinsJobDataOperations {
       },
       this.context.getCacheTtlMs()
     );
-  }
-
-  private mapJobs(
-    client: { classifyJob(job: JenkinsJob): JenkinsJobKind },
-    jobs: JenkinsJob[]
-  ): JenkinsJobInfo[] {
-    return jobs.map((job) => ({
-      name: job.name,
-      url: job.url,
-      color: job.color,
-      kind: client.classifyJob(job)
-    }));
   }
 
   private mapViews(views: JenkinsView[]): JenkinsViewInfo[] {

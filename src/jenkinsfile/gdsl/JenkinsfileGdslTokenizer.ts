@@ -1,4 +1,4 @@
-import { skipBlockComment, skipLineComment } from "./JenkinsfileGdslScannerUtils";
+import { skipGdslComment } from "./JenkinsfileGdslScannerUtils";
 import type { Token, TokenType } from "./JenkinsfileGdslTypes";
 
 export class GdslTokenizer {
@@ -83,12 +83,9 @@ function tokenizeGdsl(text: string): Token[] {
       });
       continue;
     }
-    if (character === "/" && text[index + 1] === "/") {
-      index = skipLineComment(text, index);
-      continue;
-    }
-    if (character === "/" && text[index + 1] === "*") {
-      index = skipBlockComment(text, index);
+    const nextIndex = skipGdslComment(text, index);
+    if (nextIndex !== undefined) {
+      index = nextIndex;
       continue;
     }
     if (

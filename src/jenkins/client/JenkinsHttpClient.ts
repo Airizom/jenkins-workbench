@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import { buildAuthHeaders } from "../auth";
-import { JenkinsCrumbService } from "../crumbs";
+import { type JenkinsCrumbHeader, JenkinsCrumbService } from "../crumbs";
 import { JenkinsRequestError } from "../errors";
 import {
   type JenkinsBufferResponse,
@@ -215,23 +215,14 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     try {
       return await this.requestVoidWithLocation(url, { method: "POST", headers, body });
     } catch (error) {
-      if (error instanceof JenkinsRequestError) {
-        if (error.statusCode === 401 || error.statusCode === 403) {
-          this.crumbService.invalidate();
-        }
-        if (error.statusCode === 403) {
-          const refreshed = await this.crumbService.getCrumbHeader(true);
-          if (refreshed) {
-            const retryHeaders = this.buildHeadersWithCrumb(contentHeaders, refreshed);
-            return await this.requestVoidWithLocation(url, {
-              method: "POST",
-              headers: retryHeaders,
-              body
-            });
-          }
-        }
-      }
-      throw error;
+      return this.retryAfterCrumbError(error, async (refreshed) => {
+        const retryHeaders = this.buildHeadersWithCrumb(contentHeaders, refreshed);
+        return await this.requestVoidWithLocation(url, {
+          method: "POST",
+          headers: retryHeaders,
+          body
+        });
+      });
     }
   }
 
@@ -348,22 +339,30 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     try {
       return await requestFn(headers);
     } catch (error) {
-      if (error instanceof JenkinsRequestError) {
-        if (error.statusCode === 401 || error.statusCode === 403) {
-          this.crumbService.invalidate();
-        }
-        if (error.statusCode === 403) {
-          const refreshed = await this.crumbService.getCrumbHeader(true);
-          if (refreshed) {
-            const retryHeaders = {
-              [refreshed.field]: refreshed.value
-            };
-            return await requestFn(retryHeaders);
-          }
+      return this.retryAfterCrumbError(error, async (refreshed) =>
+        requestFn({
+          [refreshed.field]: refreshed.value
+        })
+      );
+    }
+  }
+
+  private async retryAfterCrumbError<T>(
+    error: unknown,
+    retry: (refreshed: JenkinsCrumbHeader) => Promise<T>
+  ): Promise<T> {
+    if (error instanceof JenkinsRequestError) {
+      if (error.statusCode === 401 || error.statusCode === 403) {
+        this.crumbService.invalidate();
+      }
+      if (error.statusCode === 403) {
+        const refreshed = await this.crumbService.getCrumbHeader(true);
+        if (refreshed) {
+          return retry(refreshed);
         }
       }
-      throw error;
     }
+    throw error;
   }
 
   private async requestWithSsoRetry<T>(requestFn: () => Promise<T>): Promise<T> {

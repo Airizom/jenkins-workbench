@@ -3,7 +3,9 @@ import type {
   JenkinsTestReport,
   JenkinsTestSummaryAction
 } from "../../jenkins/types";
+import { pickFiniteNumber } from "../../shared/numbers";
 import { formatNumber, formatTestDuration } from "./BuildDetailsFormatters";
+import { formatTestStatusLabel, normalizeTestStatus } from "./TestStatusFormatters";
 import type {
   BuildDetailsTestStateViewModel,
   BuildTestCaseViewModel,
@@ -30,9 +32,9 @@ export function buildTestsSummary(
   options?: BuildTestsSummaryOptions
 ): BuildTestsSummaryViewModel {
   const action = findTestSummaryAction(details?.actions ?? null);
-  const failed = pickNumber(testReport?.failCount, action?.failCount);
-  const total = pickNumber(testReport?.totalCount, action?.totalCount);
-  const skipped = pickNumber(testReport?.skipCount, action?.skipCount);
+  const failed = pickFiniteNumber(testReport?.failCount, action?.failCount);
+  const total = pickFiniteNumber(testReport?.totalCount, action?.totalCount);
+  const skipped = pickFiniteNumber(testReport?.skipCount, action?.skipCount);
   const resolvedFailed = failed ?? 0;
   const resolvedTotal = total ?? 0;
   const resolvedSkipped = skipped ?? 0;
@@ -161,47 +163,6 @@ export function buildEmptyTestResultsViewModel(loading = false): BuildTestResult
   };
 }
 
-function isFailedTestCase(status?: string): boolean {
-  if (!status) {
-    return false;
-  }
-  const normalized = status.toUpperCase();
-  if (normalized === "PASSED" || normalized === "SKIPPED") {
-    return false;
-  }
-  return true;
-}
-
-function normalizeTestStatus(status?: string): BuildTestCaseViewModel["status"] {
-  const normalized = status?.trim().toUpperCase();
-  if (!normalized) {
-    return "other";
-  }
-  if (normalized === "PASSED" || normalized === "FIXED") {
-    return "passed";
-  }
-  if (normalized === "SKIPPED" || normalized === "REGRESSION_SKIPPED") {
-    return "skipped";
-  }
-  if (isFailedTestCase(normalized)) {
-    return "failed";
-  }
-  return "other";
-}
-
-function formatTestStatusLabel(status: BuildTestCaseViewModel["status"]): string {
-  switch (status) {
-    case "passed":
-      return "Passed";
-    case "failed":
-      return "Failed";
-    case "skipped":
-      return "Skipped";
-    default:
-      return "Other";
-  }
-}
-
 function buildTestCaseId(
   suiteName: string | undefined,
   className: string | undefined,
@@ -250,14 +211,4 @@ function normalizeTestText(value?: string, allowTruncation = false): string | un
     return trimmed;
   }
   return `${trimmed.slice(0, MAX_TEST_CASE_LOG_CHARS)}${TEST_CASE_LOG_TRUNCATION_SUFFIX}`;
-}
-
-function pickNumber(primary?: number, fallback?: number): number | undefined {
-  if (typeof primary === "number" && Number.isFinite(primary)) {
-    return primary;
-  }
-  if (typeof fallback === "number" && Number.isFinite(fallback)) {
-    return fallback;
-  }
-  return undefined;
 }

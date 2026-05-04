@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import * as vscode from "vscode";
 import type { JobParameter } from "../../jenkins/JenkinsDataService";
 import type { BuildParameterPayload } from "../../jenkins/JenkinsDataService";
-import { normalizeBoolean } from "../ParameterPrompts";
+import { promptBooleanParameterValue, promptChoiceParameterValue } from "../ParameterPrompts";
 import type {
   BuildParameterPromptOptions,
   BuildParameterPromptValues,
@@ -77,29 +77,15 @@ async function promptParameterValue(
   const description = parameter.description;
 
   if (parameter.kind === "boolean") {
-    const defaultValue = normalizeBoolean(
+    return promptBooleanParameterValue(
+      prompt,
       typeof presetValue === "string" ? presetValue : parameter.defaultValue
     );
-    const pick = await vscode.window.showQuickPick(
-      [
-        { label: "true", picked: defaultValue === true },
-        { label: "false", picked: defaultValue === false }
-      ],
-      { placeHolder: prompt, ignoreFocusOut: true }
-    );
-    return pick?.label;
   }
 
   if (parameter.kind === "choice" && parameter.choices?.length) {
     const defaultValue = resolveSingleDefaultValue(presetValue, parameter.defaultValue);
-    const pick = await vscode.window.showQuickPick(
-      parameter.choices.map((choice) => ({
-        label: choice,
-        picked: choice === defaultValue
-      })),
-      { placeHolder: prompt, ignoreFocusOut: true }
-    );
-    return pick?.label;
+    return promptChoiceParameterValue(prompt, parameter.choices, defaultValue);
   }
 
   if (parameter.kind === "multiChoice" && parameter.choices?.length) {

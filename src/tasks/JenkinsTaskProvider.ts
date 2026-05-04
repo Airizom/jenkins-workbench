@@ -1,10 +1,7 @@
 import * as vscode from "vscode";
-import type {
-  JenkinsDataService,
-  JobSearchEntry,
-  JobSearchOptions
-} from "../jenkins/JenkinsDataService";
+import type { JenkinsDataService, JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { getJobSearchTuningOptions } from "../jenkins/data/JobSearchTuningOptions";
 import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
@@ -154,15 +151,5 @@ function toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironment
     scope: environment.scope,
     url: environment.url,
     username: environment.username
-  };
-}
-
-function getJobSearchTuningOptions(): JobSearchOptions {
-  const configuration = vscode.workspace.getConfiguration("jenkinsWorkbench");
-  return {
-    concurrency: configuration.get<number>("jobSearchConcurrency"),
-    backoffBaseMs: configuration.get<number>("jobSearchBackoffBaseMs"),
-    backoffMaxMs: configuration.get<number>("jobSearchBackoffMaxMs"),
-    maxRetries: configuration.get<number>("jobSearchMaxRetries")
   };
 }

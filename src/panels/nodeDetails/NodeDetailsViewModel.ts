@@ -6,6 +6,7 @@ import type {
   JenkinsNodeExecutable,
   JenkinsNodeExecutor
 } from "../../jenkins/types";
+import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
 import type {
   NodeDetailsQueuedWorkViewModel,
   NodeDetailsViewModel,
@@ -420,24 +421,6 @@ function resolveNowMs(nowMs: number | undefined, updatedAt: string): number {
   }
   const parsedUpdatedAt = Date.parse(updatedAt);
   return Number.isFinite(parsedUpdatedAt) ? parsedUpdatedAt : Date.now();
-}
-
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
-  for (const value of values) {
-    const trimmed = trimToUndefined(value);
-    if (trimmed !== undefined) {
-      return trimmed;
-    }
-  }
-  return undefined;
-}
-
-function trimToUndefined(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function isFiniteNumber(value: unknown): value is number {

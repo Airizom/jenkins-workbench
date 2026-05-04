@@ -12,6 +12,12 @@ export interface JenkinsClientProviderOptions {
   browserSsoAuthenticator?: BrowserSsoAuthenticator;
 }
 
+interface JenkinsAuthMaterial {
+  authConfig: JenkinsAuthConfig | undefined;
+  authSignature: string;
+  token: string | undefined;
+}
+
 export class JenkinsClientProvider {
   private readonly clientCache = new Map<
     string,
@@ -76,14 +82,7 @@ export class JenkinsClientProvider {
       return cachedSignature.authSignature;
     }
 
-    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
-    const token = authConfig
-      ? undefined
-      : await this.store.getToken(environment.scope, environment.environmentId);
-    const authSignature = buildAuthSignature(authConfig, {
-      username: environment.username,
-      token
-    });
+    const { authSignature } = await this.resolveAuthMaterial(environment);
     this.authSignatureCache.set(cacheKey, {
       authSignature,
       authConfigRevision,
@@ -98,14 +97,7 @@ export class JenkinsClientProvider {
       environment.scope,
       environment.environmentId
     );
-    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
-    const token = authConfig
-      ? undefined
-      : await this.store.getToken(environment.scope, environment.environmentId);
-    const authSignature = buildAuthSignature(authConfig, {
-      username: environment.username,
-      token
-    });
+    const { authConfig, authSignature, token } = await this.resolveAuthMaterial(environment);
 
     const cacheKey = `${environment.scope}:${environment.environmentId}`;
     const cached = this.clientCache.get(cacheKey);
@@ -190,5 +182,19 @@ export class JenkinsClientProvider {
 
     await this.store.setAuthConfig(environment.scope, environment.environmentId, refreshed);
     return refreshed;
+  }
+
+  private async resolveAuthMaterial(
+    environment: JenkinsEnvironmentRef
+  ): Promise<JenkinsAuthMaterial> {
+    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
+    const token = authConfig
+      ? undefined
+      : await this.store.getToken(environment.scope, environment.environmentId);
+    const authSignature = buildAuthSignature(authConfig, {
+      username: environment.username,
+      token
+    });
+    return { authConfig, authSignature, token };
   }
 }

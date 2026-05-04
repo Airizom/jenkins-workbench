@@ -6,7 +6,13 @@ import type {
 } from "../types";
 import { buildActionUrl } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
-import { parseHeaderNumber, readTextPrefixFromStream } from "./JenkinsConsoleStream";
+import {
+  buildProgressiveConsoleHtmlResult,
+  parseHeaderBoolean,
+  parseHeaderInteger,
+  parseHeaderNumber,
+  readTextPrefixFromStream
+} from "./JenkinsConsoleStream";
 
 export class JenkinsBuildConsoleClient {
   constructor(private readonly context: JenkinsClientContext) {}
@@ -145,17 +151,7 @@ export class JenkinsBuildConsoleClient {
     const response = await this.context.requestTextWithHeaders(url, {
       headers: annotator ? { "X-ConsoleAnnotator": annotator } : undefined
     });
-    const textSize = this.parseTextSize(response.headers["x-text-size"]);
-    const moreData = this.parseMoreData(response.headers["x-more-data"]);
-    const nextAnnotator = this.parseConsoleAnnotator(response.headers["x-console-annotator"]);
-    const textSizeKnown = Number.isFinite(textSize);
-    return {
-      html: response.text,
-      textSize: textSizeKnown ? textSize : safeStart,
-      textSizeKnown,
-      moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0,
-      annotator: nextAnnotator
-    };
+    return buildProgressiveConsoleHtmlResult(response, safeStart);
   }
 
   private buildProgressiveTextUrl(buildUrl: string, start: number): string {
@@ -171,25 +167,10 @@ export class JenkinsBuildConsoleClient {
   }
 
   private parseTextSize(value: string | string[] | undefined): number {
-    const text = Array.isArray(value) ? value[0] : value;
-    const parsed = text ? Number.parseInt(text, 10) : Number.NaN;
-    return Number.isFinite(parsed) ? parsed : Number.NaN;
+    return parseHeaderInteger(value);
   }
 
   private parseMoreData(value: string | string[] | undefined): boolean | undefined {
-    const text = Array.isArray(value) ? value[0] : value;
-    if (!text) {
-      return undefined;
-    }
-    return text.toLowerCase() === "true";
-  }
-
-  private parseConsoleAnnotator(value: string | string[] | undefined): string | undefined {
-    const text = Array.isArray(value) ? value[0] : value;
-    if (!text) {
-      return undefined;
-    }
-    const trimmed = text.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
+    return parseHeaderBoolean(value);
   }
 }

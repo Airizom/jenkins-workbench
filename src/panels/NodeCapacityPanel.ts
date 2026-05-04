@@ -18,9 +18,17 @@ import {
   isOpenNodeDetailsMessage,
   isRefreshNodeCapacityMessage
 } from "./nodeCapacity/shared/NodeCapacityPanelMessages";
+import {
+  attachPanelLifecycle,
+  beginLoadingRequest,
+  bindEnvironmentRefresh,
+  disposePanelResources,
+  endLoadingRequest
+} from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
+import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
   type SerializedEnvironmentState,
   isSerializedEnvironmentState,
@@ -128,13 +136,16 @@ export class NodeCapacityPanel {
     this.panel = panel;
     this.extensionUri = extensionUri;
 
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    attachPanelLifecycle(this.panel, this.disposables, {
+      onDispose: () => this.dispose(),
+      onVisible: () => {
+        this.startVisibleRefreshTimer();
+        void this.refreshCapacity({ skipLoading: true });
+      }
+    });
     this.panel.onDidChangeViewState(
       () => {
-        if (this.panel.visible) {
-          this.startVisibleRefreshTimer();
-          void this.refreshCapacity({ skipLoading: true });
-        } else {
+        if (!this.panel.visible) {
           this.stopVisibleRefreshTimer();
         }
       },
@@ -171,10 +182,7 @@ export class NodeCapacityPanel {
       this.refreshSubscription.dispose();
       this.refreshSubscription = undefined;
     }
-    while (this.disposables.length > 0) {
-      const disposable = this.disposables.pop();
-      disposable?.dispose();
-    }
+    disposePanelResources(this.disposables);
   }
 
   private async load(): Promise<void> {
@@ -339,16 +347,11 @@ export class NodeCapacityPanel {
 
   private setRefreshHost(refreshHost?: NodeCapacityRefreshHost): void {
     this.refreshHost = refreshHost;
-    if (this.refreshSubscription) {
-      this.refreshSubscription.dispose();
-      this.refreshSubscription = undefined;
-    }
-    if (!refreshHost?.onDidRefreshEnvironment) {
-      return;
-    }
-    this.refreshSubscription = refreshHost.onDidRefreshEnvironment((environmentId) => {
-      void this.handleEnvironmentRefresh(environmentId);
-    });
+    this.refreshSubscription = bindEnvironmentRefresh(
+      this.refreshSubscription,
+      refreshHost,
+      (environmentId) => this.handleEnvironmentRefresh(environmentId)
+    );
   }
 
   private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
@@ -383,20 +386,15 @@ export class NodeCapacityPanel {
   }
 
   private beginLoading(): void {
-    this.loadingRequests += 1;
-    if (this.loadingRequests === 1) {
-      this.postMessage({ type: "setLoading", value: true });
-    }
+    this.loadingRequests = beginLoadingRequest(this.loadingRequests, (value) =>
+      this.postMessage({ type: "setLoading", value })
+    );
   }
 
   private endLoading(): void {
-    if (this.loadingRequests === 0) {
-      return;
-    }
-    this.loadingRequests -= 1;
-    if (this.loadingRequests === 0) {
-      this.postMessage({ type: "setLoading", value: false });
-    }
+    this.loadingRequests = endLoadingRequest(this.loadingRequests, (value) =>
+      this.postMessage({ type: "setLoading", value })
+    );
   }
 
   private isTokenCurrent(token: number): boolean {
@@ -404,27 +402,7 @@ export class NodeCapacityPanel {
   }
 
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    panel.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
-    };
-    panel.iconPath = NodeCapacityPanel.getIconPaths(extensionUri);
-  }
-
-  private static getIconPaths(extensionUri: vscode.Uri): { light: vscode.Uri; dark: vscode.Uri } {
-    const lightIconPath = vscode.Uri.joinPath(
-      extensionUri,
-      "resources",
-      "codicons",
-      "server-light.svg"
-    );
-    const darkIconPath = vscode.Uri.joinPath(
-      extensionUri,
-      "resources",
-      "codicons",
-      "server-dark.svg"
-    );
-    return { light: lightIconPath, dark: darkIconPath };
+    configureWebviewPanel(panel, extensionUri, "server");
   }
 
   private renderRestoreError(message: string, panelState?: SerializedEnvironmentState): void {

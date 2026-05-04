@@ -24,6 +24,16 @@ interface StoredPresetState {
   jobs?: StoredJobPresets[];
 }
 
+interface MutableJobPresetEntry {
+  jobs: StoredJobPresets[];
+  entryIndex: number;
+  entry: StoredJobPresets;
+}
+
+interface MutableParameterPresetEntry extends MutableJobPresetEntry {
+  presetIndex: number;
+}
+
 export interface ParameterPresetSummary {
   id: string;
   name: string;
@@ -110,11 +120,8 @@ export class JenkinsParameterPresetStore {
       throw new Error("Preset name is required.");
     }
 
-    const state = this.getState(scope);
-    const jobs = [...(state.jobs ?? [])];
-    const entryIndex = jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
+    const jobs = this.getMutableJobs(scope);
+    const entryIndex = this.findJobEntryIndex(jobs, environmentId, jobUrl);
     const currentEntry: StoredJobPresets =
       entryIndex >= 0
         ? {
@@ -213,24 +220,11 @@ export class JenkinsParameterPresetStore {
       throw new Error("Preset name is required.");
     }
 
-    const state = this.getState(scope);
-    const jobs = [...(state.jobs ?? [])];
-    const entryIndex = jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
-    if (entryIndex < 0) {
+    const target = this.getMutablePresetEntry(scope, environmentId, jobUrl, presetId);
+    if (!target) {
       return false;
     }
-
-    const entry: StoredJobPresets = {
-      ...jobs[entryIndex],
-      presets: [...jobs[entryIndex].presets]
-    };
-
-    const targetIndex = entry.presets.findIndex((preset) => preset.id === presetId);
-    if (targetIndex < 0) {
-      return false;
-    }
+    const { jobs, entryIndex, entry, presetIndex } = target;
 
     const duplicate = entry.presets.find(
       (preset) =>
@@ -241,12 +235,12 @@ export class JenkinsParameterPresetStore {
       throw new Error(`A preset named "${normalizedName}" already exists for this job.`);
     }
 
-    const previous = entry.presets[targetIndex];
+    const previous = entry.presets[presetIndex];
     if (previous.name === normalizedName) {
       return false;
     }
 
-    entry.presets[targetIndex] = {
+    entry.presets[presetIndex] = {
       ...previous,
       name: normalizedName,
       updatedAt: Date.now()
@@ -263,25 +257,13 @@ export class JenkinsParameterPresetStore {
     jobUrl: string,
     presetId: string
   ): Promise<boolean> {
-    const state = this.getState(scope);
-    const jobs = [...(state.jobs ?? [])];
-    const entryIndex = jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
-    if (entryIndex < 0) {
+    const target = this.getMutablePresetEntry(scope, environmentId, jobUrl, presetId);
+    if (!target) {
       return false;
     }
+    const { jobs, entryIndex, entry, presetIndex } = target;
 
-    const entry: StoredJobPresets = {
-      ...jobs[entryIndex],
-      presets: [...jobs[entryIndex].presets]
-    };
-    const targetIndex = entry.presets.findIndex((preset) => preset.id === presetId);
-    if (targetIndex < 0) {
-      return false;
-    }
-
-    const [removed] = entry.presets.splice(targetIndex, 1);
+    const [removed] = entry.presets.splice(presetIndex, 1);
     await this.deleteSecretKeys(removed.secretKeys);
 
     if (entry.presets.length === 0) {
@@ -299,11 +281,8 @@ export class JenkinsParameterPresetStore {
     environmentId: string,
     jobUrl: string
   ): Promise<void> {
-    const state = this.getState(scope);
-    const jobs = [...(state.jobs ?? [])];
-    const entryIndex = jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
+    const jobs = this.getMutableJobs(scope);
+    const entryIndex = this.findJobEntryIndex(jobs, environmentId, jobUrl);
     if (entryIndex < 0) {
       return;
     }
@@ -425,6 +404,61 @@ export class JenkinsParameterPresetStore {
     return state.jobs?.find(
       (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
     );
+  }
+
+  private getMutableJobs(scope: EnvironmentScope): StoredJobPresets[] {
+    return [...(this.getState(scope).jobs ?? [])];
+  }
+
+  private getMutableJobEntry(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string
+  ): MutableJobPresetEntry | undefined {
+    const jobs = this.getMutableJobs(scope);
+    const entryIndex = this.findJobEntryIndex(jobs, environmentId, jobUrl);
+    if (entryIndex < 0) {
+      return undefined;
+    }
+    return {
+      jobs,
+      entryIndex,
+      entry: {
+        ...jobs[entryIndex],
+        presets: [...jobs[entryIndex].presets]
+      }
+    };
+  }
+
+  private findJobEntryIndex(
+    jobs: StoredJobPresets[],
+    environmentId: string,
+    jobUrl: string
+  ): number {
+    return jobs.findIndex(
+      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
+    );
+  }
+
+  private findPresetIndex(entry: StoredJobPresets, presetId: string): number {
+    return entry.presets.findIndex((preset) => preset.id === presetId);
+  }
+
+  private getMutablePresetEntry(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    presetId: string
+  ): MutableParameterPresetEntry | undefined {
+    const target = this.getMutableJobEntry(scope, environmentId, jobUrl);
+    if (!target) {
+      return undefined;
+    }
+    const presetIndex = this.findPresetIndex(target.entry, presetId);
+    if (presetIndex < 0) {
+      return undefined;
+    }
+    return { ...target, presetIndex };
   }
 
   private sanitizeValues(values: unknown): Record<string, string | string[]> {

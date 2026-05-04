@@ -5,6 +5,7 @@ import type {
   JenkinsRepositoryLinkEnvironment,
   JenkinsRepositoryLinkStore
 } from "../storage/JenkinsRepositoryLinkStore";
+import { resolveCurrentBranchEnvironmentRef } from "./CurrentBranchEnvironmentResolver";
 import { toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
 import type {
   CurrentBranchLinkedContext,
@@ -67,20 +68,7 @@ export class CurrentBranchLinkResolver {
   private async resolveEnvironment(
     environment: JenkinsRepositoryLinkEnvironment
   ): Promise<JenkinsEnvironmentRef | undefined> {
-    const environments = await this.environmentStore.listEnvironmentsWithScope();
-    const match = environments.find(
-      (entry) => entry.id === environment.environmentId && entry.scope === environment.scope
-    );
-    if (!match) {
-      return undefined;
-    }
-
-    return {
-      environmentId: match.id,
-      scope: match.scope,
-      url: match.url,
-      username: match.username
-    };
+    return resolveCurrentBranchEnvironmentRef(this.environmentStore, environment);
   }
 
   private formatMissingEnvironmentMessage(environment: JenkinsRepositoryLinkEnvironment): string {
