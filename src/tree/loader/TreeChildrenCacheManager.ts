@@ -175,12 +175,12 @@ export class TreeChildrenCacheManager {
   }
 
   private clearChildrenCacheByPrefix(prefix: string): void {
-    for (const key of Array.from(this.pendingLoads.keys())) {
+    for (const key of this.pendingLoads.keys()) {
       if (key.startsWith(prefix)) {
         this.clearChildrenCache(key);
       }
     }
-    for (const key of Array.from(this.loadTokens.keys())) {
+    for (const key of this.loadTokens.keys()) {
       if (key.startsWith(prefix) && !this.pendingLoads.has(key)) {
         this.loadTokens.delete(key);
       }

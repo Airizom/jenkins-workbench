@@ -8,17 +8,24 @@ export function curateTreeViews(
   views: JenkinsViewInfo[],
   options: TreeViewCurationOptions
 ): JenkinsViewInfo[] {
-  const excludedNames = new Set(
-    options.excludedNames.map((name) => name.trim().toLowerCase()).filter((name) => name.length > 0)
-  );
+  const excludedNames = new Set<string>();
+  for (const excludedName of options.excludedNames) {
+    const normalizedName = excludedName.trim().toLowerCase();
+    if (normalizedName.length > 0) {
+      excludedNames.add(normalizedName);
+    }
+  }
 
-  return views.flatMap((view) => {
+  const curatedViews: JenkinsViewInfo[] = [];
+  for (const view of views) {
     const name = view.name.trim();
     const url = view.url.trim();
     if (name.length === 0 || url.length === 0 || excludedNames.has(name.toLowerCase())) {
-      return [];
+      continue;
     }
 
-    return [{ ...view, name, url }];
-  });
+    curatedViews.push({ ...view, name, url });
+  }
+
+  return curatedViews;
 }

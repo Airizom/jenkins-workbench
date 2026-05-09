@@ -216,11 +216,11 @@ export function mapJobsToTreeItems(
     ];
   }
 
-  const orderedJobs = orderPinnedJobsFirst(filteredJobs, pinnedJobs);
   const pinnedItems: WorkbenchTreeElement[] = [];
   const unpinnedItems: WorkbenchTreeElement[] = [];
+  let hasPinnedItems = false;
 
-  for (const job of orderedJobs) {
+  for (const job of filteredJobs) {
     const isWatched = watchedJobs.has(job.url);
     const isPinned = pinnedJobs.has(job.url);
     let item: WorkbenchTreeElement;
@@ -254,16 +254,17 @@ export function mapJobsToTreeItems(
     }
     if (isPinned && (item instanceof JobTreeItem || item instanceof PipelineTreeItem)) {
       pinnedItems.push(item);
+      hasPinnedItems = true;
     } else {
       unpinnedItems.push(item);
     }
   }
 
-  if (pinnedItems.length > 0) {
+  if (hasPinnedItems) {
     return [new PinnedSectionTreeItem(), ...pinnedItems, ...unpinnedItems];
   }
 
-  return [...pinnedItems, ...unpinnedItems];
+  return unpinnedItems;
 }
 
 export function mapQueueItemsToTreeItems(
@@ -271,30 +272,6 @@ export function mapQueueItemsToTreeItems(
   items: JenkinsQueueItemInfo[]
 ): WorkbenchTreeElement[] {
   return items.map((item) => new QueueItemTreeItem(environment, item));
-}
-
-function orderPinnedJobsFirst(jobs: JenkinsJobInfo[], pinnedJobs: Set<string>): JenkinsJobInfo[] {
-  if (pinnedJobs.size === 0) {
-    return jobs;
-  }
-
-  const pinned: JenkinsJobInfo[] = [];
-  const unpinned: JenkinsJobInfo[] = [];
-
-  for (const job of jobs) {
-    const isPinnable = job.kind === "job" || job.kind === "pipeline";
-    if (isPinnable && pinnedJobs.has(job.url)) {
-      pinned.push(job);
-    } else {
-      unpinned.push(job);
-    }
-  }
-
-  if (pinned.length === 0) {
-    return jobs;
-  }
-
-  return [...pinned, ...unpinned];
 }
 
 function createFolderTreeItem(

@@ -61,7 +61,7 @@ export class TreeActivityCache {
   clear(environment?: JenkinsEnvironmentRef): void {
     if (!environment) {
       this.summaries.clear();
-      for (const key of Array.from(this.childKeys)) {
+      for (const key of this.childKeys) {
         this.cacheManager.clearChildrenCache(key);
       }
       this.childKeys.clear();
@@ -82,7 +82,7 @@ export class TreeActivityCache {
         this.summaries.delete(key);
       }
     }
-    for (const key of Array.from(this.childKeys)) {
+    for (const key of this.childKeys) {
       if (key.startsWith(`${environmentId}:`)) {
         this.clearChildKey(key);
       }

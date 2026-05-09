@@ -61,7 +61,8 @@ export class JenkinsTreeFilter {
       return false;
     }
     const normalized = color.toLowerCase();
-    const base = normalized.split("_")[0] ?? normalized;
+    const separatorIndex = normalized.indexOf("_");
+    const base = separatorIndex >= 0 ? normalized.slice(0, separatorIndex) : normalized;
     return base === "red";
   }
 

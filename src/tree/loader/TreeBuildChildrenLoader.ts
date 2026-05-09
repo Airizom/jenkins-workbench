@@ -103,23 +103,24 @@ export class TreeBuildChildrenLoader {
           )
         ];
       }
-      const items = artifacts
-        .map((artifact) => {
-          const relativePath = (artifact.relativePath ?? "").trim();
-          if (!relativePath) {
-            return undefined;
-          }
-          const fileName = artifact.fileName?.trim();
-          return new ArtifactTreeItem(
+      const items: ArtifactTreeItem[] = [];
+      for (const artifact of artifacts) {
+        const relativePath = (artifact.relativePath ?? "").trim();
+        if (!relativePath) {
+          continue;
+        }
+        const fileName = artifact.fileName?.trim();
+        items.push(
+          new ArtifactTreeItem(
             folder.environment,
             folder.buildUrl,
             folder.buildNumber,
             relativePath,
             fileName || undefined,
             folder.jobNameHint
-          );
-        })
-        .filter((item): item is ArtifactTreeItem => Boolean(item));
+          )
+        );
+      }
 
       if (items.length === 0) {
         return [
@@ -181,10 +182,15 @@ export class TreeBuildChildrenLoader {
           )
         ];
       }
-      const runningBuilds = builds.filter((build) => Boolean(build.building) && build.url);
+      const runningBuildUrls: string[] = [];
+      for (const build of builds) {
+        if (build.building && build.url) {
+          runningBuildUrls.push(build.url);
+        }
+      }
       const summariesByUrl = await this.pendingInputCoordinator.getSummaries(
         environment,
-        runningBuilds.map((build) => build.url),
+        runningBuildUrls,
         { queueRefresh: true }
       );
 
