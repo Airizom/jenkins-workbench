@@ -32,11 +32,16 @@ export class AwaitingInputEnricher {
     if (buildUrlsByJobUrl.size === 0) {
       return new Set();
     }
-    const buildUrls = [...new Set([...buildUrlsByJobUrl.values()].flat())];
+    const buildUrls = new Set<string>();
+    for (const candidateBuildUrls of buildUrlsByJobUrl.values()) {
+      for (const buildUrl of candidateBuildUrls) {
+        buildUrls.add(buildUrl);
+      }
+    }
 
     let summaries: Awaited<ReturnType<PendingInputRefreshCoordinator["getSummaries"]>>;
     try {
-      summaries = await this.pendingInputCoordinator.getSummaries(environment, buildUrls, {
+      summaries = await this.pendingInputCoordinator.getSummaries(environment, [...buildUrls], {
         queueRefresh: true
       });
     } catch {
@@ -70,10 +75,12 @@ export class AwaitingInputEnricher {
             bypassCache: true
           }
         );
-        const runningBuildUrls = builds
-          .filter((build) => Boolean(build.building) && build.url)
-          .map((build) => build.url)
-          .filter((url): url is string => Boolean(url));
+        const runningBuildUrls: string[] = [];
+        for (const build of builds) {
+          if (build.building && build.url) {
+            runningBuildUrls.push(build.url);
+          }
+        }
         if (runningBuildUrls.length > 0) {
           buildUrlsByJobUrl.set(entry.url, runningBuildUrls);
         }
@@ -90,6 +97,10 @@ async function runWithConcurrency<T>(
   concurrency: number,
   operation: (item: T) => Promise<void>
 ): Promise<void> {
+  if (items.length === 0) {
+    return;
+  }
+
   let index = 0;
   const workerCount = Math.min(Math.max(1, concurrency), items.length);
   await Promise.all(

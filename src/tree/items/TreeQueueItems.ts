@@ -2,6 +2,8 @@ import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { formatQueueItemDescription, normalizeQueueReason } from "../formatters";
 
+const CLOCK_ICON = new vscode.ThemeIcon("clock");
+
 type QueueTreeItemData = {
   id: number;
   name: string;
@@ -23,7 +25,7 @@ export class QueueItemTreeItem extends vscode.TreeItem {
     this.contextValue = "queueItem";
     this.description = formatQueueItemDescription(item.position, item.inQueueSince);
     this.tooltip = this.buildTooltip(item);
-    this.iconPath = new vscode.ThemeIcon("clock");
+    this.iconPath = CLOCK_ICON;
   }
 
   private buildTooltip(item: QueueTreeItemData): string {

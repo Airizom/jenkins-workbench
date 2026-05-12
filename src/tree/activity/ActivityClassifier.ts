@@ -13,9 +13,10 @@ export class ActivityClassifier {
       return undefined;
     }
 
-    const isRunning = isRunningActivityColor(color);
     const normalized = color.toLowerCase();
-    const base = normalized.split("_")[0] ?? normalized;
+    const isRunning = normalized.endsWith("_anime");
+    const separatorIndex = normalized.indexOf("_");
+    const base = separatorIndex === -1 ? normalized : normalized.slice(0, separatorIndex);
     if (base === "red") {
       return { group: "failing", isRunning };
     }

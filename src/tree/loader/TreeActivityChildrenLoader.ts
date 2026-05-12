@@ -17,6 +17,8 @@ import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 import type { TreeJobUrlStateLoader } from "./TreeJobUrlStateLoader";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
 
+type JobUrlState = readonly [watchedJobs: Set<string>, pinnedJobs: Set<string>];
+
 export class TreeActivityChildrenLoader {
   private readonly activityCache: TreeActivityCache;
   private readonly refreshEnvironmentKeys = new Set<string>();
@@ -55,8 +57,17 @@ export class TreeActivityChildrenLoader {
       this.notifyEnvironment(folder.environment);
 
       const groups: ActivityGroupTreeItem[] = [];
+      let jobUrlStatePromise: Promise<JobUrlState> | undefined;
+      const getJobUrlState = () => {
+        jobUrlStatePromise ??= this.getJobUrlState(folder.environment);
+        return jobUrlStatePromise;
+      };
       for (const group of viewModel.groups) {
-        const children = await this.mapEntriesToTreeItems(folder.environment, group.items);
+        const children = await this.mapEntriesToTreeItems(
+          folder.environment,
+          group.items,
+          getJobUrlState
+        );
         if (!isCurrentLoad()) {
           return [];
         }
@@ -147,16 +158,14 @@ export class TreeActivityChildrenLoader {
 
   private async mapEntriesToTreeItems(
     environment: JenkinsEnvironmentRef,
-    entries: ActivityJobViewModel[]
+    entries: ActivityJobViewModel[],
+    getJobUrlState: () => Promise<JobUrlState>
   ): Promise<WorkbenchTreeElement[]> {
     if (entries.length === 0) {
       return [];
     }
 
-    const [watchedJobs, pinnedJobs] = await Promise.all([
-      this.jobUrlState.getWatchedJobUrls(environment),
-      this.jobUrlState.getPinnedJobUrls(environment)
-    ]);
+    const [watchedJobs, pinnedJobs] = await getJobUrlState();
 
     return entries.map((entry) => {
       const isWatched = watchedJobs.has(entry.url);
@@ -186,6 +195,13 @@ export class TreeActivityChildrenLoader {
         entry.pathContext
       );
     });
+  }
+
+  private async getJobUrlState(environment: JenkinsEnvironmentRef): Promise<JobUrlState> {
+    return Promise.all([
+      this.jobUrlState.getWatchedJobUrls(environment),
+      this.jobUrlState.getPinnedJobUrls(environment)
+    ]);
   }
 
   private buildEnvironmentKey(

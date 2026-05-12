@@ -4,6 +4,9 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import { formatNodeDescription } from "../formatters";
 
+const SERVER_ICON = new vscode.ThemeIcon("server");
+const SERVER_OFFLINE_ICON = new vscode.ThemeIcon("server", new vscode.ThemeColor("charts.gray"));
+
 export class NodeTreeItem extends vscode.TreeItem {
   public readonly nodeUrl?: string;
 
@@ -29,9 +32,7 @@ export class NodeTreeItem extends vscode.TreeItem {
     }
     this.contextValue = contextValues.join(" ");
     this.description = formatNodeDescription(node);
-    this.iconPath = node.offline
-      ? new vscode.ThemeIcon("server", new vscode.ThemeColor("charts.gray"))
-      : new vscode.ThemeIcon("server");
+    this.iconPath = node.offline ? SERVER_OFFLINE_ICON : SERVER_ICON;
     const tooltip = buildNodeTooltip(node);
     if (tooltip) {
       this.tooltip = tooltip;

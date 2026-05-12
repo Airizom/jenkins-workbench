@@ -26,11 +26,11 @@ export class TreePinnedChildrenLoader {
     environment: JenkinsEnvironmentRef
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const [pinnedEntries, watchedJobs, pinnedJobs] = await Promise.all([
+      const [pinnedEntries, watchedJobs] = await Promise.all([
         this.pinStore.listPinnedJobsForEnvironment(environment.scope, environment.environmentId),
-        this.jobUrlState.getWatchedJobUrls(environment),
-        this.jobUrlState.getPinnedJobUrls(environment)
+        this.jobUrlState.getWatchedJobUrls(environment)
       ]);
+      const pinnedJobs = this.jobUrlState.getPinnedJobUrlsFromEntries(environment, pinnedEntries);
 
       if (pinnedEntries.length === 0) {
         return [

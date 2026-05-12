@@ -2,6 +2,14 @@ import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, buildTreeJobScopeKey } from "../TreeJobScope";
 
+const FOLDER_ICON = new vscode.ThemeIcon("folder");
+const FILE_ICON = new vscode.ThemeIcon("file");
+const FILE_CODE_ICON = new vscode.ThemeIcon("file-code");
+const FILE_MEDIA_ICON = new vscode.ThemeIcon("file-media");
+const FILE_PDF_ICON = new vscode.ThemeIcon("file-pdf");
+const FILE_TEXT_ICON = new vscode.ThemeIcon("file-text");
+const FILE_ZIP_ICON = new vscode.ThemeIcon("file-zip");
+
 function buildWorkspaceTreeItemId(
   kind: string,
   environment: JenkinsEnvironmentRef,
@@ -30,7 +38,7 @@ export class WorkspaceRootTreeItem extends vscode.TreeItem {
     super("Workspace", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = WorkspaceRootTreeItem.buildId(environment, jobUrl, jobScope);
     this.contextValue = "workspaceRoot";
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.iconPath = FOLDER_ICON;
     this.tooltip = "Browse the current Jenkins workspace.";
   }
 }
@@ -56,7 +64,7 @@ export class WorkspaceDirectoryTreeItem extends vscode.TreeItem {
     this.id = WorkspaceDirectoryTreeItem.buildId(environment, jobUrl, jobScope, relativePath);
     this.contextValue = "workspaceDirectory";
     this.description = relativePath !== directoryName ? relativePath : undefined;
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.iconPath = FOLDER_ICON;
     this.tooltip = relativePath;
   }
 }
@@ -98,7 +106,7 @@ function resolveWorkspaceFileIcon(fileName: string, relativePath: string): vscod
   switch (extension) {
     case ".log":
     case ".txt":
-      return new vscode.ThemeIcon("file-text");
+      return FILE_TEXT_ICON;
     case ".json":
     case ".xml":
     case ".yaml":
@@ -111,24 +119,24 @@ function resolveWorkspaceFileIcon(fileName: string, relativePath: string): vscod
     case ".jsx":
     case ".css":
     case ".scss":
-      return new vscode.ThemeIcon("file-code");
+      return FILE_CODE_ICON;
     case ".png":
     case ".jpg":
     case ".jpeg":
     case ".gif":
     case ".svg":
     case ".webp":
-      return new vscode.ThemeIcon("file-media");
+      return FILE_MEDIA_ICON;
     case ".pdf":
-      return new vscode.ThemeIcon("file-pdf");
+      return FILE_PDF_ICON;
     case ".zip":
     case ".tar":
     case ".gz":
     case ".tgz":
     case ".jar":
     case ".war":
-      return new vscode.ThemeIcon("file-zip");
+      return FILE_ZIP_ICON;
     default:
-      return new vscode.ThemeIcon("file");
+      return FILE_ICON;
   }
 }

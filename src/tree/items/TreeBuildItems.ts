@@ -5,6 +5,14 @@ import { type BuildTooltipOptions, buildBuildTooltip } from "../BuildTooltips";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, buildTreeJobScopeKey } from "../TreeJobScope";
 import { buildIcon, formatBuildDescription } from "../formatters";
 
+const FOLDER_ICON = new vscode.ThemeIcon("folder");
+const FILE_ICON = new vscode.ThemeIcon("file");
+const FILE_CODE_ICON = new vscode.ThemeIcon("file-code");
+const FILE_MEDIA_ICON = new vscode.ThemeIcon("file-media");
+const FILE_PDF_ICON = new vscode.ThemeIcon("file-pdf");
+const FILE_TEXT_ICON = new vscode.ThemeIcon("file-text");
+const FILE_ZIP_ICON = new vscode.ThemeIcon("file-zip");
+
 export class BuildTreeItem extends vscode.TreeItem {
   static buildId(
     environment: JenkinsEnvironmentRef,
@@ -36,11 +44,11 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
     this.id = BuildTreeItem.buildId(environment, build.url, jobScope);
-    const contextParts = [this.isBuilding ? "buildRunning" : "build"];
-    if (this.awaitingInput) {
-      contextParts.push("awaitingInput");
-    }
-    this.contextValue = contextParts.join(" ");
+    this.contextValue = this.awaitingInput
+      ? `${this.isBuilding ? "buildRunning" : "build"} awaitingInput`
+      : this.isBuilding
+        ? "buildRunning"
+        : "build";
     this.description = formatBuildDescription(build, awaitingInput);
     this.iconPath = buildIcon(build, awaitingInput);
     this.tooltip = buildBuildTooltip(build, tooltipOptions);
@@ -78,7 +86,7 @@ export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
     );
     this.id = BuildArtifactsFolderTreeItem.buildId(environment, buildUrl, jobScope);
     this.contextValue = "artifactFolder";
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.iconPath = FOLDER_ICON;
     if (typeof artifactCount === "number") {
       this.description =
         artifactCount > 0
@@ -116,28 +124,28 @@ function resolveArtifactIcon(fileName?: string, relativePath?: string): vscode.T
     case ".tar":
     case ".gz":
     case ".tgz":
-      return new vscode.ThemeIcon("file-zip");
+      return FILE_ZIP_ICON;
     case ".log":
     case ".txt":
-      return new vscode.ThemeIcon("file-text");
+      return FILE_TEXT_ICON;
     case ".xml":
     case ".json":
     case ".yaml":
     case ".yml":
     case ".html":
     case ".htm":
-      return new vscode.ThemeIcon("file-code");
+      return FILE_CODE_ICON;
     case ".png":
     case ".jpg":
     case ".jpeg":
     case ".gif":
     case ".svg":
     case ".webp":
-      return new vscode.ThemeIcon("file-media");
+      return FILE_MEDIA_ICON;
     case ".pdf":
-      return new vscode.ThemeIcon("file-pdf");
+      return FILE_PDF_ICON;
     default:
-      return new vscode.ThemeIcon("file");
+      return FILE_ICON;
   }
 }
 

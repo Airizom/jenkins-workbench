@@ -8,29 +8,41 @@ import {
 import type { ActivityGroups } from "./ActivityCollectionModel";
 
 export function buildActivityViewModel(groups: ActivityGroups, limit: number): ActivityViewModel {
-  const groupViewModels = ACTIVITY_GROUP_ORDER.map((kind) => {
+  const groupViewModels: ActivityViewModel["groups"] = [];
+  const summaryGroups: ActivityViewModel["summary"]["groups"] = [];
+  let displayedTotal = 0;
+  let isTruncated = false;
+
+  for (const kind of ACTIVITY_GROUP_ORDER) {
     const entries = groups.get(kind) ?? [];
     const displayedEntries = entries.slice(0, limit);
-    return {
+    const displayedCount = displayedEntries.length;
+    if (displayedCount === 0) {
+      continue;
+    }
+
+    const groupIsTruncated = entries.length > limit;
+    groupViewModels.push({
       kind,
       items: displayedEntries.map(({ entry, group }) => mapActivityJob(entry, group)),
-      displayedCount: displayedEntries.length,
-      isTruncated: entries.length > limit
-    };
-  }).filter((group) => group.displayedCount > 0);
-
-  const summaryGroups = groupViewModels.map((group) => ({
-    kind: group.kind,
-    displayedCount: group.displayedCount,
-    isTruncated: group.isTruncated
-  }));
+      displayedCount,
+      isTruncated: groupIsTruncated
+    });
+    summaryGroups.push({
+      kind,
+      displayedCount,
+      isTruncated: groupIsTruncated
+    });
+    displayedTotal += displayedCount;
+    isTruncated ||= groupIsTruncated;
+  }
 
   return {
     groups: groupViewModels,
     summary: {
-      displayedTotal: summaryGroups.reduce((sum, group) => sum + group.displayedCount, 0),
+      displayedTotal,
       limit,
-      isTruncated: summaryGroups.some((group) => group.isTruncated),
+      isTruncated,
       groups: summaryGroups
     }
   };
@@ -48,10 +60,13 @@ function mapActivityJob(entry: JobSearchEntry, group: ActivityGroupKind): Activi
 }
 
 function formatActivityPathContext(entry: JobSearchEntry): string | undefined {
-  const parents = entry.path
-    .slice(0, -1)
-    .map((part) => part.name)
-    .filter(Boolean);
+  const parents: string[] = [];
+  for (let index = 0; index < entry.path.length - 1; index += 1) {
+    const name = entry.path[index]?.name;
+    if (name) {
+      parents.push(name);
+    }
+  }
   if (parents.length > 0) {
     return parents.join(" / ");
   }

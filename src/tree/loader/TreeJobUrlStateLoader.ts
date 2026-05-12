@@ -4,6 +4,10 @@ import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 
+type PinnedJobUrlEntry = {
+  readonly jobUrl: string;
+};
+
 export class TreeJobUrlStateLoader {
   constructor(
     private readonly cacheManager: TreeChildrenCacheManager,
@@ -35,10 +39,28 @@ export class TreeJobUrlStateLoader {
       environment.scope,
       environment.environmentId
     );
-    const pinned = new Set(
-      pinnedEntries.map((entry) => getCanonicalPinnedJobUrl(environment, entry.jobUrl))
-    );
+    const pinned = this.buildPinnedJobUrlSet(environment, pinnedEntries);
     this.cacheManager.setCachedPinnedJobs(environment, pinned);
+    return pinned;
+  }
+
+  getPinnedJobUrlsFromEntries(
+    environment: JenkinsEnvironmentRef,
+    pinnedEntries: readonly PinnedJobUrlEntry[]
+  ): Set<string> {
+    const pinned = this.buildPinnedJobUrlSet(environment, pinnedEntries);
+    this.cacheManager.setCachedPinnedJobs(environment, pinned);
+    return pinned;
+  }
+
+  private buildPinnedJobUrlSet(
+    environment: JenkinsEnvironmentRef,
+    pinnedEntries: readonly PinnedJobUrlEntry[]
+  ): Set<string> {
+    const pinned = new Set<string>();
+    for (const entry of pinnedEntries) {
+      pinned.add(getCanonicalPinnedJobUrl(environment, entry.jobUrl));
+    }
     return pinned;
   }
 }

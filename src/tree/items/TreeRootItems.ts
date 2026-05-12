@@ -11,6 +11,29 @@ import type {
   QueueFolderSummary
 } from "./TreeItemSummaries";
 
+const ACTIVITY_GROUP_AWAITING_INPUT_ICON = new vscode.ThemeIcon(
+  "debug-pause",
+  new vscode.ThemeColor("charts.blue")
+);
+const ACTIVITY_GROUP_FAILING_ICON = new vscode.ThemeIcon(
+  "error",
+  new vscode.ThemeColor("charts.red")
+);
+const ACTIVITY_GROUP_RUNNING_ICON = new vscode.ThemeIcon(
+  "sync~spin",
+  new vscode.ThemeColor("charts.blue")
+);
+const ACTIVITY_GROUP_UNSTABLE_ICON = new vscode.ThemeIcon(
+  "warning",
+  new vscode.ThemeColor("charts.yellow")
+);
+const FOLDER_ICON = new vscode.ThemeIcon("folder");
+const LIST_UNORDERED_ICON = new vscode.ThemeIcon("list-unordered");
+const PINNED_ICON = new vscode.ThemeIcon("pinned");
+const PULSE_ICON = new vscode.ThemeIcon("pulse");
+const SERVER_ENVIRONMENT_ICON = new vscode.ThemeIcon("server-environment");
+const SERVER_ICON = new vscode.ThemeIcon("server");
+
 export class ViewsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
     return `views:${environment.scope}:${environment.environmentId}`;
@@ -20,7 +43,7 @@ export class ViewsFolderTreeItem extends vscode.TreeItem {
     super("Views", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = ViewsFolderTreeItem.buildId(environment);
     this.contextValue = "views";
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.iconPath = FOLDER_ICON;
     this.tooltip = "Browse curated Jenkins views";
   }
 }
@@ -65,7 +88,7 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
     });
     this.contextValue = "environment";
     this.description = formatScopeLabel(environment.scope);
-    this.iconPath = new vscode.ThemeIcon("server-environment");
+    this.iconPath = SERVER_ENVIRONMENT_ICON;
     this.tooltip = buildEnvironmentTooltip(environment);
   }
 }
@@ -85,7 +108,7 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = JobsFolderTreeItem.buildId(environment);
     this.contextValue = "jobs";
-    this.iconPath = new vscode.ThemeIcon("folder");
+    this.iconPath = FOLDER_ICON;
     this.description = summary ? formatJobsSummaryDescription(summary) : undefined;
     this.tooltip = summary
       ? formatJobsSummaryTooltip(summary)
@@ -108,7 +131,7 @@ export class ActivityFolderTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = ActivityFolderTreeItem.buildId(environment);
     this.contextValue = "activity";
-    this.iconPath = new vscode.ThemeIcon("pulse");
+    this.iconPath = PULSE_ICON;
     this.description = summary ? formatActivitySummaryDescription(summary) : undefined;
     this.tooltip = summary
       ? formatActivitySummaryTooltip(summary)
@@ -153,7 +176,7 @@ export class NodesFolderTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = NodesFolderTreeItem.buildId(environment);
     this.contextValue = "nodes";
-    this.iconPath = new vscode.ThemeIcon("server");
+    this.iconPath = SERVER_ICON;
     this.tooltip = summary
       ? `Online: ${summary.online}\nOffline: ${summary.offline}`
       : "View build agents and their status";
@@ -172,7 +195,7 @@ export class BuildQueueFolderTreeItem extends vscode.TreeItem {
     const label = summary ? `Build Queue (${summary.total})` : "Build Queue";
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = "queueFolder";
-    this.iconPath = new vscode.ThemeIcon("list-unordered");
+    this.iconPath = LIST_UNORDERED_ICON;
     this.id = BuildQueueFolderTreeItem.buildId(environment);
     this.tooltip = summary ? `${summary.total} item(s) waiting` : "Items waiting to be built";
   }
@@ -190,7 +213,7 @@ export class PinnedJobsFolderTreeItem extends vscode.TreeItem {
     super("Pinned", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = PinnedJobsFolderTreeItem.buildId(environment);
     this.contextValue = "pinnedRoot";
-    this.iconPath = new vscode.ThemeIcon("pinned");
+    this.iconPath = PINNED_ICON;
     this.description = typeof count === "number" ? `${count} item(s)` : undefined;
     this.tooltip =
       typeof count === "number"
@@ -203,7 +226,7 @@ export class PinnedSectionTreeItem extends vscode.TreeItem {
   constructor() {
     super("Pinned", vscode.TreeItemCollapsibleState.None);
     this.contextValue = "pinnedSection";
-    this.iconPath = new vscode.ThemeIcon("pinned");
+    this.iconPath = PINNED_ICON;
   }
 }
 
@@ -273,12 +296,14 @@ function formatJobsSummaryTooltip(summary: JobsFolderSummary): string {
 }
 
 function formatActivitySummaryDescription(summary: ActivityDisplaySummary): string | undefined {
-  const parts = summary.groups
-    .filter((group) => group.displayedCount > 0)
-    .map(
-      (group) =>
+  const parts: string[] = [];
+  for (const group of summary.groups) {
+    if (group.displayedCount > 0) {
+      parts.push(
         `${formatDisplayedCountLabel(group.displayedCount)} ${formatActivityGroupLabel(group.kind).toLowerCase()}`
-    );
+      );
+    }
+  }
   return parts.length > 0 ? parts.join(" • ") : undefined;
 }
 
@@ -286,13 +311,15 @@ function formatActivitySummaryTooltip(summary: ActivityDisplaySummary): string {
   if (summary.displayedTotal === 0) {
     return "No current activity.";
   }
-  return summary.groups
-    .filter((group) => group.displayedCount > 0)
-    .map(
-      (group) =>
+  const parts: string[] = [];
+  for (const group of summary.groups) {
+    if (group.displayedCount > 0) {
+      parts.push(
         `${formatActivityGroupLabel(group.kind)}: ${formatDisplayedCountTooltip(group.displayedCount, group.isTruncated)}`
-    )
-    .join("\n");
+      );
+    }
+  }
+  return parts.join("\n");
 }
 
 function formatDisplayedCountLabel(count: number): string {
@@ -306,12 +333,12 @@ function formatDisplayedCountTooltip(count: number, isTruncated: boolean): strin
 function resolveActivityGroupIcon(group: ActivityGroupKind): vscode.ThemeIcon {
   switch (group) {
     case "awaitingInput":
-      return new vscode.ThemeIcon("debug-pause", new vscode.ThemeColor("charts.blue"));
+      return ACTIVITY_GROUP_AWAITING_INPUT_ICON;
     case "failing":
-      return new vscode.ThemeIcon("error", new vscode.ThemeColor("charts.red"));
+      return ACTIVITY_GROUP_FAILING_ICON;
     case "unstable":
-      return new vscode.ThemeIcon("warning", new vscode.ThemeColor("charts.yellow"));
+      return ACTIVITY_GROUP_UNSTABLE_ICON;
     case "running":
-      return new vscode.ThemeIcon("sync~spin", new vscode.ThemeColor("charts.blue"));
+      return ACTIVITY_GROUP_RUNNING_ICON;
   }
 }

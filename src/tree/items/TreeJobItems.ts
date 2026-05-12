@@ -21,6 +21,11 @@ import {
   jobIcon
 } from "../formatters";
 
+const EYE_ICON = new vscode.ThemeIcon("eye");
+const FOLDER_ICON = new vscode.ThemeIcon("folder");
+const GIT_BRANCH_ICON = new vscode.ThemeIcon("git-branch");
+const WARNING_ICON = new vscode.ThemeIcon("warning");
+
 export class JenkinsViewTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef, viewUrl: string): string {
     return `view:${environment.scope}:${environment.environmentId}:${viewUrl}`;
@@ -37,7 +42,7 @@ export class JenkinsViewTreeItem extends vscode.TreeItem {
     this.jobScope = createViewTreeJobScope(viewUrl);
     this.id = JenkinsViewTreeItem.buildId(environment, viewUrl);
     this.contextValue = "view";
-    this.iconPath = new vscode.ThemeIcon("eye");
+    this.iconPath = EYE_ICON;
     this.tooltip = `Browse jobs in view "${label}"`;
   }
 }
@@ -72,10 +77,7 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
       folderKind === "multibranch"
         ? formatMultibranchFolderTooltip(options?.branchFilter)
         : undefined;
-    this.iconPath =
-      folderKind === "multibranch"
-        ? new vscode.ThemeIcon("git-branch")
-        : new vscode.ThemeIcon("folder");
+    this.iconPath = folderKind === "multibranch" ? GIT_BRANCH_ICON : FOLDER_ICON;
   }
 }
 
@@ -257,7 +259,7 @@ export class StalePinnedJobTreeItem extends vscode.TreeItem {
       jobUrl,
       "Pinned entry no longer resolves in Jenkins."
     );
-    this.iconPath = new vscode.ThemeIcon("warning");
+    this.iconPath = WARNING_ICON;
   }
 }
 
@@ -327,17 +329,12 @@ function buildJobContextValue(
   isPinned: boolean,
   isDisabled: boolean
 ): string {
-  const parts: string[] = [base];
+  let contextValue = base;
   if (isPinned) {
-    parts.push("pinned");
+    contextValue += " pinned";
   }
   if (isWatched) {
-    parts.push("watched");
+    contextValue += " watched";
   }
-  if (isDisabled) {
-    parts.push("disabled");
-  } else {
-    parts.push("enabled");
-  }
-  return parts.join(" ");
+  return `${contextValue} ${isDisabled ? "disabled" : "enabled"}`;
 }

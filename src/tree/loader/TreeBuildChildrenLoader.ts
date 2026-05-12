@@ -188,14 +188,15 @@ export class TreeBuildChildrenLoader {
           runningBuildUrls.push(build.url);
         }
       }
-      const summariesByUrl = await this.pendingInputCoordinator.getSummaries(
-        environment,
-        runningBuildUrls,
-        { queueRefresh: true }
-      );
+      const summariesByUrl =
+        runningBuildUrls.length > 0
+          ? await this.pendingInputCoordinator.getSummaries(environment, runningBuildUrls, {
+              queueRefresh: true
+            })
+          : undefined;
 
       return builds.map((build) => {
-        const summary = summariesByUrl.get(build.url);
+        const summary = summariesByUrl?.get(build.url);
         return new BuildTreeItem(
           environment,
           build,
