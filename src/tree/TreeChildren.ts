@@ -48,6 +48,10 @@ export class JenkinsTreeChildrenLoader {
   private readonly cacheManager: TreeChildrenCacheManager;
   private readonly environmentSummaryStore: EnvironmentSummaryStore;
   private readonly elementHandlers: TreeElementChildrenHandler[];
+  private readonly elementHandlerCache = new WeakMap<
+    WorkbenchTreeElement,
+    TreeElementChildrenHandler | null
+  >();
   private readonly activityLoader: TreeActivityChildrenLoader;
   private readonly buildLoader: TreeBuildChildrenLoader;
 
@@ -257,7 +261,12 @@ export class JenkinsTreeChildrenLoader {
   }
 
   private getElementHandler(element: WorkbenchTreeElement): TreeElementChildrenHandler | undefined {
-    return this.elementHandlers.find((handler) => handler.matches(element));
+    if (this.elementHandlerCache.has(element)) {
+      return this.elementHandlerCache.get(element) ?? undefined;
+    }
+    const handler = this.elementHandlers.find((candidate) => candidate.matches(element));
+    this.elementHandlerCache.set(element, handler ?? null);
+    return handler;
   }
 
   private buildChildrenKey(

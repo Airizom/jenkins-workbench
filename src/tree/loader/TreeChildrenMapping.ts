@@ -216,6 +216,24 @@ export function mapJobsToTreeItems(
     ];
   }
 
+  return mapFilteredJobsToTreeItems(
+    environment,
+    filteredJobs,
+    treeFilter,
+    options.jobScope,
+    watchedJobs,
+    pinnedJobs
+  );
+}
+
+export function mapFilteredJobsToTreeItems(
+  environment: JenkinsEnvironmentRef,
+  filteredJobs: JenkinsJobInfo[],
+  treeFilter: JenkinsTreeFilter,
+  jobScope: TreeJobScope | undefined,
+  watchedJobs: Set<string>,
+  pinnedJobs: Set<string>
+): WorkbenchTreeElement[] {
   const hasWatchedJobs = watchedJobs.size > 0;
   const hasPinnedJobs = pinnedJobs.size > 0;
 
@@ -227,7 +245,7 @@ export function mapJobsToTreeItems(
           environment,
           job,
           treeFilter,
-          options.jobScope,
+          jobScope,
           hasWatchedJobs && watchedJobs.has(job.url),
           false
         )
@@ -246,7 +264,7 @@ export function mapJobsToTreeItems(
       environment,
       job,
       treeFilter,
-      options.jobScope,
+      jobScope,
       hasWatchedJobs && watchedJobs.has(job.url),
       isPinned
     );

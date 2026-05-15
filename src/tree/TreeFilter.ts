@@ -2,7 +2,6 @@ import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsJobInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
-import { buildOverrideKey } from "./TreeFilterKeys";
 import { normalizeBranchFilter } from "./branchFilters";
 
 interface TreeFilterOptions {
@@ -30,7 +29,10 @@ export class JenkinsTreeFilter {
         : undefined;
     const branchNeedle = branchFilter?.toLowerCase() ?? "";
     const hasBranchFilter = branchNeedle.length > 0;
-    const hasOverrideKeys = Boolean(overrideKeys?.size);
+    const revealOverrideKeys = overrideKeys && overrideKeys.size > 0 ? overrideKeys : undefined;
+    const overrideKeyPrefix = revealOverrideKeys
+      ? `${environment.scope}:${environment.environmentId}:`
+      : undefined;
 
     if (jobFilterMode === "all" && !hasBranchFilter) {
       return jobs;
@@ -41,7 +43,7 @@ export class JenkinsTreeFilter {
         return true;
       }
 
-      if (hasOverrideKeys && this.isRevealOverride(environment, job.url, overrideKeys)) {
+      if (overrideKeyPrefix && revealOverrideKeys?.has(`${overrideKeyPrefix}${job.url}`)) {
         return true;
       }
 
@@ -76,16 +78,5 @@ export class JenkinsTreeFilter {
       return false;
     }
     return color.toLowerCase().endsWith("_anime");
-  }
-
-  private isRevealOverride(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    overrideKeys?: Set<string>
-  ): boolean {
-    if (!overrideKeys || overrideKeys.size === 0) {
-      return false;
-    }
-    return overrideKeys.has(buildOverrideKey(environment, jobUrl));
   }
 }

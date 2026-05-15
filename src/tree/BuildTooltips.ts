@@ -162,16 +162,21 @@ function resolveParameterSummary(
     parameterMaskValue: string;
   }
 ): string | undefined {
-  const parameters = collectParameters(build, options);
+  const parameters = collectParameters(build, {
+    parameterAllowList: normalizePatterns(options.parameterAllowList),
+    parameterDenyList: normalizePatterns(options.parameterDenyList),
+    parameterMaskPatterns: normalizePatterns(options.parameterMaskPatterns)
+  });
   if (parameters.length === 0) {
     return undefined;
   }
 
-  const formatted = parameters.map((param) => {
+  const formatted: string[] = [];
+  for (const param of parameters) {
     const value = param.isMasked ? options.parameterMaskValue : formatParameterValue(param.value);
     const truncated = truncateText(value, options.maxParameterValueLength).text;
-    return `${param.name}=${truncated}`;
-  });
+    formatted.push(`${param.name}=${truncated}`);
+  }
 
   const visible = formatted.slice(0, options.maxParameterCount);
   const remaining = formatted.length - visible.length;
@@ -284,9 +289,9 @@ function collectCauses(build: JenkinsBuild): JenkinsBuildCause[] {
 function collectParameters(
   build: JenkinsBuild,
   options: {
-    parameterAllowList: string[];
-    parameterDenyList: string[];
-    parameterMaskPatterns: string[];
+    parameterAllowList: NormalizedPatterns;
+    parameterDenyList: NormalizedPatterns;
+    parameterMaskPatterns: NormalizedPatterns;
   }
 ): Array<JenkinsBuildParameter & { isMasked: boolean }> {
   const actions = build.actions ?? [];
@@ -348,12 +353,30 @@ function includesCaseInsensitive(source: string, needle: string): boolean {
   return source.toLowerCase().includes(needle.toLowerCase());
 }
 
-function matchesAnyPattern(value: string, patterns: string[]): boolean {
+type NormalizedPatterns = readonly string[];
+
+function normalizePatterns(patterns: string[]): NormalizedPatterns {
+  if (patterns.length === 0) {
+    return patterns;
+  }
+  const normalized: string[] = [];
+  for (const pattern of patterns) {
+    normalized.push(pattern.toLowerCase());
+  }
+  return normalized;
+}
+
+function matchesAnyPattern(value: string, patterns: NormalizedPatterns): boolean {
   if (patterns.length === 0) {
     return false;
   }
   const normalized = value.toLowerCase();
-  return patterns.some((pattern) => normalized.includes(pattern.toLowerCase()));
+  for (const pattern of patterns) {
+    if (normalized.includes(pattern)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function truncateText(value: string, maxChars: number): { text: string; truncated: boolean } {

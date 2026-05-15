@@ -37,11 +37,18 @@ export class TreeDataProviderExpansionResolver {
 
     for (const id of path) {
       const children = await this.getChildren(parent);
-      const match = children.find((child) => getWorkbenchTreeElementId(child) === id);
+      let match: WorkbenchTreeElement | undefined;
+      let pending = false;
+      for (const child of children) {
+        if (!match && getWorkbenchTreeElementId(child) === id) {
+          match = child;
+        }
+        pending ||= isLoadingPlaceholder(child);
+      }
       if (!match) {
         return {
           element: undefined,
-          pending: children.some((child) => isLoadingPlaceholder(child))
+          pending
         };
       }
       parent = match;

@@ -13,7 +13,7 @@ import {
   getJobCollectionElement,
   getJobCollectionLoadingLabel,
   getJobCollectionRequest,
-  mapJobsToTreeItems,
+  mapFilteredJobsToTreeItems,
   toJenkinsJobCollectionRequest
 } from "./TreeChildrenMapping";
 import type { TreeJobUrlStateLoader } from "./TreeJobUrlStateLoader";
@@ -117,18 +117,43 @@ export class TreeJobCollectionChildrenLoader {
       jobScope?: TreeJobCollectionRequest["scope"];
     }
   ): Promise<WorkbenchTreeElement[]> {
+    const createEmptyPlaceholder = (label: string, description?: string) =>
+      this.placeholders.createEmptyPlaceholder(label, description);
+    if (jobs.length === 0) {
+      return [
+        createEmptyPlaceholder("No jobs, folders, or pipelines found.", "This location is empty.")
+      ];
+    }
+
+    const filteredJobs = this.treeFilter.filterJobs(
+      environment,
+      jobs,
+      {
+        parentFolderKind: options?.parentFolderKind,
+        parentFolderUrl: options?.parentFolderUrl
+      },
+      options?.overrideKeys
+    );
+    if (filteredJobs.length === 0) {
+      return [
+        createEmptyPlaceholder(
+          "No jobs match the current filters.",
+          "Adjust or clear filters via the filter menu."
+        )
+      ];
+    }
+
     const [watchedJobs, pinnedJobs] = await Promise.all([
       this.jobUrlState.getWatchedJobUrls(environment),
       this.jobUrlState.getPinnedJobUrls(environment)
     ]);
-    return mapJobsToTreeItems(
+    return mapFilteredJobsToTreeItems(
       environment,
-      jobs,
+      filteredJobs,
       this.treeFilter,
-      options ?? {},
+      options?.jobScope,
       watchedJobs,
-      pinnedJobs,
-      (label, description) => this.placeholders.createEmptyPlaceholder(label, description)
+      pinnedJobs
     );
   }
 
