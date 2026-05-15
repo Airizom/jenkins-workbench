@@ -30,13 +30,18 @@ export class JenkinsTreeFilter {
         : undefined;
     const branchNeedle = branchFilter?.toLowerCase() ?? "";
     const hasBranchFilter = branchNeedle.length > 0;
+    const hasOverrideKeys = Boolean(overrideKeys?.size);
+
+    if (jobFilterMode === "all" && !hasBranchFilter) {
+      return jobs;
+    }
 
     return jobs.filter((job) => {
       if (job.kind === "folder" || job.kind === "multibranch") {
         return true;
       }
 
-      if (this.isRevealOverride(environment, job.url, overrideKeys)) {
+      if (hasOverrideKeys && this.isRevealOverride(environment, job.url, overrideKeys)) {
         return true;
       }
 

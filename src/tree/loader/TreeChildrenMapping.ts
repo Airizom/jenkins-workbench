@@ -216,51 +216,48 @@ export function mapJobsToTreeItems(
     ];
   }
 
+  const hasWatchedJobs = watchedJobs.size > 0;
+  const hasPinnedJobs = pinnedJobs.size > 0;
+
+  if (!hasPinnedJobs) {
+    const items: WorkbenchTreeElement[] = [];
+    for (const job of filteredJobs) {
+      items.push(
+        createJobTreeItem(
+          environment,
+          job,
+          treeFilter,
+          options.jobScope,
+          hasWatchedJobs && watchedJobs.has(job.url),
+          false
+        )
+      );
+    }
+
+    return items;
+  }
+
   const pinnedItems: WorkbenchTreeElement[] = [];
   const unpinnedItems: WorkbenchTreeElement[] = [];
-  let hasPinnedItems = false;
 
   for (const job of filteredJobs) {
-    const isWatched = watchedJobs.has(job.url);
     const isPinned = pinnedJobs.has(job.url);
-    let item: WorkbenchTreeElement;
-    switch (job.kind) {
-      case "folder":
-      case "multibranch":
-        item = createFolderTreeItem(environment, job, treeFilter, options.jobScope);
-        break;
-      case "pipeline":
-        item = new PipelineTreeItem(
-          environment,
-          job.name,
-          job.url,
-          options.jobScope,
-          job.color,
-          isWatched,
-          isPinned
-        );
-        break;
-      default:
-        item = new JobTreeItem(
-          environment,
-          job.name,
-          job.url,
-          options.jobScope,
-          job.color,
-          isWatched,
-          isPinned
-        );
-        break;
-    }
-    if (isPinned && (item instanceof JobTreeItem || item instanceof PipelineTreeItem)) {
+    const item = createJobTreeItem(
+      environment,
+      job,
+      treeFilter,
+      options.jobScope,
+      hasWatchedJobs && watchedJobs.has(job.url),
+      isPinned
+    );
+    if (isPinned && isPinnedJobTreeItem(item)) {
       pinnedItems.push(item);
-      hasPinnedItems = true;
     } else {
       unpinnedItems.push(item);
     }
   }
 
-  if (hasPinnedItems) {
+  if (pinnedItems.length > 0) {
     return [new PinnedSectionTreeItem(), ...pinnedItems, ...unpinnedItems];
   }
 
@@ -272,6 +269,45 @@ export function mapQueueItemsToTreeItems(
   items: JenkinsQueueItemInfo[]
 ): WorkbenchTreeElement[] {
   return items.map((item) => new QueueItemTreeItem(environment, item));
+}
+
+function createJobTreeItem(
+  environment: JenkinsEnvironmentRef,
+  job: JenkinsJobInfo,
+  treeFilter: JenkinsTreeFilter,
+  jobScope: TreeJobScope | undefined,
+  isWatched: boolean,
+  isPinned: boolean
+): WorkbenchTreeElement {
+  switch (job.kind) {
+    case "folder":
+    case "multibranch":
+      return createFolderTreeItem(environment, job, treeFilter, jobScope);
+    case "pipeline":
+      return new PipelineTreeItem(
+        environment,
+        job.name,
+        job.url,
+        jobScope,
+        job.color,
+        isWatched,
+        isPinned
+      );
+    default:
+      return new JobTreeItem(
+        environment,
+        job.name,
+        job.url,
+        jobScope,
+        job.color,
+        isWatched,
+        isPinned
+      );
+  }
+}
+
+function isPinnedJobTreeItem(item: WorkbenchTreeElement): item is JobTreeItem | PipelineTreeItem {
+  return item instanceof JobTreeItem || item instanceof PipelineTreeItem;
 }
 
 function createFolderTreeItem(

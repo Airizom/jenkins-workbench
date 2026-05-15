@@ -5,7 +5,7 @@ import {
   type ActivityJobViewModel,
   type ActivityViewModel
 } from "../ActivityTypes";
-import type { ActivityGroups } from "./ActivityCollectionModel";
+import type { ActivityEntry, ActivityGroups } from "./ActivityCollectionModel";
 
 export function buildActivityViewModel(groups: ActivityGroups, limit: number): ActivityViewModel {
   const groupViewModels: ActivityViewModel["groups"] = [];
@@ -15,8 +15,7 @@ export function buildActivityViewModel(groups: ActivityGroups, limit: number): A
 
   for (const kind of ACTIVITY_GROUP_ORDER) {
     const entries = groups.get(kind) ?? [];
-    const displayedEntries = entries.slice(0, limit);
-    const displayedCount = displayedEntries.length;
+    const displayedCount = Math.min(entries.length, limit);
     if (displayedCount === 0) {
       continue;
     }
@@ -24,7 +23,7 @@ export function buildActivityViewModel(groups: ActivityGroups, limit: number): A
     const groupIsTruncated = entries.length > limit;
     groupViewModels.push({
       kind,
-      items: displayedEntries.map(({ entry, group }) => mapActivityJob(entry, group)),
+      items: mapActivityJobs(entries, displayedCount),
       displayedCount,
       isTruncated: groupIsTruncated
     });
@@ -46,6 +45,15 @@ export function buildActivityViewModel(groups: ActivityGroups, limit: number): A
       groups: summaryGroups
     }
   };
+}
+
+function mapActivityJobs(entries: ActivityEntry[], count: number): ActivityJobViewModel[] {
+  const jobs: ActivityJobViewModel[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const item = entries[index];
+    jobs.push(mapActivityJob(item.entry, item.group));
+  }
+  return jobs;
 }
 
 function mapActivityJob(entry: JobSearchEntry, group: ActivityGroupKind): ActivityJobViewModel {
