@@ -106,45 +106,39 @@ function resolveLastCommit(
   build: JenkinsBuild,
   maxMessageLength: number
 ): { message: string; author?: string } | undefined {
-  const items = collectChangeItems(build);
-  if (items.length === 0) {
+  const last = resolveLastUniqueChangeItem(build);
+  if (!last) {
     return undefined;
   }
 
-  const deduped = dedupeChangeItems(items);
-  if (deduped.length === 0) {
-    return undefined;
-  }
-
-  const last = deduped[deduped.length - 1];
   const rawMessage = normalizeWhitespace(last.msg ?? "");
   const rawAuthor = normalizeWhitespace(last.author?.fullName ?? "");
-  const message = truncateText(rawMessage || "Commit", maxMessageLength).text;
+  const message = truncateText(rawMessage || "Commit", maxMessageLength);
   const author = rawAuthor || "Unknown author";
 
   return { message, author };
 }
 
 function resolveCauseSummary(build: JenkinsBuild): string | undefined {
-  const causes = collectCauses(build);
-  if (causes.length === 0) {
-    return undefined;
-  }
-
   const summaries: string[] = [];
-  for (const cause of causes) {
-    const description = normalizeWhitespace(cause.shortDescription ?? "");
-    const user = normalizeWhitespace(cause.userName ?? cause.userId ?? "");
-    if (description) {
-      if (user && !includesCaseInsensitive(description, user)) {
-        summaries.push(`${description} (${user})`);
-      } else {
-        summaries.push(description);
-      }
+  for (const action of build.actions ?? []) {
+    if (!isActionWithCauses(action)) {
       continue;
     }
-    if (user) {
-      summaries.push(`Triggered by ${user}`);
+    for (const cause of action.causes) {
+      const description = normalizeWhitespace(cause.shortDescription ?? "");
+      const user = normalizeWhitespace(cause.userName ?? cause.userId ?? "");
+      if (description) {
+        if (user && !includesCaseInsensitive(description, user)) {
+          summaries.push(`${description} (${user})`);
+        } else {
+          summaries.push(description);
+        }
+        continue;
+      }
+      if (user) {
+        summaries.push(`Triggered by ${user}`);
+      }
     }
   }
 
@@ -162,26 +156,75 @@ function resolveParameterSummary(
     parameterMaskValue: string;
   }
 ): string | undefined {
-  const parameters = collectParameters(build, {
+  const patternOptions = {
     parameterAllowList: normalizePatterns(options.parameterAllowList),
     parameterDenyList: normalizePatterns(options.parameterDenyList),
     parameterMaskPatterns: normalizePatterns(options.parameterMaskPatterns)
+  };
+
+  if (options.maxParameterCount < 0 || !Number.isInteger(options.maxParameterCount)) {
+    return resolveParameterSummaryWithSliceSemantics(build, options, patternOptions);
+  }
+
+  const visible: string[] = [];
+  let total = 0;
+  visitMatchingParameters(build, patternOptions, (name, value, isMasked) => {
+    const formatted = formatParameterSummary(name, value, isMasked, options);
+    total += 1;
+    if (visible.length < options.maxParameterCount) {
+      visible.push(formatted);
+    }
   });
-  if (parameters.length === 0) {
+
+  if (total === 0) {
     return undefined;
   }
 
+  const remaining = total - visible.length;
+  const base = visible.join(", ");
+  return remaining > 0 ? `${base} +${remaining} more` : base;
+}
+
+function resolveParameterSummaryWithSliceSemantics(
+  build: JenkinsBuild,
+  options: {
+    maxParameterCount: number;
+    maxParameterValueLength: number;
+    parameterMaskValue: string;
+  },
+  patternOptions: {
+    parameterAllowList: NormalizedPatterns;
+    parameterDenyList: NormalizedPatterns;
+    parameterMaskPatterns: NormalizedPatterns;
+  }
+): string | undefined {
   const formatted: string[] = [];
-  for (const param of parameters) {
-    const value = param.isMasked ? options.parameterMaskValue : formatParameterValue(param.value);
-    const truncated = truncateText(value, options.maxParameterValueLength).text;
-    formatted.push(`${param.name}=${truncated}`);
+  visitMatchingParameters(build, patternOptions, (name, value, isMasked) => {
+    formatted.push(formatParameterSummary(name, value, isMasked, options));
+  });
+
+  if (formatted.length === 0) {
+    return undefined;
   }
 
   const visible = formatted.slice(0, options.maxParameterCount);
   const remaining = formatted.length - visible.length;
   const base = visible.join(", ");
   return remaining > 0 ? `${base} +${remaining} more` : base;
+}
+
+function formatParameterSummary(
+  name: string,
+  rawValue: unknown,
+  isMasked: boolean,
+  options: {
+    maxParameterValueLength: number;
+    parameterMaskValue: string;
+  }
+): string {
+  const value = isMasked ? options.parameterMaskValue : formatParameterValue(rawValue);
+  const truncated = truncateText(value, options.maxParameterValueLength);
+  return `${name}=${truncated}`;
 }
 
 function resolveEstimatedDurationLabel(build: JenkinsBuild): string | undefined {
@@ -238,64 +281,48 @@ function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefine
   return timestamp;
 }
 
-function collectChangeItems(build: JenkinsBuild): JenkinsChangeSetItem[] {
-  const items: JenkinsChangeSetItem[] = [];
-  if (build.changeSet?.items) {
-    items.push(...build.changeSet.items);
-  }
-  for (const changeSet of build.changeSets ?? []) {
-    if (changeSet?.items) {
-      items.push(...changeSet.items);
-    }
-  }
-  return items;
-}
-
-function dedupeChangeItems(items: JenkinsChangeSetItem[]): JenkinsChangeSetItem[] {
-  const results: JenkinsChangeSetItem[] = [];
+function resolveLastUniqueChangeItem(build: JenkinsBuild): JenkinsChangeSetItem | undefined {
+  let last: JenkinsChangeSetItem | undefined;
   const seen = new Set<string>();
 
-  for (const item of items) {
+  const visit = (item: JenkinsChangeSetItem): void => {
     const message = normalizeWhitespace(item.msg ?? "");
     const author = normalizeWhitespace(item.author?.fullName ?? "");
     const commitId = item.commitId?.trim();
     const key = commitId ? `id:${commitId}` : `${message}|${author}`;
-    if (key && seen.has(key)) {
-      continue;
+    if (seen.has(key)) {
+      return;
     }
     seen.add(key);
-    results.push(item);
-  }
+    last = item;
+  };
 
-  return results;
-}
-
-function collectCauses(build: JenkinsBuild): JenkinsBuildCause[] {
-  const actions = build.actions ?? [];
-  const results: JenkinsBuildCause[] = [];
-
-  for (const action of actions) {
-    if (!isActionWithCauses(action)) {
-      continue;
+  if (build.changeSet?.items) {
+    for (const item of build.changeSet.items) {
+      visit(item);
     }
-    for (const cause of action.causes) {
-      results.push(cause);
+  }
+  for (const changeSet of build.changeSets ?? []) {
+    if (changeSet?.items) {
+      for (const item of changeSet.items) {
+        visit(item);
+      }
     }
   }
 
-  return results;
+  return last;
 }
 
-function collectParameters(
+function visitMatchingParameters(
   build: JenkinsBuild,
   options: {
     parameterAllowList: NormalizedPatterns;
     parameterDenyList: NormalizedPatterns;
     parameterMaskPatterns: NormalizedPatterns;
-  }
-): Array<JenkinsBuildParameter & { isMasked: boolean }> {
+  },
+  visitor: (name: string, value: unknown, isMasked: boolean) => void
+): void {
   const actions = build.actions ?? [];
-  const results: Array<JenkinsBuildParameter & { isMasked: boolean }> = [];
   const seen = new Set<string>();
 
   for (const action of actions) {
@@ -320,11 +347,9 @@ function collectParameters(
       }
       seen.add(name);
       const isMasked = matchesAnyPattern(name, options.parameterMaskPatterns);
-      results.push({ name, value: parameter.value, isMasked });
+      visitor(name, parameter.value, isMasked);
     }
   }
-
-  return results;
 }
 
 function isActionWithCauses(action: BuildAction | null): action is { causes: JenkinsBuildCause[] } {
@@ -379,12 +404,12 @@ function matchesAnyPattern(value: string, patterns: NormalizedPatterns): boolean
   return false;
 }
 
-function truncateText(value: string, maxChars: number): { text: string; truncated: boolean } {
+function truncateText(value: string, maxChars: number): string {
   if (maxChars <= 0 || value.length <= maxChars) {
-    return { text: value, truncated: false };
+    return value;
   }
   const clipped = value.slice(0, Math.max(0, maxChars - 3));
-  return { text: `${clipped}...`, truncated: true };
+  return `${clipped}...`;
 }
 
 function formatParameterValue(value: unknown): string {
