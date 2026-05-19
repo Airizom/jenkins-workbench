@@ -7,11 +7,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { ActivityViewModel, TreeActivityOptions } from "../ActivityTypes";
 import { ActivityClassifier } from "./ActivityClassifier";
-import {
-  areActivityCollectionTargetsFull,
-  createActivityGroups,
-  promoteAwaitingInputJobs
-} from "./ActivityCollectionPolicy";
+import { createActivityGroups, promoteAwaitingInputJobs } from "./ActivityCollectionPolicy";
 import { buildActivityViewModel } from "./ActivityViewModelBuilder";
 import { AwaitingInputEnricher } from "./AwaitingInputEnricher";
 
@@ -41,6 +37,9 @@ export class ActivityCollector {
     const collectionOptions = options.activityOptions.collection;
     const pendingInputCandidateLimit = collectionOptions.pendingInputCandidateLimit;
     const groups = createActivityGroups();
+    const failingItems = groups.get("failing") ?? [];
+    const unstableItems = groups.get("unstable") ?? [];
+    const runningItems = groups.get("running") ?? [];
     const runningCandidates: JobSearchEntry[] = [];
     let stop = false;
     const cancellation = {
@@ -71,12 +70,10 @@ export class ActivityCollector {
         }
 
         if (
-          areActivityCollectionTargetsFull(
-            groups,
-            runningCandidates.length,
-            collectionLimit,
-            pendingInputCandidateLimit
-          )
+          runningCandidates.length >= pendingInputCandidateLimit &&
+          failingItems.length >= collectionLimit &&
+          unstableItems.length >= collectionLimit &&
+          runningItems.length >= collectionLimit
         ) {
           stop = true;
           break;

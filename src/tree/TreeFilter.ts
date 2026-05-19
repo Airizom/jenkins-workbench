@@ -29,10 +29,19 @@ export class JenkinsTreeFilter {
         : undefined;
     const branchNeedle = branchFilter?.toLowerCase() ?? "";
     const hasBranchFilter = branchNeedle.length > 0;
-    const revealOverrideKeys = overrideKeys && overrideKeys.size > 0 ? overrideKeys : undefined;
-    const overrideKeyPrefix = revealOverrideKeys
-      ? `${environment.scope}:${environment.environmentId}:`
-      : undefined;
+    let overrideUrlSet: Set<string> | undefined;
+    if (overrideKeys && overrideKeys.size > 0) {
+      const overrideKeyPrefix = `${environment.scope}:${environment.environmentId}:`;
+      const prefixLen = overrideKeyPrefix.length;
+      for (const key of overrideKeys) {
+        if (key.startsWith(overrideKeyPrefix)) {
+          if (!overrideUrlSet) {
+            overrideUrlSet = new Set<string>();
+          }
+          overrideUrlSet.add(key.slice(prefixLen));
+        }
+      }
+    }
 
     if (jobFilterMode === "all" && !hasBranchFilter) {
       return jobs;
@@ -43,7 +52,7 @@ export class JenkinsTreeFilter {
         return true;
       }
 
-      if (overrideKeyPrefix && revealOverrideKeys?.has(`${overrideKeyPrefix}${job.url}`)) {
+      if (overrideUrlSet?.has(job.url)) {
         return true;
       }
 

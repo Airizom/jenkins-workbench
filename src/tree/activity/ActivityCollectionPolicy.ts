@@ -9,20 +9,6 @@ export function createActivityGroups(): ActivityGroups {
   );
 }
 
-export function areActivityCollectionTargetsFull(
-  groups: ActivityGroups,
-  runningCandidateCount: number,
-  collectionLimit: number,
-  pendingInputCandidateLimit: number
-): boolean {
-  return (
-    runningCandidateCount >= pendingInputCandidateLimit &&
-    (groups.get("failing")?.length ?? 0) >= collectionLimit &&
-    (groups.get("unstable")?.length ?? 0) >= collectionLimit &&
-    (groups.get("running")?.length ?? 0) >= collectionLimit
-  );
-}
-
 export function promoteAwaitingInputJobs(
   groups: ActivityGroups,
   runningCandidates: JobSearchEntry[],
