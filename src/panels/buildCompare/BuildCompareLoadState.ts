@@ -1,4 +1,4 @@
-import { formatError } from "../buildDetails/BuildDetailsFormatters";
+import { formatError } from "../../formatters/ErrorFormatters";
 
 export type BuildCompareOptionalResult<T> =
   | { status: "available"; value: T }

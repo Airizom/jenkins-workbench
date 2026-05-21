@@ -1,4 +1,8 @@
 import * as vscode from "vscode";
+import {
+  formatOptionalDurationMs,
+  formatOptionalLocaleTimestamp
+} from "../../formatters/DisplayFormatters";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { parseBuildUrl } from "../../jenkins/urls";
 import type { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
@@ -146,29 +150,12 @@ function createCompareBuildQuickPickItem(build: {
   return {
     label: `#${build.number}`,
     description: build.result ?? "Unknown",
-    detail: [formatComparisonTimestamp(build.timestamp), formatComparisonDuration(build.duration)]
+    detail: [
+      formatOptionalLocaleTimestamp(build.timestamp),
+      formatOptionalDurationMs(build.duration)
+    ]
       .filter((part) => part.length > 0)
       .join(" • "),
     buildUrl: build.url
   };
-}
-
-function formatComparisonTimestamp(timestamp?: number): string {
-  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
-    return "";
-  }
-  return new Date(timestamp).toLocaleString();
-}
-
-function formatComparisonDuration(duration?: number): string {
-  if (typeof duration !== "number" || !Number.isFinite(duration) || duration < 0) {
-    return "";
-  }
-  const totalSeconds = Math.round(duration / 1000);
-  if (totalSeconds < 60) {
-    return `${totalSeconds}s`;
-  }
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }

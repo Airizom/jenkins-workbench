@@ -1,9 +1,9 @@
+import { formatNumber } from "../../formatters/DisplayFormatters";
 import type {
   JenkinsBuildAction,
   JenkinsBuildDetails,
   JenkinsBuildParameter
 } from "../../jenkins/types";
-import { formatNumber } from "../buildDetails/BuildDetailsFormatters";
 import type { BuildParameterRedactionOptions } from "./BuildCompareOptions";
 import { normalizeString } from "./BuildCompareSectionShared";
 import type {

@@ -1,5 +1,5 @@
+import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { formatError } from "../buildDetails/BuildDetailsFormatters";
 import type { BuildCompareBackend } from "./BuildCompareBackend";
 import type { BuildCompareConsoleOptions } from "./BuildCompareOptions";
 import type {

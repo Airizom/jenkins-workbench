@@ -1,6 +1,6 @@
 import type * as vscode from "vscode";
+import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { formatError } from "../buildDetails/BuildDetailsFormatters";
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildCompareBackend } from "./BuildCompareBackend";
 import type { BuildCompareOptions } from "./BuildCompareOptions";

@@ -1,5 +1,5 @@
+import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsBuildDetails, JenkinsChangeSetItem } from "../../jenkins/types";
-import { formatNumber } from "../buildDetails/BuildDetailsFormatters";
 import { normalizeString } from "./BuildCompareSectionShared";
 import type {
   BuildCompareChangesetItem,

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatError } from "../formatters/ErrorFormatters";
 import type { CurrentBranchRepositoryContext } from "./CurrentBranchTypes";
 
 const GITHUB_PULL_REQUEST_EXTENSION_IDS = [
@@ -118,8 +119,4 @@ function normalizeRepositoryPullRequest(
 
 function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
 }

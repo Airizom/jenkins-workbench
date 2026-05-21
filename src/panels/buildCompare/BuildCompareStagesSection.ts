@@ -1,14 +1,11 @@
+import { formatNumber } from "../../formatters/DisplayFormatters";
 import {
   type PipelineRun,
   type PipelineStage,
   toPipelineRun
 } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
-import {
-  formatDuration,
-  formatNumber,
-  normalizePipelineStatus
-} from "../buildDetails/BuildDetailsFormatters";
+import { formatDuration, normalizePipelineStatus } from "../buildDetails/BuildDetailsFormatters";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {

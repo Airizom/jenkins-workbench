@@ -1,10 +1,10 @@
+import { formatNumber } from "../../formatters/DisplayFormatters";
 import { hasCoverageAction } from "../../jenkins/coverage/JenkinsCoverageActionPath";
 import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
-import { formatNumber } from "./BuildDetailsFormatters";
 import type {
   BuildCoverageFileViewModel,
   BuildCoverageQualityGateViewModel,

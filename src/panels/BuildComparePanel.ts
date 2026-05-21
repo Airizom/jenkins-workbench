@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { BuildDetailsPanelLauncher } from "./BuildDetailsPanelLauncher";
@@ -18,7 +19,6 @@ import {
   isBuildComparePanelState,
   updateBuildComparePanelState
 } from "./buildCompare/shared/BuildComparePanelWebviewState";
-import { formatError } from "./buildDetails/BuildDetailsFormatters";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -66,7 +66,7 @@ export class BuildComparePanel {
           localResourceRoots: [getWebviewAssetsRoot(options.extensionUri)]
         }
       );
-      BuildComparePanel.configurePanel(panel, options.extensionUri);
+      configureWebviewPanel(panel, options.extensionUri, "terminal");
       BuildComparePanel.currentPanel = new BuildComparePanel(
         panel,
         options.extensionUri,
@@ -93,7 +93,7 @@ export class BuildComparePanel {
     state: unknown,
     options: BuildComparePanelReviveOptions
   ): Promise<void> {
-    BuildComparePanel.configurePanel(panel, options.extensionUri);
+    configureWebviewPanel(panel, options.extensionUri, "terminal");
     panel.title = BuildComparePanel.PANEL_TITLE;
 
     const revived = new BuildComparePanel(
@@ -106,18 +106,24 @@ export class BuildComparePanel {
     revived.getCompareOptions = options.getCompareOptions;
 
     if (!isBuildComparePanelState(state)) {
-      revived.renderRestoreError(
-        "This build comparison view could not be restored. Reopen it from Jenkins Workbench."
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildCompare", {
+        title: BuildComparePanel.PANEL_TITLE,
+        message:
+          "This build comparison view could not be restored. Reopen it from Jenkins Workbench.",
+        hint: "Open the comparison again from Jenkins Workbench to continue."
+      });
       return;
     }
 
     const environment = await resolveEnvironmentRef(options.environmentStore, state);
     if (!environment) {
-      revived.renderRestoreError(
-        "This build comparison view could not be restored because its Jenkins environment was removed.",
-        state
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildCompare", {
+        title: BuildComparePanel.PANEL_TITLE,
+        message:
+          "This build comparison view could not be restored because its Jenkins environment was removed.",
+        hint: "Open the comparison again from Jenkins Workbench to continue.",
+        panelState: state
+      });
       return;
     }
 
@@ -175,20 +181,25 @@ export class BuildComparePanel {
       );
     } catch (error) {
       if (options?.suppressErrors) {
-        this.renderRestoreError(
-          `Build comparison could not be loaded. ${formatError(error)}`,
-          this.serializedState
-        );
+        assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildCompare", {
+          title: BuildComparePanel.PANEL_TITLE,
+          message: `Build comparison could not be loaded. ${formatError(error)}`,
+          hint: "Open the comparison again from Jenkins Workbench to continue.",
+          panelState: this.serializedState
+        });
         return;
       }
       throw error;
     }
 
     if (result.status === "missingAssets") {
-      this.renderRestoreError(
-        "Build compare webview assets are missing. Run the extension build (npm run compile) and try again.",
-        this.serializedState
-      );
+      assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildCompare", {
+        title: BuildComparePanel.PANEL_TITLE,
+        message:
+          "Build compare webview assets are missing. Run the extension build (npm run compile) and try again.",
+        hint: "Open the comparison again from Jenkins Workbench to continue.",
+        panelState: this.serializedState
+      });
     }
   }
 
@@ -222,18 +233,5 @@ export class BuildComparePanel {
     return side === "baseline"
       ? this.serializedState.baselineBuildUrl
       : this.serializedState.targetBuildUrl;
-  }
-
-  private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    configureWebviewPanel(panel, extensionUri, "terminal");
-  }
-
-  private renderRestoreError(message: string, panelState?: BuildComparePanelSerializedState): void {
-    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildCompare", {
-      title: BuildComparePanel.PANEL_TITLE,
-      message,
-      hint: "Open the comparison again from Jenkins Workbench to continue.",
-      panelState: panelState ?? this.serializedState
-    });
   }
 }

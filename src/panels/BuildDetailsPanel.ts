@@ -110,7 +110,7 @@ export class BuildDetailsPanel {
           localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
         }
       );
-      BuildDetailsPanel.configurePanel(panel, extensionUri);
+      configureWebviewPanel(panel, extensionUri, "terminal");
       BuildDetailsPanel.currentPanel = new BuildDetailsPanel(
         panel,
         extensionUri,
@@ -145,7 +145,7 @@ export class BuildDetailsPanel {
     state: unknown,
     options: BuildDetailsPanelReviveOptions
   ): Promise<void> {
-    BuildDetailsPanel.configurePanel(panel, options.extensionUri);
+    configureWebviewPanel(panel, options.extensionUri, "terminal");
     panel.title = "Build Details";
 
     const revived = new BuildDetailsPanel(
@@ -166,19 +166,24 @@ export class BuildDetailsPanel {
     );
 
     if (!isBuildDetailsPanelState(state)) {
-      revived.renderRestoreError(
-        "This build details view could not be restored. Reopen it from Jenkins Workbench."
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildDetails", {
+        title: "Build Details",
+        message: "This build details view could not be restored. Reopen it from Jenkins Workbench.",
+        hint: "Open the build again from Jenkins Workbench to continue."
+      });
       return;
     }
     revived.serializedState = state;
 
     const environment = await resolveEnvironmentRef(options.environmentStore, state);
     if (!environment) {
-      revived.renderRestoreError(
-        "This build details view could not be restored because its Jenkins environment was removed.",
-        state
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildDetails", {
+        title: "Build Details",
+        message:
+          "This build details view could not be restored because its Jenkins environment was removed.",
+        hint: "Open the build again from Jenkins Workbench to continue.",
+        panelState: state
+      });
       return;
     }
 
@@ -357,24 +362,14 @@ export class BuildDetailsPanel {
     );
 
     if (result.status === "missingAssets") {
-      this.renderRestoreError(
-        "Build details webview assets are missing. Run the extension build (npm run compile) and try again.",
-        panelState
-      );
+      assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildDetails", {
+        title: "Build Details",
+        message:
+          "Build details webview assets are missing. Run the extension build (npm run compile) and try again.",
+        hint: "Open the build again from Jenkins Workbench to continue.",
+        panelState: panelState ?? this.serializedState
+      });
     }
-  }
-
-  private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    configureWebviewPanel(panel, extensionUri, "terminal");
-  }
-
-  private renderRestoreError(message: string, panelState?: BuildDetailsPanelSerializedState): void {
-    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildDetails", {
-      title: "Build Details",
-      message,
-      hint: "Open the build again from Jenkins Workbench to continue.",
-      panelState: panelState ?? this.serializedState
-    });
   }
 }
 

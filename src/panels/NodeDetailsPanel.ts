@@ -113,7 +113,7 @@ export class NodeDetailsPanel {
           localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
         }
       );
-      NodeDetailsPanel.configurePanel(panel, extensionUri);
+      configureWebviewPanel(panel, extensionUri, "server");
       NodeDetailsPanel.currentPanel = new NodeDetailsPanel(panel, extensionUri);
     }
 
@@ -134,7 +134,7 @@ export class NodeDetailsPanel {
     state: unknown,
     options: NodeDetailsPanelReviveOptions
   ): Promise<void> {
-    NodeDetailsPanel.configurePanel(panel, options.extensionUri);
+    configureWebviewPanel(panel, options.extensionUri, "server");
     panel.title = "Node Details";
 
     const revived = new NodeDetailsPanel(panel, options.extensionUri);
@@ -145,18 +145,23 @@ export class NodeDetailsPanel {
     revived.setRefreshHost(options.refreshHost);
 
     if (!isNodeDetailsPanelState(state)) {
-      revived.renderRestoreError(
-        "This node details view could not be restored. Reopen it from Jenkins Workbench."
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeDetails", {
+        title: "Node Details",
+        message: "This node details view could not be restored. Reopen it from Jenkins Workbench.",
+        hint: "Open the node again from Jenkins Workbench to continue."
+      });
       return;
     }
 
     const environment = await resolveEnvironmentRef(options.environmentStore, state);
     if (!environment) {
-      revived.renderRestoreError(
-        "This node details view could not be restored because its Jenkins environment was removed.",
-        state
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeDetails", {
+        title: "Node Details",
+        message:
+          "This node details view could not be restored because its Jenkins environment was removed.",
+        hint: "Open the node again from Jenkins Workbench to continue.",
+        panelState: state
+      });
       return;
     }
 
@@ -243,10 +248,13 @@ export class NodeDetailsPanel {
         "nodeDetails"
       ));
     } catch {
-      this.renderRestoreError(
-        "Node details webview assets are missing. Run the extension build (npm run compile) and try again.",
+      assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeDetails", {
+        title: "Node Details",
+        message:
+          "Node details webview assets are missing. Run the extension build (npm run compile) and try again.",
+        hint: "Open the node again from Jenkins Workbench to continue.",
         panelState
-      );
+      });
       return;
     }
     this.panel.webview.html = renderLoadingHtml({
@@ -453,18 +461,5 @@ export class NodeDetailsPanel {
       return;
     }
     await this.refreshDetailsWith(this.currentDetailLevel);
-  }
-
-  private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    configureWebviewPanel(panel, extensionUri, "server");
-  }
-
-  private renderRestoreError(message: string, panelState?: NodeDetailsPanelSerializedState): void {
-    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeDetails", {
-      title: "Node Details",
-      message,
-      hint: "Open the node again from Jenkins Workbench to continue.",
-      panelState
-    });
   }
 }

@@ -29,7 +29,6 @@ import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtm
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
-  type SerializedEnvironmentState,
   createSerializedEnvironmentState,
   isSerializedEnvironmentState,
   resolveEnvironmentRef
@@ -83,7 +82,7 @@ export class NodeCapacityPanel {
           localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
         }
       );
-      NodeCapacityPanel.configurePanel(panel, extensionUri);
+      configureWebviewPanel(panel, extensionUri, "server");
       NodeCapacityPanel.currentPanel = new NodeCapacityPanel(panel, extensionUri);
     }
 
@@ -102,7 +101,7 @@ export class NodeCapacityPanel {
     state: unknown,
     options: NodeCapacityPanelReviveOptions
   ): Promise<void> {
-    NodeCapacityPanel.configurePanel(panel, options.extensionUri);
+    configureWebviewPanel(panel, options.extensionUri, "server");
     panel.title = "Node Capacity";
 
     const revived = new NodeCapacityPanel(panel, options.extensionUri);
@@ -112,18 +111,23 @@ export class NodeCapacityPanel {
     revived.setRefreshHost(options.refreshHost);
 
     if (!isSerializedEnvironmentState(state)) {
-      revived.renderRestoreError(
-        "This node capacity view could not be restored. Reopen it from Jenkins Workbench."
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeCapacity", {
+        title: "Node Capacity",
+        message: "This node capacity view could not be restored. Reopen it from Jenkins Workbench.",
+        hint: "Open node capacity again from Jenkins Workbench to continue."
+      });
       return;
     }
 
     const environment = await resolveEnvironmentRef(options.environmentStore, state);
     if (!environment) {
-      revived.renderRestoreError(
-        "This node capacity view could not be restored because its Jenkins environment was removed.",
-        state
-      );
+      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeCapacity", {
+        title: "Node Capacity",
+        message:
+          "This node capacity view could not be restored because its Jenkins environment was removed.",
+        hint: "Open node capacity again from Jenkins Workbench to continue.",
+        panelState: state
+      });
       return;
     }
 
@@ -205,10 +209,13 @@ export class NodeCapacityPanel {
         "nodeCapacity"
       ));
     } catch {
-      this.renderRestoreError(
-        "Node capacity webview assets are missing. Run the extension build (npm run compile) and try again.",
+      assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeCapacity", {
+        title: "Node Capacity",
+        message:
+          "Node capacity webview assets are missing. Run the extension build (npm run compile) and try again.",
+        hint: "Open node capacity again from Jenkins Workbench to continue.",
         panelState
-      );
+      });
       return;
     }
 
@@ -387,18 +394,5 @@ export class NodeCapacityPanel {
     }
     clearInterval(this.refreshTimer);
     this.refreshTimer = undefined;
-  }
-
-  private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
-    configureWebviewPanel(panel, extensionUri, "server");
-  }
-
-  private renderRestoreError(message: string, panelState?: SerializedEnvironmentState): void {
-    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeCapacity", {
-      title: "Node Capacity",
-      message,
-      hint: "Open node capacity again from Jenkins Workbench to continue.",
-      panelState
-    });
   }
 }

@@ -81,11 +81,8 @@ export function truncateConsoleText(
 
 export { escapeHtml } from "../../shared/html";
 
+export { formatNumber } from "../../formatters/DisplayFormatters";
 export { formatError } from "../../formatters/ErrorFormatters";
-
-export function formatNumber(value: number): string {
-  return value.toLocaleString();
-}
 
 export function normalizePipelineStatus(status?: string): {
   label: string;

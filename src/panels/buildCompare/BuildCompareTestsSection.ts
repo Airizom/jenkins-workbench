@@ -1,5 +1,5 @@
+import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/types";
-import { formatNumber } from "../buildDetails/BuildDetailsFormatters";
 import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";

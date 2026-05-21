@@ -1,4 +1,4 @@
-import { formatNumber } from "../buildDetails/BuildDetailsFormatters";
+import { formatNumber } from "../../formatters/DisplayFormatters";
 
 export interface TestReportCountSummaryInput {
   failed?: number;
