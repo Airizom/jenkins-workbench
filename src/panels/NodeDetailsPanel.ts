@@ -27,7 +27,8 @@ import {
   PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
-  disposePanelResources
+  disposePanelResources,
+  shouldRefreshEnvironmentScopedPanel
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
@@ -437,13 +438,16 @@ export class NodeDetailsPanel {
   }
 
   private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
-    if (!this.environment || !this.nodeUrl || !this.hasRendered) {
-      return;
-    }
-    if (environmentId && this.environment.environmentId !== environmentId) {
-      return;
-    }
-    if (!this.panel.visible) {
+    if (
+      !this.nodeUrl ||
+      !shouldRefreshEnvironmentScopedPanel({
+        environment: this.environment,
+        environmentId,
+        hasRendered: this.hasRendered,
+        requireVisible: true,
+        panel: this.panel
+      })
+    ) {
       return;
     }
     await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });

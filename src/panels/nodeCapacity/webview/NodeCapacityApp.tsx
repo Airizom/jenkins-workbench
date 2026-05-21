@@ -5,6 +5,7 @@ import type {
   NodeCapacitySeverity
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import type { QueueWorkItemViewModel } from "../../../shared/queueWork/QueueWorkContracts";
+import { QueueWorkItemRow } from "../../shared/webview/components/queueWork/QueueWorkItemRow";
 import { Alert } from "../../shared/webview/components/ui/alert";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
@@ -441,37 +442,7 @@ function QueueRow({
 }): JSX.Element {
   return (
     <div className="rounded-md border border-border bg-background p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium">{item.name}</span>
-            <Badge variant={item.stuck || item.blocked ? "secondary" : "muted"}>
-              {item.statusLabel}
-            </Badge>
-            {item.queuedForLabels.length > 0 ? (
-              <Badge variant="outline">{item.queuedForLabels.join(", ")}</Badge>
-            ) : null}
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            #{item.position} in queue
-            {item.queuedDurationLabel ? ` - ${item.queuedDurationLabel}` : ""}
-          </div>
-          {item.reason ? (
-            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.reason}</p>
-          ) : null}
-        </div>
-        {item.taskUrl ? (
-          <Button
-            aria-label={`Open ${item.name} in Jenkins`}
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={() => item.taskUrl && onOpenExternal(item.taskUrl)}
-          >
-            <ExternalLinkIcon className="h-4 w-4" />
-          </Button>
-        ) : null}
-      </div>
+      <QueueWorkItemRow item={item} onOpenExternal={onOpenExternal} action="external-icon" />
     </div>
   );
 }

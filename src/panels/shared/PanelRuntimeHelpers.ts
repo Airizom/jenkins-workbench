@@ -27,6 +27,25 @@ export function attachPanelLifecycle(
   );
 }
 
+export function shouldRefreshEnvironmentScopedPanel(options: {
+  environment?: { environmentId: string };
+  environmentId?: string;
+  hasRendered: boolean;
+  requireVisible?: boolean;
+  panel?: vscode.WebviewPanel;
+}): boolean {
+  if (!options.environment || !options.hasRendered) {
+    return false;
+  }
+  if (options.environmentId && options.environment.environmentId !== options.environmentId) {
+    return false;
+  }
+  if (options.requireVisible && options.panel && !options.panel.visible) {
+    return false;
+  }
+  return true;
+}
+
 export function bindEnvironmentRefresh(
   current: vscode.Disposable | undefined,
   refreshHost:

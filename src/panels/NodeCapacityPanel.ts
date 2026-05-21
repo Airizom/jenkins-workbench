@@ -7,6 +7,7 @@ import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { NodeCapacityService } from "../services/NodeCapacityService";
+import { buildNodeCapacityErrorViewModel } from "../shared/nodeCapacity/NodeCapacityDefaults";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import { NodeDetailsPanel } from "./NodeDetailsPanel";
@@ -22,7 +23,8 @@ import {
   PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
-  disposePanelResources
+  disposePanelResources,
+  shouldRefreshEnvironmentScopedPanel
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
@@ -278,28 +280,7 @@ export class NodeCapacityPanel {
       if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
-      return {
-        environmentLabel: this.environment.url,
-        updatedAt: new Date().toISOString(),
-        summary: {
-          totalNodes: 0,
-          onlineNodes: 0,
-          offlineNodes: 0,
-          totalExecutors: 0,
-          busyExecutors: 0,
-          idleExecutors: 0,
-          offlineExecutors: 0,
-          queuedCount: 0,
-          stuckCount: 0,
-          blockedCount: 0,
-          buildableCount: 0,
-          bottleneckCount: 0
-        },
-        pools: [],
-        hiddenLabelQueueItems: [],
-        errors: [formatActionError(error)],
-        loading: false
-      };
+      return buildNodeCapacityErrorViewModel(this.environment.url, [formatActionError(error)]);
     }
   }
 
@@ -363,10 +344,15 @@ export class NodeCapacityPanel {
   }
 
   private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
-    if (!this.environment || !this.hasRendered || !this.panel.visible) {
-      return;
-    }
-    if (environmentId && this.environment.environmentId !== environmentId) {
+    if (
+      !shouldRefreshEnvironmentScopedPanel({
+        environment: this.environment,
+        environmentId,
+        hasRendered: this.hasRendered,
+        requireVisible: true,
+        panel: this.panel
+      })
+    ) {
       return;
     }
     await this.refreshCapacity({ skipLoading: true });

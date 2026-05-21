@@ -1,5 +1,5 @@
+import { QueueWorkItemRow } from "../../../../shared/webview/components/queueWork/QueueWorkItemRow";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
-import { Button } from "../../../../shared/webview/components/ui/button";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 
 type NodeDetailsQueuedWorkSectionProps = {
@@ -77,35 +77,8 @@ function QueueGroup({
       </div>
       <div className="divide-y divide-border">
         {items.map((item) => (
-          <div key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="truncate text-sm font-medium">{item.name}</span>
-                <Badge variant={item.stuck || item.blocked ? "secondary" : "muted"}>
-                  {item.statusLabel}
-                </Badge>
-                {item.queuedForLabels.length > 0 ? (
-                  <Badge variant="outline">{item.queuedForLabels.join(", ")}</Badge>
-                ) : null}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                #{item.position} in queue
-                {item.queuedDurationLabel ? ` - ${item.queuedDurationLabel}` : ""}
-              </div>
-              {item.reason ? (
-                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.reason}</p>
-              ) : null}
-            </div>
-            {item.taskUrl ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => item.taskUrl && onOpenExternal(item.taskUrl)}
-              >
-                Open
-              </Button>
-            ) : null}
+          <div key={item.id} className="px-4 py-3">
+            <QueueWorkItemRow item={item} onOpenExternal={onOpenExternal} />
           </div>
         ))}
       </div>

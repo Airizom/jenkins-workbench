@@ -2,6 +2,7 @@ import type {
   NodeCapacityExecutorViewModel,
   NodeCapacityViewModel
 } from "../../../../shared/nodeCapacity/NodeCapacityContracts";
+import { createEmptyNodeCapacitySummary } from "../../../../shared/nodeCapacity/NodeCapacityDefaults";
 
 export type NodeCapacityState = NodeCapacityViewModel & {
   hasLoaded: boolean;
@@ -20,20 +21,7 @@ const FALLBACK_UPDATED_AT = "1970-01-01T00:00:00.000Z";
 export const FALLBACK_STATE: NodeCapacityState = {
   environmentLabel: "Jenkins",
   updatedAt: FALLBACK_UPDATED_AT,
-  summary: {
-    totalNodes: 0,
-    onlineNodes: 0,
-    offlineNodes: 0,
-    totalExecutors: 0,
-    busyExecutors: 0,
-    idleExecutors: 0,
-    offlineExecutors: 0,
-    queuedCount: 0,
-    stuckCount: 0,
-    blockedCount: 0,
-    buildableCount: 0,
-    bottleneckCount: 0
-  },
+  summary: createEmptyNodeCapacitySummary(),
   pools: [],
   hiddenLabelQueueItems: [],
   errors: [],

@@ -16,35 +16,28 @@ export function LoadingSkeleton({ className, variant = "build", ...props }: Load
 
 function BuildLoadingSkeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}
-      {...props}
-    >
-      <header className="sticky-header">
-        <LoadingProgressBar />
-        <div className="mx-auto max-w-6xl px-4 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Skeleton className="h-4 w-4 rounded-sm" />
-              <Skeleton className="h-4 w-44 max-w-[48vw]" />
-              <Skeleton className="h-4 w-16 rounded-full" />
+    <PanelLoadingShell className={className} {...props}>
+      <PanelLoadingHeader
+        leading={<Skeleton className="h-4 w-4 rounded-sm" />}
+        title={<Skeleton className="h-4 w-44 max-w-[48vw]" />}
+        badge={<Skeleton className="h-4 w-16 rounded-full" />}
+        actions={
+          <>
+            <div className="hidden sm:flex items-center gap-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-20" />
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="hidden sm:flex items-center gap-2">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-3 w-20" />
-              </div>
-              <Skeleton className="h-7 w-18 rounded" />
-            </div>
-          </div>
-          <div className="sm:hidden flex items-center gap-2 mt-1.5">
+            <Skeleton className="h-7 w-18 rounded" />
+          </>
+        }
+        mobileMeta={
+          <>
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-3 w-20" />
-          </div>
-        </div>
-        <div className="h-px bg-border" />
-      </header>
+          </>
+        }
+      />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
         <div className="border-b border-border">
@@ -61,7 +54,7 @@ function BuildLoadingSkeleton({ className, ...props }: HTMLAttributes<HTMLDivEle
           <BuildSkeletonSummaryCard />
         </div>
       </main>
-    </div>
+    </PanelLoadingShell>
   );
 }
 
@@ -120,37 +113,30 @@ function BuildSummaryMetric() {
 
 function NodeLoadingSkeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}
-      {...props}
-    >
-      <header className="sticky-header">
-        <LoadingProgressBar />
-        <div className="mx-auto max-w-6xl px-4 py-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Skeleton className="h-7 w-7 rounded" />
-              <div className="min-w-0 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-40 max-w-[44vw]" />
-                  <Skeleton className="h-4 w-14 rounded-full" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-3 w-20" />
-                  <Skeleton className="h-3 w-24" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-              </div>
+    <PanelLoadingShell className={className} {...props}>
+      <PanelLoadingHeader
+        leading={<Skeleton className="h-7 w-7 rounded" />}
+        title={
+          <div className="min-w-0 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-40 max-w-[44vw]" />
+              <Skeleton className="h-4 w-14 rounded-full" />
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Skeleton className="h-7 w-7 rounded" />
-              <Skeleton className="h-7 w-24 rounded" />
-              <Skeleton className="h-7 w-18 rounded" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-20" />
             </div>
           </div>
-        </div>
-        <div className="h-px bg-border" />
-      </header>
+        }
+        actions={
+          <>
+            <Skeleton className="h-7 w-7 rounded" />
+            <Skeleton className="h-7 w-24 rounded" />
+            <Skeleton className="h-7 w-18 rounded" />
+          </>
+        }
+      />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
         <div className="border-b border-border">
@@ -188,7 +174,62 @@ function NodeLoadingSkeleton({ className, ...props }: HTMLAttributes<HTMLDivElem
           </div>
         </div>
       </main>
+    </PanelLoadingShell>
+  );
+}
+
+function PanelLoadingShell({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLDivElement>): JSX.Element {
+  return (
+    <div
+      className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}
+      {...props}
+    >
+      {children}
     </div>
+  );
+}
+
+function PanelLoadingHeader({
+  leading,
+  title,
+  badge,
+  actions,
+  mobileMeta
+}: {
+  leading: React.ReactNode;
+  title: React.ReactNode;
+  badge?: React.ReactNode;
+  actions: React.ReactNode;
+  mobileMeta?: React.ReactNode;
+}): JSX.Element {
+  return (
+    <header className="sticky-header">
+      <LoadingProgressBar />
+      <div className="mx-auto max-w-6xl px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {leading}
+            {badge ? (
+              <div className="flex items-center gap-2 min-w-0">
+                {title}
+                {badge}
+              </div>
+            ) : (
+              title
+            )}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">{actions}</div>
+        </div>
+        {mobileMeta ? (
+          <div className="sm:hidden flex items-center gap-2 mt-1.5">{mobileMeta}</div>
+        ) : null}
+      </div>
+      <div className="h-px bg-border" />
+    </header>
   );
 }
 
