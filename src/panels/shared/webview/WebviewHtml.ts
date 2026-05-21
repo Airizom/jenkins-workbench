@@ -1,4 +1,7 @@
+import type * as vscode from "vscode";
 import { type LoadingSkeletonVariant, renderLoadingSkeletonHtml } from "./LoadingSkeletonHtml";
+import { type WebviewEntryName, resolveWebviewAssets } from "./WebviewAssets";
+import { createNonce } from "./WebviewNonce";
 
 export interface WebviewRenderOptions {
   cspSource: string;
@@ -46,6 +49,36 @@ export interface PanelRestoreErrorOptions {
   hint: string;
   styleUris: string[];
   panelState?: unknown;
+}
+
+export interface PanelManifestErrorOptions {
+  title: string;
+  message: string;
+  hint: string;
+  panelState?: unknown;
+}
+
+export function renderPanelManifestErrorHtml(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  entryName: WebviewEntryName,
+  options: PanelManifestErrorOptions
+): string {
+  const nonce = createNonce();
+  let styleUris: string[] = [];
+  try {
+    styleUris = resolveWebviewAssets(webview, extensionUri, entryName).styleUris;
+  } catch {
+    // keep empty
+  }
+  return renderPanelRestoreErrorHtml(webview.cspSource, {
+    nonce,
+    title: options.title,
+    message: options.message,
+    hint: options.hint,
+    styleUris,
+    panelState: options.panelState
+  });
 }
 
 export function renderPanelRestoreErrorHtml(

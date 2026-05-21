@@ -1,4 +1,4 @@
-import { formatDurationMs } from "../formatters/DurationFormatters";
+import { formatQueueDuration } from "../formatters/DurationFormatters";
 import type { JenkinsQueueItemInfo } from "../jenkins/JenkinsDataService";
 import type {
   NodeQueuedWorkViewModel,
@@ -77,13 +77,6 @@ function formatQueueStatus(item: JenkinsQueueItemInfo): string {
     return "Buildable";
   }
   return "Waiting";
-}
-
-function formatQueueDuration(inQueueSince?: number): string | undefined {
-  if (typeof inQueueSince !== "number" || !Number.isFinite(inQueueSince)) {
-    return undefined;
-  }
-  return formatDurationMs(Math.max(0, Date.now() - inQueueSince));
 }
 
 function inferQueuedLabelsFromBlockedNodeReason(

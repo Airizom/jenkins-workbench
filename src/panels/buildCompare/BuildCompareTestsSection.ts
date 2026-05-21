@@ -1,10 +1,6 @@
 import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/types";
-import { formatNumber, formatTestDuration } from "../buildDetails/BuildDetailsFormatters";
-import {
-  type NormalizedTestStatus,
-  formatTestStatusLabel,
-  normalizeTestStatus
-} from "../buildDetails/TestStatusFormatters";
+import { formatNumber } from "../buildDetails/BuildDetailsFormatters";
+import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {
@@ -12,15 +8,7 @@ import type {
   BuildCompareTestsSectionViewModel
 } from "./shared/BuildCompareContracts";
 
-interface NormalizedTestCase {
-  key: string;
-  name: string;
-  className?: string;
-  suiteName?: string;
-  status: NormalizedTestStatus;
-  statusLabel: string;
-  durationLabel?: string;
-}
+type NormalizedTestCase = NormalizedTestCaseBase;
 
 export function buildTestsSection(
   baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
@@ -192,22 +180,7 @@ function normalizeTestCase(
   testCase: JenkinsTestReportCase,
   suiteName: string | undefined
 ): NormalizedTestCase | undefined {
-  const name = normalizeString(testCase.name);
-  if (!name) {
-    return undefined;
-  }
-  const className = normalizeString(testCase.className);
-  const key = `${className ?? ""}::${suiteName ?? ""}::${name}`;
-  const status = normalizeTestStatus(testCase.status);
-  return {
-    key,
-    name,
-    className,
-    suiteName,
-    status,
-    statusLabel: formatTestStatusLabel(status),
-    durationLabel: formatTestDuration(testCase.duration)
-  };
+  return normalizeTestCaseBase(testCase, suiteName);
 }
 
 function buildTestCaseOccurrenceKey(key: string, occurrence: number): string {

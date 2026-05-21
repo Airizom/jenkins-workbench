@@ -4,8 +4,8 @@ import type {
   JenkinsTestSummaryAction
 } from "../../jenkins/types";
 import { pickFiniteNumber } from "../../shared/numbers";
-import { formatNumber, formatTestDuration } from "./BuildDetailsFormatters";
-import { formatTestStatusLabel, normalizeTestStatus } from "./TestStatusFormatters";
+import { normalizeTestCaseBase } from "../shared/TestCaseViewModel";
+import { formatNumber } from "./BuildDetailsFormatters";
 import type {
   BuildDetailsTestStateViewModel,
   BuildTestCaseViewModel,
@@ -129,22 +129,31 @@ export function buildTestResultsViewModel(
   for (const [suiteIndex, suite] of (testReport.suites ?? []).entries()) {
     const suiteName = suite.name?.trim() || undefined;
     for (const [caseIndex, testCase] of (suite.cases ?? []).entries()) {
-      const name = testCase.name?.trim() || testCase.className?.trim() || "Unnamed test";
-      const className = testCase.className?.trim() || undefined;
-      const status = normalizeTestStatus(testCase.status);
+      const normalized = normalizeTestCaseBase(testCase, suiteName, {
+        fallbackToClassName: true
+      });
+      if (!normalized) {
+        continue;
+      }
       items.push({
-        id: buildTestCaseId(suiteName, className, name, suiteIndex, caseIndex),
-        name,
-        className,
-        suiteName,
-        status,
-        statusLabel: formatTestStatusLabel(status),
-        durationLabel: formatTestDuration(testCase.duration),
+        id: buildTestCaseId(
+          normalized.suiteName,
+          normalized.className,
+          normalized.name,
+          suiteIndex,
+          caseIndex
+        ),
+        name: normalized.name,
+        className: normalized.className,
+        suiteName: normalized.suiteName,
+        status: normalized.status,
+        statusLabel: normalized.statusLabel,
+        durationLabel: normalized.durationLabel,
         errorDetails: normalizeTestText(testCase.errorDetails, true),
         errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
         stdout: normalizeTestText(testCase.stdout, true),
         stderr: normalizeTestText(testCase.stderr, true),
-        canOpenSource: Boolean(options?.canOpenSource?.(className))
+        canOpenSource: Boolean(options?.canOpenSource?.(normalized.className))
       });
     }
   }

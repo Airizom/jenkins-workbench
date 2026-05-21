@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsNodeInfo } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { formatNodeOfflineReason } from "../../jenkins/NodeFormatters";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import { formatNodeDescription } from "../formatters";
 
@@ -52,12 +53,4 @@ function buildNodeTooltip(node: JenkinsNodeInfo): string | undefined {
   const reason = formatNodeOfflineReason(node);
   const statusLabel = node.temporarilyOffline ? "Temporarily offline" : "Offline";
   return reason ? `${statusLabel}\n${reason}` : statusLabel;
-}
-
-function formatNodeOfflineReason(node: JenkinsNodeInfo): string | undefined {
-  const reason =
-    node.offlineCauseReason?.trim() ||
-    node.offlineCause?.description?.trim() ||
-    node.offlineCause?.shortDescription?.trim();
-  return reason && reason.length > 0 ? reason : undefined;
 }

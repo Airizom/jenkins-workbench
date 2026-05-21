@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
+import { formatEnvironmentLabel } from "../../jenkins/EnvironmentLabels";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
@@ -227,24 +228,6 @@ export class PinnedSectionTreeItem extends vscode.TreeItem {
     super("Pinned", vscode.TreeItemCollapsibleState.None);
     this.contextValue = "pinnedSection";
     this.iconPath = PINNED_ICON;
-  }
-}
-
-function formatEnvironmentLabel(rawUrl: string): string {
-  const parsed = tryParseUrl(rawUrl) ?? tryParseUrl(`https://${rawUrl}`);
-  if (!parsed) {
-    return rawUrl;
-  }
-  const host = parsed.host || parsed.hostname;
-  const path = parsed.pathname.replace(/\/+$/, "");
-  return path && path !== "/" ? `${host}${path}` : host || rawUrl;
-}
-
-function tryParseUrl(rawUrl: string): URL | undefined {
-  try {
-    return new URL(rawUrl);
-  } catch {
-    return undefined;
   }
 }
 

@@ -26,7 +26,7 @@ import {
   endLoadingRequest
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
+import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
@@ -406,25 +406,17 @@ export class NodeCapacityPanel {
   }
 
   private renderRestoreError(message: string, panelState?: SerializedEnvironmentState): void {
-    const nonce = createNonce();
-    let styleUris: string[] = [];
-    try {
-      styleUris = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "nodeCapacity"
-      ).styleUris;
-    } catch {
-      styleUris = [];
-    }
-    this.panel.webview.html = renderPanelRestoreErrorHtml(this.panel.webview.cspSource, {
-      nonce,
-      title: "Node Capacity",
-      message,
-      hint: "Open node capacity again from Jenkins Workbench to continue.",
-      styleUris,
-      panelState
-    });
+    this.panel.webview.html = renderPanelManifestErrorHtml(
+      this.panel.webview,
+      this.extensionUri,
+      "nodeCapacity",
+      {
+        title: "Node Capacity",
+        message,
+        hint: "Open node capacity again from Jenkins Workbench to continue.",
+        panelState
+      }
+    );
   }
 }
 

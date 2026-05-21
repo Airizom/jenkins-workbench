@@ -31,7 +31,7 @@ import {
   endLoadingRequest
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
+import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
@@ -475,24 +475,16 @@ export class NodeDetailsPanel {
   }
 
   private renderRestoreError(message: string, panelState?: NodeDetailsPanelSerializedState): void {
-    const nonce = createNonce();
-    let styleUris: string[] = [];
-    try {
-      styleUris = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "nodeDetails"
-      ).styleUris;
-    } catch {
-      styleUris = [];
-    }
-    this.panel.webview.html = renderPanelRestoreErrorHtml(this.panel.webview.cspSource, {
-      nonce,
-      title: "Node Details",
-      message,
-      hint: "Open the node again from Jenkins Workbench to continue.",
-      styleUris,
-      panelState
-    });
+    this.panel.webview.html = renderPanelManifestErrorHtml(
+      this.panel.webview,
+      this.extensionUri,
+      "nodeDetails",
+      {
+        title: "Node Details",
+        message,
+        hint: "Open the node again from Jenkins Workbench to continue.",
+        panelState
+      }
+    );
   }
 }

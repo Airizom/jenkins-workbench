@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { formatDurationMs } from "../formatters/DurationFormatters";
+import { formatDurationMs, formatQueueDuration } from "../formatters/DurationFormatters";
 import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
 import { parseJobUrl } from "../jenkins/urls";
 import { resolveBuildElapsedMs } from "./BuildTiming";
@@ -234,14 +234,7 @@ export function formatQueueItemDescription(
   return parts.length > 0 ? parts.join(" • ") : undefined;
 }
 
-export function formatQueueDuration(inQueueSince?: number): string | undefined {
-  if (!Number.isFinite(inQueueSince)) {
-    return undefined;
-  }
-
-  const durationMs = Math.max(0, Date.now() - (inQueueSince as number));
-  return formatDurationMs(durationMs);
-}
+export { formatQueueDuration } from "../formatters/DurationFormatters";
 
 export function normalizeQueueReason(reason?: string): string | undefined {
   const trimmed = reason?.trim();

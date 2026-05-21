@@ -32,9 +32,8 @@ import {
   mergeBuildDetailsPanelState,
   withBuildDetailsPanelUiState
 } from "./buildDetails/shared/BuildDetailsPanelWebviewState";
-import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
-import { createNonce } from "./shared/webview/WebviewNonce";
+import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
+import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
@@ -370,25 +369,17 @@ export class BuildDetailsPanel {
   }
 
   private renderRestoreError(message: string, panelState?: BuildDetailsPanelSerializedState): void {
-    const nonce = createNonce();
-    let styleUris: string[] = [];
-    try {
-      styleUris = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "buildDetails"
-      ).styleUris;
-    } catch {
-      // keep empty
-    }
-    this.panel.webview.html = renderPanelRestoreErrorHtml(this.panel.webview.cspSource, {
-      nonce,
-      title: "Build Details",
-      message,
-      hint: "Open the build again from Jenkins Workbench to continue.",
-      styleUris,
-      panelState: panelState ?? this.serializedState
-    });
+    this.panel.webview.html = renderPanelManifestErrorHtml(
+      this.panel.webview,
+      this.extensionUri,
+      "buildDetails",
+      {
+        title: "Build Details",
+        message,
+        hint: "Open the build again from Jenkins Workbench to continue.",
+        panelState: panelState ?? this.serializedState
+      }
+    );
   }
 }
 

@@ -19,6 +19,13 @@ export function formatCompactDurationFromTotalSeconds(totalSeconds: number): str
   return parts.join(" ");
 }
 
+export function formatQueueDuration(inQueueSince?: number): string | undefined {
+  if (typeof inQueueSince !== "number" || !Number.isFinite(inQueueSince)) {
+    return undefined;
+  }
+  return formatDurationMs(Math.max(0, Date.now() - inQueueSince));
+}
+
 export function formatDurationMs(duration?: number): string {
   if (duration === undefined || !Number.isFinite(duration)) {
     return "Unknown";

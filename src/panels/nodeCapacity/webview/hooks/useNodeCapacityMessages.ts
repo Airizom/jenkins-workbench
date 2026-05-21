@@ -1,26 +1,23 @@
-import * as React from "react";
+import type { Dispatch } from "react";
+import { usePanelMessages } from "../../../shared/webview/hooks/usePanelMessages";
 import {
   type NodeCapacityOutgoingMessage,
   parseNodeCapacityOutgoingMessage
 } from "../../shared/NodeCapacityPanelMessages";
 import type { NodeCapacityAction } from "../state/nodeCapacityState";
 
-export function useNodeCapacityMessages(dispatch: React.Dispatch<NodeCapacityAction>): void {
-  React.useEffect(() => {
-    const handleMessage = (event: MessageEvent<unknown>) => {
-      const message = parseNodeCapacityOutgoingMessage(event.data);
-      if (!message) {
-        return;
-      }
-      dispatch(mapMessageToAction(message));
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [dispatch]);
+export function useNodeCapacityMessages(dispatch: Dispatch<NodeCapacityAction>): void {
+  usePanelMessages(parseNodeCapacityOutgoingMessage, dispatch, mapMessageToAction);
 }
 
-function mapMessageToAction(message: NodeCapacityOutgoingMessage): NodeCapacityAction {
+function mapMessageToAction(
+  message: NodeCapacityOutgoingMessage,
+  dispatch: Dispatch<NodeCapacityAction>
+): void {
+  dispatch(mapNodeCapacityMessageToAction(message));
+}
+
+function mapNodeCapacityMessageToAction(message: NodeCapacityOutgoingMessage): NodeCapacityAction {
   switch (message.type) {
     case "updateNodeCapacity":
       return { type: "updateNodeCapacity", payload: message.payload };

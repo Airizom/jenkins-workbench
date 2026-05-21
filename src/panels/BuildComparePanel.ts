@@ -19,9 +19,8 @@ import {
   updateBuildComparePanelState
 } from "./buildCompare/shared/BuildComparePanelWebviewState";
 import { formatError } from "./buildDetails/BuildDetailsFormatters";
-import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderPanelRestoreErrorHtml } from "./shared/webview/WebviewHtml";
-import { createNonce } from "./shared/webview/WebviewNonce";
+import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
+import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
@@ -230,25 +229,16 @@ export class BuildComparePanel {
   }
 
   private renderRestoreError(message: string, panelState?: BuildComparePanelSerializedState): void {
-    const nonce = createNonce();
-    let styleUris: string[] = [];
-    try {
-      styleUris = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "buildCompare"
-      ).styleUris;
-    } catch {
-      // keep empty
-    }
-
-    this.panel.webview.html = renderPanelRestoreErrorHtml(this.panel.webview.cspSource, {
-      nonce,
-      title: BuildComparePanel.PANEL_TITLE,
-      message,
-      hint: "Open the comparison again from Jenkins Workbench to continue.",
-      styleUris,
-      panelState: panelState ?? this.serializedState
-    });
+    this.panel.webview.html = renderPanelManifestErrorHtml(
+      this.panel.webview,
+      this.extensionUri,
+      "buildCompare",
+      {
+        title: BuildComparePanel.PANEL_TITLE,
+        message,
+        hint: "Open the comparison again from Jenkins Workbench to continue.",
+        panelState: panelState ?? this.serializedState
+      }
+    );
   }
 }
