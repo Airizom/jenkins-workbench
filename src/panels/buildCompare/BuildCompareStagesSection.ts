@@ -9,7 +9,7 @@ import {
   formatNumber,
   normalizePipelineStatus
 } from "../buildDetails/BuildDetailsFormatters";
-import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
+import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {
   BuildCompareStageDiffItem,
@@ -28,39 +28,36 @@ export function buildStagesSection(
   baselineWorkflowRun: BuildCompareOptionalResult<JenkinsWorkflowRun>,
   targetWorkflowRun: BuildCompareOptionalResult<JenkinsWorkflowRun>
 ): BuildCompareStagesSectionViewModel {
-  if (baselineWorkflowRun.status === "error" || targetWorkflowRun.status === "error") {
-    return {
+  return evaluateOptionalPair(baselineWorkflowRun, targetWorkflowRun, {
+    onError: ({ baseline, target }) => ({
       status: "error",
       summaryLabel: "Pipeline timing unavailable",
-      detail: buildComparisonErrorDetail(
-        "Pipeline data",
-        baselineWorkflowRun.status === "error" ? baselineWorkflowRun.message : undefined,
-        targetWorkflowRun.status === "error" ? targetWorkflowRun.message : undefined
-      ),
+      detail: buildComparisonErrorDetail("Pipeline data", baseline, target),
       items: []
-    };
-  }
-
-  if (baselineWorkflowRun.status === "unavailable" && targetWorkflowRun.status === "unavailable") {
-    return {
+    }),
+    onBothUnavailable: () => ({
       status: "unavailable",
       summaryLabel: "Pipeline timing unavailable",
       detail: "Neither build exposed wfapi pipeline data.",
       items: []
-    };
-  }
-
-  if (baselineWorkflowRun.status !== "available" || targetWorkflowRun.status !== "available") {
-    return {
+    }),
+    onPartialUnavailable: () => ({
       status: "unavailable",
       summaryLabel: "Pipeline timing unavailable",
       detail: "Both builds need wfapi pipeline data for stage-by-stage timing comparison.",
       items: []
-    };
-  }
+    }),
+    onAvailable: (baselineValue, targetValue) =>
+      buildAvailableStagesSection(baselineValue, targetValue)
+  });
+}
 
-  const baselineStages = buildStageMap(toPipelineRun(baselineWorkflowRun.value));
-  const targetStages = buildStageMap(toPipelineRun(targetWorkflowRun.value));
+function buildAvailableStagesSection(
+  baselineValue: JenkinsWorkflowRun,
+  targetValue: JenkinsWorkflowRun
+): BuildCompareStagesSectionViewModel {
+  const baselineStages = buildStageMap(toPipelineRun(baselineValue));
+  const targetStages = buildStageMap(toPipelineRun(targetValue));
   const names = [...new Set([...baselineStages.keys(), ...targetStages.keys()])].sort();
   const items: BuildCompareStageDiffItem[] = names.map((name) => {
     const baseline = baselineStages.get(name);

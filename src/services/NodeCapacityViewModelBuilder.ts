@@ -1,6 +1,7 @@
 import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsNodeInfo, JenkinsQueueItemInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { formatNodeOfflineReason } from "../jenkins/NodeFormatters";
 import type { JenkinsNodeDetails, JenkinsNodeExecutor } from "../jenkins/types";
 import type {
   NodeCapacityExecutorViewModel,
@@ -94,7 +95,7 @@ function buildNodeViewModel(
     statusLabel: formatNodeStatus(node),
     isOffline,
     isTemporarilyOffline: node.temporarilyOffline === true,
-    offlineReason: formatOfflineReason(node),
+    offlineReason: formatNodeOfflineReason(node),
     labels: labels.allLabels,
     poolLabels: labels.poolLabels,
     hiddenLabels: labels.hiddenLabels,
@@ -359,14 +360,6 @@ export function formatNodeStatus(node: JenkinsNodeInfo): string {
     return node.temporarilyOffline ? "Temporarily offline" : "Offline";
   }
   return "Online";
-}
-
-export function formatOfflineReason(node: JenkinsNodeInfo): string | undefined {
-  return firstNonEmpty(
-    node.offlineCauseReason,
-    node.offlineCause?.description,
-    node.offlineCause?.shortDescription
-  );
 }
 
 function sumBy<T>(items: T[], getValue: (item: T) => number): number {

@@ -1,3 +1,8 @@
+import {
+  asRecord,
+  hasMessageType,
+  isOpenExternalMessage as isOpenExternalUrlMessage
+} from "../../../shared/runtimeGuards";
 import type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
 
 export type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
@@ -78,10 +83,7 @@ export function isLoadAdvancedNodeDetailsMessage(
 }
 
 export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
-  if (!hasMessageType(message, "openExternal")) {
-    return false;
-  }
-  return typeof message.url === "string";
+  return isOpenExternalUrlMessage(message);
 }
 
 export function isTakeNodeOfflineMessage(message: unknown): message is TakeNodeOfflineMessage {
@@ -101,19 +103,4 @@ export function isCopyNodeJsonMessage(message: unknown): message is CopyNodeJson
     return false;
   }
   return typeof message.content === "string";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return isRecord(value) ? value : undefined;
-}
-
-function hasMessageType<TType extends string>(
-  message: unknown,
-  type: TType
-): message is Record<string, unknown> & { type: TType } {
-  return asRecord(message)?.type === type;
 }

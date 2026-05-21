@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { NodeDetailsPanel } from "../../panels/NodeDetailsPanel";
 import { NodeActionService, type NodeActionTarget } from "../../services/NodeActionService";
+import { isRecord } from "../../shared/runtimeGuards";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 import type { NodeCommandRefreshHost, NodeCommandTarget } from "./NodeCommandTypes";
@@ -123,8 +124,4 @@ function isNodeCommandTarget(value: unknown): value is NodeCommandTarget {
     typeof environment.url === "string" &&
     typeof environment.scope === "string"
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

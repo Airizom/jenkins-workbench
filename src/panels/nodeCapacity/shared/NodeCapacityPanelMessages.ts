@@ -2,6 +2,11 @@ import type {
   NodeCapacityNodeExecutorsUpdateMessage,
   NodeCapacityUpdateMessage
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
+import {
+  hasMessageType,
+  isOpenExternalMessage as isOpenExternalUrlMessage,
+  isRecord
+} from "../../../shared/runtimeGuards";
 
 export type {
   NodeCapacityNodeExecutorsUpdateMessage,
@@ -71,10 +76,7 @@ export function isRefreshNodeCapacityMessage(
 }
 
 export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
-  return (
-    hasMessageType(message, "openExternal") &&
-    typeof (message as { url?: unknown }).url === "string"
-  );
+  return isOpenExternalUrlMessage(message);
 }
 
 export function isOpenNodeDetailsMessage(message: unknown): message is OpenNodeDetailsMessage {
@@ -93,12 +95,4 @@ export function isLoadNodeCapacityExecutorsMessage(
     Array.isArray(nodeUrls) &&
     nodeUrls.every((nodeUrl) => typeof nodeUrl === "string")
   );
-}
-
-function hasMessageType(message: unknown, type: string): boolean {
-  return isRecord(message) && message.type === type;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

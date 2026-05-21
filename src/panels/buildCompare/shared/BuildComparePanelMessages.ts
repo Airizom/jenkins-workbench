@@ -1,3 +1,4 @@
+import { asRecord, isRecord } from "../../../shared/runtimeGuards";
 import type { BuildCompareConsoleSectionViewModel } from "./BuildCompareContracts";
 
 export interface SwapBuildsMessage {
@@ -33,14 +34,6 @@ export function parseBuildCompareOutgoingMessage(
     type: "updateConsoleSection",
     console: (record.console ?? {}) as BuildCompareConsoleSectionViewModel
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return isRecord(value) ? value : undefined;
 }
 
 export function isSwapBuildsMessage(message: unknown): message is SwapBuildsMessage {

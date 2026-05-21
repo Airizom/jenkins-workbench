@@ -3,6 +3,7 @@ import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefresh
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { formatNodeOfflineReason } from "../jenkins/NodeFormatters";
 import type { JenkinsNodeDetails } from "../jenkins/types";
 
 export type NodeActionTarget = {
@@ -77,7 +78,7 @@ export class NodeActionService {
         });
       }
       if (result.status === "not_temporarily_offline") {
-        const offlineReason = this.formatOfflineReason(result.details);
+        const offlineReason = formatNodeOfflineReason(result.details);
         const reasonLabel = offlineReason ? ` Reason: ${offlineReason}` : "";
         void vscode.window.showInformationMessage(
           `${target.label} is offline but not temporarily offline. Use Jenkins to bring it online.${reasonLabel}`
@@ -134,14 +135,6 @@ export class NodeActionService {
     }
   }
 
-  private formatOfflineReason(details?: JenkinsNodeDetails): string | undefined {
-    const reason =
-      details?.offlineCauseReason?.trim() ||
-      details?.offlineCause?.description?.trim() ||
-      details?.offlineCause?.shortDescription?.trim();
-    return reason && reason.length > 0 ? reason : undefined;
-  }
-
   private handleSuccessfulOnlineAction(
     target: NodeActionTarget,
     details: JenkinsNodeDetails,
@@ -170,7 +163,7 @@ export class NodeActionService {
     target: NodeActionTarget,
     details: JenkinsNodeDetails
   ): string {
-    const offlineReason = this.formatOfflineReason(details);
+    const offlineReason = formatNodeOfflineReason(details);
     const reasonLabel = offlineReason ? ` Reason: ${offlineReason}` : "";
     return `${actionLabel} for ${target.label}, but it is still offline.${reasonLabel}`;
   }

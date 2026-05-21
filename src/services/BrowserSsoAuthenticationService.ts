@@ -2,6 +2,7 @@ import * as crypto from "node:crypto";
 import * as http from "node:http";
 import * as vscode from "vscode";
 import type { JenkinsAuthConfig } from "../jenkins/types";
+import { escapeHtml } from "../shared/html";
 
 const CALLBACK_PATH = "/jenkins-workbench/sso/callback";
 const AUTH_TIMEOUT_MS = 2 * 60 * 1000;
@@ -251,12 +252,4 @@ function writeHtml(
   </main>
 </body>
 </html>`);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

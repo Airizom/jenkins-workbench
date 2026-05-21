@@ -1,3 +1,5 @@
+import { isPlainRecord } from "../../../shared/runtimeGuards";
+
 export interface BuildFailureChangelogItem {
   message: string;
   author: string;
@@ -51,7 +53,7 @@ export interface PipelineLogTargetViewModel {
 }
 
 export function normalizePipelineLogTarget(value: unknown): PipelineLogTargetViewModel | undefined {
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     return undefined;
   }
   const key = typeof value.key === "string" ? value.key.trim() : "";
@@ -217,10 +219,6 @@ export interface BuildDetailsUpdateMessage {
   pipelineStages: PipelineStageViewModel[];
   pipelineNodeLog: PipelineNodeLogViewModel;
   pendingInputs: PendingInputViewModel[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function isPipelineLogTargetKind(value: unknown): value is PipelineLogTargetKind {

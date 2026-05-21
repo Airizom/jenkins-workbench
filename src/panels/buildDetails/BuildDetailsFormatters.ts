@@ -79,14 +79,7 @@ export function truncateConsoleText(
   };
 }
 
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+export { escapeHtml } from "../../shared/html";
 
 export { formatError } from "../../formatters/ErrorFormatters";
 

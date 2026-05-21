@@ -1,4 +1,5 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
+import { formatNodeOfflineReason } from "../../jenkins/NodeFormatters";
 import { collectAssignedLabelNames } from "../../jenkins/labels";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import type {
@@ -6,6 +7,7 @@ import type {
   JenkinsNodeExecutable,
   JenkinsNodeExecutor
 } from "../../jenkins/types";
+import { isPlainRecord } from "../../shared/runtimeGuards";
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
 import type {
   NodeDetailsQueuedWorkViewModel,
@@ -133,7 +135,7 @@ function buildNodeStatus(details?: JenkinsNodeDetails): NodeStatusFields {
     statusLabel: status.label,
     statusClass: status.className,
     ...capabilities,
-    offlineReason: formatOfflineReason(details)
+    offlineReason: formatNodeOfflineReason(details)
   };
 }
 
@@ -175,14 +177,6 @@ function formatStatus(details?: JenkinsNodeDetails): NodeStatusDescriptor {
     return STATUS_DESCRIPTORS.online;
   }
   return STATUS_DESCRIPTORS.unknown;
-}
-
-function formatOfflineReason(details?: JenkinsNodeDetails): string | undefined {
-  return firstNonEmpty(
-    details?.offlineCauseReason,
-    details?.offlineCause?.description,
-    details?.offlineCause?.shortDescription
-  );
 }
 
 function formatIdle(details?: JenkinsNodeDetails): string {
@@ -338,7 +332,7 @@ function toValidMs(value?: number): number | undefined {
 }
 
 function buildMonitorEntries(data?: Record<string, unknown>): NodeMonitorViewModel[] {
-  if (!isRecord(data)) {
+  if (!isPlainRecord(data)) {
     return [];
   }
 
@@ -361,7 +355,7 @@ function summarizeMonitorValue(value: unknown): string {
   if (Array.isArray(value)) {
     return value.length > 0 ? `${value.length} items` : "Empty list";
   }
-  if (isRecord(value)) {
+  if (isPlainRecord(value)) {
     const candidate =
       pickString(value, MONITOR_STRING_KEYS) ?? pickNumber(value, MONITOR_NUMBER_KEYS);
     if (candidate !== undefined) {
@@ -402,7 +396,7 @@ function stringifyNodeDetails(details?: JenkinsNodeDetails): string {
   return JSON.stringify(
     details,
     (_key, value) => {
-      if (!isRecord(value)) {
+      if (!isPlainRecord(value)) {
         return value;
       }
       if (seen.has(value)) {
@@ -425,8 +419,4 @@ function resolveNowMs(nowMs: number | undefined, updatedAt: string): number {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

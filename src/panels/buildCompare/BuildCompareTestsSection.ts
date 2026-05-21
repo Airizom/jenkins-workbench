@@ -5,7 +5,7 @@ import {
   formatTestStatusLabel,
   normalizeTestStatus
 } from "../buildDetails/TestStatusFormatters";
-import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
+import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {
   BuildCompareTestDiffItem,
@@ -26,15 +26,11 @@ export function buildTestsSection(
   baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
   targetReport: BuildCompareOptionalResult<JenkinsTestReport>
 ): BuildCompareTestsSectionViewModel {
-  if (baselineReport.status === "error" || targetReport.status === "error") {
-    return {
+  return evaluateOptionalPair(baselineReport, targetReport, {
+    onError: ({ baseline, target }) => ({
       status: "error",
       summaryLabel: "Test comparison unavailable",
-      detail: buildComparisonErrorDetail(
-        "Test report",
-        baselineReport.status === "error" ? baselineReport.message : undefined,
-        targetReport.status === "error" ? targetReport.message : undefined
-      ),
+      detail: buildComparisonErrorDetail("Test report", baseline, target),
       baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
       targetSummaryLabel: buildTestSummaryLabel(targetReport),
       newFailures: [],
@@ -44,11 +40,8 @@ export function buildTestsSection(
       removedTests: [],
       otherChangesCount: 0,
       unchangedCount: 0
-    };
-  }
-
-  if (baselineReport.status === "unavailable" && targetReport.status === "unavailable") {
-    return {
+    }),
+    onBothUnavailable: () => ({
       status: "unavailable",
       summaryLabel: "Test report data unavailable",
       detail: "Neither build exposed a Jenkins test report.",
@@ -61,11 +54,8 @@ export function buildTestsSection(
       removedTests: [],
       otherChangesCount: 0,
       unchangedCount: 0
-    };
-  }
-
-  if (baselineReport.status !== "available" || targetReport.status !== "available") {
-    return {
+    }),
+    onPartialUnavailable: () => ({
       status: "unavailable",
       summaryLabel: "Test report data unavailable",
       detail: "Both builds need test report data for a reliable comparison.",
@@ -78,11 +68,20 @@ export function buildTestsSection(
       removedTests: [],
       otherChangesCount: 0,
       unchangedCount: 0
-    };
-  }
+    }),
+    onAvailable: (baselineValue, targetValue) =>
+      buildAvailableTestsSection(baselineReport, targetReport, baselineValue, targetValue)
+  });
+}
 
-  const baselineCases = buildTestCaseMap(baselineReport.value);
-  const targetCases = buildTestCaseMap(targetReport.value);
+function buildAvailableTestsSection(
+  baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
+  targetReport: BuildCompareOptionalResult<JenkinsTestReport>,
+  baselineValue: JenkinsTestReport,
+  targetValue: JenkinsTestReport
+): BuildCompareTestsSectionViewModel {
+  const baselineCases = buildTestCaseMap(baselineValue);
+  const targetCases = buildTestCaseMap(targetValue);
   const keys = [...new Set([...baselineCases.keys(), ...targetCases.keys()])].sort();
   const newFailures: BuildCompareTestDiffItem[] = [];
   const stillFailing: BuildCompareTestDiffItem[] = [];

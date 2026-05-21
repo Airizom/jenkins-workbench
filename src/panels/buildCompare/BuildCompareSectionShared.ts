@@ -1,4 +1,5 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import { trimToUndefined } from "../../shared/stringValues";
 import {
   formatDuration,
   formatResult,
@@ -22,9 +23,7 @@ export function buildBuildViewModel(
   };
 }
 
-export function normalizeString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-}
+export const normalizeString = trimToUndefined;
 
 export function buildComparisonErrorDetail(
   label: string,
