@@ -144,6 +144,13 @@ export function createPanelLoadingRenderer(skeletonVariant: LoadingSkeletonVaria
     renderPanelLoadingHtml(options, skeletonVariant);
 }
 
+export function createPanelAppRenderer(skeletonVariant: LoadingSkeletonVariant) {
+  return {
+    renderLoadingHtml: createPanelLoadingRenderer(skeletonVariant),
+    renderAppHtml: renderPanelAppHtml
+  };
+}
+
 export function renderPanelAppHtml(
   initialModel: unknown,
   options: PanelDetailsRenderOptions

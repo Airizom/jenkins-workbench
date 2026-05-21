@@ -1,10 +1,10 @@
 import type * as vscode from "vscode";
 import { assignPanelLoadingHtml, resolvePanelViewAssets } from "../shared/webview/PanelViewHelpers";
-import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import { renderBuildDetailsHtml } from "./BuildDetailsRenderer";
 import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
 import type { BuildDetailsViewModel } from "./BuildDetailsViewModel";
+import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export type { PanelViewAssets as BuildDetailsPanelViewAssets } from "../shared/webview/PanelViewHelpers";
 

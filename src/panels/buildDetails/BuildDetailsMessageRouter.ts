@@ -20,7 +20,7 @@ import {
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
   isToggleFollowLogMessage
-} from "./BuildDetailsMessages";
+} from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsMessageRouterHandlers {
   onArtifactAction(message: ArtifactActionMessage): void;

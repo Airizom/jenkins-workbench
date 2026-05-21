@@ -6,6 +6,10 @@ import type {
 } from "./BuildParameterPromptTypes";
 import { validatePresetName } from "./presetNameValidation";
 
+function formatPresetUpdatedAt(updatedAt: number): string {
+  return new Date(updatedAt).toLocaleString();
+}
+
 export async function choosePreset(
   options: BuildParameterPromptOptions
 ): Promise<BuildParameterPromptSelection | undefined> {
@@ -32,7 +36,7 @@ export async function choosePreset(
     for (const preset of presets) {
       picks.push({
         label: `Use preset: ${preset.name}`,
-        description: new Date(preset.updatedAt).toLocaleString(),
+        description: formatPresetUpdatedAt(preset.updatedAt),
         action: "preset",
         presetId: preset.id
       });
@@ -187,7 +191,7 @@ async function selectPresetFromList(
   const pick = await vscode.window.showQuickPick(
     presets.map((preset) => ({
       label: preset.name,
-      description: new Date(preset.updatedAt).toLocaleString(),
+      description: formatPresetUpdatedAt(preset.updatedAt),
       preset
     })),
     {

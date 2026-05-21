@@ -2,8 +2,13 @@ import type {
   NodeCapacityNodeExecutorsUpdateMessage,
   NodeCapacityUpdateMessage
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
-import { hasMessageType, isOpenExternalMessage, isRecord } from "../../../shared/runtimeGuards";
-import type { OpenExternalMessage } from "../../shared/PanelIncomingMessages";
+import {
+  hasMessageType,
+  isOpenExternalMessage,
+  isRecord,
+  parseSetLoadingOutgoingMessage
+} from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 
 export type {
   NodeCapacityNodeExecutorsUpdateMessage,
@@ -55,9 +60,7 @@ export function parseNodeCapacityOutgoingMessage(
     case "updateNodeCapacityNodeExecutors":
       return message as unknown as NodeCapacityNodeExecutorsUpdateMessage;
     case "setLoading":
-      return typeof message.value === "boolean"
-        ? (message as unknown as SetLoadingMessage)
-        : undefined;
+      return parseSetLoadingOutgoingMessage(message);
     default:
       return undefined;
   }

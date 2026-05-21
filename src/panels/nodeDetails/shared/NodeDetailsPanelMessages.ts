@@ -1,5 +1,10 @@
-import { asRecord, hasMessageType, isOpenExternalMessage } from "../../../shared/runtimeGuards";
-import type { OpenExternalMessage } from "../../shared/PanelIncomingMessages";
+import {
+  asRecord,
+  hasMessageType,
+  isOpenExternalMessage,
+  parseSetLoadingOutgoingMessage
+} from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 import type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
 
 export type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
@@ -54,7 +59,7 @@ export function parseNodeDetailsOutgoingMessage(
 
   switch (record.type) {
     case "setLoading": {
-      return { type: "setLoading", value: Boolean(record.value) };
+      return parseSetLoadingOutgoingMessage(record);
     }
     case "updateNodeDetails": {
       return record as unknown as NodeDetailsUpdateMessage;

@@ -1,10 +1,10 @@
 import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatError } from "./BuildDetailsFormatters";
-import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import type { BuildDetailsPollingCallbacks } from "./BuildDetailsPollingController";
 import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
+import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsPollingCallbackHooks {
   postMessage: (message: BuildDetailsOutgoingMessage) => void;

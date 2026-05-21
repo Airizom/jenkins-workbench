@@ -25,3 +25,20 @@ export interface OpenExternalMessage {
 export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
   return hasMessageType(message, "openExternal") && typeof message.url === "string";
 }
+
+export interface SetLoadingOutgoingMessage {
+  type: "setLoading";
+  value: boolean;
+}
+
+export function parseSetLoadingOutgoingMessage(
+  record: Record<string, unknown>
+): SetLoadingOutgoingMessage | undefined {
+  if (record.type !== "setLoading") {
+    return undefined;
+  }
+  return {
+    type: "setLoading",
+    value: typeof record.value === "boolean" ? record.value : Boolean(record.value)
+  };
+}

@@ -11,6 +11,8 @@ import { NodeActionService } from "../services/NodeActionService";
 import { NodeQueuedWorkService } from "../services/NodeQueuedWorkService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
+import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
+import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
 import {
   type NodeDetailsOutgoingMessage,
   isBringNodeOnlineMessage,
@@ -20,9 +22,7 @@ import {
   isOpenExternalMessage,
   isRefreshNodeDetailsMessage,
   isTakeNodeOfflineMessage
-} from "./nodeDetails/NodeDetailsMessages";
-import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
-import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
+} from "./nodeDetails/shared/NodeDetailsPanelMessages";
 import {
   PanelLoadTracker,
   attachPanelLifecycle,
@@ -30,7 +30,8 @@ import {
   disposeEnvironmentScopedPanel,
   shouldRefreshEnvironmentScopedPanel
 } from "./shared/PanelRuntimeHelpers";
-import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
+import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
+import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -244,24 +245,17 @@ export class NodeDetailsPanel {
         ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
         : undefined;
 
-    let scriptUri: string;
-    let styleUris: string[];
-    try {
-      ({ scriptUri, styleUris } = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "nodeDetails"
-      ));
-    } catch {
-      assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeDetails", {
-        title: "Node Details",
-        message:
-          "Node details webview assets are missing. Run the extension build (npm run compile) and try again.",
-        hint: "Open the node again from Jenkins Workbench to continue.",
-        panelState
-      });
+    const assets = resolvePanelWebviewAssetsOrError(this.panel, this.extensionUri, "nodeDetails", {
+      title: "Node Details",
+      message:
+        "Node details webview assets are missing. Run the extension build (npm run compile) and try again.",
+      hint: "Open the node again from Jenkins Workbench to continue.",
+      panelState
+    });
+    if (!assets) {
       return;
     }
+    const { scriptUri, styleUris } = assets;
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,
       nonce: this.nonce,

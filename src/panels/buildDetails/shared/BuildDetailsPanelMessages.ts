@@ -1,5 +1,10 @@
-import { asRecord, hasMessageType, isOpenExternalMessage } from "../../../shared/runtimeGuards";
-import type { OpenExternalMessage } from "../../shared/PanelIncomingMessages";
+import {
+  asRecord,
+  hasMessageType,
+  isOpenExternalMessage,
+  parseSetLoadingOutgoingMessage
+} from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 import type {
   ArtifactAction,
   BuildDetailsUpdateMessage,
@@ -189,10 +194,7 @@ export function parseBuildDetailsOutgoingMessage(
       };
     }
     case "setLoading": {
-      return {
-        type: "setLoading",
-        value: Boolean(record.value)
-      };
+      return parseSetLoadingOutgoingMessage(record);
     }
     default:
       return undefined;

@@ -26,7 +26,8 @@ import {
   disposeEnvironmentScopedPanel,
   shouldRefreshEnvironmentScopedPanel
 } from "./shared/PanelRuntimeHelpers";
-import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
+import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
+import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -206,24 +207,17 @@ export class NodeCapacityPanel {
       ? createSerializedEnvironmentState(this.environment)
       : undefined;
 
-    let scriptUri: string;
-    let styleUris: string[];
-    try {
-      ({ scriptUri, styleUris } = resolveWebviewAssets(
-        this.panel.webview,
-        this.extensionUri,
-        "nodeCapacity"
-      ));
-    } catch {
-      assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeCapacity", {
-        title: "Node Capacity",
-        message:
-          "Node capacity webview assets are missing. Run the extension build (npm run compile) and try again.",
-        hint: "Open node capacity again from Jenkins Workbench to continue.",
-        panelState
-      });
+    const assets = resolvePanelWebviewAssetsOrError(this.panel, this.extensionUri, "nodeCapacity", {
+      title: "Node Capacity",
+      message:
+        "Node capacity webview assets are missing. Run the extension build (npm run compile) and try again.",
+      hint: "Open node capacity again from Jenkins Workbench to continue.",
+      panelState
+    });
+    if (!assets) {
       return;
     }
+    const { scriptUri, styleUris } = assets;
 
     this.panel.webview.html = renderLoadingHtml({
       cspSource: this.panel.webview.cspSource,

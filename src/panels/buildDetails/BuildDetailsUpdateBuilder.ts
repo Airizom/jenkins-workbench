@@ -6,8 +6,6 @@ import type {
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
 import { formatBuildDetailsHeaderLabels } from "./BuildDetailsFormatters";
-import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
-import type { BuildDetailsUpdateMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import {
   buildCoverageStateViewModel,
@@ -20,6 +18,8 @@ import {
   buildPipelineStagesViewModel
 } from "./BuildDetailsViewModel";
 import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
+import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
+import type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsPanelMessages";
 
 export function buildDetailsUpdateMessage(
   details: JenkinsBuildDetails,

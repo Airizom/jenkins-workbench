@@ -1,3 +1,4 @@
+import { formatOptionalLocaleTimestamp } from "../../formatters/DisplayFormatters";
 import {
   formatCompactDurationFromTotalSeconds,
   formatDurationMs
@@ -72,7 +73,7 @@ export function formatTimestamp(timestamp?: number): string {
   if (timestamp === undefined) {
     return "Unknown";
   }
-  return new Date(timestamp).toLocaleString();
+  return formatOptionalLocaleTimestamp(timestamp) || "Unknown";
 }
 
 export function formatCulprits(culprits: JenkinsBuildDetails["culprits"] | undefined): string {

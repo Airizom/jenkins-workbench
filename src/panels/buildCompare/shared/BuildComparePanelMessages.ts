@@ -1,4 +1,4 @@
-import { asRecord, isRecord } from "../../../shared/runtimeGuards";
+import { asRecord, hasMessageType } from "../../../shared/runtimeGuards";
 import type { BuildCompareConsoleSectionViewModel } from "./BuildCompareContracts";
 
 export interface SwapBuildsMessage {
@@ -37,13 +37,12 @@ export function parseBuildCompareOutgoingMessage(
 }
 
 export function isSwapBuildsMessage(message: unknown): message is SwapBuildsMessage {
-  return isRecord(message) && message.type === "swapBuilds";
+  return hasMessageType(message, "swapBuilds");
 }
 
 export function isOpenBuildDetailsMessage(message: unknown): message is OpenBuildDetailsMessage {
   return (
-    isRecord(message) &&
-    message.type === "openBuildDetails" &&
+    hasMessageType(message, "openBuildDetails") &&
     (message.side === "baseline" || message.side === "target")
   );
 }
