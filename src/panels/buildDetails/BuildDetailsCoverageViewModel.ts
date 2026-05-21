@@ -5,6 +5,7 @@ import type {
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import { normalizeCoverageStatusClass } from "./CoverageStatusFormatters";
 import type {
   BuildCoverageFileViewModel,
   BuildCoverageQualityGateViewModel,
@@ -20,6 +21,18 @@ export interface BuildCoverageStateOptions {
   enabled?: boolean;
 }
 
+type CoverageContentFields = Pick<
+  BuildDetailsCoverageStateViewModel,
+  | "projectCoverage"
+  | "modifiedFilesCoverage"
+  | "modifiedLinesCoverage"
+  | "overallQualityGateStatusLabel"
+  | "overallQualityGateStatusClass"
+  | "qualityGates"
+  | "modifiedFiles"
+  | "summaryOnly"
+>;
+
 export function buildCoverageStateViewModel(
   details: JenkinsBuildDetails | undefined,
   overview: JenkinsCoverageOverview | undefined,
@@ -27,83 +40,86 @@ export function buildCoverageStateViewModel(
 ): BuildDetailsCoverageStateViewModel {
   const showTab = hasCoverageAction(details) || Boolean(options?.actionPath);
   if (!options?.enabled || details?.building) {
-    return {
-      status: "disabled",
-      showTab: false,
-      qualityGates: [],
-      modifiedFiles: [],
-      summaryOnly: false
-    };
+    return buildEmptyCoverageState("disabled", false);
   }
 
   if (options.loading) {
     return {
       status: "loading",
       showTab,
-      projectCoverage: overview?.projectCoverage,
-      modifiedFilesCoverage: overview?.modifiedFilesCoverage,
-      modifiedLinesCoverage: overview?.modifiedLinesCoverage,
-      overallQualityGateStatusLabel: overview?.overallQualityGateStatus,
-      overallQualityGateStatusClass: formatCoverageStatusClass(overview?.overallQualityGateStatus),
-      qualityGates: buildCoverageQualityGateViewModel(overview?.qualityGates),
-      modifiedFiles: buildCoverageFileViewModel(options.modifiedFiles),
-      summaryOnly: !options.modifiedFiles || options.modifiedFiles.length === 0
+      ...buildCoverageContentFields(overview, options.modifiedFiles)
     };
   }
 
   if (!options.coverageFetched) {
-    return {
-      status: "idle",
-      showTab,
-      qualityGates: [],
-      modifiedFiles: [],
-      summaryOnly: false
-    };
+    return buildEmptyCoverageState("idle", showTab);
   }
 
   if (options.error) {
     return {
-      status: "error",
-      showTab,
-      qualityGates: [],
-      modifiedFiles: [],
-      summaryOnly: false,
+      ...buildEmptyCoverageState("error", showTab),
       errorMessage: options.error
     };
   }
 
-  const modifiedFiles = buildCoverageFileViewModel(options.modifiedFiles);
-  const qualityGates = buildCoverageQualityGateViewModel(overview?.qualityGates);
-  const hasCoverage =
-    Boolean(overview?.projectCoverage) ||
-    Boolean(overview?.modifiedFilesCoverage) ||
-    Boolean(overview?.modifiedLinesCoverage) ||
-    Boolean(overview?.overallQualityGateStatus) ||
-    qualityGates.length > 0 ||
-    modifiedFiles.length > 0;
-
-  if (!hasCoverage) {
-    return {
-      status: "unavailable",
-      showTab,
-      qualityGates: [],
-      modifiedFiles: [],
-      summaryOnly: false
-    };
+  const content = buildCoverageContentFields(overview, options.modifiedFiles);
+  if (!hasCoverageContent(overview, content)) {
+    return buildEmptyCoverageState("unavailable", showTab);
   }
 
   return {
     status: "available",
     showTab,
+    ...content
+  };
+}
+
+function buildEmptyCoverageState(
+  status: Extract<
+    BuildDetailsCoverageStateViewModel["status"],
+    "disabled" | "idle" | "unavailable" | "error"
+  >,
+  showTab: boolean
+): BuildDetailsCoverageStateViewModel {
+  return {
+    status,
+    showTab,
+    qualityGates: [],
+    modifiedFiles: [],
+    summaryOnly: false
+  };
+}
+
+function buildCoverageContentFields(
+  overview: JenkinsCoverageOverview | undefined,
+  modifiedFiles?: JenkinsModifiedCoverageFile[]
+): CoverageContentFields {
+  const files = buildCoverageFileViewModel(modifiedFiles);
+  const qualityGates = buildCoverageQualityGateViewModel(overview?.qualityGates);
+  return {
     projectCoverage: overview?.projectCoverage,
     modifiedFilesCoverage: overview?.modifiedFilesCoverage,
     modifiedLinesCoverage: overview?.modifiedLinesCoverage,
     overallQualityGateStatusLabel: overview?.overallQualityGateStatus,
-    overallQualityGateStatusClass: formatCoverageStatusClass(overview?.overallQualityGateStatus),
+    overallQualityGateStatusClass: normalizeCoverageStatusClass(overview?.overallQualityGateStatus),
     qualityGates,
-    modifiedFiles,
-    summaryOnly: modifiedFiles.length === 0
+    modifiedFiles: files,
+    summaryOnly: files.length === 0
   };
+}
+
+function hasCoverageContent(
+  overview: JenkinsCoverageOverview | undefined,
+  content: Pick<CoverageContentFields, "qualityGates" | "modifiedFiles">
+): boolean {
+  return (
+    Boolean(overview?.projectCoverage) ||
+    Boolean(overview?.modifiedFilesCoverage) ||
+    Boolean(overview?.modifiedLinesCoverage) ||
+    Boolean(overview?.overallQualityGateStatus) ||
+    content.qualityGates.length > 0 ||
+    content.modifiedFiles.length > 0
+  );
 }
 
 function buildCoverageQualityGateViewModel(
@@ -116,7 +132,7 @@ function buildCoverageQualityGateViewModel(
   return qualityGates.map((qualityGate) => ({
     name: qualityGate.name,
     statusLabel: qualityGate.status,
-    statusClass: formatCoverageStatusClass(qualityGate.status) ?? "neutral",
+    statusClass: normalizeCoverageStatusClass(qualityGate.status) ?? "neutral",
     thresholdLabel: formatCoverageThresholdLabel(qualityGate.threshold, qualityGate.value),
     valueLabel: qualityGate.value
   }));
@@ -149,23 +165,6 @@ function countModifiedCoverageLines(
     }
     return total + (block.endLine - block.startLine + 1);
   }, 0);
-}
-
-function formatCoverageStatusClass(status?: string): string | undefined {
-  const normalized = status?.trim().toUpperCase();
-  switch (normalized) {
-    case "SUCCESS":
-      return "success";
-    case "WARNING":
-    case "UNSTABLE":
-      return "warning";
-    case "ERROR":
-    case "FAILURE":
-    case "FAILED":
-      return "failure";
-    default:
-      return normalized ? "neutral" : undefined;
-  }
 }
 
 function formatCoverageThresholdLabel(threshold?: number, value?: string): string | undefined {
