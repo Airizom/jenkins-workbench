@@ -17,8 +17,11 @@ export function hasMessageType<TType extends string>(
   return asRecord(message)?.type === type;
 }
 
-export function isOpenExternalMessage(
-  message: unknown
-): message is { type: "openExternal"; url: string } {
+export interface OpenExternalMessage {
+  type: "openExternal";
+  url: string;
+}
+
+export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
   return hasMessageType(message, "openExternal") && typeof message.url === "string";
 }

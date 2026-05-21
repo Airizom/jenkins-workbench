@@ -1,13 +1,10 @@
 import type * as vscode from "vscode";
-import { resolveWebviewAssets } from "../shared/webview/WebviewAssets";
+import { assignPanelLoadingHtml, resolvePanelViewAssets } from "../shared/webview/PanelViewHelpers";
 import { renderPanelRestoreErrorHtml } from "../shared/webview/WebviewHtml";
-import { renderBuildCompareHtml, renderLoadingHtml } from "./BuildCompareRenderer";
+import { renderBuildCompareHtml } from "./BuildCompareRenderer";
 import type { BuildCompareViewModel } from "./shared/BuildCompareContracts";
 
-export interface BuildComparePanelViewAssets {
-  scriptUri: string;
-  styleUris: string[];
-}
+export type { PanelViewAssets as BuildComparePanelViewAssets } from "../shared/webview/PanelViewHelpers";
 
 export interface BuildComparePanelRenderOptions {
   nonce: string;
@@ -20,26 +17,17 @@ export class BuildComparePanelView {
     private readonly extensionUri: vscode.Uri
   ) {}
 
-  resolveAssets(): BuildComparePanelViewAssets | undefined {
-    try {
-      return resolveWebviewAssets(this.panel.webview, this.extensionUri, "buildCompare");
-    } catch {
-      return undefined;
-    }
+  resolveAssets() {
+    return resolvePanelViewAssets(this.panel.webview, this.extensionUri, "buildCompare");
   }
 
   renderLoading(options: BuildComparePanelRenderOptions & { styleUris: string[] }): void {
-    this.panel.webview.html = renderLoadingHtml({
-      cspSource: this.panel.webview.cspSource,
-      nonce: options.nonce,
-      styleUris: options.styleUris,
-      panelState: options.panelState
-    });
+    assignPanelLoadingHtml(this.panel, "build", options);
   }
 
   renderBuildCompare(
     model: BuildCompareViewModel,
-    assets: BuildComparePanelViewAssets,
+    assets: NonNullable<ReturnType<BuildComparePanelView["resolveAssets"]>>,
     options: BuildComparePanelRenderOptions
   ): void {
     this.panel.webview.html = renderBuildCompareHtml(model, {

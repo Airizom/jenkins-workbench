@@ -23,7 +23,7 @@ import {
   PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
-  disposePanelResources,
+  disposeEnvironmentScopedPanel,
   shouldRefreshEnvironmentScopedPanel
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
@@ -184,13 +184,17 @@ export class NodeCapacityPanel {
   }
 
   private dispose(): void {
-    NodeCapacityPanel.currentPanel = undefined;
-    this.stopVisibleRefreshTimer();
-    if (this.refreshSubscription) {
-      this.refreshSubscription.dispose();
-      this.refreshSubscription = undefined;
-    }
-    disposePanelResources(this.disposables);
+    disposeEnvironmentScopedPanel({
+      clearSingleton: () => {
+        NodeCapacityPanel.currentPanel = undefined;
+      },
+      onDispose: () => {
+        this.stopVisibleRefreshTimer();
+        this.refreshSubscription = undefined;
+      },
+      refreshSubscription: this.refreshSubscription,
+      disposables: this.disposables
+    });
   }
 
   private async load(): Promise<void> {

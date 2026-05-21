@@ -4,6 +4,7 @@ import type {
   BuildParameterPromptOptions,
   BuildParameterPromptSelection
 } from "./BuildParameterPromptTypes";
+import { validatePresetName } from "./presetNameValidation";
 
 export async function choosePreset(
   options: BuildParameterPromptOptions
@@ -129,12 +130,7 @@ async function managePresets(
       prompt: "New preset name",
       value: target.name,
       ignoreFocusOut: true,
-      validateInput: (value) => {
-        if (!value.trim()) {
-          return "Preset name is required.";
-        }
-        return undefined;
-      }
+      validateInput: validatePresetName
     });
     if (!name) {
       return;

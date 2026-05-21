@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { areStringArraysEqual } from "../shared/arrays";
 import type { JenkinsfileEnvironmentResolver } from "./JenkinsfileEnvironmentResolver";
 import type { JenkinsfileMatcher } from "./JenkinsfileMatcher";
 import type {
@@ -98,7 +99,7 @@ export class JenkinsfileValidationCoordinator
   }
 
   updateConfig(config: JenkinsfileValidationConfig): void {
-    const patternsChanged = !arePatternsEqual(this.config.filePatterns, config.filePatterns);
+    const patternsChanged = !areStringArraysEqual(this.config.filePatterns, config.filePatterns);
     this.config = config;
     if (patternsChanged) {
       this.matcher.updatePatterns(config.filePatterns);
@@ -462,11 +463,4 @@ export class JenkinsfileValidationCoordinator
   private shouldRunAutomaticValidation(): boolean {
     return this.config.enabled && this.config.runOnSave;
   }
-}
-
-function arePatternsEqual(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  return left.every((value, index) => value === right[index]);
 }

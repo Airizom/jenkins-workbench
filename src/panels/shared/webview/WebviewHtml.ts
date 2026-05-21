@@ -139,6 +139,11 @@ export function renderPanelLoadingHtml(
   return renderWebviewShell(`${stateScript}${renderLoadingSkeletonHtml(skeletonVariant)}`, options);
 }
 
+export function createPanelLoadingRenderer(skeletonVariant: LoadingSkeletonVariant) {
+  return (options: PanelDetailsRenderOptions): string =>
+    renderPanelLoadingHtml(options, skeletonVariant);
+}
+
 export function renderPanelAppHtml(
   initialModel: unknown,
   options: PanelDetailsRenderOptions

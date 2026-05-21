@@ -1,19 +1,13 @@
-import {
-  type PanelDetailsRenderOptions,
-  renderPanelAppHtml,
-  renderPanelLoadingHtml
-} from "../shared/webview/WebviewHtml";
+import { createPanelLoadingRenderer, renderPanelAppHtml } from "../shared/webview/WebviewHtml";
 import type { BuildCompareViewModel } from "./shared/BuildCompareContracts";
 
-export type BuildCompareRenderOptions = PanelDetailsRenderOptions;
+export type { PanelDetailsRenderOptions as BuildCompareRenderOptions } from "../shared/webview/WebviewHtml";
 
-export function renderLoadingHtml(options: BuildCompareRenderOptions): string {
-  return renderPanelLoadingHtml(options, "build");
-}
+export const renderLoadingHtml = createPanelLoadingRenderer("build");
 
 export function renderBuildCompareHtml(
   model: BuildCompareViewModel,
-  options: BuildCompareRenderOptions
+  options: import("../shared/webview/WebviewHtml").PanelDetailsRenderOptions
 ): string {
   return renderPanelAppHtml(model, options);
 }

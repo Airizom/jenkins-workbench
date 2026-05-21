@@ -197,7 +197,7 @@ export function buildDetailsReducer(
       };
     }
     case "setPipelineNodeLogLoading": {
-      if (action.targetKey && state.pipelineNodeLog.target?.key !== action.targetKey) {
+      if (!matchesPipelineLogTarget(state, action.targetKey)) {
         return state;
       }
       return {
@@ -209,7 +209,7 @@ export function buildDetailsReducer(
       };
     }
     case "setPipelineNodeLogError": {
-      if (action.targetKey && state.pipelineNodeLog.target?.key !== action.targetKey) {
+      if (!matchesPipelineLogTarget(state, action.targetKey)) {
         return state;
       }
       return {
@@ -312,4 +312,8 @@ function appendConsoleHtmlModel(
     nodes: [...current.nodes, ...parsed.nodes],
     text: current.text + parsed.text
   };
+}
+
+function matchesPipelineLogTarget(state: BuildDetailsState, targetKey?: string): boolean {
+  return !targetKey || state.pipelineNodeLog.target?.key === targetKey;
 }

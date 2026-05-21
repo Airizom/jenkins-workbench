@@ -1,19 +1,13 @@
-import {
-  type PanelDetailsRenderOptions,
-  renderPanelAppHtml,
-  renderPanelLoadingHtml
-} from "../shared/webview/WebviewHtml";
+import { createPanelLoadingRenderer, renderPanelAppHtml } from "../shared/webview/WebviewHtml";
 import type { NodeDetailsViewModel } from "./NodeDetailsViewModel";
 
-export type NodeDetailsRenderOptions = PanelDetailsRenderOptions;
+export type { PanelDetailsRenderOptions as NodeDetailsRenderOptions } from "../shared/webview/WebviewHtml";
 
-export function renderLoadingHtml(options: NodeDetailsRenderOptions): string {
-  return renderPanelLoadingHtml(options, "node");
-}
+export const renderLoadingHtml = createPanelLoadingRenderer("node");
 
 export function renderNodeDetailsHtml(
   model: NodeDetailsViewModel,
-  options: NodeDetailsRenderOptions
+  options: import("../shared/webview/WebviewHtml").PanelDetailsRenderOptions
 ): string {
   return renderPanelAppHtml(model, options);
 }

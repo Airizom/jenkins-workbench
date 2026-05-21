@@ -1,3 +1,4 @@
+import { uniqueNonEmptyStrings } from "../../../shared/arrays";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
 
 export interface BuildFailureChangelogItem {
@@ -223,21 +224,4 @@ export interface BuildDetailsUpdateMessage {
 
 function isPipelineLogTargetKind(value: unknown): value is PipelineLogTargetKind {
   return value === "stage" || value === "step";
-}
-
-function uniqueNonEmptyStrings(values: unknown[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    if (typeof value !== "string") {
-      continue;
-    }
-    const trimmed = value.trim();
-    if (!trimmed || seen.has(trimmed)) {
-      continue;
-    }
-    seen.add(trimmed);
-    result.push(trimmed);
-  }
-  return result;
 }

@@ -4,6 +4,22 @@ import {
 } from "../../formatters/DurationFormatters";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 
+export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
+  resultLabel: string;
+  resultClass: string;
+  durationLabel: string;
+  timestampLabel: string;
+  culpritsLabel: string;
+} {
+  return {
+    resultLabel: details ? formatResult(details) : "Unknown",
+    resultClass: details ? formatResultClass(details) : "neutral",
+    durationLabel: details ? formatDuration(details.duration) : "Unknown",
+    timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown",
+    culpritsLabel: details ? formatCulprits(details.culprits) : "Unknown"
+  };
+}
+
 export function formatResult(details: JenkinsBuildDetails): string {
   if (details.building) {
     return "Running";
@@ -78,8 +94,6 @@ export function truncateConsoleText(
     truncated: true
   };
 }
-
-export { escapeHtml } from "../../shared/html";
 
 export { formatNumber } from "../../formatters/DisplayFormatters";
 export { formatError } from "../../formatters/ErrorFormatters";

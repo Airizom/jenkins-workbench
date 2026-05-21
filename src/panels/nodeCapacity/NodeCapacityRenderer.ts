@@ -1,19 +1,13 @@
 import type { NodeCapacityViewModel } from "../../shared/nodeCapacity/NodeCapacityContracts";
-import {
-  type PanelDetailsRenderOptions,
-  renderPanelAppHtml,
-  renderPanelLoadingHtml
-} from "../shared/webview/WebviewHtml";
+import { createPanelLoadingRenderer, renderPanelAppHtml } from "../shared/webview/WebviewHtml";
 
-export type NodeCapacityRenderOptions = PanelDetailsRenderOptions;
+export type { PanelDetailsRenderOptions as NodeCapacityRenderOptions } from "../shared/webview/WebviewHtml";
 
-export function renderLoadingHtml(options: NodeCapacityRenderOptions): string {
-  return renderPanelLoadingHtml(options, "node");
-}
+export const renderLoadingHtml = createPanelLoadingRenderer("node");
 
 export function renderNodeCapacityHtml(
   model: NodeCapacityViewModel,
-  options: NodeCapacityRenderOptions
+  options: import("../shared/webview/WebviewHtml").PanelDetailsRenderOptions
 ): string {
   return renderPanelAppHtml(model, options);
 }

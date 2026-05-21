@@ -5,6 +5,7 @@ import type {
   BuildParameterPromptOptions,
   BuildParameterPromptValues
 } from "./BuildParameterPromptTypes";
+import { validatePresetName } from "./presetNameValidation";
 
 export async function selectTriggerMode(
   selectedPreset?: ParameterPresetSummary
@@ -61,12 +62,7 @@ export async function handlePresetSave(
       prompt: "Preset name",
       value: suggested,
       ignoreFocusOut: true,
-      validateInput: (value) => {
-        if (!value.trim()) {
-          return "Preset name is required.";
-        }
-        return undefined;
-      }
+      validateInput: validatePresetName
     });
     if (!name) {
       return false;

@@ -1,8 +1,5 @@
-import {
-  asRecord,
-  hasMessageType,
-  isOpenExternalMessage as isOpenExternalUrlMessage
-} from "../../../shared/runtimeGuards";
+import { asRecord, hasMessageType, isOpenExternalMessage } from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage } from "../../shared/PanelIncomingMessages";
 import type {
   ArtifactAction,
   BuildDetailsUpdateMessage,
@@ -45,10 +42,7 @@ export interface ToggleFollowLogMessage {
   value?: unknown;
 }
 
-export interface OpenExternalMessage {
-  type: "openExternal";
-  url: string;
-}
+export type { OpenExternalMessage };
 
 export interface ExportConsoleMessage {
   type: "exportConsole";
@@ -209,9 +203,7 @@ export function isToggleFollowLogMessage(message: unknown): message is ToggleFol
   return hasMessageType(message, "toggleFollowLog");
 }
 
-export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
-  return isOpenExternalUrlMessage(message);
-}
+export { isOpenExternalMessage };
 
 export function isExportConsoleMessage(message: unknown): message is ExportConsoleMessage {
   return hasMessageType(message, "exportConsole");

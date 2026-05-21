@@ -1,8 +1,5 @@
-import {
-  asRecord,
-  hasMessageType,
-  isOpenExternalMessage as isOpenExternalUrlMessage
-} from "../../../shared/runtimeGuards";
+import { asRecord, hasMessageType, isOpenExternalMessage } from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage } from "../../shared/PanelIncomingMessages";
 import type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
 
 export type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
@@ -31,10 +28,7 @@ export interface LaunchNodeAgentMessage {
   type: "launchNodeAgent";
 }
 
-export interface OpenExternalMessage {
-  type: "openExternal";
-  url: string;
-}
+export type { OpenExternalMessage };
 
 export interface CopyNodeJsonMessage {
   type: "copyNodeJson";
@@ -82,9 +76,7 @@ export function isLoadAdvancedNodeDetailsMessage(
   return hasMessageType(message, "loadAdvancedNodeDetails");
 }
 
-export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
-  return isOpenExternalUrlMessage(message);
-}
+export { isOpenExternalMessage };
 
 export function isTakeNodeOfflineMessage(message: unknown): message is TakeNodeOfflineMessage {
   return hasMessageType(message, "takeNodeOffline");

@@ -2,11 +2,8 @@ import type {
   NodeCapacityNodeExecutorsUpdateMessage,
   NodeCapacityUpdateMessage
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
-import {
-  hasMessageType,
-  isOpenExternalMessage as isOpenExternalUrlMessage,
-  isRecord
-} from "../../../shared/runtimeGuards";
+import { hasMessageType, isOpenExternalMessage, isRecord } from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage } from "../../shared/PanelIncomingMessages";
 
 export type {
   NodeCapacityNodeExecutorsUpdateMessage,
@@ -17,10 +14,7 @@ export interface RefreshNodeCapacityMessage {
   type: "refreshNodeCapacity";
 }
 
-export interface OpenExternalMessage {
-  type: "openExternal";
-  url: string;
-}
+export type { OpenExternalMessage };
 
 export interface OpenNodeDetailsMessage {
   type: "openNodeDetails";
@@ -75,9 +69,7 @@ export function isRefreshNodeCapacityMessage(
   return hasMessageType(message, "refreshNodeCapacity");
 }
 
-export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
-  return isOpenExternalUrlMessage(message);
-}
+export { isOpenExternalMessage };
 
 export function isOpenNodeDetailsMessage(message: unknown): message is OpenNodeDetailsMessage {
   return (

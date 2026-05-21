@@ -6,6 +6,7 @@ import type {
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
+import { areStringArraysEqual } from "../../shared/arrays";
 import type { BuildDetailsInitialState } from "./BuildDetailsPollingController";
 import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 
@@ -305,7 +306,10 @@ export class BuildDetailsPanelState {
     }
     const availabilityChanged = this.pipelineRestartAvailabilityValue !== availability;
     const restartEnabledChanged = this.pipelineRestartEnabledValue !== restartEnabled;
-    const stagesChanged = !areErrorsEqual(normalizedStages, this.pipelineRestartableStagesValue);
+    const stagesChanged = !areStringArraysEqual(
+      normalizedStages,
+      this.pipelineRestartableStagesValue
+    );
     if (!availabilityChanged && !restartEnabledChanged && !stagesChanged) {
       return false;
     }
@@ -329,19 +333,12 @@ export class BuildDetailsPanelState {
 
   updateErrors(): string[] | undefined {
     const nextErrors = composeErrors(this.baseErrorsValue, this.pipelineErrorValue);
-    if (!areErrorsEqual(nextErrors, this.currentErrorsValue)) {
+    if (!areStringArraysEqual(nextErrors, this.currentErrorsValue)) {
       this.currentErrorsValue = nextErrors;
       return nextErrors;
     }
     return undefined;
   }
-}
-
-function areErrorsEqual(left: string[], right: string[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-  return left.every((value, index) => value === right[index]);
 }
 
 function composeErrors(baseErrors: string[], pipelineError?: string): string[] {

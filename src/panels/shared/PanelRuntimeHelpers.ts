@@ -7,6 +7,22 @@ export function disposePanelResources(disposables: vscode.Disposable[]): void {
   }
 }
 
+export function disposeRefreshSubscription(subscription?: vscode.Disposable): void {
+  subscription?.dispose();
+}
+
+export function disposeEnvironmentScopedPanel(options: {
+  clearSingleton: () => void;
+  disposables: vscode.Disposable[];
+  onDispose?: () => void;
+  refreshSubscription?: vscode.Disposable;
+}): void {
+  options.clearSingleton();
+  options.onDispose?.();
+  disposeRefreshSubscription(options.refreshSubscription);
+  disposePanelResources(options.disposables);
+}
+
 export function attachPanelLifecycle(
   panel: vscode.WebviewPanel,
   disposables: vscode.Disposable[],

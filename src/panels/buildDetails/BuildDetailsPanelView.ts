@@ -1,15 +1,12 @@
 import type * as vscode from "vscode";
-import { resolveWebviewAssets } from "../shared/webview/WebviewAssets";
+import { assignPanelLoadingHtml, resolvePanelViewAssets } from "../shared/webview/PanelViewHelpers";
 import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
-import { renderBuildDetailsHtml, renderLoadingHtml } from "./BuildDetailsRenderer";
+import { renderBuildDetailsHtml } from "./BuildDetailsRenderer";
 import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
 import type { BuildDetailsViewModel } from "./BuildDetailsViewModel";
 
-export interface BuildDetailsPanelViewAssets {
-  scriptUri: string;
-  styleUris: string[];
-}
+export type { PanelViewAssets as BuildDetailsPanelViewAssets } from "../shared/webview/PanelViewHelpers";
 
 export interface BuildDetailsPanelRenderOptions {
   nonce: string;
@@ -22,26 +19,17 @@ export class BuildDetailsPanelView {
     private readonly extensionUri: vscode.Uri
   ) {}
 
-  resolveAssets(): BuildDetailsPanelViewAssets | undefined {
-    try {
-      return resolveWebviewAssets(this.panel.webview, this.extensionUri, "buildDetails");
-    } catch {
-      return undefined;
-    }
+  resolveAssets() {
+    return resolvePanelViewAssets(this.panel.webview, this.extensionUri, "buildDetails");
   }
 
   renderLoading(options: BuildDetailsPanelRenderOptions & { styleUris: string[] }): void {
-    this.panel.webview.html = renderLoadingHtml({
-      cspSource: this.panel.webview.cspSource,
-      nonce: options.nonce,
-      styleUris: options.styleUris,
-      panelState: options.panelState
-    });
+    assignPanelLoadingHtml(this.panel, "build", options);
   }
 
   renderBuildDetails(
     model: BuildDetailsViewModel,
-    assets: BuildDetailsPanelViewAssets,
+    assets: NonNullable<ReturnType<BuildDetailsPanelView["resolveAssets"]>>,
     options: BuildDetailsPanelRenderOptions
   ): void {
     this.panel.webview.html = renderBuildDetailsHtml(model, {

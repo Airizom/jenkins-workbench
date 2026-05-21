@@ -11,14 +11,7 @@ import type {
 } from "../../jenkins/types";
 import { buildCoverageStateViewModel } from "./BuildDetailsCoverageViewModel";
 import { buildBuildFailureInsights } from "./BuildDetailsFailureInsightsViewModel";
-import {
-  formatCulprits,
-  formatDuration,
-  formatResult,
-  formatResultClass,
-  formatTimestamp,
-  truncateConsoleText
-} from "./BuildDetailsFormatters";
+import { formatBuildDetailsHeaderLabels, truncateConsoleText } from "./BuildDetailsFormatters";
 import { buildPendingInputsViewModel } from "./BuildDetailsPendingInputsViewModel";
 import { buildPipelineStagesViewModel } from "./BuildDetailsPipelineViewModel";
 import { buildTestStateViewModel } from "./BuildDetailsTestsViewModel";
@@ -111,15 +104,12 @@ export function buildBuildDetailsViewModel(
     (error) => !error.toLowerCase().startsWith("console output:")
   );
   const consoleError = input.consoleError ?? extractConsoleError(input.errors);
+  const headerLabels = formatBuildDetailsHeaderLabels(details);
 
   return {
     displayName: details?.fullDisplayName ?? details?.displayName ?? "Build Details",
     buildUrl,
-    resultLabel: details ? formatResult(details) : "Unknown",
-    resultClass: details ? formatResultClass(details) : "neutral",
-    durationLabel: details ? formatDuration(details.duration) : "Unknown",
-    timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown",
-    culpritsLabel: details ? formatCulprits(details.culprits) : "Unknown",
+    ...headerLabels,
     pipelineStagesLoading: Boolean(input.pipelineLoading),
     pipelineStages: buildPipelineStagesViewModel(input.pipelineRun, {
       details,

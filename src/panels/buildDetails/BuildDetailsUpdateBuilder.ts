@@ -5,13 +5,7 @@ import type {
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
-import {
-  formatCulprits,
-  formatDuration,
-  formatResult,
-  formatResultClass,
-  formatTimestamp
-} from "./BuildDetailsFormatters";
+import { formatBuildDetailsHeaderLabels } from "./BuildDetailsFormatters";
 import type { BuildDetailsOutgoingMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsUpdateMessage } from "./BuildDetailsMessages";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
@@ -56,11 +50,7 @@ export function buildDetailsUpdateMessage(
   });
   return {
     type: "updateDetails",
-    resultLabel: formatResult(details),
-    resultClass: formatResultClass(details),
-    durationLabel: formatDuration(details.duration),
-    timestampLabel: formatTimestamp(details.timestamp),
-    culpritsLabel: formatCulprits(details.culprits),
+    ...formatBuildDetailsHeaderLabels(details),
     pipelineStagesLoading: Boolean(pipelineLoading),
     testState: buildTestStateViewModel(details, testReport, {
       testReportFetched: options?.testReportFetched,
