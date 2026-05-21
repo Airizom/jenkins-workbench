@@ -122,6 +122,16 @@ function getOpenExternalHttpUrlWarningMessage(
   });
 }
 
+export async function openJenkinsWorkbenchUrl(
+  url: string,
+  sourceLabel: string
+): Promise<OpenExternalHttpUrlResult> {
+  return openExternalHttpUrlWithWarning(url, {
+    targetLabel: "Jenkins URL",
+    sourceLabel
+  });
+}
+
 export async function openExternalHttpUrlWithWarning(
   url: string,
   options: OpenExternalHttpUrlWarningOptions = {}

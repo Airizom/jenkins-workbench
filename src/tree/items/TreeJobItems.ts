@@ -179,9 +179,7 @@ export class QuickAccessJobTreeItem extends JobTreeItem {
     isPinned = true
   ) {
     super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    this.id = `quick-access:${this.id}`;
-    this.description = buildPinnedQuickAccessDescription(jobUrl, color, isWatched);
-    this.tooltip = formatPinnedJobTooltip(label, jobUrl, this.description);
+    applyQuickAccessPresentation(this, label, jobUrl, color, isWatched);
   }
 }
 
@@ -196,9 +194,7 @@ export class QuickAccessPipelineTreeItem extends PipelineTreeItem {
     isPinned = true
   ) {
     super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    this.id = `quick-access:${this.id}`;
-    this.description = buildPinnedQuickAccessDescription(jobUrl, color, isWatched);
-    this.tooltip = formatPinnedJobTooltip(label, jobUrl, this.description);
+    applyQuickAccessPresentation(this, label, jobUrl, color, isWatched);
   }
 }
 
@@ -215,9 +211,7 @@ export class ActivityJobTreeItem extends JobTreeItem {
     pathContext?: string
   ) {
     super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    this.id = `activity:${group}:${this.id}`;
-    this.description = buildActivityDescription(pathContext, color, isWatched, isPinned);
-    this.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, this.description);
+    applyActivityPresentation(this, label, jobUrl, group, pathContext, color, isWatched, isPinned);
   }
 }
 
@@ -234,9 +228,7 @@ export class ActivityPipelineTreeItem extends PipelineTreeItem {
     pathContext?: string
   ) {
     super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    this.id = `activity:${group}:${this.id}`;
-    this.description = buildActivityDescription(pathContext, color, isWatched, isPinned);
-    this.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, this.description);
+    applyActivityPresentation(this, label, jobUrl, group, pathContext, color, isWatched, isPinned);
   }
 }
 
@@ -299,6 +291,33 @@ function formatActivityJobTooltip(
   }
   lines.push(jobUrl);
   return lines.join("\n");
+}
+
+function applyQuickAccessPresentation(
+  item: JobTreeItem | PipelineTreeItem,
+  label: string,
+  jobUrl: string,
+  color?: string,
+  isWatched = false
+): void {
+  item.id = `quick-access:${item.id}`;
+  item.description = buildPinnedQuickAccessDescription(jobUrl, color, isWatched);
+  item.tooltip = formatPinnedJobTooltip(label, jobUrl, item.description);
+}
+
+function applyActivityPresentation(
+  item: JobTreeItem | PipelineTreeItem,
+  label: string,
+  jobUrl: string,
+  group: ActivityGroupKind,
+  pathContext: string | undefined,
+  color: string | undefined,
+  isWatched: boolean,
+  isPinned: boolean
+): void {
+  item.id = `activity:${group}:${item.id}`;
+  item.description = buildActivityDescription(pathContext, color, isWatched, isPinned);
+  item.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, item.description);
 }
 
 function buildPinnedQuickAccessDescription(

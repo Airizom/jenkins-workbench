@@ -98,19 +98,7 @@ export class TreeChildrenCacheManager {
       return;
     }
 
-    const prefix = `${environmentId}:`;
-    for (const key of this.pendingLoads.keys()) {
-      if (key.startsWith(prefix)) {
-        this.clearChildrenCache(key);
-      }
-    }
-
-    for (const key of this.loadTokens.keys()) {
-      if (key.startsWith(prefix) && !this.pendingLoads.has(key)) {
-        this.loadTokens.delete(key);
-      }
-    }
-
+    this.clearPendingAndLoadTokensByPrefix(`${environmentId}:`);
     this.childrenCache.clearForEnvironment(environmentId);
     this.artifactCache.clearForEnvironment(environmentId);
   }
@@ -175,6 +163,11 @@ export class TreeChildrenCacheManager {
   }
 
   private clearChildrenCacheByPrefix(prefix: string): void {
+    this.clearPendingAndLoadTokensByPrefix(prefix);
+    this.childrenCache.clearByPrefix(prefix);
+  }
+
+  private clearPendingAndLoadTokensByPrefix(prefix: string): void {
     for (const key of this.pendingLoads.keys()) {
       if (key.startsWith(prefix)) {
         this.clearChildrenCache(key);
@@ -185,7 +178,6 @@ export class TreeChildrenCacheManager {
         this.loadTokens.delete(key);
       }
     }
-    this.childrenCache.clearByPrefix(prefix);
   }
 
   clearChildrenCache(key: string): void {

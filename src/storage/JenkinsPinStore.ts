@@ -1,6 +1,10 @@
 import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
-import { JenkinsScopedJobStore, type ScopedJobStoreEntry } from "./ScopedJobStore";
+import {
+  JenkinsScopedJobStore,
+  type ScopedJobStoreEntry,
+  mergeScopedJobEntryMetadata
+} from "./ScopedJobStore";
 
 export interface StoredPinnedJobEntry extends ScopedJobStoreEntry {}
 
@@ -38,11 +42,7 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
   }
 
   async addPin(scope: EnvironmentScope, entry: StoredPinnedJobEntry): Promise<void> {
-    await this.addOrUpdate(scope, entry, (existing, incoming) => ({
-      ...existing,
-      jobName: incoming.jobName ?? existing.jobName,
-      jobKind: incoming.jobKind ?? existing.jobKind
-    }));
+    await this.addOrUpdate(scope, entry, mergeScopedJobEntryMetadata);
   }
 
   async removePin(

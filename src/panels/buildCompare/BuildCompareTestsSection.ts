@@ -11,6 +11,38 @@ import type {
 
 type NormalizedTestCase = NormalizedTestCaseBase;
 
+const EMPTY_TEST_DIFF_LISTS = {
+  newFailures: [],
+  stillFailing: [],
+  newPasses: [],
+  addedTests: [],
+  removedTests: [],
+  otherChangesCount: 0,
+  unchangedCount: 0
+} as const satisfies Pick<
+  BuildCompareTestsSectionViewModel,
+  | "newFailures"
+  | "stillFailing"
+  | "newPasses"
+  | "addedTests"
+  | "removedTests"
+  | "otherChangesCount"
+  | "unchangedCount"
+>;
+
+function createUnavailableTestsSection(
+  overrides: Pick<
+    BuildCompareTestsSectionViewModel,
+    "summaryLabel" | "detail" | "baselineSummaryLabel" | "targetSummaryLabel"
+  >
+): BuildCompareTestsSectionViewModel {
+  return {
+    status: "unavailable",
+    ...EMPTY_TEST_DIFF_LISTS,
+    ...overrides
+  };
+}
+
 export function buildTestsSection(
   baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
   targetReport: BuildCompareOptionalResult<JenkinsTestReport>
@@ -22,42 +54,22 @@ export function buildTestsSection(
       detail: buildComparisonErrorDetail("Test report", baseline, target),
       baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
       targetSummaryLabel: buildTestSummaryLabel(targetReport),
-      newFailures: [],
-      stillFailing: [],
-      newPasses: [],
-      addedTests: [],
-      removedTests: [],
-      otherChangesCount: 0,
-      unchangedCount: 0
+      ...EMPTY_TEST_DIFF_LISTS
     }),
-    onBothUnavailable: () => ({
-      status: "unavailable",
-      summaryLabel: "Test report data unavailable",
-      detail: "Neither build exposed a Jenkins test report.",
-      baselineSummaryLabel: "Unavailable",
-      targetSummaryLabel: "Unavailable",
-      newFailures: [],
-      stillFailing: [],
-      newPasses: [],
-      addedTests: [],
-      removedTests: [],
-      otherChangesCount: 0,
-      unchangedCount: 0
-    }),
-    onPartialUnavailable: () => ({
-      status: "unavailable",
-      summaryLabel: "Test report data unavailable",
-      detail: "Both builds need test report data for a reliable comparison.",
-      baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
-      targetSummaryLabel: buildTestSummaryLabel(targetReport),
-      newFailures: [],
-      stillFailing: [],
-      newPasses: [],
-      addedTests: [],
-      removedTests: [],
-      otherChangesCount: 0,
-      unchangedCount: 0
-    }),
+    onBothUnavailable: () =>
+      createUnavailableTestsSection({
+        summaryLabel: "Test report data unavailable",
+        detail: "Neither build exposed a Jenkins test report.",
+        baselineSummaryLabel: "Unavailable",
+        targetSummaryLabel: "Unavailable"
+      }),
+    onPartialUnavailable: () =>
+      createUnavailableTestsSection({
+        summaryLabel: "Test report data unavailable",
+        detail: "Both builds need test report data for a reliable comparison.",
+        baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
+        targetSummaryLabel: buildTestSummaryLabel(targetReport)
+      }),
     onAvailable: (baselineValue, targetValue) =>
       buildAvailableTestsSection(baselineReport, targetReport, baselineValue, targetValue)
   });

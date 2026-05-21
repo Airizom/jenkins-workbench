@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders } from "node:http";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { normalizePosixRelativePath } from "../shared/posixPaths";
 import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactPathUtils";
 import type { ArtifactRetrievalService } from "./ArtifactRetrievalService";
 
@@ -95,7 +96,7 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
   safeRelativePath: string;
   label: string;
 } {
-  const safeRelativePath = normalizeArtifactRelativePath(request.relativePath);
+  const safeRelativePath = normalizePosixRelativePath(request.relativePath);
   if (!safeRelativePath) {
     throw new ArtifactStorageError("invalidPath", "Artifact path is invalid and cannot be saved.");
   }
@@ -132,7 +133,7 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
 }
 
 function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): string | undefined {
-  const normalized = normalizeStorageRoot(downloadRoot);
+  const normalized = normalizePosixRelativePath(downloadRoot);
   if (!normalized) {
     return undefined;
   }
@@ -141,44 +142,6 @@ function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): strin
     return undefined;
   }
   return resolved;
-}
-
-function normalizeStorageRoot(value: string): string | undefined {
-  const cleaned = value.replace(/\\/g, "/").trim();
-  if (!cleaned) {
-    return undefined;
-  }
-  const normalized = path.posix.normalize(cleaned);
-  const withoutLeading = normalized.replace(/^\/+/g, "");
-  const segments = withoutLeading
-    .split("/")
-    .filter((segment) => segment.length > 0 && segment !== ".");
-  if (segments.length === 0) {
-    return undefined;
-  }
-  if (segments.some((segment) => segment === "..")) {
-    return undefined;
-  }
-  return segments.join("/");
-}
-
-function normalizeArtifactRelativePath(relativePath: string): string | undefined {
-  const cleaned = relativePath.replace(/\\/g, "/").trim();
-  if (!cleaned) {
-    return undefined;
-  }
-  const normalized = path.posix.normalize(cleaned);
-  const withoutLeading = normalized.replace(/^\/+/g, "");
-  const segments = withoutLeading
-    .split("/")
-    .filter((segment) => segment.length > 0 && segment !== ".");
-  if (segments.length === 0) {
-    return undefined;
-  }
-  if (segments.some((segment) => segment === "..")) {
-    return undefined;
-  }
-  return segments.join("/");
 }
 
 function isPathInside(rootPath: string, filePath: string): boolean {

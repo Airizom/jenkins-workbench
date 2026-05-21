@@ -10,7 +10,7 @@ import type { JenkinsNodeDetails } from "../jenkins/types";
 import { NodeActionService } from "../services/NodeActionService";
 import { NodeQueuedWorkService } from "../services/NodeQueuedWorkService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
+import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import {
   type NodeDetailsOutgoingMessage,
   isBringNodeOnlineMessage,
@@ -410,10 +410,7 @@ export class NodeDetailsPanel {
   }
 
   private async openExternalUrl(url: string): Promise<void> {
-    await openExternalHttpUrlWithWarning(url, {
-      targetLabel: "Jenkins URL",
-      sourceLabel: "Node Details"
-    });
+    await openJenkinsWorkbenchUrl(url, "Node Details");
   }
 
   private async copyJson(content: string): Promise<void> {

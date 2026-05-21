@@ -2,16 +2,14 @@ import { Button } from "../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../shared/webview/components/ui/progress";
 import {
   AlertTriangleIcon,
-  CalendarIcon,
   CheckCircleIcon,
-  ClockIcon,
   ExternalLinkIcon,
   PlayCircleIcon,
   StopCircleIcon,
-  UserIcon,
   XCircleIcon
 } from "../../../../shared/webview/icons";
 import { cn } from "../../../../shared/webview/lib/utils";
+import { BuildDetailsMetaFields } from "./BuildDetailsMetaFields";
 import { StatusPill } from "./StatusPill";
 
 type BuildDetailsHeaderProps = {
@@ -83,30 +81,12 @@ export function BuildDetailsHeader({
             <StatusPill id="detail-result" label={resultLabel} status={resultClass} />
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1" id="detail-duration">
-                <ClockIcon className="h-3 w-3" />
-                {durationLabel}
-              </span>
-              <span aria-hidden="true" className="opacity-30">
-                |
-              </span>
-              <span className="inline-flex items-center gap-1" id="detail-timestamp">
-                <CalendarIcon className="h-3 w-3" />
-                {timestampLabel}
-              </span>
-              {culpritsLabel !== "—" && culpritsLabel !== "None" ? (
-                <>
-                  <span aria-hidden="true" className="opacity-30">
-                    |
-                  </span>
-                  <span className="inline-flex items-center gap-1" id="detail-culprits">
-                    <UserIcon className="h-3 w-3" />
-                    {culpritsLabel}
-                  </span>
-                </>
-              ) : null}
-            </div>
+            <BuildDetailsMetaFields
+              durationLabel={durationLabel}
+              timestampLabel={timestampLabel}
+              culpritsLabel={culpritsLabel}
+              className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground"
+            />
             <Button
               variant="ghost"
               size="sm"
@@ -120,30 +100,13 @@ export function BuildDetailsHeader({
             </Button>
           </div>
         </div>
-        <div className="sm:hidden flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1" id="detail-duration-sm">
-            <ClockIcon className="h-3 w-3" />
-            {durationLabel}
-          </span>
-          <span aria-hidden="true" className="opacity-30">
-            |
-          </span>
-          <span className="inline-flex items-center gap-1" id="detail-timestamp-sm">
-            <CalendarIcon className="h-3 w-3" />
-            {timestampLabel}
-          </span>
-          {culpritsLabel !== "—" && culpritsLabel !== "None" ? (
-            <>
-              <span aria-hidden="true" className="opacity-30">
-                |
-              </span>
-              <span className="inline-flex items-center gap-1" id="detail-culprits-sm">
-                <UserIcon className="h-3 w-3" />
-                {culpritsLabel}
-              </span>
-            </>
-          ) : null}
-        </div>
+        <BuildDetailsMetaFields
+          idSuffix="-sm"
+          durationLabel={durationLabel}
+          timestampLabel={timestampLabel}
+          culpritsLabel={culpritsLabel}
+          className="sm:hidden flex items-center gap-2 mt-1.5 text-xs text-muted-foreground"
+        />
       </div>
       <div className={cn("h-px", getStatusAccent(resultClass))} />
     </header>

@@ -1,3 +1,4 @@
+import type { JenkinsConsoleTextClient } from "../../jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
   JenkinsConsoleText,
@@ -15,22 +16,7 @@ export interface ConsoleStreamCallbacks {
   onConsoleHtmlSet(payload: { html: string; truncated: boolean }): void;
 }
 
-export interface ConsoleStreamDataService {
-  getConsoleText(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars?: number
-  ): Promise<JenkinsConsoleText>;
-  getConsoleTextTail(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars: number
-  ): Promise<JenkinsConsoleTextTail>;
-  getConsoleTextProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number
-  ): Promise<JenkinsProgressiveConsoleText>;
+export interface ConsoleStreamDataService extends JenkinsConsoleTextClient {
   getConsoleHtmlProgressive(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,

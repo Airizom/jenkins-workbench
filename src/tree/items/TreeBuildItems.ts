@@ -2,16 +2,9 @@ import * as vscode from "vscode";
 import type { JenkinsBuild } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { type BuildTooltipOptions, buildBuildTooltip } from "../BuildTooltips";
+import { TREE_FOLDER_ICON, resolveTreeFileIcon } from "../TreeFileIcons";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, buildTreeJobScopeKey } from "../TreeJobScope";
 import { buildIcon, formatBuildDescription } from "../formatters";
-
-const FOLDER_ICON = new vscode.ThemeIcon("folder");
-const FILE_ICON = new vscode.ThemeIcon("file");
-const FILE_CODE_ICON = new vscode.ThemeIcon("file-code");
-const FILE_MEDIA_ICON = new vscode.ThemeIcon("file-media");
-const FILE_PDF_ICON = new vscode.ThemeIcon("file-pdf");
-const FILE_TEXT_ICON = new vscode.ThemeIcon("file-text");
-const FILE_ZIP_ICON = new vscode.ThemeIcon("file-zip");
 
 export class BuildTreeItem extends vscode.TreeItem {
   static buildId(
@@ -86,7 +79,7 @@ export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
     );
     this.id = BuildArtifactsFolderTreeItem.buildId(environment, buildUrl, jobScope);
     this.contextValue = "artifactFolder";
-    this.iconPath = FOLDER_ICON;
+    this.iconPath = TREE_FOLDER_ICON;
     if (typeof artifactCount === "number") {
       this.description =
         artifactCount > 0
@@ -110,47 +103,6 @@ export class ArtifactTreeItem extends vscode.TreeItem {
     this.contextValue = "artifactItem";
     this.description =
       fileName && relativePath && relativePath !== fileName ? relativePath : undefined;
-    this.iconPath = resolveArtifactIcon(fileName, relativePath);
+    this.iconPath = resolveTreeFileIcon(fileName, relativePath);
   }
-}
-
-function resolveArtifactIcon(fileName?: string, relativePath?: string): vscode.ThemeIcon {
-  const ext = getFileExtension(fileName, relativePath);
-  switch (ext) {
-    case ".jar":
-    case ".war":
-    case ".ear":
-    case ".zip":
-    case ".tar":
-    case ".gz":
-    case ".tgz":
-      return FILE_ZIP_ICON;
-    case ".log":
-    case ".txt":
-      return FILE_TEXT_ICON;
-    case ".xml":
-    case ".json":
-    case ".yaml":
-    case ".yml":
-    case ".html":
-    case ".htm":
-      return FILE_CODE_ICON;
-    case ".png":
-    case ".jpg":
-    case ".jpeg":
-    case ".gif":
-    case ".svg":
-    case ".webp":
-      return FILE_MEDIA_ICON;
-    case ".pdf":
-      return FILE_PDF_ICON;
-    default:
-      return FILE_ICON;
-  }
-}
-
-function getFileExtension(fileName?: string, relativePath?: string): string {
-  const name = fileName || relativePath || "";
-  const lastDot = name.lastIndexOf(".");
-  return lastDot > 0 ? name.slice(lastDot).toLowerCase() : "";
 }

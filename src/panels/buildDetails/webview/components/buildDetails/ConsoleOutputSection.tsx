@@ -4,14 +4,8 @@ import { useConsoleSearch } from "../../hooks/useConsoleSearch";
 import { stripAnsi } from "../../lib/ansi";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
-import { ConsoleSearchToolbar } from "../ConsoleSearchToolbar";
-import {
-  ConsoleOutputEmptyState,
-  ConsoleOutputErrorNotice,
-  ConsoleOutputHeader,
-  ConsoleOutputNotice,
-  ConsoleOutputViewport
-} from "./consoleOutput";
+import { ConsoleLogSearchBody } from "../ConsoleLogSearchBody";
+import { ConsoleOutputHeader } from "./consoleOutput";
 import { buildConsoleTruncationNote, countConsoleLines } from "./consoleOutput/consoleOutputUtils";
 
 const { useEffect, useMemo } = React;
@@ -110,38 +104,16 @@ export function ConsoleOutputSection({
         onFollowLogChange={handleFollowLogChange}
       />
 
-      <ConsoleSearchToolbar
-        visible={consoleSearch.showSearchToolbar}
-        query={consoleSearch.searchQuery}
-        useRegex={consoleSearch.useRegex}
-        matchCountLabel={consoleSearch.matchCountLabel}
-        matchCount={consoleSearch.matchCount}
-        isSearchActive={consoleSearch.isSearchActive}
-        error={consoleSearch.searchError}
-        tooManyMatchesLabel={consoleSearch.tooManyMatchesLabel}
-        inputRef={consoleSearch.searchInputRef}
-        onChange={consoleSearch.handleSearchChange}
-        onKeyDown={consoleSearch.handleSearchKeyDown}
-        onToggleRegex={() => consoleSearch.setUseRegex((prev) => !prev)}
-        onPrev={() => consoleSearch.handleSearchStep("prev")}
-        onNext={() => consoleSearch.handleSearchStep("next")}
-        onClear={consoleSearch.handleClearSearch}
+      <ConsoleLogSearchBody
+        consoleSearch={consoleSearch}
+        note={consoleNote}
+        error={consoleError}
+        hasOutput={hasConsoleOutput}
+        followLog={followLog}
+        showScrollToTop={showScrollToTop}
+        onScrollToTop={scrollConsoleToTop}
+        segments={consoleSegments}
       />
-
-      <ConsoleOutputNotice note={consoleNote} />
-      <ConsoleOutputErrorNotice error={consoleError} />
-
-      {!consoleError && hasConsoleOutput ? (
-        <ConsoleOutputViewport
-          consoleOutputRef={consoleSearch.consoleOutputRef}
-          showScrollToTop={showScrollToTop}
-          followLog={followLog}
-          onScrollToTop={scrollConsoleToTop}
-          segments={consoleSegments}
-        />
-      ) : null}
-
-      {!consoleError && !hasConsoleOutput ? <ConsoleOutputEmptyState /> : null}
     </div>
   );
 }

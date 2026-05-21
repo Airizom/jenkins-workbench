@@ -1,12 +1,8 @@
 import * as fs from "node:fs";
+import type { JenkinsConsoleTextClient } from "../jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { BuildActionError } from "../jenkins/errors";
-import type {
-  JenkinsBuildDetails,
-  JenkinsConsoleText,
-  JenkinsConsoleTextTail,
-  JenkinsProgressiveConsoleText
-} from "../jenkins/types";
+import type { JenkinsBuildDetails } from "../jenkins/types";
 
 export interface BuildConsoleWriteStream {
   destroyed: boolean;
@@ -36,23 +32,7 @@ export function createNodeBuildConsoleFilesystem(): BuildConsoleFilesystem {
   };
 }
 
-export interface BuildConsoleExportClient {
-  getConsoleText(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars?: number
-  ): Promise<JenkinsConsoleText>;
-  getConsoleTextTail(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars: number
-  ): Promise<JenkinsConsoleTextTail>;
-  getConsoleTextProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number
-  ): Promise<JenkinsProgressiveConsoleText>;
-}
+export type BuildConsoleExportClient = JenkinsConsoleTextClient;
 
 export type BuildConsoleExportMode = "progressive" | "full" | "tail";
 

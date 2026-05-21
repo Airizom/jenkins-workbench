@@ -269,6 +269,28 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function CompareSectionFrame({
+  title,
+  count,
+  children,
+  emptyLabel
+}: {
+  title: string;
+  count: number;
+  children: React.ReactNode;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <Badge variant="muted">{count}</Badge>
+      </div>
+      {count > 0 ? <div className="space-y-2">{children}</div> : <EmptyState label={emptyLabel} />}
+    </div>
+  );
+}
+
 function DiffList({
   title,
   items,
@@ -279,21 +301,11 @@ function DiffList({
   emptyLabel: string;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <Badge variant="muted">{items.length}</Badge>
-      </div>
-      {items.length > 0 ? (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <TestDiffRow key={item.key} item={item} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState label={emptyLabel} />
-      )}
-    </div>
+    <CompareSectionFrame title={title} count={items.length} emptyLabel={emptyLabel}>
+      {items.map((item) => (
+        <TestDiffRow key={item.key} item={item} />
+      ))}
+    </CompareSectionFrame>
   );
 }
 
@@ -356,30 +368,20 @@ function ValueCell({ label, value }: { label: string; value?: string }) {
 
 function ChangesetColumn({ title, items }: { title: string; items: BuildCompareChangesetItem[] }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <Badge variant="muted">{items.length}</Badge>
-      </div>
-      {items.length > 0 ? (
-        <div className="space-y-2">
-          {items.map((item, index) => (
-            <div
-              key={`${item.commitId ?? item.message}:${index}`}
-              className="rounded-lg border border-border bg-muted-soft px-3 py-2"
-            >
-              <p className="text-sm">{item.message}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {item.author}
-                {item.commitId ? ` • ${item.commitId}` : ""}
-              </p>
-            </div>
-          ))}
+    <CompareSectionFrame title={title} count={items.length} emptyLabel="No changesets recorded.">
+      {items.map((item, index) => (
+        <div
+          key={`${item.commitId ?? item.message}:${index}`}
+          className="rounded-lg border border-border bg-muted-soft px-3 py-2"
+        >
+          <p className="text-sm">{item.message}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {item.author}
+            {item.commitId ? ` • ${item.commitId}` : ""}
+          </p>
         </div>
-      ) : (
-        <EmptyState label="No changesets recorded." />
-      )}
-    </div>
+      ))}
+    </CompareSectionFrame>
   );
 }
 

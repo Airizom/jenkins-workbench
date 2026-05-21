@@ -8,7 +8,7 @@ import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { NodeCapacityService } from "../services/NodeCapacityService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
+import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import { NodeDetailsPanel } from "./NodeDetailsPanel";
 import { renderLoadingHtml, renderNodeCapacityHtml } from "./nodeCapacity/NodeCapacityRenderer";
 import {
@@ -308,10 +308,7 @@ export class NodeCapacityPanel {
   }
 
   private async openExternalUrl(url: string): Promise<void> {
-    await openExternalHttpUrlWithWarning(url, {
-      targetLabel: "Jenkins URL",
-      sourceLabel: "Node Capacity"
-    });
+    await openJenkinsWorkbenchUrl(url, "Node Capacity");
   }
 
   private async openNodeDetails(nodeUrl: string, label?: string): Promise<void> {

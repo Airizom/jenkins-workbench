@@ -1,6 +1,10 @@
 import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
-import { JenkinsScopedJobStore, type ScopedJobStoreEntry } from "./ScopedJobStore";
+import {
+  JenkinsScopedJobStore,
+  type ScopedJobStoreEntry,
+  mergeScopedJobEntryMetadata
+} from "./ScopedJobStore";
 
 export type WatchStatusKind = "success" | "failure" | "other" | "unknown";
 
@@ -42,11 +46,7 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
   }
 
   async addWatch(scope: EnvironmentScope, entry: WatchUpdateInput): Promise<void> {
-    await this.addOrUpdate(scope, entry, (existing, incoming) => ({
-      ...existing,
-      jobName: incoming.jobName ?? existing.jobName,
-      jobKind: incoming.jobKind ?? existing.jobKind
-    }));
+    await this.addOrUpdate(scope, entry, mergeScopedJobEntryMetadata);
   }
 
   async removeWatch(

@@ -8,6 +8,17 @@ export interface ScopedJobStoreEntry {
   jobKind?: "job" | "pipeline";
 }
 
+export function mergeScopedJobEntryMetadata<TEntry extends ScopedJobStoreEntry>(
+  existing: TEntry,
+  incoming: TEntry
+): TEntry {
+  return {
+    ...existing,
+    jobName: incoming.jobName ?? existing.jobName,
+    jobKind: incoming.jobKind ?? existing.jobKind
+  };
+}
+
 export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> {
   protected constructor(
     protected readonly context: vscode.ExtensionContext,
