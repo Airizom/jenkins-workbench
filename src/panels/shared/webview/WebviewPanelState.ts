@@ -9,6 +9,15 @@ export interface SerializedEnvironmentState {
   scope: EnvironmentScope;
 }
 
+export function createSerializedEnvironmentState(
+  environment: JenkinsEnvironmentRef
+): SerializedEnvironmentState {
+  return {
+    environmentId: environment.environmentId,
+    scope: environment.scope
+  };
+}
+
 const VALID_SCOPES = new Set<EnvironmentScope>(["workspace", "global"]);
 
 export function isEnvironmentScope(value: unknown): value is EnvironmentScope {

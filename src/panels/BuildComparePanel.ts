@@ -20,7 +20,7 @@ import {
 } from "./buildCompare/shared/BuildComparePanelWebviewState";
 import { formatError } from "./buildDetails/BuildDetailsFormatters";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
@@ -229,16 +229,11 @@ export class BuildComparePanel {
   }
 
   private renderRestoreError(message: string, panelState?: BuildComparePanelSerializedState): void {
-    this.panel.webview.html = renderPanelManifestErrorHtml(
-      this.panel.webview,
-      this.extensionUri,
-      "buildCompare",
-      {
-        title: BuildComparePanel.PANEL_TITLE,
-        message,
-        hint: "Open the comparison again from Jenkins Workbench to continue.",
-        panelState: panelState ?? this.serializedState
-      }
-    );
+    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildCompare", {
+      title: BuildComparePanel.PANEL_TITLE,
+      message,
+      hint: "Open the comparison again from Jenkins Workbench to continue.",
+      panelState: panelState ?? this.serializedState
+    });
   }
 }

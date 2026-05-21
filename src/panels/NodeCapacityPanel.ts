@@ -19,18 +19,18 @@ import {
   isRefreshNodeCapacityMessage
 } from "./nodeCapacity/shared/NodeCapacityPanelMessages";
 import {
+  PanelLoadTracker,
   attachPanelLifecycle,
-  beginLoadingRequest,
   bindEnvironmentRefresh,
-  disposePanelResources,
-  endLoadingRequest
+  disposePanelResources
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
   type SerializedEnvironmentState,
+  createSerializedEnvironmentState,
   isSerializedEnvironmentState,
   resolveEnvironmentRef
 } from "./shared/webview/WebviewPanelState";
@@ -65,10 +65,9 @@ export class NodeCapacityPanel {
   private dataService?: JenkinsDataService;
   private capacityService?: NodeCapacityService;
   private environment?: JenkinsEnvironmentRef;
-  private loadToken = 0;
+  private readonly loadTracker: PanelLoadTracker;
   private hasRendered = false;
   private nonce = createNonce();
-  private loadingRequests = 0;
 
   static async show(options: NodeCapacityPanelShowOptions): Promise<void> {
     const { dataService, environment, extensionUri, refreshHost } = options;
@@ -135,6 +134,9 @@ export class NodeCapacityPanel {
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
+    this.loadTracker = new PanelLoadTracker((value) =>
+      this.postMessage({ type: "setLoading", value })
+    );
 
     attachPanelLifecycle(this.panel, this.disposables, {
       onDispose: () => this.dispose(),
@@ -186,11 +188,13 @@ export class NodeCapacityPanel {
   }
 
   private async load(): Promise<void> {
-    const token = ++this.loadToken;
+    const token = this.loadTracker.nextToken();
     this.hasRendered = false;
     this.nonce = createNonce();
-    this.loadingRequests = 0;
-    const panelState = this.environment ? createPanelState(this.environment) : undefined;
+    this.loadTracker.resetLoadingRequests();
+    const panelState = this.environment
+      ? createSerializedEnvironmentState(this.environment)
+      : undefined;
 
     let scriptUri: string;
     let styleUris: string[];
@@ -216,7 +220,7 @@ export class NodeCapacityPanel {
     });
 
     const model = await this.fetchCapacity(token);
-    if (!model || !this.isTokenCurrent(token)) {
+    if (!model || !this.loadTracker.isCurrent(token)) {
       return;
     }
 
@@ -236,19 +240,19 @@ export class NodeCapacityPanel {
       await this.load();
       return;
     }
-    const token = ++this.loadToken;
+    const token = this.loadTracker.nextToken();
     if (!options?.skipLoading) {
-      this.beginLoading();
+      this.loadTracker.beginLoading();
     }
     try {
       const model = await this.fetchCapacity(token);
-      if (!model || !this.isTokenCurrent(token)) {
+      if (!model || !this.loadTracker.isCurrent(token)) {
         return;
       }
       this.postMessage({ type: "updateNodeCapacity", payload: model });
     } finally {
       if (!options?.skipLoading) {
-        this.endLoading();
+        this.loadTracker.endLoading();
       }
     }
   }
@@ -259,12 +263,12 @@ export class NodeCapacityPanel {
     }
     try {
       const model = await this.capacityService.getNodeCapacity(this.environment);
-      if (!this.isTokenCurrent(token)) {
+      if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
       return model;
     } catch (error) {
-      if (!this.isTokenCurrent(token)) {
+      if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
       return {
@@ -323,7 +327,7 @@ export class NodeCapacityPanel {
     }
     const capacityService = this.capacityService;
     const environment = this.environment;
-    const token = this.loadToken;
+    const token = this.loadTracker.currentToken;
     const environmentId = environment.environmentId;
     const uniqueNodeUrls = [...new Set(nodeUrls.filter((nodeUrl) => nodeUrl.trim().length > 0))];
     if (uniqueNodeUrls.length === 0) {
@@ -331,12 +335,12 @@ export class NodeCapacityPanel {
     }
     try {
       const entries = await capacityService.hydrateNodeExecutors(environment, uniqueNodeUrls);
-      if (!this.isTokenCurrent(token) || this.environment?.environmentId !== environmentId) {
+      if (!this.loadTracker.isCurrent(token) || this.environment?.environmentId !== environmentId) {
         return;
       }
       this.postMessage({ type: "updateNodeCapacityNodeExecutors", payload: entries });
     } catch (error) {
-      if (!this.isTokenCurrent(token) || this.environment?.environmentId !== environmentId) {
+      if (!this.loadTracker.isCurrent(token) || this.environment?.environmentId !== environmentId) {
         return;
       }
       void vscode.window.showErrorMessage(
@@ -385,44 +389,16 @@ export class NodeCapacityPanel {
     this.refreshTimer = undefined;
   }
 
-  private beginLoading(): void {
-    this.loadingRequests = beginLoadingRequest(this.loadingRequests, (value) =>
-      this.postMessage({ type: "setLoading", value })
-    );
-  }
-
-  private endLoading(): void {
-    this.loadingRequests = endLoadingRequest(this.loadingRequests, (value) =>
-      this.postMessage({ type: "setLoading", value })
-    );
-  }
-
-  private isTokenCurrent(token: number): boolean {
-    return token === this.loadToken;
-  }
-
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
     configureWebviewPanel(panel, extensionUri, "server");
   }
 
   private renderRestoreError(message: string, panelState?: SerializedEnvironmentState): void {
-    this.panel.webview.html = renderPanelManifestErrorHtml(
-      this.panel.webview,
-      this.extensionUri,
-      "nodeCapacity",
-      {
-        title: "Node Capacity",
-        message,
-        hint: "Open node capacity again from Jenkins Workbench to continue.",
-        panelState
-      }
-    );
+    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeCapacity", {
+      title: "Node Capacity",
+      message,
+      hint: "Open node capacity again from Jenkins Workbench to continue.",
+      panelState
+    });
   }
-}
-
-function createPanelState(environment: JenkinsEnvironmentRef): SerializedEnvironmentState {
-  return {
-    environmentId: environment.environmentId,
-    scope: environment.scope
-  };
 }

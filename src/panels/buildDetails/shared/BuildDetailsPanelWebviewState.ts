@@ -1,6 +1,9 @@
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
 import type { SerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
-import { isSerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
+import {
+  createSerializedEnvironmentState,
+  isSerializedEnvironmentState
+} from "../../shared/webview/WebviewPanelState";
 import {
   type PipelineLogTargetViewModel,
   normalizePipelineLogTarget
@@ -25,8 +28,7 @@ export function createBuildDetailsPanelState(
   uiState?: BuildDetailsPanelUiState
 ): BuildDetailsPanelSerializedState {
   return {
-    environmentId: environment.environmentId,
-    scope: environment.scope,
+    ...createSerializedEnvironmentState(environment),
     buildUrl,
     buildDetailsUi: normalizeBuildDetailsPanelUiState(uiState)
   };

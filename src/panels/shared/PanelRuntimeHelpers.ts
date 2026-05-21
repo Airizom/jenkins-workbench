@@ -81,3 +81,34 @@ export function endLoadingRequest(
   }
   return next;
 }
+
+export class PanelLoadTracker {
+  private loadToken = 0;
+  private loadingRequests = 0;
+
+  constructor(private readonly postLoading: (value: boolean) => void) {}
+
+  nextToken(): number {
+    return ++this.loadToken;
+  }
+
+  get currentToken(): number {
+    return this.loadToken;
+  }
+
+  isCurrent(token: number): boolean {
+    return token === this.loadToken;
+  }
+
+  resetLoadingRequests(): void {
+    this.loadingRequests = 0;
+  }
+
+  beginLoading(): void {
+    this.loadingRequests = beginLoadingRequest(this.loadingRequests, this.postLoading);
+  }
+
+  endLoading(): void {
+    this.loadingRequests = endLoadingRequest(this.loadingRequests, this.postLoading);
+  }
+}

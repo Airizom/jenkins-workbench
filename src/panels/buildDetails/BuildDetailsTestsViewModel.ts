@@ -5,7 +5,7 @@ import type {
 } from "../../jenkins/types";
 import { pickFiniteNumber } from "../../shared/numbers";
 import { normalizeTestCaseBase } from "../shared/TestCaseViewModel";
-import { formatNumber } from "./BuildDetailsFormatters";
+import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
 import type {
   BuildDetailsTestStateViewModel,
   BuildTestCaseViewModel,
@@ -48,19 +48,9 @@ export function buildTestsSummary(
     Boolean(options?.testReportFetched) && hasAnyResults && !hasDetailedResults;
   const logsIncluded = Boolean(options?.logsIncluded && hasDetailedResults);
 
-  let label = "No test results.";
-  if (!hasAnyResults) {
-    label = "No test results.";
-  } else if (typeof failed === "number" && typeof total === "number") {
-    label = `Failed ${formatNumber(failed)} / ${formatNumber(total)}`;
-    if (typeof skipped === "number") {
-      label += ` • Skipped ${formatNumber(skipped)}`;
-    }
-  } else if (typeof total === "number") {
-    label = `Total ${formatNumber(total)} tests`;
-  } else if (typeof failed === "number") {
-    label = `Failed ${formatNumber(failed)} tests`;
-  }
+  const label = !hasAnyResults
+    ? "No test results."
+    : formatTestReportCountsSummary({ failed, total, skipped });
 
   return {
     totalCount: resolvedTotal,

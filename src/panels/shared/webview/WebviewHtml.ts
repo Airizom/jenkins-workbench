@@ -58,6 +58,20 @@ export interface PanelManifestErrorOptions {
   panelState?: unknown;
 }
 
+export function assignWebviewPanelManifestErrorHtml(
+  panel: vscode.WebviewPanel,
+  extensionUri: vscode.Uri,
+  entryName: WebviewEntryName,
+  options: PanelManifestErrorOptions
+): void {
+  panel.webview.html = renderPanelManifestErrorHtml(
+    panel.webview,
+    extensionUri,
+    entryName,
+    options
+  );
+}
+
 export function renderPanelManifestErrorHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,

@@ -1,6 +1,7 @@
 import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/types";
 import { formatNumber } from "../buildDetails/BuildDetailsFormatters";
 import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
+import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
 import type {
@@ -145,13 +146,11 @@ function buildTestSummaryLabel(result: BuildCompareOptionalResult<JenkinsTestRep
   if (result.status !== "available") {
     return "Unavailable";
   }
-  const failed = result.value.failCount ?? 0;
-  const total = result.value.totalCount ?? 0;
-  const skipped = result.value.skipCount ?? 0;
-  if (failed === 0 && total === 0 && skipped === 0) {
-    return "No test results";
-  }
-  return `Failed ${formatNumber(failed)} / ${formatNumber(total)} • Skipped ${formatNumber(skipped)}`;
+  return formatTestReportCountsSummary({
+    failed: result.value.failCount,
+    total: result.value.totalCount,
+    skipped: result.value.skipCount
+  });
 }
 
 function buildTestCaseMap(report: JenkinsTestReport): Map<string, NormalizedTestCase> {

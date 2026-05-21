@@ -1,4 +1,8 @@
-import { asRecord, hasMessageType } from "../../../shared/runtimeGuards";
+import {
+  asRecord,
+  hasMessageType,
+  isOpenExternalMessage as isOpenExternalUrlMessage
+} from "../../../shared/runtimeGuards";
 import type {
   ArtifactAction,
   BuildDetailsUpdateMessage,
@@ -206,10 +210,7 @@ export function isToggleFollowLogMessage(message: unknown): message is ToggleFol
 }
 
 export function isOpenExternalMessage(message: unknown): message is OpenExternalMessage {
-  if (!hasMessageType(message, "openExternal")) {
-    return false;
-  }
-  return typeof message.url === "string";
+  return isOpenExternalUrlMessage(message);
 }
 
 export function isExportConsoleMessage(message: unknown): message is ExportConsoleMessage {

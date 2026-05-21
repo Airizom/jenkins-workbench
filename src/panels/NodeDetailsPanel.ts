@@ -24,18 +24,18 @@ import {
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
 import {
+  PanelLoadTracker,
   attachPanelLifecycle,
-  beginLoadingRequest,
   bindEnvironmentRefresh,
-  disposePanelResources,
-  endLoadingRequest
+  disposePanelResources
 } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
-import { renderPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
   type SerializedEnvironmentState,
+  createSerializedEnvironmentState,
   isSerializedEnvironmentState,
   resolveEnvironmentRef
 } from "./shared/webview/WebviewPanelState";
@@ -76,8 +76,7 @@ function createNodeDetailsPanelState(
   nodeUrl: string
 ): NodeDetailsPanelSerializedState {
   return {
-    environmentId: environment.environmentId,
-    scope: environment.scope,
+    ...createSerializedEnvironmentState(environment),
     nodeUrl
   };
 }
@@ -95,11 +94,10 @@ export class NodeDetailsPanel {
   private environment?: JenkinsEnvironmentRef;
   private nodeUrl?: string;
   private lastDetails?: JenkinsNodeDetails;
-  private loadToken = 0;
+  private readonly loadTracker: PanelLoadTracker;
   private hasRendered = false;
   private nonce = createNonce();
   private advancedLoaded = false;
-  private loadingRequests = 0;
 
   static async show(options: NodeDetailsPanelShowOptions): Promise<void> {
     const { dataService, environment, nodeUrl, extensionUri, label, refreshHost } = options;
@@ -170,6 +168,9 @@ export class NodeDetailsPanel {
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
+    this.loadTracker = new PanelLoadTracker((value) =>
+      this.postMessage({ type: "setLoading", value })
+    );
 
     attachPanelLifecycle(this.panel, this.disposables, {
       onDispose: () => this.dispose(),
@@ -222,12 +223,12 @@ export class NodeDetailsPanel {
   }
 
   private async load(): Promise<void> {
-    const token = ++this.loadToken;
+    const token = this.loadTracker.nextToken();
     this.hasRendered = false;
     this.nonce = createNonce();
     this.lastDetails = undefined;
     this.advancedLoaded = false;
-    this.loadingRequests = 0;
+    this.loadTracker.resetLoadingRequests();
     const panelState =
       this.environment && this.nodeUrl
         ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
@@ -256,7 +257,7 @@ export class NodeDetailsPanel {
     });
 
     const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel: "basic" });
-    if (!model || !this.isTokenCurrent(token)) {
+    if (!model || !this.loadTracker.isCurrent(token)) {
       return;
     }
 
@@ -289,20 +290,20 @@ export class NodeDetailsPanel {
     detailLevel: "basic" | "advanced",
     options?: { skipLoading?: boolean }
   ): Promise<void> {
-    const token = ++this.loadToken;
+    const token = this.loadTracker.nextToken();
     const shouldToggleLoading = !options?.skipLoading;
     if (shouldToggleLoading) {
-      this.beginLoading();
+      this.loadTracker.beginLoading();
     }
     try {
       const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel });
-      if (!model || !this.isTokenCurrent(token)) {
+      if (!model || !this.loadTracker.isCurrent(token)) {
         return;
       }
       this.postMessage({ type: "updateNodeDetails", payload: model });
     } finally {
       if (shouldToggleLoading) {
-        this.endLoading();
+        this.loadTracker.endLoading();
       }
     }
   }
@@ -315,7 +316,7 @@ export class NodeDetailsPanel {
     }
     const label = this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node";
     const target = { environment: this.environment, nodeUrl: this.nodeUrl, label };
-    this.beginLoading();
+    this.loadTracker.beginLoading();
     try {
       const { nodeActionService, refreshHost } = this;
       const actions = {
@@ -330,7 +331,7 @@ export class NodeDetailsPanel {
     } catch (error) {
       void vscode.window.showErrorMessage(formatActionError(error));
     } finally {
-      this.endLoading();
+      this.loadTracker.endLoading();
     }
   }
 
@@ -347,7 +348,7 @@ export class NodeDetailsPanel {
         mode: options?.mode,
         detailLevel
       });
-      if (!this.isTokenCurrent(token)) {
+      if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
       if (detailLevel === "advanced") {
@@ -368,7 +369,7 @@ export class NodeDetailsPanel {
           errors.push(`Unable to load queued work: ${formatActionError(error)}`);
         }
       }
-      if (!this.isTokenCurrent(token)) {
+      if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
       return buildNodeDetailsViewModel({
@@ -381,7 +382,7 @@ export class NodeDetailsPanel {
         nowMs: Date.now()
       });
     } catch (error) {
-      if (!this.isTokenCurrent(token)) {
+      if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
       const message = formatActionError(error);
@@ -421,10 +422,6 @@ export class NodeDetailsPanel {
     return this.advancedLoaded ? "advanced" : "basic";
   }
 
-  private isTokenCurrent(token: number): boolean {
-    return token === this.loadToken;
-  }
-
   private setRefreshHost(refreshHost?: NodeDetailsRefreshHost): void {
     this.refreshHost = refreshHost;
     this.refreshSubscription = bindEnvironmentRefresh(
@@ -458,33 +455,16 @@ export class NodeDetailsPanel {
     await this.refreshDetailsWith(this.currentDetailLevel);
   }
 
-  private beginLoading(): void {
-    this.loadingRequests = beginLoadingRequest(this.loadingRequests, (value) =>
-      this.postMessage({ type: "setLoading", value })
-    );
-  }
-
-  private endLoading(): void {
-    this.loadingRequests = endLoadingRequest(this.loadingRequests, (value) =>
-      this.postMessage({ type: "setLoading", value })
-    );
-  }
-
   private static configurePanel(panel: vscode.WebviewPanel, extensionUri: vscode.Uri): void {
     configureWebviewPanel(panel, extensionUri, "server");
   }
 
   private renderRestoreError(message: string, panelState?: NodeDetailsPanelSerializedState): void {
-    this.panel.webview.html = renderPanelManifestErrorHtml(
-      this.panel.webview,
-      this.extensionUri,
-      "nodeDetails",
-      {
-        title: "Node Details",
-        message,
-        hint: "Open the node again from Jenkins Workbench to continue.",
-        panelState
-      }
-    );
+    assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "nodeDetails", {
+      title: "Node Details",
+      message,
+      hint: "Open the node again from Jenkins Workbench to continue.",
+      panelState
+    });
   }
 }
