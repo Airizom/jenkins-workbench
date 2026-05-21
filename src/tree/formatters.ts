@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
+import { resolveBuildResultLabel } from "../formatters/BuildStatusFormatters";
 import { formatDurationMs, formatQueueDuration } from "../formatters/DurationFormatters";
+import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
 import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
 import { parseJobUrl } from "../jenkins/urls";
 import { resolveBuildElapsedMs } from "./BuildTiming";
@@ -52,28 +54,7 @@ export function formatJobColor(color?: string): string | undefined {
 }
 
 export function formatBuildStatus(build: JenkinsBuild): string {
-  if (build.building) {
-    return "Running";
-  }
-
-  if (!build.result) {
-    return "Unknown";
-  }
-
-  switch (build.result) {
-    case "SUCCESS":
-      return "Success";
-    case "FAILURE":
-      return "Failed";
-    case "UNSTABLE":
-      return "Unstable";
-    case "ABORTED":
-      return "Aborted";
-    case "NOT_BUILT":
-      return "Not built";
-    default:
-      return build.result;
-  }
+  return resolveBuildResultLabel(build.result, build.building);
 }
 
 export function formatBuildDescription(build: JenkinsBuild, awaitingInput = false): string {
@@ -102,39 +83,7 @@ export function formatBuildDescription(build: JenkinsBuild, awaitingInput = fals
 }
 
 export function formatRelativeTime(timestampMs: number): string | undefined {
-  if (!Number.isFinite(timestampMs)) {
-    return undefined;
-  }
-
-  const now = Date.now();
-  const diffMs = Math.max(0, now - timestampMs);
-  const minuteMs = 60_000;
-  const hourMs = 3_600_000;
-  const dayMs = 86_400_000;
-
-  if (diffMs < minuteMs) {
-    return "just now";
-  }
-
-  if (diffMs < hourMs) {
-    const minutes = Math.floor(diffMs / minuteMs);
-    return `${minutes}m ago`;
-  }
-
-  if (diffMs < dayMs) {
-    const hours = Math.floor(diffMs / hourMs);
-    return `${hours}h ago`;
-  }
-
-  const days = Math.floor(diffMs / dayMs);
-  if (days === 1) {
-    return "yesterday";
-  }
-  if (days < 7) {
-    return `${days} days ago`;
-  }
-
-  return new Date(timestampMs).toLocaleDateString();
+  return formatRelativeTimestampMs(timestampMs);
 }
 
 export function formatNodeDescription(node: JenkinsNode): string {

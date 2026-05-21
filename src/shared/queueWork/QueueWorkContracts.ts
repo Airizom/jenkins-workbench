@@ -19,3 +19,11 @@ export interface NodeQueuedWorkViewModel {
   anyQueueItems: QueueWorkItemViewModel[];
   selfLabelQueueItems: QueueWorkItemViewModel[];
 }
+
+export function countQueuedWorkItems(queuedWork: NodeQueuedWorkViewModel): number {
+  return (
+    queuedWork.matchingQueueItems.length +
+    queuedWork.anyQueueItems.length +
+    queuedWork.selfLabelQueueItems.length
+  );
+}

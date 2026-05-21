@@ -1,8 +1,8 @@
 import * as React from "react";
+import { formatRelativeIsoTimestamp } from "../../../formatters/RelativeTimeFormatters";
 import type {
   NodeCapacityNodeViewModel,
-  NodeCapacityPoolViewModel,
-  NodeCapacitySeverity
+  NodeCapacityPoolViewModel
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import type { QueueWorkItemViewModel } from "../../../shared/queueWork/QueueWorkContracts";
 import { QueueWorkItemRow } from "../../shared/webview/components/queueWork/QueueWorkItemRow";
@@ -13,6 +13,7 @@ import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skel
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { ExternalLinkIcon, RefreshIcon, ServerIcon } from "../../shared/webview/icons";
+import { resolveSeverityBadgeClass } from "../../shared/webview/lib/statusStyles";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type {
   LoadNodeCapacityExecutorsMessage,
@@ -28,12 +29,6 @@ import {
 } from "./state/nodeCapacityState";
 
 const { useMemo, useReducer } = React;
-
-const SEVERITY_BADGE: Record<NodeCapacitySeverity, string> = {
-  critical: "border-failure-border bg-failure-soft text-failure-foreground",
-  warning: "border-warning-border bg-warning-soft text-warning-foreground",
-  normal: "border-success-border bg-success-soft text-success-foreground"
-};
 
 function postNodeCapacityMessage(message: NodeCapacityIncomingMessage): void {
   postVsCodeMessage(message);
@@ -55,7 +50,10 @@ export function NodeCapacityApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeCapacityReducer, undefined, getInitialState);
   useNodeCapacityMessages(dispatch);
 
-  const updatedAtLabel = useMemo(() => formatUpdatedAt(state.updatedAt), [state.updatedAt]);
+  const updatedAtLabel = useMemo(
+    () => formatRelativeIsoTimestamp(state.updatedAt),
+    [state.updatedAt]
+  );
   const initiallyOpenNodeUrls = useMemo(
     () => getUnloadedNodeUrls(state.pools.filter((pool) => pool.severity !== "normal")),
     [state.pools]
@@ -218,7 +216,7 @@ function PoolPanel({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-sm font-semibold">{pool.label}</h2>
               <span
-                className={`rounded-full border px-2 py-0.5 text-[11px] ${SEVERITY_BADGE[pool.severity]}`}
+                className={`rounded-full border px-2 py-0.5 text-[11px] ${resolveSeverityBadgeClass(pool.severity)}`}
               >
                 {pool.statusLabel}
               </span>
@@ -472,20 +470,4 @@ function HiddenLabelQueue({
       </div>
     </section>
   );
-}
-
-function formatUpdatedAt(value: string): string {
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) {
-    return "unknown";
-  }
-  const ageMs = Math.max(0, Date.now() - parsed);
-  if (ageMs < 60_000) {
-    return "just now";
-  }
-  const minutes = Math.floor(ageMs / 60_000);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-  return new Date(parsed).toLocaleTimeString();
 }

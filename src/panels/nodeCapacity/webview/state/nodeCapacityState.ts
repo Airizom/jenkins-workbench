@@ -3,6 +3,11 @@ import type {
   NodeCapacityViewModel
 } from "../../../../shared/nodeCapacity/NodeCapacityContracts";
 import { createEmptyNodeCapacitySummary } from "../../../../shared/nodeCapacity/NodeCapacityDefaults";
+import {
+  FALLBACK_UPDATED_AT,
+  preserveLoadingOnFullUpdate,
+  readInitialPanelState
+} from "../../../shared/webview/state/createPanelStateHelpers";
 
 export type NodeCapacityState = NodeCapacityViewModel & {
   hasLoaded: boolean;
@@ -15,8 +20,6 @@ export type NodeCapacityAction =
       type: "updateNodeCapacityNodeExecutors";
       payload: Array<{ nodeUrl: string; executors: NodeCapacityExecutorViewModel[] }>;
     };
-
-const FALLBACK_UPDATED_AT = "1970-01-01T00:00:00.000Z";
 
 export const FALLBACK_STATE: NodeCapacityState = {
   environmentLabel: "Jenkins",
@@ -51,10 +54,7 @@ export function nodeCapacityReducer(
       return { ...state, loading: action.value };
     case "updateNodeCapacity": {
       const nextState = buildInitialState(action.payload);
-      return {
-        ...nextState,
-        loading: state.loading
-      };
+      return preserveLoadingOnFullUpdate(state, nextState);
     }
     case "updateNodeCapacityNodeExecutors": {
       const executorsByNodeUrl = new Map(
@@ -83,9 +83,5 @@ export function nodeCapacityReducer(
 }
 
 export function getInitialState(): NodeCapacityState {
-  const candidate = (window as { __INITIAL_STATE__?: NodeCapacityViewModel }).__INITIAL_STATE__;
-  if (!candidate) {
-    return FALLBACK_STATE;
-  }
-  return buildInitialState(candidate);
+  return readInitialPanelState(FALLBACK_STATE, buildInitialState);
 }

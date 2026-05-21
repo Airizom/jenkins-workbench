@@ -8,6 +8,7 @@ import {
   StopCircleIcon,
   XCircleIcon
 } from "../../../../shared/webview/icons";
+import { resolveStatusAccentClass } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import { BuildDetailsMetaFields } from "./BuildDetailsMetaFields";
 import { StatusPill } from "./StatusPill";
@@ -25,17 +26,8 @@ type BuildDetailsHeaderProps = {
   onOpenBuild: () => void;
 };
 
-const STATUS_ACCENT: Record<string, string> = {
-  success: "bg-success",
-  failure: "bg-failure",
-  unstable: "bg-warning",
-  aborted: "bg-aborted",
-  running: "bg-warning",
-  neutral: "bg-border"
-};
-
 function getStatusAccent(status: string): string {
-  return STATUS_ACCENT[status] ?? STATUS_ACCENT.neutral;
+  return resolveStatusAccentClass(status);
 }
 
 function HeaderStatusIcon({ status }: { status: string }) {

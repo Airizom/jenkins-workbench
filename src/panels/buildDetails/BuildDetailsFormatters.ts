@@ -1,3 +1,7 @@
+import {
+  resolveBuildResultClass,
+  resolveBuildResultLabel
+} from "../../formatters/BuildStatusFormatters";
 import { formatOptionalLocaleTimestamp } from "../../formatters/DisplayFormatters";
 import {
   formatCompactDurationFromTotalSeconds,
@@ -22,33 +26,11 @@ export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
 }
 
 export function formatResult(details: JenkinsBuildDetails): string {
-  if (details.building) {
-    return "Running";
-  }
-  return details.result ?? "Unknown";
+  return resolveBuildResultLabel(details.result, details.building);
 }
 
 export function formatResultClass(details: JenkinsBuildDetails): string {
-  if (details.building) {
-    return "running";
-  }
-  const result = (details.result ?? "").toUpperCase();
-  if (result === "SUCCESS") {
-    return "success";
-  }
-  if (result === "FAILURE") {
-    return "failure";
-  }
-  if (result === "UNSTABLE") {
-    return "unstable";
-  }
-  if (result === "ABORTED") {
-    return "aborted";
-  }
-  if (result === "NOT_BUILT") {
-    return "neutral";
-  }
-  return "neutral";
+  return resolveBuildResultClass(details.result, details.building);
 }
 
 export function formatDuration(duration?: number): string {
@@ -98,54 +80,4 @@ export function truncateConsoleText(
 
 export { formatNumber } from "../../formatters/DisplayFormatters";
 export { formatError } from "../../formatters/ErrorFormatters";
-
-export function normalizePipelineStatus(status?: string): {
-  label: string;
-  className: string;
-  isFailed: boolean;
-} {
-  const normalized = (status ?? "").trim().toUpperCase();
-  if (!normalized) {
-    return { label: "Unknown", className: "neutral", isFailed: false };
-  }
-  if (normalized === "SUCCESS") {
-    return { label: "Success", className: "success", isFailed: false };
-  }
-  if (normalized === "FAILURE" || normalized === "FAILED" || normalized === "ERROR") {
-    return { label: "Failed", className: "failure", isFailed: true };
-  }
-  if (normalized === "UNSTABLE") {
-    return { label: "Unstable", className: "unstable", isFailed: true };
-  }
-  if (normalized === "ABORTED") {
-    return { label: "Aborted", className: "aborted", isFailed: true };
-  }
-  if (normalized === "IN_PROGRESS" || normalized === "RUNNING") {
-    return { label: "Running", className: "running", isFailed: false };
-  }
-  if (normalized === "PAUSED") {
-    return { label: "Paused", className: "running", isFailed: false };
-  }
-  if (normalized === "QUEUED") {
-    return { label: "Queued", className: "running", isFailed: false };
-  }
-  if (normalized === "NOT_BUILT") {
-    return { label: "Not built", className: "neutral", isFailed: false };
-  }
-  if (normalized === "SKIPPED") {
-    return { label: "Skipped", className: "neutral", isFailed: false };
-  }
-  return {
-    label: toTitleCase(normalized.replace(/_/g, " ").toLowerCase()),
-    className: "neutral",
-    isFailed: false
-  };
-}
-
-function toTitleCase(value: string): string {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
+export { normalizePipelineStatus } from "../../formatters/BuildStatusFormatters";

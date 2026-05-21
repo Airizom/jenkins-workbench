@@ -1,3 +1,8 @@
+import {
+  FALLBACK_UPDATED_AT,
+  preserveLoadingOnFullUpdate,
+  readInitialPanelState
+} from "../../../shared/webview/state/createPanelStateHelpers";
 import type {
   NodeDetailsUpdateMessage,
   NodeDetailsViewModel
@@ -11,8 +16,6 @@ export type NodeDetailsState = NodeDetailsViewModel & {
 export type NodeDetailsAction =
   | { type: "setLoading"; value: boolean }
   | { type: "updateNodeDetails"; payload: NodeDetailsUpdateMessage };
-
-const FALLBACK_UPDATED_AT = "1970-01-01T00:00:00.000Z";
 
 export const FALLBACK_STATE: NodeDetailsState = {
   displayName: "Node Details",
@@ -77,10 +80,7 @@ export function nodeDetailsReducer(
       return { ...state, loading: action.value };
     case "updateNodeDetails": {
       const nextState = buildInitialState(action.payload.payload);
-      return {
-        ...nextState,
-        loading: state.loading
-      };
+      return preserveLoadingOnFullUpdate(state, nextState);
     }
     default:
       return state;
@@ -88,9 +88,5 @@ export function nodeDetailsReducer(
 }
 
 export function getInitialState(): NodeDetailsState {
-  const candidate = (window as { __INITIAL_STATE__?: NodeDetailsViewModel }).__INITIAL_STATE__;
-  if (!candidate) {
-    return FALLBACK_STATE;
-  }
-  return buildInitialState(candidate);
+  return readInitialPanelState(FALLBACK_STATE, buildInitialState);
 }

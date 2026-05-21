@@ -1,3 +1,4 @@
+import { countQueuedWorkItems } from "../../../../../shared/queueWork/QueueWorkContracts";
 import { QueueWorkItemRow } from "../../../../shared/webview/components/queueWork/QueueWorkItemRow";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
@@ -11,10 +12,7 @@ export function NodeDetailsQueuedWorkSection({
   queuedWork,
   onOpenExternal
 }: NodeDetailsQueuedWorkSectionProps): JSX.Element {
-  const total =
-    queuedWork.matchingQueueItems.length +
-    queuedWork.anyQueueItems.length +
-    queuedWork.selfLabelQueueItems.length;
+  const total = countQueuedWorkItems(queuedWork);
 
   if (total === 0) {
     return (

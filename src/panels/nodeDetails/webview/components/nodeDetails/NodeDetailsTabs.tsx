@@ -1,3 +1,4 @@
+import { countQueuedWorkItems } from "../../../../../shared/queueWork/QueueWorkContracts";
 import {
   Tabs,
   TabsContent,
@@ -90,13 +91,5 @@ export function NodeDetailsTabs({
         />
       </TabsContent>
     </Tabs>
-  );
-}
-
-function countQueuedWorkItems(queuedWork: NodeDetailsState["queuedWork"]): number {
-  return (
-    queuedWork.matchingQueueItems.length +
-    queuedWork.anyQueueItems.length +
-    queuedWork.selfLabelQueueItems.length
   );
 }

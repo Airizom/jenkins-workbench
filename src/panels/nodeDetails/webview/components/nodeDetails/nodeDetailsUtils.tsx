@@ -69,25 +69,7 @@ export function parseDate(value: string | undefined): Date | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
-export function formatRelativeTime(date: Date | undefined, now: number): string {
-  if (!date) {
-    return "Unknown";
-  }
-  const deltaMs = Math.abs(now - date.getTime());
-  if (deltaMs < 15_000) {
-    return "Just now";
-  }
-  const minutes = Math.round(deltaMs / 60_000);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) {
-    return `${hours}h ago`;
-  }
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
-}
+export { formatRelativeDate as formatRelativeTime } from "../../../../../formatters/RelativeTimeFormatters";
 
 export function isStaleUpdatedAt(date: Date | undefined, now: number): boolean {
   if (!date) {
