@@ -44,7 +44,10 @@ export class PipelineStageLogAggregator {
     initial: boolean
   ): Promise<PipelineNodeLogViewModel> {
     const nodeIds = await this.resolveStageNodeIds(target);
-    const selectedNodeIds = nodeIds.slice(0, MAX_AGGREGATED_NODE_COUNT);
+    const selectedNodeIds =
+      nodeIds.length > MAX_AGGREGATED_NODE_COUNT
+        ? nodeIds.slice(0, MAX_AGGREGATED_NODE_COUNT)
+        : nodeIds;
     const omittedNodeCount = Math.max(0, nodeIds.length - selectedNodeIds.length);
     const refreshCandidates = selectedNodeIds.filter((nodeId) => {
       const cached = this.nodeCache.get(nodeId);
@@ -84,7 +87,7 @@ export class PipelineStageLogAggregator {
     omittedNodeCount: number
   ): PipelineNodeLogViewModel {
     const parts: string[] = [];
-    let text = "";
+    const textParts: string[] = [];
     let truncated = false;
     let consoleUrl: string | undefined;
     let pendingNodeCount = 0;
@@ -99,7 +102,7 @@ export class PipelineStageLogAggregator {
       const header = `Node ${nodeId}`;
       parts.push(`<div class="pipeline-node-log-divider">${escapeHtml(header)}</div>`);
       parts.push(snapshot.html);
-      text += `${text ? "\n\n" : ""}===== ${header} =====\n${snapshot.text}`;
+      textParts.push(`===== ${header} =====\n${snapshot.text}`);
       truncated = truncated || Boolean(snapshot.hasMore);
       hasMoreNodeData = hasMoreNodeData || Boolean(snapshot.hasMore);
       consoleUrl = consoleUrl ?? snapshot.consoleUrl;
@@ -108,20 +111,20 @@ export class PipelineStageLogAggregator {
     if (omittedNodeCount > 0) {
       const note = `Showing first ${MAX_AGGREGATED_NODE_COUNT} pipeline nodes; ${omittedNodeCount} additional nodes were omitted to limit Jenkins API fan-out.`;
       parts.push(`<div class="pipeline-node-log-divider">${escapeHtml(note)}</div>`);
-      text += `${text ? "\n\n" : ""}${note}`;
+      textParts.push(note);
       truncated = true;
     }
 
     if (pendingNodeCount > 0) {
       const note = `Loading ${pendingNodeCount} remaining pipeline node logs.`;
       parts.push(`<div class="pipeline-node-log-divider">${escapeHtml(note)}</div>`);
-      text += `${text ? "\n\n" : ""}${note}`;
+      textParts.push(note);
     }
 
     return {
       target,
       html: parts.join(""),
-      text,
+      text: textParts.join("\n\n"),
       truncated,
       loading: pendingNodeCount > 0,
       polling:
@@ -201,27 +204,40 @@ function isWorkflowNodeComplete(node: JenkinsWorkflowStage | undefined): boolean
 
 function collectFlowNodeChildIds(node: JenkinsWorkflowStage | JenkinsWorkflowStep): string[] {
   const ids: string[] = [];
-  const addStep = (step: JenkinsWorkflowStep): void => {
-    if (step.id?.trim()) {
-      ids.push(step.id.trim());
-    }
-    ids.push(...collectFlowNodeChildIds(step));
-  };
-  const addStage = (stage: JenkinsWorkflowStage): void => {
-    if (stage.id?.trim()) {
-      ids.push(stage.id.trim());
-    }
-    ids.push(...collectFlowNodeChildIds(stage));
-  };
+  const seen = new Set<string>();
 
   for (const step of collectFlowNodeSteps(node)) {
-    addStep(step);
+    collectFlowNodeChildIdsFromChild(step, ids, seen);
   }
   for (const stage of collectFlowNodeBranches(node)) {
-    addStage(stage);
+    collectFlowNodeChildIdsFromChild(stage, ids, seen);
   }
 
-  return uniqueStrings(ids);
+  return ids;
+}
+
+function collectFlowNodeChildIdsFromChild(
+  node: JenkinsWorkflowStage | JenkinsWorkflowStep,
+  ids: string[],
+  seen: Set<string>
+): void {
+  addFlowNodeId(node.id, ids, seen);
+
+  for (const step of collectFlowNodeSteps(node)) {
+    collectFlowNodeChildIdsFromChild(step, ids, seen);
+  }
+  for (const stage of collectFlowNodeBranches(node)) {
+    collectFlowNodeChildIdsFromChild(stage, ids, seen);
+  }
+}
+
+function addFlowNodeId(id: string | undefined, ids: string[], seen: Set<string>): void {
+  const trimmed = id?.trim();
+  if (!trimmed || seen.has(trimmed)) {
+    return;
+  }
+  seen.add(trimmed);
+  ids.push(trimmed);
 }
 
 function collectFlowNodeSteps(
