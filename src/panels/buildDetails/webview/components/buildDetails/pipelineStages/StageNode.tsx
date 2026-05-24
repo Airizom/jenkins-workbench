@@ -37,7 +37,7 @@ export function StageNode({
 }) {
   const hasBranches = stage.parallelBranches.length > 0;
   const hasBranchSteps = stage.parallelBranches.some((branch) => branch.hasSteps);
-  const hasSteps = Boolean(stage.hasSteps);
+  const hasDirectSteps = stage.stepsAll.length > 0;
   const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
   const stageIcon = getStageIcon(stage.statusClass);
   const nodeStyle = getStageNodeStyle(stage.statusClass);
@@ -161,7 +161,7 @@ export function StageNode({
                   </div>
                 ) : null}
 
-                {hasSteps && !hasBranches ? (
+                {hasDirectSteps ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -184,7 +184,7 @@ export function StageNode({
                   </div>
                 ) : null}
 
-                {!hasSteps && !hasBranches ? (
+                {!hasDirectSteps && !hasBranches ? (
                   <div className="text-xs text-muted-foreground">No step details available.</div>
                 ) : null}
               </div>
