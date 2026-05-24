@@ -4,6 +4,10 @@ import type {
   JenkinsBuildDetails,
   JenkinsBuildParameter
 } from "../../jenkins/types";
+import {
+  shouldIncludeBuildParameter,
+  shouldMaskBuildParameter
+} from "../../shared/build/BuildParameterFilters";
 import type { BuildParameterRedactionOptions } from "./BuildCompareOptions";
 import { normalizeString } from "./BuildCompareSectionShared";
 import type {
@@ -94,11 +98,13 @@ function buildParameterMap(
       if (!name || result.has(name)) {
         continue;
       }
-      if (!shouldIncludeParameter(name, allowList, denyList)) {
+      if (!shouldIncludeBuildParameter(name, allowList, denyList)) {
         continue;
       }
       const comparisonValue = formatParameterValue(parameter);
-      const displayValue = shouldMaskParameter(name, maskPatterns) ? maskValue : comparisonValue;
+      const displayValue = shouldMaskBuildParameter(name, maskPatterns)
+        ? maskValue
+        : comparisonValue;
       result.set(name, {
         comparisonValue,
         displayValue
@@ -106,25 +112,6 @@ function buildParameterMap(
     }
   }
   return result;
-}
-
-function shouldIncludeParameter(name: string, allowList: string[], denyList: string[]): boolean {
-  if (allowList.length > 0 && !matchesAnyPattern(name, allowList)) {
-    return false;
-  }
-  if (denyList.length > 0 && matchesAnyPattern(name, denyList)) {
-    return false;
-  }
-  return true;
-}
-
-function shouldMaskParameter(name: string, maskPatterns: string[]): boolean {
-  return matchesAnyPattern(name, maskPatterns);
-}
-
-function matchesAnyPattern(value: string, patterns: string[]): boolean {
-  const normalized = value.toLowerCase();
-  return patterns.some((pattern) => normalized.includes(pattern.toLowerCase()));
 }
 
 function formatParameterValue(parameter: JenkinsBuildParameter): string {

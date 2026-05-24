@@ -1,4 +1,4 @@
-import { resolveResultTextClass } from "./shared/resultStyles";
+import { resolveResultTextClass } from "../../../../shared/webview/lib/statusStyles";
 
 export function StageValueCell({
   label,

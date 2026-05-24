@@ -9,6 +9,20 @@ import {
 } from "../../formatters/DurationFormatters";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 
+export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): {
+  resultLabel: string;
+  resultClass: string;
+  durationLabel: string;
+  timestampLabel: string;
+} {
+  return {
+    resultLabel: details ? formatResult(details) : "Unknown",
+    resultClass: details ? formatResultClass(details) : "neutral",
+    durationLabel: details ? formatDuration(details.duration) : "Unknown",
+    timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown"
+  };
+}
+
 export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
   resultLabel: string;
   resultClass: string;
@@ -17,10 +31,7 @@ export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
   culpritsLabel: string;
 } {
   return {
-    resultLabel: details ? formatResult(details) : "Unknown",
-    resultClass: details ? formatResultClass(details) : "neutral",
-    durationLabel: details ? formatDuration(details.duration) : "Unknown",
-    timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown",
+    ...formatBuildHeaderLabels(details),
     culpritsLabel: details ? formatCulprits(details.culprits) : "Unknown"
   };
 }

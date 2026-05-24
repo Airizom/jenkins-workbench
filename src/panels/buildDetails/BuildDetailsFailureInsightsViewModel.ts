@@ -1,3 +1,4 @@
+import { collectBuildChangesets } from "../../jenkins/changesets/collectBuildChangesets";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type {
   BuildFailureArtifact,
@@ -31,41 +32,7 @@ export function buildBuildFailureInsights(
 }
 
 function buildChangelog(details?: JenkinsBuildDetails): BuildFailureChangelogItem[] {
-  if (!details) {
-    return [];
-  }
-  const items: NonNullable<NonNullable<JenkinsBuildDetails["changeSet"]>["items"]> = [];
-  if (details.changeSet?.items) {
-    items.push(...details.changeSet.items);
-  }
-  if (details.changeSets) {
-    for (const changeSet of details.changeSets) {
-      if (changeSet.items) {
-        items.push(...changeSet.items);
-      }
-    }
-  }
-
-  const seen = new Set<string>();
-  const results: BuildFailureChangelogItem[] = [];
-
-  for (const item of items) {
-    const message = (item.msg ?? "").trim();
-    const author = (item.author?.fullName ?? "").trim();
-    const commitId = item.commitId?.trim();
-    const key = commitId ? `id:${commitId}` : `${message}|${author}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    results.push({
-      message: message || "Commit",
-      author: author || "Unknown author",
-      commitId
-    });
-  }
-
-  return results;
+  return collectBuildChangesets(details);
 }
 
 function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {

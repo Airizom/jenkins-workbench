@@ -1,11 +1,8 @@
+import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/JenkinsChangesetViewModel";
 import { uniqueNonEmptyStrings } from "../../../shared/arrays";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
 
-export interface BuildFailureChangelogItem {
-  message: string;
-  author: string;
-  commitId?: string;
-}
+export type BuildFailureChangelogItem = JenkinsChangesetViewModel;
 
 export interface BuildFailureArtifact {
   name: string;

@@ -1,25 +1,18 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { trimToUndefined } from "../../shared/stringValues";
-import {
-  formatDuration,
-  formatResult,
-  formatResultClass,
-  formatTimestamp
-} from "../buildDetails/BuildDetailsFormatters";
+import { formatBuildHeaderLabels } from "../buildDetails/BuildDetailsFormatters";
 import type { BuildCompareBuildViewModel } from "./shared/BuildCompareContracts";
 
 export function buildBuildViewModel(
   roleLabel: string,
   details: JenkinsBuildDetails
 ): BuildCompareBuildViewModel {
+  const headerLabels = formatBuildHeaderLabels(details);
   return {
     roleLabel,
     displayName: details.fullDisplayName ?? details.displayName ?? roleLabel,
     buildUrl: details.url,
-    resultLabel: formatResult(details),
-    resultClass: formatResultClass(details),
-    durationLabel: formatDuration(details.duration),
-    timestampLabel: formatTimestamp(details.timestamp)
+    ...headerLabels
   };
 }
 

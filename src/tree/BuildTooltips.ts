@@ -2,9 +2,13 @@ import * as vscode from "vscode";
 import type {
   JenkinsBuild,
   JenkinsBuildCause,
-  JenkinsBuildParameter,
-  JenkinsChangeSetItem
+  JenkinsBuildParameter
 } from "../jenkins/JenkinsClient";
+import { resolveLastBuildChangeset } from "../jenkins/changesets/collectBuildChangesets";
+import {
+  shouldIncludeBuildParameter,
+  shouldMaskBuildParameter
+} from "../shared/build/BuildParameterFilters";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 import { formatDurationMs, formatRelativeTime } from "./formatters";
 
@@ -106,17 +110,13 @@ function resolveLastCommit(
   build: JenkinsBuild,
   maxMessageLength: number
 ): { message: string; author?: string } | undefined {
-  const last = resolveLastUniqueChangeItem(build);
+  const last = resolveLastBuildChangeset(build);
   if (!last) {
     return undefined;
   }
 
-  const rawMessage = normalizeWhitespace(last.msg ?? "");
-  const rawAuthor = normalizeWhitespace(last.author?.fullName ?? "");
-  const message = truncateText(rawMessage || "Commit", maxMessageLength);
-  const author = rawAuthor || "Unknown author";
-
-  return { message, author };
+  const message = truncateText(last.message, maxMessageLength);
+  return { message, author: last.author };
 }
 
 function resolveCauseSummary(build: JenkinsBuild): string | undefined {
@@ -156,19 +156,13 @@ function resolveParameterSummary(
     parameterMaskValue: string;
   }
 ): string | undefined {
-  const patternOptions = {
-    parameterAllowList: normalizePatterns(options.parameterAllowList),
-    parameterDenyList: normalizePatterns(options.parameterDenyList),
-    parameterMaskPatterns: normalizePatterns(options.parameterMaskPatterns)
-  };
-
   if (options.maxParameterCount < 0 || !Number.isInteger(options.maxParameterCount)) {
-    return resolveParameterSummaryWithSliceSemantics(build, options, patternOptions);
+    return resolveParameterSummaryWithSliceSemantics(build, options);
   }
 
   const visible: string[] = [];
   let total = 0;
-  visitMatchingParameters(build, patternOptions, (name, value, isMasked) => {
+  visitMatchingParameters(build, options, (name, value, isMasked) => {
     const formatted = formatParameterSummary(name, value, isMasked, options);
     total += 1;
     if (visible.length < options.maxParameterCount) {
@@ -190,16 +184,14 @@ function resolveParameterSummaryWithSliceSemantics(
   options: {
     maxParameterCount: number;
     maxParameterValueLength: number;
+    parameterAllowList: string[];
+    parameterDenyList: string[];
+    parameterMaskPatterns: string[];
     parameterMaskValue: string;
-  },
-  patternOptions: {
-    parameterAllowList: NormalizedPatterns;
-    parameterDenyList: NormalizedPatterns;
-    parameterMaskPatterns: NormalizedPatterns;
   }
 ): string | undefined {
   const formatted: string[] = [];
-  visitMatchingParameters(build, patternOptions, (name, value, isMasked) => {
+  visitMatchingParameters(build, options, (name, value, isMasked) => {
     formatted.push(formatParameterSummary(name, value, isMasked, options));
   });
 
@@ -281,44 +273,12 @@ function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefine
   return timestamp;
 }
 
-function resolveLastUniqueChangeItem(build: JenkinsBuild): JenkinsChangeSetItem | undefined {
-  let last: JenkinsChangeSetItem | undefined;
-  const seen = new Set<string>();
-
-  const visit = (item: JenkinsChangeSetItem): void => {
-    const message = normalizeWhitespace(item.msg ?? "");
-    const author = normalizeWhitespace(item.author?.fullName ?? "");
-    const commitId = item.commitId?.trim();
-    const key = commitId ? `id:${commitId}` : `${message}|${author}`;
-    if (seen.has(key)) {
-      return;
-    }
-    seen.add(key);
-    last = item;
-  };
-
-  if (build.changeSet?.items) {
-    for (const item of build.changeSet.items) {
-      visit(item);
-    }
-  }
-  for (const changeSet of build.changeSets ?? []) {
-    if (changeSet?.items) {
-      for (const item of changeSet.items) {
-        visit(item);
-      }
-    }
-  }
-
-  return last;
-}
-
 function visitMatchingParameters(
   build: JenkinsBuild,
   options: {
-    parameterAllowList: NormalizedPatterns;
-    parameterDenyList: NormalizedPatterns;
-    parameterMaskPatterns: NormalizedPatterns;
+    parameterAllowList: string[];
+    parameterDenyList: string[];
+    parameterMaskPatterns: string[];
   },
   visitor: (name: string, value: unknown, isMasked: boolean) => void
 ): void {
@@ -335,18 +295,13 @@ function visitMatchingParameters(
       if (!name || seen.has(name)) {
         continue;
       }
-      if (options.parameterAllowList.length > 0) {
-        if (!matchesAnyPattern(name, options.parameterAllowList)) {
-          continue;
-        }
-      }
-      if (options.parameterDenyList.length > 0) {
-        if (matchesAnyPattern(name, options.parameterDenyList)) {
-          continue;
-        }
+      if (
+        !shouldIncludeBuildParameter(name, options.parameterAllowList, options.parameterDenyList)
+      ) {
+        continue;
       }
       seen.add(name);
-      const isMasked = matchesAnyPattern(name, options.parameterMaskPatterns);
+      const isMasked = shouldMaskBuildParameter(name, options.parameterMaskPatterns);
       visitor(name, parameter.value, isMasked);
     }
   }
@@ -376,32 +331,6 @@ function normalizeWhitespace(value: string): string {
 
 function includesCaseInsensitive(source: string, needle: string): boolean {
   return source.toLowerCase().includes(needle.toLowerCase());
-}
-
-type NormalizedPatterns = readonly string[];
-
-function normalizePatterns(patterns: string[]): NormalizedPatterns {
-  if (patterns.length === 0) {
-    return patterns;
-  }
-  const normalized: string[] = [];
-  for (const pattern of patterns) {
-    normalized.push(pattern.toLowerCase());
-  }
-  return normalized;
-}
-
-function matchesAnyPattern(value: string, patterns: NormalizedPatterns): boolean {
-  if (patterns.length === 0) {
-    return false;
-  }
-  const normalized = value.toLowerCase();
-  for (const pattern of patterns) {
-    if (normalized.includes(pattern)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function truncateText(value: string, maxChars: number): string {

@@ -1,3 +1,5 @@
+import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/JenkinsChangesetViewModel";
+
 export type CompareSectionStatus =
   | "loading"
   | "available"
@@ -58,11 +60,7 @@ export interface BuildCompareParametersSectionViewModel {
   unchangedCount: number;
 }
 
-export interface BuildCompareChangesetItem {
-  message: string;
-  author: string;
-  commitId?: string;
-}
+export type BuildCompareChangesetItem = JenkinsChangesetViewModel;
 
 export interface BuildCompareChangesetsSectionViewModel {
   status: CompareSectionStatus;

@@ -1,3 +1,4 @@
+import { readInitialPanelState } from "../../../shared/webview/state/createPanelStateHelpers";
 import type {
   BuildDetailsCoverageStateViewModel,
   BuildDetailsTestStateViewModel,
@@ -265,10 +266,10 @@ export function buildDetailsReducer(
 }
 
 export function getInitialState(): BuildDetailsViewModel {
-  const candidate = (window as { __INITIAL_STATE__?: BuildDetailsViewModel }).__INITIAL_STATE__;
-  if (!candidate) {
-    return FALLBACK_STATE;
-  }
+  return readInitialPanelState(FALLBACK_STATE, mergeInitialViewModel);
+}
+
+function mergeInitialViewModel(candidate: BuildDetailsViewModel): BuildDetailsViewModel {
   return {
     ...FALLBACK_STATE,
     ...candidate,

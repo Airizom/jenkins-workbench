@@ -1,9 +1,9 @@
 import * as React from "react";
+import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
-import { BuildDetailsErrorList } from "./components/buildDetails/BuildDetailsErrorList";
 import { BuildDetailsHeader } from "./components/buildDetails/BuildDetailsHeader";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
@@ -80,7 +80,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         />
 
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
-          <BuildDetailsErrorList errors={state.errors} />
+          <PanelErrorList errors={state.errors} id="errors" />
           <BuildDetailsTabs
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}
