@@ -18,16 +18,6 @@ export class RestartFromStageResponseParser {
     "Unexpected response from Jenkins restart endpoint.";
   private static readonly REJECTED_RESPONSE_MESSAGE = "Jenkins rejected the restart request.";
   private static readonly OK_STATUSES = new Set(["ok", "success"]);
-  private static readonly FAILURE_MARKERS = [
-    "error",
-    "exception",
-    "not found",
-    "forbidden",
-    "unauthorized",
-    "access denied",
-    "invalid",
-    "csrf"
-  ];
 
   parseRestartFromStageInfo(response: unknown): JenkinsRestartFromStageInfo {
     const payload = this.unwrapJenkinsResponse(response);
@@ -77,6 +67,9 @@ export class RestartFromStageResponseParser {
     const message = responseText || undefined;
     if (this.isLikelySuccessfulRestartResponse(responseText)) {
       return this.successResult(message);
+    }
+    if (this.isHtmlDocument(responseText.toLowerCase())) {
+      return this.failureResult(RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE);
     }
     return this.failureResult(
       message ?? RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE
@@ -185,13 +178,7 @@ export class RestartFromStageResponseParser {
       return true;
     }
 
-    if (!this.isHtmlDocument(normalized)) {
-      return false;
-    }
-
-    return !RestartFromStageResponseParser.FAILURE_MARKERS.some((marker) =>
-      normalized.includes(marker)
-    );
+    return false;
   }
 
   private isHtmlDocument(value: string): boolean {
