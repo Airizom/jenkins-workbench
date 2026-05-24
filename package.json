@@ -1057,6 +1057,7 @@
     "typecheck:webview": "tsc -p src/panels/tsconfig.json --noEmit",
     "local:sso-proxy": "node scripts/local-sso-proxy.js",
     "local:sso-proxy:smoke": "node scripts/local-sso-proxy.js --smoke",
+    "test": "node scripts/validate-package-manifest.mjs",
     "lint": "biome lint src/",
     "lint:fix": "biome lint src/ --write",
     "format": "biome format --write .",
