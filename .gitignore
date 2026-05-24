@@ -6,3 +6,4 @@ out/
 .vscode/settings.json
 .ck
 .pi/settings.json
+.clawpatch/
