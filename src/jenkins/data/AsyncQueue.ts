@@ -65,38 +65,9 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
     });
   }
 
-  [Symbol.asyncIterator](): AsyncIterator<T> {
-    return { next: () => this.next() };
-  }
-}
-
-export class JobQueue<T> {
-  private readonly items: T[] = [];
-  private readonly pending: Array<(item?: T) => void> = [];
-  private closed = false;
-
-  push(item: T): void {
-    if (this.closed) {
-      return;
-    }
-    const waiter = this.pending.shift();
-    if (waiter) {
-      waiter(item);
-      return;
-    }
-    this.items.push(item);
-  }
-
   async shift(): Promise<T | undefined> {
-    if (this.items.length > 0) {
-      return this.items.shift();
-    }
-    if (this.closed) {
-      return undefined;
-    }
-    return new Promise((resolve) => {
-      this.pending.push(resolve);
-    });
+    const result = await this.next();
+    return result.done ? undefined : result.value;
   }
 
   clear(): number {
@@ -105,13 +76,7 @@ export class JobQueue<T> {
     return removed;
   }
 
-  close(): void {
-    if (this.closed) {
-      return;
-    }
-    this.closed = true;
-    while (this.pending.length > 0) {
-      this.pending.shift()?.(undefined);
-    }
+  [Symbol.asyncIterator](): AsyncIterator<T> {
+    return { next: () => this.next() };
   }
 }

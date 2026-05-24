@@ -1,7 +1,7 @@
 import type { JenkinsClientProvider } from "../JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { CancellationError } from "../errors";
-import { AsyncQueue, JobQueue } from "./AsyncQueue";
+import { AsyncQueue } from "./AsyncQueue";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
 import type {
   CancellationInput,
@@ -188,7 +188,7 @@ export class JenkinsJobIndex {
 
       const rootJobs = await fetchWithRetry(() => client.getRootJobs());
       const rootInfos = mapJenkinsJobs(client, rootJobs);
-      const queue = new JobQueue<JobQueueItem>();
+      const queue = new AsyncQueue<JobQueueItem>();
       let pendingJobs = 0;
       let limitReached = false;
 
