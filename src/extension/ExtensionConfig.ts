@@ -165,7 +165,7 @@ export function getArtifactMaxDownloadBytes(
   if (!Number.isFinite(value) || value <= 0) {
     return undefined;
   }
-  return Math.floor(value) * 1024 * 1024;
+  return Math.floor(value * 1024 * 1024);
 }
 
 export function getArtifactPreviewCacheMaxEntries(config: vscode.WorkspaceConfiguration): number {
