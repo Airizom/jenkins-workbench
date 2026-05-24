@@ -1,3 +1,4 @@
+import { JenkinsRequestError } from "../errors";
 import type { JenkinsBufferResponse } from "../request";
 import type { JenkinsWorkspaceEntry } from "../types";
 import { buildWorkspaceDirectoryListingUrl, buildWorkspaceFileUrl } from "../urls";
@@ -10,9 +11,10 @@ export class JenkinsWorkspaceApi {
     jobUrl: string,
     relativePath?: string
   ): Promise<JenkinsWorkspaceEntry[]> {
-    const url = buildWorkspaceDirectoryListingUrl(jobUrl, relativePath);
+    const workspacePath = normalizeWorkspaceDirectoryPath(relativePath);
+    const url = buildWorkspaceDirectoryListingUrl(jobUrl, workspacePath);
     const response = await this.context.requestText(url);
-    return parseWorkspaceEntries(response, relativePath);
+    return parseWorkspaceEntries(response, workspacePath);
   }
 
   async getWorkspaceFile(
@@ -20,9 +22,29 @@ export class JenkinsWorkspaceApi {
     relativePath: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse> {
-    const url = buildWorkspaceFileUrl(jobUrl, relativePath);
+    const workspacePath = normalizeWorkspaceFilePath(relativePath);
+    const url = buildWorkspaceFileUrl(jobUrl, workspacePath);
     return this.context.requestBufferWithHeaders(url, options);
   }
+}
+
+function normalizeWorkspaceDirectoryPath(value?: string): string | undefined {
+  if (!value?.trim()) {
+    return undefined;
+  }
+  return normalizeWorkspaceRequestPath(value);
+}
+
+function normalizeWorkspaceFilePath(value: string): string {
+  return normalizeWorkspaceRequestPath(value);
+}
+
+function normalizeWorkspaceRequestPath(value: string): string {
+  const normalized = normalizeRelativePath(value);
+  if (!normalized) {
+    throw new JenkinsRequestError("Invalid Jenkins workspace relative path.");
+  }
+  return normalized;
 }
 
 function parseWorkspaceEntries(
