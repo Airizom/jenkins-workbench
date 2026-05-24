@@ -30,12 +30,18 @@ function generateId(): string {
   return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 }
 
-function scheduleDismiss(id: string, durationMs: number): void {
+function clearDismissTimeout(id: string): void {
   const existing = timeouts.get(id);
-  if (existing) {
+  if (existing !== undefined) {
     clearTimeout(existing);
+    timeouts.delete(id);
   }
+}
+
+function scheduleDismiss(id: string, durationMs: number): void {
+  clearDismissTimeout(id);
   const timeout = setTimeout(() => {
+    timeouts.delete(id);
     dismissToast(id);
   }, durationMs);
   timeouts.set(id, timeout);
@@ -54,7 +60,14 @@ export function toast(options: ToastOptions): { id: string; dismiss: () => void 
     durationMs
   };
 
-  currentToasts = [next, ...currentToasts].slice(0, 5);
+  const cappedToasts = [next, ...currentToasts].slice(0, 5);
+  const cappedToastIds = new Set(cappedToasts.map((toastState) => toastState.id));
+  for (const toastState of currentToasts) {
+    if (!cappedToastIds.has(toastState.id)) {
+      clearDismissTimeout(toastState.id);
+    }
+  }
+  currentToasts = cappedToasts;
   emit();
   scheduleDismiss(id, durationMs);
 
@@ -74,11 +87,7 @@ export function dismissToast(id?: string): void {
 }
 
 export function removeToast(id: string): void {
-  const existing = timeouts.get(id);
-  if (existing) {
-    clearTimeout(existing);
-    timeouts.delete(id);
-  }
+  clearDismissTimeout(id);
   currentToasts = currentToasts.filter((toastState) => toastState.id !== id);
   emit();
 }
