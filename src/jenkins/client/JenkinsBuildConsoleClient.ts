@@ -14,6 +14,9 @@ import {
   readTextPrefixFromStream
 } from "./JenkinsConsoleStream";
 
+const UTF8_BOUNDARY_SLACK_BYTES = 3;
+const MAX_UTF8_BYTES_PER_CHARACTER = 4;
+
 export class JenkinsBuildConsoleClient {
   constructor(private readonly context: JenkinsClientContext) {}
 
@@ -66,19 +69,20 @@ export class JenkinsBuildConsoleClient {
       const headers = await this.context.requestHeaders(headUrl);
       const textSize = this.parseTextSize(headers["x-text-size"]);
       if (Number.isFinite(textSize) && textSize >= 0) {
-        const start = Math.max(0, textSize - maxChars);
+        const start = Math.max(0, textSize - this.getTailFetchBytes(maxChars));
         const tailUrl = this.buildProgressiveTextUrl(buildUrl, start);
         const response = await this.context.requestTextWithHeaders(tailUrl);
         const responseSize = this.parseTextSize(response.headers["x-text-size"]);
         const nextStart = Number.isFinite(responseSize)
           ? responseSize
-          : start + response.text.length;
+          : start + Buffer.byteLength(response.text, "utf8");
+        const tailText = this.trimTailText(response.text, maxChars);
         return {
-          text: response.text,
-          truncated: textSize > maxChars,
+          text: tailText,
+          truncated: start > 0 || response.text.length > tailText.length,
           nextStart,
           progressiveSupported: true,
-          bytesRead: Buffer.byteLength(response.text, "utf8")
+          bytesRead: Buffer.byteLength(tailText, "utf8")
         };
       }
     } catch {
@@ -135,7 +139,9 @@ export class JenkinsBuildConsoleClient {
     const moreData = this.parseMoreData(response.headers["x-more-data"]);
     return {
       text: response.text,
-      textSize: Number.isFinite(textSize) ? textSize : safeStart + response.text.length,
+      textSize: Number.isFinite(textSize)
+        ? textSize
+        : safeStart + Buffer.byteLength(response.text, "utf8"),
       moreData: typeof moreData === "boolean" ? moreData : response.text.length > 0,
       bytesRead: Buffer.byteLength(response.text, "utf8")
     };
@@ -172,5 +178,13 @@ export class JenkinsBuildConsoleClient {
 
   private parseMoreData(value: string | string[] | undefined): boolean | undefined {
     return parseHeaderBoolean(value);
+  }
+
+  private getTailFetchBytes(maxChars: number): number {
+    return maxChars * MAX_UTF8_BYTES_PER_CHARACTER + UTF8_BOUNDARY_SLACK_BYTES;
+  }
+
+  private trimTailText(text: string, maxChars: number): string {
+    return text.length > maxChars ? text.slice(text.length - maxChars) : text;
   }
 }
