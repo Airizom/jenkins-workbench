@@ -9,7 +9,7 @@ import {
 } from "./toast";
 
 export function Toaster(): JSX.Element {
-  const { toasts, dismissToast, removeToast } = useToast();
+  const { toasts, dismissToast } = useToast();
 
   return (
     <ToastProvider swipeDirection="right">
@@ -22,9 +22,6 @@ export function Toaster(): JSX.Element {
           onOpenChange={(open) => {
             if (!open) {
               dismissToast(toastState.id);
-              setTimeout(() => {
-                removeToast(toastState.id);
-              }, 300);
             }
           }}
         >

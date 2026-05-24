@@ -16,6 +16,8 @@ export interface ToastState extends ToastOptions {
 
 type Listener = (toasts: ToastState[]) => void;
 
+const TOAST_REMOVE_DELAY_MS = 300;
+
 let currentToasts: ToastState[] = [];
 const listeners = new Set<Listener>();
 const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
@@ -44,6 +46,15 @@ function scheduleDismiss(id: string, durationMs: number): void {
     timeouts.delete(id);
     dismissToast(id);
   }, durationMs);
+  timeouts.set(id, timeout);
+}
+
+function scheduleRemove(id: string): void {
+  clearDismissTimeout(id);
+  const timeout = setTimeout(() => {
+    timeouts.delete(id);
+    removeToast(id);
+  }, TOAST_REMOVE_DELAY_MS);
   timeouts.set(id, timeout);
 }
 
@@ -77,12 +88,16 @@ export function toast(options: ToastOptions): { id: string; dismiss: () => void 
 export function dismissToast(id?: string): void {
   if (!id) {
     currentToasts = currentToasts.map((toastState) => ({ ...toastState, open: false }));
+    for (const toastState of currentToasts) {
+      scheduleRemove(toastState.id);
+    }
     emit();
     return;
   }
   currentToasts = currentToasts.map((toastState) =>
     toastState.id === id ? { ...toastState, open: false } : toastState
   );
+  scheduleRemove(id);
   emit();
 }
 
