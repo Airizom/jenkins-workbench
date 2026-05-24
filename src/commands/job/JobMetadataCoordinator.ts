@@ -15,43 +15,65 @@ export interface JobMetadataContext {
   jobUrl: string;
 }
 
+export interface JobMetadataUpdateResult {
+  failures: unknown[];
+}
+
+type JobMetadataOperation = () => Promise<unknown>;
+
+async function settleJobMetadataOperations(
+  operations: JobMetadataOperation[]
+): Promise<JobMetadataUpdateResult> {
+  const results = await Promise.allSettled(
+    operations.map((operation) => Promise.resolve().then(operation))
+  );
+
+  return {
+    failures: results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []))
+  };
+}
+
 export async function updateJobMetadataOnRename(
   stores: JobMetadataStores,
   context: JobMetadataContext,
   newJobUrl: string,
   newJobName: string
-): Promise<void> {
-  await Promise.all([
-    stores.presetStore.updatePresetUrl(
-      context.scope,
-      context.environmentId,
-      context.jobUrl,
-      newJobUrl
-    ),
-    stores.pinStore.updatePinUrl(
-      context.scope,
-      context.environmentId,
-      context.jobUrl,
-      newJobUrl,
-      newJobName
-    ),
-    stores.watchStore.updateWatchUrl(
-      context.scope,
-      context.environmentId,
-      context.jobUrl,
-      newJobUrl,
-      newJobName
-    )
+): Promise<JobMetadataUpdateResult> {
+  return settleJobMetadataOperations([
+    () =>
+      stores.presetStore.updatePresetUrl(
+        context.scope,
+        context.environmentId,
+        context.jobUrl,
+        newJobUrl
+      ),
+    () =>
+      stores.pinStore.updatePinUrl(
+        context.scope,
+        context.environmentId,
+        context.jobUrl,
+        newJobUrl,
+        newJobName
+      ),
+    () =>
+      stores.watchStore.updateWatchUrl(
+        context.scope,
+        context.environmentId,
+        context.jobUrl,
+        newJobUrl,
+        newJobName
+      )
   ]);
 }
 
 export async function removeJobMetadataOnDelete(
   stores: JobMetadataStores,
   context: JobMetadataContext
-): Promise<void> {
-  await Promise.all([
-    stores.presetStore.removePresetsForJob(context.scope, context.environmentId, context.jobUrl),
-    stores.pinStore.removePin(context.scope, context.environmentId, context.jobUrl),
-    stores.watchStore.removeWatch(context.scope, context.environmentId, context.jobUrl)
+): Promise<JobMetadataUpdateResult> {
+  return settleJobMetadataOperations([
+    () =>
+      stores.presetStore.removePresetsForJob(context.scope, context.environmentId, context.jobUrl),
+    () => stores.pinStore.removePin(context.scope, context.environmentId, context.jobUrl),
+    () => stores.watchStore.removeWatch(context.scope, context.environmentId, context.jobUrl)
   ]);
 }

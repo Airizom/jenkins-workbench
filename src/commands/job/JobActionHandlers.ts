@@ -5,7 +5,12 @@ import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameter
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
+import {
+  formatActionError,
+  getTreeItemLabel,
+  requireSelection,
+  withActionErrorMessage
+} from "../CommandUtils";
 import type { JobCommandRefreshHost } from "./JobCommandTypes";
 import { removeJobMetadataOnDelete, updateJobMetadataOnRename } from "./JobMetadataCoordinator";
 import { getJobNameValidationError } from "./JobNameValidation";
@@ -61,6 +66,22 @@ function getMetadataStores(deps: JobActionDependencies): {
   watchStore: JenkinsWatchStore;
 } {
   return { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore };
+}
+
+function showMetadataFailureWarning(
+  successMessage: string,
+  metadataAction: "updated" | "removed",
+  failures: readonly unknown[]
+): boolean {
+  if (failures.length === 0) {
+    return false;
+  }
+
+  const details = failures.map(formatActionError).join("; ");
+  void vscode.window.showWarningMessage(
+    `${successMessage}, but some local Jenkins metadata could not be ${metadataAction}: ${details}`
+  );
+  return true;
 }
 
 async function runJobActionWithRefresh(
@@ -184,14 +205,15 @@ export async function renameJob(
     return;
   }
 
-  await runJobActionWithRefresh(deps, context, `Failed to rename "${context.label}"`, async () => {
+  await withActionErrorMessage(`Failed to rename "${context.label}"`, async () => {
     const { newUrl } = await deps.dataService.renameJob(
       context.selected.environment,
       context.selected.jobUrl,
       newName
     );
+    refreshEnvironment(deps, context.environmentId);
 
-    await updateJobMetadataOnRename(
+    const metadataResult = await updateJobMetadataOnRename(
       getMetadataStores(deps),
       {
         scope: context.selected.environment.scope,
@@ -202,7 +224,10 @@ export async function renameJob(
       newName
     );
 
-    void vscode.window.showInformationMessage(`Renamed "${context.label}" to "${newName}".`);
+    const successMessage = `Renamed "${context.label}" to "${newName}"`;
+    if (!showMetadataFailureWarning(successMessage, "updated", metadataResult.failures)) {
+      void vscode.window.showInformationMessage(`${successMessage}.`);
+    }
   });
 }
 
@@ -238,16 +263,20 @@ export async function deleteJob(
     return;
   }
 
-  await runJobActionWithRefresh(deps, context, `Failed to delete "${context.label}"`, async () => {
+  await withActionErrorMessage(`Failed to delete "${context.label}"`, async () => {
     await deps.dataService.deleteJob(context.selected.environment, context.selected.jobUrl);
+    refreshEnvironment(deps, context.environmentId);
 
-    await removeJobMetadataOnDelete(getMetadataStores(deps), {
+    const metadataResult = await removeJobMetadataOnDelete(getMetadataStores(deps), {
       scope: context.selected.environment.scope,
       environmentId: context.environmentId,
       jobUrl: context.selected.jobUrl
     });
 
-    void vscode.window.showInformationMessage(`Deleted "${context.label}".`);
+    const successMessage = `Deleted "${context.label}"`;
+    if (!showMetadataFailureWarning(successMessage, "removed", metadataResult.failures)) {
+      void vscode.window.showInformationMessage(`${successMessage}.`);
+    }
   });
 }
 
