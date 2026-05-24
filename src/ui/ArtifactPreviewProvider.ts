@@ -54,7 +54,7 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     };
     this.entries.set(id, entry);
     this.totalBytes += entry.size;
-    this.evictIfNeeded(now);
+    this.evictIfNeeded(now, id);
 
     const safeFileName = this.normalizeFileName(fileName);
     return vscode.Uri.from({
@@ -178,13 +178,13 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     return `${Date.now().toString(36)}-${this.nextId}`;
   }
 
-  private evictIfNeeded(now: number): void {
-    this.purgeExpired(now);
+  private evictIfNeeded(now: number, protectedId?: string): void {
+    this.purgeExpired(now, protectedId);
     if (this.entries.size <= this.maxEntries && this.totalBytes <= this.maxTotalBytes) {
       return;
     }
 
-    const candidates = this.getEvictionCandidates();
+    const candidates = this.getEvictionCandidates(protectedId);
     for (const id of candidates) {
       if (this.entries.size <= this.maxEntries && this.totalBytes <= this.maxTotalBytes) {
         break;
@@ -193,8 +193,11 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     }
   }
 
-  private purgeExpired(now: number): void {
+  private purgeExpired(now: number, protectedId?: string): void {
     for (const [id, entry] of this.entries.entries()) {
+      if (id === protectedId) {
+        continue;
+      }
       if (entry.inUseCount > 0) {
         continue;
       }
@@ -204,9 +207,12 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     }
   }
 
-  private getEvictionCandidates(): string[] {
+  private getEvictionCandidates(protectedId?: string): string[] {
     const candidates: Array<{ id: string; lastAccess: number }> = [];
     for (const [id, entry] of this.entries.entries()) {
+      if (id === protectedId) {
+        continue;
+      }
       if (entry.inUseCount > 0) {
         continue;
       }

@@ -1,8 +1,7 @@
 import type { IncomingHttpHeaders } from "node:http";
 import * as path from "node:path";
-import * as vscode from "vscode";
 import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
-import { openTextPreview } from "./PreviewLifecycle";
+import { openResourcePreview, openTextPreview } from "./PreviewLifecycle";
 
 const IMAGE_EXTENSIONS = new Set([
   ".apng",
@@ -32,7 +31,7 @@ export async function openBufferedContentPreview(
   const previewKind = resolvePreviewKind(content.headers, previewPath);
 
   if (previewKind === "image") {
-    await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
+    await openResourcePreview(previewProvider, uri);
     return;
   }
 

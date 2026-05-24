@@ -1059,7 +1059,7 @@
     "local:sso-proxy": "node scripts/local-sso-proxy.js",
     "local:sso-proxy:smoke": "node scripts/local-sso-proxy.js --smoke",
     "test": "node scripts/validate-package-manifest.mjs && npm run test:container",
-    "test:container": "npm run compile && node --test scripts/extension-container.test.mjs scripts/extension-config.test.mjs scripts/job-action-handlers.test.mjs scripts/job-name-validation.test.mjs",
+    "test:container": "npm run compile && node --test scripts/artifact-preview-provider.test.mjs scripts/extension-container.test.mjs scripts/extension-config.test.mjs scripts/job-action-handlers.test.mjs scripts/job-name-validation.test.mjs",
     "lint": "biome lint src/",
     "lint:fix": "biome lint src/ --write",
     "format": "biome format --write .",
