@@ -28,6 +28,7 @@ export class BuildDetailsCoverageCoordinator {
   constructor(private readonly options: BuildDetailsCoverageCoordinatorOptions) {}
 
   dispose(): void {
+    this.refreshGeneration += 1;
     this.options.decorationsAdapter.dispose();
   }
 
