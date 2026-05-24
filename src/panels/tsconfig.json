@@ -15,6 +15,9 @@
     "skipLibCheck": true
   },
   "include": [
+    "buildCompare/webview/**/*.ts",
+    "buildCompare/webview/**/*.tsx",
+    "buildCompare/shared/**/*.ts",
     "buildDetails/webview/**/*.ts",
     "buildDetails/webview/**/*.tsx",
     "buildDetails/shared/**/*.ts",
