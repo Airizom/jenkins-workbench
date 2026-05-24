@@ -16,8 +16,8 @@ export function SkeletonText({ className, lines = 3, ...props }: SkeletonTextPro
   );
   return (
     <div className={cn("space-y-2", className)} {...props}>
-      {lineWidths.map((width) => (
-        <Skeleton key={`skeleton-line-${width}`} className={cn("h-4", width)} />
+      {lineWidths.map((width, index) => (
+        <Skeleton key={`skeleton-line-${index}-${width}`} className={cn("h-4", width)} />
       ))}
     </div>
   );
