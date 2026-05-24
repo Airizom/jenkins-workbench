@@ -15,6 +15,7 @@
   },
   "homepage": "https://github.com/Airizom/jenkins-workbench#readme",
   "engines": {
+    "node": ">=24",
     "vscode": "^1.85.0"
   },
   "categories": ["Other", "Visualization"],
