@@ -58,26 +58,28 @@ export class BuildDetailsCoverageCoordinator {
       return;
     }
 
-    const actionPath = hasCoverageAction(details)
-      ? resolveCoverageActionPath(details)
-      : await coverageBackend.discoverCoverageActionPath(environment, buildUrl, { buildCompleted });
-    if (!this.options.isTokenCurrent(token) || refreshGeneration !== this.refreshGeneration) {
-      return;
-    }
-    if (!actionPath) {
-      this.clearResolvedCoverage();
-      return;
-    }
-    this.options.state.setCoverageActionPath(actionPath);
-
-    if (options?.showLoading && coverageEnabled) {
-      const changed = this.options.state.setCoverageLoading(true);
-      if (changed && this.options.isViewVisible()) {
-        this.options.postStateUpdate();
-      }
-    }
-
     try {
+      const actionPath = hasCoverageAction(details)
+        ? resolveCoverageActionPath(details)
+        : await coverageBackend.discoverCoverageActionPath(environment, buildUrl, {
+            buildCompleted
+          });
+      if (!this.options.isTokenCurrent(token) || refreshGeneration !== this.refreshGeneration) {
+        return;
+      }
+      if (!actionPath) {
+        this.clearResolvedCoverage();
+        return;
+      }
+      this.options.state.setCoverageActionPath(actionPath);
+
+      if (options?.showLoading && coverageEnabled) {
+        const changed = this.options.state.setCoverageLoading(true);
+        if (changed && this.options.isViewVisible()) {
+          this.options.postStateUpdate();
+        }
+      }
+
       const { coverageOverview, modifiedCoverageFiles } = await this.loader.load({
         coverageBackend,
         environment,
