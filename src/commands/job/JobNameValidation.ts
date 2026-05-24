@@ -5,10 +5,21 @@ export type JobNameValidationError =
   | "control_chars"
   | "reserved_name";
 
+export const JENKINS_INVALID_JOB_NAME_CHARACTERS = "?*/\\%!@#$^&|<>[]:;";
+
 function containsControlCharacters(value: string): boolean {
   for (let i = 0; i < value.length; i++) {
     const code = value.charCodeAt(i);
     if (code <= 0x1f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function containsJenkinsInvalidNameCharacter(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    if (JENKINS_INVALID_JOB_NAME_CHARACTERS.includes(value[i])) {
       return true;
     }
   }
@@ -25,8 +36,7 @@ export function validateJobName(name: string): JobNameValidationError | undefine
     return "whitespace";
   }
 
-  const invalidChars = /[\\/<>:"|?*]/;
-  if (invalidChars.test(name)) {
+  if (containsJenkinsInvalidNameCharacter(name)) {
     return "invalid_chars";
   }
 
@@ -48,7 +58,7 @@ export function formatJobNameValidationError(error: JobNameValidationError): str
     case "whitespace":
       return "Name cannot have leading or trailing whitespace.";
     case "invalid_chars":
-      return 'Name contains invalid characters (\\/<>:"|?* are not allowed).';
+      return `Name contains invalid characters (${JENKINS_INVALID_JOB_NAME_CHARACTERS} are not allowed).`;
     case "control_chars":
       return "Name cannot contain control characters.";
     case "reserved_name":
