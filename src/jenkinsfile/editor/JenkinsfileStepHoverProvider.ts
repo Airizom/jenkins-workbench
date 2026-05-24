@@ -33,7 +33,6 @@ export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
     }
 
     const markdown = new vscode.MarkdownString(undefined, true);
-    markdown.isTrusted = true;
     markdown.appendMarkdown(`**${escapeMarkdown(step.name)}**`);
     if (step.displayName && step.displayName !== step.name) {
       markdown.appendMarkdown(` — ${escapeMarkdown(step.displayName)}`);
@@ -56,9 +55,10 @@ export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
       markdown.appendMarkdown("**Jenkinsfile environment**\n");
       markdown.appendText(`${result.environment.url} (${result.environment.scope})`);
       markdown.appendMarkdown("\n\n");
-      markdown.appendMarkdown(
-        `[Open Pipeline Syntax](${result.environment.url.replace(/\/?$/, "/")}pipeline-syntax/)\n`
-      );
+      const pipelineSyntaxUrl = buildPipelineSyntaxUrl(result.environment.url);
+      if (pipelineSyntaxUrl) {
+        markdown.appendMarkdown(`[Open Pipeline Syntax](${pipelineSyntaxUrl})\n`);
+      }
     } else if (result.kind === "fallback-loading") {
       markdown.appendMarkdown("**Metadata source**\n");
       markdown.appendText(
@@ -113,4 +113,21 @@ function escapeMarkdown(value: string): string {
 
 function escapeCodeFence(value: string): string {
   return value.replace(/`/g, "\\`");
+}
+
+function buildPipelineSyntaxUrl(environmentUrl: string): string | undefined {
+  try {
+    const baseUrl = new URL(environmentUrl);
+    if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
+      return undefined;
+    }
+    baseUrl.search = "";
+    baseUrl.hash = "";
+    if (!baseUrl.pathname.endsWith("/")) {
+      baseUrl.pathname = `${baseUrl.pathname}/`;
+    }
+    return new URL("pipeline-syntax/", baseUrl).toString().replace(/[\\()]/g, "\\$&");
+  } catch {
+    return undefined;
+  }
 }
