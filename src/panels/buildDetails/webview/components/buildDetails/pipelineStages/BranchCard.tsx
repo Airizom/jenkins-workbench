@@ -12,6 +12,7 @@ import type {
   PipelineStageViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import { getStatusClass } from "../StatusPill";
+import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getStageIcon } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
 
@@ -28,7 +29,6 @@ export function BranchCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const steps = showAll ? branch.stepsAll : branch.stepsFailedOnly;
-  const hasSteps = branch.hasSteps && steps.length > 0;
   const branchIcon = getStageIcon(branch.statusClass);
   const statusClass = getStatusClass(branch.statusClass);
   const branchTarget = branch.logTarget;
@@ -75,9 +75,13 @@ export function BranchCard({
             </Button>
           ) : null}
         </div>
-        {hasSteps ? (
+        {branch.hasSteps ? (
           <CollapsibleContent className="border-t border-border px-2.5 pb-2 pt-1.5">
-            <StepsList steps={steps} compact onSelectPipelineLog={onSelectPipelineLog} />
+            {steps.length > 0 ? (
+              <StepsList steps={steps} compact onSelectPipelineLog={onSelectPipelineLog} />
+            ) : (
+              <EmptyStepsMessage showAll={showAll} />
+            )}
           </CollapsibleContent>
         ) : null}
       </div>
