@@ -9,13 +9,8 @@ import {
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
 import { trimToUndefined } from "../../shared/stringValues";
 import { unionSortedMapKeys } from "./BuildCompareDiff";
-import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
-import {
-  buildComparisonErrorDetail,
-  buildOccurrenceKey,
-  createCompareErrorSection,
-  createCompareUnavailableSection
-} from "./BuildCompareSectionShared";
+import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
+import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
 import type {
   BuildCompareStageDiffItem,
   BuildCompareStagesSectionViewModel
@@ -33,25 +28,14 @@ export function buildStagesSection(
   baselineWorkflowRun: BuildCompareOptionalResult<JenkinsWorkflowRun>,
   targetWorkflowRun: BuildCompareOptionalResult<JenkinsWorkflowRun>
 ): BuildCompareStagesSectionViewModel {
-  return evaluateOptionalPair(baselineWorkflowRun, targetWorkflowRun, {
-    onError: ({ baseline, target }) =>
-      createCompareErrorSection(
-        "Pipeline timing unavailable",
-        buildComparisonErrorDetail("Pipeline data", baseline, target),
-        { items: [] }
-      ),
-    onBothUnavailable: () =>
-      createCompareUnavailableSection(
-        "Pipeline timing unavailable",
-        "Neither build exposed wfapi pipeline data.",
-        { items: [] }
-      ),
-    onPartialUnavailable: () =>
-      createCompareUnavailableSection(
-        "Pipeline timing unavailable",
-        "Both builds need wfapi pipeline data for stage-by-stage timing comparison.",
-        { items: [] }
-      ),
+  return evaluateStandardCompareSection(baselineWorkflowRun, targetWorkflowRun, {
+    dataLabel: "Pipeline data",
+    errorSummaryLabel: "Pipeline timing unavailable",
+    unavailableSummaryLabel: "Pipeline timing unavailable",
+    bothUnavailableDetail: "Neither build exposed wfapi pipeline data.",
+    partialUnavailableDetail:
+      "Both builds need wfapi pipeline data for stage-by-stage timing comparison.",
+    emptyFields: { items: [] },
     onAvailable: (baselineValue, targetValue) =>
       buildAvailableStagesSection(baselineValue, targetValue)
   });

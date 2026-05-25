@@ -5,16 +5,16 @@ import type {
   NodeCapacityPoolViewModel
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import type { QueueWorkItemViewModel } from "../../../shared/queueWork/QueueWorkContracts";
+import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { QueueWorkItemRow } from "../../shared/webview/components/queueWork/QueueWorkItemRow";
-import { Alert } from "../../shared/webview/components/ui/alert";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
+import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { ExternalLinkIcon, RefreshIcon, ServerIcon } from "../../shared/webview/icons";
 import { resolveSeverityBadgeClass } from "../../shared/webview/lib/statusStyles";
-import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type {
   LoadNodeCapacityExecutorsMessage,
   NodeCapacityIncomingMessage,
@@ -30,11 +30,10 @@ import {
 
 const { useMemo, useReducer } = React;
 
-function postNodeCapacityMessage(message: NodeCapacityIncomingMessage): void {
-  postVsCodeMessage(message);
-}
-
-function postLoadExecutors(nodeUrls: string[]): void {
+function postLoadExecutors(
+  postMessage: (message: NodeCapacityIncomingMessage) => void,
+  nodeUrls: string[]
+): void {
   if (nodeUrls.length === 0) {
     return;
   }
@@ -43,11 +42,12 @@ function postLoadExecutors(nodeUrls: string[]): void {
     type: "loadNodeCapacityExecutors",
     nodeUrls: uniqueNodeUrls
   };
-  postNodeCapacityMessage(message);
+  postMessage(message);
 }
 
 export function NodeCapacityApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeCapacityReducer, undefined, getInitialState);
+  const postMessage = usePanelPostMessage<NodeCapacityIncomingMessage>();
   useNodeCapacityMessages(dispatch);
 
   const updatedAtLabel = useMemo(
@@ -60,29 +60,29 @@ export function NodeCapacityApp(): JSX.Element {
   );
 
   React.useEffect(() => {
-    postLoadExecutors(initiallyOpenNodeUrls);
-  }, [initiallyOpenNodeUrls]);
+    postLoadExecutors(postMessage, initiallyOpenNodeUrls);
+  }, [initiallyOpenNodeUrls, postMessage]);
 
   if (state.loading && !state.hasLoaded) {
     return <LoadingSkeleton variant="node" />;
   }
 
   const handleRefresh = () => {
-    postNodeCapacityMessage({ type: "refreshNodeCapacity" });
+    postMessage({ type: "refreshNodeCapacity" });
   };
 
   const handleOpenExternal = (url: string) => {
     const message: OpenExternalMessage = { type: "openExternal", url };
-    postNodeCapacityMessage(message);
+    postMessage(message);
   };
 
   const handleOpenNodeDetails = (nodeUrl: string, label?: string) => {
     const message: OpenNodeDetailsMessage = { type: "openNodeDetails", nodeUrl, label };
-    postNodeCapacityMessage(message);
+    postMessage(message);
   };
 
   const handleLoadExecutors = (nodeUrls: string[]) => {
-    postLoadExecutors(nodeUrls);
+    postLoadExecutors(postMessage, nodeUrls);
   };
 
   return (
@@ -110,11 +110,7 @@ export function NodeCapacityApp(): JSX.Element {
         </header>
 
         <main className="mx-auto w-full max-w-7xl space-y-4 px-4 py-4" aria-busy={state.loading}>
-          {state.errors.map((error) => (
-            <Alert key={error} variant="destructive">
-              {error}
-            </Alert>
-          ))}
+          <PanelErrorList errors={state.errors} title="Node capacity errors" />
 
           <SummaryStrip state={state} />
 

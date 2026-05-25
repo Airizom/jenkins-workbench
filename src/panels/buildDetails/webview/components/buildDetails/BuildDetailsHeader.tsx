@@ -1,13 +1,7 @@
+import { BuildResultStatusIcon } from "../../../../shared/webview/components/BuildResultStatusIcon";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../shared/webview/components/ui/progress";
-import {
-  AlertTriangleIcon,
-  CheckCircleIcon,
-  ExternalLinkIcon,
-  PlayCircleIcon,
-  StopCircleIcon,
-  XCircleIcon
-} from "../../../../shared/webview/icons";
+import { ExternalLinkIcon } from "../../../../shared/webview/icons";
 import { resolveStatusAccentClass } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import { BuildDetailsMetaFields } from "./BuildDetailsMetaFields";
@@ -25,28 +19,6 @@ type BuildDetailsHeaderProps = {
   buildUrl?: string;
   onOpenBuild: () => void;
 };
-
-function getStatusAccent(status: string): string {
-  return resolveStatusAccentClass(status);
-}
-
-function HeaderStatusIcon({ status }: { status: string }) {
-  const size = "h-4 w-4";
-  switch (status) {
-    case "success":
-      return <CheckCircleIcon className={size} />;
-    case "failure":
-      return <XCircleIcon className={size} />;
-    case "unstable":
-      return <AlertTriangleIcon className={size} />;
-    case "aborted":
-      return <StopCircleIcon className={size} />;
-    case "running":
-      return <PlayCircleIcon className={size} />;
-    default:
-      return null;
-  }
-}
 
 export function BuildDetailsHeader({
   displayName,
@@ -66,7 +38,7 @@ export function BuildDetailsHeader({
       <div className="mx-auto max-w-6xl px-4 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <HeaderStatusIcon status={resultClass} />
+            <BuildResultStatusIcon status={resultClass} />
             <h1 className="text-sm font-semibold leading-tight truncate" id="detail-title">
               {displayName}
             </h1>
@@ -100,7 +72,7 @@ export function BuildDetailsHeader({
           className="sm:hidden flex items-center gap-2 mt-1.5 text-xs text-muted-foreground"
         />
       </div>
-      <div className={cn("h-px", getStatusAccent(resultClass))} />
+      <div className={cn("h-px", resolveStatusAccentClass(resultClass))} />
     </header>
   );
 }

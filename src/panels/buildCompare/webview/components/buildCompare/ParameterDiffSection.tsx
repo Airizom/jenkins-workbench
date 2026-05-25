@@ -1,7 +1,6 @@
 import type { BuildCompareParametersSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { ParameterDiffRow } from "./ParameterDiffRow";
-import { EmptyState } from "./shared/EmptyState";
-import { SectionCard } from "./shared/SectionCard";
+import { CompareItemsSection } from "./shared/CompareItemsSection";
 
 export function ParameterDiffSection({
   section
@@ -9,21 +8,15 @@ export function ParameterDiffSection({
   section: BuildCompareParametersSectionViewModel;
 }) {
   return (
-    <SectionCard
+    <CompareItemsSection
       title="Parameter Diff"
       summary={section.summaryLabel}
       detail={section.detail}
       status={section.status}
-    >
-      {section.items.length > 0 ? (
-        <div className="space-y-2">
-          {section.items.map((item) => (
-            <ParameterDiffRow key={`${item.changeType}:${item.name}`} item={item} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState label="No changed parameters." />
-      )}
-    </SectionCard>
+      items={section.items}
+      emptyLabel="No changed parameters."
+      itemKey={(item) => `${item.changeType}:${item.name}`}
+      renderItem={(item) => <ParameterDiffRow item={item} />}
+    />
   );
 }

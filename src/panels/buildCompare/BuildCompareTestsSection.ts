@@ -4,13 +4,8 @@ import { trimToUndefined } from "../../shared/stringValues";
 import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
 import { forEachKeyedDiff } from "./BuildCompareDiff";
-import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
-import {
-  buildComparisonErrorDetail,
-  buildOccurrenceKey,
-  createCompareErrorSection,
-  createCompareUnavailableSection
-} from "./BuildCompareSectionShared";
+import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
+import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
 import type {
   BuildCompareTestDiffItem,
   BuildCompareTestsSectionViewModel
@@ -18,15 +13,7 @@ import type {
 
 type NormalizedTestCase = NormalizedTestCaseBase;
 
-const EMPTY_TEST_DIFF_LISTS = {
-  newFailures: [],
-  stillFailing: [],
-  newPasses: [],
-  addedTests: [],
-  removedTests: [],
-  otherChangesCount: 0,
-  unchangedCount: 0
-} as const satisfies Pick<
+type TestCompareEmptyFields = Pick<
   BuildCompareTestsSectionViewModel,
   | "newFailures"
   | "stillFailing"
@@ -35,50 +22,61 @@ const EMPTY_TEST_DIFF_LISTS = {
   | "removedTests"
   | "otherChangesCount"
   | "unchangedCount"
+  | "baselineSummaryLabel"
+  | "targetSummaryLabel"
 >;
 
-function createUnavailableTestsSection(
-  overrides: Pick<
-    BuildCompareTestsSectionViewModel,
-    "summaryLabel" | "detail" | "baselineSummaryLabel" | "targetSummaryLabel"
-  >
-): BuildCompareTestsSectionViewModel {
-  return createCompareUnavailableSection(overrides.summaryLabel, overrides.detail, {
-    ...EMPTY_TEST_DIFF_LISTS,
-    baselineSummaryLabel: overrides.baselineSummaryLabel,
-    targetSummaryLabel: overrides.targetSummaryLabel
-  });
-}
+const EMPTY_TEST_DIFF_LISTS: Pick<
+  BuildCompareTestsSectionViewModel,
+  | "newFailures"
+  | "stillFailing"
+  | "newPasses"
+  | "addedTests"
+  | "removedTests"
+  | "otherChangesCount"
+  | "unchangedCount"
+> = {
+  newFailures: [],
+  stillFailing: [],
+  newPasses: [],
+  addedTests: [],
+  removedTests: [],
+  otherChangesCount: 0,
+  unchangedCount: 0
+};
 
 export function buildTestsSection(
   baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
   targetReport: BuildCompareOptionalResult<JenkinsTestReport>
 ): BuildCompareTestsSectionViewModel {
-  return evaluateOptionalPair(baselineReport, targetReport, {
-    onError: ({ baseline, target }) =>
-      createCompareErrorSection(
-        "Test comparison unavailable",
-        buildComparisonErrorDetail("Test report", baseline, target),
-        {
-          baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
-          targetSummaryLabel: buildTestSummaryLabel(targetReport),
-          ...EMPTY_TEST_DIFF_LISTS
-        }
-      ),
-    onBothUnavailable: () =>
-      createUnavailableTestsSection({
-        summaryLabel: "Test report data unavailable",
-        detail: "Neither build exposed a Jenkins test report.",
-        baselineSummaryLabel: "Unavailable",
-        targetSummaryLabel: "Unavailable"
-      }),
-    onPartialUnavailable: () =>
-      createUnavailableTestsSection({
-        summaryLabel: "Test report data unavailable",
-        detail: "Both builds need test report data for a reliable comparison.",
-        baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
-        targetSummaryLabel: buildTestSummaryLabel(targetReport)
-      }),
+  const testSummaryFields = {
+    baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
+    targetSummaryLabel: buildTestSummaryLabel(targetReport),
+    ...EMPTY_TEST_DIFF_LISTS
+  };
+
+  return evaluateStandardCompareSection<
+    JenkinsTestReport,
+    TestCompareEmptyFields,
+    BuildCompareTestsSectionViewModel
+  >(baselineReport, targetReport, {
+    dataLabel: "Test report",
+    errorSummaryLabel: "Test comparison unavailable",
+    unavailableSummaryLabel: "Test report data unavailable",
+    bothUnavailableDetail: "Neither build exposed a Jenkins test report.",
+    partialUnavailableDetail: "Both builds need test report data for a reliable comparison.",
+    emptyFields: {
+      ...EMPTY_TEST_DIFF_LISTS,
+      baselineSummaryLabel: "Unavailable",
+      targetSummaryLabel: "Unavailable"
+    },
+    bothUnavailableFields: {
+      baselineSummaryLabel: "Unavailable",
+      targetSummaryLabel: "Unavailable",
+      ...EMPTY_TEST_DIFF_LISTS
+    },
+    resolveErrorFields: () => testSummaryFields,
+    resolvePartialFields: () => testSummaryFields,
     onAvailable: (baselineValue, targetValue) =>
       buildAvailableTestsSection(baselineReport, targetReport, baselineValue, targetValue)
   });

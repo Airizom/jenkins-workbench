@@ -5,15 +5,22 @@ export function BuildDetailsMetaFields({
   durationLabel,
   timestampLabel,
   culpritsLabel,
-  className
+  className,
+  showSeparators = true
 }: {
   idSuffix?: string;
   durationLabel: string;
   timestampLabel: string;
   culpritsLabel: string;
   className?: string;
+  showSeparators?: boolean;
 }): JSX.Element {
   const showCulprits = culpritsLabel !== "—" && culpritsLabel !== "None";
+  const separator = showSeparators ? (
+    <span aria-hidden="true" className="opacity-30">
+      |
+    </span>
+  ) : null;
 
   return (
     <div className={className}>
@@ -21,18 +28,14 @@ export function BuildDetailsMetaFields({
         <ClockIcon className="h-3 w-3" />
         {durationLabel}
       </span>
-      <span aria-hidden="true" className="opacity-30">
-        |
-      </span>
+      {separator}
       <span className="inline-flex items-center gap-1" id={`detail-timestamp${idSuffix}`}>
         <CalendarIcon className="h-3 w-3" />
         {timestampLabel}
       </span>
       {showCulprits ? (
         <>
-          <span aria-hidden="true" className="opacity-30">
-            |
-          </span>
+          {separator}
           <span className="inline-flex items-center gap-1" id={`detail-culprits${idSuffix}`}>
             <UserIcon className="h-3 w-3" />
             {culpritsLabel}

@@ -2,9 +2,9 @@ import * as React from "react";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
+import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { toast } from "../../shared/webview/hooks/useToast";
 import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
-import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
 import { NodeDetailsHeader } from "./components/nodeDetails/NodeDetailsHeader";
@@ -21,13 +21,10 @@ import { getInitialState, nodeDetailsReducer } from "./state/nodeDetailsState";
 
 const { useEffect, useMemo, useReducer, useState } = React;
 
-function postNodeDetailsMessage(message: NodeDetailsIncomingMessage): void {
-  postVsCodeMessage(message);
-}
-
 export function NodeDetailsApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeDetailsReducer, undefined, getInitialState);
   const [now, setNow] = useState(() => Date.now());
+  const postMessage = usePanelPostMessage<NodeDetailsIncomingMessage>();
 
   useNodeDetailsMessages(dispatch);
 
@@ -66,28 +63,28 @@ export function NodeDetailsApp(): JSX.Element {
   }
 
   const handleRefresh = () => {
-    postNodeDetailsMessage({ type: "refreshNodeDetails" });
+    postMessage({ type: "refreshNodeDetails" });
   };
 
   const handleNodeAction = () => {
     if (!nodeAction) {
       return;
     }
-    postNodeDetailsMessage({ type: nodeAction.type });
+    postMessage({ type: nodeAction.type });
   };
 
   const handleLaunchAgent = () => {
     if (!state.canLaunchAgent) {
       return;
     }
-    postNodeDetailsMessage({ type: "launchNodeAgent" });
+    postMessage({ type: "launchNodeAgent" });
   };
 
   const handleOpenExternal = (url: string) => {
     if (!url) {
       return;
     }
-    postNodeDetailsMessage({ type: "openExternal", url });
+    postMessage({ type: "openExternal", url });
   };
 
   const handleOpen = () => {
@@ -101,7 +98,7 @@ export function NodeDetailsApp(): JSX.Element {
     if (!state.rawJson) {
       return;
     }
-    postNodeDetailsMessage({ type: "copyNodeJson", content: state.rawJson });
+    postMessage({ type: "copyNodeJson", content: state.rawJson });
     toast({
       title: "Copied",
       description: "Node JSON copied to clipboard.",
@@ -111,7 +108,7 @@ export function NodeDetailsApp(): JSX.Element {
 
   const handleDiagnosticsToggle = (value: string) => {
     if (value === "diagnostics" && !state.advancedLoaded) {
-      postNodeDetailsMessage({ type: "loadAdvancedNodeDetails" });
+      postMessage({ type: "loadAdvancedNodeDetails" });
     }
   };
 

@@ -1,4 +1,4 @@
-import { Alert, AlertDescription } from "./ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card";
 
 type PanelErrorListProps = {
@@ -33,6 +33,7 @@ export function PanelErrorList({
 
   return (
     <Alert id={id} variant="destructive" className={className ?? "mb-3 flex flex-col gap-1"}>
+      {title ? <AlertTitle className="text-xs">{title}</AlertTitle> : null}
       {errors.map((error) => (
         <AlertDescription className="text-xs" key={error}>
           {error}

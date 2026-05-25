@@ -2,6 +2,19 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
+function formatRelativeMinutesAge(ageMs: number): string | undefined {
+  if (ageMs < MINUTE_MS) {
+    return "just now";
+  }
+
+  const minutes = Math.floor(ageMs / MINUTE_MS);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  return undefined;
+}
+
 export function formatRelativeTimestampMs(timestampMs: number): string | undefined {
   if (!Number.isFinite(timestampMs)) {
     return undefined;
@@ -9,14 +22,9 @@ export function formatRelativeTimestampMs(timestampMs: number): string | undefin
 
   const now = Date.now();
   const diffMs = Math.max(0, now - timestampMs);
-
-  if (diffMs < MINUTE_MS) {
-    return "just now";
-  }
-
-  if (diffMs < HOUR_MS) {
-    const minutes = Math.floor(diffMs / MINUTE_MS);
-    return `${minutes}m ago`;
+  const minuteLabel = formatRelativeMinutesAge(diffMs);
+  if (minuteLabel) {
+    return minuteLabel;
   }
 
   if (diffMs < DAY_MS) {
@@ -66,13 +74,9 @@ export function formatRelativeIsoTimestamp(value: string): string {
   }
 
   const ageMs = Math.max(0, Date.now() - parsed);
-  if (ageMs < MINUTE_MS) {
-    return "just now";
-  }
-
-  const minutes = Math.floor(ageMs / MINUTE_MS);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
+  const minuteLabel = formatRelativeMinutesAge(ageMs);
+  if (minuteLabel) {
+    return minuteLabel;
   }
 
   return new Date(parsed).toLocaleTimeString();

@@ -1,5 +1,7 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
+import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
+import { evaluateOptionalPair } from "./BuildCompareLoadState";
 import type { BuildCompareBuildViewModel } from "./shared/BuildCompareContracts";
 
 export function buildBuildViewModel(
@@ -60,4 +62,55 @@ export function createCompareUnavailableSection<T>(
     detail,
     ...fields
   };
+}
+
+type StandardCompareSectionConfig<T, F, R> = {
+  dataLabel: string;
+  errorSummaryLabel: string;
+  unavailableSummaryLabel: string;
+  bothUnavailableDetail: string;
+  partialUnavailableDetail: string;
+  emptyFields: F;
+  bothUnavailableFields?: F;
+  resolveErrorFields?: (
+    baseline: BuildCompareOptionalResult<T>,
+    target: BuildCompareOptionalResult<T>
+  ) => F;
+  resolvePartialFields?: (
+    baseline: BuildCompareOptionalResult<T>,
+    target: BuildCompareOptionalResult<T>
+  ) => F;
+  onAvailable: (baseline: T, target: T) => R;
+};
+
+export function evaluateStandardCompareSection<T, F, R>(
+  baseline: BuildCompareOptionalResult<T>,
+  target: BuildCompareOptionalResult<T>,
+  config: StandardCompareSectionConfig<T, F, R>
+): R {
+  const resolveErrorFields = config.resolveErrorFields ?? (() => config.emptyFields);
+  const resolvePartialFields = config.resolvePartialFields ?? (() => config.emptyFields);
+  const bothUnavailableFields = config.bothUnavailableFields ?? config.emptyFields;
+
+  return evaluateOptionalPair<T, R>(baseline, target, {
+    onError: ({ baseline: baselineMessage, target: targetMessage }) =>
+      createCompareErrorSection(
+        config.errorSummaryLabel,
+        buildComparisonErrorDetail(config.dataLabel, baselineMessage, targetMessage),
+        resolveErrorFields(baseline, target)
+      ) as R,
+    onBothUnavailable: () =>
+      createCompareUnavailableSection(
+        config.unavailableSummaryLabel,
+        config.bothUnavailableDetail,
+        bothUnavailableFields
+      ) as R,
+    onPartialUnavailable: () =>
+      createCompareUnavailableSection(
+        config.unavailableSummaryLabel,
+        config.partialUnavailableDetail,
+        resolvePartialFields(baseline, target)
+      ) as R,
+    onAvailable: config.onAvailable
+  });
 }

@@ -3,11 +3,12 @@ import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
+import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
+import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
 import { BuildDetailsHeader } from "./components/buildDetails/BuildDetailsHeader";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
-import { useBuildDetailsInteractions } from "./hooks/useBuildDetailsInteractions";
 import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
 import { useBuildDetailsTabs } from "./hooks/useBuildDetailsTabs";
 import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
@@ -22,7 +23,7 @@ const { useReducer } = React;
 
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
-  const postMessage = useBuildDetailsInteractions();
+  const postMessage = usePanelPostMessage<BuildDetailsIncomingMessage>();
   useBuildDetailsMessages(dispatch);
   const { showButton, scrollToTop } = useScrollToTopButton();
 
