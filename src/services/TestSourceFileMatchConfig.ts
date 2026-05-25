@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { trimToUndefined } from "../shared/stringValues";
 import type {
   TestSourceFileMatchStrategyOptions,
   TestSourcePathPreference
@@ -52,7 +53,7 @@ function readStringArray(value: unknown): string[] | undefined {
 }
 
 function readOptionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  return trimToUndefined(value);
 }
 
 function readOptionalNumber(value: unknown): number | undefined {

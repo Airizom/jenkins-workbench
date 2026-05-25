@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
+import { trimToUndefined } from "../shared/stringValues";
 import type { CurrentBranchRepositoryContext } from "./CurrentBranchTypes";
 
 const GITHUB_PULL_REQUEST_EXTENSION_IDS = [
@@ -112,11 +113,7 @@ function normalizeRepositoryPullRequest(
 
   return {
     number: pullRequest.number,
-    title: normalizeString(pullRequest.title),
-    url: normalizeString(pullRequest.url)
+    title: trimToUndefined(pullRequest.title),
+    url: trimToUndefined(pullRequest.url)
   };
-}
-
-function normalizeString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }

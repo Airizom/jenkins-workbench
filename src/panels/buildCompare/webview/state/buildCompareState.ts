@@ -1,3 +1,4 @@
+import { readInjectedPanelState } from "../../../shared/webview/state/createPanelStateHelpers";
 import type {
   BuildCompareConsoleSectionViewModel,
   BuildCompareViewModel
@@ -26,5 +27,5 @@ export function buildCompareReducer(
 }
 
 export function getInitialState(): BuildCompareViewModel | undefined {
-  return (window as { __INITIAL_STATE__?: BuildCompareViewModel }).__INITIAL_STATE__;
+  return readInjectedPanelState<BuildCompareViewModel>();
 }

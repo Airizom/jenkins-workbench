@@ -1,14 +1,11 @@
 import * as vscode from "vscode";
-import type {
-  JenkinsBuild,
-  JenkinsBuildCause,
-  JenkinsBuildParameter
-} from "../jenkins/JenkinsClient";
+import type { JenkinsBuild, JenkinsBuildCause } from "../jenkins/JenkinsClient";
 import { resolveLastBuildChangeset } from "../jenkins/changesets/collectBuildChangesets";
 import {
-  shouldIncludeBuildParameter,
-  shouldMaskBuildParameter
-} from "../shared/build/BuildParameterFilters";
+  type BuildParameterFilterOptions,
+  visitMatchingBuildParameters
+} from "../shared/build/BuildParameterCollection";
+import { formatBuildParameterValueForTooltip } from "../shared/build/BuildParameterFormatting";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 import { formatDurationMs, formatRelativeTime } from "./formatters";
 
@@ -214,7 +211,9 @@ function formatParameterSummary(
     parameterMaskValue: string;
   }
 ): string {
-  const value = isMasked ? options.parameterMaskValue : formatParameterValue(rawValue);
+  const value = isMasked
+    ? options.parameterMaskValue
+    : formatBuildParameterValueForTooltip(rawValue);
   const truncated = truncateText(value, options.maxParameterValueLength);
   return `${name}=${truncated}`;
 }
@@ -273,38 +272,37 @@ function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefine
   return timestamp;
 }
 
+type BuildParameterSummaryOptions = {
+  maxParameterCount: number;
+  maxParameterValueLength: number;
+  parameterAllowList: string[];
+  parameterDenyList: string[];
+  parameterMaskPatterns: string[];
+  parameterMaskValue: string;
+};
+
+function toBuildParameterFilterOptions(
+  options: BuildParameterSummaryOptions
+): BuildParameterFilterOptions {
+  return {
+    allowList: options.parameterAllowList,
+    denyList: options.parameterDenyList,
+    maskPatterns: options.parameterMaskPatterns
+  };
+}
+
 function visitMatchingParameters(
   build: JenkinsBuild,
-  options: {
-    parameterAllowList: string[];
-    parameterDenyList: string[];
-    parameterMaskPatterns: string[];
-  },
+  options: BuildParameterSummaryOptions,
   visitor: (name: string, value: unknown, isMasked: boolean) => void
 ): void {
-  const actions = build.actions ?? [];
-  const seen = new Set<string>();
-
-  for (const action of actions) {
-    if (!isActionWithParameters(action)) {
-      continue;
-    }
-
-    for (const parameter of action.parameters) {
-      const name = normalizeWhitespace(parameter.name ?? "");
-      if (!name || seen.has(name)) {
-        continue;
-      }
-      if (
-        !shouldIncludeBuildParameter(name, options.parameterAllowList, options.parameterDenyList)
-      ) {
-        continue;
-      }
-      seen.add(name);
-      const isMasked = shouldMaskBuildParameter(name, options.parameterMaskPatterns);
+  visitMatchingBuildParameters(
+    build.actions,
+    toBuildParameterFilterOptions(options),
+    (name, parameter, isMasked) => {
       visitor(name, parameter.value, isMasked);
     }
-  }
+  );
 }
 
 function isActionWithCauses(action: BuildAction | null): action is { causes: JenkinsBuildCause[] } {
@@ -313,16 +311,6 @@ function isActionWithCauses(action: BuildAction | null): action is { causes: Jen
   }
   const record = action as { causes?: unknown };
   return Array.isArray(record.causes);
-}
-
-function isActionWithParameters(
-  action: BuildAction | null
-): action is { parameters: JenkinsBuildParameter[] } {
-  if (!action) {
-    return false;
-  }
-  const record = action as { parameters?: unknown };
-  return Array.isArray(record.parameters);
 }
 
 function normalizeWhitespace(value: string): string {
@@ -339,33 +327,4 @@ function truncateText(value: string, maxChars: number): string {
   }
   const clipped = value.slice(0, Math.max(0, maxChars - 3));
   return `${clipped}...`;
-}
-
-function formatParameterValue(value: unknown): string {
-  switch (typeof value) {
-    case "string":
-      return normalizeWhitespace(value);
-    case "number":
-    case "boolean":
-      return value.toString();
-    case "bigint":
-      return value.toString();
-    case "symbol":
-      return value.description ?? value.toString();
-    case "function":
-      return value.name ? `[function ${value.name}]` : "[function]";
-    case "undefined":
-      return "Unknown";
-    case "object":
-      if (value === null) {
-        return "null";
-      }
-      try {
-        return normalizeWhitespace(JSON.stringify(value));
-      } catch {
-        return "[object]";
-      }
-    default:
-      return "Unknown";
-  }
 }

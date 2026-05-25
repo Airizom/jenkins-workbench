@@ -1,15 +1,8 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
-import type {
-  JenkinsBuildAction,
-  JenkinsBuildDetails,
-  JenkinsBuildParameter
-} from "../../jenkins/types";
-import {
-  shouldIncludeBuildParameter,
-  shouldMaskBuildParameter
-} from "../../shared/build/BuildParameterFilters";
+import type { JenkinsBuildAction, JenkinsBuildDetails } from "../../jenkins/types";
+import { visitMatchingBuildParameters } from "../../shared/build/BuildParameterCollection";
+import { formatBuildParameterValueForCompare } from "../../shared/build/BuildParameterFormatting";
 import type { BuildParameterRedactionOptions } from "./BuildCompareOptions";
-import { normalizeString } from "./BuildCompareSectionShared";
 import type {
   BuildCompareParameterDiffItem,
   BuildCompareParametersSectionViewModel
@@ -89,45 +82,17 @@ function buildParameterMap(
   maskValue: string
 ): Map<string, NormalizedParameterValue> {
   const result = new Map<string, NormalizedParameterValue>();
-  for (const action of actions ?? []) {
-    if (!action || !("parameters" in action) || !Array.isArray(action.parameters)) {
-      continue;
-    }
-    for (const parameter of action.parameters) {
-      const name = normalizeString(parameter.name);
-      if (!name || result.has(name)) {
-        continue;
-      }
-      if (!shouldIncludeBuildParameter(name, allowList, denyList)) {
-        continue;
-      }
-      const comparisonValue = formatParameterValue(parameter);
-      const displayValue = shouldMaskBuildParameter(name, maskPatterns)
-        ? maskValue
-        : comparisonValue;
+  visitMatchingBuildParameters(
+    actions,
+    { allowList, denyList, maskPatterns },
+    (name, parameter, isMasked) => {
+      const comparisonValue = formatBuildParameterValueForCompare(parameter);
+      const displayValue = isMasked ? maskValue : comparisonValue;
       result.set(name, {
         comparisonValue,
         displayValue
       });
     }
-  }
+  );
   return result;
-}
-
-function formatParameterValue(parameter: JenkinsBuildParameter): string {
-  const value = parameter.value;
-  if (Array.isArray(value)) {
-    return value.map((entry) => String(entry)).join(", ");
-  }
-  if (typeof value === "object" && value !== null) {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
-  }
-  if (typeof value === "undefined") {
-    return "(undefined)";
-  }
-  return String(value);
 }

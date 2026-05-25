@@ -6,6 +6,7 @@ import type {
   BuildCompareOptions,
   BuildParameterRedactionOptions
 } from "../panels/buildCompare/BuildCompareOptions";
+import { trimToUndefined } from "../shared/stringValues";
 import type { TreeActivityOptions } from "../tree/ActivityTypes";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
@@ -144,7 +145,7 @@ export function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfigu
 
 export function getArtifactDownloadRoot(config: vscode.WorkspaceConfiguration): string {
   return (
-    normalizeString(config.get<unknown>("artifactDownloadRoot")) ?? DEFAULT_ARTIFACT_DOWNLOAD_ROOT
+    trimToUndefined(config.get<unknown>("artifactDownloadRoot")) ?? DEFAULT_ARTIFACT_DOWNLOAD_ROOT
   );
 }
 
@@ -226,7 +227,7 @@ export function getBuildParameterRedactionOptions(
     )
   );
   const maskValue =
-    normalizeString(config.get<unknown>("buildTooltips.parameters.maskValue")) ??
+    trimToUndefined(config.get<unknown>("buildTooltips.parameters.maskValue")) ??
     DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE;
 
   return {
@@ -448,13 +449,5 @@ function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.map((item) => normalizeString(item)).filter((item): item is string => Boolean(item));
-}
-
-function normalizeString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return value.map((item) => trimToUndefined(item)).filter((item): item is string => Boolean(item));
 }

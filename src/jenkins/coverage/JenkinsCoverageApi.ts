@@ -1,3 +1,4 @@
+import { trimToUndefined } from "../../shared/stringValues";
 import type { JenkinsClientContext } from "../client/JenkinsClientContext";
 import { JenkinsRequestError } from "../errors";
 import { buildActionUrl } from "../urls";
@@ -65,7 +66,7 @@ function normalizeCoverageOverview(
   const projectCoverage = normalizeCoverageStatistic(response.projectStatistics);
   const modifiedFilesCoverage = normalizeCoverageStatistic(response.modifiedFilesStatistics);
   const modifiedLinesCoverage = normalizeCoverageStatistic(response.modifiedLinesStatistics);
-  const overallQualityGateStatus = normalizeString(response.qualityGates?.overallResult);
+  const overallQualityGateStatus = trimToUndefined(response.qualityGates?.overallResult);
 
   if (
     !projectCoverage &&
@@ -117,8 +118,8 @@ function normalizeCoverageQualityGates(value: unknown): JenkinsCoverageOverview[
       continue;
     }
     const candidate = item as Record<string, unknown>;
-    const name = normalizeString(candidate.qualityGate);
-    const status = normalizeString(candidate.result);
+    const name = trimToUndefined(candidate.qualityGate);
+    const status = trimToUndefined(candidate.result);
     if (!name || !status) {
       continue;
     }
@@ -181,7 +182,7 @@ function normalizeModifiedCoverageBlocks(value: unknown): JenkinsModifiedCoverag
 function normalizeCoverageBlockType(
   value: unknown
 ): JenkinsModifiedCoverageFile["blocks"][number]["type"] | undefined {
-  const normalized = normalizeString(value)?.toUpperCase();
+  const normalized = trimToUndefined(value)?.toUpperCase();
   switch (normalized) {
     case "COVERED":
       return "covered";
@@ -195,19 +196,15 @@ function normalizeCoverageBlockType(
 }
 
 function normalizeCoverageValue(value: unknown): string | undefined {
-  const normalized = normalizeString(value);
+  const normalized = trimToUndefined(value);
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
 function normalizeRelativePath(value: unknown): string | undefined {
-  const normalized = normalizeString(value)
+  const normalized = trimToUndefined(value)
     ?.replace(/\\/g, "/")
     .replace(/^\/+|\/+$/g, "");
   return normalized && normalized.length > 0 ? normalized : undefined;
-}
-
-function normalizeString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
 function normalizePositiveInteger(value: unknown): number | undefined {

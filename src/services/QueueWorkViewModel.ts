@@ -4,6 +4,7 @@ import type {
   NodeQueuedWorkViewModel,
   QueueWorkItemViewModel
 } from "../shared/queueWork/QueueWorkContracts";
+import { trimToUndefined } from "../shared/stringValues";
 import type { NodeLabelClassification, NodeLabelInput } from "./NodeLabelClassification";
 import { classifyNodeLabels, normalizeLabelKey } from "./NodeLabelClassification";
 
@@ -120,12 +121,4 @@ function buildPoolLabelsByNodeName(nodes: NodeLabelInput[]): Map<string, string[
     }
   }
   return labelsByNodeName;
-}
-
-function trimToUndefined(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }

@@ -1,3 +1,4 @@
+import { trimToUndefined } from "../../shared/stringValues";
 import type {
   JenkinsItemCreateKind,
   JenkinsQueueItem,
@@ -145,14 +146,6 @@ export class JenkinsQueueAndJobManagementOperations {
       };
     });
   }
-}
-
-function trimToUndefined(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function inferAssignedLabelFromQueueReason(value: unknown): string | undefined {

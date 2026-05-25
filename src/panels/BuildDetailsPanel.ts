@@ -32,6 +32,7 @@ import {
   mergeBuildDetailsPanelState,
   withBuildDetailsPanelUiState
 } from "./buildDetails/shared/BuildDetailsPanelWebviewState";
+import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -314,10 +315,7 @@ export class BuildDetailsPanel {
   private dispose(): void {
     this.controller.dispose();
     BuildDetailsPanel.currentPanel = undefined;
-    while (this.disposables.length > 0) {
-      const disposable = this.disposables.pop();
-      disposable?.dispose();
-    }
+    disposePanelResources(this.disposables);
   }
 
   private configure(

@@ -19,6 +19,7 @@ import {
   isBuildComparePanelState,
   updateBuildComparePanelState
 } from "./buildCompare/shared/BuildComparePanelWebviewState";
+import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -156,9 +157,7 @@ export class BuildComparePanel {
 
   private dispose(): void {
     BuildComparePanel.currentPanel = undefined;
-    while (this.disposables.length > 0) {
-      this.disposables.pop()?.dispose();
-    }
+    disposePanelResources(this.disposables);
   }
 
   private async load(options?: { suppressErrors?: boolean }): Promise<void> {
