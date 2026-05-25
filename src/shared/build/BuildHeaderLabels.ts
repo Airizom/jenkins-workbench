@@ -25,12 +25,14 @@ export function formatBuildTimestamp(timestamp?: number): string {
   return formatOptionalLocaleTimestamp(timestamp) || "Unknown";
 }
 
-export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): {
+export interface BuildHeaderViewModel {
   resultLabel: string;
   resultClass: string;
   durationLabel: string;
   timestampLabel: string;
-} {
+}
+
+export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): BuildHeaderViewModel {
   return {
     resultLabel: details ? formatBuildResultLabel(details) : "Unknown",
     resultClass: details ? formatBuildResultClass(details) : "neutral",

@@ -1,4 +1,5 @@
 import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/JenkinsChangesetViewModel";
+import type { BuildHeaderViewModel } from "../../../shared/build/BuildHeaderLabels";
 
 export type CompareSectionStatus =
   | "loading"
@@ -9,14 +10,16 @@ export type CompareSectionStatus =
   | "tooLarge"
   | "identical";
 
-export interface BuildCompareBuildViewModel {
+export interface CompareSectionBaseViewModel {
+  status: CompareSectionStatus;
+  summaryLabel: string;
+  detail?: string;
+}
+
+export interface BuildCompareBuildViewModel extends BuildHeaderViewModel {
   roleLabel: string;
   displayName: string;
   buildUrl: string;
-  resultLabel: string;
-  resultClass: string;
-  durationLabel: string;
-  timestampLabel: string;
 }
 
 export interface BuildCompareTestDiffItem {
@@ -30,10 +33,7 @@ export interface BuildCompareTestDiffItem {
   targetDurationLabel?: string;
 }
 
-export interface BuildCompareTestsSectionViewModel {
-  status: CompareSectionStatus;
-  summaryLabel: string;
-  detail?: string;
+export interface BuildCompareTestsSectionViewModel extends CompareSectionBaseViewModel {
   baselineSummaryLabel: string;
   targetSummaryLabel: string;
   newFailures: BuildCompareTestDiffItem[];
@@ -52,20 +52,14 @@ export interface BuildCompareParameterDiffItem {
   targetValue?: string;
 }
 
-export interface BuildCompareParametersSectionViewModel {
-  status: CompareSectionStatus;
-  summaryLabel: string;
-  detail?: string;
+export interface BuildCompareParametersSectionViewModel extends CompareSectionBaseViewModel {
   items: BuildCompareParameterDiffItem[];
   unchangedCount: number;
 }
 
 export type BuildCompareChangesetItem = JenkinsChangesetViewModel;
 
-export interface BuildCompareChangesetsSectionViewModel {
-  status: CompareSectionStatus;
-  summaryLabel: string;
-  detail?: string;
+export interface BuildCompareChangesetsSectionViewModel extends CompareSectionBaseViewModel {
   baselineItems: BuildCompareChangesetItem[];
   targetItems: BuildCompareChangesetItem[];
 }
@@ -82,10 +76,7 @@ export interface BuildCompareStageDiffItem {
   deltaLabel?: string;
 }
 
-export interface BuildCompareStagesSectionViewModel {
-  status: CompareSectionStatus;
-  summaryLabel: string;
-  detail?: string;
+export interface BuildCompareStagesSectionViewModel extends CompareSectionBaseViewModel {
   items: BuildCompareStageDiffItem[];
 }
 
@@ -95,10 +86,7 @@ export interface BuildCompareConsoleSnippetLine {
   highlight: boolean;
 }
 
-export interface BuildCompareConsoleSectionViewModel {
-  status: CompareSectionStatus;
-  summaryLabel: string;
-  detail?: string;
+export interface BuildCompareConsoleSectionViewModel extends CompareSectionBaseViewModel {
   divergenceLineLabel?: string;
   baselineLines: BuildCompareConsoleSnippetLine[];
   targetLines: BuildCompareConsoleSnippetLine[];

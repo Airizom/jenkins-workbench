@@ -1,5 +1,6 @@
 import { collectBuildChangesets } from "../../jenkins/changesets/collectBuildChangesets";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import { EMPTY_TEST_RESULTS_LABEL } from "../shared/TestReportFormatters";
 import type {
   BuildFailureArtifact,
   BuildFailureChangelogItem,
@@ -22,7 +23,7 @@ export function buildBuildFailureInsights(
   return {
     changelogItems: cappedChangelog.items,
     changelogOverflow: cappedChangelog.overflow,
-    testSummaryLabel: testsSummary?.summaryLabel ?? "No test results.",
+    testSummaryLabel: testsSummary?.summaryLabel ?? EMPTY_TEST_RESULTS_LABEL,
     testResultsHint: testsSummary?.hasDetailedResults
       ? "Browse detailed results in the Test Results tab."
       : undefined,

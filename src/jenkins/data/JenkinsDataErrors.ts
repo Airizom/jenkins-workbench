@@ -53,6 +53,19 @@ const toActionError = <T extends JenkinsActionError>(
 export const toBuildActionError = (error: unknown): BuildActionError =>
   toActionError(error, BuildActionError);
 
+export async function callOptionalBuildEndpoint<T>(
+  operation: () => Promise<T>
+): Promise<T | undefined> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+      return undefined;
+    }
+    throw toBuildActionError(error);
+  }
+}
+
 export const toJobManagementActionError = (error: unknown): JobManagementActionError =>
   toActionError(error, JobManagementActionError);
 

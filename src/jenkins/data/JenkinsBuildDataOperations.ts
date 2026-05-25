@@ -14,7 +14,7 @@ import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import { JenkinsRequestError } from "../errors";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type { JenkinsTestReport } from "../types";
-import { toBuildActionError } from "./JenkinsDataErrors";
+import { callOptionalBuildEndpoint, toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 import type {
   BuildParameterPayload,
@@ -217,14 +217,7 @@ export class JenkinsBuildDataOperations {
     nodeId: string
   ): Promise<FlowNodeLogResult | undefined> {
     const client = await this.context.getClient(environment);
-    try {
-      return await client.getFlowNodeLog(buildUrl, nodeId);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        return undefined;
-      }
-      throw toBuildActionError(error);
-    }
+    return callOptionalBuildEndpoint(() => client.getFlowNodeLog(buildUrl, nodeId));
   }
 
   async getFlowNodeDetails(
@@ -233,14 +226,7 @@ export class JenkinsBuildDataOperations {
     nodeId: string
   ): Promise<FlowNodeDetailsResult | undefined> {
     const client = await this.context.getClient(environment);
-    try {
-      return await client.getFlowNodeDetails(buildUrl, nodeId);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        return undefined;
-      }
-      throw toBuildActionError(error);
-    }
+    return callOptionalBuildEndpoint(() => client.getFlowNodeDetails(buildUrl, nodeId));
   }
 
   async getFlowNodeLogHtmlProgressive(
@@ -251,14 +237,9 @@ export class JenkinsBuildDataOperations {
     annotator?: string
   ): Promise<ProgressiveConsoleHtmlResult | undefined> {
     const client = await this.context.getClient(environment);
-    try {
-      return await client.getFlowNodeLogHtmlProgressive(buildUrl, nodeId, start, annotator);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        return undefined;
-      }
-      throw toBuildActionError(error);
-    }
+    return callOptionalBuildEndpoint(() =>
+      client.getFlowNodeLogHtmlProgressive(buildUrl, nodeId, start, annotator)
+    );
   }
 
   async getLastFailedBuild(
@@ -279,14 +260,7 @@ export class JenkinsBuildDataOperations {
     options?: JenkinsTestReportOptions
   ): Promise<JenkinsTestReport | undefined> {
     const client = await this.context.getClient(environment);
-    try {
-      return await client.getTestReport(buildUrl, options);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        return undefined;
-      }
-      throw toBuildActionError(error);
-    }
+    return callOptionalBuildEndpoint(() => client.getTestReport(buildUrl, options));
   }
 
   async triggerBuild(

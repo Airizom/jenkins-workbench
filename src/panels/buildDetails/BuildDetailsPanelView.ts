@@ -1,5 +1,8 @@
 import type * as vscode from "vscode";
-import { assignPanelLoadingHtml, resolvePanelViewAssets } from "../shared/webview/PanelViewHelpers";
+import {
+  type EnvironmentPanelRenderOptions,
+  EnvironmentPanelView
+} from "../shared/webview/PanelViewHelpers";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import { renderBuildDetailsHtml } from "./BuildDetailsRenderer";
 import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
@@ -8,23 +11,11 @@ import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMess
 
 export type { PanelViewAssets as BuildDetailsPanelViewAssets } from "../shared/webview/PanelViewHelpers";
 
-export interface BuildDetailsPanelRenderOptions {
-  nonce: string;
-  panelState?: unknown;
-}
+export type BuildDetailsPanelRenderOptions = EnvironmentPanelRenderOptions;
 
-export class BuildDetailsPanelView {
-  constructor(
-    private readonly panel: vscode.WebviewPanel,
-    private readonly extensionUri: vscode.Uri
-  ) {}
-
-  resolveAssets() {
-    return resolvePanelViewAssets(this.panel.webview, this.extensionUri, "buildDetails");
-  }
-
-  renderLoading(options: BuildDetailsPanelRenderOptions & { styleUris: string[] }): void {
-    assignPanelLoadingHtml(this.panel, "build", options);
+export class BuildDetailsPanelView extends EnvironmentPanelView<BuildDetailsViewModel> {
+  constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    super(panel, extensionUri, "buildDetails", "build", "Build Details", renderBuildDetailsHtml);
   }
 
   renderBuildDetails(
@@ -32,17 +23,7 @@ export class BuildDetailsPanelView {
     assets: NonNullable<ReturnType<BuildDetailsPanelView["resolveAssets"]>>,
     options: BuildDetailsPanelRenderOptions
   ): void {
-    this.panel.webview.html = renderBuildDetailsHtml(model, {
-      cspSource: this.panel.webview.cspSource,
-      nonce: options.nonce,
-      scriptUri: assets.scriptUri,
-      styleUris: assets.styleUris,
-      panelState: options.panelState
-    });
-  }
-
-  setTitle(label?: string): void {
-    this.panel.title = label ? `Build Details - ${label}` : "Build Details";
+    this.renderModel(model, assets, options);
   }
 
   isVisible(): boolean {

@@ -36,6 +36,7 @@ import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
   assignWebviewPanelManifestErrorHtml,
+  createPanelRestoreMessages,
   resolveRestoredPanelEnvironment
 } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -175,14 +176,11 @@ export class BuildDetailsPanel {
       state,
       isValidState: isBuildDetailsPanelState,
       environmentStore: options.environmentStore,
-      messages: {
+      messages: createPanelRestoreMessages({
         title: "Build Details",
-        invalidStateMessage:
-          "This build details view could not be restored. Reopen it from Jenkins Workbench.",
-        missingEnvironmentMessage:
-          "This build details view could not be restored because its Jenkins environment was removed.",
-        hint: "Open the build again from Jenkins Workbench to continue."
-      }
+        viewNoun: "build details view",
+        reopenHint: "Open the build again from Jenkins Workbench to continue."
+      })
     });
     if (!restored.ok) {
       return;

@@ -13,31 +13,12 @@ import {
   RefreshIcon,
   ServerIcon
 } from "../../../../shared/webview/icons";
+import {
+  resolveNodeStatusBadgeClass,
+  resolveNodeStatusIconClass
+} from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeStatusClass } from "../../../shared/NodeDetailsContracts";
-
-const STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string }> = {
-  online: {
-    badge: "border-success-border text-success bg-success-soft",
-    icon: "text-success"
-  },
-  idle: {
-    badge: "border-warning-border text-warning bg-warning-soft",
-    icon: "text-warning"
-  },
-  temporary: {
-    badge: "border-warning-border text-warning bg-warning-soft",
-    icon: "text-warning"
-  },
-  offline: {
-    badge: "border-failure-border text-failure bg-failure-soft",
-    icon: "text-failure"
-  },
-  unknown: {
-    badge: "border-border text-foreground bg-muted",
-    icon: "text-muted-foreground"
-  }
-};
 
 export type NodeAction =
   | { type: "takeNodeOffline"; label: "Take Offline..." }
@@ -87,7 +68,8 @@ export function NodeDetailsHeader({
   onLaunchAgent,
   onOpen
 }: NodeDetailsHeaderProps): JSX.Element {
-  const statusStyle = STATUS_STYLES[statusClass];
+  const statusBadgeClass = resolveNodeStatusBadgeClass(statusClass);
+  const statusIconClass = resolveNodeStatusIconClass(statusClass);
 
   return (
     <header className="sticky-header">
@@ -96,7 +78,7 @@ export function NodeDetailsHeader({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted ${statusStyle.icon}`}
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted ${statusIconClass}`}
             >
               <ServerIcon className="h-3.5 w-3.5" />
             </div>
@@ -105,7 +87,7 @@ export function NodeDetailsHeader({
                 <h1 className="text-sm font-semibold leading-tight truncate">{displayName}</h1>
                 <Badge
                   variant="outline"
-                  className={cn("text-[10px] px-1.5 py-0", statusStyle.badge)}
+                  className={cn("text-[10px] px-1.5 py-0", statusBadgeClass)}
                 >
                   {statusLabel}
                 </Badge>

@@ -1,28 +1,19 @@
 import type * as vscode from "vscode";
-import { assignPanelLoadingHtml, resolvePanelViewAssets } from "../shared/webview/PanelViewHelpers";
+import {
+  type EnvironmentPanelRenderOptions,
+  EnvironmentPanelView
+} from "../shared/webview/PanelViewHelpers";
 import { renderPanelRestoreErrorHtml } from "../shared/webview/WebviewHtml";
 import { renderBuildCompareHtml } from "./BuildCompareRenderer";
 import type { BuildCompareViewModel } from "./shared/BuildCompareContracts";
 
 export type { PanelViewAssets as BuildComparePanelViewAssets } from "../shared/webview/PanelViewHelpers";
 
-export interface BuildComparePanelRenderOptions {
-  nonce: string;
-  panelState?: unknown;
-}
+export type BuildComparePanelRenderOptions = EnvironmentPanelRenderOptions;
 
-export class BuildComparePanelView {
-  constructor(
-    private readonly panel: vscode.WebviewPanel,
-    private readonly extensionUri: vscode.Uri
-  ) {}
-
-  resolveAssets() {
-    return resolvePanelViewAssets(this.panel.webview, this.extensionUri, "buildCompare");
-  }
-
-  renderLoading(options: BuildComparePanelRenderOptions & { styleUris: string[] }): void {
-    assignPanelLoadingHtml(this.panel, "build", options);
+export class BuildComparePanelView extends EnvironmentPanelView<BuildCompareViewModel> {
+  constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    super(panel, extensionUri, "buildCompare", "build", "Build Compare", renderBuildCompareHtml);
   }
 
   renderBuildCompare(
@@ -30,13 +21,7 @@ export class BuildComparePanelView {
     assets: NonNullable<ReturnType<BuildComparePanelView["resolveAssets"]>>,
     options: BuildComparePanelRenderOptions
   ): void {
-    this.panel.webview.html = renderBuildCompareHtml(model, {
-      cspSource: this.panel.webview.cspSource,
-      nonce: options.nonce,
-      scriptUri: assets.scriptUri,
-      styleUris: assets.styleUris,
-      panelState: options.panelState
-    });
+    this.renderModel(model, assets, options);
   }
 
   postMessage(message: unknown): Thenable<boolean> {
@@ -53,9 +38,5 @@ export class BuildComparePanelView {
       styleUris,
       panelState: options.panelState
     });
-  }
-
-  setTitle(label?: string): void {
-    this.panel.title = label ? `Build Compare - ${label}` : "Build Compare";
   }
 }

@@ -1,8 +1,4 @@
 import * as vscode from "vscode";
-import type {
-  EnvironmentScopedRefreshHost,
-  ExtensionRefreshHost
-} from "../extension/ExtensionRefreshHost";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
@@ -23,6 +19,7 @@ import {
   isRefreshNodeDetailsMessage,
   isTakeNodeOfflineMessage
 } from "./nodeDetails/shared/NodeDetailsPanelMessages";
+import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
   PanelLoadTracker,
   attachPanelLifecycle,
@@ -32,7 +29,11 @@ import {
 } from "./shared/PanelRuntimeHelpers";
 import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { resolveRestoredPanelEnvironment } from "./shared/webview/WebviewHtml";
+import {
+  createMissingPanelAssetsMessages,
+  createPanelRestoreMessages,
+  resolveRestoredPanelEnvironment
+} from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
@@ -45,8 +46,7 @@ interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
   nodeUrl: string;
 }
 
-type NodeDetailsRefreshHost = EnvironmentScopedRefreshHost &
-  Pick<ExtensionRefreshHost, "onDidRefreshEnvironment">;
+type NodeDetailsRefreshHost = EnvironmentPanelRefreshHost;
 
 interface NodeDetailsPanelShowOptions {
   dataService: JenkinsDataService;
@@ -152,14 +152,11 @@ export class NodeDetailsPanel {
       state,
       isValidState: isNodeDetailsPanelState,
       environmentStore: options.environmentStore,
-      messages: {
+      messages: createPanelRestoreMessages({
         title: "Node Details",
-        invalidStateMessage:
-          "This node details view could not be restored. Reopen it from Jenkins Workbench.",
-        missingEnvironmentMessage:
-          "This node details view could not be restored because its Jenkins environment was removed.",
-        hint: "Open the node again from Jenkins Workbench to continue."
-      }
+        viewNoun: "node details view",
+        reopenHint: "Open the node again from Jenkins Workbench to continue."
+      })
     });
     if (!restored.ok) {
       return;
@@ -244,10 +241,11 @@ export class NodeDetailsPanel {
         : undefined;
 
     const assets = resolvePanelWebviewAssetsOrError(this.panel, this.extensionUri, "nodeDetails", {
-      title: "Node Details",
-      message:
-        "Node details webview assets are missing. Run the extension build (npm run compile) and try again.",
-      hint: "Open the node again from Jenkins Workbench to continue.",
+      ...createMissingPanelAssetsMessages({
+        title: "Node Details",
+        panelLabel: "Node details",
+        reopenHint: "Open the node again from Jenkins Workbench to continue."
+      }),
       panelState
     });
     if (!assets) {

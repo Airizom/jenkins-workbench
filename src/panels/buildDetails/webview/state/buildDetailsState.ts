@@ -1,3 +1,4 @@
+import { EMPTY_TEST_RESULTS_LABEL } from "../../../shared/TestReportConstants";
 import { readInitialPanelState } from "../../../shared/webview/state/createPanelStateHelpers";
 import type {
   BuildDetailsCoverageStateViewModel,
@@ -33,7 +34,7 @@ export type BuildDetailsAction =
 export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
   changelogOverflow: 0,
-  testSummaryLabel: "No test results.",
+  testSummaryLabel: EMPTY_TEST_RESULTS_LABEL,
   testResultsHint: undefined,
   artifacts: [],
   artifactsOverflow: 0
@@ -44,7 +45,7 @@ export const DEFAULT_TESTS_SUMMARY: BuildTestsSummaryViewModel = {
   failedCount: 0,
   skippedCount: 0,
   passedCount: 0,
-  summaryLabel: "No test results.",
+  summaryLabel: EMPTY_TEST_RESULTS_LABEL,
   hasAnyResults: false,
   hasDetailedResults: false,
   detailsUnavailable: false,

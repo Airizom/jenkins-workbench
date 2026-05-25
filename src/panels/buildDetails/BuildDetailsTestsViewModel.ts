@@ -5,7 +5,10 @@ import type {
 } from "../../jenkins/types";
 import { pickFiniteNumber } from "../../shared/numbers";
 import { normalizeTestCaseBase } from "../shared/TestCaseViewModel";
-import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
+import {
+  EMPTY_TEST_RESULTS_LABEL,
+  formatTestReportCountsSummary
+} from "../shared/TestReportFormatters";
 import type {
   BuildDetailsTestStateViewModel,
   BuildTestCaseViewModel,
@@ -49,7 +52,7 @@ export function buildTestsSummary(
   const logsIncluded = Boolean(options?.logsIncluded && hasDetailedResults);
 
   const label = !hasAnyResults
-    ? "No test results."
+    ? EMPTY_TEST_RESULTS_LABEL
     : formatTestReportCountsSummary({ failed, total, skipped });
 
   return {

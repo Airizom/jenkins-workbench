@@ -49,6 +49,44 @@ export function resolveStatusAccentClass(resultClass: string): string {
   }
 }
 
+type NodeStatusClassName = "online" | "offline" | "idle" | "temporary" | "unknown";
+
+const NODE_STATUS_BADGE_CLASSES: Record<NodeStatusClassName, string> = {
+  online: "border-success-border text-success bg-success-soft",
+  idle: "border-warning-border text-warning bg-warning-soft",
+  temporary: "border-warning-border text-warning bg-warning-soft",
+  offline: "border-failure-border text-failure bg-failure-soft",
+  unknown: "border-border text-foreground bg-muted"
+};
+
+const NODE_STATUS_ICON_CLASSES: Record<NodeStatusClassName, string> = {
+  online: "text-success",
+  idle: "text-warning",
+  temporary: "text-warning",
+  offline: "text-failure",
+  unknown: "text-muted-foreground"
+};
+
+const NODE_STATUS_ACCENT_CLASSES: Record<NodeStatusClassName, string> = {
+  online: "bg-success",
+  idle: "bg-warning",
+  temporary: "bg-warning",
+  offline: "bg-failure",
+  unknown: "bg-border"
+};
+
+export function resolveNodeStatusBadgeClass(statusClass: NodeStatusClassName): string {
+  return NODE_STATUS_BADGE_CLASSES[statusClass];
+}
+
+export function resolveNodeStatusIconClass(statusClass: NodeStatusClassName): string {
+  return NODE_STATUS_ICON_CLASSES[statusClass];
+}
+
+export function resolveNodeStatusAccentClass(statusClass: NodeStatusClassName): string {
+  return NODE_STATUS_ACCENT_CLASSES[statusClass];
+}
+
 export function resolveSeverityBadgeClass(severity: "critical" | "warning" | "normal"): string {
   switch (severity) {
     case "critical":

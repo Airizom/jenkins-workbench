@@ -3,6 +3,7 @@ import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skel
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { toast } from "../../shared/webview/hooks/useToast";
+import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
@@ -16,21 +17,9 @@ import {
   parseDate
 } from "./components/nodeDetails/nodeDetailsUtils";
 import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
-import {
-  type NodeDetailsState,
-  getInitialState,
-  nodeDetailsReducer
-} from "./state/nodeDetailsState";
+import { getInitialState, nodeDetailsReducer } from "./state/nodeDetailsState";
 
 const { useEffect, useMemo, useReducer, useState } = React;
-
-const STATUS_ACCENT: Record<NodeDetailsState["statusClass"], string> = {
-  online: "bg-success",
-  idle: "bg-warning",
-  temporary: "bg-warning",
-  offline: "bg-failure",
-  unknown: "bg-border"
-};
 
 function postNodeDetailsMessage(message: NodeDetailsIncomingMessage): void {
   postVsCodeMessage(message);
@@ -54,7 +43,7 @@ export function NodeDetailsApp(): JSX.Element {
   );
   const isStale = useMemo(() => isStaleUpdatedAt(updatedAtDate, now), [updatedAtDate, now]);
   const showOfflineBanner = state.statusClass === "offline" || state.statusClass === "temporary";
-  const statusAccent = STATUS_ACCENT[state.statusClass];
+  const statusAccent = resolveNodeStatusAccentClass(state.statusClass);
   const nodeAction = useMemo<NodeAction | undefined>(() => {
     if (state.canTakeOffline) {
       return { type: "takeNodeOffline", label: "Take Offline..." };

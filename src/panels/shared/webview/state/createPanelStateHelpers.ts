@@ -24,3 +24,23 @@ export function preserveLoadingOnFullUpdate<TState extends { loading: boolean }>
     loading: currentState.loading
   };
 }
+
+export function createLoadingPanelStateHelpers<
+  TViewModel,
+  TState extends TViewModel & { loading: boolean; hasLoaded: boolean }
+>(options: {
+  fallback: TState;
+  buildInitial: (viewModel: TViewModel) => TState;
+}) {
+  return {
+    getInitialState(): TState {
+      return readInitialPanelState(options.fallback, options.buildInitial);
+    },
+    handleSetLoading(state: TState, value: boolean): TState {
+      return { ...state, loading: value };
+    },
+    handleFullUpdate(state: TState, viewModel: TViewModel): TState {
+      return preserveLoadingOnFullUpdate(state, options.buildInitial(viewModel));
+    }
+  };
+}

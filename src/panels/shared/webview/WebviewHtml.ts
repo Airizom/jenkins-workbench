@@ -68,6 +68,31 @@ export interface PanelRestoreErrorMessages {
   hint: string;
 }
 
+export function createPanelRestoreMessages(options: {
+  title: string;
+  viewNoun: string;
+  reopenHint: string;
+}): PanelRestoreErrorMessages {
+  return {
+    title: options.title,
+    invalidStateMessage: `This ${options.viewNoun} could not be restored. Reopen it from Jenkins Workbench.`,
+    missingEnvironmentMessage: `This ${options.viewNoun} could not be restored because its Jenkins environment was removed.`,
+    hint: options.reopenHint
+  };
+}
+
+export function createMissingPanelAssetsMessages(options: {
+  title: string;
+  panelLabel: string;
+  reopenHint: string;
+}): PanelManifestErrorOptions {
+  return {
+    title: options.title,
+    message: `${options.panelLabel} webview assets are missing. Run the extension build (npm run compile) and try again.`,
+    hint: options.reopenHint
+  };
+}
+
 export type PanelRestoreResult<TState extends SerializedEnvironmentState> =
   | { ok: true; state: TState; environment: JenkinsEnvironmentRef }
   | { ok: false };

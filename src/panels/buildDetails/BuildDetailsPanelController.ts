@@ -3,11 +3,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
-import {
-  LoadTokenTracker,
-  beginLoadingRequest,
-  endLoadingRequest
-} from "../shared/PanelRuntimeHelpers";
+import { LoadTokenTracker, PanelLoadTracker } from "../shared/PanelRuntimeHelpers";
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
 import {
@@ -76,11 +72,11 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private readonly runtime: BuildDetailsPanelRuntime;
   private readonly canOpenTestSource?: BuildDetailsCanOpenTestSource;
   private readonly loadTokenTracker = new LoadTokenTracker();
+  private readonly loadTracker: PanelLoadTracker;
   private backend?: BuildDetailsBackend;
   private pollingController?: BuildDetailsPollingController;
   private pipelineNodeLogManager?: PipelineNodeLogManager;
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
-  private loadingRequests = 0;
 
   constructor(
     panel: vscode.WebviewPanel,
@@ -90,6 +86,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   ) {
     this.canOpenTestSource = getCanOpenTestSource;
     this.view = new BuildDetailsPanelView(panel, extensionUri);
+    this.loadTracker = new PanelLoadTracker((value) => this.view.setLoading(value));
     this.runtime = new BuildDetailsPanelRuntime({
       state: this.state,
       view: this.view,
@@ -108,7 +105,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.pipelineNodeLogManager?.dispose();
     this.pipelineNodeLogManager = undefined;
     this.runtime.dispose();
-    this.loadingRequests = 0;
+    this.loadTracker.resetLoadingRequests();
   }
 
   setPendingInputProvider(provider: BuildDetailsPendingInputProvider | undefined): void {
@@ -206,7 +203,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.pipelineNodeLogManager = undefined;
     this.runtime.dispose();
     this.backend = backend;
-    this.loadingRequests = 0;
+    this.loadTracker.resetLoadingRequests();
     this.state.resetForLoad(environment, buildUrl, createNonce());
 
     const assets = this.view.resolveAssets();
@@ -386,14 +383,10 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   beginLoading(): void {
-    this.loadingRequests = beginLoadingRequest(this.loadingRequests, (value) =>
-      this.view.setLoading(value)
-    );
+    this.loadTracker.beginLoading();
   }
 
   endLoading(): void {
-    this.loadingRequests = endLoadingRequest(this.loadingRequests, (value) =>
-      this.view.setLoading(value)
-    );
+    this.loadTracker.endLoading();
   }
 }

@@ -1,5 +1,6 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
 import { formatCompactDurationFromTotalSeconds } from "../../formatters/DurationFormatters";
+import { EMPTY_TEST_RESULTS_LABEL } from "./TestReportConstants";
 
 export function formatTestDuration(durationSeconds?: number): string | undefined {
   if (durationSeconds === undefined || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
@@ -15,6 +16,8 @@ export function formatTestDuration(durationSeconds?: number): string | undefined
   return formatCompactDurationFromTotalSeconds(Math.round(durationSeconds));
 }
 
+export { EMPTY_TEST_RESULTS_LABEL } from "./TestReportConstants";
+
 export interface TestReportCountSummaryInput {
   failed?: number;
   total?: number;
@@ -28,7 +31,7 @@ export function formatTestReportCountsSummary(input: TestReportCountSummaryInput
   const hasAnyResults = total > 0 || failed > 0 || skipped > 0;
 
   if (!hasAnyResults) {
-    return "No test results.";
+    return EMPTY_TEST_RESULTS_LABEL;
   }
   if (typeof input.failed === "number" && typeof input.total === "number") {
     let label = `Failed ${formatNumber(input.failed)} / ${formatNumber(input.total)}`;
@@ -43,5 +46,5 @@ export function formatTestReportCountsSummary(input: TestReportCountSummaryInput
   if (typeof input.failed === "number") {
     return `Failed ${formatNumber(input.failed)} tests`;
   }
-  return "No test results.";
+  return EMPTY_TEST_RESULTS_LABEL;
 }

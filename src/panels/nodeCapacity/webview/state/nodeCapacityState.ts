@@ -5,8 +5,7 @@ import type {
 import { createEmptyNodeCapacitySummary } from "../../../../shared/nodeCapacity/NodeCapacityDefaults";
 import {
   FALLBACK_UPDATED_AT,
-  preserveLoadingOnFullUpdate,
-  readInitialPanelState
+  createLoadingPanelStateHelpers
 } from "../../../shared/webview/state/createPanelStateHelpers";
 
 export type NodeCapacityState = NodeCapacityViewModel & {
@@ -45,17 +44,20 @@ export function buildInitialState(initialState: NodeCapacityViewModel): NodeCapa
   };
 }
 
+const panelStateHelpers = createLoadingPanelStateHelpers({
+  fallback: FALLBACK_STATE,
+  buildInitial: buildInitialState
+});
+
 export function nodeCapacityReducer(
   state: NodeCapacityState,
   action: NodeCapacityAction
 ): NodeCapacityState {
   switch (action.type) {
     case "setLoading":
-      return { ...state, loading: action.value };
-    case "updateNodeCapacity": {
-      const nextState = buildInitialState(action.payload);
-      return preserveLoadingOnFullUpdate(state, nextState);
-    }
+      return panelStateHelpers.handleSetLoading(state, action.value);
+    case "updateNodeCapacity":
+      return panelStateHelpers.handleFullUpdate(state, action.payload);
     case "updateNodeCapacityNodeExecutors": {
       const executorsByNodeUrl = new Map(
         action.payload.map((entry) => [entry.nodeUrl, entry.executors])
@@ -83,5 +85,5 @@ export function nodeCapacityReducer(
 }
 
 export function getInitialState(): NodeCapacityState {
-  return readInitialPanelState(FALLBACK_STATE, buildInitialState);
+  return panelStateHelpers.getInitialState();
 }

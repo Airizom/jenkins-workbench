@@ -1,8 +1,4 @@
 import * as vscode from "vscode";
-import type {
-  EnvironmentScopedRefreshHost,
-  ExtensionRefreshHost
-} from "../extension/ExtensionRefreshHost";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
@@ -19,6 +15,7 @@ import {
   isOpenNodeDetailsMessage,
   isRefreshNodeCapacityMessage
 } from "./nodeCapacity/shared/NodeCapacityPanelMessages";
+import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
   PanelLoadTracker,
   attachPanelLifecycle,
@@ -28,7 +25,11 @@ import {
 } from "./shared/PanelRuntimeHelpers";
 import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { resolveRestoredPanelEnvironment } from "./shared/webview/WebviewHtml";
+import {
+  createMissingPanelAssetsMessages,
+  createPanelRestoreMessages,
+  resolveRestoredPanelEnvironment
+} from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
@@ -36,8 +37,7 @@ import {
   isSerializedEnvironmentState
 } from "./shared/webview/WebviewPanelState";
 
-type NodeCapacityRefreshHost = EnvironmentScopedRefreshHost &
-  Pick<ExtensionRefreshHost, "onDidRefreshEnvironment">;
+type NodeCapacityRefreshHost = EnvironmentPanelRefreshHost;
 
 const NODE_CAPACITY_VISIBLE_REFRESH_INTERVAL_MS = 10_000;
 
@@ -119,14 +119,11 @@ export class NodeCapacityPanel {
       state,
       isValidState: isSerializedEnvironmentState,
       environmentStore: options.environmentStore,
-      messages: {
+      messages: createPanelRestoreMessages({
         title: "Node Capacity",
-        invalidStateMessage:
-          "This node capacity view could not be restored. Reopen it from Jenkins Workbench.",
-        missingEnvironmentMessage:
-          "This node capacity view could not be restored because its Jenkins environment was removed.",
-        hint: "Open node capacity again from Jenkins Workbench to continue."
-      }
+        viewNoun: "node capacity view",
+        reopenHint: "Open node capacity again from Jenkins Workbench to continue."
+      })
     });
     if (!restored.ok) {
       return;
@@ -206,10 +203,11 @@ export class NodeCapacityPanel {
       : undefined;
 
     const assets = resolvePanelWebviewAssetsOrError(this.panel, this.extensionUri, "nodeCapacity", {
-      title: "Node Capacity",
-      message:
-        "Node capacity webview assets are missing. Run the extension build (npm run compile) and try again.",
-      hint: "Open node capacity again from Jenkins Workbench to continue.",
+      ...createMissingPanelAssetsMessages({
+        title: "Node Capacity",
+        panelLabel: "Node capacity",
+        reopenHint: "Open node capacity again from Jenkins Workbench to continue."
+      }),
       panelState
     });
     if (!assets) {

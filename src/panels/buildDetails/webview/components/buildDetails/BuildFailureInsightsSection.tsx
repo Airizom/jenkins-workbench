@@ -1,3 +1,4 @@
+import { EMPTY_TEST_RESULTS_LABEL } from "../../../../shared/TestReportConstants";
 import type {
   ArtifactAction,
   BuildFailureArtifact,
@@ -21,7 +22,7 @@ export function BuildFailureInsightsSection({
   const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
   const hasChangelog = insights.changelogItems.length > 0 || insights.changelogOverflow > 0;
   const hasTests =
-    Boolean(insights.testSummaryLabel) && insights.testSummaryLabel !== "No test results.";
+    Boolean(insights.testSummaryLabel) && insights.testSummaryLabel !== EMPTY_TEST_RESULTS_LABEL;
   const hasArtifacts = insights.artifacts.length > 0 || insights.artifactsOverflow > 0;
   const hasInsights = hasChangelog || hasTests || hasArtifacts;
 

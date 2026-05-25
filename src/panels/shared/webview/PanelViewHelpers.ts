@@ -13,6 +13,52 @@ export interface PanelViewAssets {
   styleUris: string[];
 }
 
+export interface EnvironmentPanelRenderOptions {
+  nonce: string;
+  panelState?: unknown;
+}
+
+export type EnvironmentPanelLoadingRenderOptions = EnvironmentPanelRenderOptions & {
+  styleUris: string[];
+};
+
+export class EnvironmentPanelView<TModel> {
+  constructor(
+    protected readonly panel: vscode.WebviewPanel,
+    protected readonly extensionUri: vscode.Uri,
+    private readonly entryName: WebviewEntryName,
+    private readonly skeletonVariant: LoadingSkeletonVariant,
+    private readonly defaultTitle: string,
+    private readonly renderPanelHtml: (model: TModel, options: PanelDetailsRenderOptions) => string
+  ) {}
+
+  resolveAssets(): PanelViewAssets | undefined {
+    return resolvePanelViewAssets(this.panel.webview, this.extensionUri, this.entryName);
+  }
+
+  renderLoading(options: EnvironmentPanelLoadingRenderOptions): void {
+    assignPanelLoadingHtml(this.panel, this.skeletonVariant, options);
+  }
+
+  renderModel(
+    model: TModel,
+    assets: PanelViewAssets,
+    options: EnvironmentPanelRenderOptions
+  ): void {
+    this.panel.webview.html = this.renderPanelHtml(model, {
+      cspSource: this.panel.webview.cspSource,
+      nonce: options.nonce,
+      scriptUri: assets.scriptUri,
+      styleUris: assets.styleUris,
+      panelState: options.panelState
+    });
+  }
+
+  setTitle(label?: string): void {
+    this.panel.title = label ? `${this.defaultTitle} - ${label}` : this.defaultTitle;
+  }
+}
+
 export function resolvePanelViewAssets(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,

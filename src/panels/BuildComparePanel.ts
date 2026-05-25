@@ -23,6 +23,7 @@ import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
   assignWebviewPanelManifestErrorHtml,
+  createPanelRestoreMessages,
   resolveRestoredPanelEnvironment
 } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
@@ -115,14 +116,11 @@ export class BuildComparePanel {
       state,
       isValidState: isBuildComparePanelState,
       environmentStore: options.environmentStore,
-      messages: {
+      messages: createPanelRestoreMessages({
         title: BuildComparePanel.PANEL_TITLE,
-        invalidStateMessage:
-          "This build comparison view could not be restored. Reopen it from Jenkins Workbench.",
-        missingEnvironmentMessage:
-          "This build comparison view could not be restored because its Jenkins environment was removed.",
-        hint: "Open the comparison again from Jenkins Workbench to continue."
-      }
+        viewNoun: "build comparison view",
+        reopenHint: "Open the comparison again from Jenkins Workbench to continue."
+      })
     });
     if (!restored.ok) {
       return;

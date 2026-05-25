@@ -1,4 +1,11 @@
 import type * as vscode from "vscode";
+import type {
+  EnvironmentScopedRefreshHost,
+  ExtensionRefreshHost
+} from "../../extension/ExtensionRefreshHost";
+
+export type EnvironmentPanelRefreshHost = EnvironmentScopedRefreshHost &
+  Pick<ExtensionRefreshHost, "onDidRefreshEnvironment">;
 
 export function disposePanelResources(disposables: vscode.Disposable[]): void {
   while (disposables.length > 0) {

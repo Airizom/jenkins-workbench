@@ -1,7 +1,6 @@
 import {
   FALLBACK_UPDATED_AT,
-  preserveLoadingOnFullUpdate,
-  readInitialPanelState
+  createLoadingPanelStateHelpers
 } from "../../../shared/webview/state/createPanelStateHelpers";
 import type {
   NodeDetailsUpdateMessage,
@@ -71,22 +70,25 @@ export function buildInitialState(initialState: NodeDetailsViewModel): NodeDetai
   };
 }
 
+const panelStateHelpers = createLoadingPanelStateHelpers({
+  fallback: FALLBACK_STATE,
+  buildInitial: buildInitialState
+});
+
 export function nodeDetailsReducer(
   state: NodeDetailsState,
   action: NodeDetailsAction
 ): NodeDetailsState {
   switch (action.type) {
     case "setLoading":
-      return { ...state, loading: action.value };
-    case "updateNodeDetails": {
-      const nextState = buildInitialState(action.payload.payload);
-      return preserveLoadingOnFullUpdate(state, nextState);
-    }
+      return panelStateHelpers.handleSetLoading(state, action.value);
+    case "updateNodeDetails":
+      return panelStateHelpers.handleFullUpdate(state, action.payload.payload);
     default:
       return state;
   }
 }
 
 export function getInitialState(): NodeDetailsState {
-  return readInitialPanelState(FALLBACK_STATE, buildInitialState);
+  return panelStateHelpers.getInitialState();
 }
