@@ -1,4 +1,5 @@
 import type { JenkinsStreamResponse } from "../request";
+import { parseContentLength } from "../request/responses";
 import type { JenkinsProgressiveConsoleHtml } from "../types";
 
 export interface JenkinsTextPrefixResult {
@@ -6,15 +7,6 @@ export interface JenkinsTextPrefixResult {
   truncated: boolean;
   bytesRead: number;
   resumeBytes: number;
-}
-
-export function parseHeaderNumber(value: string | string[] | undefined): number | undefined {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (typeof raw !== "string") {
-    return undefined;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 export function parseHeaderInteger(value: string | string[] | undefined): number {
@@ -61,7 +53,7 @@ export async function readTextPrefixFromStream(
   const stream = response.stream as NodeJS.ReadableStream & {
     destroy(error?: Error): void;
   };
-  const contentLength = parseHeaderNumber(response.headers["content-length"]);
+  const contentLength = parseContentLength(response.headers["content-length"]);
   const chunks: Buffer[] = [];
   let receivedBytes = 0;
   let truncated = false;

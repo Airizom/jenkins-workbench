@@ -34,10 +34,10 @@ export function mapPendingInputActions(actions: JenkinsPendingInputAction[]): Pe
       continue;
     }
     const message = (action.message ?? "").trim() || "Input required";
-    const submitter = normalizeString(action.submitter);
-    const proceedText = normalizeString(action.proceedText);
-    const proceedUrl = normalizeString(action.proceedUrl);
-    const abortUrl = normalizeString(action.abortUrl);
+    const submitter = trimToUndefined(action.submitter);
+    const proceedText = trimToUndefined(action.proceedText);
+    const proceedUrl = trimToUndefined(action.proceedUrl);
+    const abortUrl = trimToUndefined(action.abortUrl);
     const parameters = mapPendingInputParameters(action);
     results.push({
       id,
@@ -143,8 +143,4 @@ export function classifyParameterKind(
     return { kind: "password", isSensitive: true, allowsMultiple: false };
   }
   return { kind: "string", isSensitive: false, allowsMultiple: false };
-}
-
-export function normalizeString(value?: string): string | undefined {
-  return trimToUndefined(value);
 }

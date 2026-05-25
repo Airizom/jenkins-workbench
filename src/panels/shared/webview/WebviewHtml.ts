@@ -1,7 +1,10 @@
 import type * as vscode from "vscode";
+import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsEnvironmentStore } from "../../../storage/JenkinsEnvironmentStore";
 import { type LoadingSkeletonVariant, renderLoadingSkeletonHtml } from "./LoadingSkeletonHtml";
 import { type WebviewEntryName, resolveWebviewAssets } from "./WebviewAssets";
 import { createNonce } from "./WebviewNonce";
+import { type SerializedEnvironmentState, resolveEnvironmentRef } from "./WebviewPanelState";
 
 export interface WebviewRenderOptions {
   cspSource: string;
@@ -56,6 +59,54 @@ export interface PanelManifestErrorOptions {
   message: string;
   hint: string;
   panelState?: unknown;
+}
+
+export interface PanelRestoreErrorMessages {
+  title: string;
+  invalidStateMessage: string;
+  missingEnvironmentMessage: string;
+  hint: string;
+}
+
+export type PanelRestoreResult<TState extends SerializedEnvironmentState> =
+  | { ok: true; state: TState; environment: JenkinsEnvironmentRef }
+  | { ok: false };
+
+export async function resolveRestoredPanelEnvironment<
+  TState extends SerializedEnvironmentState
+>(options: {
+  panel: vscode.WebviewPanel;
+  extensionUri: vscode.Uri;
+  entryName: WebviewEntryName;
+  state: unknown;
+  isValidState: (state: unknown) => state is TState;
+  environmentStore: JenkinsEnvironmentStore;
+  messages: PanelRestoreErrorMessages;
+}): Promise<PanelRestoreResult<TState>> {
+  const { panel, extensionUri, entryName, state, isValidState, environmentStore, messages } =
+    options;
+
+  if (!isValidState(state)) {
+    assignWebviewPanelManifestErrorHtml(panel, extensionUri, entryName, {
+      title: messages.title,
+      message: messages.invalidStateMessage,
+      hint: messages.hint
+    });
+    return { ok: false };
+  }
+
+  const environment = await resolveEnvironmentRef(environmentStore, state);
+  if (!environment) {
+    assignWebviewPanelManifestErrorHtml(panel, extensionUri, entryName, {
+      title: messages.title,
+      message: messages.missingEnvironmentMessage,
+      hint: messages.hint,
+      panelState: state
+    });
+    return { ok: false };
+  }
+
+  return { ok: true, state, environment };
 }
 
 export function assignWebviewPanelManifestErrorHtml(

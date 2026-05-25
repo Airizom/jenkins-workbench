@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { trimToUndefined } from "./stringValues";
 
 export function normalizePosixRelativePath(value: string): string | undefined {
   const cleaned = value.replace(/\\/g, "/").trim();
@@ -17,4 +18,17 @@ export function normalizePosixRelativePath(value: string): string | undefined {
     return undefined;
   }
   return segments.join("/");
+}
+
+export function normalizePosixRelativePathInput(value: unknown): string | undefined {
+  const text = trimToUndefined(value);
+  if (!text) {
+    return undefined;
+  }
+  return normalizePosixRelativePath(text);
+}
+
+export function normalizePosixPathForComparison(value: string): string {
+  const normalized = value.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
 }

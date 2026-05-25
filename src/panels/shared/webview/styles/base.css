@@ -481,6 +481,15 @@
   }
 }
 
+@layer components {
+  .sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--header-bg);
+  }
+}
+
 @layer utilities {
   @media (prefers-reduced-motion: reduce) {
     .animate-collapsible-down,

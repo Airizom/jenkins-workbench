@@ -1,6 +1,5 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
-import { trimToUndefined } from "../../shared/stringValues";
 import type { BuildCompareBuildViewModel } from "./shared/BuildCompareContracts";
 
 export function buildBuildViewModel(
@@ -15,8 +14,6 @@ export function buildBuildViewModel(
     ...headerLabels
   };
 }
-
-export const normalizeString = trimToUndefined;
 
 export function buildOccurrenceKey(base: string, occurrence: number): string {
   return `${base}::${occurrence}`;

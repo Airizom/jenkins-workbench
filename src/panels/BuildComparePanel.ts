@@ -21,9 +21,11 @@ import {
 } from "./buildCompare/shared/BuildComparePanelWebviewState";
 import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import {
+  assignWebviewPanelManifestErrorHtml,
+  resolveRestoredPanelEnvironment
+} from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
-import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
 interface BuildComparePanelShowOptions {
   backend: BuildCompareBackend;
@@ -106,30 +108,28 @@ export class BuildComparePanel {
     revived.backend = options.backend;
     revived.getCompareOptions = options.getCompareOptions;
 
-    if (!isBuildComparePanelState(state)) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildCompare", {
+    const restored = await resolveRestoredPanelEnvironment({
+      panel: revived.panel,
+      extensionUri: revived.extensionUri,
+      entryName: "buildCompare",
+      state,
+      isValidState: isBuildComparePanelState,
+      environmentStore: options.environmentStore,
+      messages: {
         title: BuildComparePanel.PANEL_TITLE,
-        message:
+        invalidStateMessage:
           "This build comparison view could not be restored. Reopen it from Jenkins Workbench.",
-        hint: "Open the comparison again from Jenkins Workbench to continue."
-      });
-      return;
-    }
-
-    const environment = await resolveEnvironmentRef(options.environmentStore, state);
-    if (!environment) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildCompare", {
-        title: BuildComparePanel.PANEL_TITLE,
-        message:
+        missingEnvironmentMessage:
           "This build comparison view could not be restored because its Jenkins environment was removed.",
-        hint: "Open the comparison again from Jenkins Workbench to continue.",
-        panelState: state
-      });
+        hint: "Open the comparison again from Jenkins Workbench to continue."
+      }
+    });
+    if (!restored.ok) {
       return;
     }
 
-    revived.environment = environment;
-    revived.serializedState = state;
+    revived.environment = restored.environment;
+    revived.serializedState = restored.state;
     await revived.load({ suppressErrors: true });
   }
 

@@ -1,3 +1,4 @@
+import { parseContentLength } from "../request/responses";
 import type {
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
@@ -10,7 +11,6 @@ import {
   buildProgressiveConsoleHtmlResult,
   parseHeaderBoolean,
   parseHeaderInteger,
-  parseHeaderNumber,
   readTextPrefixFromStream
 } from "./JenkinsConsoleStream";
 
@@ -42,7 +42,7 @@ export class JenkinsBuildConsoleClient {
 
     const url = buildActionUrl(buildUrl, "consoleText");
     const response = await this.context.requestStream(url);
-    const contentLength = parseHeaderNumber(response.headers["content-length"]);
+    const contentLength = parseContentLength(response.headers["content-length"]);
     const prefix = await readTextPrefixFromStream(response, maxBytes);
     return {
       text: prefix.text,

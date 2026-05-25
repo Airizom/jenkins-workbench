@@ -1,5 +1,6 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsTestReport } from "../../jenkins/types";
+import { trimToUndefined } from "../../shared/stringValues";
 import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
 import { forEachKeyedDiff } from "./BuildCompareDiff";
@@ -8,8 +9,7 @@ import {
   buildComparisonErrorDetail,
   buildOccurrenceKey,
   createCompareErrorSection,
-  createCompareUnavailableSection,
-  normalizeString
+  createCompareUnavailableSection
 } from "./BuildCompareSectionShared";
 import type {
   BuildCompareTestDiffItem,
@@ -170,7 +170,7 @@ function buildTestCaseMap(report: JenkinsTestReport): Map<string, NormalizedTest
   const items = new Map<string, NormalizedTestCase>();
   const duplicateCounts = new Map<string, number>();
   for (const suite of report.suites ?? []) {
-    const suiteName = normalizeString(suite.name);
+    const suiteName = trimToUndefined(suite.name);
     for (const testCase of suite.cases ?? []) {
       const normalized = normalizeTestCaseBase(testCase, suiteName);
       if (!normalized) {

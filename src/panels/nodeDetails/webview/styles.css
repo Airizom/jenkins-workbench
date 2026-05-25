@@ -1,11 +1,4 @@
 @layer components {
-  .sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: var(--header-bg);
-  }
-
   .executor-progress-track {
     height: 3px;
     background-color: var(--muted);

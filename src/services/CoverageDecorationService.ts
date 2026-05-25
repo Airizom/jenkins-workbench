@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { getGitApi } from "../git/GitExtensionApi";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsModifiedCoverageFile } from "../jenkins/coverage/JenkinsCoverageTypes";
+import { normalizePosixPathForComparison } from "../shared/posixPaths";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import { buildTestSourceNavigationContext } from "./TestSourceResolver";
 
@@ -391,10 +392,5 @@ function toRepositoryRootKey(uri: vscode.Uri): string {
 }
 
 function normalizeCoveragePath(relativePath: string): string {
-  return normalizedRelativePath(relativePath.replace(/\\/g, "/"));
-}
-
-function normalizedRelativePath(value: string): string {
-  const normalized = value.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-  return process.platform === "win32" ? normalized.toLowerCase() : normalized;
+  return normalizePosixPathForComparison(relativePath);
 }

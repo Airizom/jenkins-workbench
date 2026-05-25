@@ -28,13 +28,12 @@ import {
 } from "./shared/PanelRuntimeHelpers";
 import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import { resolveRestoredPanelEnvironment } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
   createSerializedEnvironmentState,
-  isSerializedEnvironmentState,
-  resolveEnvironmentRef
+  isSerializedEnvironmentState
 } from "./shared/webview/WebviewPanelState";
 
 type NodeCapacityRefreshHost = EnvironmentScopedRefreshHost &
@@ -113,28 +112,27 @@ export class NodeCapacityPanel {
     revived.capacityService = new NodeCapacityService(options.dataService);
     revived.setRefreshHost(options.refreshHost);
 
-    if (!isSerializedEnvironmentState(state)) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeCapacity", {
+    const restored = await resolveRestoredPanelEnvironment({
+      panel: revived.panel,
+      extensionUri: revived.extensionUri,
+      entryName: "nodeCapacity",
+      state,
+      isValidState: isSerializedEnvironmentState,
+      environmentStore: options.environmentStore,
+      messages: {
         title: "Node Capacity",
-        message: "This node capacity view could not be restored. Reopen it from Jenkins Workbench.",
-        hint: "Open node capacity again from Jenkins Workbench to continue."
-      });
-      return;
-    }
-
-    const environment = await resolveEnvironmentRef(options.environmentStore, state);
-    if (!environment) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeCapacity", {
-        title: "Node Capacity",
-        message:
+        invalidStateMessage:
+          "This node capacity view could not be restored. Reopen it from Jenkins Workbench.",
+        missingEnvironmentMessage:
           "This node capacity view could not be restored because its Jenkins environment was removed.",
-        hint: "Open node capacity again from Jenkins Workbench to continue.",
-        panelState: state
-      });
+        hint: "Open node capacity again from Jenkins Workbench to continue."
+      }
+    });
+    if (!restored.ok) {
       return;
     }
 
-    revived.environment = environment;
+    revived.environment = restored.environment;
     await revived.load();
   }
 

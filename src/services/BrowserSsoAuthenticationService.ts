@@ -1,6 +1,7 @@
 import * as crypto from "node:crypto";
 import * as http from "node:http";
 import * as vscode from "vscode";
+import { normalizeUnknownHeaders } from "../jenkins/auth";
 import type { JenkinsAuthConfig } from "../jenkins/types";
 import { escapeHtml } from "../shared/html";
 
@@ -168,7 +169,7 @@ function parseCallbackResult(url: URL): CallbackResult {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("Browser SSO callback headers payload was invalid.");
     }
-    const headers = normalizeHeaders(parsed as Record<string, unknown>);
+    const headers = normalizeUnknownHeaders(parsed as Record<string, unknown>);
     if (Object.keys(headers).length === 0) {
       throw new Error("Browser SSO callback did not provide any headers.");
     }
@@ -199,21 +200,6 @@ function parseCallbackResult(url: URL): CallbackResult {
   }
 
   throw new Error("Browser SSO callback did not include session headers.");
-}
-
-function normalizeHeaders(raw: Record<string, unknown>): Record<string, string> {
-  const headers: Record<string, string> = {};
-  for (const [key, value] of Object.entries(raw)) {
-    if (typeof value !== "string") {
-      continue;
-    }
-    const normalizedKey = key.trim();
-    const normalizedValue = value.trim();
-    if (normalizedKey.length > 0 && normalizedValue.length > 0) {
-      headers[normalizedKey] = normalizedValue;
-    }
-  }
-  return headers;
 }
 
 function parseExpiresAt(value: string | null): number | undefined {

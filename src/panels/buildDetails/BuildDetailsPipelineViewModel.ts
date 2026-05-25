@@ -1,10 +1,11 @@
+import { normalizePipelineStatus } from "../../formatters/BuildStatusFormatters";
 import type {
   PipelineRun,
   PipelineStage,
   PipelineStep
 } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
-import { formatDuration, normalizePipelineStatus } from "./BuildDetailsFormatters";
+import { formatBuildDuration } from "../../shared/build/BuildHeaderLabels";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 import type {
   PipelineLogTargetViewModel,
@@ -46,7 +47,7 @@ function mapPipelineStage(
   const key = stage.key;
   const status = normalizePipelineStatus(stage.status);
   const durationMs = normalizeDurationMillis(stage.durationMillis);
-  const durationLabel = formatDuration(stage.durationMillis);
+  const durationLabel = formatBuildDuration(stage.durationMillis);
   const steps = stage.steps.map((step) => mapPipelineStep(step));
   const stepsFailedOnly = steps.filter((step) => step.isFailed);
   const stepsAll = steps.map((step) => stripFailure(step));
@@ -105,7 +106,7 @@ function createPipelineStageRestartState(
 
 function mapPipelineStep(step: PipelineStep): PipelineStepDraft {
   const status = normalizePipelineStatus(step.status);
-  const durationLabel = formatDuration(step.durationMillis);
+  const durationLabel = formatBuildDuration(step.durationMillis);
   return {
     key: step.key,
     nodeId: step.nodeId,

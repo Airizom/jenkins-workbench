@@ -7,14 +7,14 @@ import {
   toPipelineRun
 } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
+import { trimToUndefined } from "../../shared/stringValues";
 import { unionSortedMapKeys } from "./BuildCompareDiff";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import {
   buildComparisonErrorDetail,
   buildOccurrenceKey,
   createCompareErrorSection,
-  createCompareUnavailableSection,
-  normalizeString
+  createCompareUnavailableSection
 } from "./BuildCompareSectionShared";
 import type {
   BuildCompareStageDiffItem,
@@ -128,7 +128,7 @@ function collectStageEntries(
   target: Map<string, StageEntry>,
   occurrenceCounts: Map<string, number>
 ): void {
-  const name = normalizeString(stage.name) ?? "Stage";
+  const name = trimToUndefined(stage.name) ?? "Stage";
   const path = [...parentPath, name];
   const pathLabel = path.join(" / ");
   const occurrence = occurrenceCounts.get(pathLabel) ?? 0;

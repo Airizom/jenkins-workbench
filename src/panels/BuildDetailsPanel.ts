@@ -34,9 +34,11 @@ import {
 } from "./buildDetails/shared/BuildDetailsPanelWebviewState";
 import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import {
+  assignWebviewPanelManifestErrorHtml,
+  resolveRestoredPanelEnvironment
+} from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
-import { resolveEnvironmentRef } from "./shared/webview/WebviewPanelState";
 
 interface BuildDetailsPanelShowOptions {
   backend: BuildDetailsBackend;
@@ -166,29 +168,33 @@ export class BuildDetailsPanel {
       options.testSourceNavigationUiService
     );
 
-    if (!isBuildDetailsPanelState(state)) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildDetails", {
+    const restored = await resolveRestoredPanelEnvironment({
+      panel: revived.panel,
+      extensionUri: revived.extensionUri,
+      entryName: "buildDetails",
+      state,
+      isValidState: isBuildDetailsPanelState,
+      environmentStore: options.environmentStore,
+      messages: {
         title: "Build Details",
-        message: "This build details view could not be restored. Reopen it from Jenkins Workbench.",
-        hint: "Open the build again from Jenkins Workbench to continue."
-      });
-      return;
-    }
-    revived.serializedState = state;
-
-    const environment = await resolveEnvironmentRef(options.environmentStore, state);
-    if (!environment) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "buildDetails", {
-        title: "Build Details",
-        message:
+        invalidStateMessage:
+          "This build details view could not be restored. Reopen it from Jenkins Workbench.",
+        missingEnvironmentMessage:
           "This build details view could not be restored because its Jenkins environment was removed.",
-        hint: "Open the build again from Jenkins Workbench to continue.",
-        panelState: state
-      });
+        hint: "Open the build again from Jenkins Workbench to continue."
+      }
+    });
+    if (!restored.ok) {
       return;
     }
 
-    await revived.load(options.backend, options.artifactActionHandler, environment, state.buildUrl);
+    revived.serializedState = restored.state;
+    await revived.load(
+      options.backend,
+      options.artifactActionHandler,
+      restored.environment,
+      restored.state.buildUrl
+    );
   }
 
   private constructor(

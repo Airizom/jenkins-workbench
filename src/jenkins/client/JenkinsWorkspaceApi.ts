@@ -1,3 +1,4 @@
+import { normalizePosixRelativePath } from "../../shared/posixPaths";
 import { JenkinsRequestError } from "../errors";
 import type { JenkinsBufferResponse } from "../request";
 import type { JenkinsWorkspaceEntry } from "../types";
@@ -40,7 +41,7 @@ function normalizeWorkspaceFilePath(value: string): string {
 }
 
 function normalizeWorkspaceRequestPath(value: string): string {
-  const normalized = normalizeRelativePath(value);
+  const normalized = normalizePosixRelativePath(value);
   if (!normalized) {
     throw new JenkinsRequestError("Invalid Jenkins workspace relative path.");
   }
@@ -51,7 +52,7 @@ function parseWorkspaceEntries(
   listing: string,
   parentRelativePath?: string
 ): JenkinsWorkspaceEntry[] {
-  const parentPath = normalizeRelativePath(parentRelativePath);
+  const parentPath = normalizePosixRelativePath(parentRelativePath ?? "");
   const entries: JenkinsWorkspaceEntry[] = [];
 
   for (const line of listing.split(/\r?\n/)) {
@@ -97,7 +98,7 @@ function normalizeWorkspaceEntryName(
 
   const isDirectory = normalizedLine.endsWith("/");
   const rawName = isDirectory ? normalizedLine.slice(0, -1) : normalizedLine;
-  const name = normalizeRelativePath(rawName);
+  const name = normalizePosixRelativePath(rawName);
   if (!name || name.includes("/")) {
     return undefined;
   }
@@ -110,26 +111,9 @@ function joinWorkspaceRelativePath(
   childPath: string
 ): string | undefined {
   if (!parentPath) {
-    return normalizeRelativePath(childPath);
+    return normalizePosixRelativePath(childPath);
   }
-  return normalizeRelativePath(`${parentPath}/${childPath}`);
-}
-
-function normalizeRelativePath(value?: string): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const normalized = value.replace(/\\/g, "/").trim().replace(/^\/+/, "").replace(/\/+$/, "");
-  if (!normalized) {
-    return undefined;
-  }
-
-  const segments = normalized.split("/").filter((segment) => segment.length > 0 && segment !== ".");
-  if (segments.length === 0 || segments.some((segment) => segment === "..")) {
-    return undefined;
-  }
-  return segments.join("/");
+  return normalizePosixRelativePath(`${parentPath}/${childPath}`);
 }
 
 function compareWorkspaceEntries(

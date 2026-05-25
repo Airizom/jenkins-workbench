@@ -1,3 +1,4 @@
+import { normalizePosixRelativePathInput } from "../../shared/posixPaths";
 import { trimToUndefined } from "../../shared/stringValues";
 import type { JenkinsClientContext } from "../client/JenkinsClientContext";
 import { JenkinsRequestError } from "../errors";
@@ -146,7 +147,7 @@ function normalizeModifiedCoverageFiles(
       continue;
     }
     const candidate = file as Record<string, unknown>;
-    const path = normalizeRelativePath(candidate.fullyQualifiedFileName);
+    const path = normalizePosixRelativePathInput(candidate.fullyQualifiedFileName);
     const blocks = normalizeModifiedCoverageBlocks(candidate.modifiedLinesBlocks);
     if (!path || blocks.length === 0) {
       continue;
@@ -197,13 +198,6 @@ function normalizeCoverageBlockType(
 
 function normalizeCoverageValue(value: unknown): string | undefined {
   const normalized = trimToUndefined(value);
-  return normalized && normalized.length > 0 ? normalized : undefined;
-}
-
-function normalizeRelativePath(value: unknown): string | undefined {
-  const normalized = trimToUndefined(value)
-    ?.replace(/\\/g, "/")
-    .replace(/^\/+|\/+$/g, "");
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
 

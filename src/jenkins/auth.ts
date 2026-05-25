@@ -240,6 +240,16 @@ export function normalizeHeaders(headers: Record<string, string>): Record<string
   return normalized;
 }
 
+export function normalizeUnknownHeaders(raw: Record<string, unknown>): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === "string") {
+      headers[key] = value;
+    }
+  }
+  return normalizeHeaders(headers);
+}
+
 function stableHeadersSignature(headers: Record<string, string>): string {
   const normalized = normalizeHeaders(headers);
   const entries = Object.entries(normalized).sort(([a], [b]) => a.localeCompare(b));

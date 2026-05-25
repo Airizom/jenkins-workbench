@@ -32,14 +32,13 @@ import {
 } from "./shared/PanelRuntimeHelpers";
 import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
-import { assignWebviewPanelManifestErrorHtml } from "./shared/webview/WebviewHtml";
+import { resolveRestoredPanelEnvironment } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 import {
   type SerializedEnvironmentState,
   createSerializedEnvironmentState,
-  isSerializedEnvironmentState,
-  resolveEnvironmentRef
+  isSerializedEnvironmentState
 } from "./shared/webview/WebviewPanelState";
 
 interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
@@ -146,29 +145,28 @@ export class NodeDetailsPanel {
     revived.nodeQueuedWorkService = new NodeQueuedWorkService(options.dataService);
     revived.setRefreshHost(options.refreshHost);
 
-    if (!isNodeDetailsPanelState(state)) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeDetails", {
+    const restored = await resolveRestoredPanelEnvironment({
+      panel: revived.panel,
+      extensionUri: revived.extensionUri,
+      entryName: "nodeDetails",
+      state,
+      isValidState: isNodeDetailsPanelState,
+      environmentStore: options.environmentStore,
+      messages: {
         title: "Node Details",
-        message: "This node details view could not be restored. Reopen it from Jenkins Workbench.",
-        hint: "Open the node again from Jenkins Workbench to continue."
-      });
-      return;
-    }
-
-    const environment = await resolveEnvironmentRef(options.environmentStore, state);
-    if (!environment) {
-      assignWebviewPanelManifestErrorHtml(revived.panel, revived.extensionUri, "nodeDetails", {
-        title: "Node Details",
-        message:
+        invalidStateMessage:
+          "This node details view could not be restored. Reopen it from Jenkins Workbench.",
+        missingEnvironmentMessage:
           "This node details view could not be restored because its Jenkins environment was removed.",
-        hint: "Open the node again from Jenkins Workbench to continue.",
-        panelState: state
-      });
+        hint: "Open the node again from Jenkins Workbench to continue."
+      }
+    });
+    if (!restored.ok) {
       return;
     }
 
-    revived.environment = environment;
-    revived.nodeUrl = state.nodeUrl;
+    revived.environment = restored.environment;
+    revived.nodeUrl = restored.state.nodeUrl;
     await revived.load();
   }
 

@@ -3,7 +3,11 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
-import { LoadTokenTracker } from "../shared/PanelRuntimeHelpers";
+import {
+  LoadTokenTracker,
+  beginLoadingRequest,
+  endLoadingRequest
+} from "../shared/PanelRuntimeHelpers";
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
 import {
@@ -382,19 +386,14 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   beginLoading(): void {
-    this.loadingRequests += 1;
-    if (this.loadingRequests === 1) {
-      this.view.setLoading(true);
-    }
+    this.loadingRequests = beginLoadingRequest(this.loadingRequests, (value) =>
+      this.view.setLoading(value)
+    );
   }
 
   endLoading(): void {
-    if (this.loadingRequests === 0) {
-      return;
-    }
-    this.loadingRequests -= 1;
-    if (this.loadingRequests === 0) {
-      this.view.setLoading(false);
-    }
+    this.loadingRequests = endLoadingRequest(this.loadingRequests, (value) =>
+      this.view.setLoading(value)
+    );
   }
 }

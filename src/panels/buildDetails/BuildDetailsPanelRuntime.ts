@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
+import { formatBuildResultLabel } from "../../shared/build/BuildHeaderLabels";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
 import type { BuildDetailsBackend } from "./BuildDetailsBackend";
 import { BuildDetailsCompletionPoller } from "./BuildDetailsCompletionPoller";
@@ -10,7 +11,6 @@ import {
 } from "./BuildDetailsConfig";
 import { BuildDetailsCoverageCoordinator } from "./BuildDetailsCoverageCoordinator";
 import { BuildDetailsCoverageDecorationsAdapter } from "./BuildDetailsCoverageDecorationsAdapter";
-import { formatResult } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import type { BuildDetailsPanelView } from "./BuildDetailsPanelView";
 import type { BuildDetailsPollingController } from "./BuildDetailsPollingController";
@@ -240,7 +240,7 @@ export class BuildDetailsPanelRuntime {
       return;
     }
     const title = details.fullDisplayName ?? details.displayName ?? "Build";
-    const resultLabel = formatResult(details);
+    const resultLabel = formatBuildResultLabel(details);
     const action = "Open in Jenkins";
     const selection = await vscode.window.showInformationMessage(
       `${title} finished with status ${resultLabel}.`,
