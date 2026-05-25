@@ -1,5 +1,14 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
-import { formatNodeOfflineReason } from "../../jenkins/NodeFormatters";
+import {
+  buildBaseNodeExecutorViewModels,
+  formatExecutorWorkLabel
+} from "../../jenkins/NodeExecutorFormatters";
+import {
+  formatNodeBusyExecutorRatio,
+  formatNodeIdleLabel,
+  formatNodeOfflineReason,
+  resolveNodeStatusDescriptor
+} from "../../jenkins/NodeFormatters";
 import { collectAssignedLabelNames } from "../../jenkins/labels";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import type {
@@ -7,14 +16,14 @@ import type {
   JenkinsNodeExecutable,
   JenkinsNodeExecutor
 } from "../../jenkins/types";
+import { clampPercent, isFiniteNumber } from "../../shared/numbers";
 import { isPlainRecord } from "../../shared/runtimeGuards";
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
 import type {
   NodeDetailsQueuedWorkViewModel,
   NodeDetailsViewModel,
   NodeExecutorViewModel,
-  NodeMonitorViewModel,
-  NodeStatusClass
+  NodeMonitorViewModel
 } from "./shared/NodeDetailsContracts";
 
 export type {
@@ -38,18 +47,6 @@ export interface NodeDetailsViewModelInput {
 const UNKNOWN_LABEL = "Not available";
 const MONITOR_STRING_KEYS = ["message", "status", "state", "description", "name"] as const;
 const MONITOR_NUMBER_KEYS = ["size", "count", "total"] as const;
-const STATUS_DESCRIPTORS = {
-  unknown: { label: "Unknown", className: "unknown" },
-  temporary: { label: "Temporarily Offline", className: "temporary" },
-  offline: { label: "Offline", className: "offline" },
-  idle: { label: "Idle", className: "idle" },
-  online: { label: "Online", className: "online" }
-} as const satisfies Record<string, NodeStatusDescriptor>;
-
-interface NodeStatusDescriptor {
-  label: string;
-  className: NodeStatusClass;
-}
 
 interface DurationResult {
   label?: string;
@@ -128,7 +125,7 @@ function buildNodeIdentity(
 }
 
 function buildNodeStatus(details?: JenkinsNodeDetails): NodeStatusFields {
-  const status = formatStatus(details);
+  const status = resolveNodeStatusDescriptor(details);
   const capabilities = buildNodeActionCapabilities(details);
 
   return {
@@ -141,7 +138,7 @@ function buildNodeStatus(details?: JenkinsNodeDetails): NodeStatusFields {
 
 function buildNodeOverview(details?: JenkinsNodeDetails): NodeOverviewFields {
   return {
-    idleLabel: formatIdle(details),
+    idleLabel: formatNodeIdleLabel(details, UNKNOWN_LABEL),
     executorsLabel: formatExecutorsSummary(details),
     labels: collectAssignedLabelNames(details?.assignedLabels),
     jnlpAgentLabel: formatBoolean(details?.jnlpAgent),
@@ -163,41 +160,12 @@ function buildNodeRuntimeFields(
   };
 }
 
-function formatStatus(details?: JenkinsNodeDetails): NodeStatusDescriptor {
-  if (!details) {
-    return STATUS_DESCRIPTORS.unknown;
-  }
-  if (details.offline === true) {
-    return details.temporarilyOffline ? STATUS_DESCRIPTORS.temporary : STATUS_DESCRIPTORS.offline;
-  }
-  if (details.idle === true) {
-    return STATUS_DESCRIPTORS.idle;
-  }
-  if (details.offline === false) {
-    return STATUS_DESCRIPTORS.online;
-  }
-  return STATUS_DESCRIPTORS.unknown;
-}
-
-function formatIdle(details?: JenkinsNodeDetails): string {
-  if (!details) {
-    return UNKNOWN_LABEL;
-  }
-  if (details.idle === true) {
-    return "Idle";
-  }
-  if (details.idle === false) {
-    return "Busy";
-  }
-  return UNKNOWN_LABEL;
-}
-
 function formatExecutorsSummary(details?: JenkinsNodeDetails): string {
-  const total = details?.numExecutors;
-  const busy = details?.busyExecutors;
-  if (isFiniteNumber(total) && isFiniteNumber(busy)) {
-    return `Busy ${busy}/${total}`;
+  const ratio = formatNodeBusyExecutorRatio(details ?? {}, { prefix: "Busy " });
+  if (ratio) {
+    return ratio;
   }
+  const total = details?.numExecutors;
   if (isFiniteNumber(total)) {
     return `${total} total`;
   }
@@ -216,55 +184,36 @@ function buildExecutors(
   labelPrefix: string,
   nowMs: number
 ): NodeExecutorViewModel[] {
-  if (!Array.isArray(executors)) {
-    return [];
-  }
-
-  return executors.map((executor, index) => {
-    const fallbackLabel = `${labelPrefix} ${index + 1}`;
-    return buildExecutorViewModel(executor, fallbackLabel, nowMs);
-  });
+  return buildBaseNodeExecutorViewModels(executors, labelPrefix).map((base, index) =>
+    enrichExecutorViewModel(executors?.[index], base, nowMs)
+  );
 }
 
-function buildExecutorViewModel(
-  executor: JenkinsNodeExecutor,
-  fallbackLabel: string,
+function enrichExecutorViewModel(
+  executor: JenkinsNodeExecutor | undefined,
+  base: ReturnType<typeof buildBaseNodeExecutorViewModels>[number],
   nowMs: number
 ): NodeExecutorViewModel {
-  const workItem = executor.currentExecutable ?? executor.currentWorkUnit;
-  const isIdle = resolveExecutorIdle(executor, workItem);
-  const progressPercent = normalizeProgressPercent(executor.progress);
+  const workItem = executor?.currentExecutable ?? executor?.currentWorkUnit;
+  const progressPercent = normalizeProgressPercent(executor?.progress);
   const workDuration = resolveWorkDuration(workItem, nowMs);
 
   return {
-    id: formatExecutorId(executor.number, fallbackLabel),
-    statusLabel: isIdle ? "Idle" : "Busy",
-    isIdle,
+    ...base,
     progressPercent,
     progressLabel: formatProgress(progressPercent),
-    workLabel: formatWorkLabel(workItem),
-    workUrl: trimToUndefined(workItem?.url),
+    workLabel: formatWorkLabel(workItem) ?? base.workLabel,
+    workUrl: trimToUndefined(workItem?.url) ?? base.workUrl,
     workDurationLabel: workDuration.label,
     workDurationMs: workDuration.ms
   };
-}
-
-function formatExecutorId(number: number | undefined, fallbackLabel: string): string {
-  return isFiniteNumber(number) ? `#${number}` : fallbackLabel;
-}
-
-function resolveExecutorIdle(
-  executor: JenkinsNodeExecutor,
-  workItem: JenkinsNodeExecutable | undefined
-): boolean {
-  return !workItem && executor.idle !== false;
 }
 
 function normalizeProgressPercent(progress?: number): number | undefined {
   if (!isFiniteNumber(progress)) {
     return undefined;
   }
-  return Math.max(0, Math.min(100, Math.floor(progress)));
+  return clampPercent(progress);
 }
 
 function formatProgress(progressPercent?: number): string | undefined {
@@ -279,10 +228,7 @@ function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
     return undefined;
   }
 
-  const name =
-    firstNonEmpty(work.fullDisplayName, work.displayName) ??
-    (isFiniteNumber(work.number) ? `#${work.number}` : undefined) ??
-    trimToUndefined(work.url);
+  const name = formatExecutorWorkLabel(work);
   const result = trimToUndefined(work.result);
 
   if (name && result) {
@@ -415,8 +361,4 @@ function resolveNowMs(nowMs: number | undefined, updatedAt: string): number {
   }
   const parsedUpdatedAt = Date.parse(updatedAt);
   return Number.isFinite(parsedUpdatedAt) ? parsedUpdatedAt : Date.now();
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }

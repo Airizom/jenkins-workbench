@@ -28,6 +28,7 @@
     "nodeDetails/webview/**/*.tsx",
     "nodeDetails/shared/**/*.ts",
     "../shared/**/*.ts",
+    "shared/**/*.ts",
     "shared/webview/**/*.ts",
     "shared/webview/**/*.tsx"
   ]

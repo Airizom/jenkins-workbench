@@ -5,7 +5,7 @@ import type {
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
-import { normalizeCoverageStatusClass } from "./CoverageStatusFormatters";
+import { normalizeCoverageStatusClass } from "../shared/TestStatusStyles";
 import type {
   BuildCoverageFileViewModel,
   BuildCoverageQualityGateViewModel,

@@ -5,38 +5,96 @@ import type {
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
-import { formatBuildDetailsHeaderLabels } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import {
-  buildCoverageStateViewModel,
-  buildTestStateViewModel,
-  buildTestsSummary
-} from "./BuildDetailsViewModel";
-import {
-  buildBuildFailureInsights,
-  buildPendingInputsViewModel,
-  buildPipelineStagesViewModel
+  type BuildDetailsSectionsInput,
+  assembleBuildDetailsSections
 } from "./BuildDetailsViewModel";
 import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
-import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
-import type { BuildDetailsUpdateMessage } from "./shared/BuildDetailsPanelMessages";
+import type {
+  BuildDetailsOutgoingMessage,
+  BuildDetailsUpdateMessage
+} from "./shared/BuildDetailsPanelMessages";
+
+export interface BuildDetailsUpdateOptions {
+  testReportFetched?: boolean;
+  testReportLogsIncluded?: boolean;
+  testResultsLoading?: boolean;
+  coverageOverview?: JenkinsCoverageOverview;
+  modifiedCoverageFiles?: JenkinsModifiedCoverageFile[];
+  coverageActionPath?: string;
+  coverageFetched?: boolean;
+  coverageLoading?: boolean;
+  coverageError?: string;
+  coverageEnabled?: boolean;
+  canOpenSource?: (className?: string) => boolean;
+}
+
+function buildSectionsInput(
+  details: JenkinsBuildDetails,
+  testReport: JenkinsTestReport | undefined,
+  options: BuildDetailsUpdateOptions | undefined,
+  pipelineRun: PipelineRun | undefined,
+  pendingInputs: PendingInputAction[] | undefined,
+  pipelineLoading: boolean | undefined,
+  pipelineRestartEnabled: boolean | undefined,
+  pipelineRestartableStages: string[] | undefined,
+  pipelineNodeLog: PipelineNodeLogViewModel | undefined
+): BuildDetailsSectionsInput {
+  return {
+    details,
+    testReport,
+    testReportFetched: options?.testReportFetched,
+    testReportLogsIncluded: options?.testReportLogsIncluded,
+    testResultsLoading: options?.testResultsLoading,
+    coverageOverview: options?.coverageOverview,
+    modifiedCoverageFiles: options?.modifiedCoverageFiles,
+    coverageActionPath: options?.coverageActionPath,
+    coverageFetched: options?.coverageFetched,
+    coverageLoading: options?.coverageLoading,
+    coverageError: options?.coverageError,
+    coverageEnabled: options?.coverageEnabled,
+    pipelineRun,
+    pipelineLoading,
+    pipelineRestartEnabled,
+    pipelineRestartableStages,
+    pipelineNodeLog,
+    pendingInputs,
+    canOpenTestSource: options?.canOpenSource
+  };
+}
+
+function buildSectionsInputFromPanelState(
+  state: BuildDetailsPanelState,
+  options?: Pick<BuildDetailsUpdateOptions, "canOpenSource" | "coverageEnabled">
+): BuildDetailsSectionsInput {
+  return {
+    details: state.currentDetails,
+    testReport: state.currentTestReport,
+    testReportFetched: state.testReportFetched,
+    testReportLogsIncluded: state.testReportLogsIncluded,
+    testResultsLoading: state.testResultsLoading,
+    coverageOverview: state.currentCoverageOverview,
+    modifiedCoverageFiles: state.currentModifiedCoverageFiles,
+    coverageActionPath: state.currentCoverageActionPath,
+    coverageFetched: state.coverageFetched,
+    coverageLoading: state.coverageLoading,
+    coverageError: state.currentCoverageError,
+    coverageEnabled: options?.coverageEnabled,
+    pipelineRun: state.currentPipelineRun,
+    pipelineLoading: state.pipelineLoading,
+    pipelineRestartEnabled: state.pipelineRestartEnabled,
+    pipelineRestartableStages: state.pipelineRestartableStages,
+    pipelineNodeLog: state.pipelineNodeLog,
+    pendingInputs: state.currentPendingInputs,
+    canOpenTestSource: options?.canOpenSource
+  };
+}
 
 export function buildDetailsUpdateMessage(
   details: JenkinsBuildDetails,
   testReport?: JenkinsTestReport,
-  options?: {
-    testReportFetched?: boolean;
-    testReportLogsIncluded?: boolean;
-    testResultsLoading?: boolean;
-    coverageOverview?: JenkinsCoverageOverview;
-    modifiedCoverageFiles?: JenkinsModifiedCoverageFile[];
-    coverageActionPath?: string;
-    coverageFetched?: boolean;
-    coverageLoading?: boolean;
-    coverageError?: string;
-    coverageEnabled?: boolean;
-    canOpenSource?: (className?: string) => boolean;
-  },
+  options?: BuildDetailsUpdateOptions,
   pipelineRun?: PipelineRun,
   pendingInputs?: PendingInputAction[],
   pipelineLoading?: boolean,
@@ -44,100 +102,30 @@ export function buildDetailsUpdateMessage(
   pipelineRestartableStages?: string[],
   pipelineNodeLog?: PipelineNodeLogViewModel
 ): BuildDetailsUpdateMessage {
-  const testsSummary = buildTestsSummary(details, testReport, {
-    testReportFetched: options?.testReportFetched,
-    logsIncluded: options?.testReportLogsIncluded
-  });
   return {
     type: "updateDetails",
-    ...formatBuildDetailsHeaderLabels(details),
-    pipelineStagesLoading: Boolean(pipelineLoading),
-    testState: buildTestStateViewModel(details, testReport, {
-      testReportFetched: options?.testReportFetched,
-      logsIncluded: options?.testReportLogsIncluded,
-      loading: options?.testResultsLoading,
-      canOpenSource: options?.canOpenSource
-    }),
-    coverageState: buildCoverageStateViewModel(details, options?.coverageOverview, {
-      modifiedFiles: options?.modifiedCoverageFiles,
-      actionPath: options?.coverageActionPath,
-      coverageFetched: options?.coverageFetched,
-      loading: options?.coverageLoading,
-      error: options?.coverageError,
-      enabled: options?.coverageEnabled
-    }),
-    insights: buildBuildFailureInsights(details, testsSummary),
-    pipelineStages: buildPipelineStagesViewModel(pipelineRun, {
-      details,
-      restartEnabled: Boolean(pipelineRestartEnabled),
-      restartableStages: pipelineRestartableStages ?? []
-    }),
-    pipelineNodeLog: pipelineNodeLog ?? {
-      text: "",
-      truncated: false,
-      loading: false
-    },
-    pendingInputs: buildPendingInputsViewModel(pendingInputs)
+    ...assembleBuildDetailsSections(
+      buildSectionsInput(
+        details,
+        testReport,
+        options,
+        pipelineRun,
+        pendingInputs,
+        pipelineLoading,
+        pipelineRestartEnabled,
+        pipelineRestartableStages,
+        pipelineNodeLog
+      )
+    )
   };
 }
 
 export function buildUpdateMessageFromState(
   state: BuildDetailsPanelState,
-  options?: { canOpenSource?: (className?: string) => boolean; coverageEnabled?: boolean }
-): BuildDetailsOutgoingMessage | undefined {
-  if (state.currentDetails) {
-    return buildDetailsUpdateMessage(
-      state.currentDetails,
-      state.currentTestReport,
-      {
-        testReportFetched: state.testReportFetched,
-        testReportLogsIncluded: state.testReportLogsIncluded,
-        testResultsLoading: state.testResultsLoading,
-        coverageOverview: state.currentCoverageOverview,
-        modifiedCoverageFiles: state.currentModifiedCoverageFiles,
-        coverageActionPath: state.currentCoverageActionPath,
-        coverageFetched: state.coverageFetched,
-        coverageLoading: state.coverageLoading,
-        coverageError: state.currentCoverageError,
-        coverageEnabled: options?.coverageEnabled,
-        canOpenSource: options?.canOpenSource
-      },
-      state.currentPipelineRun,
-      state.currentPendingInputs,
-      state.pipelineLoading,
-      state.pipelineRestartEnabled,
-      state.pipelineRestartableStages,
-      state.pipelineNodeLog
-    );
-  }
-
+  options?: Pick<BuildDetailsUpdateOptions, "canOpenSource" | "coverageEnabled">
+): BuildDetailsOutgoingMessage {
   return {
     type: "updateDetails",
-    resultLabel: "Unknown",
-    resultClass: "neutral",
-    durationLabel: "Unknown",
-    timestampLabel: "Unknown",
-    culpritsLabel: "Unknown",
-    testState: buildTestStateViewModel(undefined, undefined, {
-      loading: state.testResultsLoading,
-      canOpenSource: options?.canOpenSource
-    }),
-    coverageState: buildCoverageStateViewModel(undefined, state.currentCoverageOverview, {
-      modifiedFiles: state.currentModifiedCoverageFiles,
-      actionPath: state.currentCoverageActionPath,
-      coverageFetched: state.coverageFetched,
-      loading: state.coverageLoading,
-      error: state.currentCoverageError,
-      enabled: options?.coverageEnabled
-    }),
-    insights: buildBuildFailureInsights(undefined),
-    pipelineStages: buildPipelineStagesViewModel(state.currentPipelineRun, {
-      details: state.currentDetails,
-      restartEnabled: state.pipelineRestartEnabled,
-      restartableStages: state.pipelineRestartableStages
-    }),
-    pipelineNodeLog: state.pipelineNodeLog,
-    pendingInputs: buildPendingInputsViewModel(state.currentPendingInputs),
-    pipelineStagesLoading: state.pipelineLoading
+    ...assembleBuildDetailsSections(buildSectionsInputFromPanelState(state, options))
   };
 }

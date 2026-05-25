@@ -33,6 +33,16 @@ export function buildTestCaseKey(
   return `${className ?? ""}::${suiteName ?? ""}::${name}`;
 }
 
+export function buildTestCaseId(
+  className: string | undefined,
+  suiteName: string | undefined,
+  name: string,
+  suiteIndex: number,
+  caseIndex: number
+): string {
+  return `${buildTestCaseKey(className, suiteName, name)}::${suiteIndex}::${caseIndex}`;
+}
+
 export function resolveTestCaseName(
   testCase: JenkinsTestReportCase,
   options?: { fallbackToClassName?: boolean; unnamedLabel?: string }

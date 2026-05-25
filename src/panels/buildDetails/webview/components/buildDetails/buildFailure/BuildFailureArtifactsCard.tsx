@@ -9,6 +9,7 @@ import type {
   ArtifactAction,
   BuildFailureArtifact
 } from "../../../../shared/BuildDetailsContracts";
+import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 import { OverflowText } from "./BuildFailureOverflowText";
 
 export function BuildFailureArtifactsCard({
@@ -21,22 +22,14 @@ export function BuildFailureArtifactsCard({
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
   return (
-    <div className="rounded border border-border p-3 flex flex-col gap-2">
-      <div className="flex items-center gap-1.5">
-        <FileIcon className="h-4 w-4 shrink-0" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Artifacts
-        </span>
-      </div>
+    <BuildFailureInsightCard icon={<FileIcon className="h-4 w-4 shrink-0" />} title="Artifacts">
       {items.length > 0 ? (
         <ArtifactsList items={items} onArtifactAction={onArtifactAction} />
       ) : (
-        <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 text-xs text-muted-foreground">
-          No artifacts available
-        </div>
+        <BuildFailureInsightEmpty>No artifacts available</BuildFailureInsightEmpty>
       )}
       <OverflowText value={overflowCount} />
-    </div>
+    </BuildFailureInsightCard>
   );
 }
 

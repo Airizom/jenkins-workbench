@@ -1,4 +1,5 @@
 import { EMPTY_TEST_RESULTS_LABEL } from "../../../../shared/TestReportConstants";
+import { isAnalysisBuildResult } from "../../../../shared/webview/lib/statusStyles";
 import type {
   ArtifactAction,
   BuildFailureArtifact,
@@ -18,7 +19,7 @@ export function BuildFailureInsightsSection({
   resultClass: string;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
-  const isFailure = resultClass === "failure" || resultClass === "unstable";
+  const isFailure = isAnalysisBuildResult(resultClass);
   const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
   const hasChangelog = insights.changelogItems.length > 0 || insights.changelogOverflow > 0;
   const hasTests =
@@ -38,6 +39,7 @@ export function BuildFailureInsightsSection({
       />
       <BuildFailureTestsSummaryCard
         summaryLabel={insights.testSummaryLabel}
+        hasFailedTests={insights.hasFailedTests}
         hint={insights.testResultsHint}
       />
       <BuildFailureArtifactsCard

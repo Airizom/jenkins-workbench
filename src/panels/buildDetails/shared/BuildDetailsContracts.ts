@@ -1,6 +1,7 @@
 import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/JenkinsChangesetViewModel";
 import { uniqueNonEmptyStrings } from "../../../shared/arrays";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
+import type { NormalizedTestStatus } from "../../shared/TestStatusFormatters";
 
 export type BuildFailureChangelogItem = JenkinsChangesetViewModel;
 
@@ -88,12 +89,13 @@ export interface BuildFailureInsightsViewModel {
   changelogItems: BuildFailureChangelogItem[];
   changelogOverflow: number;
   testSummaryLabel: string;
+  hasFailedTests: boolean;
   testResultsHint?: string;
   artifacts: BuildFailureArtifact[];
   artifactsOverflow: number;
 }
 
-export type TestResultStatus = "passed" | "failed" | "skipped" | "other";
+export type TestResultStatus = NormalizedTestStatus;
 
 export interface BuildTestsSummaryViewModel {
   totalCount: number;

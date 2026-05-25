@@ -1,5 +1,6 @@
 import { collectBuildChangesets } from "../../jenkins/changesets/collectBuildChangesets";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import { capListWithOverflow } from "../../shared/arrays";
 import { EMPTY_TEST_RESULTS_LABEL } from "../shared/TestReportFormatters";
 import type {
   BuildFailureArtifact,
@@ -15,15 +16,16 @@ export function buildBuildFailureInsights(
   testsSummary?: BuildTestsSummaryViewModel
 ): BuildFailureInsightsViewModel {
   const changelogItems = buildChangelog(details);
-  const cappedChangelog = capList(changelogItems, INSIGHTS_LIST_LIMIT);
+  const cappedChangelog = capListWithOverflow(changelogItems, INSIGHTS_LIST_LIMIT);
 
   const artifacts = buildArtifacts(details);
-  const cappedArtifacts = capList(artifacts, INSIGHTS_LIST_LIMIT);
+  const cappedArtifacts = capListWithOverflow(artifacts, INSIGHTS_LIST_LIMIT);
 
   return {
     changelogItems: cappedChangelog.items,
     changelogOverflow: cappedChangelog.overflow,
     testSummaryLabel: testsSummary?.summaryLabel ?? EMPTY_TEST_RESULTS_LABEL,
+    hasFailedTests: (testsSummary?.failedCount ?? 0) > 0,
     testResultsHint: testsSummary?.hasDetailedResults
       ? "Browse detailed results in the Test Results tab."
       : undefined,
@@ -58,14 +60,4 @@ function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {
     items.push(entry);
   }
   return items;
-}
-
-function capList<T>(items: T[], limit: number): { items: T[]; overflow: number } {
-  if (items.length <= limit) {
-    return { items, overflow: 0 };
-  }
-  return {
-    items: items.slice(0, limit),
-    overflow: Math.max(0, items.length - limit)
-  };
 }

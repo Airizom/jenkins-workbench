@@ -36,6 +36,7 @@ export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
   changelogOverflow: 0,
   testSummaryLabel: EMPTY_TEST_RESULTS_LABEL,
+  hasFailedTests: false,
   testResultsHint: undefined,
   artifacts: [],
   artifactsOverflow: 0

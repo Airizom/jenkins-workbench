@@ -1,3 +1,4 @@
+import { NodeStatusBadge } from "../../../../shared/webview/components/NodeStatusBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../shared/webview/components/ui/progress";
@@ -13,10 +14,7 @@ import {
   RefreshIcon,
   ServerIcon
 } from "../../../../shared/webview/icons";
-import {
-  resolveNodeStatusBadgeClass,
-  resolveNodeStatusIconClass
-} from "../../../../shared/webview/lib/statusStyles";
+import { resolveNodeStatusIconClass } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeStatusClass } from "../../../shared/NodeDetailsContracts";
 
@@ -68,7 +66,6 @@ export function NodeDetailsHeader({
   onLaunchAgent,
   onOpen
 }: NodeDetailsHeaderProps): JSX.Element {
-  const statusBadgeClass = resolveNodeStatusBadgeClass(statusClass);
   const statusIconClass = resolveNodeStatusIconClass(statusClass);
 
   return (
@@ -85,12 +82,7 @@ export function NodeDetailsHeader({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-semibold leading-tight truncate">{displayName}</h1>
-                <Badge
-                  variant="outline"
-                  className={cn("text-[10px] px-1.5 py-0", statusBadgeClass)}
-                >
-                  {statusLabel}
-                </Badge>
+                <NodeStatusBadge label={statusLabel} statusClass={statusClass} />
                 {isStale ? (
                   <Badge
                     variant="outline"

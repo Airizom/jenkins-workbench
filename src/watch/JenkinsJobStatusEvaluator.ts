@@ -1,3 +1,7 @@
+import {
+  isRunningJobColor,
+  resolveWatchStatusFromJobColor
+} from "../formatters/JobColorFormatters";
 import type { JenkinsBuildSummary } from "../jenkins/types";
 import type { WatchStatusKind, WatchedJobEntry } from "../storage/JenkinsWatchStore";
 import type { StatusNotifier } from "./StatusNotifier";
@@ -22,11 +26,11 @@ export class JenkinsJobStatusEvaluator {
     lastCompletedBuild: JenkinsBuildSummary | undefined,
     environmentUrl: string
   ): JobStatusEvaluation {
-    const currentStatus = classifyJobStatus(color);
+    const currentStatus = resolveWatchStatusFromJobColor(color);
     const previousStatus = entry.lastStatus;
     const currentCompletedBuildNumber = lastCompletedBuild?.number;
     const previousCompletedBuildNumber = entry.lastCompletedBuildNumber;
-    const currentIsBuilding = isBuildingColor(color);
+    const currentIsBuilding = resolveBuildingFromJobColor(color);
     const previousIsBuilding = entry.lastIsBuilding;
 
     const buildNumberChanged =
@@ -87,47 +91,11 @@ export class JenkinsJobStatusEvaluator {
   }
 }
 
-function classifyJobStatus(color?: string): WatchStatusKind {
-  const normalized = normalizeColor(color);
-  if (!normalized) {
-    return "unknown";
-  }
-
-  if (normalized === "red") {
-    return "failure";
-  }
-
-  if (normalized === "blue" || normalized === "green") {
-    return "success";
-  }
-
-  if (
-    normalized === "yellow" ||
-    normalized === "aborted" ||
-    normalized === "disabled" ||
-    normalized === "grey" ||
-    normalized === "notbuilt"
-  ) {
-    return "other";
-  }
-
-  return "unknown";
-}
-
-function normalizeColor(color?: string): string | undefined {
+function resolveBuildingFromJobColor(color?: string): boolean | undefined {
   if (!color) {
     return undefined;
   }
-
-  return color.toLowerCase().replace(/_anime$/, "");
-}
-
-function isBuildingColor(color?: string): boolean | undefined {
-  if (!color) {
-    return undefined;
-  }
-
-  return color.toLowerCase().endsWith("_anime");
+  return isRunningJobColor(color);
 }
 
 function shouldNotifyFailure(

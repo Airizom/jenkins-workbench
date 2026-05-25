@@ -1,47 +1,29 @@
+import { resolveKnownBuildResult } from "./BuildStatusFormatters";
+import {
+  type JobColorStatus,
+  formatJobColorStatusLabel,
+  resolveJobColorStatus
+} from "./JobColorFormatters";
+import { normalizeStatusToken } from "./StatusTokenUtils";
+
 type CompletionSeverity = "info" | "warning";
-type CompletionStatus = { label: string; severity: CompletionSeverity };
 
-const COMPLETION_STATUSES = {
-  success: { label: "Success", severity: "info" },
-  failure: { label: "Failure", severity: "warning" },
-  unstable: { label: "Unstable", severity: "warning" },
-  aborted: { label: "Aborted", severity: "warning" },
-  notBuilt: { label: "Not built", severity: "info" },
-  disabled: { label: "Disabled", severity: "info" },
-  unknown: { label: "Unknown", severity: "info" }
-} as const;
-
-const RESULT_STATUS_MAP: Record<string, CompletionStatus> = {
-  SUCCESS: COMPLETION_STATUSES.success,
-  FAILURE: COMPLETION_STATUSES.failure,
-  UNSTABLE: COMPLETION_STATUSES.unstable,
-  ABORTED: COMPLETION_STATUSES.aborted,
-  NOT_BUILT: COMPLETION_STATUSES.notBuilt
-};
-
-const COLOR_STATUS_MAP: Record<string, CompletionStatus> = {
-  blue: COMPLETION_STATUSES.success,
-  green: COMPLETION_STATUSES.success,
-  red: COMPLETION_STATUSES.failure,
-  yellow: COMPLETION_STATUSES.unstable,
-  aborted: COMPLETION_STATUSES.aborted,
-  notbuilt: COMPLETION_STATUSES.notBuilt,
-  disabled: COMPLETION_STATUSES.disabled,
-  grey: COMPLETION_STATUSES.disabled
+const JOB_COLOR_SEVERITY: Record<JobColorStatus, CompletionSeverity> = {
+  success: "info",
+  failed: "warning",
+  unstable: "warning",
+  aborted: "warning",
+  notBuilt: "info",
+  disabled: "info",
+  running: "info",
+  unknown: "info"
 };
 
 const normalizeResult = (value: unknown): string | undefined => {
   if (typeof value !== "string") {
     return undefined;
   }
-  return value.toUpperCase();
-};
-
-const normalizeColor = (value: unknown): string | undefined => {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  return value.toLowerCase().replace(/_anime$/, "");
+  return normalizeStatusToken(value);
 };
 
 export function formatCompletionStatus(
@@ -50,16 +32,21 @@ export function formatCompletionStatus(
 ): { label: string; severity: CompletionSeverity } {
   const normalizedResult = normalizeResult(result);
   if (normalizedResult) {
-    const status = RESULT_STATUS_MAP[normalizedResult];
-    if (status) {
-      return status;
+    const knownResult = resolveKnownBuildResult(normalizedResult);
+    if (knownResult) {
+      return knownResult;
     }
   }
 
-  const normalizedColor = normalizeColor(color);
-  if (normalizedColor) {
-    return COLOR_STATUS_MAP[normalizedColor] ?? COMPLETION_STATUSES.unknown;
+  if (typeof color === "string" && color.trim()) {
+    const status = resolveJobColorStatus(color);
+    if (status) {
+      return {
+        label: formatJobColorStatusLabel(status),
+        severity: JOB_COLOR_SEVERITY[status]
+      };
+    }
   }
 
-  return COMPLETION_STATUSES.unknown;
+  return { label: "Unknown", severity: "info" };
 }

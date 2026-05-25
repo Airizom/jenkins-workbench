@@ -4,10 +4,6 @@ export type TestStatusFilter = "all" | "failed" | "skipped" | "passed";
 
 export type EmptyStateIcon = "loading" | "info" | "empty" | "search";
 
-export type SummaryMetricTone = "failed" | "skipped" | "passed" | "neutral";
-
-export type CoverageTone = "success" | "warning" | "failure" | "neutral";
-
 export interface TestResultsView {
   statusFilter: TestStatusFilter;
   query: string;

@@ -1,10 +1,17 @@
 import * as vscode from "vscode";
+import {
+  resolveJobColorCodicon,
+  resolveJobColorStatusBarThemeColorKey
+} from "../formatters/JobColorFormatters";
 import type {
   CurrentBranchJenkinsService,
   CurrentBranchState
 } from "./CurrentBranchJenkinsService";
-import { formatCurrentBranchTooltip, isCurrentBranchBuilding } from "./CurrentBranchPresentation";
-import type { CurrentBranchPullRequestInfo } from "./CurrentBranchTypes";
+import {
+  formatCurrentBranchTooltip,
+  formatPullRequestLabel,
+  isCurrentBranchBuilding
+} from "./CurrentBranchPresentation";
 
 const ACTION_COMMAND = "jenkinsWorkbench.currentBranchActions";
 
@@ -85,48 +92,18 @@ function getStatusBarPresentation(
 }
 
 function iconForMatchedState(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
-  if (state.jobColor?.endsWith("_anime")) {
-    return "$(sync~spin)";
-  }
-
-  switch (state.jobColor?.replace(/_anime$/, "")) {
-    case "blue":
-      return "$(check)";
-    case "yellow":
-      return "$(warning)";
-    case "red":
-      return "$(error)";
-    case "aborted":
-    case "disabled":
-    case "gray":
-    case "grey":
-      return "$(circle-slash)";
-    default:
-      return "$(symbol-misc)";
-  }
+  return `$(${resolveJobColorCodicon(state.jobColor)})`;
 }
 
 function colorForMatchedState(
   state: Extract<CurrentBranchState, { kind: "matched" }>
 ): vscode.ThemeColor | undefined {
-  const color = state.jobColor?.replace(/_anime$/, "");
-  switch (color) {
-    case "red":
-      return new vscode.ThemeColor("statusBarItem.errorForeground");
-    case "yellow":
-      return new vscode.ThemeColor("statusBarItem.warningForeground");
-    case "aborted":
-    case "disabled":
-    case "gray":
-    case "grey":
-      return new vscode.ThemeColor("statusBarItem.inactiveForeground");
-    default:
-      return undefined;
-  }
+  const themeColorKey = resolveJobColorStatusBarThemeColorKey(state.jobColor);
+  return themeColorKey ? new vscode.ThemeColor(themeColorKey) : undefined;
 }
 
 function formatMatchedStatusLabel(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
-  const pullRequestLabel = formatPullRequestStatusLabel(state.pullRequest);
+  const pullRequestLabel = formatPullRequestLabel(state.pullRequest);
   if (state.resolvedTargetKind === "pullRequest" && pullRequestLabel) {
     return pullRequestLabel;
   }
@@ -137,16 +114,10 @@ function formatMatchedStatusLabel(state: Extract<CurrentBranchState, { kind: "ma
 function formatFailedStatusLabel(
   state: Extract<CurrentBranchState, { kind: "requestFailed" }>
 ): string {
-  const pullRequestLabel = formatPullRequestStatusLabel(state.selectedTarget?.pullRequest);
+  const pullRequestLabel = formatPullRequestLabel(state.selectedTarget?.pullRequest);
   if (state.selectedTarget?.kind === "pullRequest" && pullRequestLabel) {
     return pullRequestLabel;
   }
 
   return state.branchName ?? "Current Branch";
-}
-
-function formatPullRequestStatusLabel(
-  pullRequest: CurrentBranchPullRequestInfo | undefined
-): string | undefined {
-  return pullRequest ? `PR #${pullRequest.number}` : undefined;
 }

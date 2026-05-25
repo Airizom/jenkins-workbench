@@ -1,3 +1,5 @@
+import { resolveBuildResultLabel } from "../formatters/BuildStatusFormatters";
+import { isRunningJobColor } from "../formatters/JobColorFormatters";
 import { formatJobColor, formatRelativeTime } from "../tree/formatters";
 import type { CurrentBranchState } from "./CurrentBranchJenkinsService";
 import type { CurrentBranchPullRequestInfo } from "./CurrentBranchTypes";
@@ -58,7 +60,7 @@ export function formatCurrentBranchTooltip(
 export function isCurrentBranchBuilding(
   state: Extract<CurrentBranchState, { kind: "matched" }>
 ): boolean {
-  return state.jobColor?.endsWith("_anime") === true || state.lastBuild?.building === true;
+  return isRunningJobColor(state.jobColor) || state.lastBuild?.building === true;
 }
 
 function formatMatchedTooltip(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
@@ -100,9 +102,8 @@ function formatLastBuildSummary(
     parts.push(`#${build.number}`);
   }
 
-  const resultLabel = build.building ? "Running" : (build.result ?? undefined);
-  if (resultLabel) {
-    parts.push(resultLabel);
+  if (build.building || build.result?.trim()) {
+    parts.push(resolveBuildResultLabel(build.result, build.building));
   }
 
   const timeLabel =
@@ -145,7 +146,7 @@ function formatSelectedTargetLines(
   return lines;
 }
 
-function formatPullRequestLabel(
+export function formatPullRequestLabel(
   pullRequest: CurrentBranchPullRequestInfo | undefined
 ): string | undefined {
   return pullRequest ? `PR #${pullRequest.number}` : undefined;

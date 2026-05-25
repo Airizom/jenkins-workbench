@@ -1,17 +1,21 @@
 import { normalizeWhitespace } from "../stringValues";
 import type { BuildParameterRecord } from "./BuildParameterCollection";
 
+function stringifyParameterObject(value: object): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 export function formatBuildParameterValueForCompare(parameter: BuildParameterRecord): string {
   const value = parameter.value;
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry)).join(", ");
   }
   if (typeof value === "object" && value !== null) {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return String(value);
-    }
+    return stringifyParameterObject(value);
   }
   if (typeof value === "undefined") {
     return "(undefined)";
@@ -38,11 +42,7 @@ export function formatBuildParameterValueForTooltip(value: unknown): string {
       if (value === null) {
         return "null";
       }
-      try {
-        return normalizeWhitespace(JSON.stringify(value));
-      } catch {
-        return "[object]";
-      }
+      return normalizeWhitespace(stringifyParameterObject(value));
     default:
       return "Unknown";
   }

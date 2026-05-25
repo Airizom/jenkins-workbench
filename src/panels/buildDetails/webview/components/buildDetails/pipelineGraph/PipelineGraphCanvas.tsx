@@ -1,5 +1,9 @@
 import * as React from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
+import {
+  resolveBuildResultBorderColor,
+  resolveBuildResultGraphBackground
+} from "../../../../../shared/webview/lib/statusStyles";
 import { getStatusClass } from "../StatusPill";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipelineGraphTypes";
@@ -250,8 +254,8 @@ function PipelineGraphStageNode({
   const branchCount = node.stage.parallelBranches.length;
   const stepCount = node.stage.stepsAll.length;
   const accentWidth = Math.round(28 + node.durationRatio * 72);
-  const borderColor = resolveStatusColor(node.stage.statusClass);
-  const background = resolveNodeBackground(node.stage.statusClass);
+  const borderColor = resolveBuildResultBorderColor(node.stage.statusClass);
+  const background = resolveBuildResultGraphBackground(node.stage.statusClass);
   const strokeWidth = selected ? 2.4 : hovered ? 1.8 : 1.4;
 
   return (
@@ -333,38 +337,6 @@ function createFittedViewport(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function resolveNodeBackground(statusClass?: string): string {
-  switch (statusClass) {
-    case "failure":
-      return "linear-gradient(180deg, color-mix(in srgb, var(--failure-soft) 75%, var(--card)), var(--card))";
-    case "unstable":
-    case "running":
-      return "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))";
-    case "success":
-      return "linear-gradient(180deg, color-mix(in srgb, var(--success-soft) 60%, var(--card)), var(--card))";
-    case "aborted":
-      return "linear-gradient(180deg, color-mix(in srgb, var(--aborted-soft) 70%, var(--card)), var(--card))";
-    default:
-      return "linear-gradient(180deg, color-mix(in srgb, var(--muted-soft) 60%, var(--card)), var(--card))";
-  }
-}
-
-function resolveStatusColor(statusClass?: string): string {
-  switch (statusClass) {
-    case "failure":
-      return "var(--failure-border)";
-    case "unstable":
-    case "running":
-      return "var(--warning-border)";
-    case "success":
-      return "var(--success-border)";
-    case "aborted":
-      return "var(--aborted-border)";
-    default:
-      return "var(--border)";
-  }
 }
 
 function resolveEdgeColor(kind: "sequential" | "parallel" | "join"): string {

@@ -14,7 +14,7 @@ import { buildBuildFailureInsights } from "./BuildDetailsFailureInsightsViewMode
 import { formatBuildDetailsHeaderLabels, truncateConsoleText } from "./BuildDetailsFormatters";
 import { buildPendingInputsViewModel } from "./BuildDetailsPendingInputsViewModel";
 import { buildPipelineStagesViewModel } from "./BuildDetailsPipelineViewModel";
-import { buildTestStateViewModel } from "./BuildDetailsTestsViewModel";
+import { buildTestStateViewModel, buildTestsSummary } from "./BuildDetailsTestsViewModel";
 import type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
 import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "./shared/BuildDetailsErrorHelpers";
@@ -77,25 +77,76 @@ export interface BuildDetailsViewModelInput {
   canOpenTestSource?: (className?: string) => boolean;
 }
 
+const EMPTY_PIPELINE_NODE_LOG: PipelineNodeLogViewModel = {
+  text: "",
+  truncated: false,
+  loading: false
+};
+
+export interface BuildDetailsSectionsInput
+  extends Pick<
+    BuildDetailsViewModelInput,
+    | "details"
+    | "testReport"
+    | "testReportFetched"
+    | "testReportLogsIncluded"
+    | "testResultsLoading"
+    | "coverageOverview"
+    | "modifiedCoverageFiles"
+    | "coverageActionPath"
+    | "coverageFetched"
+    | "coverageLoading"
+    | "coverageError"
+    | "coverageEnabled"
+    | "pipelineRun"
+    | "pipelineLoading"
+    | "pipelineRestartEnabled"
+    | "pipelineRestartableStages"
+    | "pipelineNodeLog"
+    | "pendingInputs"
+    | "canOpenTestSource"
+  > {}
+
+export function assembleBuildDetailsSections(input: BuildDetailsSectionsInput) {
+  const details = input.details;
+  const testsSummary = buildTestsSummary(details, input.testReport, {
+    testReportFetched: input.testReportFetched,
+    logsIncluded: input.testReportLogsIncluded
+  });
+
+  return {
+    ...formatBuildDetailsHeaderLabels(details),
+    pipelineStagesLoading: Boolean(input.pipelineLoading),
+    testState: buildTestStateViewModel(details, input.testReport, {
+      testReportFetched: input.testReportFetched,
+      logsIncluded: input.testReportLogsIncluded,
+      loading: input.testResultsLoading,
+      canOpenSource: input.canOpenTestSource
+    }),
+    coverageState: buildCoverageStateViewModel(details, input.coverageOverview, {
+      modifiedFiles: input.modifiedCoverageFiles,
+      actionPath: input.coverageActionPath,
+      coverageFetched: input.coverageFetched,
+      loading: input.coverageLoading,
+      error: input.coverageError,
+      enabled: input.coverageEnabled
+    }),
+    insights: buildBuildFailureInsights(details, testsSummary),
+    pipelineStages: buildPipelineStagesViewModel(input.pipelineRun, {
+      details,
+      restartEnabled: Boolean(input.pipelineRestartEnabled),
+      restartableStages: input.pipelineRestartableStages ?? []
+    }),
+    pipelineNodeLog: input.pipelineNodeLog ?? EMPTY_PIPELINE_NODE_LOG,
+    pendingInputs: buildPendingInputsViewModel(input.pendingInputs)
+  };
+}
+
 export function buildBuildDetailsViewModel(
   input: BuildDetailsViewModelInput
 ): BuildDetailsViewModel {
   const details = input.details;
   const buildUrl = details?.url ?? input.buildUrl;
-  const testState = buildTestStateViewModel(details, input.testReport, {
-    testReportFetched: input.testReportFetched,
-    logsIncluded: input.testReportLogsIncluded,
-    loading: input.testResultsLoading,
-    canOpenSource: input.canOpenTestSource
-  });
-  const coverageState = buildCoverageStateViewModel(details, input.coverageOverview, {
-    modifiedFiles: input.modifiedCoverageFiles,
-    actionPath: input.coverageActionPath,
-    coverageFetched: input.coverageFetched,
-    loading: input.coverageLoading,
-    error: input.coverageError,
-    enabled: input.coverageEnabled
-  });
   const truncated = truncateConsoleText(input.consoleTextResult?.text ?? "", input.maxConsoleChars);
   const consoleTruncated =
     Boolean(input.consoleHtmlResult?.truncated) ||
@@ -104,27 +155,12 @@ export function buildBuildDetailsViewModel(
   const { consoleError: parsedConsoleError, displayErrors: nonConsoleErrors } =
     splitBuildDetailsErrors(input.errors);
   const consoleError = input.consoleError ?? parsedConsoleError;
-  const headerLabels = formatBuildDetailsHeaderLabels(details);
+  const sections = assembleBuildDetailsSections(input);
 
   return {
     displayName: details?.fullDisplayName ?? details?.displayName ?? "Build Details",
     buildUrl,
-    ...headerLabels,
-    pipelineStagesLoading: Boolean(input.pipelineLoading),
-    pipelineStages: buildPipelineStagesViewModel(input.pipelineRun, {
-      details,
-      restartEnabled: Boolean(input.pipelineRestartEnabled),
-      restartableStages: input.pipelineRestartableStages ?? []
-    }),
-    pipelineNodeLog: input.pipelineNodeLog ?? {
-      text: "",
-      truncated: false,
-      loading: false
-    },
-    testState,
-    coverageState,
-    insights: buildBuildFailureInsights(details, testState.summary),
-    pendingInputs: buildPendingInputsViewModel(input.pendingInputs),
+    ...sections,
     consoleText: truncated.text,
     consoleHtml: input.consoleHtmlResult?.html,
     consoleTruncated,

@@ -4,11 +4,16 @@ import type {
   JenkinsTestSummaryAction
 } from "../../jenkins/types";
 import { pickFiniteNumber } from "../../shared/numbers";
-import { forEachNormalizedTestCase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
+import {
+  buildTestCaseId,
+  forEachNormalizedTestCase,
+  normalizeTestCaseBase
+} from "../shared/TestCaseViewModel";
 import {
   EMPTY_TEST_RESULTS_LABEL,
   formatTestReportCountsSummary
 } from "../shared/TestReportFormatters";
+import { getTestStatusSortRank } from "../shared/TestStatusFormatters";
 import type {
   BuildDetailsTestStateViewModel,
   BuildTestCaseViewModel,
@@ -128,8 +133,8 @@ export function buildTestResultsViewModel(
     }
     items.push({
       id: buildTestCaseId(
-        normalized.suiteName,
         normalized.className,
+        normalized.suiteName,
         normalized.name,
         suiteIndex,
         caseIndex
@@ -162,16 +167,6 @@ export function buildEmptyTestResultsViewModel(loading = false): BuildTestResult
   };
 }
 
-function buildTestCaseId(
-  suiteName: string | undefined,
-  className: string | undefined,
-  name: string,
-  suiteIndex: number,
-  caseIndex: number
-): string {
-  return [suiteName ?? "", className ?? "", name, String(suiteIndex), String(caseIndex)].join("::");
-}
-
 function compareTestCases(left: BuildTestCaseViewModel, right: BuildTestCaseViewModel): number {
   const statusRank = getTestStatusSortRank(left.status) - getTestStatusSortRank(right.status);
   if (statusRank !== 0) {
@@ -186,19 +181,6 @@ function compareTestCases(left: BuildTestCaseViewModel, right: BuildTestCaseView
     return classRank;
   }
   return left.name.localeCompare(right.name);
-}
-
-function getTestStatusSortRank(status: BuildTestCaseViewModel["status"]): number {
-  switch (status) {
-    case "failed":
-      return 0;
-    case "skipped":
-      return 1;
-    case "passed":
-      return 2;
-    default:
-      return 3;
-  }
 }
 
 function normalizeTestText(value?: string, allowTruncation = false): string | undefined {

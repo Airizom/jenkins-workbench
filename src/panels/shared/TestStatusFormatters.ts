@@ -1,7 +1,14 @@
+import { normalizeStatusToken } from "../../formatters/StatusTokenUtils";
+import type { StatusVisualTone } from "./TestStatusStyles";
+
 export type NormalizedTestStatus = "passed" | "failed" | "skipped" | "other";
 
+export function testStatusToVisualTone(status: NormalizedTestStatus): StatusVisualTone {
+  return status === "other" ? "neutral" : status;
+}
+
 export function normalizeTestStatus(status?: string): NormalizedTestStatus {
-  const normalized = status?.trim().toUpperCase();
+  const normalized = normalizeStatusToken(status);
   if (!normalized) {
     return "other";
   }
@@ -17,16 +24,16 @@ export function normalizeTestStatus(status?: string): NormalizedTestStatus {
   return "other";
 }
 
-export function resolveTestStatusBadgeClass(status: NormalizedTestStatus): string {
+export function getTestStatusSortRank(status: NormalizedTestStatus): number {
   switch (status) {
     case "failed":
-      return "border-failure-border-subtle text-failure";
-    case "passed":
-      return "border-success-border text-success";
+      return 0;
     case "skipped":
-      return "border-warning-border text-warning";
+      return 1;
+    case "passed":
+      return 2;
     default:
-      return "border-border text-muted-foreground";
+      return 3;
   }
 }
 

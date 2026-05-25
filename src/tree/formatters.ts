@@ -1,20 +1,26 @@
 import * as vscode from "vscode";
-import { resolveBuildResultLabel } from "../formatters/BuildStatusFormatters";
+import {
+  type BuildResultClass,
+  resolveBuildResultClass,
+  resolveBuildResultLabel
+} from "../formatters/BuildStatusFormatters";
 import { formatDurationMs, formatQueueDuration } from "../formatters/DurationFormatters";
+import {
+  type JobColorStatus,
+  formatJobColorStatusLabel,
+  isJobColorDisabled,
+  resolveJobColorIconId,
+  resolveJobColorStatus
+} from "../formatters/JobColorFormatters";
 import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
+import { normalizeStatusToken } from "../formatters/StatusTokenUtils";
 import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
+import { formatNodeTreeDescription } from "../jenkins/NodeFormatters";
 import { parseJobUrl } from "../jenkins/urls";
+import { clampPercent } from "../shared/numbers";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 
-type NormalizedStatus =
-  | "success"
-  | "failed"
-  | "unstable"
-  | "aborted"
-  | "notBuilt"
-  | "disabled"
-  | "running"
-  | "unknown";
+type NormalizedStatus = JobColorStatus;
 
 const STATUS_THEME_COLORS: Record<NormalizedStatus, vscode.ThemeColor> = {
   success: new vscode.ThemeColor("charts.green"),
@@ -32,25 +38,7 @@ export function formatJobColor(color?: string): string | undefined {
   if (!status) {
     return undefined;
   }
-
-  switch (status) {
-    case "success":
-      return "Success";
-    case "failed":
-      return "Failed";
-    case "unstable":
-      return "Unstable";
-    case "aborted":
-      return "Aborted";
-    case "notBuilt":
-      return "Not built";
-    case "disabled":
-      return "Disabled";
-    case "running":
-      return "Running";
-    default:
-      return undefined;
-  }
+  return formatJobColorStatusLabel(status);
 }
 
 export function formatBuildStatus(build: JenkinsBuild): string {
@@ -66,7 +54,7 @@ export function formatBuildDescription(build: JenkinsBuild, awaitingInput = fals
 
     if (Number.isFinite(elapsedMs) && typeof estimatedMs === "number" && estimatedMs > 0) {
       const progressPercentRaw = Math.floor(((elapsedMs as number) / estimatedMs) * 100);
-      const progressPercent = Math.max(0, Math.min(100, progressPercentRaw));
+      const progressPercent = clampPercent(progressPercentRaw);
       const progressBar = formatProgressBar(progressPercent, 10);
       const base = `Running ${progressPercent}% ${progressBar}`;
       return awaitingInput ? `${base} • Awaiting input` : base;
@@ -87,17 +75,7 @@ export function formatRelativeTime(timestampMs: number): string | undefined {
 }
 
 export function formatNodeDescription(node: JenkinsNode): string {
-  if (node.offline) {
-    return node.temporarilyOffline ? "Temporarily offline" : "Offline";
-  }
-
-  const totalExecutors = node.numExecutors;
-  const busyExecutors = node.busyExecutors;
-  if (Number.isFinite(totalExecutors) && Number.isFinite(busyExecutors)) {
-    return `${busyExecutors}/${totalExecutors} busy`;
-  }
-
-  return "Online";
+  return formatNodeTreeDescription(node);
 }
 
 export function buildIcon(build: JenkinsBuild, awaitingInput = false): vscode.ThemeIcon {
@@ -191,91 +169,41 @@ export function normalizeQueueReason(reason?: string): string | undefined {
 }
 
 function resolveBuildStatus(build: JenkinsBuild): NormalizedStatus {
-  if (build.building) {
-    return "running";
-  }
+  return mapBuildResultClassToTreeStatus(
+    resolveBuildResultClass(build.result, build.building),
+    build.result
+  );
+}
 
-  switch (build.result) {
-    case "SUCCESS":
+function mapBuildResultClassToTreeStatus(
+  resultClass: BuildResultClass,
+  result?: string
+): NormalizedStatus {
+  switch (resultClass) {
+    case "success":
       return "success";
-    case "FAILURE":
+    case "failure":
       return "failed";
-    case "UNSTABLE":
+    case "unstable":
       return "unstable";
-    case "ABORTED":
+    case "aborted":
       return "aborted";
-    case "NOT_BUILT":
-      return "notBuilt";
-    default:
-      return "unknown";
+    case "running":
+      return "running";
+    case "neutral": {
+      return normalizeStatusToken(result) === "NOT_BUILT" ? "notBuilt" : "unknown";
+    }
   }
 }
 
 function buildIconId(status: NormalizedStatus): string {
-  switch (status) {
-    case "success":
-      return "check";
-    case "failed":
-      return "error";
-    case "unstable":
-      return "warning";
-    case "aborted":
-      return "circle-slash";
-    case "notBuilt":
-      return "circle-outline";
-    default:
-      return "symbol-misc";
-  }
+  return resolveJobColorIconId(status);
 }
 
-function getBaseJobColor(color: string): string {
-  return color.endsWith("_anime") ? color.slice(0, -"_anime".length) : color;
-}
-
-export function isJobColorDisabled(color?: string): boolean {
-  if (!color) {
-    return false;
-  }
-  const baseColor = getBaseJobColor(color);
-  return baseColor === "disabled" || baseColor === "grey" || baseColor === "gray";
-}
+export { isJobColorDisabled };
 
 export function resolveJobStatus(color?: string): NormalizedStatus | undefined {
-  if (!color) {
-    return undefined;
-  }
-
-  const isRunning = color.endsWith("_anime");
-  const baseColor = getBaseJobColor(color);
-
-  let status: NormalizedStatus;
-  switch (baseColor) {
-    case "blue":
-      status = "success";
-      break;
-    case "red":
-      status = "failed";
-      break;
-    case "yellow":
-      status = "unstable";
-      break;
-    case "aborted":
-      status = "aborted";
-      break;
-    case "notbuilt":
-      status = "notBuilt";
-      break;
-    case "disabled":
-    case "grey":
-    case "gray":
-      status = "disabled";
-      break;
-    default:
-      status = "unknown";
-      break;
-  }
-
-  return isRunning ? "running" : status;
+  return resolveJobColorStatus(color);
 }
 
 function formatDurationLabel(durationMs?: number): string | undefined {
@@ -286,7 +214,7 @@ function formatDurationLabel(durationMs?: number): string | undefined {
 }
 
 function formatProgressBar(percent: number, width: number): string {
-  const clamped = Math.max(0, Math.min(100, percent));
+  const clamped = clampPercent(percent);
   const filled = Math.round((clamped / 100) * width);
   const empty = Math.max(0, width - filled);
   const filledBar = "#".repeat(filled);

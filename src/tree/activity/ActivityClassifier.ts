@@ -1,3 +1,4 @@
+import { isRunningJobColor, resolveJobColorStatus } from "../../formatters/JobColorFormatters";
 import type { JobSearchEntry } from "../../jenkins/JenkinsDataService";
 import type { ActivityGroupKind } from "../ActivityTypes";
 
@@ -13,14 +14,12 @@ export class ActivityClassifier {
       return undefined;
     }
 
-    const normalized = color.toLowerCase();
-    const isRunning = normalized.endsWith("_anime");
-    const separatorIndex = normalized.indexOf("_");
-    const base = separatorIndex === -1 ? normalized : normalized.slice(0, separatorIndex);
-    if (base === "red") {
+    const isRunning = isRunningJobColor(color);
+    const status = resolveJobColorStatus(color);
+    if (status === "failed") {
       return { group: "failing", isRunning };
     }
-    if (base === "yellow") {
+    if (status === "unstable") {
       return { group: "unstable", isRunning };
     }
     if (isRunning) {
@@ -31,5 +30,5 @@ export class ActivityClassifier {
 }
 
 export function isRunningActivityColor(color?: string): boolean {
-  return Boolean(color?.toLowerCase().endsWith("_anime"));
+  return isRunningJobColor(color);
 }

@@ -1,3 +1,4 @@
+import { isRunningJobColor } from "../formatters/JobColorFormatters";
 import type {
   JenkinsJobInfo,
   JenkinsNodeInfo,
@@ -131,7 +132,7 @@ function buildJobsSummary(jobs: JenkinsJobInfo[]): JobsFolderSummary {
     } else {
       summary.jobs += 1;
     }
-    if (!isFolder && job.color?.endsWith("_anime")) {
+    if (!isFolder && isRunningJobColor(job.color)) {
       summary.running += 1;
     }
     if (isJobColorDisabled(job.color)) {

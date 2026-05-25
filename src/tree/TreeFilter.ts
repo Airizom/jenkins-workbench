@@ -1,3 +1,4 @@
+import { isFailingJobColor, isRunningJobColor } from "../formatters/JobColorFormatters";
 import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsJobInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
@@ -56,11 +57,11 @@ export class JenkinsTreeFilter {
         return true;
       }
 
-      if (jobFilterMode === "failing" && !this.isFailing(job.color)) {
+      if (jobFilterMode === "failing" && !isFailingJobColor(job.color)) {
         return false;
       }
 
-      if (jobFilterMode === "running" && !this.isRunning(job.color)) {
+      if (jobFilterMode === "running" && !isRunningJobColor(job.color)) {
         return false;
       }
 
@@ -70,22 +71,5 @@ export class JenkinsTreeFilter {
 
       return true;
     });
-  }
-
-  private isFailing(color?: string): boolean {
-    if (!color) {
-      return false;
-    }
-    const normalized = color.toLowerCase();
-    const separatorIndex = normalized.indexOf("_");
-    const base = separatorIndex >= 0 ? normalized.slice(0, separatorIndex) : normalized;
-    return base === "red";
-  }
-
-  private isRunning(color?: string): boolean {
-    if (!color) {
-      return false;
-    }
-    return color.toLowerCase().endsWith("_anime");
   }
 }

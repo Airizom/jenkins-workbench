@@ -5,6 +5,7 @@ import {
   TabsTrigger
 } from "../../../../shared/webview/components/ui/tabs";
 import { CheckCircleIcon } from "../../../../shared/webview/icons";
+import { isAnalysisBuildResult } from "../../../../shared/webview/lib/statusStyles";
 import type {
   ArtifactAction,
   BuildDetailsCoverageStateViewModel,
@@ -151,7 +152,7 @@ export function BuildDetailsTabs({
           </TabsTrigger>
         ) : null}
         <TabsTrigger value="insights" className="text-xs">
-          {resultClass === "failure" || resultClass === "unstable" ? "Analysis" : "Summary"}
+          {isAnalysisBuildResult(resultClass) ? "Analysis" : "Summary"}
         </TabsTrigger>
       </TabsList>
 

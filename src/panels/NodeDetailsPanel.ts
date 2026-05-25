@@ -19,6 +19,10 @@ import {
   isRefreshNodeDetailsMessage,
   isTakeNodeOfflineMessage
 } from "./nodeDetails/shared/NodeDetailsPanelMessages";
+import {
+  createNodeDetailsPanelState,
+  isNodeDetailsPanelState
+} from "./nodeDetails/shared/NodeDetailsPanelWebviewState";
 import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
   PanelLoadTracker,
@@ -36,15 +40,6 @@ import {
 } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
-import {
-  type SerializedEnvironmentState,
-  createSerializedEnvironmentState,
-  isSerializedEnvironmentState
-} from "./shared/webview/WebviewPanelState";
-
-interface NodeDetailsPanelSerializedState extends SerializedEnvironmentState {
-  nodeUrl: string;
-}
 
 type NodeDetailsRefreshHost = EnvironmentPanelRefreshHost;
 
@@ -62,24 +57,6 @@ interface NodeDetailsPanelReviveOptions {
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
   refreshHost?: NodeDetailsRefreshHost;
-}
-
-function isNodeDetailsPanelState(value: unknown): value is NodeDetailsPanelSerializedState {
-  if (!isSerializedEnvironmentState(value)) {
-    return false;
-  }
-  const record = value as { nodeUrl?: unknown };
-  return typeof record.nodeUrl === "string" && record.nodeUrl.length > 0;
-}
-
-function createNodeDetailsPanelState(
-  environment: JenkinsEnvironmentRef,
-  nodeUrl: string
-): NodeDetailsPanelSerializedState {
-  return {
-    ...createSerializedEnvironmentState(environment),
-    nodeUrl
-  };
 }
 
 export class NodeDetailsPanel {

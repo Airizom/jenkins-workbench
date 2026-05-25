@@ -1,15 +1,12 @@
+import type { NodeStatusClass } from "../../../jenkins/NodeFormatters";
+import type { NodeCapacityExecutorViewModel } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import type { NodeQueuedWorkViewModel } from "../../../shared/queueWork/QueueWorkContracts";
 
-export type NodeStatusClass = "online" | "offline" | "idle" | "temporary" | "unknown";
+export type { NodeStatusClass };
 
-export interface NodeExecutorViewModel {
-  id: string;
-  statusLabel: string;
-  isIdle: boolean;
+export interface NodeExecutorViewModel extends NodeCapacityExecutorViewModel {
   progressPercent?: number;
   progressLabel?: string;
-  workLabel?: string;
-  workUrl?: string;
   workDurationLabel?: string;
   workDurationMs?: number;
 }

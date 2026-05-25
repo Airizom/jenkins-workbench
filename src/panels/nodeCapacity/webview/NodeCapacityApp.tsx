@@ -7,6 +7,7 @@ import type {
 import type { QueueWorkItemViewModel } from "../../../shared/queueWork/QueueWorkContracts";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
+import { SeverityBadge } from "../../shared/webview/components/SeverityBadge";
 import { QueueWorkItemRow } from "../../shared/webview/components/queueWork/QueueWorkItemRow";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
@@ -15,7 +16,6 @@ import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { ExternalLinkIcon, RefreshIcon, ServerIcon } from "../../shared/webview/icons";
-import { resolveSeverityBadgeClass } from "../../shared/webview/lib/statusStyles";
 import type {
   LoadNodeCapacityExecutorsMessage,
   NodeCapacityIncomingMessage,
@@ -210,11 +210,7 @@ function PoolPanel({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-sm font-semibold">{pool.label}</h2>
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[11px] ${resolveSeverityBadgeClass(pool.severity)}`}
-              >
-                {pool.statusLabel}
-              </span>
+              <SeverityBadge severity={pool.severity} label={pool.statusLabel} />
               {pool.kind === "any" ? <Badge variant="outline">unassigned</Badge> : null}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">

@@ -1,8 +1,9 @@
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
 import type { SerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
 import {
-  createSerializedEnvironmentState,
-  isSerializedEnvironmentState
+  createEnvironmentScopedPanelState,
+  isNonEmptyString,
+  validateEnvironmentScopedPanelState
 } from "../../shared/webview/WebviewPanelState";
 import {
   type PipelineLogTargetViewModel,
@@ -27,29 +28,25 @@ export function createBuildDetailsPanelState(
   buildUrl: string,
   uiState?: BuildDetailsPanelUiState
 ): BuildDetailsPanelSerializedState {
-  return {
-    ...createSerializedEnvironmentState(environment),
+  return createEnvironmentScopedPanelState(environment, {
     buildUrl,
     buildDetailsUi: normalizeBuildDetailsPanelUiState(uiState)
-  };
+  });
 }
 
 export function isBuildDetailsPanelState(
   value: unknown
 ): value is BuildDetailsPanelSerializedState {
-  if (!isSerializedEnvironmentState(value)) {
-    return false;
-  }
+  return validateEnvironmentScopedPanelState(value, (record) => {
+    if (!isNonEmptyString(record.buildUrl)) {
+      return false;
+    }
 
-  const record = value as unknown as Record<string, unknown>;
-  if (typeof record.buildUrl !== "string" || record.buildUrl.length === 0) {
-    return false;
-  }
-
-  return (
-    typeof record.buildDetailsUi === "undefined" ||
-    isBuildDetailsPanelUiState(record.buildDetailsUi)
-  );
+    return (
+      typeof record.buildDetailsUi === "undefined" ||
+      isBuildDetailsPanelUiState(record.buildDetailsUi)
+    );
+  });
 }
 
 export function normalizeBuildDetailsPanelUiState(

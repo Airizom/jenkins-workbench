@@ -36,6 +36,30 @@ export function isSerializedEnvironmentState(value: unknown): value is Serialize
   );
 }
 
+export function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+export function createEnvironmentScopedPanelState<TExtra extends Record<string, unknown>>(
+  environment: JenkinsEnvironmentRef,
+  extra: TExtra
+): SerializedEnvironmentState & TExtra {
+  return {
+    ...createSerializedEnvironmentState(environment),
+    ...extra
+  };
+}
+
+export function validateEnvironmentScopedPanelState(
+  value: unknown,
+  validateExtraFields: (record: Record<string, unknown>) => boolean
+): value is SerializedEnvironmentState {
+  if (!isSerializedEnvironmentState(value)) {
+    return false;
+  }
+  return validateExtraFields(value as unknown as Record<string, unknown>);
+}
+
 export async function resolveEnvironmentRef(
   store: JenkinsEnvironmentStore,
   state: SerializedEnvironmentState

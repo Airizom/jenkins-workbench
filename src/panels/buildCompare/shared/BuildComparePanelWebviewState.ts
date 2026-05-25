@@ -1,8 +1,9 @@
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
 import type { SerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
 import {
-  createSerializedEnvironmentState,
-  isSerializedEnvironmentState
+  createEnvironmentScopedPanelState,
+  isNonEmptyString,
+  validateEnvironmentScopedPanelState
 } from "../../shared/webview/WebviewPanelState";
 
 export interface BuildComparePanelSerializedState extends SerializedEnvironmentState {
@@ -15,25 +16,18 @@ export function createBuildComparePanelState(
   baselineBuildUrl: string,
   targetBuildUrl: string
 ): BuildComparePanelSerializedState {
-  return {
-    ...createSerializedEnvironmentState(environment),
+  return createEnvironmentScopedPanelState(environment, {
     baselineBuildUrl,
     targetBuildUrl
-  };
+  });
 }
 
 export function isBuildComparePanelState(
   value: unknown
 ): value is BuildComparePanelSerializedState {
-  if (!isSerializedEnvironmentState(value)) {
-    return false;
-  }
-  const record = value as unknown as Record<string, unknown>;
-  return (
-    typeof record.baselineBuildUrl === "string" &&
-    record.baselineBuildUrl.length > 0 &&
-    typeof record.targetBuildUrl === "string" &&
-    record.targetBuildUrl.length > 0
+  return validateEnvironmentScopedPanelState(
+    value,
+    (record) => isNonEmptyString(record.baselineBuildUrl) && isNonEmptyString(record.targetBuildUrl)
   );
 }
 

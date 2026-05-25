@@ -1,8 +1,14 @@
 import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsNodeInfo, JenkinsQueueItemInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { formatNodeOfflineReason } from "../jenkins/NodeFormatters";
-import type { JenkinsNodeDetails, JenkinsNodeExecutor } from "../jenkins/types";
+import { buildBaseNodeExecutorViewModels } from "../jenkins/NodeExecutorFormatters";
+import {
+  formatNodeBusyExecutorRatio,
+  formatNodeOfflineReason,
+  formatNodeStatusLabel,
+  resolveBusyExecutors
+} from "../jenkins/NodeFormatters";
+import type { JenkinsNodeDetails } from "../jenkins/types";
 import type {
   NodeCapacityExecutorViewModel,
   NodeCapacityNodeViewModel,
@@ -12,6 +18,7 @@ import type {
   NodeCapacitySummaryViewModel,
   NodeCapacityViewModel
 } from "../shared/nodeCapacity/NodeCapacityContracts";
+import { toNonNegativeInteger } from "../shared/numbers";
 import type { QueueWorkItemViewModel } from "../shared/queueWork/QueueWorkContracts";
 import { firstNonEmpty } from "../shared/stringValues";
 import { classifyNodeLabels, normalizeLabelKey } from "./NodeLabelClassification";
@@ -70,8 +77,8 @@ export function buildNodeCapacityExecutorViewModels(
   details: JenkinsNodeDetails
 ): NodeCapacityExecutorViewModel[] {
   return [
-    ...buildExecutorGroup(details.executors, "Executor"),
-    ...buildExecutorGroup(details.oneOffExecutors, "One-off")
+    ...buildBaseNodeExecutorViewModels(details.executors, "Executor"),
+    ...buildBaseNodeExecutorViewModels(details.oneOffExecutors, "One-off")
   ];
 }
 
@@ -92,7 +99,7 @@ function buildNodeViewModel(
     displayName,
     name,
     nodeUrl: node.nodeUrl,
-    statusLabel: formatNodeStatus(node),
+    statusLabel: formatNodeStatusLabel(node),
     isOffline,
     isTemporarilyOffline: node.temporarilyOffline === true,
     offlineReason: formatNodeOfflineReason(node),
@@ -103,7 +110,7 @@ function buildNodeViewModel(
     busyExecutors,
     idleExecutors,
     offlineExecutors,
-    executorSummary: `${busyExecutors}/${totalExecutors} busy`,
+    executorSummary: formatNodeBusyExecutorRatio(node, { suffix: " busy" }) ?? "Online",
     executorsLoaded: false,
     executors: [],
     ...buildNodeQueuedWorkViewModel(queueItems, labels)
@@ -199,30 +206,6 @@ function buildOfflineImpact(
       executors: node.offlineExecutors,
       reason: node.offlineReason
     }));
-}
-
-function buildExecutorGroup(
-  executors: JenkinsNodeExecutor[] | undefined,
-  labelPrefix: string
-): NodeCapacityExecutorViewModel[] {
-  if (!Array.isArray(executors)) {
-    return [];
-  }
-  return executors.map((executor, index) => {
-    const work = executor.currentExecutable ?? executor.currentWorkUnit;
-    const isIdle = !work && executor.idle !== false;
-    return {
-      id:
-        typeof executor.number === "number" ? `#${executor.number}` : `${labelPrefix} ${index + 1}`,
-      statusLabel: isIdle ? "Idle" : "Busy",
-      isIdle,
-      workLabel:
-        firstNonEmpty(work?.fullDisplayName, work?.displayName) ??
-        (typeof work?.number === "number" ? `#${work.number}` : undefined) ??
-        firstNonEmpty(work?.url),
-      workUrl: firstNonEmpty(work?.url)
-    };
-  });
 }
 
 function buildHiddenLabelKeySet(nodes: JenkinsNodeInfo[]): Set<string> {
@@ -355,38 +338,6 @@ export function formatPoolStatus(
   return "Available";
 }
 
-export function formatNodeStatus(node: JenkinsNodeInfo): string {
-  if (node.offline === true) {
-    return node.temporarilyOffline ? "Temporarily offline" : "Offline";
-  }
-  return "Online";
-}
-
 function sumBy<T>(items: T[], getValue: (item: T) => number): number {
   return items.reduce((sum, item) => sum + getValue(item), 0);
-}
-
-function toNonNegativeInteger(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-}
-
-function resolveBusyExecutors(node: JenkinsNodeInfo, totalExecutors: number): number {
-  if (node.offline === true) {
-    return 0;
-  }
-  if (typeof node.busyExecutors === "number" && Number.isFinite(node.busyExecutors)) {
-    return Math.min(totalExecutors, toNonNegativeInteger(node.busyExecutors));
-  }
-  if (!Array.isArray(node.executors)) {
-    return 0;
-  }
-  return Math.min(
-    totalExecutors,
-    node.executors.filter(
-      (executor) =>
-        executor.currentExecutable !== undefined ||
-        executor.currentWorkUnit !== undefined ||
-        executor.idle === false
-    ).length
-  );
 }
