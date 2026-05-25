@@ -1,8 +1,11 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsTestReport } from "../../jenkins/types";
-import { trimToUndefined } from "../../shared/stringValues";
-import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
-import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
+import {
+  type NormalizedTestCaseBase,
+  forEachNormalizedTestCase,
+  normalizeTestCaseBase
+} from "../shared/TestCaseViewModel";
+import { formatAvailableTestReportCountsSummary } from "../shared/TestReportFormatters";
 import { forEachKeyedDiff } from "./BuildCompareDiff";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
 import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
@@ -157,32 +160,25 @@ function buildTestSummaryLabel(result: BuildCompareOptionalResult<JenkinsTestRep
   if (result.status !== "available") {
     return "Unavailable";
   }
-  return formatTestReportCountsSummary({
-    failed: result.value.failCount,
-    total: result.value.totalCount,
-    skipped: result.value.skipCount
-  });
+  return formatAvailableTestReportCountsSummary(result.value);
 }
 
 function buildTestCaseMap(report: JenkinsTestReport): Map<string, NormalizedTestCase> {
   const items = new Map<string, NormalizedTestCase>();
   const duplicateCounts = new Map<string, number>();
-  for (const suite of report.suites ?? []) {
-    const suiteName = trimToUndefined(suite.name);
-    for (const testCase of suite.cases ?? []) {
-      const normalized = normalizeTestCaseBase(testCase, suiteName);
-      if (!normalized) {
-        continue;
-      }
-      const occurrence = duplicateCounts.get(normalized.key) ?? 0;
-      duplicateCounts.set(normalized.key, occurrence + 1);
-      const occurrenceKey = buildOccurrenceKey(normalized.key, occurrence);
-      items.set(occurrenceKey, {
-        ...normalized,
-        key: occurrenceKey
-      });
+  forEachNormalizedTestCase(report, (testCase, { suiteName }) => {
+    const normalized = normalizeTestCaseBase(testCase, suiteName);
+    if (!normalized) {
+      return;
     }
-  }
+    const occurrence = duplicateCounts.get(normalized.key) ?? 0;
+    duplicateCounts.set(normalized.key, occurrence + 1);
+    const occurrenceKey = buildOccurrenceKey(normalized.key, occurrence);
+    items.set(occurrenceKey, {
+      ...normalized,
+      key: occurrenceKey
+    });
+  });
   return items;
 }
 

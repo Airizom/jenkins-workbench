@@ -17,9 +17,7 @@ export function buildBuildViewModel(
   };
 }
 
-export function buildOccurrenceKey(base: string, occurrence: number): string {
-  return `${base}::${occurrence}`;
-}
+export { buildOccurrenceKey } from "../shared/TestCaseViewModel";
 
 export function buildComparisonErrorDetail(
   label: string,

@@ -1,4 +1,5 @@
 import { resolveResultTextClass } from "../../../../shared/webview/lib/statusStyles";
+import { CompareValueCellShell } from "./shared/CompareValueCellShell";
 
 export function StageValueCell({
   label,
@@ -12,10 +13,9 @@ export function StageValueCell({
   duration?: string;
 }) {
   return (
-    <div className="min-w-0 rounded border border-mutedBorder bg-background px-2 py-1">
-      <p className="text-muted-foreground">{label}</p>
+    <CompareValueCellShell label={label}>
       <p className={`text-sm ${resolveResultTextClass(statusClass)}`}>{status ?? "-"}</p>
       <p className="text-muted-foreground">{duration ?? "-"}</p>
-    </div>
+    </CompareValueCellShell>
   );
 }

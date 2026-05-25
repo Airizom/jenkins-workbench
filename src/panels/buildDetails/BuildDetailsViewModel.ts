@@ -17,6 +17,7 @@ import { buildPipelineStagesViewModel } from "./BuildDetailsPipelineViewModel";
 import { buildTestStateViewModel } from "./BuildDetailsTestsViewModel";
 import type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
 import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
+import { splitBuildDetailsErrors } from "./shared/BuildDetailsErrorHelpers";
 
 export type {
   BuildCoverageFileViewModel,
@@ -100,10 +101,9 @@ export function buildBuildDetailsViewModel(
     Boolean(input.consoleHtmlResult?.truncated) ||
     truncated.truncated ||
     Boolean(input.consoleTextResult?.truncated);
-  const nonConsoleErrors = input.errors.filter(
-    (error) => !error.toLowerCase().startsWith("console output:")
-  );
-  const consoleError = input.consoleError ?? extractConsoleError(input.errors);
+  const { consoleError: parsedConsoleError, displayErrors: nonConsoleErrors } =
+    splitBuildDetailsErrors(input.errors);
+  const consoleError = input.consoleError ?? parsedConsoleError;
   const headerLabels = formatBuildDetailsHeaderLabels(details);
 
   return {
@@ -133,12 +133,4 @@ export function buildBuildDetailsViewModel(
     errors: nonConsoleErrors,
     followLog: input.followLog ?? true
   };
-}
-
-function extractConsoleError(errors: string[]): string | undefined {
-  const consoleError = errors.find((error) => error.toLowerCase().startsWith("console output:"));
-  if (consoleError) {
-    return consoleError.replace(/^console output:\s*/i, "");
-  }
-  return undefined;
 }

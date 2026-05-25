@@ -1,4 +1,4 @@
-import type { JenkinsTestReportCase } from "../../jenkins/types";
+import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/types";
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
 import { formatTestDuration } from "./TestReportFormatters";
 import {
@@ -15,6 +15,14 @@ export interface NormalizedTestCaseBase {
   status: NormalizedTestStatus;
   statusLabel: string;
   durationLabel?: string;
+}
+
+export function formatTestCaseSubtitle(
+  className?: string,
+  suiteName?: string,
+  fallback = "Unnamed suite"
+): string {
+  return [className, suiteName].filter(Boolean).join(" • ") || fallback;
 }
 
 export function buildTestCaseKey(
@@ -37,6 +45,28 @@ export function resolveTestCaseName(
     return firstNonEmpty(testCase.className, options.unnamedLabel ?? "Unnamed test");
   }
   return undefined;
+}
+
+export interface NormalizedTestCaseIterationContext {
+  suiteName?: string;
+  suiteIndex: number;
+  caseIndex: number;
+}
+
+export function forEachNormalizedTestCase(
+  report: JenkinsTestReport,
+  callback: (testCase: JenkinsTestReportCase, context: NormalizedTestCaseIterationContext) => void
+): void {
+  for (const [suiteIndex, suite] of (report.suites ?? []).entries()) {
+    const suiteName = trimToUndefined(suite.name);
+    for (const [caseIndex, testCase] of (suite.cases ?? []).entries()) {
+      callback(testCase, { suiteName, suiteIndex, caseIndex });
+    }
+  }
+}
+
+export function buildOccurrenceKey(base: string, occurrence: number): string {
+  return `${base}::${occurrence}`;
 }
 
 export function normalizeTestCaseBase(

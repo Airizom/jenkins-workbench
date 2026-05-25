@@ -1,4 +1,5 @@
 import type { BuildCompareChangesetItem } from "../../../shared/BuildCompareContracts";
+import { CompareMutedCard } from "./shared/CompareMutedCard";
 import { CompareSectionFrame } from "./shared/CompareSectionFrame";
 
 export function ChangesetColumn({
@@ -8,16 +9,13 @@ export function ChangesetColumn({
   return (
     <CompareSectionFrame title={title} count={items.length} emptyLabel="No changesets recorded.">
       {items.map((item, index) => (
-        <div
-          key={`${item.commitId ?? item.message}:${index}`}
-          className="rounded-lg border border-border bg-muted-soft px-3 py-2"
-        >
+        <CompareMutedCard key={`${item.commitId ?? item.message}:${index}`}>
           <p className="text-sm">{item.message}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {item.author}
             {item.commitId ? ` • ${item.commitId}` : ""}
           </p>
-        </div>
+        </CompareMutedCard>
       ))}
     </CompareSectionFrame>
   );

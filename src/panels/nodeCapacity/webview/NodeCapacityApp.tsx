@@ -6,19 +6,19 @@ import type {
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import type { QueueWorkItemViewModel } from "../../../shared/queueWork/QueueWorkContracts";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
+import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { QueueWorkItemRow } from "../../shared/webview/components/queueWork/QueueWorkItemRow";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
-import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
+import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { ExternalLinkIcon, RefreshIcon, ServerIcon } from "../../shared/webview/icons";
 import { resolveSeverityBadgeClass } from "../../shared/webview/lib/statusStyles";
 import type {
   LoadNodeCapacityExecutorsMessage,
   NodeCapacityIncomingMessage,
-  OpenExternalMessage,
   OpenNodeDetailsMessage
 } from "../shared/NodeCapacityPanelMessages";
 import { useNodeCapacityMessages } from "./hooks/useNodeCapacityMessages";
@@ -48,6 +48,7 @@ function postLoadExecutors(
 export function NodeCapacityApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeCapacityReducer, undefined, getInitialState);
   const postMessage = usePanelPostMessage<NodeCapacityIncomingMessage>();
+  const handleOpenExternal = useOpenExternalMessage(postMessage);
   useNodeCapacityMessages(dispatch);
 
   const updatedAtLabel = useMemo(
@@ -63,17 +64,15 @@ export function NodeCapacityApp(): JSX.Element {
     postLoadExecutors(postMessage, initiallyOpenNodeUrls);
   }, [initiallyOpenNodeUrls, postMessage]);
 
-  if (state.loading && !state.hasLoaded) {
-    return <LoadingSkeleton variant="node" />;
+  const initialLoading = (
+    <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="node" />
+  );
+  if (initialLoading) {
+    return initialLoading;
   }
 
   const handleRefresh = () => {
     postMessage({ type: "refreshNodeCapacity" });
-  };
-
-  const handleOpenExternal = (url: string) => {
-    const message: OpenExternalMessage = { type: "openExternal", url };
-    postMessage(message);
   };
 
   const handleOpenNodeDetails = (nodeUrl: string, label?: string) => {

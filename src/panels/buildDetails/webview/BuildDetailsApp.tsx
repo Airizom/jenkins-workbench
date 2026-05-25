@@ -1,8 +1,9 @@
 import * as React from "react";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
-import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
+import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
+import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
 import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
@@ -24,6 +25,7 @@ const { useReducer } = React;
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
   const postMessage = usePanelPostMessage<BuildDetailsIncomingMessage>();
+  const handleOpenExternal = useOpenExternalMessage(postMessage);
   useBuildDetailsMessages(dispatch);
   const { showButton, scrollToTop } = useScrollToTopButton();
 
@@ -39,10 +41,6 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     hasPipelineStages,
     hasTests
   });
-
-  const handleOpenExternal = (url: string) => {
-    postMessage({ type: "openExternal", url });
-  };
 
   const handleOpenBuild = () => {
     if (!buildUrl) {
@@ -60,8 +58,11 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     postMessage({ type: "exportConsole" });
   };
 
-  if (state.loading && !state.hasLoaded) {
-    return <LoadingSkeleton variant="build" />;
+  const initialLoading = (
+    <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="build" />
+  );
+  if (initialLoading) {
+    return initialLoading;
   }
 
   return (
@@ -81,7 +82,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         />
 
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
-          <PanelErrorList errors={state.errors} id="errors" />
+          <PanelErrorList errors={state.errors} id="errors" title="Unable to load build details" />
           <BuildDetailsTabs
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}

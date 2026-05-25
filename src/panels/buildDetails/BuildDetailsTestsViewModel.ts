@@ -4,7 +4,7 @@ import type {
   JenkinsTestSummaryAction
 } from "../../jenkins/types";
 import { pickFiniteNumber } from "../../shared/numbers";
-import { normalizeTestCaseBase } from "../shared/TestCaseViewModel";
+import { forEachNormalizedTestCase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import {
   EMPTY_TEST_RESULTS_LABEL,
   formatTestReportCountsSummary
@@ -119,37 +119,34 @@ export function buildTestResultsViewModel(
   }
 
   const items: BuildTestCaseViewModel[] = [];
-  for (const [suiteIndex, suite] of (testReport.suites ?? []).entries()) {
-    const suiteName = suite.name?.trim() || undefined;
-    for (const [caseIndex, testCase] of (suite.cases ?? []).entries()) {
-      const normalized = normalizeTestCaseBase(testCase, suiteName, {
-        fallbackToClassName: true
-      });
-      if (!normalized) {
-        continue;
-      }
-      items.push({
-        id: buildTestCaseId(
-          normalized.suiteName,
-          normalized.className,
-          normalized.name,
-          suiteIndex,
-          caseIndex
-        ),
-        name: normalized.name,
-        className: normalized.className,
-        suiteName: normalized.suiteName,
-        status: normalized.status,
-        statusLabel: normalized.statusLabel,
-        durationLabel: normalized.durationLabel,
-        errorDetails: normalizeTestText(testCase.errorDetails, true),
-        errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
-        stdout: normalizeTestText(testCase.stdout, true),
-        stderr: normalizeTestText(testCase.stderr, true),
-        canOpenSource: Boolean(options?.canOpenSource?.(normalized.className))
-      });
+  forEachNormalizedTestCase(testReport, (testCase, { suiteName, suiteIndex, caseIndex }) => {
+    const normalized = normalizeTestCaseBase(testCase, suiteName, {
+      fallbackToClassName: true
+    });
+    if (!normalized) {
+      return;
     }
-  }
+    items.push({
+      id: buildTestCaseId(
+        normalized.suiteName,
+        normalized.className,
+        normalized.name,
+        suiteIndex,
+        caseIndex
+      ),
+      name: normalized.name,
+      className: normalized.className,
+      suiteName: normalized.suiteName,
+      status: normalized.status,
+      statusLabel: normalized.statusLabel,
+      durationLabel: normalized.durationLabel,
+      errorDetails: normalizeTestText(testCase.errorDetails, true),
+      errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
+      stdout: normalizeTestText(testCase.stdout, true),
+      stderr: normalizeTestText(testCase.stderr, true),
+      canOpenSource: Boolean(options?.canOpenSource?.(normalized.className))
+    });
+  });
 
   items.sort(compareTestCases);
   return {

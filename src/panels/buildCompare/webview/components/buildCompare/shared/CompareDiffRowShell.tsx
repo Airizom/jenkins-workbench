@@ -1,25 +1,39 @@
 import type { ReactNode } from "react";
+import { CompareMutedCard } from "./CompareMutedCard";
 
 export function CompareDiffRowShell({
   title,
   changeType,
+  subtitle,
   titleClassName,
+  align = "start",
   children
 }: {
   title: string;
-  changeType: string;
+  changeType?: string;
+  subtitle?: string;
   titleClassName?: string;
-  children: ReactNode;
+  align?: "start" | "center";
+  children?: ReactNode;
 }) {
+  const secondaryLine = subtitle ?? changeType;
+  const alignmentClass = align === "center" ? "items-center" : "items-start";
+
   return (
-    <div className="rounded-lg border border-border bg-muted-soft px-3 py-2">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <CompareMutedCard>
+      <div className={`flex flex-wrap ${alignmentClass} justify-between gap-3`}>
         <div className="min-w-0">
           <p className={`text-sm font-medium ${titleClassName ?? ""}`.trim()}>{title}</p>
-          <p className="mt-1 text-xs capitalize text-muted-foreground">{changeType}</p>
+          {secondaryLine ? (
+            <p
+              className={`mt-1 text-xs text-muted-foreground ${subtitle ? "truncate" : "capitalize"}`.trim()}
+            >
+              {secondaryLine}
+            </p>
+          ) : null}
         </div>
         {children}
       </div>
-    </div>
+    </CompareMutedCard>
   );
 }

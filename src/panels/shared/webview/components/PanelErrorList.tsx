@@ -12,7 +12,7 @@ type PanelErrorListProps = {
 export function PanelErrorList({
   errors,
   variant = "alert",
-  title = "Comparison errors",
+  title = "Errors",
   id,
   className
 }: PanelErrorListProps): JSX.Element | null {

@@ -1,7 +1,8 @@
 import * as React from "react";
-import { LoadingSkeleton } from "../../shared/webview/components/ui/loading-skeleton";
+import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
+import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { toast } from "../../shared/webview/hooks/useToast";
 import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
@@ -25,6 +26,7 @@ export function NodeDetailsApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeDetailsReducer, undefined, getInitialState);
   const [now, setNow] = useState(() => Date.now());
   const postMessage = usePanelPostMessage<NodeDetailsIncomingMessage>();
+  const handleOpenExternal = useOpenExternalMessage(postMessage);
 
   useNodeDetailsMessages(dispatch);
 
@@ -58,8 +60,11 @@ export function NodeDetailsApp(): JSX.Element {
     return () => clearInterval(intervalId);
   }, []);
 
-  if (state.loading && !state.hasLoaded) {
-    return <LoadingSkeleton variant="node" />;
+  const initialLoading = (
+    <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="node" />
+  );
+  if (initialLoading) {
+    return initialLoading;
   }
 
   const handleRefresh = () => {
@@ -78,13 +83,6 @@ export function NodeDetailsApp(): JSX.Element {
       return;
     }
     postMessage({ type: "launchNodeAgent" });
-  };
-
-  const handleOpenExternal = (url: string) => {
-    if (!url) {
-      return;
-    }
-    postMessage({ type: "openExternal", url });
   };
 
   const handleOpen = () => {

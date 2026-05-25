@@ -8,6 +8,7 @@ import type {
   BuildFailureInsightsViewModel,
   BuildTestsSummaryViewModel
 } from "../../shared/BuildDetailsContracts";
+import { splitBuildDetailsErrors } from "../../shared/BuildDetailsErrorHelpers";
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
 import { parseConsoleHtml } from "../lib/consoleHtml";
 
@@ -100,19 +101,14 @@ export const FALLBACK_STATE: BuildDetailsState = {
 };
 
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
+  const mergedDefaults = mergeBuildDetailsDefaults(initialState);
   const merged: BuildDetailsState = {
-    ...FALLBACK_STATE,
-    ...initialState,
-    testState: initialState.testState ?? DEFAULT_TEST_STATE,
-    coverageState: initialState.coverageState ?? DEFAULT_COVERAGE_STATE,
-    insights: initialState.insights ?? DEFAULT_INSIGHTS,
-    pendingInputs: initialState.pendingInputs ?? [],
+    ...mergedDefaults,
     pipelineNodeLog: initialState.pipelineNodeLog ?? FALLBACK_STATE.pipelineNodeLog,
     pipelineNodeLogHtmlModel: initialState.pipelineNodeLog.html
       ? parseConsoleHtml(initialState.pipelineNodeLog.html)
       : undefined,
     consoleHtmlModel: undefined,
-    loading: initialState.loading ?? false,
     hasLoaded: !(initialState.loading ?? false)
   };
   if (merged.consoleHtml) {
@@ -224,7 +220,7 @@ export function buildDetailsReducer(
       };
     }
     case "setErrors": {
-      const { consoleError, displayErrors } = splitConsoleError(action.errors);
+      const { consoleError, displayErrors } = splitBuildDetailsErrors(action.errors);
       return {
         ...state,
         errors: displayErrors,
@@ -271,6 +267,10 @@ export function getInitialState(): BuildDetailsViewModel {
 }
 
 function mergeInitialViewModel(candidate: BuildDetailsViewModel): BuildDetailsViewModel {
+  return mergeBuildDetailsDefaults(candidate);
+}
+
+function mergeBuildDetailsDefaults<T extends BuildDetailsViewModel>(candidate: T): T {
   return {
     ...FALLBACK_STATE,
     ...candidate,
@@ -280,26 +280,6 @@ function mergeInitialViewModel(candidate: BuildDetailsViewModel): BuildDetailsVi
     pendingInputs: candidate.pendingInputs ?? [],
     loading: candidate.loading ?? false
   };
-}
-
-function splitConsoleError(errors: string[]): { consoleError?: string; displayErrors: string[] } {
-  let consoleError: string | undefined;
-  const displayErrors: string[] = [];
-  for (const error of errors) {
-    if (
-      !consoleError &&
-      typeof error === "string" &&
-      error.toLowerCase().startsWith("console output:")
-    ) {
-      consoleError = error.replace(/^console output:\s*/i, "").trim();
-    } else {
-      displayErrors.push(error);
-    }
-  }
-  if (consoleError && consoleError.length === 0) {
-    consoleError = undefined;
-  }
-  return { consoleError, displayErrors };
 }
 
 function appendConsoleHtmlModel(

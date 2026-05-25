@@ -24,6 +24,20 @@ export interface TestReportCountSummaryInput {
   skipped?: number;
 }
 
+export interface TestReportCountSource {
+  failCount?: number;
+  totalCount?: number;
+  skipCount?: number;
+}
+
+export function formatAvailableTestReportCountsSummary(report: TestReportCountSource): string {
+  return formatTestReportCountsSummary({
+    failed: report.failCount,
+    total: report.totalCount,
+    skipped: report.skipCount
+  });
+}
+
 export function formatTestReportCountsSummary(input: TestReportCountSummaryInput): string {
   const failed = input.failed ?? 0;
   const total = input.total ?? 0;

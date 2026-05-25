@@ -17,6 +17,19 @@ export function normalizeTestStatus(status?: string): NormalizedTestStatus {
   return "other";
 }
 
+export function resolveTestStatusBadgeClass(status: NormalizedTestStatus): string {
+  switch (status) {
+    case "failed":
+      return "border-failure-border-subtle text-failure";
+    case "passed":
+      return "border-success-border text-success";
+    case "skipped":
+      return "border-warning-border text-warning";
+    default:
+      return "border-border text-muted-foreground";
+  }
+}
+
 export function formatTestStatusLabel(status: NormalizedTestStatus): string {
   switch (status) {
     case "passed":

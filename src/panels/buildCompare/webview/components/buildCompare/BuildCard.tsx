@@ -1,3 +1,4 @@
+import { ResultBadge } from "../../../../shared/webview/components/ResultBadge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import {
   Card,
@@ -7,7 +8,6 @@ import {
 } from "../../../../shared/webview/components/ui/card";
 import { postVsCodeMessage } from "../../../../shared/webview/lib/vscodeApi";
 import type { BuildCompareBuildViewModel } from "../../../shared/BuildCompareContracts";
-import { ResultBadge } from "./shared/ResultBadge";
 import { SummaryStat } from "./shared/SummaryStat";
 
 export function BuildCard({
