@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatLocaleTimestampWithRelative } from "../formatters/DisplayFormatters";
 import type { JenkinsBuild, JenkinsBuildCause } from "../jenkins/JenkinsClient";
 import { resolveLastBuildChangeset } from "../jenkins/changesets/collectBuildChangesets";
 import {
@@ -8,7 +9,7 @@ import {
 import { formatBuildParameterValueForTooltip } from "../shared/build/BuildParameterFormatting";
 import { normalizeWhitespace } from "../shared/stringValues";
 import { resolveBuildElapsedMs } from "./BuildTiming";
-import { formatDurationMs, formatRelativeTime } from "./formatters";
+import { formatDurationMs } from "./formatters";
 
 const DEFAULT_MAX_COMMIT_MESSAGE_LENGTH = 120;
 const DEFAULT_MAX_PARAMETER_COUNT = 5;
@@ -243,23 +244,14 @@ function resolveTimingSummary(build: JenkinsBuild): { label: string; value: stri
   }
 
   if (build.building) {
-    const startLabel = formatTimestamp(build.timestamp as number, true);
+    const startLabel = formatLocaleTimestampWithRelative(build.timestamp as number, true);
     return { label: "Started", value: startLabel };
   }
 
   const completionTimestamp = resolveBuildCompletionTimestamp(build);
   const completedAt = completionTimestamp ?? (build.timestamp as number);
-  const completedLabel = formatTimestamp(completedAt, true);
+  const completedLabel = formatLocaleTimestampWithRelative(completedAt, true);
   return { label: "Completed", value: completedLabel };
-}
-
-function formatTimestamp(timestampMs: number, includeRelative: boolean): string {
-  const absolute = new Date(timestampMs).toLocaleString();
-  if (!includeRelative) {
-    return absolute;
-  }
-  const relative = formatRelativeTime(timestampMs);
-  return relative ? `${absolute} (${relative})` : absolute;
 }
 
 function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefined {

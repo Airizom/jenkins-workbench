@@ -117,22 +117,38 @@ export function endLoadingRequest(
   return next;
 }
 
+export class LoadTokenTracker {
+  private token = 0;
+
+  next(): number {
+    return ++this.token;
+  }
+
+  get current(): number {
+    return this.token;
+  }
+
+  isCurrent(token: number): boolean {
+    return token === this.token;
+  }
+}
+
 export class PanelLoadTracker {
-  private loadToken = 0;
+  private readonly loadTokenTracker = new LoadTokenTracker();
   private loadingRequests = 0;
 
   constructor(private readonly postLoading: (value: boolean) => void) {}
 
   nextToken(): number {
-    return ++this.loadToken;
+    return this.loadTokenTracker.next();
   }
 
   get currentToken(): number {
-    return this.loadToken;
+    return this.loadTokenTracker.current;
   }
 
   isCurrent(token: number): boolean {
-    return token === this.loadToken;
+    return this.loadTokenTracker.isCurrent(token);
   }
 
   resetLoadingRequests(): void {

@@ -1,6 +1,6 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
 import { trimToUndefined } from "../../shared/stringValues";
-import { formatBuildHeaderLabels } from "../buildDetails/BuildDetailsFormatters";
 import type { BuildCompareBuildViewModel } from "./shared/BuildCompareContracts";
 
 export function buildBuildViewModel(
@@ -37,4 +37,30 @@ export function buildComparisonErrorDetail(
     return `Target ${label.toLowerCase()}: ${targetMessage}`;
   }
   return `${label} comparison failed.`;
+}
+
+export function createCompareErrorSection<T>(
+  summaryLabel: string,
+  detail: string | undefined,
+  fields: T
+): T & { status: "error"; summaryLabel: string; detail?: string } {
+  return {
+    status: "error",
+    summaryLabel,
+    detail,
+    ...fields
+  };
+}
+
+export function createCompareUnavailableSection<T>(
+  summaryLabel: string,
+  detail: string | undefined,
+  fields: T
+): T & { status: "unavailable"; summaryLabel: string; detail?: string } {
+  return {
+    status: "unavailable",
+    summaryLabel,
+    detail,
+    ...fields
+  };
 }

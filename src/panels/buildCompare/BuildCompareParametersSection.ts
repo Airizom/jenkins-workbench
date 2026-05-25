@@ -2,6 +2,7 @@ import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsBuildAction, JenkinsBuildDetails } from "../../jenkins/types";
 import { visitMatchingBuildParameters } from "../../shared/build/BuildParameterCollection";
 import { formatBuildParameterValueForCompare } from "../../shared/build/BuildParameterFormatting";
+import { forEachKeyedDiff } from "./BuildCompareDiff";
 import type { BuildParameterRedactionOptions } from "./BuildCompareOptions";
 import type {
   BuildCompareParameterDiffItem,
@@ -32,32 +33,29 @@ export function buildParametersSection(
     options.maskPatterns,
     options.maskValue
   );
-  const names = [...new Set([...baselineParameters.keys(), ...targetParameters.keys()])].sort();
   const items: BuildCompareParameterDiffItem[] = [];
   let unchangedCount = 0;
 
-  for (const name of names) {
-    const baselineValue = baselineParameters.get(name);
-    const targetValue = targetParameters.get(name);
-    if (baselineValue?.comparisonValue === targetValue?.comparisonValue) {
-      unchangedCount += 1;
-      continue;
-    }
-    if (baselineValue === undefined) {
-      items.push({ name, changeType: "added", targetValue: targetValue?.displayValue });
-      continue;
-    }
-    if (targetValue === undefined) {
+  forEachKeyedDiff(baselineParameters, targetParameters, {
+    onAdded: (name, targetValue) => {
+      items.push({ name, changeType: "added", targetValue: targetValue.displayValue });
+    },
+    onRemoved: (name, baselineValue) => {
       items.push({ name, changeType: "removed", baselineValue: baselineValue.displayValue });
-      continue;
+    },
+    onBoth: (name, baselineValue, targetValue) => {
+      if (baselineValue.comparisonValue === targetValue.comparisonValue) {
+        unchangedCount += 1;
+        return;
+      }
+      items.push({
+        name,
+        changeType: "changed",
+        baselineValue: baselineValue.displayValue,
+        targetValue: targetValue.displayValue
+      });
     }
-    items.push({
-      name,
-      changeType: "changed",
-      baselineValue: baselineValue.displayValue,
-      targetValue: targetValue.displayValue
-    });
-  }
+  });
 
   return {
     status: items.length > 0 ? "available" : "empty",

@@ -2,10 +2,13 @@ import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsTestReport } from "../../jenkins/types";
 import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
+import { forEachKeyedDiff } from "./BuildCompareDiff";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import {
   buildComparisonErrorDetail,
   buildOccurrenceKey,
+  createCompareErrorSection,
+  createCompareUnavailableSection,
   normalizeString
 } from "./BuildCompareSectionShared";
 import type {
@@ -40,11 +43,11 @@ function createUnavailableTestsSection(
     "summaryLabel" | "detail" | "baselineSummaryLabel" | "targetSummaryLabel"
   >
 ): BuildCompareTestsSectionViewModel {
-  return {
-    status: "unavailable",
+  return createCompareUnavailableSection(overrides.summaryLabel, overrides.detail, {
     ...EMPTY_TEST_DIFF_LISTS,
-    ...overrides
-  };
+    baselineSummaryLabel: overrides.baselineSummaryLabel,
+    targetSummaryLabel: overrides.targetSummaryLabel
+  });
 }
 
 export function buildTestsSection(
@@ -52,14 +55,16 @@ export function buildTestsSection(
   targetReport: BuildCompareOptionalResult<JenkinsTestReport>
 ): BuildCompareTestsSectionViewModel {
   return evaluateOptionalPair(baselineReport, targetReport, {
-    onError: ({ baseline, target }) => ({
-      status: "error",
-      summaryLabel: "Test comparison unavailable",
-      detail: buildComparisonErrorDetail("Test report", baseline, target),
-      baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
-      targetSummaryLabel: buildTestSummaryLabel(targetReport),
-      ...EMPTY_TEST_DIFF_LISTS
-    }),
+    onError: ({ baseline, target }) =>
+      createCompareErrorSection(
+        "Test comparison unavailable",
+        buildComparisonErrorDetail("Test report", baseline, target),
+        {
+          baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
+          targetSummaryLabel: buildTestSummaryLabel(targetReport),
+          ...EMPTY_TEST_DIFF_LISTS
+        }
+      ),
     onBothUnavailable: () =>
       createUnavailableTestsSection({
         summaryLabel: "Test report data unavailable",
@@ -87,7 +92,6 @@ function buildAvailableTestsSection(
 ): BuildCompareTestsSectionViewModel {
   const baselineCases = buildTestCaseMap(baselineValue);
   const targetCases = buildTestCaseMap(targetValue);
-  const keys = [...new Set([...baselineCases.keys(), ...targetCases.keys()])].sort();
   const newFailures: BuildCompareTestDiffItem[] = [];
   const stillFailing: BuildCompareTestDiffItem[] = [];
   const newPasses: BuildCompareTestDiffItem[] = [];
@@ -96,21 +100,14 @@ function buildAvailableTestsSection(
   let otherChangesCount = 0;
   let unchangedCount = 0;
 
-  for (const key of keys) {
-    const baseline = baselineCases.get(key);
-    const target = targetCases.get(key);
-    if (!baseline && !target) {
-      continue;
-    }
-    if (!baseline && target) {
+  forEachKeyedDiff(baselineCases, targetCases, {
+    onAdded: (_key, target) => {
       addedTests.push(buildSingleSideTestDiffItem(target, "added"));
-      continue;
-    }
-    if (baseline && !target) {
+    },
+    onRemoved: (_key, baseline) => {
       removedTests.push(buildSingleSideTestDiffItem(baseline, "removed"));
-      continue;
-    }
-    if (baseline && target) {
+    },
+    onBoth: (_key, baseline, target) => {
       const item = buildTestDiffItem(baseline, target);
       if (target.status === "failed" && baseline.status !== "failed") {
         newFailures.push(item);
@@ -124,7 +121,7 @@ function buildAvailableTestsSection(
         otherChangesCount += 1;
       }
     }
-  }
+  });
 
   const hasDiffs =
     newFailures.length > 0 ||

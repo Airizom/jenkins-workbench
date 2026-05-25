@@ -3,6 +3,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
+import { LoadTokenTracker } from "../shared/PanelRuntimeHelpers";
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
 import {
@@ -70,7 +71,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private readonly view: BuildDetailsPanelView;
   private readonly runtime: BuildDetailsPanelRuntime;
   private readonly canOpenTestSource?: BuildDetailsCanOpenTestSource;
-  private loadToken = 0;
+  private readonly loadTokenTracker = new LoadTokenTracker();
   private backend?: BuildDetailsBackend;
   private pollingController?: BuildDetailsPollingController;
   private pipelineNodeLogManager?: PipelineNodeLogManager;
@@ -91,8 +92,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       coverageDecorationService,
       getBackend: () => this.backend,
       getPollingController: () => this.pollingController,
-      getCurrentToken: () => this.loadToken,
-      isTokenCurrent: (token) => this.isTokenCurrent(token),
+      getCurrentToken: () => this.loadTokenTracker.current,
+      isTokenCurrent: (token) => this.loadTokenTracker.isCurrent(token),
       canOpenTestSource: getCanOpenTestSource
     });
   }
@@ -141,7 +142,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   getLoadToken(): number {
-    return this.loadToken;
+    return this.loadTokenTracker.current;
   }
 
   getPipelineRestartAvailability(): PipelineRestartAvailability {
@@ -194,7 +195,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     buildUrl: string,
     options?: BuildDetailsPanelLoadOptions
   ): Promise<BuildDetailsPanelLoadResult> {
-    const token = ++this.loadToken;
+    const token = this.loadTokenTracker.next();
     this.pollingController?.dispose();
     this.pollingController = undefined;
     this.pipelineNodeLogManager?.dispose();
@@ -264,7 +265,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
         postMessage: (message) => this.view.postMessage(message),
         setTitle: (title) => this.view.setTitle(title),
         publishErrors: () => this.publishErrors(),
-        isTokenCurrent: (currentToken) => this.isTokenCurrent(currentToken),
+        isTokenCurrent: (currentToken) => this.loadTokenTracker.isCurrent(currentToken),
         showCompletionToast: (details) => {
           void this.runtime.showCompletionToast(details);
         },
@@ -281,7 +282,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
     const initialState: BuildDetailsInitialState = await this.pollingController.loadInitial();
 
-    if (token !== this.loadToken) {
+    if (!this.loadTokenTracker.isCurrent(token)) {
       return { status: "ok" };
     }
 
@@ -356,13 +357,13 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
   handlePanelHidden(): void {
     this.pipelineNodeLogManager?.pause();
-    this.runtime.handlePanelHidden(this.loadToken);
+    this.runtime.handlePanelHidden(this.loadTokenTracker.current);
   }
 
   async handlePanelVisible(): Promise<void> {
     this.beginLoading();
     try {
-      await this.runtime.handlePanelVisible(this.loadToken);
+      await this.runtime.handlePanelVisible(this.loadTokenTracker.current);
       this.pipelineNodeLogManager?.resume();
     } finally {
       this.endLoading();
@@ -395,9 +396,5 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     if (this.loadingRequests === 0) {
       this.view.setLoading(false);
     }
-  }
-
-  private isTokenCurrent(token: number): boolean {
-    return token === this.loadToken;
   }
 }

@@ -1,24 +1,13 @@
-import {
-  resolveBuildResultClass,
-  resolveBuildResultLabel
-} from "../../formatters/BuildStatusFormatters";
-import { formatOptionalLocaleTimestamp } from "../../formatters/DisplayFormatters";
-import { formatDurationMs } from "../../formatters/DurationFormatters";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import {
+  formatBuildDuration,
+  formatBuildHeaderLabels,
+  formatBuildResultClass,
+  formatBuildResultLabel,
+  formatBuildTimestamp
+} from "../../shared/build/BuildHeaderLabels";
 
-export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): {
-  resultLabel: string;
-  resultClass: string;
-  durationLabel: string;
-  timestampLabel: string;
-} {
-  return {
-    resultLabel: details ? formatResult(details) : "Unknown",
-    resultClass: details ? formatResultClass(details) : "neutral",
-    durationLabel: details ? formatDuration(details.duration) : "Unknown",
-    timestampLabel: details ? formatTimestamp(details.timestamp) : "Unknown"
-  };
-}
+export { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
 
 export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
   resultLabel: string;
@@ -34,22 +23,19 @@ export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
 }
 
 export function formatResult(details: JenkinsBuildDetails): string {
-  return resolveBuildResultLabel(details.result, details.building);
+  return formatBuildResultLabel(details);
 }
 
 export function formatResultClass(details: JenkinsBuildDetails): string {
-  return resolveBuildResultClass(details.result, details.building);
+  return formatBuildResultClass(details);
 }
 
 export function formatDuration(duration?: number): string {
-  return formatDurationMs(duration);
+  return formatBuildDuration(duration);
 }
 
 export function formatTimestamp(timestamp?: number): string {
-  if (timestamp === undefined) {
-    return "Unknown";
-  }
-  return formatOptionalLocaleTimestamp(timestamp) || "Unknown";
+  return formatBuildTimestamp(timestamp);
 }
 
 export function formatCulprits(culprits: JenkinsBuildDetails["culprits"] | undefined): string {

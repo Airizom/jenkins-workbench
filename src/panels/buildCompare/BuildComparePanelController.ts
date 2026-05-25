@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { LoadTokenTracker } from "../shared/PanelRuntimeHelpers";
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildCompareBackend } from "./BuildCompareBackend";
 import type { BuildCompareOptions } from "./BuildCompareOptions";
@@ -20,7 +21,7 @@ export type BuildComparePanelLoadResult = { status: "ok" } | { status: "missingA
 
 export class BuildComparePanelController {
   private readonly view: BuildComparePanelView;
-  private loadToken = 0;
+  private readonly loadTokenTracker = new LoadTokenTracker();
 
   constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.view = new BuildComparePanelView(panel, extensionUri);
@@ -34,7 +35,7 @@ export class BuildComparePanelController {
     targetBuildUrl: string,
     options?: BuildComparePanelLoadOptions
   ): Promise<BuildComparePanelLoadResult> {
-    const token = ++this.loadToken;
+    const token = this.loadTokenTracker.next();
     const nonce = createNonce();
     const assets = this.view.resolveAssets();
     if (!assets) {
@@ -56,7 +57,7 @@ export class BuildComparePanelController {
         targetBuildUrl
       });
     } catch (error) {
-      if (token !== this.loadToken) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
         return { status: "ok" };
       }
       this.view.setTitle(options?.label);
@@ -66,7 +67,7 @@ export class BuildComparePanelController {
       });
       throw error;
     }
-    if (token !== this.loadToken) {
+    if (!this.loadTokenTracker.isCurrent(token)) {
       return { status: "ok" };
     }
 
@@ -102,7 +103,7 @@ export class BuildComparePanelController {
       baselineBuildUrl,
       targetBuildUrl
     });
-    if (token !== this.loadToken) {
+    if (!this.loadTokenTracker.isCurrent(token)) {
       return;
     }
     await this.view.postMessage({

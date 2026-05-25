@@ -7,10 +7,13 @@ import {
   toPipelineRun
 } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
+import { unionSortedMapKeys } from "./BuildCompareDiff";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
 import {
   buildComparisonErrorDetail,
   buildOccurrenceKey,
+  createCompareErrorSection,
+  createCompareUnavailableSection,
   normalizeString
 } from "./BuildCompareSectionShared";
 import type {
@@ -31,24 +34,24 @@ export function buildStagesSection(
   targetWorkflowRun: BuildCompareOptionalResult<JenkinsWorkflowRun>
 ): BuildCompareStagesSectionViewModel {
   return evaluateOptionalPair(baselineWorkflowRun, targetWorkflowRun, {
-    onError: ({ baseline, target }) => ({
-      status: "error",
-      summaryLabel: "Pipeline timing unavailable",
-      detail: buildComparisonErrorDetail("Pipeline data", baseline, target),
-      items: []
-    }),
-    onBothUnavailable: () => ({
-      status: "unavailable",
-      summaryLabel: "Pipeline timing unavailable",
-      detail: "Neither build exposed wfapi pipeline data.",
-      items: []
-    }),
-    onPartialUnavailable: () => ({
-      status: "unavailable",
-      summaryLabel: "Pipeline timing unavailable",
-      detail: "Both builds need wfapi pipeline data for stage-by-stage timing comparison.",
-      items: []
-    }),
+    onError: ({ baseline, target }) =>
+      createCompareErrorSection(
+        "Pipeline timing unavailable",
+        buildComparisonErrorDetail("Pipeline data", baseline, target),
+        { items: [] }
+      ),
+    onBothUnavailable: () =>
+      createCompareUnavailableSection(
+        "Pipeline timing unavailable",
+        "Neither build exposed wfapi pipeline data.",
+        { items: [] }
+      ),
+    onPartialUnavailable: () =>
+      createCompareUnavailableSection(
+        "Pipeline timing unavailable",
+        "Both builds need wfapi pipeline data for stage-by-stage timing comparison.",
+        { items: [] }
+      ),
     onAvailable: (baselineValue, targetValue) =>
       buildAvailableStagesSection(baselineValue, targetValue)
   });
@@ -60,41 +63,42 @@ function buildAvailableStagesSection(
 ): BuildCompareStagesSectionViewModel {
   const baselineStages = buildStageMap(toPipelineRun(baselineValue));
   const targetStages = buildStageMap(toPipelineRun(targetValue));
-  const names = [...new Set([...baselineStages.keys(), ...targetStages.keys()])].sort();
-  const items: BuildCompareStageDiffItem[] = names.map((name) => {
-    const baseline = baselineStages.get(name);
-    const target = targetStages.get(name);
-    const displayName = baseline?.path ?? target?.path ?? name;
-    if (!baseline && target) {
+  const items: BuildCompareStageDiffItem[] = unionSortedMapKeys(baselineStages, targetStages).map(
+    (name) => {
+      const baseline = baselineStages.get(name);
+      const target = targetStages.get(name);
+      const displayName = baseline?.path ?? target?.path ?? name;
+      if (!baseline && target) {
+        return {
+          name: displayName,
+          changeType: "added",
+          targetStatusLabel: target.statusLabel,
+          targetStatusClass: target.statusClass,
+          targetDurationLabel: target.durationLabel
+        };
+      }
+      if (baseline && !target) {
+        return {
+          name: displayName,
+          changeType: "removed",
+          baselineStatusLabel: baseline.statusLabel,
+          baselineStatusClass: baseline.statusClass,
+          baselineDurationLabel: baseline.durationLabel
+        };
+      }
       return {
         name: displayName,
-        changeType: "added",
-        targetStatusLabel: target.statusLabel,
-        targetStatusClass: target.statusClass,
-        targetDurationLabel: target.durationLabel
+        changeType: "matched",
+        baselineStatusLabel: baseline?.statusLabel,
+        baselineStatusClass: baseline?.statusClass,
+        targetStatusLabel: target?.statusLabel,
+        targetStatusClass: target?.statusClass,
+        baselineDurationLabel: baseline?.durationLabel,
+        targetDurationLabel: target?.durationLabel,
+        deltaLabel: formatDurationDelta(baseline?.durationMs, target?.durationMs)
       };
     }
-    if (baseline && !target) {
-      return {
-        name: displayName,
-        changeType: "removed",
-        baselineStatusLabel: baseline.statusLabel,
-        baselineStatusClass: baseline.statusClass,
-        baselineDurationLabel: baseline.durationLabel
-      };
-    }
-    return {
-      name: displayName,
-      changeType: "matched",
-      baselineStatusLabel: baseline?.statusLabel,
-      baselineStatusClass: baseline?.statusClass,
-      targetStatusLabel: target?.statusLabel,
-      targetStatusClass: target?.statusClass,
-      baselineDurationLabel: baseline?.durationLabel,
-      targetDurationLabel: target?.durationLabel,
-      deltaLabel: formatDurationDelta(baseline?.durationMs, target?.durationMs)
-    };
-  });
+  );
 
   return {
     status: items.length > 0 ? "available" : "empty",

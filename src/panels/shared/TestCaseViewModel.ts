@@ -1,11 +1,11 @@
 import type { JenkinsTestReportCase } from "../../jenkins/types";
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
+import { formatTestDuration } from "./TestReportFormatters";
 import {
   type NormalizedTestStatus,
   formatTestStatusLabel,
   normalizeTestStatus
-} from "../buildDetails/TestStatusFormatters";
-import { formatTestDuration } from "./TestReportFormatters";
+} from "./TestStatusFormatters";
 
 export interface NormalizedTestCaseBase {
   key: string;
