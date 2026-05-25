@@ -1,3 +1,4 @@
+import { trimToUndefined } from "../../shared/stringValues";
 import type { JenkinsChangeSetItem } from "../types";
 import type { JenkinsChangesetViewModel } from "./JenkinsChangesetViewModel";
 
@@ -6,18 +7,14 @@ export interface BuildChangesetSource {
   changeSets?: Array<{ items?: JenkinsChangeSetItem[] }>;
 }
 
-function trimValue(value: string | undefined): string {
-  return (value ?? "").trim();
-}
-
 function changesetDedupeKey(message: string, author: string, commitId?: string): string {
   return commitId ? `id:${commitId}` : `${message}|${author}`;
 }
 
 function toViewModel(item: JenkinsChangeSetItem): JenkinsChangesetViewModel {
-  const message = trimValue(item.msg);
-  const author = trimValue(item.author?.fullName);
-  const commitId = trimValue(item.commitId) || undefined;
+  const message = trimToUndefined(item.msg);
+  const author = trimToUndefined(item.author?.fullName);
+  const commitId = trimToUndefined(item.commitId);
   return {
     message: message || "Commit",
     author: author || "Unknown author",

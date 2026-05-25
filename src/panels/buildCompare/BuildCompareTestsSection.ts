@@ -1,9 +1,13 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
-import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/types";
+import type { JenkinsTestReport } from "../../jenkins/types";
 import { type NormalizedTestCaseBase, normalizeTestCaseBase } from "../shared/TestCaseViewModel";
 import { formatTestReportCountsSummary } from "../shared/TestReportFormatters";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
-import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
+import {
+  buildComparisonErrorDetail,
+  buildOccurrenceKey,
+  normalizeString
+} from "./BuildCompareSectionShared";
 import type {
   BuildCompareTestDiffItem,
   BuildCompareTestsSectionViewModel
@@ -171,13 +175,13 @@ function buildTestCaseMap(report: JenkinsTestReport): Map<string, NormalizedTest
   for (const suite of report.suites ?? []) {
     const suiteName = normalizeString(suite.name);
     for (const testCase of suite.cases ?? []) {
-      const normalized = normalizeTestCase(testCase, suiteName);
+      const normalized = normalizeTestCaseBase(testCase, suiteName);
       if (!normalized) {
         continue;
       }
       const occurrence = duplicateCounts.get(normalized.key) ?? 0;
       duplicateCounts.set(normalized.key, occurrence + 1);
-      const occurrenceKey = buildTestCaseOccurrenceKey(normalized.key, occurrence);
+      const occurrenceKey = buildOccurrenceKey(normalized.key, occurrence);
       items.set(occurrenceKey, {
         ...normalized,
         key: occurrenceKey
@@ -185,17 +189,6 @@ function buildTestCaseMap(report: JenkinsTestReport): Map<string, NormalizedTest
     }
   }
   return items;
-}
-
-function normalizeTestCase(
-  testCase: JenkinsTestReportCase,
-  suiteName: string | undefined
-): NormalizedTestCase | undefined {
-  return normalizeTestCaseBase(testCase, suiteName);
-}
-
-function buildTestCaseOccurrenceKey(key: string, occurrence: number): string {
-  return `${key}::${occurrence}`;
 }
 
 function buildTestDiffItem(

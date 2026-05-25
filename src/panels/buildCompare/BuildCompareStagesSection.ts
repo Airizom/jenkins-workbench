@@ -1,13 +1,18 @@
+import { normalizePipelineStatus } from "../../formatters/BuildStatusFormatters";
 import { formatNumber } from "../../formatters/DisplayFormatters";
+import { formatDurationMs } from "../../formatters/DurationFormatters";
 import {
   type PipelineRun,
   type PipelineStage,
   toPipelineRun
 } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
-import { formatDuration, normalizePipelineStatus } from "../buildDetails/BuildDetailsFormatters";
 import { type BuildCompareOptionalResult, evaluateOptionalPair } from "./BuildCompareLoadState";
-import { buildComparisonErrorDetail, normalizeString } from "./BuildCompareSectionShared";
+import {
+  buildComparisonErrorDetail,
+  buildOccurrenceKey,
+  normalizeString
+} from "./BuildCompareSectionShared";
 import type {
   BuildCompareStageDiffItem,
   BuildCompareStagesSectionViewModel
@@ -124,22 +129,18 @@ function collectStageEntries(
   const pathLabel = path.join(" / ");
   const occurrence = occurrenceCounts.get(pathLabel) ?? 0;
   occurrenceCounts.set(pathLabel, occurrence + 1);
-  const pathKey = buildStageOccurrenceKey(pathLabel, occurrence);
+  const pathKey = buildOccurrenceKey(pathLabel, occurrence);
   const status = normalizePipelineStatus(stage.status);
   target.set(pathKey, {
     path: pathLabel,
     statusLabel: status.label,
     statusClass: status.className,
-    durationLabel: formatDuration(stage.durationMillis),
+    durationLabel: formatDurationMs(stage.durationMillis),
     durationMs: stage.durationMillis
   });
   for (const branch of stage.parallelBranches) {
     collectStageEntries(branch, path, target, occurrenceCounts);
   }
-}
-
-function buildStageOccurrenceKey(path: string, occurrence: number): string {
-  return `${path}::${occurrence}`;
 }
 
 function formatDurationDelta(
@@ -159,5 +160,5 @@ function formatDurationDelta(
     return "No change";
   }
   const prefix = delta > 0 ? "+" : "-";
-  return `${prefix}${formatDuration(Math.abs(delta))}`;
+  return `${prefix}${formatDurationMs(Math.abs(delta))}`;
 }

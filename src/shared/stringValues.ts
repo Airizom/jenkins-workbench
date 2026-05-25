@@ -15,3 +15,7 @@ export function trimToUndefined(value: unknown): string | undefined {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
 }
+
+export function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}

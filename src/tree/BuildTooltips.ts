@@ -6,6 +6,7 @@ import {
   visitMatchingBuildParameters
 } from "../shared/build/BuildParameterCollection";
 import { formatBuildParameterValueForTooltip } from "../shared/build/BuildParameterFormatting";
+import { normalizeWhitespace } from "../shared/stringValues";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 import { formatDurationMs, formatRelativeTime } from "./formatters";
 
@@ -311,10 +312,6 @@ function isActionWithCauses(action: BuildAction | null): action is { causes: Jen
   }
   const record = action as { causes?: unknown };
   return Array.isArray(record.causes);
-}
-
-function normalizeWhitespace(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
 }
 
 function includesCaseInsensitive(source: string, needle: string): boolean {

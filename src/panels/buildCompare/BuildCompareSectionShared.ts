@@ -18,6 +18,10 @@ export function buildBuildViewModel(
 
 export const normalizeString = trimToUndefined;
 
+export function buildOccurrenceKey(base: string, occurrence: number): string {
+  return `${base}::${occurrence}`;
+}
+
 export function buildComparisonErrorDetail(
   label: string,
   baselineMessage?: string,

@@ -1,4 +1,19 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
+import { formatCompactDurationFromTotalSeconds } from "../../formatters/DurationFormatters";
+
+export function formatTestDuration(durationSeconds?: number): string | undefined {
+  if (durationSeconds === undefined || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
+    return undefined;
+  }
+  if (durationSeconds < 1) {
+    return `${Math.round(durationSeconds * 1000)} ms`;
+  }
+  if (durationSeconds < 60) {
+    const rounded = Math.round(durationSeconds * 10) / 10;
+    return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)} s`;
+  }
+  return formatCompactDurationFromTotalSeconds(Math.round(durationSeconds));
+}
 
 export interface TestReportCountSummaryInput {
   failed?: number;

@@ -3,10 +3,7 @@ import {
   resolveBuildResultLabel
 } from "../../formatters/BuildStatusFormatters";
 import { formatOptionalLocaleTimestamp } from "../../formatters/DisplayFormatters";
-import {
-  formatCompactDurationFromTotalSeconds,
-  formatDurationMs
-} from "../../formatters/DurationFormatters";
+import { formatDurationMs } from "../../formatters/DurationFormatters";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 
 export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): {
@@ -46,20 +43,6 @@ export function formatResultClass(details: JenkinsBuildDetails): string {
 
 export function formatDuration(duration?: number): string {
   return formatDurationMs(duration);
-}
-
-export function formatTestDuration(durationSeconds?: number): string | undefined {
-  if (durationSeconds === undefined || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
-    return undefined;
-  }
-  if (durationSeconds < 1) {
-    return `${Math.round(durationSeconds * 1000)} ms`;
-  }
-  if (durationSeconds < 60) {
-    const rounded = Math.round(durationSeconds * 10) / 10;
-    return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)} s`;
-  }
-  return formatCompactDurationFromTotalSeconds(Math.round(durationSeconds));
 }
 
 export function formatTimestamp(timestamp?: number): string {

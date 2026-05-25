@@ -151,6 +151,15 @@ export function createPanelAppRenderer(skeletonVariant: LoadingSkeletonVariant) 
   };
 }
 
+export function createTypedPanelRenderer<TModel>(skeletonVariant: LoadingSkeletonVariant) {
+  const { renderLoadingHtml, renderAppHtml } = createPanelAppRenderer(skeletonVariant);
+  return {
+    renderLoadingHtml,
+    renderPanelHtml: (model: TModel, options: PanelDetailsRenderOptions): string =>
+      renderAppHtml(model, options)
+  };
+}
+
 export function renderPanelAppHtml(
   initialModel: unknown,
   options: PanelDetailsRenderOptions

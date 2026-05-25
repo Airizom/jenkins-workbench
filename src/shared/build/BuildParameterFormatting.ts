@@ -1,3 +1,4 @@
+import { normalizeWhitespace } from "../stringValues";
 import type { BuildParameterRecord } from "./BuildParameterCollection";
 
 export function formatBuildParameterValueForCompare(parameter: BuildParameterRecord): string {
@@ -45,8 +46,4 @@ export function formatBuildParameterValueForTooltip(value: unknown): string {
     default:
       return "Unknown";
   }
-}
-
-function normalizeWhitespace(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
 }
