@@ -10,6 +10,61 @@ import type { JenkinsfileActiveCall, JenkinsfileArgumentContext } from "./Jenkin
 const BARE_CALL_PREFIX_KEYWORDS = new Set(["else", "return", "throw", "yield"]);
 const BARE_CALL_PREFIX_PAREN_KEYWORDS = new Set(["catch", "for", "if", "switch", "while"]);
 const BARE_CALL_PREFIX_DECLARATION_KEYWORDS = new Set(["def", "final"]);
+const LEADING_NAMED_ARG_PATTERN = /^\s*([A-Za-z_$][\w$]*)\s*:/;
+
+function extractLeadingNamedArgName(segmentText: string): string | undefined {
+  const match = segmentText.match(LEADING_NAMED_ARG_PATTERN);
+  if (!match) {
+    return undefined;
+  }
+  const colonIndex = match.index! + match[0].length - 1;
+  if (segmentText[colonIndex - 1] === "?") {
+    return undefined;
+  }
+  if (containsTopLevelQuestionMark(segmentText.slice(0, colonIndex))) {
+    return undefined;
+  }
+  return match[1];
+}
+
+function containsTopLevelQuestionMark(text: string): boolean {
+  let depthParen = 0;
+  let depthBracket = 0;
+  let depthBrace = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === "(") {
+      depthParen += 1;
+      continue;
+    }
+    if (character === ")") {
+      depthParen = Math.max(0, depthParen - 1);
+      continue;
+    }
+    if (character === "[") {
+      depthBracket += 1;
+      continue;
+    }
+    if (character === "]") {
+      depthBracket = Math.max(0, depthBracket - 1);
+      continue;
+    }
+    if (character === "{") {
+      depthBrace += 1;
+      continue;
+    }
+    if (character === "}") {
+      depthBrace = Math.max(0, depthBrace - 1);
+      continue;
+    }
+    if (character === "?" && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export function analyzeActiveCallArguments(
   maskedText: string,
@@ -55,9 +110,9 @@ export function analyzeActiveCallArguments(
     }
     if (character === "," && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
       const segmentText = segment.slice(currentSegmentStart, index);
-      const match = segmentText.match(/^\s*([A-Za-z_$][\w$]*)\s*:/);
-      if (match) {
-        namedArgs.push(match[1]);
+      const namedArg = extractLeadingNamedArgName(segmentText);
+      if (namedArg) {
+        namedArgs.push(namedArg);
       }
       commaCount += 1;
       currentSegmentStart = index + 1;
@@ -65,12 +120,12 @@ export function analyzeActiveCallArguments(
   }
 
   const currentSegment = segment.slice(currentSegmentStart);
-  const currentMatch = currentSegment.match(/^\s*([A-Za-z_$][\w$]*)\s*:/);
+  const activeName = extractLeadingNamedArgName(currentSegment);
 
   return {
     activeIndex: commaCount,
-    activeName: currentMatch?.[1],
-    usesNamedArgs: namedArgs.length > 0 || Boolean(currentMatch?.[1])
+    activeName,
+    usesNamedArgs: namedArgs.length > 0 || Boolean(activeName)
   };
 }
 
