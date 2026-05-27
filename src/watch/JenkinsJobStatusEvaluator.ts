@@ -75,7 +75,9 @@ export class JenkinsJobStatusEvaluator {
     const shouldUpdateBuilding =
       typeof currentIsBuilding === "boolean" && currentIsBuilding !== previousIsBuilding;
     const shouldRefresh =
-      (shouldUpdateStatus && previousStatus !== undefined) ||
+      shouldUpdateStatus ||
+      shouldUpdateCompletion ||
+      shouldUpdateBuilding ||
       (buildNumberChanged && hasCompletionHistory) ||
       buildingChanged;
 
