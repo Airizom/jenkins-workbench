@@ -1,7 +1,6 @@
 import {
   findBareCallArgumentStart,
   findNextMeaningfulIndex,
-  findStatementStart,
   isValidStepStart,
   readIdentifier
 } from "./JenkinsfileContextNavigation";
@@ -133,7 +132,7 @@ export function findBareActiveCall(
   maskedText: string,
   offset: number
 ): JenkinsfileActiveCall | undefined {
-  const statementStart = findStatementStart(maskedText, offset);
+  const statementStart = findBareCallStatementStart(maskedText, offset);
   const callStart = resolveBareCallStart(maskedText, statementStart, offset);
   if (callStart === undefined) {
     return undefined;
@@ -203,6 +202,44 @@ function resolveBareCallStart(
   return undefined;
 }
 
+function findBareCallStatementStart(maskedText: string, offset: number): number {
+  let current = Math.max(0, offset - 1);
+  while (current >= 0) {
+    const character = maskedText[current];
+    if (character === "}") {
+      const interpolationStart = findInterpolationStart(maskedText, current);
+      if (interpolationStart !== undefined) {
+        current = interpolationStart - 1;
+        continue;
+      }
+      return current + 1;
+    }
+    if (character === "\n" || character === ";" || character === "{") {
+      return current + 1;
+    }
+    current -= 1;
+  }
+  return 0;
+}
+
+function findInterpolationStart(maskedText: string, closeBrace: number): number | undefined {
+  let depth = 0;
+  let index = closeBrace;
+  while (index >= 0) {
+    const character = maskedText[index];
+    if (character === "}") {
+      depth += 1;
+    } else if (character === "{") {
+      depth -= 1;
+      if (depth === 0) {
+        return index > 0 && maskedText[index - 1] === "$" ? index - 1 : undefined;
+      }
+    }
+    index -= 1;
+  }
+  return undefined;
+}
+
 function resolveAssignmentValueStart(
   maskedText: string,
   start: number,
@@ -246,9 +283,31 @@ function skipBalancedParentheses(maskedText: string, openParen: number): number 
   let index = openParen;
   while (index < maskedText.length) {
     const character = maskedText[index];
+    if (character === "$" && maskedText[index + 1] === "{") {
+      index = skipInterpolation(maskedText, index + 2);
+      continue;
+    }
     if (character === "(") {
       depth += 1;
     } else if (character === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return index + 1;
+      }
+    }
+    index += 1;
+  }
+  return maskedText.length;
+}
+
+function skipInterpolation(maskedText: string, start: number): number {
+  let depth = 1;
+  let index = start;
+  while (index < maskedText.length) {
+    const character = maskedText[index];
+    if (character === "{") {
+      depth += 1;
+    } else if (character === "}") {
       depth -= 1;
       if (depth === 0) {
         return index + 1;
