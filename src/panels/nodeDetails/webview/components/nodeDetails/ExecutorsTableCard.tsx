@@ -35,6 +35,19 @@ export function ExecutorsTableCard({
   entries,
   onOpenExternal
 }: ExecutorsTableCardProps): JSX.Element {
+  const [filter, setFilter] = React.useState<ExecutorFilter>("all");
+  const filteredEntries = React.useMemo(() => {
+    const sourceEntries = entries ?? [];
+
+    if (filter === "all") {
+      return sourceEntries;
+    }
+    if (filter === "busy") {
+      return sourceEntries.filter((entry) => Boolean(entry.workLabel));
+    }
+    return sourceEntries.filter((entry) => !entry.workLabel);
+  }, [entries, filter]);
+
   if (!entries || entries.length === 0) {
     return (
       <div className="flex items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
@@ -45,17 +58,6 @@ export function ExecutorsTableCard({
       </div>
     );
   }
-
-  const [filter, setFilter] = React.useState<ExecutorFilter>("all");
-  const filteredEntries = React.useMemo(() => {
-    if (filter === "all") {
-      return entries;
-    }
-    if (filter === "busy") {
-      return entries.filter((entry) => Boolean(entry.workLabel));
-    }
-    return entries.filter((entry) => !entry.workLabel);
-  }, [entries, filter]);
 
   return (
     <div className="rounded border border-border overflow-hidden">
