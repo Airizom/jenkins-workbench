@@ -37,8 +37,8 @@ export class BrowserSsoAuthenticationService implements BrowserSsoAuthenticator 
       return undefined;
     }
 
-    const callback = await createCallbackServer();
     const state = crypto.randomBytes(24).toString("base64url");
+    const callback = await createCallbackServer(state);
     const signInUrl = this.buildSignInUrl(loginUrl, callback.url, state);
     const timeout = this.createTimeout(callback.server);
 
@@ -50,7 +50,7 @@ export class BrowserSsoAuthenticationService implements BrowserSsoAuthenticator 
         return undefined;
       }
 
-      const result = await Promise.race([callback.waitForResult(state), timeout]);
+      const result = await Promise.race([callback.waitForResult(), timeout]);
       return {
         type: "sso",
         loginUrl: loginUrl.toString(),
@@ -96,10 +96,10 @@ export class BrowserSsoAuthenticationService implements BrowserSsoAuthenticator 
   }
 }
 
-function createCallbackServer(): Promise<{
+function createCallbackServer(expectedState: string): Promise<{
   server: http.Server;
   url: string;
-  waitForResult(state: string): Promise<CallbackResult>;
+  waitForResult(): Promise<CallbackResult>;
 }> {
   let resolveResult: ((value: CallbackResult) => void) | undefined;
   let rejectResult: ((reason: Error) => void) | undefined;
@@ -113,6 +113,21 @@ function createCallbackServer(): Promise<{
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
     if (requestUrl.pathname !== CALLBACK_PATH) {
       writeHtml(response, 404, "Jenkins Workbench SSO", "Unknown browser SSO callback path.");
+      return;
+    }
+
+    const callbackState = requestUrl.searchParams.get("state")?.trim();
+    if (!callbackState) {
+      writeHtml(response, 400, "Jenkins Workbench SSO", "Browser SSO callback was missing state.");
+      return;
+    }
+    if (callbackState !== expectedState) {
+      writeHtml(
+        response,
+        400,
+        "Jenkins Workbench SSO",
+        "Browser SSO callback state did not match."
+      );
       return;
     }
 
@@ -145,13 +160,7 @@ function createCallbackServer(): Promise<{
       resolve({
         server,
         url: `http://127.0.0.1:${address.port}${CALLBACK_PATH}`,
-        waitForResult: async (state) => {
-          const result = await resultPromise;
-          if (result.state !== state) {
-            throw new Error("Browser SSO callback state did not match.");
-          }
-          return result;
-        }
+        waitForResult: () => resultPromise
       });
     });
   });
