@@ -174,7 +174,12 @@ export function encodePathSegments(path: string): string {
   return path
     .split("/")
     .filter((segment) => segment.length > 0)
-    .map((segment) => encodeURIComponent(segment))
+    .map((segment) => {
+      if (segment === "." || segment === "..") {
+        throw new Error("Relative paths cannot contain dot path segments.");
+      }
+      return encodeURIComponent(segment);
+    })
     .join("/");
 }
 
