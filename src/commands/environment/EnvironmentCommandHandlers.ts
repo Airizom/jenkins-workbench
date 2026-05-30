@@ -144,12 +144,16 @@ function toEnvironmentTarget(
   return environment;
 }
 
-async function promptEnvironmentRemovalTarget(
-  store: JenkinsEnvironmentStore
+async function promptEnvironmentTarget(
+  store: JenkinsEnvironmentStore,
+  copy: {
+    emptyMessage: string;
+    placeHolder: string;
+  }
 ): Promise<EnvironmentTarget | undefined> {
   const environments = await store.listEnvironmentsWithScope();
   if (environments.length === 0) {
-    void vscode.window.showInformationMessage("No environments are available to remove.");
+    void vscode.window.showInformationMessage(copy.emptyMessage);
     return undefined;
   }
 
@@ -160,11 +164,20 @@ async function promptEnvironmentRemovalTarget(
   }));
 
   const pick = await vscode.window.showQuickPick(picks, {
-    placeHolder: "Select an environment to remove",
+    placeHolder: copy.placeHolder,
     matchOnDescription: true
   });
 
   return pick?.target;
+}
+
+async function promptEnvironmentRemovalTarget(
+  store: JenkinsEnvironmentStore
+): Promise<EnvironmentTarget | undefined> {
+  return promptEnvironmentTarget(store, {
+    emptyMessage: "No environments are available to remove.",
+    placeHolder: "Select an environment to remove"
+  });
 }
 
 export async function addEnvironment(
@@ -229,7 +242,12 @@ export async function signInWithBrowserSso(
   refreshHost: EnvironmentCommandRefreshHost,
   item?: JenkinsEnvironmentRef
 ): Promise<void> {
-  const target = item ? toEnvironmentTarget(item) : await promptEnvironmentRemovalTarget(store);
+  const target = item
+    ? toEnvironmentTarget(item)
+    : await promptEnvironmentTarget(store, {
+        emptyMessage: "No environments are available to sign in to.",
+        placeHolder: "Select an environment to sign in to"
+      });
   if (!target) {
     return;
   }
