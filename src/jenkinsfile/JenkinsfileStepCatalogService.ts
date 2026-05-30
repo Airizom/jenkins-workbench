@@ -20,6 +20,18 @@ interface LoadErrorEntry {
   retryAfter: number;
 }
 
+interface CatalogLoadContext {
+  allGeneration: number;
+  environmentGeneration: number;
+  environmentKey: string;
+}
+
+interface InFlightLoad {
+  context: CatalogLoadContext;
+  id: number;
+  promise: Promise<JenkinsfileStepCatalog>;
+}
+
 type JenkinsfileCatalogEnvironmentKey = Pick<JenkinsEnvironmentRef, "scope" | "environmentId">;
 
 const STEP_CATALOG_TTL_MS = 15 * 60 * 1000;
@@ -27,8 +39,11 @@ const STEP_CATALOG_RETRY_BACKOFF_MS = 30 * 1000;
 
 export class JenkinsfileStepCatalogService {
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly inFlight = new Map<string, Promise<JenkinsfileStepCatalog>>();
+  private readonly inFlight = new Map<string, InFlightLoad>();
   private readonly loadErrors = new Map<string, LoadErrorEntry>();
+  private readonly environmentGenerations = new Map<string, number>();
+  private allGeneration = 0;
+  private nextLoadId = 0;
 
   constructor(
     private readonly clientProvider: JenkinsClientProvider,
@@ -76,44 +91,44 @@ export class JenkinsfileStepCatalogService {
       return cached.catalog;
     }
 
-    const existing = this.inFlight.get(key);
-    if (existing) {
-      return existing;
+    const existingLoad = this.inFlight.get(key);
+    if (existingLoad) {
+      return existingLoad.promise;
     }
 
-    const promise = this.loadCatalog(environment, key);
-    this.inFlight.set(key, promise);
-    try {
-      return await promise;
-    } finally {
-      this.inFlight.delete(key);
-    }
+    return this.startCatalogLoad(environment, key).promise;
   }
 
   private async loadCatalog(
     environment: JenkinsEnvironmentRef,
-    key: string
+    key: string,
+    context: CatalogLoadContext
   ): Promise<JenkinsfileStepCatalog> {
     const client = await this.clientProvider.getClient(environment);
     const gdsl = await client.fetchPipelineSyntaxGdsl();
     const liveCatalog = parseJenkinsfileGdsl(gdsl);
     const catalog = mergeStepCatalogs(FALLBACK_JENKINSFILE_STEP_CATALOG, liveCatalog);
-    this.loadErrors.delete(key);
-    this.cache.set(key, {
-      catalog,
-      expiresAt: Date.now() + STEP_CATALOG_TTL_MS
-    });
+    if (this.isCurrentLoadContext(context)) {
+      this.loadErrors.delete(key);
+      this.cache.set(key, {
+        catalog,
+        expiresAt: Date.now() + STEP_CATALOG_TTL_MS
+      });
+    }
     return catalog;
   }
 
   invalidateAll(): void {
+    this.allGeneration += 1;
     this.cache.clear();
     this.inFlight.clear();
     this.loadErrors.clear();
+    this.environmentGenerations.clear();
   }
 
   invalidateEnvironment(environment: JenkinsfileCatalogEnvironmentKey): void {
     const environmentKey = buildEnvironmentKey(environment);
+    this.bumpEnvironmentGeneration(environmentKey);
     deleteMatchingKeys(this.cache, environmentKey);
     deleteMatchingKeys(this.inFlight, environmentKey);
     deleteMatchingKeys(this.loadErrors, environmentKey);
@@ -130,18 +145,57 @@ export class JenkinsfileStepCatalogService {
       return;
     }
     this.loadErrors.delete(key);
-    const promise = this.loadCatalog(environment, key);
-    this.inFlight.set(key, promise);
-    void promise
-      .catch((error) => {
+    const load = this.startCatalogLoad(environment, key);
+    void load.promise.catch((error) => {
+      if (this.isCurrentLoadContext(load.context)) {
         this.loadErrors.set(key, {
           error: normalizeCatalogError(error),
           retryAfter: Date.now() + STEP_CATALOG_RETRY_BACKOFF_MS
         });
-      })
-      .finally(() => {
+      }
+    });
+  }
+
+  private startCatalogLoad(environment: JenkinsEnvironmentRef, key: string): InFlightLoad {
+    const context = this.createLoadContext(environment);
+    const loadId = this.nextLoadId;
+    this.nextLoadId += 1;
+    const promise = this.loadCatalog(environment, key, context).finally(() => {
+      if (this.inFlight.get(key)?.id === loadId) {
         this.inFlight.delete(key);
-      });
+      }
+    });
+    const load = {
+      context,
+      id: loadId,
+      promise
+    };
+    this.inFlight.set(key, load);
+    return load;
+  }
+
+  private createLoadContext(environment: JenkinsfileCatalogEnvironmentKey): CatalogLoadContext {
+    const environmentKey = buildEnvironmentKey(environment);
+    return {
+      allGeneration: this.allGeneration,
+      environmentGeneration: this.environmentGenerations.get(environmentKey) ?? 0,
+      environmentKey
+    };
+  }
+
+  private isCurrentLoadContext(context: CatalogLoadContext): boolean {
+    return (
+      context.allGeneration === this.allGeneration &&
+      context.environmentGeneration ===
+        (this.environmentGenerations.get(context.environmentKey) ?? 0)
+    );
+  }
+
+  private bumpEnvironmentGeneration(environmentKey: string): void {
+    this.environmentGenerations.set(
+      environmentKey,
+      (this.environmentGenerations.get(environmentKey) ?? 0) + 1
+    );
   }
 }
 
