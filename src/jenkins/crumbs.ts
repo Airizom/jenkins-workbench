@@ -21,6 +21,7 @@ interface JenkinsCrumbFetchResult {
 
 export class JenkinsCrumbService {
   private crumbHeader?: JenkinsCrumbHeader;
+  private crumbFetchPromise?: Promise<JenkinsCrumbHeader | undefined>;
   private crumbFetchAttempted = false;
   private crumbFetchedAt = 0;
 
@@ -38,12 +39,35 @@ export class JenkinsCrumbService {
       return this.crumbHeader;
     }
 
+    if (this.crumbFetchPromise && !force) {
+      return this.crumbFetchPromise;
+    }
+
     if (this.crumbFetchAttempted && !force && !isExpired) {
       return undefined;
     }
 
     this.crumbFetchAttempted = true;
+    const crumbFetchPromise = this.fetchAndCacheCrumb(now);
+    this.crumbFetchPromise = crumbFetchPromise;
 
+    try {
+      return await crumbFetchPromise;
+    } finally {
+      if (this.crumbFetchPromise === crumbFetchPromise) {
+        this.crumbFetchPromise = undefined;
+      }
+    }
+  }
+
+  invalidate(): void {
+    this.crumbHeader = undefined;
+    this.crumbFetchPromise = undefined;
+    this.crumbFetchAttempted = false;
+    this.crumbFetchedAt = 0;
+  }
+
+  private async fetchAndCacheCrumb(fetchedAt: number): Promise<JenkinsCrumbHeader | undefined> {
     try {
       const url = buildApiUrlFromBase(this.baseUrl, "crumbIssuer/api/json");
       const { body: response, headers } = await this.fetchCrumb(url);
@@ -53,7 +77,7 @@ export class JenkinsCrumbService {
           value: response.crumb,
           cookie: buildCookieHeader(headers?.["set-cookie"])
         };
-        this.crumbFetchedAt = now;
+        this.crumbFetchedAt = fetchedAt;
         return this.crumbHeader;
       }
     } catch {
@@ -64,12 +88,6 @@ export class JenkinsCrumbService {
     }
 
     return undefined;
-  }
-
-  invalidate(): void {
-    this.crumbHeader = undefined;
-    this.crumbFetchAttempted = false;
-    this.crumbFetchedAt = 0;
   }
 }
 
