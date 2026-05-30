@@ -58,7 +58,13 @@ export async function handlePendingInputAction(
     }
 
     if (options.onRefresh) {
-      await options.onRefresh();
+      try {
+        await options.onRefresh();
+      } catch (error) {
+        void vscode.window.showWarningMessage(
+          `Input action for ${label} succeeded, but refresh failed: ${formatActionError(error)}`
+        );
+      }
     }
     return true;
   } catch (error) {
