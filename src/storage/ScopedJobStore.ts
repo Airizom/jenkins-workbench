@@ -139,23 +139,53 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     environmentId: string,
     oldJobUrl: string,
     newJobUrl: string,
-    newJobName?: string
+    newJobName: string | undefined,
+    merge: (existing: TEntry, incoming: TEntry) => TEntry
   ): Promise<boolean> {
     const entries = await this.readEntries(scope);
-    let found = false;
+    const sourceEntries = entries.filter((entry) =>
+      this.isSameJob(entry, { environmentId, jobUrl: oldJobUrl })
+    );
+
+    if (sourceEntries.length === 0) {
+      return false;
+    }
+
+    const incomingEntries = sourceEntries.map((entry) => ({
+      ...entry,
+      jobUrl: newJobUrl,
+      jobName: newJobName ?? entry.jobName
+    }));
+    const targetEntry =
+      oldJobUrl === newJobUrl
+        ? undefined
+        : entries.find((entry) => this.isSameJob(entry, { environmentId, jobUrl: newJobUrl }));
+    const mergedEntry = incomingEntries.reduce(
+      (merged, incoming) => merge(merged, incoming),
+      targetEntry ?? incomingEntries[0]
+    );
+    const shouldWriteAtTarget = Boolean(targetEntry);
+    let wroteMergedEntry = false;
     const next: TEntry[] = [];
 
     for (const entry of entries) {
-      if (entry.environmentId === environmentId && entry.jobUrl === oldJobUrl) {
-        found = true;
-        next.push({ ...entry, jobUrl: newJobUrl, jobName: newJobName ?? entry.jobName });
-      } else {
-        next.push(entry);
+      if (this.isSameJob(entry, { environmentId, jobUrl: oldJobUrl })) {
+        if (!shouldWriteAtTarget && !wroteMergedEntry) {
+          next.push(mergedEntry);
+          wroteMergedEntry = true;
+        }
+        continue;
       }
-    }
 
-    if (!found) {
-      return false;
+      if (this.isSameJob(entry, { environmentId, jobUrl: newJobUrl })) {
+        if (shouldWriteAtTarget && !wroteMergedEntry) {
+          next.push(mergedEntry);
+          wroteMergedEntry = true;
+        }
+        continue;
+      }
+
+      next.push(entry);
     }
 
     await this.writeEntries(scope, next);

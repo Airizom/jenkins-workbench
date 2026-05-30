@@ -110,6 +110,19 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
     newJobUrl: string,
     newJobName?: string
   ): Promise<boolean> {
-    return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName);
+    return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName, mergeWatchEntry);
   }
+}
+
+function mergeWatchEntry(
+  existing: StoredWatchedJobEntry,
+  incoming: StoredWatchedJobEntry
+): StoredWatchedJobEntry {
+  return {
+    ...mergeScopedJobEntryMetadata(existing, incoming),
+    lastStatus: existing.lastStatus ?? incoming.lastStatus,
+    lastCompletedBuildNumber:
+      existing.lastCompletedBuildNumber ?? incoming.lastCompletedBuildNumber,
+    lastIsBuilding: existing.lastIsBuilding ?? incoming.lastIsBuilding
+  };
 }

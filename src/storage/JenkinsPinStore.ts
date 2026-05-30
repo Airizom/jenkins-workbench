@@ -80,6 +80,13 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
     newJobUrl: string,
     newJobName?: string
   ): Promise<boolean> {
-    return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName);
+    return this.updateUrl(
+      scope,
+      environmentId,
+      oldJobUrl,
+      newJobUrl,
+      newJobName,
+      mergeScopedJobEntryMetadata
+    );
   }
 }
