@@ -7,6 +7,7 @@
   "include": [
     "src/jenkinsfile/JenkinsfileContextAnalyzer.ts",
     "src/jenkinsfile/context/**/*.ts",
+    "src/watch/**/*.ts",
     "test/**/*.ts"
   ],
   "exclude": ["node_modules", "out", "out-test", ".vscode-test"]
