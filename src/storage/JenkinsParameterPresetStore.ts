@@ -163,6 +163,7 @@ export class JenkinsParameterPresetStore {
     const nonSecretValues = this.sanitizeValues(input.values);
     const secretValues = this.sanitizeValues(input.secretValues ?? {});
     const nextSecretKeys: Record<string, string> = {};
+    const storedSecretKeys: string[] = [];
 
     for (const nameKey of Object.keys(previousSecretKeys)) {
       if (!Object.prototype.hasOwnProperty.call(nonSecretValues, nameKey)) {
@@ -182,6 +183,7 @@ export class JenkinsParameterPresetStore {
       const secretKey = this.buildSecretKey(scope, environmentId, jobUrl, presetId, nameKey);
       await this.context.secrets.store(secretKey, JSON.stringify(value));
       nextSecretKeys[nameKey] = secretKey;
+      storedSecretKeys.push(secretKey);
     }
 
     if (preserveExistingSecrets) {
@@ -189,8 +191,6 @@ export class JenkinsParameterPresetStore {
         nextSecretKeys[nameKey] = nextSecretKeys[nameKey] ?? secretKey;
       }
     }
-
-    await this.deleteUnusedSecretKeys(previousSecretKeys, nextSecretKeys);
 
     const updatedAt = Date.now();
     const nextPreset: StoredParameterPreset = {
@@ -217,9 +217,16 @@ export class JenkinsParameterPresetStore {
       jobs.push(currentEntry);
     }
 
-    await this.updateState(scope, {
-      jobs
-    });
+    try {
+      await this.updateState(scope, {
+        jobs
+      });
+    } catch (error) {
+      await this.deleteSecretKeyValuesBestEffort(storedSecretKeys);
+      throw error;
+    }
+
+    await this.deleteUnusedSecretKeys(previousSecretKeys, nextSecretKeys);
 
     return {
       id: nextPreset.id,
@@ -284,7 +291,6 @@ export class JenkinsParameterPresetStore {
     const { jobs, entryIndex, entry, presetIndex } = target;
 
     const [removed] = entry.presets.splice(presetIndex, 1);
-    await this.deleteSecretKeys(removed.secretKeys);
 
     if (entry.presets.length === 0) {
       jobs.splice(entryIndex, 1);
@@ -293,6 +299,7 @@ export class JenkinsParameterPresetStore {
     }
 
     await this.updateState(scope, { jobs });
+    await this.deleteSecretKeys(removed.secretKeys);
     return true;
   }
 
@@ -308,11 +315,11 @@ export class JenkinsParameterPresetStore {
     }
 
     const [removed] = jobs.splice(entryIndex, 1);
+
+    await this.updateState(scope, { jobs });
     for (const preset of removed.presets) {
       await this.deleteSecretKeys(preset.secretKeys);
     }
-
-    await this.updateState(scope, { jobs });
   }
 
   async removePresetsForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
@@ -324,13 +331,12 @@ export class JenkinsParameterPresetStore {
     }
 
     const next = jobs.filter((entry) => entry.environmentId !== environmentId);
+    await this.updateState(scope, { jobs: next });
     for (const entry of removed) {
       for (const preset of entry.presets) {
         await this.deleteSecretKeys(preset.secretKeys);
       }
     }
-
-    await this.updateState(scope, { jobs: next });
   }
 
   async updatePresetUrl(
@@ -550,6 +556,16 @@ export class JenkinsParameterPresetStore {
     }
   }
 
+  private async deleteSecretKeyValuesBestEffort(secretKeys: readonly string[]): Promise<void> {
+    for (const key of secretKeys) {
+      try {
+        await this.context.secrets.delete(key);
+      } catch {
+        // Preserve the original memento update error.
+      }
+    }
+  }
+
   private buildSecretKey(
     scope: EnvironmentScope,
     environmentId: string,
@@ -561,7 +577,7 @@ export class JenkinsParameterPresetStore {
       .createHash("sha256")
       .update(`${scope}|${environmentId}|${jobUrl}|${presetId}|${parameterName}`)
       .digest("hex");
-    return `${SECRET_KEY_PREFIX}.${scope}.${environmentId}.${hash}`;
+    return `${SECRET_KEY_PREFIX}.${scope}.${environmentId}.${hash}.${crypto.randomUUID()}`;
   }
 
   private getMemento(scope: EnvironmentScope): vscode.Memento {
