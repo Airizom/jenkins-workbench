@@ -35,6 +35,12 @@ export class PipelineStageLogAggregator {
 
   constructor(private readonly options: PipelineStageLogAggregatorOptions) {}
 
+  reset(): void {
+    this.nodeCache.clear();
+    this.childNodeIdsCache.clear();
+    this.resetCursor();
+  }
+
   resetCursor(): void {
     this.fetchCursor = 0;
   }

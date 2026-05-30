@@ -52,11 +52,16 @@ export class PipelineNodeLogManager {
     if (!normalizedTarget) {
       return;
     }
+    const targetChanged = this.activeTarget?.key !== normalizedTarget.key;
     this.generation += 1;
     this.paused = false;
     this.activeTarget = normalizedTarget;
     this.nodeLogFetcher.reset();
-    this.stageLogAggregator.resetCursor();
+    if (targetChanged) {
+      this.stageLogAggregator.reset();
+    } else {
+      this.stageLogAggregator.resetCursor();
+    }
     this.queuedFetchInitial = undefined;
     this.clearTimer();
 
