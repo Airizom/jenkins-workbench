@@ -18,6 +18,7 @@ const DEFAULT_MAX_CONSECUTIVE_ERRORS = 3;
 export class JenkinsStatusPoller implements vscode.Disposable {
   private tickSubscription: vscode.Disposable | undefined;
   private isPolling = false;
+  private hasPendingPoll = false;
   private readonly _onDidChangeWatchErrorCount = new vscode.EventEmitter<number>();
   private readonly evaluator: JenkinsJobStatusEvaluator;
   private readonly failureCounts = new Map<string, number>();
@@ -81,20 +82,21 @@ export class JenkinsStatusPoller implements vscode.Disposable {
 
   private async poll(): Promise<void> {
     if (this.isPolling) {
+      this.hasPendingPoll = true;
       return;
     }
 
     this.isPolling = true;
     try {
-      const watched = await this.watchStore.listWatchedJobs();
-      if (watched.length === 0) {
-        this.clearWatchState();
-        return;
-      }
-      const didChange = await this.checkWatchedJobs(watched);
-      if (didChange) {
-        this.host.fullEnvironmentRefresh();
-      }
+      do {
+        this.hasPendingPoll = false;
+        const watched = await this.watchStore.listWatchedJobs();
+        if (watched.length === 0) {
+          this.clearWatchState();
+        } else if (await this.checkWatchedJobs(watched)) {
+          this.host.fullEnvironmentRefresh();
+        }
+      } while (this.hasPendingPoll);
     } finally {
       this.isPolling = false;
     }
