@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.48.1] - 2026-05-30
+
+### Fixed
+
+- fix: reset Jenkins crumb retry state after crumb fetch errors
+- fix: prevent stale build details, stage log, node details, and webview state updates
+- fix: improve pending-input, watch, refresh, and queue update handling
+- fix: harden Jenkins Browser SSO callback validation and webview nonce generation
+- fix: preserve scoped job, preset secret, artifact preview, and workspace path behavior
+- fix: improve Jenkinsfile parsing, validation, hover links, and parameter handling
+- fix: correct panel loading, badges, summaries, checkbox, skeleton, and empty-state UI
+
+### Changed
+
+- refactor: consolidate shared panel, tree, build, formatter, and Jenkins helper modules
+- chore: require Node 24 or newer in package engine fields
+
+### Tests
+
+- test: add package manifest validation and container regression coverage
+- test: remove compiled-output node tests
+
 ## [1.48.0] - 2026-05-03
 
 ### Added
