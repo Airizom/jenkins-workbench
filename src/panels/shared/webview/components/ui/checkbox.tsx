@@ -17,12 +17,14 @@ export const Checkbox = React.forwardRef<
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "data-[state=checked]:bg-checkbox-checked",
+      "data-[state=indeterminate]:bg-checkbox-checked",
       className
     )}
     {...props}
   >
-    <CheckboxPrimitive.Indicator className="flex items-center justify-center text-current">
-      <CheckIcon />
+    <CheckboxPrimitive.Indicator className="group flex items-center justify-center text-current">
+      <CheckIcon className="hidden group-data-[state=checked]:block" />
+      <IndeterminateIcon className="hidden group-data-[state=indeterminate]:block" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ));
@@ -43,6 +45,24 @@ function CheckIcon({ className }: { className?: string }) {
       className={cn(className)}
     >
       <path d="M3.5 8.5l3 3 6-7" />
+    </svg>
+  );
+}
+
+function IndeterminateIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      className={cn(className)}
+    >
+      <path d="M4 8h8" />
     </svg>
   );
 }
