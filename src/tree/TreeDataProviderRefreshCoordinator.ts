@@ -28,6 +28,9 @@ export class TreeDataProviderRefreshCoordinator {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = undefined;
     }
+    for (const resolveWaiter of this.refreshWaiters.values()) {
+      resolveWaiter();
+    }
     this.refreshWaiters.clear();
     this.pendingRefreshWaiters.clear();
   }
