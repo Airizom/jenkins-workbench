@@ -381,7 +381,11 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         buildUrl,
         jobName
       );
-    } catch {
+    } catch (error) {
+      console.warn(
+        `Failed to check pending inputs for ${this.formatWatchLabel(entry, jobName)} in ${environment.url} (${buildUrl}).`,
+        error
+      );
       return;
     }
   }
