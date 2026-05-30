@@ -98,7 +98,7 @@ export class TreeChildrenCacheManager {
       return;
     }
 
-    this.clearPendingAndLoadTokensByPrefix(`${environmentId}:`);
+    this.clearPendingAndLoadTokensForEnvironment(environmentId);
     this.childrenCache.clearForEnvironment(environmentId);
     this.artifactCache.clearForEnvironment(environmentId);
   }
@@ -178,6 +178,32 @@ export class TreeChildrenCacheManager {
         this.loadTokens.delete(key);
       }
     }
+  }
+
+  private clearPendingAndLoadTokensForEnvironment(environmentId: string): void {
+    for (const key of this.pendingLoads.keys()) {
+      if (this.isEnvironmentScopedChildKey(key, environmentId)) {
+        this.clearChildrenCache(key);
+      }
+    }
+    for (const key of this.loadTokens.keys()) {
+      if (this.isEnvironmentScopedChildKey(key, environmentId) && !this.pendingLoads.has(key)) {
+        this.loadTokens.delete(key);
+      }
+    }
+  }
+
+  private isEnvironmentScopedChildKey(key: string, environmentId: string): boolean {
+    if (key.startsWith(`${environmentId}:`)) {
+      return true;
+    }
+
+    const firstSeparator = key.indexOf(":");
+    const secondSeparator = key.indexOf(":", firstSeparator + 1);
+    if (firstSeparator < 0 || secondSeparator < 0) {
+      return false;
+    }
+    return key.slice(firstSeparator + 1, secondSeparator) === environmentId;
   }
 
   clearChildrenCache(key: string): void {
