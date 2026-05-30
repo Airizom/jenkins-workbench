@@ -210,6 +210,63 @@ const validateValueAgainstSchema = (value, schema, pathLabel) => {
   }
 };
 
+const valueMatchesSchema = (value, schema) => {
+  if (!schema || typeof schema !== "object") {
+    return true;
+  }
+
+  if (Array.isArray(schema.anyOf)) {
+    return schema.anyOf.some((childSchema) => valueMatchesSchema(value, childSchema));
+  }
+
+  if (Array.isArray(schema.oneOf)) {
+    return (
+      schema.oneOf.filter((childSchema) => valueMatchesSchema(value, childSchema)).length === 1
+    );
+  }
+
+  const types = getSchemaTypes(schema);
+  if (types.length > 0 && !types.some((type) => matchesSchemaType(value, type))) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return schema.items ? value.every((item) => valueMatchesSchema(item, schema.items)) : true;
+  }
+
+  if (value !== null && typeof value === "object") {
+    for (const requiredKey of schema.required ?? []) {
+      if (!Object.hasOwn(value, requiredKey)) {
+        return false;
+      }
+    }
+
+    const properties = schema.properties ?? {};
+    for (const [key, childValue] of Object.entries(value)) {
+      if (Object.hasOwn(properties, key)) {
+        if (!valueMatchesSchema(childValue, properties[key])) {
+          return false;
+        }
+        continue;
+      }
+
+      if (schema.additionalProperties === false) {
+        return false;
+      }
+
+      if (
+        schema.additionalProperties &&
+        typeof schema.additionalProperties === "object" &&
+        !valueMatchesSchema(childValue, schema.additionalProperties)
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
 const configurationProperties = packageJson.contributes?.configuration?.properties ?? {};
 
 for (const [name, schema] of Object.entries(configurationProperties)) {
@@ -223,6 +280,30 @@ for (const [name, schema] of Object.entries(configurationProperties)) {
     schema,
     `contributes.configuration.properties.${name}`
   );
+}
+
+const jenkinsTaskDefinition = (packageJson.contributes?.taskDefinitions ?? []).find(
+  (definition) => definition?.type === "jenkinsWorkbench"
+);
+const taskParametersSchema = jenkinsTaskDefinition?.properties?.parameters;
+
+if (!taskParametersSchema) {
+  fail("jenkinsWorkbench task definition must declare parameters schema");
+} else {
+  const validTaskParameterExamples = [
+    { branch: "main", retry: 2, deploy: true, targets: ["qa", "prod"] },
+    [
+      { name: "branch", value: "main" },
+      { name: "retry", value: 2 },
+      { name: "deploy", value: true }
+    ]
+  ];
+
+  validTaskParameterExamples.forEach((example, index) => {
+    if (!valueMatchesSchema(example, taskParametersSchema)) {
+      fail(`jenkinsWorkbench task parameters schema rejects supported example ${index + 1}`);
+    }
+  });
 }
 
 if (errors.length > 0) {
