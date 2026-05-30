@@ -64,11 +64,10 @@ export function NodeCapacityApp(): JSX.Element {
     postLoadExecutors(postMessage, initiallyOpenNodeUrls);
   }, [initiallyOpenNodeUrls, postMessage]);
 
-  const initialLoading = (
-    <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="node" />
-  );
-  if (initialLoading) {
-    return initialLoading;
+  if (state.loading && !state.hasLoaded) {
+    return (
+      <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="node" />
+    );
   }
 
   const handleRefresh = () => {
