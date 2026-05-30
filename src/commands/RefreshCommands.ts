@@ -18,11 +18,15 @@ export function registerRefreshCommands(
         const refreshWaiter = provider.createRefreshWaiter();
 
         if (item) {
-          refreshHost.fullEnvironmentRefresh({
+          const result = refreshHost.fullEnvironmentRefresh({
             environmentId: item.environmentId,
             trigger: "manual",
             refreshToken: refreshWaiter.token
           });
+          if (!result.executed) {
+            refreshWaiter.dispose();
+            return;
+          }
           await refreshWaiter.promise;
           await expansionState.restore(snapshot);
           return;
