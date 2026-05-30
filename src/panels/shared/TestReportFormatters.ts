@@ -60,5 +60,8 @@ export function formatTestReportCountsSummary(input: TestReportCountSummaryInput
   if (typeof input.failed === "number") {
     return `Failed ${formatNumber(input.failed)} tests`;
   }
+  if (typeof input.skipped === "number") {
+    return `Skipped ${formatNumber(input.skipped)} tests`;
+  }
   return EMPTY_TEST_RESULTS_LABEL;
 }
