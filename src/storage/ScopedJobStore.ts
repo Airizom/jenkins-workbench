@@ -122,6 +122,28 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     return true;
   }
 
+  protected async removeJobs(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrls: ReadonlySet<string>
+  ): Promise<number> {
+    if (jobUrls.size === 0) {
+      return 0;
+    }
+
+    const entries = await this.readEntries(scope);
+    const next = entries.filter(
+      (entry) => entry.environmentId !== environmentId || !jobUrls.has(entry.jobUrl)
+    );
+    const removed = entries.length - next.length;
+    if (removed === 0) {
+      return 0;
+    }
+
+    await this.writeEntries(scope, next);
+    return removed;
+  }
+
   protected async removeForEnvironment(
     scope: EnvironmentScope,
     environmentId: string

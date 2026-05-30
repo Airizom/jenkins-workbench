@@ -69,8 +69,7 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
       return 0;
     }
 
-    await Promise.all(missing.map((entry) => this.remove(scope, environmentId, entry.jobUrl)));
-    return missing.length;
+    return this.removeJobs(scope, environmentId, new Set(missing.map((entry) => entry.jobUrl)));
   }
 
   async updatePinUrl(
