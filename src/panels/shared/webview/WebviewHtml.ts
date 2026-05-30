@@ -242,7 +242,7 @@ export function renderPanelAppHtml(
 ): string {
   const initialState = serializeForScript(initialModel);
   const scriptUri = options.scriptUri ?? "";
-  const stateScript = renderWebviewStateScript(options.panelState, options.nonce);
+  const stateScript = renderInjectedWebviewStateScript(options.panelState, options.nonce);
   return renderWebviewShell(
     `
       ${stateScript}
@@ -263,15 +263,22 @@ export function renderWebviewStateScript(state: unknown, nonce: string): string 
   const serialized = serializeForScript(state);
   return `
     <script nonce="${nonce}">
-      const vscodeApi =
-        window.__vscodeApi__ ??
-        (typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined);
-      if (vscodeApi) {
-        window.__vscodeApi__ = vscodeApi;
-      }
+      const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined;
       if (vscodeApi && typeof vscodeApi.setState === "function") {
         vscodeApi.setState(${serialized});
       }
+    </script>
+  `;
+}
+
+function renderInjectedWebviewStateScript(state: unknown, nonce: string): string {
+  if (state === undefined) {
+    return "";
+  }
+  const serialized = serializeForScript(state);
+  return `
+    <script nonce="${nonce}">
+      window.__JENKINS_WORKBENCH_PANEL_STATE__ = ${serialized};
     </script>
   `;
 }

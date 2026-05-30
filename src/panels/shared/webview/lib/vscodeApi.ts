@@ -5,18 +5,34 @@ type VsCodeApi = {
 };
 
 let vscodeApiInstance: VsCodeApi | undefined;
+let injectedStateApplied = false;
+
+function applyInjectedPanelState(api: VsCodeApi): void {
+  if (injectedStateApplied) {
+    return;
+  }
+  injectedStateApplied = true;
+
+  const windowWithState = window as {
+    __JENKINS_WORKBENCH_PANEL_STATE__?: unknown;
+  };
+  if (!Object.prototype.hasOwnProperty.call(windowWithState, "__JENKINS_WORKBENCH_PANEL_STATE__")) {
+    return;
+  }
+
+  const state = windowWithState.__JENKINS_WORKBENCH_PANEL_STATE__;
+  windowWithState.__JENKINS_WORKBENCH_PANEL_STATE__ = undefined;
+  api.setState?.(state);
+}
 
 export function getVsCodeApi(): VsCodeApi {
   if (!vscodeApiInstance) {
     const windowWithApi = window as {
       acquireVsCodeApi?: () => VsCodeApi;
-      __vscodeApi__?: VsCodeApi;
     };
-    const api = windowWithApi.__vscodeApi__ ?? windowWithApi.acquireVsCodeApi?.();
+    const api = windowWithApi.acquireVsCodeApi?.();
     vscodeApiInstance = api ?? { postMessage: () => undefined };
-    if (!windowWithApi.__vscodeApi__ && api) {
-      windowWithApi.__vscodeApi__ = api;
-    }
+    applyInjectedPanelState(vscodeApiInstance);
   }
   return vscodeApiInstance;
 }
