@@ -159,7 +159,11 @@ export class PanelLoadTracker {
   }
 
   resetLoadingRequests(): void {
+    if (this.loadingRequests === 0) {
+      return;
+    }
     this.loadingRequests = 0;
+    this.postLoading(false);
   }
 
   beginLoading(): void {
