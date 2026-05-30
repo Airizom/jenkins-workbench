@@ -254,7 +254,7 @@ async function promptForFileParameter(
   });
 
   if (!selected || selected.length === 0) {
-    return hasDefaultPath ? undefined : "";
+    return undefined;
   }
 
   return selected[0].fsPath;
