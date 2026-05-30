@@ -157,17 +157,37 @@ export class JenkinsParameterPresetStore {
       );
     }
 
-    const nonSecretValues = this.sanitizeValues(input.values);
-    const secretValues = this.sanitizeValues(input.secretValues ?? {});
-
     const previous = existingIndex >= 0 ? currentEntry.presets[existingIndex] : undefined;
     const previousSecretKeys = previous?.secretKeys ?? {};
+    const preserveExistingSecrets = input.secretValues === undefined;
+    const nonSecretValues = this.sanitizeValues(input.values);
+    const secretValues = this.sanitizeValues(input.secretValues ?? {});
     const nextSecretKeys: Record<string, string> = {};
+
+    for (const nameKey of Object.keys(previousSecretKeys)) {
+      if (!Object.prototype.hasOwnProperty.call(nonSecretValues, nameKey)) {
+        continue;
+      }
+      if (preserveExistingSecrets) {
+        secretValues[nameKey] = nonSecretValues[nameKey];
+      }
+      delete nonSecretValues[nameKey];
+    }
+
+    for (const nameKey of Object.keys(secretValues)) {
+      delete nonSecretValues[nameKey];
+    }
 
     for (const [nameKey, value] of Object.entries(secretValues)) {
       const secretKey = this.buildSecretKey(scope, environmentId, jobUrl, presetId, nameKey);
       await this.context.secrets.store(secretKey, JSON.stringify(value));
       nextSecretKeys[nameKey] = secretKey;
+    }
+
+    if (preserveExistingSecrets) {
+      for (const [nameKey, secretKey] of Object.entries(previousSecretKeys)) {
+        nextSecretKeys[nameKey] = nextSecretKeys[nameKey] ?? secretKey;
+      }
     }
 
     await this.deleteUnusedSecretKeys(previousSecretKeys, nextSecretKeys);
