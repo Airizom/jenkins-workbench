@@ -58,6 +58,7 @@ export class JenkinsCrumbService {
       }
     } catch {
       this.crumbHeader = undefined;
+      this.crumbFetchAttempted = false;
       this.crumbFetchedAt = 0;
       return undefined;
     }
