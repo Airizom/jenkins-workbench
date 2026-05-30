@@ -108,7 +108,14 @@ export async function removeMissingPins(
     const jobs = await dataService.getAllJobsForEnvironment(item.environment, {
       mode: "refresh"
     });
-    const validUrls = new Set(jobs.map((job) => job.url));
+    const validUrls = new Set<string>();
+    for (const job of jobs) {
+      validUrls.add(job.url);
+      const canonicalJobUrl = canonicalizeJobUrlForEnvironment(item.environment.url, job.url);
+      if (canonicalJobUrl) {
+        validUrls.add(canonicalJobUrl);
+      }
+    }
     const removed = await pinStore.removeMissingPins(
       item.environment.scope,
       item.environment.environmentId,
