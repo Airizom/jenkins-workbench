@@ -342,7 +342,7 @@ export class BuildDetailsPollingController {
         this.lastPendingInputsCount = 0;
       }
 
-      if (pollGeneration !== this.pollGeneration) {
+      if (!this.isPollCurrent(pollGeneration)) {
         return;
       }
 
@@ -388,23 +388,27 @@ export class BuildDetailsPollingController {
       const shouldFetchWorkflow = this.shouldFetchWorkflow(building, completedNow);
       if (shouldFetchWorkflow) {
         const workflowStart = Date.now();
-        const retryingWorkflow = building === false && this.workflowRetryPending;
-        if (retryingWorkflow) {
-          this.workflowRetryPending = false;
-        }
         this.callbacks.onWorkflowFetchStart?.();
         try {
           workflowRun = await this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
+          if (!this.isPollCurrent(pollGeneration)) {
+            return;
+          }
           this.callbacks.onWorkflowRun(workflowRun);
           this.workflowRetryPending = false;
         } catch (error) {
+          if (!this.isPollCurrent(pollGeneration)) {
+            return;
+          }
           workflowError = error;
           this.callbacks.onWorkflowError(workflowError);
           if (building === false) {
             this.workflowRetryPending = true;
           }
         } finally {
-          this.lastWorkflowFetchAt = workflowStart;
+          if (this.isPollCurrent(pollGeneration)) {
+            this.lastWorkflowFetchAt = workflowStart;
+          }
         }
       }
 
@@ -445,5 +449,9 @@ export class BuildDetailsPollingController {
       MIN_WORKFLOW_REFRESH_MS
     );
     return Date.now() - this.lastWorkflowFetchAt >= interval;
+  }
+
+  private isPollCurrent(pollGeneration: number): boolean {
+    return pollGeneration === this.pollGeneration && this.pollingActive && !this.disposed;
   }
 }
