@@ -58,11 +58,14 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     postMessage({ type: "exportConsole" });
   };
 
-  const initialLoading = (
-    <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="build" />
-  );
-  if (initialLoading) {
-    return initialLoading;
+  if (state.loading && !state.hasLoaded) {
+    return (
+      <PanelInitialLoadingGate
+        loading={state.loading}
+        hasLoaded={state.hasLoaded}
+        variant="build"
+      />
+    );
   }
 
   return (
