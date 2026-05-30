@@ -48,8 +48,12 @@ export function formatRelativeDate(date: Date | undefined, now: number): string 
     return "Unknown";
   }
 
-  const rawDeltaMs = now - date.getTime();
-  const deltaMs = rawDeltaMs < 0 ? -rawDeltaMs : rawDeltaMs;
+  const timestampMs = date.getTime();
+  if (!Number.isFinite(timestampMs) || !Number.isFinite(now)) {
+    return "Unknown";
+  }
+
+  const deltaMs = Math.max(0, now - timestampMs);
   if (deltaMs < 15_000) {
     return "Just now";
   }
