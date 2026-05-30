@@ -177,11 +177,12 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         job.name
       );
 
+      const jobNameChanged = job.name !== entry.jobName;
       const shouldUpdateEntry =
         evaluation.shouldUpdateStatus ||
         evaluation.shouldUpdateCompletion ||
         evaluation.shouldUpdateBuilding ||
-        job.name !== entry.jobName;
+        jobNameChanged;
 
       if (shouldUpdateEntry) {
         await this.watchStore.updateWatchStatus(entry.scope, entry.environmentId, entry.jobUrl, {
@@ -196,7 +197,7 @@ export class JenkinsStatusPoller implements vscode.Disposable {
         });
       }
 
-      return evaluation.shouldRefresh;
+      return evaluation.shouldRefresh || jobNameChanged;
     } catch (error) {
       return await this.handlePollingError(entry, environment, error);
     }

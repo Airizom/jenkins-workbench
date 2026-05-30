@@ -67,6 +67,7 @@ export class NodeCapacityPanel {
   private capacityService?: NodeCapacityService;
   private environment?: JenkinsEnvironmentRef;
   private readonly loadTracker: PanelLoadTracker;
+  private capacityRequestCount = 0;
   private hasRendered = false;
   private nonce = createNonce();
 
@@ -143,6 +144,9 @@ export class NodeCapacityPanel {
     attachPanelLifecycle(this.panel, this.disposables, {
       onDispose: () => this.dispose(),
       onVisible: () => {
+        if (!this.hasRendered) {
+          return;
+        }
         this.startVisibleRefreshTimer();
         void this.refreshCapacity({ skipLoading: true });
       }
@@ -194,55 +198,72 @@ export class NodeCapacityPanel {
   }
 
   private async load(): Promise<void> {
+    this.stopVisibleRefreshTimer();
+    this.beginCapacityRequest();
     const token = this.loadTracker.nextToken();
     this.hasRendered = false;
     this.nonce = createNonce();
     this.loadTracker.resetLoadingRequests();
-    const panelState = this.environment
-      ? createSerializedEnvironmentState(this.environment)
-      : undefined;
+    try {
+      const panelState = this.environment
+        ? createSerializedEnvironmentState(this.environment)
+        : undefined;
 
-    const assets = resolvePanelWebviewAssetsOrError(this.panel, this.extensionUri, "nodeCapacity", {
-      ...createMissingPanelAssetsMessages({
-        title: "Node Capacity",
-        panelLabel: "Node capacity",
-        reopenHint: "Open node capacity again from Jenkins Workbench to continue."
-      }),
-      panelState
-    });
-    if (!assets) {
-      return;
+      const assets = resolvePanelWebviewAssetsOrError(
+        this.panel,
+        this.extensionUri,
+        "nodeCapacity",
+        {
+          ...createMissingPanelAssetsMessages({
+            title: "Node Capacity",
+            panelLabel: "Node capacity",
+            reopenHint: "Open node capacity again from Jenkins Workbench to continue."
+          }),
+          panelState
+        }
+      );
+      if (!assets) {
+        return;
+      }
+      const { scriptUri, styleUris } = assets;
+
+      this.panel.webview.html = renderLoadingHtml({
+        cspSource: this.panel.webview.cspSource,
+        nonce: this.nonce,
+        styleUris,
+        panelState
+      });
+
+      const model = await this.fetchCapacity(token);
+      if (!model || !this.loadTracker.isCurrent(token)) {
+        return;
+      }
+
+      this.panel.webview.html = renderNodeCapacityHtml(model, {
+        cspSource: this.panel.webview.cspSource,
+        nonce: this.nonce,
+        scriptUri,
+        styleUris,
+        panelState
+      });
+      this.hasRendered = true;
+    } finally {
+      this.endCapacityRequest();
+      if (this.hasRendered) {
+        this.startVisibleRefreshTimer();
+      }
     }
-    const { scriptUri, styleUris } = assets;
-
-    this.panel.webview.html = renderLoadingHtml({
-      cspSource: this.panel.webview.cspSource,
-      nonce: this.nonce,
-      styleUris,
-      panelState
-    });
-
-    const model = await this.fetchCapacity(token);
-    if (!model || !this.loadTracker.isCurrent(token)) {
-      return;
-    }
-
-    this.panel.webview.html = renderNodeCapacityHtml(model, {
-      cspSource: this.panel.webview.cspSource,
-      nonce: this.nonce,
-      scriptUri,
-      styleUris,
-      panelState
-    });
-    this.hasRendered = true;
-    this.startVisibleRefreshTimer();
   }
 
   private async refreshCapacity(options?: { skipLoading?: boolean }): Promise<void> {
+    if (this.hasCapacityRequestInFlight) {
+      return;
+    }
     if (!this.hasRendered) {
       await this.load();
       return;
     }
+    this.beginCapacityRequest();
     const token = this.loadTracker.nextToken();
     if (!options?.skipLoading) {
       this.loadTracker.beginLoading();
@@ -257,6 +278,7 @@ export class NodeCapacityPanel {
       if (!options?.skipLoading) {
         this.loadTracker.endLoading();
       }
+      this.endCapacityRequest();
     }
   }
 
@@ -353,7 +375,7 @@ export class NodeCapacityPanel {
   }
 
   private startVisibleRefreshTimer(): void {
-    if (!this.panel.visible || this.refreshTimer) {
+    if (!this.panel.visible || this.refreshTimer || this.hasCapacityRequestInFlight) {
       return;
     }
     // Capacity combines queue and node calls, so it polls only while visible and uses a named
@@ -371,5 +393,17 @@ export class NodeCapacityPanel {
     }
     clearInterval(this.refreshTimer);
     this.refreshTimer = undefined;
+  }
+
+  private get hasCapacityRequestInFlight(): boolean {
+    return this.capacityRequestCount > 0;
+  }
+
+  private beginCapacityRequest(): void {
+    this.capacityRequestCount += 1;
+  }
+
+  private endCapacityRequest(): void {
+    this.capacityRequestCount = Math.max(0, this.capacityRequestCount - 1);
   }
 }
