@@ -113,6 +113,7 @@ export async function promptHeadersJson(): Promise<Record<string, string> | unde
   const value = await vscode.window.showInputBox({
     prompt: "Custom headers (JSON object)",
     placeHolder: '{"Cookie":"JSESSIONID=...","X-Forwarded-User":"jenkins"}',
+    password: true,
     ignoreFocusOut: true,
     validateInput: (input) => {
       const trimmed = input.trim();
