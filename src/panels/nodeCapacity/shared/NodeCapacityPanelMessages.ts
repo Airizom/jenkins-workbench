@@ -84,10 +84,9 @@ export function isOpenNodeDetailsMessage(message: unknown): message is OpenNodeD
 export function isLoadNodeCapacityExecutorsMessage(
   message: unknown
 ): message is LoadNodeCapacityExecutorsMessage {
-  const nodeUrls = (message as { nodeUrls?: unknown }).nodeUrls;
-  return (
-    hasMessageType(message, "loadNodeCapacityExecutors") &&
-    Array.isArray(nodeUrls) &&
-    nodeUrls.every((nodeUrl) => typeof nodeUrl === "string")
-  );
+  if (!hasMessageType(message, "loadNodeCapacityExecutors")) {
+    return false;
+  }
+  const nodeUrls = message.nodeUrls;
+  return Array.isArray(nodeUrls) && nodeUrls.every((nodeUrl) => typeof nodeUrl === "string");
 }
