@@ -12,6 +12,7 @@
     "noUnusedParameters": true,
     "isolatedModules": true,
     "esModuleInterop": true,
+    "types": ["node", "vscode", "react", "react-dom"],
     "skipLibCheck": true
   },
   "include": [
