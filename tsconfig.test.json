@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "out-test"
+  },
+  "include": [
+    "src/jenkinsfile/JenkinsfileContextAnalyzer.ts",
+    "src/jenkinsfile/context/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "exclude": ["node_modules", "out", "out-test", ".vscode-test"]
+}
