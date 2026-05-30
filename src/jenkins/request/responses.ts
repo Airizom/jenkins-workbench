@@ -58,7 +58,7 @@ function collectResponseBody(
   options: JenkinsRequestOptions
 ): Promise<JenkinsCollectedResponseBody> {
   const collectBuffer = options.returnBuffer === true;
-  const maxBytes = collectBuffer ? normalizeMaxBytes(options.maxBytes) : undefined;
+  const maxBytes = normalizeMaxBytes(options.maxBytes);
   const contentLength = parseContentLength(res.headers["content-length"]);
   if (maxBytes !== undefined && contentLength !== undefined && contentLength > maxBytes) {
     res.destroy();
@@ -106,8 +106,15 @@ function collectResponseBody(
     }
 
     let text = "";
+    let receivedBytes = 0;
     res.setEncoding("utf8");
     res.on("data", (chunk) => {
+      receivedBytes += Buffer.byteLength(chunk, "utf8");
+      if (maxBytes !== undefined && receivedBytes > maxBytes) {
+        safeReject(new JenkinsMaxBytesError(maxBytes, statusCode));
+        res.destroy();
+        return;
+      }
       text += chunk;
     });
     res.on("end", () => {

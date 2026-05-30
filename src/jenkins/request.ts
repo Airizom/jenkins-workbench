@@ -31,7 +31,8 @@ export async function requestJson<T>(
     parseJson: true,
     authHeader: options?.authHeader,
     headers: options?.headers,
-    timeoutMs: options?.timeoutMs
+    timeoutMs: options?.timeoutMs,
+    maxBytes: options?.maxBytes
   });
 }
 
@@ -44,7 +45,8 @@ export async function requestText(
     returnText: true,
     authHeader: options?.authHeader,
     headers: options?.headers,
-    timeoutMs: options?.timeoutMs
+    timeoutMs: options?.timeoutMs,
+    maxBytes: options?.maxBytes
   });
 }
 
@@ -75,7 +77,8 @@ export async function requestTextWithHeaders(
     returnHeaders: true,
     authHeader: options?.authHeader,
     headers: options?.headers,
-    timeoutMs: options?.timeoutMs
+    timeoutMs: options?.timeoutMs,
+    maxBytes: options?.maxBytes
   });
 }
 
