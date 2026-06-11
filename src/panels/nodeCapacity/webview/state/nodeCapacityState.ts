@@ -22,7 +22,7 @@ export type NodeCapacityAction =
       payload: Array<{ nodeUrl: string; executors: NodeCapacityExecutorViewModel[] }>;
     };
 
-export const FALLBACK_STATE: NodeCapacityState = {
+const FALLBACK_STATE: NodeCapacityState = {
   environmentLabel: "Jenkins",
   updatedAt: FALLBACK_UPDATED_AT,
   summary: createEmptyNodeCapacitySummary(),

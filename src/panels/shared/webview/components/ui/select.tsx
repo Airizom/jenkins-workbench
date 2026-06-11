@@ -2,13 +2,10 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-
 export const Select = SelectPrimitive.Root;
-export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
 
 export type SelectTriggerProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>;
-
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
@@ -33,7 +30,6 @@ export const SelectTrigger = React.forwardRef<
 SelectTrigger.displayName = "SelectTrigger";
 
 export type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>;
-
 export const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   SelectContentProps
@@ -57,7 +53,6 @@ export const SelectContent = React.forwardRef<
 SelectContent.displayName = "SelectContent";
 
 export type SelectItemProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>;
-
 export const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
   SelectItemProps
@@ -84,7 +79,7 @@ SelectItem.displayName = "SelectItem";
 
 export type SelectSeparatorProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>;
 
-export const SelectSeparator = React.forwardRef<
+const SelectSeparator = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Separator>,
   SelectSeparatorProps
 >(({ className, ...props }, ref) => (

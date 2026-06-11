@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle
 } from "../../../../../shared/webview/components/ui/card";
-
 export function SectionCard({
   title,
   summary,

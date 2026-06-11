@@ -19,7 +19,6 @@ type PipelineGraphLayoutState =
   | { status: "error"; model: PipelineGraphModel; error: Error };
 
 const elk = new ELK();
-
 export function usePipelineGraphLayout(
   stages: PipelineStageViewModel[],
   enabled: boolean

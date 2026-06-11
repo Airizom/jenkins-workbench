@@ -11,7 +11,6 @@ type NodeDetailsAlertsProps = {
   offlineReason?: string;
   errors: string[];
 };
-
 export function NodeDetailsAlerts({
   showOfflineBanner,
   statusLabel,

@@ -3,5 +3,5 @@ import type { BuildCompareViewModel } from "./shared/BuildCompareContracts";
 
 export type { PanelDetailsRenderOptions as BuildCompareRenderOptions } from "../shared/webview/WebviewHtml";
 
-export const { renderLoadingHtml, renderPanelHtml: renderBuildCompareHtml } =
+export const { renderPanelHtml: renderBuildCompareHtml } =
   createTypedPanelRenderer<BuildCompareViewModel>("build");

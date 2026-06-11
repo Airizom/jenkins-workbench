@@ -1,7 +1,6 @@
 import type { BuildCompareChangesetItem } from "../../../shared/BuildCompareContracts";
 import { CompareMutedCard } from "./shared/CompareMutedCard";
 import { CompareSectionFrame } from "./shared/CompareSectionFrame";
-
 export function ChangesetColumn({
   title,
   items

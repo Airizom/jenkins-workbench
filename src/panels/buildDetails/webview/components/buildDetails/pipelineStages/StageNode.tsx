@@ -17,7 +17,6 @@ import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getConnectorColor, getStageIcon, getStageNodeStyle } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
-
 export function StageNode({
   stageId,
   stage,

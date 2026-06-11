@@ -31,7 +31,6 @@ export type BuildDetailsAction =
   | { type: "setFollowLog"; value: boolean }
   | { type: "setLoading"; value: boolean }
   | { type: "updateDetails"; payload: BuildDetailsUpdateMessage };
-
 export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
   changelogOverflow: 0,
@@ -42,7 +41,7 @@ export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   artifactsOverflow: 0
 };
 
-export const DEFAULT_TESTS_SUMMARY: BuildTestsSummaryViewModel = {
+const DEFAULT_TESTS_SUMMARY: BuildTestsSummaryViewModel = {
   totalCount: 0,
   failedCount: 0,
   skippedCount: 0,
@@ -55,14 +54,13 @@ export const DEFAULT_TESTS_SUMMARY: BuildTestsSummaryViewModel = {
   canLoadLogs: false
 };
 
-export const DEFAULT_TEST_STATE: BuildDetailsTestStateViewModel = {
+const DEFAULT_TEST_STATE: BuildDetailsTestStateViewModel = {
   summary: DEFAULT_TESTS_SUMMARY,
   results: {
     items: [],
     loading: false
   }
 };
-
 export const DEFAULT_COVERAGE_STATE: BuildDetailsCoverageStateViewModel = {
   status: "disabled",
   showTab: false,
@@ -71,7 +69,7 @@ export const DEFAULT_COVERAGE_STATE: BuildDetailsCoverageStateViewModel = {
   summaryOnly: false
 };
 
-export const FALLBACK_STATE: BuildDetailsState = {
+const FALLBACK_STATE: BuildDetailsState = {
   displayName: "Build Details",
   resultLabel: "Unknown",
   resultClass: "neutral",
@@ -100,7 +98,6 @@ export const FALLBACK_STATE: BuildDetailsState = {
   loading: true,
   hasLoaded: false
 };
-
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
   const mergedDefaults = mergeBuildDetailsDefaults(initialState);
   const merged: BuildDetailsState = {
@@ -121,7 +118,6 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
   }
   return merged;
 }
-
 export function buildDetailsReducer(
   state: BuildDetailsState,
   action: BuildDetailsAction
@@ -269,7 +265,6 @@ export function buildDetailsReducer(
       return state;
   }
 }
-
 export function getInitialState(): BuildDetailsViewModel {
   return readInitialPanelState(FALLBACK_STATE, mergeInitialViewModel);
 }

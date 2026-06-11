@@ -5,7 +5,6 @@ type NodeDetailsOverviewSectionProps = {
   rows: OverviewRow[];
   offlineReason?: string;
 };
-
 export function NodeDetailsOverviewSection({
   rows,
   offlineReason

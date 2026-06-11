@@ -21,7 +21,6 @@ export interface ConsoleSearchToolbarProps {
   onNext: () => void;
   onClear: () => void;
 }
-
 export function ConsoleSearchToolbar({
   visible,
   query,

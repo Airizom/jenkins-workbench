@@ -10,7 +10,6 @@ import { StageNode } from "./pipelineStages/StageNode";
 import { getStageId, pruneStageFlags } from "./pipelineStages/pipelineStagesUtils";
 
 const { useEffect, useMemo, useState } = React;
-
 export function PipelineStagesSection({
   stages,
   loading,

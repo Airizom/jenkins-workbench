@@ -21,7 +21,6 @@ import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
 import { getInitialState, nodeDetailsReducer } from "./state/nodeDetailsState";
 
 const { useEffect, useMemo, useReducer, useState } = React;
-
 export function NodeDetailsApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeDetailsReducer, undefined, getInitialState);
   const [now, setNow] = useState(() => Date.now());

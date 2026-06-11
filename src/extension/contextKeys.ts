@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsfileMatcher } from "../validation/JenkinsfileMatcher";
 
-export const NO_ENVIRONMENTS_CONTEXT_KEY = "jenkinsWorkbench.noEnvironments";
-export const JENKINSFILE_ACTIVE_CONTEXT_KEY = "jenkinsWorkbench.jenkinsfileActive";
+const NO_ENVIRONMENTS_CONTEXT_KEY = "jenkinsWorkbench.noEnvironments";
+const JENKINSFILE_ACTIVE_CONTEXT_KEY = "jenkinsWorkbench.jenkinsfileActive";
 
 export async function syncNoEnvironmentsContext(store: JenkinsEnvironmentStore): Promise<boolean> {
   const environments = await store.listEnvironmentsWithScope();

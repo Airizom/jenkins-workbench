@@ -10,7 +10,7 @@ export function formatBuildResultLabel(details: JenkinsBuildDetails): string {
   return resolveBuildResultLabel(details.result, details.building);
 }
 
-export function formatBuildResultClass(details: JenkinsBuildDetails): string {
+function formatBuildResultClass(details: JenkinsBuildDetails): string {
   return resolveBuildResultClass(details.result, details.building);
 }
 
@@ -18,7 +18,7 @@ export function formatBuildDuration(duration?: number): string {
   return formatDurationMs(duration);
 }
 
-export function formatBuildTimestamp(timestamp?: number): string {
+function formatBuildTimestamp(timestamp?: number): string {
   if (timestamp === undefined) {
     return "Unknown";
   }

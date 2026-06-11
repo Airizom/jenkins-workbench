@@ -1,11 +1,11 @@
 import type { CancellationInput, JobSearchOptions } from "./JenkinsDataTypes";
 
-export const DEFAULT_JOB_SEARCH_MAX_RESULTS = Number.POSITIVE_INFINITY;
-export const DEFAULT_JOB_SEARCH_BATCH_SIZE = 50;
-export const DEFAULT_JOB_SEARCH_CONCURRENCY = 4;
-export const DEFAULT_JOB_SEARCH_BACKOFF_BASE_MS = 200;
-export const DEFAULT_JOB_SEARCH_BACKOFF_MAX_MS = 2000;
-export const DEFAULT_JOB_SEARCH_MAX_RETRIES = 2;
+const DEFAULT_JOB_SEARCH_MAX_RESULTS = Number.POSITIVE_INFINITY;
+const DEFAULT_JOB_SEARCH_BATCH_SIZE = 50;
+const DEFAULT_JOB_SEARCH_CONCURRENCY = 4;
+const DEFAULT_JOB_SEARCH_BACKOFF_BASE_MS = 200;
+const DEFAULT_JOB_SEARCH_BACKOFF_MAX_MS = 2000;
+const DEFAULT_JOB_SEARCH_MAX_RETRIES = 2;
 
 export interface NormalizedJobSearchOptions {
   cancellation?: CancellationInput;

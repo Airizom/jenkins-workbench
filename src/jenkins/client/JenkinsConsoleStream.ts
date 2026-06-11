@@ -23,7 +23,7 @@ export function parseHeaderBoolean(value: string | string[] | undefined): boolea
   return text.toLowerCase() === "true";
 }
 
-export function parseHeaderText(value: string | string[] | undefined): string | undefined {
+function parseHeaderText(value: string | string[] | undefined): string | undefined {
   const text = Array.isArray(value) ? value[0] : value;
   const trimmed = text?.trim();
   return trimmed ? trimmed : undefined;

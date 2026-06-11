@@ -90,25 +90,6 @@ export async function promptRequiredInput(
   return trimmed.length === 0 ? undefined : trimmed;
 }
 
-export async function promptOptionalInput(
-  prompt: string,
-  placeHolder?: string,
-  password = false
-): Promise<string | undefined> {
-  const value = await vscode.window.showInputBox({
-    prompt,
-    placeHolder,
-    password,
-    ignoreFocusOut: true
-  });
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  return value.trim();
-}
-
 export async function promptHeadersJson(): Promise<Record<string, string> | undefined> {
   const value = await vscode.window.showInputBox({
     prompt: "Custom headers (JSON object)",

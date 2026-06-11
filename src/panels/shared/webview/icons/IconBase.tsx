@@ -6,7 +6,6 @@ type IconBaseProps = IconProps & {
   children: ReactNode;
   defaultClassName?: string;
 };
-
 export function IconBase({
   className,
   defaultClassName = "h-4 w-4",

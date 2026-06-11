@@ -16,7 +16,6 @@ function resolveConsoleEmptyLabel(status: BuildCompareConsoleSectionViewModel["s
       return "Console comparison did not produce a snippet.";
   }
 }
-
 export function ConsoleDivergenceSection({
   section
 }: {

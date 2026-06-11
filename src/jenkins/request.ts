@@ -4,7 +4,6 @@ import { requestStream as requestStreamInternal } from "./request/streamRequest"
 import type {
   JenkinsBufferResponse,
   JenkinsPostResponse,
-  JenkinsRequestOptions,
   JenkinsSimpleRequestOptions,
   JenkinsStreamResponse,
   JenkinsTextRequestOptions,
@@ -123,10 +122,6 @@ export async function requestHeaders(
   });
 }
 
-export async function requestVoid(url: string, options: JenkinsVoidRequestOptions): Promise<void> {
-  await requestInternal<void>(url, { ...options, parseJson: false });
-}
-
 export async function requestVoidWithLocation(
   url: string,
   options: JenkinsVoidRequestOptions
@@ -141,8 +136,4 @@ export async function requestVoidWithLocation(
   return {
     location: typeof location === "string" ? location : undefined
   };
-}
-
-export async function request<T>(url: string, options: JenkinsRequestOptions): Promise<T> {
-  return requestInternal<T>(url, options);
 }

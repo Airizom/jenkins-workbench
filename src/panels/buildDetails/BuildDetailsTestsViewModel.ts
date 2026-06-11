@@ -114,8 +114,7 @@ function findTestSummaryAction(
   }
   return undefined;
 }
-
-export function buildTestResultsViewModel(
+function buildTestResultsViewModel(
   testReport: JenkinsTestReport | undefined,
   options?: { canOpenSource?: (className?: string) => boolean; loading?: boolean }
 ): BuildTestResultsViewModel {
@@ -159,8 +158,7 @@ export function buildTestResultsViewModel(
     loading: Boolean(options?.loading)
   };
 }
-
-export function buildEmptyTestResultsViewModel(loading = false): BuildTestResultsViewModel {
+function buildEmptyTestResultsViewModel(loading = false): BuildTestResultsViewModel {
   return {
     items: [],
     loading

@@ -82,7 +82,7 @@ export type {
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload
 } from "./types";
-export { BuildActionError, CancellationError, JobManagementActionError } from "./errors";
+export { CancellationError } from "./errors";
 
 export interface JenkinsDataServiceOptions {
   buildParameterRequestPreparer: BuildParameterRequestPreparer;

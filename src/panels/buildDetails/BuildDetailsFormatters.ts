@@ -1,8 +1,6 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
 
-export { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
-
 export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
   resultLabel: string;
   resultClass: string;
@@ -16,7 +14,7 @@ export function formatBuildDetailsHeaderLabels(details?: JenkinsBuildDetails): {
   };
 }
 
-export function formatCulprits(culprits: JenkinsBuildDetails["culprits"] | undefined): string {
+function formatCulprits(culprits: JenkinsBuildDetails["culprits"] | undefined): string {
   if (!culprits || culprits.length === 0) {
     return "None";
   }
@@ -36,6 +34,4 @@ export function truncateConsoleText(
   };
 }
 
-export { formatNumber } from "../../formatters/DisplayFormatters";
 export { formatError } from "../../formatters/ErrorFormatters";
-export { normalizePipelineStatus } from "../../formatters/BuildStatusFormatters";

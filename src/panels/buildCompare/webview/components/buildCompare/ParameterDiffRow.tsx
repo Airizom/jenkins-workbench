@@ -2,7 +2,6 @@ import type { BuildCompareParameterDiffItem } from "../../../shared/BuildCompare
 import { CompareDiffRowShell } from "./shared/CompareDiffRowShell";
 import { CompareSideGrid } from "./shared/CompareSideGrid";
 import { ValueCell } from "./shared/ValueCell";
-
 export function ParameterDiffRow({ item }: { item: BuildCompareParameterDiffItem }) {
   return (
     <CompareDiffRowShell title={item.name} changeType={item.changeType}>

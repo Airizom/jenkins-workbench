@@ -24,7 +24,6 @@ export type {
   JenkinsfileContextAnalysis,
   JenkinsfileIdentifier
 } from "./context/JenkinsfileContextTypes";
-export { maskGroovyText } from "./context/JenkinsfileGroovyTextMasker";
 
 export function analyzeJenkinsfileContext(
   document: vscode.TextDocument,

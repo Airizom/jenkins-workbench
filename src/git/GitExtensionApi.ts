@@ -26,7 +26,7 @@ export interface GitRepositoryUiState {
   onDidChange?: vscode.Event<void>;
 }
 
-export enum GitRefType {
+enum GitRefType {
   Head = 0,
   RemoteHead = 1,
   Tag = 2

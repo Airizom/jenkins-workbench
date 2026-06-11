@@ -44,7 +44,6 @@ function postLoadExecutors(
   };
   postMessage(message);
 }
-
 export function NodeCapacityApp(): JSX.Element {
   const [state, dispatch] = useReducer(nodeCapacityReducer, undefined, getInitialState);
   const postMessage = usePanelPostMessage<NodeCapacityIncomingMessage>();

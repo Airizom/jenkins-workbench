@@ -170,7 +170,7 @@ export function buildActionUrl(itemUrl: string, action: string): string {
   return url.toString();
 }
 
-export function encodePathSegments(path: string): string {
+function encodePathSegments(path: string): string {
   return path
     .split("/")
     .filter((segment) => segment.length > 0)
@@ -187,12 +187,6 @@ export function buildArtifactDownloadUrl(buildUrl: string, relativePath: string)
   const base = ensureTrailingSlash(buildUrl);
   const encodedPath = encodePathSegments(relativePath);
   return new URL(`artifact/${encodedPath}`, base).toString();
-}
-
-export function buildArtifactViewUrl(buildUrl: string, relativePath: string): string {
-  const base = ensureTrailingSlash(buildUrl);
-  const encodedPath = encodePathSegments(relativePath);
-  return new URL(`artifact/${encodedPath}/*view*/`, base).toString();
 }
 
 export function buildWorkspaceDirectoryListingUrl(jobUrl: string, relativePath?: string): string {

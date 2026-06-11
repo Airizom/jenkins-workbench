@@ -1,5 +1,4 @@
 import { LoadingSkeleton, type LoadingSkeletonProps } from "./ui/loading-skeleton";
-
 export function PanelInitialLoadingGate({
   loading = false,
   hasLoaded,

@@ -11,7 +11,6 @@ type BuildResultStatusIconProps = {
   status?: string;
   className?: string;
 };
-
 export function BuildResultStatusIcon({
   status,
   className = "h-4 w-4"

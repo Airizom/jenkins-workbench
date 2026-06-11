@@ -6,7 +6,6 @@ export type ClassValue =
   | boolean
   | ClassValue[]
   | Record<string, boolean>;
-
 export function cn(...inputs: ClassValue[]): string {
   const classes: string[] = [];
 

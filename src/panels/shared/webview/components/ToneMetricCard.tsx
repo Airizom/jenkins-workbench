@@ -5,7 +5,6 @@ import {
   resolveMetricToneClass
 } from "../../TestStatusStyles";
 import { cn } from "../lib/utils";
-
 export function ToneMetricCard({
   label,
   value,

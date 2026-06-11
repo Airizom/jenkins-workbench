@@ -2,7 +2,6 @@ import { GitCommitIcon, UserIcon } from "../../../../../shared/webview/icons";
 import type { BuildFailureChangelogItem } from "../../../../shared/BuildDetailsContracts";
 import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 import { OverflowText } from "./BuildFailureOverflowText";
-
 export function BuildFailureChangelogCard({
   items,
   overflowCount

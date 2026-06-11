@@ -70,7 +70,6 @@ type BuildDetailsTabsProps = {
   onReloadTestResults: () => void;
   onOpenTestSource: (testCase: BuildTestCaseViewModel) => void;
 };
-
 export function BuildDetailsTabs({
   selectedTab,
   onTabChange,

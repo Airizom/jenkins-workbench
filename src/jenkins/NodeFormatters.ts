@@ -54,7 +54,7 @@ export function formatNodeOfflineReason(node?: JenkinsNodeOfflineCauseFields): s
   );
 }
 
-export function resolveNodeConnectivityState(
+function resolveNodeConnectivityState(
   node?: (NodeConnectivityFields & { idle?: boolean }) | null
 ): NodeConnectivityState {
   if (!node) {

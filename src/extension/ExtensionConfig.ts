@@ -129,13 +129,13 @@ export function getMaxCacheEntries(config: vscode.WorkspaceConfiguration): numbe
   return Number.isFinite(maxEntries) ? Math.max(100, maxEntries) : DEFAULT_MAX_CACHE_ENTRIES;
 }
 
-export function getBuildTooltipDetailsEnabled(config: vscode.WorkspaceConfiguration): boolean {
+function getBuildTooltipDetailsEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>("buildTooltips.includeDetails", DEFAULT_BUILD_TOOLTIP_DETAILS)
   );
 }
 
-export function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfiguration): boolean {
+function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfiguration): boolean {
   const includeParameters = config.get<boolean>(
     "buildTooltips.parameters.enabled",
     DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED
@@ -143,7 +143,7 @@ export function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfigu
   return Boolean(includeParameters);
 }
 
-export function getArtifactDownloadRoot(config: vscode.WorkspaceConfiguration): string {
+function getArtifactDownloadRoot(config: vscode.WorkspaceConfiguration): string {
   return (
     trimToUndefined(config.get<unknown>("artifactDownloadRoot")) ?? DEFAULT_ARTIFACT_DOWNLOAD_ROOT
   );
@@ -215,7 +215,7 @@ export function getBuildTooltipOptions(config: vscode.WorkspaceConfiguration): B
   };
 }
 
-export function getBuildParameterRedactionOptions(
+function getBuildParameterRedactionOptions(
   config: vscode.WorkspaceConfiguration
 ): BuildParameterRedactionOptions {
   const allowList = normalizeStringList(config.get<unknown>("buildTooltips.parameters.allowList"));
@@ -378,13 +378,13 @@ export function getCurrentBranchPullRequestJobNamePatterns(
   ];
 }
 
-export function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfiguration): boolean {
+function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>("jenkinsfileValidation.enabled", DEFAULT_JENKINSFILE_VALIDATION_ENABLED)
   );
 }
 
-export function getJenkinsfileIntelligenceEnabled(config: vscode.WorkspaceConfiguration): boolean {
+function getJenkinsfileIntelligenceEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>(
       "jenkinsfile.intelligence.enabled",
@@ -393,7 +393,7 @@ export function getJenkinsfileIntelligenceEnabled(config: vscode.WorkspaceConfig
   );
 }
 
-export function getJenkinsfileValidationRunOnSave(config: vscode.WorkspaceConfiguration): boolean {
+function getJenkinsfileValidationRunOnSave(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>(
       "jenkinsfileValidation.runOnSave",
@@ -402,9 +402,7 @@ export function getJenkinsfileValidationRunOnSave(config: vscode.WorkspaceConfig
   );
 }
 
-export function getJenkinsfileValidationChangeDebounceMs(
-  config: vscode.WorkspaceConfiguration
-): number {
+function getJenkinsfileValidationChangeDebounceMs(config: vscode.WorkspaceConfiguration): number {
   const value = config.get<number>(
     "jenkinsfileValidation.changeDebounceMs",
     DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS
@@ -415,9 +413,7 @@ export function getJenkinsfileValidationChangeDebounceMs(
   return Math.max(0, Math.floor(value));
 }
 
-export function getJenkinsfileValidationFilePatterns(
-  config: vscode.WorkspaceConfiguration
-): string[] {
+function getJenkinsfileValidationFilePatterns(config: vscode.WorkspaceConfiguration): string[] {
   const value = config.get<unknown>(
     "jenkinsfileValidation.filePatterns",
     DEFAULT_JENKINSFILE_VALIDATION_FILE_PATTERNS

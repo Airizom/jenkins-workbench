@@ -1,6 +1,5 @@
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { postVsCodeMessage } from "../../../../shared/webview/lib/vscodeApi";
-
 export function BuildCompareHeader({ displayName }: { displayName: string }) {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-header/95 backdrop-blur">

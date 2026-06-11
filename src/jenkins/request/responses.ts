@@ -164,7 +164,7 @@ function getResponseTextForError(
   return body.text ?? "";
 }
 
-export function resolveResponseStatusPolicy(
+function resolveResponseStatusPolicy(
   options: JenkinsRequestOptions,
   redirectDecision: RedirectDecision
 ): RequestResponseStatusPolicy {

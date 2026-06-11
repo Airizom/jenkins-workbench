@@ -78,7 +78,7 @@ export function resolveBraceLabel(
   return undefined;
 }
 
-export function findPreviousMeaningfulIndex(text: string, index: number): number | undefined {
+function findPreviousMeaningfulIndex(text: string, index: number): number | undefined {
   let current = index;
   while (current >= 0) {
     if (!text[current].trim()) {
@@ -101,7 +101,7 @@ export function findNextMeaningfulIndex(text: string, index: number): number | u
   return undefined;
 }
 
-export function findStatementStart(text: string, offset: number): number {
+function findStatementStart(text: string, offset: number): number {
   let current = Math.max(0, offset - 1);
   while (current >= 0) {
     const character = text[current];

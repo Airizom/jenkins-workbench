@@ -21,7 +21,6 @@ import { ConsoleLogSearchBody } from "../ConsoleLogSearchBody";
 import { buildConsoleTruncationNote, countConsoleLines } from "./consoleOutput/consoleOutputUtils";
 
 const { useEffect, useMemo, useState } = React;
-
 export function PipelineNodeLogPane({
   log,
   htmlModel,

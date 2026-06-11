@@ -19,7 +19,6 @@ type NodeDetailsAdvancedSectionProps = {
   onDiagnosticsToggle: (value: string) => void;
   onCopyJson: () => void;
 };
-
 export function NodeDetailsAdvancedSection({
   advancedLoaded,
   loading,

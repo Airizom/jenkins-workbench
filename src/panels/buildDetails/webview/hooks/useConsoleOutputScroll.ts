@@ -13,7 +13,6 @@ const readConsoleScrollState = (output: HTMLPreElement) => {
   const isScrolledDown = scrollTop > CONSOLE_SCROLL_THRESHOLD_PX;
   return { isScrollable, isScrolledDown };
 };
-
 export function useConsoleOutputScroll(
   consoleOutputRef: React.RefObject<HTMLPreElement>,
   consoleScrollKey: string

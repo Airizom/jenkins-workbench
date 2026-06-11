@@ -1,14 +1,12 @@
 import { resolveResultBadgeClass } from "../lib/statusStyles";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
-
 export function getResultBadgeClass(status?: string): string {
   if (!status) {
     return resolveResultBadgeClass("neutral");
   }
   return resolveResultBadgeClass(status);
 }
-
 export function ResultBadge({
   label,
   resultClass,

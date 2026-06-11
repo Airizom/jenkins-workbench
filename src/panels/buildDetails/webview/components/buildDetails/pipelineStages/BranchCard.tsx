@@ -17,7 +17,6 @@ import { getStageIcon } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
 
 const { useState } = React;
-
 export function BranchCard({
   branch,
   showAll,

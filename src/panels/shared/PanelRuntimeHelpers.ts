@@ -14,7 +14,7 @@ export function disposePanelResources(disposables: vscode.Disposable[]): void {
   }
 }
 
-export function disposeRefreshSubscription(subscription?: vscode.Disposable): void {
+function disposeRefreshSubscription(subscription?: vscode.Disposable): void {
   subscription?.dispose();
 }
 
@@ -83,7 +83,7 @@ export function bindEnvironmentRefresh(
   });
 }
 
-export function replaceRefreshSubscription(
+function replaceRefreshSubscription(
   current: vscode.Disposable | undefined,
   refreshHost:
     | {
@@ -99,7 +99,7 @@ export function replaceRefreshSubscription(
   return refreshHost.onDidRefreshEnvironment(listener);
 }
 
-export function beginLoadingRequest(
+function beginLoadingRequest(
   loadingRequests: number,
   postLoading: (value: boolean) => void
 ): number {
@@ -110,10 +110,7 @@ export function beginLoadingRequest(
   return next;
 }
 
-export function endLoadingRequest(
-  loadingRequests: number,
-  postLoading: (value: boolean) => void
-): number {
+function endLoadingRequest(loadingRequests: number, postLoading: (value: boolean) => void): number {
   if (loadingRequests === 0) {
     return 0;
   }

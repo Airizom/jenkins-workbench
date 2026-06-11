@@ -5,7 +5,6 @@ import {
   parseNodeCapacityOutgoingMessage
 } from "../../shared/NodeCapacityPanelMessages";
 import type { NodeCapacityAction } from "../state/nodeCapacityState";
-
 export function useNodeCapacityMessages(dispatch: Dispatch<NodeCapacityAction>): void {
   usePanelMessages(parseNodeCapacityOutgoingMessage, dispatch, mapMessageToAction);
 }

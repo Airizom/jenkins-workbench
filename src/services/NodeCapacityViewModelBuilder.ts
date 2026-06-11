@@ -218,7 +218,7 @@ function buildHiddenLabelKeySet(nodes: JenkinsNodeInfo[]): Set<string> {
   return keys;
 }
 
-export function collectPoolLabels(
+function collectPoolLabels(
   nodes: JenkinsNodeInfo[],
   queueItems: QueueWorkItemViewModel[],
   hiddenLabelKeys: Set<string>
@@ -240,7 +240,7 @@ export function collectPoolLabels(
   return [...labelsByKey.values()];
 }
 
-export function buildNodeViewModelsByLabel(
+function buildNodeViewModelsByLabel(
   nodes: NodeCapacityNodeViewModel[]
 ): Map<string, NodeCapacityNodeViewModel[]> {
   const grouped = new Map<string, NodeCapacityNodeViewModel[]>();
@@ -253,7 +253,7 @@ export function buildNodeViewModelsByLabel(
   return grouped;
 }
 
-export function groupQueueItemsByLabel(
+function groupQueueItemsByLabel(
   queueItems: QueueWorkItemViewModel[],
   hiddenLabelKeys: Set<string>
 ): Map<string, QueueWorkItemViewModel[]> {
@@ -280,7 +280,7 @@ function getOrCreateGroup<TKey, TValue>(map: Map<TKey, TValue[]>, key: TKey): TV
   return created;
 }
 
-export function resolvePoolSeverity(
+function resolvePoolSeverity(
   queuedCount: number,
   stuckCount: number,
   idleExecutors: number,
@@ -295,10 +295,7 @@ export function resolvePoolSeverity(
   return "normal";
 }
 
-export function comparePools(
-  left: NodeCapacityPoolViewModel,
-  right: NodeCapacityPoolViewModel
-): number {
+function comparePools(left: NodeCapacityPoolViewModel, right: NodeCapacityPoolViewModel): number {
   const scoreDelta = scorePool(right) - scorePool(left);
   if (scoreDelta !== 0) {
     return scoreDelta;
@@ -309,7 +306,7 @@ export function comparePools(
   return left.label.localeCompare(right.label);
 }
 
-export function scorePool(pool: NodeCapacityPoolViewModel): number {
+function scorePool(pool: NodeCapacityPoolViewModel): number {
   const severityScore =
     pool.severity === "critical" ? 10_000 : pool.severity === "warning" ? 1_000 : 0;
   return (
@@ -321,7 +318,7 @@ export function scorePool(pool: NodeCapacityPoolViewModel): number {
   );
 }
 
-export function formatPoolStatus(
+function formatPoolStatus(
   severity: NodeCapacitySeverity,
   queuedCount: number,
   idleExecutors: number

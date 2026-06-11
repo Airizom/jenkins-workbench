@@ -12,7 +12,7 @@ export interface QueueWorkBuildOptions {
   nodes?: NodeLabelInput[];
 }
 
-export function buildQueueWorkItemViewModel(
+function buildQueueWorkItemViewModel(
   item: JenkinsQueueItemInfo,
   options?: QueueWorkBuildOptions
 ): QueueWorkItemViewModel {

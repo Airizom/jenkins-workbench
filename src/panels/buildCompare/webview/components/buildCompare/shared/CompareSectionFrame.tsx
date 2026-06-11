@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Badge } from "../../../../../shared/webview/components/ui/badge";
 import { EmptyState } from "./EmptyState";
-
 export function CompareSectionFrame({
   title,
   count,

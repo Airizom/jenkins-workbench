@@ -2,7 +2,6 @@ import type { Dispatch } from "react";
 import { usePanelMessages } from "../../../shared/webview/hooks/usePanelMessages";
 import { parseBuildDetailsOutgoingMessage } from "../../shared/BuildDetailsPanelMessages";
 import type { BuildDetailsAction } from "../state/buildDetailsState";
-
 export function useBuildDetailsMessages(dispatch: Dispatch<BuildDetailsAction>): void {
   usePanelMessages(parseBuildDetailsOutgoingMessage, dispatch, reduceBuildDetailsMessage);
 }

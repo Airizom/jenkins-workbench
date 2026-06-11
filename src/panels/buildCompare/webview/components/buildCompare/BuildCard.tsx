@@ -9,7 +9,6 @@ import {
 import { postVsCodeMessage } from "../../../../shared/webview/lib/vscodeApi";
 import type { BuildCompareBuildViewModel } from "../../../shared/BuildCompareContracts";
 import { SummaryStat } from "./shared/SummaryStat";
-
 export function BuildCard({
   build,
   side

@@ -32,7 +32,7 @@ export function buildBaseNodeExecutorViewModels(
   });
 }
 
-export function formatExecutorId(number: number | undefined, fallbackLabel: string): string {
+function formatExecutorId(number: number | undefined, fallbackLabel: string): string {
   return isFiniteNumber(number) ? `#${number}` : fallbackLabel;
 }
 

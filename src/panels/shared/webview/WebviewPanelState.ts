@@ -20,7 +20,7 @@ export function createSerializedEnvironmentState(
 
 const VALID_SCOPES = new Set<EnvironmentScope>(["workspace", "global"]);
 
-export function isEnvironmentScope(value: unknown): value is EnvironmentScope {
+function isEnvironmentScope(value: unknown): value is EnvironmentScope {
   return VALID_SCOPES.has(value as EnvironmentScope);
 }
 

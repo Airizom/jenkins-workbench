@@ -15,7 +15,7 @@ export interface BuildParameterAction {
   parameters?: unknown;
 }
 
-export function normalizeBuildParameterName(name: unknown): string | undefined {
+function normalizeBuildParameterName(name: unknown): string | undefined {
   if (typeof name !== "string") {
     return undefined;
   }
@@ -23,7 +23,7 @@ export function normalizeBuildParameterName(name: unknown): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-export function isActionWithBuildParameters(
+function isActionWithBuildParameters(
   action: unknown
 ): action is { parameters: BuildParameterRecord[] } {
   if (!action || typeof action !== "object") {

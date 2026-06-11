@@ -33,7 +33,6 @@ interface PersistedBuildDetailsState {
   selectedGraphStageKey?: string;
   selectedPipelineLogTarget?: PipelineLogTargetViewModel;
 }
-
 export function PipelineSection({
   stages,
   pipelineNodeLog,

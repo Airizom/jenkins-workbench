@@ -1,6 +1,5 @@
 import { IconBase } from "./IconBase";
 import type { IconProps } from "./types";
-
 export function CheckCircleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-8 w-8 text-success" {...props}>
@@ -9,7 +8,6 @@ export function CheckCircleIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function XCircleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-8 w-8 text-failure" {...props}>
@@ -19,7 +17,6 @@ export function XCircleIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function AlertTriangleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-8 w-8 text-warning" {...props}>
@@ -29,7 +26,6 @@ export function AlertTriangleIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function AlertCircleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-warning" {...props}>
@@ -39,7 +35,6 @@ export function AlertCircleIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function InfoIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -49,7 +44,6 @@ export function InfoIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function PlayCircleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase
@@ -62,7 +56,6 @@ export function PlayCircleIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function StopSquareIcon({ className, ...props }: IconProps) {
   return (
     <IconBase
@@ -76,7 +69,6 @@ export function StopSquareIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function StopCircleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-8 w-8 text-aborted" {...props}>

@@ -20,7 +20,6 @@ type NodeDetailsTabsProps = {
   onCopyJson: () => void;
   onOpenExternal: (url: string) => void;
 };
-
 export function NodeDetailsTabs({
   state,
   overviewRows,

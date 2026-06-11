@@ -45,7 +45,6 @@ type NodeDetailsHeaderProps = {
   onLaunchAgent: () => void;
   onOpen: () => void;
 };
-
 export function NodeDetailsHeader({
   displayName,
   name,

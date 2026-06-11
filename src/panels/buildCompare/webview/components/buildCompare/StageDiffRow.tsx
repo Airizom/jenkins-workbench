@@ -3,7 +3,6 @@ import { StageValueCell } from "./StageValueCell";
 import { CompareDiffRowShell } from "./shared/CompareDiffRowShell";
 import { CompareSideGrid } from "./shared/CompareSideGrid";
 import { ValueCell } from "./shared/ValueCell";
-
 export function StageDiffRow({ item }: { item: BuildCompareStageDiffItem }) {
   return (
     <CompareDiffRowShell title={item.name} changeType={item.changeType} titleClassName="truncate">

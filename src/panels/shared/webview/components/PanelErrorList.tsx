@@ -8,7 +8,6 @@ type PanelErrorListProps = {
   id?: string;
   className?: string;
 };
-
 export function PanelErrorList({
   errors,
   variant = "alert",

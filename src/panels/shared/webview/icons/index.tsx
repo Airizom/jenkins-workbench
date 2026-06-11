@@ -34,7 +34,6 @@ export {
 } from "./statusIcons";
 
 export {
-  ActivityIcon,
   CpuIcon,
   ExecutorsIcon,
   FileIcon,

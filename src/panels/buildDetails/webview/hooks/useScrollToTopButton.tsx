@@ -29,7 +29,6 @@ export type ScrollToTopButtonState = {
   showButton: boolean;
   scrollToTop: () => void;
 };
-
 export function useScrollToTopButton(): ScrollToTopButtonState {
   const [showButton, setShowButton] = useState(false);
 

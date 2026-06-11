@@ -1,5 +1,4 @@
 import { InfoIcon } from "../../../../../shared/webview/icons";
-
 export function BuildFailureEmptyStateCard({ title }: { title: string }) {
   return (
     <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">

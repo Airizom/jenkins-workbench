@@ -34,7 +34,7 @@ export type HtmlConsoleSnapshot = {
   annotator?: string;
 };
 
-export async function fetchConsoleHtmlSnapshot(
+async function fetchConsoleHtmlSnapshot(
   dataService: HtmlConsoleStreamDataService,
   environment: JenkinsEnvironmentRef,
   buildUrl: string,

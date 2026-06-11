@@ -4,7 +4,6 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 export type AccordionProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>;
-
 export const Accordion = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Root>,
   AccordionProps
@@ -14,7 +13,6 @@ export const Accordion = React.forwardRef<
 Accordion.displayName = "Accordion";
 
 export type AccordionItemProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>;
-
 export const AccordionItem = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Item>,
   AccordionItemProps
@@ -28,7 +26,6 @@ export type AccordionTriggerProps = React.ComponentPropsWithoutRef<
 > & {
   asChild?: boolean;
 };
-
 export const AccordionTrigger = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Trigger>,
   AccordionTriggerProps
@@ -85,7 +82,6 @@ function ChevronIcon({ className }: { className?: string }) {
 export type AccordionContentProps = React.ComponentPropsWithoutRef<
   typeof AccordionPrimitive.Content
 >;
-
 export const AccordionContent = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Content>,
   AccordionContentProps

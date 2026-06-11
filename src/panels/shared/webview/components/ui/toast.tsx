@@ -3,11 +3,9 @@ import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
-
 export const ToastProvider = ToastPrimitive.Provider;
 
 export type ToastViewportProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Viewport>;
-
 export const ToastViewport = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Viewport>,
   ToastViewportProps
@@ -41,7 +39,6 @@ const toastVariants = cva(
 
 export type ToastProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Root> &
   VariantProps<typeof toastVariants>;
-
 export const Toast = React.forwardRef<React.ElementRef<typeof ToastPrimitive.Root>, ToastProps>(
   ({ className, variant, ...props }, ref) => (
     <ToastPrimitive.Root
@@ -59,7 +56,6 @@ export const Toast = React.forwardRef<React.ElementRef<typeof ToastPrimitive.Roo
 Toast.displayName = "Toast";
 
 export type ToastTitleProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Title>;
-
 export const ToastTitle = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Title>,
   ToastTitleProps
@@ -71,7 +67,6 @@ ToastTitle.displayName = "ToastTitle";
 export type ToastDescriptionProps = React.ComponentPropsWithoutRef<
   typeof ToastPrimitive.Description
 >;
-
 export const ToastDescription = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Description>,
   ToastDescriptionProps
@@ -85,7 +80,6 @@ export const ToastDescription = React.forwardRef<
 ToastDescription.displayName = "ToastDescription";
 
 export type ToastCloseProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Close>;
-
 export const ToastClose = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Close>,
   ToastCloseProps

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { cn } from "../../../../../shared/webview/lib/utils";
-
 export function CompareMutedCard({
   children,
   className

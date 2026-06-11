@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 
 export const TREE_FOLDER_ICON = new vscode.ThemeIcon("folder");
-export const TREE_FILE_ICON = new vscode.ThemeIcon("file");
-export const TREE_FILE_CODE_ICON = new vscode.ThemeIcon("file-code");
-export const TREE_FILE_MEDIA_ICON = new vscode.ThemeIcon("file-media");
-export const TREE_FILE_PDF_ICON = new vscode.ThemeIcon("file-pdf");
-export const TREE_FILE_TEXT_ICON = new vscode.ThemeIcon("file-text");
-export const TREE_FILE_ZIP_ICON = new vscode.ThemeIcon("file-zip");
+const TREE_FILE_ICON = new vscode.ThemeIcon("file");
+const TREE_FILE_CODE_ICON = new vscode.ThemeIcon("file-code");
+const TREE_FILE_MEDIA_ICON = new vscode.ThemeIcon("file-media");
+const TREE_FILE_PDF_ICON = new vscode.ThemeIcon("file-pdf");
+const TREE_FILE_TEXT_ICON = new vscode.ThemeIcon("file-text");
+const TREE_FILE_ZIP_ICON = new vscode.ThemeIcon("file-zip");
 
-export function getTreeFileExtension(fileName?: string, relativePath?: string): string {
+function getTreeFileExtension(fileName?: string, relativePath?: string): string {
   const name = fileName || relativePath || "";
   const lastDot = name.lastIndexOf(".");
   return lastDot > 0 ? name.slice(lastDot).toLowerCase() : "";

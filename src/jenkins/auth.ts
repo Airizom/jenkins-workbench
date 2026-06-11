@@ -6,7 +6,7 @@ export interface JenkinsAuthHeaders {
   headers?: Record<string, string>;
 }
 
-export function getAuthorizationHeader(username?: string, token?: string): string | undefined {
+function getAuthorizationHeader(username?: string, token?: string): string | undefined {
   const trimmedUsername = username?.trim() ?? "";
   const trimmedToken = token?.trim() ?? "";
   if (!trimmedUsername || !trimmedToken) {
@@ -227,7 +227,7 @@ function buildHeadersFromConfig(authConfig: JenkinsAuthConfig): JenkinsAuthHeade
   }
 }
 
-export function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
+function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
   const normalized: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
     const trimmedKey = key.trim();

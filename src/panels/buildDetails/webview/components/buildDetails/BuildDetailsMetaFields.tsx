@@ -1,5 +1,4 @@
 import { CalendarIcon, ClockIcon, UserIcon } from "../../../../shared/webview/icons";
-
 export function BuildDetailsMetaFields({
   idSuffix = "",
   durationLabel,

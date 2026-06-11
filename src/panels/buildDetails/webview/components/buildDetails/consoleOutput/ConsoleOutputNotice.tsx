@@ -8,7 +8,6 @@ type ConsoleOutputNoticeProps = {
 type ConsoleOutputErrorNoticeProps = {
   error?: string;
 };
-
 export function ConsoleOutputTruncationNotice({
   note
 }: ConsoleOutputNoticeProps): JSX.Element | null {

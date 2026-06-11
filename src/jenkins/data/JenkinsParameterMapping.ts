@@ -52,7 +52,7 @@ export function mapPendingInputActions(actions: JenkinsPendingInputAction[]): Pe
   return results;
 }
 
-export function mapPendingInputParameters(action: JenkinsPendingInputAction): JobParameter[] {
+function mapPendingInputParameters(action: JenkinsPendingInputAction): JobParameter[] {
   const rawParameters = Array.isArray(action.parameters)
     ? action.parameters
     : Array.isArray(action.inputs)
@@ -68,9 +68,7 @@ export function mapPendingInputParameters(action: JenkinsPendingInputAction): Jo
   return results;
 }
 
-export function mapPendingInputParameter(
-  parameter: JenkinsPendingInputParameterDefinition
-): JobParameter {
+function mapPendingInputParameter(parameter: JenkinsPendingInputParameterDefinition): JobParameter {
   const choices = Array.isArray(parameter.choices)
     ? parameter.choices.map((choice) => String(choice))
     : undefined;
@@ -96,7 +94,7 @@ export function mapPendingInputParameter(
   };
 }
 
-export function classifyParameterKind(
+function classifyParameterKind(
   rawType: string | undefined,
   options?: { choices?: string[]; includeLooseTokens?: boolean }
 ): { kind: JobParameterKind; isSensitive: boolean; allowsMultiple: boolean } {

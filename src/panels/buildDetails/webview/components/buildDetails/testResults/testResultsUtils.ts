@@ -3,17 +3,14 @@ import type {
   BuildTestsSummaryViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import type { TestStatusFilter } from "./testResultsTypes";
-
 export const RENDER_BATCH_SIZE = 500;
-export const AUTO_EXPAND_FAILED_LIMIT = 3;
-
+const AUTO_EXPAND_FAILED_LIMIT = 3;
 export function getTestResultsDatasetKey(
   buildUrl: string | undefined,
   items: BuildTestCaseViewModel[]
 ): string {
   return [buildUrl ?? "", ...items.map((item) => item.id)].join("::");
 }
-
 export function filterTestResults(
   items: BuildTestCaseViewModel[],
   statusFilter: TestStatusFilter,
@@ -36,7 +33,6 @@ export function filterTestResults(
     return haystack.includes(normalizedQuery);
   });
 }
-
 export function getAutoExpandIds(items: BuildTestCaseViewModel[]): Set<string> {
   const ids = new Set<string>();
   let count = 0;
@@ -48,11 +44,9 @@ export function getAutoExpandIds(items: BuildTestCaseViewModel[]): Set<string> {
   }
   return ids;
 }
-
 export function getPassRate(summary: BuildTestsSummaryViewModel): number {
   return summary.totalCount > 0 ? Math.round((summary.passedCount / summary.totalCount) * 100) : 0;
 }
-
 export function getTestDistribution(summary: BuildTestsSummaryViewModel): {
   failedPct: number;
   skippedPct: number;
@@ -65,7 +59,6 @@ export function getTestDistribution(summary: BuildTestsSummaryViewModel): {
     passedPct: (summary.passedCount / total) * 100
   };
 }
-
 export function hasTestDetails(item: BuildTestCaseViewModel): boolean {
   return Boolean(item.errorDetails || item.errorStackTrace || item.stdout || item.stderr);
 }

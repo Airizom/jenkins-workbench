@@ -1,6 +1,5 @@
 import { type StatusVisualTone, resolveStatusBorderClass } from "../../TestStatusStyles";
 import { cn } from "../lib/utils";
-
 export function TestDetailBlock({
   label,
   value,

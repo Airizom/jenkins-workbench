@@ -1,5 +1,4 @@
 import { CompareValueCellShell } from "./CompareValueCellShell";
-
 export function ValueCell({ label, value }: { label: string; value?: string }) {
   return (
     <CompareValueCellShell label={label}>

@@ -1,4 +1,4 @@
-export function matchesAnyParameterPattern(value: string, patterns: readonly string[]): boolean {
+function matchesAnyParameterPattern(value: string, patterns: readonly string[]): boolean {
   if (patterns.length === 0) {
     return false;
   }

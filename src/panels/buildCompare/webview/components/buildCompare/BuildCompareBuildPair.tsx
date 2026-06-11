@@ -1,6 +1,5 @@
 import type { BuildCompareBuildViewModel } from "../../../shared/BuildCompareContracts";
 import { BuildCard } from "./BuildCard";
-
 export function BuildCompareBuildPair({
   baseline,
   target

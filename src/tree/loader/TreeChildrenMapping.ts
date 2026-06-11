@@ -77,7 +77,7 @@ export function getJobCollectionLoadingLabel(request: TreeJobCollectionRequest):
   return "Loading jobs...";
 }
 
-export function buildScopedTreeExtra(scope: TreeJobScope, resourceUrl: string): string {
+function buildScopedTreeExtra(scope: TreeJobScope, resourceUrl: string): string {
   return `${buildTreeJobScopeKey(scope)}::${resourceUrl}`;
 }
 

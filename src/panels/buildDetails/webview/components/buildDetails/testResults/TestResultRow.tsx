@@ -17,7 +17,6 @@ import type { BuildTestCaseViewModel } from "../../../../shared/BuildDetailsCont
 import { hasTestDetails } from "./testResultsUtils";
 
 const { useState } = React;
-
 export function TestResultRow({
   item,
   initialOpen,

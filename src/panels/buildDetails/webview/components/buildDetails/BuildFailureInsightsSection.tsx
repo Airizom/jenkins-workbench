@@ -9,7 +9,6 @@ import { BuildFailureArtifactsCard } from "./buildFailure/BuildFailureArtifactsC
 import { BuildFailureChangelogCard } from "./buildFailure/BuildFailureChangelogCard";
 import { BuildFailureEmptyStateCard } from "./buildFailure/BuildFailureEmptyStateCard";
 import { BuildFailureTestsSummaryCard } from "./buildFailure/BuildFailureTestsSummaryCard";
-
 export function BuildFailureInsightsSection({
   insights,
   resultClass,

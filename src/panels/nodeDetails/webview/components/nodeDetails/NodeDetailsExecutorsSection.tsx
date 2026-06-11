@@ -6,7 +6,6 @@ type NodeDetailsExecutorsSectionProps = {
   oneOffExecutors: NodeDetailsState["oneOffExecutors"];
   onOpenExternal: (url: string) => void;
 };
-
 export function NodeDetailsExecutorsSection({
   executors,
   oneOffExecutors,

@@ -16,7 +16,7 @@ export type NodeDetailsAction =
   | { type: "setLoading"; value: boolean }
   | { type: "updateNodeDetails"; payload: NodeDetailsUpdateMessage };
 
-export const FALLBACK_STATE: NodeDetailsState = {
+const FALLBACK_STATE: NodeDetailsState = {
   displayName: "Node Details",
   name: "Unknown",
   description: undefined,
@@ -53,7 +53,7 @@ export const FALLBACK_STATE: NodeDetailsState = {
   hasLoaded: false
 };
 
-export function buildInitialState(initialState: NodeDetailsViewModel): NodeDetailsState {
+function buildInitialState(initialState: NodeDetailsViewModel): NodeDetailsState {
   return {
     ...FALLBACK_STATE,
     ...initialState,
@@ -74,7 +74,6 @@ const panelStateHelpers = createLoadingPanelStateHelpers({
   fallback: FALLBACK_STATE,
   buildInitial: buildInitialState
 });
-
 export function nodeDetailsReducer(
   state: NodeDetailsState,
   action: NodeDetailsAction
@@ -88,7 +87,6 @@ export function nodeDetailsReducer(
       return state;
   }
 }
-
 export function getInitialState(): NodeDetailsState {
   return panelStateHelpers.getInitialState();
 }

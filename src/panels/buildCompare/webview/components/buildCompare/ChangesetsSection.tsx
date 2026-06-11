@@ -1,7 +1,6 @@
 import type { BuildCompareChangesetsSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { ChangesetColumn } from "./ChangesetColumn";
 import { SectionCard } from "./shared/SectionCard";
-
 export function ChangesetsSection({
   section
 }: { section: BuildCompareChangesetsSectionViewModel }) {

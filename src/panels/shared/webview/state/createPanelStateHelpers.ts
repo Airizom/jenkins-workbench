@@ -15,7 +15,7 @@ export function readInitialPanelState<TViewModel, TState extends TViewModel>(
   return buildInitial(candidate);
 }
 
-export function preserveLoadingOnFullUpdate<TState extends { loading: boolean }>(
+function preserveLoadingOnFullUpdate<TState extends { loading: boolean }>(
   currentState: TState,
   nextState: TState
 ): TState {

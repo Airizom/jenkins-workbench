@@ -12,7 +12,6 @@ type MonitorCardProps = {
   title: string;
   entries: NodeMonitorViewModel[];
 };
-
 export function MonitorCard({ title, entries }: MonitorCardProps): JSX.Element {
   if (!entries || entries.length === 0) {
     return (

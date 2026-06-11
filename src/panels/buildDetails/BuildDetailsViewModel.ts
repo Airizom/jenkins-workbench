@@ -37,17 +37,6 @@ export type {
   PipelineStageViewModel
 } from "./shared/BuildDetailsContracts";
 
-export { buildCoverageStateViewModel } from "./BuildDetailsCoverageViewModel";
-export { buildBuildFailureInsights } from "./BuildDetailsFailureInsightsViewModel";
-export { buildPendingInputsViewModel } from "./BuildDetailsPendingInputsViewModel";
-export { buildPipelineStagesViewModel } from "./BuildDetailsPipelineViewModel";
-export {
-  buildEmptyTestResultsViewModel,
-  buildTestResultsViewModel,
-  buildTestsSummary,
-  buildTestStateViewModel
-} from "./BuildDetailsTestsViewModel";
-
 export interface BuildDetailsViewModelInput {
   details?: JenkinsBuildDetails;
   buildUrl?: string;

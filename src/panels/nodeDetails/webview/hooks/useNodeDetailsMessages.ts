@@ -2,7 +2,6 @@ import type { Dispatch } from "react";
 import { usePanelMessages } from "../../../shared/webview/hooks/usePanelMessages";
 import { parseNodeDetailsOutgoingMessage } from "../../shared/NodeDetailsPanelMessages";
 import type { NodeDetailsAction } from "../state/nodeDetailsState";
-
 export function useNodeDetailsMessages(dispatch: Dispatch<NodeDetailsAction>): void {
   usePanelMessages(parseNodeDetailsOutgoingMessage, dispatch, reduceNodeDetailsMessage);
 }

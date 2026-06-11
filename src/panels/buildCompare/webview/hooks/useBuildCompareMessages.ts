@@ -2,7 +2,6 @@ import type { Dispatch } from "react";
 import { usePanelMessages } from "../../../shared/webview/hooks/usePanelMessages";
 import { parseBuildCompareOutgoingMessage } from "../../shared/BuildComparePanelMessages";
 import type { BuildCompareAction } from "../state/buildCompareState";
-
 export function useBuildCompareMessages(dispatch: Dispatch<BuildCompareAction>): void {
   usePanelMessages(parseBuildCompareOutgoingMessage, dispatch, reduceBuildCompareMessage);
 }

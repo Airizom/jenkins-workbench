@@ -4,7 +4,6 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 export type CollapsibleProps = React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Root>;
-
 export const Collapsible = CollapsiblePrimitive.Root;
 
 export type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<
@@ -12,7 +11,6 @@ export type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<
 > & {
   asChild?: boolean;
 };
-
 export const CollapsibleTrigger = React.forwardRef<
   React.ElementRef<typeof CollapsiblePrimitive.Trigger>,
   CollapsibleTriggerProps
@@ -67,7 +65,6 @@ function ChevronIcon({ className }: { className?: string }) {
 export type CollapsibleContentProps = React.ComponentPropsWithoutRef<
   typeof CollapsiblePrimitive.Content
 >;
-
 export const CollapsibleContent = React.forwardRef<
   React.ElementRef<typeof CollapsiblePrimitive.Content>,
   CollapsibleContentProps

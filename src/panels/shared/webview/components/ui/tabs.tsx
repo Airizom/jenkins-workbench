@@ -4,7 +4,6 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 export type TabsProps = React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root>;
-
 export const Tabs = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Root>, TabsProps>(
   ({ className, ...props }, ref) => (
     <TabsPrimitive.Root ref={ref} className={cn("flex flex-col", className)} {...props} />
@@ -13,7 +12,6 @@ export const Tabs = React.forwardRef<React.ElementRef<typeof TabsPrimitive.Root>
 Tabs.displayName = "Tabs";
 
 export type TabsListProps = React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>;
-
 export const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   TabsListProps
@@ -30,7 +28,6 @@ export const TabsList = React.forwardRef<
 TabsList.displayName = "TabsList";
 
 export type TabsTriggerProps = React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>;
-
 export const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   TabsTriggerProps
@@ -54,7 +51,6 @@ export const TabsTrigger = React.forwardRef<
 TabsTrigger.displayName = "TabsTrigger";
 
 export type TabsContentProps = React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>;
-
 export const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   TabsContentProps

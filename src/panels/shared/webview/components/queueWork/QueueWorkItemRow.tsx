@@ -9,7 +9,6 @@ export type QueueWorkItemRowProps = {
   action?: "open-button" | "external-icon";
   className?: string;
 };
-
 export function QueueWorkItemRow({
   item,
   onOpenExternal,

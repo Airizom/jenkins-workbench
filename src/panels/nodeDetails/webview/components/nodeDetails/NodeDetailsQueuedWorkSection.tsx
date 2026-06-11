@@ -7,7 +7,6 @@ type NodeDetailsQueuedWorkSectionProps = {
   queuedWork: NodeDetailsState["queuedWork"];
   onOpenExternal: (url: string) => void;
 };
-
 export function NodeDetailsQueuedWorkSection({
   queuedWork,
   onOpenExternal

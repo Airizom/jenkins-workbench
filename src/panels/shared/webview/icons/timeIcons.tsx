@@ -1,6 +1,5 @@
 import { IconBase } from "./IconBase";
 import type { IconProps } from "./types";
-
 export function ClockIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-3.5 w-3.5" {...props}>
@@ -9,7 +8,6 @@ export function ClockIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function CalendarIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-3.5 w-3.5" {...props}>
@@ -20,7 +18,6 @@ export function CalendarIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function StatusIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -28,7 +25,6 @@ export function StatusIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function IdleIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>

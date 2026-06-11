@@ -7,7 +7,6 @@ import {
   ToastTitle,
   ToastViewport
 } from "./toast";
-
 export function Toaster(): JSX.Element {
   const { toasts, dismissToast } = useToast();
 

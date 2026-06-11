@@ -41,7 +41,7 @@ export function formatJobColor(color?: string): string | undefined {
   return formatJobColorStatusLabel(status);
 }
 
-export function formatBuildStatus(build: JenkinsBuild): string {
+function formatBuildStatus(build: JenkinsBuild): string {
   return resolveBuildResultLabel(build.result, build.building);
 }
 
@@ -161,8 +161,6 @@ export function formatQueueItemDescription(
   return parts.length > 0 ? parts.join(" • ") : undefined;
 }
 
-export { formatQueueDuration } from "../formatters/DurationFormatters";
-
 export function normalizeQueueReason(reason?: string): string | undefined {
   const trimmed = reason?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
@@ -202,7 +200,7 @@ function buildIconId(status: NormalizedStatus): string {
 
 export { isJobColorDisabled };
 
-export function resolveJobStatus(color?: string): NormalizedStatus | undefined {
+function resolveJobStatus(color?: string): NormalizedStatus | undefined {
   return resolveJobColorStatus(color);
 }
 

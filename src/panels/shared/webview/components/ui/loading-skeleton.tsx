@@ -6,7 +6,6 @@ import { Skeleton } from "./skeleton";
 export interface LoadingSkeletonProps extends HTMLAttributes<HTMLDivElement> {
   variant?: "build" | "node";
 }
-
 export function LoadingSkeleton({ className, variant = "build", ...props }: LoadingSkeletonProps) {
   if (variant === "node") {
     return <NodeLoadingSkeleton className={className} {...props} />;
@@ -261,46 +260,6 @@ function LoadingProgressBar() {
   return (
     <div className="h-px w-full overflow-hidden bg-muted">
       <div className="h-full w-1/3 animate-progress-indeterminate bg-progress rounded-full" />
-    </div>
-  );
-}
-
-export function LoadingSpinner({ className, ...props }: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={cn("h-5 w-5 animate-spin text-primary", className)}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-      {...props}
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeOpacity="0.25"
-        strokeWidth="3"
-        fill="none"
-      />
-      <path
-        d="M12 2a10 10 0 0 1 10 10"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
-
-export function LoadingIndicator({ className, message }: { className?: string; message?: string }) {
-  return (
-    <div className={cn("flex flex-col items-center justify-center gap-3 py-12", className)}>
-      <LoadingSpinner className="h-8 w-8" />
-      {message ? <p className="text-sm text-muted-foreground animate-pulse">{message}</p> : null}
     </div>
   );
 }

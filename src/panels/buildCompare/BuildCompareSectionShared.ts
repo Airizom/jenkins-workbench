@@ -19,7 +19,7 @@ export function buildBuildViewModel(
 
 export { buildOccurrenceKey } from "../shared/TestCaseViewModel";
 
-export function buildComparisonErrorDetail(
+function buildComparisonErrorDetail(
   label: string,
   baselineMessage?: string,
   targetMessage?: string
@@ -36,7 +36,7 @@ export function buildComparisonErrorDetail(
   return `${label} comparison failed.`;
 }
 
-export function createCompareErrorSection<T>(
+function createCompareErrorSection<T>(
   summaryLabel: string,
   detail: string | undefined,
   fields: T
@@ -49,7 +49,7 @@ export function createCompareErrorSection<T>(
   };
 }
 
-export function createCompareUnavailableSection<T>(
+function createCompareUnavailableSection<T>(
   summaryLabel: string,
   detail: string | undefined,
   fields: T

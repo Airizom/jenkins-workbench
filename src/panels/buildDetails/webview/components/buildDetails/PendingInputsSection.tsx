@@ -8,7 +8,6 @@ import { StatusPill } from "./StatusPill";
 const { useEffect, useRef, useState } = React;
 
 const PROCESSING_TIMEOUT_MS = 5000;
-
 export function PendingInputsSection({
   pendingInputs,
   onApprove,

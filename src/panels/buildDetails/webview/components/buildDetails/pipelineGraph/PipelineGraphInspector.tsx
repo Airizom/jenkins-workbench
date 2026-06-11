@@ -18,7 +18,6 @@ import { EmptyStepsMessage } from "../pipelineStages/EmptyStepsMessage";
 import { StepsList } from "../pipelineStages/StepsList";
 
 const { useEffect, useState } = React;
-
 export function PipelineGraphInspector({
   stage,
   onRestartStage,

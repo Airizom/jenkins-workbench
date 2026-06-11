@@ -5,7 +5,7 @@ export type JobNameValidationError =
   | "control_chars"
   | "reserved_name";
 
-export const JENKINS_INVALID_JOB_NAME_CHARACTERS = "?*/\\%!@#$^&|<>[]:;";
+const JENKINS_INVALID_JOB_NAME_CHARACTERS = "?*/\\%!@#$^&|<>[]:;";
 
 function containsControlCharacters(value: string): boolean {
   for (let i = 0; i < value.length; i++) {
@@ -26,7 +26,7 @@ function containsJenkinsInvalidNameCharacter(value: string): boolean {
   return false;
 }
 
-export function validateJobName(name: string): JobNameValidationError | undefined {
+function validateJobName(name: string): JobNameValidationError | undefined {
   if (!name || name.trim().length === 0) {
     return "empty";
   }
@@ -51,7 +51,7 @@ export function validateJobName(name: string): JobNameValidationError | undefine
   return undefined;
 }
 
-export function formatJobNameValidationError(error: JobNameValidationError): string {
+function formatJobNameValidationError(error: JobNameValidationError): string {
   switch (error) {
     case "empty":
       return "Name cannot be empty.";

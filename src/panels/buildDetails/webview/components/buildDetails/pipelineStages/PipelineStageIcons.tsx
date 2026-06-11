@@ -9,7 +9,6 @@ import {
   resolveBuildResultConnectorColor,
   resolveBuildResultStageNodeClass
 } from "../../../../../shared/webview/lib/statusStyles";
-
 export function getStageIcon(statusClass?: string) {
   switch (statusClass) {
     case "success":
@@ -26,11 +25,9 @@ export function getStageIcon(statusClass?: string) {
       return null;
   }
 }
-
 export function getStageNodeStyle(statusClass?: string): string {
   return resolveBuildResultStageNodeClass(statusClass);
 }
-
 export function getConnectorColor(statusClass?: string): string {
   return resolveBuildResultConnectorColor(statusClass);
 }

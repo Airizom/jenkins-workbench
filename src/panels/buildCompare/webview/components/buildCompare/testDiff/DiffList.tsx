@@ -1,7 +1,6 @@
 import type { BuildCompareTestDiffItem } from "../../../../shared/BuildCompareContracts";
 import { CompareSectionFrame } from "../shared/CompareSectionFrame";
 import { TestDiffRow } from "./TestDiffRow";
-
 export function DiffList({
   title,
   items,

@@ -12,7 +12,7 @@ export type JobColorStatus =
 
 const JOB_COLOR_ANIMATION_SUFFIX = "_anime";
 
-export function stripJobColorAnimation(color: string): string {
+function stripJobColorAnimation(color: string): string {
   const lowerColor = color.toLowerCase();
   if (!lowerColor.endsWith(JOB_COLOR_ANIMATION_SUFFIX)) {
     return color;
@@ -20,7 +20,7 @@ export function stripJobColorAnimation(color: string): string {
   return color.slice(0, color.length - JOB_COLOR_ANIMATION_SUFFIX.length);
 }
 
-export function getBaseJobColor(color: string): string {
+function getBaseJobColor(color: string): string {
   return stripJobColorAnimation(color).toLowerCase();
 }
 

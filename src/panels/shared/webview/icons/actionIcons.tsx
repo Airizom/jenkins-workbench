@@ -1,6 +1,5 @@
 import { IconBase } from "./IconBase";
 import type { IconProps } from "./types";
-
 export function ArrowUpIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -9,7 +8,6 @@ export function ArrowUpIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function ExternalLinkIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -19,7 +17,6 @@ export function ExternalLinkIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function RefreshIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -29,7 +26,6 @@ export function RefreshIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function SearchIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -38,7 +34,6 @@ export function SearchIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function DownloadIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -48,7 +43,6 @@ export function DownloadIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function CopyIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -57,7 +51,6 @@ export function CopyIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function XIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -66,7 +59,6 @@ export function XIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function CheckIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -74,7 +66,6 @@ export function CheckIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function PlayIcon({ className, ...props }: IconProps) {
   return (
     <IconBase
@@ -88,7 +79,6 @@ export function PlayIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function ChevronDownIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -96,7 +86,6 @@ export function ChevronDownIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function EyeIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -105,7 +94,6 @@ export function EyeIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function LaunchIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>

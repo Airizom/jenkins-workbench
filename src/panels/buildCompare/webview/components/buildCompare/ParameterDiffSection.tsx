@@ -1,7 +1,6 @@
 import type { BuildCompareParametersSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { ParameterDiffRow } from "./ParameterDiffRow";
 import { CompareItemsSection } from "./shared/CompareItemsSection";
-
 export function ParameterDiffSection({
   section
 }: {

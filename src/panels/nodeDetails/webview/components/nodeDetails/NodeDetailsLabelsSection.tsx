@@ -4,7 +4,6 @@ import { TagIcon } from "../../../../shared/webview/icons";
 type NodeDetailsLabelsSectionProps = {
   labels: string[];
 };
-
 export function NodeDetailsLabelsSection({ labels }: NodeDetailsLabelsSectionProps): JSX.Element {
   return labels.length > 0 ? (
     <div className="flex flex-wrap gap-1.5">

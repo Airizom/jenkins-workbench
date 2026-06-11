@@ -1,5 +1,4 @@
 import { Skeleton } from "../../../../../shared/webview/components/ui/skeleton";
-
 export function PipelineStagesPlaceholder(): JSX.Element {
   return (
     <div className="space-y-2">

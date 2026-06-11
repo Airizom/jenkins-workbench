@@ -2,7 +2,6 @@ import { formatTestCaseSubtitle } from "../../../../../shared/TestCaseViewModel"
 import type { BuildCompareTestDiffItem } from "../../../../shared/BuildCompareContracts";
 import { CompareDiffRowShell } from "../shared/CompareDiffRowShell";
 import { CompareSideGrid } from "../shared/CompareSideGrid";
-
 export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
   return (
     <CompareDiffRowShell

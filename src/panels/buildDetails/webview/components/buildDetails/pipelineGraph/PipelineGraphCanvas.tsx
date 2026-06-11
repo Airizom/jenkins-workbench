@@ -19,7 +19,6 @@ interface ViewportState {
   x: number;
   y: number;
 }
-
 export function PipelineGraphCanvas({
   layout,
   selectedStageKey,

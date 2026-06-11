@@ -29,7 +29,6 @@ type ExecutorsTableCardProps = {
   entries: NodeDetailsState["executors"];
   onOpenExternal: (url: string) => void;
 };
-
 export function ExecutorsTableCard({
   title,
   entries,

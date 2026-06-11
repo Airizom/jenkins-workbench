@@ -21,7 +21,6 @@ interface RawNode {
   stage: PipelineStageViewModel;
   order: number;
 }
-
 export function buildPipelineGraphModel(stages: PipelineStageViewModel[]): PipelineGraphModel {
   const rawNodes: RawNode[] = [];
   const edges: PipelineGraphEdgeModel[] = [];

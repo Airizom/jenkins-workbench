@@ -14,7 +14,6 @@ import { useBuildCompareMessages } from "./hooks/useBuildCompareMessages";
 import { buildCompareReducer } from "./state/buildCompareState";
 
 const { useEffect, useReducer } = React;
-
 export function BuildCompareApp({ initialState }: { initialState: BuildCompareViewModel }) {
   const [state, dispatch] = useReducer(buildCompareReducer, initialState);
   const postMessage = usePanelPostMessage<BuildCompareIncomingMessage>();

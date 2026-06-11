@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 
 export type OpenExternalPanelMessage = { type: "openExternal"; url: string };
-
 export function useOpenExternalMessage(
   postMessage: (message: OpenExternalPanelMessage) => void
 ): (url: string) => void {

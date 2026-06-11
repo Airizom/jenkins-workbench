@@ -2,7 +2,6 @@ import { TestStatusIcon } from "../../../../../shared/webview/components/TestSta
 import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { TestTubeIcon } from "../../../../../shared/webview/icons";
 import { BuildFailureInsightCard } from "./BuildFailureInsightCard";
-
 export function BuildFailureTestsSummaryCard({
   summaryLabel,
   hasFailedTests,

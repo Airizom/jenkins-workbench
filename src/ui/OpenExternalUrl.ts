@@ -18,7 +18,7 @@ export type ExternalHttpUrlValidationResult =
 type ExternalHttpUrlValidationFailure = Extract<ExternalHttpUrlValidationResult, { ok: false }>;
 export type ExternalHttpUrlValidationFailureReason = ExternalHttpUrlValidationFailure["reason"];
 
-export function validateExternalHttpUrl(url: string): ExternalHttpUrlValidationResult {
+function validateExternalHttpUrl(url: string): ExternalHttpUrlValidationResult {
   let parsed: vscode.Uri;
   try {
     parsed = vscode.Uri.parse(url);
@@ -43,7 +43,7 @@ export function validateExternalHttpUrl(url: string): ExternalHttpUrlValidationR
   };
 }
 
-export function getExternalHttpUrlValidationMessage(
+function getExternalHttpUrlValidationMessage(
   reason: ExternalHttpUrlValidationFailureReason,
   options: ExternalHttpUrlValidationMessageOptions
 ): string {
@@ -63,7 +63,7 @@ export type OpenExternalHttpUrlResult =
       reason: ExternalHttpUrlValidationFailureReason;
     };
 
-export async function openExternalHttpUrl(url: string): Promise<OpenExternalHttpUrlResult> {
+async function openExternalHttpUrl(url: string): Promise<OpenExternalHttpUrlResult> {
   const validation = validateExternalHttpUrl(url);
   if (!validation.ok) {
     return {

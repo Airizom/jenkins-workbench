@@ -24,7 +24,6 @@ import {
 } from "./state/buildDetailsState";
 
 const { useCallback, useReducer } = React;
-
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
   const postMessage = usePanelPostMessage<BuildDetailsIncomingMessage>();

@@ -8,7 +8,6 @@ type ExecutorTableRowProps = {
   entry: ExecutorEntry;
   onOpenExternal: (url: string) => void;
 };
-
 export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProps): JSX.Element {
   const durationLabel = entry.workDurationLabel ?? "—";
   const hasWork = Boolean(entry.workLabel);

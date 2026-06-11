@@ -11,7 +11,6 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 import { OverflowText } from "./BuildFailureOverflowText";
-
 export function BuildFailureArtifactsCard({
   items,
   overflowCount,

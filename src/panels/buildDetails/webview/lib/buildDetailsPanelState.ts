@@ -11,7 +11,6 @@ import {
   normalizeBuildDetailsPanelUiState,
   withBuildDetailsPanelUiState
 } from "../../shared/BuildDetailsPanelWebviewState";
-
 export function getBuildDetailsPanelUiState(): BuildDetailsPanelUiState {
   const state = getVsCodeState<BuildDetailsPanelSerializedState>();
   if (!isBuildDetailsPanelState(state)) {
@@ -19,7 +18,6 @@ export function getBuildDetailsPanelUiState(): BuildDetailsPanelUiState {
   }
   return normalizeBuildDetailsPanelUiState(state.buildDetailsUi) ?? {};
 }
-
 export function setBuildDetailsPanelUiState(uiState: BuildDetailsPanelUiState): void {
   const state = getVsCodeState<BuildDetailsPanelSerializedState>();
   if (!isBuildDetailsPanelState(state)) {

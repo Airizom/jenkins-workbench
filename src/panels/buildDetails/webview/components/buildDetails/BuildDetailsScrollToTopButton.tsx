@@ -10,7 +10,6 @@ type BuildDetailsScrollToTopButtonProps = {
   show: boolean;
   onScrollToTop: () => void;
 };
-
 export function BuildDetailsScrollToTopButton({
   show,
   onScrollToTop

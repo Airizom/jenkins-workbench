@@ -2,7 +2,6 @@ import type { NodeStatusClass } from "../../../nodeDetails/shared/NodeDetailsCon
 import { resolveNodeStatusBadgeClass } from "../lib/statusStyles";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
-
 export function NodeStatusBadge({
   label,
   statusClass,

@@ -16,7 +16,6 @@ type UseBuildDetailsTabsResult = {
   defaultTab: BuildDetailsTab;
   availableTabs: BuildDetailsTab[];
 };
-
 export function useBuildDetailsTabs({
   hasPendingInputs,
   hasPipelineStages,

@@ -19,7 +19,6 @@ type BuildDetailsHeaderProps = {
   buildUrl?: string;
   onOpenBuild: () => void;
 };
-
 export function BuildDetailsHeader({
   displayName,
   resultLabel,

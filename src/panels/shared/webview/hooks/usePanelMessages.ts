@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-
 export function usePanelMessages<TMessage, TDispatch>(
   parseMessage: (data: unknown) => TMessage | undefined,
   dispatch: TDispatch,

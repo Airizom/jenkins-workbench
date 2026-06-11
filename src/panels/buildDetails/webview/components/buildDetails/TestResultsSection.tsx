@@ -12,7 +12,6 @@ import {
   TestResultsToolbar,
   useTestResultsView
 } from "./testResults";
-
 export function TestResultsSection({
   buildUrl,
   summary,

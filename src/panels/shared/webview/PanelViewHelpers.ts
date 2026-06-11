@@ -59,7 +59,7 @@ export class EnvironmentPanelView<TModel> {
   }
 }
 
-export function resolvePanelViewAssets(
+function resolvePanelViewAssets(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
   entryName: WebviewEntryName
@@ -85,7 +85,7 @@ export function resolvePanelWebviewAssetsOrError(
   }
 }
 
-export function assignPanelLoadingHtml(
+function assignPanelLoadingHtml(
   panel: vscode.WebviewPanel,
   skeletonVariant: LoadingSkeletonVariant,
   options: Omit<PanelDetailsRenderOptions, "cspSource"> & { styleUris: string[] }

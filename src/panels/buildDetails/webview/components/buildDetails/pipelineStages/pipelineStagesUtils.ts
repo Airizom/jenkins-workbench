@@ -1,5 +1,4 @@
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
-
 export function getStageId(stage: PipelineStageViewModel, index: number): string {
   if (typeof stage.key === "string" && stage.key.length > 0) {
     return stage.key;
@@ -9,7 +8,6 @@ export function getStageId(stage: PipelineStageViewModel, index: number): string
   }
   return `stage-${index}`;
 }
-
 export function pruneStageFlags(
   prev: Record<string, boolean>,
   validKeys: Set<string>

@@ -10,7 +10,6 @@ export type BuildCompareAction = {
   type: "updateConsoleSection";
   console: BuildCompareConsoleSectionViewModel;
 };
-
 export function buildCompareReducer(
   state: BuildCompareState,
   action: BuildCompareAction
@@ -25,7 +24,6 @@ export function buildCompareReducer(
       return state;
   }
 }
-
 export function getInitialState(): BuildCompareViewModel | undefined {
   return readInjectedPanelState<BuildCompareViewModel>();
 }

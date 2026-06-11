@@ -1,6 +1,5 @@
 import { IconBase } from "./IconBase";
 import type { IconProps } from "./types";
-
 export function UserIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -9,7 +8,6 @@ export function UserIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function ServerIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-5 w-5" {...props}>
@@ -20,7 +18,6 @@ export function ServerIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function TerminalIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -29,7 +26,6 @@ export function TerminalIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function CpuIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -46,7 +42,6 @@ export function CpuIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function TagIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
@@ -55,7 +50,6 @@ export function TagIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function FileIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -64,7 +58,6 @@ export function FileIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function GitCommitIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -74,7 +67,6 @@ export function GitCommitIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
 export function TestTubeIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
@@ -84,15 +76,6 @@ export function TestTubeIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-
-export function ActivityIcon({ className, ...props }: IconProps) {
-  return (
-    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </IconBase>
-  );
-}
-
 export function ExecutorsIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>

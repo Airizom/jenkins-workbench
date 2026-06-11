@@ -1,6 +1,5 @@
 import { resolveResultTextClass } from "../../../../shared/webview/lib/statusStyles";
 import { CompareValueCellShell } from "./shared/CompareValueCellShell";
-
 export function StageValueCell({
   label,
   status,

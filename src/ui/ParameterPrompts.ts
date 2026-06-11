@@ -17,9 +17,7 @@ export async function promptForParameters(
   return payload;
 }
 
-export async function promptForParameterValue(
-  parameter: JobParameter
-): Promise<string | undefined> {
+async function promptForParameterValue(parameter: JobParameter): Promise<string | undefined> {
   const prompt = `Parameter: ${parameter.name}`;
   const description = parameter.description;
 
@@ -86,9 +84,7 @@ export async function promptChoiceParameterValue(
   return pick?.label;
 }
 
-export function normalizeBoolean(
-  value?: string | number | boolean | string[]
-): boolean | undefined {
+function normalizeBoolean(value?: string | number | boolean | string[]): boolean | undefined {
   if (value === undefined) {
     return undefined;
   }

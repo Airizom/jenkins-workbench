@@ -1,7 +1,6 @@
 import { resolveSeverityBadgeClass } from "../lib/statusStyles";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
-
 export function SeverityBadge({
   label,
   severity,

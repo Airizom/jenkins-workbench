@@ -23,7 +23,7 @@ export interface BuildDetailsPanelSerializedState extends SerializedEnvironmentS
   buildDetailsUi?: BuildDetailsPanelUiState;
 }
 
-export function createBuildDetailsPanelState(
+function createBuildDetailsPanelState(
   environment: JenkinsEnvironmentRef,
   buildUrl: string,
   uiState?: BuildDetailsPanelUiState

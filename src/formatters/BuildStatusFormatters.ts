@@ -41,9 +41,7 @@ export function resolveBuildResultLabel(result?: string, building?: boolean): st
 
 export type BuildResultCompletionSeverity = "info" | "warning";
 
-export function resolveBuildResultCompletionSeverity(
-  result?: string
-): BuildResultCompletionSeverity {
+function resolveBuildResultCompletionSeverity(result?: string): BuildResultCompletionSeverity {
   const resultClass = resolveBuildResultClass(result);
   return resultClass === "success" || resultClass === "neutral" ? "info" : "warning";
 }
@@ -63,7 +61,7 @@ export function resolveKnownBuildResult(
   };
 }
 
-export function isFailedBuildResult(result?: string): boolean {
+function isFailedBuildResult(result?: string): boolean {
   return isFailedStatusToken(result);
 }
 

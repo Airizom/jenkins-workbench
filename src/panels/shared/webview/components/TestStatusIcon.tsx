@@ -5,7 +5,6 @@ import { AlertCircleIcon, CheckCircleIcon, TestTubeIcon, XCircleIcon } from "../
 import { cn } from "../lib/utils";
 
 const DEFAULT_SIZE = 14;
-
 export function TestStatusIcon({
   status,
   className,

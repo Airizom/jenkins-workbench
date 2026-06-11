@@ -1,5 +1,4 @@
 import type { BuildCompareConsoleSectionViewModel } from "../../../../shared/BuildCompareContracts";
-
 export function ConsoleSnippet({
   title,
   lines

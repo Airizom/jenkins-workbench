@@ -7,7 +7,6 @@ import {
   ConsoleOutputNotice,
   ConsoleOutputViewport
 } from "./buildDetails/consoleOutput";
-
 export function ConsoleLogSearchBody({
   consoleSearch,
   note,

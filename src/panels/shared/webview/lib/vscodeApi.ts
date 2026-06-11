@@ -24,7 +24,6 @@ function applyInjectedPanelState(api: VsCodeApi): void {
   windowWithState.__JENKINS_WORKBENCH_PANEL_STATE__ = undefined;
   api.setState?.(state);
 }
-
 export function getVsCodeApi(): VsCodeApi {
   if (!vscodeApiInstance) {
     const windowWithApi = window as {
@@ -36,15 +35,12 @@ export function getVsCodeApi(): VsCodeApi {
   }
   return vscodeApiInstance;
 }
-
 export function postVsCodeMessage(message: unknown): void {
   getVsCodeApi().postMessage(message);
 }
-
 export function getVsCodeState<T = unknown>(): T | undefined {
   return getVsCodeApi().getState?.<T>();
 }
-
 export function setVsCodeState<T>(state: T): T | undefined {
   return getVsCodeApi().setState?.(state);
 }

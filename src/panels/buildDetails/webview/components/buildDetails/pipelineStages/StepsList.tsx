@@ -12,7 +12,6 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import { getStatusClass } from "../StatusPill";
 import { getStageIcon } from "./PipelineStageIcons";
-
 export function StepsList({
   steps,
   compact = false,

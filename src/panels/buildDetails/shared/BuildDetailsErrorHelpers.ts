@@ -22,7 +22,3 @@ export function splitBuildDetailsErrors(errors: string[]): {
   }
   return { consoleError, displayErrors };
 }
-
-export function isConsoleOutputError(error: string): boolean {
-  return error.toLowerCase().startsWith(CONSOLE_ERROR_PREFIX);
-}

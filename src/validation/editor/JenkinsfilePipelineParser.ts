@@ -27,10 +27,6 @@ export function findPipelineBlock(document: TextDocument): PipelineBlockContext 
   return findPipelineBlockFromSource(createDocumentSource(document));
 }
 
-export function findPipelineBlockFromText(text: string): PipelineBlockContext | undefined {
-  return findPipelineBlockFromSource(createTextSource(text));
-}
-
 export function hasTopLevelSection(
   document: TextDocument,
   context: PipelineBlockContext,
@@ -82,15 +78,6 @@ function createDocumentSource(document: TextDocument): PipelineTextSource {
   return {
     lineCount: document.lineCount,
     lineAt: (line: number) => document.lineAt(line).text
-  };
-}
-
-function createTextSource(text: string): PipelineTextSource {
-  const normalized = text.replace(/\r\n/g, "\n");
-  const lines = normalized.split("\n");
-  return {
-    lineCount: lines.length,
-    lineAt: (line: number) => lines[line] ?? ""
   };
 }
 

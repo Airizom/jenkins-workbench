@@ -1,14 +1,13 @@
 import { ExecutorsIcon, IdleIcon, LaunchIcon, StatusIcon } from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 
-export const STALE_AFTER_MS = 5 * 60 * 1000;
+const STALE_AFTER_MS = 5 * 60 * 1000;
 
 export interface OverviewRow {
   label: string;
   value: string;
   icon: JSX.Element;
 }
-
 export function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
   const rows: OverviewRow[] = [
     { label: "Status", value: state.statusLabel, icon: <StatusIcon className="h-3.5 w-3.5" /> },
@@ -52,7 +51,6 @@ export function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
 
   return rows;
 }
-
 export function formatJson(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2) ?? "";
@@ -60,7 +58,6 @@ export function formatJson(value: unknown): string {
     return String(value ?? "");
   }
 }
-
 export function parseDate(value: string | undefined): Date | undefined {
   if (!value) {
     return undefined;
@@ -70,7 +67,6 @@ export function parseDate(value: string | undefined): Date | undefined {
 }
 
 export { formatRelativeDate as formatRelativeTime } from "../../../../../formatters/RelativeTimeFormatters";
-
 export function isStaleUpdatedAt(date: Date | undefined, now: number): boolean {
   if (!date) {
     return false;

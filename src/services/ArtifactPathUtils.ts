@@ -16,7 +16,7 @@ export function sanitizeEnvironmentSegment(environment: JenkinsEnvironmentRef): 
   return sanitizePathSegment(environment.environmentId, "environment");
 }
 
-export function sanitizePathSegment(segment: string, fallback = "unknown"): string {
+function sanitizePathSegment(segment: string, fallback = "unknown"): string {
   const trimmed = segment.trim();
   if (!trimmed) {
     return fallback;

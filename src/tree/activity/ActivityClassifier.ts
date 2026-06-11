@@ -28,7 +28,3 @@ export class ActivityClassifier {
     return undefined;
   }
 }
-
-export function isRunningActivityColor(color?: string): boolean {
-  return isRunningJobColor(color);
-}

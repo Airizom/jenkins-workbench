@@ -2,7 +2,6 @@ import type { BuildCompareTestsSectionViewModel } from "../../../shared/BuildCom
 import { SectionCard } from "./shared/SectionCard";
 import { SummaryStat } from "./shared/SummaryStat";
 import { DiffList } from "./testDiff/DiffList";
-
 export function TestDiffSection({ section }: { section: BuildCompareTestsSectionViewModel }) {
   return (
     <SectionCard

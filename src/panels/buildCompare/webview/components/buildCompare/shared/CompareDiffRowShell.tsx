@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { CompareMutedCard } from "./CompareMutedCard";
-
 export function CompareDiffRowShell({
   title,
   changeType,

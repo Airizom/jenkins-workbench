@@ -9,7 +9,6 @@ export interface ProgressProps
   max?: number;
   indeterminate?: boolean;
 }
-
 export const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   ProgressProps
@@ -44,7 +43,7 @@ export interface ProgressCircleProps extends React.SVGAttributes<SVGSVGElement> 
   indeterminate?: boolean;
 }
 
-export const ProgressCircle = React.forwardRef<SVGSVGElement, ProgressCircleProps>(
+const ProgressCircle = React.forwardRef<SVGSVGElement, ProgressCircleProps>(
   (
     {
       className,

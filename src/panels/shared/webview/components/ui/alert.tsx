@@ -18,14 +18,12 @@ const alertVariants = cva("relative w-full rounded border p-3 text-sm", {
 });
 
 export type AlertProps = React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>;
-
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   ({ className, variant, ...props }, ref) => (
     <div ref={ref} role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
   )
 );
 Alert.displayName = "Alert";
-
 export const AlertTitle = React.forwardRef<
   HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
@@ -33,7 +31,6 @@ export const AlertTitle = React.forwardRef<
   <h5 ref={ref} className={cn("mb-1 font-semibold leading-tight", className)} {...props} />
 ));
 AlertTitle.displayName = "AlertTitle";
-
 export const AlertDescription = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>

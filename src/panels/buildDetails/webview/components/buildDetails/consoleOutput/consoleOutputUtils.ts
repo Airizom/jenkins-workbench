@@ -11,7 +11,6 @@ export function countConsoleLines(text: string): number {
   }
   return count;
 }
-
 export function buildConsoleTruncationNote(
   consoleTruncated: boolean,
   consoleMaxChars: number

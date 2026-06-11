@@ -65,7 +65,7 @@ export function mergeStepCatalogs(
   return { steps: merged };
 }
 
-export function mergeStepDefinitions(
+function mergeStepDefinitions(
   baseStep: JenkinsfileStepDefinition,
   nextStep: JenkinsfileStepDefinition
 ): JenkinsfileStepDefinition {

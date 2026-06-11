@@ -113,57 +113,45 @@ const NODE_STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string;
       accent: "bg-border"
     }
   };
-
 export function resolveResultBadgeClass(resultClass: string): string {
   return BUILD_RESULT_BADGE_CLASSES[normalizeBuildResultClass(resultClass)];
 }
-
 export function resolveResultTextClass(resultClass?: string): string {
   return BUILD_RESULT_TEXT_CLASSES[normalizeBuildResultClass(resultClass)];
 }
-
 export function resolveStatusAccentClass(resultClass: string): string {
   return BUILD_RESULT_ACCENT_CLASSES[normalizeBuildResultClass(resultClass)];
 }
 
 const STAGE_NODE_BASE_CLASS =
   "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors";
-
 export function resolveBuildResultStageNodeClass(resultClass?: string): string {
   return cn(
     STAGE_NODE_BASE_CLASS,
     BUILD_RESULT_STAGE_NODE_CLASSES[normalizeBuildResultClass(resultClass)]
   );
 }
-
 export function resolveBuildResultConnectorColor(resultClass?: string): string {
   return BUILD_RESULT_CONNECTOR_COLORS[normalizeBuildResultClass(resultClass)];
 }
-
 export function resolveBuildResultGraphBackground(resultClass?: string): string {
   return BUILD_RESULT_GRAPH_BACKGROUNDS[normalizeBuildResultClass(resultClass)];
 }
-
 export function resolveBuildResultBorderColor(resultClass?: string): string {
   return BUILD_RESULT_BORDER_COLORS[normalizeBuildResultClass(resultClass)];
 }
-
 export function resolveNodeStatusBadgeClass(statusClass: NodeStatusClass): string {
   return NODE_STATUS_STYLES[statusClass].badge;
 }
-
 export function resolveNodeStatusIconClass(statusClass: NodeStatusClass): string {
   return NODE_STATUS_STYLES[statusClass].icon;
 }
-
 export function resolveNodeStatusAccentClass(statusClass: NodeStatusClass): string {
   return NODE_STATUS_STYLES[statusClass].accent;
 }
-
 export function isAnalysisBuildResult(resultClass: string): boolean {
   return resultClass === "failure" || resultClass === "unstable";
 }
-
 export function resolveSeverityBadgeClass(severity: "critical" | "warning" | "normal"): string {
   switch (severity) {
     case "critical":

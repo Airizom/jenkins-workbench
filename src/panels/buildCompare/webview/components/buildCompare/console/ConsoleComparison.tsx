@@ -1,6 +1,5 @@
 import type { BuildCompareConsoleSectionViewModel } from "../../../../shared/BuildCompareContracts";
 import { ConsoleSnippet } from "./ConsoleSnippet";
-
 export function ConsoleComparison({ section }: { section: BuildCompareConsoleSectionViewModel }) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">

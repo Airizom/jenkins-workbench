@@ -1,7 +1,6 @@
 import { BuildResultStatusIcon } from "../../../../shared/webview/components/BuildResultStatusIcon";
 import { BuildDetailsMetaFields } from "./BuildDetailsMetaFields";
 import { StatusPill } from "./StatusPill";
-
 export function BuildSummaryCard({
   displayName,
   resultLabel,

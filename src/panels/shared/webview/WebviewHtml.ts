@@ -14,7 +14,7 @@ export interface WebviewRenderOptions {
   styleUris: string[];
 }
 
-export function renderWebviewShell(content: string, options: WebviewRenderOptions): string {
+function renderWebviewShell(content: string, options: WebviewRenderOptions): string {
   const csp = [
     "default-src 'none'",
     `style-src ${options.cspSource} 'nonce-${options.nonce}'`,
@@ -37,7 +37,7 @@ ${styleLinks}
 </html>`;
 }
 
-export function serializeForScript(value: unknown): string {
+function serializeForScript(value: unknown): string {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e")
@@ -149,7 +149,7 @@ export function assignWebviewPanelManifestErrorHtml(
   );
 }
 
-export function renderPanelManifestErrorHtml(
+function renderPanelManifestErrorHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
   entryName: WebviewEntryName,
@@ -218,12 +218,12 @@ export function renderPanelLoadingHtml(
   return renderWebviewShell(`${stateScript}${renderLoadingSkeletonHtml(skeletonVariant)}`, options);
 }
 
-export function createPanelLoadingRenderer(skeletonVariant: LoadingSkeletonVariant) {
+function createPanelLoadingRenderer(skeletonVariant: LoadingSkeletonVariant) {
   return (options: PanelDetailsRenderOptions): string =>
     renderPanelLoadingHtml(options, skeletonVariant);
 }
 
-export function createPanelAppRenderer(skeletonVariant: LoadingSkeletonVariant) {
+function createPanelAppRenderer(skeletonVariant: LoadingSkeletonVariant) {
   return {
     renderLoadingHtml: createPanelLoadingRenderer(skeletonVariant),
     renderAppHtml: renderPanelAppHtml
@@ -239,10 +239,7 @@ export function createTypedPanelRenderer<TModel>(skeletonVariant: LoadingSkeleto
   };
 }
 
-export function renderPanelAppHtml(
-  initialModel: unknown,
-  options: PanelDetailsRenderOptions
-): string {
+function renderPanelAppHtml(initialModel: unknown, options: PanelDetailsRenderOptions): string {
   const initialState = serializeForScript(initialModel);
   const scriptUri = options.scriptUri ?? "";
   const stateScript = renderInjectedWebviewStateScript(options.panelState, options.nonce);
@@ -259,7 +256,7 @@ export function renderPanelAppHtml(
   );
 }
 
-export function renderWebviewStateScript(state: unknown, nonce: string): string {
+function renderWebviewStateScript(state: unknown, nonce: string): string {
   if (state === undefined) {
     return "";
   }

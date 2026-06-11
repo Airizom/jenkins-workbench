@@ -9,7 +9,6 @@ import { ConsoleOutputHeader } from "./consoleOutput";
 import { buildConsoleTruncationNote, countConsoleLines } from "./consoleOutput/consoleOutputUtils";
 
 const { useEffect, useMemo } = React;
-
 export function ConsoleOutputSection({
   consoleText,
   consoleHtmlModel,

@@ -1,6 +1,5 @@
 import { resolveCoverageStatusBadgeClass } from "../../TestStatusStyles";
 import { ToneBadge } from "./ToneBadge";
-
 export function CoverageStatusBadge({
   label,
   statusClass,

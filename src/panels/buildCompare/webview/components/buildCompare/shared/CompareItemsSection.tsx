@@ -15,7 +15,6 @@ type CompareItemsSectionProps<TItem> = {
   renderItem: (item: TItem) => ReactNode;
   itemKey: (item: TItem) => string;
 };
-
 export function CompareItemsSection<TItem>({
   title,
   summary,

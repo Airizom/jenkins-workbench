@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-
 export function BuildFailureInsightCard({
   icon,
   title,
@@ -26,7 +25,6 @@ export function BuildFailureInsightCard({
     </div>
   );
 }
-
 export function BuildFailureInsightEmpty({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 text-xs text-muted-foreground">

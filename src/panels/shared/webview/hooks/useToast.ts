@@ -57,7 +57,6 @@ function scheduleRemove(id: string): void {
   }, TOAST_REMOVE_DELAY_MS);
   timeouts.set(id, timeout);
 }
-
 export function toast(options: ToastOptions): { id: string; dismiss: () => void } {
   const id = generateId();
   const durationMs = options.durationMs ?? 3000;
@@ -85,7 +84,7 @@ export function toast(options: ToastOptions): { id: string; dismiss: () => void 
   return { id, dismiss: () => dismissToast(id) };
 }
 
-export function dismissToast(id?: string): void {
+function dismissToast(id?: string): void {
   if (!id) {
     currentToasts = currentToasts.map((toastState) => ({ ...toastState, open: false }));
     for (const toastState of currentToasts) {
@@ -101,12 +100,11 @@ export function dismissToast(id?: string): void {
   emit();
 }
 
-export function removeToast(id: string): void {
+function removeToast(id: string): void {
   clearDismissTimeout(id);
   currentToasts = currentToasts.filter((toastState) => toastState.id !== id);
   emit();
 }
-
 export function useToast(): {
   toasts: ToastState[];
   toast: typeof toast;

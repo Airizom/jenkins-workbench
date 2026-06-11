@@ -1,7 +1,6 @@
 import { type StatusVisualTone, resolveStatusBadgeClass } from "../../TestStatusStyles";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
-
 export function ToneBadge({
   label,
   tone,
