@@ -29,9 +29,7 @@ import type {
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
-import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
-import { ActivityFolderTreeItem, BuildQueueFolderTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
@@ -110,7 +108,10 @@ export class JenkinsWorkbenchTreeDataProvider
       this.notifyElement.bind(this),
       this.notifyEnvironment.bind(this)
     );
-    this.revealResolver = new JenkinsTreeRevealResolver(this.getChildrenInternal.bind(this));
+    this.revealResolver = new JenkinsTreeRevealResolver(
+      this.getChildrenInternal.bind(this),
+      this._onDidChangeTreeData.event
+    );
     this.expansionResolver = new TreeDataProviderExpansionResolver(
       this.getParent.bind(this),
       this.getChildrenInternal.bind(this)
@@ -188,8 +189,10 @@ export class JenkinsWorkbenchTreeDataProvider
 
   refreshQueueOnly(environment: JenkinsEnvironmentRef): void {
     this.childrenLoader.clearQueueCache(environment);
-    const item = new BuildQueueFolderTreeItem(environment);
-    this._onDidChangeTreeData.fire(item);
+    this.notifyEnvironmentFolder(
+      this.hierarchyState.notifyQueueFolderInstance(environment),
+      environment
+    );
   }
 
   refreshQueueFolder(environment: JenkinsEnvironmentRef): void {
@@ -198,7 +201,23 @@ export class JenkinsWorkbenchTreeDataProvider
 
   refreshActivity(environment: JenkinsEnvironmentRef): void {
     this.childrenLoader.refreshActivityCache(environment);
-    this._onDidChangeTreeData.fire(new ActivityFolderTreeItem(environment));
+    this.notifyEnvironmentFolder(
+      this.hierarchyState.notifyActivityFolderInstance(environment),
+      environment
+    );
+  }
+
+  // VS Code resolves fired elements by object identity against elements previously
+  // returned from getChildren, so only the cached folder instance can be refreshed.
+  // If the folder was never rendered, fall back to the cached environment instance
+  // (or a full refresh when that is unknown too).
+  private notifyEnvironmentFolder(
+    folder: WorkbenchTreeElement | undefined,
+    environment: JenkinsEnvironmentRef
+  ): void {
+    this._onDidChangeTreeData.fire(
+      folder ?? this.hierarchyState.notifyEnvironmentInstance(environment)
+    );
   }
 
   invalidateBuildArtifacts(request: InvalidateBuildArtifactsRequest): void {
@@ -298,10 +317,9 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   private async getChildrenInternal(
-    element?: WorkbenchTreeElement,
-    options?: TreeChildrenOptions
+    element?: WorkbenchTreeElement
   ): Promise<WorkbenchTreeElement[]> {
-    const items = await this.childrenLoader.getChildren(element, options);
+    const items = await this.childrenLoader.getChildren(element);
     const withParent = this.hierarchyState.withParent(element, items);
     this.emitSummary();
     return withParent;

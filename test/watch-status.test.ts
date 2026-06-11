@@ -163,6 +163,94 @@ describe("JenkinsJobStatusEvaluator", () => {
     ]);
   });
 
+  it("keeps a running observation from overwriting a stored terminal status", () => {
+    const notifier = createNotifier();
+    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+
+    const result = evaluator.evaluate(
+      watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
+      "demo",
+      "red_anime",
+      { number: 8, result: "FAILURE" },
+      "https://jenkins.example"
+    );
+
+    assert.equal(result.nextStatus, "other");
+    assert.equal(result.shouldUpdateStatus, false);
+    assert.equal(result.shouldUpdateBuilding, true);
+    assert.deepEqual(notifier.calls.failures, []);
+    assert.deepEqual(notifier.calls.recoveries, []);
+  });
+
+  it("notifies recovery for failure -> other -> success", () => {
+    const notifier = createNotifier();
+    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+
+    const running = evaluator.evaluate(
+      watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
+      "demo",
+      "red_anime",
+      { number: 8, result: "FAILURE" },
+      "https://jenkins.example"
+    );
+    // The running observation is not persisted, so the stored status stays "failure".
+    assert.equal(running.shouldUpdateStatus, false);
+    evaluator.evaluate(
+      watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: true }),
+      "demo",
+      "blue",
+      { number: 9, result: "SUCCESS" },
+      "https://jenkins.example"
+    );
+
+    assert.deepEqual(notifier.calls.failures, []);
+    assert.deepEqual(notifier.calls.recoveries, ["Job demo recovered in https://jenkins.example."]);
+    assert.deepEqual(notifier.calls.completions, []);
+  });
+
+  it("still notifies failure for success -> other -> failure", () => {
+    const notifier = createNotifier();
+    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+
+    const running = evaluator.evaluate(
+      watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
+      "demo",
+      "blue_anime",
+      { number: 8, result: "SUCCESS" },
+      "https://jenkins.example"
+    );
+    assert.equal(running.shouldUpdateStatus, false);
+    evaluator.evaluate(
+      watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 8, lastIsBuilding: true }),
+      "demo",
+      "red",
+      { number: 9, result: "FAILURE" },
+      "https://jenkins.example"
+    );
+
+    assert.deepEqual(notifier.calls.failures, ["Job demo failed in https://jenkins.example."]);
+    assert.deepEqual(notifier.calls.recoveries, []);
+    assert.deepEqual(notifier.calls.completions, []);
+  });
+
+  it("still seeds 'other' when no status was stored yet", () => {
+    const notifier = createNotifier();
+    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+
+    const result = evaluator.evaluate(
+      watchedEntry(),
+      "demo",
+      "aborted",
+      { number: 3, result: "ABORTED" },
+      "https://jenkins.example"
+    );
+
+    assert.equal(result.nextStatus, "other");
+    assert.equal(result.shouldUpdateStatus, true);
+    assert.deepEqual(notifier.calls.failures, []);
+    assert.deepEqual(notifier.calls.recoveries, []);
+  });
+
   it("keeps unknown colors from overwriting known status", () => {
     const notifier = createNotifier();
     const evaluator = new JenkinsJobStatusEvaluator(notifier);

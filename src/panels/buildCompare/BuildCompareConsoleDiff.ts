@@ -208,7 +208,7 @@ async function compareConsoleReaders(
   targetReader: ConsoleComparisonReader,
   options: BuildCompareConsoleOptions
 ): Promise<ConsoleComparisonResult> {
-  let comparedChars = 0;
+  let comparedBytes = 0;
   let comparedLineBreaks = 0;
   let sharedTail = "";
 
@@ -234,7 +234,7 @@ async function compareConsoleReaders(
       };
     }
 
-    if (comparedChars >= options.maxBytes || comparedLineBreaks >= options.maxLines) {
+    if (comparedBytes >= options.maxBytes || comparedLineBreaks >= options.maxLines) {
       return buildConsoleTooLargeResult(options);
     }
 
@@ -277,24 +277,36 @@ async function compareConsoleReaders(
     if (commonLength > 0) {
       const sharedSegment = baselineReader.consume(commonLength);
       targetReader.consume(commonLength);
+      // Progress is tracked in UTF-8 bytes so it stays in the same units as the
+      // readers' byte budgets; counting JS chars would undercount multibyte logs
+      // and let the loop spin after both budgets are exhausted.
+      const sharedBytes = Buffer.byteLength(sharedSegment, "utf8");
       const nextLineBreaks = countLineBreaks(sharedSegment);
       if (
-        comparedChars + commonLength > options.maxBytes ||
+        comparedBytes + sharedBytes > options.maxBytes ||
         comparedLineBreaks + nextLineBreaks > options.maxLines
       ) {
         return buildConsoleTooLargeResult(options);
       }
-      comparedChars += commonLength;
+      comparedBytes += sharedBytes;
       comparedLineBreaks += nextLineBreaks;
       sharedTail = trimToLastLines(sharedTail + sharedSegment, LEADING_CONTEXT_LINES);
       continue;
     }
 
     if (baselineReader.buffer.length === 0 && baselineReader.moreData) {
-      continue;
+      if (baselineReader.getRemainingByteBudget() > 0) {
+        continue;
+      }
+      // The buffer cannot grow (byte budget exhausted) and nothing was consumed
+      // this iteration, so the comparison hit its scan limit.
+      return buildConsoleTooLargeResult(options);
     }
     if (targetReader.buffer.length === 0 && targetReader.moreData) {
-      continue;
+      if (targetReader.getRemainingByteBudget() > 0) {
+        continue;
+      }
+      return buildConsoleTooLargeResult(options);
     }
 
     if (baselineReader.buffer.length === 0 || targetReader.buffer.length === 0) {

@@ -237,10 +237,15 @@ export class PendingInputRefreshCoordinator implements vscode.Disposable {
           continue;
         }
         this.inFlight += 1;
-        void this.refreshSummary(item.environment, item.buildUrl, item.previous).finally(() => {
-          this.inFlight -= 1;
-          void this.processQueue();
-        });
+        void this.refreshSummary(item.environment, item.buildUrl, item.previous)
+          .catch(() => {
+            // Background refresh failures are non-fatal; foreground callers
+            // that need the summary surface errors themselves.
+          })
+          .finally(() => {
+            this.inFlight -= 1;
+            void this.processQueue();
+          });
       }
     } finally {
       this.processing = false;

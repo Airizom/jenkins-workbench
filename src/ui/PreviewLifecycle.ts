@@ -40,24 +40,33 @@ export async function openTextPreview(
   options?: { languageId?: string }
 ): Promise<vscode.TextEditor> {
   previewProvider.markInUse(uri);
-  let releaseOnClose: vscode.Disposable | undefined;
+  let released = false;
+  // Register before any await so a document closed mid-open still triggers release;
+  // otherwise the entry's inUseCount would stay above zero forever.
+  const releaseOnClose = vscode.workspace.onDidCloseTextDocument((document) => {
+    if (document.uri.toString() !== uri.toString()) {
+      return;
+    }
+    release();
+  });
+
+  function release(): void {
+    if (released) {
+      return;
+    }
+    released = true;
+    releaseOnClose.dispose();
+    previewProvider.release(uri);
+  }
 
   try {
     const editor = await vscode.window.showTextDocument(uri, { preview: true });
     if (options?.languageId && editor.document.languageId !== options.languageId) {
       await vscode.languages.setTextDocumentLanguage(editor.document, options.languageId);
     }
-    releaseOnClose = vscode.workspace.onDidCloseTextDocument((document) => {
-      if (document.uri.toString() !== uri.toString()) {
-        return;
-      }
-      previewProvider.release(uri);
-      releaseOnClose?.dispose();
-    });
     return editor;
   } catch (error) {
-    releaseOnClose?.dispose();
-    previewProvider.release(uri);
+    release();
     throw error;
   }
 }

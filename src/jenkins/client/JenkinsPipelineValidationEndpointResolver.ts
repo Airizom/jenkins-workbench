@@ -40,7 +40,9 @@ export class JenkinsPipelineValidationEndpointResolver {
     body: string,
     headers: Record<string, string>
   ): Promise<ValidationEndpointResolution> {
-    const response = await this.context.requestPostTextWithCrumbRaw(jsonUrl, body, headers);
+    const response = await this.context.requestPostTextWithCrumbRaw(jsonUrl, body, headers, {
+      acceptErrorStatuses: [404, 405]
+    });
     if (isMissingValidationEndpointResponse(response)) {
       this.cachedEndpoint = "text";
       return { endpoint: "text" };

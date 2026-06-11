@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import { type RedirectDecision, decideRedirect } from "./redirects";
+import { type RedirectDecision, decideRedirect, isCrossOriginRedirect } from "./redirects";
 import { createRequestTarget, createTimeoutError } from "./transport";
 
 type RequestMethod = "GET" | "POST" | "HEAD";
@@ -20,6 +20,8 @@ export type RequestLifecycleAction =
 
 export interface RedirectableRequestOptions {
   method?: RequestMethod;
+  headers?: Record<string, string>;
+  authHeader?: string;
   body?: string | Uint8Array;
   timeoutMs?: number;
   redirectCount?: number;
@@ -118,15 +120,27 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
         });
 
         if (redirectAction.type === "abort") {
+          // Drain the discarded response so the socket is released.
+          response.resume();
           safeReject(redirectAction.error);
           return;
         }
 
         if (redirectAction.type === "follow") {
           clearTimer();
+          response.resume();
+          // Never forward credentials to another origin.
+          const nextOptions: TOptions = isCrossOriginRedirect(url, redirectAction.nextUrl)
+            ? {
+                ...options,
+                redirectCount: redirectAction.redirectCount,
+                authHeader: undefined,
+                headers: undefined
+              }
+            : { ...options, redirectCount: redirectAction.redirectCount };
           executeRequestLifecycle<TOptions, TResponse>({
             url: redirectAction.nextUrl,
-            options: { ...options, redirectCount: redirectAction.redirectCount },
+            options: nextOptions,
             buildHeaders,
             resolveRedirectAction,
             onResponse

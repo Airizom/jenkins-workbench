@@ -20,7 +20,7 @@ import { PipelineStagesSection } from "./PipelineStagesSection";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
 import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 
-const { Suspense, lazy, useEffect, useState } = React;
+const { Suspense, lazy, useEffect, useRef, useState } = React;
 
 const DEFAULT_PRESENTATION: PipelinePresentation = "list";
 const LazyPipelineGraphSection = lazy(async () => {
@@ -66,6 +66,7 @@ export function PipelineSection({
   const [restoredLogTarget] = useState<PipelineLogTargetViewModel | undefined>(() =>
     readSelectedPipelineLogTargetFromState()
   );
+  const restoredLogConsumedRef = useRef(false);
   const [fallbackNotice, setFallbackNotice] = useState<string | undefined>();
   const hasStages = stages.length > 0;
   const showPlaceholder = loading && !hasStages;
@@ -79,10 +80,16 @@ export function PipelineSection({
   }, [presentation, selectedStageKey, pipelineNodeLog.target]);
 
   useEffect(() => {
-    if (pipelineNodeLog.target || !restoredLogTarget) {
+    // Restore the persisted log selection at most once; marking it consumed
+    // before firing keeps a later user close (target -> undefined) from
+    // reopening the pane and avoids reposting the selection on every render.
+    if (restoredLogConsumedRef.current || !restoredLogTarget) {
       return;
     }
-    onSelectPipelineLog(restoredLogTarget);
+    restoredLogConsumedRef.current = true;
+    if (!pipelineNodeLog.target) {
+      onSelectPipelineLog(restoredLogTarget);
+    }
   }, [pipelineNodeLog.target, restoredLogTarget, onSelectPipelineLog]);
 
   if (!loading && !hasStages) {

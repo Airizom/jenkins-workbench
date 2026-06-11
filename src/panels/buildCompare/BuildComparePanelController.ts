@@ -10,7 +10,10 @@ import {
   loadBuildCompareConsoleViewModel,
   loadBuildCompareViewModel
 } from "./BuildCompareViewModel";
-import type { BuildCompareViewModel } from "./shared/BuildCompareContracts";
+import type {
+  BuildCompareConsoleSectionViewModel,
+  BuildCompareViewModel
+} from "./shared/BuildCompareContracts";
 
 export interface BuildComparePanelLoadOptions {
   label?: string;
@@ -22,9 +25,31 @@ export type BuildComparePanelLoadResult = { status: "ok" } | { status: "missingA
 export class BuildComparePanelController {
   private readonly view: BuildComparePanelView;
   private readonly loadTokenTracker = new LoadTokenTracker();
+  private loadedConsoleSection?: BuildCompareConsoleSectionViewModel;
 
   constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.view = new BuildComparePanelView(panel, extensionUri);
+  }
+
+  /** Invalidates in-flight loads so they stop posting to a disposed webview. */
+  dispose(): void {
+    this.loadTokenTracker.next();
+    this.loadedConsoleSection = undefined;
+  }
+
+  /**
+   * Re-sends the console section when the webview signals it is ready; the
+   * initial updateConsoleSection message is dropped if it arrives before the
+   * React app attaches its window message listener.
+   */
+  async handleWebviewReady(): Promise<void> {
+    if (!this.loadedConsoleSection) {
+      return;
+    }
+    await this.view.postMessage({
+      type: "updateConsoleSection",
+      console: this.loadedConsoleSection
+    });
   }
 
   async load(
@@ -36,6 +61,7 @@ export class BuildComparePanelController {
     options?: BuildComparePanelLoadOptions
   ): Promise<BuildComparePanelLoadResult> {
     const token = this.loadTokenTracker.next();
+    this.loadedConsoleSection = undefined;
     const nonce = createNonce();
     const assets = this.view.resolveAssets();
     if (!assets) {
@@ -106,6 +132,7 @@ export class BuildComparePanelController {
     if (!this.loadTokenTracker.isCurrent(token)) {
       return;
     }
+    this.loadedConsoleSection = console;
     await this.view.postMessage({
       type: "updateConsoleSection",
       console

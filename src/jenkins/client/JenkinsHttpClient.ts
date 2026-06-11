@@ -131,11 +131,12 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   async requestPostTextWithCrumbRaw(
     url: string,
     body: string | Uint8Array,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    options?: { acceptErrorStatuses?: number[] }
   ): Promise<string> {
     return this.requestWithSsoRetry(() => {
       const contentHeaders = this.buildRawContentHeaders(body, headers);
-      return this.requestPostTextWithCrumbInternal(url, body, contentHeaders);
+      return this.requestPostTextWithCrumbInternal(url, body, contentHeaders, options);
     });
   }
 
@@ -229,7 +230,8 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   private async requestPostTextWithCrumbInternal(
     url: string,
     body: string | Uint8Array,
-    contentHeaders: Record<string, string>
+    contentHeaders: Record<string, string>,
+    options?: { acceptErrorStatuses?: number[] }
   ): Promise<string> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
     const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
@@ -253,13 +255,12 @@ export class JenkinsHttpClient implements JenkinsClientContext {
             });
           }
         }
+        // Callers that sniff endpoint availability (e.g. 404 HTML pages) opt in
+        // to receiving specific error bodies as text; everything else throws.
         if (
           typeof error.responseText === "string" &&
           statusCode !== undefined &&
-          statusCode >= 400 &&
-          statusCode < 600 &&
-          statusCode !== 401 &&
-          statusCode !== 403
+          options?.acceptErrorStatuses?.includes(statusCode)
         ) {
           return error.responseText;
         }

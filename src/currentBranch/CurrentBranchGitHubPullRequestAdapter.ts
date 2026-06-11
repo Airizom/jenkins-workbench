@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
-import { trimToUndefined } from "../shared/stringValues";
+import { firstNonEmpty, trimToUndefined } from "../shared/stringValues";
 import type { CurrentBranchRepositoryContext } from "./CurrentBranchTypes";
 
 const GITHUB_PULL_REQUEST_EXTENSION_IDS = [
@@ -17,6 +17,8 @@ interface GitHubRepositoryDescription {
     number?: number;
     title?: string;
     url?: string;
+    headRefName?: string;
+    head?: { ref?: string };
   };
 }
 
@@ -25,6 +27,7 @@ export interface CurrentBranchGitHubPullRequestSnapshot {
     number: number;
     title?: string;
     url?: string;
+    headBranch?: string;
   };
 }
 
@@ -114,6 +117,8 @@ function normalizeRepositoryPullRequest(
   return {
     number: pullRequest.number,
     title: trimToUndefined(pullRequest.title),
-    url: trimToUndefined(pullRequest.url)
+    url: trimToUndefined(pullRequest.url),
+    // The extension API is duck-typed; accept both GraphQL- and REST-shaped head refs.
+    headBranch: firstNonEmpty(pullRequest.headRefName, pullRequest.head?.ref)
   };
 }

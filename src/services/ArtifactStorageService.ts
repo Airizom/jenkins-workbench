@@ -96,10 +96,11 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
   safeRelativePath: string;
   label: string;
 } {
-  const safeRelativePath = normalizePosixRelativePath(request.relativePath);
-  if (!safeRelativePath) {
+  const normalizedRelativePath = normalizePosixRelativePath(request.relativePath);
+  if (!normalizedRelativePath) {
     throw new ArtifactStorageError("invalidPath", "Artifact path is invalid and cannot be saved.");
   }
+  const safeRelativePath = sanitizeArtifactRelativePath(normalizedRelativePath);
 
   const resolvedRoot = resolveDownloadRoot(request.workspaceRoot, request.downloadRoot);
   if (!resolvedRoot) {
@@ -130,6 +131,18 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
 
   const label = request.fileName || path.basename(safeRelativePath) || safeRelativePath;
   return { targetPath, safeRelativePath, label };
+}
+
+function sanitizeArtifactRelativePath(relativePath: string): string {
+  // On NTFS a ':' in a file name addresses an alternate data stream, so a
+  // Jenkins-controlled artifact name like "report.txt:payload" would write hidden
+  // content into the target root. Replace ':' with '_' (matching the '_' substitution
+  // used for the surrounding directory segments) on every platform so downloads land
+  // at the same path everywhere; POSIX names containing ':' are renamed accordingly.
+  return relativePath
+    .split("/")
+    .map((segment) => segment.replace(/:/g, "_"))
+    .join("/");
 }
 
 function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): string | undefined {

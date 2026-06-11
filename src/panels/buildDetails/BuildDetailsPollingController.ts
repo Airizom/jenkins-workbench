@@ -274,7 +274,10 @@ export class BuildDetailsPollingController {
       clearTimeout(this.pollTimer);
       this.pollTimer = undefined;
     }
-    this.pollInFlight = false;
+    // pollInFlight is intentionally left untouched: only the poll that set it
+    // may clear it (in its finally), otherwise a stop()/start() cycle while a
+    // poll is awaiting would run two polls concurrently against the same
+    // ConsoleStreamManager.
   }
 
   dispose(): void {
@@ -294,7 +297,13 @@ export class BuildDetailsPollingController {
   }
 
   private async poll(): Promise<void> {
-    if (this.pollInFlight || !this.pollingActive || this.disposed) {
+    if (!this.pollingActive || this.disposed) {
+      return;
+    }
+    if (this.pollInFlight) {
+      // A poll from a previous generation is still draining; retry after the
+      // regular interval instead of running a second concurrent poll.
+      this.scheduleNextPoll();
       return;
     }
 

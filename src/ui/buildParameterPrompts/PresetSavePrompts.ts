@@ -72,6 +72,7 @@ export async function handlePresetSave(
 
   const nonSecretValues: Record<string, string | string[]> = {};
   const secretValues: Record<string, string | string[]> = {};
+  const keepSecretNames: string[] = [];
 
   for (const parameter of options.parameters) {
     const value = input.prompted.values[parameter.name];
@@ -84,29 +85,15 @@ export async function handlePresetSave(
       continue;
     }
 
-    const saveSecret = await vscode.window.showQuickPick(
-      [
-        {
-          label: "Do not save (default)",
-          save: false
-        },
-        {
-          label: "Save securely",
-          save: true
-        }
-      ],
-      {
-        placeHolder: `Store ${parameter.name} in SecretStorage?`,
-        ignoreFocusOut: true
-      }
-    );
-
-    if (!saveSecret) {
+    const choice = await promptSecretSaveChoice(parameter.name, targetId !== undefined);
+    if (!choice) {
       return false;
     }
 
-    if (saveSecret.save) {
+    if (choice === "save") {
       secretValues[parameter.name] = value;
+    } else if (choice === "keep") {
+      keepSecretNames.push(parameter.name);
     }
   }
 
@@ -118,13 +105,41 @@ export async function handlePresetSave(
       id: targetId,
       name: targetName,
       values: nonSecretValues,
-      secretValues
+      secretValues,
+      keepSecretNames
     }
   );
 
   const actionText = targetId ? "Updated" : "Saved";
   void vscode.window.showInformationMessage(`${actionText} preset "${targetName}".`);
   return true;
+}
+
+type SecretSaveChoice = "save" | "keep" | "skip";
+
+async function promptSecretSaveChoice(
+  parameterName: string,
+  isUpdate: boolean
+): Promise<SecretSaveChoice | undefined> {
+  // On update, skipping must not delete a previously saved secret, so the choices
+  // distinguish keeping the stored value from removing it.
+  const picks: Array<vscode.QuickPickItem & { choice: SecretSaveChoice }> = isUpdate
+    ? [
+        { label: "Keep existing saved value (default)", choice: "keep" },
+        { label: "Save new value securely", choice: "save" },
+        { label: "Remove saved value", choice: "skip" }
+      ]
+    : [
+        { label: "Do not save (default)", choice: "skip" },
+        { label: "Save securely", choice: "save" }
+      ];
+
+  const pick = await vscode.window.showQuickPick(picks, {
+    placeHolder: `Store ${parameterName} in SecretStorage?`,
+    ignoreFocusOut: true
+  });
+
+  return pick?.choice;
 }
 
 function suggestPresetName(presets: ParameterPresetSummary[]): string {

@@ -10,6 +10,7 @@ import {
   type BuildComparePanelLoadResult
 } from "./buildCompare/BuildComparePanelController";
 import {
+  isBuildCompareReadyMessage,
   isOpenBuildDetailsMessage,
   isSwapBuildsMessage
 } from "./buildCompare/shared/BuildComparePanelMessages";
@@ -146,6 +147,10 @@ export class BuildComparePanel {
         }
         if (isOpenBuildDetailsMessage(message)) {
           void this.openBuildDetails(message.side);
+          return;
+        }
+        if (isBuildCompareReadyMessage(message)) {
+          void this.controller.handleWebviewReady();
         }
       },
       null,
@@ -155,6 +160,7 @@ export class BuildComparePanel {
 
   private dispose(): void {
     BuildComparePanel.currentPanel = undefined;
+    this.controller.dispose();
     disposePanelResources(this.disposables);
   }
 

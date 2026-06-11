@@ -1,6 +1,8 @@
 import * as React from "react";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
+import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import type { BuildCompareViewModel } from "../shared/BuildCompareContracts";
+import type { BuildCompareIncomingMessage } from "../shared/BuildComparePanelMessages";
 import { BuildCompareBuildPair } from "./components/buildCompare/BuildCompareBuildPair";
 import { BuildCompareHeader } from "./components/buildCompare/BuildCompareHeader";
 import { ChangesetsSection } from "./components/buildCompare/ChangesetsSection";
@@ -11,11 +13,18 @@ import { TestDiffSection } from "./components/buildCompare/TestDiffSection";
 import { useBuildCompareMessages } from "./hooks/useBuildCompareMessages";
 import { buildCompareReducer } from "./state/buildCompareState";
 
-const { useReducer } = React;
+const { useEffect, useReducer } = React;
 
 export function BuildCompareApp({ initialState }: { initialState: BuildCompareViewModel }) {
   const [state, dispatch] = useReducer(buildCompareReducer, initialState);
+  const postMessage = usePanelPostMessage<BuildCompareIncomingMessage>();
   useBuildCompareMessages(dispatch);
+
+  // Declared after useBuildCompareMessages so the message listener is attached
+  // before the host reacts to the ready handshake by re-sending sections.
+  useEffect(() => {
+    postMessage({ type: "buildCompareReady" });
+  }, [postMessage]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

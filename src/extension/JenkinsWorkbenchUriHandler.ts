@@ -8,6 +8,7 @@ import type {
 } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWorkbenchDeepLinkBuildHandler } from "./JenkinsWorkbenchDeepLinkBuildHandler";
 import type { JenkinsWorkbenchDeepLinkJobHandler } from "./JenkinsWorkbenchDeepLinkJobHandler";
+import { parseUriQueryParams } from "./UriQueryParams";
 
 interface EnvironmentMatch {
   environment: EnvironmentWithScope;
@@ -82,13 +83,13 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
   }
 
   private getUrlParam(uri: vscode.Uri): string | undefined {
-    const params = new URLSearchParams(uri.query);
+    const params = parseUriQueryParams(uri.query);
     const value = params.get("url")?.trim();
     return value && value.length > 0 ? value : undefined;
   }
 
   private getPipelineNodeSelectionParam(uri: vscode.Uri): PipelineNodeSelection | undefined {
-    const params = new URLSearchParams(uri.query);
+    const params = parseUriQueryParams(uri.query);
     const nodeId = params.get("nodeId")?.trim();
     if (!nodeId) {
       return undefined;

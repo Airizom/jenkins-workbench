@@ -32,6 +32,79 @@ export function parseConsoleHtml(html: string): ConsoleHtmlModel {
   return { nodes, text: textParts.join("") };
 }
 
+/**
+ * Windows a console HTML model to the trailing `maxChars` characters of text,
+ * mirroring how the main console streams keep only the tail. Leading nodes are
+ * dropped or trimmed recursively so the rendered markup stays consistent with
+ * the model text.
+ */
+export function trimConsoleHtmlModelToTail(
+  model: ConsoleHtmlModel,
+  maxChars: number
+): ConsoleHtmlModel {
+  if (maxChars <= 0 || model.text.length <= maxChars) {
+    return model;
+  }
+  const target = model.text.length - maxChars;
+  return {
+    nodes: trimConsoleHtmlNodesFromStart(model.nodes, target),
+    text: model.text.slice(target)
+  };
+}
+
+function consoleHtmlNodeTextLength(node: ConsoleHtmlNode): number {
+  if (node.type === "text") {
+    return node.value.length;
+  }
+  if (node.type === "br") {
+    return 1;
+  }
+  return node.children.reduce((sum, child) => sum + consoleHtmlNodeTextLength(child), 0);
+}
+
+function trimConsoleHtmlNodesFromStart(
+  nodes: ConsoleHtmlNode[],
+  charsToRemove: number
+): ConsoleHtmlNode[] {
+  const trimmedNodes: ConsoleHtmlNode[] = [];
+  let remaining = charsToRemove;
+  for (const node of nodes) {
+    if (remaining <= 0) {
+      trimmedNodes.push(node);
+      continue;
+    }
+
+    const nodeLength = consoleHtmlNodeTextLength(node);
+    if (nodeLength <= remaining) {
+      remaining -= nodeLength;
+      continue;
+    }
+
+    trimmedNodes.push(trimConsoleHtmlNodeFromStart(node, remaining));
+    remaining = 0;
+  }
+  return trimmedNodes;
+}
+
+function trimConsoleHtmlNodeFromStart(
+  node: ConsoleHtmlNode,
+  charsToRemove: number
+): ConsoleHtmlNode {
+  if (charsToRemove <= 0) {
+    return node;
+  }
+  if (node.type === "text") {
+    return { type: "text", value: node.value.slice(charsToRemove) };
+  }
+  if (node.type === "br") {
+    return node;
+  }
+  return {
+    ...node,
+    children: trimConsoleHtmlNodesFromStart(node.children, charsToRemove)
+  };
+}
+
 export function renderConsoleHtmlWithHighlights(
   model: ConsoleHtmlModel,
   matches: ConsoleMatch[],

@@ -22,7 +22,7 @@ interface ArtifactPreviewEntry {
   inUseCount: number;
 }
 
-export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
+export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscode.Disposable {
   private readonly entries = new Map<string, ArtifactPreviewEntry>();
   private readonly onDidChangeFileEmitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.onDidChangeFileEmitter.event;
@@ -31,6 +31,7 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
   private readonly maxTotalBytes: number;
   private readonly ttlMs: number;
   private totalBytes = 0;
+  private purgeTimer: NodeJS.Timeout | undefined;
 
   constructor(options: ArtifactPreviewProviderOptions = {}) {
     const maxEntries = options.maxEntries ?? DEFAULT_MAX_PREVIEW_ENTRIES;
@@ -55,6 +56,7 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     this.entries.set(id, entry);
     this.totalBytes += entry.size;
     this.evictIfNeeded(now, id);
+    this.ensurePurgeTimer();
 
     const safeFileName = this.normalizeFileName(fileName);
     return vscode.Uri.from({
@@ -229,5 +231,39 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider {
     }
     this.totalBytes -= entry.size;
     this.entries.delete(id);
+    if (this.entries.size === 0) {
+      this.clearPurgeTimer();
+    }
+  }
+
+  // Eviction is otherwise lazy (it runs on register/release), so without this timer
+  // the last previewed artifact would stay resident for the whole session.
+  private ensurePurgeTimer(): void {
+    if (this.purgeTimer || this.entries.size === 0) {
+      return;
+    }
+    this.purgeTimer = setInterval(() => {
+      this.purgeExpired(Date.now());
+      if (this.entries.size === 0) {
+        this.clearPurgeTimer();
+      }
+    }, this.ttlMs);
+    // Never keep the process alive just to purge an in-memory cache.
+    this.purgeTimer.unref?.();
+  }
+
+  private clearPurgeTimer(): void {
+    if (!this.purgeTimer) {
+      return;
+    }
+    clearInterval(this.purgeTimer);
+    this.purgeTimer = undefined;
+  }
+
+  dispose(): void {
+    this.clearPurgeTimer();
+    this.entries.clear();
+    this.totalBytes = 0;
+    this.onDidChangeFileEmitter.dispose();
   }
 }

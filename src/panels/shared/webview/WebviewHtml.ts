@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
+import { escapeHtml } from "../../../shared/html";
 import type { JenkinsEnvironmentStore } from "../../../storage/JenkinsEnvironmentStore";
 import { type LoadingSkeletonVariant, renderLoadingSkeletonHtml } from "./LoadingSkeletonHtml";
 import { type WebviewEntryName, resolveWebviewAssets } from "./WebviewAssets";
@@ -177,13 +178,15 @@ export function renderPanelRestoreErrorHtml(
 ): string {
   const { nonce, title, message, hint, styleUris, panelState } = options;
   const stateScript = renderWebviewStateScript(panelState, nonce);
+  // Callers pass plain text, and `message` can embed server-controlled error
+  // details (for example HTTP status messages), so escape everything centrally.
   return renderWebviewShell(
     `
       ${stateScript}
       <main class="jenkins-workbench-panel-message">
-        <h1>${title}</h1>
-        <p>${message}</p>
-        <p>${hint}</p>
+        <h1>${escapeHtml(title)}</h1>
+        <p>${escapeHtml(message)}</p>
+        <p>${escapeHtml(hint)}</p>
       </main>
       <style nonce="${nonce}">
         .jenkins-workbench-panel-message {

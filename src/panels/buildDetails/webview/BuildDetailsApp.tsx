@@ -5,7 +5,10 @@ import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
-import type { BuildDetailsViewModel } from "../shared/BuildDetailsContracts";
+import type {
+  BuildDetailsViewModel,
+  PipelineLogTargetViewModel
+} from "../shared/BuildDetailsContracts";
 import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
 import { BuildDetailsHeader } from "./components/buildDetails/BuildDetailsHeader";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
@@ -20,7 +23,7 @@ import {
   buildInitialState
 } from "./state/buildDetailsState";
 
-const { useReducer } = React;
+const { useCallback, useReducer } = React;
 
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
@@ -57,6 +60,14 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const handleExportConsole = () => {
     postMessage({ type: "exportConsole" });
   };
+
+  // Stable identity: PipelineSection uses this callback in effect dependencies.
+  const handleSelectPipelineLog = useCallback(
+    (target: PipelineLogTargetViewModel) => {
+      postMessage({ type: "selectPipelineLogNode", target });
+    },
+    [postMessage]
+  );
 
   if (state.loading && !state.hasLoaded) {
     return (
@@ -120,7 +131,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             onRestartStage={(stageName) =>
               postMessage({ type: "restartPipelineFromStage", stageName })
             }
-            onSelectPipelineLog={(target) => postMessage({ type: "selectPipelineLogNode", target })}
+            onSelectPipelineLog={handleSelectPipelineLog}
             onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
             onExportPipelineLog={() => postMessage({ type: "exportPipelineNodeLog" })}
             onToggleFollowLog={handleToggleFollowLog}

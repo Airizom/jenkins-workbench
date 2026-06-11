@@ -1,7 +1,8 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import type { CurrentBranchActionExecutor } from "./CurrentBranchActionExecutor";
 import type { CurrentBranchCommandMapper } from "./CurrentBranchCommandMapper";
 import type {
+  CurrentBranchBuildAction,
   CurrentBranchBuildDetailsTarget,
   CurrentBranchJobActionTarget,
   CurrentBranchOpenRequest,
@@ -134,6 +135,7 @@ export class CurrentBranchWorkflowService {
   async triggerCurrentBranchBuild(state: CurrentBranchState): Promise<void> {
     const target = this.commandMapper.getBuildTarget(state);
     if (!target) {
+      this.showActionUnavailableMessage(state, "triggerBuild");
       return;
     }
 
@@ -145,6 +147,7 @@ export class CurrentBranchWorkflowService {
   async openLatestBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
     const target = this.commandMapper.getLatestBuildTarget(state);
     if (!target) {
+      this.showActionUnavailableMessage(state, "openLatestBuild");
       return;
     }
 
@@ -154,9 +157,27 @@ export class CurrentBranchWorkflowService {
   async openLastFailedBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
     const target = this.commandMapper.getLastFailedBuildTarget(state);
     if (!target) {
+      this.showActionUnavailableMessage(state, "openLastFailedBuild");
       return;
     }
 
     await this.actionExecutor.openLastFailedBuild(target, extensionUri);
+  }
+
+  private showActionUnavailableMessage(
+    state: CurrentBranchState,
+    action: CurrentBranchBuildAction
+  ): void {
+    const message = this.commandMapper.getActionUnavailableMessage(state, action);
+    if (!message) {
+      return;
+    }
+
+    if (message.severity === "warning") {
+      void vscode.window.showWarningMessage(message.message);
+      return;
+    }
+
+    void vscode.window.showInformationMessage(message.message);
   }
 }

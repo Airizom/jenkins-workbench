@@ -458,6 +458,9 @@ npm run check
 # Lint and format with fixes (Biome)
 npm run check:fix
 
+# Run the test suite (manifest validation + unit tests)
+npm test
+
 # Launch Extension Development Host
 # Press F5 in VS Code
 ```
@@ -466,7 +469,7 @@ npm run check:fix
 
 ### Manual Testing Checklist
 
-1. Run `npm run compile` and `npm run check`, then press F5 to launch the Extension Development Host
+1. Run `npm run compile`, `npm run check`, and `npm test`, then press F5 to launch the Extension Development Host
 2. Add a workspace and a global environment
 3. Verify jobs, builds, and nodes load correctly
 4. Test build actions (trigger, stop, replay, rebuild)

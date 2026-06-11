@@ -57,6 +57,16 @@ export type RequestRedirectResolution =
       type: "continue";
     };
 
+export function isCrossOriginRedirect(currentUrl: string, nextUrl: string): boolean {
+  try {
+    // URL.origin covers protocol, host, and port (normalizing default ports),
+    // so an https→http downgrade on the same host is treated as cross-origin.
+    return new URL(currentUrl).origin !== new URL(nextUrl).origin;
+  } catch {
+    return true;
+  }
+}
+
 export function decideRedirect({
   statusCode,
   method,

@@ -12,6 +12,13 @@ import type {
   CurrentBranchState
 } from "./CurrentBranchTypes";
 
+interface PendingRefresh {
+  options: CurrentBranchRefreshOptions;
+  promise: Promise<CurrentBranchState>;
+  resolve: (state: CurrentBranchState) => void;
+  reject: (error: unknown) => void;
+}
+
 export type {
   CurrentBranchBuildInfo,
   CurrentBranchRepositoryInfo,
@@ -23,6 +30,8 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
   private readonly subscriptions: vscode.Disposable[] = [];
   private currentState: CurrentBranchState = { kind: "noGit" };
   private refreshSequence = 0;
+  private activeRefreshPromise: Promise<CurrentBranchState> | undefined;
+  private pendingRefresh: PendingRefresh | undefined;
   private startPromise: Promise<void> | undefined;
   private isDisposed = false;
 
@@ -65,6 +74,7 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
 
   dispose(): void {
     this.isDisposed = true;
+    this.resolvePendingRefresh(this.currentState);
     for (const subscription of this.subscriptions) {
       subscription.dispose();
     }
@@ -91,10 +101,38 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
 
   async refresh(options: CurrentBranchRefreshOptions = {}): Promise<CurrentBranchState> {
     this.refreshCoordinator.beginRefresh();
+    if (this.isDisposed) {
+      return this.currentState;
+    }
+
+    if (this.activeRefreshPromise) {
+      return this.queuePendingRefresh(options);
+    }
+
+    return this.runRefresh(options);
+  }
+
+  private async runRefresh(options: CurrentBranchRefreshOptions): Promise<CurrentBranchState> {
+    const refreshPromise = this.resolveRefresh(options);
+    this.activeRefreshPromise = refreshPromise;
+    try {
+      return await refreshPromise;
+    } finally {
+      if (this.activeRefreshPromise === refreshPromise) {
+        this.activeRefreshPromise = undefined;
+      }
+      this.startPendingRefresh();
+    }
+  }
+
+  private async resolveRefresh(options: CurrentBranchRefreshOptions): Promise<CurrentBranchState> {
+    if (this.isDisposed) {
+      return this.currentState;
+    }
 
     const sequence = ++this.refreshSequence;
     const localState = await this.resolveLocalState();
-    if (sequence !== this.refreshSequence) {
+    if (this.isDisposed || sequence !== this.refreshSequence) {
       return this.currentState;
     }
 
@@ -104,10 +142,46 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
     }
 
     const nextState = await this.statusResolver.resolve(localState, options);
-    if (sequence === this.refreshSequence) {
+    if (!this.isDisposed && sequence === this.refreshSequence) {
       this.updateState(nextState);
     }
     return this.currentState;
+  }
+
+  private queuePendingRefresh(options: CurrentBranchRefreshOptions): Promise<CurrentBranchState> {
+    this.refreshSequence += 1;
+    if (!this.pendingRefresh) {
+      this.pendingRefresh = createPendingRefresh(options);
+      return this.pendingRefresh.promise;
+    }
+
+    this.pendingRefresh.options = mergeRefreshOptions(this.pendingRefresh.options, options);
+    return this.pendingRefresh.promise;
+  }
+
+  private startPendingRefresh(): void {
+    const pending = this.pendingRefresh;
+    if (!pending) {
+      return;
+    }
+
+    this.pendingRefresh = undefined;
+    if (this.isDisposed) {
+      pending.resolve(this.currentState);
+      return;
+    }
+
+    this.runRefresh(pending.options).then(pending.resolve, pending.reject);
+  }
+
+  private resolvePendingRefresh(state: CurrentBranchState): void {
+    const pending = this.pendingRefresh;
+    if (!pending) {
+      return;
+    }
+
+    this.pendingRefresh = undefined;
+    pending.resolve(state);
   }
 
   async resolveForRepository(
@@ -157,4 +231,29 @@ function shouldRefreshFromStatusTick(state: CurrentBranchState): boolean {
   return (
     state.kind === "matched" || state.kind === "branchMissing" || state.kind === "requestFailed"
   );
+}
+
+function createPendingRefresh(options: CurrentBranchRefreshOptions): PendingRefresh {
+  let resolve!: (state: CurrentBranchState) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<CurrentBranchState>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return {
+    options,
+    promise,
+    resolve,
+    reject
+  };
+}
+
+function mergeRefreshOptions(
+  first: CurrentBranchRefreshOptions,
+  second: CurrentBranchRefreshOptions
+): CurrentBranchRefreshOptions {
+  return {
+    force: first.force || second.force
+  };
 }

@@ -10,6 +10,8 @@ export interface BuildConsoleWriteStream {
   once(event: "error", listener: (error: Error) => void): this;
   once(event: "drain", listener: () => void): this;
   once(event: "close", listener: () => void): this;
+  off(event: "error", listener: (error: Error) => void): this;
+  off(event: "drain", listener: () => void): this;
   write(chunk: string): boolean;
   end(cb?: () => void): this;
   end(data: string | Uint8Array, cb?: () => void): this;
@@ -171,8 +173,16 @@ export class BuildConsoleExporter {
       return;
     }
     await new Promise<void>((resolve, reject) => {
-      writeStream.once("drain", () => resolve());
-      writeStream.once("error", reject);
+      const onDrain = (): void => {
+        writeStream.off("error", onError);
+        resolve();
+      };
+      const onError = (error: Error): void => {
+        writeStream.off("drain", onDrain);
+        reject(error);
+      };
+      writeStream.once("drain", onDrain);
+      writeStream.once("error", onError);
     });
   }
 

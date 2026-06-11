@@ -4,7 +4,6 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { EnvironmentSummaryStore } from "../EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "../TreeFilter";
 import type { TreeJobCollectionRequest } from "../TreeJobScope";
-import type { TreeChildrenOptions } from "../TreeTypes";
 import { JenkinsFolderTreeItem } from "../items/TreeJobItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
@@ -34,10 +33,7 @@ export class TreeJobCollectionChildrenLoader {
     private readonly placeholders: TreePlaceholderFactory
   ) {}
 
-  async getJobCollectionChildren(
-    element: WorkbenchTreeElement,
-    options?: TreeChildrenOptions
-  ): Promise<WorkbenchTreeElement[]> {
+  async getJobCollectionChildren(element: WorkbenchTreeElement): Promise<WorkbenchTreeElement[]> {
     const jobCollectionElement = getJobCollectionElement(element);
     if (!jobCollectionElement) {
       return [];
@@ -48,19 +44,12 @@ export class TreeJobCollectionChildrenLoader {
       jobCollectionElement instanceof JenkinsFolderTreeItem
         ? jobCollectionElement.folderKind
         : undefined;
-    if (options?.overrideKeys && options.overrideKeys.size > 0) {
-      return await this.loadJobsForCollection(jobCollectionElement.environment, request, {
-        parentFolderKind,
-        overrideKeys: options.overrideKeys
-      });
-    }
     return await this.cacheManager.getOrLoadChildren(
       this.buildJobCollectionChildrenKey(jobCollectionElement.environment, request),
       jobCollectionElement,
       () =>
         this.loadJobsForCollection(jobCollectionElement.environment, request, {
-          parentFolderKind,
-          overrideKeys: options?.overrideKeys
+          parentFolderKind
         }),
       getJobCollectionLoadingLabel(request)
     );
@@ -85,7 +74,6 @@ export class TreeJobCollectionChildrenLoader {
     request: TreeJobCollectionRequest,
     options?: {
       parentFolderKind?: JenkinsJobKind;
-      overrideKeys?: Set<string>;
     }
   ): Promise<WorkbenchTreeElement[]> {
     try {
@@ -99,7 +87,6 @@ export class TreeJobCollectionChildrenLoader {
       return await this.mapJobsToTreeItems(environment, jobs, {
         parentFolderKind: options?.parentFolderKind,
         parentFolderUrl: request.folderUrl,
-        overrideKeys: options?.overrideKeys,
         jobScope: request.scope
       });
     } catch (error) {
@@ -113,7 +100,6 @@ export class TreeJobCollectionChildrenLoader {
     options?: {
       parentFolderKind?: JenkinsJobKind;
       parentFolderUrl?: string;
-      overrideKeys?: Set<string>;
       jobScope?: TreeJobCollectionRequest["scope"];
     }
   ): Promise<WorkbenchTreeElement[]> {
@@ -125,15 +111,10 @@ export class TreeJobCollectionChildrenLoader {
       ];
     }
 
-    const filteredJobs = this.treeFilter.filterJobs(
-      environment,
-      jobs,
-      {
-        parentFolderKind: options?.parentFolderKind,
-        parentFolderUrl: options?.parentFolderUrl
-      },
-      options?.overrideKeys
-    );
+    const filteredJobs = this.treeFilter.filterJobs(environment, jobs, {
+      parentFolderKind: options?.parentFolderKind,
+      parentFolderUrl: options?.parentFolderUrl
+    });
     if (filteredJobs.length === 0) {
       return [
         createEmptyPlaceholder(

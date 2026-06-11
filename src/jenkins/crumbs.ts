@@ -1,4 +1,5 @@
 import type { IncomingHttpHeaders } from "node:http";
+import { JenkinsRequestError } from "./errors";
 import { buildApiUrlFromBase } from "./urls";
 
 export interface JenkinsCrumbHeader {
@@ -80,10 +81,15 @@ export class JenkinsCrumbService {
         this.crumbFetchedAt = fetchedAt;
         return this.crumbHeader;
       }
-    } catch {
+    } catch (error) {
       this.crumbHeader = undefined;
-      this.crumbFetchAttempted = false;
       this.crumbFetchedAt = 0;
+      // A 404 means CSRF protection is disabled; keep crumbFetchAttempted set
+      // so we do not re-probe the crumb issuer before every POST. Transient
+      // errors stay retryable.
+      if (!(error instanceof JenkinsRequestError && error.statusCode === 404)) {
+        this.crumbFetchAttempted = false;
+      }
       return undefined;
     }
 

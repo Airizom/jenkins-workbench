@@ -1,5 +1,6 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsFlowNodeLog } from "../../jenkins/types";
+import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
 import { escapeHtml, htmlToText } from "./PipelineNodeLogContent";
 import type {
@@ -23,10 +24,12 @@ export class PipelineNodeLogFetcher {
   private progressiveSupported: boolean | undefined;
   private progressiveOffset = 0;
   private annotator: string | undefined;
+  private generation = 0;
 
   constructor(private readonly options: PipelineNodeLogFetcherOptions) {}
 
   reset(): void {
+    this.generation += 1;
     this.progressiveSupported = undefined;
     this.progressiveOffset = 0;
     this.annotator = undefined;
@@ -72,6 +75,7 @@ export class PipelineNodeLogFetcher {
     initial: boolean,
     cached: PipelineNodeLogViewModel | undefined
   ): Promise<PipelineNodeLogFetchResult | undefined> {
+    const generation = this.generation;
     try {
       const chunk = await this.options.backend.getFlowNodeLogHtmlProgressive(
         this.options.environment,
@@ -80,6 +84,11 @@ export class PipelineNodeLogFetcher {
         this.progressiveOffset,
         this.annotator
       );
+      if (generation !== this.generation) {
+        // The fetcher was reset (target changed) while this request was in
+        // flight; the new target's state must not absorb this response.
+        return {};
+      }
       if (!chunk?.textSizeKnown) {
         this.progressiveSupported = false;
         return undefined;
@@ -90,12 +99,15 @@ export class PipelineNodeLogFetcher {
         this.annotator = chunk.annotator;
       }
       if (!initial && cached && chunk.html) {
+        const combinedText = cached.text + htmlToText(chunk.html);
+        const truncatedByWindow = combinedText.length > MAX_CONSOLE_CHARS;
         return {
           appendHtml: chunk.html,
           cachedLog: {
             ...cached,
             html: undefined,
-            text: cached.text + htmlToText(chunk.html),
+            text: truncatedByWindow ? combinedText.slice(-MAX_CONSOLE_CHARS) : combinedText,
+            truncated: cached.truncated || truncatedByWindow,
             loading: false,
             polling: chunk.moreData,
             error: undefined
@@ -124,6 +136,9 @@ export class PipelineNodeLogFetcher {
         }
       };
     } catch {
+      if (generation !== this.generation) {
+        return {};
+      }
       this.progressiveSupported = false;
       return undefined;
     }

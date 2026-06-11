@@ -18,7 +18,10 @@
     "node": ">=24",
     "vscode": "^1.85.0"
   },
-  "categories": ["Other", "Visualization"],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
   "keywords": [
     "jenkins",
     "ci",
@@ -34,7 +37,10 @@
     "color": "#1a1a2e",
     "theme": "dark"
   },
-  "activationEvents": ["onStartupFinished", "onUri"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onUri"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "uriHandler": {
@@ -325,7 +331,10 @@
     "taskDefinitions": [
       {
         "type": "jenkinsWorkbench",
-        "required": ["environmentUrl", "jobUrl"],
+        "required": [
+          "environmentUrl",
+          "jobUrl"
+        ],
         "properties": {
           "environmentUrl": {
             "type": "string",
@@ -345,9 +354,18 @@
               {
                 "type": "object",
                 "additionalProperties": {
-                  "type": ["string", "number", "boolean", "array"],
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array"
+                  ],
                   "items": {
-                    "type": ["string", "number", "boolean"]
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
                   }
                 }
               },
@@ -355,13 +373,20 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": ["name", "value"],
+                  "required": [
+                    "name",
+                    "value"
+                  ],
                   "properties": {
                     "name": {
                       "type": "string"
                     },
                     "value": {
-                      "type": ["string", "number", "boolean"]
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
                     }
                   },
                   "additionalProperties": false
@@ -489,7 +514,10 @@
           ],
           "items": {
             "type": "object",
-            "required": ["fragment", "score"],
+            "required": [
+              "fragment",
+              "score"
+            ],
             "properties": {
               "fragment": {
                 "type": "string"
@@ -620,7 +648,9 @@
           "items": {
             "type": "string"
           },
-          "default": ["all"],
+          "default": [
+            "all"
+          ],
           "description": "Case-insensitive Jenkins view names to hide from the Views section."
         },
         "jenkinsWorkbench.activity.maxItemsPerGroup": {
@@ -677,7 +707,9 @@
           "items": {
             "type": "string"
           },
-          "default": ["pr-{number}"],
+          "default": [
+            "pr-{number}"
+          ],
           "description": "Job-name patterns to use when resolving current-branch pull request jobs. Use {number} as the pull request number placeholder."
         },
         "jenkinsWorkbench.jenkinsfileValidation.enabled": {
@@ -706,7 +738,11 @@
           "items": {
             "type": "string"
           },
-          "default": ["**/Jenkinsfile", "**/*.jenkinsfile", "**/Jenkinsfile.*"],
+          "default": [
+            "**/Jenkinsfile",
+            "**/*.jenkinsfile",
+            "**/Jenkinsfile.*"
+          ],
           "description": "Glob patterns used to detect Jenkinsfile documents for validation and language intelligence."
         }
       }
@@ -1076,17 +1112,15 @@
     "build:webview": "vite build",
     "watch:webview": "vite build --watch",
     "typecheck:webview": "tsc -p src/panels/tsconfig.json --noEmit",
-    "local:sso-proxy": "node scripts/local-sso-proxy.js",
-    "local:sso-proxy:smoke": "node scripts/local-sso-proxy.js --smoke",
     "test": "npm run test:manifest && npm run test:unit",
     "test:manifest": "node scripts/validate-package-manifest.mjs",
-    "test:unit": "tsc -p tsconfig.test.json && node --test \"out-test/test/**/*.test.js\"",
-    "lint": "biome lint src/",
-    "lint:fix": "biome lint src/ --write",
+    "test:unit": "node -e \"fs.rmSync('out-test',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \"out-test/test/**/*.test.js\"",
+    "lint": "biome lint src/ test/ scripts/",
+    "lint:fix": "biome lint src/ test/ scripts/ --write",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "check": "biome check src/",
-    "check:fix": "biome check src/ --write"
+    "check": "biome check src/ test/ scripts/",
+    "check:fix": "biome check src/ test/ scripts/ --write"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -1106,7 +1140,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.2.2",
-    "@types/node": "^20.19.37",
+    "@types/node": "^24.13.2",
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
     "@types/vscode": "^1.85.0",

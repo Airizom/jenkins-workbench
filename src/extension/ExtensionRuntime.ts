@@ -160,6 +160,7 @@ export async function activateRuntime(
     nodeDetailsSerializer,
     vscode.window.registerUriHandler(uriHandler),
     jenkinsfileCodeLensProvider,
+    artifactPreviewProvider,
     vscode.workspace.registerFileSystemProvider(ARTIFACT_PREVIEW_SCHEME, artifactPreviewProvider, {
       isReadonly: true
     }),

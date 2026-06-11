@@ -46,6 +46,8 @@ export type CurrentBranchOpenRequest =
       kind: "message";
     } & CurrentBranchUserMessage);
 
+export type CurrentBranchBuildAction = "triggerBuild" | "openLatestBuild" | "openLastFailedBuild";
+
 export class CurrentBranchCommandMapper {
   mapStateToResolution(
     state: CurrentBranchState,
@@ -134,6 +136,47 @@ export class CurrentBranchCommandMapper {
       url: state.link.multibranchFolderUrl,
       targetLabel: "Jenkins multibranch URL"
     };
+  }
+
+  getActionUnavailableMessage(
+    state: CurrentBranchState,
+    action: CurrentBranchBuildAction
+  ): CurrentBranchUserMessage | undefined {
+    switch (state.kind) {
+      case "matched":
+        // Only the latest-build action can lack a target for matched states.
+        return action === "openLatestBuild" && !state.lastBuild?.url
+          ? {
+              severity: "info",
+              message: `No builds were found for "${state.jobName}" yet.`
+            }
+          : undefined;
+      case "branchMissing":
+        return {
+          severity: "info",
+          message: `No Jenkins job found for branch "${state.branchName}" under ${state.link.multibranchLabel}.`
+        };
+      case "unlinked":
+      case "requestFailed":
+        // mapStateToResolution already attaches a user message to these resolved states.
+        return undefined;
+      case "detachedHead":
+        return {
+          severity: "info",
+          message: "Check out a branch to use current-branch Jenkins actions."
+        };
+      case "noGit":
+        return {
+          severity: "info",
+          message: "Git integration is unavailable."
+        };
+      case "noRepository":
+      case "ambiguousRepository":
+        return {
+          severity: "info",
+          message: "No Git repository is active in this window."
+        };
+    }
   }
 
   getBuildTarget(state: CurrentBranchState): CurrentBranchJobActionTarget | undefined {

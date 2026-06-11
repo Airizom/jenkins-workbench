@@ -5,6 +5,11 @@ src/**
 docs/**
 node_modules/**
 out/**/*.map
+out-test/**
+scripts/**
+.opencode/**
+.clawpatch/**
+.ck/**
 *.vsix
 .gitignore
 .nvmrc

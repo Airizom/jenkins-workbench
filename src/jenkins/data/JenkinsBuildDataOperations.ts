@@ -49,7 +49,7 @@ export class JenkinsBuildDataOperations {
         includeParameters
       });
     }
-    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}`;
+    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}-${limit}`;
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, jobUrl);
     return this.context.getCache().getOrLoad(
       cacheKey,

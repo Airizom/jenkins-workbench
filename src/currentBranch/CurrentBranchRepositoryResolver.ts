@@ -13,6 +13,7 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
   private readonly repositoryUiSubscriptions = new Map<string, vscode.Disposable>();
   private readonly repositoryHeadNames = new Map<string, string | undefined>();
   private gitApi?: GitApi;
+  private isDisposed = false;
 
   readonly onDidChange = this.emitter.event;
 
@@ -34,7 +35,9 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
       this.gitApi = undefined;
     }
 
-    if (!this.gitApi) {
+    // dispose() may run while getGitApi() is pending; subscriptions registered
+    // after that point would never be disposed.
+    if (this.isDisposed || !this.gitApi) {
       return;
     }
 
@@ -53,6 +56,7 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.isDisposed = true;
     for (const subscription of this.subscriptions) {
       subscription.dispose();
     }

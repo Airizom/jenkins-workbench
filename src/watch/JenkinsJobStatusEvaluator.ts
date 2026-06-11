@@ -64,7 +64,12 @@ export class JenkinsJobStatusEvaluator {
       });
     }
 
-    const shouldUpdateStatus = currentStatus !== "unknown" && currentStatus !== previousStatus;
+    const statusChanged = currentStatus !== "unknown" && currentStatus !== previousStatus;
+    // Keep the last terminal status stored: an intervening "other" observation (e.g. a
+    // running build) must not clobber a stored failure/success, or the next terminal
+    // transition would skip its failure/recovery notification.
+    const shouldUpdateStatus =
+      statusChanged && !(currentStatus === "other" && isTerminalWatchStatus(previousStatus));
     const shouldSeedCompletion =
       previousCompletedBuildNumber === undefined && typeof currentCompletedBuildNumber === "number";
     const shouldUpdateCompletion =
@@ -91,6 +96,10 @@ export class JenkinsJobStatusEvaluator {
       currentIsBuilding
     };
   }
+}
+
+function isTerminalWatchStatus(status: WatchStatusKind | undefined): boolean {
+  return status === "success" || status === "failure";
 }
 
 function resolveBuildingFromJobColor(color?: string): boolean | undefined {

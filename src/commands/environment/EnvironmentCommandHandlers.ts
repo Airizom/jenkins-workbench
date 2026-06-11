@@ -290,6 +290,16 @@ export async function removeEnvironment(
     return;
   }
 
+  const confirmLabel = "Remove Environment";
+  const confirmation = await vscode.window.showWarningMessage(
+    `Remove the Jenkins environment ${target.url}? Its stored credentials and all pins, watches, and parameter presets for this environment will also be removed.`,
+    { modal: true },
+    confirmLabel
+  );
+  if (confirmation !== confirmLabel) {
+    return;
+  }
+
   const removed = await store.removeEnvironment(target.scope, target.id);
   if (!removed) {
     void vscode.window.showWarningMessage("The selected environment no longer exists.");

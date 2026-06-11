@@ -71,7 +71,7 @@ export class AwaitingInputEnricher {
           options.buildLookupLimit,
           {
             ...options.buildListFetchOptions,
-            // Build-list cache keys are not limit-aware; Activity uses a small lookup limit.
+            // Pending-input checks need fresh build state, not TTL-cached lists.
             bypassCache: true
           }
         );

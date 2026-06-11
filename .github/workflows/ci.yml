@@ -19,5 +19,7 @@ jobs:
         run: npm ci
       - name: Compile
         run: npm run compile
-      # - name: Test
-      #   run: npm test
+      - name: Lint
+        run: npm run check
+      - name: Test
+        run: npm test

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { ensureTrailingSlash } from "../jenkins/urls";
 import { NodeCapacityService } from "../services/NodeCapacityService";
 import { buildNodeCapacityErrorViewModel } from "../shared/nodeCapacity/NodeCapacityDefaults";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -69,6 +70,7 @@ export class NodeCapacityPanel {
   private readonly loadTracker: PanelLoadTracker;
   private capacityRequestCount = 0;
   private hasRendered = false;
+  private disposed = false;
   private nonce = createNonce();
 
   static async show(options: NodeCapacityPanelShowOptions): Promise<void> {
@@ -184,6 +186,7 @@ export class NodeCapacityPanel {
   }
 
   private dispose(): void {
+    this.disposed = true;
     disposeEnvironmentScopedPanel({
       clearSingleton: () => {
         NodeCapacityPanel.currentPanel = undefined;
@@ -301,6 +304,9 @@ export class NodeCapacityPanel {
   }
 
   private postMessage(message: NodeCapacityOutgoingMessage): void {
+    if (this.disposed) {
+      return;
+    }
     void this.panel.webview.postMessage(message);
   }
 
@@ -308,8 +314,32 @@ export class NodeCapacityPanel {
     await openJenkinsWorkbenchUrl(url, "Node Capacity");
   }
 
+  /**
+   * Webview-supplied node URLs feed authenticated requests, so only accept
+   * URLs inside this panel's environment (same prefix containment as the URI
+   * handler and task provider).
+   */
+  private isNodeUrlWithinEnvironment(nodeUrl: string): boolean {
+    const environmentUrl = this.environment?.url;
+    if (!environmentUrl) {
+      return false;
+    }
+    try {
+      const normalizedBase = ensureTrailingSlash(new URL(environmentUrl).toString());
+      return new URL(nodeUrl).toString().startsWith(normalizedBase);
+    } catch {
+      return false;
+    }
+  }
+
   private async openNodeDetails(nodeUrl: string, label?: string): Promise<void> {
     if (!this.dataService || !this.environment) {
+      return;
+    }
+    if (!this.isNodeUrlWithinEnvironment(nodeUrl)) {
+      console.warn(
+        `Node Capacity ignored a node details request outside the environment: ${nodeUrl}`
+      );
       return;
     }
     await NodeDetailsPanel.show({
@@ -330,7 +360,13 @@ export class NodeCapacityPanel {
     const environment = this.environment;
     const token = this.loadTracker.currentToken;
     const environmentId = environment.environmentId;
-    const uniqueNodeUrls = [...new Set(nodeUrls.filter((nodeUrl) => nodeUrl.trim().length > 0))];
+    const candidateNodeUrls = [...new Set(nodeUrls.filter((nodeUrl) => nodeUrl.trim().length > 0))];
+    const uniqueNodeUrls = candidateNodeUrls.filter((nodeUrl) =>
+      this.isNodeUrlWithinEnvironment(nodeUrl)
+    );
+    if (uniqueNodeUrls.length < candidateNodeUrls.length) {
+      console.warn("Node Capacity ignored executor requests for URLs outside the environment.");
+    }
     if (uniqueNodeUrls.length === 0) {
       return;
     }

@@ -10,7 +10,6 @@ import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "./TreeJobScope";
-import type { TreeChildrenOptions } from "./TreeTypes";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
 import { ActivityCollector } from "./activity/ActivityCollector";
 import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
@@ -175,10 +174,7 @@ export class JenkinsTreeChildrenLoader {
     return this.environmentSummaryStore.getTotals();
   }
 
-  async getChildren(
-    element?: WorkbenchTreeElement,
-    options?: TreeChildrenOptions
-  ): Promise<WorkbenchTreeElement[]> {
+  async getChildren(element?: WorkbenchTreeElement): Promise<WorkbenchTreeElement[]> {
     if (!element) {
       const environments = await this.store.listEnvironmentsWithScope();
       if (environments.length === 0) {
@@ -188,7 +184,7 @@ export class JenkinsTreeChildrenLoader {
     }
 
     const handler = this.getElementHandler(element);
-    return (await handler?.getChildren?.(element, options)) ?? [];
+    return (await handler?.getChildren?.(element)) ?? [];
   }
 
   clearWatchCacheForEnvironment(environmentId?: string): void {

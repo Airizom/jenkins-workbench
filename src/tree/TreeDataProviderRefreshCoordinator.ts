@@ -81,9 +81,12 @@ export class TreeDataProviderRefreshCoordinator {
       invalidateForElement(element);
     }
 
-    if (this.pendingRefreshElement === undefined && element !== undefined) {
+    // pendingRefreshElement: null = nothing pending, undefined = full refresh pending.
+    if (element === undefined) {
+      this.pendingRefreshElement = undefined;
+    } else if (this.pendingRefreshElement === null) {
       this.pendingRefreshElement = element;
-    } else {
+    } else if (this.pendingRefreshElement !== element) {
       this.pendingRefreshElement = undefined;
     }
 

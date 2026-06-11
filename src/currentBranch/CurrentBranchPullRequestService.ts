@@ -37,7 +37,8 @@ export class CurrentBranchPullRequestService {
       kind: "pullRequest",
       number: pullRequest.number,
       title: pullRequest.title,
-      url: pullRequest.url
+      url: pullRequest.url,
+      headBranch: pullRequest.headBranch
     };
   }
 }

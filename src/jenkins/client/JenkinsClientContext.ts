@@ -25,6 +25,7 @@ export interface JenkinsClientContext {
   requestPostTextWithCrumbRaw(
     url: string,
     body: string | Uint8Array,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
+    options?: { acceptErrorStatuses?: number[] }
   ): Promise<string>;
 }

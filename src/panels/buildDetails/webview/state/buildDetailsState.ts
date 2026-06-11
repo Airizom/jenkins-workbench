@@ -10,7 +10,7 @@ import type {
 } from "../../shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "../../shared/BuildDetailsErrorHelpers";
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
-import { parseConsoleHtml } from "../lib/consoleHtml";
+import { parseConsoleHtml, trimConsoleHtmlModelToTail } from "../lib/consoleHtml";
 
 export type BuildDetailsState = BuildDetailsViewModel & {
   consoleHtmlModel?: ConsoleHtmlModel;
@@ -182,12 +182,19 @@ export function buildDetailsReducer(
       if (state.pipelineNodeLog.target?.key !== action.targetKey || !action.html) {
         return state;
       }
-      const nextModel = appendConsoleHtmlModel(state.pipelineNodeLogHtmlModel, action.html);
+      const appendedModel = appendConsoleHtmlModel(state.pipelineNodeLogHtmlModel, action.html);
+      // Progressive node logs have no host-side window, so cap accumulation to
+      // the same character budget as the main console stream.
+      const nextModel =
+        state.consoleMaxChars > 0
+          ? trimConsoleHtmlModelToTail(appendedModel, state.consoleMaxChars)
+          : appendedModel;
       return {
         ...state,
         pipelineNodeLog: {
           ...state.pipelineNodeLog,
           text: nextModel.text,
+          truncated: state.pipelineNodeLog.truncated || nextModel !== appendedModel,
           html: undefined,
           loading: false,
           error: undefined

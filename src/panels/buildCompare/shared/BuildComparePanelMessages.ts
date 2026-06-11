@@ -5,6 +5,11 @@ export interface SwapBuildsMessage {
   type: "swapBuilds";
 }
 
+/** Posted by the webview after mount so the host can re-send pending sections. */
+export interface BuildCompareReadyMessage {
+  type: "buildCompareReady";
+}
+
 export interface OpenBuildDetailsMessage {
   type: "openBuildDetails";
   side: "baseline" | "target";
@@ -16,7 +21,10 @@ export interface UpdateConsoleSectionMessage {
 }
 
 export type BuildCompareOutgoingMessage = UpdateConsoleSectionMessage;
-export type BuildCompareIncomingMessage = SwapBuildsMessage | OpenBuildDetailsMessage;
+export type BuildCompareIncomingMessage =
+  | SwapBuildsMessage
+  | OpenBuildDetailsMessage
+  | BuildCompareReadyMessage;
 
 export function parseBuildCompareOutgoingMessage(
   message: unknown
@@ -38,6 +46,10 @@ export function parseBuildCompareOutgoingMessage(
 
 export function isSwapBuildsMessage(message: unknown): message is SwapBuildsMessage {
   return hasMessageType(message, "swapBuilds");
+}
+
+export function isBuildCompareReadyMessage(message: unknown): message is BuildCompareReadyMessage {
+  return hasMessageType(message, "buildCompareReady");
 }
 
 export function isOpenBuildDetailsMessage(message: unknown): message is OpenBuildDetailsMessage {

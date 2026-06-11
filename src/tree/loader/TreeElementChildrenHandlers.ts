@@ -139,8 +139,7 @@ export function createTreeElementChildrenHandlers({
     },
     {
       matches: (element) => Boolean(getJobCollectionElement(element)),
-      getChildren: (element, options) =>
-        jobCollectionLoader.getJobCollectionChildren(element, options),
+      getChildren: (element) => jobCollectionLoader.getJobCollectionChildren(element),
       invalidate: (element) => jobCollectionLoader.invalidateJobCollectionChildren(element)
     },
     {

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { parseAuthConfig } from "../jenkins/auth";
 import type { JenkinsAuthConfig } from "../jenkins/types";
+import { createSerialTaskQueue } from "./SerialTaskQueue";
 
 export type EnvironmentScope = "workspace" | "global";
 
@@ -36,6 +37,7 @@ const AUTH_CONFIG_KEY = "jenkinsWorkbench.envAuthConfig";
 
 export class JenkinsEnvironmentStore {
   private readonly authConfigRevisions = new Map<string, number>();
+  private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<JenkinsEnvironmentStoreChange>();
 
   readonly onDidChange = this.emitter.event;
@@ -58,33 +60,41 @@ export class JenkinsEnvironmentStore {
     this.emitter.fire(change);
   }
 
-  async addEnvironment(
+  addEnvironment(
     scope: EnvironmentScope,
     environment: JenkinsEnvironment,
     token?: string
   ): Promise<void> {
-    const environments = await this.getEnvironments(scope);
-    environments.push(environment);
-    await this.saveEnvironments(
-      scope,
-      environments,
-      createScopedChange("environment-added", scope, environment.id)
-    );
-    if (token && token.length > 0) {
-      await this.setToken(scope, environment.id, token);
-    }
+    return this.mutationQueue(async () => {
+      const environments = [...(await this.getEnvironments(scope))];
+      environments.push(environment);
+      await this.saveEnvironments(
+        scope,
+        environments,
+        createScopedChange("environment-added", scope, environment.id)
+      );
+      if (token && token.length > 0) {
+        await this.setToken(scope, environment.id, token);
+      }
+    });
   }
 
-  async removeEnvironment(scope: EnvironmentScope, id: string): Promise<boolean> {
-    const environments = await this.getEnvironments(scope);
-    const next = environments.filter((environment) => environment.id !== id);
-    if (next.length === environments.length) {
-      return false;
-    }
-    await this.saveEnvironments(scope, next, createScopedChange("environment-removed", scope, id));
-    await this.deleteToken(scope, id);
-    await this.deleteAuthConfig(scope, id);
-    return true;
+  removeEnvironment(scope: EnvironmentScope, id: string): Promise<boolean> {
+    return this.mutationQueue(async () => {
+      const environments = await this.getEnvironments(scope);
+      const next = environments.filter((environment) => environment.id !== id);
+      if (next.length === environments.length) {
+        return false;
+      }
+      await this.saveEnvironments(
+        scope,
+        next,
+        createScopedChange("environment-removed", scope, id)
+      );
+      await this.deleteToken(scope, id);
+      await this.deleteAuthConfig(scope, id);
+      return true;
+    });
   }
 
   async listEnvironmentsWithScope(): Promise<EnvironmentWithScope[]> {

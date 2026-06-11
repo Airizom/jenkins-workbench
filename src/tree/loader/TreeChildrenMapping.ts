@@ -1,4 +1,3 @@
-import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type {
   JenkinsJobCollectionRequest as JenkinsDataJobCollectionRequest,
   JenkinsJobInfo,
@@ -19,7 +18,6 @@ import {
   JobTreeItem,
   PipelineTreeItem
 } from "../items/TreeJobItems";
-import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import { QueueItemTreeItem } from "../items/TreeQueueItems";
 import { JobsFolderTreeItem, PinnedSectionTreeItem } from "../items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
@@ -175,55 +173,6 @@ export function toJenkinsJobCollectionRequest(
     },
     folderUrl: request.folderUrl
   };
-}
-
-export function mapJobsToTreeItems(
-  environment: JenkinsEnvironmentRef,
-  jobs: JenkinsJobInfo[],
-  treeFilter: JenkinsTreeFilter,
-  options: {
-    parentFolderKind?: JenkinsJobKind;
-    parentFolderUrl?: string;
-    overrideKeys?: Set<string>;
-    jobScope?: TreeJobScope;
-  },
-  watchedJobs: Set<string>,
-  pinnedJobs: Set<string>,
-  createEmptyPlaceholder: (label: string, description?: string) => PlaceholderTreeItem
-): WorkbenchTreeElement[] {
-  if (jobs.length === 0) {
-    return [
-      createEmptyPlaceholder("No jobs, folders, or pipelines found.", "This location is empty.")
-    ];
-  }
-
-  const filteredJobs = treeFilter.filterJobs(
-    environment,
-    jobs,
-    {
-      parentFolderKind: options.parentFolderKind,
-      parentFolderUrl: options.parentFolderUrl
-    },
-    options.overrideKeys
-  );
-
-  if (filteredJobs.length === 0) {
-    return [
-      createEmptyPlaceholder(
-        "No jobs match the current filters.",
-        "Adjust or clear filters via the filter menu."
-      )
-    ];
-  }
-
-  return mapFilteredJobsToTreeItems(
-    environment,
-    filteredJobs,
-    treeFilter,
-    options.jobScope,
-    watchedJobs,
-    pinnedJobs
-  );
 }
 
 export function mapFilteredJobsToTreeItems(

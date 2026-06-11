@@ -27,6 +27,8 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
     onResponse: ({ response, statusCode, options: requestOptions, redirectDecision }) => {
       const responsePlan = buildRequestResponsePlan(requestOptions, redirectDecision);
       if (responsePlan.type === "resolveImmediately") {
+        // Drain the discarded response so the socket is released.
+        response.resume();
         return Promise.resolve(undefined as T);
       }
       return decodeAndMaterializeResponse<T>(

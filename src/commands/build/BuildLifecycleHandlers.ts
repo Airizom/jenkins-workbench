@@ -74,6 +74,16 @@ export async function stopBuild(
   }
 
   const label = getTreeItemLabel(selected);
+  const confirmLabel = "Stop Build";
+  const confirmation = await vscode.window.showWarningMessage(
+    `Stop the running build ${label}?`,
+    { modal: true },
+    confirmLabel
+  );
+  if (confirmation !== confirmLabel) {
+    return;
+  }
+
   await runBuildAction(
     refreshHost,
     selected,

@@ -74,6 +74,7 @@ export class NodeDetailsPanel {
   private lastDetails?: JenkinsNodeDetails;
   private readonly loadTracker: PanelLoadTracker;
   private hasRendered = false;
+  private disposed = false;
   private nonce = createNonce();
   private advancedLoaded = false;
 
@@ -193,6 +194,7 @@ export class NodeDetailsPanel {
   }
 
   private dispose(): void {
+    this.disposed = true;
     disposeEnvironmentScopedPanel({
       clearSingleton: () => {
         NodeDetailsPanel.currentPanel = undefined;
@@ -378,6 +380,9 @@ export class NodeDetailsPanel {
   }
 
   private postMessage(message: NodeDetailsOutgoingMessage): void {
+    if (this.disposed) {
+      return;
+    }
     void this.panel.webview.postMessage(message);
   }
 

@@ -20,8 +20,7 @@ export class JenkinsTreeFilter {
   filterJobs(
     environment: JenkinsEnvironmentRef,
     jobs: JenkinsJobInfo[],
-    options?: TreeFilterOptions,
-    overrideKeys?: Set<string>
+    options?: TreeFilterOptions
   ): JenkinsJobInfo[] {
     const jobFilterMode = this.viewStateStore.getJobFilterMode();
     const branchFilter =
@@ -30,19 +29,6 @@ export class JenkinsTreeFilter {
         : undefined;
     const branchNeedle = branchFilter?.toLowerCase() ?? "";
     const hasBranchFilter = branchNeedle.length > 0;
-    let overrideUrlSet: Set<string> | undefined;
-    if (overrideKeys && overrideKeys.size > 0) {
-      const overrideKeyPrefix = `${environment.scope}:${environment.environmentId}:`;
-      const prefixLen = overrideKeyPrefix.length;
-      for (const key of overrideKeys) {
-        if (key.startsWith(overrideKeyPrefix)) {
-          if (!overrideUrlSet) {
-            overrideUrlSet = new Set<string>();
-          }
-          overrideUrlSet.add(key.slice(prefixLen));
-        }
-      }
-    }
 
     if (jobFilterMode === "all" && !hasBranchFilter) {
       return jobs;
@@ -50,10 +36,6 @@ export class JenkinsTreeFilter {
 
     return jobs.filter((job) => {
       if (job.kind === "folder" || job.kind === "multibranch") {
-        return true;
-      }
-
-      if (overrideUrlSet?.has(job.url)) {
         return true;
       }
 

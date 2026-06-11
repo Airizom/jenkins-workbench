@@ -66,8 +66,12 @@ export class JenkinsBuildsApi {
     limit = 20,
     options?: { includeDetails?: boolean; includeParameters?: boolean }
   ): Promise<JenkinsBuild[]> {
-    const end = Math.max(limit - 1, 0);
-    const tree = buildBuildsTree(options).replace("{limit}", `{0,${end}}`);
+    const safeLimit = Math.floor(limit);
+    if (safeLimit <= 0) {
+      return [];
+    }
+    // Stapler tree ranges {M,N} are exclusive of N, so {0,limit} returns `limit` builds.
+    const tree = buildBuildsTree(options).replace("{limit}", `{0,${safeLimit}}`);
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
     return Array.isArray(response.builds) ? response.builds : [];

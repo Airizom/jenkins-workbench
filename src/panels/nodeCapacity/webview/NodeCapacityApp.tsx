@@ -28,7 +28,7 @@ import {
   nodeCapacityReducer
 } from "./state/nodeCapacityState";
 
-const { useMemo, useReducer } = React;
+const { useCallback, useMemo, useReducer, useState } = React;
 
 function postLoadExecutors(
   postMessage: (message: NodeCapacityIncomingMessage) => void,
@@ -55,14 +55,36 @@ export function NodeCapacityApp(): JSX.Element {
     () => formatRelativeIsoTimestamp(state.updatedAt),
     [state.updatedAt]
   );
-  const initiallyOpenNodeUrls = useMemo(
-    () => getUnloadedNodeUrls(state.pools.filter((pool) => pool.severity !== "normal")),
-    [state.pools]
+  const [poolOpenStates, setPoolOpenStates] = useState<ReadonlyMap<string, boolean>>(
+    () => new Map()
   );
+  const handlePoolToggle = useCallback((poolId: string, open: boolean) => {
+    setPoolOpenStates((current) => {
+      if (current.get(poolId) === open) {
+        return current;
+      }
+      const next = new Map(current);
+      next.set(poolId, open);
+      return next;
+    });
+  }, []);
+
+  // Encodes the latest update timestamp plus the node URLs of every expanded
+  // pool. Executor hydration responses leave this string unchanged, so the
+  // refresh effect below only fires on full updates and expansion changes.
+  const executorRefreshKey = useMemo(() => {
+    const expandedNodeUrls = state.pools
+      .filter((pool) => poolOpenStates.get(pool.id) ?? pool.severity !== "normal")
+      .flatMap((pool) => pool.nodes)
+      .map((node) => node.nodeUrl)
+      .filter((nodeUrl): nodeUrl is string => Boolean(nodeUrl));
+    return [state.updatedAt, ...expandedNodeUrls].join("\n");
+  }, [state.pools, poolOpenStates, state.updatedAt]);
 
   React.useEffect(() => {
-    postLoadExecutors(postMessage, initiallyOpenNodeUrls);
-  }, [initiallyOpenNodeUrls, postMessage]);
+    const [, ...nodeUrls] = executorRefreshKey.split("\n");
+    postLoadExecutors(postMessage, nodeUrls);
+  }, [executorRefreshKey, postMessage]);
 
   if (state.loading && !state.hasLoaded) {
     return (
@@ -77,10 +99,6 @@ export function NodeCapacityApp(): JSX.Element {
   const handleOpenNodeDetails = (nodeUrl: string, label?: string) => {
     const message: OpenNodeDetailsMessage = { type: "openNodeDetails", nodeUrl, label };
     postMessage(message);
-  };
-
-  const handleLoadExecutors = (nodeUrls: string[]) => {
-    postLoadExecutors(postMessage, nodeUrls);
   };
 
   return (
@@ -129,9 +147,10 @@ export function NodeCapacityApp(): JSX.Element {
                 <PoolPanel
                   key={pool.id}
                   pool={pool}
+                  isOpen={poolOpenStates.get(pool.id) ?? pool.severity !== "normal"}
                   onOpenExternal={handleOpenExternal}
                   onOpenNodeDetails={handleOpenNodeDetails}
-                  onLoadExecutors={handleLoadExecutors}
+                  onToggleExpanded={handlePoolToggle}
                 />
               ))
             )}
@@ -141,13 +160,6 @@ export function NodeCapacityApp(): JSX.Element {
       </div>
     </TooltipProvider>
   );
-}
-
-function getUnloadedNodeUrls(pools: NodeCapacityPoolViewModel[]): string[] {
-  return pools
-    .flatMap((pool) => pool.nodes)
-    .filter((node) => node.nodeUrl && !node.executorsLoaded)
-    .map((node) => node.nodeUrl as string);
 }
 
 function SummaryStrip({ state }: { state: NodeCapacityState }): JSX.Element {
@@ -182,26 +194,25 @@ function SummaryStrip({ state }: { state: NodeCapacityState }): JSX.Element {
 
 function PoolPanel({
   pool,
+  isOpen,
   onOpenExternal,
   onOpenNodeDetails,
-  onLoadExecutors
+  onToggleExpanded
 }: {
   pool: NodeCapacityPoolViewModel;
+  isOpen: boolean;
   onOpenExternal: (url: string) => void;
   onOpenNodeDetails: (nodeUrl: string, label?: string) => void;
-  onLoadExecutors: (nodeUrls: string[]) => void;
+  onToggleExpanded: (poolId: string, open: boolean) => void;
 }): JSX.Element {
   const handleToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
-    if (!event.currentTarget.open) {
-      return;
-    }
-    onLoadExecutors(getUnloadedNodeUrls([pool]));
+    onToggleExpanded(pool.id, event.currentTarget.open);
   };
 
   return (
     <details
       className="capacity-pool rounded-md border border-border bg-card"
-      open={pool.severity !== "normal"}
+      open={isOpen}
       onToggle={handleToggle}
     >
       <summary className="cursor-pointer list-none px-4 py-3">

@@ -15,6 +15,16 @@ export async function cancelQueueItem(
   }
 
   const label = getTreeItemLabel(selected);
+  const confirmLabel = "Cancel Item";
+  const confirmation = await vscode.window.showWarningMessage(
+    `Cancel the queued item ${label}?`,
+    { modal: true },
+    confirmLabel
+  );
+  if (confirmation !== confirmLabel) {
+    return;
+  }
+
   await withActionErrorMessage(`Failed to cancel ${label}`, async () => {
     await dataService.cancelQueueItem(selected.environment, selected.queueId);
     void vscode.window.showInformationMessage(`Cancelled ${label}.`);
