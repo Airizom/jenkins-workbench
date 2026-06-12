@@ -31,6 +31,7 @@ import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineSection } from "./PipelineSection";
 import { TestResultsSection } from "./TestResultsSection";
+import { resolveBuildDetailsSelectedTab } from "./buildDetailsTabsModel";
 import { OverviewTab } from "./overview/OverviewTab";
 
 function TabCountBadge({
@@ -163,9 +164,15 @@ export function BuildDetailsTabs({
   onReloadTestResults,
   onOpenTestSource
 }: BuildDetailsTabsProps): JSX.Element {
+  const activeTab = resolveBuildDetailsSelectedTab(selectedTab, {
+    hasPendingInputs,
+    hasPipelineStages,
+    hasTests
+  });
+
   return (
     <Tabs
-      value={selectedTab}
+      value={activeTab}
       onValueChange={(value) => onTabChange(value as BuildDetailsTab)}
       className="space-y-3"
     >
@@ -241,7 +248,7 @@ export function BuildDetailsTabs({
             onClearPipelineLog={onClearPipelineLog}
             onExportPipelineLog={onExportPipelineLog}
             onOpenExternal={onOpenExternal}
-            isActive={selectedTab === "pipeline"}
+            isActive={activeTab === "pipeline"}
           />
         </TabsContent>
       ) : null}
