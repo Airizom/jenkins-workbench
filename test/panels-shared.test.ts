@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { PanelLoadTracker } from "../src/panels/shared/PanelRuntimeHelpers";
+import { PanelLoadTracker, bindEnvironmentRefresh } from "../src/panels/shared/PanelRuntimeHelpers";
 import {
   buildOccurrenceKey,
   buildTestCaseId,
@@ -83,6 +83,36 @@ describe("PanelLoadTracker", () => {
     tracker.beginLoading();
 
     assert.deepEqual(posted, [true, false, true]);
+  });
+});
+
+describe("bindEnvironmentRefresh", () => {
+  it("routes rejected refresh callbacks to the refresh error handler", async () => {
+    let listener: ((environmentId?: string) => void) | undefined;
+    const refreshError = new Error("refresh failed");
+    const handledErrors: Array<{ error: unknown; environmentId?: string }> = [];
+
+    const subscription = bindEnvironmentRefresh(
+      undefined,
+      {
+        onDidRefreshEnvironment: (nextListener) => {
+          listener = nextListener;
+          return { dispose() {} };
+        }
+      },
+      async () => {
+        throw refreshError;
+      },
+      (error, environmentId) => {
+        handledErrors.push({ error, environmentId });
+      }
+    );
+
+    assert.ok(subscription);
+    listener?.("env-a");
+    await Promise.resolve();
+
+    assert.deepEqual(handledErrors, [{ error: refreshError, environmentId: "env-a" }]);
   });
 });
 

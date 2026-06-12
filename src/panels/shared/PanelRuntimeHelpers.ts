@@ -7,6 +7,8 @@ import type {
 export type EnvironmentPanelRefreshHost = EnvironmentScopedRefreshHost &
   Pick<ExtensionRefreshHost, "onDidRefreshEnvironment">;
 
+export type EnvironmentRefreshErrorHandler = (error: unknown, environmentId?: string) => void;
+
 export function disposePanelResources(disposables: vscode.Disposable[]): void {
   while (disposables.length > 0) {
     const disposable = disposables.pop();
@@ -88,11 +90,18 @@ export function bindEnvironmentRefresh(
         onDidRefreshEnvironment?: (listener: (environmentId?: string) => void) => vscode.Disposable;
       }
     | undefined,
-  refresh: (environmentId?: string) => Promise<void>
+  refresh: (environmentId?: string) => Promise<void>,
+  onRefreshError: EnvironmentRefreshErrorHandler = logEnvironmentRefreshError
 ): vscode.Disposable | undefined {
   return replaceRefreshSubscription(current, refreshHost, (environmentId) => {
-    void refresh(environmentId);
+    void refresh(environmentId).catch((error: unknown) => {
+      onRefreshError(error, environmentId);
+    });
   });
+}
+
+function logEnvironmentRefreshError(error: unknown): void {
+  console.error("Failed to refresh environment-scoped panel.", error);
 }
 
 export function createPanelLoadingTracker<TMessage extends { type: "setLoading"; value: boolean }>(
