@@ -166,6 +166,7 @@ export class JenkinsJobDataOperations {
     const client = await this.context.getClient(environment);
     try {
       await client.updateJobConfigXml(jobUrl, xml);
+      await this.clearJobConfigDependentCache(environment, jobUrl);
     } catch (error) {
       throw toBuildActionError(error);
     }
@@ -189,6 +190,16 @@ export class JenkinsJobDataOperations {
       },
       this.context.getCacheTtlMs()
     );
+  }
+
+  private async clearJobConfigDependentCache(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string
+  ): Promise<void> {
+    this.context
+      .getCache()
+      .delete(await this.context.buildCacheKey(environment, "parameters", jobUrl));
+    this.context.getCache().delete(await this.context.buildCacheKey(environment, "job", jobUrl));
   }
 
   private mapViews(views: JenkinsView[]): JenkinsViewInfo[] {
