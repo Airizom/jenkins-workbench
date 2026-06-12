@@ -18,6 +18,7 @@ import {
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
 import { PipelineStagesSection } from "./PipelineStagesSection";
+import { hasPipelineLogTarget } from "./pipelineLogTargets";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
 import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 
@@ -70,14 +71,29 @@ export function PipelineSection({
   const [fallbackNotice, setFallbackNotice] = useState<string | undefined>();
   const hasStages = stages.length > 0;
   const showPlaceholder = loading && !hasStages;
+  const canValidateLogTarget = hasStages || !loading;
 
   useEffect(() => {
+    const selectedPipelineLogTarget =
+      pipelineNodeLog.target &&
+      (!canValidateLogTarget || hasPipelineLogTarget(stages, pipelineNodeLog.target))
+        ? pipelineNodeLog.target
+        : !canValidateLogTarget
+          ? restoredLogTarget
+          : undefined;
     persistBuildDetailsUiState({
       pipelinePresentation: presentation,
       selectedGraphStageKey: selectedStageKey,
-      selectedPipelineLogTarget: pipelineNodeLog.target
+      selectedPipelineLogTarget
     });
-  }, [presentation, selectedStageKey, pipelineNodeLog.target]);
+  }, [
+    canValidateLogTarget,
+    presentation,
+    restoredLogTarget,
+    selectedStageKey,
+    stages,
+    pipelineNodeLog.target
+  ]);
 
   useEffect(() => {
     // Restore the persisted log selection at most once; marking it consumed
@@ -86,11 +102,20 @@ export function PipelineSection({
     if (restoredLogConsumedRef.current || !restoredLogTarget) {
       return;
     }
+    if (!canValidateLogTarget) {
+      return;
+    }
     restoredLogConsumedRef.current = true;
-    if (!pipelineNodeLog.target) {
+    if (!pipelineNodeLog.target && hasPipelineLogTarget(stages, restoredLogTarget)) {
       onSelectPipelineLog(restoredLogTarget);
     }
-  }, [pipelineNodeLog.target, restoredLogTarget, onSelectPipelineLog]);
+  }, [
+    canValidateLogTarget,
+    pipelineNodeLog.target,
+    restoredLogTarget,
+    stages,
+    onSelectPipelineLog
+  ]);
 
   if (!loading && !hasStages) {
     return null;
