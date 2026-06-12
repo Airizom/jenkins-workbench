@@ -9,18 +9,24 @@ interface ProgressProps
   max?: number;
   indeterminate?: boolean;
 }
+
+function normalizeProgressMax(max: number): number {
+  return Number.isFinite(max) && max > 0 ? max : 100;
+}
+
 export const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   ProgressProps
 >(({ className, value = 0, max = 100, indeterminate = false, ...props }, ref) => {
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+  const safeMax = normalizeProgressMax(max);
+  const percentage = Math.min(100, Math.max(0, (value / safeMax) * 100));
 
   return (
     <ProgressPrimitive.Root
       ref={ref}
       className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted", className)}
       value={indeterminate ? undefined : value}
-      max={indeterminate ? undefined : max}
+      max={indeterminate ? undefined : safeMax}
       {...props}
     >
       <ProgressPrimitive.Indicator
@@ -56,7 +62,8 @@ const ProgressCircle = React.forwardRef<SVGSVGElement, ProgressCircleProps>(
     },
     ref
   ) => {
-    const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+    const safeMax = normalizeProgressMax(max);
+    const percentage = Math.min(100, Math.max(0, (value / safeMax) * 100));
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
