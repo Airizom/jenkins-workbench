@@ -111,15 +111,8 @@ async function promptParameterValue(
     return picks.map((pick) => pick.label);
   }
 
-  if (parameter.kind === "password" || parameter.kind === "credentials") {
-    const value = await vscode.window.showInputBox({
-      prompt,
-      placeHolder: description,
-      password: true,
-      ignoreFocusOut: true,
-      value: typeof presetValue === "string" ? presetValue : undefined
-    });
-    return value;
+  if (isSensitiveParameter(parameter)) {
+    return promptForSensitiveParameter(parameter, presetValue);
   }
 
   if (parameter.kind === "run") {
@@ -146,6 +139,26 @@ async function promptParameterValue(
   }
 
   return input;
+}
+
+async function promptForSensitiveParameter(
+  parameter: JobParameter,
+  presetValue?: ParameterValue
+): Promise<string | undefined> {
+  return vscode.window.showInputBox({
+    prompt: `Parameter: ${parameter.name}`,
+    placeHolder: parameter.description,
+    password: true,
+    ignoreFocusOut: true,
+    value: resolveSingleDefaultValue(presetValue, parameter.defaultValue)
+  });
+}
+
+function isSensitiveParameter(parameter: JobParameter): boolean {
+  if (parameter.isSensitive) {
+    return true;
+  }
+  return parameter.kind === "password" || parameter.kind === "credentials";
 }
 
 async function promptForRunParameter(
