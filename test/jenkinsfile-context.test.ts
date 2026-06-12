@@ -55,6 +55,12 @@ describe("Jenkinsfile Groovy context parsing", () => {
     assert.equal(masked.includes("prod"), false);
   });
 
+  it("preserves length for unterminated strings ending with an escape", () => {
+    for (const text of ["'\\", '"\\']) {
+      assert.equal(maskGroovyText(text).length, text.length);
+    }
+  });
+
   it("reports named argument context for parenthesized calls with Elvis and ternary arguments", () => {
     const { text, offset } = withCursor(
       'sh(script: params.CMD ?: "make test", returnStatus: /*cursor*/)'

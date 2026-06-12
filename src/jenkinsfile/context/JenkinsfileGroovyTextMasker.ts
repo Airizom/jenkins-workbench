@@ -60,7 +60,9 @@ export function maskGroovyText(text: string): string {
     if (currentMode?.type === "single") {
       chars[index] = character === "\n" ? "\n" : " ";
       if (character === "\\") {
-        chars[index + 1] = next === "\n" ? "\n" : " ";
+        if (index + 1 < chars.length) {
+          chars[index + 1] = next === "\n" ? "\n" : " ";
+        }
         index += 2;
         continue;
       }
@@ -99,7 +101,9 @@ export function maskGroovyText(text: string): string {
       }
       if (currentMode.type === "double") {
         if (character === "\\") {
-          chars[index + 1] = next === "\n" ? "\n" : " ";
+          if (index + 1 < chars.length) {
+            chars[index + 1] = next === "\n" ? "\n" : " ";
+          }
           index += 2;
           continue;
         }
