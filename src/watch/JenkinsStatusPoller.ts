@@ -141,6 +141,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     }
 
     this.pruneInactiveFailures(activeFailureKeys);
+    this.pruneInactivePendingInputs(activeFailureKeys);
 
     for (const [scope, environmentIds] of staleByScope) {
       for (const environmentId of environmentIds) {
@@ -308,6 +309,21 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     }
     if (didChange) {
       this.emitWatchErrorCount();
+    }
+  }
+
+  private pruneInactivePendingInputs(activeWatchKeys: Set<string>): void {
+    for (const key of Array.from(this.pendingInputSignatures.keys())) {
+      let isActive = false;
+      for (const watchKey of activeWatchKeys) {
+        if (key.startsWith(`${watchKey}:`)) {
+          isActive = true;
+          break;
+        }
+      }
+      if (!isActive) {
+        this.pendingInputSignatures.delete(key);
+      }
     }
   }
 

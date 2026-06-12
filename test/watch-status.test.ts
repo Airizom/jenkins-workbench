@@ -332,14 +332,40 @@ describe("JenkinsStatusPoller", () => {
 
     assert.equal(fixture.notifier.calls.pendingInputs.length, 2);
   });
+
+  it("prunes pending input signatures when a watched job is removed", async () => {
+    const removedJob = watchedEntry();
+    const activeJob = watchedEntry({ jobUrl: "job/other/", jobName: "other" });
+    const watched = [removedJob, activeJob];
+    const fixture = createPollerFixture({
+      watched,
+      getJob: async (_environment, jobUrl) => runningJob(jobUrl),
+      getPendingInputSummary: async () => ({
+        awaitingInput: true,
+        count: 1,
+        signature: "input-a",
+        message: "Approve deploy",
+        fetchedAt: 1
+      })
+    });
+
+    await fixture.poller.poll();
+    watched.splice(0, 1);
+    await fixture.poller.poll();
+    watched.unshift(removedJob);
+    await fixture.poller.poll();
+
+    assert.equal(fixture.notifier.calls.pendingInputs.length, 3);
+  });
 });
 
-function runningJob(): JenkinsJob {
+function runningJob(jobUrl = "job/demo/"): JenkinsJob {
+  const name = jobUrl.includes("other") ? "other" : "demo";
   return {
-    name: "demo",
-    url: "job/demo/",
+    name,
+    url: jobUrl,
     color: "blue_anime",
-    lastBuild: { number: 8, url: "job/demo/8/", building: true },
+    lastBuild: { number: 8, url: `${jobUrl}8/`, building: true },
     lastCompletedBuild: { number: 7, result: "SUCCESS" }
   };
 }
