@@ -59,7 +59,51 @@ export interface ParameterPresetSaveInput {
   keepSecretNames?: readonly string[];
 }
 
-export class JenkinsParameterPresetStore {
+interface JenkinsParameterPresetStoreRuntimeSurface {
+  listPresets(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string
+  ): Promise<ParameterPresetSummary[]>;
+  getPreset(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    presetId: string
+  ): Promise<ParameterPreset | undefined>;
+  savePreset(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    input: ParameterPresetSaveInput
+  ): Promise<ParameterPresetSummary>;
+  renamePreset(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    presetId: string,
+    nextName: string
+  ): Promise<boolean>;
+  deletePreset(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    presetId: string
+  ): Promise<boolean>;
+  removePresetsForJob(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string
+  ): Promise<void>;
+  updatePresetUrl(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldJobUrl: string,
+    newJobUrl: string
+  ): Promise<boolean>;
+}
+
+export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreRuntimeSurface {
   private readonly mutationQueue = createSerialTaskQueue();
 
   constructor(private readonly context: vscode.ExtensionContext) {}

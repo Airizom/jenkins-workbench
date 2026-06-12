@@ -1,14 +1,14 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { getTreeItemLabel as resolveTreeItemLabel } from "../tree/TreeItemLabels";
-import {
-  BuildTreeItem,
-  type JobTreeItem,
-  NodeTreeItem,
-  type PipelineTreeItem
-} from "../tree/TreeItems";
+import { canonicalizeJobUrlForEnvironment } from "../jenkins/urls";
+import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
+import { BuildTreeItem, type JobTreeItem, NodeTreeItem, PipelineTreeItem } from "../tree/TreeItems";
 export { formatActionError };
+
+interface FullEnvironmentRefreshHost {
+  fullEnvironmentRefresh(options: { environmentId: string }): void;
+}
 
 export function getOpenUrl(
   item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem
@@ -29,7 +29,23 @@ export function getOpenUrl(
 }
 
 export function getTreeItemLabel(item: vscode.TreeItem): string {
-  return resolveTreeItemLabel(item, "item");
+  return resolveTreeItemLabel(item) ?? "item";
+}
+
+export function getCanonicalTreeJobUrl(item: JobScopedStateItem): string {
+  return canonicalizeJobUrlForEnvironment(item.environment.url, item.jobUrl) ?? item.jobUrl;
+}
+
+export function getJobTreeItemKind(item: JobTreeItem | PipelineTreeItem): "job" | "pipeline" {
+  return item instanceof PipelineTreeItem ? "pipeline" : "job";
+}
+
+export function createEnvironmentRefreshCallback(
+  refreshHost: FullEnvironmentRefreshHost
+): (environmentId: string) => void {
+  return (environmentId) => {
+    refreshHost.fullEnvironmentRefresh({ environmentId });
+  };
 }
 
 export function requireSelection<T>(

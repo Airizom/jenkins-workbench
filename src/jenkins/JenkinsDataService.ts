@@ -53,11 +53,7 @@ import type {
 } from "./types";
 
 export type {
-  BuildActionErrorCode,
   BuildParameterPayload,
-  CancellationChecker,
-  CancellationInput,
-  CancellationSignal,
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobCollectionRequest,
@@ -67,7 +63,6 @@ export type {
   JenkinsQueueItemInfo,
   JenkinsViewInfo,
   JobParameter,
-  JobParameterKind,
   PendingInputAction,
   PendingInputSummary,
   ProgressiveConsoleHtmlResult,
@@ -78,7 +73,6 @@ export type {
 } from "./data/JenkinsDataTypes";
 export type {
   JenkinsReplayDefinition,
-  JenkinsReplayLoadedScript,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload
 } from "./types";
@@ -96,7 +90,31 @@ export interface BuildListFetchOptions {
   bypassCache?: boolean;
 }
 
-export class JenkinsDataService {
+interface JenkinsDataServiceRuntimeSurface {
+  updateCacheTtlMs(cacheTtlMs?: number): void;
+  enableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void>;
+  disableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void>;
+  renameJob(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    newName: string
+  ): Promise<{ newUrl: string }>;
+  deleteJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void>;
+  copyJob(
+    environment: JenkinsEnvironmentRef,
+    parentUrl: string,
+    sourceName: string,
+    newName: string
+  ): Promise<{ newUrl: string }>;
+  createItem(
+    kind: JenkinsItemCreateKind,
+    environment: JenkinsEnvironmentRef,
+    parentUrl: string,
+    newName: string
+  ): Promise<{ newUrl: string }>;
+}
+
+export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
   private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
   private readonly buildOperations: JenkinsBuildDataOperations;
@@ -131,10 +149,6 @@ export class JenkinsDataService {
     this.runtimeContext.setCacheTtlMs(cacheTtlMs);
   }
 
-  async getJobsForEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsJobInfo[]> {
-    return this.jobOperations.getJobsForEnvironment(environment);
-  }
-
   async getJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<JenkinsJob> {
     return this.jobOperations.getJob(environment, jobUrl);
   }
@@ -160,21 +174,6 @@ export class JenkinsDataService {
 
   async getViewsForEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsViewInfo[]> {
     return this.jobOperations.getViewsForEnvironment(environment);
-  }
-
-  async getJobsForView(
-    environment: JenkinsEnvironmentRef,
-    viewUrl: string
-  ): Promise<JenkinsJobInfo[]> {
-    return this.jobOperations.getJobsForView(environment, viewUrl);
-  }
-
-  async getJobsForFolderInView(
-    environment: JenkinsEnvironmentRef,
-    folderUrl: string,
-    viewUrl: string
-  ): Promise<JenkinsJobInfo[]> {
-    return this.jobOperations.getJobsForFolderInView(environment, folderUrl, viewUrl);
   }
 
   async getAllJobsForEnvironment(

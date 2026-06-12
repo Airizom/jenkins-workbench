@@ -3,8 +3,6 @@ import { isFiniteNumber } from "../shared/numbers";
 import { firstNonEmpty } from "../shared/stringValues";
 import type { JenkinsNodeExecutable, JenkinsNodeExecutor } from "./types";
 
-export type { NodeCapacityExecutorViewModel as BaseNodeExecutorViewModel };
-
 export function formatExecutorStatusLabel(isIdle: boolean): string {
   return isIdle ? "Idle" : "Busy";
 }

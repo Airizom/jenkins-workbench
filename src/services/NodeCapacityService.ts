@@ -13,7 +13,14 @@ const NODE_CAPACITY_EXECUTOR_HYDRATION_CONCURRENCY = 4;
 
 type NodeCapacityExecutorHydrationEntry = NodeCapacityNodeExecutorsUpdateMessage["payload"][number];
 
-export class NodeCapacityService {
+interface NodeCapacityExecutorHydrationSurface {
+  hydrateNodeExecutors(
+    environment: JenkinsEnvironmentRef,
+    nodeUrls: string[]
+  ): Promise<NodeCapacityNodeExecutorsUpdateMessage["payload"]>;
+}
+
+export class NodeCapacityService implements NodeCapacityExecutorHydrationSurface {
   private readonly executorHydrationRequests = new Map<
     string,
     Promise<NodeCapacityExecutorHydrationEntry>

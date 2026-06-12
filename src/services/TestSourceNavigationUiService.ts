@@ -2,7 +2,14 @@ import * as vscode from "vscode";
 import type { TestSourceNavigationService } from "./TestSourceNavigationService";
 import type { TestSourceNavigationContext, TestSourceNavigationTarget } from "./TestSourceResolver";
 
-export class TestSourceNavigationUiService {
+interface TestSourceNavigationRuntimeSurface {
+  openTestSource(
+    context: TestSourceNavigationContext,
+    target: TestSourceNavigationTarget
+  ): Promise<void>;
+}
+
+export class TestSourceNavigationUiService implements TestSourceNavigationRuntimeSurface {
   constructor(private readonly navigationService: TestSourceNavigationService) {}
 
   async openTestSource(

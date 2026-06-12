@@ -1,9 +1,3 @@
-export type {
-  JobsFolderSummary,
-  NodesFolderSummary,
-  QueueFolderSummary
-} from "./items/TreeItemSummaries";
-
 export {
   ActivityFolderTreeItem,
   BuildQueueFolderTreeItem,

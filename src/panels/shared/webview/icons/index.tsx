@@ -1,5 +1,3 @@
-export type { IconProps } from "./types";
-
 export {
   ArrowUpIcon,
   ChevronDownIcon,

@@ -2,7 +2,7 @@ import { pickFiniteNumber } from "../../shared/numbers";
 import type { JenkinsWorkflowRun, JenkinsWorkflowStage, JenkinsWorkflowStep } from "../types";
 import type { PipelineRun, PipelineStage, PipelineStep } from "./PipelineTypes";
 
-export type { PipelineRun, PipelineStage, PipelineStep } from "./PipelineTypes";
+export type { PipelineRun, PipelineStage } from "./PipelineTypes";
 
 export function toPipelineRun(workflowRun?: JenkinsWorkflowRun): PipelineRun | undefined {
   const stages = workflowRun?.stages;

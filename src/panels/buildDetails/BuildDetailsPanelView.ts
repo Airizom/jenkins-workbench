@@ -9,11 +9,23 @@ import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
 import type { BuildDetailsViewModel } from "./BuildDetailsViewModel";
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
-export type { PanelViewAssets as BuildDetailsPanelViewAssets } from "../shared/webview/PanelViewHelpers";
-
 export type BuildDetailsPanelRenderOptions = EnvironmentPanelRenderOptions;
 
-export class BuildDetailsPanelView extends EnvironmentPanelView<BuildDetailsViewModel> {
+interface BuildDetailsPanelViewRuntimeSurface {
+  postStateUpdate(
+    state: BuildDetailsPanelState,
+    options?: { canOpenSource?: (className?: string) => boolean; coverageEnabled?: boolean }
+  ): void;
+  postConsoleSnapshot(snapshot: {
+    consoleTextResult?: { text: string; truncated: boolean };
+    consoleHtmlResult?: { html: string; truncated: boolean };
+  }): void;
+}
+
+export class BuildDetailsPanelView
+  extends EnvironmentPanelView<BuildDetailsViewModel>
+  implements BuildDetailsPanelViewRuntimeSurface
+{
   constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     super(panel, extensionUri, "buildDetails", "build", "Build Details", renderBuildDetailsHtml);
   }

@@ -65,14 +65,6 @@ export abstract class InMemoryDraftFilesystem implements vscode.FileSystemProvid
     this.updateEntry(uri, Buffer.from(content, "utf8"));
   }
 
-  getDraftContent(uri: vscode.Uri): string | undefined {
-    const entry = this.drafts.get(uri.path);
-    if (!entry) {
-      return undefined;
-    }
-    return Buffer.from(entry.content).toString("utf8");
-  }
-
   hasDraft(uri: vscode.Uri): boolean {
     return this.drafts.has(uri.path);
   }

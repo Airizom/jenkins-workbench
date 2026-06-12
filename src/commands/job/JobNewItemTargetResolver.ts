@@ -15,7 +15,12 @@ import type { JobNewItemTarget } from "./JobNewItemWorkflow";
 
 export type JobNewItemTreeTarget = InstanceTreeItem | JobsFolderTreeItem | JenkinsFolderTreeItem;
 
-export class JobNewItemTargetResolver {
+interface JobNewItemTargetResolverSurface {
+  resolveFromTreeItem(item: JobNewItemTreeTarget): JobNewItemTarget | undefined;
+  resolveFromEnvironmentPicker(): Promise<JobNewItemTarget | undefined>;
+}
+
+export class JobNewItemTargetResolver implements JobNewItemTargetResolverSurface {
   constructor(private readonly environmentStore: JenkinsEnvironmentStore) {}
 
   resolveFromTreeItem(item: JobNewItemTreeTarget): JobNewItemTarget | undefined {

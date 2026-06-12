@@ -217,10 +217,6 @@ export class JenkinsTreeChildrenLoader {
     this.cacheManager.clearChildrenCache(key);
   }
 
-  clearActivityCache(environment: JenkinsEnvironmentRef): void {
-    this.activityLoader.clearActivityData(environment);
-  }
-
   refreshActivityCache(environment: JenkinsEnvironmentRef): void {
     this.activityLoader.refreshActivityData(environment);
   }

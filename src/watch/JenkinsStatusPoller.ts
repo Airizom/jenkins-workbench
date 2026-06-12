@@ -15,7 +15,13 @@ export interface JenkinsStatusPollerHost {
 
 const DEFAULT_MAX_CONSECUTIVE_ERRORS = 3;
 
-export class JenkinsStatusPoller implements vscode.Disposable {
+interface JenkinsStatusPollerRuntimeSurface {
+  readonly onDidChangeWatchErrorCount: vscode.Event<number>;
+  updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
+  start(): void;
+}
+
+export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPollerRuntimeSurface {
   private tickSubscription: vscode.Disposable | undefined;
   private isPolling = false;
   private hasPendingPoll = false;

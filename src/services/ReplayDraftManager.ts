@@ -5,7 +5,7 @@ import { ReplayDraftEditorCoordinator } from "./ReplayDraftEditorCoordinator";
 import type { ReplayDraftFilesystem } from "./ReplayDraftFilesystem";
 import { type ReplayDraftSession, ReplayDraftSessionStore } from "./ReplayDraftSessionStore";
 
-export type { ReplayDraftScript, ReplayDraftSession } from "./ReplayDraftSessionStore";
+export type { ReplayDraftSession } from "./ReplayDraftSessionStore";
 
 export class ReplayDraftManager implements vscode.Disposable {
   private readonly store: ReplayDraftSessionStore;
@@ -19,10 +19,6 @@ export class ReplayDraftManager implements vscode.Disposable {
   dispose(): void {
     this.editorCoordinator.dispose();
     this.store.dispose();
-  }
-
-  hasDraft(uri: vscode.Uri): boolean {
-    return this.store.hasDraft(uri);
   }
 
   getSessionForUri(uri: vscode.Uri): ReplayDraftSession | undefined {

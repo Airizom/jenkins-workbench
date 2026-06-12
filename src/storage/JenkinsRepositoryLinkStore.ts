@@ -27,7 +27,11 @@ export interface JenkinsRepositoryLink {
 
 const STATE_KEY = "jenkinsWorkbench.repositoryLinks";
 
-export class JenkinsRepositoryLinkStore {
+interface JenkinsRepositoryLinkStoreMigrationSurface {
+  migrateLegacyWorkspaceLinks(): Promise<void>;
+}
+
+export class JenkinsRepositoryLinkStore implements JenkinsRepositoryLinkStoreMigrationSurface {
   private readonly emitter = new vscode.EventEmitter<void>();
 
   readonly onDidChange = this.emitter.event;
@@ -138,10 +142,6 @@ export class JenkinsRepositoryLinkStore {
     });
     this.emitter.fire();
     return true;
-  }
-
-  hasLinks(): boolean {
-    return Object.keys(this.getState().links ?? {}).length > 0;
   }
 
   private getState(): StoredRepositoryLinksState {

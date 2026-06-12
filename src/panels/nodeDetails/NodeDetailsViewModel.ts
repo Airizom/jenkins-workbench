@@ -28,10 +28,7 @@ import type {
 
 export type {
   NodeDetailsViewModel,
-  NodeDetailsQueuedWorkViewModel,
-  NodeExecutorViewModel,
-  NodeMonitorViewModel,
-  NodeStatusClass
+  NodeDetailsQueuedWorkViewModel
 } from "./shared/NodeDetailsContracts";
 
 export interface NodeDetailsViewModelInput {

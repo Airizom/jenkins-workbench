@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-export type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root>;
+type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root>;
 export const ToggleGroup = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Root>,
   ToggleGroupProps
@@ -19,7 +19,7 @@ export const ToggleGroup = React.forwardRef<
 ));
 ToggleGroup.displayName = "ToggleGroup";
 
-export type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item>;
+type ToggleGroupItemProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Item>;
 export const ToggleGroupItem = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Item>,
   ToggleGroupItemProps

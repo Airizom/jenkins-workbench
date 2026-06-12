@@ -18,12 +18,7 @@ import type {
 } from "./context/JenkinsfileContextTypes";
 import { maskGroovyText } from "./context/JenkinsfileGroovyTextMasker";
 
-export type {
-  JenkinsfileActiveCall,
-  JenkinsfileArgumentContext,
-  JenkinsfileContextAnalysis,
-  JenkinsfileIdentifier
-} from "./context/JenkinsfileContextTypes";
+export type { JenkinsfileContextAnalysis } from "./context/JenkinsfileContextTypes";
 
 export function analyzeJenkinsfileContext(
   document: vscode.TextDocument,

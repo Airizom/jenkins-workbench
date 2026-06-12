@@ -6,7 +6,7 @@ import { normalizeMaxBytes, parseContentLength } from "./responses";
 import { buildRequestHeaders } from "./transport";
 import type { JenkinsStreamRequestOptions, JenkinsStreamResponse } from "./types";
 
-export function requestStream(
+export function requestJenkinsStream(
   url: string,
   options: JenkinsStreamRequestOptions
 ): Promise<JenkinsStreamResponse> {

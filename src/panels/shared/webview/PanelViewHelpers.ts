@@ -22,6 +22,16 @@ export type EnvironmentPanelLoadingRenderOptions = EnvironmentPanelRenderOptions
   styleUris: string[];
 };
 
+export interface PanelLoadingShellOptions {
+  panel: vscode.WebviewPanel;
+  extensionUri: vscode.Uri;
+  entryName: WebviewEntryName;
+  nonce: string;
+  panelState?: unknown;
+  errorOptions: PanelManifestErrorOptions;
+  renderLoadingHtml: (options: PanelDetailsRenderOptions) => string;
+}
+
 export class EnvironmentPanelView<TModel> {
   constructor(
     protected readonly panel: vscode.WebviewPanel,
@@ -71,7 +81,7 @@ function resolvePanelViewAssets(
   }
 }
 
-export function resolvePanelWebviewAssetsOrError(
+function resolvePanelWebviewAssetsOrError(
   panel: vscode.WebviewPanel,
   extensionUri: vscode.Uri,
   entryName: WebviewEntryName,
@@ -83,6 +93,31 @@ export function resolvePanelWebviewAssetsOrError(
     assignWebviewPanelManifestErrorHtml(panel, extensionUri, entryName, errorOptions);
     return undefined;
   }
+}
+
+export function resolvePanelAssetsAndRenderLoading(
+  options: PanelLoadingShellOptions
+): PanelViewAssets | undefined {
+  const assets = resolvePanelWebviewAssetsOrError(
+    options.panel,
+    options.extensionUri,
+    options.entryName,
+    {
+      ...options.errorOptions,
+      panelState: options.panelState
+    }
+  );
+  if (!assets) {
+    return undefined;
+  }
+
+  options.panel.webview.html = options.renderLoadingHtml({
+    cspSource: options.panel.webview.cspSource,
+    nonce: options.nonce,
+    styleUris: assets.styleUris,
+    panelState: options.panelState
+  });
+  return assets;
 }
 
 function assignPanelLoadingHtml(

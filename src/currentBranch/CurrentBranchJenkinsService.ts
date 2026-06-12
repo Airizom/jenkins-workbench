@@ -12,6 +12,10 @@ import type {
   CurrentBranchState
 } from "./CurrentBranchTypes";
 
+interface CurrentBranchServiceRuntimeSurface {
+  start(): Promise<void>;
+}
+
 interface PendingRefresh {
   options: CurrentBranchRefreshOptions;
   promise: Promise<CurrentBranchState>;
@@ -25,7 +29,9 @@ export type {
   CurrentBranchState
 } from "./CurrentBranchTypes";
 
-export class CurrentBranchJenkinsService implements vscode.Disposable {
+export class CurrentBranchJenkinsService
+  implements vscode.Disposable, CurrentBranchServiceRuntimeSurface
+{
   private readonly emitter = new vscode.EventEmitter<CurrentBranchState>();
   private readonly subscriptions: vscode.Disposable[] = [];
   private currentState: CurrentBranchState = { kind: "noGit" };

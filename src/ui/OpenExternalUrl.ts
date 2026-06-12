@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 
-export interface ExternalHttpUrlValidationMessageOptions {
+interface ExternalHttpUrlValidationMessageOptions {
   invalidUrlMessage: string;
   unsupportedSchemeMessage?: string;
 }
 
-export type ExternalHttpUrlValidationResult =
+type ExternalHttpUrlValidationResult =
   | {
       ok: true;
       uri: vscode.Uri;

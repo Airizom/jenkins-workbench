@@ -11,12 +11,18 @@ const BARE_CALL_PREFIX_PAREN_KEYWORDS = new Set(["catch", "for", "if", "switch",
 const BARE_CALL_PREFIX_DECLARATION_KEYWORDS = new Set(["def", "final"]);
 const LEADING_NAMED_ARG_PATTERN = /^\s*([A-Za-z_$][\w$]*)\s*:/;
 
+interface GroupingDepth {
+  brace: number;
+  bracket: number;
+  paren: number;
+}
+
 function extractLeadingNamedArgName(segmentText: string): string | undefined {
-  const match = segmentText.match(LEADING_NAMED_ARG_PATTERN);
+  const match = LEADING_NAMED_ARG_PATTERN.exec(segmentText);
   if (!match) {
     return undefined;
   }
-  const colonIndex = match.index! + match[0].length - 1;
+  const colonIndex = match.index + match[0].length - 1;
   if (segmentText[colonIndex - 1] === "?") {
     return undefined;
   }
@@ -27,37 +33,14 @@ function extractLeadingNamedArgName(segmentText: string): string | undefined {
 }
 
 function containsTopLevelQuestionMark(text: string): boolean {
-  let depthParen = 0;
-  let depthBracket = 0;
-  let depthBrace = 0;
+  const depth = createGroupingDepth();
 
   for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
-    if (character === "(") {
-      depthParen += 1;
+    if (updateGroupingDepth(depth, character)) {
       continue;
     }
-    if (character === ")") {
-      depthParen = Math.max(0, depthParen - 1);
-      continue;
-    }
-    if (character === "[") {
-      depthBracket += 1;
-      continue;
-    }
-    if (character === "]") {
-      depthBracket = Math.max(0, depthBracket - 1);
-      continue;
-    }
-    if (character === "{") {
-      depthBrace += 1;
-      continue;
-    }
-    if (character === "}") {
-      depthBrace = Math.max(0, depthBrace - 1);
-      continue;
-    }
-    if (character === "?" && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
+    if (character === "?" && isTopLevel(depth)) {
       return true;
     }
   }
@@ -74,40 +57,17 @@ export function analyzeActiveCallArguments(
     activeCall.syntax === "paren"
       ? maskedText.slice((activeCall.openParen ?? activeCall.callStart) + 1, offset)
       : maskedText.slice(findBareCallArgumentStart(maskedText, activeCall.callStart), offset);
-  let depthParen = 0;
-  let depthBracket = 0;
-  let depthBrace = 0;
+  const depth = createGroupingDepth();
   let commaCount = 0;
   let currentSegmentStart = 0;
   const namedArgs: string[] = [];
 
   for (let index = 0; index < segment.length; index += 1) {
     const character = segment[index];
-    if (character === "(") {
-      depthParen += 1;
+    if (updateGroupingDepth(depth, character)) {
       continue;
     }
-    if (character === ")") {
-      depthParen = Math.max(0, depthParen - 1);
-      continue;
-    }
-    if (character === "[") {
-      depthBracket += 1;
-      continue;
-    }
-    if (character === "]") {
-      depthBracket = Math.max(0, depthBracket - 1);
-      continue;
-    }
-    if (character === "{") {
-      depthBrace += 1;
-      continue;
-    }
-    if (character === "}") {
-      depthBrace = Math.max(0, depthBrace - 1);
-      continue;
-    }
-    if (character === "," && depthParen === 0 && depthBracket === 0 && depthBrace === 0) {
+    if (character === "," && isTopLevel(depth)) {
       const segmentText = segment.slice(currentSegmentStart, index);
       const namedArg = extractLeadingNamedArgName(segmentText);
       if (namedArg) {
@@ -126,6 +86,42 @@ export function analyzeActiveCallArguments(
     activeName,
     usesNamedArgs: namedArgs.length > 0 || Boolean(activeName)
   };
+}
+
+function createGroupingDepth(): GroupingDepth {
+  return { brace: 0, bracket: 0, paren: 0 };
+}
+
+function updateGroupingDepth(depth: GroupingDepth, character: string): boolean {
+  if (character === "(") {
+    depth.paren += 1;
+    return true;
+  }
+  if (character === ")") {
+    depth.paren = Math.max(0, depth.paren - 1);
+    return true;
+  }
+  if (character === "[") {
+    depth.bracket += 1;
+    return true;
+  }
+  if (character === "]") {
+    depth.bracket = Math.max(0, depth.bracket - 1);
+    return true;
+  }
+  if (character === "{") {
+    depth.brace += 1;
+    return true;
+  }
+  if (character === "}") {
+    depth.brace = Math.max(0, depth.brace - 1);
+    return true;
+  }
+  return false;
+}
+
+function isTopLevel(depth: GroupingDepth): boolean {
+  return depth.paren === 0 && depth.bracket === 0 && depth.brace === 0;
 }
 
 export function findBareActiveCall(

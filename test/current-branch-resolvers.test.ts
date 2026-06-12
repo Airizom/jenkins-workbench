@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import Module = require("node:module");
 import { beforeEach, describe, it } from "node:test";
 import type { CurrentBranchGitHubPullRequestLookupResult } from "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import type {
@@ -14,105 +13,48 @@ import type {
 import type { GitApi, GitRepository } from "../src/git/GitExtensionApi";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-
-type ModuleLoader = (request: string, parent: unknown, isMain: boolean) => unknown;
-
-class TestUri {
-  readonly scheme = "file";
-  readonly authority = "";
-
-  private constructor(readonly fsPath: string) {}
-
-  static file(fsPath: string): TestUri {
-    return new TestUri(fsPath);
-  }
-
-  toString(): string {
-    return `file://${this.fsPath}`;
-  }
-}
-
-class TestEventEmitter<T> {
-  private readonly listeners = new Set<(event: T) => void>();
-
-  readonly event = (listener: (event: T) => void): { dispose(): void } => {
-    this.listeners.add(listener);
-    return {
-      dispose: () => {
-        this.listeners.delete(listener);
-      }
-    };
-  };
-
-  fire(event: T): void {
-    for (const listener of this.listeners) {
-      listener(event);
-    }
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-  }
-}
+import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { createCurrentBranchVscodeMock, TestUri } from "./helpers/vscodeMocks";
 
 let githubPullRequestExtension:
   | { isActive: boolean; exports: unknown; activate: () => Promise<unknown> }
   | undefined;
 
-const vscodeMock = {
-  EventEmitter: TestEventEmitter,
-  window: {
-    activeTextEditor: undefined as { document: { uri: TestUri } } | undefined,
-    onDidChangeActiveTextEditor: () => ({ dispose: () => undefined })
-  },
-  workspace: {
-    onDidChangeWorkspaceFolders: () => ({ dispose: () => undefined })
-  },
-  extensions: {
-    getExtension: () => githubPullRequestExtension
-  },
-  Uri: TestUri
-};
+const vscodeMock = createCurrentBranchVscodeMock({
+  githubPullRequestExtension: () => githubPullRequestExtension
+});
 
-const moduleWithLoad = Module as unknown as { _load: ModuleLoader };
-const originalLoad = moduleWithLoad._load;
-moduleWithLoad._load = (request, parent, isMain) => {
-  if (request === "vscode") {
-    return vscodeMock;
-  }
-  return originalLoad(request, parent, isMain);
-};
-
-const { CurrentBranchRepositoryResolver } =
-  require("../src/currentBranch/CurrentBranchRepositoryResolver") as typeof import(
+const {
+  CurrentBranchRepositoryResolver,
+  CurrentBranchTargetResolver,
+  CurrentBranchStatusResolver,
+  CurrentBranchRefreshCoordinator,
+  CurrentBranchJenkinsService,
+  CurrentBranchPullRequestService,
+  VscodeCurrentBranchGitHubPullRequestAdapter
+} = withModuleMocks([exactModuleMock("vscode", vscodeMock)], () => ({
+  ...(require("../src/currentBranch/CurrentBranchRepositoryResolver") as typeof import(
     "../src/currentBranch/CurrentBranchRepositoryResolver"
-  );
-const { CurrentBranchTargetResolver } =
-  require("../src/currentBranch/CurrentBranchTargetResolver") as typeof import(
+  )),
+  ...(require("../src/currentBranch/CurrentBranchTargetResolver") as typeof import(
     "../src/currentBranch/CurrentBranchTargetResolver"
-  );
-const { CurrentBranchStatusResolver } =
-  require("../src/currentBranch/CurrentBranchStatusResolver") as typeof import(
+  )),
+  ...(require("../src/currentBranch/CurrentBranchStatusResolver") as typeof import(
     "../src/currentBranch/CurrentBranchStatusResolver"
-  );
-const { CurrentBranchRefreshCoordinator } =
-  require("../src/currentBranch/CurrentBranchRefreshCoordinator") as typeof import(
+  )),
+  ...(require("../src/currentBranch/CurrentBranchRefreshCoordinator") as typeof import(
     "../src/currentBranch/CurrentBranchRefreshCoordinator"
-  );
-const { CurrentBranchJenkinsService } =
-  require("../src/currentBranch/CurrentBranchJenkinsService") as typeof import(
+  )),
+  ...(require("../src/currentBranch/CurrentBranchJenkinsService") as typeof import(
     "../src/currentBranch/CurrentBranchJenkinsService"
-  );
-const { CurrentBranchPullRequestService } =
-  require("../src/currentBranch/CurrentBranchPullRequestService") as typeof import(
+  )),
+  ...(require("../src/currentBranch/CurrentBranchPullRequestService") as typeof import(
     "../src/currentBranch/CurrentBranchPullRequestService"
-  );
-const { VscodeCurrentBranchGitHubPullRequestAdapter } =
-  require("../src/currentBranch/CurrentBranchGitHubPullRequestAdapter") as typeof import(
+  )),
+  ...(require("../src/currentBranch/CurrentBranchGitHubPullRequestAdapter") as typeof import(
     "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter"
-  );
-
-moduleWithLoad._load = originalLoad;
+  ))
+}));
 
 const noopEvent = (() => ({
   dispose: () => undefined
@@ -264,25 +206,13 @@ describe("CurrentBranchTargetResolver", () => {
 
 describe("VscodeCurrentBranchGitHubPullRequestAdapter", () => {
   it("snapshots the pull request head branch from the extension metadata", async () => {
-    githubPullRequestExtension = {
-      isActive: true,
-      exports: {
-        getRepositoryDescription: async () => ({
-          pullRequest: {
-            number: 42,
-            title: " Add deployment ",
-            url: "https://github.example/pull/42",
-            headRefName: "feature/deploy"
-          }
-        })
-      },
-      activate: async () => undefined
-    };
-    const adapter = new VscodeCurrentBranchGitHubPullRequestAdapter();
+    const { result } = await lookupAvailablePullRequest({
+      number: 42,
+      title: " Add deployment ",
+      url: "https://github.example/pull/42",
+      headRefName: "feature/deploy"
+    });
 
-    const result = await adapter.lookup(createRepositoryContext("/workspace/app"));
-
-    assert.equal(result.kind, "available");
     assert.deepEqual(result.snapshot.pullRequest, {
       number: 42,
       title: "Add deployment",
@@ -292,24 +222,13 @@ describe("VscodeCurrentBranchGitHubPullRequestAdapter", () => {
   });
 
   it("accepts REST-shaped head refs and omits the head branch when absent", async () => {
-    githubPullRequestExtension = {
-      isActive: true,
-      exports: {
-        getRepositoryDescription: async () => ({
-          pullRequest: {
-            number: 7,
-            head: { ref: "bugfix/timeout" }
-          }
-        })
-      },
-      activate: async () => undefined
-    };
-    const adapter = new VscodeCurrentBranchGitHubPullRequestAdapter();
+    const { adapter, result } = await lookupAvailablePullRequest({
+      number: 7,
+      head: { ref: "bugfix/timeout" }
+    });
 
-    const result = await adapter.lookup(createRepositoryContext("/workspace/app"));
-
-    assert.equal(result.kind, "available");
     assert.equal(result.snapshot.pullRequest?.headBranch, "bugfix/timeout");
+    assert.ok(githubPullRequestExtension);
 
     githubPullRequestExtension.exports = {
       getRepositoryDescription: async () => ({
@@ -553,6 +472,26 @@ function createRepositoryContext(rootFsPath: string): CurrentBranchRepositoryCon
     repositoryUriString: repository.rootUri.toString(),
     repositoryLabel: "app",
     repositoryPath: rootFsPath
+  };
+}
+
+async function lookupAvailablePullRequest(pullRequest: unknown): Promise<{
+  adapter: InstanceType<typeof VscodeCurrentBranchGitHubPullRequestAdapter>;
+  result: Extract<CurrentBranchGitHubPullRequestLookupResult, { kind: "available" }>;
+}> {
+  githubPullRequestExtension = {
+    isActive: true,
+    exports: {
+      getRepositoryDescription: async () => ({ pullRequest })
+    },
+    activate: async () => undefined
+  };
+  const adapter = new VscodeCurrentBranchGitHubPullRequestAdapter();
+  const result = await adapter.lookup(createRepositoryContext("/workspace/app"));
+  assert.equal(result.kind, "available");
+  return {
+    adapter,
+    result: result as Extract<CurrentBranchGitHubPullRequestLookupResult, { kind: "available" }>
   };
 }
 

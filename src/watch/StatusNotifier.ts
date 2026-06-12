@@ -1,12 +1,3 @@
-export type CompletionStatusKind =
-  | "success"
-  | "failure"
-  | "unstable"
-  | "aborted"
-  | "notBuilt"
-  | "disabled"
-  | "unknown";
-
 export interface CompletionNotification {
   jobLabel: string;
   environmentUrl: string;

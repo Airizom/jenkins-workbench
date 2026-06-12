@@ -1,4 +1,4 @@
-export type JobNameValidationError =
+type JobNameValidationError =
   | "empty"
   | "whitespace"
   | "invalid_chars"

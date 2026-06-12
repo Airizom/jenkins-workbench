@@ -12,7 +12,31 @@ import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 
 export type PipelineRestartAvailability = "unknown" | "supported" | "unsupported";
 
-export class BuildDetailsPanelState {
+interface BuildDetailsPanelStateRuntimeSurface {
+  readonly lastDetailsBuilding: boolean;
+  setTestReport(
+    testReport: JenkinsTestReport | undefined,
+    options?: { logsIncluded?: boolean }
+  ): void;
+  markTestReportFetchAttempted(): void;
+  setTestResultsLoading(value: boolean): boolean;
+  setCoverage(
+    overview: JenkinsCoverageOverview | undefined,
+    modifiedFiles: JenkinsModifiedCoverageFile[] | undefined
+  ): void;
+  setCoverageActionPath(actionPath: string | undefined): boolean;
+  setCoverageError(error: string): void;
+  setCoverageLoading(value: boolean): boolean;
+  setPipelineLoading(value: boolean): boolean;
+  setPipelineRestartInfo(
+    restartEnabled: boolean,
+    restartableStages: string[],
+    availability: PipelineRestartAvailability
+  ): boolean;
+  takeCompletionToastSlot(): boolean;
+}
+
+export class BuildDetailsPanelState implements BuildDetailsPanelStateRuntimeSurface {
   private environmentValue: JenkinsEnvironmentRef | undefined;
   private currentBuildUrlValue: string | undefined;
   private currentDetailsValue: JenkinsBuildDetails | undefined;

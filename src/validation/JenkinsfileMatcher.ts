@@ -21,10 +21,6 @@ export class JenkinsfileMatcher {
     }
     return vscode.languages.match(this.selector, document) > 0;
   }
-
-  getPatterns(): string[] {
-    return [...this.patterns];
-  }
 }
 
 function buildSelector(patterns: string[], schemes: string[]): vscode.DocumentSelector {

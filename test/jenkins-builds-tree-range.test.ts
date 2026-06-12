@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { JenkinsBuildsApi } from "../src/jenkins/client/JenkinsBuildsApi";
 import type { JenkinsClientContext } from "../src/jenkins/client/JenkinsClientContext";
+import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
 interface ContextHarness {
   context: JenkinsClientContext;
@@ -10,24 +11,12 @@ interface ContextHarness {
 
 function createContextHarness(): ContextHarness {
   const requestedUrls: string[] = [];
-  const context: JenkinsClientContext = {
-    baseUrl: "https://jenkins.example.com/",
+  const context: JenkinsClientContext = createJenkinsClientContext({
     requestJson: async <T>(url: string): Promise<T> => {
       requestedUrls.push(url);
       return { builds: [] } as T;
-    },
-    requestHeaders: async () => ({}),
-    requestText: async () => "",
-    requestTextWithHeaders: async () => ({ text: "", headers: {} }),
-    requestBufferWithHeaders: async () => ({ data: new Uint8Array(), headers: {} }),
-    requestStream: async () => {
-      throw new Error("not implemented");
-    },
-    requestVoidWithCrumb: async () => undefined,
-    requestPostWithCrumb: async () => ({}),
-    requestPostWithCrumbRaw: async () => ({}),
-    requestPostTextWithCrumbRaw: async () => ""
-  };
+    }
+  });
   return { context, requestedUrls };
 }
 

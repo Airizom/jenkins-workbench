@@ -1,3 +1,6 @@
+// fallow-ignore-file unused-class-member
+// JenkinsClient is an intentional facade; data operation classes reach these
+// methods through the client provider/runtime context rather than direct calls.
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
 import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
@@ -43,9 +46,7 @@ import type {
 
 export type {
   JenkinsBuild,
-  JenkinsBuildAction,
   JenkinsBuildCause,
-  JenkinsBuildParameter,
   JenkinsBuildDetails,
   JenkinsArtifact,
   JenkinsClientOptions,
@@ -53,15 +54,10 @@ export type {
   JenkinsConsoleTextTail,
   JenkinsFlowNodeLog,
   JenkinsItemCreateKind,
-  JenkinsChangeSet,
-  JenkinsChangeSetItem,
   JenkinsJob,
   JenkinsJobKind,
   JenkinsNode,
   JenkinsNodeDetails,
-  JenkinsNodeExecutable,
-  JenkinsNodeExecutor,
-  JenkinsNodeOfflineCause,
   JenkinsPendingInputAction,
   JenkinsPendingInputParameterDefinition,
   JenkinsParameterDefinition,
@@ -69,23 +65,18 @@ export type {
   JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
   JenkinsReplayDefinition,
-  JenkinsReplayLoadedScript,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload,
   JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsView,
-  JenkinsTestSummaryAction,
   JenkinsWorkspaceEntry,
   JenkinsWorkflowStage,
   JenkinsWorkflowRun,
   ScanMultibranchResult
 } from "./types";
 
-export type {
-  JenkinsBuildTriggerMode,
-  JenkinsBuildTriggerOptions
-} from "./client/JenkinsBuildsApi";
+export type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 export type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 
 export { JenkinsRequestError };

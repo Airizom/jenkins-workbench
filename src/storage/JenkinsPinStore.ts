@@ -33,10 +33,6 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
     );
   }
 
-  async getPinnedJobUrls(scope: EnvironmentScope, environmentId: string): Promise<Set<string>> {
-    return this.getJobUrls(scope, environmentId);
-  }
-
   async isPinned(scope: EnvironmentScope, environmentId: string, jobUrl: string): Promise<boolean> {
     return this.isTracked(scope, environmentId, jobUrl);
   }

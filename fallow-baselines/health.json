@@ -1,0 +1,1397 @@
+{
+  "finding_counts": {
+    "scripts/validate-package-manifest.mjs": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 3
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/CurrentBranchCommands.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/commands/NodeCapacityCommands.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/SearchCommands.ts": {
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "src/commands/build/BuildComparisonHandlers.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/build/BuildNavigationHandlers.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/build/BuildTriggerHandlers.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/build/ReplayBuildWorkflow.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/environment/EnvironmentCommandHandlers.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/environment/EnvironmentPrompts.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/jenkinsfile/JenkinsfileCommandHandlers.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/job/JobActionHandlers.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/commands/job/JobConfigUpdateWorkflow.ts": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/commands/job/JobNameValidation.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/job/JobNewItemWorkflow.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/node/NodeCommandHandlers.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/currentBranch/CurrentBranchCommandMapper.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/currentBranch/CurrentBranchRepositoryResolver.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/currentBranch/CurrentBranchStatusBar.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/extension/ExtensionRuntime.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/extension/ExtensionSubscriptions.ts": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/extension/JenkinsWorkbenchDeepLinkJobHandler.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/extension/JenkinsWorkbenchUriHandler.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/extension/container/ExtensionContainer.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/formatters/BuildStatusFormatters.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/formatters/CompletionFormatters.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/JenkinsClientProvider.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/auth.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/jenkins/client/JenkinsBuildConsoleClient.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/JenkinsBuildsApi.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/JenkinsHttpClient.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/jenkins/client/JenkinsParameters.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/JenkinsPendingInputClient.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/JenkinsPipelineValidationEndpointResolver.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/JenkinsReplayClient.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/ReplayPageParser.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/client/RestartFromStageResponseParser.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/crumbs.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/data/JenkinsDataErrors.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/data/JenkinsJobIndex.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/data/JenkinsParameterMapping.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/jenkins/data/JenkinsPendingInputDataOperations.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/data/JenkinsQueueAndJobManagementOperations.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/pipeline/JenkinsPipelineAdapter.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkins/request/responses.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/JenkinsfileContextAnalyzer.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/JenkinsfileStepCatalogService.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/JenkinsfileStepCatalogUtils.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/jenkinsfile/context/JenkinsfileCallAnalysis.ts": {
+      "complexity_moderate": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/jenkinsfile/context/JenkinsfileGroovyTextMasker.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/editor/JenkinsfileCompletionProvider.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/editor/JenkinsfileSignatureHelpProvider.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/editor/JenkinsfileStepHoverProvider.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/jenkinsfile/gdsl/JenkinsfileGdslBlockScanner.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/jenkinsfile/gdsl/JenkinsfileGdslScannerUtils.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/jenkinsfile/gdsl/JenkinsfileGdslStepBuilder.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/jenkinsfile/gdsl/JenkinsfileGdslTokenizer.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "src/jenkinsfile/gdsl/JenkinsfileGdslValueParser.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/BuildComparePanel.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/BuildDetailsPanel.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/NodeCapacityPanel.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/panels/NodeDetailsPanel.ts": {
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildCompare/BuildCompareChangesetsSection.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareConsoleDiff.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareDiff.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareLoadState.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildComparePanelController.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareParametersSection.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareSectionShared.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareStagesSection.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/BuildCompareTestsSection.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildCompare/webview/components/buildCompare/shared/CompareDiffRowShell.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsCompletionPoller.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsCoverageCoordinator.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsCoverageDecorationsAdapter.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsCoverageLoader.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsCoverageViewModel.ts": {
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsFailureInsightsViewModel.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsMessageRouter.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsPanelActions.ts": {
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 3
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsPanelController.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsPanelRuntime.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsPanelState.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsPipelineViewModel.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsPollingController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsTestsViewModel.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/BuildDetailsViewModel.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/ConsoleStreamManager.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/HtmlConsoleStream.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/PipelineNodeLogFetcher.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/PipelineNodeLogManager.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/PipelineRestartEligibility.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/PipelineStageLogAggregator.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/shared/BuildDetailsContracts.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/shared/BuildDetailsErrorHelpers.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/shared/BuildDetailsPanelMessages.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/shared/BuildDetailsPanelWebviewState.ts": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/webview/BuildDetailsApp.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/ConsoleLogSearchBody.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/ConsoleSearchToolbar.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/BuildDetailsTabs.tsx": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/BuildFailureInsightsSection.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/ConsoleOutputSection.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/PendingInputsSection.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/PipelineNodeLogPane.tsx": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/PipelineSection.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/PipelineStagesSection.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/TestResultsSection.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureArtifactsCard.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureTestsSummaryCard.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/PipelineGraphCanvas.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/PipelineGraphInspector.tsx": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/PipelineGraphSection.tsx": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/pipelineGraphModel.ts": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/usePipelineGraphLayout.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/BranchCard.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/PipelineStageIcons.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode.tsx": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StepsList.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/testResults/CoverageSection.tsx": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/testResults/TestResultRow.tsx": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/testResults/TestResultsEmptyState.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/testResults/testResultsUtils.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleMatches.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/buildDetails/webview/hooks/useBuildDetailsMessages.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/lib/consoleHtml.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/state/buildDetailsState.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/panels/nodeCapacity/webview/NodeCapacityApp.tsx": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/NodeDetailsViewModel.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/ExecutorTableRow.tsx": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsAdvancedSection.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsAlerts.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsHeader.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/nodeDetailsUtils.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/state/nodeDetailsState.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/WebviewAssets.ts": {
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/WebviewPanelState.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/components/BuildResultStatusIcon.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/components/PanelErrorList.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/components/ToneMetricCard.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/components/queueWork/QueueWorkItemRow.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/components/ui/button.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/components/ui/progress.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/hooks/useToast.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/lib/statusStyles.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/shared/webview/lib/utils.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/services/BrowserSsoAuthenticationService.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/BuildConsoleExporter.ts": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/services/BuildParameterRequestPreparerService.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/CoverageDecorationService.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/DraftEditorService.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/NodeActionService.ts": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/services/NodeCapacityViewModelBuilder.ts": {
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "src/services/PendingInputRefreshCoordinator.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/QueueWorkViewModel.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/QueuedBuildWaiter.ts": {
+      "crap_high": {
+        "count": 3
+      }
+    },
+    "src/services/ReplayDraftEditorCoordinator.ts": {
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "src/services/ReplayDraftSessionStore.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/services/TestSourceFileMatchConfig.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/services/TestSourceFileMatchStrategy.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/TestSourceNavigationService.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/services/TestSourceNavigationUiService.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/services/TestSourceResolver.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/storage/JenkinsEnvironmentStore.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/storage/JenkinsParameterPresetStore.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/storage/ScopedJobStore.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tasks/JenkinsTaskProvider.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tasks/JenkinsTaskTerminal.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "src/tasks/JenkinsTaskTypes.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tree/BuildTooltips.ts": {
+      "complexity_moderate": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tree/EnvironmentSummaryStore.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tree/TreeExpansionState.ts": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/tree/TreeFileIcons.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tree/activity/ActivityCollector.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/tree/activity/ActivityRefreshService.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/ui/ArtifactActions.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/ui/ArtifactPreviewProvider.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/ui/ArtifactPreviewer.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/ui/BuildParameterPrompts.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/ui/ParameterPrompts.ts": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/ui/PendingInputActions.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/ui/PreviewLifecycle.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/ui/buildParameterPrompts/ParameterValueDefaults.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/ui/buildParameterPrompts/ParameterValuePrompts.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/ui/buildParameterPrompts/PresetSavePrompts.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/ui/buildParameterPrompts/PresetSelectionPrompts.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "src/ui/buildParameterPrompts/RunParameterLookup.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileDiagnosticUtils.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileEnvironmentResolver.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileValidationCoordinator.ts": {
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/validation/JenkinsfileValidationDiagnostics.ts": {
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileValidationParser.ts": {
+      "crap_critical": {
+        "count": 4
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileValidationRunner.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileValidationStateStore.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileValidationStatusBar.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/validation/JenkinsfileValidationUtils.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/validation/editor/JenkinsfilePipelineParser.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/validation/editor/JenkinsfileQuickFixProvider.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/validation/editor/JenkinsfileValidationCodeLensProvider.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/validation/editor/JenkinsfileValidationHoverProvider.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/watch/JenkinsJobStatusEvaluator.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/watch/JenkinsStatusPoller.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "test/node-details-view-model.test.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "src/panels/shared/webview/components/ui/popover.tsx:dead code",
+    "src/panels/buildDetails/BuildDetailsPanelRuntime.ts:untested risk",
+    "src/jenkins/auth.ts:high impact",
+    "src/formatters/JobColorFormatters.ts:high impact",
+    "src/panels/buildDetails/BuildDetailsPollingController.ts:complexity",
+    "src/jenkins/data/JenkinsJobIndex.ts:complexity",
+    "src/formatters/DisplayFormatters.ts:high impact",
+    "src/storage/JenkinsParameterPresetStore.ts:complexity",
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode.tsx:complexity",
+    "src/formatters/ErrorFormatters.ts:high impact",
+    "src/shared/stringValues.ts:high impact",
+    "src/panels/buildCompare/BuildCompareConsoleDiff.ts:complexity",
+    "src/jenkinsfile/gdsl/JenkinsfileGdslScannerUtils.ts:untested risk",
+    "src/jenkinsfile/gdsl/JenkinsfileGdslStepBuilder.ts:untested risk",
+    "src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleMatches.ts:complexity",
+    "src/ui/buildParameterPrompts/ParameterValueDefaults.ts:untested risk",
+    "src/tasks/JenkinsTaskTypes.ts:complexity",
+    "src/jenkinsfile/context/JenkinsfileGroovyTextMasker.ts:complexity",
+    "scripts/validate-package-manifest.mjs:complexity"
+  ]
+}

@@ -23,7 +23,7 @@ export interface NodeExecutorCountFields {
   executors?: JenkinsNodeExecutor[];
 }
 
-export type NodeConnectivityState = "unknown" | "temporary-offline" | "offline" | "idle" | "online";
+type NodeConnectivityState = "unknown" | "temporary-offline" | "offline" | "idle" | "online";
 
 export type NodeStatusClass = "online" | "offline" | "idle" | "temporary" | "unknown";
 

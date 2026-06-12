@@ -47,7 +47,6 @@ export interface BuildDetailsPanelControllerAccess {
   getEnvironment(): JenkinsEnvironmentRef | undefined;
   getBuildUrl(): string | undefined;
   getCurrentDetails(): JenkinsBuildDetails | undefined;
-  getPollingController(): BuildDetailsPollingController | undefined;
   getLoadToken(): number;
   getPipelineRestartAvailability(): PipelineRestartAvailability;
   getPipelineRestartEnabled(): boolean;
@@ -136,10 +135,6 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
   getCurrentDetails(): JenkinsBuildDetails | undefined {
     return this.state.currentDetails;
-  }
-
-  getPollingController(): BuildDetailsPollingController | undefined {
-    return this.pollingController;
   }
 
   getLoadToken(): number {

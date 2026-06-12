@@ -8,7 +8,19 @@ export interface ActivityRefreshServiceOptions {
   refreshActivity: (environment: JenkinsEnvironmentRef) => void;
 }
 
-export class ActivityRefreshService {
+interface ActivityRefreshSubscriptionSurface {
+  updateOptions(activityOptions: TreeActivityOptions): void;
+  handleActivityFolderExpanded(environment: JenkinsEnvironmentRef): void;
+  handleActivityFolderCollapsed(environment: JenkinsEnvironmentRef): void;
+  handleEnvironmentCollapsed(
+    environment: Pick<JenkinsEnvironmentRef, "environmentId" | "scope">
+  ): void;
+  handleAllEnvironmentsCollapsed(): void;
+  handleEnvironmentStoreChange(change: JenkinsEnvironmentStoreChange): void;
+  handleStatusTick(): void;
+}
+
+export class ActivityRefreshService implements ActivityRefreshSubscriptionSurface {
   private readonly tracker: ActivityRefreshTracker;
 
   constructor(options: ActivityRefreshServiceOptions) {

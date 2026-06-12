@@ -2,11 +2,11 @@ import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
+import { DisclosureChevron } from "./disclosure-chevron";
 
-export type CollapsibleProps = React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Root>;
 export const Collapsible = CollapsiblePrimitive.Root;
 
-export type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<
+type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<
   typeof CollapsiblePrimitive.Trigger
 > & {
   asChild?: boolean;
@@ -31,40 +31,14 @@ export const CollapsibleTrigger = React.forwardRef<
     ) : (
       <>
         {children}
-        <ChevronIcon />
+        <DisclosureChevron />
       </>
     )}
   </CollapsiblePrimitive.Trigger>
 ));
 CollapsibleTrigger.displayName = "CollapsibleTrigger";
 
-function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn(
-        "mr-2 shrink-0 text-muted-foreground transition-transform duration-200",
-        "group-data-[state=open]:rotate-180",
-        "group-data-[state=open]:text-foreground",
-        className
-      )}
-    >
-      <path d="M4 6l4 4 4-4" />
-    </svg>
-  );
-}
-
-export type CollapsibleContentProps = React.ComponentPropsWithoutRef<
-  typeof CollapsiblePrimitive.Content
->;
+type CollapsibleContentProps = React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Content>;
 export const CollapsibleContent = React.forwardRef<
   React.ElementRef<typeof CollapsiblePrimitive.Content>,
   CollapsibleContentProps

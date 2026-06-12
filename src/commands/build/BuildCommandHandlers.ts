@@ -1,5 +1,4 @@
 export { compareWithBuild } from "./BuildComparisonHandlers";
-export type { JenkinsJobTarget } from "./BuildCommandTargets";
 export {
   approveInput,
   quickReplayBuild,

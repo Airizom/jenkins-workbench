@@ -18,7 +18,3 @@ export function resolveTreeItemLabel(input: TreeItemLabelInput): string | undefi
 
   return label?.label;
 }
-
-export function getTreeItemLabel(input: TreeItemLabelInput, fallback = "item"): string {
-  return resolveTreeItemLabel(input) ?? fallback;
-}

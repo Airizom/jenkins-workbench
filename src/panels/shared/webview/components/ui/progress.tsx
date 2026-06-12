@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-export interface ProgressProps
+interface ProgressProps
   extends Omit<React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>, "value" | "max"> {
   value?: number;
   max?: number;
@@ -35,7 +35,7 @@ export const Progress = React.forwardRef<
 });
 Progress.displayName = "Progress";
 
-export interface ProgressCircleProps extends React.SVGAttributes<SVGSVGElement> {
+interface ProgressCircleProps extends React.SVGAttributes<SVGSVGElement> {
   value?: number;
   max?: number;
   size?: number;

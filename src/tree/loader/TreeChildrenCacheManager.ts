@@ -33,10 +33,6 @@ export class TreeChildrenCacheManager {
     this.childrenCache.set(key, items);
   }
 
-  deleteChildren(key: string): void {
-    this.childrenCache.delete(key);
-  }
-
   getCachedArtifacts<T>(key: string): T | undefined {
     return this.artifactCache.get<T>(key);
   }
@@ -265,13 +261,6 @@ export class TreeChildrenCacheManager {
 
     this.pendingLoads.set(key, pending);
     return Promise.resolve([this.createLoadingPlaceholder(loadingLabel)]);
-  }
-
-  clearForAll(): void {
-    this.childrenCache.clear();
-    this.pendingLoads.clear();
-    this.loadTokens.clear();
-    this.artifactCache.clear();
   }
 
   private nextLoadToken(key: string): number {

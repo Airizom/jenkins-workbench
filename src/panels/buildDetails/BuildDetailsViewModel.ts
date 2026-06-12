@@ -19,23 +19,7 @@ import type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
 import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "./shared/BuildDetailsErrorHelpers";
 
-export type {
-  BuildCoverageFileViewModel,
-  BuildCoverageQualityGateViewModel,
-  BuildDetailsCoverageStateViewModel,
-  BuildTestCaseViewModel,
-  BuildTestResultsViewModel,
-  BuildDetailsTestStateViewModel,
-  BuildTestsSummaryViewModel,
-  BuildDetailsViewModel,
-  BuildFailureArtifact,
-  BuildFailureChangelogItem,
-  BuildFailureInsightsViewModel,
-  PendingInputParameterViewModel,
-  PendingInputViewModel,
-  PipelineStageStepViewModel,
-  PipelineStageViewModel
-} from "./shared/BuildDetailsContracts";
+export type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
 
 export interface BuildDetailsViewModelInput {
   details?: JenkinsBuildDetails;

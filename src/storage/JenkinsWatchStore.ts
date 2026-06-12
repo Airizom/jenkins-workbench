@@ -24,7 +24,20 @@ type WatchUpdateInput = Omit<StoredWatchedJobEntry, "lastStatus"> & {
   lastStatus?: WatchStatusKind;
 };
 
-export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEntry> {
+interface JenkinsWatchStoreRuntimeSurface {
+  updateWatchUrl(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldJobUrl: string,
+    newJobUrl: string,
+    newJobName?: string
+  ): Promise<boolean>;
+}
+
+export class JenkinsWatchStore
+  extends JenkinsScopedJobStore<StoredWatchedJobEntry>
+  implements JenkinsWatchStoreRuntimeSurface
+{
   constructor(context: vscode.ExtensionContext) {
     super(context, WATCHED_JOBS_KEY);
   }

@@ -25,7 +25,17 @@ interface RefreshWorkItem {
   previous?: PendingInputSummary;
 }
 
-export class PendingInputRefreshCoordinator implements vscode.Disposable {
+interface PendingInputActionsRuntimeSurface {
+  getPendingInputActions(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { mode?: "cached" | "refresh" }
+  ): Promise<PendingInputAction[]>;
+}
+
+export class PendingInputRefreshCoordinator
+  implements vscode.Disposable, PendingInputActionsRuntimeSurface
+{
   private readonly queue: RefreshWorkItem[] = [];
   private readonly queuedKeys = new Set<string>();
   private readonly inFlightKeys = new Set<string>();

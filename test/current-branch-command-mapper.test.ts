@@ -1,37 +1,16 @@
 import assert from "node:assert/strict";
-import Module = require("node:module");
 import { describe, it } from "node:test";
 import type { CurrentBranchState } from "../src/currentBranch/CurrentBranchTypes";
+import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { createThemeVscodeMock } from "./helpers/vscodeMocks";
 
-type ModuleLoader = (request: string, parent: unknown, isMain: boolean) => unknown;
-
-const vscodeMock = {
-  ThemeColor: class {
-    constructor(readonly id: string) {}
-  },
-  ThemeIcon: class {
-    constructor(
-      readonly id: string,
-      readonly color?: unknown
-    ) {}
-  }
-};
-
-const moduleWithLoad = Module as unknown as { _load: ModuleLoader };
-const originalLoad = moduleWithLoad._load;
-moduleWithLoad._load = (request, parent, isMain) => {
-  if (request === "vscode") {
-    return vscodeMock;
-  }
-  return originalLoad(request, parent, isMain);
-};
-
-const { CurrentBranchCommandMapper } =
-  require("../src/currentBranch/CurrentBranchCommandMapper") as typeof import(
-    "../src/currentBranch/CurrentBranchCommandMapper"
-  );
-
-moduleWithLoad._load = originalLoad;
+const { CurrentBranchCommandMapper } = withModuleMocks(
+  [exactModuleMock("vscode", createThemeVscodeMock())],
+  () =>
+    require("../src/currentBranch/CurrentBranchCommandMapper") as typeof import(
+      "../src/currentBranch/CurrentBranchCommandMapper"
+    )
+);
 
 describe("CurrentBranchCommandMapper.getActionUnavailableMessage", () => {
   it("explains a missing branch job instead of silently doing nothing", () => {

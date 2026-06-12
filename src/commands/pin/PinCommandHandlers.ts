@@ -2,29 +2,28 @@ import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { canonicalizeJobUrlForEnvironment } from "../../jenkins/urls";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
-import {
-  type JobTreeItem,
-  type PinnedJobsFolderTreeItem,
+import type {
+  JobTreeItem,
+  PinnedJobsFolderTreeItem,
   PipelineTreeItem,
-  type StalePinnedJobTreeItem
+  StalePinnedJobTreeItem
 } from "../../tree/TreeItems";
 import {
   addJobScopedState,
+  createEnvironmentRefreshCallback,
+  getCanonicalTreeJobUrl,
+  getJobTreeItemKind,
   getTreeItemLabel,
   removeJobScopedState,
   withActionErrorMessage
 } from "../CommandUtils";
 import type { PinCommandRefreshHost } from "./PinCommandTypes";
 
-function getCanonicalJobUrl(item: JobTreeItem | PipelineTreeItem | StalePinnedJobTreeItem): string {
-  return canonicalizeJobUrlForEnvironment(item.environment.url, item.jobUrl) ?? item.jobUrl;
-}
-
 async function isPinnedJob(
   pinStore: JenkinsPinStore,
   item: JobTreeItem | PipelineTreeItem
 ): Promise<boolean> {
-  const canonicalJobUrl = getCanonicalJobUrl(item);
+  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
   const [hasRawPin, hasCanonicalPin] = await Promise.all([
     pinStore.isPinned(item.environment.scope, item.environment.environmentId, item.jobUrl),
     canonicalJobUrl === item.jobUrl
@@ -39,7 +38,7 @@ async function removePinnedJob(
   pinStore: JenkinsPinStore,
   item: JobTreeItem | PipelineTreeItem | StalePinnedJobTreeItem
 ): Promise<boolean> {
-  const canonicalJobUrl = getCanonicalJobUrl(item);
+  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
   const [removedRawPin, removedCanonicalPin] = await Promise.all([
     pinStore.removePin(item.environment.scope, item.environment.environmentId, item.jobUrl),
     canonicalJobUrl === item.jobUrl
@@ -58,20 +57,18 @@ export async function pinJob(
   await addJobScopedState({
     item,
     missingSelectionMessage: "Select a job or pipeline to pin.",
-    getLabel: (selected) => getTreeItemLabel(selected),
+    getLabel: getTreeItemLabel,
     alreadyPresentMessage: (label) => `${label} is already pinned.`,
     addedMessage: (label) => `Pinned ${label}.`,
     isPresent: async (selected) => isPinnedJob(pinStore, selected),
     add: async (selected, label) =>
       pinStore.addPin(selected.environment.scope, {
         environmentId: selected.environment.environmentId,
-        jobUrl: getCanonicalJobUrl(selected),
+        jobUrl: getCanonicalTreeJobUrl(selected),
         jobName: label,
-        jobKind: selected instanceof PipelineTreeItem ? "pipeline" : "job"
+        jobKind: getJobTreeItemKind(selected)
       }),
-    refreshEnvironment: (environmentId) => {
-      refreshHost.fullEnvironmentRefresh({ environmentId: environmentId });
-    }
+    refreshEnvironment: createEnvironmentRefreshCallback(refreshHost)
   });
 }
 
@@ -83,13 +80,11 @@ export async function unpinJob(
   await removeJobScopedState({
     item,
     missingSelectionMessage: "Select a job or pipeline to unpin.",
-    getLabel: (selected) => getTreeItemLabel(selected),
+    getLabel: getTreeItemLabel,
     missingStateMessage: (label) => `${label} is not currently pinned.`,
     removedMessage: (label) => `Unpinned ${label}.`,
     remove: async (selected) => removePinnedJob(pinStore, selected),
-    refreshEnvironment: (environmentId) => {
-      refreshHost.fullEnvironmentRefresh({ environmentId: environmentId });
-    }
+    refreshEnvironment: createEnvironmentRefreshCallback(refreshHost)
   });
 }
 

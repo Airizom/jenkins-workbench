@@ -47,12 +47,23 @@ const BUILD_LIMIT = 20;
 const REFRESH_DEBOUNCE_MS = 150;
 const MANUAL_REFRESH_COOLDOWN_MS = 2000;
 
+interface JenkinsWorkbenchTreeRuntimeSurface {
+  readonly onDidChangeSummary: vscode.Event<TreeViewSummary>;
+  refreshActivity(environment: JenkinsEnvironmentRef): void;
+  updateBuildTooltipOptions(options: BuildTooltipOptions): void;
+  updateBuildListFetchOptions(options: BuildListFetchOptions): void;
+  updateViewCurationOptions(options: TreeViewCurationOptions): void;
+  updateActivityOptions(options: TreeActivityOptions): void;
+  setWatchErrorCount(count: number): void;
+}
+
 export class JenkinsWorkbenchTreeDataProvider
   implements
     vscode.TreeDataProvider<WorkbenchTreeElement>,
     JenkinsTreeRevealProvider,
     TreeExpansionResolver,
-    vscode.Disposable
+    vscode.Disposable,
+    JenkinsWorkbenchTreeRuntimeSurface
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     WorkbenchTreeElement | undefined
@@ -178,11 +189,6 @@ export class JenkinsWorkbenchTreeDataProvider
     this.refreshView();
   }
 
-  refreshElement(element?: WorkbenchTreeElement): void {
-    this.childrenLoader.invalidateForElement(element);
-    this._onDidChangeTreeData.fire(element);
-  }
-
   private notifyElement(element?: WorkbenchTreeElement): void {
     this._onDidChangeTreeData.fire(element);
   }
@@ -193,10 +199,6 @@ export class JenkinsWorkbenchTreeDataProvider
       this.hierarchyState.notifyQueueFolderInstance(environment),
       environment
     );
-  }
-
-  refreshQueueFolder(environment: JenkinsEnvironmentRef): void {
-    this.refreshQueueOnly(environment);
   }
 
   refreshActivity(environment: JenkinsEnvironmentRef): void {

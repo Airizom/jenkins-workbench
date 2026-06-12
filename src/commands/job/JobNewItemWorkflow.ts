@@ -30,7 +30,11 @@ export interface JobNewItemWorkflowDependencies {
   onEnvironmentChanged(environmentId: string): void;
 }
 
-export class JobNewItemWorkflow {
+interface JobNewItemWorkflowSurface {
+  run(target: JobNewItemTarget): Promise<void>;
+}
+
+export class JobNewItemWorkflow implements JobNewItemWorkflowSurface {
   constructor(private readonly deps: JobNewItemWorkflowDependencies) {}
 
   async run(target: JobNewItemTarget): Promise<void> {

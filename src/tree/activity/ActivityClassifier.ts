@@ -7,7 +7,11 @@ export interface ActivityClassification {
   isRunning: boolean;
 }
 
-export class ActivityClassifier {
+interface TreeActivityClassificationSurface {
+  classify(entry: Pick<JobSearchEntry, "color">): ActivityClassification | undefined;
+}
+
+export class ActivityClassifier implements TreeActivityClassificationSurface {
   classify(entry: Pick<JobSearchEntry, "color">): ActivityClassification | undefined {
     const color = entry.color;
     if (!color) {

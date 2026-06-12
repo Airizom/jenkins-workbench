@@ -8,7 +8,11 @@ interface CacheEntry<T> {
 
 const DEFAULT_MAX_ENTRIES = 1000;
 
-export class JenkinsDataCache {
+interface JenkinsDataCacheRuntimeSurface {
+  getOrLoad<T>(key: string, loader: () => Promise<T>, ttlMs?: number): Promise<T>;
+}
+
+export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
   private readonly cache = new Map<string, CacheEntry<unknown>>();
   private readonly maxEntries: number;
 

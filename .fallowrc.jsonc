@@ -1,0 +1,273 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "src/panels/buildCompare/webview/index.tsx",
+    "src/panels/buildDetails/webview/index.tsx",
+    "src/panels/nodeCapacity/webview/index.tsx",
+    "src/panels/nodeDetails/webview/index.tsx"
+  ],
+  "ignorePatterns": ["out/**", "out-test/**", ".vscode-test/**", "resources/**", "*.vsix"],
+  // VS Code invokes these methods/properties by interface, so normal call graph
+  // analysis cannot see the runtime call path.
+  "usedClassMembers": [
+    {
+      "implements": "vscode.CodeActionProvider",
+      "members": ["provideCodeActions"]
+    },
+    {
+      "implements": "vscode.CodeLensProvider",
+      "members": ["onDidChangeCodeLenses", "provideCodeLenses"]
+    },
+    {
+      "implements": "vscode.Disposable",
+      "members": ["dispose"]
+    },
+    {
+      "implements": "vscode.FileSystemProvider",
+      "members": [
+        "onDidChangeFile",
+        "watch",
+        "stat",
+        "readDirectory",
+        "createDirectory",
+        "readFile",
+        "writeFile",
+        "delete",
+        "rename"
+      ]
+    },
+    {
+      "implements": "vscode.Pseudoterminal",
+      "members": ["onDidWrite", "onDidClose", "open", "close"]
+    },
+    {
+      "implements": "vscode.SignatureHelpProvider",
+      "members": ["provideSignatureHelp"]
+    },
+    {
+      "implements": "vscode.TaskProvider",
+      "members": ["provideTasks", "resolveTask"]
+    },
+    {
+      "implements": "vscode.UriHandler",
+      "members": ["handleUri"]
+    },
+    {
+      "implements": "BuildDetailsCoverageDecorationsSurface",
+      "members": ["dispose", "activate", "deactivate", "apply"]
+    },
+    {
+      "implements": "BuildDetailsPanelStateRuntimeSurface",
+      "members": [
+        "lastDetailsBuilding",
+        "setTestReport",
+        "markTestReportFetchAttempted",
+        "setTestResultsLoading",
+        "setCoverage",
+        "setCoverageActionPath",
+        "setCoverageError",
+        "setCoverageLoading",
+        "setPipelineLoading",
+        "setPipelineRestartInfo",
+        "takeCompletionToastSlot"
+      ]
+    },
+    {
+      "implements": "BuildDetailsPanelViewRuntimeSurface",
+      "members": ["postStateUpdate", "postConsoleSnapshot"]
+    },
+    {
+      "implements": "BuildDetailsPollingRuntimeSurface",
+      "members": [
+        "refreshConsoleSnapshot",
+        "fetchTestReport",
+        "fetchWorkflowRunWithCallbacks",
+        "refreshPendingInputs"
+      ]
+    },
+    {
+      "implements": "JenkinsDataServiceRuntimeSurface",
+      "members": [
+        "updateCacheTtlMs",
+        "enableJob",
+        "disableJob",
+        "renameJob",
+        "deleteJob",
+        "copyJob",
+        "createItem"
+      ]
+    },
+    {
+      "implements": "JenkinsParameterPresetStoreRuntimeSurface",
+      "members": [
+        "listPresets",
+        "getPreset",
+        "savePreset",
+        "renamePreset",
+        "deletePreset",
+        "removePresetsForJob",
+        "updatePresetUrl"
+      ]
+    },
+    {
+      "implements": "JenkinsWorkbenchTreeRuntimeSurface",
+      "members": [
+        "onDidChangeSummary",
+        "refreshActivity",
+        "updateBuildTooltipOptions",
+        "updateBuildListFetchOptions",
+        "updateViewCurationOptions",
+        "updateActivityOptions",
+        "setWatchErrorCount"
+      ]
+    },
+    {
+      "implements": "ActivityRefreshSubscriptionSurface",
+      "members": [
+        "updateOptions",
+        "handleActivityFolderExpanded",
+        "handleActivityFolderCollapsed",
+        "handleEnvironmentCollapsed",
+        "handleAllEnvironmentsCollapsed",
+        "handleEnvironmentStoreChange",
+        "handleStatusTick"
+      ]
+    },
+    {
+      "implements": "BuildComparePanelRevivalSurface",
+      "members": ["revive"]
+    },
+    {
+      "implements": "BuildConsoleExporterActionSurface",
+      "members": ["getDefaultFileName", "exportToFile"]
+    },
+    {
+      "implements": "BuildDetailsPanelRevivalSurface",
+      "members": ["revive"]
+    },
+    {
+      "implements": "CurrentBranchPullRequestMatcherConfigSurface",
+      "members": ["updatePatterns"]
+    },
+    {
+      "implements": "CurrentBranchServiceRuntimeSurface",
+      "members": ["start"]
+    },
+    {
+      "implements": "JenkinsClientProviderRuntimeSurface",
+      "members": ["createClientContext"]
+    },
+    {
+      "implements": "JenkinsDataCacheRuntimeSurface",
+      "members": ["getOrLoad"]
+    },
+    {
+      "implements": "JenkinsEnvironmentStoreMigrationSurface",
+      "members": ["migrateLegacyAuthConfigs"]
+    },
+    {
+      "implements": "JenkinsfileIntelligenceConfigRuntimeSurface",
+      "members": ["updateConfig"]
+    },
+    {
+      "implements": "JenkinsfileStepCatalogInvalidationSurface",
+      "members": ["invalidateAll"]
+    },
+    {
+      "implements": "JenkinsfileValidationRuntimeSurface",
+      "members": ["start", "updateConfig"]
+    },
+    {
+      "implements": "JenkinsQueuePollerRuntimeSurface",
+      "members": ["trackExpanded", "trackCollapsed", "clearAll", "updatePollIntervalSeconds"]
+    },
+    {
+      "implements": "JenkinsRepositoryLinkStoreMigrationSurface",
+      "members": ["migrateLegacyWorkspaceLinks"]
+    },
+    {
+      "implements": "JenkinsStatusPollerRuntimeSurface",
+      "members": ["onDidChangeWatchErrorCount", "updateMaxConsecutiveErrors", "start"]
+    },
+    {
+      "implements": "JenkinsStatusRefreshRuntimeSurface",
+      "members": ["updateRefreshIntervalSeconds"]
+    },
+    {
+      "implements": "JenkinsViewStateStoreRuntimeSurface",
+      "members": ["onDidChange", "syncFilterContext"]
+    },
+    {
+      "implements": "JenkinsWatchStoreRuntimeSurface",
+      "members": ["updateWatchUrl"]
+    },
+    {
+      "implements": "JobNewItemTargetResolverSurface",
+      "members": ["resolveFromTreeItem", "resolveFromEnvironmentPicker"]
+    },
+    {
+      "implements": "JobNewItemWorkflowSurface",
+      "members": ["run"]
+    },
+    {
+      "implements": "NodeCapacityExecutorHydrationSurface",
+      "members": ["hydrateNodeExecutors"]
+    },
+    {
+      "implements": "PendingInputActionsRuntimeSurface",
+      "members": ["getPendingInputActions"]
+    },
+    {
+      "implements": "TestSourceNavigationRuntimeSurface",
+      "members": ["openTestSource"]
+    },
+    {
+      "implements": "TreeActivityClassificationSurface",
+      "members": ["classify"]
+    },
+    {
+      "implements": "TreeActivityPendingInputEnrichmentSurface",
+      "members": ["findAwaitingInputJobUrls"]
+    }
+  ],
+  "rules": {
+    "unresolved-imports": "error",
+    "unlisted-dependencies": "error",
+    "unused-files": "warn",
+    "unused-exports": "warn",
+    "unused-types": "warn",
+    "unused-enum-members": "warn",
+    "unused-class-members": "warn",
+    "unused-dependencies": "warn",
+    "unused-dev-dependencies": "warn",
+    "unused-optional-dependencies": "warn",
+    "duplicate-exports": "warn",
+    "circular-dependencies": "warn",
+    "re-export-cycle": "warn",
+    "boundary-violation": "error",
+    "type-only-dependencies": "warn",
+    "test-only-dependencies": "warn",
+    "coverage-gaps": "off",
+    "stale-suppressions": "warn"
+  },
+  "duplicates": {
+    "mode": "mild",
+    "minTokens": 50,
+    "minLines": 5,
+    "threshold": 0,
+    "ignoreImports": true
+  },
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 30,
+    "suggestInlineSuppression": false
+  },
+  "audit": {
+    "deadCodeBaseline": "fallow-baselines/dead-code.json",
+    "healthBaseline": "fallow-baselines/health.json",
+    "dupesBaseline": "fallow-baselines/dupes.json",
+    "gate": "new-only",
+    "cacheMaxAgeDays": 14
+  }
+}

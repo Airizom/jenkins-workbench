@@ -18,7 +18,11 @@ interface JenkinsAuthMaterial {
   token: string | undefined;
 }
 
-export class JenkinsClientProvider {
+interface JenkinsClientProviderRuntimeSurface {
+  createClientContext(environment: JenkinsEnvironmentRef): Promise<JenkinsClientContext>;
+}
+
+export class JenkinsClientProvider implements JenkinsClientProviderRuntimeSurface {
   private readonly clientCache = new Map<
     string,
     {
@@ -48,12 +52,6 @@ export class JenkinsClientProvider {
   ) {
     this.requestTimeoutMs = options?.requestTimeoutMs;
     this.browserSsoAuthenticator = options?.browserSsoAuthenticator;
-  }
-
-  setRequestTimeoutMs(timeoutMs: number | undefined): void {
-    this.requestTimeoutMs = timeoutMs;
-    this.clientCache.clear();
-    this.authSignatureCache.clear();
   }
 
   async getAuthSignature(environment: JenkinsEnvironmentRef): Promise<string> {

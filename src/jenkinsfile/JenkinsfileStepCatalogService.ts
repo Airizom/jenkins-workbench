@@ -37,7 +37,11 @@ type JenkinsfileCatalogEnvironmentKey = Pick<JenkinsEnvironmentRef, "scope" | "e
 const STEP_CATALOG_TTL_MS = 15 * 60 * 1000;
 const STEP_CATALOG_RETRY_BACKOFF_MS = 30 * 1000;
 
-export class JenkinsfileStepCatalogService {
+interface JenkinsfileStepCatalogInvalidationSurface {
+  invalidateAll(): void;
+}
+
+export class JenkinsfileStepCatalogService implements JenkinsfileStepCatalogInvalidationSurface {
   private readonly cache = new Map<string, CacheEntry>();
   private readonly inFlight = new Map<string, InFlightLoad>();
   private readonly loadErrors = new Map<string, LoadErrorEntry>();
@@ -81,24 +85,6 @@ export class JenkinsfileStepCatalogService {
     return createFallbackLoadingResult(environment);
   }
 
-  async getCatalogForEnvironment(
-    environment: JenkinsEnvironmentRef
-  ): Promise<JenkinsfileStepCatalog> {
-    const authSignature = await this.clientProvider.getAuthSignature(environment);
-    const key = buildCacheKey(environment, authSignature);
-    const cached = this.cache.get(key);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.catalog;
-    }
-
-    const existingLoad = this.inFlight.get(key);
-    if (existingLoad) {
-      return existingLoad.promise;
-    }
-
-    return this.startCatalogLoad(environment, key).promise;
-  }
-
   private async loadCatalog(
     environment: JenkinsEnvironmentRef,
     key: string,
@@ -132,11 +118,6 @@ export class JenkinsfileStepCatalogService {
     deleteMatchingKeys(this.cache, environmentKey);
     deleteMatchingKeys(this.inFlight, environmentKey);
     deleteMatchingKeys(this.loadErrors, environmentKey);
-  }
-
-  async refreshEnvironment(environment: JenkinsEnvironmentRef): Promise<JenkinsfileStepCatalog> {
-    this.invalidateEnvironment(environment);
-    return this.getCatalogForEnvironment(environment);
   }
 
   private ensureCatalogLoaded(environment: JenkinsEnvironmentRef, key: string): void {

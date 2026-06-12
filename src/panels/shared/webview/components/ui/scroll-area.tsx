@@ -3,8 +3,7 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-export interface ScrollAreaProps
-  extends React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
+interface ScrollAreaProps extends React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
   orientation?: "vertical" | "horizontal" | "both";
 }
 export const ScrollArea = React.forwardRef<

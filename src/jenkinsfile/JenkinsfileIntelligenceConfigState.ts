@@ -1,6 +1,12 @@
 import type { JenkinsfileIntelligenceConfig } from "./JenkinsfileIntelligenceTypes";
 
-export class JenkinsfileIntelligenceConfigState {
+interface JenkinsfileIntelligenceConfigRuntimeSurface {
+  updateConfig(config: JenkinsfileIntelligenceConfig): void;
+}
+
+export class JenkinsfileIntelligenceConfigState
+  implements JenkinsfileIntelligenceConfigRuntimeSurface
+{
   private config: JenkinsfileIntelligenceConfig;
 
   constructor(config: JenkinsfileIntelligenceConfig) {

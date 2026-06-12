@@ -5,7 +5,7 @@ import { cn } from "../../lib/utils";
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
 
-export type SelectTriggerProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>;
+type SelectTriggerProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>;
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
@@ -29,7 +29,7 @@ export const SelectTrigger = React.forwardRef<
 ));
 SelectTrigger.displayName = "SelectTrigger";
 
-export type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>;
+type SelectContentProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>;
 export const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   SelectContentProps
@@ -52,7 +52,7 @@ export const SelectContent = React.forwardRef<
 ));
 SelectContent.displayName = "SelectContent";
 
-export type SelectItemProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>;
+type SelectItemProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>;
 export const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
   SelectItemProps
@@ -77,7 +77,7 @@ export const SelectItem = React.forwardRef<
 ));
 SelectItem.displayName = "SelectItem";
 
-export type SelectSeparatorProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>;
+type SelectSeparatorProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>;
 
 const SelectSeparator = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Separator>,

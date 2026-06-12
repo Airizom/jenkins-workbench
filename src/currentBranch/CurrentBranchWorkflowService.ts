@@ -3,8 +3,6 @@ import type { CurrentBranchActionExecutor } from "./CurrentBranchActionExecutor"
 import type { CurrentBranchCommandMapper } from "./CurrentBranchCommandMapper";
 import type {
   CurrentBranchBuildAction,
-  CurrentBranchBuildDetailsTarget,
-  CurrentBranchJobActionTarget,
   CurrentBranchOpenRequest,
   CurrentBranchResolutionResult
 } from "./CurrentBranchCommandMapper";
@@ -24,8 +22,6 @@ import type {
 } from "./CurrentBranchTypes";
 
 export type {
-  CurrentBranchBuildDetailsTarget,
-  CurrentBranchJobActionTarget,
   CurrentBranchOpenRequest,
   CurrentBranchResolutionResult
 } from "./CurrentBranchCommandMapper";
@@ -105,18 +101,6 @@ export class CurrentBranchWorkflowService {
 
   getOpenMultibranchRequest(state: CurrentBranchState): CurrentBranchOpenRequest | undefined {
     return this.commandMapper.getOpenMultibranchRequest(state);
-  }
-
-  getBuildTarget(state: CurrentBranchState): CurrentBranchJobActionTarget | undefined {
-    return this.commandMapper.getBuildTarget(state);
-  }
-
-  getLatestBuildTarget(state: CurrentBranchState): CurrentBranchBuildDetailsTarget | undefined {
-    return this.commandMapper.getLatestBuildTarget(state);
-  }
-
-  getLastFailedBuildTarget(state: CurrentBranchState): CurrentBranchJobActionTarget | undefined {
-    return this.commandMapper.getLastFailedBuildTarget(state);
   }
 
   async scanLinkedMultibranch(

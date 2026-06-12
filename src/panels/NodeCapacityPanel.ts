@@ -18,13 +18,14 @@ import {
 } from "./nodeCapacity/shared/NodeCapacityPanelMessages";
 import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
-  PanelLoadTracker,
+  type PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
+  createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
-  shouldRefreshEnvironmentScopedPanel
+  shouldRefreshVisibleEnvironmentPanel
 } from "./shared/PanelRuntimeHelpers";
-import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
+import { resolvePanelAssetsAndRenderLoading } from "./shared/webview/PanelViewHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
   createMissingPanelAssetsMessages,
@@ -139,29 +140,10 @@ export class NodeCapacityPanel {
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
-    this.loadTracker = new PanelLoadTracker((value) =>
-      this.postMessage({ type: "setLoading", value })
+    this.loadTracker = createPanelLoadingTracker((message: NodeCapacityOutgoingMessage) =>
+      this.postMessage(message)
     );
-
-    attachPanelLifecycle(this.panel, this.disposables, {
-      onDispose: () => this.dispose(),
-      onVisible: () => {
-        if (!this.hasRendered) {
-          return;
-        }
-        this.startVisibleRefreshTimer();
-        void this.refreshCapacity({ skipLoading: true });
-      }
-    });
-    this.panel.onDidChangeViewState(
-      () => {
-        if (!this.panel.visible) {
-          this.stopVisibleRefreshTimer();
-        }
-      },
-      null,
-      this.disposables
-    );
+    this.attachLifecycle();
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
         if (isRefreshNodeCapacityMessage(message)) {
@@ -178,6 +160,28 @@ export class NodeCapacityPanel {
         }
         if (isLoadNodeCapacityExecutorsMessage(message)) {
           void this.loadNodeExecutors(message.nodeUrls);
+        }
+      },
+      null,
+      this.disposables
+    );
+  }
+
+  private attachLifecycle(): void {
+    attachPanelLifecycle(this.panel, this.disposables, {
+      onDispose: () => this.dispose(),
+      onVisible: () => {
+        if (!this.hasRendered) {
+          return;
+        }
+        this.startVisibleRefreshTimer();
+        void this.refreshCapacity({ skipLoading: true });
+      }
+    });
+    this.panel.onDidChangeViewState(
+      () => {
+        if (!this.panel.visible) {
+          this.stopVisibleRefreshTimer();
         }
       },
       null,
@@ -212,30 +216,23 @@ export class NodeCapacityPanel {
         ? createSerializedEnvironmentState(this.environment)
         : undefined;
 
-      const assets = resolvePanelWebviewAssetsOrError(
-        this.panel,
-        this.extensionUri,
-        "nodeCapacity",
-        {
-          ...createMissingPanelAssetsMessages({
-            title: "Node Capacity",
-            panelLabel: "Node capacity",
-            reopenHint: "Open node capacity again from Jenkins Workbench to continue."
-          }),
-          panelState
-        }
-      );
+      const assets = resolvePanelAssetsAndRenderLoading({
+        panel: this.panel,
+        extensionUri: this.extensionUri,
+        entryName: "nodeCapacity",
+        nonce: this.nonce,
+        panelState,
+        errorOptions: createMissingPanelAssetsMessages({
+          title: "Node Capacity",
+          panelLabel: "Node capacity",
+          reopenHint: "Open node capacity again from Jenkins Workbench to continue."
+        }),
+        renderLoadingHtml
+      });
       if (!assets) {
         return;
       }
       const { scriptUri, styleUris } = assets;
-
-      this.panel.webview.html = renderLoadingHtml({
-        cspSource: this.panel.webview.cspSource,
-        nonce: this.nonce,
-        styleUris,
-        panelState
-      });
 
       const model = await this.fetchCapacity(token);
       if (!model || !this.loadTracker.isCurrent(token)) {
@@ -391,17 +388,16 @@ export class NodeCapacityPanel {
     this.refreshSubscription = bindEnvironmentRefresh(
       this.refreshSubscription,
       refreshHost,
-      (environmentId) => this.handleEnvironmentRefresh(environmentId)
+      this.handleEnvironmentRefresh.bind(this)
     );
   }
 
   private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
     if (
-      !shouldRefreshEnvironmentScopedPanel({
+      !shouldRefreshVisibleEnvironmentPanel({
         environment: this.environment,
         environmentId,
         hasRendered: this.hasRendered,
-        requireVisible: true,
         panel: this.panel
       })
     ) {

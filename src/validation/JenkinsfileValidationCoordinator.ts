@@ -24,8 +24,16 @@ import type {
 } from "./JenkinsfileValidationStatusProvider";
 import type { JenkinsfileValidationConfig } from "./JenkinsfileValidationTypes";
 
+interface JenkinsfileValidationRuntimeSurface {
+  start(): void;
+  updateConfig(config: JenkinsfileValidationConfig): void;
+}
+
 export class JenkinsfileValidationCoordinator
-  implements vscode.Disposable, JenkinsfileValidationStatusProvider
+  implements
+    vscode.Disposable,
+    JenkinsfileValidationStatusProvider,
+    JenkinsfileValidationRuntimeSurface
 {
   private readonly diagnostics = vscode.languages.createDiagnosticCollection("Jenkinsfile");
   private readonly outputChannel = vscode.window.createOutputChannel("Jenkinsfile Validation");
@@ -108,14 +116,6 @@ export class JenkinsfileValidationCoordinator
     if (!config.enabled) {
       this.clearDiagnostics();
     }
-  }
-
-  revalidateActiveDocument(reason: ValidationReason = "command"): void {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      return;
-    }
-    this.revalidateDocument(editor.document, reason);
   }
 
   revalidateDocument(document: vscode.TextDocument, reason: ValidationReason = "command"): void {

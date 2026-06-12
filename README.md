@@ -455,6 +455,12 @@ npm run watch
 # Check source files without modifying them (Biome)
 npm run check
 
+# Run changed-code Fallow audit against committed baselines
+npm run fallow:audit
+
+# Run the full Fallow report for cleanup work
+npm run fallow
+
 # Lint and format with fixes (Biome)
 npm run check:fix
 
@@ -466,6 +472,8 @@ npm test
 ```
 
 `npm run compile` is the canonical sync point for the project. It rebuilds the webview bundle, typechecks the webview code, and then runs the extension TypeScript compile so the runtime webview manifest stays aligned with the backend.
+
+Fallow runs in CI as a changed-code audit using the committed files in `fallow-baselines/`. Shrink those baselines as existing dead code, duplication, and complexity findings are cleaned up.
 
 ### Manual Testing Checklist
 

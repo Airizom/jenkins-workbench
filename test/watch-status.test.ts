@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import Module = require("node:module");
 import { describe, it } from "node:test";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsJob } from "../src/jenkins/types";
 import { JenkinsJobStatusEvaluator } from "../src/watch/JenkinsJobStatusEvaluator";
 import type { StatusNotifier } from "../src/watch/StatusNotifier";
 import type { WatchedJobEntry } from "../src/storage/JenkinsWatchStore";
+import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 interface PollerConstructor {
   new (...args: unknown[]): unknown;
@@ -14,45 +15,14 @@ interface PollerHarness {
   poll(): Promise<void>;
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
 }
-type ModuleLoader = (request: string, parent: unknown, isMain: boolean) => unknown;
 
-class TestEventEmitter<T> {
-  private readonly listeners = new Set<(event: T) => void>();
-
-  readonly event = (listener: (event: T) => void): { dispose(): void } => {
-    this.listeners.add(listener);
-    return {
-      dispose: () => {
-        this.listeners.delete(listener);
-      }
-    };
-  };
-
-  fire(event: T): void {
-    for (const listener of this.listeners) {
-      listener(event);
+const { JenkinsStatusPoller } = withModuleMocks(
+  [exactModuleMock("vscode", createEventEmitterVscodeMock())],
+  () =>
+    require("../src/watch/JenkinsStatusPoller") as {
+      JenkinsStatusPoller: PollerConstructor;
     }
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-  }
-}
-
-const moduleWithLoad = Module as unknown as { _load: ModuleLoader };
-const originalLoad = moduleWithLoad._load;
-moduleWithLoad._load = (request, parent, isMain) => {
-  if (request === "vscode") {
-    return { EventEmitter: TestEventEmitter };
-  }
-  return originalLoad(request, parent, isMain);
-};
-
-const { JenkinsStatusPoller } = require("../src/watch/JenkinsStatusPoller") as {
-  JenkinsStatusPoller: PollerConstructor;
-};
-
-moduleWithLoad._load = originalLoad;
+);
 
 interface NotifierCalls {
   failures: string[];

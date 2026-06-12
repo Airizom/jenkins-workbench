@@ -1,55 +1,8 @@
 import assert from "node:assert/strict";
-import Module = require("node:module");
 import { describe, it } from "node:test";
 import type { GitApi, GitRef, GitRepository } from "../src/git/GitExtensionApi";
-
-type ModuleLoader = (request: string, parent: unknown, isMain: boolean) => unknown;
-
-class TestUri {
-  private constructor(readonly fsPath: string) {}
-
-  static file(fsPath: string): TestUri {
-    return new TestUri(fsPath);
-  }
-
-  toString(): string {
-    return `file://${this.fsPath}`;
-  }
-}
-
-class TestEventEmitter<T> {
-  private readonly listeners = new Set<(event: T) => void>();
-
-  readonly event = (listener: (event: T) => void): { dispose(): void } => {
-    this.listeners.add(listener);
-    return {
-      dispose: () => {
-        this.listeners.delete(listener);
-      }
-    };
-  };
-
-  fire(event: T): void {
-    for (const listener of this.listeners) {
-      listener(event);
-    }
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-  }
-}
-
-const vscodeMock = {
-  EventEmitter: TestEventEmitter,
-  window: {
-    onDidChangeActiveTextEditor: () => ({ dispose: () => undefined })
-  },
-  workspace: {
-    onDidChangeWorkspaceFolders: () => ({ dispose: () => undefined })
-  },
-  Uri: TestUri
-};
+import { exactModuleMock, suffixModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { createCurrentBranchVscodeMock, TestUri } from "./helpers/vscodeMocks";
 
 let getGitApiImpl: () => Promise<GitApi | undefined> = async () => undefined;
 
@@ -65,24 +18,16 @@ const gitExtensionApiMock = {
   }
 };
 
-const moduleWithLoad = Module as unknown as { _load: ModuleLoader };
-const originalLoad = moduleWithLoad._load;
-moduleWithLoad._load = (request, parent, isMain) => {
-  if (request === "vscode") {
-    return vscodeMock;
-  }
-  if (typeof request === "string" && request.endsWith("git/GitExtensionApi")) {
-    return gitExtensionApiMock;
-  }
-  return originalLoad(request, parent, isMain);
-};
-
-const { CurrentBranchRepositoryResolver } =
-  require("../src/currentBranch/CurrentBranchRepositoryResolver") as typeof import(
-    "../src/currentBranch/CurrentBranchRepositoryResolver"
-  );
-
-moduleWithLoad._load = originalLoad;
+const { CurrentBranchRepositoryResolver } = withModuleMocks(
+  [
+    exactModuleMock("vscode", createCurrentBranchVscodeMock()),
+    suffixModuleMock("git/GitExtensionApi", gitExtensionApiMock)
+  ],
+  () =>
+    require("../src/currentBranch/CurrentBranchRepositoryResolver") as typeof import(
+      "../src/currentBranch/CurrentBranchRepositoryResolver"
+    )
+);
 
 interface ListenerCounters {
   open: number;

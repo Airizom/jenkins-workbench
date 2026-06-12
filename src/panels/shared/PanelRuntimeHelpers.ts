@@ -50,7 +50,7 @@ export function attachPanelLifecycle(
   );
 }
 
-export function shouldRefreshEnvironmentScopedPanel(options: {
+function shouldRefreshEnvironmentScopedPanel(options: {
   environment?: { environmentId: string };
   environmentId?: string;
   hasRendered: boolean;
@@ -69,6 +69,18 @@ export function shouldRefreshEnvironmentScopedPanel(options: {
   return true;
 }
 
+export function shouldRefreshVisibleEnvironmentPanel(options: {
+  environment?: { environmentId: string };
+  environmentId?: string;
+  hasRendered: boolean;
+  panel: vscode.WebviewPanel;
+}): boolean {
+  return shouldRefreshEnvironmentScopedPanel({
+    ...options,
+    requireVisible: true
+  });
+}
+
 export function bindEnvironmentRefresh(
   current: vscode.Disposable | undefined,
   refreshHost:
@@ -80,6 +92,14 @@ export function bindEnvironmentRefresh(
 ): vscode.Disposable | undefined {
   return replaceRefreshSubscription(current, refreshHost, (environmentId) => {
     void refresh(environmentId);
+  });
+}
+
+export function createPanelLoadingTracker<TMessage extends { type: "setLoading"; value: boolean }>(
+  postMessage: (message: TMessage) => void
+): PanelLoadTracker {
+  return new PanelLoadTracker((value) => {
+    postMessage({ type: "setLoading", value } as TMessage);
   });
 }
 

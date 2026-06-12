@@ -212,11 +212,8 @@ function collectFlowNodeChildIds(node: JenkinsWorkflowStage | JenkinsWorkflowSte
   const ids: string[] = [];
   const seen = new Set<string>();
 
-  for (const step of collectFlowNodeSteps(node)) {
-    collectFlowNodeChildIdsFromChild(step, ids, seen);
-  }
-  for (const stage of collectFlowNodeBranches(node)) {
-    collectFlowNodeChildIdsFromChild(stage, ids, seen);
+  for (const child of collectFlowNodeChildren(node)) {
+    collectFlowNodeChildIdsFromChild(child, ids, seen);
   }
 
   return ids;
@@ -229,11 +226,8 @@ function collectFlowNodeChildIdsFromChild(
 ): void {
   addFlowNodeId(node.id, ids, seen);
 
-  for (const step of collectFlowNodeSteps(node)) {
-    collectFlowNodeChildIdsFromChild(step, ids, seen);
-  }
-  for (const stage of collectFlowNodeBranches(node)) {
-    collectFlowNodeChildIdsFromChild(stage, ids, seen);
+  for (const child of collectFlowNodeChildren(node)) {
+    collectFlowNodeChildIdsFromChild(child, ids, seen);
   }
 }
 
@@ -271,4 +265,11 @@ function collectFlowNodeBranches(
     return node.children;
   }
   return [];
+}
+
+function* collectFlowNodeChildren(
+  node: JenkinsWorkflowStage | JenkinsWorkflowStep
+): Iterable<JenkinsWorkflowStage | JenkinsWorkflowStep> {
+  yield* collectFlowNodeSteps(node);
+  yield* collectFlowNodeBranches(node);
 }

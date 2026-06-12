@@ -11,7 +11,6 @@ import type {
 } from "../JenkinsClient";
 
 export type JenkinsActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
-export type BuildActionErrorCode = JenkinsActionErrorCode;
 
 export type JobParameterKind =
   | "boolean"

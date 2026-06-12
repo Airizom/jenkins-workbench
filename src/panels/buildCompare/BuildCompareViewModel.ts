@@ -1,16 +1,11 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type {
-  JenkinsBuildDetails,
-  JenkinsTestReport,
-  JenkinsWorkflowRun
-} from "../../jenkins/types";
 import type { BuildCompareBackend } from "./BuildCompareBackend";
 import { buildChangesetsSection } from "./BuildCompareChangesetsSection";
 import {
   buildConsoleComparisonSection,
   createLoadingConsoleComparisonSection
 } from "./BuildCompareConsoleDiff";
-import { type BuildCompareOptionalResult, loadOptionalData } from "./BuildCompareLoadState";
+import { loadOptionalData } from "./BuildCompareLoadState";
 import type { BuildCompareOptions } from "./BuildCompareOptions";
 import { buildParametersSection } from "./BuildCompareParametersSection";
 import { buildBuildViewModel } from "./BuildCompareSectionShared";
@@ -83,8 +78,3 @@ export function loadBuildCompareConsoleViewModel(
     options.targetBuildUrl
   );
 }
-
-export type { BuildCompareOptionalResult };
-export type BuildCompareOptionalTestReportResult = BuildCompareOptionalResult<JenkinsTestReport>;
-export type BuildCompareOptionalWorkflowRunResult = BuildCompareOptionalResult<JenkinsWorkflowRun>;
-export type BuildCompareRequiredDetails = JenkinsBuildDetails;

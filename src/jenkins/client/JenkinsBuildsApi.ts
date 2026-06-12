@@ -38,8 +38,6 @@ import { JenkinsPendingInputClient } from "./JenkinsPendingInputClient";
 import { JenkinsReplayClient } from "./JenkinsReplayClient";
 import { RestartFromStageClient } from "./RestartFromStageClient";
 
-export type JenkinsBuildTriggerMode = "build" | "buildWithParameters";
-
 export type JenkinsBuildTriggerOptions =
   | { mode: "build" }
   | {

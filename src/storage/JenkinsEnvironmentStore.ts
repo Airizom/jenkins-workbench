@@ -35,7 +35,11 @@ export type JenkinsEnvironmentStoreChange =
 const ENVIRONMENTS_KEY = "jenkinsWorkbench.environments";
 const AUTH_CONFIG_KEY = "jenkinsWorkbench.envAuthConfig";
 
-export class JenkinsEnvironmentStore {
+interface JenkinsEnvironmentStoreMigrationSurface {
+  migrateLegacyAuthConfigs(): Promise<void>;
+}
+
+export class JenkinsEnvironmentStore implements JenkinsEnvironmentStoreMigrationSurface {
   private readonly authConfigRevisions = new Map<string, number>();
   private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<JenkinsEnvironmentStoreChange>();

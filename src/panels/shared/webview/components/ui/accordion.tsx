@@ -2,8 +2,9 @@ import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
+import { DisclosureChevron } from "./disclosure-chevron";
 
-export type AccordionProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>;
+type AccordionProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>;
 export const Accordion = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Root>,
   AccordionProps
@@ -12,7 +13,7 @@ export const Accordion = React.forwardRef<
 ));
 Accordion.displayName = "Accordion";
 
-export type AccordionItemProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>;
+type AccordionItemProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>;
 export const AccordionItem = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Item>,
   AccordionItemProps
@@ -21,9 +22,7 @@ export const AccordionItem = React.forwardRef<
 ));
 AccordionItem.displayName = "AccordionItem";
 
-export type AccordionTriggerProps = React.ComponentPropsWithoutRef<
-  typeof AccordionPrimitive.Trigger
-> & {
+type AccordionTriggerProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> & {
   asChild?: boolean;
 };
 export const AccordionTrigger = React.forwardRef<
@@ -47,7 +46,7 @@ export const AccordionTrigger = React.forwardRef<
       ) : (
         <>
           {children}
-          <ChevronIcon />
+          <DisclosureChevron />
         </>
       )}
     </AccordionPrimitive.Trigger>
@@ -55,33 +54,7 @@ export const AccordionTrigger = React.forwardRef<
 ));
 AccordionTrigger.displayName = "AccordionTrigger";
 
-function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn(
-        "mr-2 shrink-0 text-muted-foreground transition-transform duration-200",
-        "group-data-[state=open]:rotate-180",
-        "group-data-[state=open]:text-foreground",
-        className
-      )}
-    >
-      <path d="M4 6l4 4 4-4" />
-    </svg>
-  );
-}
-
-export type AccordionContentProps = React.ComponentPropsWithoutRef<
-  typeof AccordionPrimitive.Content
->;
+type AccordionContentProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>;
 export const AccordionContent = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Content>,
   AccordionContentProps

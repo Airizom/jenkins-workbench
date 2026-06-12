@@ -64,10 +64,20 @@ export interface BuildDetailsTestReportFetchResult {
   effectiveOptions: JenkinsTestReportOptions | undefined;
 }
 
+interface BuildDetailsPollingRuntimeSurface {
+  refreshConsoleSnapshot(): Promise<{
+    consoleTextResult?: JenkinsConsoleTextTail;
+    consoleHtmlResult?: { html: string; truncated: boolean };
+  }>;
+  fetchTestReport(options?: JenkinsTestReportOptions): Promise<BuildDetailsTestReportFetchResult>;
+  fetchWorkflowRunWithCallbacks(token: number): Promise<void>;
+  refreshPendingInputs(): Promise<void>;
+}
+
 const WORKFLOW_REFRESH_MULTIPLIER = 3;
 const MIN_WORKFLOW_REFRESH_MS = 5000;
 
-export class BuildDetailsPollingController {
+export class BuildDetailsPollingController implements BuildDetailsPollingRuntimeSurface {
   private readonly statusBackend: BuildDetailsStatusBackend;
   private readonly testsBackend: BuildDetailsTestsBackend;
   private readonly pendingInputProvider: BuildDetailsPendingInputProvider;

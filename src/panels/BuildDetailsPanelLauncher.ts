@@ -36,7 +36,11 @@ export interface BuildDetailsPanelLauncherOptions {
   extensionUri: vscode.Uri;
 }
 
-export class BuildDetailsPanelLauncher {
+interface BuildDetailsPanelRevivalSurface {
+  revive(panel: vscode.WebviewPanel, state: unknown): Promise<void>;
+}
+
+export class BuildDetailsPanelLauncher implements BuildDetailsPanelRevivalSurface {
   constructor(private readonly options: BuildDetailsPanelLauncherOptions) {}
 
   async show(request: BuildDetailsPanelLaunchRequest): Promise<void> {

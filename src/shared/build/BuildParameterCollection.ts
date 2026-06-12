@@ -11,7 +11,7 @@ export interface BuildParameterRecord {
   value?: unknown;
 }
 
-export interface BuildParameterAction {
+interface BuildParameterAction {
   parameters?: unknown;
 }
 

@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-export type ToggleProps = React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root> & {
+type ToggleProps = React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root> & {
   size?: "sm" | "md";
 };
 export const Toggle = React.forwardRef<React.ElementRef<typeof TogglePrimitive.Root>, ToggleProps>(

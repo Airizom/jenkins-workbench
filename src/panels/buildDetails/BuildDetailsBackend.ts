@@ -18,7 +18,6 @@ import {
 } from "../shared/backend/BuildInspectionBackend";
 
 export type {
-  BuildInspectionBackend as BuildDetailsInspectionBackend,
   BuildInspectionConsoleBackend as BuildDetailsConsoleBackend,
   BuildInspectionStatusBackend as BuildDetailsStatusBackend,
   BuildInspectionTestsBackend as BuildDetailsTestsBackend

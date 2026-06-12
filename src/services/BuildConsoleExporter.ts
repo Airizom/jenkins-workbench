@@ -52,7 +52,16 @@ export interface BuildConsoleExporterOptions {
 const DEFAULT_PROGRESSIVE_EMPTY_RETRIES = 3;
 const DEFAULT_PROGRESSIVE_EMPTY_DELAY_MS = 500;
 
-export class BuildConsoleExporter {
+interface BuildConsoleExporterActionSurface {
+  getDefaultFileName(details?: JenkinsBuildDetails): string;
+  exportToFile(options: {
+    environment: JenkinsEnvironmentRef;
+    buildUrl: string;
+    targetPath: string;
+  }): Promise<BuildConsoleExportResult>;
+}
+
+export class BuildConsoleExporter implements BuildConsoleExporterActionSurface {
   private readonly maxConsoleChars: number;
   private readonly progressiveEmptyRetries: number;
   private readonly progressiveEmptyDelayMs: number;

@@ -5,7 +5,6 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
 import { formatActivityGroupLabel } from "../ActivityTypes";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import type {
   JobsFolderSummary,
   NodesFolderSummary,
@@ -98,8 +97,6 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
     return `jobs:${environment.scope}:${environment.environmentId}`;
   }
-
-  public readonly jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,

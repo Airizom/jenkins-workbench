@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-export type CheckboxProps = React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>;
+type CheckboxProps = React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>;
 export const Checkbox = React.forwardRef<
   React.ElementRef<typeof CheckboxPrimitive.Root>,
   CheckboxProps

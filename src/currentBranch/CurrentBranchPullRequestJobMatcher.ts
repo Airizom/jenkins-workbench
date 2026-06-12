@@ -19,7 +19,13 @@ export interface CurrentBranchPullRequestJobMatcher {
   ): CurrentBranchPullRequestJobMatch | undefined;
 }
 
-export class CurrentBranchPullRequestJobNameMatcher implements CurrentBranchPullRequestJobMatcher {
+interface CurrentBranchPullRequestMatcherConfigSurface {
+  updatePatterns(jobNamePatterns: readonly string[]): void;
+}
+
+export class CurrentBranchPullRequestJobNameMatcher
+  implements CurrentBranchPullRequestJobMatcher, CurrentBranchPullRequestMatcherConfigSurface
+{
   private jobNamePatterns: readonly string[];
 
   constructor(

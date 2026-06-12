@@ -123,10 +123,6 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
     return undefined;
   }
 
-  getRepositoryCount(): number {
-    return this.gitApi?.repositories.length ?? 0;
-  }
-
   private syncRepositoryStateSubscriptions(): void {
     const gitApi = this.gitApi;
     if (!gitApi) {

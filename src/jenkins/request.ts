@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import { request as requestInternal } from "./request/standardRequest";
-import { requestStream as requestStreamInternal } from "./request/streamRequest";
+import { requestJenkinsStream } from "./request/streamRequest";
 import type {
   JenkinsBufferResponse,
   JenkinsPostResponse,
@@ -14,7 +14,6 @@ import type {
 export type {
   JenkinsBufferResponse,
   JenkinsPostResponse,
-  JenkinsRequestOptions,
   JenkinsSimpleRequestOptions,
   JenkinsStreamResponse,
   JenkinsTextRequestOptions,
@@ -100,7 +99,7 @@ export async function requestStream(
   url: string,
   options?: JenkinsSimpleRequestOptions
 ): Promise<JenkinsStreamResponse> {
-  return requestStreamInternal(url, {
+  return requestJenkinsStream(url, {
     authHeader: options?.authHeader,
     headers: options?.headers,
     timeoutMs: options?.timeoutMs,

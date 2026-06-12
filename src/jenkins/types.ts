@@ -11,8 +11,6 @@ export type ScanMultibranchResult = {
   queueLocation?: string;
 };
 
-export type JenkinsAuthType = "none" | "basic" | "bearer" | "cookie" | "headers" | "sso";
-
 export type JenkinsAuthConfig =
   | { type: "none" }
   | { type: "basic"; username: string; token: string }

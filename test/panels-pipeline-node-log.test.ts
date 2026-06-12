@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
 import type { BuildDetailsConsoleBackend } from "../src/panels/buildDetails/BuildDetailsBackend";
-import { PipelineNodeLogFetcher } from "../src/panels/buildDetails/PipelineNodeLogFetcher";
+import {
+  PipelineNodeLogFetcher,
+  type PipelineNodeLogFetchResult
+} from "../src/panels/buildDetails/PipelineNodeLogFetcher";
 import { MAX_CONSOLE_CHARS } from "../src/services/ConsoleOutputConfig";
 import type {
   PipelineLogTargetViewModel,
@@ -74,25 +77,44 @@ function buildChunk(
   };
 }
 
+async function resolveFetchAfterReset(
+  fake: FakeBackend,
+  fetcher: PipelineNodeLogFetcher,
+  staleValue: JenkinsProgressiveConsoleHtml | undefined
+): Promise<PipelineNodeLogFetchResult> {
+  const staleFetch = fetcher.fetch(buildTarget("11"), true, undefined);
+  fetcher.reset();
+  fake.resolveNext(staleValue);
+  return staleFetch;
+}
+
+async function fetchFreshAfterReset(
+  fake: FakeBackend,
+  fetcher: PipelineNodeLogFetcher
+): Promise<PipelineNodeLogFetchResult> {
+  const freshFetch = fetcher.fetch(buildTarget("22"), true, undefined);
+  fake.resolveNext(buildChunk({ html: "fresh<br>", textSize: 7, moreData: false }));
+  return freshFetch;
+}
+
 describe("PipelineNodeLogFetcher", () => {
   it("discards in-flight completions after reset so the next fetch starts at offset 0", async () => {
     const fake = createFakeBackend();
     const fetcher = createFetcher(fake.backend);
 
-    const staleFetch = fetcher.fetch(buildTarget("11"), true, undefined);
     // Target switch: the manager resets the fetcher while the old node's
     // response is still in flight.
-    fetcher.reset();
-    fake.resolveNext(buildChunk({ textSize: 500, annotator: "stale-annotator" }));
-    const staleResult = await staleFetch;
+    const staleResult = await resolveFetchAfterReset(
+      fake,
+      fetcher,
+      buildChunk({ textSize: 500, annotator: "stale-annotator" })
+    );
 
     assert.equal(staleResult.log, undefined);
     assert.equal(staleResult.appendHtml, undefined);
     assert.equal(staleResult.cachedLog, undefined);
 
-    const freshFetch = fetcher.fetch(buildTarget("22"), true, undefined);
-    fake.resolveNext(buildChunk({ html: "fresh<br>", textSize: 7, moreData: false }));
-    const freshResult = await freshFetch;
+    const freshResult = await fetchFreshAfterReset(fake, fetcher);
 
     assert.equal(fake.calls.length, 2);
     assert.deepEqual(fake.calls[1], { nodeId: "22", start: 0, annotator: undefined });
@@ -103,16 +125,11 @@ describe("PipelineNodeLogFetcher", () => {
     const fake = createFakeBackend();
     const fetcher = createFetcher(fake.backend);
 
-    const staleFetch = fetcher.fetch(buildTarget("11"), true, undefined);
-    fetcher.reset();
     // Resolving with undefined makes the fetcher treat the chunk as
     // unsupported; a stale completion must not record that.
-    fake.resolveNext(undefined);
-    await staleFetch;
+    await resolveFetchAfterReset(fake, fetcher, undefined);
 
-    const freshFetch = fetcher.fetch(buildTarget("22"), true, undefined);
-    fake.resolveNext(buildChunk({ html: "fresh<br>", textSize: 7, moreData: false }));
-    const freshResult = await freshFetch;
+    const freshResult = await fetchFreshAfterReset(fake, fetcher);
 
     assert.equal(fake.calls.length, 2, "fresh fetch should still try the progressive endpoint");
     assert.equal(freshResult.log?.text, "fresh\n");

@@ -125,14 +125,6 @@ abstract class JobLikeTreeItem extends vscode.TreeItem {
 }
 
 export class JobTreeItem extends JobLikeTreeItem {
-  static buildId(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    jobScope: TreeJobScope
-  ): string {
-    return buildJobLikeTreeItemId("job", environment, jobUrl, jobScope);
-  }
-
   constructor(
     environment: JenkinsEnvironmentRef,
     label: string,
@@ -147,14 +139,6 @@ export class JobTreeItem extends JobLikeTreeItem {
 }
 
 export class PipelineTreeItem extends JobLikeTreeItem {
-  static buildId(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    jobScope: TreeJobScope
-  ): string {
-    return buildJobLikeTreeItemId("pipeline", environment, jobUrl, jobScope);
-  }
-
   constructor(
     environment: JenkinsEnvironmentRef,
     label: string,

@@ -25,13 +25,14 @@ import {
 } from "./nodeDetails/shared/NodeDetailsPanelWebviewState";
 import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
-  PanelLoadTracker,
+  type PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
+  createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
-  shouldRefreshEnvironmentScopedPanel
+  shouldRefreshVisibleEnvironmentPanel
 } from "./shared/PanelRuntimeHelpers";
-import { resolvePanelWebviewAssetsOrError } from "./shared/webview/PanelViewHelpers";
+import { resolvePanelAssetsAndRenderLoading } from "./shared/webview/PanelViewHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
   createMissingPanelAssetsMessages,
@@ -148,16 +149,10 @@ export class NodeDetailsPanel {
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
-    this.loadTracker = new PanelLoadTracker((value) =>
-      this.postMessage({ type: "setLoading", value })
+    this.loadTracker = createPanelLoadingTracker((message: NodeDetailsOutgoingMessage) =>
+      this.postMessage(message)
     );
-
-    attachPanelLifecycle(this.panel, this.disposables, {
-      onDispose: () => this.dispose(),
-      onVisible: () => {
-        void this.handlePanelVisible();
-      }
-    });
+    this.attachLifecycle();
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
         if (isRefreshNodeDetailsMessage(message)) {
@@ -193,6 +188,15 @@ export class NodeDetailsPanel {
     );
   }
 
+  private attachLifecycle(): void {
+    attachPanelLifecycle(this.panel, this.disposables, {
+      onDispose: () => this.dispose(),
+      onVisible: () => {
+        void this.handlePanelVisible();
+      }
+    });
+  }
+
   private dispose(): void {
     this.disposed = true;
     disposeEnvironmentScopedPanel({
@@ -219,24 +223,23 @@ export class NodeDetailsPanel {
         ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
         : undefined;
 
-    const assets = resolvePanelWebviewAssetsOrError(this.panel, this.extensionUri, "nodeDetails", {
-      ...createMissingPanelAssetsMessages({
+    const assets = resolvePanelAssetsAndRenderLoading({
+      panel: this.panel,
+      extensionUri: this.extensionUri,
+      entryName: "nodeDetails",
+      nonce: this.nonce,
+      panelState,
+      errorOptions: createMissingPanelAssetsMessages({
         title: "Node Details",
         panelLabel: "Node details",
         reopenHint: "Open the node again from Jenkins Workbench to continue."
       }),
-      panelState
+      renderLoadingHtml
     });
     if (!assets) {
       return;
     }
     const { scriptUri, styleUris } = assets;
-    this.panel.webview.html = renderLoadingHtml({
-      cspSource: this.panel.webview.cspSource,
-      nonce: this.nonce,
-      styleUris,
-      panelState
-    });
 
     const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel: "basic" });
     if (!model || !this.loadTracker.isCurrent(token)) {
@@ -409,18 +412,17 @@ export class NodeDetailsPanel {
     this.refreshSubscription = bindEnvironmentRefresh(
       this.refreshSubscription,
       refreshHost,
-      (environmentId) => this.handleEnvironmentRefresh(environmentId)
+      this.handleEnvironmentRefresh.bind(this)
     );
   }
 
   private async handleEnvironmentRefresh(environmentId?: string): Promise<void> {
     if (
       !this.nodeUrl ||
-      !shouldRefreshEnvironmentScopedPanel({
+      !shouldRefreshVisibleEnvironmentPanel({
         environment: this.environment,
         environmentId,
         hasRendered: this.hasRendered,
-        requireVisible: true,
         panel: this.panel
       })
     ) {

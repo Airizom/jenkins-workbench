@@ -7,8 +7,6 @@ import { renderPanelRestoreErrorHtml } from "../shared/webview/WebviewHtml";
 import { renderBuildCompareHtml } from "./BuildCompareRenderer";
 import type { BuildCompareViewModel } from "./shared/BuildCompareContracts";
 
-export type { PanelViewAssets as BuildComparePanelViewAssets } from "../shared/webview/PanelViewHelpers";
-
 export type BuildComparePanelRenderOptions = EnvironmentPanelRenderOptions;
 
 export class BuildComparePanelView extends EnvironmentPanelView<BuildCompareViewModel> {

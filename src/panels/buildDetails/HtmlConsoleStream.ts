@@ -26,7 +26,7 @@ export interface HtmlConsoleStreamOptions {
   callbacks: HtmlConsoleStreamCallbacks;
 }
 
-export type HtmlConsoleSnapshot = {
+type HtmlConsoleSnapshot = {
   html: string;
   truncated: boolean;
   start: number;

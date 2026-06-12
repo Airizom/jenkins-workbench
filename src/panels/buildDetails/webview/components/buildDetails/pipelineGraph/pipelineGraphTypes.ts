@@ -1,7 +1,5 @@
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 
-export type PipelinePresentation = "graph" | "list";
-
 export interface PipelineGraphNodeModel {
   id: string;
   stage: PipelineStageViewModel;

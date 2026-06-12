@@ -51,6 +51,12 @@ export function getJobCollectionRequest(
     };
   }
 
+  if (element instanceof JobsFolderTreeItem) {
+    return {
+      scope: ROOT_TREE_JOB_SCOPE
+    };
+  }
+
   return {
     scope: element.jobScope
   };

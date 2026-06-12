@@ -13,7 +13,15 @@ export interface AwaitingInputEnrichmentOptions {
   lookupConcurrency: number;
 }
 
-export class AwaitingInputEnricher {
+interface TreeActivityPendingInputEnrichmentSurface {
+  findAwaitingInputJobUrls(
+    environment: JenkinsEnvironmentRef,
+    runningCandidates: JobSearchEntry[],
+    options: AwaitingInputEnrichmentOptions
+  ): Promise<Set<string>>;
+}
+
+export class AwaitingInputEnricher implements TreeActivityPendingInputEnrichmentSurface {
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly pendingInputCoordinator: PendingInputRefreshCoordinator

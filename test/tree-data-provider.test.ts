@@ -1,32 +1,8 @@
 import assert from "node:assert/strict";
-import Module = require("node:module");
 import { describe, it } from "node:test";
 import type { JobSearchEntry } from "../src/jenkins/JenkinsDataService";
-
-type ModuleLoader = (request: string, parent: unknown, isMain: boolean) => unknown;
-
-class TestEventEmitter<T> {
-  private readonly listeners = new Set<(event: T) => void>();
-
-  readonly event = (listener: (event: T) => void): { dispose(): void } => {
-    this.listeners.add(listener);
-    return {
-      dispose: () => {
-        this.listeners.delete(listener);
-      }
-    };
-  };
-
-  fire(event: T): void {
-    for (const listener of this.listeners) {
-      listener(event);
-    }
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-  }
-}
+import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 class TestTreeItem {
   id?: string;
@@ -76,7 +52,7 @@ class TestMarkdownString {
 }
 
 const vscodeShim = {
-  EventEmitter: TestEventEmitter,
+  ...createEventEmitterVscodeMock(),
   TreeItem: TestTreeItem,
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   ThemeIcon: TestThemeIcon,
@@ -84,15 +60,6 @@ const vscodeShim = {
   MarkdownString: TestMarkdownString,
   Uri: { parse: (value: string) => ({ toString: () => value }) },
   window: { setStatusBarMessage: () => ({ dispose: () => undefined }) }
-};
-
-const moduleWithLoad = Module as unknown as { _load: ModuleLoader };
-const originalLoad = moduleWithLoad._load;
-moduleWithLoad._load = (request, parent, isMain) => {
-  if (request === "vscode") {
-    return vscodeShim;
-  }
-  return originalLoad(request, parent, isMain);
 };
 
 interface EnvironmentRef {
@@ -115,11 +82,13 @@ interface ProviderConstructor {
   new (...args: unknown[]): ProviderHarness;
 }
 
-const { JenkinsWorkbenchTreeDataProvider } = require("../src/tree/TreeDataProvider") as {
-  JenkinsWorkbenchTreeDataProvider: ProviderConstructor;
-};
-
-moduleWithLoad._load = originalLoad;
+const { JenkinsWorkbenchTreeDataProvider } = withModuleMocks(
+  [exactModuleMock("vscode", vscodeShim)],
+  () =>
+    require("../src/tree/TreeDataProvider") as {
+      JenkinsWorkbenchTreeDataProvider: ProviderConstructor;
+    }
+);
 
 interface TreeItemView {
   id?: string;
