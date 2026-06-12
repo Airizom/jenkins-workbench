@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import type { BuildParameterPromptOptions } from "../src/ui/buildParameterPrompts/BuildParameterPromptTypes";
+import { fetchRunBuildChoices } from "../src/ui/buildParameterPrompts/RunParameterLookup";
 import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 
 interface InputBoxOptions {
@@ -97,5 +98,36 @@ describe("promptParameterValues sensitive parameters", () => {
     assert.equal(inputBoxCalls.length, 1);
     assert.equal(inputBoxCalls[0].password, true);
     assert.equal(inputBoxCalls[0].value, "line one\nline two");
+  });
+});
+
+describe("fetchRunBuildChoices run parameter lookup", () => {
+  it("does not request external absolute runProjectName URLs", async () => {
+    const requestedJobUrls: string[] = [];
+    const options = createOptions([
+      {
+        name: "RUN_BUILD",
+        kind: "run",
+        runProjectName: "https://example.invalid/job/x/"
+      }
+    ]);
+    options.dataService = {
+      getBuildsForJob: async (
+        _environment: BuildParameterPromptOptions["environment"],
+        jobUrl: string
+      ) => {
+        requestedJobUrls.push(jobUrl);
+        return [];
+      }
+    } as unknown as BuildParameterPromptOptions["dataService"];
+
+    await fetchRunBuildChoices(options, options.parameters[0]);
+
+    assert.ok(requestedJobUrls.length > 0);
+    assert.equal(requestedJobUrls.includes("https://example.invalid/job/x/"), false);
+    assert.deepEqual(
+      requestedJobUrls.filter((jobUrl) => new URL(jobUrl).origin !== "https://jenkins.example"),
+      []
+    );
   });
 });

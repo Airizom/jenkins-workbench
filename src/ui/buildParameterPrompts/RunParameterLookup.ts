@@ -43,7 +43,11 @@ function resolveRunJobCandidates(
 ): string[] {
   const values: string[] = [];
   const seen = new Set<string>();
+  const environmentOrigin = resolveOrigin(environment.url);
   const addCandidate = (candidate: string): void => {
+    if (!isSameOrigin(candidate, environmentOrigin)) {
+      return;
+    }
     if (seen.has(candidate)) {
       return;
     }
@@ -91,4 +95,23 @@ function resolveRunJobCandidates(
   addCandidate(currentJobUrl);
 
   return values;
+}
+
+function resolveOrigin(value: string): string | undefined {
+  try {
+    return new URL(ensureTrailingSlash(value)).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function isSameOrigin(candidate: string, environmentOrigin: string | undefined): boolean {
+  if (!environmentOrigin) {
+    return false;
+  }
+  try {
+    return new URL(candidate).origin === environmentOrigin;
+  } catch {
+    return false;
+  }
 }
