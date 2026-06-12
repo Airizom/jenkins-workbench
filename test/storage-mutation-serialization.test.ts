@@ -12,6 +12,13 @@ const { JenkinsEnvironmentStore } = withModuleMocks(
       JenkinsEnvironmentStore: EnvironmentStoreConstructor;
     }
 );
+const { JenkinsRepositoryLinkStore } = withModuleMocks(
+  [exactModuleMock("vscode", createEventEmitterVscodeMock())],
+  () =>
+    require("../src/storage/JenkinsRepositoryLinkStore") as {
+      JenkinsRepositoryLinkStore: RepositoryLinkStoreConstructor;
+    }
+);
 
 interface EnvironmentStoreConstructor {
   new (context: unknown): EnvironmentStoreHarness;
@@ -24,6 +31,27 @@ interface EnvironmentStoreHarness {
     token?: string
   ): Promise<void>;
   getEnvironments(scope: "workspace" | "global"): Promise<Array<{ id: string; url: string }>>;
+}
+
+interface RepositoryLinkStoreConstructor {
+  new (context: unknown): RepositoryLinkStoreHarness;
+}
+
+interface RepositoryLinkStoreHarness {
+  setLink(
+    repositoryUri: string,
+    link: {
+      environment: { environmentId: string; scope: "workspace" | "global" };
+      multibranchFolderUrl: string;
+      multibranchLabel: string;
+    }
+  ): Promise<void>;
+  listLinks(): ReadonlyArray<{
+    repositoryUri: string;
+    environment: { environmentId: string; scope: "workspace" | "global" };
+    multibranchFolderUrl: string;
+    multibranchLabel: string;
+  }>;
 }
 
 class AsyncMemento {
@@ -120,5 +148,31 @@ describe("JenkinsEnvironmentStore mutation serialization", () => {
 
     const environments = await store.getEnvironments("workspace");
     assert.deepEqual(environments.map((environment) => environment.id).sort(), ["env-1", "env-2"]);
+  });
+});
+
+describe("JenkinsRepositoryLinkStore mutation serialization", () => {
+  it("retains both links when two workspace links are set concurrently", async () => {
+    const { context } = createContext();
+    const store = new JenkinsRepositoryLinkStore(context);
+
+    await Promise.all([
+      store.setLink("file:///repo-a", {
+        environment: { environmentId: "env-1", scope: "workspace" },
+        multibranchFolderUrl: "https://jenkins.example/job/a/",
+        multibranchLabel: "Repo A"
+      }),
+      store.setLink("file:///repo-b", {
+        environment: { environmentId: "env-1", scope: "workspace" },
+        multibranchFolderUrl: "https://jenkins.example/job/b/",
+        multibranchLabel: "Repo B"
+      })
+    ]);
+
+    const links = store.listLinks();
+    assert.deepEqual(links.map((link) => link.repositoryUri).sort(), [
+      "file:///repo-a",
+      "file:///repo-b"
+    ]);
   });
 });

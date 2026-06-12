@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { ensureTrailingSlash } from "../jenkins/urls";
+import { createSerialTaskQueue } from "./SerialTaskQueue";
 
 interface StoredRepositoryLink {
   environmentId: string;
@@ -32,6 +33,7 @@ interface JenkinsRepositoryLinkStoreMigrationSurface {
 }
 
 export class JenkinsRepositoryLinkStore implements JenkinsRepositoryLinkStoreMigrationSurface {
+  private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<void>();
 
   readonly onDidChange = this.emitter.event;
@@ -39,31 +41,36 @@ export class JenkinsRepositoryLinkStore implements JenkinsRepositoryLinkStoreMig
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   async migrateLegacyWorkspaceLinks(): Promise<void> {
-    const workspaceState = this.getWorkspaceState();
-    const globalState = this.getGlobalState();
+    await this.mutationQueue(async () => {
+      const workspaceState = this.getWorkspaceState();
+      const globalState = this.getGlobalState();
 
-    const workspaceScopedLinks = {
-      ...filterLinksByScope(globalState.links, "workspace"),
-      ...filterLinksByScope(workspaceState.links, "workspace")
-    };
-    const globalScopedLinks = {
-      ...filterLinksByScope(workspaceState.links, "global"),
-      ...filterLinksByScope(globalState.links, "global")
-    };
+      const workspaceScopedLinks = {
+        ...filterLinksByScope(globalState.links, "workspace"),
+        ...filterLinksByScope(workspaceState.links, "workspace")
+      };
+      const globalScopedLinks = {
+        ...filterLinksByScope(workspaceState.links, "global"),
+        ...filterLinksByScope(globalState.links, "global")
+      };
 
-    const didChange =
-      !areLinkMapsEqual(workspaceState.links, workspaceScopedLinks) ||
-      !areLinkMapsEqual(globalState.links, globalScopedLinks);
-    if (!didChange) {
-      return;
-    }
+      const didChange =
+        !areLinkMapsEqual(workspaceState.links, workspaceScopedLinks) ||
+        !areLinkMapsEqual(globalState.links, globalScopedLinks);
+      if (!didChange) {
+        return;
+      }
 
-    await this.context.workspaceState.update(STATE_KEY, {
-      ...workspaceState,
-      links: workspaceScopedLinks
+      await this.context.workspaceState.update(STATE_KEY, {
+        ...workspaceState,
+        links: workspaceScopedLinks
+      });
+      await this.context.globalState.update(STATE_KEY, {
+        ...globalState,
+        links: globalScopedLinks
+      });
+      this.emitter.fire();
     });
-    await this.context.globalState.update(STATE_KEY, { ...globalState, links: globalScopedLinks });
-    this.emitter.fire();
   }
 
   getLink(repositoryUri: vscode.Uri | string): JenkinsRepositoryLink | undefined {
@@ -106,42 +113,46 @@ export class JenkinsRepositoryLinkStore implements JenkinsRepositoryLinkStoreMig
     repositoryUri: vscode.Uri | string,
     link: Omit<JenkinsRepositoryLink, "repositoryUri">
   ): Promise<void> {
-    const key = this.toRepositoryKey(repositoryUri);
-    const storedLink = this.toStoredRepositoryLink(link);
-    if (link.environment.scope === "workspace") {
-      await this.updateWorkspaceLinks((links) => {
-        links[key] = storedLink;
-      });
-      await this.updateGlobalLinks((links) => {
-        delete links[key];
-      });
-    } else {
-      await this.updateGlobalLinks((links) => {
-        links[key] = storedLink;
-      });
-      await this.updateWorkspaceLinks((links) => {
-        delete links[key];
-      });
-    }
-    this.emitter.fire();
+    await this.mutationQueue(async () => {
+      const key = this.toRepositoryKey(repositoryUri);
+      const storedLink = this.toStoredRepositoryLink(link);
+      if (link.environment.scope === "workspace") {
+        await this.updateWorkspaceLinks((links) => {
+          links[key] = storedLink;
+        });
+        await this.updateGlobalLinks((links) => {
+          delete links[key];
+        });
+      } else {
+        await this.updateGlobalLinks((links) => {
+          links[key] = storedLink;
+        });
+        await this.updateWorkspaceLinks((links) => {
+          delete links[key];
+        });
+      }
+      this.emitter.fire();
+    });
   }
 
   async clearLink(repositoryUri: vscode.Uri | string): Promise<boolean> {
-    const key = this.toRepositoryKey(repositoryUri);
-    const hasWorkspaceLink = Boolean(this.getWorkspaceState().links?.[key]);
-    const hasGlobalLink = Boolean(this.getGlobalState().links?.[key]);
-    if (!hasWorkspaceLink && !hasGlobalLink) {
-      return false;
-    }
+    return this.mutationQueue(async () => {
+      const key = this.toRepositoryKey(repositoryUri);
+      const hasWorkspaceLink = Boolean(this.getWorkspaceState().links?.[key]);
+      const hasGlobalLink = Boolean(this.getGlobalState().links?.[key]);
+      if (!hasWorkspaceLink && !hasGlobalLink) {
+        return false;
+      }
 
-    await this.updateWorkspaceLinks((links) => {
-      delete links[key];
+      await this.updateWorkspaceLinks((links) => {
+        delete links[key];
+      });
+      await this.updateGlobalLinks((links) => {
+        delete links[key];
+      });
+      this.emitter.fire();
+      return true;
     });
-    await this.updateGlobalLinks((links) => {
-      delete links[key];
-    });
-    this.emitter.fire();
-    return true;
   }
 
   private getState(): StoredRepositoryLinksState {
