@@ -133,7 +133,14 @@ function decodeHtmlEntities(input: string): string {
     if (entity[0] === "#") {
       const hex = entity[1]?.toLowerCase() === "x";
       const value = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
-      return Number.isFinite(value) ? String.fromCodePoint(value) : `&${entity};`;
+      if (!isValidUnicodeScalar(value)) {
+        return `&${entity};`;
+      }
+      try {
+        return String.fromCodePoint(value);
+      } catch {
+        return `&${entity};`;
+      }
     }
 
     switch (entity) {
@@ -154,6 +161,12 @@ function decodeHtmlEntities(input: string): string {
         return `&${entity};`;
     }
   });
+}
+
+function isValidUnicodeScalar(value: number): boolean {
+  return (
+    Number.isInteger(value) && value >= 0 && value <= 0x10ffff && (value < 0xd800 || value > 0xdfff)
+  );
 }
 
 function createReplayParseError(reason: string): Error {
