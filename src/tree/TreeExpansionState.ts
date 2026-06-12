@@ -22,7 +22,11 @@ const RESTORE_RETRY_TIMEOUT_MS = 4000;
 
 export class TreeExpansionState implements vscode.Disposable {
   private readonly expandedPaths = new Map<string, TreeExpansionPath>();
+  private readonly expandedPathVersions = new Map<string, number>();
+  private readonly collapsedPathVersions = new Map<string, number>();
+  private readonly elementOperationVersions = new WeakMap<WorkbenchTreeElement, number>();
   private readonly disposables: vscode.Disposable[] = [];
+  private nextOperationVersion = 0;
   private isRestoring = false;
 
   constructor(
@@ -61,19 +65,23 @@ export class TreeExpansionState implements vscode.Disposable {
       for (const path of sortedPaths) {
         const key = this.buildKey(path);
         this.expandedPaths.set(key, path);
+        this.expandedPathVersions.delete(key);
         const outcome = await this.resolvePathWithRetry(path);
         if (!outcome.element) {
           if (!outcome.wasPending) {
             this.expandedPaths.delete(key);
+            this.expandedPathVersions.delete(key);
           }
           continue;
         }
         try {
           await this.treeView.reveal(outcome.element, this.buildRevealOptions());
           this.expandedPaths.set(key, path);
+          this.expandedPathVersions.delete(key);
         } catch {
           // Ignore reveal failures for missing/virtual elements.
           this.expandedPaths.delete(key);
+          this.expandedPathVersions.delete(key);
         }
       }
     } finally {
@@ -93,26 +101,59 @@ export class TreeExpansionState implements vscode.Disposable {
     if (this.isRestoring) {
       return;
     }
+    const operationVersion = this.startElementOperation(element);
     const path = await this.treeDataProvider.buildExpansionPath(element);
-    if (!path) {
+    if (
+      !path ||
+      !this.isCurrentElementOperation(element, operationVersion) ||
+      this.hasNewerCollapsedPrefix(path, operationVersion)
+    ) {
       return;
     }
-    this.expandedPaths.set(this.buildKey(path), path);
+    const key = this.buildKey(path);
+    this.expandedPaths.set(key, path);
+    this.expandedPathVersions.set(key, operationVersion);
   }
 
   private async trackCollapsed(element: WorkbenchTreeElement): Promise<void> {
     if (this.isRestoring) {
       return;
     }
+    const operationVersion = this.startElementOperation(element);
     const path = await this.treeDataProvider.buildExpansionPath(element);
-    if (!path) {
+    if (!path || !this.isCurrentElementOperation(element, operationVersion)) {
       return;
     }
+    this.collapsedPathVersions.set(this.buildKey(path), operationVersion);
     for (const [key, storedPath] of this.expandedPaths) {
-      if (isPathPrefix(path, storedPath)) {
+      const expandedVersion = this.expandedPathVersions.get(key) ?? 0;
+      if (expandedVersion < operationVersion && isPathPrefix(path, storedPath)) {
         this.expandedPaths.delete(key);
+        this.expandedPathVersions.delete(key);
       }
     }
+  }
+
+  private startElementOperation(element: WorkbenchTreeElement): number {
+    const operationVersion = ++this.nextOperationVersion;
+    this.elementOperationVersions.set(element, operationVersion);
+    return operationVersion;
+  }
+
+  private isCurrentElementOperation(
+    element: WorkbenchTreeElement,
+    operationVersion: number
+  ): boolean {
+    return this.elementOperationVersions.get(element) === operationVersion;
+  }
+
+  private hasNewerCollapsedPrefix(path: TreeExpansionPath, operationVersion: number): boolean {
+    for (const [collapsedKey, collapsedVersion] of this.collapsedPathVersions) {
+      if (collapsedVersion > operationVersion && isPathPrefix(JSON.parse(collapsedKey), path)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async resolvePathWithRetry(path: TreeExpansionPath): Promise<ResolvePathOutcome> {
