@@ -62,12 +62,11 @@ export class BuildDetailsCompletionPoller {
   }
 
   private async poll(token: number): Promise<void> {
-    if (
-      this.pollInFlight ||
-      !this.pollingActive ||
-      !this.shouldPoll() ||
-      !this.isTokenCurrent(token)
-    ) {
+    if (this.pollInFlight || !this.pollingActive) {
+      return;
+    }
+    if (!this.shouldPoll() || !this.isTokenCurrent(token)) {
+      this.pollingActive = false;
       return;
     }
     this.pollInFlight = true;
