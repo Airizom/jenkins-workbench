@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.48.2] - 2026-06-12
+
+### Fixed
+
+- fix: stabilize watch, pending-input, queue, tree expansion, and refresh invalidation behavior
+- fix: prevent stale build details, node details, workflow polling, and panel state updates
+- fix: harden Jenkins URL handling, replay parsing, crumb fetching, and cached job invalidation
+- fix: preserve sensitive parameter masking and accept documented task parameter array values
+- fix: enforce artifact preview cache limits and response size caps
+- fix: improve changeset deduping, executor filtering, progress values, and restored log targets
+- fix: guard credential storage rollback, remote config changes, and repository link mutations
+- fix: pin release workflow actions to immutable commit SHAs
+
+### Changed
+
+- refactor: rebuild build and node detail panel layouts
+- refactor: internalize unused helpers and remove dead exports
+- chore: add audit and runtime interface contracts
+
+### Tests
+
+- test: add queue poller, SSO refresh retry, watch polling, Jenkinsfile parsing, and shared helper regression coverage
+
 ## [1.48.1] - 2026-05-30
 
 ### Fixed
