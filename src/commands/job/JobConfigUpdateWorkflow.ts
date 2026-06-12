@@ -99,6 +99,21 @@ export class JobConfigUpdateWorkflow {
     }
 
     try {
+      const currentXml = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Checking current config.xml for ${draft.label}...`,
+          cancellable: false
+        },
+        () => this.dataService.getJobConfigXml(draft.environment, draft.jobUrl)
+      );
+      if (currentXml !== draft.originalXml) {
+        const overwrite = await this.showRemoteConflictConfirmation(draft.label);
+        if (!overwrite) {
+          return;
+        }
+      }
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -146,6 +161,17 @@ export class JobConfigUpdateWorkflow {
     });
 
     return selected === submitItem;
+  }
+
+  private async showRemoteConflictConfirmation(label: string): Promise<boolean> {
+    const overwriteLabel = "Overwrite Remote";
+    const selected = await vscode.window.showWarningMessage(
+      `The config.xml for ${label} changed in Jenkins after this draft was opened. Overwrite the current remote config with this draft?`,
+      { modal: true },
+      overwriteLabel
+    );
+
+    return selected === overwriteLabel;
   }
 
   private async resolveDraftForSubmit(
