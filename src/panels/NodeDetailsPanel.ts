@@ -336,10 +336,7 @@ export class NodeDetailsPanel {
       if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
-      if (detailLevel === "advanced") {
-        this.advancedLoaded = true;
-      }
-      this.lastDetails = details;
+      const advancedLoaded = this.advancedLoaded || detailLevel === "advanced";
       const errors: string[] = [];
       let queuedWork:
         | Awaited<ReturnType<NodeQueuedWorkService["getQueuedWorkForNode"]>>
@@ -357,12 +354,14 @@ export class NodeDetailsPanel {
       if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
+      this.lastDetails = details;
+      this.advancedLoaded = advancedLoaded;
       return buildNodeDetailsViewModel({
         details,
         errors,
         updatedAt: new Date().toISOString(),
         fallbackUrl: this.nodeUrl,
-        advancedLoaded: this.advancedLoaded,
+        advancedLoaded,
         queuedWork,
         nowMs: Date.now()
       });
