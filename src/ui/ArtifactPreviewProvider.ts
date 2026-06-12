@@ -13,6 +13,24 @@ export interface ArtifactPreviewProviderOptions {
   ttlMs?: number;
 }
 
+export class ArtifactPreviewCacheLimitError extends Error {
+  constructor(
+    readonly requestedBytes: number,
+    readonly maxTotalBytes: number,
+    readonly retainedBytes = 0
+  ) {
+    super(
+      requestedBytes > maxTotalBytes
+        ? `Artifact preview requires ${requestedBytes} bytes, exceeding the in-memory preview cache limit of ${maxTotalBytes} bytes.`
+        : `Artifact preview requires ${requestedBytes} bytes, but only ${Math.max(
+            0,
+            maxTotalBytes - retainedBytes
+          )} bytes remain in the in-memory preview cache limit of ${maxTotalBytes} bytes.`
+    );
+    this.name = "ArtifactPreviewCacheLimitError";
+  }
+}
+
 interface ArtifactPreviewEntry {
   data: Uint8Array;
   ctime: number;
@@ -43,8 +61,21 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
   }
 
   registerArtifact(data: Uint8Array, fileName: string): vscode.Uri {
-    const id = this.createId();
+    if (data.byteLength > this.maxTotalBytes) {
+      throw new ArtifactPreviewCacheLimitError(data.byteLength, this.maxTotalBytes);
+    }
+
     const now = Date.now();
+    this.evictIfNeeded(now);
+    if (this.totalBytes + data.byteLength > this.maxTotalBytes) {
+      throw new ArtifactPreviewCacheLimitError(
+        data.byteLength,
+        this.maxTotalBytes,
+        this.totalBytes
+      );
+    }
+
+    const id = this.createId();
     const entry: ArtifactPreviewEntry = {
       data,
       ctime: now,
