@@ -1,13 +1,13 @@
 import { NodeStatusBadge } from "../../../../shared/webview/components/NodeStatusBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
-import { Progress } from "../../../../shared/webview/components/ui/progress";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
 } from "../../../../shared/webview/components/ui/tooltip";
 import {
+  AlertTriangleIcon,
   ClockIcon,
   ExternalLinkIcon,
   LaunchIcon,
@@ -16,7 +16,8 @@ import {
 } from "../../../../shared/webview/icons";
 import { resolveNodeStatusIconClass } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
-import type { NodeStatusClass } from "../../../shared/NodeDetailsContracts";
+import type { NodeExecutorViewModel, NodeStatusClass } from "../../../shared/NodeDetailsContracts";
+import { ExecutorUtilizationSummary } from "./ExecutorUtilizationSummary";
 
 export type NodeAction =
   | { type: "takeNodeOffline"; label: "Take Offline..." }
@@ -25,7 +26,7 @@ export type NodeAction =
       label: "Bring Online";
     };
 
-type NodeDetailsHeaderProps = {
+type NodeDetailsHeroProps = {
   displayName: string;
   name: string;
   description?: string;
@@ -40,12 +41,18 @@ type NodeDetailsHeaderProps = {
   canLaunchAgent: boolean;
   canOpenAgentInstructions: boolean;
   hasUrl: boolean;
+  showOfflineBanner: boolean;
+  offlineReason?: string;
+  executors: NodeExecutorViewModel[];
+  oneOffExecutors: NodeExecutorViewModel[];
+  executorsLabel: string;
+  idleLabel: string;
   onRefresh: () => void;
   onNodeAction: () => void;
   onLaunchAgent: () => void;
   onOpen: () => void;
 };
-export function NodeDetailsHeader({
+export function NodeDetailsHero({
   displayName,
   name,
   description,
@@ -60,27 +67,35 @@ export function NodeDetailsHeader({
   canLaunchAgent,
   canOpenAgentInstructions,
   hasUrl,
+  showOfflineBanner,
+  offlineReason,
+  executors,
+  oneOffExecutors,
+  executorsLabel,
+  idleLabel,
   onRefresh,
   onNodeAction,
   onLaunchAgent,
   onOpen
-}: NodeDetailsHeaderProps): JSX.Element {
+}: NodeDetailsHeroProps): JSX.Element {
   const statusIconClass = resolveNodeStatusIconClass(statusClass);
 
   return (
-    <header className="sticky-header">
-      {loading ? <Progress indeterminate className="h-px rounded-none" /> : null}
-      <div className="mx-auto max-w-6xl px-4 py-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+    <header className="node-hero" data-status={statusClass}>
+      <div className="mx-auto max-w-6xl px-4 pt-4 pb-3 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted ${statusIconClass}`}
+              className={cn(
+                "node-hero-icon flex h-10 w-10 shrink-0 items-center justify-center",
+                statusIconClass
+              )}
             >
-              <ServerIcon className="h-3.5 w-3.5" />
+              <ServerIcon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-semibold leading-tight truncate">{displayName}</h1>
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <h1 className="text-lg font-semibold leading-tight truncate">{displayName}</h1>
                 <NodeStatusBadge label={statusLabel} statusClass={statusClass} />
                 {isStale ? (
                   <Badge
@@ -91,7 +106,7 @@ export function NodeDetailsHeader({
                   </Badge>
                 ) : null}
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                 <span>{name}</span>
                 {description ? (
                   <>
@@ -156,10 +171,11 @@ export function NodeDetailsHeader({
               </Button>
             ) : null}
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={onOpen}
               disabled={!hasUrl}
+              aria-label={canOpenAgentInstructions ? "Open agent instructions" : "Open in Jenkins"}
               className="gap-1 h-7 px-2 text-xs"
             >
               <ExternalLinkIcon className="h-3.5 w-3.5" />
@@ -169,8 +185,28 @@ export function NodeDetailsHeader({
             </Button>
           </div>
         </div>
+
+        {showOfflineBanner ? (
+          <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-soft px-3 py-2">
+            <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+            <div className="min-w-0 text-xs">
+              <span className="font-semibold">{statusLabel}.</span>{" "}
+              <span className="text-muted-foreground">
+                {offlineReason ?? "Jenkins reported this node as offline."}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        <ExecutorUtilizationSummary
+          executors={executors}
+          oneOffExecutors={oneOffExecutors}
+          executorsLabel={executorsLabel}
+          idleLabel={idleLabel}
+          isOffline={statusClass === "offline"}
+        />
       </div>
-      <div className={cn("h-px", statusAccent)} />
+      <div className={cn("h-0.5", statusAccent)} />
     </header>
   );
 }

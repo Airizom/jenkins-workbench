@@ -4,6 +4,7 @@ import {
   ToggleGroup,
   ToggleGroupItem
 } from "../../../../shared/webview/components/ui/toggle-group";
+import { WorkflowIcon } from "../../../../shared/webview/icons";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel,
@@ -98,11 +99,13 @@ export function PipelineSection({
   return (
     <section id="pipeline-section" className="space-y-3" aria-busy={loading}>
       <div className="flex flex-col gap-2 rounded-lg border border-card-border bg-card px-3 py-2 shadow-widget sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-sm font-semibold">Pipeline</div>
-          <div className="text-xs text-muted-foreground">
-            Switch between the current list view and a stage graph derived from the existing stage
-            payload.
+        <div className="flex items-center gap-2">
+          <WorkflowIcon className="h-4 w-4 shrink-0" />
+          <div>
+            <div className="text-sm font-semibold">Pipeline</div>
+            <div className="text-xs text-muted-foreground">
+              Stages and steps for this run. Select a stage to inspect its log.
+            </div>
           </div>
         </div>
         <ToggleGroup

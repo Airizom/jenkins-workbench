@@ -34,6 +34,15 @@ const BUILD_RESULT_TEXT_CLASSES: Record<BuildResultClassKey, string> = {
   neutral: "text-foreground"
 };
 
+const BUILD_RESULT_ICON_TEXT_CLASSES: Record<BuildResultClassKey, string> = {
+  success: "text-success",
+  failure: "text-failure",
+  unstable: "text-warning",
+  aborted: "text-aborted",
+  running: "text-warning",
+  neutral: "text-muted-foreground"
+};
+
 const BUILD_RESULT_ACCENT_CLASSES: Record<BuildResultClassKey, string> = {
   success: "bg-success",
   failure: "bg-failure",
@@ -121,6 +130,9 @@ export function resolveResultTextClass(resultClass?: string): string {
 }
 export function resolveStatusAccentClass(resultClass: string): string {
   return BUILD_RESULT_ACCENT_CLASSES[normalizeBuildResultClass(resultClass)];
+}
+export function resolveResultIconTextClass(resultClass?: string): string {
+  return BUILD_RESULT_ICON_TEXT_CLASSES[normalizeBuildResultClass(resultClass)];
 }
 
 const STAGE_NODE_BASE_CLASS =

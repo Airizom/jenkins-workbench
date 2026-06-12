@@ -4,8 +4,14 @@ import {
   TabsList,
   TabsTrigger
 } from "../../../../shared/webview/components/ui/tabs";
-import { CheckCircleIcon } from "../../../../shared/webview/icons";
-import { isAnalysisBuildResult } from "../../../../shared/webview/lib/statusStyles";
+import {
+  AlertCircleIcon,
+  CheckCircleIcon,
+  GaugeIcon,
+  TerminalIcon,
+  TestTubeIcon,
+  WorkflowIcon
+} from "../../../../shared/webview/icons";
 import type {
   ArtifactAction,
   BuildDetailsCoverageStateViewModel,
@@ -21,12 +27,55 @@ import type {
 } from "../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
-import { BuildFailureInsightsSection } from "./BuildFailureInsightsSection";
-import { BuildSummaryCard } from "./BuildSummaryCard";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineSection } from "./PipelineSection";
 import { TestResultsSection } from "./TestResultsSection";
+import { OverviewTab } from "./overview/OverviewTab";
+
+function TabCountBadge({
+  count,
+  tone
+}: {
+  count: number;
+  tone: "warning" | "failure";
+}): JSX.Element {
+  const toneClass =
+    tone === "warning" ? "bg-warning-badge text-warning" : "bg-failure-soft text-failure";
+  return (
+    <span
+      className={`inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-medium ${toneClass}`}
+    >
+      {count}
+    </span>
+  );
+}
+
+function PipelineTabStatus({
+  failedCount,
+  loading
+}: {
+  failedCount: number;
+  loading: boolean;
+}): JSX.Element | null {
+  if (failedCount > 0) {
+    return <TabCountBadge count={failedCount} tone="failure" />;
+  }
+  if (loading) {
+    return <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />;
+  }
+  return null;
+}
+
+function TestsTabStatus({ summary }: { summary: BuildTestsSummaryViewModel }): JSX.Element | null {
+  if (summary.failedCount > 0) {
+    return <TabCountBadge count={summary.failedCount} tone="failure" />;
+  }
+  if (summary.hasAnyResults) {
+    return <CheckCircleIcon className="h-3 w-3 text-success" />;
+  }
+  return null;
+}
 
 type BuildDetailsTabsProps = {
   selectedTab: BuildDetailsTab;
@@ -39,6 +88,7 @@ type BuildDetailsTabsProps = {
   pipelineNodeLog: PipelineNodeLogViewModel;
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   pipelineStagesLoading: boolean;
+  stripFailedCount: number;
   displayName: string;
   buildUrl?: string;
   resultClass: string;
@@ -81,6 +131,7 @@ export function BuildDetailsTabs({
   pipelineNodeLog,
   pipelineNodeLogHtmlModel,
   pipelineStagesLoading,
+  stripFailedCount,
   displayName,
   buildUrl,
   resultClass,
@@ -119,41 +170,54 @@ export function BuildDetailsTabs({
       className="space-y-3"
     >
       <TabsList className="w-full justify-start">
+        <TabsTrigger value="overview" className="gap-1.5 text-xs">
+          <GaugeIcon className="h-3.5 w-3.5" />
+          Overview
+        </TabsTrigger>
         {hasPendingInputs ? (
-          <TabsTrigger value="inputs" className="relative text-xs">
+          <TabsTrigger value="inputs" className="relative gap-1.5 text-xs">
+            <AlertCircleIcon className="h-3.5 w-3.5" />
             Inputs
-            <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-warning-badge px-1 text-[10px] font-medium text-warning">
-              {pendingInputs.length}
-            </span>
+            <TabCountBadge count={pendingInputs.length} tone="warning" />
           </TabsTrigger>
         ) : null}
         {hasPipelineStages ? (
-          <TabsTrigger value="pipeline" className="text-xs">
+          <TabsTrigger value="pipeline" className="gap-1.5 text-xs">
+            <WorkflowIcon className="h-3.5 w-3.5" />
             Pipeline
-            {pipelineStagesLoading ? (
-              <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            ) : null}
+            <PipelineTabStatus failedCount={stripFailedCount} loading={pipelineStagesLoading} />
           </TabsTrigger>
         ) : null}
-        <TabsTrigger value="console" className="text-xs">
+        <TabsTrigger value="console" className="gap-1.5 text-xs">
+          <TerminalIcon className="h-3.5 w-3.5" />
           Console
         </TabsTrigger>
         {hasTests ? (
-          <TabsTrigger value="tests" className="relative text-xs">
-            Test Results
-            {testsSummary.failedCount > 0 ? (
-              <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-failure-soft px-1 text-[10px] font-medium text-failure">
-                {testsSummary.failedCount}
-              </span>
-            ) : testsSummary.hasAnyResults ? (
-              <CheckCircleIcon className="ml-1 h-3 w-3 text-success" />
-            ) : null}
+          <TabsTrigger value="tests" className="relative gap-1.5 text-xs">
+            <TestTubeIcon className="h-3.5 w-3.5" />
+            Tests
+            <TestsTabStatus summary={testsSummary} />
           </TabsTrigger>
         ) : null}
-        <TabsTrigger value="insights" className="text-xs">
-          {isAnalysisBuildResult(resultClass) ? "Analysis" : "Summary"}
-        </TabsTrigger>
       </TabsList>
+
+      <TabsContent value="overview" className="space-y-3">
+        <OverviewTab
+          displayName={displayName}
+          resultLabel={resultLabel}
+          resultClass={resultClass}
+          durationLabel={durationLabel}
+          timestampLabel={timestampLabel}
+          culpritsLabel={culpritsLabel}
+          testsSummary={testsSummary}
+          coverageState={coverageState}
+          insights={insights}
+          hasPipelineStages={hasPipelineStages}
+          hasTests={hasTests}
+          onNavigateTab={onTabChange}
+          onArtifactAction={onArtifactAction}
+        />
+      </TabsContent>
 
       {hasPendingInputs ? (
         <TabsContent value="inputs" className="space-y-2">
@@ -209,22 +273,6 @@ export function BuildDetailsTabs({
           />
         </TabsContent>
       ) : null}
-
-      <TabsContent value="insights" className="space-y-3" forceMount>
-        <BuildSummaryCard
-          displayName={displayName}
-          resultLabel={resultLabel}
-          resultClass={resultClass}
-          durationLabel={durationLabel}
-          timestampLabel={timestampLabel}
-          culpritsLabel={culpritsLabel}
-        />
-        <BuildFailureInsightsSection
-          insights={insights}
-          resultClass={resultClass}
-          onArtifactAction={onArtifactAction}
-        />
-      </TabsContent>
     </Tabs>
   );
 }

@@ -310,11 +310,8 @@
       }
     },
     "src/jenkinsfile/context/JenkinsfileCallAnalysis.ts": {
-      "complexity_moderate": {
-        "count": 2
-      },
       "crap_moderate": {
-        "count": 3
+        "count": 2
       }
     },
     "src/jenkinsfile/context/JenkinsfileGroovyTextMasker.ts": {
@@ -702,7 +699,7 @@
       }
     },
     "src/panels/buildDetails/webview/components/buildDetails/BuildDetailsTabs.tsx": {
-      "crap_critical": {
+      "crap_high": {
         "count": 1
       }
     },
@@ -748,6 +745,16 @@
     },
     "src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureTestsSummaryCard.tsx": {
       "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/hero/BuildStatusHero.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/buildDetails/webview/components/buildDetails/overview/CoverageGlanceCard.tsx": {
+      "crap_high": {
         "count": 1
       }
     },
@@ -884,22 +891,37 @@
         "count": 1
       }
     },
+    "src/panels/nodeDetails/webview/NodeDetailsApp.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/ExecutorSlotGrid.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
     "src/panels/nodeDetails/webview/components/nodeDetails/ExecutorTableRow.tsx": {
       "crap_critical": {
         "count": 1
       }
     },
-    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsAdvancedSection.tsx": {
+    "src/panels/nodeDetails/webview/components/nodeDetails/ExecutorUtilizationSummary.tsx": {
       "crap_moderate": {
         "count": 1
       }
     },
-    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsAlerts.tsx": {
+    "src/panels/nodeDetails/webview/components/nodeDetails/ExecutorsTableCard.tsx": {
       "crap_moderate": {
         "count": 1
       }
     },
-    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsHeader.tsx": {
+    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsHero.tsx": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsOverviewSection.tsx": {
       "crap_high": {
         "count": 1
       }
@@ -1374,20 +1396,19 @@
   },
   "runtime_coverage_findings": [],
   "target_keys": [
-    "src/panels/shared/webview/components/ui/popover.tsx:dead code",
     "src/panels/buildDetails/BuildDetailsPanelRuntime.ts:untested risk",
     "src/jenkins/auth.ts:high impact",
     "src/formatters/JobColorFormatters.ts:high impact",
     "src/panels/buildDetails/BuildDetailsPollingController.ts:complexity",
+    "src/panels/buildDetails/webview/components/buildDetails/testResults/testResultsUtils.ts:high impact",
     "src/jenkins/data/JenkinsJobIndex.ts:complexity",
-    "src/formatters/DisplayFormatters.ts:high impact",
     "src/storage/JenkinsParameterPresetStore.ts:complexity",
-    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode.tsx:complexity",
     "src/formatters/ErrorFormatters.ts:high impact",
+    "src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode.tsx:complexity",
     "src/shared/stringValues.ts:high impact",
     "src/panels/buildCompare/BuildCompareConsoleDiff.ts:complexity",
-    "src/jenkinsfile/gdsl/JenkinsfileGdslScannerUtils.ts:untested risk",
     "src/jenkinsfile/gdsl/JenkinsfileGdslStepBuilder.ts:untested risk",
+    "src/jenkinsfile/gdsl/JenkinsfileGdslScannerUtils.ts:untested risk",
     "src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleMatches.ts:complexity",
     "src/ui/buildParameterPrompts/ParameterValueDefaults.ts:untested risk",
     "src/tasks/JenkinsTaskTypes.ts:complexity",

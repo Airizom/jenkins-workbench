@@ -58,13 +58,24 @@ export function ExecutorsTableCard({
     );
   }
 
+  const busyCount = entries.filter((entry) => Boolean(entry.workLabel)).length;
+
   return (
-    <div className="rounded border border-border overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted-soft border-b border-border">
+    <div className="rounded-lg border border-mutedBorder bg-card shadow-widget overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted-soft border-b border-mutedBorder">
         <div className="flex items-center gap-1.5">
           <CpuIcon className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">{title}</span>
           <span className="text-[11px] text-muted-foreground">({filteredEntries.length})</span>
+          {busyCount > 0 ? (
+            <span className="inline-flex items-center rounded-full border border-warning-border bg-warning-soft px-1.5 text-[10px] font-medium text-warning">
+              {busyCount} busy
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-success-border bg-success-soft px-1.5 text-[10px] font-medium text-success">
+              all idle
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <div className="hidden sm:block">
@@ -102,6 +113,9 @@ export function ExecutorsTableCard({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="py-1.5 pl-3 pr-0 w-4">
+                <span className="sr-only">Status</span>
+              </TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">#</TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">Build</TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">Duration</TableHead>
@@ -116,7 +130,7 @@ export function ExecutorsTableCard({
               ))
             ) : (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={5} className="py-4 text-center text-xs text-muted-foreground">
+                <TableCell colSpan={6} className="py-4 text-center text-xs text-muted-foreground">
                   No executors match this filter.
                 </TableCell>
               </TableRow>

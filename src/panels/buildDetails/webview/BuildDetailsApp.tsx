@@ -10,9 +10,15 @@ import type {
   PipelineLogTargetViewModel
 } from "../shared/BuildDetailsContracts";
 import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
-import { BuildDetailsHeader } from "./components/buildDetails/BuildDetailsHeader";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
+import { BuildStatusHero } from "./components/buildDetails/hero/BuildStatusHero";
+import { PipelineStageStrip } from "./components/buildDetails/stageStrip/PipelineStageStrip";
+import type { StageStripSegment } from "./components/buildDetails/stageStrip/stageStripModel";
+import {
+  buildStageStripSegments,
+  countFailedSegments
+} from "./components/buildDetails/stageStrip/stageStripModel";
 import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
 import { useBuildDetailsTabs } from "./hooks/useBuildDetailsTabs";
 import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
@@ -23,7 +29,21 @@ import {
   buildInitialState
 } from "./state/buildDetailsState";
 
-const { useCallback, useReducer } = React;
+const { useCallback, useMemo, useReducer } = React;
+
+function scrollStageIntoView(stageKey: string): void {
+  // Wait a frame so the pipeline tab content is visible before scrolling.
+  requestAnimationFrame(() => {
+    const stageElement = document.querySelector(`[data-stage-key="${CSS.escape(stageKey)}"]`);
+    if (!stageElement) {
+      return;
+    }
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth";
+    stageElement.scrollIntoView({ behavior, block: "center" });
+  });
+}
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
   const postMessage = usePanelPostMessage<BuildDetailsIncomingMessage>();
@@ -68,6 +88,23 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     [postMessage]
   );
 
+  const stripSegments = useMemo(
+    () => buildStageStripSegments(state.pipelineStages),
+    [state.pipelineStages]
+  );
+  const stripFailedCount = useMemo(() => countFailedSegments(stripSegments), [stripSegments]);
+
+  const handleStripStageSelect = useCallback(
+    (segment: StageStripSegment) => {
+      setSelectedTab("pipeline");
+      if (segment.logTarget) {
+        handleSelectPipelineLog(segment.logTarget);
+      }
+      scrollStageIntoView(segment.key);
+    },
+    [setSelectedTab, handleSelectPipelineLog]
+  );
+
   if (state.loading && !state.hasLoaded) {
     return (
       <PanelInitialLoadingGate
@@ -81,7 +118,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col">
-        <BuildDetailsHeader
+        <BuildStatusHero
           displayName={state.displayName}
           resultLabel={state.resultLabel}
           resultClass={state.resultClass}
@@ -91,8 +128,16 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           loading={Boolean(state.loading)}
           isRunning={isRunning}
           buildUrl={buildUrl}
+          testsSummary={state.testState.summary}
+          stageCount={stripSegments.length}
           onOpenBuild={handleOpenBuild}
-        />
+        >
+          <PipelineStageStrip
+            segments={stripSegments}
+            loading={state.pipelineStagesLoading}
+            onSelectStage={handleStripStageSelect}
+          />
+        </BuildStatusHero>
 
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
           <PanelErrorList errors={state.errors} id="errors" title="Unable to load build details" />
@@ -107,6 +152,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             pipelineNodeLog={state.pipelineNodeLog}
             pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
             pipelineStagesLoading={state.pipelineStagesLoading}
+            stripFailedCount={stripFailedCount}
             displayName={state.displayName}
             buildUrl={buildUrl}
             resultClass={state.resultClass}

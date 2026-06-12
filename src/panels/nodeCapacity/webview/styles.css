@@ -1,3 +1,8 @@
+/* Pin the cascade layer order before contributing to any layer. Without this,
+ * loading this file ahead of the shared Tailwind bundle would register
+ * "components" first and demote Tailwind's base/preflight below utilities. */
+@layer theme, base, components, utilities;
+
 @layer components {
   .capacity-pool summary::-webkit-details-marker {
     display: none;

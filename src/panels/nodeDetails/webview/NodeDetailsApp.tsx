@@ -1,5 +1,6 @@
 import * as React from "react";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
+import { Progress } from "../../shared/webview/components/ui/progress";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
@@ -8,8 +9,8 @@ import { toast } from "../../shared/webview/hooks/useToast";
 import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
-import { NodeDetailsHeader } from "./components/nodeDetails/NodeDetailsHeader";
-import type { NodeAction } from "./components/nodeDetails/NodeDetailsHeader";
+import { NodeDetailsHero } from "./components/nodeDetails/NodeDetailsHero";
+import type { NodeAction } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
 import {
   buildOverviewRows,
@@ -111,7 +112,12 @@ export function NodeDetailsApp(): JSX.Element {
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col bg-background text-foreground">
-        <NodeDetailsHeader
+        {state.loading ? (
+          <div className="fixed inset-x-0 top-0 z-50">
+            <Progress indeterminate className="h-px rounded-none" />
+          </div>
+        ) : null}
+        <NodeDetailsHero
           displayName={state.displayName}
           name={state.name}
           description={state.description}
@@ -126,18 +132,19 @@ export function NodeDetailsApp(): JSX.Element {
           canLaunchAgent={state.canLaunchAgent}
           canOpenAgentInstructions={state.canOpenAgentInstructions}
           hasUrl={Boolean(state.url)}
+          showOfflineBanner={showOfflineBanner}
+          offlineReason={state.offlineReason}
+          executors={state.executors}
+          oneOffExecutors={state.oneOffExecutors}
+          executorsLabel={state.executorsLabel}
+          idleLabel={state.idleLabel}
           onRefresh={handleRefresh}
           onNodeAction={handleNodeAction}
           onLaunchAgent={handleLaunchAgent}
           onOpen={handleOpen}
         />
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
-          <NodeDetailsAlerts
-            showOfflineBanner={showOfflineBanner}
-            statusLabel={state.statusLabel}
-            offlineReason={state.offlineReason}
-            errors={state.errors}
-          />
+          <NodeDetailsAlerts errors={state.errors} />
 
           <NodeDetailsTabs
             state={state}

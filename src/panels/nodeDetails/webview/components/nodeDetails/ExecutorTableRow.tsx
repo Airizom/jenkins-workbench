@@ -19,6 +19,15 @@ export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProp
 
   return (
     <TableRow>
+      <TableCell className="py-1.5 pl-3 pr-0 w-4">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "inline-block h-2 w-2 rounded-full",
+            hasWork ? "bg-progress" : "bg-muted-foreground/40"
+          )}
+        />
+      </TableCell>
       <TableCell className="font-mono text-[11px] text-muted-foreground py-1.5 px-3">
         {entry.id}
       </TableCell>
@@ -36,7 +45,7 @@ export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProp
       <TableCell className="py-1.5 px-3">
         {progressPercent !== undefined ? (
           <div className="flex items-center gap-1.5">
-            <div className="executor-progress-track w-20">
+            <div className="executor-progress-track w-28">
               <div className="executor-progress-bar" style={{ width: `${progressPercent}%` }} />
             </div>
             <span className="text-[11px] text-muted-foreground">{progressLabel}</span>

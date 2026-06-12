@@ -76,6 +76,23 @@ export function TestTubeIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
+export function GaugeIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+      <path d="m12 14 4-4" />
+      <path d="M3.34 19a10 10 0 1 1 17.32 0" />
+    </IconBase>
+  );
+}
+export function WorkflowIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+      <rect x="3" y="3" width="8" height="8" rx="2" />
+      <path d="M7 11v4a2 2 0 0 0 2 2h4" />
+      <rect x="13" y="13" width="8" height="8" rx="2" />
+    </IconBase>
+  );
+}
 export function ExecutorsIcon({ className, ...props }: IconProps) {
   return (
     <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>

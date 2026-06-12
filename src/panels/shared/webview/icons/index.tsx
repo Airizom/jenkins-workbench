@@ -35,10 +35,12 @@ export {
   CpuIcon,
   ExecutorsIcon,
   FileIcon,
+  GaugeIcon,
   GitCommitIcon,
   ServerIcon,
   TagIcon,
   TerminalIcon,
   TestTubeIcon,
-  UserIcon
+  UserIcon,
+  WorkflowIcon
 } from "./systemIcons";

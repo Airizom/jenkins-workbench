@@ -1,3 +1,8 @@
+/* Pin the cascade layer order before contributing to any layer. Without this,
+ * loading this file ahead of the shared Tailwind bundle would register layers
+ * in the wrong order and demote Tailwind's base/preflight below utilities. */
+@layer theme, base, components, utilities;
+
 @layer base {
   .console-match {
     background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(255, 220, 0, 0.2));
@@ -38,7 +43,27 @@
   }
 
   .console-output {
-    max-height: max(200px, calc(100vh - 260px));
+    max-height: max(200px, calc(100vh - 300px));
+  }
+
+  .stage-strip {
+    scrollbar-width: thin;
+  }
+
+  .stage-strip::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .stage-strip-bar--running {
+    animation: stage-strip-pulse 1.6s ease-in-out infinite;
+  }
+
+  .hero-status-glyph--running {
+    animation: hero-status-pulse 2s ease-in-out infinite;
+  }
+
+  .donut-segment {
+    transition: stroke-dashoffset 600ms ease;
   }
 
   .pipeline-node-log-divider {
@@ -51,5 +76,38 @@
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
     line-height: 1.4;
+  }
+}
+
+@keyframes stage-strip-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes hero-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent);
+  }
+}
+
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .stage-strip-bar--running,
+    .hero-status-glyph--running {
+      animation: none;
+    }
+
+    .donut-segment {
+      transition: none;
+    }
   }
 }

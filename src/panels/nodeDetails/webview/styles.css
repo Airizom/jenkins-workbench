@@ -1,15 +1,20 @@
+/* Pin the cascade layer order before contributing to any layer. Without this,
+ * loading this file ahead of the shared Tailwind bundle would register
+ * "components" first and demote Tailwind's base/preflight below utilities. */
+@layer theme, base, components, utilities;
+
 @layer components {
   .executor-progress-track {
-    height: 3px;
+    height: 6px;
     background-color: var(--muted);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
   }
 
   .executor-progress-bar {
     height: 100%;
     background-color: var(--progress);
-    border-radius: 2px;
+    border-radius: 3px;
     transition: width 0.3s ease-out;
   }
 
@@ -20,6 +25,11 @@
     background-color: var(--muted);
     border-radius: 3px;
     overflow: hidden;
+  }
+
+  .monitor-gauge--lg {
+    height: 8px;
+    border-radius: 4px;
   }
 
   .monitor-gauge-fill {
@@ -38,5 +48,105 @@
 
   .monitor-gauge-fill[data-level="high"] {
     background-color: var(--failure);
+  }
+
+  .node-hero {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--muted) 35%, transparent),
+      transparent
+    );
+  }
+
+  .node-hero[data-status="online"] {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--success) 12%, transparent),
+      transparent
+    );
+  }
+
+  .node-hero[data-status="idle"],
+  .node-hero[data-status="temporary"] {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--warning) 12%, transparent),
+      transparent
+    );
+  }
+
+  .node-hero[data-status="offline"] {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--failure) 12%, transparent),
+      transparent
+    );
+  }
+
+  .node-hero-icon {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: var(--radius);
+  }
+
+  .executor-slot-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .executor-slot {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid var(--muted-foreground-border);
+    background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+    padding: 0;
+  }
+
+  .executor-slot[data-busy="true"] {
+    background: var(--progress);
+    border-color: color-mix(in srgb, var(--progress) 60%, var(--foreground));
+    animation: executor-slot-pulse 2.4s ease-in-out infinite;
+  }
+
+  button.executor-slot {
+    cursor: pointer;
+  }
+
+  button.executor-slot:hover {
+    filter: brightness(1.2);
+  }
+
+  button.executor-slot:focus-visible {
+    outline: 1px solid var(--ring);
+    outline-offset: 1px;
+  }
+}
+
+@keyframes executor-slot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .executor-slot[data-busy="true"] {
+      animation: none;
+    }
+
+    .executor-progress-bar,
+    .monitor-gauge-fill {
+      transition: none;
+    }
   }
 }

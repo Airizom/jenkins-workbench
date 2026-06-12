@@ -82,17 +82,20 @@ function collectCssFiles(manifest: ViteManifest, entryKey: string): string[] {
     if (!entry) {
       return;
     }
-    if (Array.isArray(entry.css)) {
-      for (const css of entry.css) {
-        if (typeof css === "string" && !cssFiles.includes(css)) {
-          cssFiles.push(css);
-        }
-      }
-    }
+    // Imported chunks first: the shared Tailwind bundle declares the cascade
+    // layer order (theme, base, components, utilities) and must load before
+    // entry CSS that contributes to those layers.
     if (Array.isArray(entry.imports)) {
       for (const importKey of entry.imports) {
         if (typeof importKey === "string") {
           visit(importKey);
+        }
+      }
+    }
+    if (Array.isArray(entry.css)) {
+      for (const css of entry.css) {
+        if (typeof css === "string" && !cssFiles.includes(css)) {
+          cssFiles.push(css);
         }
       }
     }
