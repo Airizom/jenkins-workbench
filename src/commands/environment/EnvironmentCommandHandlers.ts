@@ -1,5 +1,6 @@
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
+import { formatError } from "../../formatters/ErrorFormatters";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
@@ -231,7 +232,25 @@ export async function addEnvironment(
   };
 
   await store.addEnvironment(scope, environment);
-  await store.setAuthConfig(scope, environment.id, authConfig);
+  try {
+    await store.setAuthConfig(scope, environment.id, authConfig);
+  } catch (error) {
+    const authErrorMessage = formatError(error);
+    try {
+      const removed = await store.removeEnvironment(scope, environment.id);
+      const cleanupMessage = removed
+        ? "The partially added environment was removed."
+        : "The partially added environment could not be found for cleanup.";
+      void vscode.window.showErrorMessage(
+        `Unable to store authentication settings for ${url}: ${authErrorMessage} ${cleanupMessage}`
+      );
+    } catch (rollbackError) {
+      void vscode.window.showErrorMessage(
+        `Unable to store authentication settings for ${url}: ${authErrorMessage} Failed to remove the partially added environment: ${formatError(rollbackError)}`
+      );
+    }
+    return;
+  }
   refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
 }
 
