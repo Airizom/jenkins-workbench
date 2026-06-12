@@ -1,4 +1,4 @@
-import { JenkinsRequestError } from "../JenkinsClient";
+import { JenkinsRequestError } from "../errors";
 import type { CancellationInput } from "./JenkinsDataTypes";
 import { waitWithCancellation } from "./JobSearchCancellation";
 

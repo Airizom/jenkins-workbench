@@ -155,9 +155,18 @@ export class JenkinsJobIndex {
 
     const client = await this.clientProvider.getClient(environment);
     const output = new AsyncQueue<JobSearchEntry[]>();
+    let disposed = false;
+    let workQueue: AsyncQueue<JobQueueItem> | undefined;
 
     void (async () => {
-      this.throwIfCancelled(cancellation);
+      const throwIfStopped = (): void => {
+        if (disposed) {
+          throw new CancellationError();
+        }
+        this.throwIfCancelled(cancellation);
+      };
+
+      throwIfStopped();
       const backoff = new AdaptiveBackoff({
         baseDelayMs: backoffBaseMs,
         minDelayMs: 0,
@@ -170,10 +179,12 @@ export class JenkinsJobIndex {
       const fetchWithRetry = async <T>(operation: () => Promise<T>): Promise<T> => {
         let attempt = 0;
         for (;;) {
-          this.throwIfCancelled(cancellation);
+          throwIfStopped();
           await backoff.wait(cancellation);
+          throwIfStopped();
           try {
             const result = await operation();
+            throwIfStopped();
             backoff.onSuccess();
             return result;
           } catch (error) {
@@ -189,16 +200,20 @@ export class JenkinsJobIndex {
       const rootJobs = await fetchWithRetry(() => client.getRootJobs());
       const rootInfos = mapJenkinsJobs(client, rootJobs);
       const queue = new AsyncQueue<JobQueueItem>();
+      workQueue = queue;
       let pendingJobs = 0;
       let limitReached = false;
 
       const results: JobSearchEntry[] = [];
       let batch: JobSearchEntry[] = [];
 
-      const flushBatch = (): void => {
+      const flushBatch = async (): Promise<void> => {
+        throwIfStopped();
         if (batch.length > 0) {
           output.push(batch);
           batch = [];
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          throwIfStopped();
         }
       };
 
@@ -213,14 +228,15 @@ export class JenkinsJobIndex {
       };
 
       const enqueue = (job: JenkinsJobInfo, path: JobPathSegment[]): void => {
-        if (limitReached) {
+        if (limitReached || disposed) {
           return;
         }
         pendingJobs += 1;
         queue.push({ job, path });
       };
 
-      const addEntry = (job: JenkinsJobInfo, path: JobPathSegment[]): boolean => {
+      const addEntry = async (job: JenkinsJobInfo, path: JobPathSegment[]): Promise<boolean> => {
+        throwIfStopped();
         if (limitReached) {
           return true;
         }
@@ -233,7 +249,7 @@ export class JenkinsJobIndex {
         results.push(entry);
         batch.push(entry);
         if (batch.length >= batchSize) {
-          flushBatch();
+          await flushBatch();
         }
         if (results.length >= maxResults) {
           markLimitReached();
@@ -252,7 +268,8 @@ export class JenkinsJobIndex {
       }
 
       if (pendingJobs === 0) {
-        flushBatch();
+        await flushBatch();
+        throwIfStopped();
         this.cache.set(cacheKey, {
           timestamp: Date.now(),
           entries: results,
@@ -264,11 +281,12 @@ export class JenkinsJobIndex {
 
       const worker = async (): Promise<void> => {
         for (;;) {
-          this.throwIfCancelled(cancellation);
+          throwIfStopped();
           const item = await queue.shift();
           if (!item) {
             return;
           }
+          throwIfStopped();
 
           const { job, path } = item;
 
@@ -277,7 +295,7 @@ export class JenkinsJobIndex {
               continue;
             }
 
-            if (strategy.shouldInclude(job) && addEntry(job, path)) {
+            if (strategy.shouldInclude(job) && (await addEntry(job, path))) {
               continue;
             }
 
@@ -323,7 +341,8 @@ export class JenkinsJobIndex {
         throw new Error("Unexpected error.");
       }
 
-      flushBatch();
+      await flushBatch();
+      throwIfStopped();
       this.cache.set(cacheKey, {
         timestamp: Date.now(),
         entries: results,
@@ -334,8 +353,16 @@ export class JenkinsJobIndex {
       output.fail(error);
     });
 
-    for await (const batch of output) {
-      yield batch;
+    try {
+      for await (const batch of output) {
+        yield batch;
+      }
+    } finally {
+      disposed = true;
+      output.clear();
+      output.close();
+      workQueue?.clear();
+      workQueue?.close();
     }
   }
 
