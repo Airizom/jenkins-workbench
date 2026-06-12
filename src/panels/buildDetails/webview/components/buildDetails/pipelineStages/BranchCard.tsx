@@ -31,6 +31,7 @@ export function BranchCard({
   const branchIcon = getStageIcon(branch.statusClass);
   const statusClass = getStatusClass(branch.statusClass);
   const branchTarget = branch.logTarget;
+  const branchLogLabel = `Open log for ${branch.name.trim() || "branch"}`;
 
   return (
     <Collapsible open={expanded} onOpenChange={setExpanded} className="group">
@@ -67,6 +68,7 @@ export function BranchCard({
             <Button
               variant="ghost"
               size="icon"
+              aria-label={branchLogLabel}
               className="h-5 w-5 shrink-0"
               onClick={() => onSelectPipelineLog(branchTarget)}
             >

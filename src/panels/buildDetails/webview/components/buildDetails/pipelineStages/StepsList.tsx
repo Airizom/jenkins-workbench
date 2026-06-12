@@ -25,6 +25,7 @@ export function StepsList({
     <ul className="list-none m-0 p-0 flex flex-col gap-1">
       {steps.map((step, index) => {
         const statusClass = getStatusClass(step.statusClass);
+        const stepLogLabel = `Open log for ${step.name.trim() || "step"}`;
         return (
           <li
             className={cn(
@@ -52,6 +53,7 @@ export function StepsList({
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label={stepLogLabel}
                       className="h-5 w-5"
                       onClick={() => step.logTarget && onSelectPipelineLog(step.logTarget)}
                     >
