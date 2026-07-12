@@ -103,7 +103,6 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
     });
   }
 
-  // fallow-ignore-next-line unused-class-member
   async updateWatchUrl(
     scope: EnvironmentScope,
     environmentId: string,

@@ -30,7 +30,6 @@ export class JenkinsParameterPresetStore {
     this.secrets = new ParameterPresetSecretStore(context.secrets);
   }
 
-  // fallow-ignore-next-line unused-class-member
   async listPresets(
     scope: EnvironmentScope,
     environmentId: string,
@@ -73,7 +72,6 @@ export class JenkinsParameterPresetStore {
     return this.mutationQueue(() => this.savePresetUnlocked(scope, environmentId, jobUrl, input));
   }
 
-  // fallow-ignore-next-line unused-class-member
   renamePreset(
     scope: EnvironmentScope,
     environmentId: string,
@@ -132,7 +130,6 @@ export class JenkinsParameterPresetStore {
     });
   }
 
-  // fallow-ignore-next-line unused-class-member
   removePresetsForJob(
     scope: EnvironmentScope,
     environmentId: string,
@@ -169,7 +166,6 @@ export class JenkinsParameterPresetStore {
     });
   }
 
-  // fallow-ignore-next-line unused-class-member
   updatePresetUrl(
     scope: EnvironmentScope,
     environmentId: string,

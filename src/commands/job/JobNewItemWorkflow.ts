@@ -53,7 +53,6 @@ export interface JobNewItemWorkflowDependencies {
 export class JobNewItemWorkflow {
   constructor(private readonly deps: JobNewItemWorkflowDependencies) {}
 
-  // fallow-ignore-next-line unused-class-member
   async run(target: JobNewItemTarget): Promise<void> {
     const kind = await promptNewItemKind();
     if (!kind) {

@@ -15,6 +15,29 @@
     "resources/**",
     "*.vsix"
   ],
+  // These packages are runtime imports in source, but Vite bundles them into
+  // the generated webview assets. They must remain development dependencies so
+  // VS Code packaging does not ship a redundant node_modules tree.
+  "ignoreDependencies": [
+    "@radix-ui/react-accordion",
+    "@radix-ui/react-checkbox",
+    "@radix-ui/react-collapsible",
+    "@radix-ui/react-progress",
+    "@radix-ui/react-scroll-area",
+    "@radix-ui/react-select",
+    "@radix-ui/react-slot",
+    "@radix-ui/react-switch",
+    "@radix-ui/react-tabs",
+    "@radix-ui/react-toast",
+    "@radix-ui/react-toggle",
+    "@radix-ui/react-toggle-group",
+    "@radix-ui/react-tooltip",
+    "class-variance-authority",
+    "elkjs",
+    "react",
+    "react-dom",
+    "tailwindcss"
+  ],
   // VS Code invokes these methods/properties by interface, so normal call graph
   // analysis cannot see the runtime call path.
   "usedClassMembers": [

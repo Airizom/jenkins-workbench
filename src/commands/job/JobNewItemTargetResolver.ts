@@ -18,7 +18,6 @@ export type JobNewItemTreeTarget = InstanceTreeItem | JobsFolderTreeItem | Jenki
 export class JobNewItemTargetResolver {
   constructor(private readonly environmentStore: JenkinsEnvironmentStore) {}
 
-  // fallow-ignore-next-line unused-class-member
   resolveFromTreeItem(item: JobNewItemTreeTarget): JobNewItemTarget | undefined {
     if (item instanceof InstanceTreeItem) {
       return {
@@ -50,7 +49,6 @@ export class JobNewItemTargetResolver {
     };
   }
 
-  // fallow-ignore-next-line unused-class-member
   async resolveFromEnvironmentPicker(): Promise<JobNewItemTarget | undefined> {
     const environments = await this.environmentStore.listEnvironmentsWithScope();
     if (environments.length === 0) {

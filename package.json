@@ -1132,7 +1132,7 @@
     "class-variance-authority": "^0.7.1",
     "concurrently": "^8.2.2",
     "elkjs": "^0.11.1",
-    "fallow": "^2.93.0",
+    "fallow": "^3.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwindcss": "^4.2.2",
