@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.49.0] - 2026-07-12
+
+### Added
+
+- feat: enhance current-branch workflows and build, compare, node, and tree interactions
+
+### Fixed
+
+- fix: harden Jenkins requests, authentication, replay, console streaming, artifact, and validation flows
+- fix: prevent stale state across panels, polling, tree refreshes, and persisted settings
+
+### Changed
+
+- refactor: consolidate shared services, panel state, storage, and UI helpers
+- chore: upgrade Fallow to 3.3.0 and align its audit configuration
+
+### Tests
+
+- test: expand Vitest coverage, VS Code integration smoke tests, and release safeguards
+
 ## [1.48.2] - 2026-06-12
 
 ### Fixed
