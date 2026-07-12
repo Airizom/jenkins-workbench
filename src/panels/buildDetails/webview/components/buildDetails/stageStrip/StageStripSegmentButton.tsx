@@ -3,10 +3,16 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
-import { resolveStatusAccentClass } from "../../../../../shared/webview/lib/statusStyles";
+import {
+  resolveResultIconTextClass,
+  resolveStatusAccentClass
+} from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
+import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { StageStripSegment } from "./stageStripModel";
 import { describeSegmentAria, describeSegmentDetail } from "./stageStripModel";
+
+const DENSE_GLYPH_STATUSES = new Set(["failure", "unstable", "aborted"]);
 
 type StageStripSegmentButtonProps = {
   segment: StageStripSegment;
@@ -31,7 +37,7 @@ export function StageStripSegmentButton({
             dense ? "w-5 flex-none" : "flex-1 min-w-[56px] max-w-[150px]"
           )}
         >
-          {dense ? null : <SegmentLabel segment={segment} />}
+          {dense ? <DenseStatusGlyph segment={segment} /> : <SegmentLabel segment={segment} />}
           <span
             className={cn(
               "h-1.5 w-full rounded-full",
@@ -49,9 +55,27 @@ export function StageStripSegmentButton({
   );
 }
 
+// Dense segments hide labels, so surface bad outcomes with a status glyph.
+function DenseStatusGlyph({ segment }: { segment: StageStripSegment }): JSX.Element | null {
+  if (!DENSE_GLYPH_STATUSES.has(segment.statusClass)) {
+    return null;
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex w-full items-center justify-center",
+        resolveResultIconTextClass(segment.statusClass)
+      )}
+    >
+      {getStageIcon(segment.statusClass)}
+    </span>
+  );
+}
+
 function SegmentLabel({ segment }: { segment: StageStripSegment }): JSX.Element {
   return (
-    <span className="flex w-full items-center gap-1 text-[10px] leading-tight text-muted-foreground">
+    <span className="flex w-full items-center gap-1 text-[11px] leading-tight text-muted-foreground">
       <span className="truncate">{segment.name}</span>
       {segment.branchCount > 0 ? (
         <span className="shrink-0 opacity-70">×{segment.branchCount}</span>

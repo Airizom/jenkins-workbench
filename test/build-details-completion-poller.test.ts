@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { JenkinsBuildDetails } from "../src/jenkins/types";
 import { BuildDetailsCompletionPoller } from "../src/panels/buildDetails/BuildDetailsCompletionPoller";
 

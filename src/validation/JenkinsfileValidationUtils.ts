@@ -142,6 +142,10 @@ function scanTokenOccurrences(
   token: string,
   onMatch: (index: number) => boolean
 ): void {
+  if (token.length === 0) {
+    return;
+  }
+
   const lowerLine = lineText.toLowerCase();
   const lowerToken = token.toLowerCase();
   let index = lowerLine.indexOf(lowerToken);

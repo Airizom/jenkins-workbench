@@ -12,6 +12,7 @@ import { unionSortedMapKeys } from "./BuildCompareDiff";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
 import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
 import type {
+  BuildCompareStageDeltaDirection,
   BuildCompareStageDiffItem,
   BuildCompareStagesSectionViewModel
 } from "./shared/BuildCompareContracts";
@@ -48,12 +49,13 @@ function buildAvailableStagesSection(
   const baselineStages = buildStageMap(toPipelineRun(baselineValue));
   const targetStages = buildStageMap(toPipelineRun(targetValue));
   const items: BuildCompareStageDiffItem[] = unionSortedMapKeys(baselineStages, targetStages).map(
-    (name) => {
-      const baseline = baselineStages.get(name);
-      const target = targetStages.get(name);
-      const displayName = baseline?.path ?? target?.path ?? name;
+    (stageKey) => {
+      const baseline = baselineStages.get(stageKey);
+      const target = targetStages.get(stageKey);
+      const displayName = baseline?.path ?? target?.path ?? stageKey;
       if (!baseline && target) {
         return {
+          key: stageKey,
           name: displayName,
           changeType: "added",
           targetStatusLabel: target.statusLabel,
@@ -63,6 +65,7 @@ function buildAvailableStagesSection(
       }
       if (baseline && !target) {
         return {
+          key: stageKey,
           name: displayName,
           changeType: "removed",
           baselineStatusLabel: baseline.statusLabel,
@@ -70,7 +73,9 @@ function buildAvailableStagesSection(
           baselineDurationLabel: baseline.durationLabel
         };
       }
+      const delta = formatDurationDelta(baseline?.durationMs, target?.durationMs);
       return {
+        key: stageKey,
         name: displayName,
         changeType: "matched",
         baselineStatusLabel: baseline?.statusLabel,
@@ -79,7 +84,8 @@ function buildAvailableStagesSection(
         targetStatusClass: target?.statusClass,
         baselineDurationLabel: baseline?.durationLabel,
         targetDurationLabel: target?.durationLabel,
-        deltaLabel: formatDurationDelta(baseline?.durationMs, target?.durationMs)
+        deltaLabel: delta?.label,
+        deltaDirection: delta?.direction
       };
     }
   );
@@ -134,7 +140,7 @@ function collectStageEntries(
 function formatDurationDelta(
   baselineDuration?: number,
   targetDuration?: number
-): string | undefined {
+): { label: string; direction?: BuildCompareStageDeltaDirection } | undefined {
   if (
     typeof baselineDuration !== "number" ||
     !Number.isFinite(baselineDuration) ||
@@ -145,8 +151,11 @@ function formatDurationDelta(
   }
   const delta = targetDuration - baselineDuration;
   if (delta === 0) {
-    return "No change";
+    return { label: "No change" };
   }
   const prefix = delta > 0 ? "+" : "-";
-  return `${prefix}${formatDurationMs(Math.abs(delta))}`;
+  return {
+    label: `${prefix}${formatDurationMs(Math.abs(delta))}`,
+    direction: delta > 0 ? "slower" : "faster"
+  };
 }

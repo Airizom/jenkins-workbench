@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import { JenkinsQueuePoller } from "../src/queue/JenkinsQueuePoller";
 
@@ -34,8 +34,12 @@ function createPollerFixture(pollIntervalSeconds = 2): {
 }
 
 describe("JenkinsQueuePoller", () => {
-  it("polls immediately on first expansion without duplicating the interval", (context) => {
-    context.mock.timers.enable({ apis: ["setInterval"], now: 0 });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("polls immediately on first expansion without duplicating the interval", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture();
     const env = environment();
 
@@ -44,14 +48,14 @@ describe("JenkinsQueuePoller", () => {
 
     assert.deepEqual(refreshes, [env]);
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, [env, env]);
 
     poller.dispose();
   });
 
-  it("polls expanded environments and stops after the last collapse", (context) => {
-    context.mock.timers.enable({ apis: ["setInterval"], now: 0 });
+  it("polls expanded environments and stops after the last collapse", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture();
     const first = environment();
     const second = environment({
@@ -64,24 +68,24 @@ describe("JenkinsQueuePoller", () => {
     poller.trackExpanded(second);
     refreshes.length = 0;
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, [first, second]);
 
     poller.trackCollapsed(first);
     refreshes.length = 0;
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, [second]);
 
     poller.trackCollapsed(second);
     refreshes.length = 0;
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, []);
   });
 
-  it("stops polling after clearAll and dispose", (context) => {
-    context.mock.timers.enable({ apis: ["setInterval"], now: 0 });
+  it("stops polling after clearAll and dispose", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture();
     const first = environment();
 
@@ -89,19 +93,19 @@ describe("JenkinsQueuePoller", () => {
     poller.clearAll();
     refreshes.length = 0;
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, []);
 
     poller.trackExpanded(first);
     poller.dispose();
     refreshes.length = 0;
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, []);
   });
 
-  it("replaces the active interval when the configured interval changes", (context) => {
-    context.mock.timers.enable({ apis: ["setInterval"], now: 0 });
+  it("replaces the active interval when the configured interval changes", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture(10);
     const env = environment();
 
@@ -110,20 +114,20 @@ describe("JenkinsQueuePoller", () => {
 
     assert.deepEqual(refreshes, [env, env]);
 
-    context.mock.timers.tick(2999);
+    vi.advanceTimersByTime(2999);
     assert.equal(refreshes.length, 2);
 
-    context.mock.timers.tick(1);
+    vi.advanceTimersByTime(1);
     assert.equal(refreshes.length, 3);
 
-    context.mock.timers.tick(7000);
+    vi.advanceTimersByTime(7000);
     assert.equal(refreshes.length, 5);
 
     poller.dispose();
   });
 
-  it("uses the latest environment reference for an expanded environment key", (context) => {
-    context.mock.timers.enable({ apis: ["setInterval"], now: 0 });
+  it("uses the latest environment reference for an expanded environment key", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture();
     const initial = environment({ url: "https://old.example" });
     const updated = environment({ url: "https://new.example", username: "jenkins-user" });
@@ -132,7 +136,7 @@ describe("JenkinsQueuePoller", () => {
     poller.updateEnvironment(updated);
     refreshes.length = 0;
 
-    context.mock.timers.tick(2000);
+    vi.advanceTimersByTime(2000);
     assert.deepEqual(refreshes, [updated]);
 
     poller.dispose();

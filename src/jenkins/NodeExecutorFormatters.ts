@@ -1,16 +1,23 @@
-import type { NodeCapacityExecutorViewModel } from "../shared/nodeCapacity/NodeCapacityContracts";
 import { isFiniteNumber } from "../shared/numbers";
 import { firstNonEmpty } from "../shared/stringValues";
 import type { JenkinsNodeExecutable, JenkinsNodeExecutor } from "./types";
+
+export interface JenkinsNodeExecutorSummary {
+  id: string;
+  statusLabel: string;
+  isIdle: boolean;
+  workLabel?: string;
+  workUrl?: string;
+}
 
 export function formatExecutorStatusLabel(isIdle: boolean): string {
   return isIdle ? "Idle" : "Busy";
 }
 
-export function buildBaseNodeExecutorViewModels(
+export function buildBaseNodeExecutorSummaries(
   executors: JenkinsNodeExecutor[] | undefined,
   labelPrefix: string
-): NodeCapacityExecutorViewModel[] {
+): JenkinsNodeExecutorSummary[] {
   if (!Array.isArray(executors)) {
     return [];
   }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
 import type { BuildDetailsConsoleBackend } from "../src/panels/buildDetails/BuildDetailsBackend";
 import {
@@ -133,6 +133,23 @@ describe("PipelineNodeLogFetcher", () => {
 
     assert.equal(fake.calls.length, 2, "fresh fetch should still try the progressive endpoint");
     assert.equal(freshResult.log?.text, "fresh\n");
+  });
+
+  it("resets progressive state when fetching a different node without an explicit reset", async () => {
+    const fake = createFakeBackend();
+    const fetcher = createFetcher(fake.backend);
+
+    const firstFetch = fetcher.fetch(buildTarget("11"), true, undefined);
+    fake.resolveNext(buildChunk({ textSize: 500, annotator: "node-11-annotator" }));
+    await firstFetch;
+
+    const secondFetch = fetcher.fetch(buildTarget("22"), true, undefined);
+    fake.resolveNext(buildChunk({ html: "node 22<br>", textSize: 8, moreData: false }));
+    const secondResult = await secondFetch;
+
+    assert.equal(fake.calls.length, 2);
+    assert.deepEqual(fake.calls[1], { nodeId: "22", start: 0, annotator: undefined });
+    assert.equal(secondResult.log?.text, "node 22\n");
   });
 
   it("caps accumulated progressive node log text at the console window", async () => {

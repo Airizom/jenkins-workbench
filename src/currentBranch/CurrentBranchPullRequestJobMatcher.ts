@@ -19,13 +19,7 @@ export interface CurrentBranchPullRequestJobMatcher {
   ): CurrentBranchPullRequestJobMatch | undefined;
 }
 
-interface CurrentBranchPullRequestMatcherConfigSurface {
-  updatePatterns(jobNamePatterns: readonly string[]): void;
-}
-
-export class CurrentBranchPullRequestJobNameMatcher
-  implements CurrentBranchPullRequestJobMatcher, CurrentBranchPullRequestMatcherConfigSurface
-{
+export class CurrentBranchPullRequestJobNameMatcher implements CurrentBranchPullRequestJobMatcher {
   private jobNamePatterns: readonly string[];
 
   constructor(
@@ -34,6 +28,7 @@ export class CurrentBranchPullRequestJobNameMatcher
     this.jobNamePatterns = normalizeJobNamePatterns(jobNamePatterns);
   }
 
+  // fallow-ignore-next-line unused-class-member
   updatePatterns(jobNamePatterns: readonly string[]): void {
     this.jobNamePatterns = normalizeJobNamePatterns(jobNamePatterns);
   }

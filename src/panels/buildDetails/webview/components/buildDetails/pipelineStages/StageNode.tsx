@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ResultBadge } from "../../../../../shared/webview/components/ResultBadge";
 import {
   AccordionContent,
   AccordionItem,
@@ -7,15 +8,18 @@ import {
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Toggle } from "../../../../../shared/webview/components/ui/toggle";
 import { ChevronDownIcon, TerminalIcon } from "../../../../../shared/webview/icons";
+import {
+  resolveBuildResultConnectorColor,
+  resolveBuildResultStageNodeClass
+} from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type {
   PipelineLogTargetViewModel,
   PipelineStageViewModel
 } from "../../../../shared/BuildDetailsContracts";
-import { StatusPill } from "../StatusPill";
 import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
-import { getConnectorColor, getStageIcon, getStageNodeStyle } from "./PipelineStageIcons";
+import { getStageIcon } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
 export function StageNode({
   stageId,
@@ -39,11 +43,12 @@ export function StageNode({
   const hasDirectSteps = stage.stepsAll.length > 0;
   const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
   const stageIcon = getStageIcon(stage.statusClass);
-  const nodeStyle = getStageNodeStyle(stage.statusClass);
-  const connectorColor = getConnectorColor(stage.statusClass);
+  const nodeStyle = resolveBuildResultStageNodeClass(stage.statusClass);
+  const connectorColor = resolveBuildResultConnectorColor(stage.statusClass);
   const stageName = stage.name.trim();
   const canRestartStage = stage.canRestartFromStage && stageName.length > 0;
   const stageLogTarget = stage.logTarget;
+  const hasStageActions = Boolean(stageLogTarget) || canRestartStage;
 
   return (
     <div className="relative flex" data-stage-key={stage.key}>
@@ -69,14 +74,14 @@ export function StageNode({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <StatusPill
+                  <ResultBadge
                     label={stage.statusLabel || "Unknown"}
                     status={stage.statusClass}
-                    className="text-[10px]"
+                    className="text-[11px]"
                   />
                   <ChevronDownIcon
                     className={cn(
-                      "text-muted-foreground transition-transform duration-200",
+                      "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
                       "group-data-[state=open]:rotate-180 group-data-[state=open]:text-foreground"
                     )}
                   />
@@ -86,13 +91,13 @@ export function StageNode({
 
             <AccordionContent>
               <div className="border-t border-border px-3 py-2.5 space-y-2.5">
-                {canRestartStage ? (
+                {hasStageActions ? (
                   <div className="flex items-center justify-end gap-2">
                     {stageLogTarget ? (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-6 px-2 text-[10px]"
+                        className="h-6 px-2 text-[11px]"
                         onClick={(event) => {
                           event.stopPropagation();
                           onSelectPipelineLog(stageLogTarget);
@@ -102,32 +107,19 @@ export function StageNode({
                         Log
                       </Button>
                     ) : null}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-[10px]"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onRestartStage(stageName);
-                      }}
-                    >
-                      Restart from this stage
-                    </Button>
-                  </div>
-                ) : stageLogTarget ? (
-                  <div className="flex items-center justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-[10px]"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onSelectPipelineLog(stageLogTarget);
-                      }}
-                    >
-                      <TerminalIcon className="mr-1 h-3 w-3" />
-                      Log
-                    </Button>
+                    {canRestartStage ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[11px]"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRestartStage(stageName);
+                        }}
+                      >
+                        Restart from this stage
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
                 {hasBranches ? (

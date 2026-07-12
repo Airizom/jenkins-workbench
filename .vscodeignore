@@ -20,3 +20,9 @@ postcss.config.cjs
 tailwind.config.cjs
 AGENTS.md
 **/*.ts
+test/**
+coverage/**
+.vscode-test.mjs
+tsconfig.test.json
+tsconfig.integration.json
+vitest.config.ts

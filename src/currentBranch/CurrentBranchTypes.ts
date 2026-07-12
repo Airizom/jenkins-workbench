@@ -92,33 +92,25 @@ export interface CurrentBranchLinkedContext {
   environment: JenkinsEnvironmentRef;
 }
 
-export type CurrentBranchRemoteResolvedState =
-  | {
-      kind: "branchMissing";
-      branchName: string;
-      link: JenkinsRepositoryLink;
-      environment: JenkinsEnvironmentRef;
-    }
-  | {
-      kind: "requestFailed";
-      branchName: string;
-      link: JenkinsRepositoryLink;
-      environment: JenkinsEnvironmentRef;
-      message: string;
-      selectedTarget?: CurrentBranchSelectedTargetInfo;
-    }
-  | {
-      kind: "matched";
-      branchName: string;
-      link: JenkinsRepositoryLink;
-      environment: JenkinsEnvironmentRef;
-      resolvedTargetKind: CurrentBranchTargetKind;
-      jobName: string;
-      jobUrl: string;
-      jobColor?: string;
-      lastBuild?: CurrentBranchBuildInfo;
-      pullRequest?: CurrentBranchPullRequestInfo;
-    };
+type CurrentBranchRemoteStateKind = "branchMissing" | "requestFailed" | "matched";
+
+type CurrentBranchRemoteResolvedRequirements = {
+  branchName: string;
+  link: JenkinsRepositoryLink;
+  environment: JenkinsEnvironmentRef;
+};
+
+type CurrentBranchRemotePublicState = Extract<
+  CurrentBranchState,
+  { kind: CurrentBranchRemoteStateKind }
+>;
+
+export type CurrentBranchRemoteResolvedState = CurrentBranchRemotePublicState extends infer State
+  ? State extends CurrentBranchRemotePublicState
+    ? Omit<State, "repository" | keyof CurrentBranchRemoteResolvedRequirements> &
+        CurrentBranchRemoteResolvedRequirements
+    : never
+  : never;
 
 export type CurrentBranchRefreshOptions = {
   force?: boolean;

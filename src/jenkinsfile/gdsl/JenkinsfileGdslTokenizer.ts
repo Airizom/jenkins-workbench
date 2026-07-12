@@ -59,7 +59,7 @@ function tokenizeGdsl(text: string): Token[] {
       index = end;
       continue;
     }
-    if (/[0-9]/.test(character)) {
+    if (/[0-9]/.test(character) || (character === "-" && /[0-9]/.test(text[index + 1] ?? ""))) {
       const start = index;
       index += 1;
       while (index < text.length && /[0-9.]/.test(text[index])) {

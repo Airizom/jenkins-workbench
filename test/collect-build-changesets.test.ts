@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { collectBuildChangesets } from "../src/jenkins/changesets/collectBuildChangesets";
 import type { JenkinsChangeSetItem } from "../src/jenkins/types";
 

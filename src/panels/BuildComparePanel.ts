@@ -12,6 +12,7 @@ import {
 import {
   isBuildCompareReadyMessage,
   isOpenBuildDetailsMessage,
+  isRefreshBuildCompareMessage,
   isSwapBuildsMessage
 } from "./buildCompare/shared/BuildComparePanelMessages";
 import {
@@ -147,6 +148,10 @@ export class BuildComparePanel {
         }
         if (isOpenBuildDetailsMessage(message)) {
           void this.openBuildDetails(message.side);
+          return;
+        }
+        if (isRefreshBuildCompareMessage(message)) {
+          void this.load({ suppressErrors: true });
           return;
         }
         if (isBuildCompareReadyMessage(message)) {

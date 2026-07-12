@@ -473,9 +473,10 @@
           "description": "Workspace glob excluded while searching for matching test source files."
         },
         "jenkinsWorkbench.buildDetails.testSourceMatching.maxResultsPerPattern": {
-          "type": "number",
+          "type": "integer",
           "default": 10,
           "minimum": 1,
+          "maximum": 100,
           "description": "Maximum number of file matches to collect per search pattern when resolving test sources."
         },
         "jenkinsWorkbench.buildDetails.testSourceMatching.preferredPathScores": {
@@ -506,9 +507,10 @@
           "description": "Preferred path fragments and scoring applied when ranking candidate test source files."
         },
         "jenkinsWorkbench.jobSearchConcurrency": {
-          "type": "number",
+          "type": "integer",
           "default": 4,
           "minimum": 1,
+          "maximum": 10,
           "description": "Maximum number of concurrent folder requests per environment while indexing jobs for Go to Job."
         },
         "jenkinsWorkbench.jobSearchBackoffBaseMs": {
@@ -524,9 +526,10 @@
           "description": "Maximum delay in milliseconds for adaptive backoff during job search."
         },
         "jenkinsWorkbench.jobSearchMaxRetries": {
-          "type": "number",
+          "type": "integer",
           "default": 2,
           "minimum": 0,
+          "maximum": 10,
           "description": "Maximum number of retries for transient Jenkins errors (429/5xx) during job search."
         },
         "jenkinsWorkbench.requestTimeoutSeconds": {
@@ -539,6 +542,8 @@
         "jenkinsWorkbench.artifactDownloadRoot": {
           "type": "string",
           "default": "jenkins-artifacts",
+          "pattern": "^(?!\\s*$)(?![\\\\/])(?![A-Za-z]:)(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$)).+$",
+          "patternErrorMessage": "Use a non-empty workspace-relative folder without parent (..) segments.",
           "description": "Workspace-relative folder for downloaded artifacts."
         },
         "jenkinsWorkbench.artifactMaxDownloadMb": {
@@ -548,9 +553,10 @@
           "description": "Maximum artifact download size in megabytes. Set to 0 to disable the limit."
         },
         "jenkinsWorkbench.artifactPreviewCacheMaxEntries": {
-          "type": "number",
+          "type": "integer",
           "default": 50,
           "minimum": 1,
+          "maximum": 1000,
           "description": "Maximum number of in-memory artifact previews to keep before eviction."
         },
         "jenkinsWorkbench.artifactPreviewCacheMaxMb": {
@@ -566,9 +572,10 @@
           "description": "Time-to-live in seconds for unused in-memory artifact previews."
         },
         "jenkinsWorkbench.maxCacheEntries": {
-          "type": "number",
+          "type": "integer",
           "default": 1000,
           "minimum": 100,
+          "maximum": 100000,
           "description": "Maximum number of entries to keep in the data cache. Older entries are evicted when the limit is reached."
         },
         "jenkinsWorkbench.buildTooltips.includeDetails": {
@@ -627,42 +634,42 @@
           "description": "Case-insensitive Jenkins view names to hide from the Views section."
         },
         "jenkinsWorkbench.activity.maxItemsPerGroup": {
-          "type": "number",
+          "type": "integer",
           "default": 50,
           "minimum": 1,
           "maximum": 100,
           "description": "Maximum number of jobs to show in each Activity group."
         },
         "jenkinsWorkbench.activity.maxScanResults": {
-          "type": "number",
+          "type": "integer",
           "default": 2000,
           "minimum": 100,
           "maximum": 10000,
           "description": "Maximum Jenkins jobs to scan while collecting Activity groups."
         },
         "jenkinsWorkbench.activity.jobSearchBatchSize": {
-          "type": "number",
+          "type": "integer",
           "default": 50,
           "minimum": 10,
           "maximum": 200,
           "description": "Jenkins job search batch size used while collecting Activity groups."
         },
         "jenkinsWorkbench.activity.pendingInputCandidateLimit": {
-          "type": "number",
+          "type": "integer",
           "default": 100,
           "minimum": 0,
           "maximum": 500,
           "description": "Maximum running jobs to enrich when checking Activity jobs for pending input."
         },
         "jenkinsWorkbench.activity.pendingInputLookupConcurrency": {
-          "type": "number",
+          "type": "integer",
           "default": 4,
           "minimum": 1,
           "maximum": 10,
           "description": "Maximum concurrent build lookups used when checking Activity jobs for pending input."
         },
         "jenkinsWorkbench.activity.pendingInputBuildLookupLimit": {
-          "type": "number",
+          "type": "integer",
           "default": 5,
           "minimum": 1,
           "maximum": 20,
@@ -1079,10 +1086,14 @@
     "build:webview": "vite build",
     "watch:webview": "vite build --watch",
     "typecheck:webview": "tsc -p src/panels/tsconfig.json --noEmit",
-    "test": "npm run test:manifest && npm run test:workflows && npm run test:unit",
+    "test": "npm run test:manifest && npm run test:workflows && npm run typecheck:test && npm run test:coverage",
     "test:manifest": "node scripts/validate-package-manifest.mjs",
     "test:workflows": "node scripts/validate-release-workflow-actions.mjs",
-    "test:unit": "node -e \"fs.rmSync('out-test',{recursive:true,force:true})\" && tsc -p tsconfig.test.json && node --test \"out-test/test/**/*.test.js\"",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "npm run compile && tsc -p tsconfig.integration.json && vscode-test",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "lint": "biome lint src/ test/ scripts/",
     "lint:fix": "biome lint src/ test/ scripts/ --write",
     "fallow": "fallow --format compact",
@@ -1109,11 +1120,15 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^24.13.2",
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
     "@types/vscode": "^1.85.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
     "class-variance-authority": "^0.7.1",
     "concurrently": "^8.2.2",
     "elkjs": "^0.11.1",
@@ -1122,6 +1137,7 @@
     "react-dom": "^18.2.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.3.3",
-    "vite": "^8.0.2"
+    "vite": "^8.0.2",
+    "vitest": "^4.1.10"
   }
 }

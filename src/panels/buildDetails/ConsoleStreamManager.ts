@@ -128,12 +128,16 @@ export class ConsoleStreamManager {
       try {
         const value = await this.htmlConsoleStream.fetchNext();
         return { mode: "html", value };
-      } catch (error) {
+      } catch {
         this.htmlConsoleStream.handleError();
         this.textConsoleStream.resetForFallback();
-        return { mode: "html", error };
+        return this.fetchNextText();
       }
     }
+    return this.fetchNextText();
+  }
+
+  private async fetchNextText(): Promise<ConsoleFetchResult> {
     try {
       const value = await this.textConsoleStream.fetchNext();
       return { mode: "text", value };

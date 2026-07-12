@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { beforeEach, describe, it } from "node:test";
+import { beforeEach, describe, it, vi } from "vitest";
+import type { JobParameter } from "../src/jenkins/JenkinsDataService";
 import type { BuildParameterPromptOptions } from "../src/ui/buildParameterPrompts/BuildParameterPromptTypes";
+import { isSensitiveParameter } from "../src/ui/buildParameterPrompts/ParameterSensitivity";
 import { fetchRunBuildChoices } from "../src/ui/buildParameterPrompts/RunParameterLookup";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 
 interface InputBoxOptions {
   readonly prompt?: string;
@@ -35,9 +36,10 @@ const vscodeMock = {
   }
 };
 
-const { promptParameterValues } = withModuleMocks([exactModuleMock("vscode", vscodeMock)], () =>
-  require("../src/ui/buildParameterPrompts/ParameterValuePrompts")
-) as typeof import("../src/ui/buildParameterPrompts/ParameterValuePrompts");
+vi.doMock("vscode", () => vscodeMock);
+const { promptParameterValues } = await import(
+  "../src/ui/buildParameterPrompts/ParameterValuePrompts"
+);
 
 function createOptions(
   parameters: BuildParameterPromptOptions["parameters"]
@@ -63,6 +65,13 @@ beforeEach(() => {
 });
 
 describe("promptParameterValues sensitive parameters", () => {
+  it("classifies Jenkins sensitive parameter forms in one shared helper", () => {
+    assert.equal(isSensitiveParameter({ name: "TOKEN", kind: "string", isSensitive: true }), true);
+    assert.equal(isSensitiveParameter({ name: "PASSWORD", kind: "password" }), true);
+    assert.equal(isSensitiveParameter({ name: "CREDENTIALS", kind: "credentials" }), true);
+    assert.equal(isSensitiveParameter({ name: "PLAIN", kind: "string" } as JobParameter), false);
+  });
+
   it("masks sensitive string parameters", async () => {
     const prompted = await promptParameterValues(
       createOptions([

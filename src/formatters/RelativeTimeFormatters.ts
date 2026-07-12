@@ -54,7 +54,7 @@ export function formatRelativeDate(date: Date | undefined, now: number): string 
   }
 
   const deltaMs = Math.max(0, now - timestampMs);
-  if (deltaMs < 15_000) {
+  if (deltaMs < MINUTE_MS) {
     return "Just now";
   }
 

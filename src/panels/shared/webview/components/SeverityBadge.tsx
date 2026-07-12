@@ -13,7 +13,8 @@ export function SeverityBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("text-[11px]", resolveSeverityBadgeClass(severity), className)}
+      size="sm"
+      className={cn(resolveSeverityBadgeClass(severity), className)}
     >
       {label}
     </Badge>

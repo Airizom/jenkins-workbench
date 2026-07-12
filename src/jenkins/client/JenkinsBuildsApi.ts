@@ -1,5 +1,5 @@
+import type { PreparedBuildParametersRequest } from "../BuildParameterRequests";
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
-import type { PreparedBuildParametersRequest } from "../data/JenkinsDataTypes";
 import { JenkinsRequestError } from "../errors";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type {
@@ -36,7 +36,29 @@ import type { JenkinsClientContext } from "./JenkinsClientContext";
 import { buildProgressiveConsoleHtmlResult } from "./JenkinsConsoleStream";
 import { JenkinsPendingInputClient } from "./JenkinsPendingInputClient";
 import { JenkinsReplayClient } from "./JenkinsReplayClient";
+import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
 import { RestartFromStageClient } from "./RestartFromStageClient";
+
+const BUILD_ARTIFACTS_TREE = "artifacts[fileName,relativePath]";
+const LAST_FAILED_BUILD_TREE = "lastFailedBuild[number,url,result,building,timestamp,duration]";
+const REBUILD_AUTOREBUILD_BODY = "autorebuild=true";
+const BUILD_LIST_LIMIT_TOKEN = "{limit}";
+
+const BUILD_LIST_TREE_PREFIXES = [
+  buildBuildsTree(),
+  buildBuildsTree({ includeDetails: true }),
+  buildBuildsTree({ includeParameters: true }),
+  buildBuildsTree({ includeDetails: true, includeParameters: true })
+].map((tree) => tree.slice(0, -BUILD_LIST_LIMIT_TOKEN.length));
+
+const BUILD_DETAILS_TREE_TEMPLATES = [
+  buildBuildDetailsTree(),
+  buildBuildDetailsTree({ includeCauses: true }),
+  buildBuildDetailsTree({ includeParameters: true }),
+  buildBuildDetailsTree({ includeCauses: true, includeParameters: true })
+];
+
+const TEST_REPORT_TREES = [buildTestReportTree(), buildTestReportTree({ includeCaseLogs: true })];
 
 export type JenkinsBuildTriggerOptions =
   | { mode: "build" }
@@ -69,7 +91,7 @@ export class JenkinsBuildsApi {
       return [];
     }
     // Stapler tree ranges {M,N} are exclusive of N, so {0,limit} returns `limit` builds.
-    const tree = buildBuildsTree(options).replace("{limit}", `{0,${safeLimit}}`);
+    const tree = `${getBuildsTreePrefix(options)}{0,${safeLimit}}`;
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
     return Array.isArray(response.builds) ? response.builds : [];
@@ -79,13 +101,13 @@ export class JenkinsBuildsApi {
     buildUrl: string,
     options?: { includeCauses?: boolean; includeParameters?: boolean }
   ): Promise<JenkinsBuildDetails> {
-    const tree = buildBuildDetailsTree(options);
+    const tree = getBuildDetailsTree(options);
     const url = buildApiUrlFromItem(buildUrl, tree);
     return this.context.requestJson<JenkinsBuildDetails>(url);
   }
 
   async getBuildArtifacts(buildUrl: string): Promise<JenkinsArtifact[]> {
-    const url = buildApiUrlFromItem(buildUrl, "artifacts[fileName,relativePath]");
+    const url = buildApiUrlFromItem(buildUrl, BUILD_ARTIFACTS_TREE);
     const response = await this.context.requestJson<{ artifacts?: JenkinsArtifact[] }>(url);
     return Array.isArray(response.artifacts) ? response.artifacts : [];
   }
@@ -94,8 +116,8 @@ export class JenkinsBuildsApi {
     buildUrl: string,
     options?: JenkinsTestReportOptions
   ): Promise<JenkinsTestReport> {
-    const url = new URL(buildActionUrl(buildUrl, "testReport/api/json"));
-    url.searchParams.set("tree", buildTestReportTree(options));
+    const url = new URL("testReport/api/json", ensureTrailingSlash(buildUrl));
+    url.searchParams.set("tree", getTestReportTree(options));
     return this.context.requestJson<JenkinsTestReport>(url.toString());
   }
 
@@ -160,7 +182,11 @@ export class JenkinsBuildsApi {
     return {
       ...snapshot,
       consoleUrl: snapshot.consoleUrl
-        ? resolveFlowNodeConsoleUrl(buildUrl, snapshot.consoleUrl)
+        ? resolveTrustedJenkinsUrl(
+            this.context.baseUrl,
+            snapshot.consoleUrl,
+            ensureTrailingSlash(buildUrl)
+          )
         : undefined
     };
   }
@@ -176,12 +202,12 @@ export class JenkinsBuildsApi {
     start: number,
     annotator?: string
   ): Promise<JenkinsProgressiveConsoleHtml> {
-    const snapshot = await this.getFlowNodeLog(buildUrl, nodeId);
-    if (!snapshot.consoleUrl) {
+    const consoleUrl = await this.resolveFlowNodeLogConsoleUrl(buildUrl, nodeId);
+    if (!consoleUrl) {
       throw new JenkinsRequestError("Flow node console URL is unavailable.", 404);
     }
     const safeStart = Math.max(0, Math.floor(start));
-    const url = new URL("logText/progressiveHtml", ensureTrailingSlash(snapshot.consoleUrl));
+    const url = new URL("logText/progressiveHtml", ensureTrailingSlash(consoleUrl));
     url.searchParams.set("start", safeStart.toString());
     const response = await this.context.requestTextWithHeaders(url.toString(), {
       headers: annotator ? { "X-ConsoleAnnotator": annotator } : undefined
@@ -190,8 +216,7 @@ export class JenkinsBuildsApi {
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
-    const tree = "lastFailedBuild[number,url,result,building,timestamp,duration]";
-    const url = buildApiUrlFromItem(jobUrl, tree);
+    const url = buildApiUrlFromItem(jobUrl, LAST_FAILED_BUILD_TREE);
     const response = await this.context.requestJson<{
       lastFailedBuild?: JenkinsBuild | null;
     }>(url);
@@ -259,8 +284,7 @@ export class JenkinsBuildsApi {
     // The rebuild plugin expects a trailing slash for POSTs and supports the
     // `autorebuild` parameter to bypass the parameter entry page.
     const url = buildActionUrl(buildUrl, "rebuild/");
-    const body = new URLSearchParams({ autorebuild: "true" }).toString();
-    await this.context.requestVoidWithCrumb(url, body);
+    await this.context.requestVoidWithCrumb(url, REBUILD_AUTOREBUILD_BODY);
   }
 
   async getRestartFromStageInfo(buildUrl: string): Promise<JenkinsRestartFromStageInfo> {
@@ -296,12 +320,43 @@ export class JenkinsBuildsApi {
       `execution/node/${encodeURIComponent(nodeId.trim())}/wfapi/describe`
     );
   }
+
+  private async resolveFlowNodeLogConsoleUrl(
+    buildUrl: string,
+    nodeId: string
+  ): Promise<string | undefined> {
+    const url = this.buildFlowNodeLogUrl(buildUrl, nodeId);
+    const snapshot = await this.context.requestJson<Pick<JenkinsFlowNodeLog, "consoleUrl">>(url);
+    return snapshot.consoleUrl
+      ? resolveTrustedJenkinsUrl(
+          this.context.baseUrl,
+          snapshot.consoleUrl,
+          ensureTrailingSlash(buildUrl)
+        )
+      : undefined;
+  }
 }
 
-function resolveFlowNodeConsoleUrl(buildUrl: string, consoleUrl: string): string | undefined {
-  try {
-    return new URL(consoleUrl, ensureTrailingSlash(buildUrl)).toString();
-  } catch {
-    return undefined;
-  }
+function getBuildsTreePrefix(options?: {
+  includeDetails?: boolean;
+  includeParameters?: boolean;
+}): string {
+  const key = getBooleanOptionKey(options?.includeDetails, options?.includeParameters);
+  return BUILD_LIST_TREE_PREFIXES[key];
+}
+
+function getBuildDetailsTree(options?: {
+  includeCauses?: boolean;
+  includeParameters?: boolean;
+}): string {
+  const key = getBooleanOptionKey(options?.includeCauses, options?.includeParameters);
+  return BUILD_DETAILS_TREE_TEMPLATES[key];
+}
+
+function getTestReportTree(options?: JenkinsTestReportOptions): string {
+  return TEST_REPORT_TREES[options?.includeCaseLogs ? 1 : 0];
+}
+
+function getBooleanOptionKey(first?: boolean, second?: boolean): number {
+  return (first ? 1 : 0) | (second ? 2 : 0);
 }

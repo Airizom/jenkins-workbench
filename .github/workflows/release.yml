@@ -26,6 +26,10 @@ jobs:
 
       - name: Verify tag matches package.json version
         run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "Error: Releases must run from a tag, not a $GITHUB_REF_TYPE." >&2
+            exit 1
+          fi
           PKG_VERSION=$(node -p "require('./package.json').version")
           TAG=${GITHUB_REF_NAME#v}
           echo "Package version: $PKG_VERSION"
@@ -47,19 +51,12 @@ jobs:
       - name: Build
         run: npm run vscode:prepublish
 
-      - name: Warm npm cache for vsce
+      - name: Install pinned publishing tools
         env:
           npm_config_fetch_retries: 6
           npm_config_fetch_retry_mintimeout: 20000
           npm_config_fetch_retry_maxtimeout: 120000
-        run: npm i --no-save --prefer-offline --no-audit --no-fund @vscode/vsce@3
-
-      - name: Warm npm cache for ovsx
-        env:
-          npm_config_fetch_retries: 6
-          npm_config_fetch_retry_mintimeout: 20000
-          npm_config_fetch_retry_maxtimeout: 120000
-        run: npm i --no-save --prefer-offline --no-audit --no-fund ovsx
+        run: npm i --no-save --prefer-offline --no-audit --no-fund @vscode/vsce@3.9.2 ovsx@1.0.2
 
       - name: Package VS Code extension (.vsix)
         env:
@@ -79,24 +76,30 @@ jobs:
           set -e
           test -f "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
 
-      - name: Publish to VS Code Marketplace
+      - name: Verify publishing credentials
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           if [ -z "$VSCE_PAT" ]; then
             echo "Error: VSCE_PAT secret is not set. Configure it in GitHub Actions secrets." >&2
             exit 1
           fi
+          if [ -z "$OVSX_PAT" ]; then
+            echo "Error: OVSX_PAT secret is not set. Configure it in GitHub Actions secrets." >&2
+            exit 1
+          fi
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
           ./node_modules/.bin/vsce publish --pat "$VSCE_PAT" --packagePath "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
 
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
-          if [ -z "$OVSX_PAT" ]; then
-            echo "Error: OVSX_PAT secret is not set. Configure it in GitHub Actions secrets." >&2
-            exit 1
-          fi
           ./node_modules/.bin/ovsx publish "jenkins-workbench-${GITHUB_REF_NAME}.vsix" -p "$OVSX_PAT"
 
       - name: Upload artifact

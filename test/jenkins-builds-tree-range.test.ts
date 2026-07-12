@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { JenkinsBuildsApi } from "../src/jenkins/client/JenkinsBuildsApi";
+import {
+  buildBuildDetailsTree,
+  buildBuildsTree
+} from "../src/jenkins/client/JenkinsBuildTreeBuilders";
 import type { JenkinsClientContext } from "../src/jenkins/client/JenkinsClientContext";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
@@ -64,5 +68,21 @@ describe("JenkinsBuildsApi getBuilds tree range", () => {
     assert.deepEqual(await api.getBuilds("https://jenkins.example.com/job/demo/", 0), []);
     assert.deepEqual(await api.getBuilds("https://jenkins.example.com/job/demo/", -5), []);
     assert.equal(requestedUrls.length, 0);
+  });
+});
+
+describe("Jenkins build tree builders", () => {
+  it("includes shared change set and action fragments for build lists with details", () => {
+    assert.equal(
+      buildBuildsTree({ includeDetails: true, includeParameters: true }),
+      "builds[number,url,result,building,timestamp,duration,estimatedDuration,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,causes[shortDescription,userId,userName],parameters[name,value]]]{limit}"
+    );
+  });
+
+  it("includes shared change set and action fragments for build details", () => {
+    assert.equal(
+      buildBuildDetailsTree({ includeCauses: true, includeParameters: true }),
+      "number,url,result,building,timestamp,duration,estimatedDuration,displayName,fullDisplayName,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,failCount,skipCount,totalCount,causes[shortDescription,userId,userName],parameters[name,value]]"
+    );
   });
 });

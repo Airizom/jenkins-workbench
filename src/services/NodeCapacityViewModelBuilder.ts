@@ -1,7 +1,7 @@
 import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsNodeInfo, JenkinsQueueItemInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { buildBaseNodeExecutorViewModels } from "../jenkins/NodeExecutorFormatters";
+import { buildBaseNodeExecutorSummaries } from "../jenkins/NodeExecutorFormatters";
 import {
   formatNodeBusyExecutorRatio,
   formatNodeOfflineReason,
@@ -77,9 +77,9 @@ export function buildNodeCapacityExecutorViewModels(
   details: JenkinsNodeDetails
 ): NodeCapacityExecutorViewModel[] {
   return [
-    ...buildBaseNodeExecutorViewModels(details.executors, "Executor"),
-    ...buildBaseNodeExecutorViewModels(details.oneOffExecutors, "One-off")
-  ];
+    ...buildBaseNodeExecutorSummaries(details.executors, "Executor"),
+    ...buildBaseNodeExecutorSummaries(details.oneOffExecutors, "One-off")
+  ].map((executor) => ({ ...executor }));
 }
 
 function buildNodeViewModel(
@@ -209,13 +209,21 @@ function buildOfflineImpact(
 }
 
 function buildHiddenLabelKeySet(nodes: JenkinsNodeInfo[]): Set<string> {
-  const keys = new Set<string>();
+  const hiddenKeys = new Set<string>();
+  const poolKeys = new Set<string>();
   for (const node of nodes) {
-    for (const label of classifyNodeLabels(node).hiddenLabels) {
-      keys.add(normalizeLabelKey(label));
+    const labels = classifyNodeLabels(node);
+    for (const label of labels.poolLabels) {
+      poolKeys.add(normalizeLabelKey(label));
+    }
+    for (const label of labels.hiddenLabels) {
+      hiddenKeys.add(normalizeLabelKey(label));
     }
   }
-  return keys;
+  for (const key of poolKeys) {
+    hiddenKeys.delete(key);
+  }
+  return hiddenKeys;
 }
 
 function collectPoolLabels(

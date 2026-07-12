@@ -15,8 +15,8 @@ export function ToneBadge({
   return (
     <Badge
       variant="outline"
+      size="sm"
       className={cn(
-        "text-[10px] px-1.5 py-0",
         tone !== undefined ? resolveStatusBadgeClass(tone) : undefined,
         badgeClassName,
         className

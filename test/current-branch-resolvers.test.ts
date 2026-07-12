@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, describe, it } from "node:test";
+import { beforeEach, describe, it, vi } from "vitest";
 import type { CurrentBranchGitHubPullRequestLookupResult } from "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import type {
   CurrentBranchPullRequestJobMatcher,
@@ -13,7 +13,6 @@ import type {
 import type { GitApi, GitRepository } from "../src/git/GitExtensionApi";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 import { createCurrentBranchVscodeMock, TestUri } from "./helpers/vscodeMocks";
 
 let githubPullRequestExtension:
@@ -24,37 +23,28 @@ const vscodeMock = createCurrentBranchVscodeMock({
   githubPullRequestExtension: () => githubPullRequestExtension
 });
 
-const {
-  CurrentBranchRepositoryResolver,
-  CurrentBranchTargetResolver,
-  CurrentBranchStatusResolver,
-  CurrentBranchRefreshCoordinator,
-  CurrentBranchJenkinsService,
-  CurrentBranchPullRequestService,
-  VscodeCurrentBranchGitHubPullRequestAdapter
-} = withModuleMocks([exactModuleMock("vscode", vscodeMock)], () => ({
-  ...(require("../src/currentBranch/CurrentBranchRepositoryResolver") as typeof import(
-    "../src/currentBranch/CurrentBranchRepositoryResolver"
-  )),
-  ...(require("../src/currentBranch/CurrentBranchTargetResolver") as typeof import(
-    "../src/currentBranch/CurrentBranchTargetResolver"
-  )),
-  ...(require("../src/currentBranch/CurrentBranchStatusResolver") as typeof import(
-    "../src/currentBranch/CurrentBranchStatusResolver"
-  )),
-  ...(require("../src/currentBranch/CurrentBranchRefreshCoordinator") as typeof import(
-    "../src/currentBranch/CurrentBranchRefreshCoordinator"
-  )),
-  ...(require("../src/currentBranch/CurrentBranchJenkinsService") as typeof import(
-    "../src/currentBranch/CurrentBranchJenkinsService"
-  )),
-  ...(require("../src/currentBranch/CurrentBranchPullRequestService") as typeof import(
-    "../src/currentBranch/CurrentBranchPullRequestService"
-  )),
-  ...(require("../src/currentBranch/CurrentBranchGitHubPullRequestAdapter") as typeof import(
-    "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter"
-  ))
-}));
+vi.doMock("vscode", () => vscodeMock);
+const { CurrentBranchRepositoryResolver } = await import(
+  "../src/currentBranch/CurrentBranchRepositoryResolver"
+);
+const { CurrentBranchTargetResolver } = await import(
+  "../src/currentBranch/CurrentBranchTargetResolver"
+);
+const { CurrentBranchStatusResolver } = await import(
+  "../src/currentBranch/CurrentBranchStatusResolver"
+);
+const { CurrentBranchRefreshCoordinator } = await import(
+  "../src/currentBranch/CurrentBranchRefreshCoordinator"
+);
+const { CurrentBranchJenkinsService } = await import(
+  "../src/currentBranch/CurrentBranchJenkinsService"
+);
+const { CurrentBranchPullRequestService } = await import(
+  "../src/currentBranch/CurrentBranchPullRequestService"
+);
+const { VscodeCurrentBranchGitHubPullRequestAdapter } = await import(
+  "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter"
+);
 
 const noopEvent = (() => ({
   dispose: () => undefined

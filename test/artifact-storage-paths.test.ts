@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { ArtifactRetrievalService } from "../src/services/ArtifactRetrievalService";
 import {
   type ArtifactDownloadRequest,
@@ -86,5 +86,34 @@ describe("ArtifactStorageService path sanitization", () => {
       (error: unknown) => error instanceof ArtifactStorageError && error.code === "invalidPath"
     );
     assert.deepEqual(writes, []);
+  });
+
+  it.each([
+    "",
+    "   ",
+    "/outside",
+    "\\\\server\\share",
+    "C:\\outside",
+    "C:outside",
+    "../outside",
+    "safe/../outside"
+  ])("rejects invalid download root %j", async (downloadRoot) => {
+    const { service, writes } = createService();
+    const request = { ...createRequest("report.txt"), downloadRoot };
+
+    await assert.rejects(
+      service.downloadArtifact(request),
+      (error: unknown) => error instanceof ArtifactStorageError && error.code === "invalidRoot"
+    );
+    assert.deepEqual(writes, []);
+  });
+
+  it("accepts a nested workspace-relative download root", async () => {
+    const { service } = createService();
+    const request = { ...createRequest("report.txt"), downloadRoot: "downloads/artifacts" };
+
+    const result = await service.downloadArtifact(request);
+
+    assert.ok(result.targetPath.startsWith(path.join(WORKSPACE_ROOT, "downloads", "artifacts")));
   });
 });

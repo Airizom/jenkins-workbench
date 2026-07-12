@@ -5,15 +5,35 @@ import type { JenkinsItemCreateKind } from "../../jenkins/types";
 import { formatActionError } from "../CommandUtils";
 import { getJobNameValidationError } from "./JobNameValidation";
 
-const NEW_ITEM_LABELS: Record<JenkinsItemCreateKind, string> = {
-  job: "job",
-  pipeline: "pipeline"
-};
+interface NewItemKindDefinition {
+  itemType: JenkinsItemCreateKind;
+  label: string;
+  description: string;
+  promptLabel: string;
+  defaultName: string;
+}
 
-const NEW_ITEM_DEFAULT_NAMES: Record<JenkinsItemCreateKind, string> = {
-  job: "new-job",
-  pipeline: "new-pipeline"
-};
+const NEW_ITEM_KIND_DEFINITIONS: readonly NewItemKindDefinition[] = [
+  {
+    itemType: "job",
+    label: "Job",
+    description: "Freestyle job",
+    promptLabel: "job",
+    defaultName: "new-job"
+  },
+  {
+    itemType: "pipeline",
+    label: "Pipeline",
+    description: "Pipeline job",
+    promptLabel: "pipeline",
+    defaultName: "new-pipeline"
+  }
+];
+
+const NEW_ITEM_KIND_BY_TYPE: Record<JenkinsItemCreateKind, NewItemKindDefinition> =
+  Object.fromEntries(
+    NEW_ITEM_KIND_DEFINITIONS.map((definition) => [definition.itemType, definition])
+  ) as Record<JenkinsItemCreateKind, NewItemKindDefinition>;
 
 export interface JobNewItemTarget {
   environment: JenkinsEnvironmentRef;
@@ -30,22 +50,20 @@ export interface JobNewItemWorkflowDependencies {
   onEnvironmentChanged(environmentId: string): void;
 }
 
-interface JobNewItemWorkflowSurface {
-  run(target: JobNewItemTarget): Promise<void>;
-}
-
-export class JobNewItemWorkflow implements JobNewItemWorkflowSurface {
+export class JobNewItemWorkflow {
   constructor(private readonly deps: JobNewItemWorkflowDependencies) {}
 
+  // fallow-ignore-next-line unused-class-member
   async run(target: JobNewItemTarget): Promise<void> {
     const kind = await promptNewItemKind();
     if (!kind) {
       return;
     }
+    const kindDefinition = NEW_ITEM_KIND_BY_TYPE[kind];
 
     const newName = await vscode.window.showInputBox({
-      prompt: `Enter a name for the new ${NEW_ITEM_LABELS[kind]}`,
-      value: NEW_ITEM_DEFAULT_NAMES[kind],
+      prompt: `Enter a name for the new ${kindDefinition.promptLabel}`,
+      value: kindDefinition.defaultName,
       validateInput: (value) => getJobNameValidationError(value),
       ignoreFocusOut: true
     });
@@ -54,7 +72,7 @@ export class JobNewItemWorkflow implements JobNewItemWorkflowSurface {
     }
 
     const confirm = await vscode.window.showWarningMessage(
-      `Create ${NEW_ITEM_LABELS[kind]} "${newName}" in ${target.locationLabel}?`,
+      `Create ${kindDefinition.promptLabel} "${newName}" in ${target.locationLabel}?`,
       { modal: true },
       "Create"
     );
@@ -70,22 +88,21 @@ export class JobNewItemWorkflow implements JobNewItemWorkflowSurface {
         newName
       );
       void vscode.window.showInformationMessage(
-        `Created ${NEW_ITEM_LABELS[kind]} "${newName}".${newUrl ? ` New job URL: ${newUrl}` : ""}`
+        `Created ${kindDefinition.promptLabel} "${newName}".${newUrl ? ` New job URL: ${newUrl}` : ""}`
       );
       this.deps.onEnvironmentChanged(target.environment.environmentId);
     } catch (error) {
       void vscode.window.showErrorMessage(
-        `Failed to create ${NEW_ITEM_LABELS[kind]} "${newName}": ${formatActionError(error)}`
+        `Failed to create ${kindDefinition.promptLabel} "${newName}": ${formatActionError(error)}`
       );
     }
   }
 }
 
 async function promptNewItemKind(): Promise<JenkinsItemCreateKind | undefined> {
-  const picks: NewItemCreateKindPick[] = [
-    { label: "Job", description: "Freestyle job", itemType: "job" },
-    { label: "Pipeline", description: "Pipeline job", itemType: "pipeline" }
-  ];
+  const picks: NewItemCreateKindPick[] = NEW_ITEM_KIND_DEFINITIONS.map(
+    ({ label, description, itemType }) => ({ label, description, itemType })
+  );
   const pick = await vscode.window.showQuickPick(picks, {
     placeHolder: "Select an item type to create",
     ignoreFocusOut: true

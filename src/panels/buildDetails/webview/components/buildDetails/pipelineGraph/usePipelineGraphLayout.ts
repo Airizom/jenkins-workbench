@@ -56,7 +56,11 @@ export function usePipelineGraphLayout(
     }
 
     const previousLayout = previousLayoutRef.current;
-    if (previousLayout && previousLayout.model.geometryKey === model.geometryKey) {
+    if (
+      previousLayout &&
+      previousLayout.model.topologyKey === model.topologyKey &&
+      previousLayout.model.geometryKey === model.geometryKey
+    ) {
       const nextLayout = updateLayoutForModel(previousLayout, model);
       previousLayoutRef.current = nextLayout;
       setState({ status: "ready", layout: nextLayout });

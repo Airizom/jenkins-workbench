@@ -13,6 +13,8 @@ export interface AwaitingInputEnrichmentOptions {
   lookupConcurrency: number;
 }
 
+type PendingInputSummaries = Awaited<ReturnType<PendingInputRefreshCoordinator["getSummaries"]>>;
+
 interface TreeActivityPendingInputEnrichmentSurface {
   findAwaitingInputJobUrls(
     environment: JenkinsEnvironmentRef,
@@ -32,6 +34,10 @@ export class AwaitingInputEnricher implements TreeActivityPendingInputEnrichment
     runningCandidates: JobSearchEntry[],
     options: AwaitingInputEnrichmentOptions
   ): Promise<Set<string>> {
+    if (runningCandidates.length === 0) {
+      return new Set();
+    }
+
     const buildUrlsByJobUrl = await this.collectRunningBuildUrlsByJob(
       environment,
       runningCandidates,
@@ -40,29 +46,29 @@ export class AwaitingInputEnricher implements TreeActivityPendingInputEnrichment
     if (buildUrlsByJobUrl.size === 0) {
       return new Set();
     }
-    const buildUrls = new Set<string>();
-    for (const candidateBuildUrls of buildUrlsByJobUrl.values()) {
-      for (const buildUrl of candidateBuildUrls) {
-        buildUrls.add(buildUrl);
-      }
-    }
 
-    let summaries: Awaited<ReturnType<PendingInputRefreshCoordinator["getSummaries"]>>;
-    try {
-      summaries = await this.pendingInputCoordinator.getSummaries(environment, [...buildUrls], {
-        queueRefresh: true
-      });
-    } catch {
+    const summaries = await this.fetchPendingInputSummaries(
+      environment,
+      collectUniqueBuildUrls(buildUrlsByJobUrl)
+    );
+    if (!summaries) {
       return new Set();
     }
 
-    const awaitingJobUrls = new Set<string>();
-    for (const [jobUrl, candidateBuildUrls] of buildUrlsByJobUrl) {
-      if (candidateBuildUrls.some((buildUrl) => summaries.get(buildUrl)?.awaitingInput)) {
-        awaitingJobUrls.add(jobUrl);
-      }
+    return selectJobUrlsAwaitingInput(buildUrlsByJobUrl, summaries);
+  }
+
+  private async fetchPendingInputSummaries(
+    environment: JenkinsEnvironmentRef,
+    buildUrls: string[]
+  ): Promise<PendingInputSummaries | undefined> {
+    try {
+      return await this.pendingInputCoordinator.getSummaries(environment, buildUrls, {
+        queueRefresh: true
+      });
+    } catch {
+      return undefined;
     }
-    return awaitingJobUrls;
   }
 
   private async collectRunningBuildUrlsByJob(
@@ -71,17 +77,18 @@ export class AwaitingInputEnricher implements TreeActivityPendingInputEnrichment
     options: AwaitingInputEnrichmentOptions
   ): Promise<Map<string, string[]>> {
     const buildUrlsByJobUrl = new Map<string, string[]>();
+    const buildListFetchOptions = {
+      ...options.buildListFetchOptions,
+      // Pending-input checks need fresh build state, not TTL-cached lists.
+      bypassCache: true
+    };
     await runWithConcurrency(runningCandidates, options.lookupConcurrency, async (entry) => {
       try {
         const builds = await this.dataService.getBuildsForJob(
           environment,
           entry.url,
           options.buildLookupLimit,
-          {
-            ...options.buildListFetchOptions,
-            // Pending-input checks need fresh build state, not TTL-cached lists.
-            bypassCache: true
-          }
+          buildListFetchOptions
         );
         const runningBuildUrls: string[] = [];
         for (const build of builds) {
@@ -100,6 +107,33 @@ export class AwaitingInputEnricher implements TreeActivityPendingInputEnrichment
   }
 }
 
+function collectUniqueBuildUrls(buildUrlsByJobUrl: ReadonlyMap<string, string[]>): string[] {
+  const buildUrls: string[] = [];
+  const seenBuildUrls = new Set<string>();
+  for (const candidateBuildUrls of buildUrlsByJobUrl.values()) {
+    for (const buildUrl of candidateBuildUrls) {
+      if (!seenBuildUrls.has(buildUrl)) {
+        seenBuildUrls.add(buildUrl);
+        buildUrls.push(buildUrl);
+      }
+    }
+  }
+  return buildUrls;
+}
+
+function selectJobUrlsAwaitingInput(
+  buildUrlsByJobUrl: ReadonlyMap<string, string[]>,
+  summaries: PendingInputSummaries
+): Set<string> {
+  const awaitingJobUrls = new Set<string>();
+  for (const [jobUrl, candidateBuildUrls] of buildUrlsByJobUrl) {
+    if (candidateBuildUrls.some((buildUrl) => summaries.get(buildUrl)?.awaitingInput)) {
+      awaitingJobUrls.add(jobUrl);
+    }
+  }
+  return awaitingJobUrls;
+}
+
 async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
@@ -110,18 +144,22 @@ async function runWithConcurrency<T>(
   }
 
   let index = 0;
-  const workerCount = Math.min(Math.max(1, concurrency), items.length);
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      for (;;) {
-        const current = index;
-        index += 1;
-        if (current >= items.length) {
-          return;
+  const workerCount = Math.trunc(Math.min(Math.max(1, concurrency), items.length));
+  const workers: Promise<void>[] = [];
+  for (let workerIndex = 0; workerIndex < workerCount; workerIndex += 1) {
+    workers.push(
+      (async () => {
+        for (;;) {
+          const current = index;
+          index += 1;
+          if (current >= items.length) {
+            return;
+          }
+          const item = items[current];
+          await operation(item);
         }
-        const item = items[current];
-        await operation(item);
-      }
-    })
-  );
+      })()
+    );
+  }
+  await Promise.all(workers);
 }

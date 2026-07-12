@@ -21,7 +21,7 @@ export function RawJsonCard({
   advancedLoaded,
   onCopyJson
 }: RawJsonCardProps): JSX.Element {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   return (
     <Collapsible
@@ -31,7 +31,10 @@ export function RawJsonCard({
     >
       <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-mutedBorder bg-muted-soft">
         <CollapsibleTrigger asChild>
-          <button type="button" className="group flex flex-1 items-center gap-2 text-left">
+          <button
+            type="button"
+            className="group flex flex-1 items-center justify-start gap-2 text-left"
+          >
             <DisclosureChevron className="h-3.5 w-3.5" />
             <div>
               <div className="text-xs font-medium">Raw JSON</div>

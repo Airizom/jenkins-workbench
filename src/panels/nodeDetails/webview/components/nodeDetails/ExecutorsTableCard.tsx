@@ -68,11 +68,11 @@ export function ExecutorsTableCard({
           <span className="text-xs font-medium">{title}</span>
           <span className="text-[11px] text-muted-foreground">({filteredEntries.length})</span>
           {busyCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-warning-border bg-warning-soft px-1.5 text-[10px] font-medium text-warning">
+            <span className="inline-flex items-center rounded-full border border-warning-border bg-warning-soft px-1.5 text-[10px] font-medium text-warning-foreground">
               {busyCount} busy
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-success-border bg-success-soft px-1.5 text-[10px] font-medium text-success">
+            <span className="inline-flex items-center rounded-full border border-success-border bg-success-soft px-1.5 text-[10px] font-medium text-success-foreground">
               all idle
             </span>
           )}
@@ -118,7 +118,9 @@ export function ExecutorsTableCard({
               </TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">#</TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">Build</TableHead>
-              <TableHead className="text-[11px] py-1.5 px-3">Duration</TableHead>
+              <TableHead className="hidden md:table-cell text-[11px] py-1.5 px-3">
+                Duration
+              </TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">Progress</TableHead>
               <TableHead className="text-[11px] py-1.5 px-3">Link</TableHead>
             </TableRow>

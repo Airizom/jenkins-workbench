@@ -4,8 +4,7 @@ import {
   findMatchingDelimiterBackward,
   findPreviousMeaningfulIndex,
   readIdentifierBackward,
-  skipBlockComment,
-  skipLineComment,
+  skipGdslComment,
   skipString,
   skipWhitespace
 } from "./JenkinsfileGdslScannerUtils";
@@ -68,12 +67,9 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
       index = skipString(body, index);
       continue;
     }
-    if (character === "/" && body[index + 1] === "/") {
-      index = skipLineComment(body, index);
-      continue;
-    }
-    if (character === "/" && body[index + 1] === "*") {
-      index = skipBlockComment(body, index);
+    const nextIndex = skipGdslComment(body, index);
+    if (nextIndex !== undefined) {
+      index = nextIndex;
       continue;
     }
     const aliasAssignment = findGuardAliasAssignment(body, index);

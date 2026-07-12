@@ -132,21 +132,17 @@ export function NodeDetailsHero({
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onRefresh}
-                  disabled={loading}
-                  aria-label="Refresh node details"
-                  className="h-7 w-7 p-0"
-                >
-                  <RefreshIcon className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh</TooltipContent>
-            </Tooltip>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              disabled={loading}
+              aria-label="Refresh node details"
+              className="gap-1 h-7 px-2 text-xs"
+            >
+              <RefreshIcon className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+              Refresh
+            </Button>
             {nodeAction ? (
               <Button
                 variant="outline"

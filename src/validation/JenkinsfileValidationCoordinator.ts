@@ -24,16 +24,8 @@ import type {
 } from "./JenkinsfileValidationStatusProvider";
 import type { JenkinsfileValidationConfig } from "./JenkinsfileValidationTypes";
 
-interface JenkinsfileValidationRuntimeSurface {
-  start(): void;
-  updateConfig(config: JenkinsfileValidationConfig): void;
-}
-
 export class JenkinsfileValidationCoordinator
-  implements
-    vscode.Disposable,
-    JenkinsfileValidationStatusProvider,
-    JenkinsfileValidationRuntimeSurface
+  implements vscode.Disposable, JenkinsfileValidationStatusProvider
 {
   private readonly diagnostics = vscode.languages.createDiagnosticCollection("Jenkinsfile");
   private readonly outputChannel = vscode.window.createOutputChannel("Jenkinsfile Validation");
@@ -62,6 +54,7 @@ export class JenkinsfileValidationCoordinator
 
   readonly onDidChangeValidationStatus = this.statusEmitter.event;
 
+  // fallow-ignore-next-line unused-class-member
   start(): void {
     this.subscriptions.push(
       vscode.workspace.onDidSaveTextDocument((document) => {
@@ -106,6 +99,7 @@ export class JenkinsfileValidationCoordinator
     );
   }
 
+  // fallow-ignore-next-line unused-class-member
   updateConfig(config: JenkinsfileValidationConfig): void {
     const patternsChanged = !areStringArraysEqual(this.config.filePatterns, config.filePatterns);
     this.config = config;

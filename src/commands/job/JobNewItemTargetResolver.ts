@@ -15,14 +15,10 @@ import type { JobNewItemTarget } from "./JobNewItemWorkflow";
 
 export type JobNewItemTreeTarget = InstanceTreeItem | JobsFolderTreeItem | JenkinsFolderTreeItem;
 
-interface JobNewItemTargetResolverSurface {
-  resolveFromTreeItem(item: JobNewItemTreeTarget): JobNewItemTarget | undefined;
-  resolveFromEnvironmentPicker(): Promise<JobNewItemTarget | undefined>;
-}
-
-export class JobNewItemTargetResolver implements JobNewItemTargetResolverSurface {
+export class JobNewItemTargetResolver {
   constructor(private readonly environmentStore: JenkinsEnvironmentStore) {}
 
+  // fallow-ignore-next-line unused-class-member
   resolveFromTreeItem(item: JobNewItemTreeTarget): JobNewItemTarget | undefined {
     if (item instanceof InstanceTreeItem) {
       return {
@@ -54,6 +50,7 @@ export class JobNewItemTargetResolver implements JobNewItemTargetResolverSurface
     };
   }
 
+  // fallow-ignore-next-line unused-class-member
   async resolveFromEnvironmentPicker(): Promise<JobNewItemTarget | undefined> {
     const environments = await this.environmentStore.listEnvironmentsWithScope();
     if (environments.length === 0) {

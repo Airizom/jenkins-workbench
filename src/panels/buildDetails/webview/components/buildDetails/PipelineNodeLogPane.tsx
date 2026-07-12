@@ -13,14 +13,10 @@ import {
   XIcon
 } from "../../../../shared/webview/icons";
 import type { PipelineNodeLogViewModel } from "../../../shared/BuildDetailsContracts";
-import { useConsoleOutputScroll } from "../../hooks/useConsoleOutputScroll";
-import { useConsoleSearch } from "../../hooks/useConsoleSearch";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
-import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";
-import { ConsoleLogSearchBody } from "../ConsoleLogSearchBody";
-import { buildConsoleTruncationNote, countConsoleLines } from "./consoleOutput/consoleOutputUtils";
+import { ConsoleLogViewer } from "./ConsoleLogViewer";
 
-const { useEffect, useMemo, useState } = React;
+const { useState } = React;
 export function PipelineNodeLogPane({
   log,
   htmlModel,
@@ -37,41 +33,7 @@ export function PipelineNodeLogPane({
   isActive: boolean;
 }) {
   const [followLog, setFollowLog] = useState(true);
-  const sourceText = htmlModel?.text ?? log.text;
-  const consoleSearch = useConsoleSearch(sourceText, isActive);
-  const segments = useMemo(() => {
-    if (htmlModel) {
-      return renderConsoleHtmlWithHighlights(
-        htmlModel,
-        consoleSearch.matches,
-        consoleSearch.activeMatchIndex,
-        onOpenExternal
-      );
-    }
-    return consoleSearch.consoleSegments;
-  }, [
-    htmlModel,
-    consoleSearch.matches,
-    consoleSearch.activeMatchIndex,
-    consoleSearch.consoleSegments,
-    onOpenExternal
-  ]);
-  const scrollKey = `${log.target?.key ?? "none"}-${sourceText.length}-${log.error ?? ""}`;
-  const { showScrollToTop, scrollConsoleToBottom, scrollConsoleToTop } = useConsoleOutputScroll(
-    consoleSearch.consoleOutputRef,
-    scrollKey
-  );
-  const hasOutput = sourceText.length > 0;
-  const lineCount = useMemo(() => countConsoleLines(sourceText), [sourceText]);
-  const note = useMemo(() => buildConsoleTruncationNote(log.truncated, 0), [log.truncated]);
   const consoleUrl = log.consoleUrl;
-
-  useEffect(() => {
-    if (!isActive || !followLog || consoleSearch.isSearchActive) {
-      return;
-    }
-    scrollConsoleToBottom();
-  }, [isActive, followLog, scrollKey, consoleSearch.isSearchActive, scrollConsoleToBottom]);
 
   if (!log.target) {
     return (
@@ -80,74 +42,82 @@ export function PipelineNodeLogPane({
       </aside>
     );
   }
+  const target = log.target;
 
   return (
     <aside className="rounded border border-card-border bg-card shadow-widget">
-      <div className="flex flex-col gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {log.target.kind === "stage" ? "Stage Log" : "Step Log"}
+      <ConsoleLogViewer
+        text={log.text}
+        htmlModel={htmlModel}
+        truncated={log.truncated}
+        maxChars={0}
+        error={log.error}
+        followLog={followLog}
+        isActive={isActive}
+        scrollKeyPrefix={target.key}
+        bodyClassName="space-y-2 p-3"
+        onOpenExternal={onOpenExternal}
+        renderHeader={({ hasOutput, lineCount, openSearchToolbar }) => (
+          <div className="flex flex-col gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {target.kind === "stage" ? "Stage Log" : "Step Log"}
+              </div>
+              <div className="truncate text-sm font-semibold">{target.name}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {log.loading ? "Loading" : `${lineCount.toLocaleString()} lines`}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={openSearchToolbar}>
+                    <SearchIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Search log</TooltipContent>
+              </Tooltip>
+              {consoleUrl ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={() => onOpenExternal(consoleUrl)}>
+                      <ExternalLinkIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open in Jenkins</TooltipContent>
+                </Tooltip>
+              ) : null}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" disabled={!hasOutput} onClick={onExport}>
+                    <DownloadIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Export log</TooltipContent>
+              </Tooltip>
+              <div className="mx-1 h-5 w-px bg-border" />
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Switch
+                  id="pipeline-node-log-follow"
+                  checked={followLog}
+                  onCheckedChange={setFollowLog}
+                />
+                <label htmlFor="pipeline-node-log-follow" className="select-none">
+                  Follow
+                </label>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={onClear}>
+                    <XIcon className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Close log</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
-          <div className="truncate text-sm font-semibold">{log.target.name}</div>
-          <div className="text-[11px] text-muted-foreground">
-            {log.loading ? "Loading" : `${lineCount.toLocaleString()} lines`}
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={consoleSearch.openSearchToolbar}>
-                <SearchIcon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Search log</TooltipContent>
-          </Tooltip>
-          {consoleUrl ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => onOpenExternal(consoleUrl)}>
-                  <ExternalLinkIcon />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Open in Jenkins</TooltipContent>
-            </Tooltip>
-          ) : null}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" disabled={!hasOutput} onClick={onExport}>
-                <DownloadIcon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Export log</TooltipContent>
-          </Tooltip>
-          <div className="mx-1 h-5 w-px bg-border" />
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <Switch checked={followLog} onCheckedChange={setFollowLog} />
-            <span>Follow</span>
-          </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onClear}>
-                <XIcon />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Close log</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      <div className="space-y-2 p-3">
-        <ConsoleLogSearchBody
-          consoleSearch={consoleSearch}
-          note={note}
-          error={log.error}
-          hasOutput={hasOutput}
-          followLog={followLog}
-          showScrollToTop={showScrollToTop}
-          onScrollToTop={scrollConsoleToTop}
-          segments={segments}
-        />
-      </div>
+        )}
+      />
     </aside>
   );
 }

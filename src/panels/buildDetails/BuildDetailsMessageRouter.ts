@@ -15,6 +15,7 @@ import {
   isOpenExternalMessage,
   isOpenTestSourceMessage,
   isPersistUiStateMessage,
+  isRefreshBuildDetailsMessage,
   isRejectInputMessage,
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
@@ -35,6 +36,7 @@ export interface BuildDetailsMessageRouterHandlers {
   onReloadTestReport(message: ReloadTestReportMessage): void;
   onOpenTestSource(message: OpenTestSourceMessage): void;
   onPersistUiState(message: PersistUiStateMessage): void;
+  onRefreshBuildDetails(): void;
   onToggleFollowLog(value: unknown): void;
 }
 
@@ -52,6 +54,10 @@ export class BuildDetailsMessageRouter {
     }
     if (isExportConsoleMessage(message)) {
       this.handlers.onExportConsole();
+      return;
+    }
+    if (isRefreshBuildDetailsMessage(message)) {
+      this.handlers.onRefreshBuildDetails();
       return;
     }
     if (isApproveInputMessage(message)) {

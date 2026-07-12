@@ -17,7 +17,7 @@ export class RestartFromStageResponseParser {
   private static readonly UNEXPECTED_RESPONSE_MESSAGE =
     "Unexpected response from Jenkins restart endpoint.";
   private static readonly REJECTED_RESPONSE_MESSAGE = "Jenkins rejected the restart request.";
-  private static readonly OK_STATUSES = new Set(["ok", "success"]);
+  private static readonly MISSING_ENDPOINT_STATUS_PATTERN = /\b404\b/;
 
   parseRestartFromStageInfo(response: unknown): JenkinsRestartFromStageInfo {
     const payload = this.unwrapJenkinsResponse(response);
@@ -68,7 +68,7 @@ export class RestartFromStageResponseParser {
     if (this.isLikelySuccessfulRestartResponse(responseText)) {
       return this.successResult(message);
     }
-    if (this.isHtmlDocument(responseText.toLowerCase())) {
+    if (this.isHtmlDocument(responseText)) {
       return this.failureResult(RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE);
     }
     return this.failureResult(
@@ -98,7 +98,14 @@ export class RestartFromStageResponseParser {
       return value;
     }
     if (typeof value === "string") {
-      const normalized = value.trim().toLowerCase();
+      const trimmed = value.trim();
+      if (trimmed === "true") {
+        return true;
+      }
+      if (trimmed === "false") {
+        return false;
+      }
+      const normalized = trimmed.toLowerCase();
       if (normalized === "true") {
         return true;
       }
@@ -121,14 +128,22 @@ export class RestartFromStageResponseParser {
     if (!Array.isArray(value)) {
       return [];
     }
-    const seen = new Set<string>();
     const stages: string[] = [];
+    let seen: Set<string> | undefined;
     for (const entry of value) {
       if (typeof entry !== "string") {
         continue;
       }
       const trimmed = entry.trim();
-      if (trimmed.length === 0 || seen.has(trimmed)) {
+      if (trimmed.length === 0) {
+        continue;
+      }
+      if (stages.length === 0) {
+        stages.push(trimmed);
+        continue;
+      }
+      seen ??= new Set(stages);
+      if (seen.has(trimmed)) {
         continue;
       }
       seen.add(trimmed);
@@ -145,7 +160,8 @@ export class RestartFromStageResponseParser {
   }
 
   private tryParseJson(value: string): unknown | undefined {
-    if (!value.startsWith("{") && !value.startsWith("[")) {
+    const firstCharacter = value[0];
+    if (firstCharacter !== "{" && firstCharacter !== "[") {
       return undefined;
     }
     try {
@@ -156,37 +172,47 @@ export class RestartFromStageResponseParser {
   }
 
   private isMissingRestartEndpointResponse(responseText: string): boolean {
-    if (!responseText) {
+    if (!responseText || !responseText.includes("404")) {
       return false;
     }
 
     const normalized = responseText.toLowerCase();
-    const hasHtml = this.isHtmlDocument(normalized);
-    const has404 = /\b404\b/.test(normalized);
-    const hasNotFound = normalized.includes("not found");
-    const hasHttpError = normalized.includes("http error");
-    return (hasHtml && has404) || (has404 && (hasNotFound || hasHttpError));
+    if (!RestartFromStageResponseParser.MISSING_ENDPOINT_STATUS_PATTERN.test(normalized)) {
+      return false;
+    }
+
+    return (
+      this.isHtmlDocument(normalized) ||
+      normalized.includes("not found") ||
+      normalized.includes("http error")
+    );
   }
 
   private isLikelySuccessfulRestartResponse(trimmedResponse: string): boolean {
-    if (!trimmedResponse) {
-      return true;
-    }
-
-    const normalized = trimmedResponse.toLowerCase();
-    if (this.isSuccessStatus(normalized)) {
-      return true;
-    }
-
-    return false;
+    return !trimmedResponse || this.isSuccessStatus(trimmedResponse);
   }
 
   private isHtmlDocument(value: string): boolean {
-    return value.startsWith("<!doctype") || value.startsWith("<html");
+    if (!value.startsWith("<")) {
+      return false;
+    }
+    if (value.startsWith("<!doctype") || value.startsWith("<html")) {
+      return true;
+    }
+    return (
+      value.slice(0, 9).toLowerCase() === "<!doctype" || value.slice(0, 5).toLowerCase() === "<html"
+    );
   }
 
   private isSuccessStatus(value: string | undefined): boolean {
-    return value ? RestartFromStageResponseParser.OK_STATUSES.has(value.toLowerCase()) : false;
+    if (!value) {
+      return false;
+    }
+    if (value === "ok" || value === "success") {
+      return true;
+    }
+    const normalized = value.toLowerCase();
+    return normalized === "ok" || normalized === "success";
   }
 
   private successResult(message?: string): RestartPipelineAttemptResult {

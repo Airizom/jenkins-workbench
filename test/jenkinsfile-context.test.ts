@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { analyzeJenkinsfileContext } from "../src/jenkinsfile/JenkinsfileContextAnalyzer";
 import {
   analyzeActiveCallArguments,
@@ -9,7 +9,10 @@ import {
   findPartialIdentifier,
   isValidStepStart
 } from "../src/jenkinsfile/context/JenkinsfileContextNavigation";
-import { computeIsStepAllowed } from "../src/jenkinsfile/context/JenkinsfileContextRules";
+import {
+  computeHasNodeContext,
+  computeIsStepAllowed
+} from "../src/jenkinsfile/context/JenkinsfileContextRules";
 import { maskGroovyText } from "../src/jenkinsfile/context/JenkinsfileGroovyTextMasker";
 
 const CURSOR = "/*cursor*/";
@@ -141,6 +144,7 @@ pipeline {
 
     assert.deepEqual(stepsAnalysis.blockPath, ["pipeline", "stages", "stage", "steps"]);
     assert.equal(stepsAnalysis.isStepAllowed, true);
+    assert.equal(stepsAnalysis.hasNodeContext, true);
     assert.equal(stepsAnalysis.activeCall?.name, "sh");
     assert.equal(stepsAnalysis.argumentContext?.activeName, "script");
 
@@ -153,9 +157,12 @@ pipeline {
 
     assert.deepEqual(environmentAnalysis.blockPath, ["pipeline", "environment"]);
     assert.equal(environmentAnalysis.isStepAllowed, false);
+    assert.equal(environmentAnalysis.hasNodeContext, false);
     assert.equal(computeIsStepAllowed(["pipeline"]), false);
     assert.equal(computeIsStepAllowed(["pipeline", "post", "always"]), true);
     assert.equal(computeIsStepAllowed(["pipeline", "environment"]), false);
+    assert.equal(computeHasNodeContext(["pipeline", "steps"]), true);
+    assert.equal(computeHasNodeContext(["pipeline", "environment"]), false);
   });
 
   it("validates step-start navigation around member access and keyword prefixes", () => {

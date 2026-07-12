@@ -8,7 +8,11 @@ import { buildNodeCapacityErrorViewModel } from "../shared/nodeCapacity/NodeCapa
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import { NodeDetailsPanel } from "./NodeDetailsPanel";
-import { renderLoadingHtml, renderNodeCapacityHtml } from "./nodeCapacity/NodeCapacityRenderer";
+import {
+  nodeCapacityWebviewEntryName,
+  renderLoadingHtml,
+  renderNodeCapacityHtml
+} from "./nodeCapacity/NodeCapacityRenderer";
 import {
   type NodeCapacityOutgoingMessage,
   isLoadNodeCapacityExecutorsMessage,
@@ -119,7 +123,7 @@ export class NodeCapacityPanel {
     const restored = await resolveRestoredPanelEnvironment({
       panel: revived.panel,
       extensionUri: revived.extensionUri,
-      entryName: "nodeCapacity",
+      entryName: nodeCapacityWebviewEntryName,
       state,
       isValidState: isSerializedEnvironmentState,
       environmentStore: options.environmentStore,
@@ -219,7 +223,7 @@ export class NodeCapacityPanel {
       const assets = resolvePanelAssetsAndRenderLoading({
         panel: this.panel,
         extensionUri: this.extensionUri,
-        entryName: "nodeCapacity",
+        entryName: nodeCapacityWebviewEntryName,
         nonce: this.nonce,
         panelState,
         errorOptions: createMissingPanelAssetsMessages({

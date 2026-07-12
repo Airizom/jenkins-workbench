@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import * as React from "react";
+import type { CompareSectionStatus } from "../../../../shared/BuildCompareContracts";
 import { EmptyState } from "./EmptyState";
 import { SectionCard } from "./SectionCard";
 
@@ -9,7 +10,7 @@ type CompareItemsSectionProps<TItem> = {
   title: string;
   summary: string;
   detail?: string;
-  status: string;
+  status: CompareSectionStatus;
   items: TItem[];
   emptyLabel: string;
   renderItem: (item: TItem) => ReactNode;

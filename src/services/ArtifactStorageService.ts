@@ -146,7 +146,18 @@ function sanitizeArtifactRelativePath(relativePath: string): string {
 }
 
 function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): string | undefined {
-  const normalized = normalizePosixRelativePath(downloadRoot);
+  const trimmedRoot = downloadRoot.trim();
+  const rootSegments = trimmedRoot.replace(/\\/g, "/").split("/");
+  if (
+    !trimmedRoot ||
+    path.posix.isAbsolute(trimmedRoot) ||
+    path.win32.parse(trimmedRoot).root !== "" ||
+    rootSegments.includes("..")
+  ) {
+    return undefined;
+  }
+
+  const normalized = normalizePosixRelativePath(trimmedRoot);
   if (!normalized) {
     return undefined;
   }

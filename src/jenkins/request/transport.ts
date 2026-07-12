@@ -2,7 +2,7 @@ import * as http from "node:http";
 import * as https from "node:https";
 import { JenkinsRequestError } from "../errors";
 
-const DEFAULT_TIMEOUT_MS = 30000;
+export const DEFAULT_TIMEOUT_MS = 30000;
 
 export function buildRequestHeaders(options: {
   parseJson?: boolean;

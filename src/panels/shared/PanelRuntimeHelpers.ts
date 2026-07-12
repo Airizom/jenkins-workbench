@@ -128,28 +128,6 @@ function replaceRefreshSubscription(
   return refreshHost.onDidRefreshEnvironment(listener);
 }
 
-function beginLoadingRequest(
-  loadingRequests: number,
-  postLoading: (value: boolean) => void
-): number {
-  const next = loadingRequests + 1;
-  if (next === 1) {
-    postLoading(true);
-  }
-  return next;
-}
-
-function endLoadingRequest(loadingRequests: number, postLoading: (value: boolean) => void): number {
-  if (loadingRequests === 0) {
-    return 0;
-  }
-  const next = loadingRequests - 1;
-  if (next === 0) {
-    postLoading(false);
-  }
-  return next;
-}
-
 export class LoadTokenTracker {
   private token = 0;
 
@@ -193,10 +171,19 @@ export class PanelLoadTracker {
   }
 
   beginLoading(): void {
-    this.loadingRequests = beginLoadingRequest(this.loadingRequests, this.postLoading);
+    this.loadingRequests += 1;
+    if (this.loadingRequests === 1) {
+      this.postLoading(true);
+    }
   }
 
   endLoading(): void {
-    this.loadingRequests = endLoadingRequest(this.loadingRequests, this.postLoading);
+    if (this.loadingRequests === 0) {
+      return;
+    }
+    this.loadingRequests -= 1;
+    if (this.loadingRequests === 0) {
+      this.postLoading(false);
+    }
   }
 }

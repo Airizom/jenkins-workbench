@@ -18,7 +18,14 @@ import {
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
 import { PipelineStagesSection } from "./PipelineStagesSection";
-import { hasPipelineLogTarget } from "./pipelineLogTargets";
+import {
+  type PipelineSectionBodyKind,
+  derivePipelineSectionView,
+  findStageLogTarget,
+  isPipelinePresentation,
+  planRestoredLogTarget,
+  resolvePersistedPipelineLogTarget
+} from "./pipelineSectionModel";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
 import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 
@@ -69,18 +76,16 @@ export function PipelineSection({
   );
   const restoredLogConsumedRef = useRef(false);
   const [fallbackNotice, setFallbackNotice] = useState<string | undefined>();
-  const hasStages = stages.length > 0;
-  const showPlaceholder = loading && !hasStages;
-  const canValidateLogTarget = hasStages || !loading;
+  const view = derivePipelineSectionView(loading, stages.length, presentation);
+  const canValidateLogTarget = view.canValidateLogTarget;
 
   useEffect(() => {
-    const selectedPipelineLogTarget =
-      pipelineNodeLog.target &&
-      (!canValidateLogTarget || hasPipelineLogTarget(stages, pipelineNodeLog.target))
-        ? pipelineNodeLog.target
-        : !canValidateLogTarget
-          ? restoredLogTarget
-          : undefined;
+    const selectedPipelineLogTarget = resolvePersistedPipelineLogTarget({
+      currentTarget: pipelineNodeLog.target,
+      restoredTarget: restoredLogTarget,
+      canValidateLogTarget,
+      stages
+    });
     persistBuildDetailsUiState({
       pipelinePresentation: presentation,
       selectedGraphStageKey: selectedStageKey,
@@ -99,15 +104,19 @@ export function PipelineSection({
     // Restore the persisted log selection at most once; marking it consumed
     // before firing keeps a later user close (target -> undefined) from
     // reopening the pane and avoids reposting the selection on every render.
-    if (restoredLogConsumedRef.current || !restoredLogTarget) {
-      return;
-    }
-    if (!canValidateLogTarget) {
+    const plan = planRestoredLogTarget({
+      alreadyConsumed: restoredLogConsumedRef.current,
+      restoredTarget: restoredLogTarget,
+      canValidateLogTarget,
+      currentTarget: pipelineNodeLog.target,
+      stages
+    });
+    if (!plan.consume) {
       return;
     }
     restoredLogConsumedRef.current = true;
-    if (!pipelineNodeLog.target && hasPipelineLogTarget(stages, restoredLogTarget)) {
-      onSelectPipelineLog(restoredLogTarget);
+    if (plan.targetToRestore) {
+      onSelectPipelineLog(plan.targetToRestore);
     }
   }, [
     canValidateLogTarget,
@@ -117,7 +126,27 @@ export function PipelineSection({
     onSelectPipelineLog
   ]);
 
-  if (!loading && !hasStages) {
+  const handlePresentationChange = (value: string) => {
+    if (isPipelinePresentation(value)) {
+      setFallbackNotice(undefined);
+      setPresentation(value);
+    }
+  };
+
+  const handleSelectGraphStage = (stageKey: string | undefined) => {
+    setSelectedStageKey(stageKey);
+    const target = findStageLogTarget(stages, stageKey);
+    if (target) {
+      onSelectPipelineLog(target);
+    }
+  };
+
+  const handleGraphError = () => {
+    setFallbackNotice("Graph layout failed for the current pipeline. Showing list view instead.");
+    setPresentation("list");
+  };
+
+  if (view.hidden) {
     return null;
   }
 
@@ -136,12 +165,7 @@ export function PipelineSection({
         <ToggleGroup
           type="single"
           value={presentation}
-          onValueChange={(value) => {
-            if (value === "graph" || value === "list") {
-              setFallbackNotice(undefined);
-              setPresentation(value);
-            }
-          }}
+          onValueChange={handlePresentationChange}
           aria-label="Pipeline presentation"
         >
           <ToggleGroupItem value="graph" aria-label="Graph view">
@@ -159,48 +183,18 @@ export function PipelineSection({
         </Alert>
       ) : null}
 
-      {loading && hasStages ? <LoadingBanner /> : null}
+      {view.showLoadingBanner ? <LoadingBanner /> : null}
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.9fr)]">
         <div className="min-w-0">
-          {showPlaceholder ? (
-            <PipelineStagesPlaceholder />
-          ) : presentation === "graph" ? (
-            <Suspense
-              fallback={
-                <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-sm text-muted-foreground shadow-widget">
-                  Loading graph tools…
-                </div>
-              }
-            >
-              <LazyPipelineGraphSection
-                stages={stages}
-                selectedStageKey={selectedStageKey}
-                onSelectStage={(stageKey) => {
-                  setSelectedStageKey(stageKey);
-                  const stage = stageKey ? findStageByKey(stages, stageKey) : undefined;
-                  const target = stage?.logTarget;
-                  if (target) {
-                    onSelectPipelineLog(target);
-                  }
-                }}
-                onRestartStage={onRestartStage}
-                onSelectPipelineLog={onSelectPipelineLog}
-                onGraphError={() => {
-                  setFallbackNotice(
-                    "Graph layout failed for the current pipeline. Showing list view instead."
-                  );
-                  setPresentation("list");
-                }}
-              />
-            </Suspense>
-          ) : (
-            <PipelineStagesSection
-              stages={stages}
-              loading={loading}
-              onRestartStage={onRestartStage}
-              onSelectPipelineLog={onSelectPipelineLog}
-            />
-          )}
+          <PipelineSectionBody
+            body={view.body}
+            stages={stages}
+            selectedStageKey={selectedStageKey}
+            onSelectStage={handleSelectGraphStage}
+            onRestartStage={onRestartStage}
+            onSelectPipelineLog={onSelectPipelineLog}
+            onGraphError={handleGraphError}
+          />
         </div>
         <PipelineNodeLogPane
           log={pipelineNodeLog}
@@ -215,10 +209,59 @@ export function PipelineSection({
   );
 }
 
+function PipelineSectionBody({
+  body,
+  stages,
+  selectedStageKey,
+  onSelectStage,
+  onRestartStage,
+  onSelectPipelineLog,
+  onGraphError
+}: {
+  body: PipelineSectionBodyKind;
+  stages: PipelineStageViewModel[];
+  selectedStageKey?: string;
+  onSelectStage: (stageKey: string | undefined) => void;
+  onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
+  onGraphError: () => void;
+}) {
+  if (body === "placeholder") {
+    return <PipelineStagesPlaceholder />;
+  }
+  if (body === "graph") {
+    return (
+      <Suspense
+        fallback={
+          <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-sm text-muted-foreground shadow-widget">
+            Loading graph tools…
+          </div>
+        }
+      >
+        <LazyPipelineGraphSection
+          stages={stages}
+          selectedStageKey={selectedStageKey}
+          onSelectStage={onSelectStage}
+          onRestartStage={onRestartStage}
+          onSelectPipelineLog={onSelectPipelineLog}
+          onGraphError={onGraphError}
+        />
+      </Suspense>
+    );
+  }
+  return (
+    <PipelineStagesSection
+      stages={stages}
+      onRestartStage={onRestartStage}
+      onSelectPipelineLog={onSelectPipelineLog}
+    />
+  );
+}
+
 function readPresentationFromState(): PipelinePresentation {
   const persisted = getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
   const presentation = persisted.pipelinePresentation;
-  return presentation === "graph" || presentation === "list" ? presentation : DEFAULT_PRESENTATION;
+  return isPipelinePresentation(presentation) ? presentation : DEFAULT_PRESENTATION;
 }
 
 function readSelectedStageKeyFromState(): string | undefined {
@@ -238,20 +281,4 @@ function persistBuildDetailsUiState(nextState: {
   selectedPipelineLogTarget?: PipelineLogTargetViewModel;
 }): void {
   setBuildDetailsPanelUiState(nextState);
-}
-
-function findStageByKey(
-  stages: PipelineStageViewModel[],
-  key: string
-): PipelineStageViewModel | undefined {
-  for (const stage of stages) {
-    if (stage.key === key) {
-      return stage;
-    }
-    const branch = findStageByKey(stage.parallelBranches, key);
-    if (branch) {
-      return branch;
-    }
-  }
-  return undefined;
 }

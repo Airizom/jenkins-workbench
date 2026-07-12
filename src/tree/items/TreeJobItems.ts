@@ -2,12 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { ActivityGroupKind } from "../ActivityTypes";
-import {
-  ROOT_TREE_JOB_SCOPE,
-  type TreeJobScope,
-  buildTreeJobScopeKey,
-  createViewTreeJobScope
-} from "../TreeJobScope";
+import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, createViewTreeJobScope } from "../TreeJobScope";
 import {
   formatMultibranchFolderDescription,
   formatMultibranchFolderTooltip
@@ -20,6 +15,7 @@ import {
   isJobColorDisabled,
   jobIcon
 } from "../formatters";
+import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 const EYE_ICON = new vscode.ThemeIcon("eye");
 const FOLDER_ICON = new vscode.ThemeIcon("folder");
@@ -28,7 +24,7 @@ const WARNING_ICON = new vscode.ThemeIcon("warning");
 
 export class JenkinsViewTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef, viewUrl: string): string {
-    return `view:${environment.scope}:${environment.environmentId}:${viewUrl}`;
+    return buildEnvironmentTreeItemId("view", environment, viewUrl);
   }
 
   public readonly jobScope: TreeJobScope;
@@ -53,7 +49,7 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
     folderUrl: string,
     scope: TreeJobScope
   ): string {
-    return `folder:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(scope)}:${folderUrl}`;
+    return buildEnvironmentTreeItemId("folder", environment, scope, folderUrl);
   }
 
   constructor(
@@ -89,7 +85,7 @@ function buildJobLikeTreeItemId(
   jobUrl: string,
   jobScope: TreeJobScope
 ): string {
-  return `${presentation}:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${jobUrl}`;
+  return buildEnvironmentTreeItemId(presentation, environment, jobScope, jobUrl);
 }
 
 abstract class JobLikeTreeItem extends vscode.TreeItem {
@@ -224,7 +220,7 @@ export class StalePinnedJobTreeItem extends vscode.TreeItem {
     public readonly jobKind: "job" | "pipeline" = "job"
   ) {
     super(label, vscode.TreeItemCollapsibleState.None);
-    this.id = `stale-pinned:${environment.scope}:${environment.environmentId}:${jobUrl}`;
+    this.id = buildEnvironmentTreeItemId("stale-pinned", environment, jobUrl);
     this.contextValue = "stalePinnedItem pinned";
     const pathContext = formatPinnedJobPathContext(jobUrl);
     this.description = pathContext
@@ -245,19 +241,15 @@ function buildActivityDescription(
   isWatched: boolean,
   isPinned: boolean
 ): string | undefined {
-  const parts: string[] = [];
-  if (pathContext) {
-    parts.push(pathContext);
-  }
   const statusDescription = formatJobDescription({
     status: formatJobColor(color),
     isWatched,
     isPinned
   });
-  if (statusDescription) {
-    parts.push(statusDescription);
+  if (pathContext && statusDescription) {
+    return `${pathContext} • ${statusDescription}`;
   }
-  return parts.length > 0 ? parts.join(" • ") : undefined;
+  return pathContext || statusDescription;
 }
 
 function formatActivityJobTooltip(
@@ -266,15 +258,14 @@ function formatActivityJobTooltip(
   pathContext?: string,
   details?: string
 ): string | undefined {
-  const lines = [label];
+  let tooltip = label;
   if (pathContext) {
-    lines.push(pathContext);
+    tooltip += `\n${pathContext}`;
   }
   if (details && details !== pathContext) {
-    lines.push(details);
+    tooltip += `\n${details}`;
   }
-  lines.push(jobUrl);
-  return lines.join("\n");
+  return `${tooltip}\n${jobUrl}`;
 }
 
 function applyQuickAccessPresentation(
@@ -309,21 +300,16 @@ function buildPinnedQuickAccessDescription(
   color?: string,
   isWatched = false
 ): string | undefined {
-  const parts: string[] = [];
   const pathContext = formatPinnedJobPathContext(jobUrl);
   const statusDescription = formatJobDescription({
     status: formatJobColor(color),
     isWatched
   });
 
-  if (pathContext) {
-    parts.push(pathContext);
+  if (pathContext && statusDescription) {
+    return `${pathContext} • ${statusDescription}`;
   }
-  if (statusDescription) {
-    parts.push(statusDescription);
-  }
-
-  return parts.length > 0 ? parts.join(" • ") : undefined;
+  return pathContext || statusDescription;
 }
 
 function buildJobContextValue(

@@ -1,5 +1,4 @@
 import { getAttachedBranchName } from "../git/GitExtensionApi";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type {
   JenkinsRepositoryLinkEnvironment,
@@ -36,7 +35,10 @@ export class CurrentBranchLinkResolver {
       };
     }
 
-    const environment = await this.resolveEnvironment(link.environment);
+    const environment = await resolveCurrentBranchEnvironmentRef(
+      this.environmentStore,
+      link.environment
+    );
     if (!environment) {
       return {
         kind: "requestFailed",
@@ -63,12 +65,6 @@ export class CurrentBranchLinkResolver {
       link,
       environment
     };
-  }
-
-  private async resolveEnvironment(
-    environment: JenkinsRepositoryLinkEnvironment
-  ): Promise<JenkinsEnvironmentRef | undefined> {
-    return resolveCurrentBranchEnvironmentRef(this.environmentStore, environment);
   }
 
   private formatMissingEnvironmentMessage(environment: JenkinsRepositoryLinkEnvironment): string {

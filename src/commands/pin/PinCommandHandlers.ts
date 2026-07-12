@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { canonicalizeJobUrlForEnvironment } from "../../jenkins/urls";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -17,7 +18,6 @@ import {
   removeJobScopedState,
   withActionErrorMessage
 } from "../CommandUtils";
-import type { PinCommandRefreshHost } from "./PinCommandTypes";
 
 async function isPinnedJob(
   pinStore: JenkinsPinStore,
@@ -51,7 +51,7 @@ async function removePinnedJob(
 
 export async function pinJob(
   pinStore: JenkinsPinStore,
-  refreshHost: PinCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
   await addJobScopedState({
@@ -74,7 +74,7 @@ export async function pinJob(
 
 export async function unpinJob(
   pinStore: JenkinsPinStore,
-  refreshHost: PinCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: JobTreeItem | PipelineTreeItem | StalePinnedJobTreeItem
 ): Promise<void> {
   await removeJobScopedState({
@@ -91,7 +91,7 @@ export async function unpinJob(
 export async function removeMissingPins(
   dataService: JenkinsDataService,
   pinStore: JenkinsPinStore,
-  refreshHost: PinCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: PinnedJobsFolderTreeItem
 ): Promise<void> {
   if (!item) {

@@ -19,15 +19,16 @@ export class ActivityClassifier implements TreeActivityClassificationSurface {
     }
 
     const isRunning = isRunningJobColor(color);
+    if (isRunning) {
+      return { group: "running", isRunning };
+    }
+
     const status = resolveJobColorStatus(color);
     if (status === "failed") {
       return { group: "failing", isRunning };
     }
     if (status === "unstable") {
       return { group: "unstable", isRunning };
-    }
-    if (isRunning) {
-      return { group: "running", isRunning };
     }
     return undefined;
   }

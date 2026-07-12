@@ -18,12 +18,22 @@ const REPLAY_QUEUE_DISCOVERY_SETTLE_MS = 1000;
 
 interface JenkinsReplayQueueSnapshot {
   knownIds: Set<number>;
-  jobUrl: string;
+  normalizedJobUrl: string;
 }
 
 interface JenkinsQueueDiscoveryItem {
   id: number;
   taskUrl?: string;
+}
+
+interface ReplayQueueCandidateScan {
+  candidateId?: number;
+  hasMultipleCandidates: boolean;
+}
+
+interface ReplayQueueSettleState {
+  candidateId: number;
+  observedAt: number;
 }
 
 export class JenkinsReplayClient {
@@ -84,11 +94,16 @@ export class JenkinsReplayClient {
 
     try {
       const items = await this.getQueueDiscoveryItems();
+      const normalizedJobUrl = normalizeLocationForComparison(jobUrl);
+      const knownIds = new Set<number>();
+      for (const item of items) {
+        if (isSameNormalizedQueueTask(item.taskUrl, normalizedJobUrl)) {
+          knownIds.add(item.id);
+        }
+      }
       return {
-        jobUrl,
-        knownIds: new Set(
-          items.filter((item) => isSameQueueTask(item.taskUrl, jobUrl)).map((item) => item.id)
-        )
+        knownIds,
+        normalizedJobUrl
       };
     } catch {
       return undefined;
@@ -99,47 +114,27 @@ export class JenkinsReplayClient {
     snapshot: JenkinsReplayQueueSnapshot
   ): Promise<string | undefined> {
     const deadline = Date.now() + REPLAY_QUEUE_DISCOVERY_TIMEOUT_MS;
-    let candidateId: number | undefined;
-    let candidateObservedAt: number | undefined;
+    let settleState: ReplayQueueSettleState | undefined;
 
     while (Date.now() < deadline) {
       try {
-        const items = await this.getQueueDiscoveryItems();
-        const candidateIds = new Set(
-          items
-            .filter(
-              (item) =>
-                !snapshot.knownIds.has(item.id) && isSameQueueTask(item.taskUrl, snapshot.jobUrl)
-            )
-            .map((item) => item.id)
-        );
-
-        if (candidateId !== undefined && !candidateIds.has(candidateId)) {
-          candidateId = undefined;
-          candidateObservedAt = undefined;
-        }
-
-        if (candidateIds.size > 1) {
+        const scan = scanReplayQueueCandidates(await this.getQueueDiscoveryItems(), snapshot);
+        if (scan.hasMultipleCandidates) {
           return undefined;
         }
-
-        const nextCandidateId = candidateIds.values().next().value;
-        if (nextCandidateId === undefined) {
-          await delay(REPLAY_QUEUE_DISCOVERY_POLL_INTERVAL_MS);
-          continue;
-        }
-
-        if (candidateId !== nextCandidateId) {
-          candidateId = nextCandidateId;
-          candidateObservedAt = Date.now();
-        }
-
         if (
-          candidateId !== undefined &&
-          candidateObservedAt !== undefined &&
-          Date.now() - candidateObservedAt >= REPLAY_QUEUE_DISCOVERY_SETTLE_MS
+          scan.candidateId === undefined &&
+          settleState &&
+          (await this.hasReplayQueueCandidateStarted(settleState.candidateId, snapshot))
         ) {
-          return buildQueueItemLocation(this.context.baseUrl, candidateId);
+          return buildQueueItemLocation(this.context.baseUrl, settleState.candidateId);
+        }
+        settleState = advanceReplayQueueSettleState(settleState, scan.candidateId, Date.now());
+        if (
+          settleState &&
+          Date.now() - settleState.observedAt >= REPLAY_QUEUE_DISCOVERY_SETTLE_MS
+        ) {
+          return buildQueueItemLocation(this.context.baseUrl, settleState.candidateId);
         }
       } catch {
         return undefined;
@@ -147,6 +142,28 @@ export class JenkinsReplayClient {
       await delay(REPLAY_QUEUE_DISCOVERY_POLL_INTERVAL_MS);
     }
     return undefined;
+  }
+
+  private async hasReplayQueueCandidateStarted(
+    candidateId: number,
+    snapshot: JenkinsReplayQueueSnapshot
+  ): Promise<boolean> {
+    const tree = "id,task[url],executable[url]";
+    const url = buildApiUrlFromBase(
+      this.context.baseUrl,
+      `queue/item/${Math.floor(candidateId)}/api/json`,
+      tree
+    );
+    const response = await this.context.requestJson<{
+      id?: number;
+      task?: { url?: string };
+      executable?: { url?: string };
+    }>(url);
+    return (
+      response.id === candidateId &&
+      isSameNormalizedQueueTask(response.task?.url, snapshot.normalizedJobUrl) &&
+      typeof response.executable?.url === "string"
+    );
   }
 
   private async getQueueDiscoveryItems(): Promise<JenkinsQueueDiscoveryItem[]> {
@@ -158,13 +175,15 @@ export class JenkinsReplayClient {
     if (!Array.isArray(response.items)) {
       return [];
     }
-    return response.items.flatMap((item) => {
+    const items: JenkinsQueueDiscoveryItem[] = [];
+    for (const item of response.items) {
       const id = typeof item.id === "number" && Number.isFinite(item.id) ? item.id : undefined;
       if (id === undefined) {
-        return [];
+        continue;
       }
-      return [{ id, taskUrl: item.task?.url }];
-    });
+      items.push({ id, taskUrl: item.task?.url });
+    }
+    return items;
   }
 }
 
@@ -196,8 +215,47 @@ function resolveReplayJobUrl(environmentUrl: string, buildUrl: string): string |
   }
 }
 
-function isSameQueueTask(taskUrl: string | undefined, jobUrl: string): boolean {
-  return Boolean(taskUrl && areEquivalentLocations(taskUrl, jobUrl));
+function isSameNormalizedQueueTask(taskUrl: string | undefined, normalizedJobUrl: string): boolean {
+  return Boolean(taskUrl && normalizeLocationForComparison(taskUrl) === normalizedJobUrl);
+}
+
+// Find the single queue item that appeared after the replay was submitted.
+// More than one new item for the same job makes the replay's item ambiguous.
+function scanReplayQueueCandidates(
+  items: readonly JenkinsQueueDiscoveryItem[],
+  snapshot: JenkinsReplayQueueSnapshot
+): ReplayQueueCandidateScan {
+  let candidateId: number | undefined;
+  for (const item of items) {
+    if (
+      snapshot.knownIds.has(item.id) ||
+      !isSameNormalizedQueueTask(item.taskUrl, snapshot.normalizedJobUrl)
+    ) {
+      continue;
+    }
+    if (candidateId === undefined) {
+      candidateId = item.id;
+    } else if (candidateId !== item.id) {
+      return { candidateId, hasMultipleCandidates: true };
+    }
+  }
+  return { candidateId, hasMultipleCandidates: false };
+}
+
+// Track how long the same candidate has been observed; any change (including
+// the candidate disappearing) restarts the settle window.
+function advanceReplayQueueSettleState(
+  state: ReplayQueueSettleState | undefined,
+  nextCandidateId: number | undefined,
+  now: number
+): ReplayQueueSettleState | undefined {
+  if (nextCandidateId === undefined) {
+    return undefined;
+  }
+  if (state?.candidateId === nextCandidateId) {
+    return state;
+  }
+  return { candidateId: nextCandidateId, observedAt: now };
 }
 
 function classifyReplayBuildLocation(

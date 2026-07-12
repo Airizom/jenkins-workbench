@@ -21,6 +21,7 @@ export interface PipelineNodeLogFetcherOptions {
 }
 
 export class PipelineNodeLogFetcher {
+  private activeNodeId: string | undefined;
   private progressiveSupported: boolean | undefined;
   private progressiveOffset = 0;
   private annotator: string | undefined;
@@ -30,6 +31,7 @@ export class PipelineNodeLogFetcher {
 
   reset(): void {
     this.generation += 1;
+    this.activeNodeId = undefined;
     this.progressiveSupported = undefined;
     this.progressiveOffset = 0;
     this.annotator = undefined;
@@ -54,6 +56,8 @@ export class PipelineNodeLogFetcher {
       };
     }
 
+    this.ensureNodeState(nodeId);
+
     if (this.progressiveSupported !== false) {
       const progressive = await this.tryFetchProgressive(target, nodeId, initial, cached);
       if (progressive) {
@@ -67,6 +71,17 @@ export class PipelineNodeLogFetcher {
       nodeId
     );
     return { log: this.buildSnapshotLog(target, snapshot) };
+  }
+
+  private ensureNodeState(nodeId: string): void {
+    if (this.activeNodeId === nodeId) {
+      return;
+    }
+    this.generation += 1;
+    this.activeNodeId = nodeId;
+    this.progressiveSupported = undefined;
+    this.progressiveOffset = 0;
+    this.annotator = undefined;
   }
 
   private async tryFetchProgressive(

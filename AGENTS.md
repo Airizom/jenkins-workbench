@@ -94,9 +94,18 @@ If this is skipped, `resolveWebviewAssets(...)` throws and panel load fails.
   - Update message types + reducer + UI.
   - Test panel in both visible and hidden states (completion polling path differs).
 
-## 7) Fast Verification Path (No Full Automated Suite Here)
+## 7) Verification Path
 
-There is no meaningful automated test suite in this repo currently. Use this minimum gate:
+Automated coverage exists at two levels:
+
+- Unit tests: Vitest (`test/**/*.test.ts`, config in `vitest.config.ts`).
+  - `npm run test:unit` (fast), `npm run test:watch` (watch mode), `npm run test:coverage` (v8 coverage with thresholds).
+  - The `vscode` module is aliased to `test/helpers/vscodeStub.ts`; tests needing custom behavior use `vi.doMock("vscode", () => shim)` followed by a top-level `await import(...)` of the module under test. Never `require(...)` in tests.
+  - `npm run typecheck:test` type-checks test files (`tsconfig.test.json`, noEmit).
+  - `npm test` runs manifest/workflow validation + test typecheck + coverage; CI enforces coverage thresholds — if a legitimate change dips below one, adjust the threshold in `vitest.config.ts` in the same PR and say why.
+- Integration smoke tests: `npm run test:integration` (`@vscode/test-cli`, `.vscode-test.mjs`, `test/integration/`). Compiles the extension, downloads VS Code, and verifies activation + command registration in a real extension host.
+
+Unit tests do not exercise the webview UI or live Jenkins traffic. For changes to panels, tree interaction, or HTTP flows, still do the manual gate:
 
 1. `npm run compile`
 2. `npm run check`

@@ -1,5 +1,6 @@
 import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/JenkinsChangesetViewModel";
 import type { BuildHeaderViewModel } from "../../../shared/build/BuildHeaderLabels";
+import type { StatusVisualTone } from "../../shared/TestStatusStyles";
 
 export type CompareSectionStatus =
   | "loading"
@@ -29,6 +30,8 @@ export interface BuildCompareTestDiffItem {
   suiteName?: string;
   baselineStatusLabel: string;
   targetStatusLabel: string;
+  baselineStatusTone?: StatusVisualTone;
+  targetStatusTone?: StatusVisualTone;
   baselineDurationLabel?: string;
   targetDurationLabel?: string;
 }
@@ -65,6 +68,7 @@ export interface BuildCompareChangesetsSectionViewModel extends CompareSectionBa
 }
 
 export interface BuildCompareStageDiffItem {
+  key: string;
   name: string;
   changeType: "matched" | "added" | "removed";
   baselineStatusLabel?: string;
@@ -74,7 +78,10 @@ export interface BuildCompareStageDiffItem {
   baselineDurationLabel?: string;
   targetDurationLabel?: string;
   deltaLabel?: string;
+  deltaDirection?: BuildCompareStageDeltaDirection;
 }
+
+export type BuildCompareStageDeltaDirection = "slower" | "faster";
 
 export interface BuildCompareStagesSectionViewModel extends CompareSectionBaseViewModel {
   items: BuildCompareStageDiffItem[];

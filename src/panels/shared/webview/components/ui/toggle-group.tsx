@@ -11,7 +11,7 @@ export const ToggleGroup = React.forwardRef<
   <ToggleGroupPrimitive.Root
     ref={ref}
     className={cn(
-      "inline-flex items-center gap-1 rounded border border-border bg-muted-soft p-1",
+      "inline-flex items-center gap-1 rounded-md border border-border bg-muted-soft p-1",
       className
     )}
     {...props}
@@ -27,7 +27,7 @@ export const ToggleGroupItem = React.forwardRef<
   <ToggleGroupPrimitive.Item
     ref={ref}
     className={cn(
-      "inline-flex h-7 items-center justify-center rounded px-2.5 text-xs font-medium transition-colors",
+      "inline-flex h-7 items-center justify-center rounded-md px-2.5 text-xs font-medium transition-colors",
       "hover:bg-accent-soft hover:text-accent-foreground",
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       "disabled:pointer-events-none disabled:opacity-50",

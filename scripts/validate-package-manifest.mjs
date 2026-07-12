@@ -164,107 +164,89 @@ const matchesSchemaType = (value, type) => {
 };
 
 const validateValueAgainstSchema = (value, schema, pathLabel) => {
+  if (!schema || typeof schema !== "object") {
+    return [];
+  }
+
+  if (Array.isArray(schema.anyOf)) {
+    if (
+      schema.anyOf.some(
+        (childSchema) => validateValueAgainstSchema(value, childSchema, pathLabel).length === 0
+      )
+    ) {
+      return [];
+    }
+
+    return [`${pathLabel} does not match any allowed schema`];
+  }
+
+  if (Array.isArray(schema.oneOf)) {
+    const matchingSchemaCount = schema.oneOf.filter(
+      (childSchema) => validateValueAgainstSchema(value, childSchema, pathLabel).length === 0
+    ).length;
+
+    return matchingSchemaCount === 1 ? [] : [`${pathLabel} must match exactly one allowed schema`];
+  }
+
+  const validationErrors = [];
   const types = getSchemaTypes(schema);
 
   if (types.length > 0 && !types.some((type) => matchesSchemaType(value, type))) {
-    fail(`${pathLabel} default does not match schema type ${types.join(" | ")}`);
-    return;
+    return [`${pathLabel} does not match schema type ${types.join(" | ")}`];
   }
 
   if (typeof value === "number") {
     if (typeof schema.minimum === "number" && value < schema.minimum) {
-      fail(`${pathLabel} default ${value} is below minimum ${schema.minimum}`);
+      validationErrors.push(`${pathLabel} ${value} is below minimum ${schema.minimum}`);
     }
 
     if (typeof schema.maximum === "number" && value > schema.maximum) {
-      fail(`${pathLabel} default ${value} is above maximum ${schema.maximum}`);
+      validationErrors.push(`${pathLabel} ${value} is above maximum ${schema.maximum}`);
     }
   }
 
   if (Array.isArray(value) && schema.items) {
-    value.forEach((item, index) =>
-      validateValueAgainstSchema(item, schema.items, `${pathLabel}.default[${index}]`)
-    );
+    value.forEach((item, index) => {
+      validationErrors.push(
+        ...validateValueAgainstSchema(item, schema.items, `${pathLabel}[${index}]`)
+      );
+    });
   }
 
   if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     for (const requiredKey of schema.required ?? []) {
       if (!Object.hasOwn(value, requiredKey)) {
-        fail(`${pathLabel}.default is missing required key ${requiredKey}`);
-      }
-    }
-
-    if (schema.additionalProperties === false && schema.properties) {
-      for (const key of Object.keys(value)) {
-        if (!Object.hasOwn(schema.properties, key)) {
-          fail(`${pathLabel}.default contains unsupported key ${key}`);
-        }
-      }
-    }
-
-    for (const [key, childSchema] of Object.entries(schema.properties ?? {})) {
-      if (Object.hasOwn(value, key)) {
-        validateValueAgainstSchema(value[key], childSchema, `${pathLabel}.default.${key}`);
-      }
-    }
-  }
-};
-
-const valueMatchesSchema = (value, schema) => {
-  if (!schema || typeof schema !== "object") {
-    return true;
-  }
-
-  if (Array.isArray(schema.anyOf)) {
-    return schema.anyOf.some((childSchema) => valueMatchesSchema(value, childSchema));
-  }
-
-  if (Array.isArray(schema.oneOf)) {
-    return (
-      schema.oneOf.filter((childSchema) => valueMatchesSchema(value, childSchema)).length === 1
-    );
-  }
-
-  const types = getSchemaTypes(schema);
-  if (types.length > 0 && !types.some((type) => matchesSchemaType(value, type))) {
-    return false;
-  }
-
-  if (Array.isArray(value)) {
-    return schema.items ? value.every((item) => valueMatchesSchema(item, schema.items)) : true;
-  }
-
-  if (value !== null && typeof value === "object") {
-    for (const requiredKey of schema.required ?? []) {
-      if (!Object.hasOwn(value, requiredKey)) {
-        return false;
+        validationErrors.push(`${pathLabel} is missing required key ${requiredKey}`);
       }
     }
 
     const properties = schema.properties ?? {};
     for (const [key, childValue] of Object.entries(value)) {
       if (Object.hasOwn(properties, key)) {
-        if (!valueMatchesSchema(childValue, properties[key])) {
-          return false;
-        }
+        validationErrors.push(
+          ...validateValueAgainstSchema(childValue, properties[key], `${pathLabel}.${key}`)
+        );
         continue;
       }
 
       if (schema.additionalProperties === false) {
-        return false;
+        validationErrors.push(`${pathLabel} contains unsupported key ${key}`);
+        continue;
       }
 
-      if (
-        schema.additionalProperties &&
-        typeof schema.additionalProperties === "object" &&
-        !valueMatchesSchema(childValue, schema.additionalProperties)
-      ) {
-        return false;
+      if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
+        validationErrors.push(
+          ...validateValueAgainstSchema(
+            childValue,
+            schema.additionalProperties,
+            `${pathLabel}.${key}`
+          )
+        );
       }
     }
   }
 
-  return true;
+  return validationErrors;
 };
 
 const configurationProperties = packageJson.contributes?.configuration?.properties ?? {};
@@ -275,11 +257,13 @@ for (const [name, schema] of Object.entries(configurationProperties)) {
     continue;
   }
 
-  validateValueAgainstSchema(
+  for (const error of validateValueAgainstSchema(
     schema.default,
     schema,
-    `contributes.configuration.properties.${name}`
-  );
+    `contributes.configuration.properties.${name}.default`
+  )) {
+    fail(error);
+  }
 }
 
 const jenkinsTaskDefinition = (packageJson.contributes?.taskDefinitions ?? []).find(
@@ -300,7 +284,13 @@ if (!taskParametersSchema) {
   ];
 
   validTaskParameterExamples.forEach((example, index) => {
-    if (!valueMatchesSchema(example, taskParametersSchema)) {
+    if (
+      validateValueAgainstSchema(
+        example,
+        taskParametersSchema,
+        `jenkinsWorkbench task parameters example ${index + 1}`
+      ).length > 0
+    ) {
       fail(`jenkinsWorkbench task parameters schema rejects supported example ${index + 1}`);
     }
   });

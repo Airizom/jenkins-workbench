@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHost";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
@@ -7,10 +8,10 @@ import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsTaskRefreshHost } from "./JenkinsTaskRefreshHost";
 import {
   type JenkinsTaskDefinition,
   normalizeEnvironmentUrl,
+  normalizeOptionalString,
   normalizeTaskDefinition,
   parseTaskParameters
 } from "./JenkinsTaskTypes";
@@ -29,7 +30,7 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
     private readonly definition: JenkinsTaskDefinition,
     private readonly environmentStore: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
-    private readonly refreshHost: JenkinsTaskRefreshHost
+    private readonly refreshHost: FullEnvironmentRefreshHost
   ) {}
 
   open(): void {
@@ -231,12 +232,4 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
     void vscode.window.showErrorMessage(message);
     this.signalClose();
   }
-}
-
-function normalizeOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
 }

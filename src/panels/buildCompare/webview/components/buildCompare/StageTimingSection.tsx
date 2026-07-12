@@ -10,7 +10,7 @@ export function StageTimingSection({ section }: { section: BuildCompareStagesSec
       status={section.status}
       items={section.items}
       emptyLabel="No pipeline stage data to compare."
-      itemKey={(item) => `${item.changeType}:${item.name}`}
+      itemKey={(item) => item.key}
       renderItem={(item) => <StageDiffRow item={item} />}
     />
   );

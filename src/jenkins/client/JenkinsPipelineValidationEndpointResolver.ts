@@ -40,12 +40,18 @@ export class JenkinsPipelineValidationEndpointResolver {
     body: string,
     headers: Record<string, string>
   ): Promise<ValidationEndpointResolution> {
-    const response = await this.context.requestPostTextWithCrumbRaw(jsonUrl, body, headers, {
-      acceptErrorStatuses: [404, 405]
-    });
-    if (isMissingValidationEndpointResponse(response)) {
-      this.cachedEndpoint = "text";
-      return { endpoint: "text" };
+    let response: string;
+    try {
+      response = await this.context.requestPostTextWithCrumbRaw(jsonUrl, body, headers);
+    } catch (error) {
+      if (
+        error instanceof JenkinsRequestError &&
+        (error.statusCode === 404 || error.statusCode === 405)
+      ) {
+        this.cachedEndpoint = "text";
+        return { endpoint: "text" };
+      }
+      throw error;
     }
 
     if (isJsonResponse(response)) {
@@ -64,28 +70,4 @@ function isJsonResponse(response: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isMissingValidationEndpointResponse(response: string): boolean {
-  const trimmed = response.trim();
-  if (!trimmed) {
-    return false;
-  }
-  const lower = trimmed.toLowerCase();
-  const hasHtml = lower.startsWith("<!doctype") || lower.startsWith("<html");
-  const has404 = /\b404\b/.test(lower);
-  const has405 = /\b405\b/.test(lower);
-  const hasNotFound = lower.includes("not found");
-  const hasMethodNotAllowed = lower.includes("method not allowed");
-  const hasHttpError = lower.includes("http error");
-
-  if (hasHtml && (has404 || has405)) {
-    return true;
-  }
-
-  if ((has404 && hasNotFound) || (has405 && hasMethodNotAllowed)) {
-    return lower.length < 600 || hasHttpError;
-  }
-
-  return false;
 }

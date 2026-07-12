@@ -325,7 +325,7 @@ export async function removeEnvironment(
     return;
   }
 
-  await Promise.all([
+  const cleanupResults = await Promise.allSettled([
     presetStore.removePresetsForEnvironment(target.scope, target.id),
     watchStore.removeWatchesForEnvironment(target.scope, target.id),
     pinStore.removePinsForEnvironment(target.scope, target.id)
@@ -337,4 +337,13 @@ export async function removeEnvironment(
     url: target.url
   });
   refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
+
+  const cleanupFailures = cleanupResults.filter((result) => result.status === "rejected");
+  if (cleanupFailures.length > 0) {
+    void vscode.window.showErrorMessage(
+      `The environment was removed, but some related records could not be removed: ${cleanupFailures
+        .map((failure) => formatError(failure.reason))
+        .join("; ")}`
+    );
+  }
 }

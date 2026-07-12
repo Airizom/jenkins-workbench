@@ -3,6 +3,7 @@ import type { ScopedCache } from "../../services/ScopedCache";
 import type { TreeJobScope } from "../TreeJobScope";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { buildScopedEnvironmentKey, isEnvironmentScopedChildKey } from "./TreeCacheKeys";
 import {
   buildWorkspaceDirectoryChildrenKey,
   buildWorkspaceDirectoryChildrenPrefix,
@@ -66,8 +67,9 @@ export class TreeChildrenCacheManager {
       this.watchedUrlsCache.clear();
       return;
     }
+    const environmentSuffix = `:${environmentId}`;
     for (const key of this.watchedUrlsCache.keys()) {
-      if (key.endsWith(`:${environmentId}`)) {
+      if (key.endsWith(environmentSuffix)) {
         this.watchedUrlsCache.delete(key);
       }
     }
@@ -78,8 +80,9 @@ export class TreeChildrenCacheManager {
       this.pinnedUrlsCache.clear();
       return;
     }
+    const environmentSuffix = `:${environmentId}`;
     for (const key of this.pinnedUrlsCache.keys()) {
-      if (key.endsWith(`:${environmentId}`)) {
+      if (key.endsWith(environmentSuffix)) {
         this.pinnedUrlsCache.delete(key);
       }
     }
@@ -101,11 +104,7 @@ export class TreeChildrenCacheManager {
 
   clearChildrenCacheForKind(environment: JenkinsEnvironmentRef, kind: string): void {
     const prefix = `${this.childrenCache.buildEnvironmentKey(environment)}:${kind}:`;
-    for (const key of this.pendingLoads.keys()) {
-      if (key.startsWith(prefix)) {
-        this.clearChildrenCache(key);
-      }
-    }
+    this.clearPendingAndLoadTokensByPrefix(prefix);
     this.childrenCache.clearForEnvironmentKind(environment, kind);
   }
 
@@ -178,28 +177,15 @@ export class TreeChildrenCacheManager {
 
   private clearPendingAndLoadTokensForEnvironment(environmentId: string): void {
     for (const key of this.pendingLoads.keys()) {
-      if (this.isEnvironmentScopedChildKey(key, environmentId)) {
+      if (isEnvironmentScopedChildKey(key, environmentId)) {
         this.clearChildrenCache(key);
       }
     }
     for (const key of this.loadTokens.keys()) {
-      if (this.isEnvironmentScopedChildKey(key, environmentId) && !this.pendingLoads.has(key)) {
+      if (isEnvironmentScopedChildKey(key, environmentId) && !this.pendingLoads.has(key)) {
         this.loadTokens.delete(key);
       }
     }
-  }
-
-  private isEnvironmentScopedChildKey(key: string, environmentId: string): boolean {
-    if (key.startsWith(`${environmentId}:`)) {
-      return true;
-    }
-
-    const firstSeparator = key.indexOf(":");
-    const secondSeparator = key.indexOf(":", firstSeparator + 1);
-    if (firstSeparator < 0 || secondSeparator < 0) {
-      return false;
-    }
-    return key.slice(firstSeparator + 1, secondSeparator) === environmentId;
   }
 
   clearChildrenCache(key: string): void {
@@ -295,6 +281,6 @@ export class TreeChildrenCacheManager {
   }
 
   private environmentCacheKey(environment: JenkinsEnvironmentRef): string {
-    return `${environment.scope}:${environment.environmentId}`;
+    return buildScopedEnvironmentKey(environment);
   }
 }

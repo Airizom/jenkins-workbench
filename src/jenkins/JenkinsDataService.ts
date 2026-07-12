@@ -1,4 +1,8 @@
 import type {
+  BuildParameterPayload,
+  BuildParameterRequestPreparer
+} from "./BuildParameterRequests";
+import type {
   JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
@@ -14,11 +18,17 @@ import type {
 import type { JenkinsClientProvider } from "./JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
+import type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "./coverage/JenkinsCoverageTypes";
 import { JenkinsBuildDataOperations } from "./data/JenkinsBuildDataOperations";
+import {
+  JenkinsCoverageDataOperations,
+  type JenkinsCoverageRequestOptions
+} from "./data/JenkinsCoverageDataOperations";
 import { JenkinsDataRuntimeContext } from "./data/JenkinsDataRuntimeContext";
 import type {
-  BuildParameterPayload,
-  BuildParameterRequestPreparer,
   ConsoleTextResult,
   ConsoleTextTailResult,
   FlowNodeDetailsResult,
@@ -54,6 +64,9 @@ import type {
 
 export type {
   BuildParameterPayload,
+  BuildParameterRequestPreparer
+} from "./BuildParameterRequests";
+export type {
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobCollectionRequest,
@@ -71,6 +84,11 @@ export type {
   JobSearchEntry,
   JobSearchOptions
 } from "./data/JenkinsDataTypes";
+export type { JenkinsCoverageRequestOptions } from "./data/JenkinsCoverageDataOperations";
+export type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "./coverage/JenkinsCoverageTypes";
 export type {
   JenkinsReplayDefinition,
   JenkinsReplayResult,
@@ -118,6 +136,7 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
   private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
   private readonly buildOperations: JenkinsBuildDataOperations;
+  private readonly coverageOperations: JenkinsCoverageDataOperations;
   private readonly pendingInputOperations: JenkinsPendingInputDataOperations;
   private readonly nodeOperations: JenkinsNodeDataOperations;
   private readonly jobOperations: JenkinsJobDataOperations;
@@ -128,6 +147,7 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
     this.runtimeContext = new JenkinsDataRuntimeContext(clientProvider, options);
     this.jobIndex = new JenkinsJobIndex(this.runtimeContext.getCache(), clientProvider);
     this.buildOperations = new JenkinsBuildDataOperations(this.runtimeContext);
+    this.coverageOperations = new JenkinsCoverageDataOperations(this.runtimeContext);
     this.pendingInputOperations = new JenkinsPendingInputDataOperations(this.runtimeContext);
     this.nodeOperations = new JenkinsNodeDataOperations(this.runtimeContext);
     this.jobOperations = new JenkinsJobDataOperations(this.runtimeContext);
@@ -228,6 +248,30 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
     buildUrl: string
   ): Promise<JenkinsWorkflowRun | undefined> {
     return this.buildOperations.getWorkflowRun(environment, buildUrl);
+  }
+
+  async discoverCoverageActionPath(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: JenkinsCoverageRequestOptions
+  ): Promise<string | undefined> {
+    return this.coverageOperations.discoverCoverageActionPath(environment, buildUrl, options);
+  }
+
+  async getCoverageOverview(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: JenkinsCoverageRequestOptions
+  ): Promise<JenkinsCoverageOverview | undefined> {
+    return this.coverageOperations.getCoverageOverview(environment, buildUrl, options);
+  }
+
+  async getModifiedCoverageFiles(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: JenkinsCoverageRequestOptions
+  ): Promise<JenkinsModifiedCoverageFile[] | undefined> {
+    return this.coverageOperations.getModifiedCoverageFiles(environment, buildUrl, options);
   }
 
   async getPendingInputActions(

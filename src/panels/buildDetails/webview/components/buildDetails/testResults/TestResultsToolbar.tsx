@@ -29,7 +29,7 @@ export function TestResultsToolbar({
   onReloadWithLogs: () => void;
 }) {
   return (
-    <div className="sticky-header rounded border border-border bg-background/95 p-3 backdrop-blur">
+    <div className="sticky-header sticky-header--below-hero rounded border border-border bg-background/95 p-3 backdrop-blur">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <ToggleGroup

@@ -36,12 +36,9 @@ export function ExecutorUtilizationSummary({
   const ratio = utilization.ratio ?? 0;
   const percent = Math.round(ratio * 100);
 
+  // No role="img" wrapper: the busy/idle counts and percent are readable text.
   return (
-    <div
-      className={cn("flex flex-wrap items-center gap-x-4 gap-y-1.5", isOffline && "opacity-60")}
-      role="img"
-      aria-label={`${utilization.busy} of ${utilization.total} executors busy`}
-    >
+    <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-1.5", isOffline && "opacity-60")}>
       <div className="flex items-baseline gap-2 text-xs">
         <span className="text-base font-semibold tabular-nums">{utilization.busy}</span>
         <span className="text-muted-foreground">busy</span>

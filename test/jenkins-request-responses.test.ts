@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { IncomingMessage } from "node:http";
 import { PassThrough } from "node:stream";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { JenkinsMaxBytesError } from "../src/jenkins/errors";
 import { decodeAndMaterializeResponse } from "../src/jenkins/request/responses";
 

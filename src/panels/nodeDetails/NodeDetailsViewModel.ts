@@ -1,6 +1,6 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
 import {
-  buildBaseNodeExecutorViewModels,
+  buildBaseNodeExecutorSummaries,
   formatExecutorWorkLabel
 } from "../../jenkins/NodeExecutorFormatters";
 import {
@@ -181,14 +181,14 @@ function buildExecutors(
   labelPrefix: string,
   nowMs: number
 ): NodeExecutorViewModel[] {
-  return buildBaseNodeExecutorViewModels(executors, labelPrefix).map((base, index) =>
+  return buildBaseNodeExecutorSummaries(executors, labelPrefix).map((base, index) =>
     enrichExecutorViewModel(executors?.[index], base, nowMs)
   );
 }
 
 function enrichExecutorViewModel(
   executor: JenkinsNodeExecutor | undefined,
-  base: ReturnType<typeof buildBaseNodeExecutorViewModels>[number],
+  base: ReturnType<typeof buildBaseNodeExecutorSummaries>[number],
   nowMs: number
 ): NodeExecutorViewModel {
   const workItem = executor?.currentExecutable ?? executor?.currentWorkUnit;

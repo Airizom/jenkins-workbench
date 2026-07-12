@@ -1,9 +1,12 @@
 import * as vscode from "vscode";
 import type { JenkinsNodeInfo } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { formatNodeOfflineReason, resolveNodeStatusDescriptor } from "../../jenkins/NodeFormatters";
+import {
+  formatNodeOfflineReason,
+  formatNodeTreeDescription,
+  resolveNodeStatusDescriptor
+} from "../../jenkins/NodeFormatters";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
-import { formatNodeDescription } from "../formatters";
 
 const SERVER_ICON = new vscode.ThemeIcon("server");
 const SERVER_OFFLINE_ICON = new vscode.ThemeIcon("server", new vscode.ThemeColor("charts.gray"));
@@ -17,22 +20,22 @@ export class NodeTreeItem extends vscode.TreeItem {
   ) {
     super(node.displayName, vscode.TreeItemCollapsibleState.None);
     this.nodeUrl = node.nodeUrl;
-    const contextValues = ["node"];
+    let contextValue = "node";
     const capabilities = buildNodeActionCapabilities(node);
     if (node.nodeUrl) {
-      contextValues.push("nodeOpenable");
+      contextValue += " nodeOpenable";
     }
     if (capabilities.canTakeOffline) {
-      contextValues.push("nodeOnline");
+      contextValue += " nodeOnline";
     }
     if (capabilities.isTemporarilyOffline) {
-      contextValues.push("nodeTemporarilyOffline");
+      contextValue += " nodeTemporarilyOffline";
     }
     if (capabilities.canLaunchAgent) {
-      contextValues.push("nodeLaunchable");
+      contextValue += " nodeLaunchable";
     }
-    this.contextValue = contextValues.join(" ");
-    this.description = formatNodeDescription(node);
+    this.contextValue = contextValue;
+    this.description = formatNodeTreeDescription(node);
     this.iconPath = node.offline ? SERVER_OFFLINE_ICON : SERVER_ICON;
     const tooltip = buildNodeTooltip(node);
     if (tooltip) {

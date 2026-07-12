@@ -25,12 +25,35 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
     postMessage({ type: "buildCompareReady" });
   }, [postMessage]);
 
+  const handleRetry = () => {
+    postMessage({ type: "refreshBuildCompare" });
+  };
+  const sectionErrors = [
+    state.tests,
+    state.parameters,
+    state.changesets,
+    state.stages,
+    state.console
+  ].flatMap((section) =>
+    section.status === "error" ? [section.detail ?? section.summaryLabel] : []
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <BuildCompareHeader displayName={state.target.displayName} />
+      <BuildCompareHeader
+        baselineDisplayName={state.baseline.displayName}
+        targetDisplayName={state.target.displayName}
+      />
 
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4">
-        <PanelErrorList errors={state.errors} variant="card" title="Comparison errors" />
+      <main
+        className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4"
+        aria-busy={state.console.status === "loading"}
+      >
+        <PanelErrorList
+          errors={[...state.errors, ...sectionErrors]}
+          title="Comparison errors"
+          onRetry={handleRetry}
+        />
         <BuildCompareBuildPair baseline={state.baseline} target={state.target} />
         <TestDiffSection section={state.tests} />
         <ParameterDiffSection section={state.parameters} />

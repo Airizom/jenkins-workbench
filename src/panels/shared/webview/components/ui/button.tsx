@@ -19,10 +19,10 @@ const buttonVariants = cva(
           "bg-destructive text-destructive-foreground border border-destructive-border hover:opacity-90"
       },
       size: {
-        sm: "h-7 rounded px-2.5 text-xs",
-        md: "h-8 rounded px-3 text-sm",
-        lg: "h-9 rounded px-4 text-sm",
-        icon: "h-8 w-8 rounded"
+        sm: "h-7 rounded-md px-2.5 text-xs",
+        md: "h-8 rounded-md px-3 text-sm",
+        lg: "h-9 rounded-md px-4 text-sm",
+        icon: "h-8 w-8 rounded-md"
       }
     },
     defaultVariants: {

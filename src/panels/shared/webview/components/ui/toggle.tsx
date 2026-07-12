@@ -11,7 +11,7 @@ export const Toggle = React.forwardRef<React.ElementRef<typeof TogglePrimitive.R
     <TogglePrimitive.Root
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded border border-input bg-transparent font-medium transition-colors",
+        "inline-flex items-center justify-center gap-2 rounded-md border border-input bg-transparent font-medium transition-colors",
         "hover:bg-accent-soft hover:text-accent-foreground",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         "disabled:pointer-events-none disabled:opacity-50",

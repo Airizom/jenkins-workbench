@@ -1,7 +1,11 @@
 import type * as vscode from "vscode";
 import { getDiagnosticMetadata } from "./JenkinsfileDiagnosticMetadata";
 import type { JenkinsfileValidationCode } from "./JenkinsfileValidationTypes";
-import { extractSuggestionsFromText, uniqueSuggestions } from "./JenkinsfileValidationUtils";
+import {
+  deriveValidationCode,
+  extractSuggestionsFromText,
+  uniqueSuggestions
+} from "./JenkinsfileValidationUtils";
 
 export const JENKINS_DIAGNOSTIC_SOURCE = "jenkins";
 
@@ -16,8 +20,29 @@ const VALIDATION_CODES = new Set<JenkinsfileValidationCode>([
   "no-environment"
 ]);
 
-export function isValidationCode(value: string): value is JenkinsfileValidationCode {
+function isValidationCode(value: string): value is JenkinsfileValidationCode {
   return VALIDATION_CODES.has(value as JenkinsfileValidationCode);
+}
+
+export function resolveDiagnosticCode(
+  diagnostic: vscode.Diagnostic
+): JenkinsfileValidationCode | undefined {
+  const metadata = getDiagnosticMetadata(diagnostic);
+  if (metadata?.code) {
+    return metadata.code;
+  }
+  if (diagnostic.source !== JENKINS_DIAGNOSTIC_SOURCE) {
+    return undefined;
+  }
+
+  const code = diagnostic.code;
+  if (typeof code === "string") {
+    return isValidationCode(code) ? code : undefined;
+  }
+  if (typeof code === "object" && code && "value" in code && typeof code.value === "string") {
+    return isValidationCode(code.value) ? code.value : undefined;
+  }
+  return deriveValidationCode(diagnostic.message);
 }
 
 export function resolveDiagnosticSuggestions(diagnostic: vscode.Diagnostic): string[] {

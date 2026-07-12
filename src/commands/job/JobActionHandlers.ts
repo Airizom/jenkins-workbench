@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { parseJobUrl } from "../../jenkins/urls";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
@@ -11,7 +12,6 @@ import {
   requireSelection,
   withActionErrorMessage
 } from "../CommandUtils";
-import type { JobCommandRefreshHost } from "./JobCommandTypes";
 import { removeJobMetadataOnDelete, updateJobMetadataOnRename } from "./JobMetadataCoordinator";
 import { getJobNameValidationError } from "./JobNameValidation";
 import type { JobNewItemTargetResolver, JobNewItemTreeTarget } from "./JobNewItemTargetResolver";
@@ -24,7 +24,7 @@ export interface JobActionDependencies {
   presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;
   watchStore: JenkinsWatchStore;
-  refreshHost: JobCommandRefreshHost;
+  refreshHost: EnvironmentScopedRefreshHost;
 }
 
 type JobActionTreeItem = JobTreeItem | PipelineTreeItem;

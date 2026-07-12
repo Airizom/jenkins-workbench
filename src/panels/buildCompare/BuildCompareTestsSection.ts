@@ -6,6 +6,7 @@ import {
   normalizeTestCaseBase
 } from "../shared/TestCaseViewModel";
 import { formatAvailableTestReportCountsSummary } from "../shared/TestReportFormatters";
+import { testStatusToVisualTone } from "../shared/TestStatusFormatters";
 import { forEachKeyedDiff } from "./BuildCompareDiff";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
 import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
@@ -193,6 +194,8 @@ function buildTestDiffItem(
     suiteName: target.suiteName,
     baselineStatusLabel: baseline.statusLabel,
     targetStatusLabel: target.statusLabel,
+    baselineStatusTone: testStatusToVisualTone(baseline.status),
+    targetStatusTone: testStatusToVisualTone(target.status),
     baselineDurationLabel: baseline.durationLabel,
     targetDurationLabel: target.durationLabel
   };
@@ -209,6 +212,8 @@ function buildSingleSideTestDiffItem(
     suiteName: testCase.suiteName,
     baselineStatusLabel: side === "removed" ? testCase.statusLabel : "-",
     targetStatusLabel: side === "added" ? testCase.statusLabel : "-",
+    baselineStatusTone: side === "removed" ? testStatusToVisualTone(testCase.status) : undefined,
+    targetStatusTone: side === "added" ? testStatusToVisualTone(testCase.status) : undefined,
     baselineDurationLabel: side === "removed" ? testCase.durationLabel : undefined,
     targetDurationLabel: side === "added" ? testCase.durationLabel : undefined
   };

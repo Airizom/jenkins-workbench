@@ -68,15 +68,16 @@ function mapActivityJob(entry: JobSearchEntry, group: ActivityGroupKind): Activi
 }
 
 function formatActivityPathContext(entry: JobSearchEntry): string | undefined {
-  const parents: string[] = [];
+  let pathParts: string[] | undefined;
   for (let index = 0; index < entry.path.length - 1; index += 1) {
     const name = entry.path[index]?.name;
     if (name) {
-      parents.push(name);
+      pathParts ??= [];
+      pathParts.push(name);
     }
   }
-  if (parents.length > 0) {
-    return parents.join(" / ");
+  if (pathParts) {
+    return pathParts.join(" / ");
   }
   const fullNameParts = entry.fullName.split("/").filter(Boolean);
   return fullNameParts.length > 1 ? fullNameParts.slice(0, -1).join(" / ") : undefined;

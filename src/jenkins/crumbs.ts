@@ -81,6 +81,9 @@ export class JenkinsCrumbService {
         this.crumbFetchedAt = fetchedAt;
         return this.crumbHeader;
       }
+      this.crumbHeader = undefined;
+      this.crumbFetchedAt = 0;
+      this.crumbFetchAttempted = false;
     } catch (error) {
       this.crumbHeader = undefined;
       this.crumbFetchedAt = 0;

@@ -15,9 +15,13 @@ export interface WebviewRenderOptions {
 }
 
 function renderWebviewShell(content: string, options: WebviewRenderOptions): string {
+  // Styles allow 'unsafe-inline' (the VS Code webview convention) because React
+  // components set inline `style=""` attributes (progress bar widths, graph
+  // backgrounds); a style nonce would disable those, as nonces only authorize
+  // <style> elements. Scripts stay nonce-gated.
   const csp = [
     "default-src 'none'",
-    `style-src ${options.cspSource} 'nonce-${options.nonce}'`,
+    `style-src ${options.cspSource} 'unsafe-inline'`,
     `script-src ${options.cspSource} 'nonce-${options.nonce}'`
   ].join("; ");
   const styleLinks = options.styleUris
@@ -188,7 +192,7 @@ export function renderPanelRestoreErrorHtml(
         <p>${escapeHtml(message)}</p>
         <p>${escapeHtml(hint)}</p>
       </main>
-      <style nonce="${nonce}">
+      <style>
         .jenkins-workbench-panel-message {
           color: var(--vscode-foreground);
           font-family: var(--vscode-font-family);
@@ -210,6 +214,11 @@ export function renderPanelRestoreErrorHtml(
 
 export type PanelDetailsRenderOptions = WebviewRenderOptions & { panelState?: unknown };
 
+export interface TypedPanelRendererOptions {
+  entryName: WebviewEntryName;
+  skeletonVariant: LoadingSkeletonVariant;
+}
+
 export function renderPanelLoadingHtml(
   options: PanelDetailsRenderOptions,
   skeletonVariant: LoadingSkeletonVariant
@@ -218,24 +227,17 @@ export function renderPanelLoadingHtml(
   return renderWebviewShell(`${stateScript}${renderLoadingSkeletonHtml(skeletonVariant)}`, options);
 }
 
-function createPanelLoadingRenderer(skeletonVariant: LoadingSkeletonVariant) {
-  return (options: PanelDetailsRenderOptions): string =>
-    renderPanelLoadingHtml(options, skeletonVariant);
-}
-
-function createPanelAppRenderer(skeletonVariant: LoadingSkeletonVariant) {
+export function createTypedPanelRenderer<TModel>(
+  options: LoadingSkeletonVariant | TypedPanelRendererOptions
+) {
+  const entryName = typeof options === "string" ? undefined : options.entryName;
+  const skeletonVariant = typeof options === "string" ? options : options.skeletonVariant;
   return {
-    renderLoadingHtml: createPanelLoadingRenderer(skeletonVariant),
-    renderAppHtml: renderPanelAppHtml
-  };
-}
-
-export function createTypedPanelRenderer<TModel>(skeletonVariant: LoadingSkeletonVariant) {
-  const { renderLoadingHtml, renderAppHtml } = createPanelAppRenderer(skeletonVariant);
-  return {
-    renderLoadingHtml,
+    entryName,
+    renderLoadingHtml: (options: PanelDetailsRenderOptions): string =>
+      renderPanelLoadingHtml(options, skeletonVariant),
     renderPanelHtml: (model: TModel, options: PanelDetailsRenderOptions): string =>
-      renderAppHtml(model, options)
+      renderPanelAppHtml(model, options)
   };
 }
 

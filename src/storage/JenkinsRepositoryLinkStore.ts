@@ -28,11 +28,7 @@ export interface JenkinsRepositoryLink {
 
 const STATE_KEY = "jenkinsWorkbench.repositoryLinks";
 
-interface JenkinsRepositoryLinkStoreMigrationSurface {
-  migrateLegacyWorkspaceLinks(): Promise<void>;
-}
-
-export class JenkinsRepositoryLinkStore implements JenkinsRepositoryLinkStoreMigrationSurface {
+export class JenkinsRepositoryLinkStore {
   private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<void>();
 
@@ -40,6 +36,7 @@ export class JenkinsRepositoryLinkStore implements JenkinsRepositoryLinkStoreMig
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
+  // fallow-ignore-next-line unused-class-member
   async migrateLegacyWorkspaceLinks(): Promise<void> {
     await this.mutationQueue(async () => {
       const workspaceState = this.getWorkspaceState();

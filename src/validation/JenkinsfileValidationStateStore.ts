@@ -4,6 +4,7 @@ import type {
   ValidationCacheEntry,
   ValidationRequestOptions
 } from "./JenkinsfileValidationCoordinatorTypes";
+import { getValidationEnvironmentIdentity } from "./JenkinsfileValidationEnvironmentIdentity";
 import type { JenkinsfileValidationStatusState } from "./JenkinsfileValidationStatusProvider";
 
 type ResultValidationState = Extract<JenkinsfileValidationStatusState, { kind: "result" }>;
@@ -267,7 +268,7 @@ function areStatusStatesEqual(
   if (left.kind === "request-failed" && right.kind === "request-failed") {
     return (
       left.message === right.message &&
-      getEnvironmentSignature(left.environment) === getEnvironmentSignature(right.environment)
+      getEnvironmentIdentity(left.environment) === getEnvironmentIdentity(right.environment)
     );
   }
   if (left.kind !== "result" || right.kind !== "result") {
@@ -276,18 +277,13 @@ function areStatusStatesEqual(
   return (
     left.errorCount === right.errorCount &&
     Boolean(left.stale) === Boolean(right.stale) &&
-    getEnvironmentSignature(left.environment) === getEnvironmentSignature(right.environment)
+    getEnvironmentIdentity(left.environment) === getEnvironmentIdentity(right.environment)
   );
 }
 
-function getEnvironmentSignature(environment?: JenkinsEnvironmentRef): string | undefined {
+function getEnvironmentIdentity(environment?: JenkinsEnvironmentRef): string | undefined {
   if (!environment) {
     return undefined;
   }
-  return [
-    environment.environmentId,
-    environment.scope,
-    environment.url,
-    environment.username ?? ""
-  ].join("|");
+  return getValidationEnvironmentIdentity(environment);
 }

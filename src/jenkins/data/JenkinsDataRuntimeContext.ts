@@ -1,12 +1,12 @@
-import type { JenkinsClient } from "../JenkinsClient";
-import type { JenkinsClientProvider } from "../JenkinsClientProvider";
-import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
-import { JenkinsDataCache } from "./JenkinsDataCache";
 import type {
   BuildParameterPayload,
   BuildParameterRequestPreparer,
   PreparedBuildParametersRequest
-} from "./JenkinsDataTypes";
+} from "../BuildParameterRequests";
+import type { JenkinsClient } from "../JenkinsClient";
+import type { JenkinsClientProvider } from "../JenkinsClientProvider";
+import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
+import { JenkinsDataCache } from "./JenkinsDataCache";
 
 export interface JenkinsDataRuntimeContextOptions {
   buildParameterRequestPreparer: BuildParameterRequestPreparer;

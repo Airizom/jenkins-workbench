@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
+import { normalizeBuildDetailsPanelUiState } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 import { resolveBuildDetailsSelectedTab } from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsTabsModel";
 
 describe("BuildDetailsTabs", () => {
@@ -25,5 +26,13 @@ describe("BuildDetailsTabs", () => {
     assert.equal(resolveBuildDetailsSelectedTab("overview", availability), "overview");
     assert.equal(resolveBuildDetailsSelectedTab("console", availability), "console");
     assert.equal(resolveBuildDetailsSelectedTab("tests", availability), "inputs");
+  });
+
+  it("normalizes persisted active tabs", () => {
+    assert.equal(
+      normalizeBuildDetailsPanelUiState({ selectedTab: "console" })?.selectedTab,
+      "console"
+    );
+    assert.equal(normalizeBuildDetailsPanelUiState({ selectedTab: "invalid" }), undefined);
   });
 });

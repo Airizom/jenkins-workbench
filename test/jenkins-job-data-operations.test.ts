@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { JenkinsClient } from "../src/jenkins/JenkinsClient";
 import type { JenkinsClientProvider } from "../src/jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";

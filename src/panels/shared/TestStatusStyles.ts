@@ -45,13 +45,13 @@ export function coverageStatusClassToVisualTone(
 export function resolveStatusBadgeClass(tone: StatusVisualTone): string {
   switch (tone) {
     case "failed":
-      return "border-failure-border-subtle text-failure";
+      return "border-failure-border bg-failure-soft text-failure-foreground";
     case "passed":
-      return "border-success-border text-success";
+      return "border-success-border bg-success-soft text-success-foreground";
     case "skipped":
-      return "border-warning-border text-warning";
+      return "border-warning-border bg-warning-soft text-warning-foreground";
     default:
-      return "border-border text-muted-foreground";
+      return "border-border bg-muted text-muted-foreground";
   }
 }
 
@@ -105,8 +105,5 @@ export function resolveMetricToneClass(tone: StatusVisualTone): string {
 
 export function resolveCoverageStatusBadgeClass(statusClass?: string): string {
   const normalized = resolveCoverageStatusClass(statusClass);
-  if (normalized === "warning") {
-    return "border-border text-warning";
-  }
   return resolveStatusBadgeClass(coverageStatusClassToVisualTone(normalized));
 }

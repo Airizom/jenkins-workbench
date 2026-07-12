@@ -75,6 +75,7 @@ export class JenkinsWorkbenchTreeDataProvider
   private readonly hierarchyState: TreeDataProviderHierarchyState;
   private readonly expansionResolver: TreeDataProviderExpansionResolver;
   private readonly summaryState: TreeDataProviderSummaryState;
+  private readonly invalidateForElement: (element: WorkbenchTreeElement) => void;
   private pendingInputUnsubscribe: (() => void) | undefined;
 
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -99,11 +100,6 @@ export class JenkinsWorkbenchTreeDataProvider
       (ms) => vscode.window.setStatusBarMessage("$(sync) Refresh already in progress", ms)
     );
 
-    this.pendingInputUnsubscribe = pendingInputCoordinator.onSummaryChange((change) => {
-      this.childrenLoader.clearPendingInputDependentCaches(change.environment);
-      this.notifyElement(undefined);
-    });
-
     this.childrenLoader = new JenkinsTreeChildrenLoader(
       store,
       dataService,
@@ -119,6 +115,12 @@ export class JenkinsWorkbenchTreeDataProvider
       this.notifyElement.bind(this),
       this.notifyEnvironment.bind(this)
     );
+    this.invalidateForElement = this.childrenLoader.invalidateForElement.bind(this.childrenLoader);
+    this.pendingInputUnsubscribe = pendingInputCoordinator.onSummaryChange((change) => {
+      this.childrenLoader.clearPendingInputDependentCaches(change.environment);
+      this.notifyElement(undefined);
+    });
+
     this.revealResolver = new JenkinsTreeRevealResolver(
       this.getChildrenInternal.bind(this),
       this._onDidChangeTreeData.event
@@ -177,7 +179,7 @@ export class JenkinsWorkbenchTreeDataProvider
       undefined,
       undefined,
       REFRESH_DEBOUNCE_MS,
-      this.childrenLoader.invalidateForElement.bind(this.childrenLoader)
+      this.invalidateForElement
     );
     this.emitSummary();
   }
@@ -233,7 +235,7 @@ export class JenkinsWorkbenchTreeDataProvider
         undefined,
         undefined,
         REFRESH_DEBOUNCE_MS,
-        this.childrenLoader.invalidateForElement.bind(this.childrenLoader)
+        this.invalidateForElement
       );
     }
     this.emitSummary();
@@ -278,7 +280,7 @@ export class JenkinsWorkbenchTreeDataProvider
       undefined,
       refreshToken,
       REFRESH_DEBOUNCE_MS,
-      this.childrenLoader.invalidateForElement.bind(this.childrenLoader)
+      this.invalidateForElement
     );
     this.emitSummary();
   }

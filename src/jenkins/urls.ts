@@ -12,8 +12,75 @@ export interface ParsedBuildUrl {
   buildNumber: number;
 }
 
+const BUILD_NUMBER_PATTERN = /^\d+$/;
+
 export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
+}
+
+function splitPathParts(pathname: string): string[] {
+  const pathParts = pathname.split("/");
+  let pathPartCount = 0;
+
+  for (let index = 0; index < pathParts.length; index++) {
+    const part = pathParts[index];
+    if (part.length > 0) {
+      pathParts[pathPartCount] = part;
+      pathPartCount++;
+    }
+  }
+
+  pathParts.length = pathPartCount;
+  return pathParts;
+}
+
+function hasJobPathParts(pathParts: readonly string[], endExclusive = pathParts.length): boolean {
+  let firstJobIndex = -1;
+  for (let index = 0; index < endExclusive; index++) {
+    if (pathParts[index] === "job") {
+      firstJobIndex = index;
+      break;
+    }
+  }
+
+  if (firstJobIndex < 0) {
+    return false;
+  }
+
+  let hasSegments = false;
+  for (let index = firstJobIndex; index < endExclusive; index++) {
+    if (pathParts[index] === "job" && index + 1 < endExclusive) {
+      try {
+        decodeURIComponent(pathParts[index + 1]);
+      } catch {
+        return false;
+      }
+      hasSegments = true;
+      index++;
+    }
+  }
+
+  return hasSegments;
+}
+
+function buildPathFromParts(pathParts: readonly string[], endExclusive: number): string {
+  if (endExclusive <= 0) {
+    return "";
+  }
+
+  let path = "";
+  for (let index = 0; index < endExclusive; index++) {
+    path += `/${pathParts[index]}`;
+  }
+  return path;
+}
+
+function appendJobPathSegments(baseUrl: string, segments: readonly string[]): string {
+  let url = ensureTrailingSlash(baseUrl);
+  for (let index = 0; index < segments.length; index++) {
+    url += `job/${encodeURIComponent(segments[index])}/`;
+  }
+  return url;
 }
 
 export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
@@ -35,7 +102,11 @@ export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
   const segments: string[] = [];
   for (let i = firstJobIndex; i < pathParts.length; i++) {
     if (pathParts[i] === "job" && i + 1 < pathParts.length) {
-      segments.push(decodeURIComponent(pathParts[i + 1]));
+      try {
+        segments.push(decodeURIComponent(pathParts[i + 1]));
+      } catch {
+        return undefined;
+      }
       i++;
     }
   }
@@ -73,11 +144,7 @@ export function buildViewScopedJobUrl(viewUrl: string, jobUrl: string): string {
     return jobUrl;
   }
 
-  let scopedUrl = viewUrl;
-  for (const segment of parsed.fullPath) {
-    scopedUrl = buildJobUrl(scopedUrl, segment);
-  }
-  return scopedUrl;
+  return appendJobPathSegments(viewUrl, parsed.fullPath);
 }
 
 export function canonicalizeJobUrlForEnvironment(
@@ -89,12 +156,7 @@ export function canonicalizeJobUrlForEnvironment(
     return undefined;
   }
 
-  let canonicalUrl = ensureTrailingSlash(environmentUrl);
-  for (const segment of parsed.fullPath) {
-    canonicalUrl = buildJobUrl(canonicalUrl, segment);
-  }
-
-  return canonicalUrl;
+  return appendJobPathSegments(environmentUrl, parsed.fullPath);
 }
 
 export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
@@ -105,9 +167,9 @@ export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
     return undefined;
   }
 
-  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
-  const buildNumberPart = pathParts.at(-1);
-  if (!buildNumberPart || !/^\d+$/.test(buildNumberPart)) {
+  const pathParts = splitPathParts(url.pathname);
+  const buildNumberPart = pathParts[pathParts.length - 1];
+  if (!buildNumberPart || !BUILD_NUMBER_PATTERN.test(buildNumberPart)) {
     return undefined;
   }
 
@@ -116,12 +178,14 @@ export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
     return undefined;
   }
 
-  const jobPathParts = pathParts.slice(0, -1);
-  const jobPath = jobPathParts.length > 0 ? `/${jobPathParts.join("/")}/` : "/";
-  const jobUrl = `${url.origin}${jobPath}`;
-  if (!parseJobUrl(jobUrl)) {
+  const jobPathPartCount = pathParts.length - 1;
+  if (url.origin === "null" || !hasJobPathParts(pathParts, jobPathPartCount)) {
     return undefined;
   }
+
+  const jobPath =
+    jobPathPartCount > 0 ? `${buildPathFromParts(pathParts, jobPathPartCount)}/` : "/";
+  const jobUrl = `${url.origin}${jobPath}`;
 
   return {
     jobUrl,
@@ -171,16 +235,24 @@ export function buildActionUrl(itemUrl: string, action: string): string {
 }
 
 function encodePathSegments(path: string): string {
-  return path
-    .split("/")
-    .filter((segment) => segment.length > 0)
-    .map((segment) => {
-      if (segment === "." || segment === "..") {
-        throw new Error("Relative paths cannot contain dot path segments.");
-      }
-      return encodeURIComponent(segment);
-    })
-    .join("/");
+  const segments = path.split("/");
+  let encodedSegmentCount = 0;
+
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index];
+    if (segment.length === 0) {
+      continue;
+    }
+    if (segment === "." || segment === "..") {
+      throw new Error("Relative paths cannot contain dot path segments.");
+    }
+
+    segments[encodedSegmentCount] = encodeURIComponent(segment);
+    encodedSegmentCount++;
+  }
+
+  segments.length = encodedSegmentCount;
+  return segments.join("/");
 }
 
 export function buildArtifactDownloadUrl(buildUrl: string, relativePath: string): string {

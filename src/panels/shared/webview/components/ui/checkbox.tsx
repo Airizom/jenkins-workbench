@@ -1,6 +1,7 @@
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import * as React from "react";
 
+import { CheckIcon, MinusIcon } from "../../icons";
 import { cn } from "../../lib/utils";
 
 type CheckboxProps = React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>;
@@ -11,7 +12,7 @@ export const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "peer h-4 w-4 shrink-0 rounded border border-checkbox-border bg-checkbox",
+      "peer h-4 w-4 shrink-0 rounded-md border border-checkbox-border bg-checkbox",
       "text-checkbox-checkedForeground",
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       "disabled:cursor-not-allowed disabled:opacity-50",
@@ -22,46 +23,9 @@ export const Checkbox = React.forwardRef<
     {...props}
   >
     <CheckboxPrimitive.Indicator className="group flex items-center justify-center text-current">
-      <CheckIcon className="hidden group-data-[state=checked]:block" />
-      <IndeterminateIcon className="hidden group-data-[state=indeterminate]:block" />
+      <CheckIcon className="hidden h-3.5 w-3.5 group-data-[state=checked]:block" />
+      <MinusIcon className="hidden h-3.5 w-3.5 group-data-[state=indeterminate]:block" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ));
 Checkbox.displayName = "Checkbox";
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn(className)}
-    >
-      <path d="M3.5 8.5l3 3 6-7" />
-    </svg>
-  );
-}
-
-function IndeterminateIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      className={cn(className)}
-    >
-      <path d="M4 8h8" />
-    </svg>
-  );
-}

@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { cn } from "../../../../shared/webview/lib/utils";
 
 type OverviewCardProps = {

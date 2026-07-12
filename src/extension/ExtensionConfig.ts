@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS } from "../currentBranch/CurrentBranchPullRequestJobPatterns";
-import type { BuildListFetchOptions } from "../jenkins/JenkinsDataService";
+import type { BuildListFetchOptions, JobSearchOptions } from "../jenkins/JenkinsDataService";
 import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
 import type {
   BuildCompareOptions,
@@ -16,15 +16,19 @@ export const CONFIG_SECTION = "jenkinsWorkbench";
 
 const DEFAULT_CACHE_TTL_SECONDS = 300;
 const DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS = 60;
+const MIN_STATUS_REFRESH_INTERVAL_SECONDS = 5;
 const DEFAULT_WATCH_ERROR_THRESHOLD = 3;
 const DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 10;
+const MIN_QUEUE_POLL_INTERVAL_SECONDS = 2;
 const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
 const DEFAULT_MAX_CACHE_ENTRIES = 1000;
+const MAX_CACHE_ENTRIES = 100_000;
 const DEFAULT_BUILD_TOOLTIP_DETAILS = false;
 const DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED = false;
 const DEFAULT_ARTIFACT_DOWNLOAD_ROOT = "jenkins-artifacts";
 const DEFAULT_ARTIFACT_MAX_DOWNLOAD_MB = 100;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES = 50;
+const MAX_ARTIFACT_PREVIEW_CACHE_ENTRIES = 1000;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB = 200;
 const DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS = 900;
 const DEFAULT_BUILD_COMPARE_CONSOLE_MAX_BYTES = 5 * 1024 * 1024;
@@ -91,7 +95,7 @@ export function getStatusRefreshIntervalSeconds(config: vscode.WorkspaceConfigur
     DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS
   );
   return Number.isFinite(refreshIntervalSeconds)
-    ? refreshIntervalSeconds
+    ? Math.max(MIN_STATUS_REFRESH_INTERVAL_SECONDS, refreshIntervalSeconds)
     : DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS;
 }
 
@@ -109,7 +113,7 @@ export function getQueuePollIntervalSeconds(config: vscode.WorkspaceConfiguratio
     DEFAULT_QUEUE_POLL_INTERVAL_SECONDS
   );
   return Number.isFinite(pollIntervalSeconds)
-    ? pollIntervalSeconds
+    ? Math.max(MIN_QUEUE_POLL_INTERVAL_SECONDS, pollIntervalSeconds)
     : DEFAULT_QUEUE_POLL_INTERVAL_SECONDS;
 }
 
@@ -126,7 +130,9 @@ export function getRequestTimeoutMs(config: vscode.WorkspaceConfiguration): numb
 
 export function getMaxCacheEntries(config: vscode.WorkspaceConfiguration): number {
   const maxEntries = config.get<number>("maxCacheEntries", DEFAULT_MAX_CACHE_ENTRIES);
-  return Number.isFinite(maxEntries) ? Math.max(100, maxEntries) : DEFAULT_MAX_CACHE_ENTRIES;
+  return Number.isFinite(maxEntries)
+    ? Math.min(MAX_CACHE_ENTRIES, Math.max(100, Math.floor(maxEntries)))
+    : DEFAULT_MAX_CACHE_ENTRIES;
 }
 
 function getBuildTooltipDetailsEnabled(config: vscode.WorkspaceConfiguration): boolean {
@@ -177,7 +183,7 @@ export function getArtifactPreviewCacheMaxEntries(config: vscode.WorkspaceConfig
   if (!Number.isFinite(value)) {
     return DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES;
   }
-  return Math.max(1, Math.floor(value));
+  return Math.min(MAX_ARTIFACT_PREVIEW_CACHE_ENTRIES, Math.max(1, Math.floor(value)));
 }
 
 export function getArtifactPreviewCacheMaxBytes(config: vscode.WorkspaceConfiguration): number {
@@ -292,6 +298,15 @@ export function getBuildListFetchOptions(
   return {
     detailLevel: includeDetails ? "details" : "summary",
     includeParameters: getBuildTooltipParametersEnabled(config)
+  };
+}
+
+export function getJobSearchTuningOptions(config: vscode.WorkspaceConfiguration): JobSearchOptions {
+  return {
+    concurrency: config.get<number>("jobSearchConcurrency"),
+    backoffBaseMs: config.get<number>("jobSearchBackoffBaseMs"),
+    backoffMaxMs: config.get<number>("jobSearchBackoffMaxMs"),
+    maxRetries: config.get<number>("jobSearchMaxRetries")
   };
 }
 

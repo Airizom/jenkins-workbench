@@ -181,14 +181,16 @@ function PanelLoadingShell({
   className,
   children,
   ...props
-}: HTMLAttributes<HTMLDivElement>): JSX.Element {
+}: HTMLAttributes<HTMLElement>): JSX.Element {
   return (
-    <div
+    <output
+      aria-label="Loading"
+      aria-live="polite"
       className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}
       {...props}
     >
       {children}
-    </div>
+    </output>
   );
 }
 

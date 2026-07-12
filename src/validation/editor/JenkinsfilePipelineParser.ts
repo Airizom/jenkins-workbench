@@ -83,73 +83,124 @@ function createDocumentSource(document: TextDocument): PipelineTextSource {
 
 function findPipelineBlockFromSource(source: PipelineTextSource): PipelineBlockContext | undefined {
   for (let lineIndex = 0; lineIndex < source.lineCount; lineIndex += 1) {
-    const lineText = source.lineAt(lineIndex);
-    const signature = stripLineComment(lineText);
-    const pipelineMatch = signature.match(/^\s*pipeline\b/);
-    if (!pipelineMatch) {
-      continue;
+    const context = parsePipelineBlockAtLine(source, lineIndex);
+    if (context) {
+      return context;
     }
-
-    const hasInlineBrace = /\bpipeline\b[^{]*\{/.test(signature);
-    const isBarePipeline = !hasInlineBrace && /^\s*pipeline\s*$/.test(signature);
-    if (!hasInlineBrace && !isBarePipeline) {
-      continue;
-    }
-
-    const pipelineIndent = getIndent(lineText);
-    const pipelineIndex = pipelineMatch.index ?? signature.indexOf(pipelineMatch[0]);
-    let openLine = lineIndex;
-    let openChar = lineText.indexOf("{", pipelineIndex + pipelineMatch[0].length);
-
-    if (openChar === -1 && isBarePipeline) {
-      const nextLine = findNextNonEmptyLine(source, lineIndex + 1, lineIndex + 3);
-      if (nextLine === undefined) {
-        continue;
-      }
-      const nextText = source.lineAt(nextLine);
-      const nextSignature = stripLineComment(nextText).trim();
-      if (nextSignature !== "{") {
-        continue;
-      }
-      openLine = nextLine;
-      openChar = nextText.indexOf("{");
-    }
-
-    if (openChar === -1) {
-      continue;
-    }
-
-    const inlineCloseChar = findInlineCloseBrace(lineText, openChar);
-    let closeLine: number | undefined;
-    let closeChar: number | undefined;
-    if (inlineCloseChar !== undefined) {
-      closeLine = openLine;
-      closeChar = inlineCloseChar;
-    } else {
-      const closingLine = findClosingBraceLine(source, openLine + 1, pipelineIndent.length);
-      if (closingLine === undefined) {
-        continue;
-      }
-      closeLine = closingLine;
-      closeChar = source.lineAt(closingLine).indexOf("}");
-      if (closeChar === -1) {
-        continue;
-      }
-    }
-
-    const indentInfo = resolveIndentation(source, pipelineIndent, openLine, closeLine);
-    return {
-      openLine,
-      openChar,
-      closeLine,
-      closeChar,
-      pipelineIndent,
-      childIndent: indentInfo.childIndent,
-      indentUnit: indentInfo.indentUnit,
-      inline: openLine === closeLine
-    };
   }
   return undefined;
+}
+
+interface PipelineHeaderMatch {
+  pipelineIndent: string;
+  isBarePipeline: boolean;
+  braceSearchStart: number;
+}
+
+interface BracePosition {
+  line: number;
+  character: number;
+}
+
+function parsePipelineBlockAtLine(
+  source: PipelineTextSource,
+  lineIndex: number
+): PipelineBlockContext | undefined {
+  const lineText = source.lineAt(lineIndex);
+  const header = matchPipelineHeader(lineText);
+  if (!header) {
+    return undefined;
+  }
+  const open = resolveOpenBrace(source, lineIndex, lineText, header);
+  if (!open) {
+    return undefined;
+  }
+  const close = resolveCloseBrace(source, lineText, open, header.pipelineIndent.length);
+  if (!close) {
+    return undefined;
+  }
+  const indentInfo = resolveIndentation(source, header.pipelineIndent, open.line, close.line);
+  return {
+    openLine: open.line,
+    openChar: open.character,
+    closeLine: close.line,
+    closeChar: close.character,
+    pipelineIndent: header.pipelineIndent,
+    childIndent: indentInfo.childIndent,
+    indentUnit: indentInfo.indentUnit,
+    inline: open.line === close.line
+  };
+}
+
+function matchPipelineHeader(lineText: string): PipelineHeaderMatch | undefined {
+  const signature = stripLineComment(lineText);
+  const pipelineMatch = signature.match(/^\s*pipeline\b/);
+  if (!pipelineMatch) {
+    return undefined;
+  }
+  const hasInlineBrace = /\bpipeline\b[^{]*\{/.test(signature);
+  const isBarePipeline = !hasInlineBrace && /^\s*pipeline\s*$/.test(signature);
+  if (!hasInlineBrace && !isBarePipeline) {
+    return undefined;
+  }
+  const pipelineIndex = pipelineMatch.index ?? signature.indexOf(pipelineMatch[0]);
+  return {
+    pipelineIndent: getIndent(lineText),
+    isBarePipeline,
+    braceSearchStart: pipelineIndex + pipelineMatch[0].length
+  };
+}
+
+function resolveOpenBrace(
+  source: PipelineTextSource,
+  lineIndex: number,
+  lineText: string,
+  header: PipelineHeaderMatch
+): BracePosition | undefined {
+  const openChar = lineText.indexOf("{", header.braceSearchStart);
+  if (openChar !== -1) {
+    return { line: lineIndex, character: openChar };
+  }
+  if (!header.isBarePipeline) {
+    return undefined;
+  }
+  return findOpeningBraceOnFollowingLine(source, lineIndex);
+}
+
+function findOpeningBraceOnFollowingLine(
+  source: PipelineTextSource,
+  pipelineLine: number
+): BracePosition | undefined {
+  const nextLine = findNextNonEmptyLine(source, pipelineLine + 1, pipelineLine + 3);
+  if (nextLine === undefined) {
+    return undefined;
+  }
+  const nextText = source.lineAt(nextLine);
+  if (stripLineComment(nextText).trim() !== "{") {
+    return undefined;
+  }
+  return { line: nextLine, character: nextText.indexOf("{") };
+}
+
+function resolveCloseBrace(
+  source: PipelineTextSource,
+  openLineText: string,
+  open: BracePosition,
+  pipelineIndentLength: number
+): BracePosition | undefined {
+  const inlineCloseChar = findInlineCloseBrace(openLineText, open.character);
+  if (inlineCloseChar !== undefined) {
+    return { line: open.line, character: inlineCloseChar };
+  }
+  const closingLine = findClosingBraceLine(source, open.line + 1, pipelineIndentLength);
+  if (closingLine === undefined) {
+    return undefined;
+  }
+  const closeChar = source.lineAt(closingLine).indexOf("}");
+  if (closeChar === -1) {
+    return undefined;
+  }
+  return { line: closingLine, character: closeChar };
 }
 
 function hasTopLevelSectionInSource(
@@ -159,10 +210,113 @@ function hasTopLevelSectionInSource(
 ): boolean {
   if (context.inline) {
     const lineText = source.lineAt(context.openLine);
-    const slice = lineText.slice(context.openChar + 1, context.closeChar);
-    return new RegExp(`\\b${token}\\b`).test(slice);
+    return hasInlineTopLevelSection(lineText, context.openChar + 1, context.closeChar, token);
   }
   return findTopLevelSectionLine(source, context, token) !== undefined;
+}
+
+interface InlineScanState {
+  depth: number;
+  quote: '"' | "'" | undefined;
+  inBlockComment: boolean;
+}
+
+/** Exported for unit tests only. */
+export function hasInlineTopLevelSection(
+  lineText: string,
+  startIndex: number,
+  endIndex: number,
+  token: string
+): boolean {
+  const state: InlineScanState = { depth: 0, quote: undefined, inBlockComment: false };
+  let index = startIndex;
+
+  while (index < endIndex) {
+    if (state.inBlockComment) {
+      index = advanceThroughBlockComment(lineText, index, state);
+      continue;
+    }
+    if (state.quote) {
+      index = advanceThroughQuoted(lineText, index, state);
+      continue;
+    }
+    if (isLineCommentStart(lineText, index)) {
+      return false;
+    }
+    const consumed = consumeCodeStructure(lineText, index, state);
+    if (consumed !== undefined) {
+      index = consumed;
+      continue;
+    }
+    if (isTopLevelTokenAt(lineText, index, endIndex, token, state.depth)) {
+      return true;
+    }
+    index += 1;
+  }
+
+  return false;
+}
+
+function advanceThroughBlockComment(
+  lineText: string,
+  index: number,
+  state: InlineScanState
+): number {
+  if (lineText[index] === "*" && lineText[index + 1] === "/") {
+    state.inBlockComment = false;
+    return index + 2;
+  }
+  return index + 1;
+}
+
+function advanceThroughQuoted(lineText: string, index: number, state: InlineScanState): number {
+  const char = lineText[index];
+  if (char === "\\") {
+    return index + 2;
+  }
+  if (char === state.quote) {
+    state.quote = undefined;
+  }
+  return index + 1;
+}
+
+function isLineCommentStart(lineText: string, index: number): boolean {
+  return lineText[index] === "/" && lineText[index + 1] === "/";
+}
+
+function consumeCodeStructure(
+  lineText: string,
+  index: number,
+  state: InlineScanState
+): number | undefined {
+  const char = lineText[index];
+  if (char === "/" && lineText[index + 1] === "*") {
+    state.inBlockComment = true;
+    return index + 2;
+  }
+  if (char === '"' || char === "'") {
+    state.quote = char;
+    return index + 1;
+  }
+  if (char === "{") {
+    state.depth += 1;
+    return index + 1;
+  }
+  if (char === "}") {
+    state.depth = Math.max(0, state.depth - 1);
+    return index + 1;
+  }
+  return undefined;
+}
+
+function isTopLevelTokenAt(
+  lineText: string,
+  index: number,
+  endIndex: number,
+  token: string,
+  depth: number
+): boolean {
+  return depth === 0 && isTokenAt(lineText, index, endIndex, token);
 }
 
 function resolveInsertLocationFromSource(
@@ -359,6 +513,21 @@ function stripLineComment(lineText: string): string {
     return lineText;
   }
   return lineText.slice(0, index);
+}
+
+function isTokenAt(lineText: string, index: number, endIndex: number, token: string): boolean {
+  if (!lineText.startsWith(token, index)) {
+    return false;
+  }
+  const tokenEnd = index + token.length;
+  if (tokenEnd > endIndex) {
+    return false;
+  }
+  return !isTokenCharacter(lineText[index - 1]) && !isTokenCharacter(lineText[tokenEnd]);
+}
+
+function isTokenCharacter(char: string | undefined): boolean {
+  return char !== undefined && /[A-Za-z0-9_]/.test(char);
 }
 
 function getIndent(lineText: string): string {

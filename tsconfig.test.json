@@ -2,14 +2,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "out-test"
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node", "vscode"]
   },
-  "include": [
-    "src/jenkinsfile/JenkinsfileContextAnalyzer.ts",
-    "src/jenkinsfile/context/**/*.ts",
-    "src/queue/**/*.ts",
-    "src/watch/**/*.ts",
-    "test/**/*.ts"
-  ],
-  "exclude": ["node_modules", "out", "out-test", ".vscode-test"]
+  "include": ["test/**/*.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "out", "out-test", ".vscode-test", "test/integration"]
 }

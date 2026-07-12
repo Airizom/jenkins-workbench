@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -24,7 +25,6 @@ import {
   scanMultibranch
 } from "./job/JobActionHandlers";
 import { submitJobConfigDraft, updateJobConfig, viewJobConfig } from "./job/JobCommandHandlers";
-import type { JobCommandRefreshHost } from "./job/JobCommandTypes";
 import type { JobConfigUpdateWorkflow } from "./job/JobConfigUpdateWorkflow";
 import {
   JobNewItemTargetResolver,
@@ -39,7 +39,7 @@ export function registerJobCommands(
   environmentStore: JenkinsEnvironmentStore,
   jobConfigPreviewer: JobConfigPreviewer,
   workspacePreviewer: WorkspacePreviewer,
-  refreshHost: JobCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   draftManager: JobConfigDraftManager,
   workflow: JobConfigUpdateWorkflow,
   presetStore: JenkinsParameterPresetStore,

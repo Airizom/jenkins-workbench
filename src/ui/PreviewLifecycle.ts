@@ -5,33 +5,23 @@ export async function openResourcePreview(
   previewProvider: ArtifactPreviewProvider,
   uri: vscode.Uri
 ): Promise<void> {
-  previewProvider.markInUse(uri);
-  let released = false;
-  const releaseOnClose = vscode.window.tabGroups.onDidChangeTabs((event) => {
-    if (!event.closed.some((tab) => tabReferencesUri(tab, uri))) {
-      return;
+  await withPreviewLease(
+    previewProvider,
+    uri,
+    (release) =>
+      vscode.window.tabGroups.onDidChangeTabs((event) => {
+        if (!event.closed.some((tab) => tabReferencesUri(tab, uri))) {
+          return;
+        }
+        release();
+      }),
+    async (release) => {
+      await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
+      if (!isUriOpenInTabs(uri)) {
+        release();
+      }
     }
-    release();
-  });
-
-  function release(): void {
-    if (released) {
-      return;
-    }
-    released = true;
-    releaseOnClose.dispose();
-    previewProvider.release(uri);
-  }
-
-  try {
-    await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
-    if (!isUriOpenInTabs(uri)) {
-      release();
-    }
-  } catch (error) {
-    release();
-    throw error;
-  }
+  );
 }
 
 export async function openTextPreview(
@@ -39,16 +29,37 @@ export async function openTextPreview(
   uri: vscode.Uri,
   options?: { languageId?: string }
 ): Promise<vscode.TextEditor> {
+  return withPreviewLease(
+    previewProvider,
+    uri,
+    (release) =>
+      // Register before any await so a document closed mid-open still triggers release;
+      // otherwise the entry's inUseCount would stay above zero forever.
+      vscode.workspace.onDidCloseTextDocument((document) => {
+        if (document.uri.toString() !== uri.toString()) {
+          return;
+        }
+        release();
+      }),
+    async () => {
+      const editor = await vscode.window.showTextDocument(uri, { preview: true });
+      if (options?.languageId && editor.document.languageId !== options.languageId) {
+        await vscode.languages.setTextDocumentLanguage(editor.document, options.languageId);
+      }
+      return editor;
+    }
+  );
+}
+
+async function withPreviewLease<T>(
+  previewProvider: ArtifactPreviewProvider,
+  uri: vscode.Uri,
+  onClose: (release: () => void) => vscode.Disposable,
+  open: (release: () => void) => Promise<T>
+): Promise<T> {
   previewProvider.markInUse(uri);
   let released = false;
-  // Register before any await so a document closed mid-open still triggers release;
-  // otherwise the entry's inUseCount would stay above zero forever.
-  const releaseOnClose = vscode.workspace.onDidCloseTextDocument((document) => {
-    if (document.uri.toString() !== uri.toString()) {
-      return;
-    }
-    release();
-  });
+  const releaseOnClose = onClose(release);
 
   function release(): void {
     if (released) {
@@ -60,11 +71,7 @@ export async function openTextPreview(
   }
 
   try {
-    const editor = await vscode.window.showTextDocument(uri, { preview: true });
-    if (options?.languageId && editor.document.languageId !== options.languageId) {
-      await vscode.languages.setTextDocumentLanguage(editor.document, options.languageId);
-    }
-    return editor;
+    return await open(release);
   } catch (error) {
     release();
     throw error;

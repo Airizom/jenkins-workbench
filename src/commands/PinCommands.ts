@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type {
@@ -8,13 +9,12 @@ import type {
   StalePinnedJobTreeItem
 } from "../tree/TreeItems";
 import { pinJob, removeMissingPins, unpinJob } from "./pin/PinCommandHandlers";
-import type { PinCommandRefreshHost } from "./pin/PinCommandTypes";
 
 export function registerPinCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
   pinStore: JenkinsPinStore,
-  refreshHost: PinCommandRefreshHost
+  refreshHost: EnvironmentScopedRefreshHost
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -33,5 +33,3 @@ export function registerPinCommands(
     )
   );
 }
-
-export type { PinCommandRefreshHost };

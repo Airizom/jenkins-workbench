@@ -81,31 +81,37 @@ export class EnvironmentSummaryStore {
   private updateJobsSummary(environment: JenkinsEnvironmentRef, jobs: JobsFolderSummary): void {
     const key = this.buildKey(environment);
     const current = this.cache.get<EnvironmentSummary>(key);
+    if (current && areJobSummariesEqual(current.jobs, jobs)) {
+      this.cache.set(key, current);
+      return;
+    }
     const next: EnvironmentSummary = current ? { ...current, jobs } : { jobs };
     this.cache.set(key, next);
-    if (!areJobSummariesEqual(current?.jobs, jobs)) {
-      this.notify(environment);
-    }
+    this.notify(environment);
   }
 
   private updateNodesSummary(environment: JenkinsEnvironmentRef, nodes: NodesFolderSummary): void {
     const key = this.buildKey(environment);
     const current = this.cache.get<EnvironmentSummary>(key);
+    if (current && areNodeSummariesEqual(current.nodes, nodes)) {
+      this.cache.set(key, current);
+      return;
+    }
     const next: EnvironmentSummary = current ? { ...current, nodes } : { nodes };
     this.cache.set(key, next);
-    if (!areNodeSummariesEqual(current?.nodes, nodes)) {
-      this.notify(environment);
-    }
+    this.notify(environment);
   }
 
   private updateQueueSummary(environment: JenkinsEnvironmentRef, queue: QueueFolderSummary): void {
     const key = this.buildKey(environment);
     const current = this.cache.get<EnvironmentSummary>(key);
+    if (current && areQueueSummariesEqual(current.queue, queue)) {
+      this.cache.set(key, current);
+      return;
+    }
     const next: EnvironmentSummary = current ? { ...current, queue } : { queue };
     this.cache.set(key, next);
-    if (!areQueueSummariesEqual(current?.queue, queue)) {
-      this.notify(environment);
-    }
+    this.notify(environment);
   }
 
   private buildKey(environment: JenkinsEnvironmentRef): string {
@@ -114,45 +120,53 @@ export class EnvironmentSummaryStore {
 }
 
 function buildJobsSummary(jobs: JenkinsJobInfo[]): JobsFolderSummary {
-  const summary: JobsFolderSummary = {
-    total: jobs.length,
-    jobs: 0,
-    pipelines: 0,
-    folders: 0,
-    disabled: 0,
-    running: 0
-  };
+  let freestyleJobs = 0;
+  let pipelines = 0;
+  let folders = 0;
+  let disabled = 0;
+  let running = 0;
 
   for (const job of jobs) {
-    const isFolder = job.kind === "folder" || job.kind === "multibranch";
-    if (isFolder) {
-      summary.folders += 1;
-    } else if (job.kind === "pipeline") {
-      summary.pipelines += 1;
-    } else {
-      summary.jobs += 1;
+    let isFolder = false;
+    switch (job.kind) {
+      case "folder":
+      case "multibranch":
+        folders += 1;
+        isFolder = true;
+        break;
+      case "pipeline":
+        pipelines += 1;
+        break;
+      default:
+        freestyleJobs += 1;
+        break;
     }
     if (!isFolder && isRunningJobColor(job.color)) {
-      summary.running += 1;
+      running += 1;
     }
     if (isJobColorDisabled(job.color)) {
-      summary.disabled += 1;
+      disabled += 1;
     }
   }
 
-  return summary;
+  return {
+    total: jobs.length,
+    jobs: freestyleJobs,
+    pipelines,
+    folders,
+    disabled,
+    running
+  };
 }
 
 function buildNodesSummary(nodes: JenkinsNodeInfo[]): NodesFolderSummary {
-  const summary: NodesFolderSummary = { total: nodes.length, online: 0, offline: 0 };
+  let offline = 0;
   for (const node of nodes) {
     if (node.offline) {
-      summary.offline += 1;
-    } else {
-      summary.online += 1;
+      offline += 1;
     }
   }
-  return summary;
+  return { total: nodes.length, online: nodes.length - offline, offline };
 }
 
 function areJobSummariesEqual(left?: JobsFolderSummary, right?: JobsFolderSummary): boolean {

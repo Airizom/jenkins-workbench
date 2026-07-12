@@ -8,7 +8,7 @@ export function CompareMutedCard({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-lg border border-border bg-muted-soft px-3 py-2", className)}>
+    <div className={cn("rounded-md border border-border bg-muted-soft px-3 py-2", className)}>
       {children}
     </div>
   );

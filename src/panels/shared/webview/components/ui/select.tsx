@@ -1,6 +1,7 @@
 import * as SelectPrimitive from "@radix-ui/react-select";
 import * as React from "react";
 
+import { CheckIcon, ChevronDownIcon } from "../../icons";
 import { cn } from "../../lib/utils";
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
@@ -13,7 +14,7 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-7 w-full items-center justify-between gap-2 rounded border border-input bg-transparent px-2 text-xs",
+      "inline-flex h-7 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-xs",
       "text-foreground",
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       "disabled:cursor-not-allowed disabled:opacity-50",
@@ -60,7 +61,7 @@ export const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded px-2 py-1.5 text-xs outline-none",
+      "relative flex w-full cursor-default select-none items-center rounded-md px-2 py-1.5 text-xs outline-none",
       "focus:bg-list-hover focus:text-list-hoverForeground",
       "data-disabled:pointer-events-none data-disabled:opacity-50",
       className
@@ -76,51 +77,3 @@ export const SelectItem = React.forwardRef<
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = "SelectItem";
-
-type SelectSeparatorProps = React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>;
-
-const SelectSeparator = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Separator>,
-  SelectSeparatorProps
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Separator
-    ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-border", className)}
-    {...props}
-  />
-));
-SelectSeparator.displayName = "SelectSeparator";
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn(className)}
-    >
-      <path d="M4 6l4 4 4-4" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn(className)}
-    >
-      <path d="M3.5 8.5l3 3 6-7" />
-    </svg>
-  );
-}

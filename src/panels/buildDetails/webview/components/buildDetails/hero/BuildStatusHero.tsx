@@ -1,4 +1,6 @@
+import * as React from "react";
 import { BuildResultStatusIcon } from "../../../../../shared/webview/components/BuildResultStatusIcon";
+import { ResultBadge } from "../../../../../shared/webview/components/ResultBadge";
 import { Badge } from "../../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../../shared/webview/components/ui/progress";
@@ -13,7 +15,32 @@ import {
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
-import { StatusPill } from "../StatusPill";
+
+const { useEffect, useRef } = React;
+
+// Secondary sticky toolbars dock below the hero via this custom property.
+function useStickyHeroOffset(): React.RefObject<HTMLElement> {
+  const heroRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) {
+      return;
+    }
+    const publishOffset = () => {
+      document.documentElement.style.setProperty("--sticky-hero-offset", `${hero.offsetHeight}px`);
+    };
+    publishOffset();
+    const observer = new ResizeObserver(publishOffset);
+    observer.observe(hero);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--sticky-hero-offset");
+    };
+  }, []);
+
+  return heroRef;
+}
 
 function describeTestsPill(
   summary: BuildTestsSummaryViewModel
@@ -64,9 +91,10 @@ export function BuildStatusHero({
   children
 }: BuildStatusHeroProps): JSX.Element {
   const testsPill = describeTestsPill(testsSummary);
+  const heroRef = useStickyHeroOffset();
 
   return (
-    <header className="sticky-header">
+    <header ref={heroRef} className="sticky-header">
       {isRunning || loading ? <Progress indeterminate className="h-px rounded-none" /> : null}
       <div
         style={{
@@ -97,7 +125,7 @@ export function BuildStatusHero({
                   >
                     {displayName}
                   </h1>
-                  <StatusPill id="detail-result" label={resultLabel} status={resultClass} />
+                  <ResultBadge id="detail-result" label={resultLabel} status={resultClass} />
                 </div>
                 <BuildDetailsMetaFields
                   durationLabel={durationLabel}

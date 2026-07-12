@@ -105,7 +105,12 @@ export interface PersistUiStateMessage {
   uiState: BuildDetailsPanelUiState;
 }
 
+export interface RefreshBuildDetailsMessage {
+  type: "refreshBuildDetails";
+}
+
 export type BuildDetailsIncomingMessage =
+  | RefreshBuildDetailsMessage
   | ToggleFollowLogMessage
   | OpenExternalMessage
   | ExportConsoleMessage
@@ -209,6 +214,12 @@ export { isOpenExternalMessage };
 
 export function isExportConsoleMessage(message: unknown): message is ExportConsoleMessage {
   return hasMessageType(message, "exportConsole");
+}
+
+export function isRefreshBuildDetailsMessage(
+  message: unknown
+): message is RefreshBuildDetailsMessage {
+  return hasMessageType(message, "refreshBuildDetails");
 }
 
 export function isArtifactActionMessage(message: unknown): message is ArtifactActionMessage {

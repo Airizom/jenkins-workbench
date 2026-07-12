@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { setImmediate } from "node:timers/promises";
 import type { JenkinsClient, JenkinsJob, JenkinsJobKind } from "../src/jenkins/JenkinsClient";
 import type { JenkinsClientProvider } from "../src/jenkins/JenkinsClientProvider";

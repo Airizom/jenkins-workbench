@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { getExtensionConfiguration, getJobSearchTuningOptions } from "../extension/ExtensionConfig";
 import { formatError } from "../formatters/ErrorFormatters";
 import {
   CancellationError,
@@ -7,7 +8,6 @@ import {
   type JobSearchOptions
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { getJobSearchTuningOptions } from "../jenkins/data/JobSearchTuningOptions";
 import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
@@ -76,9 +76,11 @@ async function goToJob(
 
   const quickPick = vscode.window.createQuickPick<JobQuickPickItem>();
   const cancellationSource = new vscode.CancellationTokenSource();
+  const cancellationToken = cancellationSource.token;
   const picks: JobQuickPickItem[] = [];
   let pending = environments.length;
   let loadFailedCount = 0;
+  let cleanupCompleted = false;
 
   quickPick.placeholder = "Search jobs across all Jenkins environments";
   quickPick.matchOnDescription = true;
@@ -100,16 +102,21 @@ async function goToJob(
   });
 
   quickPick.onDidHide(() => {
+    if (cleanupCompleted) {
+      return;
+    }
+    cleanupCompleted = true;
     cancellationSource.cancel();
+    cancellationSource.dispose();
     quickPick.dispose();
   });
 
   quickPick.show();
 
-  const searchOptions = getJobSearchTuningOptions();
+  const searchOptions = getJobSearchTuningOptions(getExtensionConfiguration());
   const onLoadCompleted = (): void => {
     pending -= 1;
-    if (cancellationSource.token.isCancellationRequested || pending > 0) {
+    if (cancellationToken.isCancellationRequested || pending > 0) {
       return;
     }
 
@@ -129,10 +136,9 @@ async function goToJob(
 
   for (const environment of environments) {
     const envRef = toEnvironmentRef(environment);
-    const cancellationToken = cancellationSource.token;
     const seenEntries = new Set<string>();
     const appendEntries = (entries: JobSearchEntry[]): void => {
-      if (cancellationSource.token.isCancellationRequested) {
+      if (cancellationToken.isCancellationRequested) {
         return;
       }
       for (const entry of entries) {

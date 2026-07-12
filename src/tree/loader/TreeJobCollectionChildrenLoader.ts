@@ -103,11 +103,12 @@ export class TreeJobCollectionChildrenLoader {
       jobScope?: TreeJobCollectionRequest["scope"];
     }
   ): Promise<WorkbenchTreeElement[]> {
-    const createEmptyPlaceholder = (label: string, description?: string) =>
-      this.placeholders.createEmptyPlaceholder(label, description);
     if (jobs.length === 0) {
       return [
-        createEmptyPlaceholder("No jobs, folders, or pipelines found.", "This location is empty.")
+        this.placeholders.createEmptyPlaceholder(
+          "No jobs, folders, or pipelines found.",
+          "This location is empty."
+        )
       ];
     }
 
@@ -117,7 +118,7 @@ export class TreeJobCollectionChildrenLoader {
     });
     if (filteredJobs.length === 0) {
       return [
-        createEmptyPlaceholder(
+        this.placeholders.createEmptyPlaceholder(
           "No jobs match the current filters.",
           "Adjust or clear filters via the filter menu."
         )

@@ -1,129 +1,48 @@
 import * as crypto from "node:crypto";
 import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
+import { ParameterPresetSecretStore } from "./ParameterPresetSecretStore";
+import { ParameterPresetStateRepository } from "./ParameterPresetStateRepository";
+import type {
+  ParameterPreset,
+  ParameterPresetSaveInput,
+  ParameterPresetSummary,
+  StoredJobPresets,
+  StoredParameterPreset
+} from "./ParameterPresetTypes";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 
-const PARAMETER_PRESETS_KEY = "jenkinsWorkbench.parameterPresets";
-const SECRET_KEY_PREFIX = "jenkinsWorkbench.parameterPresetSecret";
+export type {
+  ParameterPreset,
+  ParameterPresetSaveInput,
+  ParameterPresetSummary
+} from "./ParameterPresetTypes";
+
 const MAX_PRESETS_PER_JOB = 20;
 
-interface StoredParameterPreset {
-  id: string;
-  name: string;
-  updatedAt: number;
-  values: Record<string, string | string[]>;
-  secretKeys?: Record<string, string>;
-}
-
-interface StoredJobPresets {
-  environmentId: string;
-  jobUrl: string;
-  presets: StoredParameterPreset[];
-}
-
-interface StoredPresetState {
-  jobs?: StoredJobPresets[];
-}
-
-interface MutableJobPresetEntry {
-  jobs: StoredJobPresets[];
-  entryIndex: number;
-  entry: StoredJobPresets;
-}
-
-interface MutableParameterPresetEntry extends MutableJobPresetEntry {
-  presetIndex: number;
-}
-
-export interface ParameterPresetSummary {
-  id: string;
-  name: string;
-  updatedAt: number;
-}
-
-export interface ParameterPreset extends ParameterPresetSummary {
-  values: Record<string, string | string[]>;
-}
-
-export interface ParameterPresetSaveInput {
-  id?: string;
-  name: string;
-  values: Record<string, string | string[]>;
-  secretValues?: Record<string, string | string[]>;
-  /**
-   * Names of secret parameters whose previously stored values must be kept as-is.
-   * Secrets that are neither re-saved via `secretValues` nor listed here are deleted
-   * (the parameter was removed from the preset or the user cleared it).
-   * Ignored when `secretValues` is undefined, which preserves all existing secrets.
-   */
-  keepSecretNames?: readonly string[];
-}
-
-interface JenkinsParameterPresetStoreRuntimeSurface {
-  listPresets(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string
-  ): Promise<ParameterPresetSummary[]>;
-  getPreset(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    presetId: string
-  ): Promise<ParameterPreset | undefined>;
-  savePreset(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    input: ParameterPresetSaveInput
-  ): Promise<ParameterPresetSummary>;
-  renamePreset(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    presetId: string,
-    nextName: string
-  ): Promise<boolean>;
-  deletePreset(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    presetId: string
-  ): Promise<boolean>;
-  removePresetsForJob(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string
-  ): Promise<void>;
-  updatePresetUrl(
-    scope: EnvironmentScope,
-    environmentId: string,
-    oldJobUrl: string,
-    newJobUrl: string
-  ): Promise<boolean>;
-}
-
-export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreRuntimeSurface {
+export class JenkinsParameterPresetStore {
   private readonly mutationQueue = createSerialTaskQueue();
+  private readonly state: ParameterPresetStateRepository;
+  private readonly secrets: ParameterPresetSecretStore;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(context: vscode.ExtensionContext) {
+    this.state = new ParameterPresetStateRepository(context);
+    this.secrets = new ParameterPresetSecretStore(context.secrets);
+  }
 
+  // fallow-ignore-next-line unused-class-member
   async listPresets(
     scope: EnvironmentScope,
     environmentId: string,
     jobUrl: string
   ): Promise<ParameterPresetSummary[]> {
-    const entry = this.findJobEntry(scope, environmentId, jobUrl);
+    const entry = this.state.findJob(scope, environmentId, jobUrl);
     if (!entry) {
       return [];
     }
     return [...entry.presets]
       .sort((a, b) => b.updatedAt - a.updatedAt || a.name.localeCompare(b.name))
-      .map((preset) => ({
-        id: preset.id,
-        name: preset.name,
-        updatedAt: preset.updatedAt
-      }));
+      .map(toPresetSummary);
   }
 
   async getPreset(
@@ -132,34 +51,16 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
     jobUrl: string,
     presetId: string
   ): Promise<ParameterPreset | undefined> {
-    const entry = this.findJobEntry(scope, environmentId, jobUrl);
-    if (!entry) {
-      return undefined;
-    }
-    const preset = entry.presets.find((candidate) => candidate.id === presetId);
+    const preset = this.state
+      .findJob(scope, environmentId, jobUrl)
+      ?.presets.find((candidate) => candidate.id === presetId);
     if (!preset) {
       return undefined;
     }
 
-    const values = this.cloneValues(preset.values);
-    const secretKeys = preset.secretKeys ?? {};
-
-    for (const [name, key] of Object.entries(secretKeys)) {
-      const stored = await this.context.secrets.get(key);
-      if (typeof stored !== "string") {
-        continue;
-      }
-      const parsed = this.parseSecretValue(stored);
-      if (parsed !== undefined) {
-        values[name] = parsed;
-      }
-    }
-
     return {
-      id: preset.id,
-      name: preset.name,
-      updatedAt: preset.updatedAt,
-      values
+      ...toPresetSummary(preset),
+      values: await this.secrets.resolveValues(preset.values, preset.secretKeys)
     };
   }
 
@@ -172,136 +73,7 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
     return this.mutationQueue(() => this.savePresetUnlocked(scope, environmentId, jobUrl, input));
   }
 
-  private async savePresetUnlocked(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    input: ParameterPresetSaveInput
-  ): Promise<ParameterPresetSummary> {
-    const name = this.normalizeName(input.name);
-    if (!name) {
-      throw new Error("Preset name is required.");
-    }
-
-    const jobs = this.getMutableJobs(scope);
-    const entryIndex = this.findJobEntryIndex(jobs, environmentId, jobUrl);
-    const currentEntry: StoredJobPresets =
-      entryIndex >= 0
-        ? {
-            ...jobs[entryIndex],
-            presets: [...jobs[entryIndex].presets]
-          }
-        : {
-            environmentId,
-            jobUrl,
-            presets: []
-          };
-
-    const existingIndex = input.id
-      ? currentEntry.presets.findIndex((preset) => preset.id === input.id)
-      : -1;
-    const presetId =
-      existingIndex >= 0
-        ? currentEntry.presets[existingIndex].id
-        : (input.id ?? crypto.randomUUID());
-
-    const duplicate = currentEntry.presets.find(
-      (preset) =>
-        preset.id !== presetId &&
-        preset.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase()
-    );
-    if (duplicate) {
-      throw new Error(`A preset named "${name}" already exists for this job.`);
-    }
-
-    if (existingIndex < 0 && currentEntry.presets.length >= MAX_PRESETS_PER_JOB) {
-      throw new Error(
-        `Preset limit reached (${MAX_PRESETS_PER_JOB}). Delete an existing preset before adding another.`
-      );
-    }
-
-    const previous = existingIndex >= 0 ? currentEntry.presets[existingIndex] : undefined;
-    const previousSecretKeys = previous?.secretKeys ?? {};
-    const preserveExistingSecrets = input.secretValues === undefined;
-    const keepSecretNames = new Set(input.keepSecretNames ?? []);
-    const nonSecretValues = this.sanitizeValues(input.values);
-    const secretValues = this.sanitizeValues(input.secretValues ?? {});
-    const nextSecretKeys: Record<string, string> = {};
-    const storedSecretKeys: string[] = [];
-
-    for (const nameKey of Object.keys(previousSecretKeys)) {
-      if (!Object.prototype.hasOwnProperty.call(nonSecretValues, nameKey)) {
-        continue;
-      }
-      if (preserveExistingSecrets) {
-        secretValues[nameKey] = nonSecretValues[nameKey];
-      }
-      delete nonSecretValues[nameKey];
-    }
-
-    for (const nameKey of Object.keys(secretValues)) {
-      delete nonSecretValues[nameKey];
-    }
-
-    for (const [nameKey, value] of Object.entries(secretValues)) {
-      const secretKey = this.buildSecretKey(scope, environmentId, jobUrl, presetId, nameKey);
-      await this.context.secrets.store(secretKey, JSON.stringify(value));
-      nextSecretKeys[nameKey] = secretKey;
-      storedSecretKeys.push(secretKey);
-    }
-
-    for (const [nameKey, secretKey] of Object.entries(previousSecretKeys)) {
-      if (nextSecretKeys[nameKey]) {
-        continue;
-      }
-      if (preserveExistingSecrets || keepSecretNames.has(nameKey)) {
-        nextSecretKeys[nameKey] = secretKey;
-      }
-    }
-
-    const updatedAt = Date.now();
-    const nextPreset: StoredParameterPreset = {
-      id: presetId,
-      name,
-      updatedAt,
-      values: nonSecretValues,
-      secretKeys: Object.keys(nextSecretKeys).length > 0 ? nextSecretKeys : undefined
-    };
-
-    if (existingIndex >= 0) {
-      currentEntry.presets[existingIndex] = nextPreset;
-    } else {
-      currentEntry.presets.push(nextPreset);
-    }
-
-    if (currentEntry.presets.length === 0) {
-      if (entryIndex >= 0) {
-        jobs.splice(entryIndex, 1);
-      }
-    } else if (entryIndex >= 0) {
-      jobs[entryIndex] = currentEntry;
-    } else {
-      jobs.push(currentEntry);
-    }
-
-    try {
-      await this.updateState(scope, {
-        jobs
-      });
-    } catch (error) {
-      await this.deleteSecretKeyValuesBestEffort(storedSecretKeys);
-      throw error;
-    }
-
-    await this.deleteUnusedSecretKeys(previousSecretKeys, nextSecretKeys);
-
-    return {
-      id: nextPreset.id,
-      name: nextPreset.name,
-      updatedAt: nextPreset.updatedAt
-    };
-  }
-
+  // fallow-ignore-next-line unused-class-member
   renamePreset(
     scope: EnvironmentScope,
     environmentId: string,
@@ -310,26 +82,14 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
     nextName: string
   ): Promise<boolean> {
     return this.mutationQueue(async () => {
-      const normalizedName = this.normalizeName(nextName);
-      if (!normalizedName) {
-        throw new Error("Preset name is required.");
-      }
-
-      const target = this.getMutablePresetEntry(scope, environmentId, jobUrl, presetId);
+      const normalizedName = requirePresetName(nextName);
+      const target = this.state.getMutablePreset(scope, environmentId, jobUrl, presetId);
       if (!target) {
         return false;
       }
       const { jobs, entryIndex, entry, presetIndex } = target;
 
-      const duplicate = entry.presets.find(
-        (preset) =>
-          preset.id !== presetId &&
-          preset.name.trim().toLocaleLowerCase() === normalizedName.toLocaleLowerCase()
-      );
-      if (duplicate) {
-        throw new Error(`A preset named "${normalizedName}" already exists for this job.`);
-      }
-
+      assertUniqueName(entry.presets, presetId, normalizedName);
       const previous = entry.presets[presetIndex];
       if (previous.name === normalizedName) {
         return false;
@@ -340,9 +100,8 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
         name: normalizedName,
         updatedAt: Date.now()
       };
-
       jobs[entryIndex] = entry;
-      await this.updateState(scope, { jobs });
+      await this.state.writeJobs(scope, jobs);
       return true;
     });
   }
@@ -354,12 +113,11 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
     presetId: string
   ): Promise<boolean> {
     return this.mutationQueue(async () => {
-      const target = this.getMutablePresetEntry(scope, environmentId, jobUrl, presetId);
+      const target = this.state.getMutablePreset(scope, environmentId, jobUrl, presetId);
       if (!target) {
         return false;
       }
       const { jobs, entryIndex, entry, presetIndex } = target;
-
       const [removed] = entry.presets.splice(presetIndex, 1);
 
       if (entry.presets.length === 0) {
@@ -368,52 +126,50 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
         jobs[entryIndex] = entry;
       }
 
-      await this.updateState(scope, { jobs });
-      await this.deleteSecretKeys(removed.secretKeys);
+      await this.state.writeJobs(scope, jobs);
+      await this.secrets.deleteMappedKeys(removed.secretKeys);
       return true;
     });
   }
 
+  // fallow-ignore-next-line unused-class-member
   removePresetsForJob(
     scope: EnvironmentScope,
     environmentId: string,
     jobUrl: string
   ): Promise<void> {
     return this.mutationQueue(async () => {
-      const jobs = this.getMutableJobs(scope);
-      const entryIndex = this.findJobEntryIndex(jobs, environmentId, jobUrl);
+      const jobs = this.state.readJobs(scope);
+      const entryIndex = this.state.findJobIndex(jobs, environmentId, jobUrl);
       if (entryIndex < 0) {
         return;
       }
 
       const [removed] = jobs.splice(entryIndex, 1);
-
-      await this.updateState(scope, { jobs });
-      for (const preset of removed.presets) {
-        await this.deleteSecretKeys(preset.secretKeys);
-      }
+      await this.state.writeJobs(scope, jobs);
+      await this.deletePresetSecrets(removed.presets);
     });
   }
 
   removePresetsForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
     return this.mutationQueue(async () => {
-      const state = this.getState(scope);
-      const jobs = [...(state.jobs ?? [])];
+      const jobs = this.state.readJobs(scope);
       const removed = jobs.filter((entry) => entry.environmentId === environmentId);
       if (removed.length === 0) {
         return;
       }
 
-      const next = jobs.filter((entry) => entry.environmentId !== environmentId);
-      await this.updateState(scope, { jobs: next });
+      await this.state.writeJobs(
+        scope,
+        jobs.filter((entry) => entry.environmentId !== environmentId)
+      );
       for (const entry of removed) {
-        for (const preset of entry.presets) {
-          await this.deleteSecretKeys(preset.secretKeys);
-        }
+        await this.deletePresetSecrets(entry.presets);
       }
     });
   }
 
+  // fallow-ignore-next-line unused-class-member
   updatePresetUrl(
     scope: EnvironmentScope,
     environmentId: string,
@@ -423,10 +179,74 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
     if (oldJobUrl === newJobUrl) {
       return Promise.resolve(false);
     }
-
     return this.mutationQueue(() =>
       this.updatePresetUrlUnlocked(scope, environmentId, oldJobUrl, newJobUrl)
     );
+  }
+
+  private async savePresetUnlocked(
+    scope: EnvironmentScope,
+    environmentId: string,
+    jobUrl: string,
+    input: ParameterPresetSaveInput
+  ): Promise<ParameterPresetSummary> {
+    const name = requirePresetName(input.name);
+    const jobs = this.state.readJobs(scope);
+    const entryIndex = this.state.findJobIndex(jobs, environmentId, jobUrl);
+    const entry = copyOrCreateJobEntry(jobs, entryIndex, environmentId, jobUrl);
+    const existingIndex = input.id
+      ? entry.presets.findIndex((preset) => preset.id === input.id)
+      : -1;
+    const presetId =
+      existingIndex >= 0 ? entry.presets[existingIndex].id : (input.id ?? crypto.randomUUID());
+
+    assertUniqueName(entry.presets, presetId, name);
+    if (existingIndex < 0 && entry.presets.length >= MAX_PRESETS_PER_JOB) {
+      throw new Error(
+        `Preset limit reached (${MAX_PRESETS_PER_JOB}). Delete an existing preset before adding another.`
+      );
+    }
+
+    const previous = existingIndex >= 0 ? entry.presets[existingIndex] : undefined;
+    const previousSecretKeys = previous?.secretKeys ?? {};
+    const preparedSecrets = await this.secrets.prepare({
+      scope,
+      environmentId,
+      jobUrl,
+      presetId,
+      values: input.values,
+      secretValues: input.secretValues,
+      keepSecretNames: input.keepSecretNames,
+      previousSecretKeys
+    });
+    const nextPreset: StoredParameterPreset = {
+      id: presetId,
+      name,
+      updatedAt: Date.now(),
+      values: preparedSecrets.values,
+      secretKeys:
+        Object.keys(preparedSecrets.secretKeys).length > 0 ? preparedSecrets.secretKeys : undefined
+    };
+
+    if (existingIndex >= 0) {
+      entry.presets[existingIndex] = nextPreset;
+    } else {
+      entry.presets.push(nextPreset);
+    }
+    if (entryIndex >= 0) {
+      jobs[entryIndex] = entry;
+    } else {
+      jobs.push(entry);
+    }
+
+    try {
+      await this.state.writeJobs(scope, jobs);
+    } catch (error) {
+      await this.secrets.deleteKeyValuesBestEffort(preparedSecrets.newlyStoredKeys);
+      throw error;
+    }
+    await this.secrets.deleteUnused(previousSecretKeys, preparedSecrets.secretKeys);
+    return toPresetSummary(nextPreset);
   }
 
   private async updatePresetUrlUnlocked(
@@ -435,238 +255,80 @@ export class JenkinsParameterPresetStore implements JenkinsParameterPresetStoreR
     oldJobUrl: string,
     newJobUrl: string
   ): Promise<boolean> {
-    const state = this.getState(scope);
-    const jobs = [...(state.jobs ?? [])];
-    const sourceIndex = jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === oldJobUrl
-    );
+    const jobs = this.state.readJobs(scope);
+    const sourceIndex = this.state.findJobIndex(jobs, environmentId, oldJobUrl);
     if (sourceIndex < 0) {
       return false;
     }
 
     const source = jobs[sourceIndex];
-    const targetIndex = jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === newJobUrl
-    );
+    const targetIndex = this.state.findJobIndex(jobs, environmentId, newJobUrl);
     let droppedPresets: StoredParameterPreset[] = [];
 
     if (targetIndex < 0) {
-      jobs[sourceIndex] = {
-        ...source,
-        jobUrl: newJobUrl
-      };
+      jobs[sourceIndex] = { ...source, jobUrl: newJobUrl };
     } else {
       const target = jobs[targetIndex];
       const sortedPresets = [...target.presets, ...source.presets].sort(
         (a, b) => b.updatedAt - a.updatedAt
       );
-      const merged = sortedPresets.slice(0, MAX_PRESETS_PER_JOB);
-      droppedPresets = sortedPresets.slice(MAX_PRESETS_PER_JOB);
       jobs[targetIndex] = {
         ...target,
-        presets: merged
+        presets: sortedPresets.slice(0, MAX_PRESETS_PER_JOB)
       };
+      droppedPresets = sortedPresets.slice(MAX_PRESETS_PER_JOB);
       jobs.splice(sourceIndex, 1);
     }
 
-    await this.updateState(scope, { jobs });
-    for (const preset of droppedPresets) {
-      await this.deleteSecretKeys(preset.secretKeys);
-    }
+    await this.state.writeJobs(scope, jobs);
+    await this.deletePresetSecrets(droppedPresets);
     return true;
   }
 
-  private getState(scope: EnvironmentScope): StoredPresetState {
-    const memento = this.getMemento(scope);
-    const stored = memento.get<StoredPresetState>(PARAMETER_PRESETS_KEY);
-    if (!stored || !Array.isArray(stored.jobs)) {
-      return { jobs: [] };
-    }
-    return {
-      jobs: stored.jobs.map((entry) => ({
-        environmentId: entry.environmentId,
-        jobUrl: entry.jobUrl,
-        presets: Array.isArray(entry.presets)
-          ? entry.presets.map((preset) => ({
-              id: preset.id,
-              name: preset.name,
-              updatedAt: typeof preset.updatedAt === "number" ? preset.updatedAt : 0,
-              values: this.sanitizeValues(preset.values),
-              secretKeys:
-                preset.secretKeys && typeof preset.secretKeys === "object"
-                  ? { ...preset.secretKeys }
-                  : undefined
-            }))
-          : []
-      }))
-    };
-  }
-
-  private async updateState(scope: EnvironmentScope, state: StoredPresetState): Promise<void> {
-    const memento = this.getMemento(scope);
-    await memento.update(PARAMETER_PRESETS_KEY, state);
-  }
-
-  private findJobEntry(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string
-  ): StoredJobPresets | undefined {
-    const state = this.getState(scope);
-    return state.jobs?.find(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
-  }
-
-  private getMutableJobs(scope: EnvironmentScope): StoredJobPresets[] {
-    return [...(this.getState(scope).jobs ?? [])];
-  }
-
-  private getMutableJobEntry(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string
-  ): MutableJobPresetEntry | undefined {
-    const jobs = this.getMutableJobs(scope);
-    const entryIndex = this.findJobEntryIndex(jobs, environmentId, jobUrl);
-    if (entryIndex < 0) {
-      return undefined;
-    }
-    return {
-      jobs,
-      entryIndex,
-      entry: {
-        ...jobs[entryIndex],
-        presets: [...jobs[entryIndex].presets]
-      }
-    };
-  }
-
-  private findJobEntryIndex(
-    jobs: StoredJobPresets[],
-    environmentId: string,
-    jobUrl: string
-  ): number {
-    return jobs.findIndex(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
-  }
-
-  private findPresetIndex(entry: StoredJobPresets, presetId: string): number {
-    return entry.presets.findIndex((preset) => preset.id === presetId);
-  }
-
-  private getMutablePresetEntry(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    presetId: string
-  ): MutableParameterPresetEntry | undefined {
-    const target = this.getMutableJobEntry(scope, environmentId, jobUrl);
-    if (!target) {
-      return undefined;
-    }
-    const presetIndex = this.findPresetIndex(target.entry, presetId);
-    if (presetIndex < 0) {
-      return undefined;
-    }
-    return { ...target, presetIndex };
-  }
-
-  private sanitizeValues(values: unknown): Record<string, string | string[]> {
-    const result: Record<string, string | string[]> = {};
-    if (!values || typeof values !== "object") {
-      return result;
-    }
-    for (const [key, rawValue] of Object.entries(values as Record<string, unknown>)) {
-      const normalizedKey = key.trim();
-      if (!normalizedKey) {
-        continue;
-      }
-      if (typeof rawValue === "string") {
-        result[normalizedKey] = rawValue;
-        continue;
-      }
-      if (Array.isArray(rawValue)) {
-        result[normalizedKey] = rawValue.map((entry) => String(entry));
-      }
-    }
-    return result;
-  }
-
-  private cloneValues(
-    values: Record<string, string | string[]>
-  ): Record<string, string | string[]> {
-    const result: Record<string, string | string[]> = {};
-    for (const [key, value] of Object.entries(values)) {
-      result[key] = Array.isArray(value) ? [...value] : value;
-    }
-    return result;
-  }
-
-  private parseSecretValue(value: string): string | string[] | undefined {
-    try {
-      const parsed = JSON.parse(value) as unknown;
-      if (typeof parsed === "string") {
-        return parsed;
-      }
-      if (Array.isArray(parsed)) {
-        return parsed.map((entry) => String(entry));
-      }
-      return undefined;
-    } catch {
-      return value;
+  private async deletePresetSecrets(presets: StoredParameterPreset[]): Promise<void> {
+    for (const preset of presets) {
+      await this.secrets.deleteMappedKeys(preset.secretKeys);
     }
   }
+}
 
-  private normalizeName(value: string): string | undefined {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
+function copyOrCreateJobEntry(
+  jobs: StoredJobPresets[],
+  entryIndex: number,
+  environmentId: string,
+  jobUrl: string
+): StoredJobPresets {
+  if (entryIndex < 0) {
+    return { environmentId, jobUrl, presets: [] };
   }
+  return {
+    ...jobs[entryIndex],
+    presets: [...jobs[entryIndex].presets]
+  };
+}
 
-  private async deleteUnusedSecretKeys(
-    previous: Record<string, string>,
-    next: Record<string, string>
-  ): Promise<void> {
-    for (const [name, key] of Object.entries(previous)) {
-      if (next[name] === key) {
-        continue;
-      }
-      await this.context.secrets.delete(key);
-    }
+function requirePresetName(value: string): string {
+  const name = value.trim();
+  if (!name) {
+    throw new Error("Preset name is required.");
   }
+  return name;
+}
 
-  private async deleteSecretKeys(secretKeys?: Record<string, string>): Promise<void> {
-    for (const key of Object.values(secretKeys ?? {})) {
-      await this.context.secrets.delete(key);
-    }
+function assertUniqueName(presets: StoredParameterPreset[], presetId: string, name: string): void {
+  const normalizedName = name.toLocaleLowerCase();
+  const duplicate = presets.some(
+    (preset) => preset.id !== presetId && preset.name.trim().toLocaleLowerCase() === normalizedName
+  );
+  if (duplicate) {
+    throw new Error(`A preset named "${name}" already exists for this job.`);
   }
+}
 
-  private async deleteSecretKeyValuesBestEffort(secretKeys: readonly string[]): Promise<void> {
-    for (const key of secretKeys) {
-      try {
-        await this.context.secrets.delete(key);
-      } catch {
-        // Preserve the original memento update error.
-      }
-    }
-  }
-
-  private buildSecretKey(
-    scope: EnvironmentScope,
-    environmentId: string,
-    jobUrl: string,
-    presetId: string,
-    parameterName: string
-  ): string {
-    const hash = crypto
-      .createHash("sha256")
-      .update(`${scope}|${environmentId}|${jobUrl}|${presetId}|${parameterName}`)
-      .digest("hex");
-    return `${SECRET_KEY_PREFIX}.${scope}.${environmentId}.${hash}.${crypto.randomUUID()}`;
-  }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
-  }
+function toPresetSummary(preset: StoredParameterPreset): ParameterPresetSummary {
+  return {
+    id: preset.id,
+    name: preset.name,
+    updatedAt: preset.updatedAt
+  };
 }

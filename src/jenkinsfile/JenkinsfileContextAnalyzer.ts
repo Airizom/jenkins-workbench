@@ -9,7 +9,7 @@ import {
   resolveBraceLabel,
   resolveCallName
 } from "./context/JenkinsfileContextNavigation";
-import { computeIsStepAllowed } from "./context/JenkinsfileContextRules";
+import { computeHasNodeContext, computeIsStepAllowed } from "./context/JenkinsfileContextRules";
 import type {
   JenkinsfileBraceEntry,
   JenkinsfileClosedCall,
@@ -34,6 +34,7 @@ export function analyzeJenkinsfileContext(
     ? analyzeActiveCallArguments(maskedText, activeCall, offset)
     : undefined;
   const isStepAllowed = computeIsStepAllowed(blockPath);
+  const hasNodeContext = computeHasNodeContext(blockPath);
   const canSuggestStep = isStepAllowed && isValidStepStart(maskedText, offset);
 
   return {
@@ -44,7 +45,8 @@ export function analyzeJenkinsfileContext(
     argumentContext,
     blockPath,
     isStepAllowed,
-    canSuggestStep
+    canSuggestStep,
+    hasNodeContext
   };
 }
 

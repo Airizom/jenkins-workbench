@@ -2,6 +2,7 @@ import { JenkinsRequestError } from "../errors";
 import type { JenkinsPendingInputAction } from "../types";
 import { buildActionUrl } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
+import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
 
 export class JenkinsPendingInputClient {
   constructor(private readonly context: JenkinsClientContext) {}
@@ -66,11 +67,7 @@ export class JenkinsPendingInputClient {
     fallbackAction: "proceedEmpty" | "proceed" | "abort"
   ): string {
     if (actionUrl) {
-      try {
-        return new URL(actionUrl, buildUrl).toString();
-      } catch {
-        // Fall back to the well-known input action route.
-      }
+      return resolveTrustedJenkinsUrl(this.context.baseUrl, actionUrl, buildUrl);
     }
     return buildActionUrl(buildUrl, `input/${encodeURIComponent(inputId)}/${fallbackAction}`);
   }
@@ -85,12 +82,12 @@ export class JenkinsPendingInputClient {
       parameter: entries.map(([name, value]) => ({ name, value }))
     };
     const body = new URLSearchParams();
-    body.set("inputId", inputId);
-    body.set("proceed", proceedText?.trim() || "Proceed");
-    body.set("json", JSON.stringify(payload));
     for (const [name, value] of entries) {
       body.set(name, value);
     }
+    body.set("inputId", inputId);
+    body.set("proceed", proceedText?.trim() || "Proceed");
+    body.set("json", JSON.stringify(payload));
     return body.toString();
   }
 }

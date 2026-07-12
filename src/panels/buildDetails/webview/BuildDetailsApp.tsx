@@ -5,11 +5,26 @@ import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
+import { toast } from "../../shared/webview/hooks/useToast";
 import type {
   BuildDetailsViewModel,
   PipelineLogTargetViewModel
 } from "../shared/BuildDetailsContracts";
 import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
+import {
+  buildApproveInputMessage,
+  buildArtifactActionMessage,
+  buildClearPipelineLogNodeMessage,
+  buildExportConsoleMessage,
+  buildExportPipelineNodeLogMessage,
+  buildOpenTestSourceMessage,
+  buildRefreshBuildDetailsMessage,
+  buildRejectInputMessage,
+  buildReloadTestReportMessage,
+  buildRestartPipelineFromStageMessage,
+  buildSelectPipelineLogNodeMessage,
+  buildToggleFollowLogMessage
+} from "./buildDetailsWebviewMessages";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
 import { BuildStatusHero } from "./components/buildDetails/hero/BuildStatusHero";
@@ -73,17 +88,22 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
 
   const handleToggleFollowLog = (value: boolean) => {
     dispatch({ type: "setFollowLog", value });
-    postMessage({ type: "toggleFollowLog", value });
+    postMessage(buildToggleFollowLogMessage(value));
   };
 
   const handleExportConsole = () => {
-    postMessage({ type: "exportConsole" });
+    postMessage(buildExportConsoleMessage());
+    toast({ title: "Console export requested" });
+  };
+
+  const handleRetry = () => {
+    postMessage(buildRefreshBuildDetailsMessage());
   };
 
   // Stable identity: PipelineSection uses this callback in effect dependencies.
   const handleSelectPipelineLog = useCallback(
     (target: PipelineLogTargetViewModel) => {
-      postMessage({ type: "selectPipelineLogNode", target });
+      postMessage(buildSelectPipelineLogNodeMessage(target));
     },
     [postMessage]
   );
@@ -139,8 +159,13 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           />
         </BuildStatusHero>
 
-        <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
-          <PanelErrorList errors={state.errors} id="errors" title="Unable to load build details" />
+        <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
+          <PanelErrorList
+            errors={state.errors}
+            id="errors"
+            title="Unable to load build details"
+            onRetry={handleRetry}
+          />
           <BuildDetailsTabs
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}
@@ -153,13 +178,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
             pipelineStagesLoading={state.pipelineStagesLoading}
             stripFailedCount={stripFailedCount}
-            displayName={state.displayName}
             buildUrl={buildUrl}
             resultClass={state.resultClass}
-            resultLabel={state.resultLabel}
-            durationLabel={state.durationLabel}
-            timestampLabel={state.timestampLabel}
-            culpritsLabel={state.culpritsLabel}
             testsSummary={state.testState.summary}
             testResults={state.testState.results}
             coverageState={coverageState}
@@ -171,39 +191,31 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             consoleError={state.consoleError}
             followLog={state.followLog}
             isConsoleTabActive={selectedTab === "console"}
-            onApproveInput={(inputId) => postMessage({ type: "approveInput", inputId })}
-            onRejectInput={(inputId) => postMessage({ type: "rejectInput", inputId })}
+            onApproveInput={(inputId) => postMessage(buildApproveInputMessage(inputId))}
+            onRejectInput={(inputId) => postMessage(buildRejectInputMessage(inputId))}
             onRestartStage={(stageName) =>
-              postMessage({ type: "restartPipelineFromStage", stageName })
+              postMessage(buildRestartPipelineFromStageMessage(stageName))
             }
             onSelectPipelineLog={handleSelectPipelineLog}
-            onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
-            onExportPipelineLog={() => postMessage({ type: "exportPipelineNodeLog" })}
+            onClearPipelineLog={() => postMessage(buildClearPipelineLogNodeMessage())}
+            onExportPipelineLog={() => {
+              postMessage(buildExportPipelineNodeLogMessage());
+              toast({ title: "Log export requested" });
+            }}
             onToggleFollowLog={handleToggleFollowLog}
             onExportLogs={handleExportConsole}
             onOpenExternal={handleOpenExternal}
-            onArtifactAction={(action, artifact) =>
-              postMessage({
-                type: "artifactAction",
-                action,
-                relativePath: artifact.relativePath,
-                fileName: artifact.fileName ?? undefined
-              })
-            }
-            onReloadTestResults={() =>
-              postMessage({
-                type: "reloadTestReport",
-                includeCaseLogs: true
-              })
-            }
-            onOpenTestSource={(testCase) =>
-              postMessage({
-                type: "openTestSource",
-                testName: testCase.name,
-                className: testCase.className,
-                suiteName: testCase.suiteName
-              })
-            }
+            onArtifactAction={(action, artifact) => {
+              postMessage(buildArtifactActionMessage(action, artifact));
+              if (action === "download") {
+                toast({ title: "Download requested", description: artifact.name });
+              }
+            }}
+            onReloadTestResults={() => {
+              postMessage(buildReloadTestReportMessage());
+              toast({ title: "Reloading test report" });
+            }}
+            onOpenTestSource={(testCase) => postMessage(buildOpenTestSourceMessage(testCase))}
           />
         </main>
 

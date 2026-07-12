@@ -495,8 +495,21 @@
     .animate-collapsible-down,
     .animate-collapsible-up,
     .animate-accordion-down,
-    .animate-accordion-up {
+    .animate-accordion-up,
+    .animate-pulse,
+    .animate-spin,
+    .animate-progress-indeterminate,
+    .animate-in,
+    .animate-out {
       animation: none;
+    }
+
+    /* Indeterminate progress indicators rely on animation to show activity; keep
+     * them visible as a static bar instead of a moving one. */
+    .animate-progress-indeterminate {
+      transform: none;
+      width: 100%;
+      opacity: 0.6;
     }
   }
 }

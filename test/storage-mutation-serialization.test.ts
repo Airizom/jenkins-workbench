@@ -1,24 +1,20 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, vi } from "vitest";
 import type * as vscode from "vscode";
 import { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
-const { JenkinsEnvironmentStore } = withModuleMocks(
-  [exactModuleMock("vscode", createEventEmitterVscodeMock())],
-  () =>
-    require("../src/storage/JenkinsEnvironmentStore") as {
-      JenkinsEnvironmentStore: EnvironmentStoreConstructor;
-    }
-);
-const { JenkinsRepositoryLinkStore } = withModuleMocks(
-  [exactModuleMock("vscode", createEventEmitterVscodeMock())],
-  () =>
-    require("../src/storage/JenkinsRepositoryLinkStore") as {
-      JenkinsRepositoryLinkStore: RepositoryLinkStoreConstructor;
-    }
-);
+vi.doMock("vscode", () => createEventEmitterVscodeMock());
+const { JenkinsEnvironmentStore } = (await import(
+  "../src/storage/JenkinsEnvironmentStore"
+)) as unknown as {
+  JenkinsEnvironmentStore: EnvironmentStoreConstructor;
+};
+const { JenkinsRepositoryLinkStore } = (await import(
+  "../src/storage/JenkinsRepositoryLinkStore"
+)) as unknown as {
+  JenkinsRepositoryLinkStore: RepositoryLinkStoreConstructor;
+};
 
 interface EnvironmentStoreConstructor {
   new (context: unknown): EnvironmentStoreHarness;

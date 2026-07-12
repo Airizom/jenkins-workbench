@@ -1,14 +1,9 @@
 import * as vscode from "vscode";
 import { getDiagnosticMetadata } from "../JenkinsfileDiagnosticMetadata";
-import {
-  JENKINS_DIAGNOSTIC_SOURCE,
-  isValidationCode,
-  resolveDiagnosticSuggestions
-} from "../JenkinsfileDiagnosticUtils";
+import { resolveDiagnosticCode, resolveDiagnosticSuggestions } from "../JenkinsfileDiagnosticUtils";
 import type { JenkinsfileMatcher } from "../JenkinsfileMatcher";
 import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
 import {
-  deriveValidationCode,
   extractInvalidStepToken,
   findTokenOccurrences,
   isTokenChar
@@ -83,22 +78,6 @@ export class JenkinsfileQuickFixProvider implements vscode.CodeActionProvider {
 
     return actions;
   }
-}
-
-function resolveDiagnosticCode(
-  diagnostic: vscode.Diagnostic
-): JenkinsfileValidationCode | undefined {
-  const metadata = getDiagnosticMetadata(diagnostic);
-  if (metadata?.code) {
-    return metadata.code;
-  }
-  if (diagnostic.source !== JENKINS_DIAGNOSTIC_SOURCE) {
-    return undefined;
-  }
-  if (typeof diagnostic.code === "string") {
-    return isValidationCode(diagnostic.code) ? diagnostic.code : undefined;
-  }
-  return deriveValidationCode(diagnostic.message);
 }
 
 function resolveMissingSection(code: JenkinsfileValidationCode): "agent" | "stages" | undefined {

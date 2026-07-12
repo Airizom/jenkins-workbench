@@ -15,8 +15,15 @@ const DEFAULT_MAX_COMMIT_MESSAGE_LENGTH = 120;
 const DEFAULT_MAX_PARAMETER_COUNT = 5;
 const DEFAULT_MAX_PARAMETER_VALUE_LENGTH = 80;
 const DEFAULT_PARAMETER_MASK_VALUE = "[redacted]";
+const EMPTY_STRING_LIST: readonly string[] = [];
 
 type BuildAction = NonNullable<NonNullable<JenkinsBuild["actions"]>[number]>;
+
+type BuildParameterSummaryOptions = BuildParameterFilterOptions & {
+  maxParameterCount: number;
+  maxParameterValueLength: number;
+  parameterMaskValue: string;
+};
 
 export interface BuildTooltipOptions {
   includeParameters?: boolean;
@@ -40,9 +47,9 @@ export function buildBuildTooltip(
   const maxParameterValueLength =
     options.maxParameterValueLength ?? DEFAULT_MAX_PARAMETER_VALUE_LENGTH;
   const includeParameters = options.includeParameters ?? false;
-  const parameterAllowList = options.parameterAllowList ?? [];
-  const parameterDenyList = options.parameterDenyList ?? [];
-  const parameterMaskPatterns = options.parameterMaskPatterns ?? [];
+  const parameterAllowList = options.parameterAllowList ?? EMPTY_STRING_LIST;
+  const parameterDenyList = options.parameterDenyList ?? EMPTY_STRING_LIST;
+  const parameterMaskPatterns = options.parameterMaskPatterns ?? EMPTY_STRING_LIST;
   const parameterMaskValue = options.parameterMaskValue ?? DEFAULT_PARAMETER_MASK_VALUE;
 
   let hasSection = false;
@@ -75,9 +82,9 @@ export function buildBuildTooltip(
     const parameters = resolveParameterSummary(build, {
       maxParameterCount,
       maxParameterValueLength,
-      parameterAllowList,
-      parameterDenyList,
-      parameterMaskPatterns,
+      allowList: parameterAllowList,
+      denyList: parameterDenyList,
+      maskPatterns: parameterMaskPatterns,
       parameterMaskValue
     });
     if (parameters) {
@@ -119,41 +126,42 @@ function resolveLastCommit(
 }
 
 function resolveCauseSummary(build: JenkinsBuild): string | undefined {
-  const summaries: string[] = [];
-  for (const action of build.actions ?? []) {
+  const actions = build.actions;
+  if (!actions) {
+    return undefined;
+  }
+
+  let summaries: string[] | undefined;
+  for (const action of actions) {
     if (!isActionWithCauses(action)) {
       continue;
     }
     for (const cause of action.causes) {
-      const description = normalizeWhitespace(cause.shortDescription ?? "");
-      const user = normalizeWhitespace(cause.userName ?? cause.userId ?? "");
-      if (description) {
-        if (user && !includesCaseInsensitive(description, user)) {
-          summaries.push(`${description} (${user})`);
-        } else {
-          summaries.push(description);
-        }
-        continue;
-      }
-      if (user) {
-        summaries.push(`Triggered by ${user}`);
+      const summary = formatCauseSummary(cause);
+      if (summary) {
+        summaries ??= [];
+        summaries.push(summary);
       }
     }
   }
 
-  return summaries.length > 0 ? summaries.join(" | ") : undefined;
+  return summaries ? summaries.join(" | ") : undefined;
+}
+
+function formatCauseSummary(cause: JenkinsBuildCause): string | undefined {
+  const description = normalizeWhitespace(cause.shortDescription ?? "");
+  const user = normalizeWhitespace(cause.userName ?? cause.userId ?? "");
+  if (description) {
+    return user && !includesCaseInsensitive(description, user)
+      ? `${description} (${user})`
+      : description;
+  }
+  return user ? `Triggered by ${user}` : undefined;
 }
 
 function resolveParameterSummary(
   build: JenkinsBuild,
-  options: {
-    maxParameterCount: number;
-    maxParameterValueLength: number;
-    parameterAllowList: string[];
-    parameterDenyList: string[];
-    parameterMaskPatterns: string[];
-    parameterMaskValue: string;
-  }
+  options: BuildParameterSummaryOptions
 ): string | undefined {
   if (options.maxParameterCount < 0 || !Number.isInteger(options.maxParameterCount)) {
     return resolveParameterSummaryWithSliceSemantics(build, options);
@@ -180,14 +188,7 @@ function resolveParameterSummary(
 
 function resolveParameterSummaryWithSliceSemantics(
   build: JenkinsBuild,
-  options: {
-    maxParameterCount: number;
-    maxParameterValueLength: number;
-    parameterAllowList: string[];
-    parameterDenyList: string[];
-    parameterMaskPatterns: string[];
-    parameterMaskValue: string;
-  }
+  options: BuildParameterSummaryOptions
 ): string | undefined {
   const formatted: string[] = [];
   visitMatchingParameters(build, options, (name, value, isMasked) => {
@@ -198,7 +199,10 @@ function resolveParameterSummaryWithSliceSemantics(
     return undefined;
   }
 
-  const visible = formatted.slice(0, options.maxParameterCount);
+  const visible =
+    options.maxParameterCount >= formatted.length
+      ? formatted
+      : formatted.slice(0, options.maxParameterCount);
   const remaining = formatted.length - visible.length;
   const base = visible.join(", ");
   return remaining > 0 ? `${base} +${remaining} more` : base;
@@ -242,46 +246,18 @@ function resolveTimingSummary(build: JenkinsBuild): { label: string; value: stri
   if (!Number.isFinite(build.timestamp)) {
     return undefined;
   }
+  const timestamp = build.timestamp as number;
 
   if (build.building) {
-    const startLabel = formatLocaleTimestampWithRelative(build.timestamp as number, true);
+    const startLabel = formatLocaleTimestampWithRelative(timestamp, true);
     return { label: "Started", value: startLabel };
   }
 
-  const completionTimestamp = resolveBuildCompletionTimestamp(build);
-  const completedAt = completionTimestamp ?? (build.timestamp as number);
+  const completedAt = Number.isFinite(build.duration)
+    ? timestamp + (build.duration as number)
+    : timestamp;
   const completedLabel = formatLocaleTimestampWithRelative(completedAt, true);
   return { label: "Completed", value: completedLabel };
-}
-
-function resolveBuildCompletionTimestamp(build: JenkinsBuild): number | undefined {
-  if (!Number.isFinite(build.timestamp)) {
-    return undefined;
-  }
-  const timestamp = build.timestamp as number;
-  if (Number.isFinite(build.duration)) {
-    return timestamp + (build.duration as number);
-  }
-  return timestamp;
-}
-
-type BuildParameterSummaryOptions = {
-  maxParameterCount: number;
-  maxParameterValueLength: number;
-  parameterAllowList: string[];
-  parameterDenyList: string[];
-  parameterMaskPatterns: string[];
-  parameterMaskValue: string;
-};
-
-function toBuildParameterFilterOptions(
-  options: BuildParameterSummaryOptions
-): BuildParameterFilterOptions {
-  return {
-    allowList: options.parameterAllowList,
-    denyList: options.parameterDenyList,
-    maskPatterns: options.parameterMaskPatterns
-  };
 }
 
 function visitMatchingParameters(
@@ -289,13 +265,9 @@ function visitMatchingParameters(
   options: BuildParameterSummaryOptions,
   visitor: (name: string, value: unknown, isMasked: boolean) => void
 ): void {
-  visitMatchingBuildParameters(
-    build.actions,
-    toBuildParameterFilterOptions(options),
-    (name, parameter, isMasked) => {
-      visitor(name, parameter.value, isMasked);
-    }
-  );
+  visitMatchingBuildParameters(build.actions, options, (name, parameter, isMasked) => {
+    visitor(name, parameter.value, isMasked);
+  });
 }
 
 function isActionWithCauses(action: BuildAction | null): action is { causes: JenkinsBuildCause[] } {
@@ -307,7 +279,7 @@ function isActionWithCauses(action: BuildAction | null): action is { causes: Jen
 }
 
 function includesCaseInsensitive(source: string, needle: string): boolean {
-  return source.toLowerCase().includes(needle.toLowerCase());
+  return source.includes(needle) || source.toLowerCase().includes(needle.toLowerCase());
 }
 
 function truncateText(value: string, maxChars: number): string {

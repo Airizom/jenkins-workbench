@@ -113,14 +113,12 @@ class ConsoleComparisonReader {
       this.moreData &&
       (remainingBytes === undefined || remainingBytes > 0)
     ) {
-      const beforeLength = this.buffer.length;
-      await this.appendNextChunk(remainingBytes);
-      const appendedLength = this.buffer.length - beforeLength;
-      if (appendedLength <= 0) {
+      const bytesRead = await this.appendNextChunk(remainingBytes);
+      if (bytesRead <= 0) {
         break;
       }
       if (remainingBytes !== undefined) {
-        remainingBytes -= appendedLength;
+        remainingBytes -= bytesRead;
       }
     }
   }
@@ -135,10 +133,10 @@ class ConsoleComparisonReader {
     return Math.max(0, this.maxBytes - this.loadedBytes);
   }
 
-  private async appendNextChunk(maxBytes?: number): Promise<void> {
+  private async appendNextChunk(maxBytes?: number): Promise<number> {
     if (this.mode === "progressive") {
       if (!this.moreData) {
-        return;
+        return 0;
       }
       const next = await this.backend.console.getConsoleTextProgressive(
         this.environment,
@@ -150,12 +148,12 @@ class ConsoleComparisonReader {
       this.buffer += next.text;
       this.loadedBytes += next.bytesRead;
       this.moreData = Boolean(next.moreData);
-      return;
+      return next.bytesRead;
     }
 
     if (this.loadedFullText) {
       this.moreData = false;
-      return;
+      return 0;
     }
 
     const full = await this.backend.console.getConsoleTextHead(
@@ -168,6 +166,7 @@ class ConsoleComparisonReader {
     this.loadedFullText = true;
     this.loadedBytes += full.bytesRead;
     this.truncatedByLimit = Boolean(full.truncated);
+    return full.bytesRead;
   }
 }
 

@@ -7,6 +7,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { ActivityViewModel, TreeActivityOptions } from "../ActivityTypes";
 import { ActivityClassifier } from "./ActivityClassifier";
+import type { ActivityGroups } from "./ActivityCollectionModel";
 import { createActivityGroups, promoteAwaitingInputJobs } from "./ActivityCollectionPolicy";
 import { buildActivityViewModel } from "./ActivityViewModelBuilder";
 import { AwaitingInputEnricher } from "./AwaitingInputEnricher";
@@ -15,6 +16,14 @@ export interface ActivityCollectorOptions {
   activityOptions: TreeActivityOptions;
   buildListFetchOptions: BuildListFetchOptions;
   bypassCache?: boolean;
+}
+
+interface ActivityScanState {
+  groups: ActivityGroups;
+  runningCandidates: JobSearchEntry[];
+  collectionLimit: number;
+  pendingInputCandidateLimit: number;
+  stop: boolean;
 }
 
 export class ActivityCollector {
@@ -35,16 +44,13 @@ export class ActivityCollector {
     const displayLimit = options.activityOptions.maxItemsPerGroup;
     const collectionLimit = displayLimit + 1;
     const collectionOptions = options.activityOptions.collection;
-    const pendingInputCandidateLimit = collectionOptions.pendingInputCandidateLimit;
-    const groups = createActivityGroups();
-    const failingItems = groups.get("failing") ?? [];
-    const unstableItems = groups.get("unstable") ?? [];
-    const runningItems = groups.get("running") ?? [];
-    const runningCandidates: JobSearchEntry[] = [];
-    let stop = false;
+    const scan = createActivityScanState(
+      collectionLimit,
+      collectionOptions.pendingInputCandidateLimit
+    );
     const cancellation = {
       get isCancellationRequested(): boolean {
-        return stop;
+        return scan.stop;
       }
     };
 
@@ -54,39 +60,15 @@ export class ActivityCollector {
       maxResults: collectionOptions.maxScanResults,
       batchSize: collectionOptions.jobSearchBatchSize
     })) {
-      for (const entry of batch) {
-        const classification = this.classifier.classify(entry);
-        if (!classification) {
-          continue;
-        }
-
-        if (classification.isRunning && runningCandidates.length < pendingInputCandidateLimit) {
-          runningCandidates.push(entry);
-        }
-
-        const groupItems = groups.get(classification.group);
-        if (groupItems && groupItems.length < collectionLimit) {
-          groupItems.push({ entry, group: classification.group });
-        }
-
-        if (
-          runningCandidates.length >= pendingInputCandidateLimit &&
-          failingItems.length >= collectionLimit &&
-          unstableItems.length >= collectionLimit &&
-          runningItems.length >= collectionLimit
-        ) {
-          stop = true;
-          break;
-        }
-      }
-      if (stop) {
+      collectBatchEntries(scan, batch, this.classifier);
+      if (scan.stop) {
         break;
       }
     }
 
     const awaitingInputJobUrls = await this.awaitingInputEnricher.findAwaitingInputJobUrls(
       environment,
-      runningCandidates,
+      scan.runningCandidates,
       {
         buildListFetchOptions: options.buildListFetchOptions,
         buildLookupLimit: collectionOptions.pendingInputBuildLookupLimit,
@@ -94,8 +76,76 @@ export class ActivityCollector {
         lookupConcurrency: collectionOptions.pendingInputLookupConcurrency
       }
     );
-    promoteAwaitingInputJobs(groups, runningCandidates, awaitingInputJobUrls, collectionLimit);
+    promoteAwaitingInputJobs(
+      scan.groups,
+      scan.runningCandidates,
+      awaitingInputJobUrls,
+      collectionLimit
+    );
 
-    return buildActivityViewModel(groups, displayLimit);
+    return buildActivityViewModel(scan.groups, displayLimit);
   }
+}
+
+function createActivityScanState(
+  collectionLimit: number,
+  pendingInputCandidateLimit: number
+): ActivityScanState {
+  return {
+    groups: createActivityGroups(),
+    runningCandidates: [],
+    collectionLimit,
+    pendingInputCandidateLimit,
+    stop: false
+  };
+}
+
+function collectBatchEntries(
+  scan: ActivityScanState,
+  batch: JobSearchEntry[],
+  classifier: ActivityClassifier
+): void {
+  for (const entry of batch) {
+    collectEntry(scan, entry, classifier);
+    if (scan.stop) {
+      return;
+    }
+  }
+}
+
+function collectEntry(
+  scan: ActivityScanState,
+  entry: JobSearchEntry,
+  classifier: ActivityClassifier
+): void {
+  const classification = classifier.classify(entry);
+  if (!classification) {
+    return;
+  }
+
+  if (classification.isRunning && scan.runningCandidates.length < scan.pendingInputCandidateLimit) {
+    scan.runningCandidates.push(entry);
+  }
+
+  const groupItems = scan.groups.get(classification.group);
+  if (groupItems && groupItems.length < scan.collectionLimit) {
+    groupItems.push({ entry, group: classification.group });
+  }
+
+  if (hasCollectedEnough(scan)) {
+    scan.stop = true;
+  }
+}
+
+function hasCollectedEnough(scan: ActivityScanState): boolean {
+  return (
+    scan.runningCandidates.length >= scan.pendingInputCandidateLimit &&
+    isGroupFull(scan, "failing") &&
+    isGroupFull(scan, "unstable") &&
+    isGroupFull(scan, "running")
+  );
+}
+
+function isGroupFull(scan: ActivityScanState, group: "failing" | "unstable" | "running"): boolean {
+  return (scan.groups.get(group)?.length ?? 0) >= scan.collectionLimit;
 }

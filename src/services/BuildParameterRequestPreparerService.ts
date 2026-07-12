@@ -5,7 +5,7 @@ import type {
   BuildParameterRequestPreparer,
   BuildWithParametersRequest,
   PreparedBuildParametersRequest
-} from "../jenkins/data/JenkinsDataTypes";
+} from "../jenkins/BuildParameterRequests";
 
 export class BuildParameterRequestPreparerService implements BuildParameterRequestPreparer {
   async prepareBuildParameters(

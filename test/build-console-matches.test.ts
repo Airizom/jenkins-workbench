@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { buildConsoleMatches } from "../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleMatches";
 
 describe("buildConsoleMatches", () => {
+  it("maps plain-text matches back to original offsets after Unicode case folds", () => {
+    const result = buildConsoleMatches("İX", "x", false);
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.tooManyMatches, false);
+    assert.deepEqual(result.matches, [{ start: 1, end: 2 }]);
+  });
+
   it("finds ordinary regex matches", () => {
     const result = buildConsoleMatches("ERROR 1\nWARN 2\nERROR 3", "ERROR \\d", true);
 

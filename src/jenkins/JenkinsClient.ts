@@ -11,7 +11,11 @@ import { JenkinsPipelineSyntaxApi } from "./client/JenkinsPipelineSyntaxApi";
 import { JenkinsPipelineValidationApi } from "./client/JenkinsPipelineValidationApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
 import { JenkinsWorkspaceApi } from "./client/JenkinsWorkspaceApi";
-import { JenkinsRequestError } from "./errors";
+import { JenkinsCoverageApi } from "./coverage/JenkinsCoverageApi";
+import type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "./coverage/JenkinsCoverageTypes";
 import type { JenkinsBufferResponse } from "./request";
 import type { JenkinsStreamResponse } from "./request";
 import type {
@@ -79,8 +83,6 @@ export type {
 export type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 export type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 
-export { JenkinsRequestError };
-
 export class JenkinsClient {
   private readonly buildsApi: JenkinsBuildsApi;
   private readonly jobsApi: JenkinsJobsApi;
@@ -89,6 +91,7 @@ export class JenkinsClient {
   private readonly pipelineValidationApi: JenkinsPipelineValidationApi;
   private readonly pipelineSyntaxApi: JenkinsPipelineSyntaxApi;
   private readonly workspaceApi: JenkinsWorkspaceApi;
+  private readonly coverageApi: JenkinsCoverageApi;
 
   constructor(options: JenkinsClientOptions) {
     const httpClient = new JenkinsHttpClient(options);
@@ -99,6 +102,7 @@ export class JenkinsClient {
     this.pipelineValidationApi = new JenkinsPipelineValidationApi(httpClient);
     this.pipelineSyntaxApi = new JenkinsPipelineSyntaxApi(httpClient);
     this.workspaceApi = new JenkinsWorkspaceApi(httpClient);
+    this.coverageApi = new JenkinsCoverageApi(httpClient);
   }
 
   async getRootJobs(): Promise<JenkinsJob[]> {
@@ -202,6 +206,24 @@ export class JenkinsClient {
 
   async getWorkflowRun(buildUrl: string): Promise<JenkinsWorkflowRun> {
     return this.buildsApi.getWorkflowRun(buildUrl);
+  }
+
+  async discoverCoverageActionPath(buildUrl: string): Promise<string | undefined> {
+    return this.coverageApi.discoverCoverageActionPath(buildUrl);
+  }
+
+  async getCoverageOverview(
+    buildUrl: string,
+    actionPath?: string
+  ): Promise<JenkinsCoverageOverview | undefined> {
+    return this.coverageApi.getCoverageOverview(buildUrl, actionPath);
+  }
+
+  async getModifiedCoverageFiles(
+    buildUrl: string,
+    actionPath?: string
+  ): Promise<JenkinsModifiedCoverageFile[] | undefined> {
+    return this.coverageApi.getModifiedCoverageFiles(buildUrl, actionPath);
   }
 
   async getPendingInputActions(buildUrl: string): Promise<JenkinsPendingInputAction[]> {

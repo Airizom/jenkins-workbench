@@ -9,14 +9,10 @@ interface StoredViewState {
 
 const VIEW_STATE_KEY = "jenkinsWorkbench.viewState";
 
-interface JenkinsViewStateStoreRuntimeSurface {
-  readonly onDidChange: vscode.Event<void>;
-  syncFilterContext(): Promise<void>;
-}
-
-export class JenkinsViewStateStore implements JenkinsViewStateStoreRuntimeSurface {
+export class JenkinsViewStateStore {
   private readonly emitter = new vscode.EventEmitter<void>();
 
+  // fallow-ignore-next-line unused-class-member
   readonly onDidChange = this.emitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
@@ -42,6 +38,7 @@ export class JenkinsViewStateStore implements JenkinsViewStateStoreRuntimeSurfac
     this.emitter.fire();
   }
 
+  // fallow-ignore-next-line unused-class-member
   async syncFilterContext(): Promise<void> {
     await this.updateFilterContext(this.getJobFilterMode());
   }

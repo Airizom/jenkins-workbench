@@ -23,19 +23,9 @@ export function skipWhitespace(text: string, index: number): number {
       current += 1;
       continue;
     }
-    if (text[current] === "/" && text[current + 1] === "/") {
-      current += 2;
-      while (current < text.length && text[current] !== "\n") {
-        current += 1;
-      }
-      continue;
-    }
-    if (text[current] === "/" && text[current + 1] === "*") {
-      current += 2;
-      while (current < text.length && !(text[current] === "*" && text[current + 1] === "/")) {
-        current += 1;
-      }
-      current += 2;
+    const nextIndex = skipGdslComment(text, current);
+    if (nextIndex !== undefined) {
+      current = nextIndex;
       continue;
     }
     break;
@@ -122,7 +112,7 @@ export function skipString(text: string, start: number): number {
   return text.length;
 }
 
-export function skipLineComment(text: string, start: number): number {
+function skipLineComment(text: string, start: number): number {
   let index = start + 2;
   while (index < text.length && text[index] !== "\n") {
     index += 1;
@@ -130,7 +120,7 @@ export function skipLineComment(text: string, start: number): number {
   return index;
 }
 
-export function skipBlockComment(text: string, start: number): number {
+function skipBlockComment(text: string, start: number): number {
   let index = start + 2;
   while (index < text.length && !(text[index] === "*" && text[index + 1] === "/")) {
     index += 1;

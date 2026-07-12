@@ -2,6 +2,7 @@ import type * as React from "react";
 import { Button } from "../../../shared/webview/components/ui/button";
 import { Checkbox } from "../../../shared/webview/components/ui/checkbox";
 import { Input } from "../../../shared/webview/components/ui/input";
+import { ChevronDownIcon, ChevronUpIcon, XIcon } from "../../../shared/webview/icons";
 import { cn } from "../../../shared/webview/lib/utils";
 
 export interface ConsoleSearchToolbarProps {
@@ -76,8 +77,10 @@ export function ConsoleSearchToolbar({
           onClick={onPrev}
           size="sm"
           variant="ghost"
-          className="h-6 px-1.5 text-[11px]"
+          className="h-6 gap-1 px-1.5 text-[11px]"
+          title="Previous match (Shift+Enter)"
         >
+          <ChevronUpIcon className="h-3.5 w-3.5" />
           Prev
         </Button>
         <Button
@@ -85,8 +88,10 @@ export function ConsoleSearchToolbar({
           onClick={onNext}
           size="sm"
           variant="ghost"
-          className="h-6 px-1.5 text-[11px]"
+          className="h-6 gap-1 px-1.5 text-[11px]"
+          title="Next match (Enter)"
         >
+          <ChevronDownIcon className="h-3.5 w-3.5" />
           Next
         </Button>
         <Button
@@ -94,8 +99,10 @@ export function ConsoleSearchToolbar({
           onClick={onClear}
           size="sm"
           variant="ghost"
-          className="h-6 px-1.5 text-[11px]"
+          className="h-6 gap-1 px-1.5 text-[11px]"
+          title="Clear search"
         >
+          <XIcon className="h-3.5 w-3.5" />
           Clear
         </Button>
       </div>

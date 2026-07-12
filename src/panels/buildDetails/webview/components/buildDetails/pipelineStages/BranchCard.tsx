@@ -1,4 +1,5 @@
 import * as React from "react";
+import { getResultBadgeClass } from "../../../../../shared/webview/components/ResultBadge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
   Collapsible,
@@ -11,7 +12,6 @@ import type {
   PipelineLogTargetViewModel,
   PipelineStageViewModel
 } from "../../../../shared/BuildDetailsContracts";
-import { getStatusClass } from "../StatusPill";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getStageIcon } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
@@ -29,7 +29,7 @@ export function BranchCard({
   const [expanded, setExpanded] = useState(false);
   const steps = showAll ? branch.stepsAll : branch.stepsFailedOnly;
   const branchIcon = getStageIcon(branch.statusClass);
-  const statusClass = getStatusClass(branch.statusClass);
+  const statusClass = getResultBadgeClass(branch.statusClass);
   const branchTarget = branch.logTarget;
   const branchLogLabel = `Open log for ${branch.name.trim() || "branch"}`;
 

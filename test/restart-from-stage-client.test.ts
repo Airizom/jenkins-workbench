@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { RestartFromStageClient } from "../src/jenkins/client/RestartFromStageClient";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";

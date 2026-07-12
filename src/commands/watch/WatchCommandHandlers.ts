@@ -1,3 +1,4 @@
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import {
@@ -8,49 +9,45 @@ import {
   getTreeItemLabel,
   removeJobScopedState
 } from "../CommandUtils";
-import type { WatchCommandRefreshHost } from "./WatchCommandTypes";
+
+function getWatchJobUrls(item: JobTreeItem | PipelineTreeItem): string[] {
+  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
+
+  return canonicalJobUrl === item.jobUrl ? [item.jobUrl] : [item.jobUrl, canonicalJobUrl];
+}
 
 async function isWatchedJob(
   watchStore: JenkinsWatchStore,
   item: JobTreeItem | PipelineTreeItem
 ): Promise<boolean> {
-  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
-  const [hasRawWatch, hasCanonicalWatch] = await Promise.all([
-    watchStore.isWatched(item.environment.scope, item.environment.environmentId, item.jobUrl),
-    canonicalJobUrl === item.jobUrl
-      ? Promise.resolve(false)
-      : watchStore.isWatched(
-          item.environment.scope,
-          item.environment.environmentId,
-          canonicalJobUrl
-        )
-  ]);
+  const watchResults = await Promise.all(
+    getWatchJobUrls(item).map((jobUrl) =>
+      watchStore.isWatched(item.environment.scope, item.environment.environmentId, jobUrl)
+    )
+  );
 
-  return hasRawWatch || hasCanonicalWatch;
+  return watchResults.some(Boolean);
 }
 
 async function removeWatchedJob(
   watchStore: JenkinsWatchStore,
   item: JobTreeItem | PipelineTreeItem
-): Promise<boolean> {
-  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
-  const [removedRawWatch, removedCanonicalWatch] = await Promise.all([
-    watchStore.removeWatch(item.environment.scope, item.environment.environmentId, item.jobUrl),
-    canonicalJobUrl === item.jobUrl
-      ? Promise.resolve(false)
-      : watchStore.removeWatch(
-          item.environment.scope,
-          item.environment.environmentId,
-          canonicalJobUrl
-        )
-  ]);
+): Promise<{ removed: boolean; errors: unknown[] }> {
+  const removeResults = await Promise.allSettled(
+    getWatchJobUrls(item).map((jobUrl) =>
+      watchStore.removeWatch(item.environment.scope, item.environment.environmentId, jobUrl)
+    )
+  );
 
-  return removedRawWatch || removedCanonicalWatch;
+  return {
+    removed: removeResults.some((result) => result.status === "fulfilled" && result.value),
+    errors: removeResults.flatMap((result) => (result.status === "rejected" ? [result.reason] : []))
+  };
 }
 
 export async function watchJob(
   watchStore: JenkinsWatchStore,
-  refreshHost: WatchCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
   await addJobScopedState({
@@ -73,16 +70,28 @@ export async function watchJob(
 
 export async function unwatchJob(
   watchStore: JenkinsWatchStore,
-  refreshHost: WatchCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
+  let removalErrors: unknown[] = [];
   await removeJobScopedState({
     item,
     missingSelectionMessage: "Select a job or pipeline to unwatch.",
     getLabel: getTreeItemLabel,
     missingStateMessage: (label) => `${label} is not currently watched.`,
     removedMessage: (label) => `Stopped watching ${label}.`,
-    remove: async (selected) => removeWatchedJob(watchStore, selected),
+    remove: async (selected) => {
+      const result = await removeWatchedJob(watchStore, selected);
+      if (!result.removed && result.errors.length > 0) {
+        throw new AggregateError(result.errors, "Failed to remove watch aliases.");
+      }
+      removalErrors = result.errors;
+      return result.removed;
+    },
     refreshEnvironment: createEnvironmentRefreshCallback(refreshHost)
   });
+
+  if (removalErrors.length > 0) {
+    throw new AggregateError(removalErrors, "Failed to remove all watch aliases.");
+  }
 }

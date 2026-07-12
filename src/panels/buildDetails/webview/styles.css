@@ -31,15 +31,11 @@
     );
   }
 
-  .build-progress-bar {
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      var(--primary) 0%,
-      var(--primary) var(--progress, 0%),
-      var(--muted) var(--progress, 0%),
-      var(--muted) 100%
-    );
+  /* Extra specificity so this wins over the shared .sticky-header rule
+   * regardless of layer source order. */
+  .sticky-header.sticky-header--below-hero {
+    top: var(--sticky-hero-offset, 0px);
+    z-index: 5;
   }
 
   .console-output {
@@ -73,7 +69,7 @@
     background: var(--muted);
     padding: 0.25rem 0.5rem;
     color: var(--muted-foreground);
-    font-family: var(--vscode-editor-font-family, monospace);
+    font-family: var(--font-mono);
     font-size: 11px;
     line-height: 1.4;
   }

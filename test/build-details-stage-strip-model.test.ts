@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { PipelineStageViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import {
   buildStageStripSegments,
@@ -65,6 +65,22 @@ describe("stageStripModel", () => {
 
     assert.equal(segments[0]?.statusClass, "failure");
     assert.equal(segments[0]?.statusLabel, "Failed");
+  });
+
+  it("keeps a neutral parent neutral when nested branches succeeded", () => {
+    const segments = buildStageStripSegments([
+      makeStage({
+        key: "parallel",
+        statusClass: "neutral",
+        statusLabel: "Not built",
+        parallelBranches: [
+          makeStage({ key: "branch-ok", statusClass: "success", statusLabel: "Success" })
+        ]
+      })
+    ]);
+
+    assert.equal(segments[0]?.statusClass, "neutral");
+    assert.equal(segments[0]?.statusLabel, "Not built");
   });
 
   it("does not downgrade a parent that already reports a worse status", () => {

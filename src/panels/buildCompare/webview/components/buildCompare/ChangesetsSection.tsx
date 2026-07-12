@@ -11,7 +11,7 @@ export function ChangesetsSection({
       detail={section.detail}
       status={section.status}
     >
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <ChangesetColumn title="Baseline build changes" items={section.baselineItems} />
         <ChangesetColumn title="Target build changes" items={section.targetItems} />
       </div>

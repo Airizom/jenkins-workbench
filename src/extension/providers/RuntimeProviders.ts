@@ -85,10 +85,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       new CoverageDecorationService(container.get("repositoryLinkStore")),
     buildDetailsPanelLauncher: (container) =>
       new BuildDetailsPanelLauncher({
-        backend: new BuildDetailsBackendAdapter(
-          container.get("dataService"),
-          container.get("coverageService")
-        ),
+        backend: new BuildDetailsBackendAdapter(container.get("dataService")),
         artifactActionHandler: container.get("artifactActionHandler"),
         consoleExporter: container.get("consoleExporter"),
         coverageDecorationService: container.get("coverageDecorationService"),

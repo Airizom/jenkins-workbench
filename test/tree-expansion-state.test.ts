@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { TreeExpansionState } from "../src/tree/TreeExpansionState";
 import type { TreeExpansionPath, TreeExpansionResolver } from "../src/tree/TreeDataProviderTypes";
 import type { WorkbenchTreeElement } from "../src/tree/items/WorkbenchTreeElement";

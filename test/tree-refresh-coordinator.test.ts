@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { TreeDataProviderRefreshCoordinator } from "../src/tree/TreeDataProviderRefreshCoordinator";
 import type { WorkbenchTreeElement } from "../src/tree/items/WorkbenchTreeElement";
 

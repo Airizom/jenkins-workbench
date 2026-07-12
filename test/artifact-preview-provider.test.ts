@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { describe, it, vi } from "vitest";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 class TestUri {
@@ -16,17 +15,9 @@ const vscodeMock = {
   Uri: TestUri
 };
 
-const { ArtifactPreviewCacheLimitError, ArtifactPreviewProvider } = withModuleMocks(
-  [exactModuleMock("vscode", vscodeMock)],
-  () =>
-    require("../src/ui/ArtifactPreviewProvider") as {
-      ArtifactPreviewCacheLimitError: typeof import(
-        "../src/ui/ArtifactPreviewProvider"
-      ).ArtifactPreviewCacheLimitError;
-      ArtifactPreviewProvider: typeof import(
-        "../src/ui/ArtifactPreviewProvider"
-      ).ArtifactPreviewProvider;
-    }
+vi.doMock("vscode", () => vscodeMock);
+const { ArtifactPreviewCacheLimitError, ArtifactPreviewProvider } = await import(
+  "../src/ui/ArtifactPreviewProvider"
 );
 
 function getCacheState(provider: unknown): { totalBytes: number; entries: Map<string, unknown> } {

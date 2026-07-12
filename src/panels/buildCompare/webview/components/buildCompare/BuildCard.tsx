@@ -39,10 +39,9 @@ export function BuildCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <SummaryStat label="Duration" value={build.durationLabel} />
           <SummaryStat label="Completed" value={build.timestampLabel} />
-          <SummaryStat label="Result" value={build.resultLabel} />
         </div>
       </CardContent>
     </Card>

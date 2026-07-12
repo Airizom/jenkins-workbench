@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, describe, it } from "node:test";
-import { exactModuleMock, suffixModuleMock, withModuleMocks } from "./helpers/moduleMock";
+import { beforeEach, describe, it, vi } from "vitest";
 
 type UriLike = { toString(): string };
 
@@ -56,10 +55,9 @@ const commandUtilsMock = {
   getTreeItemLabel: () => "demo"
 };
 
-const { JobConfigUpdateWorkflow } = withModuleMocks(
-  [exactModuleMock("vscode", vscodeMock), suffixModuleMock("CommandUtils", commandUtilsMock)],
-  () => require("../src/commands/job/JobConfigUpdateWorkflow")
-) as typeof import("../src/commands/job/JobConfigUpdateWorkflow");
+vi.doMock("vscode", () => vscodeMock);
+vi.doMock("../src/commands/CommandUtils", () => commandUtilsMock);
+const { JobConfigUpdateWorkflow } = await import("../src/commands/job/JobConfigUpdateWorkflow");
 
 const environment = {
   environmentId: "env-1",
@@ -140,10 +138,7 @@ describe("JobConfigUpdateWorkflow submitDraft", () => {
 
     await workflow.submitDraft(refreshHost, targetUri as never);
 
-    assert.equal(calls.getJobConfigXml, 1);
-    assert.deepEqual(calls.updateJobConfigXml, [documentText]);
-    assert.deepEqual(calls.refreshes, ["env-1"]);
-    assert.deepEqual(calls.discarded, [targetUri.toString()]);
+    assertSuccessfulSubmit(calls);
   });
 
   it("blocks submission when the remote config changed after the draft opened", async () => {
@@ -165,9 +160,13 @@ describe("JobConfigUpdateWorkflow submitDraft", () => {
 
     await workflow.submitDraft(refreshHost, targetUri as never);
 
-    assert.equal(calls.getJobConfigXml, 1);
-    assert.deepEqual(calls.updateJobConfigXml, [documentText]);
-    assert.deepEqual(calls.refreshes, ["env-1"]);
-    assert.deepEqual(calls.discarded, [targetUri.toString()]);
+    assertSuccessfulSubmit(calls);
   });
 });
+
+function assertSuccessfulSubmit(calls: ReturnType<typeof createWorkflow>["calls"]): void {
+  assert.equal(calls.getJobConfigXml, 1);
+  assert.deepEqual(calls.updateJobConfigXml, [documentText]);
+  assert.deepEqual(calls.refreshes, ["env-1"]);
+  assert.deepEqual(calls.discarded, [targetUri.toString()]);
+}

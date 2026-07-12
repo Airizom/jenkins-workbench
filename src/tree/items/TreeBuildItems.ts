@@ -3,8 +3,9 @@ import type { JenkinsBuild } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { type BuildTooltipOptions, buildBuildTooltip } from "../BuildTooltips";
 import { TREE_FOLDER_ICON, resolveTreeFileIcon } from "../TreeFileIcons";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, buildTreeJobScopeKey } from "../TreeJobScope";
+import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import { buildIcon, formatBuildDescription } from "../formatters";
+import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 export class BuildTreeItem extends vscode.TreeItem {
   static buildId(
@@ -12,7 +13,7 @@ export class BuildTreeItem extends vscode.TreeItem {
     buildUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return `build:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${buildUrl}`;
+    return buildEnvironmentTreeItemId("build", environment, jobScope, buildUrl);
   }
 
   public readonly buildUrl: string;
@@ -59,7 +60,7 @@ export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
     buildUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return `buildArtifacts:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${buildUrl}`;
+    return buildEnvironmentTreeItemId("buildArtifacts", environment, jobScope, buildUrl);
   }
 
   constructor(

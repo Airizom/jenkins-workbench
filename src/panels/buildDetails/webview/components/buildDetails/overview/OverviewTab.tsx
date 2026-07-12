@@ -1,3 +1,5 @@
+import { Button } from "../../../../../shared/webview/components/ui/button";
+import { TerminalIcon, TestTubeIcon, WorkflowIcon } from "../../../../../shared/webview/icons";
 import { isAnalysisBuildResult } from "../../../../../shared/webview/lib/statusStyles";
 import type {
   ArtifactAction,
@@ -9,16 +11,10 @@ import type {
 import type { BuildDetailsTab } from "../../../hooks/useBuildDetailsTabs";
 import { BuildFailureInsightsSection } from "../BuildFailureInsightsSection";
 import { CoverageGlanceCard } from "./CoverageGlanceCard";
-import { StatusSummaryCard } from "./StatusSummaryCard";
 import { TestPassDonutCard } from "./TestPassDonutCard";
 
 type OverviewTabProps = {
-  displayName: string;
-  resultLabel: string;
   resultClass: string;
-  durationLabel: string;
-  timestampLabel: string;
-  culpritsLabel: string;
   testsSummary: BuildTestsSummaryViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
@@ -28,12 +24,7 @@ type OverviewTabProps = {
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 };
 export function OverviewTab({
-  displayName,
-  resultLabel,
   resultClass,
-  durationLabel,
-  timestampLabel,
-  culpritsLabel,
   testsSummary,
   coverageState,
   insights,
@@ -47,35 +38,54 @@ export function OverviewTab({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <StatusSummaryCard
-          displayName={displayName}
-          resultLabel={resultLabel}
-          resultClass={resultClass}
-          durationLabel={durationLabel}
-          timestampLabel={timestampLabel}
-          culpritsLabel={culpritsLabel}
-          hasPipelineStages={hasPipelineStages}
-          hasTests={hasTests}
-          onNavigateTab={onNavigateTab}
-        />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Jump to</span>
+        {hasPipelineStages ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 h-7 px-2 text-xs text-muted-foreground"
+            onClick={() => onNavigateTab("pipeline")}
+          >
+            <WorkflowIcon className="h-3.5 w-3.5" />
+            Pipeline
+          </Button>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 h-7 px-2 text-xs text-muted-foreground"
+          onClick={() => onNavigateTab("console")}
+        >
+          <TerminalIcon className="h-3.5 w-3.5" />
+          Console
+        </Button>
+        {hasTests ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 h-7 px-2 text-xs text-muted-foreground"
+            onClick={() => onNavigateTab("tests")}
+          >
+            <TestTubeIcon className="h-3.5 w-3.5" />
+            Tests
+          </Button>
+        ) : null}
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
         {showTestsCard ? (
           <TestPassDonutCard summary={testsSummary} onShowTests={() => onNavigateTab("tests")} />
         ) : null}
+        <CoverageGlanceCard
+          coverageState={coverageState}
+          onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
+        />
       </div>
-      <CoverageGlanceCard
-        coverageState={coverageState}
-        onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
-      />
       <section aria-label={insightsTitle} className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {insightsTitle}
         </h2>
-        <BuildFailureInsightsSection
-          insights={insights}
-          resultClass={resultClass}
-          onArtifactAction={onArtifactAction}
-        />
+        <BuildFailureInsightsSection insights={insights} onArtifactAction={onArtifactAction} />
       </section>
     </div>
   );

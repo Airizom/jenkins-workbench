@@ -7,6 +7,13 @@ const FORM_ITEM_PATTERN =
 const LABEL_PATTERN =
   /<div\b[^>]*class\s*=\s*(["'])[^"'<>]*\bjenkins-form-label\b[^"'<>]*\1[^>]*>([\s\S]*?)<\/div>/i;
 const TEXTAREA_PATTERN = /<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/i;
+const FIELD_NAME_PATTERN = /\bname\s*=\s*(["'])(.*?)\1/i;
+const WHITESPACE_PATTERN = /\s+/g;
+const WINDOWS_NEWLINE_PATTERN = /\r\n?/g;
+const LEADING_TEXTAREA_NEWLINE_PATTERN = /^\n[ \t]*/;
+const TRAILING_TEXTAREA_NEWLINE_PATTERN = /\n[ \t]*$/;
+const TAG_PATTERN = /<[^>]+>/g;
+const HTML_ENTITY_PATTERN = /&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g;
 
 type ParsedReplayEntry = {
   field: string;
@@ -17,22 +24,28 @@ type ParsedReplayEntry = {
 export function parseReplayDefinitionPage(html: string): JenkinsReplayDefinition {
   const formHtml = extractRunForm(html);
   const entries = extractReplayEntries(formHtml);
-  const mainScript = entries.find((entry) => entry.field === "mainScript");
-  if (!mainScript) {
+  let mainScript: string | undefined;
+  const loadedScripts: JenkinsReplayLoadedScript[] = [];
+  for (const entry of entries) {
+    if (entry.field === "mainScript") {
+      mainScript ??= entry.script;
+      continue;
+    }
+
+    loadedScripts.push({
+      displayName: entry.label,
+      postField: entry.field,
+      script: entry.script
+    });
+  }
+
+  if (mainScript === undefined) {
     throw createReplayParseError("Missing mainScript field in replay form.");
   }
 
   return {
-    mainScript: mainScript.script,
-    loadedScripts: entries
-      .filter((entry) => entry.field !== "mainScript")
-      .map(
-        (entry): JenkinsReplayLoadedScript => ({
-          displayName: entry.label,
-          postField: entry.field,
-          script: entry.script
-        })
-      )
+    mainScript,
+    loadedScripts
   };
 }
 
@@ -52,20 +65,22 @@ function extractRunForm(html: string): string {
 }
 
 function extractReplayEntries(formHtml: string): ParsedReplayEntry[] {
-  const markers = Array.from(formHtml.matchAll(FORM_ITEM_PATTERN));
   const entries: ParsedReplayEntry[] = [];
+  let previousStart: number | undefined;
 
-  for (let index = 0; index < markers.length; index += 1) {
-    const start = markers[index]?.index;
-    if (start === undefined) {
-      continue;
+  FORM_ITEM_PATTERN.lastIndex = 0;
+  let marker = FORM_ITEM_PATTERN.exec(formHtml);
+  while (marker) {
+    const start = marker.index;
+    if (previousStart !== undefined) {
+      appendReplayEntry(entries, formHtml.slice(previousStart, start));
     }
-    const end = markers[index + 1]?.index ?? formHtml.length;
-    const block = formHtml.slice(start, end);
-    const entry = parseReplayEntry(block);
-    if (entry) {
-      entries.push(entry);
-    }
+    previousStart = start;
+    marker = FORM_ITEM_PATTERN.exec(formHtml);
+  }
+
+  if (previousStart !== undefined) {
+    appendReplayEntry(entries, formHtml.slice(previousStart));
   }
 
   if (entries.length === 0) {
@@ -73,6 +88,13 @@ function extractReplayEntries(formHtml: string): ParsedReplayEntry[] {
   }
 
   return entries;
+}
+
+function appendReplayEntry(entries: ParsedReplayEntry[], block: string): void {
+  const entry = parseReplayEntry(block);
+  if (entry) {
+    entries.push(entry);
+  }
 }
 
 function parseReplayEntry(block: string): ParsedReplayEntry | undefined {
@@ -100,7 +122,7 @@ function parseReplayEntry(block: string): ParsedReplayEntry | undefined {
 }
 
 function extractFieldName(attributes: string): string | undefined {
-  const nameMatch = attributes.match(/\bname\s*=\s*(["'])(.*?)\1/i);
+  const nameMatch = attributes.match(FIELD_NAME_PATTERN);
   const rawName = nameMatch?.[2]?.trim();
   if (!rawName) {
     return undefined;
@@ -113,23 +135,23 @@ function normalizeLabel(input: string | undefined): string | undefined {
     return undefined;
   }
 
-  const text = decodeHtmlEntities(stripTags(input)).replace(/\s+/g, " ").trim();
+  const text = decodeHtmlEntities(stripTags(input)).replace(WHITESPACE_PATTERN, " ").trim();
   return text.length > 0 ? text : undefined;
 }
 
 function normalizeTextareaContent(input: string): string {
   return decodeHtmlEntities(input)
-    .replace(/\r\n?/g, "\n")
-    .replace(/^\n[ \t]*/, "")
-    .replace(/\n[ \t]*$/, "");
+    .replace(WINDOWS_NEWLINE_PATTERN, "\n")
+    .replace(LEADING_TEXTAREA_NEWLINE_PATTERN, "")
+    .replace(TRAILING_TEXTAREA_NEWLINE_PATTERN, "");
 }
 
 function stripTags(input: string): string {
-  return input.replace(/<[^>]+>/g, "");
+  return input.replace(TAG_PATTERN, "");
 }
 
 function decodeHtmlEntities(input: string): string {
-  return input.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (_match, entity: string) => {
+  return input.replace(HTML_ENTITY_PATTERN, (_match, entity: string) => {
     if (entity[0] === "#") {
       const hex = entity[1]?.toLowerCase() === "x";
       const value = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);

@@ -70,7 +70,7 @@ export function buildConsoleMatches(
   }
 
   const matches: ConsoleMatch[] = [];
-  const normalizedText = text.toLowerCase();
+  const { normalizedText, sourceStarts, sourceEnds } = buildPlainTextSearchIndex(text);
   const normalizedQuery = query.toLowerCase();
   let startIndex = 0;
   let tooManyMatches = false;
@@ -81,7 +81,8 @@ export function buildConsoleMatches(
       break;
     }
 
-    matches.push({ start: nextIndex, end: nextIndex + normalizedQuery.length });
+    const endIndex = nextIndex + normalizedQuery.length - 1;
+    matches.push({ start: sourceStarts[nextIndex], end: sourceEnds[endIndex] });
     if (matches.length >= MAX_CONSOLE_MATCHES) {
       tooManyMatches = true;
       break;
@@ -91,6 +92,33 @@ export function buildConsoleMatches(
   }
 
   return { matches, tooManyMatches };
+}
+
+function buildPlainTextSearchIndex(text: string): {
+  normalizedText: string;
+  sourceStarts: number[];
+  sourceEnds: number[];
+} {
+  let normalizedText = "";
+  const sourceStarts: number[] = [];
+  const sourceEnds: number[] = [];
+  let sourceIndex = 0;
+
+  for (const char of text) {
+    const folded = char.toLowerCase();
+    const start = sourceIndex;
+    const end = start + char.length;
+    normalizedText += folded;
+
+    for (let index = 0; index < folded.length; index += 1) {
+      sourceStarts.push(start);
+      sourceEnds.push(end);
+    }
+
+    sourceIndex = end;
+  }
+
+  return { normalizedText, sourceStarts, sourceEnds };
 }
 
 function getRegexSafetyError(text: string, query: string): string | undefined {

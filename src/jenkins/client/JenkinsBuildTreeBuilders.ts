@@ -1,5 +1,14 @@
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 
+const BUILD_CHANGE_SET_FIELDS = [
+  "changeSet[items[commitId,msg,author[fullName]]]",
+  "changeSets[items[commitId,msg,author[fullName]]]"
+];
+
+const BUILD_ACTION_BASE_FIELDS = ["_class", "urlName"];
+const BUILD_ACTION_CAUSE_FIELD = "causes[shortDescription,userId,userName]";
+const BUILD_ACTION_PARAMETER_FIELD = "parameters[name,value]";
+
 export function buildBuildsTree(options?: {
   includeDetails?: boolean;
   includeParameters?: boolean;
@@ -10,21 +19,13 @@ export function buildBuildsTree(options?: {
   ];
 
   if (options?.includeDetails) {
-    parts.push(",changeSet[items[commitId,msg,author[fullName]]]");
-    parts.push(",changeSets[items[commitId,msg,author[fullName]]]");
+    parts.push(",", BUILD_CHANGE_SET_FIELDS.join(","));
   }
 
   const includeCauses = Boolean(options?.includeDetails);
   const includeParameters = Boolean(options?.includeParameters);
   if (includeCauses || includeParameters) {
-    const actionParts = ["_class", "urlName"];
-    if (includeCauses) {
-      actionParts.push("causes[shortDescription,userId,userName]");
-    }
-    if (includeParameters) {
-      actionParts.push("parameters[name,value]");
-    }
-    parts.push(`,actions[${actionParts.join(",")}]`);
+    parts.push(`,actions[${buildActionFields({ includeCauses, includeParameters }).join(",")}]`);
   }
 
   parts.push("]{limit}");
@@ -35,19 +36,16 @@ export function buildBuildDetailsTree(options?: {
   includeCauses?: boolean;
   includeParameters?: boolean;
 }): string {
-  const actionParts = ["_class", "urlName", "failCount", "skipCount", "totalCount"];
-  if (options?.includeCauses) {
-    actionParts.push("causes[shortDescription,userId,userName]");
-  }
-  if (options?.includeParameters) {
-    actionParts.push("parameters[name,value]");
-  }
+  const actionParts = buildActionFields({
+    extraFields: ["failCount", "skipCount", "totalCount"],
+    includeCauses: options?.includeCauses,
+    includeParameters: options?.includeParameters
+  });
   return [
     "number,url,result,building,timestamp,duration,estimatedDuration,",
     "displayName,fullDisplayName,culprits[fullName],",
     "artifacts[fileName,relativePath],",
-    "changeSet[items[commitId,msg,author[fullName]]],",
-    "changeSets[items[commitId,msg,author[fullName]]],",
+    `${BUILD_CHANGE_SET_FIELDS.join(",")},`,
     `actions[${actionParts.join(",")}]`
   ].join("");
 }
@@ -58,4 +56,19 @@ export function buildTestReportTree(options?: JenkinsTestReportOptions): string 
     caseFields.push("errorStackTrace", "stdout", "stderr");
   }
   return `failCount,skipCount,totalCount,suites[cases[${caseFields.join(",")}]]`;
+}
+
+function buildActionFields(options?: {
+  extraFields?: string[];
+  includeCauses?: boolean;
+  includeParameters?: boolean;
+}): string[] {
+  const fields = [...BUILD_ACTION_BASE_FIELDS, ...(options?.extraFields ?? [])];
+  if (options?.includeCauses) {
+    fields.push(BUILD_ACTION_CAUSE_FIELD);
+  }
+  if (options?.includeParameters) {
+    fields.push(BUILD_ACTION_PARAMETER_FIELD);
+  }
+  return fields;
 }

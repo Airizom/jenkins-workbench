@@ -36,7 +36,7 @@ export class JenkinsfileCompletionProvider implements vscode.CompletionItemProvi
 
     const result = await this.stepCatalogService.getCatalogForDocument(document);
     const items = [...result.catalog.steps.values()]
-      .filter((step) => !step.requiresNodeContext || hasKnownNodeContext(analysis.blockPath))
+      .filter((step) => !step.requiresNodeContext || analysis.hasNodeContext)
       .filter((step) => step.name.startsWith(prefix))
       .sort((left, right) => left.name.localeCompare(right.name))
       .map((step) => createCompletionItem(step, range));
@@ -130,13 +130,4 @@ function appendBody(snippet: vscode.SnippetString, takesClosure: boolean): void 
   snippet.appendText(" {\n\t");
   snippet.appendTabstop();
   snippet.appendText("\n}");
-}
-
-function hasKnownNodeContext(blockPath: readonly string[]): boolean {
-  return (
-    blockPath.includes("node") ||
-    blockPath.includes("steps") ||
-    blockPath.includes("script") ||
-    blockPath.includes("post")
-  );
 }

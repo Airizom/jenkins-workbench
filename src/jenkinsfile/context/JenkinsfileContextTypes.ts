@@ -26,6 +26,7 @@ export interface JenkinsfileContextAnalysis {
   blockPath: string[];
   isStepAllowed: boolean;
   canSuggestStep: boolean;
+  hasNodeContext: boolean;
 }
 
 export interface JenkinsfileParenEntry {

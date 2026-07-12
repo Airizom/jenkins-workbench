@@ -1,10 +1,11 @@
 import * as React from "react";
+import { getResultBadgeClass } from "../../../../../shared/webview/components/ResultBadge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
+import { MinusIcon, PlusIcon } from "../../../../../shared/webview/icons";
 import {
   resolveBuildResultBorderColor,
   resolveBuildResultGraphBackground
 } from "../../../../../shared/webview/lib/statusStyles";
-import { getStatusClass } from "../StatusPill";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipelineGraphTypes";
 
@@ -13,6 +14,12 @@ const { useEffect, useRef, useState } = React;
 const CANVAS_PADDING = 40;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 1.85;
+const KEYBOARD_PAN_STEP = 40;
+
+const IS_MAC_PLATFORM = /Mac|iPhone|iPad/i.test(
+  typeof navigator === "undefined" ? "" : navigator.platform
+);
+const ZOOM_HINT = IS_MAC_PLATFORM ? "⌘ + scroll to zoom" : "Ctrl + scroll to zoom";
 
 interface ViewportState {
   scale: number;
@@ -58,24 +65,84 @@ export function PipelineGraphCanvas({
     return () => observer.disconnect();
   }, []);
 
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) {
       return;
     }
 
-    const rect = container.getBoundingClientRect();
-    const pointerX = event.clientX - rect.left;
-    const pointerY = event.clientY - rect.top;
-    const nextScale = clamp(viewport.scale * (event.deltaY < 0 ? 1.1 : 0.92), MIN_SCALE, MAX_SCALE);
-    const ratio = nextScale / viewport.scale;
+    // Native listener: React wheel handlers are passive, so preventDefault
+    // would be ignored. Plain wheel scrolls the page; Ctrl/Cmd (including
+    // trackpad pinch, which browsers report with ctrlKey) zooms.
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+      event.preventDefault();
+      const rect = container.getBoundingClientRect();
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+      setViewport((current) => {
+        const nextScale = clamp(
+          current.scale * (event.deltaY < 0 ? 1.1 : 0.92),
+          MIN_SCALE,
+          MAX_SCALE
+        );
+        const ratio = nextScale / current.scale;
+        return {
+          scale: nextScale,
+          x: pointerX - (pointerX - current.x) * ratio,
+          y: pointerY - (pointerY - current.y) * ratio
+        };
+      });
+    };
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, []);
 
+  const zoomBy = (factor: number) => {
     setViewport((current) => ({
-      scale: nextScale,
-      x: pointerX - (pointerX - current.x) * ratio,
-      y: pointerY - (pointerY - current.y) * ratio
+      ...current,
+      scale: clamp(current.scale * factor, MIN_SCALE, MAX_SCALE)
     }));
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    const pan = (deltaX: number, deltaY: number) => {
+      setViewport((current) => ({
+        ...current,
+        x: current.x + deltaX,
+        y: current.y + deltaY
+      }));
+    };
+    switch (event.key) {
+      case "ArrowLeft":
+        pan(KEYBOARD_PAN_STEP, 0);
+        break;
+      case "ArrowRight":
+        pan(-KEYBOARD_PAN_STEP, 0);
+        break;
+      case "ArrowUp":
+        pan(0, KEYBOARD_PAN_STEP);
+        break;
+      case "ArrowDown":
+        pan(0, -KEYBOARD_PAN_STEP);
+        break;
+      case "+":
+      case "=":
+        zoomBy(1.1);
+        break;
+      case "-":
+      case "_":
+        zoomBy(0.9);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -128,39 +195,22 @@ export function PipelineGraphCanvas({
     <div className="rounded-lg border border-card-border bg-card shadow-widget">
       <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Pipeline Graph
           </div>
           <div className="text-xs text-muted-foreground">
-            Drag to pan. Scroll to zoom. Selection syncs the inspector.
+            Drag or use arrow keys to pan. Selection syncs the inspector.
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label="Zoom out"
-            onClick={() =>
-              setViewport((current) => ({
-                ...current,
-                scale: clamp(current.scale * 0.9, MIN_SCALE, MAX_SCALE)
-              }))
-            }
-          >
-            -
+          <span className="mr-1 hidden text-[11px] text-muted-foreground sm:inline">
+            {ZOOM_HINT}
+          </span>
+          <Button variant="outline" size="sm" aria-label="Zoom out" onClick={() => zoomBy(0.9)}>
+            <MinusIcon className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label="Zoom in"
-            onClick={() =>
-              setViewport((current) => ({
-                ...current,
-                scale: clamp(current.scale * 1.1, MIN_SCALE, MAX_SCALE)
-              }))
-            }
-          >
-            +
+          <Button variant="outline" size="sm" aria-label="Zoom in" onClick={() => zoomBy(1.1)}>
+            <PlusIcon className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="outline"
@@ -180,8 +230,12 @@ export function PipelineGraphCanvas({
 
       <div
         ref={containerRef}
-        className="relative h-[360px] overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_12%,transparent),transparent_38%),linear-gradient(180deg,color-mix(in_srgb,var(--muted)_75%,transparent),transparent)] md:h-[440px]"
-        onWheel={handleWheel}
+        role="application"
+        aria-label="Pipeline graph. Arrow keys pan, plus and minus zoom."
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the canvas must be keyboard-focusable so arrow keys can pan and +/- can zoom without a pointer
+        tabIndex={0}
+        className="relative h-[360px] overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_12%,transparent),transparent_38%),linear-gradient(180deg,color-mix(in_srgb,var(--muted)_75%,transparent),transparent)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring md:h-[440px]"
+        onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -248,7 +302,7 @@ function PipelineGraphStageNode({
   onHoverChange: (stageKey?: string) => void;
   onSelect: (stageKey: string) => void;
 }) {
-  const statusClass = getStatusClass(node.stage.statusClass);
+  const statusClass = getResultBadgeClass(node.stage.statusClass);
   const statusIcon = getStageIcon(node.stage.statusClass);
   const branchCount = node.stage.parallelBranches.length;
   const stepCount = node.stage.stepsAll.length;
@@ -301,7 +355,7 @@ function PipelineGraphStageNode({
                 {statusIcon}
               </div>
             </div>
-            <div className="mt-auto flex items-center justify-between gap-2 text-[10px]">
+            <div className="mt-auto flex items-center justify-between gap-2 text-[11px]">
               <span
                 className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${statusClass}`}
               >

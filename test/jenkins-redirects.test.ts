@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { requestText } from "../src/jenkins/request";
 import { isCrossOriginRedirect } from "../src/jenkins/request/redirects";
 

@@ -1,3 +1,4 @@
+import { getResultBadgeClass } from "../../../../../shared/webview/components/ResultBadge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
   Tooltip,
@@ -10,8 +11,8 @@ import type {
   PipelineLogTargetViewModel,
   PipelineStageStepViewModel
 } from "../../../../shared/BuildDetailsContracts";
-import { getStatusClass } from "../StatusPill";
 import { getStageIcon } from "./PipelineStageIcons";
+import { buildStepRows, getStepRowPaddingClass } from "./stepsListModel";
 export function StepsList({
   steps,
   compact = false,
@@ -21,52 +22,49 @@ export function StepsList({
   compact?: boolean;
   onSelectPipelineLog?: (target: PipelineLogTargetViewModel) => void;
 }) {
+  const paddingClass = getStepRowPaddingClass(compact);
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-1">
-      {steps.map((step, index) => {
-        const statusClass = getStatusClass(step.statusClass);
-        const stepLogLabel = `Open log for ${step.name.trim() || "step"}`;
-        return (
-          <li
-            className={cn(
-              "flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-background",
-              compact ? "px-2 py-1" : "px-2.5 py-1.5"
-            )}
-            key={`${step.name}-${index}`}
-          >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div
-                className={cn(
-                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[8px]",
-                  statusClass
-                )}
-              >
-                {getStageIcon(step.statusClass)}
-              </div>
-              <span className="text-[11px] truncate">{step.name || "Step"}</span>
+      {buildStepRows(steps).map((row) => (
+        <li
+          className={cn(
+            "flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-background",
+            paddingClass
+          )}
+          key={row.key}
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div
+              className={cn(
+                "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                getResultBadgeClass(row.statusClass)
+              )}
+            >
+              {getStageIcon(row.statusClass)}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="text-[11px] text-muted-foreground">{step.durationLabel || "—"}</span>
-              {step.logTarget && onSelectPipelineLog ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={stepLogLabel}
-                      className="h-5 w-5"
-                      onClick={() => step.logTarget && onSelectPipelineLog(step.logTarget)}
-                    >
-                      <TerminalIcon className="h-3 w-3" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Open step log</TooltipContent>
-                </Tooltip>
-              ) : null}
-            </div>
-          </li>
-        );
-      })}
+            <span className="text-[11px] truncate">{row.name}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">{row.durationLabel}</span>
+            {row.logTarget && onSelectPipelineLog ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={row.logLabel}
+                    className="h-5 w-5"
+                    onClick={() => row.logTarget && onSelectPipelineLog(row.logTarget)}
+                  >
+                    <TerminalIcon className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open step log</TooltipContent>
+              </Tooltip>
+            ) : null}
+          </div>
+        </li>
+      ))}
     </ul>
   );
 }

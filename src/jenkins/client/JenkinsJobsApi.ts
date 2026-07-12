@@ -24,17 +24,22 @@ const JOB_LIST_TREE = "jobs[name,url,_class,color]";
 const JOB_DETAIL_TREE =
   "name,url,_class,color,lastCompletedBuild[number,result,timestamp],lastBuild[number,url,result,building,timestamp]";
 const VIEW_LIST_TREE = "views[name,url]";
+const JOB_PARAMETER_TREE =
+  "parameterDefinitions[name,type,defaultParameterValue[value],defaultValue,choices,description,projectName,multiSelectDelimiter]";
+const JOB_PARAMETERS_TREE = `actions[${JOB_PARAMETER_TREE}],property[${JOB_PARAMETER_TREE}]`;
 const CREATE_ITEM_MODES: Record<JenkinsItemCreateKind, string> = {
   job: "hudson.model.FreeStyleProject",
   pipeline: "org.jenkinsci.plugins.workflow.job.WorkflowJob"
 };
 
-const JOB_CLASSIFIERS: Array<{ kind: JenkinsJobKind; tokens: string[] }> = [
-  { kind: "folder", tokens: ["organizationfolder", "folder"] },
-  { kind: "multibranch", tokens: ["workflowmultibranchproject"] },
-  { kind: "pipeline", tokens: ["workflowjob"] },
-  { kind: "job", tokens: ["job"] }
+const JOB_CLASSIFIER_TOKENS: Array<{ readonly token: string; readonly kind: JenkinsJobKind }> = [
+  { token: "organizationfolder", kind: "folder" },
+  { token: "folder", kind: "folder" },
+  { token: "workflowmultibranchproject", kind: "multibranch" },
+  { token: "workflowjob", kind: "pipeline" },
+  { token: "job", kind: "job" }
 ];
+const JOB_CLASSIFIER_TOKEN_COUNT = JOB_CLASSIFIER_TOKENS.length;
 
 export class JenkinsJobsApi {
   constructor(private readonly context: JenkinsClientContext) {}
@@ -69,28 +74,26 @@ export class JenkinsJobsApi {
   }
 
   classifyJob(job: JenkinsJob): JenkinsJobKind {
-    const className = job._class?.trim();
+    const className = job._class;
     if (!className) {
       return "unknown";
     }
 
     const normalized = className.toLowerCase();
-    for (const classifier of JOB_CLASSIFIERS) {
-      if (classifier.tokens.some((token) => normalized.includes(token))) {
+    for (let index = 0; index < JOB_CLASSIFIER_TOKEN_COUNT; index++) {
+      const classifier = JOB_CLASSIFIER_TOKENS[index];
+      if (normalized.includes(classifier.token)) {
         return classifier.kind;
       }
     }
 
     // Jenkins exposes many concrete job subclasses that are still job-like
     // from the tree's perspective, such as FreeStyleProject and MatrixProject.
-    return "job";
+    return className.trim() ? "job" : "unknown";
   }
 
   async getJobParameters(jobUrl: string): Promise<JenkinsParameterDefinition[]> {
-    const parameterTree =
-      "parameterDefinitions[name,type,defaultParameterValue[value],defaultValue,choices,description,projectName,multiSelectDelimiter]";
-    const tree = `actions[${parameterTree}],property[${parameterTree}]`;
-    const url = buildApiUrlFromItem(jobUrl, tree);
+    const url = buildApiUrlFromItem(jobUrl, JOB_PARAMETERS_TREE);
     const response = await this.context.requestJson<JenkinsJobParametersResponse>(url);
     return extractParameterDefinitions(response);
   }

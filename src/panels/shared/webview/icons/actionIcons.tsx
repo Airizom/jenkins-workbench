@@ -66,6 +66,36 @@ export function CheckIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
+export function MinusIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </IconBase>
+  );
+}
+export function PlusIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </IconBase>
+  );
+}
+export function ArrowDownIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <polyline points="19 12 12 19 5 12" />
+    </IconBase>
+  );
+}
+export function ChevronUpIcon({ className, ...props }: IconProps) {
+  return (
+    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
+      <polyline points="6 15 12 9 18 15" />
+    </IconBase>
+  );
+}
 export function PlayIcon({ className, ...props }: IconProps) {
   return (
     <IconBase

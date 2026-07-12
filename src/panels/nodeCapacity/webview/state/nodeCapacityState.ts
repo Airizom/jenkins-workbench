@@ -95,6 +95,23 @@ export function getInitialState(): NodeCapacityState {
   return panelStateHelpers.getInitialState();
 }
 
+/** Mirrors NODE_CAPACITY_VISIBLE_REFRESH_INTERVAL_MS in NodeCapacityPanel.ts. */
+export const NODE_CAPACITY_REFRESH_INTERVAL_MS = 10_000;
+
+/** Keep the stale badge consistent with the relative timestamp's sub-minute label. */
+export const NODE_CAPACITY_STALE_AFTER_MS = 60_000;
+
+export function isStaleCapacityTimestamp(updatedAt: string | undefined, now: number): boolean {
+  if (!updatedAt) {
+    return false;
+  }
+  const timestamp = new Date(updatedAt).getTime();
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return false;
+  }
+  return now - timestamp > NODE_CAPACITY_STALE_AFTER_MS;
+}
+
 /**
  * Full updates rebuild every node with `executorsLoaded: false`; keep previously
  * hydrated executor lists so expanded pools do not flash empty between the

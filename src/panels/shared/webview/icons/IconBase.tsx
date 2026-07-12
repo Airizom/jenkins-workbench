@@ -9,11 +9,12 @@ type IconBaseProps = IconProps & {
 
 // cn() does not resolve Tailwind conflicts, so a default like "h-8 w-8" can
 // override a caller's smaller size depending on stylesheet order. Drop the
-// default's size/color tokens whenever the caller supplies their own.
+// default's size/known color tokens whenever the caller supplies their own.
 const SIZE_TOKEN = /^(?:h-|w-|size-)/;
-const COLOR_TOKEN = /^text-/;
+const COLOR_TOKEN =
+  /^text-(?:aborted|accent|background|badge|border|card|checkbox|current|description|destructive|editor-widget|failure|focus|foreground|header|input(?:ErrorFg|InfoFg|WarningFg)?|link|list|muted|panel-border|popover|primary|progress|ring|secondary|selection|success|terminal|toolbar|warning)(?:$|[-/])/;
 
-function resolveIconClassName(defaultClassName: string, className?: string): string {
+export function resolveIconClassName(defaultClassName: string, className?: string): string {
   if (!className) {
     return defaultClassName;
   }

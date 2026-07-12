@@ -15,3 +15,12 @@ export function computeIsStepAllowed(blockPath: string[]): boolean {
   }
   return true;
 }
+
+export function computeHasNodeContext(blockPath: string[]): boolean {
+  return (
+    blockPath.includes("node") ||
+    blockPath.includes("steps") ||
+    blockPath.includes("script") ||
+    blockPath.includes("post")
+  );
+}

@@ -166,7 +166,9 @@ export class ReplayDraftSessionStore {
     }
 
     this.sessions.delete(sessionId);
-    this.sessionsByBuildKey.delete(session.buildKey);
+    if (this.sessionsByBuildKey.get(session.buildKey) === sessionId) {
+      this.sessionsByBuildKey.delete(session.buildKey);
+    }
   }
 
   private createScriptDraft(

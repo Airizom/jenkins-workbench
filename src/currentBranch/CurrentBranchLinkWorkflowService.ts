@@ -1,5 +1,4 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type {
   JenkinsRepositoryLink,
@@ -79,7 +78,10 @@ export class CurrentBranchLinkWorkflowService {
   async discoverMultibranchTargets(
     environment: JenkinsRepositoryLink["environment"]
   ): Promise<CurrentBranchMultibranchDiscoveryResult> {
-    const environmentRef = await this.resolveEnvironment(environment);
+    const environmentRef = await resolveCurrentBranchEnvironmentRef(
+      this.environmentStore,
+      environment
+    );
     if (!environmentRef) {
       return {
         kind: "failed",
@@ -145,11 +147,5 @@ export class CurrentBranchLinkWorkflowService {
         : "Triggered a multibranch scan.",
       environmentId: state.environment.environmentId
     };
-  }
-
-  private async resolveEnvironment(
-    environment: JenkinsRepositoryLink["environment"]
-  ): Promise<JenkinsEnvironmentRef | undefined> {
-    return resolveCurrentBranchEnvironmentRef(this.environmentStore, environment);
   }
 }

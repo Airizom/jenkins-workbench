@@ -131,10 +131,14 @@ export class TreePinnedChildrenLoader {
     const items: WorkbenchTreeElement[] = [];
 
     for (let index = 0; index < pinnedEntries.length; index += PINNED_ITEM_LOOKUP_CONCURRENCY) {
-      const batch = pinnedEntries.slice(index, index + PINNED_ITEM_LOOKUP_CONCURRENCY);
-      const loaded = await Promise.all(
-        batch.map((entry) => this.loadPinnedItem(environment, entry, watchedJobs, pinnedJobs))
-      );
+      const limit = Math.min(index + PINNED_ITEM_LOOKUP_CONCURRENCY, pinnedEntries.length);
+      const pending: Promise<WorkbenchTreeElement>[] = [];
+      for (let batchIndex = index; batchIndex < limit; batchIndex++) {
+        pending.push(
+          this.loadPinnedItem(environment, pinnedEntries[batchIndex], watchedJobs, pinnedJobs)
+        );
+      }
+      const loaded = await Promise.all(pending);
       items.push(...loaded);
     }
 

@@ -3,8 +3,6 @@ import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore
 import { JenkinsClient } from "./JenkinsClient";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import { buildAuthSignature } from "./auth";
-import type { JenkinsClientContext } from "./client/JenkinsClientContext";
-import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import type { JenkinsAuthConfig } from "./types";
 
 export interface JenkinsClientProviderOptions {
@@ -18,11 +16,7 @@ interface JenkinsAuthMaterial {
   token: string | undefined;
 }
 
-interface JenkinsClientProviderRuntimeSurface {
-  createClientContext(environment: JenkinsEnvironmentRef): Promise<JenkinsClientContext>;
-}
-
-export class JenkinsClientProvider implements JenkinsClientProviderRuntimeSurface {
+export class JenkinsClientProvider {
   private readonly clientCache = new Map<
     string,
     {
@@ -136,22 +130,6 @@ export class JenkinsClientProvider implements JenkinsClientProviderRuntimeSurfac
     });
 
     return client;
-  }
-
-  async createClientContext(environment: JenkinsEnvironmentRef): Promise<JenkinsClientContext> {
-    const authConfig = await this.store.getAuthConfig(environment.scope, environment.environmentId);
-    const token = authConfig
-      ? undefined
-      : await this.store.getToken(environment.scope, environment.environmentId);
-    return new JenkinsHttpClient({
-      baseUrl: environment.url,
-      username: environment.username,
-      token,
-      authConfig,
-      refreshAuthConfig: (currentAuthConfig) =>
-        this.refreshBrowserSsoAuthConfig(environment, currentAuthConfig),
-      requestTimeoutMs: this.requestTimeoutMs
-    });
   }
 
   invalidateClient(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {

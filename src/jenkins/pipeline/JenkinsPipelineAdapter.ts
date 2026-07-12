@@ -37,7 +37,7 @@ function mapStep(step: JenkinsWorkflowStep, index: number, parentKey: string): P
     nodeId: normalizeNodeId(step.id),
     name: step.name ?? "Step",
     status: step.status,
-    durationMillis: step.durationMillis
+    durationMillis: pickFiniteNumber(step.durationMillis, step.execDurationMillis)
   };
 }
 

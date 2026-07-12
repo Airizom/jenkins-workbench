@@ -100,11 +100,12 @@ const FALLBACK_STATE: BuildDetailsState = {
 };
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
   const mergedDefaults = mergeBuildDetailsDefaults(initialState);
+  const pipelineNodeLog = mergedDefaults.pipelineNodeLog;
   const merged: BuildDetailsState = {
     ...mergedDefaults,
-    pipelineNodeLog: initialState.pipelineNodeLog ?? FALLBACK_STATE.pipelineNodeLog,
-    pipelineNodeLogHtmlModel: initialState.pipelineNodeLog.html
-      ? parseConsoleHtml(initialState.pipelineNodeLog.html)
+    pipelineNodeLog,
+    pipelineNodeLogHtmlModel: pipelineNodeLog.html
+      ? parseConsoleHtml(pipelineNodeLog.html)
       : undefined,
     consoleHtmlModel: undefined,
     hasLoaded: !(initialState.loading ?? false)
@@ -280,6 +281,7 @@ function mergeBuildDetailsDefaults<T extends BuildDetailsViewModel>(candidate: T
     testState: candidate.testState ?? DEFAULT_TEST_STATE,
     coverageState: candidate.coverageState ?? DEFAULT_COVERAGE_STATE,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,
+    pipelineNodeLog: candidate.pipelineNodeLog ?? FALLBACK_STATE.pipelineNodeLog,
     pendingInputs: candidate.pendingInputs ?? [],
     loading: candidate.loading ?? false
   };

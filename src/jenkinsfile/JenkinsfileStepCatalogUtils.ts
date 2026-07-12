@@ -59,7 +59,10 @@ export function mergeStepCatalogs(
       }))
     };
 
-    merged.set(name, mergeStepDefinitions(fallbackStep, enrichedLiveStep));
+    merged.set(name, {
+      ...mergeStepDefinitions(fallbackStep, enrichedLiveStep),
+      requiresNodeContext: liveStep.requiresNodeContext
+    });
   }
 
   return { steps: merged };

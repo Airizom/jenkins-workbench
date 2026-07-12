@@ -7,7 +7,7 @@ import {
   showNodeDetails,
   takeNodeOffline
 } from "./node/NodeCommandHandlers";
-import type { NodeCommandRefreshHost, NodeCommandTarget } from "./node/NodeCommandTypes";
+import type { NodeCommandRefreshHost } from "./node/NodeCommandTypes";
 
 export function registerNodeCommands(
   context: vscode.ExtensionContext,
@@ -18,17 +18,14 @@ export function registerNodeCommands(
     vscode.commands.registerCommand("jenkinsWorkbench.showNodeDetails", (item?: NodeTreeItem) =>
       showNodeDetails(dataService, refreshHost, context.extensionUri, item)
     ),
-    vscode.commands.registerCommand(
-      "jenkinsWorkbench.takeNodeOffline",
-      (item?: NodeTreeItem | NodeCommandTarget) => takeNodeOffline(dataService, refreshHost, item)
+    vscode.commands.registerCommand("jenkinsWorkbench.takeNodeOffline", (item?: NodeTreeItem) =>
+      takeNodeOffline(dataService, refreshHost, item)
     ),
-    vscode.commands.registerCommand(
-      "jenkinsWorkbench.bringNodeOnline",
-      (item?: NodeTreeItem | NodeCommandTarget) => bringNodeOnline(dataService, refreshHost, item)
+    vscode.commands.registerCommand("jenkinsWorkbench.bringNodeOnline", (item?: NodeTreeItem) =>
+      bringNodeOnline(dataService, refreshHost, item)
     ),
-    vscode.commands.registerCommand(
-      "jenkinsWorkbench.launchNodeAgent",
-      (item?: NodeTreeItem | NodeCommandTarget) => launchNodeAgent(dataService, refreshHost, item)
+    vscode.commands.registerCommand("jenkinsWorkbench.launchNodeAgent", (item?: NodeTreeItem) =>
+      launchNodeAgent(dataService, refreshHost, item)
     )
   );
 }

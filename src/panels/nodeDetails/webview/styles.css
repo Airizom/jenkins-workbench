@@ -4,20 +4,6 @@
 @layer theme, base, components, utilities;
 
 @layer components {
-  .executor-progress-track {
-    height: 6px;
-    background-color: var(--muted);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .executor-progress-bar {
-    height: 100%;
-    background-color: var(--progress);
-    border-radius: 3px;
-    transition: width 0.3s ease-out;
-  }
-
   .monitor-gauge {
     position: relative;
     width: 100%;
@@ -43,11 +29,13 @@
   }
 
   .monitor-gauge-fill[data-level="medium"] {
-    background-color: var(--warning);
+    background-color: var(--progress);
   }
 
-  .monitor-gauge-fill[data-level="high"] {
-    background-color: var(--failure);
+  /* Saturation is amber, not red: a fully busy node is often healthy, so red
+   * stays reserved for genuine faults (offline/stuck). */
+  .monitor-gauge-fill[data-level="saturated"] {
+    background-color: var(--warning);
   }
 
   .node-hero {
@@ -100,6 +88,9 @@
   }
 
   .executor-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 18px;
     height: 18px;
     border-radius: 4px;
@@ -114,6 +105,15 @@
     animation: executor-slot-pulse 2.4s ease-in-out infinite;
   }
 
+  /* Non-color busy cue so busy vs idle does not rely on background alone. */
+  .executor-slot[data-busy="true"]::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--background);
+  }
+
   button.executor-slot {
     cursor: pointer;
   }
@@ -122,7 +122,7 @@
     filter: brightness(1.2);
   }
 
-  button.executor-slot:focus-visible {
+  .executor-slot:focus-visible {
     outline: 1px solid var(--ring);
     outline-offset: 1px;
   }
@@ -144,7 +144,6 @@
       animation: none;
     }
 
-    .executor-progress-bar,
     .monitor-gauge-fill {
       transition: none;
     }

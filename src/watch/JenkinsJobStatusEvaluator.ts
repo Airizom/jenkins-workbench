@@ -5,6 +5,7 @@ import {
 import type { JenkinsBuildSummary } from "../jenkins/types";
 import type { WatchStatusKind, WatchedJobEntry } from "../storage/JenkinsWatchStore";
 import type { StatusNotifier } from "./StatusNotifier";
+import { formatWatchJobLabel } from "./WatchJobLabelFormatter";
 
 export interface JobStatusEvaluation {
   nextStatus: WatchStatusKind;
@@ -45,19 +46,21 @@ export class JenkinsJobStatusEvaluator {
 
     const notifiedFailure = shouldNotifyFailure(previousStatus, currentStatus);
     if (notifiedFailure) {
-      this.notifier.notifyFailure(`${formatJobLabel(entry, jobName)} failed in ${environmentUrl}.`);
+      this.notifier.notifyFailure(
+        `${formatWatchJobLabel(entry, jobName)} failed in ${environmentUrl}.`
+      );
     }
 
     const notifiedRecovery = shouldNotifyRecovery(previousStatus, currentStatus);
     if (notifiedRecovery) {
       this.notifier.notifyRecovery(
-        `${formatJobLabel(entry, jobName)} recovered in ${environmentUrl}.`
+        `${formatWatchJobLabel(entry, jobName)} recovered in ${environmentUrl}.`
       );
     }
 
     if (buildNumberChanged && hasCompletionHistory && !notifiedFailure && !notifiedRecovery) {
       this.notifier.notifyCompletion({
-        jobLabel: formatJobLabel(entry, jobName),
+        jobLabel: formatWatchJobLabel(entry, jobName),
         environmentUrl,
         result: lastCompletedBuild?.result,
         color
@@ -129,10 +132,4 @@ function shouldNotifyRecovery(
   }
 
   return previous === "failure" && current === "success";
-}
-
-function formatJobLabel(entry: WatchedJobEntry, name?: string): string {
-  const label = name ?? entry.jobName ?? entry.jobUrl;
-  const kind = entry.jobKind === "pipeline" ? "Pipeline" : "Job";
-  return `${kind} ${label}`;
 }

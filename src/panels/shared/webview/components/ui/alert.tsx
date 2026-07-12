@@ -3,13 +3,13 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-const alertVariants = cva("relative w-full rounded border p-3 text-sm", {
+const alertVariants = cva("relative w-full rounded-md border p-3 text-sm", {
   variants: {
     variant: {
       default: "border-border bg-muted text-foreground",
       destructive: "border-inputErrorBorder bg-inputErrorBg text-inputErrorFg",
       warning: "border-inputWarningBorder bg-inputWarningBg text-inputWarningFg",
-      info: "border-ring bg-muted text-foreground"
+      info: "border-inputInfoBorder bg-inputInfoBg text-inputInfoFg"
     }
   },
   defaultVariants: {

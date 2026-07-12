@@ -11,8 +11,10 @@ import {
 } from "./BuildDetailsContracts";
 
 export type PipelinePresentation = "graph" | "list";
+export type BuildDetailsTab = "overview" | "inputs" | "pipeline" | "console" | "tests";
 
 export interface BuildDetailsPanelUiState {
+  selectedTab?: BuildDetailsTab;
   pipelinePresentation?: PipelinePresentation;
   selectedGraphStageKey?: string;
   selectedPipelineLogTarget?: PipelineLogTargetViewModel;
@@ -57,6 +59,7 @@ export function normalizeBuildDetailsPanelUiState(
   }
 
   const record = value as Record<string, unknown>;
+  const selectedTab = isBuildDetailsTab(record.selectedTab) ? record.selectedTab : undefined;
   const pipelinePresentation = isPipelinePresentation(record.pipelinePresentation)
     ? record.pipelinePresentation
     : undefined;
@@ -67,11 +70,17 @@ export function normalizeBuildDetailsPanelUiState(
       : undefined;
   const selectedPipelineLogTarget = normalizePipelineLogTarget(record.selectedPipelineLogTarget);
 
-  if (!pipelinePresentation && !selectedGraphStageKey && !selectedPipelineLogTarget) {
+  if (
+    !selectedTab &&
+    !pipelinePresentation &&
+    !selectedGraphStageKey &&
+    !selectedPipelineLogTarget
+  ) {
     return undefined;
   }
 
   return {
+    selectedTab,
     pipelinePresentation,
     selectedGraphStageKey,
     selectedPipelineLogTarget
@@ -114,6 +123,16 @@ function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelU
 
 function isPipelinePresentation(value: unknown): value is PipelinePresentation {
   return value === "graph" || value === "list";
+}
+
+function isBuildDetailsTab(value: unknown): value is BuildDetailsTab {
+  return (
+    value === "overview" ||
+    value === "inputs" ||
+    value === "pipeline" ||
+    value === "console" ||
+    value === "tests"
+  );
 }
 
 function isEmptyObject(value: unknown): boolean {

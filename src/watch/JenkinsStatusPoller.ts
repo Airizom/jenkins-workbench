@@ -8,6 +8,7 @@ import type { EnvironmentScope, JenkinsEnvironmentStore } from "../storage/Jenki
 import type { JenkinsWatchStore, WatchedJobEntry } from "../storage/JenkinsWatchStore";
 import { JenkinsJobStatusEvaluator } from "./JenkinsJobStatusEvaluator";
 import type { StatusNotifier } from "./StatusNotifier";
+import { formatWatchJobLabel } from "./WatchJobLabelFormatter";
 
 export interface JenkinsStatusPollerHost {
   fullEnvironmentRefresh(): void;
@@ -224,7 +225,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       this.removeWatchErrorKey(key);
       this.clearPendingInputsForJob(entry);
       this.notifier.notifyWatchError(
-        `${this.formatWatchLabel(entry)} was removed because Jenkins reported it missing in ${environment.url}.`
+        `${formatWatchJobLabel(entry)} was removed because Jenkins reported it missing in ${environment.url}.`
       );
       return true;
     }
@@ -239,7 +240,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
 
     if (nextCount === this.maxConsecutiveErrors) {
       this.notifier.notifyWatchError(
-        `Unable to poll ${this.formatWatchLabel(entry)} in ${environment.url} after ${this.maxConsecutiveErrors} attempts. Keeping the watch; check connectivity or credentials.`
+        `Unable to poll ${formatWatchJobLabel(entry)} in ${environment.url} after ${this.maxConsecutiveErrors} attempts. Keeping the watch; check connectivity or credentials.`
       );
       this.addWatchErrorKey(key);
     }
@@ -273,12 +274,6 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
         this.pendingInputSignatures.delete(key);
       }
     }
-  }
-
-  private formatWatchLabel(entry: WatchedJobEntry, jobName?: string): string {
-    const label = jobName ?? entry.jobName ?? entry.jobUrl;
-    const kind = entry.jobKind === "pipeline" ? "Pipeline" : "Job";
-    return `${kind} ${label}`;
   }
 
   private clearPendingInputsForJob(entry: WatchedJobEntry): void {
@@ -407,7 +402,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       );
     } catch (error) {
       console.warn(
-        `Failed to check pending inputs for ${this.formatWatchLabel(entry, jobName)} in ${environment.url} (${buildUrl}).`,
+        `Failed to check pending inputs for ${formatWatchJobLabel(entry, jobName)} in ${environment.url} (${buildUrl}).`,
         error
       );
       return;
@@ -430,7 +425,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     if (previousSignature !== summary.signature) {
       this.pendingInputSignatures.set(pendingKey, summary.signature);
       this.notifier.notifyPendingInput({
-        jobLabel: this.formatWatchLabel(entry, jobName),
+        jobLabel: formatWatchJobLabel(entry, jobName),
         environmentUrl,
         buildUrl,
         inputCount: summary.count,

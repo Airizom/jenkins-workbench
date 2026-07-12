@@ -5,6 +5,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
 import { formatActivityGroupLabel } from "../ActivityTypes";
+import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 import type {
   JobsFolderSummary,
   NodesFolderSummary,
@@ -36,7 +37,7 @@ const SERVER_ICON = new vscode.ThemeIcon("server");
 
 export class ViewsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `views:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("views", environment);
   }
 
   constructor(public readonly environment: JenkinsEnvironmentRef) {
@@ -65,7 +66,7 @@ export class RootSectionTreeItem extends vscode.TreeItem {
 
 export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironmentRef {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `environment:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("environment", environment);
   }
 
   public readonly environmentId: string;
@@ -95,7 +96,7 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
 
 export class JobsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `jobs:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("jobs", environment);
   }
 
   constructor(
@@ -116,7 +117,7 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
 
 export class ActivityFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `activity:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("activity", environment);
   }
 
   constructor(
@@ -139,7 +140,7 @@ export class ActivityFolderTreeItem extends vscode.TreeItem {
 
 export class ActivityGroupTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef, group: ActivityGroupKind): string {
-    return `activity-group:${environment.scope}:${environment.environmentId}:${group}`;
+    return buildEnvironmentTreeItemId("activity-group", environment, group);
   }
 
   constructor(
@@ -148,20 +149,21 @@ export class ActivityGroupTreeItem extends vscode.TreeItem {
     displayedCount: number,
     isTruncated = false
   ) {
+    const groupLabel = formatActivityGroupLabel(group);
     super(
-      `${formatActivityGroupLabel(group)} (${formatDisplayedCountLabel(displayedCount)})`,
+      `${groupLabel} (${formatDisplayedCountLabel(displayedCount)})`,
       vscode.TreeItemCollapsibleState.Collapsed
     );
     this.id = ActivityGroupTreeItem.buildId(environment, group);
     this.contextValue = "activityGroup";
     this.iconPath = resolveActivityGroupIcon(group);
-    this.tooltip = `${formatDisplayedCountTooltip(displayedCount, isTruncated)} ${formatActivityGroupLabel(group).toLowerCase()} job(s)`;
+    this.tooltip = `${formatDisplayedCountTooltip(displayedCount, isTruncated)} ${groupLabel.toLowerCase()} job(s)`;
   }
 }
 
 export class NodesFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `nodes:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("nodes", environment);
   }
 
   constructor(
@@ -183,7 +185,7 @@ export class NodesFolderTreeItem extends vscode.TreeItem {
 
 export class BuildQueueFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `queue:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("queue", environment);
   }
 
   constructor(
@@ -201,7 +203,7 @@ export class BuildQueueFolderTreeItem extends vscode.TreeItem {
 
 export class PinnedJobsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
-    return `pinned-root:${environment.scope}:${environment.environmentId}`;
+    return buildEnvironmentTreeItemId("pinned-root", environment);
   }
 
   constructor(

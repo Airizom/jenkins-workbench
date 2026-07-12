@@ -57,7 +57,10 @@ export function buildStageStripSegments(stages: PipelineStageViewModel[]): Stage
     let statusLabel = stage.statusLabel;
     if (statusClass === "success" || statusClass === "neutral") {
       const worst = worstBranchStatus(stage);
-      if (severityOf(worst.statusClass) < severityOf(statusClass)) {
+      if (
+        severityOf(worst.statusClass) < severityOf(statusClass) &&
+        !(statusClass === "neutral" && worst.statusClass === "success")
+      ) {
         statusClass = worst.statusClass;
         statusLabel = worst.statusLabel;
       }

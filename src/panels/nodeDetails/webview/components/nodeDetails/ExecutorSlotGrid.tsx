@@ -11,12 +11,14 @@ type ExecutorSlotGridProps = {
   executors: NodeExecutorViewModel[];
   oneOffExecutors: NodeExecutorViewModel[];
   onOpenExternal: (url: string) => void;
+  onViewAll?: () => void;
   maxSlots?: number;
 };
 export function ExecutorSlotGrid({
   executors,
   oneOffExecutors,
   onOpenExternal,
+  onViewAll,
   maxSlots = DEFAULT_MAX_SLOTS
 }: ExecutorSlotGridProps): JSX.Element | null {
   const allExecutors = [
@@ -36,7 +38,20 @@ export function ExecutorSlotGrid({
         <ExecutorSlot key={key} executor={executor} onOpenExternal={onOpenExternal} />
       ))}
       {overflow > 0 ? (
-        <li className="self-center text-[11px] text-muted-foreground">+{overflow}</li>
+        <li className="flex self-center">
+          {onViewAll ? (
+            <button
+              type="button"
+              className="text-[11px] text-link hover:text-link-hover hover:underline"
+              aria-label={`View all executors (${overflow} more)`}
+              onClick={onViewAll}
+            >
+              +{overflow}
+            </button>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">+{overflow}</span>
+          )}
+        </li>
       ) : null}
     </ul>
   );
@@ -78,7 +93,14 @@ function ExecutorSlot({
     <li className="flex">
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="executor-slot" data-busy={busy ? "true" : "false"} aria-label={label} />
+          <div
+            className="executor-slot"
+            data-busy={busy ? "true" : "false"}
+            role="img"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: tooltip triggers must be keyboard-focusable so the slot label is reachable without a pointer
+            tabIndex={0}
+            aria-label={label}
+          />
         </TooltipTrigger>
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { BuildCompareBackend } from "../src/panels/buildCompare/BuildCompareBackend";
 import { buildConsoleComparisonSection } from "../src/panels/buildCompare/BuildCompareConsoleDiff";
@@ -13,12 +13,20 @@ const ENVIRONMENT: JenkinsEnvironmentRef = {
 const BASELINE_URL = "https://jenkins.example/job/example/1/";
 const TARGET_URL = "https://jenkins.example/job/example/2/";
 
+interface ProgressiveCall {
+  buildUrl: string;
+  maxBytes?: number;
+}
+
 /**
  * Builds a fake console backend whose progressive endpoint serves the given
  * chunks per build URL in order. `moreData` stays true while chunks remain, so
  * a log can report more data than the comparison byte budget allows.
  */
-function createFakeBackend(chunksByUrl: Record<string, string[]>): BuildCompareBackend {
+function createFakeBackend(
+  chunksByUrl: Record<string, string[]>,
+  calls: ProgressiveCall[] = []
+): BuildCompareBackend {
   const cursors = new Map<string, number>();
   const consoleBackend = {
     getConsoleTextProgressive: async (
@@ -27,6 +35,7 @@ function createFakeBackend(chunksByUrl: Record<string, string[]>): BuildCompareB
       _start: number,
       _maxBytes?: number
     ) => {
+      calls.push({ buildUrl, maxBytes: _maxBytes });
       const chunks = chunksByUrl[buildUrl] ?? [];
       const index = cursors.get(buildUrl) ?? 0;
       cursors.set(buildUrl, index + 1);
@@ -118,6 +127,35 @@ describe("buildConsoleComparisonSection", () => {
 
     assert.equal(section.status, "available");
     assert.equal(section.divergenceLineLabel, "First difference at line 3");
+  });
+
+  it("does not request trailing context after multibyte chunks exhaust the byte budget", async () => {
+    const calls: ProgressiveCall[] = [];
+    const backend = createFakeBackend(
+      {
+        [BASELINE_URL]: ["x\nbb", "éééé", "extra"],
+        [TARGET_URL]: ["x\ntt", "éééé", "extra"]
+      },
+      calls
+    );
+
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 12, maxLines: 1000 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
+
+    assert.equal(section.status, "available");
+    assert.deepEqual(
+      calls.filter((call) => call.buildUrl === BASELINE_URL).map((call) => call.maxBytes),
+      [12, 8]
+    );
+    assert.deepEqual(
+      calls.filter((call) => call.buildUrl === TARGET_URL).map((call) => call.maxBytes),
+      [12, 8]
+    );
   });
 
   it("reports identical when both logs end within the budget", async () => {

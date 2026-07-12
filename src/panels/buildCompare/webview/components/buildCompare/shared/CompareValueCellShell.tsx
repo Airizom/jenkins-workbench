@@ -7,7 +7,7 @@ export function CompareValueCellShell({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <div className="min-w-0 rounded border border-mutedBorder bg-background px-2 py-1">
+    <div className="min-w-0 rounded-md border border-border bg-background px-2 py-1">
       <p className="text-muted-foreground">{label}</p>
       {children}
     </div>

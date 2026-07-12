@@ -5,6 +5,7 @@ import {
   type ActivityGroupKind
 } from "../ActivityTypes";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { buildScopedEnvironmentKey, isEnvironmentScopedChildKey } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 
 type BuildChildrenKey = (
@@ -77,20 +78,21 @@ export class TreeActivityCache {
 
   // Used by legacy refresh paths that only carry an environment id, not a scope.
   clearForEnvironmentIdAcrossScopes(environmentId: string): void {
+    const environmentSuffix = `:${environmentId}`;
     for (const key of this.summaries.keys()) {
-      if (key.endsWith(`:${environmentId}`)) {
+      if (key.endsWith(environmentSuffix)) {
         this.summaries.delete(key);
       }
     }
     for (const key of this.childKeys) {
-      if (key.startsWith(`${environmentId}:`)) {
+      if (isEnvironmentScopedChildKey(key, environmentId)) {
         this.clearChildKey(key);
       }
     }
   }
 
   private buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
-    return `${environment.scope}:${environment.environmentId}`;
+    return buildScopedEnvironmentKey(environment);
   }
 
   private trackChildKey(key: string): string {

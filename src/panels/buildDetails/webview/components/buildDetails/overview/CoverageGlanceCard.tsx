@@ -1,4 +1,3 @@
-import { coverageStatusClassToVisualTone } from "../../../../../shared/TestStatusStyles";
 import { CoverageStatusBadge } from "../../../../../shared/webview/components/CoverageStatusBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { Button } from "../../../../../shared/webview/components/ui/button";
@@ -53,20 +52,16 @@ export function CoverageGlanceCard({
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            <ToneMetricCard
-              label="Project"
-              value={coverageState.projectCoverage}
-              tone={coverageStatusClassToVisualTone("success")}
-            />
+            <ToneMetricCard label="Project" value={coverageState.projectCoverage} tone="neutral" />
             <ToneMetricCard
               label="Modified Files"
               value={coverageState.modifiedFilesCoverage}
-              tone={coverageStatusClassToVisualTone("success")}
+              tone="neutral"
             />
             <ToneMetricCard
               label="Modified Lines"
               value={coverageState.modifiedLinesCoverage}
-              tone={coverageStatusClassToVisualTone("success")}
+              tone="neutral"
             />
           </div>
         )}

@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
 import { unwatchJob, watchJob } from "./watch/WatchCommandHandlers";
-import type { WatchCommandRefreshHost } from "./watch/WatchCommandTypes";
 
 export function registerWatchCommands(
   context: vscode.ExtensionContext,
   watchStore: JenkinsWatchStore,
-  refreshHost: WatchCommandRefreshHost
+  refreshHost: EnvironmentScopedRefreshHost
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -21,4 +21,4 @@ export function registerWatchCommands(
   );
 }
 
-export type { WatchCommandRefreshHost };
+export type { EnvironmentScopedRefreshHost };

@@ -1,3 +1,4 @@
+import { JenkinsRequestError } from "../errors";
 import { parseContentLength } from "../request/responses";
 import type {
   JenkinsConsoleText,
@@ -85,7 +86,10 @@ export class JenkinsBuildConsoleClient {
           bytesRead: Buffer.byteLength(tailText, "utf8")
         };
       }
-    } catch {
+    } catch (error) {
+      if (!this.isUnsupportedProgressiveHeadError(error)) {
+        throw error;
+      }
       // Fall through to consoleText for Jenkins instances that do not support HEAD.
     }
 
@@ -186,5 +190,11 @@ export class JenkinsBuildConsoleClient {
 
   private trimTailText(text: string, maxChars: number): string {
     return text.length > maxChars ? text.slice(text.length - maxChars) : text;
+  }
+
+  private isUnsupportedProgressiveHeadError(error: unknown): boolean {
+    return (
+      error instanceof JenkinsRequestError && (error.statusCode === 404 || error.statusCode === 405)
+    );
   }
 }

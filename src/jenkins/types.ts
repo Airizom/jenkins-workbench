@@ -194,6 +194,7 @@ export interface JenkinsWorkflowStep {
   startTimeMillis?: number;
   durationMillis?: number;
   pauseDurationMillis?: number;
+  execDurationMillis?: number;
   stageFlowNodes?: JenkinsWorkflowStep[];
   steps?: JenkinsWorkflowStep[];
   parallelStages?: JenkinsWorkflowStage[];

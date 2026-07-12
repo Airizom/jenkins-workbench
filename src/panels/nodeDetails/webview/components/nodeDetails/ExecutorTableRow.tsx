@@ -1,3 +1,4 @@
+import { Progress } from "../../../../shared/webview/components/ui/progress";
 import { TableCell, TableRow } from "../../../../shared/webview/components/ui/table";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
@@ -41,13 +42,13 @@ export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProp
           ) : null}
         </div>
       </TableCell>
-      <TableCell className="text-xs text-muted-foreground py-1.5 px-3">{durationLabel}</TableCell>
+      <TableCell className="hidden md:table-cell text-xs text-muted-foreground py-1.5 px-3">
+        {durationLabel}
+      </TableCell>
       <TableCell className="py-1.5 px-3">
         {progressPercent !== undefined ? (
           <div className="flex items-center gap-1.5">
-            <div className="executor-progress-track w-28">
-              <div className="executor-progress-bar" style={{ width: `${progressPercent}%` }} />
-            </div>
+            <Progress value={progressPercent} className="h-1.5 w-28" />
             <span className="text-[11px] text-muted-foreground">{progressLabel}</span>
           </div>
         ) : (

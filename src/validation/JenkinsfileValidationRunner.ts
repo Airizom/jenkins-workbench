@@ -8,6 +8,7 @@ import type {
   ValidationOutcome,
   ValidationRequestOptions
 } from "./JenkinsfileValidationCoordinatorTypes";
+import { getValidationEnvironmentIdentity } from "./JenkinsfileValidationEnvironmentIdentity";
 import type { JenkinsfileValidationOutputLogger } from "./JenkinsfileValidationOutputLogger";
 import { parseDeclarativeValidationOutput } from "./JenkinsfileValidationParser";
 import type { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
@@ -49,7 +50,10 @@ export class JenkinsfileValidationRunner {
         return canceledBeforeLookup;
       }
 
-      const environment = await this.environmentResolver.resolveForDocument(document);
+      const environment =
+        options.reason === "command"
+          ? await this.environmentResolver.resolveForDocument(document)
+          : await this.environmentResolver.resolveForDocumentSilently(document);
       const activeAfterLookup = this.getActiveOutcome(document, options, key, token, callbacks);
       if (activeAfterLookup) {
         return activeAfterLookup;
@@ -61,7 +65,7 @@ export class JenkinsfileValidationRunner {
         return { status: "completed", kind: "no-environment" };
       }
 
-      const environmentKey = buildEnvironmentKey(environment);
+      const environmentKey = getValidationEnvironmentIdentity(environment);
       if (this.stateStore.canReuseCachedResult(options, cached, hash, environmentKey)) {
         return { status: "skipped", reason: "cached" };
       }
@@ -152,13 +156,4 @@ export class JenkinsfileValidationRunner {
 
 function hashText(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-function buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
-  return [
-    environment.environmentId,
-    environment.scope,
-    environment.url,
-    environment.username ?? ""
-  ].join("|");
 }

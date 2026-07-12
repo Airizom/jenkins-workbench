@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, vi } from "vitest";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsJob } from "../src/jenkins/types";
 import { JenkinsJobStatusEvaluator } from "../src/watch/JenkinsJobStatusEvaluator";
 import type { StatusNotifier } from "../src/watch/StatusNotifier";
 import type { WatchedJobEntry } from "../src/storage/JenkinsWatchStore";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 interface PollerConstructor {
@@ -16,13 +15,10 @@ interface PollerHarness {
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
 }
 
-const { JenkinsStatusPoller } = withModuleMocks(
-  [exactModuleMock("vscode", createEventEmitterVscodeMock())],
-  () =>
-    require("../src/watch/JenkinsStatusPoller") as {
-      JenkinsStatusPoller: PollerConstructor;
-    }
-);
+vi.doMock("vscode", () => createEventEmitterVscodeMock());
+const { JenkinsStatusPoller } = (await import("../src/watch/JenkinsStatusPoller")) as unknown as {
+  JenkinsStatusPoller: PollerConstructor;
+};
 
 interface NotifierCalls {
   failures: string[];

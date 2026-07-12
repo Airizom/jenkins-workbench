@@ -75,6 +75,7 @@ export function NodeDetailsOverviewSection({
                 executors={state.executors}
                 oneOffExecutors={state.oneOffExecutors}
                 onOpenExternal={onOpenExternal}
+                onViewAll={() => onShowTab("executors")}
               />
             ) : (
               <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">

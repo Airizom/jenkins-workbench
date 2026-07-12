@@ -1,15 +1,11 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, vi } from "vitest";
 import type { CurrentBranchState } from "../src/currentBranch/CurrentBranchTypes";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 import { createThemeVscodeMock } from "./helpers/vscodeMocks";
 
-const { CurrentBranchCommandMapper } = withModuleMocks(
-  [exactModuleMock("vscode", createThemeVscodeMock())],
-  () =>
-    require("../src/currentBranch/CurrentBranchCommandMapper") as typeof import(
-      "../src/currentBranch/CurrentBranchCommandMapper"
-    )
+vi.doMock("vscode", () => createThemeVscodeMock());
+const { CurrentBranchCommandMapper } = await import(
+  "../src/currentBranch/CurrentBranchCommandMapper"
 );
 
 describe("CurrentBranchCommandMapper.getActionUnavailableMessage", () => {

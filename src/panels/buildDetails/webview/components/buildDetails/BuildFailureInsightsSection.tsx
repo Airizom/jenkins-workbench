@@ -1,5 +1,4 @@
 import { EMPTY_TEST_RESULTS_LABEL } from "../../../../shared/TestReportConstants";
-import { isAnalysisBuildResult } from "../../../../shared/webview/lib/statusStyles";
 import type {
   ArtifactAction,
   BuildFailureArtifact,
@@ -11,15 +10,11 @@ import { BuildFailureEmptyStateCard } from "./buildFailure/BuildFailureEmptyStat
 import { BuildFailureTestsSummaryCard } from "./buildFailure/BuildFailureTestsSummaryCard";
 export function BuildFailureInsightsSection({
   insights,
-  resultClass,
   onArtifactAction
 }: {
   insights: BuildFailureInsightsViewModel;
-  resultClass: string;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
-  const isFailure = isAnalysisBuildResult(resultClass);
-  const sectionTitle = isFailure ? "Failure Analysis" : "Build Summary";
   const hasChangelog = insights.changelogItems.length > 0 || insights.changelogOverflow > 0;
   const hasTests =
     Boolean(insights.testSummaryLabel) && insights.testSummaryLabel !== EMPTY_TEST_RESULTS_LABEL;
@@ -27,7 +22,8 @@ export function BuildFailureInsightsSection({
   const hasInsights = hasChangelog || hasTests || hasArtifacts;
 
   if (!hasInsights) {
-    return <BuildFailureEmptyStateCard title={sectionTitle} />;
+    // The overview heading already names this section; keep the card body-only.
+    return <BuildFailureEmptyStateCard />;
   }
 
   return (

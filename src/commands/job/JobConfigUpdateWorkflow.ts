@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { DraftEditorService } from "../../services/DraftEditorService";
 import type { JobConfigDraft, JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
-import type { JobCommandRefreshHost } from "./JobCommandTypes";
 
 type DraftMetadata = Parameters<JobConfigDraftManager["createDraft"]>[2];
 
@@ -73,7 +73,7 @@ export class JobConfigUpdateWorkflow {
     );
   }
 
-  async submitDraft(refreshHost: JobCommandRefreshHost, uri?: vscode.Uri): Promise<void> {
+  async submitDraft(refreshHost: EnvironmentScopedRefreshHost, uri?: vscode.Uri): Promise<void> {
     const resolved = await this.resolveDraftForSubmit(
       uri ?? vscode.window.activeTextEditor?.document.uri
     );

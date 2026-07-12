@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type {
   NodeCapacityExecutorViewModel,
   NodeCapacityNodeViewModel,
@@ -8,8 +8,10 @@ import type {
 } from "../src/shared/nodeCapacity/NodeCapacityContracts";
 import { createEmptyNodeCapacitySummary } from "../src/shared/nodeCapacity/NodeCapacityDefaults";
 import {
+  NODE_CAPACITY_STALE_AFTER_MS,
   type NodeCapacityState,
   buildInitialState,
+  isStaleCapacityTimestamp,
   nodeCapacityReducer
 } from "../src/panels/nodeCapacity/webview/state/nodeCapacityState";
 
@@ -228,5 +230,32 @@ describe("nodeCapacityReducer", () => {
 
     const node = findNode(refreshed, "pool:label:linux", "https://jenkins.example/computer/a/");
     assert.deepEqual(node?.executors, freshExecutors);
+  });
+});
+
+describe("isStaleCapacityTimestamp", () => {
+  const updatedAt = "2026-06-11T00:00:00.000Z";
+  const updatedAtMs = Date.parse(updatedAt);
+
+  it("is fresh while the data age is within the stale window", () => {
+    assert.equal(isStaleCapacityTimestamp(updatedAt, updatedAtMs), false);
+    assert.equal(
+      isStaleCapacityTimestamp(updatedAt, updatedAtMs + NODE_CAPACITY_STALE_AFTER_MS),
+      false
+    );
+  });
+
+  it("is stale once the data age exceeds the stale window", () => {
+    assert.equal(
+      isStaleCapacityTimestamp(updatedAt, updatedAtMs + NODE_CAPACITY_STALE_AFTER_MS + 1),
+      true
+    );
+  });
+
+  it("never marks missing, invalid, or fallback timestamps as stale", () => {
+    const now = Date.parse("2026-06-11T12:00:00.000Z");
+    assert.equal(isStaleCapacityTimestamp(undefined, now), false);
+    assert.equal(isStaleCapacityTimestamp("not-a-date", now), false);
+    assert.equal(isStaleCapacityTimestamp("1970-01-01T00:00:00.000Z", now), false);
   });
 });

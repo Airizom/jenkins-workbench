@@ -1,6 +1,7 @@
 import { resolveBuildResultLabel } from "../formatters/BuildStatusFormatters";
 import { isRunningJobColor } from "../formatters/JobColorFormatters";
-import { formatJobColor, formatRelativeTime } from "../tree/formatters";
+import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
+import { formatJobColor } from "../tree/formatters";
 import type { CurrentBranchState } from "./CurrentBranchJenkinsService";
 import type { CurrentBranchPullRequestInfo } from "./CurrentBranchTypes";
 
@@ -107,7 +108,7 @@ function formatLastBuildSummary(
   }
 
   const timeLabel =
-    typeof build.timestamp === "number" ? formatRelativeTime(build.timestamp) : undefined;
+    typeof build.timestamp === "number" ? formatRelativeTimestampMs(build.timestamp) : undefined;
   if (timeLabel) {
     parts.push(timeLabel);
   }

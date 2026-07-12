@@ -193,17 +193,16 @@ export function mapFilteredJobsToTreeItems(
   const hasPinnedJobs = pinnedJobs.size > 0;
 
   if (!hasPinnedJobs) {
-    const items: WorkbenchTreeElement[] = [];
-    for (const job of filteredJobs) {
-      items.push(
-        createJobTreeItem(
-          environment,
-          job,
-          treeFilter,
-          jobScope,
-          hasWatchedJobs && watchedJobs.has(job.url),
-          false
-        )
+    const items: WorkbenchTreeElement[] = new Array(filteredJobs.length);
+    for (let index = 0; index < filteredJobs.length; index += 1) {
+      const job = filteredJobs[index];
+      items[index] = createJobTreeItem(
+        environment,
+        job,
+        treeFilter,
+        jobScope,
+        hasWatchedJobs && watchedJobs.has(job.url),
+        false
       );
     }
 

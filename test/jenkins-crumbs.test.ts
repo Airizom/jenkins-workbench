@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { JenkinsCrumbService } from "../src/jenkins/crumbs";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 
@@ -56,6 +56,23 @@ describe("JenkinsCrumbService crumb fetch caching", () => {
     });
 
     await expectRetryAfterMissingCrumb(fixture);
+  });
+
+  it("retries after malformed successful crumb responses", async () => {
+    const { getFetchCount, service } = createCountingCrumbService((fetchCount) => {
+      if (fetchCount === 1) {
+        return { body: {} };
+      }
+      return { body: { crumbRequestField: "Jenkins-Crumb", crumb: "abc123" } };
+    });
+
+    assert.equal(await service.getCrumbHeader(), undefined);
+    assert.deepEqual(await service.getCrumbHeader(), {
+      field: "Jenkins-Crumb",
+      value: "abc123",
+      cookie: undefined
+    });
+    assert.equal(getFetchCount(), 2);
   });
 
   it("re-probes a negatively cached 404 when forced", async () => {

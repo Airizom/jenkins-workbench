@@ -17,7 +17,6 @@ import type { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBra
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
-import type { JenkinsCoverageService } from "../../jenkins/coverage/JenkinsCoverageService";
 import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/JenkinsfileIntelligenceConfigState";
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
@@ -79,7 +78,6 @@ export interface ExtensionTokenMap {
   environmentStore: JenkinsEnvironmentStore;
   browserSsoAuthenticator: BrowserSsoAuthenticationService;
   clientProvider: JenkinsClientProvider;
-  coverageService: JenkinsCoverageService;
   dataService: JenkinsDataService;
   pendingInputCoordinator: PendingInputRefreshCoordinator;
   queuedBuildWaiter: QueuedBuildWaiter;

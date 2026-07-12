@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   type CoverageStatusClass,
   coverageStatusClassToVisualTone,
@@ -8,82 +9,88 @@ import { CoverageStatusBadge } from "../../../../../shared/webview/components/Co
 import { MetricsSummarySection } from "../../../../../shared/webview/components/MetricsSummarySection";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { FileIcon } from "../../../../../shared/webview/icons";
-import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/BuildDetailsContracts";
+
+const COVERAGE_ICON = <FileIcon className="h-4 w-4" />;
+const COVERAGE_LINE_COUNT_CLASS_BY_TONE: Record<Exclude<CoverageStatusClass, "neutral">, string> = {
+  success: `font-medium ${resolveMetricToneClass(coverageStatusClassToVisualTone("success"))}`,
+  warning: `font-medium ${resolveMetricToneClass(coverageStatusClassToVisualTone("warning"))}`,
+  failure: `font-medium ${resolveMetricToneClass(coverageStatusClassToVisualTone("failure"))}`
+};
 
 export function CoverageSection({
   coverageState
 }: {
   coverageState: BuildDetailsCoverageStateViewModel;
 }) {
-  if (coverageState.status === "disabled") {
+  const {
+    status,
+    overallQualityGateStatusLabel,
+    overallQualityGateStatusClass,
+    projectCoverage,
+    modifiedFilesCoverage,
+    modifiedLinesCoverage,
+    qualityGates,
+    modifiedFiles,
+    errorMessage
+  } = coverageState;
+
+  if (status === "disabled") {
     return null;
   }
+
+  const qualityGateCount = qualityGates.length;
+  const hasQualityGates = qualityGateCount > 0;
+  const hasModifiedFiles = modifiedFiles.length > 0;
 
   return (
     <section className="space-y-3">
       <MetricsSummarySection
-        icon={<FileIcon className="h-4 w-4" />}
+        icon={COVERAGE_ICON}
         title="Coverage"
         badge={
-          coverageState.overallQualityGateStatusLabel ? (
+          overallQualityGateStatusLabel ? (
             <CoverageStatusBadge
-              label={coverageState.overallQualityGateStatusLabel}
-              statusClass={coverageState.overallQualityGateStatusClass}
+              label={overallQualityGateStatusLabel}
+              statusClass={overallQualityGateStatusClass}
             />
           ) : undefined
         }
         description="Coverage plugin summary for this completed build."
         metrics={
           <>
-            <ToneMetricCard
-              label="Project"
-              value={coverageState.projectCoverage}
-              tone={coverageStatusClassToVisualTone("success")}
-            />
-            <ToneMetricCard
-              label="Modified Files"
-              value={coverageState.modifiedFilesCoverage}
-              tone={coverageStatusClassToVisualTone("success")}
-            />
-            <ToneMetricCard
-              label="Modified Lines"
-              value={coverageState.modifiedLinesCoverage}
-              tone={coverageStatusClassToVisualTone("success")}
-            />
+            <ToneMetricCard label="Project" value={projectCoverage} tone="neutral" />
+            <ToneMetricCard label="Modified Files" value={modifiedFilesCoverage} tone="neutral" />
+            <ToneMetricCard label="Modified Lines" value={modifiedLinesCoverage} tone="neutral" />
             <ToneMetricCard
               label="Quality Gates"
-              value={
-                coverageState.qualityGates.length > 0
-                  ? String(coverageState.qualityGates.length)
-                  : undefined
-              }
+              value={hasQualityGates ? String(qualityGateCount) : undefined}
               tone={coverageStatusClassToVisualTone(
-                resolveCoverageStatusClass(coverageState.overallQualityGateStatusClass)
+                resolveCoverageStatusClass(overallQualityGateStatusClass)
               )}
             />
           </>
         }
         footer={
-          coverageState.status === "loading" || coverageState.status === "idle" ? (
+          status === "loading" || status === "idle" ? (
             <div className="rounded border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
               Loading coverage results for this build.
             </div>
-          ) : coverageState.status === "error" ? (
+          ) : status === "error" ? (
             <div className="rounded border border-failure-border-subtle bg-background px-3 py-2 text-sm text-muted-foreground">
               Coverage data could not be loaded for this build.
-              {coverageState.errorMessage ? ` ${coverageState.errorMessage}` : ""}
+              {errorMessage ? ` ${errorMessage}` : ""}
             </div>
-          ) : coverageState.status === "unavailable" ? (
+          ) : status === "unavailable" ? (
             <div className="rounded border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
               Coverage data is unavailable for this build. The coverage plugin or report may be
               missing.
             </div>
           ) : (
             <>
-              {coverageState.qualityGates.length > 0 ? (
+              {hasQualityGates ? (
                 <div className="flex flex-wrap gap-2">
-                  {coverageState.qualityGates.map((qualityGate) => (
+                  {qualityGates.map((qualityGate) => (
                     <div
                       key={`${qualityGate.name}:${qualityGate.statusLabel}`}
                       className="rounded border border-border bg-background px-3 py-2 text-xs"
@@ -106,13 +113,13 @@ export function CoverageSection({
                 </div>
               ) : null}
 
-              {coverageState.modifiedFiles.length > 0 ? (
+              {hasModifiedFiles ? (
                 <div className="rounded border border-border bg-background">
                   <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Modified Files
                   </div>
                   <div className="divide-y divide-border">
-                    {coverageState.modifiedFiles.map((file) => (
+                    {modifiedFiles.map((file) => (
                       <div
                         key={file.path}
                         className="grid gap-2 px-3 py-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
@@ -147,7 +154,7 @@ export function CoverageSection({
   );
 }
 
-function CoverageLineCount({
+const CoverageLineCount = memo(function CoverageLineCount({
   label,
   value,
   tone
@@ -158,12 +165,8 @@ function CoverageLineCount({
 }) {
   return (
     <div className="text-xs text-muted-foreground">
-      <span
-        className={cn("font-medium", resolveMetricToneClass(coverageStatusClassToVisualTone(tone)))}
-      >
-        {value.toLocaleString()}
-      </span>{" "}
+      <span className={COVERAGE_LINE_COUNT_CLASS_BY_TONE[tone]}>{value.toLocaleString()}</span>{" "}
       {label}
     </div>
   );
-}
+});

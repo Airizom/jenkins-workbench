@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { NodeExecutorViewModel } from "../src/panels/nodeDetails/shared/NodeDetailsContracts";
 import {
   summarizeExecutorUtilization,
@@ -71,7 +71,7 @@ describe("utilizationLevel", () => {
     assert.equal(utilizationLevel(0.49), "low");
     assert.equal(utilizationLevel(0.5), "medium");
     assert.equal(utilizationLevel(0.89), "medium");
-    assert.equal(utilizationLevel(0.9), "high");
-    assert.equal(utilizationLevel(1), "high");
+    assert.equal(utilizationLevel(0.9), "saturated");
+    assert.equal(utilizationLevel(1), "saturated");
   });
 });

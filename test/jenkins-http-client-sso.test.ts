@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
-import { describe, it } from "node:test";
+import { describe, it, vi } from "vitest";
 import { JenkinsBuildConsoleClient } from "../src/jenkins/client/JenkinsBuildConsoleClient";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsStreamResponse } from "../src/jenkins/request";
 import type { JenkinsAuthConfig } from "../src/jenkins/types";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 
 interface RequestAttempt {
   url: string;
@@ -25,7 +24,7 @@ const requestMock = {
     options?: { headers?: Record<string, string> }
   ): Promise<JenkinsStreamResponse> => {
     streamAttempts.push({ url, headers: options?.headers });
-    if (streamAttempts.length === 1) {
+    if (options?.headers?.Cookie === "session=stale") {
       throw new JenkinsRequestError(
         "Jenkins API request failed (403 Forbidden)",
         403,
@@ -44,59 +43,97 @@ const requestMock = {
   }
 };
 
-const { JenkinsHttpClient } = withModuleMocks(
-  [exactModuleMock("../request", requestMock)],
-  () =>
-    require("../src/jenkins/client/JenkinsHttpClient") as typeof import(
-      "../src/jenkins/client/JenkinsHttpClient"
-    )
-);
+vi.doMock("../src/jenkins/request", () => requestMock);
+const { JenkinsHttpClient } = await import("../src/jenkins/client/JenkinsHttpClient");
 
 describe("JenkinsHttpClient SSO stream retry", () => {
   it("refreshes stale SSO auth before returning console text head streams", async () => {
-    streamAttempts = [];
-    streamBody = "console-head-ok";
-    streamHeaders = { "content-length": Buffer.byteLength(streamBody).toString() };
-    const consoleClient = new JenkinsBuildConsoleClient(
-      createSsoHttpClient("https://jenkins.example.com/", "session=stale")
-    );
-
-    const result = await consoleClient.getConsoleTextHead(
-      "https://jenkins.example.com/job/example/1/",
-      100
+    const result = await runSsoStreamRetry("console-head-ok", (consoleClient) =>
+      consoleClient.getConsoleTextHead("https://jenkins.example.com/job/example/1/", 100)
     );
 
     assert.equal(result.text, "console-head-ok");
-    assert.equal(streamAttempts.length, 2);
-    assert.equal(streamAttempts[0].headers?.Cookie, "session=stale");
-    assert.equal(streamAttempts[1].headers?.Cookie, "session=fresh");
   });
 
   it("refreshes stale SSO auth before returning progressive console streams", async () => {
-    streamAttempts = [];
-    streamBody = "progressive-ok";
-    streamHeaders = {
-      "content-length": Buffer.byteLength(streamBody).toString(),
-      "x-more-data": "false",
-      "x-text-size": Buffer.byteLength(streamBody).toString()
-    };
-    const consoleClient = new JenkinsBuildConsoleClient(
-      createSsoHttpClient("https://jenkins.example.com/", "session=stale")
-    );
-
-    const result = await consoleClient.getConsoleTextProgressive(
-      "https://jenkins.example.com/job/example/1/",
-      0,
-      100
+    const result = await runSsoStreamRetry(
+      "progressive-ok",
+      (consoleClient) =>
+        consoleClient.getConsoleTextProgressive(
+          "https://jenkins.example.com/job/example/1/",
+          0,
+          100
+        ),
+      { "x-more-data": "false", "x-text-size": Buffer.byteLength("progressive-ok").toString() }
     );
 
     assert.equal(result.text, "progressive-ok");
     assert.equal(result.moreData, false);
-    assert.equal(streamAttempts.length, 2);
-    assert.equal(streamAttempts[0].headers?.Cookie, "session=stale");
-    assert.equal(streamAttempts[1].headers?.Cookie, "session=fresh");
+  });
+
+  it("coalesces concurrent SSO refreshes and retries with the same credentials", async () => {
+    streamAttempts = [];
+    streamBody = "ok";
+    streamHeaders = {};
+    let resolveRefresh: ((authConfig: JenkinsAuthConfig) => void) | undefined;
+    const refreshAuthConfig = vi.fn(
+      () =>
+        new Promise<JenkinsAuthConfig>((resolve) => {
+          resolveRefresh = resolve;
+        })
+    );
+    const baseUrl = "https://jenkins.example.com/";
+    const client = new JenkinsHttpClient({
+      baseUrl,
+      authConfig: {
+        type: "sso",
+        loginUrl: new URL("__sso/login", baseUrl).toString(),
+        headers: { Cookie: "session=stale" }
+      },
+      refreshAuthConfig
+    });
+
+    const requests = [
+      client.requestStream(`${baseUrl}first`),
+      client.requestStream(`${baseUrl}second`)
+    ];
+    await vi.waitFor(() => assert.equal(refreshAuthConfig.mock.calls.length, 1));
+    resolveRefresh?.({
+      type: "sso",
+      loginUrl: new URL("__sso/login", baseUrl).toString(),
+      headers: { Cookie: "session=fresh" }
+    });
+    await Promise.all(requests);
+
+    assert.equal(refreshAuthConfig.mock.calls.length, 1);
+    assert.deepEqual(
+      streamAttempts.map((attempt) => attempt.headers?.Cookie),
+      ["session=stale", "session=stale", "session=fresh", "session=fresh"]
+    );
   });
 });
+
+async function runSsoStreamRetry<T>(
+  body: string,
+  readStream: (consoleClient: JenkinsBuildConsoleClient) => Promise<T>,
+  headers: Record<string, string> = {}
+): Promise<T> {
+  streamAttempts = [];
+  streamBody = body;
+  streamHeaders = {
+    "content-length": Buffer.byteLength(streamBody).toString(),
+    ...headers
+  };
+  const consoleClient = new JenkinsBuildConsoleClient(
+    createSsoHttpClient("https://jenkins.example.com/", "session=stale")
+  );
+
+  const result = await readStream(consoleClient);
+  assert.equal(streamAttempts.length, 2);
+  assert.equal(streamAttempts[0].headers?.Cookie, "session=stale");
+  assert.equal(streamAttempts[1].headers?.Cookie, "session=fresh");
+  return result;
+}
 
 function createSsoHttpClient(
   baseUrl: string,

@@ -6,6 +6,7 @@ import type {
 } from "./TestSourceFileMatchStrategy";
 
 const TEST_SOURCE_MATCHING_CONFIG_SECTION = "jenkinsWorkbench.buildDetails.testSourceMatching";
+const MAX_RESULTS_PER_PATTERN = 100;
 
 export interface TestSourceFileMatchConfig {
   getOptions(): Required<TestSourceFileMatchStrategyOptions>;
@@ -22,11 +23,11 @@ export class WorkspaceTestSourceFileMatchConfig implements TestSourceFileMatchCo
         EMPTY_STRING_ARRAY
       ),
       excludeGlob: readRequiredSetting(configuration, "excludeGlob", readOptionalString, ""),
-      maxResultsPerPattern: readRequiredSetting(
+      maxResultsPerPattern: readBoundedIntegerSetting(
         configuration,
         "maxResultsPerPattern",
-        readOptionalNumber,
-        1
+        1,
+        MAX_RESULTS_PER_PATTERN
       ),
       preferredPathScores: readRequiredSetting(
         configuration,
@@ -72,6 +73,16 @@ function readRequiredSetting<TValue>(
   }
   const defaultValue = reader(configuration.inspect(key)?.defaultValue);
   return typeof defaultValue !== "undefined" ? defaultValue : fallback;
+}
+
+function readBoundedIntegerSetting(
+  configuration: vscode.WorkspaceConfiguration,
+  key: string,
+  minimum: number,
+  maximum: number
+): number {
+  const value = readRequiredSetting(configuration, key, readOptionalNumber, minimum);
+  return Math.min(maximum, Math.max(minimum, Math.floor(value)));
 }
 
 function readPathPreferences(value: unknown): TestSourcePathPreference[] | undefined {

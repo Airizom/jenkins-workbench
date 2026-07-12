@@ -1,14 +1,18 @@
 export {
+  ArrowDownIcon,
   ArrowUpIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
   CheckIcon,
   CopyIcon,
   DownloadIcon,
   EyeIcon,
   ExternalLinkIcon,
   PlayIcon,
+  PlusIcon,
   RefreshIcon,
   LaunchIcon,
+  MinusIcon,
   SearchIcon,
   XIcon
 } from "./actionIcons";

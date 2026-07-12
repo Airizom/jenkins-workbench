@@ -239,6 +239,13 @@ export class BuildDetailsPanel {
       onExportConsole: () => {
         void this.actions.handleExportConsole();
       },
+      onRefreshBuildDetails: () => {
+        const details = this.controller.getCurrentDetails();
+        void this.controller.refreshBuildDetails({
+          label: details?.fullDisplayName ?? details?.displayName,
+          panelState: this.serializedState
+        });
+      },
       onApproveInput: (message) => {
         void this.actions.handleApproveInput(message);
       },

@@ -1,10 +1,3 @@
-type JobNameValidationError =
-  | "empty"
-  | "whitespace"
-  | "invalid_chars"
-  | "control_chars"
-  | "reserved_name";
-
 const JENKINS_INVALID_JOB_NAME_CHARACTERS = "?*/\\%!@#$^&|<>[]:;";
 
 function containsControlCharacters(value: string): boolean {
@@ -26,47 +19,27 @@ function containsJenkinsInvalidNameCharacter(value: string): boolean {
   return false;
 }
 
-function validateJobName(name: string): JobNameValidationError | undefined {
+export function getJobNameValidationError(name: string): string | undefined {
   if (!name || name.trim().length === 0) {
-    return "empty";
+    return "Name cannot be empty.";
   }
 
   const trimmed = name.trim();
   if (trimmed !== name) {
-    return "whitespace";
+    return "Name cannot have leading or trailing whitespace.";
   }
 
   if (containsJenkinsInvalidNameCharacter(name)) {
-    return "invalid_chars";
+    return `Name contains invalid characters (${JENKINS_INVALID_JOB_NAME_CHARACTERS} are not allowed).`;
   }
 
   if (containsControlCharacters(name)) {
-    return "control_chars";
+    return "Name cannot contain control characters.";
   }
 
   if (name === "." || name === "..") {
-    return "reserved_name";
+    return 'Name cannot be "." or "..".';
   }
 
   return undefined;
-}
-
-function formatJobNameValidationError(error: JobNameValidationError): string {
-  switch (error) {
-    case "empty":
-      return "Name cannot be empty.";
-    case "whitespace":
-      return "Name cannot have leading or trailing whitespace.";
-    case "invalid_chars":
-      return `Name contains invalid characters (${JENKINS_INVALID_JOB_NAME_CHARACTERS} are not allowed).`;
-    case "control_chars":
-      return "Name cannot contain control characters.";
-    case "reserved_name":
-      return 'Name cannot be "." or "..".';
-  }
-}
-
-export function getJobNameValidationError(name: string): string | undefined {
-  const error = validateJobName(name);
-  return error ? formatJobNameValidationError(error) : undefined;
 }

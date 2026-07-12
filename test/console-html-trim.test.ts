@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { ConsoleHtmlModel } from "../src/panels/buildDetails/webview/lib/consoleHtml";
 import { trimConsoleHtmlModelToTail } from "../src/panels/buildDetails/webview/lib/consoleHtml";
 

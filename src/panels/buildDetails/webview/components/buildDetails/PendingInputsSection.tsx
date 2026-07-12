@@ -1,9 +1,15 @@
 import * as React from "react";
+import { ResultBadge } from "../../../../shared/webview/components/ResultBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
-import { AlertCircleIcon, CheckIcon, UserIcon, XIcon } from "../../../../shared/webview/icons";
+import {
+  AlertCircleIcon,
+  CheckIcon,
+  RefreshIcon,
+  UserIcon,
+  XIcon
+} from "../../../../shared/webview/icons";
 import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
-import { StatusPill } from "./StatusPill";
 
 const { useEffect, useRef, useState } = React;
 
@@ -110,18 +116,18 @@ export function PendingInputsSection({
                 </span>
               ) : null}
             </div>
-            <StatusPill label="Pending" status="running" className="text-[10px] shrink-0" />
+            <ResultBadge label="Pending" status="running" className="text-[11px] shrink-0" />
           </div>
 
           <div className="flex items-center justify-between gap-2 px-3 py-2 bg-card">
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
               {input.parameters.length > 0 ? (
                 <>
                   {input.parameters.map((param) => (
                     <Badge
                       key={`${input.id}-${param.name}`}
                       variant="secondary"
-                      className="font-mono text-[10px] px-1.5 py-0"
+                      className="font-mono text-[11px] px-1.5 py-0"
                     >
                       {param.name}
                     </Badge>
@@ -147,8 +153,17 @@ export function PendingInputsSection({
                 className="gap-1 h-6 px-2 text-[11px]"
                 disabled={Boolean(processingIds[input.id])}
               >
-                <CheckIcon className="h-4 w-4" />
-                {processingActions[input.id] === "approve" ? "..." : "Approve"}
+                {processingActions[input.id] === "approve" ? (
+                  <>
+                    <RefreshIcon className="h-4 w-4 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="h-4 w-4" />
+                    Approve
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -163,8 +178,17 @@ export function PendingInputsSection({
                 className="gap-1 h-6 px-2 text-[11px]"
                 disabled={Boolean(processingIds[input.id])}
               >
-                <XIcon className="h-4 w-4" />
-                {processingActions[input.id] === "reject" ? "..." : "Reject"}
+                {processingActions[input.id] === "reject" ? (
+                  <>
+                    <RefreshIcon className="h-4 w-4 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>
+                    <XIcon className="h-4 w-4" />
+                    Reject
+                  </>
+                )}
               </Button>
             </div>
           </div>

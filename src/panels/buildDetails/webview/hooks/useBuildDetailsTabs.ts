@@ -1,8 +1,13 @@
 import * as React from "react";
+import type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState";
+import {
+  getBuildDetailsPanelUiState,
+  setBuildDetailsPanelUiState
+} from "../lib/buildDetailsPanelState";
 
-const { useEffect, useMemo, useState } = React;
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
-export type BuildDetailsTab = "overview" | "inputs" | "pipeline" | "console" | "tests";
+export type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState";
 
 type UseBuildDetailsTabsParams = {
   hasPendingInputs: boolean;
@@ -41,10 +46,20 @@ export function useBuildDetailsTabs({
     return tabs;
   }, [hasPendingInputs, hasPipelineStages, hasTests]);
 
-  const [selectedTab, setSelectedTab] = useState<BuildDetailsTab>(defaultTab);
+  const [selectedTab, setSelectedTabState] = useState<BuildDetailsTab>(
+    () => getBuildDetailsPanelUiState().selectedTab ?? defaultTab
+  );
+  const selectedTabWasAvailable = useRef(availableTabs.includes(selectedTab));
+  const setSelectedTab = useCallback((tab: BuildDetailsTab) => {
+    selectedTabWasAvailable.current = true;
+    setSelectedTabState(tab);
+    setBuildDetailsPanelUiState({ selectedTab: tab });
+  }, []);
 
   useEffect(() => {
-    if (!availableTabs.includes(selectedTab)) {
+    if (availableTabs.includes(selectedTab)) {
+      selectedTabWasAvailable.current = true;
+    } else if (selectedTabWasAvailable.current) {
       setSelectedTab(defaultTab);
     }
   }, [availableTabs, defaultTab, selectedTab, setSelectedTab]);

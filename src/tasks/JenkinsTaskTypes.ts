@@ -10,7 +10,7 @@ export type JenkinsTaskParameters = Record<string, JenkinsTaskParameterValues>;
 
 export interface JenkinsTaskParameterEntry {
   name: string;
-  value: JenkinsTaskParameterValue;
+  value: JenkinsTaskParameterValues;
 }
 
 export type JenkinsTaskRawParameters = JenkinsTaskParameters | JenkinsTaskParameterEntry[];
@@ -173,7 +173,14 @@ export function parseTaskParameters(parameters: unknown): TaskParametersResult {
         invalidKeys.add("parameters");
         continue;
       }
-      appendValue(name, record.value);
+      const { value } = record;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          appendValue(name, item);
+        }
+      } else {
+        appendValue(name, value);
+      }
     }
   } else if (typeof parameters === "object") {
     for (const [key, value] of Object.entries(parameters as Record<string, unknown>)) {
@@ -207,7 +214,7 @@ export function parseTaskParameters(parameters: unknown): TaskParametersResult {
   return { params: hasParams ? params : undefined, allowEmptyParams: true };
 }
 
-function normalizeOptionalString(value: unknown): string | undefined {
+export function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
   }

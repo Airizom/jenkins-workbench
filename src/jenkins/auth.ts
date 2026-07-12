@@ -32,7 +32,7 @@ export function parseHeadersJson(input: string): {
   }
 
   const candidate = parsed as Record<string, unknown>;
-  const rawHeaders: Record<string, string> = {};
+  const headers: Record<string, string> = {};
   for (const [rawKey, rawValue] of Object.entries(candidate)) {
     if (typeof rawValue !== "string") {
       return { error: `Header "${rawKey}" must be a string.` };
@@ -45,11 +45,10 @@ export function parseHeadersJson(input: string): {
     if (trimmedValue.length === 0) {
       return { error: `Header "${trimmedKey}" cannot be empty.` };
     }
-    rawHeaders[trimmedKey] = trimmedValue;
+    headers[trimmedKey] = trimmedValue;
   }
 
-  const headers = normalizeHeaders(rawHeaders);
-  if (Object.keys(headers).length === 0) {
+  if (!hasOwnEntries(headers)) {
     return { error: "Provide at least one header." };
   }
 
@@ -100,8 +99,7 @@ export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
       if (!stringHeaders) {
         return undefined;
       }
-      const headers = normalizeHeaders(stringHeaders);
-      return Object.keys(headers).length > 0 ? { type: "headers", headers } : undefined;
+      return hasOwnEntries(stringHeaders) ? { type: "headers", headers: stringHeaders } : undefined;
     }
     case "sso": {
       if (typeof record.loginUrl !== "string") {
@@ -118,7 +116,7 @@ export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
         if (!stringHeaders) {
           return undefined;
         }
-        headers = normalizeHeaders(stringHeaders);
+        headers = stringHeaders;
       }
 
       const expiresAt = typeof record.expiresAt === "number" ? record.expiresAt : undefined;
@@ -143,7 +141,7 @@ function parseStoredStringHeaders(value: unknown): Record<string, string> | unde
     if (typeof headerValue !== "string") {
       return undefined;
     }
-    stringHeaders[key] = headerValue;
+    setNormalizedHeader(stringHeaders, key, headerValue);
   }
   return stringHeaders;
 }
@@ -230,12 +228,7 @@ function buildHeadersFromConfig(authConfig: JenkinsAuthConfig): JenkinsAuthHeade
 function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
   const normalized: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    const trimmedKey = key.trim();
-    const trimmedValue = value.trim();
-    if (trimmedKey.length === 0 || trimmedValue.length === 0) {
-      continue;
-    }
-    normalized[trimmedKey] = trimmedValue;
+    setNormalizedHeader(normalized, key, value);
   }
   return normalized;
 }
@@ -244,18 +237,41 @@ export function normalizeUnknownHeaders(raw: Record<string, unknown>): Record<st
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === "string") {
-      headers[key] = value;
+      setNormalizedHeader(headers, key, value);
     }
   }
-  return normalizeHeaders(headers);
+  return headers;
 }
 
 function stableHeadersSignature(headers: Record<string, string>): string {
   const normalized = normalizeHeaders(headers);
-  const entries = Object.entries(normalized).sort(([a], [b]) => a.localeCompare(b));
+  const entries = Object.entries(normalized);
+  if (entries.length === 0) {
+    return "{}";
+  }
+
+  entries.sort(([a], [b]) => a.localeCompare(b));
   const stable: Record<string, string> = {};
   for (const [key, value] of entries) {
     stable[key] = value;
   }
   return JSON.stringify(stable);
+}
+
+function setNormalizedHeader(target: Record<string, string>, key: string, value: string): void {
+  const trimmedKey = key.trim();
+  const trimmedValue = value.trim();
+  if (trimmedKey.length === 0 || trimmedValue.length === 0) {
+    return;
+  }
+  target[trimmedKey] = trimmedValue;
+}
+
+function hasOwnEntries(record: Record<string, string>): boolean {
+  for (const key in record) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      return true;
+    }
+  }
+  return false;
 }

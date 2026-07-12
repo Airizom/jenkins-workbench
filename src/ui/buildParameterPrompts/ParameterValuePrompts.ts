@@ -8,6 +8,7 @@ import type {
   BuildParameterPromptValues,
   ParameterValue
 } from "./BuildParameterPromptTypes";
+import { isSensitiveParameter } from "./ParameterSensitivity";
 import { resolveMultiDefaultValue, resolveSingleDefaultValue } from "./ParameterValueDefaults";
 import { fetchRunBuildChoices } from "./RunParameterLookup";
 
@@ -152,13 +153,6 @@ async function promptForSensitiveParameter(
     ignoreFocusOut: true,
     value: resolveSingleDefaultValue(presetValue, parameter.defaultValue)
   });
-}
-
-function isSensitiveParameter(parameter: JobParameter): boolean {
-  if (parameter.isSensitive) {
-    return true;
-  }
-  return parameter.kind === "password" || parameter.kind === "credentials";
 }
 
 async function promptForRunParameter(

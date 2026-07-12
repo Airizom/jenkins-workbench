@@ -12,10 +12,8 @@ import {
   resolveJobColorIconId,
   resolveJobColorStatus
 } from "../formatters/JobColorFormatters";
-import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
 import { normalizeStatusToken } from "../formatters/StatusTokenUtils";
-import type { JenkinsBuild, JenkinsNode } from "../jenkins/JenkinsClient";
-import { formatNodeTreeDescription } from "../jenkins/NodeFormatters";
+import type { JenkinsBuild } from "../jenkins/JenkinsClient";
 import { parseJobUrl } from "../jenkins/urls";
 import { clampPercent } from "../shared/numbers";
 import { resolveBuildElapsedMs } from "./BuildTiming";
@@ -34,7 +32,7 @@ const STATUS_THEME_COLORS: Record<NormalizedStatus, vscode.ThemeColor> = {
 };
 
 export function formatJobColor(color?: string): string | undefined {
-  const status = resolveJobStatus(color);
+  const status = resolveJobColorStatus(color);
   if (!status) {
     return undefined;
   }
@@ -70,14 +68,6 @@ export function formatBuildDescription(build: JenkinsBuild, awaitingInput = fals
   return durationLabel ? `${status} • ${durationLabel}` : status;
 }
 
-export function formatRelativeTime(timestampMs: number): string | undefined {
-  return formatRelativeTimestampMs(timestampMs);
-}
-
-export function formatNodeDescription(node: JenkinsNode): string {
-  return formatNodeTreeDescription(node);
-}
-
 export function buildIcon(build: JenkinsBuild, awaitingInput = false): vscode.ThemeIcon {
   if (awaitingInput) {
     return new vscode.ThemeIcon("debug-pause", STATUS_THEME_COLORS.running);
@@ -86,12 +76,12 @@ export function buildIcon(build: JenkinsBuild, awaitingInput = false): vscode.Th
   if (status === "running") {
     return new vscode.ThemeIcon("sync~spin", STATUS_THEME_COLORS.running);
   }
-  return new vscode.ThemeIcon(buildIconId(status), STATUS_THEME_COLORS[status]);
+  return new vscode.ThemeIcon(resolveJobColorIconId(status), STATUS_THEME_COLORS[status]);
 }
 
 export function jobIcon(kind: "job" | "pipeline", color?: string): vscode.ThemeIcon {
   const iconId = kind === "pipeline" ? "symbol-structure" : "gear";
-  const status = resolveJobStatus(color);
+  const status = resolveJobColorStatus(color);
   return new vscode.ThemeIcon(iconId, status ? STATUS_THEME_COLORS[status] : undefined);
 }
 
@@ -194,15 +184,7 @@ function mapBuildResultClassToTreeStatus(
   }
 }
 
-function buildIconId(status: NormalizedStatus): string {
-  return resolveJobColorIconId(status);
-}
-
 export { isJobColorDisabled };
-
-function resolveJobStatus(color?: string): NormalizedStatus | undefined {
-  return resolveJobColorStatus(color);
-}
 
 function formatDurationLabel(durationMs?: number): string | undefined {
   if (!Number.isFinite(durationMs)) {

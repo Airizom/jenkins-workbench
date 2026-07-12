@@ -272,7 +272,7 @@ function buildElementAttributes(element: HTMLElement, tag: string): Record<strin
   const attrs: Record<string, string> = {};
   if (tag === "a") {
     const href = element.getAttribute("href") ?? "";
-    const safeHref = sanitizeUrl(href);
+    const safeHref = sanitizeConsoleExternalUrl(href);
     if (safeHref) {
       attrs.href = safeHref;
       attrs["data-external-url"] = safeHref;
@@ -292,12 +292,12 @@ function buildElementAttributes(element: HTMLElement, tag: string): Record<strin
   return attrs;
 }
 
-function sanitizeUrl(value: string): string | undefined {
+export function sanitizeConsoleExternalUrl(value: string): string | undefined {
   if (!value) {
     return undefined;
   }
   try {
-    const parsed = new URL(value, window.location.href);
+    const parsed = new URL(value);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return undefined;
     }

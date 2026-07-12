@@ -53,16 +53,18 @@ export class TreeEnvironmentChildrenLoader {
       element.scope,
       element.environmentId
     );
-    return [
-      ...(pinnedEntries.length > 0
-        ? [new PinnedJobsFolderTreeItem(element, pinnedEntries.length)]
-        : []),
+    const items: WorkbenchTreeElement[] = [];
+    if (pinnedEntries.length > 0) {
+      items.push(new PinnedJobsFolderTreeItem(element, pinnedEntries.length));
+    }
+    items.push(
       new ActivityFolderTreeItem(element, this.getActivitySummary(element)),
       new ViewsFolderTreeItem(element),
       new JobsFolderTreeItem(element, summary?.jobs),
       new BuildQueueFolderTreeItem(element, summary?.queue),
       new NodesFolderTreeItem(element, summary?.nodes)
-    ];
+    );
+    return items;
   }
 
   async loadViewsForEnvironment(

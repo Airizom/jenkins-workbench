@@ -26,17 +26,61 @@ type CurrentBranchActionPick = vscode.QuickPickItem & {
   action: CurrentBranchAction;
 };
 
-function createActionPick(label: string, action: CurrentBranchAction): CurrentBranchActionPick {
-  return { label, action };
+const FORCE_REFRESH_OPTIONS = { force: true };
+
+const COMMON_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
+  { label: "Refresh Current Branch Status", action: "refresh" },
+  { label: "Relink Repository", action: "relink" },
+  { label: "Unlink Repository", action: "unlink" }
+];
+
+const MATCHED_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
+  { label: "Open Current Jenkins Job", action: "openBranch" },
+  { label: "Trigger Current Jenkins Build", action: "triggerBuild" },
+  { label: "Open Last Failed Build", action: "openLastFailed" },
+  ...COMMON_ACTION_PICKS
+];
+
+const MATCHED_WITH_LATEST_BUILD_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
+  { label: "Open Current Jenkins Job", action: "openBranch" },
+  { label: "Trigger Current Jenkins Build", action: "triggerBuild" },
+  { label: "Open Latest Build Details", action: "openLatestBuild" },
+  { label: "Open Last Failed Build", action: "openLastFailed" },
+  ...COMMON_ACTION_PICKS
+];
+
+const BRANCH_MISSING_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
+  { label: "Open Linked Multibranch in Jenkins", action: "openMultibranch" },
+  { label: "Scan Linked Multibranch Now", action: "scanMultibranch" },
+  ...COMMON_ACTION_PICKS
+];
+
+interface CurrentBranchActionContext {
+  workflowService: CurrentBranchWorkflowService;
+  state: CurrentBranchState;
+  extensionUri: vscode.Uri;
 }
 
-function createCommonActionPicks(): CurrentBranchActionPick[] {
-  return [
-    createActionPick("Refresh Current Branch Status", "refresh"),
-    createActionPick("Relink Repository", "relink"),
-    createActionPick("Unlink Repository", "unlink")
-  ];
-}
+const CURRENT_BRANCH_ACTION_RUNNERS: Record<
+  CurrentBranchAction,
+  (context: CurrentBranchActionContext) => Promise<void>
+> = {
+  openBranch: ({ workflowService, state }) =>
+    openRequest(workflowService.getOpenBranchRequest(state)),
+  openMultibranch: ({ workflowService, state }) =>
+    openRequest(workflowService.getOpenMultibranchRequest(state)),
+  triggerBuild: ({ workflowService, state }) => workflowService.triggerCurrentBranchBuild(state),
+  openLatestBuild: ({ workflowService, state, extensionUri }) =>
+    workflowService.openLatestBuild(state, extensionUri),
+  openLastFailed: ({ workflowService, state, extensionUri }) =>
+    workflowService.openLastFailedBuild(state, extensionUri),
+  scanMultibranch: ({ workflowService, state }) => scanLinkedMultibranch(workflowService, state),
+  refresh: async ({ workflowService }) => {
+    await workflowService.refreshCurrentBranchStatus(FORCE_REFRESH_OPTIONS);
+  },
+  relink: ({ workflowService }) => linkCurrentRepository(workflowService),
+  unlink: ({ workflowService }) => unlinkCurrentRepository(workflowService)
+};
 
 export function registerCurrentBranchCommands(
   context: vscode.ExtensionContext,
@@ -102,8 +146,8 @@ async function linkRepositoryHere(
     return;
   }
 
-  const multibranchLabel = getItemLabel(item, "Multibranch");
-  const itemLabel = getItemLabel(item, "that multibranch");
+  const itemLabel = getItemLabel(item);
+  const multibranchLabel = itemLabel ?? "Multibranch";
   await workflowService.linkRepository(repository, {
     environment: item.environment,
     environmentUrl: item.environment.url,
@@ -111,7 +155,7 @@ async function linkRepositoryHere(
     multibranchLabel
   });
   void vscode.window.showInformationMessage(
-    `Linked ${repository.repositoryLabel} to ${itemLabel}.`
+    `Linked ${repository.repositoryLabel} to ${itemLabel ?? "that multibranch"}.`
   );
 }
 
@@ -187,40 +231,7 @@ async function showCurrentBranchActions(
     return;
   }
 
-  switch (pick.action) {
-    case "openBranch":
-      await openRequest(workflowService.getOpenBranchRequest(state));
-      return;
-    case "openMultibranch":
-      await openRequest(workflowService.getOpenMultibranchRequest(state));
-      return;
-    case "triggerBuild": {
-      await workflowService.triggerCurrentBranchBuild(state);
-      return;
-    }
-    case "openLatestBuild": {
-      await workflowService.openLatestBuild(state, extensionUri);
-      return;
-    }
-    case "openLastFailed": {
-      await workflowService.openLastFailedBuild(state, extensionUri);
-      return;
-    }
-    case "scanMultibranch":
-      await scanLinkedMultibranch(workflowService, state);
-      return;
-    case "refresh":
-      await workflowService.refreshCurrentBranchStatus({ force: true });
-      return;
-    case "relink":
-      await linkCurrentRepository(workflowService);
-      return;
-    case "unlink":
-      await unlinkCurrentRepository(workflowService);
-      return;
-    default:
-      return;
-  }
+  await CURRENT_BRANCH_ACTION_RUNNERS[pick.action]({ workflowService, state, extensionUri });
 }
 
 async function openCurrentBranchInJenkins(
@@ -273,7 +284,7 @@ async function pickMultibranchTarget(
       title: `Loading Jenkins multibranch pipelines from ${selectedEnvironment.environment.scope}/${selectedEnvironment.environment.environmentId}`,
       cancellable: false
     },
-    async () => workflowService.discoverMultibranchTargets(selectedEnvironment.environment)
+    () => workflowService.discoverMultibranchTargets(selectedEnvironment.environment)
   );
 
   if (result.kind === "failed") {
@@ -330,7 +341,7 @@ async function pickLinkableEnvironment(
 async function resolveCurrentBranchState(
   workflowService: CurrentBranchWorkflowService
 ): Promise<CurrentBranchState | undefined> {
-  const result = await workflowService.resolveCurrentBranchState({ force: true });
+  const result = await workflowService.resolveCurrentBranchState(FORCE_REFRESH_OPTIONS);
   if (result.kind === "ambiguousRepository") {
     const repository = await pickRepository(
       workflowService,
@@ -340,7 +351,10 @@ async function resolveCurrentBranchState(
       return undefined;
     }
     return unwrapResolvedState(
-      await workflowService.resolveCurrentBranchStateForRepository(repository, { force: true })
+      await workflowService.resolveCurrentBranchStateForRepository(
+        repository,
+        FORCE_REFRESH_OPTIONS
+      )
     );
   }
 
@@ -401,31 +415,18 @@ async function openRequest(request: CurrentBranchOpenRequest | undefined): Promi
   });
 }
 
-function buildActionPicks(state: CurrentBranchState): CurrentBranchActionPick[] {
-  const commonActions = createCommonActionPicks();
+function buildActionPicks(state: CurrentBranchState): readonly CurrentBranchActionPick[] {
   if (state.kind === "matched") {
-    return [
-      createActionPick("Open Current Jenkins Job", "openBranch"),
-      createActionPick("Trigger Current Jenkins Build", "triggerBuild"),
-      ...(state.lastBuild?.url
-        ? [createActionPick("Open Latest Build Details", "openLatestBuild")]
-        : []),
-      createActionPick("Open Last Failed Build", "openLastFailed"),
-      ...commonActions
-    ];
+    return state.lastBuild?.url ? MATCHED_WITH_LATEST_BUILD_ACTION_PICKS : MATCHED_ACTION_PICKS;
   }
 
   if (state.kind === "branchMissing") {
-    return [
-      createActionPick("Open Linked Multibranch in Jenkins", "openMultibranch"),
-      createActionPick("Scan Linked Multibranch Now", "scanMultibranch"),
-      ...commonActions
-    ];
+    return BRANCH_MISSING_ACTION_PICKS;
   }
 
-  return commonActions;
+  return COMMON_ACTION_PICKS;
 }
 
-function getItemLabel(item: JenkinsFolderTreeItem, fallback: string): string {
-  return typeof item.label === "string" ? item.label : (item.label?.label ?? fallback);
+function getItemLabel(item: JenkinsFolderTreeItem): string | undefined {
+  return typeof item.label === "string" ? item.label : item.label?.label;
 }

@@ -6,7 +6,15 @@
     "src/panels/nodeCapacity/webview/index.tsx",
     "src/panels/nodeDetails/webview/index.tsx"
   ],
-  "ignorePatterns": ["out/**", "out-test/**", ".vscode-test/**", "resources/**", "*.vsix"],
+  "ignorePatterns": [
+    "out/**",
+    "out-test/**",
+    ".vscode-test/**",
+    ".vscode-test.mjs",
+    "coverage/**",
+    "resources/**",
+    "*.vsix"
+  ],
   // VS Code invokes these methods/properties by interface, so normal call graph
   // analysis cannot see the runtime call path.
   "usedClassMembers": [
@@ -98,18 +106,6 @@
       ]
     },
     {
-      "implements": "JenkinsParameterPresetStoreRuntimeSurface",
-      "members": [
-        "listPresets",
-        "getPreset",
-        "savePreset",
-        "renamePreset",
-        "deletePreset",
-        "removePresetsForJob",
-        "updatePresetUrl"
-      ]
-    },
-    {
       "implements": "JenkinsWorkbenchTreeRuntimeSurface",
       "members": [
         "onDidChangeSummary",
@@ -146,24 +142,8 @@
       "members": ["revive"]
     },
     {
-      "implements": "CurrentBranchPullRequestMatcherConfigSurface",
-      "members": ["updatePatterns"]
-    },
-    {
-      "implements": "CurrentBranchServiceRuntimeSurface",
-      "members": ["start"]
-    },
-    {
-      "implements": "JenkinsClientProviderRuntimeSurface",
-      "members": ["createClientContext"]
-    },
-    {
       "implements": "JenkinsDataCacheRuntimeSurface",
       "members": ["getOrLoad"]
-    },
-    {
-      "implements": "JenkinsEnvironmentStoreMigrationSurface",
-      "members": ["migrateLegacyAuthConfigs"]
     },
     {
       "implements": "JenkinsfileIntelligenceConfigRuntimeSurface",
@@ -174,16 +154,8 @@
       "members": ["invalidateAll"]
     },
     {
-      "implements": "JenkinsfileValidationRuntimeSurface",
-      "members": ["start", "updateConfig"]
-    },
-    {
       "implements": "JenkinsQueuePollerRuntimeSurface",
       "members": ["trackExpanded", "trackCollapsed", "clearAll", "updatePollIntervalSeconds"]
-    },
-    {
-      "implements": "JenkinsRepositoryLinkStoreMigrationSurface",
-      "members": ["migrateLegacyWorkspaceLinks"]
     },
     {
       "implements": "JenkinsStatusPollerRuntimeSurface",
@@ -192,22 +164,6 @@
     {
       "implements": "JenkinsStatusRefreshRuntimeSurface",
       "members": ["updateRefreshIntervalSeconds"]
-    },
-    {
-      "implements": "JenkinsViewStateStoreRuntimeSurface",
-      "members": ["onDidChange", "syncFilterContext"]
-    },
-    {
-      "implements": "JenkinsWatchStoreRuntimeSurface",
-      "members": ["updateWatchUrl"]
-    },
-    {
-      "implements": "JobNewItemTargetResolverSurface",
-      "members": ["resolveFromTreeItem", "resolveFromEnvironmentPicker"]
-    },
-    {
-      "implements": "JobNewItemWorkflowSurface",
-      "members": ["run"]
     },
     {
       "implements": "NodeCapacityExecutorHydrationSurface",

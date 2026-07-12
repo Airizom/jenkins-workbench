@@ -370,6 +370,16 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     await this.runtime.refreshBuildStatus(token);
   }
 
+  async refreshBuildDetails(options?: BuildDetailsPanelLoadOptions): Promise<void> {
+    const backend = this.backend;
+    const environment = this.state.environment;
+    const buildUrl = this.state.currentBuildUrl;
+    if (!backend || !environment || !buildUrl) {
+      return;
+    }
+    await this.load(backend, environment, buildUrl, options);
+  }
+
   private publishErrors(): void {
     const nextErrors = this.state.updateErrors();
     if (nextErrors) {

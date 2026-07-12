@@ -14,7 +14,8 @@ export function NodeStatusBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("text-[10px] px-1.5 py-0", resolveNodeStatusBadgeClass(statusClass), className)}
+      size="sm"
+      className={cn(resolveNodeStatusBadgeClass(statusClass), className)}
     >
       {label}
     </Badge>

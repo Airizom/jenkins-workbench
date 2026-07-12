@@ -96,7 +96,6 @@ type ConfigReactionKey =
 
 interface ConfigReactionContext {
   config: vscode.WorkspaceConfiguration;
-  coverageService: ExtensionTokenMap["coverageService"];
   dataService: ExtensionTokenMap["dataService"];
   refreshHost: ExtensionTokenMap["refreshHost"];
   treeDataProvider: ExtensionTokenMap["treeDataProvider"];
@@ -152,7 +151,6 @@ export function registerExtensionSubscriptions(
   const treeDataProvider = container.get("treeDataProvider");
   const treeView = container.get("treeView");
   const dataService = container.get("dataService");
-  const coverageService = container.get("coverageService");
   const refreshHost = container.get("refreshHost");
   const statusRefreshService = container.get("statusRefreshService");
   const activityRefreshService = container.get("activityRefreshService");
@@ -170,7 +168,6 @@ export function registerExtensionSubscriptions(
       keys: [CACHE_TTL_CONFIG_KEY],
       run: (reactionContext) => {
         reactionContext.dataService.updateCacheTtlMs(getCacheTtlMs(reactionContext.config));
-        reactionContext.coverageService.updateCacheTtlMs(getCacheTtlMs(reactionContext.config));
         reactionContext.refreshHost.fullEnvironmentRefresh({ trigger: "system" });
       }
     },
@@ -278,7 +275,6 @@ export function registerExtensionSubscriptions(
 
     const reactionContext: ConfigReactionContext = {
       config: getExtensionConfiguration(),
-      coverageService,
       dataService,
       refreshHost,
       statusRefreshService,

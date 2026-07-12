@@ -1,10 +1,15 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
-import type { BuildDetailsCoverageLoadResult } from "./BuildDetailsCoverageLoader";
 
-interface ApplyCoverageDecorationsOptions extends BuildDetailsCoverageLoadResult {
+interface ApplyCoverageDecorationsOptions {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
+  coverageOverview: JenkinsCoverageOverview | undefined;
+  modifiedCoverageFiles: JenkinsModifiedCoverageFile[] | undefined;
   decorationsEnabled: boolean;
 }
 

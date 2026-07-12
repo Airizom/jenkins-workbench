@@ -2,10 +2,9 @@ import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { NodeDetailsPanel } from "../../panels/NodeDetailsPanel";
 import { NodeActionService, type NodeActionTarget } from "../../services/NodeActionService";
-import { isRecord } from "../../shared/runtimeGuards";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
-import type { NodeCommandRefreshHost, NodeCommandTarget } from "./NodeCommandTypes";
+import type { NodeCommandRefreshHost } from "./NodeCommandTypes";
 
 export async function showNodeDetails(
   dataService: JenkinsDataService,
@@ -40,7 +39,7 @@ export async function showNodeDetails(
 export async function takeNodeOffline(
   dataService: JenkinsDataService,
   refreshHost: NodeCommandRefreshHost,
-  item?: NodeTreeItem | NodeCommandTarget
+  item?: NodeTreeItem
 ): Promise<boolean> {
   const target = resolveNodeActionTarget(item, "take offline");
   if (!target) {
@@ -53,7 +52,7 @@ export async function takeNodeOffline(
 export async function bringNodeOnline(
   dataService: JenkinsDataService,
   refreshHost: NodeCommandRefreshHost,
-  item?: NodeTreeItem | NodeCommandTarget
+  item?: NodeTreeItem
 ): Promise<boolean> {
   const target = resolveNodeActionTarget(item, "bring online");
   if (!target) {
@@ -66,7 +65,7 @@ export async function bringNodeOnline(
 export async function launchNodeAgent(
   dataService: JenkinsDataService,
   refreshHost: NodeCommandRefreshHost,
-  item?: NodeTreeItem | NodeCommandTarget
+  item?: NodeTreeItem
 ): Promise<boolean> {
   const target = resolveNodeActionTarget(item, "launch agent");
   if (!target) {
@@ -77,7 +76,7 @@ export async function launchNodeAgent(
 }
 
 function resolveNodeActionTarget(
-  item: NodeTreeItem | NodeCommandTarget | undefined,
+  item: NodeTreeItem | undefined,
   actionLabel: string
 ): NodeActionTarget | undefined {
   const selected = requireSelection(item, `Select a node to ${actionLabel}.`);
@@ -85,7 +84,7 @@ function resolveNodeActionTarget(
     return undefined;
   }
 
-  if (!isNodeCommandTarget(selected)) {
+  if (!(selected instanceof NodeTreeItem)) {
     void vscode.window.showInformationMessage(`Select a node to ${actionLabel}.`);
     return undefined;
   }
@@ -96,32 +95,9 @@ function resolveNodeActionTarget(
     );
     return undefined;
   }
-
-  if (selected instanceof NodeTreeItem) {
-    return {
-      label: getTreeItemLabel(selected),
-      nodeUrl: selected.nodeUrl,
-      environment: selected.environment
-    };
-  }
-
   return {
-    label: selected.label?.trim() || selected.nodeUrl,
+    label: getTreeItemLabel(selected),
     nodeUrl: selected.nodeUrl,
     environment: selected.environment
   };
-}
-
-function isNodeCommandTarget(value: unknown): value is NodeCommandTarget {
-  if (!isRecord(value)) {
-    return false;
-  }
-  const environment = value.environment;
-  return (
-    typeof value.nodeUrl === "string" &&
-    isRecord(environment) &&
-    typeof environment.environmentId === "string" &&
-    typeof environment.url === "string" &&
-    typeof environment.scope === "string"
-  );
 }

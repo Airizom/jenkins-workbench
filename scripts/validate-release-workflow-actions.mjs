@@ -5,9 +5,51 @@ import process from "node:process";
 const workflowPath = path.join(process.cwd(), ".github", "workflows", "release.yml");
 const source = await readFile(workflowPath, "utf8");
 const fullShaPattern = /^[a-f0-9]{40}$/i;
+const exactVersionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const publishingTools = ["@vscode/vsce", "ovsx"];
+const publishingSecrets = ["VSCE_PAT", "OVSX_PAT"];
 const errors = [];
 
+if (!/if \[ "\$GITHUB_REF_TYPE" != "tag" \]; then/.test(source)) {
+  errors.push(`${workflowPath} must reject release runs whose ref type is not a tag`);
+}
+
+const firstPublishIndex = Math.min(
+  source.indexOf("./node_modules/.bin/vsce publish"),
+  source.indexOf("./node_modules/.bin/ovsx publish")
+);
+
+for (const secret of publishingSecrets) {
+  const validationIndex = source.indexOf(`if [ -z "$${secret}" ]; then`);
+
+  if (validationIndex === -1 || firstPublishIndex === -1 || validationIndex > firstPublishIndex) {
+    errors.push(`${workflowPath} must validate ${secret} before the first marketplace publish`);
+  }
+}
+
 for (const [index, line] of source.split(/\r?\n/).entries()) {
+  const installMatch = line.match(/\bnpm\s+(?:i|install)\b(.*)/);
+
+  if (installMatch) {
+    const installArguments = installMatch[1].trim().split(/\s+/);
+
+    for (const tool of publishingTools) {
+      const toolArgument = installArguments.find(
+        (argument) => argument === tool || argument.startsWith(`${tool}@`)
+      );
+
+      if (!toolArgument) {
+        continue;
+      }
+
+      const version = toolArgument.slice(tool.length + 1);
+
+      if (!toolArgument.startsWith(`${tool}@`) || !exactVersionPattern.test(version)) {
+        errors.push(`${workflowPath}:${index + 1} ${tool} must be installed at an exact version`);
+      }
+    }
+  }
+
   const match = line.match(/^\s*uses:\s*([^#\s]+)/);
 
   if (!match || match[1].startsWith("./")) {

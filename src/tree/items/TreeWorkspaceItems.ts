@@ -1,18 +1,8 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { TREE_FOLDER_ICON, resolveTreeFileIcon } from "../TreeFileIcons";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, buildTreeJobScopeKey } from "../TreeJobScope";
-
-function buildWorkspaceTreeItemId(
-  kind: string,
-  environment: JenkinsEnvironmentRef,
-  jobUrl: string,
-  jobScope: TreeJobScope,
-  relativePath?: string
-): string {
-  const baseId = `${kind}:${environment.scope}:${environment.environmentId}:${buildTreeJobScopeKey(jobScope)}:${jobUrl}`;
-  return relativePath ? `${baseId}:${relativePath}` : baseId;
-}
+import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
+import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 export class WorkspaceRootTreeItem extends vscode.TreeItem {
   static buildId(
@@ -20,7 +10,7 @@ export class WorkspaceRootTreeItem extends vscode.TreeItem {
     jobUrl: string,
     jobScope: TreeJobScope
   ): string {
-    return buildWorkspaceTreeItemId("workspace-root", environment, jobUrl, jobScope);
+    return buildEnvironmentTreeItemId("workspace-root", environment, jobScope, jobUrl);
   }
 
   constructor(
@@ -43,7 +33,7 @@ export class WorkspaceDirectoryTreeItem extends vscode.TreeItem {
     jobScope: TreeJobScope,
     relativePath: string
   ): string {
-    return buildWorkspaceTreeItemId("workspace-dir", environment, jobUrl, jobScope, relativePath);
+    return buildEnvironmentTreeItemId("workspace-dir", environment, jobScope, jobUrl, relativePath);
   }
 
   constructor(
@@ -69,7 +59,13 @@ export class WorkspaceFileTreeItem extends vscode.TreeItem {
     jobScope: TreeJobScope,
     relativePath: string
   ): string {
-    return buildWorkspaceTreeItemId("workspace-file", environment, jobUrl, jobScope, relativePath);
+    return buildEnvironmentTreeItemId(
+      "workspace-file",
+      environment,
+      jobScope,
+      jobUrl,
+      relativePath
+    );
   }
 
   constructor(

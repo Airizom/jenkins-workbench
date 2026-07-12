@@ -1,9 +1,5 @@
 import type * as vscode from "vscode";
-import type {
-  TreeExpansionPath,
-  TreeExpansionResolveResult,
-  TreeExpansionResolver
-} from "./TreeDataProviderTypes";
+import type { TreeExpansionPath, TreeExpansionResolver } from "./TreeDataProviderTypes";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 type TreeRevealOptions = {
@@ -15,6 +11,11 @@ type TreeRevealOptions = {
 type ResolvePathOutcome = {
   element?: WorkbenchTreeElement;
   wasPending: boolean;
+};
+
+type ExpansionOperation = {
+  operationVersion: number;
+  path?: TreeExpansionPath;
 };
 
 const RESTORE_RETRY_LIMIT = 3;
@@ -98,36 +99,30 @@ export class TreeExpansionState implements vscode.Disposable {
   }
 
   private async trackExpanded(element: WorkbenchTreeElement): Promise<void> {
-    if (this.isRestoring) {
-      return;
-    }
-    const operationVersion = this.startElementOperation(element);
-    const path = await this.treeDataProvider.buildExpansionPath(element);
+    const operation = await this.startExpansionOperation(element);
     if (
-      !path ||
-      !this.isCurrentElementOperation(element, operationVersion) ||
-      this.hasNewerCollapsedPrefix(path, operationVersion)
+      !operation?.path ||
+      this.hasNewerCollapsedPrefix(operation.path, operation.operationVersion)
     ) {
       return;
     }
-    const key = this.buildKey(path);
-    this.expandedPaths.set(key, path);
-    this.expandedPathVersions.set(key, operationVersion);
+    const key = this.buildKey(operation.path);
+    this.expandedPaths.set(key, operation.path);
+    this.expandedPathVersions.set(key, operation.operationVersion);
   }
 
   private async trackCollapsed(element: WorkbenchTreeElement): Promise<void> {
-    if (this.isRestoring) {
+    const operation = await this.startExpansionOperation(element);
+    if (!operation?.path) {
       return;
     }
-    const operationVersion = this.startElementOperation(element);
-    const path = await this.treeDataProvider.buildExpansionPath(element);
-    if (!path || !this.isCurrentElementOperation(element, operationVersion)) {
-      return;
-    }
-    this.collapsedPathVersions.set(this.buildKey(path), operationVersion);
+    this.collapsedPathVersions.set(this.buildKey(operation.path), operation.operationVersion);
     for (const [key, storedPath] of this.expandedPaths) {
       const expandedVersion = this.expandedPathVersions.get(key) ?? 0;
-      if (expandedVersion < operationVersion && isPathPrefix(path, storedPath)) {
+      if (
+        expandedVersion < operation.operationVersion &&
+        isPathPrefix(operation.path, storedPath)
+      ) {
         this.expandedPaths.delete(key);
         this.expandedPathVersions.delete(key);
       }
@@ -138,6 +133,30 @@ export class TreeExpansionState implements vscode.Disposable {
     const operationVersion = ++this.nextOperationVersion;
     this.elementOperationVersions.set(element, operationVersion);
     return operationVersion;
+  }
+
+  private async startExpansionOperation(
+    element: WorkbenchTreeElement
+  ): Promise<ExpansionOperation | undefined> {
+    if (this.isRestoring) {
+      return undefined;
+    }
+    const operationVersion = this.startElementOperation(element);
+    return {
+      operationVersion,
+      path: await this.buildCurrentExpansionPath(element, operationVersion)
+    };
+  }
+
+  private async buildCurrentExpansionPath(
+    element: WorkbenchTreeElement,
+    operationVersion: number
+  ): Promise<TreeExpansionPath | undefined> {
+    const path = await this.treeDataProvider.buildExpansionPath(element);
+    if (!path || !this.isCurrentElementOperation(element, operationVersion)) {
+      return undefined;
+    }
+    return path;
   }
 
   private isCurrentElementOperation(
@@ -160,7 +179,7 @@ export class TreeExpansionState implements vscode.Disposable {
     let attempts = 0;
     let wasPending = false;
     while (attempts <= RESTORE_RETRY_LIMIT) {
-      const result = await this.resolvePathOnce(path);
+      const result = await this.treeDataProvider.resolveExpansionPath(path);
       if (result.element) {
         return { element: result.element, wasPending };
       }
@@ -175,10 +194,6 @@ export class TreeExpansionState implements vscode.Disposable {
       }
     }
     return { element: undefined, wasPending: true };
-  }
-
-  private async resolvePathOnce(path: TreeExpansionPath): Promise<TreeExpansionResolveResult> {
-    return await this.treeDataProvider.resolveExpansionPath(path);
   }
 
   private buildKey(path: TreeExpansionPath): string {

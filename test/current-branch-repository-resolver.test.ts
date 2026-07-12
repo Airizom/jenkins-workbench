@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, vi } from "vitest";
 import type { GitApi, GitRef, GitRepository } from "../src/git/GitExtensionApi";
-import { exactModuleMock, suffixModuleMock, withModuleMocks } from "./helpers/moduleMock";
 import { createCurrentBranchVscodeMock, TestUri } from "./helpers/vscodeMocks";
 
 let getGitApiImpl: () => Promise<GitApi | undefined> = async () => undefined;
@@ -18,15 +17,10 @@ const gitExtensionApiMock = {
   }
 };
 
-const { CurrentBranchRepositoryResolver } = withModuleMocks(
-  [
-    exactModuleMock("vscode", createCurrentBranchVscodeMock()),
-    suffixModuleMock("git/GitExtensionApi", gitExtensionApiMock)
-  ],
-  () =>
-    require("../src/currentBranch/CurrentBranchRepositoryResolver") as typeof import(
-      "../src/currentBranch/CurrentBranchRepositoryResolver"
-    )
+vi.doMock("vscode", () => createCurrentBranchVscodeMock());
+vi.doMock("../src/git/GitExtensionApi", () => gitExtensionApiMock);
+const { CurrentBranchRepositoryResolver } = await import(
+  "../src/currentBranch/CurrentBranchRepositoryResolver"
 );
 
 interface ListenerCounters {

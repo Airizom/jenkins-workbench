@@ -14,7 +14,7 @@ export interface ToastState extends ToastOptions {
   open: boolean;
 }
 
-type Listener = (toasts: ToastState[]) => void;
+type Listener = () => void;
 
 const TOAST_REMOVE_DELAY_MS = 300;
 
@@ -24,8 +24,17 @@ const timeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 function emit(): void {
   for (const listener of listeners) {
-    listener(currentToasts);
+    listener();
   }
+}
+
+function subscribe(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): ToastState[] {
+  return currentToasts;
 }
 
 function generateId(): string {
@@ -111,17 +120,7 @@ export function useToast(): {
   dismissToast: typeof dismissToast;
   removeToast: typeof removeToast;
 } {
-  const [toasts, setToasts] = React.useState<ToastState[]>(currentToasts);
-
-  React.useEffect(() => {
-    const listener: Listener = (next) => {
-      setToasts(next);
-    };
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
+  const toasts = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   return { toasts, toast, dismissToast, removeToast };
 }

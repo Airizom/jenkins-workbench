@@ -1,3 +1,5 @@
+import { EventEmitter as TestEventEmitter } from "./vscodeStub";
+
 type Disposable = { dispose(): void };
 
 type TestEventEmitterConstructor = new <T>() => {
@@ -5,29 +7,6 @@ type TestEventEmitterConstructor = new <T>() => {
   fire(event: T): void;
   dispose(): void;
 };
-
-class TestEventEmitter<T> {
-  private readonly listeners = new Set<(event: T) => void>();
-
-  readonly event = (listener: (event: T) => void): Disposable => {
-    this.listeners.add(listener);
-    return {
-      dispose: () => {
-        this.listeners.delete(listener);
-      }
-    };
-  };
-
-  fire(event: T): void {
-    for (const listener of this.listeners) {
-      listener(event);
-    }
-  }
-
-  dispose(): void {
-    this.listeners.clear();
-  }
-}
 
 export interface TestUriLike {
   readonly scheme: string;

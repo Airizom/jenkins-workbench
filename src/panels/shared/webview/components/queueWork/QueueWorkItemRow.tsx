@@ -15,6 +15,28 @@ export function QueueWorkItemRow({
   action = "open-button",
   className
 }: QueueWorkItemRowProps): JSX.Element {
+  const renderTaskAction = (taskUrl: string): JSX.Element =>
+    action === "external-icon" ? (
+      <Button
+        aria-label={`Open ${item.name} in Jenkins`}
+        variant="ghost"
+        size="icon"
+        className="shrink-0"
+        onClick={() => onOpenExternal(taskUrl)}
+      >
+        <ExternalLinkIcon className="h-4 w-4" />
+      </Button>
+    ) : (
+      <Button
+        variant="outline"
+        size="sm"
+        className="shrink-0"
+        onClick={() => onOpenExternal(taskUrl)}
+      >
+        Open
+      </Button>
+    );
+
   return (
     <div className={className ?? "flex items-start justify-between gap-3"}>
       <div className="min-w-0">
@@ -35,28 +57,7 @@ export function QueueWorkItemRow({
           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.reason}</p>
         ) : null}
       </div>
-      {item.taskUrl ? (
-        action === "external-icon" ? (
-          <Button
-            aria-label={`Open ${item.name} in Jenkins`}
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={() => item.taskUrl && onOpenExternal(item.taskUrl)}
-          >
-            <ExternalLinkIcon className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={() => item.taskUrl && onOpenExternal(item.taskUrl)}
-          >
-            Open
-          </Button>
-        )
-      ) : null}
+      {item.taskUrl ? renderTaskAction(item.taskUrl) : null}
     </div>
   );
 }

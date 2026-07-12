@@ -120,15 +120,8 @@ export class BuildConsoleExporter implements BuildConsoleExporterActionSurface {
       let truncated = false;
       while (true) {
         const response = await this.client.getConsoleTextProgressive(environment, buildUrl, start);
-        if (response.text.length > 0) {
-          await this.writeStreamChunk(writeStream, response.text);
-          emptyAttempts = 0;
-        }
         const nextStart = Math.max(start, response.textSize);
-        if (!response.moreData) {
-          break;
-        }
-        if (response.text.length === 0 && nextStart === start) {
+        if (response.moreData && nextStart === start) {
           emptyAttempts += 1;
           if (emptyAttempts > this.progressiveEmptyRetries) {
             truncated = true;
@@ -136,6 +129,13 @@ export class BuildConsoleExporter implements BuildConsoleExporterActionSurface {
           }
           await this.delay(this.progressiveEmptyDelayMs);
           continue;
+        }
+        if (response.text.length > 0) {
+          await this.writeStreamChunk(writeStream, response.text);
+          emptyAttempts = 0;
+        }
+        if (!response.moreData) {
+          break;
         }
         start = nextStart;
       }

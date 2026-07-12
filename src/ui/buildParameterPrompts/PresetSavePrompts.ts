@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
-import type { JobParameter } from "../../jenkins/JenkinsDataService";
 import type { ParameterPresetSummary } from "../../storage/JenkinsParameterPresetStore";
 import type {
   BuildParameterPromptOptions,
   BuildParameterPromptValues
 } from "./BuildParameterPromptTypes";
+import { isSensitiveParameter } from "./ParameterSensitivity";
 import { validatePresetName } from "./presetNameValidation";
 
 export async function selectTriggerMode(
@@ -151,11 +151,4 @@ function suggestPresetName(presets: ParameterPresetSummary[]): string {
     }
   }
   return "Preset";
-}
-
-function isSensitiveParameter(parameter: JobParameter): boolean {
-  if (parameter.isSensitive) {
-    return true;
-  }
-  return parameter.kind === "password" || parameter.kind === "credentials";
 }

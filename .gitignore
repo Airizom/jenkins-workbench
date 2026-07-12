@@ -11,3 +11,4 @@ fallow-results.sarif
 .pi/settings.json
 .clawpatch/
 .opencode/
+coverage/

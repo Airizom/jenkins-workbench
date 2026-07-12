@@ -1,13 +1,10 @@
-import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type {
-  JenkinsCoverageRequestOptions,
-  JenkinsCoverageService
-} from "../../jenkins/coverage/JenkinsCoverageService";
 import type {
   JenkinsCoverageOverview,
+  JenkinsCoverageRequestOptions,
+  JenkinsDataService,
   JenkinsModifiedCoverageFile
-} from "../../jenkins/coverage/JenkinsCoverageTypes";
+} from "../../jenkins/JenkinsDataService";
+import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsRestartFromStageInfo } from "../../jenkins/types";
 import type { PendingInputActionService } from "../../shared/PendingInputActionService";
 import {
@@ -77,15 +74,15 @@ export class BuildDetailsBackendAdapter implements BuildDetailsBackend {
   readonly pendingInputs: BuildDetailsPendingInputsBackend;
   readonly restart: BuildDetailsRestartBackend;
 
-  constructor(dataService: JenkinsDataService, coverageService: JenkinsCoverageService) {
+  constructor(dataService: JenkinsDataService) {
     const inspection = new BuildInspectionBackendAdapter(dataService);
     this.status = inspection.status;
     this.tests = inspection.tests;
     this.console = inspection.console;
     this.coverage = {
-      discoverCoverageActionPath: (...args) => coverageService.discoverCoverageActionPath(...args),
-      getCoverageOverview: (...args) => coverageService.getCoverageOverview(...args),
-      getModifiedCoverageFiles: (...args) => coverageService.getModifiedCoverageFiles(...args)
+      discoverCoverageActionPath: (...args) => dataService.discoverCoverageActionPath(...args),
+      getCoverageOverview: (...args) => dataService.getCoverageOverview(...args),
+      getModifiedCoverageFiles: (...args) => dataService.getModifiedCoverageFiles(...args)
     };
     this.pendingInputs = {
       getPendingInputActions: (...args) => dataService.getPendingInputActions(...args),

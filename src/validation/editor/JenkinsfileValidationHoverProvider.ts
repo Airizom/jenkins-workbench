@@ -1,14 +1,12 @@
 import * as vscode from "vscode";
-import { getDiagnosticMetadata } from "../JenkinsfileDiagnosticMetadata";
 import {
   JENKINS_DIAGNOSTIC_SOURCE,
-  isValidationCode,
+  resolveDiagnosticCode,
   resolveDiagnosticSuggestions
 } from "../JenkinsfileDiagnosticUtils";
 import type { JenkinsfileMatcher } from "../JenkinsfileMatcher";
 import type { JenkinsfileValidationCoordinator } from "../JenkinsfileValidationCoordinator";
 import { getDocsLinksForCode } from "../JenkinsfileValidationDocs";
-import type { JenkinsfileValidationCode } from "../JenkinsfileValidationTypes";
 
 export class JenkinsfileValidationHoverProvider implements vscode.HoverProvider {
   constructor(
@@ -33,7 +31,7 @@ export class JenkinsfileValidationHoverProvider implements vscode.HoverProvider 
     const code = resolveDiagnosticCode(diagnostic);
     const suggestions = resolveDiagnosticSuggestions(diagnostic);
     const markdown = new vscode.MarkdownString(undefined, true);
-    markdown.isTrusted = true;
+    markdown.isTrusted = false;
 
     markdown.appendMarkdown("**Jenkinsfile validation**\n\n");
     markdown.appendText(diagnostic.message);
@@ -56,7 +54,11 @@ export class JenkinsfileValidationHoverProvider implements vscode.HoverProvider 
     if (docsLinks.length > 0) {
       markdown.appendMarkdown("**Jenkins docs**\n");
       for (const link of docsLinks) {
-        markdown.appendMarkdown(`- [${link.label}](${link.url})\n`);
+        const safeUrl = resolveSafeDocsUrl(link.url);
+        if (!safeUrl) {
+          continue;
+        }
+        markdown.appendMarkdown(`- [${escapeMarkdownLinkLabel(link.label)}](<${safeUrl}>)\n`);
       }
       markdown.appendMarkdown("\n");
     }
@@ -72,24 +74,6 @@ export class JenkinsfileValidationHoverProvider implements vscode.HoverProvider 
   }
 }
 
-function resolveDiagnosticCode(
-  diagnostic: vscode.Diagnostic
-): JenkinsfileValidationCode | undefined {
-  const metadata = getDiagnosticMetadata(diagnostic);
-  if (metadata?.code) {
-    return metadata.code;
-  }
-
-  const code = diagnostic.code;
-  if (typeof code === "string") {
-    return isValidationCode(code) ? code : undefined;
-  }
-  if (typeof code === "object" && code && "value" in code && typeof code.value === "string") {
-    return isValidationCode(code.value) ? code.value : undefined;
-  }
-  return undefined;
-}
-
 function resolveDetails(diagnostic: vscode.Diagnostic): string[] {
   const related = diagnostic.relatedInformation ?? [];
   return related.map((info) => info.message).filter((message) => message.trim().length > 0);
@@ -101,4 +85,25 @@ function appendBulletList(markdown: vscode.MarkdownString, items: string[]): voi
     markdown.appendText(item);
     markdown.appendMarkdown("\n");
   }
+}
+
+function resolveSafeDocsUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname !== "www.jenkins.io") {
+      return undefined;
+    }
+    return url.href.replace(/[<>\r\n]/g, (char) => encodeURIComponent(char));
+  } catch {
+    return undefined;
+  }
+}
+
+function escapeMarkdownLinkLabel(value: string): string {
+  return (
+    value
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[\\[\]]/g, "\\$&") || "Jenkins documentation"
+  );
 }

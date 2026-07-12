@@ -45,7 +45,7 @@ function TabCountBadge({
     tone === "warning" ? "bg-warning-badge text-warning" : "bg-failure-soft text-failure";
   return (
     <span
-      className={`inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-medium ${toneClass}`}
+      className={`inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[11px] font-medium ${toneClass}`}
     >
       {count}
     </span>
@@ -90,13 +90,8 @@ type BuildDetailsTabsProps = {
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   pipelineStagesLoading: boolean;
   stripFailedCount: number;
-  displayName: string;
   buildUrl?: string;
   resultClass: string;
-  resultLabel: string;
-  durationLabel: string;
-  timestampLabel: string;
-  culpritsLabel: string;
   testsSummary: BuildTestsSummaryViewModel;
   testResults: BuildTestResultsViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
@@ -133,13 +128,8 @@ export function BuildDetailsTabs({
   pipelineNodeLogHtmlModel,
   pipelineStagesLoading,
   stripFailedCount,
-  displayName,
   buildUrl,
   resultClass,
-  resultLabel,
-  durationLabel,
-  timestampLabel,
-  culpritsLabel,
   testsSummary,
   testResults,
   coverageState,
@@ -210,12 +200,7 @@ export function BuildDetailsTabs({
 
       <TabsContent value="overview" className="space-y-3">
         <OverviewTab
-          displayName={displayName}
-          resultLabel={resultLabel}
           resultClass={resultClass}
-          durationLabel={durationLabel}
-          timestampLabel={timestampLabel}
-          culpritsLabel={culpritsLabel}
           testsSummary={testsSummary}
           coverageState={coverageState}
           insights={insights}

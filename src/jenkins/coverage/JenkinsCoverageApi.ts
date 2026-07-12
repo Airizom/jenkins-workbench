@@ -19,6 +19,8 @@ interface ModifiedCoverageApiResponse {
   files?: unknown;
 }
 
+const coverageActionLinkHrefPattern = /id="coverage-action-link-[^"]+"\s+href="([^"]+)"/i;
+
 export class JenkinsCoverageApi {
   constructor(private readonly context: JenkinsClientContext) {}
 
@@ -98,8 +100,11 @@ function normalizeCoverageStatistic(statistics?: Record<string, unknown>): strin
     return lineCoverage;
   }
 
-  for (const value of Object.values(statistics)) {
-    const normalized = normalizeCoverageValue(value);
+  for (const key in statistics) {
+    if (!Object.prototype.hasOwnProperty.call(statistics, key)) {
+      continue;
+    }
+    const normalized = normalizeCoverageValue(statistics[key]);
     if (normalized) {
       return normalized;
     }
@@ -147,10 +152,13 @@ function normalizeModifiedCoverageFiles(
       continue;
     }
     const candidate = file as Record<string, unknown>;
+    const blocks = normalizeModifiedCoverageBlocks(candidate.modifiedLinesBlocks);
+    if (blocks.length === 0) {
+      continue;
+    }
     const fileName = trimToUndefined(candidate.fullyQualifiedFileName);
     const path = fileName ? normalizePosixRelativePath(fileName) : undefined;
-    const blocks = normalizeModifiedCoverageBlocks(candidate.modifiedLinesBlocks);
-    if (!path || blocks.length === 0) {
+    if (!path) {
       continue;
     }
     files.push({ path, blocks });
@@ -171,9 +179,15 @@ function normalizeModifiedCoverageBlocks(value: unknown): JenkinsModifiedCoverag
     }
     const candidate = block as Record<string, unknown>;
     const startLine = normalizePositiveInteger(candidate.startLine);
+    if (!startLine) {
+      continue;
+    }
     const endLine = normalizePositiveInteger(candidate.endLine);
+    if (!endLine || endLine < startLine) {
+      continue;
+    }
     const type = normalizeCoverageBlockType(candidate.type);
-    if (!startLine || !endLine || !type || endLine < startLine) {
+    if (!type) {
       continue;
     }
     blocks.push({ startLine, endLine, type });
@@ -198,8 +212,7 @@ function normalizeCoverageBlockType(
 }
 
 function normalizeCoverageValue(value: unknown): string | undefined {
-  const normalized = trimToUndefined(value);
-  return normalized && normalized.length > 0 ? normalized : undefined;
+  return trimToUndefined(value);
 }
 
 function normalizePositiveInteger(value: unknown): number | undefined {
@@ -211,7 +224,7 @@ function normalizeNumber(value: unknown): number | undefined {
 }
 
 function parseCoverageActionPathFromBuildHtml(html: string, buildUrl: string): string | undefined {
-  const match = html.match(/id="coverage-action-link-[^"]+"\s+href="([^"]+)"/i);
+  const match = coverageActionLinkHrefPattern.exec(html);
   if (!match?.[1]) {
     return undefined;
   }
@@ -225,8 +238,9 @@ function normalizeCoverageActionHref(href: string, buildUrl: string): string | u
   }
 
   try {
-    const resolved = new URL(rawHref, buildUrl);
-    const buildPath = ensureTrailingPathname(new URL(buildUrl).pathname);
+    const build = new URL(buildUrl);
+    const resolved = new URL(rawHref, build);
+    const buildPath = ensureTrailingPathname(build.pathname);
     const resolvedPath = ensureTrailingPathname(resolved.pathname);
     if (!resolvedPath.startsWith(buildPath)) {
       return undefined;
@@ -243,7 +257,17 @@ function ensureTrailingPathname(value: string): string {
 }
 
 function normalizeRelativeActionPath(value: string): string | undefined {
-  const withoutQuery = value.split(/[?#]/, 1)[0] ?? value;
+  const queryIndex = value.indexOf("?");
+  const hashIndex = value.indexOf("#");
+  let endIndex = -1;
+  if (queryIndex === -1) {
+    endIndex = hashIndex;
+  } else if (hashIndex === -1) {
+    endIndex = queryIndex;
+  } else {
+    endIndex = Math.min(queryIndex, hashIndex);
+  }
+  const withoutQuery = endIndex === -1 ? value : value.slice(0, endIndex);
   const normalized = withoutQuery.replace(/^\/+|\/+$/g, "");
   return normalized || undefined;
 }

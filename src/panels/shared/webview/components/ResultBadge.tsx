@@ -22,7 +22,7 @@ export function ResultBadge({
 }) {
   const badgeClass = getResultBadgeClass(resultClass ?? status);
   return (
-    <Badge id={id} variant="outline" className={cn("text-xs font-semibold", badgeClass, className)}>
+    <Badge id={id} variant="outline" className={cn("font-semibold", badgeClass, className)}>
       {label}
     </Badge>
   );

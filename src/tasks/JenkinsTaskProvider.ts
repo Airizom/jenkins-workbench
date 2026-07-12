@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
+import { getExtensionConfiguration, getJobSearchTuningOptions } from "../extension/ExtensionConfig";
+import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService, JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { getJobSearchTuningOptions } from "../jenkins/data/JobSearchTuningOptions";
 import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsTaskRefreshHost } from "./JenkinsTaskRefreshHost";
 import { JenkinsTaskTerminal } from "./JenkinsTaskTerminal";
 import {
   JENKINS_TASK_SOURCE,
@@ -23,7 +23,7 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
   constructor(
     private readonly environmentStore: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
-    private readonly refreshHost: JenkinsTaskRefreshHost
+    private readonly refreshHost: FullEnvironmentRefreshHost
   ) {}
 
   async provideTasks(token?: vscode.CancellationToken): Promise<vscode.Task[]> {
@@ -33,7 +33,7 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
     }
 
     const tasks: vscode.Task[] = [];
-    const searchOptions = getJobSearchTuningOptions();
+    const searchOptions = getJobSearchTuningOptions(getExtensionConfiguration());
 
     for (const environment of environments) {
       if (token?.isCancellationRequested) {

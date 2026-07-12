@@ -2,6 +2,16 @@ import type { NodeStatusClass } from "../../../nodeDetails/shared/NodeDetailsCon
 import { cn } from "./utils";
 
 type BuildResultClassKey = "success" | "failure" | "unstable" | "aborted" | "running" | "neutral";
+type BuildResultStyle = {
+  badge: string;
+  text: string;
+  iconText: string;
+  accent: string;
+  stageNode: string;
+  connectorColor: string;
+  graphBackground: string;
+  borderColor: string;
+};
 
 function normalizeBuildResultClass(resultClass?: string): BuildResultClassKey {
   switch (resultClass) {
@@ -16,82 +26,73 @@ function normalizeBuildResultClass(resultClass?: string): BuildResultClassKey {
   }
 }
 
-const BUILD_RESULT_BADGE_CLASSES: Record<BuildResultClassKey, string> = {
-  success: "border-success-border bg-success-soft text-success-foreground",
-  failure: "border-failure-border bg-failure-soft text-failure-foreground",
-  unstable: "border-warning-border bg-warning-soft text-warning-foreground",
-  aborted: "border-aborted-border bg-aborted-soft text-aborted-foreground",
-  running: "border-inputInfoBorder bg-inputInfoBg text-inputInfoFg",
-  neutral: "border-border bg-muted text-muted-foreground"
-};
-
-const BUILD_RESULT_TEXT_CLASSES: Record<BuildResultClassKey, string> = {
-  success: "text-success-foreground",
-  failure: "text-failure-foreground",
-  unstable: "text-warning-foreground",
-  aborted: "text-aborted-foreground",
-  running: "text-inputInfoFg",
-  neutral: "text-foreground"
-};
-
-const BUILD_RESULT_ICON_TEXT_CLASSES: Record<BuildResultClassKey, string> = {
-  success: "text-success",
-  failure: "text-failure",
-  unstable: "text-warning",
-  aborted: "text-aborted",
-  running: "text-warning",
-  neutral: "text-muted-foreground"
-};
-
-const BUILD_RESULT_ACCENT_CLASSES: Record<BuildResultClassKey, string> = {
-  success: "bg-success",
-  failure: "bg-failure",
-  unstable: "bg-warning",
-  aborted: "bg-aborted",
-  running: "bg-warning",
-  neutral: "bg-border"
-};
-
-const BUILD_RESULT_STAGE_NODE_CLASSES: Record<BuildResultClassKey, string> = {
-  success: "border-success-border bg-success-soft text-success",
-  failure: "border-failure-border bg-failure-soft text-failure",
-  unstable: "border-warning-border bg-warning-soft text-warning",
-  aborted: "border-aborted-border bg-aborted-soft text-aborted",
-  running: "border-warning-border bg-warning-soft text-warning animate-pulse",
-  neutral: "border-border bg-muted text-muted-foreground"
-};
-
-const BUILD_RESULT_CONNECTOR_COLORS: Record<BuildResultClassKey, string> = {
-  success: "var(--success)",
-  failure: "var(--failure)",
-  unstable: "var(--warning)",
-  aborted: "var(--aborted)",
-  running: "var(--warning)",
-  neutral: "var(--border)"
-};
-
-const BUILD_RESULT_GRAPH_BACKGROUNDS: Record<BuildResultClassKey, string> = {
-  success:
-    "linear-gradient(180deg, color-mix(in srgb, var(--success-soft) 60%, var(--card)), var(--card))",
-  failure:
-    "linear-gradient(180deg, color-mix(in srgb, var(--failure-soft) 75%, var(--card)), var(--card))",
-  unstable:
-    "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
-  aborted:
-    "linear-gradient(180deg, color-mix(in srgb, var(--aborted-soft) 70%, var(--card)), var(--card))",
-  running:
-    "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
-  neutral:
-    "linear-gradient(180deg, color-mix(in srgb, var(--muted-soft) 60%, var(--card)), var(--card))"
-};
-
-const BUILD_RESULT_BORDER_COLORS: Record<BuildResultClassKey, string> = {
-  success: "var(--success-border)",
-  failure: "var(--failure-border)",
-  unstable: "var(--warning-border)",
-  aborted: "var(--aborted-border)",
-  running: "var(--warning-border)",
-  neutral: "var(--border)"
+const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
+  success: {
+    badge: "border-success-border bg-success-soft text-success-foreground",
+    text: "text-success-foreground",
+    iconText: "text-success",
+    accent: "bg-success",
+    stageNode: "border-success-border bg-success-soft text-success",
+    connectorColor: "var(--success)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--success-soft) 60%, var(--card)), var(--card))",
+    borderColor: "var(--success-border)"
+  },
+  failure: {
+    badge: "border-failure-border bg-failure-soft text-failure-foreground",
+    text: "text-failure-foreground",
+    iconText: "text-failure",
+    accent: "bg-failure",
+    stageNode: "border-failure-border bg-failure-soft text-failure",
+    connectorColor: "var(--failure)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--failure-soft) 75%, var(--card)), var(--card))",
+    borderColor: "var(--failure-border)"
+  },
+  unstable: {
+    badge: "border-warning-border bg-warning-soft text-warning-foreground",
+    text: "text-warning-foreground",
+    iconText: "text-warning",
+    accent: "bg-warning",
+    stageNode: "border-warning-border bg-warning-soft text-warning",
+    connectorColor: "var(--warning)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
+    borderColor: "var(--warning-border)"
+  },
+  aborted: {
+    badge: "border-aborted-border bg-aborted-soft text-aborted-foreground",
+    text: "text-aborted-foreground",
+    iconText: "text-aborted",
+    accent: "bg-aborted",
+    stageNode: "border-aborted-border bg-aborted-soft text-aborted",
+    connectorColor: "var(--aborted)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--aborted-soft) 70%, var(--card)), var(--card))",
+    borderColor: "var(--aborted-border)"
+  },
+  running: {
+    badge: "border-warning-border bg-warning-soft text-warning-foreground",
+    text: "text-warning-foreground",
+    iconText: "text-warning",
+    accent: "bg-warning",
+    stageNode: "border-warning-border bg-warning-soft text-warning animate-pulse",
+    connectorColor: "var(--warning)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
+    borderColor: "var(--warning-border)"
+  },
+  neutral: {
+    badge: "border-border bg-muted text-muted-foreground",
+    text: "text-foreground",
+    iconText: "text-muted-foreground",
+    accent: "bg-border",
+    stageNode: "border-border bg-muted text-muted-foreground",
+    connectorColor: "var(--border)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--muted-soft) 60%, var(--card)), var(--card))",
+    borderColor: "var(--border)"
+  }
 };
 
 const NODE_STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string; accent: string }> =
@@ -123,16 +124,16 @@ const NODE_STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string;
     }
   };
 export function resolveResultBadgeClass(resultClass: string): string {
-  return BUILD_RESULT_BADGE_CLASSES[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].badge;
 }
 export function resolveResultTextClass(resultClass?: string): string {
-  return BUILD_RESULT_TEXT_CLASSES[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].text;
 }
 export function resolveStatusAccentClass(resultClass: string): string {
-  return BUILD_RESULT_ACCENT_CLASSES[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].accent;
 }
 export function resolveResultIconTextClass(resultClass?: string): string {
-  return BUILD_RESULT_ICON_TEXT_CLASSES[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].iconText;
 }
 
 const STAGE_NODE_BASE_CLASS =
@@ -140,17 +141,17 @@ const STAGE_NODE_BASE_CLASS =
 export function resolveBuildResultStageNodeClass(resultClass?: string): string {
   return cn(
     STAGE_NODE_BASE_CLASS,
-    BUILD_RESULT_STAGE_NODE_CLASSES[normalizeBuildResultClass(resultClass)]
+    BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].stageNode
   );
 }
 export function resolveBuildResultConnectorColor(resultClass?: string): string {
-  return BUILD_RESULT_CONNECTOR_COLORS[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].connectorColor;
 }
 export function resolveBuildResultGraphBackground(resultClass?: string): string {
-  return BUILD_RESULT_GRAPH_BACKGROUNDS[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].graphBackground;
 }
 export function resolveBuildResultBorderColor(resultClass?: string): string {
-  return BUILD_RESULT_BORDER_COLORS[normalizeBuildResultClass(resultClass)];
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].borderColor;
 }
 export function resolveNodeStatusBadgeClass(statusClass: NodeStatusClass): string {
   return NODE_STATUS_STYLES[statusClass].badge;
@@ -171,6 +172,6 @@ export function resolveSeverityBadgeClass(severity: "critical" | "warning" | "no
     case "warning":
       return resolveResultBadgeClass("unstable");
     default:
-      return resolveResultBadgeClass("success");
+      return resolveResultBadgeClass("neutral");
   }
 }

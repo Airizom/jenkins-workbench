@@ -9,7 +9,7 @@ export interface ExecutorUtilization {
   ratio: number | undefined;
 }
 
-export type UtilizationLevel = "low" | "medium" | "high";
+export type UtilizationLevel = "low" | "medium" | "saturated";
 
 export function summarizeExecutorUtilization(
   executors: NodeExecutorViewModel[],
@@ -29,6 +29,11 @@ export function summarizeExecutorUtilization(
   };
 }
 
+/**
+ * A fully busy node is often healthy, so the top band renders as a warning
+ * (saturated) rather than a failure; red is reserved for genuine faults such
+ * as offline or stuck states.
+ */
 export function utilizationLevel(ratio: number): UtilizationLevel {
   if (ratio < 0.5) {
     return "low";
@@ -36,5 +41,5 @@ export function utilizationLevel(ratio: number): UtilizationLevel {
   if (ratio < 0.9) {
     return "medium";
   }
-  return "high";
+  return "saturated";
 }

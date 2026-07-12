@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it, vi } from "vitest";
 import type { JobSearchEntry } from "../src/jenkins/JenkinsDataService";
-import { exactModuleMock, withModuleMocks } from "./helpers/moduleMock";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 class TestTreeItem {
@@ -82,13 +81,12 @@ interface ProviderConstructor {
   new (...args: unknown[]): ProviderHarness;
 }
 
-const { JenkinsWorkbenchTreeDataProvider } = withModuleMocks(
-  [exactModuleMock("vscode", vscodeShim)],
-  () =>
-    require("../src/tree/TreeDataProvider") as {
-      JenkinsWorkbenchTreeDataProvider: ProviderConstructor;
-    }
-);
+vi.doMock("vscode", () => vscodeShim);
+const { JenkinsWorkbenchTreeDataProvider } = (await import(
+  "../src/tree/TreeDataProvider"
+)) as unknown as {
+  JenkinsWorkbenchTreeDataProvider: ProviderConstructor;
+};
 
 interface TreeItemView {
   id?: string;
@@ -123,7 +121,11 @@ interface ProviderFixture {
   events: unknown[];
 }
 
-function createProviderFixture(): ProviderFixture {
+interface ProviderFixtureOptions {
+  replayPendingInputSummaryOnSubscribe?: boolean;
+}
+
+function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFixture {
   const environmentRef: EnvironmentRef = {
     environmentId: "env-1",
     scope: "workspace",
@@ -183,7 +185,22 @@ function createProviderFixture(): ProviderFixture {
     }
   };
   const pendingInputCoordinator = {
-    onSummaryChange: () => () => undefined
+    onSummaryChange: (
+      listener: (change: {
+        environment: EnvironmentRef;
+        buildUrl: string;
+        summary: { awaitingInput: boolean; count: number; fetchedAt: number };
+      }) => void
+    ) => {
+      if (options.replayPendingInputSummaryOnSubscribe) {
+        listener({
+          environment: environmentRef,
+          buildUrl: "https://jenkins.example/job/demo/1/",
+          summary: { awaitingInput: true, count: 1, fetchedAt: Date.now() }
+        });
+      }
+      return () => undefined;
+    }
   };
 
   fixture.provider = new JenkinsWorkbenchTreeDataProvider(
@@ -225,6 +242,12 @@ async function expandToFolders(fixture: ProviderFixture): Promise<{
 }
 
 describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
+  it("constructs when pending input summary listeners replay immediately", () => {
+    const fixture = createProviderFixture({ replayPendingInputSummaryOnSubscribe: true });
+
+    fixture.provider.dispose();
+  });
+
   it("fires the cached queue folder instance when refreshing the queue", async () => {
     const fixture = createProviderFixture();
     const { queueFolder } = await expandToFolders(fixture);

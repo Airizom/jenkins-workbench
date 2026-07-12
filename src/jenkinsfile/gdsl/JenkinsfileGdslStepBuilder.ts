@@ -23,18 +23,7 @@ export function toStepDefinition(
   const documentation = asString(named.doc) ?? undefined;
   const params = toParameterEntries(named.params);
   const namedParams = toNamedParams(named.namedParams);
-  const takesClosure =
-    params.some((entry) => entry.isBody) || namedParams.some((entry) => entry.isBody);
-
   const signatures = buildSignatures(stepName, params, namedParams);
-  if (signatures.length === 0) {
-    signatures.push({
-      label: `${stepName}()`,
-      parameters: [],
-      usesNamedArgs: false,
-      takesClosure
-    });
-  }
 
   return {
     name: stepName,
@@ -81,15 +70,6 @@ function buildSignatures(
       parameters,
       usesNamedArgs: false,
       takesClosure
-    });
-  }
-
-  if (signatures.length === 0 && takesClosure && bodyParameter) {
-    signatures.push({
-      label: `${stepName} { ... }`,
-      parameters: [bodyParameter],
-      usesNamedArgs: false,
-      takesClosure: true
     });
   }
 

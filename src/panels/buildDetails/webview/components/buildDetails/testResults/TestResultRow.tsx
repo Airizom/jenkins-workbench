@@ -14,9 +14,60 @@ import {
 import { ChevronDownIcon, ClockIcon, FileIcon } from "../../../../../shared/webview/icons";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestCaseViewModel } from "../../../../shared/BuildDetailsContracts";
+import { resolveTestResultRowOpenState } from "./testResultRowState";
 import { hasTestDetails } from "./testResultsUtils";
 
-const { useState } = React;
+const { memo, useEffect, useState } = React;
+
+function TestResultRowHeaderContent({
+  className,
+  durationLabel,
+  hasDetails,
+  name,
+  open,
+  status,
+  statusLabel,
+  suiteName
+}: {
+  className?: string;
+  durationLabel?: string;
+  hasDetails: boolean;
+  name: string;
+  open: boolean;
+  status: BuildTestCaseViewModel["status"];
+  statusLabel: string;
+  suiteName?: string;
+}) {
+  return (
+    <>
+      <TestStatusIcon status={status} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-foreground">{name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {formatTestCaseSubtitle(className, suiteName)}
+        </div>
+      </div>
+      <TestStatusBadge status={status} label={statusLabel} />
+      {durationLabel ? (
+        <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
+          <ClockIcon className="h-3.5 w-3.5" />
+          {durationLabel}
+        </span>
+      ) : null}
+      {hasDetails ? (
+        <ChevronDownIcon
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+            open ? "rotate-180" : ""
+          )}
+        />
+      ) : null}
+    </>
+  );
+}
+
+const MemoizedTestResultRowHeaderContent = memo(TestResultRowHeaderContent);
+
 export function TestResultRow({
   item,
   initialOpen,
@@ -30,31 +81,24 @@ export function TestResultRow({
   const hasDetails = hasTestDetails(item);
   const borderClass = resolveStatusBorderClass(testStatusToVisualTone(item.status));
 
+  useEffect(() => {
+    if (!initialOpen) {
+      return;
+    }
+    setOpen((currentOpen) => resolveTestResultRowOpenState(currentOpen, initialOpen));
+  }, [initialOpen]);
+
   const content = (
-    <>
-      <TestStatusIcon status={item.status} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
-        <div className="truncate text-xs text-muted-foreground">
-          {formatTestCaseSubtitle(item.className, item.suiteName)}
-        </div>
-      </div>
-      <TestStatusBadge status={item.status} label={item.statusLabel} />
-      {item.durationLabel ? (
-        <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
-          <ClockIcon className="h-3.5 w-3.5" />
-          {item.durationLabel}
-        </span>
-      ) : null}
-      {hasDetails ? (
-        <ChevronDownIcon
-          className={cn(
-            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-            open ? "rotate-180" : ""
-          )}
-        />
-      ) : null}
-    </>
+    <MemoizedTestResultRowHeaderContent
+      className={item.className}
+      durationLabel={item.durationLabel}
+      hasDetails={hasDetails}
+      name={item.name}
+      open={hasDetails && open}
+      status={item.status}
+      statusLabel={item.statusLabel}
+      suiteName={item.suiteName}
+    />
   );
 
   if (!hasDetails) {
