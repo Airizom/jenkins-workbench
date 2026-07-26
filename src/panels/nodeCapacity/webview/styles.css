@@ -13,6 +13,27 @@
   }
 
   .capacity-pool summary:focus-visible {
-    box-shadow: 0 0 0 1px var(--ring);
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  .capacity-pool[open] > summary .capacity-pool-chevron {
+    transform: rotate(180deg);
+    color: var(--foreground);
+  }
+
+  /* Square off the summary's bottom corners once content sits beneath it so the
+   * hover highlight does not leave gaps against the card edge. */
+  .capacity-pool[open] > summary {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+}
+
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .capacity-pool-chevron {
+      transition: none;
+    }
   }
 }

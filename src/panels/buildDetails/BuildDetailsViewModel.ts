@@ -1,8 +1,8 @@
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type {
   JenkinsBuildDetails,
@@ -14,9 +14,11 @@ import { buildBuildFailureInsights } from "./BuildDetailsFailureInsightsViewMode
 import { formatBuildDetailsHeaderLabels, truncateConsoleText } from "./BuildDetailsFormatters";
 import { buildPendingInputsViewModel } from "./BuildDetailsPendingInputsViewModel";
 import { buildPipelineStagesViewModel } from "./BuildDetailsPipelineViewModel";
-import { buildTestStateViewModel, buildTestsSummary } from "./BuildDetailsTestsViewModel";
-import type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
-import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
+import { buildTestStateViewModel } from "./BuildDetailsTestsViewModel";
+import type {
+  BuildDetailsViewModel,
+  PipelineNodeLogViewModel
+} from "./shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "./shared/BuildDetailsErrorHelpers";
 
 export type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
@@ -82,20 +84,17 @@ export interface BuildDetailsSectionsInput
 
 export function assembleBuildDetailsSections(input: BuildDetailsSectionsInput) {
   const details = input.details;
-  const testsSummary = buildTestsSummary(details, input.testReport, {
+  const testState = buildTestStateViewModel(details, input.testReport, {
     testReportFetched: input.testReportFetched,
-    logsIncluded: input.testReportLogsIncluded
+    logsIncluded: input.testReportLogsIncluded,
+    loading: input.testResultsLoading,
+    canOpenSource: input.canOpenTestSource
   });
 
   return {
     ...formatBuildDetailsHeaderLabels(details),
     pipelineStagesLoading: Boolean(input.pipelineLoading),
-    testState: buildTestStateViewModel(details, input.testReport, {
-      testReportFetched: input.testReportFetched,
-      logsIncluded: input.testReportLogsIncluded,
-      loading: input.testResultsLoading,
-      canOpenSource: input.canOpenTestSource
-    }),
+    testState,
     coverageState: buildCoverageStateViewModel(details, input.coverageOverview, {
       modifiedFiles: input.modifiedCoverageFiles,
       actionPath: input.coverageActionPath,
@@ -104,7 +103,7 @@ export function assembleBuildDetailsSections(input: BuildDetailsSectionsInput) {
       error: input.coverageError,
       enabled: input.coverageEnabled
     }),
-    insights: buildBuildFailureInsights(details, testsSummary),
+    insights: buildBuildFailureInsights(details, testState.summary),
     pipelineStages: buildPipelineStagesViewModel(input.pipelineRun, {
       details,
       restartEnabled: Boolean(input.pipelineRestartEnabled),

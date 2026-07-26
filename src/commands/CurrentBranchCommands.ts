@@ -7,6 +7,7 @@ import type {
   CurrentBranchResolutionResult,
   CurrentBranchWorkflowService
 } from "../currentBranch/CurrentBranchWorkflowService";
+import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
 import { withActionErrorMessage } from "./CommandUtils";
@@ -34,20 +35,17 @@ const COMMON_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
   { label: "Unlink Repository", action: "unlink" }
 ];
 
-const MATCHED_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
-  { label: "Open Current Jenkins Job", action: "openBranch" },
-  { label: "Trigger Current Jenkins Build", action: "triggerBuild" },
-  { label: "Open Last Failed Build", action: "openLastFailed" },
-  ...COMMON_ACTION_PICKS
-];
-
-const MATCHED_WITH_LATEST_BUILD_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
-  { label: "Open Current Jenkins Job", action: "openBranch" },
-  { label: "Trigger Current Jenkins Build", action: "triggerBuild" },
-  { label: "Open Latest Build Details", action: "openLatestBuild" },
-  { label: "Open Last Failed Build", action: "openLastFailed" },
-  ...COMMON_ACTION_PICKS
-];
+function buildMatchedActionPicks(includeLatestBuild: boolean): readonly CurrentBranchActionPick[] {
+  const picks: CurrentBranchActionPick[] = [
+    { label: "Open Current Jenkins Job", action: "openBranch" },
+    { label: "Trigger Current Jenkins Build", action: "triggerBuild" }
+  ];
+  if (includeLatestBuild) {
+    picks.push({ label: "Open Latest Build Details", action: "openLatestBuild" });
+  }
+  picks.push({ label: "Open Last Failed Build", action: "openLastFailed" }, ...COMMON_ACTION_PICKS);
+  return picks;
+}
 
 const BRANCH_MISSING_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
   { label: "Open Linked Multibranch in Jenkins", action: "openMultibranch" },
@@ -146,7 +144,7 @@ async function linkRepositoryHere(
     return;
   }
 
-  const itemLabel = getItemLabel(item);
+  const itemLabel = resolveTreeItemLabel(item);
   const multibranchLabel = itemLabel ?? "Multibranch";
   await workflowService.linkRepository(repository, {
     environment: item.environment,
@@ -417,7 +415,7 @@ async function openRequest(request: CurrentBranchOpenRequest | undefined): Promi
 
 function buildActionPicks(state: CurrentBranchState): readonly CurrentBranchActionPick[] {
   if (state.kind === "matched") {
-    return state.lastBuild?.url ? MATCHED_WITH_LATEST_BUILD_ACTION_PICKS : MATCHED_ACTION_PICKS;
+    return buildMatchedActionPicks(Boolean(state.lastBuild?.url));
   }
 
   if (state.kind === "branchMissing") {
@@ -425,8 +423,4 @@ function buildActionPicks(state: CurrentBranchState): readonly CurrentBranchActi
   }
 
   return COMMON_ACTION_PICKS;
-}
-
-function getItemLabel(item: JenkinsFolderTreeItem): string | undefined {
-  return typeof item.label === "string" ? item.label : item.label?.label;
 }

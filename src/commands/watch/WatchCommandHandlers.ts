@@ -7,21 +7,16 @@ import {
   getCanonicalTreeJobUrl,
   getJobTreeItemKind,
   getTreeItemLabel,
+  getTreeJobUrlAliases,
   removeJobScopedState
 } from "../CommandUtils";
-
-function getWatchJobUrls(item: JobTreeItem | PipelineTreeItem): string[] {
-  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
-
-  return canonicalJobUrl === item.jobUrl ? [item.jobUrl] : [item.jobUrl, canonicalJobUrl];
-}
 
 async function isWatchedJob(
   watchStore: JenkinsWatchStore,
   item: JobTreeItem | PipelineTreeItem
 ): Promise<boolean> {
   const watchResults = await Promise.all(
-    getWatchJobUrls(item).map((jobUrl) =>
+    getTreeJobUrlAliases(item).map((jobUrl) =>
       watchStore.isWatched(item.environment.scope, item.environment.environmentId, jobUrl)
     )
   );
@@ -34,7 +29,7 @@ async function removeWatchedJob(
   item: JobTreeItem | PipelineTreeItem
 ): Promise<{ removed: boolean; errors: unknown[] }> {
   const removeResults = await Promise.allSettled(
-    getWatchJobUrls(item).map((jobUrl) =>
+    getTreeJobUrlAliases(item).map((jobUrl) =>
       watchStore.removeWatch(item.environment.scope, item.environment.environmentId, jobUrl)
     )
   );

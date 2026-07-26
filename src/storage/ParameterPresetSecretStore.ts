@@ -1,6 +1,5 @@
 import * as crypto from "node:crypto";
 import type * as vscode from "vscode";
-import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import type { ParameterPresetValues } from "./ParameterPresetTypes";
 import {
   cloneParameterValues,
@@ -10,14 +9,7 @@ import {
 
 const SECRET_KEY_PREFIX = "jenkinsWorkbench.parameterPresetSecret";
 
-interface PresetSecretLocation {
-  scope: EnvironmentScope;
-  environmentId: string;
-  jobUrl: string;
-  presetId: string;
-}
-
-interface PreparePresetSecretsInput extends PresetSecretLocation {
+interface PreparePresetSecretsInput {
   values: ParameterPresetValues;
   secretValues?: ParameterPresetValues;
   keepSecretNames?: readonly string[];
@@ -60,7 +52,7 @@ export class ParameterPresetSecretStore {
     movePreviousSecretValues(values, secretValues, previousSecretKeys, preserveExistingSecrets);
     removeSecretNamesFromValues(values, secretValues);
 
-    const { secretKeys, newlyStoredKeys } = await this.storeSecretValues(input, secretValues);
+    const { secretKeys, newlyStoredKeys } = await this.storeSecretValues(secretValues);
     carryOverRetainedSecretKeys(secretKeys, previousSecretKeys, {
       preserveExistingSecrets,
       keepSecretNames: new Set(input.keepSecretNames ?? [])
@@ -70,14 +62,13 @@ export class ParameterPresetSecretStore {
   }
 
   private async storeSecretValues(
-    location: PresetSecretLocation,
     secretValues: ParameterPresetValues
   ): Promise<{ secretKeys: Record<string, string>; newlyStoredKeys: string[] }> {
     const secretKeys: Record<string, string> = {};
     const newlyStoredKeys: string[] = [];
     try {
       for (const [name, value] of Object.entries(secretValues)) {
-        const secretKey = this.buildSecretKey(location, name);
+        const secretKey = this.buildSecretKey();
         await this.secrets.store(secretKey, JSON.stringify(value));
         secretKeys[name] = secretKey;
         newlyStoredKeys.push(secretKey);
@@ -116,14 +107,8 @@ export class ParameterPresetSecretStore {
     }
   }
 
-  private buildSecretKey(location: PresetSecretLocation, parameterName: string): string {
-    const hash = crypto
-      .createHash("sha256")
-      .update(
-        `${location.scope}|${location.environmentId}|${location.jobUrl}|${location.presetId}|${parameterName}`
-      )
-      .digest("hex");
-    return `${SECRET_KEY_PREFIX}.${location.scope}.${location.environmentId}.${hash}.${crypto.randomUUID()}`;
+  private buildSecretKey(): string {
+    return `${SECRET_KEY_PREFIX}.${crypto.randomUUID()}`;
   }
 }
 
@@ -137,7 +122,7 @@ function movePreviousSecretValues(
   preserveExistingSecrets: boolean
 ): void {
   for (const name of Object.keys(previousSecretKeys)) {
-    if (!Object.prototype.hasOwnProperty.call(values, name)) {
+    if (!Object.hasOwn(values, name)) {
       continue;
     }
     if (preserveExistingSecrets) {

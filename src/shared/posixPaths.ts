@@ -13,11 +13,12 @@ export function normalizePosixRelativePath(value: string): string | undefined {
   if (segments.length === 0) {
     return undefined;
   }
-  if (segments.some((segment) => segment === "..")) {
+  if (segments.includes("..")) {
     return undefined;
   }
   return segments.join("/");
 }
+
 export function normalizePosixPathForComparison(value: string): string {
   const normalized = value.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;

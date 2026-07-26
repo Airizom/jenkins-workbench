@@ -1,8 +1,9 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsFlowNodeLog } from "../../jenkins/types";
 import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
+import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
-import { escapeHtml, htmlToText } from "./PipelineNodeLogContent";
+import { htmlToText } from "./PipelineNodeLogContent";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel

@@ -1,8 +1,8 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
 import type { JenkinsTestReport } from "../../jenkins/types";
 import {
-  type NormalizedTestCaseBase,
   forEachNormalizedTestCase,
+  type NormalizedTestCaseBase,
   normalizeTestCaseBase
 } from "../shared/TestCaseViewModel";
 import { formatAvailableTestReportCountsSummary } from "../shared/TestReportFormatters";
@@ -49,6 +49,11 @@ const EMPTY_TEST_DIFF_LISTS: Pick<
   unchangedCount: 0
 };
 
+const UNAVAILABLE_TEST_SUMMARY_LABELS = {
+  baselineSummaryLabel: "Unavailable",
+  targetSummaryLabel: "Unavailable"
+};
+
 export function buildTestsSection(
   baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
   targetReport: BuildCompareOptionalResult<JenkinsTestReport>
@@ -71,12 +76,10 @@ export function buildTestsSection(
     partialUnavailableDetail: "Both builds need test report data for a reliable comparison.",
     emptyFields: {
       ...EMPTY_TEST_DIFF_LISTS,
-      baselineSummaryLabel: "Unavailable",
-      targetSummaryLabel: "Unavailable"
+      ...UNAVAILABLE_TEST_SUMMARY_LABELS
     },
     bothUnavailableFields: {
-      baselineSummaryLabel: "Unavailable",
-      targetSummaryLabel: "Unavailable",
+      ...UNAVAILABLE_TEST_SUMMARY_LABELS,
       ...EMPTY_TEST_DIFF_LISTS
     },
     resolveErrorFields: () => testSummaryFields,

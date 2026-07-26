@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   findPipelineBlock,
-  hasInlineTopLevelSection,
   hasTopLevelSection
 } from "../src/validation/editor/JenkinsfilePipelineParser";
 
@@ -45,6 +44,57 @@ describe("Jenkinsfile pipeline parser", () => {
 
     assert.equal(hasTopLevelSection(commented.document, commented.context, "agent"), false);
     assert.equal(hasTopLevelSection(topLevel.document, topLevel.context, "agent"), true);
+  });
+
+  it("uses consistent lexical rules for inline sections and closing braces", () => {
+    const cases = [
+      {
+        name: "quoted line-comment markers and braces",
+        text: 'pipeline { echo "https://jenkins.example/{job}" agent any }',
+        inline: true,
+        hasAgent: true
+      },
+      {
+        name: "escaped quotes before braces",
+        text: 'pipeline { echo "\\"}" agent any }',
+        inline: true,
+        hasAgent: true
+      },
+      {
+        name: "block comments containing braces and line-comment markers",
+        text: "pipeline { /* } // hidden */ agent any }",
+        inline: true,
+        hasAgent: true
+      },
+      {
+        name: "nested braces",
+        text: "pipeline { stages { stage('x') { } } agent any }",
+        inline: true,
+        hasAgent: true
+      },
+      {
+        name: "tokens truncated by the closing brace",
+        text: "pipeline { agen}t",
+        inline: true,
+        hasAgent: false
+      },
+      {
+        name: "real line comments",
+        text: "pipeline { // } agent any\n}",
+        inline: false,
+        hasAgent: false
+      }
+    ];
+
+    for (const testCase of cases) {
+      const { document, context } = parsePipeline(testCase.text);
+      assert.equal(context.inline, testCase.inline, testCase.name);
+      assert.equal(
+        hasTopLevelSection(document, context, "agent"),
+        testCase.hasAgent,
+        testCase.name
+      );
+    }
   });
 
   describe("findPipelineBlock", () => {
@@ -171,7 +221,7 @@ describe("Jenkinsfile pipeline parser", () => {
     });
 
     it("resumes scanning after block comments even when they contain braces", () => {
-      const { document, context } = parsePipeline("pipeline { /* { */ } agent any }");
+      const { document, context } = parsePipeline("pipeline { /* { */ agent any }");
       assert.equal(context.inline, true);
       assert.equal(hasTopLevelSection(document, context, "agent"), true);
     });
@@ -179,30 +229,6 @@ describe("Jenkinsfile pipeline parser", () => {
     it("does not match tokens that are part of a longer identifier", () => {
       const { document, context } = parsePipeline("pipeline { agents any }");
       assert.equal(hasTopLevelSection(document, context, "agent"), false);
-    });
-  });
-
-  describe("hasInlineTopLevelSection", () => {
-    it("stops scanning at a line comment", () => {
-      assert.equal(hasInlineTopLevelSection("{ // agent }", 1, 12, "agent"), false);
-    });
-
-    it("ignores tokens truncated by the scan end", () => {
-      assert.equal(hasInlineTopLevelSection("{ agent }", 1, 6, "agent"), false);
-      assert.equal(hasInlineTopLevelSection("{ agent }", 1, 8, "agent"), true);
-    });
-
-    it("treats an unterminated block comment as hiding the rest of the line", () => {
-      assert.equal(hasInlineTopLevelSection("{ /* agent }", 1, 12, "agent"), false);
-    });
-
-    it("skips escaped characters inside strings", () => {
-      assert.equal(hasInlineTopLevelSection('{ "\\" agent" }', 1, 13, "agent"), false);
-    });
-
-    it("only matches tokens at brace depth zero", () => {
-      assert.equal(hasInlineTopLevelSection("{ inner { agent } }", 1, 18, "agent"), false);
-      assert.equal(hasInlineTopLevelSection("{ } agent {", 1, 11, "agent"), true);
     });
   });
 });

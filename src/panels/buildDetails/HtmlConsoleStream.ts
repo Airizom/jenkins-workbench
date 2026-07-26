@@ -65,7 +65,7 @@ export class HtmlConsoleStream {
   private readonly callbacks: HtmlConsoleStreamCallbacks;
   private consoleHtmlOffset = 0;
   private consoleHtmlStart = 0;
-  private consoleHtmlBuffer = "";
+  private consoleHtmlBufferLength = 0;
   private consoleHtmlSupported = false;
   private consoleAnnotator: string | undefined;
   private consoleHtmlNeedsReset = false;
@@ -109,7 +109,7 @@ export class HtmlConsoleStream {
         this.handleError();
         return undefined;
       }
-      this.consoleHtmlBuffer = snapshot.html;
+      this.consoleHtmlBufferLength = snapshot.html.length;
       this.consoleHtmlOffset = snapshot.textSize;
       this.consoleHtmlStart = snapshot.start;
       this.consoleHtmlSupported = true;
@@ -132,7 +132,7 @@ export class HtmlConsoleStream {
     this.consoleHtmlNeedsReset = false;
     this.consoleHtmlStart = 0;
     this.consoleHtmlOffset = 0;
-    this.consoleHtmlBuffer = "";
+    this.consoleHtmlBufferLength = 0;
   }
 
   fetchNext(): Promise<JenkinsProgressiveConsoleHtml> {
@@ -170,12 +170,12 @@ export class HtmlConsoleStream {
     if (!chunk.html) {
       return true;
     }
-    const nextBufferLength = this.consoleHtmlBuffer.length + chunk.html.length;
+    const nextBufferLength = this.consoleHtmlBufferLength + chunk.html.length;
     if (this.shouldResetForMarkup(nextBufferLength, chunk.textSize)) {
       this.resetConsoleHtmlWindow(Math.max(0, chunk.textSize - this.maxConsoleChars));
       return true;
     }
-    this.consoleHtmlBuffer += chunk.html;
+    this.consoleHtmlBufferLength = nextBufferLength;
     this.callbacks.onConsoleHtmlAppend(chunk.html);
     return true;
   }
@@ -183,7 +183,7 @@ export class HtmlConsoleStream {
   private handleResetChunk(chunk: JenkinsProgressiveConsoleHtml): void {
     if (!chunk.html) {
       if (!chunk.moreData) {
-        this.consoleHtmlBuffer = "";
+        this.consoleHtmlBufferLength = 0;
         this.consoleHtmlNeedsReset = false;
         this.callbacks.onConsoleHtmlSet({
           html: "",
@@ -192,10 +192,10 @@ export class HtmlConsoleStream {
       }
       return;
     }
-    this.consoleHtmlBuffer = chunk.html;
+    this.consoleHtmlBufferLength = chunk.html.length;
     this.consoleHtmlNeedsReset = false;
     this.callbacks.onConsoleHtmlSet({
-      html: this.consoleHtmlBuffer,
+      html: chunk.html,
       truncated: this.consoleHtmlStart > 0
     });
   }
@@ -232,7 +232,7 @@ export class HtmlConsoleStream {
     const safeStart = Math.max(0, start);
     this.consoleHtmlStart = safeStart;
     this.consoleHtmlOffset = safeStart;
-    this.consoleHtmlBuffer = "";
+    this.consoleHtmlBufferLength = 0;
     this.consoleAnnotator = undefined;
     this.consoleHtmlNeedsReset = true;
   }

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { TREE_FOLDER_ICON, resolveTreeFileIcon } from "../TreeFileIcons";
+import { resolveTreeFileIcon, TREE_FOLDER_ICON } from "../TreeFileIcons";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 

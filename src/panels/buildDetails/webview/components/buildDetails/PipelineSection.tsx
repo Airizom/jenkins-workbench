@@ -19,10 +19,10 @@ import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
 import { PipelineStagesSection } from "./PipelineStagesSection";
 import {
-  type PipelineSectionBodyKind,
   derivePipelineSectionView,
   findStageLogTarget,
   isPipelinePresentation,
+  type PipelineSectionBodyKind,
   planRestoredLogTarget,
   resolvePersistedPipelineLogTarget
 } from "./pipelineSectionModel";
@@ -86,7 +86,7 @@ export function PipelineSection({
       canValidateLogTarget,
       stages
     });
-    persistBuildDetailsUiState({
+    setBuildDetailsPanelUiState({
       pipelinePresentation: presentation,
       selectedGraphStageKey: selectedStageKey,
       selectedPipelineLogTarget
@@ -152,9 +152,9 @@ export function PipelineSection({
 
   return (
     <section id="pipeline-section" className="space-y-3" aria-busy={loading}>
-      <div className="flex flex-col gap-2 rounded-lg border border-card-border bg-card px-3 py-2 shadow-widget sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 rounded-lg border border-card-border bg-card px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <WorkflowIcon className="h-4 w-4 shrink-0" />
+          <WorkflowIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div>
             <div className="text-sm font-semibold">Pipeline</div>
             <div className="text-xs text-muted-foreground">
@@ -233,7 +233,7 @@ function PipelineSectionBody({
     return (
       <Suspense
         fallback={
-          <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-sm text-muted-foreground shadow-widget">
+          <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">
             Loading graph tools…
           </div>
         }
@@ -273,12 +273,4 @@ function readSelectedStageKeyFromState(): string | undefined {
 function readSelectedPipelineLogTargetFromState(): PipelineLogTargetViewModel | undefined {
   const persisted = getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
   return persisted.selectedPipelineLogTarget;
-}
-
-function persistBuildDetailsUiState(nextState: {
-  pipelinePresentation: PipelinePresentation;
-  selectedGraphStageKey?: string;
-  selectedPipelineLogTarget?: PipelineLogTargetViewModel;
-}): void {
-  setBuildDetailsPanelUiState(nextState);
 }

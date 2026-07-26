@@ -14,19 +14,19 @@ import {
   renderNodeCapacityHtml
 } from "./nodeCapacity/NodeCapacityRenderer";
 import {
-  type NodeCapacityOutgoingMessage,
   isLoadNodeCapacityExecutorsMessage,
   isOpenExternalMessage,
   isOpenNodeDetailsMessage,
-  isRefreshNodeCapacityMessage
+  isRefreshNodeCapacityMessage,
+  type NodeCapacityOutgoingMessage
 } from "./nodeCapacity/shared/NodeCapacityPanelMessages";
 import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
-  type PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
   createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
+  type PanelLoadTracker,
   shouldRefreshVisibleEnvironmentPanel
 } from "./shared/PanelRuntimeHelpers";
 import { resolvePanelAssetsAndRenderLoading } from "./shared/webview/PanelViewHelpers";

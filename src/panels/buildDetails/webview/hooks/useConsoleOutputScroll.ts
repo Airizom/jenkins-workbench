@@ -14,7 +14,7 @@ const readConsoleScrollState = (output: HTMLPreElement) => {
   return { isScrollable, isScrolledDown };
 };
 export function useConsoleOutputScroll(
-  consoleOutputRef: React.RefObject<HTMLPreElement>,
+  consoleOutputRef: React.RefObject<HTMLPreElement | null>,
   consoleScrollKey: string
 ) {
   const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -28,9 +28,7 @@ export function useConsoleOutputScroll(
 
     const { isScrollable, isScrolledDown } = readConsoleScrollState(output);
     const nextShowScrollToTop = isScrollable && isScrolledDown;
-    setShowScrollToTop((previous) =>
-      previous === nextShowScrollToTop ? previous : nextShowScrollToTop
-    );
+    setShowScrollToTop(nextShowScrollToTop);
   }, [consoleOutputRef]);
 
   useEffect(() => {

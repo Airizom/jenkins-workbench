@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { normalizeBuildDetailsPanelUiState } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
+import {
+  isBuildDetailsPanelState,
+  normalizeBuildDetailsPanelUiState
+} from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 import { resolveBuildDetailsSelectedTab } from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsTabsModel";
 
 describe("BuildDetailsTabs", () => {
@@ -34,5 +37,16 @@ describe("BuildDetailsTabs", () => {
       "console"
     );
     assert.equal(normalizeBuildDetailsPanelUiState({ selectedTab: "invalid" }), undefined);
+  });
+
+  it("accepts an empty UI-state record but rejects an empty array", () => {
+    const state = {
+      environmentId: "env-1",
+      scope: "workspace",
+      buildUrl: "https://jenkins.example/job/example/1/"
+    } as const;
+
+    assert.equal(isBuildDetailsPanelState({ ...state, buildDetailsUi: {} }), true);
+    assert.equal(isBuildDetailsPanelState({ ...state, buildDetailsUi: [] }), false);
   });
 });

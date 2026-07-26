@@ -4,17 +4,13 @@ const { useCallback, useEffect, useState } = React;
 
 const BOTTOM_THRESHOLD_PX = 32;
 
-const getScrollElement = (): HTMLElement | null => {
+const getScrollElement = (): HTMLElement => {
   const element = document.scrollingElement ?? document.documentElement;
-  return element as HTMLElement | null;
+  return element as HTMLElement;
 };
 
 const readScrollState = () => {
   const element = getScrollElement();
-  if (!element) {
-    return { isScrollable: false, isAtBottom: false };
-  }
-
   const { scrollTop, clientHeight, scrollHeight } = element;
   const isScrollable = scrollHeight - clientHeight > 1;
   const isAtBottom = isScrollable && scrollTop + clientHeight >= scrollHeight - BOTTOM_THRESHOLD_PX;
@@ -35,7 +31,7 @@ export function useScrollToTopButton(): ScrollToTopButtonState {
   const updateVisibility = useCallback(() => {
     const { isScrollable, isAtBottom } = readScrollState();
     const nextShow = isScrollable && isAtBottom;
-    setShowButton((prev) => (prev === nextShow ? prev : nextShow));
+    setShowButton(nextShow);
   }, []);
 
   useEffect(() => {
@@ -55,15 +51,8 @@ export function useScrollToTopButton(): ScrollToTopButtonState {
 
   const scrollToTop = useCallback(() => {
     const element = getScrollElement();
-    if (!element) {
-      return;
-    }
     const behavior = prefersReducedMotion() ? "auto" : "smooth";
-    if (typeof element.scrollTo === "function") {
-      element.scrollTo({ top: 0, behavior });
-      return;
-    }
-    element.scrollTop = 0;
+    element.scrollTo({ top: 0, behavior });
   }, []);
 
   return { showButton, scrollToTop };

@@ -15,8 +15,8 @@ export interface StageStripSegment {
 
 const DENSE_STRIP_THRESHOLD = 10;
 
-// Lower index = worse outcome; unknown statuses sort with "neutral".
-const STATUS_SEVERITY = ["failure", "unstable", "running", "aborted", "success", "neutral"];
+// Lower index = worse outcome; success, neutral, and unknown statuses share the fallback rank.
+const STATUS_SEVERITY = ["failure", "unstable", "running", "aborted"];
 
 type StageStatus = {
   statusClass: string;
@@ -25,7 +25,7 @@ type StageStatus = {
 
 function severityOf(statusClass: string): number {
   const index = STATUS_SEVERITY.indexOf(statusClass);
-  return index === -1 ? STATUS_SEVERITY.length - 1 : index;
+  return index === -1 ? STATUS_SEVERITY.length : index;
 }
 
 function worstBranchStatus(stage: PipelineStageViewModel): StageStatus {
@@ -57,10 +57,7 @@ export function buildStageStripSegments(stages: PipelineStageViewModel[]): Stage
     let statusLabel = stage.statusLabel;
     if (statusClass === "success" || statusClass === "neutral") {
       const worst = worstBranchStatus(stage);
-      if (
-        severityOf(worst.statusClass) < severityOf(statusClass) &&
-        !(statusClass === "neutral" && worst.statusClass === "success")
-      ) {
+      if (severityOf(worst.statusClass) < severityOf(statusClass)) {
         statusClass = worst.statusClass;
         statusLabel = worst.statusLabel;
       }

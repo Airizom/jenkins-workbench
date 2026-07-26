@@ -50,10 +50,7 @@ export class BuildDetailsPanelView
     state: BuildDetailsPanelState,
     options?: { canOpenSource?: (className?: string) => boolean; coverageEnabled?: boolean }
   ): void {
-    const updateMessage = buildUpdateMessageFromState(state, options);
-    if (updateMessage) {
-      this.postMessage(updateMessage);
-    }
+    this.postMessage(buildUpdateMessageFromState(state, options));
   }
 
   postErrors(errors: string[]): void {

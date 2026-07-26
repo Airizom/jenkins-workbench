@@ -22,12 +22,14 @@ export function derivePipelineSectionView(
 ): PipelineSectionView {
   const hasStages = stageCount > 0;
   const showPlaceholder = loading && !hasStages;
+  const body: PipelineSectionBodyKind = showPlaceholder ? "placeholder" : presentation;
+
   return {
     hidden: !loading && !hasStages,
     hasStages,
     canValidateLogTarget: hasStages || !loading,
     showLoadingBanner: loading && hasStages,
-    body: showPlaceholder ? "placeholder" : presentation === "graph" ? "graph" : "list"
+    body
   };
 }
 

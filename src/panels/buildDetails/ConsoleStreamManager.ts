@@ -31,11 +31,17 @@ export type ConsoleSnapshotResult = {
   consoleError?: unknown;
 };
 
-export type ConsoleFetchResult = {
-  mode: "html" | "text";
-  value?: JenkinsProgressiveConsoleHtml | JenkinsProgressiveConsoleText | JenkinsConsoleText;
-  error?: unknown;
-};
+export type ConsoleFetchResult =
+  | {
+      mode: "html";
+      value?: JenkinsProgressiveConsoleHtml;
+      error?: unknown;
+    }
+  | {
+      mode: "text";
+      value?: JenkinsProgressiveConsoleText | JenkinsConsoleText;
+      error?: unknown;
+    };
 
 export interface ConsoleStreamManagerOptions {
   dataService: ConsoleStreamDataService;
@@ -147,18 +153,18 @@ export class ConsoleStreamManager {
     }
   }
 
-  applyResult(
-    mode: "html" | "text",
-    value: JenkinsProgressiveConsoleHtml | JenkinsProgressiveConsoleText | JenkinsConsoleText
-  ): void {
-    if (mode === "html") {
-      const supported = this.htmlConsoleStream.applyResult(value as JenkinsProgressiveConsoleHtml);
+  applyResult(result: ConsoleFetchResult): void {
+    if (!result.value) {
+      return;
+    }
+    if (result.mode === "html") {
+      const supported = this.htmlConsoleStream.applyResult(result.value);
       if (!supported) {
         this.textConsoleStream.resetForFallback();
       }
       return;
     }
-    this.textConsoleStream.applyResult(value as JenkinsProgressiveConsoleText | JenkinsConsoleText);
+    this.textConsoleStream.applyResult(result.value);
   }
 
   private async tryProbeHtmlStream(): Promise<boolean> {

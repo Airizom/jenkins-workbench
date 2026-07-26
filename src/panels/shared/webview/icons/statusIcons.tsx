@@ -56,15 +56,9 @@ export function PlayCircleIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-export function StopSquareIcon({ className, ...props }: IconProps) {
+export function StopSquareIcon(props: IconProps) {
   return (
-    <IconBase
-      className={className}
-      defaultClassName="h-4 w-4"
-      fill="currentColor"
-      stroke="none"
-      {...props}
-    >
+    <IconBase fill="currentColor" stroke="none" {...props}>
       <rect x="6" y="6" width="12" height="12" rx="1" />
     </IconBase>
   );

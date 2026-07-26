@@ -13,27 +13,24 @@ interface NewItemKindDefinition {
   defaultName: string;
 }
 
-const NEW_ITEM_KIND_DEFINITIONS: readonly NewItemKindDefinition[] = [
-  {
+const NEW_ITEM_KIND_BY_TYPE: Record<JenkinsItemCreateKind, NewItemKindDefinition> = {
+  job: {
     itemType: "job",
     label: "Job",
     description: "Freestyle job",
     promptLabel: "job",
     defaultName: "new-job"
   },
-  {
+  pipeline: {
     itemType: "pipeline",
     label: "Pipeline",
     description: "Pipeline job",
     promptLabel: "pipeline",
     defaultName: "new-pipeline"
   }
-];
+};
 
-const NEW_ITEM_KIND_BY_TYPE: Record<JenkinsItemCreateKind, NewItemKindDefinition> =
-  Object.fromEntries(
-    NEW_ITEM_KIND_DEFINITIONS.map((definition) => [definition.itemType, definition])
-  ) as Record<JenkinsItemCreateKind, NewItemKindDefinition>;
+const NEW_ITEM_KIND_DEFINITIONS = Object.values(NEW_ITEM_KIND_BY_TYPE);
 
 export interface JobNewItemTarget {
   environment: JenkinsEnvironmentRef;

@@ -1,13 +1,13 @@
 import * as React from "react";
+import type { ConsoleMatch, SearchDirection } from "./consoleSearch";
 import {
-  MAX_CONSOLE_MATCHES,
   buildConsoleMatches,
   buildConsoleSegments,
   createConsoleSearchKeyDownHandler,
   getNextActiveMatchIndex,
+  MAX_CONSOLE_MATCHES,
   scrollActiveConsoleMatchIntoView
 } from "./consoleSearch";
-import type { ConsoleMatch, SearchDirection } from "./consoleSearch";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
@@ -25,8 +25,8 @@ export type ConsoleSearchState = {
   searchError?: string;
   tooManyMatchesLabel?: string;
   consoleSegments: React.ReactNode[];
-  searchInputRef: React.RefObject<HTMLInputElement>;
-  consoleOutputRef: React.RefObject<HTMLPreElement>;
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
+  consoleOutputRef: React.RefObject<HTMLPreElement | null>;
   handleSearchChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   handleSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   handleSearchStep: (direction: "next" | "prev") => void;

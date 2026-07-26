@@ -16,10 +16,6 @@ export function disposePanelResources(disposables: vscode.Disposable[]): void {
   }
 }
 
-function disposeRefreshSubscription(subscription?: vscode.Disposable): void {
-  subscription?.dispose();
-}
-
 export function disposeEnvironmentScopedPanel(options: {
   clearSingleton: () => void;
   disposables: vscode.Disposable[];
@@ -28,7 +24,7 @@ export function disposeEnvironmentScopedPanel(options: {
 }): void {
   options.clearSingleton();
   options.onDispose?.();
-  disposeRefreshSubscription(options.refreshSubscription);
+  options.refreshSubscription?.dispose();
   disposePanelResources(options.disposables);
 }
 
@@ -52,12 +48,11 @@ export function attachPanelLifecycle(
   );
 }
 
-function shouldRefreshEnvironmentScopedPanel(options: {
+export function shouldRefreshVisibleEnvironmentPanel(options: {
   environment?: { environmentId: string };
   environmentId?: string;
   hasRendered: boolean;
-  requireVisible?: boolean;
-  panel?: vscode.WebviewPanel;
+  panel: vscode.WebviewPanel;
 }): boolean {
   if (!options.environment || !options.hasRendered) {
     return false;
@@ -65,22 +60,10 @@ function shouldRefreshEnvironmentScopedPanel(options: {
   if (options.environmentId && options.environment.environmentId !== options.environmentId) {
     return false;
   }
-  if (options.requireVisible && options.panel && !options.panel.visible) {
+  if (!options.panel.visible) {
     return false;
   }
   return true;
-}
-
-export function shouldRefreshVisibleEnvironmentPanel(options: {
-  environment?: { environmentId: string };
-  environmentId?: string;
-  hasRendered: boolean;
-  panel: vscode.WebviewPanel;
-}): boolean {
-  return shouldRefreshEnvironmentScopedPanel({
-    ...options,
-    requireVisible: true
-  });
 }
 
 export function bindEnvironmentRefresh(

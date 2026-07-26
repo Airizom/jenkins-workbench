@@ -2,8 +2,8 @@ import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import {
   JenkinsScopedJobStore,
-  type ScopedJobStoreEntry,
-  mergeScopedJobEntryMetadata
+  mergeScopedJobEntryMetadata,
+  type ScopedJobStoreEntry
 } from "./ScopedJobStore";
 
 export type WatchStatusKind = "success" | "failure" | "other" | "unknown";
@@ -19,10 +19,6 @@ export interface WatchedJobEntry extends StoredWatchedJobEntry {
 }
 
 const WATCHED_JOBS_KEY = "jenkinsWorkbench.watchedJobs";
-
-type WatchUpdateInput = Omit<StoredWatchedJobEntry, "lastStatus"> & {
-  lastStatus?: WatchStatusKind;
-};
 
 export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEntry> {
   constructor(context: vscode.ExtensionContext) {
@@ -45,7 +41,7 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
     return this.isTracked(scope, environmentId, jobUrl);
   }
 
-  async addWatch(scope: EnvironmentScope, entry: WatchUpdateInput): Promise<void> {
+  async addWatch(scope: EnvironmentScope, entry: StoredWatchedJobEntry): Promise<void> {
     await this.addOrUpdate(scope, entry, mergeScopedJobEntryMetadata);
   }
 

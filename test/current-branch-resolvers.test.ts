@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
-import type { CurrentBranchGitHubPullRequestLookupResult } from "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter";
+import type { CurrentBranchPullRequestResolution } from "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import type {
   CurrentBranchPullRequestJobMatcher,
   CurrentBranchPullRequestJobRef
@@ -38,9 +38,6 @@ const { CurrentBranchRefreshCoordinator } = await import(
 );
 const { CurrentBranchJenkinsService } = await import(
   "../src/currentBranch/CurrentBranchJenkinsService"
-);
-const { CurrentBranchPullRequestService } = await import(
-  "../src/currentBranch/CurrentBranchPullRequestService"
 );
 const { VscodeCurrentBranchGitHubPullRequestAdapter } = await import(
   "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter"
@@ -87,16 +84,12 @@ describe("CurrentBranchRepositoryResolver", () => {
 describe("CurrentBranchTargetResolver", () => {
   it("selects a matching pull request job before branch fallback", async () => {
     const fixture = createTargetFixture({
-      pullRequestLookup: {
-        kind: "available",
-        snapshot: {
-          pullRequest: {
-            number: 42,
-            title: "Add deployment",
-            url: "https://github.example/pull/42",
-            headBranch: "feature/deploy"
-          }
-        }
+      pullRequestResolution: {
+        kind: "pullRequest",
+        number: 42,
+        title: "Add deployment",
+        url: "https://github.example/pull/42",
+        headBranch: "feature/deploy"
       },
       jobs: [
         { name: "feature%2Fdeploy", url: "job/main/job/feature%2Fdeploy/", color: "blue" },
@@ -123,15 +116,11 @@ describe("CurrentBranchTargetResolver", () => {
 
   it("falls back to the pull request head branch job when no pull request job matches", async () => {
     const fixture = createTargetFixture({
-      pullRequestLookup: {
-        kind: "available",
-        snapshot: {
-          pullRequest: {
-            number: 42,
-            url: "https://github.example/pull/42",
-            headBranch: "feature/deployment-v2"
-          }
-        }
+      pullRequestResolution: {
+        kind: "pullRequest",
+        number: 42,
+        url: "https://github.example/pull/42",
+        headBranch: "feature/deployment-v2"
       },
       jobs: [{ name: "feature%2Fdeployment-v2", url: "job/main/job/feature%2Fdeployment-v2/" }]
     });
@@ -146,7 +135,7 @@ describe("CurrentBranchTargetResolver", () => {
 
   it("matches URL-encoded Jenkins branch names and reports missing branches", async () => {
     const matched = createTargetFixture({
-      pullRequestLookup: { kind: "available", snapshot: {} },
+      pullRequestResolution: { kind: "none" },
       jobs: [{ name: "feature%2Fdeploy", url: "job/main/job/feature%2Fdeploy/" }]
     });
 
@@ -157,7 +146,7 @@ describe("CurrentBranchTargetResolver", () => {
     assert.equal(selected.target.selectedTarget.jobName, "feature/deploy");
 
     const missing = createTargetFixture({
-      pullRequestLookup: { kind: "available", snapshot: {} },
+      pullRequestResolution: { kind: "none" },
       jobs: []
     });
 
@@ -173,7 +162,7 @@ describe("CurrentBranchTargetResolver", () => {
       [{ name: "feature%2Fdeploy", url: "job/main/job/feature%2Fdeploy/", color: "red" }]
     ];
     const fixture = createTargetFixture({
-      pullRequestLookup: { kind: "available", snapshot: {} },
+      pullRequestResolution: { kind: "none" },
       get jobs() {
         return jobsByCall[Math.min(fixture.jobCalls, jobsByCall.length - 1)];
       }
@@ -203,7 +192,8 @@ describe("VscodeCurrentBranchGitHubPullRequestAdapter", () => {
       headRefName: "feature/deploy"
     });
 
-    assert.deepEqual(result.snapshot.pullRequest, {
+    assert.deepEqual(result, {
+      kind: "pullRequest",
       number: 42,
       title: "Add deployment",
       url: "https://github.example/pull/42",
@@ -217,7 +207,8 @@ describe("VscodeCurrentBranchGitHubPullRequestAdapter", () => {
       head: { ref: "bugfix/timeout" }
     });
 
-    assert.equal(result.snapshot.pullRequest?.headBranch, "bugfix/timeout");
+    assert.equal(result.kind, "pullRequest");
+    assert.equal(result.headBranch, "bugfix/timeout");
     assert.ok(githubPullRequestExtension);
 
     githubPullRequestExtension.exports = {
@@ -228,8 +219,14 @@ describe("VscodeCurrentBranchGitHubPullRequestAdapter", () => {
 
     const withoutHead = await adapter.lookup(createRepositoryContext("/workspace/app"));
 
-    assert.equal(withoutHead.kind, "available");
-    assert.equal(withoutHead.snapshot.pullRequest?.headBranch, undefined);
+    assert.equal(withoutHead.kind, "pullRequest");
+    assert.equal(withoutHead.headBranch, undefined);
+  });
+
+  it("returns none when repository metadata has no pull request", async () => {
+    const { result } = await lookupAvailablePullRequest(undefined);
+
+    assert.deepEqual(result, { kind: "none" });
   });
 });
 
@@ -392,7 +389,7 @@ function createGitRepository(
 }
 
 function createTargetFixture(options: {
-  pullRequestLookup: CurrentBranchGitHubPullRequestLookupResult;
+  pullRequestResolution: CurrentBranchPullRequestResolution;
   jobs: CurrentBranchPullRequestJobRef[];
   matcher?: CurrentBranchPullRequestJobMatcher["findMatch"];
 }): {
@@ -410,14 +407,12 @@ function createTargetFixture(options: {
       return jobs;
     }
   } as unknown as JenkinsDataService;
-  // Use the production pull request service so adapter snapshots flow through
-  // the same resolution path the extension uses at runtime.
-  const pullRequestService = new CurrentBranchPullRequestService({
+  const pullRequestAdapter = {
     lookup: async () => {
       pullRequestCalls += 1;
-      return options.pullRequestLookup;
+      return options.pullRequestResolution;
     }
-  });
+  };
   const pullRequestJobMatcher = {
     findMatch: options.matcher ?? (() => undefined)
   };
@@ -425,7 +420,7 @@ function createTargetFixture(options: {
   return {
     resolver: new CurrentBranchTargetResolver(
       dataService,
-      pullRequestService,
+      pullRequestAdapter,
       pullRequestJobMatcher
     ),
     localState: createLinkedContext(),
@@ -467,7 +462,7 @@ function createRepositoryContext(rootFsPath: string): CurrentBranchRepositoryCon
 
 async function lookupAvailablePullRequest(pullRequest: unknown): Promise<{
   adapter: InstanceType<typeof VscodeCurrentBranchGitHubPullRequestAdapter>;
-  result: Extract<CurrentBranchGitHubPullRequestLookupResult, { kind: "available" }>;
+  result: Exclude<CurrentBranchPullRequestResolution, { kind: "unavailable" }>;
 }> {
   githubPullRequestExtension = {
     isActive: true,
@@ -478,10 +473,10 @@ async function lookupAvailablePullRequest(pullRequest: unknown): Promise<{
   };
   const adapter = new VscodeCurrentBranchGitHubPullRequestAdapter();
   const result = await adapter.lookup(createRepositoryContext("/workspace/app"));
-  assert.equal(result.kind, "available");
+  assert.notEqual(result.kind, "unavailable");
   return {
     adapter,
-    result: result as Extract<CurrentBranchGitHubPullRequestLookupResult, { kind: "available" }>
+    result: result as Exclude<CurrentBranchPullRequestResolution, { kind: "unavailable" }>
   };
 }
 

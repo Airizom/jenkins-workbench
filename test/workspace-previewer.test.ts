@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
+import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBufferResponse } from "../src/jenkins/request";
-import type { WorkspaceRetrievalService } from "../src/services/WorkspaceRetrievalService";
 import type { ArtifactPreviewProvider } from "../src/ui/ArtifactPreviewProvider";
 
 interface WorkspaceFileCall {
@@ -10,6 +10,12 @@ interface WorkspaceFileCall {
   jobUrl: string;
   relativePath: string;
   options?: { maxBytes?: number };
+}
+
+function createWorkspaceDataService(
+  getWorkspaceFile: JenkinsDataService["getWorkspaceFile"]
+): JenkinsDataService {
+  return { getWorkspaceFile } as unknown as JenkinsDataService;
 }
 
 interface OpenPreviewCall {
@@ -50,8 +56,8 @@ describe("WorkspacePreviewer", () => {
       url: "https://jenkins.example/"
     };
     const previewProvider = {} as ArtifactPreviewProvider;
-    const retrievalService: WorkspaceRetrievalService = {
-      getWorkspaceFile: async (requestEnvironment, jobUrl, relativePath, options) => {
+    const dataService = createWorkspaceDataService(
+      async (requestEnvironment, jobUrl, relativePath, options) => {
         workspaceFileCalls.push({
           environment: requestEnvironment,
           jobUrl,
@@ -60,8 +66,8 @@ describe("WorkspacePreviewer", () => {
         });
         return response;
       }
-    };
-    const previewer = new WorkspacePreviewer(retrievalService, previewProvider, () => ({
+    );
+    const previewer = new WorkspacePreviewer(dataService, previewProvider, () => ({
       maxBytes: 4096
     }));
 
@@ -95,11 +101,9 @@ describe("WorkspacePreviewer", () => {
       data: new Uint8Array([4, 5, 6]),
       headers: {}
     };
-    const retrievalService: WorkspaceRetrievalService = {
-      getWorkspaceFile: async () => response
-    };
+    const dataService = createWorkspaceDataService(async () => response);
     const previewer = new WorkspacePreviewer(
-      retrievalService,
+      dataService,
       {} as ArtifactPreviewProvider,
       () => ({})
     );

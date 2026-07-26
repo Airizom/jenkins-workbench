@@ -83,6 +83,22 @@ describe("stageStripModel", () => {
     assert.equal(segments[0]?.statusLabel, "Not built");
   });
 
+  it("escalates a neutral parent when a nested branch was aborted", () => {
+    const segments = buildStageStripSegments([
+      makeStage({
+        key: "parallel",
+        statusClass: "neutral",
+        statusLabel: "Not built",
+        parallelBranches: [
+          makeStage({ key: "branch-aborted", statusClass: "aborted", statusLabel: "Aborted" })
+        ]
+      })
+    ]);
+
+    assert.equal(segments[0]?.statusClass, "aborted");
+    assert.equal(segments[0]?.statusLabel, "Aborted");
+  });
+
   it("does not downgrade a parent that already reports a worse status", () => {
     const segments = buildStageStripSegments([
       makeStage({

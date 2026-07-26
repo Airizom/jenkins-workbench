@@ -1,8 +1,8 @@
 import {
-  type StatusVisualTone,
   resolveMetricCardClass,
   resolveMetricDotClass,
-  resolveMetricToneClass
+  resolveMetricToneClass,
+  type StatusVisualTone
 } from "../../TestStatusStyles";
 import { cn } from "../lib/utils";
 export function ToneMetricCard({

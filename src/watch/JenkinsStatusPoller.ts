@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
+import { JenkinsRequestError } from "../jenkins/errors";
 import type { JenkinsDataService, PendingInputSummary } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { JenkinsRequestError } from "../jenkins/errors";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { EnvironmentScope, JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -290,13 +290,13 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
   }
 
   private pruneInactiveFailures(activeKeys: Set<string>): void {
-    for (const key of Array.from(this.failureCounts.keys())) {
+    for (const key of this.failureCounts.keys()) {
       if (!activeKeys.has(key)) {
         this.failureCounts.delete(key);
       }
     }
     let didChange = false;
-    for (const key of Array.from(this.watchErrorKeys.keys())) {
+    for (const key of this.watchErrorKeys) {
       if (!activeKeys.has(key)) {
         this.watchErrorKeys.delete(key);
         didChange = true;
@@ -308,7 +308,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
   }
 
   private pruneInactivePendingInputs(activeWatchKeys: Set<string>): void {
-    for (const key of Array.from(this.pendingInputSignatures.keys())) {
+    for (const key of this.pendingInputSignatures.keys()) {
       let isActive = false;
       for (const watchKey of activeWatchKeys) {
         if (key.startsWith(`${watchKey}:`)) {
@@ -325,7 +325,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
   private clearWatchErrorsForEnvironment(scope: EnvironmentScope, environmentId: string): void {
     const prefix = `${scope}:${environmentId}:`;
     let didChange = false;
-    for (const key of Array.from(this.watchErrorKeys.keys())) {
+    for (const key of this.watchErrorKeys) {
       if (key.startsWith(prefix)) {
         this.watchErrorKeys.delete(key);
         didChange = true;

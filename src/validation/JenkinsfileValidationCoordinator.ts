@@ -16,7 +16,7 @@ import {
 } from "./JenkinsfileValidationDiagnostics";
 import { JenkinsfileValidationOutputLogger } from "./JenkinsfileValidationOutputLogger";
 import { JenkinsfileValidationRunner } from "./JenkinsfileValidationRunner";
-import { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
+import type { JenkinsfileValidationStateStore } from "./JenkinsfileValidationStateStore";
 import type { JenkinsfileValidationStatusBar } from "./JenkinsfileValidationStatusBar";
 import type {
   JenkinsfileValidationStatusProvider,
@@ -31,7 +31,6 @@ export class JenkinsfileValidationCoordinator
   private readonly outputChannel = vscode.window.createOutputChannel("Jenkinsfile Validation");
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly statusEmitter = new vscode.EventEmitter<vscode.Uri>();
-  private readonly stateStore = new JenkinsfileValidationStateStore();
   private readonly logger = new JenkinsfileValidationOutputLogger(this.outputChannel);
   private readonly runner: JenkinsfileValidationRunner;
   private config: JenkinsfileValidationConfig;
@@ -39,6 +38,7 @@ export class JenkinsfileValidationCoordinator
   constructor(
     clientProvider: JenkinsClientProvider,
     environmentResolver: JenkinsfileEnvironmentResolver,
+    private readonly stateStore: JenkinsfileValidationStateStore,
     private readonly statusBar: JenkinsfileValidationStatusBar,
     private readonly matcher: JenkinsfileMatcher,
     config: JenkinsfileValidationConfig
@@ -58,20 +58,14 @@ export class JenkinsfileValidationCoordinator
   start(): void {
     this.subscriptions.push(
       vscode.workspace.onDidSaveTextDocument((document) => {
-        if (!this.shouldRunAutomaticValidation()) {
-          return;
-        }
-        if (!this.matcher.matches(document)) {
+        if (!this.shouldValidateAutomatically(document)) {
           return;
         }
         this.cancelChangeValidation(document);
         void this.validateDocument(document, { reason: "save" });
       }),
       vscode.workspace.onDidOpenTextDocument((document) => {
-        if (!this.shouldRunAutomaticValidation()) {
-          return;
-        }
-        if (!this.matcher.matches(document)) {
+        if (!this.shouldValidateAutomatically(document)) {
           return;
         }
         void this.validateDocument(document, { reason: "open" });
@@ -214,28 +208,13 @@ export class JenkinsfileValidationCoordinator
 
   clearWorkspaceState(workspaceFolder: vscode.WorkspaceFolder): void {
     const workspaceKey = workspaceFolder.uri.toString();
-    for (const document of vscode.workspace.textDocuments) {
-      if (!this.matcher.matches(document)) {
-        continue;
-      }
-      const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-      if (!folder || folder.uri.toString() !== workspaceKey) {
-        continue;
-      }
-      this.clearDocumentState(document);
-    }
+    this.clearMatchingDocuments((documentFolder) => {
+      return documentFolder?.uri.toString() === workspaceKey;
+    });
   }
 
   clearFallbackState(): void {
-    for (const document of vscode.workspace.textDocuments) {
-      if (!this.matcher.matches(document)) {
-        continue;
-      }
-      if (vscode.workspace.getWorkspaceFolder(document.uri)) {
-        continue;
-      }
-      this.clearDocumentState(document);
-    }
+    this.clearMatchingDocuments((documentFolder) => !documentFolder);
   }
 
   revalidateWorkspaceState(workspaceFolder: vscode.WorkspaceFolder): void {
@@ -333,28 +312,23 @@ export class JenkinsfileValidationCoordinator
     environment?: JenkinsEnvironmentRef,
     stale = false
   ): void {
-    const { changed, state } = this.stateStore.setResultState(
-      document,
-      errorCount,
-      environment,
-      stale
-    );
-    this.statusBar.setResult(document, state.errorCount, state.environment, Boolean(state.stale));
+    const changed = this.stateStore.setResultState(document, errorCount, environment, stale);
+    this.statusBar.refresh(document);
     this.emitStatusChangeIfNeeded(document, changed);
   }
 
   private setResultStaleState(document: vscode.TextDocument, stale: boolean): void {
-    const { changed, state } = this.stateStore.setResultStaleState(document, stale);
-    if (!state) {
+    const changed = this.stateStore.setResultStaleState(document, stale);
+    if (this.stateStore.getStatusState(document)?.kind !== "result") {
       return;
     }
-    this.statusBar.setResult(document, state.errorCount, state.environment, Boolean(state.stale));
+    this.statusBar.refresh(document);
     this.emitStatusChangeIfNeeded(document, changed);
   }
 
   private setNoEnvironmentState(document: vscode.TextDocument): void {
     const changed = this.stateStore.setNoEnvironmentState(document);
-    this.statusBar.setNoEnvironment(document);
+    this.statusBar.refresh(document);
     this.emitStatusChangeIfNeeded(document, changed);
   }
 
@@ -363,12 +337,8 @@ export class JenkinsfileValidationCoordinator
     message: string,
     environment?: JenkinsEnvironmentRef
   ): void {
-    const { changed, state } = this.stateStore.setRequestFailedState(
-      document,
-      message,
-      environment
-    );
-    this.statusBar.setRequestFailed(document, state.message, state.environment);
+    const changed = this.stateStore.setRequestFailedState(document, message, environment);
+    this.statusBar.refresh(document);
     this.emitStatusChangeIfNeeded(document, changed);
   }
 
@@ -411,25 +381,7 @@ export class JenkinsfileValidationCoordinator
   }
 
   private restoreStatusBar(document: vscode.TextDocument): void {
-    const lastState = this.stateStore.getStatusState(document);
-    if (lastState?.kind === "result") {
-      this.statusBar.setResult(
-        document,
-        lastState.errorCount,
-        lastState.environment,
-        Boolean(lastState.stale)
-      );
-      return;
-    }
-    if (lastState?.kind === "no-environment") {
-      this.statusBar.setNoEnvironment(document);
-      return;
-    }
-    if (lastState?.kind === "request-failed") {
-      this.statusBar.setRequestFailed(document, lastState.message, lastState.environment);
-      return;
-    }
-    this.statusBar.clear(document);
+    this.statusBar.refresh(document);
   }
 
   private revalidateMatchingDocuments(
@@ -447,6 +399,20 @@ export class JenkinsfileValidationCoordinator
     }
   }
 
+  private clearMatchingDocuments(
+    predicate: (workspaceFolder: vscode.WorkspaceFolder | undefined) => boolean
+  ): void {
+    for (const document of vscode.workspace.textDocuments) {
+      if (!this.matcher.matches(document)) {
+        continue;
+      }
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+      if (predicate(workspaceFolder)) {
+        this.clearDocumentState(document);
+      }
+    }
+  }
+
   private emitStatusChangeIfNeeded(document: vscode.TextDocument, changed: boolean): void {
     if (!changed) {
       return;
@@ -454,7 +420,7 @@ export class JenkinsfileValidationCoordinator
     this.statusEmitter.fire(document.uri);
   }
 
-  private shouldRunAutomaticValidation(): boolean {
-    return this.config.enabled && this.config.runOnSave;
+  private shouldValidateAutomatically(document: vscode.TextDocument): boolean {
+    return this.config.enabled && this.config.runOnSave && this.matcher.matches(document);
   }
 }

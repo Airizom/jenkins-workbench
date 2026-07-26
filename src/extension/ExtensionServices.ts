@@ -6,13 +6,12 @@ import type { TreeActivityOptions } from "../tree/ActivityTypes";
 import type { BuildTooltipOptions } from "../tree/BuildTooltips";
 import type { TreeViewCurationOptions } from "../tree/TreeViewCuration";
 import type { ArtifactActionOptionsProvider } from "../ui/ArtifactActionHandler";
-import type { ArtifactPreviewProviderOptions } from "../ui/ArtifactPreviewProvider";
 import type { ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
+import type { ArtifactPreviewProviderOptions } from "../ui/ArtifactPreviewProvider";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
 import {
-  type ExtensionContainer,
-  type ExtensionProviderCatalog,
   composeProviderCatalog,
+  type ExtensionContainer,
   registerProviderCatalog
 } from "./container/ExtensionContainer";
 import { createCoreProviderCatalog } from "./providers/CoreProviders";
@@ -87,5 +86,5 @@ export function registerExtensionProviders(
     validationCatalog,
     runtimeCatalog
   ]);
-  registerProviderCatalog(container, composedCatalog as ExtensionProviderCatalog);
+  registerProviderCatalog(container, composedCatalog);
 }

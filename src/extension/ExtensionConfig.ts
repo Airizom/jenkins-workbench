@@ -14,6 +14,35 @@ import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValid
 
 export const CONFIG_SECTION = "jenkinsWorkbench";
 
+export const CONFIG_KEYS = {
+  cacheTtlSeconds: "cacheTtlSeconds",
+  statusRefreshIntervalSeconds: "pollIntervalSeconds",
+  watchErrorThreshold: "watchErrorThreshold",
+  queuePollIntervalSeconds: "queuePollIntervalSeconds",
+  currentBranchPullRequestJobNamePatterns: "currentBranch.pullRequestJobNamePatterns",
+  buildTooltipDetails: "buildTooltips.includeDetails",
+  buildTooltipParametersEnabled: "buildTooltips.parameters.enabled",
+  buildTooltipParametersAllowList: "buildTooltips.parameters.allowList",
+  buildTooltipParametersDenyList: "buildTooltips.parameters.denyList",
+  buildTooltipParametersMaskPatterns: "buildTooltips.parameters.maskPatterns",
+  buildTooltipParametersMaskValue: "buildTooltips.parameters.maskValue",
+  treeViewsExcludedNames: "treeViews.excludedNames",
+  activityMaxItemsPerGroup: "activity.maxItemsPerGroup",
+  activityMaxScanResults: "activity.maxScanResults",
+  activityJobSearchBatchSize: "activity.jobSearchBatchSize",
+  activityPendingInputCandidateLimit: "activity.pendingInputCandidateLimit",
+  activityPendingInputLookupConcurrency: "activity.pendingInputLookupConcurrency",
+  activityPendingInputBuildLookupLimit: "activity.pendingInputBuildLookupLimit",
+  activityRefreshIntervalSeconds: "activity.refreshIntervalSeconds",
+  jenkinsfileValidationEnabled: "jenkinsfileValidation.enabled",
+  jenkinsfileValidationRunOnSave: "jenkinsfileValidation.runOnSave",
+  jenkinsfileValidationChangeDebounce: "jenkinsfileValidation.changeDebounceMs",
+  jenkinsfileValidationFilePatterns: "jenkinsfileValidation.filePatterns",
+  jenkinsfileIntelligenceEnabled: "jenkinsfile.intelligence.enabled"
+} as const;
+
+export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS];
+
 const DEFAULT_CACHE_TTL_SECONDS = 300;
 const DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS = 60;
 const MIN_STATUS_REFRESH_INTERVAL_SECONDS = 5;
@@ -82,71 +111,82 @@ export function buildConfigKey(key: string): string {
   return `${CONFIG_SECTION}.${key}`;
 }
 
+function getFiniteNumberConfigValue(
+  config: vscode.WorkspaceConfiguration,
+  key: string,
+  defaultValue: number
+): number {
+  const value = config.get<number>(key, defaultValue);
+  return Number.isFinite(value) ? value : defaultValue;
+}
+
 export function getCacheTtlMs(config: vscode.WorkspaceConfiguration): number {
-  const cacheTtlSeconds = config.get<number>("cacheTtlSeconds", DEFAULT_CACHE_TTL_SECONDS);
-  return Number.isFinite(cacheTtlSeconds)
-    ? Math.max(0, cacheTtlSeconds) * 1000
-    : DEFAULT_CACHE_TTL_SECONDS * 1000;
+  const cacheTtlSeconds = getFiniteNumberConfigValue(
+    config,
+    CONFIG_KEYS.cacheTtlSeconds,
+    DEFAULT_CACHE_TTL_SECONDS
+  );
+  return Math.max(0, cacheTtlSeconds) * 1000;
 }
 
 export function getStatusRefreshIntervalSeconds(config: vscode.WorkspaceConfiguration): number {
-  const refreshIntervalSeconds = config.get<number>(
-    "pollIntervalSeconds",
+  const refreshIntervalSeconds = getFiniteNumberConfigValue(
+    config,
+    CONFIG_KEYS.statusRefreshIntervalSeconds,
     DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS
   );
-  return Number.isFinite(refreshIntervalSeconds)
-    ? Math.max(MIN_STATUS_REFRESH_INTERVAL_SECONDS, refreshIntervalSeconds)
-    : DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS;
+  return Math.max(MIN_STATUS_REFRESH_INTERVAL_SECONDS, refreshIntervalSeconds);
 }
 
 export function getWatchErrorThreshold(config: vscode.WorkspaceConfiguration): number {
-  const watchErrorThreshold = config.get<number>(
-    "watchErrorThreshold",
+  return getFiniteNumberConfigValue(
+    config,
+    CONFIG_KEYS.watchErrorThreshold,
     DEFAULT_WATCH_ERROR_THRESHOLD
   );
-  return Number.isFinite(watchErrorThreshold) ? watchErrorThreshold : DEFAULT_WATCH_ERROR_THRESHOLD;
 }
 
 export function getQueuePollIntervalSeconds(config: vscode.WorkspaceConfiguration): number {
-  const pollIntervalSeconds = config.get<number>(
-    "queuePollIntervalSeconds",
+  const pollIntervalSeconds = getFiniteNumberConfigValue(
+    config,
+    CONFIG_KEYS.queuePollIntervalSeconds,
     DEFAULT_QUEUE_POLL_INTERVAL_SECONDS
   );
-  return Number.isFinite(pollIntervalSeconds)
-    ? Math.max(MIN_QUEUE_POLL_INTERVAL_SECONDS, pollIntervalSeconds)
-    : DEFAULT_QUEUE_POLL_INTERVAL_SECONDS;
+  return Math.max(MIN_QUEUE_POLL_INTERVAL_SECONDS, pollIntervalSeconds);
 }
 
 export function getRequestTimeoutMs(config: vscode.WorkspaceConfiguration): number {
-  const timeoutSeconds = config.get<number>(
+  const timeoutSeconds = getFiniteNumberConfigValue(
+    config,
     "requestTimeoutSeconds",
     DEFAULT_REQUEST_TIMEOUT_SECONDS
   );
-  const resolved = Number.isFinite(timeoutSeconds)
-    ? Math.max(5, timeoutSeconds)
-    : DEFAULT_REQUEST_TIMEOUT_SECONDS;
-  return resolved * 1000;
+  return Math.max(5, timeoutSeconds) * 1000;
 }
 
 export function getMaxCacheEntries(config: vscode.WorkspaceConfiguration): number {
-  const maxEntries = config.get<number>("maxCacheEntries", DEFAULT_MAX_CACHE_ENTRIES);
-  return Number.isFinite(maxEntries)
-    ? Math.min(MAX_CACHE_ENTRIES, Math.max(100, Math.floor(maxEntries)))
-    : DEFAULT_MAX_CACHE_ENTRIES;
+  return getClampedIntegerConfigValue(
+    config,
+    "maxCacheEntries",
+    DEFAULT_MAX_CACHE_ENTRIES,
+    100,
+    MAX_CACHE_ENTRIES
+  );
 }
 
 function getBuildTooltipDetailsEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
-    config.get<boolean>("buildTooltips.includeDetails", DEFAULT_BUILD_TOOLTIP_DETAILS)
+    config.get<boolean>(CONFIG_KEYS.buildTooltipDetails, DEFAULT_BUILD_TOOLTIP_DETAILS)
   );
 }
 
 function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfiguration): boolean {
-  const includeParameters = config.get<boolean>(
-    "buildTooltips.parameters.enabled",
-    DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED
+  return Boolean(
+    config.get<boolean>(
+      CONFIG_KEYS.buildTooltipParametersEnabled,
+      DEFAULT_BUILD_TOOLTIP_PARAMETERS_ENABLED
+    )
   );
-  return Boolean(includeParameters);
 }
 
 function getArtifactDownloadRoot(config: vscode.WorkspaceConfiguration): string {
@@ -176,36 +216,33 @@ export function getArtifactMaxDownloadBytes(
 }
 
 export function getArtifactPreviewCacheMaxEntries(config: vscode.WorkspaceConfiguration): number {
-  const value = config.get<number>(
+  return getClampedIntegerConfigValue(
+    config,
     "artifactPreviewCacheMaxEntries",
-    DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES
+    DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES,
+    1,
+    MAX_ARTIFACT_PREVIEW_CACHE_ENTRIES
   );
-  if (!Number.isFinite(value)) {
-    return DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_ENTRIES;
-  }
-  return Math.min(MAX_ARTIFACT_PREVIEW_CACHE_ENTRIES, Math.max(1, Math.floor(value)));
 }
 
 export function getArtifactPreviewCacheMaxBytes(config: vscode.WorkspaceConfiguration): number {
-  const value = config.get<number>(
+  const maxMegabytes = getBoundedIntegerConfigValue(
+    config,
     "artifactPreviewCacheMaxMb",
-    DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB
+    DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB,
+    1
   );
-  if (!Number.isFinite(value)) {
-    return DEFAULT_ARTIFACT_PREVIEW_CACHE_MAX_MB * 1024 * 1024;
-  }
-  return Math.max(1, Math.floor(value)) * 1024 * 1024;
+  return maxMegabytes * 1024 * 1024;
 }
 
 export function getArtifactPreviewCacheTtlMs(config: vscode.WorkspaceConfiguration): number {
-  const value = config.get<number>(
+  const ttlSeconds = getBoundedIntegerConfigValue(
+    config,
     "artifactPreviewCacheTtlSeconds",
-    DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS
+    DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS,
+    1
   );
-  if (!Number.isFinite(value)) {
-    return DEFAULT_ARTIFACT_PREVIEW_CACHE_TTL_SECONDS * 1000;
-  }
-  return Math.max(1, Math.floor(value)) * 1000;
+  return ttlSeconds * 1000;
 }
 
 export function getBuildTooltipOptions(config: vscode.WorkspaceConfiguration): BuildTooltipOptions {
@@ -224,16 +261,20 @@ export function getBuildTooltipOptions(config: vscode.WorkspaceConfiguration): B
 function getBuildParameterRedactionOptions(
   config: vscode.WorkspaceConfiguration
 ): BuildParameterRedactionOptions {
-  const allowList = normalizeStringList(config.get<unknown>("buildTooltips.parameters.allowList"));
-  const denyList = normalizeStringList(config.get<unknown>("buildTooltips.parameters.denyList"));
+  const allowList = normalizeStringList(
+    config.get<unknown>(CONFIG_KEYS.buildTooltipParametersAllowList)
+  );
+  const denyList = normalizeStringList(
+    config.get<unknown>(CONFIG_KEYS.buildTooltipParametersDenyList)
+  );
   const maskPatterns = normalizeStringList(
     config.get<unknown>(
-      "buildTooltips.parameters.maskPatterns",
+      CONFIG_KEYS.buildTooltipParametersMaskPatterns,
       DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_PATTERNS
     )
   );
   const maskValue =
-    trimToUndefined(config.get<unknown>("buildTooltips.parameters.maskValue")) ??
+    trimToUndefined(config.get<unknown>(CONFIG_KEYS.buildTooltipParametersMaskValue)) ??
     DEFAULT_BUILD_TOOLTIP_PARAMETER_MASK_VALUE;
 
   return {
@@ -271,7 +312,7 @@ function getBoundedIntegerConfigValue(
   minimumValue: number
 ): number {
   const value = config.get<number>(key, defaultValue);
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (!Number.isFinite(value)) {
     return defaultValue;
   }
   return Math.max(minimumValue, Math.floor(value));
@@ -285,7 +326,7 @@ function getClampedIntegerConfigValue(
   maximumValue: number
 ): number {
   const value = config.get<number>(key, defaultValue);
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (!Number.isFinite(value)) {
     return defaultValue;
   }
   return Math.min(maximumValue, Math.max(minimumValue, Math.floor(value)));
@@ -313,7 +354,7 @@ export function getJobSearchTuningOptions(config: vscode.WorkspaceConfiguration)
 export function getTreeViewCurationOptions(
   config: vscode.WorkspaceConfiguration
 ): TreeViewCurationOptions {
-  const configuredValue = config.get<unknown>("treeViews.excludedNames");
+  const configuredValue = config.get<unknown>(CONFIG_KEYS.treeViewsExcludedNames);
   const excludedNames =
     typeof configuredValue === "undefined"
       ? DEFAULT_TREE_VIEW_CURATION_EXCLUDED_NAMES
@@ -326,7 +367,7 @@ export function getTreeViewCurationOptions(
 export function getTreeActivityOptions(config: vscode.WorkspaceConfiguration): TreeActivityOptions {
   const refreshIntervalSeconds = getClampedIntegerConfigValue(
     config,
-    "activity.refreshIntervalSeconds",
+    CONFIG_KEYS.activityRefreshIntervalSeconds,
     DEFAULT_ACTIVITY_REFRESH_INTERVAL_SECONDS,
     MIN_ACTIVITY_REFRESH_INTERVAL_SECONDS,
     MAX_ACTIVITY_REFRESH_INTERVAL_SECONDS
@@ -334,7 +375,7 @@ export function getTreeActivityOptions(config: vscode.WorkspaceConfiguration): T
   return {
     maxItemsPerGroup: getClampedIntegerConfigValue(
       config,
-      "activity.maxItemsPerGroup",
+      CONFIG_KEYS.activityMaxItemsPerGroup,
       DEFAULT_ACTIVITY_MAX_ITEMS_PER_GROUP,
       1,
       MAX_ACTIVITY_ITEMS_PER_GROUP
@@ -342,35 +383,35 @@ export function getTreeActivityOptions(config: vscode.WorkspaceConfiguration): T
     collection: {
       maxScanResults: getClampedIntegerConfigValue(
         config,
-        "activity.maxScanResults",
+        CONFIG_KEYS.activityMaxScanResults,
         DEFAULT_ACTIVITY_SCAN_MAX_RESULTS,
         MIN_ACTIVITY_SCAN_MAX_RESULTS,
         MAX_ACTIVITY_SCAN_MAX_RESULTS
       ),
       jobSearchBatchSize: getClampedIntegerConfigValue(
         config,
-        "activity.jobSearchBatchSize",
+        CONFIG_KEYS.activityJobSearchBatchSize,
         DEFAULT_ACTIVITY_JOB_SEARCH_BATCH_SIZE,
         MIN_ACTIVITY_JOB_SEARCH_BATCH_SIZE,
         MAX_ACTIVITY_JOB_SEARCH_BATCH_SIZE
       ),
       pendingInputCandidateLimit: getClampedIntegerConfigValue(
         config,
-        "activity.pendingInputCandidateLimit",
+        CONFIG_KEYS.activityPendingInputCandidateLimit,
         DEFAULT_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT,
         MIN_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT,
         MAX_ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT
       ),
       pendingInputLookupConcurrency: getClampedIntegerConfigValue(
         config,
-        "activity.pendingInputLookupConcurrency",
+        CONFIG_KEYS.activityPendingInputLookupConcurrency,
         DEFAULT_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY,
         MIN_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY,
         MAX_ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY
       ),
       pendingInputBuildLookupLimit: getClampedIntegerConfigValue(
         config,
-        "activity.pendingInputBuildLookupLimit",
+        CONFIG_KEYS.activityPendingInputBuildLookupLimit,
         DEFAULT_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT,
         MIN_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT,
         MAX_ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT
@@ -383,7 +424,7 @@ export function getTreeActivityOptions(config: vscode.WorkspaceConfiguration): T
 export function getCurrentBranchPullRequestJobNamePatterns(
   config: vscode.WorkspaceConfiguration
 ): string[] {
-  const configuredValue = config.get<unknown>("currentBranch.pullRequestJobNamePatterns");
+  const configuredValue = config.get<unknown>(CONFIG_KEYS.currentBranchPullRequestJobNamePatterns);
   const patterns =
     typeof configuredValue === "undefined"
       ? DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS
@@ -395,14 +436,17 @@ export function getCurrentBranchPullRequestJobNamePatterns(
 
 function getJenkinsfileValidationEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
-    config.get<boolean>("jenkinsfileValidation.enabled", DEFAULT_JENKINSFILE_VALIDATION_ENABLED)
+    config.get<boolean>(
+      CONFIG_KEYS.jenkinsfileValidationEnabled,
+      DEFAULT_JENKINSFILE_VALIDATION_ENABLED
+    )
   );
 }
 
 function getJenkinsfileIntelligenceEnabled(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>(
-      "jenkinsfile.intelligence.enabled",
+      CONFIG_KEYS.jenkinsfileIntelligenceEnabled,
       DEFAULT_JENKINSFILE_INTELLIGENCE_ENABLED
     )
   );
@@ -411,26 +455,24 @@ function getJenkinsfileIntelligenceEnabled(config: vscode.WorkspaceConfiguration
 function getJenkinsfileValidationRunOnSave(config: vscode.WorkspaceConfiguration): boolean {
   return Boolean(
     config.get<boolean>(
-      "jenkinsfileValidation.runOnSave",
+      CONFIG_KEYS.jenkinsfileValidationRunOnSave,
       DEFAULT_JENKINSFILE_VALIDATION_RUN_ON_SAVE
     )
   );
 }
 
 function getJenkinsfileValidationChangeDebounceMs(config: vscode.WorkspaceConfiguration): number {
-  const value = config.get<number>(
-    "jenkinsfileValidation.changeDebounceMs",
-    DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS
+  return getBoundedIntegerConfigValue(
+    config,
+    CONFIG_KEYS.jenkinsfileValidationChangeDebounce,
+    DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS,
+    0
   );
-  if (!Number.isFinite(value)) {
-    return DEFAULT_JENKINSFILE_VALIDATION_DEBOUNCE_MS;
-  }
-  return Math.max(0, Math.floor(value));
 }
 
 function getJenkinsfileValidationFilePatterns(config: vscode.WorkspaceConfiguration): string[] {
   const value = config.get<unknown>(
-    "jenkinsfileValidation.filePatterns",
+    CONFIG_KEYS.jenkinsfileValidationFilePatterns,
     DEFAULT_JENKINSFILE_VALIDATION_FILE_PATTERNS
   );
   const patterns = normalizeStringList(value);

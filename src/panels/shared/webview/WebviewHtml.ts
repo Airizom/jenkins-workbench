@@ -3,9 +3,9 @@ import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentR
 import { escapeHtml } from "../../../shared/html";
 import type { JenkinsEnvironmentStore } from "../../../storage/JenkinsEnvironmentStore";
 import { type LoadingSkeletonVariant, renderLoadingSkeletonHtml } from "./LoadingSkeletonHtml";
-import { type WebviewEntryName, resolveWebviewAssets } from "./WebviewAssets";
+import { resolveWebviewAssets, type WebviewEntryName } from "./WebviewAssets";
 import { createNonce } from "./WebviewNonce";
-import { type SerializedEnvironmentState, resolveEnvironmentRef } from "./WebviewPanelState";
+import { resolveEnvironmentRef, type SerializedEnvironmentState } from "./WebviewPanelState";
 
 export interface WebviewRenderOptions {
   cspSource: string;

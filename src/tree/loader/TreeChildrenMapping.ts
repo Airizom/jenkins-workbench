@@ -4,14 +4,6 @@ import type {
   JenkinsQueueItemInfo
 } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsTreeFilter } from "../TreeFilter";
-import {
-  ROOT_TREE_JOB_SCOPE,
-  type TreeJobCollectionRequest,
-  type TreeJobScope,
-  buildTreeJobScopeKey,
-  getTreeJobCollectionCacheParts
-} from "../TreeJobScope";
 import {
   JenkinsFolderTreeItem,
   JenkinsViewTreeItem,
@@ -21,6 +13,15 @@ import {
 import { QueueItemTreeItem } from "../items/TreeQueueItems";
 import { JobsFolderTreeItem, PinnedSectionTreeItem } from "../items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import type { JenkinsTreeFilter } from "../TreeFilter";
+import {
+  buildTreeJobScopeKey,
+  getTreeJobCollectionCacheParts,
+  ROOT_TREE_JOB_SCOPE,
+  type TreeJobCollectionRequest,
+  type TreeJobScope
+} from "../TreeJobScope";
+import type { TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 
 export type JobCollectionTreeElement =
   | JobsFolderTreeItem
@@ -63,7 +64,7 @@ export function getJobCollectionRequest(
 }
 
 export function buildJobCollectionChildrenKey(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   request: TreeJobCollectionRequest
 ): string {
@@ -88,7 +89,7 @@ function buildScopedTreeExtra(scope: TreeJobScope, resourceUrl: string): string 
 }
 
 export function buildBuildsChildrenKey(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   jobUrl: string,
   jobScope: TreeJobScope
@@ -97,7 +98,7 @@ export function buildBuildsChildrenKey(
 }
 
 export function buildBuildArtifactsKey(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   buildUrl: string,
   jobScope: TreeJobScope
@@ -106,7 +107,7 @@ export function buildBuildArtifactsKey(
 }
 
 export function buildArtifactChildrenKey(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   buildUrl: string,
   jobScope: TreeJobScope
@@ -115,7 +116,7 @@ export function buildArtifactChildrenKey(
 }
 
 export function buildWorkspaceRootChildrenKey(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   jobUrl: string,
   jobScope: TreeJobScope
@@ -124,7 +125,7 @@ export function buildWorkspaceRootChildrenKey(
 }
 
 export function buildWorkspaceDirectoryChildrenKey(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   jobUrl: string,
   jobScope: TreeJobScope,
@@ -138,7 +139,7 @@ export function buildWorkspaceDirectoryChildrenKey(
 }
 
 export function buildWorkspaceDirectoryChildrenPrefix(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   jobUrl: string,
   jobScope: TreeJobScope
@@ -151,7 +152,7 @@ export function buildWorkspaceDirectoryChildrenPrefix(
 }
 
 export function buildWorkspaceDirectorySubtreePrefix(
-  buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+  buildChildrenKey: TreeChildrenKeyBuilder,
   environment: JenkinsEnvironmentRef,
   jobUrl: string,
   jobScope: TreeJobScope,
@@ -190,24 +191,6 @@ export function mapFilteredJobsToTreeItems(
   pinnedJobs: Set<string>
 ): WorkbenchTreeElement[] {
   const hasWatchedJobs = watchedJobs.size > 0;
-  const hasPinnedJobs = pinnedJobs.size > 0;
-
-  if (!hasPinnedJobs) {
-    const items: WorkbenchTreeElement[] = new Array(filteredJobs.length);
-    for (let index = 0; index < filteredJobs.length; index += 1) {
-      const job = filteredJobs[index];
-      items[index] = createJobTreeItem(
-        environment,
-        job,
-        treeFilter,
-        jobScope,
-        hasWatchedJobs && watchedJobs.has(job.url),
-        false
-      );
-    }
-
-    return items;
-  }
 
   const pinnedItems: WorkbenchTreeElement[] = [];
   const unpinnedItems: WorkbenchTreeElement[] = [];

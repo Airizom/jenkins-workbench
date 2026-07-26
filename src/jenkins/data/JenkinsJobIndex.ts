@@ -1,6 +1,6 @@
+import { CancellationError } from "../errors";
 import type { JenkinsClientProvider } from "../JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
-import { CancellationError } from "../errors";
 import { AsyncQueue } from "./AsyncQueue";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
 import type {
@@ -22,7 +22,6 @@ import { isCancellationRequested } from "./JobSearchCancellation";
 import { normalizeJobSearchOptions } from "./JobSearchConfig";
 
 interface JobIndexCacheEntry {
-  timestamp: number;
   entries: JobSearchEntry[];
   complete: boolean;
 }
@@ -62,11 +61,7 @@ export class JenkinsJobIndex {
     environment: JenkinsEnvironmentRef,
     options?: JobSearchOptions
   ): Promise<JobSearchEntry[]> {
-    const entries: JobSearchEntry[] = [];
-    for await (const batch of this.iterateJobsForEnvironment(environment, options)) {
-      entries.push(...batch);
-    }
-    return entries;
+    return this.getCachedOrCollectEntries(environment, options, FULL_JOB_SEARCH_STRATEGY);
   }
 
   async getMultibranchJobsForEnvironment(
@@ -118,27 +113,19 @@ export class JenkinsJobIndex {
       authSignature
     );
     if (options?.mode !== "refresh") {
-      const cached = this.cache.get<JobIndexCacheEntry | JobSearchEntry[]>(cacheKey);
+      const cached = this.cache.get<JobIndexCacheEntry>(cacheKey);
       if (cached) {
-        if (Array.isArray(cached)) {
-          if (cached.length > 0) {
-            yield cached;
+        const maxResults = options?.maxResults;
+        if (cached.complete) {
+          const entries = maxResults ? cached.entries.slice(0, maxResults) : cached.entries;
+          if (entries.length > 0) {
+            yield entries;
           }
           return;
         }
-        if (Date.now() - cached.timestamp < JOB_INDEX_TTL_MS) {
-          const maxResults = options?.maxResults;
-          if (cached.complete) {
-            const entries = maxResults ? cached.entries.slice(0, maxResults) : cached.entries;
-            if (entries.length > 0) {
-              yield entries;
-            }
-            return;
-          }
-          if (maxResults && cached.entries.length >= maxResults) {
-            yield cached.entries.slice(0, maxResults);
-            return;
-          }
+        if (maxResults && cached.entries.length >= maxResults) {
+          yield cached.entries.slice(0, maxResults);
+          return;
         }
       }
     }
@@ -270,11 +257,14 @@ export class JenkinsJobIndex {
       if (pendingJobs === 0) {
         await flushBatch();
         throwIfStopped();
-        this.cache.set(cacheKey, {
-          timestamp: Date.now(),
-          entries: results,
-          complete: !limitReached
-        });
+        this.cache.set(
+          cacheKey,
+          {
+            entries: results,
+            complete: !limitReached
+          },
+          JOB_INDEX_TTL_MS
+        );
         output.close();
         return;
       }
@@ -343,11 +333,14 @@ export class JenkinsJobIndex {
 
       await flushBatch();
       throwIfStopped();
-      this.cache.set(cacheKey, {
-        timestamp: Date.now(),
-        entries: results,
-        complete: !limitReached
-      });
+      this.cache.set(
+        cacheKey,
+        {
+          entries: results,
+          complete: !limitReached
+        },
+        JOB_INDEX_TTL_MS
+      );
       output.close();
     })().catch((error) => {
       output.fail(error);

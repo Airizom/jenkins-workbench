@@ -1,12 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["out/**", "node_modules/**", ".vscode-test/**"]
+    "includes": ["**", "!**/out/**", "!**/node_modules/**", "!**/.vscode-test/**"]
   },
   "formatter": {
     "enabled": true,
@@ -14,13 +14,11 @@
     "indentWidth": 2,
     "lineWidth": 100
   },
-  "organizeImports": {
-    "enabled": true
-  },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "complexity": {
         "noUselessTypeConstraint": "error"
       },
@@ -44,7 +42,7 @@
   },
   "overrides": [
     {
-      "include": ["**/*.tsx"],
+      "includes": ["**/*.tsx"],
       "linter": {
         "rules": {
           "style": {
@@ -54,10 +52,8 @@
       }
     },
     {
-      "include": ["test/**"],
-      "organizeImports": {
-        "enabled": false
-      }
+      "includes": ["**/test/**"],
+      "assist": { "actions": { "source": { "organizeImports": "off" } } }
     }
   ],
   "javascript": {
@@ -66,6 +62,11 @@
       "semicolons": "always",
       "trailingCommas": "none",
       "arrowParentheses": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   }
 }

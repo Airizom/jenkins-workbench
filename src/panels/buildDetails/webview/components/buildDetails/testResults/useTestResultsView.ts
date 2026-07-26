@@ -1,26 +1,20 @@
 import * as React from "react";
-import type {
-  BuildTestResultsViewModel,
-  BuildTestsSummaryViewModel
-} from "../../../../shared/BuildDetailsContracts";
+import type { BuildTestResultsViewModel } from "../../../../shared/BuildDetailsContracts";
 import type { TestResultsView, TestStatusFilter } from "./testResultsTypes";
 import {
-  RENDER_BATCH_SIZE,
   filterTestResults,
   getAutoExpandIds,
-  getPassRate,
-  getTestResultsDatasetKey
+  getTestResultsDatasetKey,
+  RENDER_BATCH_SIZE
 } from "./testResultsUtils";
 
 const { useEffect, useMemo, useState } = React;
 
 export function useTestResultsView({
   buildUrl,
-  summary,
   results
 }: {
   buildUrl?: string;
-  summary: BuildTestsSummaryViewModel;
   results: BuildTestResultsViewModel;
 }): TestResultsView {
   const [statusFilter, setStatusFilter] = useState<TestStatusFilter>("all");
@@ -50,7 +44,6 @@ export function useTestResultsView({
 
   const visibleItems = filteredItems.slice(0, renderCount);
   const hasMore = filteredItems.length > visibleItems.length;
-  const passRate = getPassRate(summary);
 
   return {
     statusFilter,
@@ -59,7 +52,6 @@ export function useTestResultsView({
     visibleItems,
     autoExpandIds,
     hasMore,
-    passRate,
     setStatusFilter,
     setQuery,
     showMore: () => setRenderCount((current) => current + RENDER_BATCH_SIZE)

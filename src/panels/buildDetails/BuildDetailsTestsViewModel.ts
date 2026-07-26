@@ -34,7 +34,7 @@ export interface BuildTestStateOptions extends BuildTestsSummaryOptions {
   canOpenSource?: (className?: string) => boolean;
 }
 
-export function buildTestsSummary(
+function buildTestsSummary(
   details?: JenkinsBuildDetails,
   testReport?: JenkinsTestReport,
   options?: BuildTestsSummaryOptions

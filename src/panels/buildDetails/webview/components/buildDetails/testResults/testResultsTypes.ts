@@ -11,7 +11,6 @@ export interface TestResultsView {
   visibleItems: BuildTestCaseViewModel[];
   autoExpandIds: Set<string>;
   hasMore: boolean;
-  passRate: number;
   setStatusFilter: (value: TestStatusFilter) => void;
   setQuery: (value: string) => void;
   showMore: () => void;

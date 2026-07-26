@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { RefreshIcon } from "../icons";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Button } from "./ui/button";
@@ -30,7 +31,7 @@ export function PanelErrorList({
   className,
   onRetry,
   retryLabel = "Retry"
-}: PanelErrorListProps): JSX.Element | null {
+}: PanelErrorListProps): React.JSX.Element | null {
   if (errors.length === 0) {
     return null;
   }

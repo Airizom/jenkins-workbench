@@ -1,23 +1,19 @@
 import * as vscode from "vscode";
-import type { TestSourceNavigationService } from "./TestSourceNavigationService";
-import type { TestSourceNavigationContext, TestSourceNavigationTarget } from "./TestSourceResolver";
+import type {
+  TestSourceNavigationContext,
+  TestSourceNavigationTarget,
+  TestSourceResolver
+} from "./TestSourceResolver";
 
-interface TestSourceNavigationRuntimeSurface {
-  openTestSource(
-    context: TestSourceNavigationContext,
-    target: TestSourceNavigationTarget
-  ): Promise<void>;
-}
-
-export class TestSourceNavigationUiService implements TestSourceNavigationRuntimeSurface {
-  constructor(private readonly navigationService: TestSourceNavigationService) {}
+export class TestSourceNavigationUiService {
+  constructor(private readonly resolver: TestSourceResolver) {}
 
   async openTestSource(
     context: TestSourceNavigationContext,
     target: TestSourceNavigationTarget
   ): Promise<void> {
-    const outcome = await this.navigationService.resolveNavigation(context, target);
-    switch (outcome.kind) {
+    const resolution = await this.resolver.resolve(context, target);
+    switch (resolution.kind) {
       case "missingClassName":
         void vscode.window.showInformationMessage(
           `No source location is available for ${target.testName}.`
@@ -33,11 +29,12 @@ export class TestSourceNavigationUiService implements TestSourceNavigationRuntim
           `No matching source file was found for ${target.testName}.`
         );
         return;
-      case "singleMatch":
-        await this.openSource(outcome.uri);
-        return;
-      case "multipleMatches": {
-        const selected = await this.resolveSelection(outcome.matches, target);
+      case "matches": {
+        if (resolution.matches.length === 1) {
+          await this.openSource(resolution.matches[0]);
+          return;
+        }
+        const selected = await this.resolveSelection(resolution.matches, target);
         if (!selected) {
           return;
         }

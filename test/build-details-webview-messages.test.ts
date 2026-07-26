@@ -1,63 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
-  buildApproveInputMessage,
   buildArtifactActionMessage,
-  buildClearPipelineLogNodeMessage,
-  buildExportConsoleMessage,
-  buildExportPipelineNodeLogMessage,
   buildOpenTestSourceMessage,
-  buildRefreshBuildDetailsMessage,
-  buildRejectInputMessage,
-  buildReloadTestReportMessage,
-  buildRestartPipelineFromStageMessage,
-  buildSelectPipelineLogNodeMessage,
-  buildToggleFollowLogMessage
+  buildReloadTestReportMessage
 } from "../src/panels/buildDetails/webview/buildDetailsWebviewMessages";
 import type {
   BuildFailureArtifact,
-  BuildTestCaseViewModel,
-  PipelineLogTargetViewModel
+  BuildTestCaseViewModel
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 
 describe("BuildDetails webview messages", () => {
-  it("builds console and pipeline control messages", () => {
-    const target: PipelineLogTargetViewModel = {
-      key: "stage:Build",
-      kind: "stage",
-      name: "Build",
-      nodeId: "7"
-    };
-
-    assert.deepEqual(buildToggleFollowLogMessage(true), {
-      type: "toggleFollowLog",
-      value: true
-    });
-    assert.deepEqual(buildExportConsoleMessage(), { type: "exportConsole" });
-    assert.deepEqual(buildRestartPipelineFromStageMessage("Build"), {
-      type: "restartPipelineFromStage",
-      stageName: "Build"
-    });
-    assert.deepEqual(buildSelectPipelineLogNodeMessage(target), {
-      type: "selectPipelineLogNode",
-      target
-    });
-    assert.deepEqual(buildClearPipelineLogNodeMessage(), { type: "clearPipelineLogNode" });
-    assert.deepEqual(buildExportPipelineNodeLogMessage(), { type: "exportPipelineNodeLog" });
-    assert.deepEqual(buildRefreshBuildDetailsMessage(), { type: "refreshBuildDetails" });
-  });
-
-  it("builds pending input decision messages", () => {
-    assert.deepEqual(buildApproveInputMessage("deploy-prod"), {
-      type: "approveInput",
-      inputId: "deploy-prod"
-    });
-    assert.deepEqual(buildRejectInputMessage("deploy-prod"), {
-      type: "rejectInput",
-      inputId: "deploy-prod"
-    });
-  });
-
   it("builds artifact action messages with backend payload fields", () => {
     const artifact: BuildFailureArtifact = {
       name: "Report",

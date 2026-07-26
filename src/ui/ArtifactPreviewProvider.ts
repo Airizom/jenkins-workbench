@@ -13,20 +13,26 @@ export interface ArtifactPreviewProviderOptions {
   ttlMs?: number;
 }
 
+function formatCacheLimitError(
+  requestedBytes: number,
+  maxTotalBytes: number,
+  retainedBytes: number
+): string {
+  if (requestedBytes > maxTotalBytes) {
+    return `Artifact preview requires ${requestedBytes} bytes, exceeding the in-memory preview cache limit of ${maxTotalBytes} bytes.`;
+  }
+
+  const remainingBytes = Math.max(0, maxTotalBytes - retainedBytes);
+  return `Artifact preview requires ${requestedBytes} bytes, but only ${remainingBytes} bytes remain in the in-memory preview cache limit of ${maxTotalBytes} bytes.`;
+}
+
 export class ArtifactPreviewCacheLimitError extends Error {
   constructor(
     readonly requestedBytes: number,
     readonly maxTotalBytes: number,
     readonly retainedBytes = 0
   ) {
-    super(
-      requestedBytes > maxTotalBytes
-        ? `Artifact preview requires ${requestedBytes} bytes, exceeding the in-memory preview cache limit of ${maxTotalBytes} bytes.`
-        : `Artifact preview requires ${requestedBytes} bytes, but only ${Math.max(
-            0,
-            maxTotalBytes - retainedBytes
-          )} bytes remain in the in-memory preview cache limit of ${maxTotalBytes} bytes.`
-    );
+    super(formatCacheLimitError(requestedBytes, maxTotalBytes, retainedBytes));
     this.name = "ArtifactPreviewCacheLimitError";
   }
 }
@@ -108,13 +114,14 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
       throw vscode.FileSystemError.FileNotFound(uri);
     }
 
-    if (pathParts.length === 1) {
-      entry.lastAccess = Date.now();
-      return { type: vscode.FileType.Directory, ctime: entry.ctime, mtime: entry.mtime, size: 0 };
-    }
-
     entry.lastAccess = Date.now();
-    return { type: vscode.FileType.File, ctime: entry.ctime, mtime: entry.mtime, size: entry.size };
+    const isDirectory = pathParts.length === 1;
+    return {
+      type: isDirectory ? vscode.FileType.Directory : vscode.FileType.File,
+      ctime: entry.ctime,
+      mtime: entry.mtime,
+      size: isDirectory ? 0 : entry.size
+    };
   }
 
   readFile(uri: vscode.Uri): Uint8Array {
@@ -152,11 +159,11 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
   }
 
   private getEntry(uri: vscode.Uri): ArtifactPreviewEntry {
-    const pathParts = this.getPathParts(uri);
-    if (pathParts.length === 0) {
+    const id = this.getPathParts(uri)[0];
+    if (!id) {
       throw vscode.FileSystemError.FileNotFound(uri);
     }
-    const entry = this.entries.get(pathParts[0]);
+    const entry = this.entries.get(id);
     if (!entry) {
       throw vscode.FileSystemError.FileNotFound(uri);
     }
@@ -191,11 +198,8 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
   }
 
   private tryGetEntry(uri: vscode.Uri): ArtifactPreviewEntry | undefined {
-    const pathParts = this.getPathParts(uri);
-    if (pathParts.length === 0) {
-      return undefined;
-    }
-    return this.entries.get(pathParts[0]);
+    const id = this.getPathParts(uri)[0];
+    return id ? this.entries.get(id) : undefined;
   }
 
   private normalizeFileName(fileName: string): string {

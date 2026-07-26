@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
-import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
+import { NodeTreeItem } from "../../tree/TreeItems";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
 import {

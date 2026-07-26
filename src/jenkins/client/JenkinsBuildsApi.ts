@@ -1,6 +1,6 @@
 import type { PreparedBuildParametersRequest } from "../BuildParameterRequests";
-import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import { JenkinsRequestError } from "../errors";
+import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type {
   JenkinsArtifact,
@@ -181,13 +181,7 @@ export class JenkinsBuildsApi {
     const snapshot = await this.context.requestJson<JenkinsFlowNodeLog>(url);
     return {
       ...snapshot,
-      consoleUrl: snapshot.consoleUrl
-        ? resolveTrustedJenkinsUrl(
-            this.context.baseUrl,
-            snapshot.consoleUrl,
-            ensureTrailingSlash(buildUrl)
-          )
-        : undefined
+      consoleUrl: this.resolveTrustedFlowNodeConsoleUrl(buildUrl, snapshot.consoleUrl)
     };
   }
 
@@ -232,9 +226,7 @@ export class JenkinsBuildsApi {
       const hasParams = prepared.hasParameters;
       const allowEmptyParams = options.allowEmptyParams === true;
       if (!hasParams && !allowEmptyParams) {
-        const fallbackUrl = buildActionUrl(jobUrl, "build");
-        const fallbackResponse = await this.context.requestPostWithCrumb(fallbackUrl);
-        return { queueLocation: fallbackResponse.location };
+        return this.triggerParameterlessBuild(jobUrl);
       }
       const url = buildActionUrl(jobUrl, "buildWithParameters");
       const request = prepared.request;
@@ -244,19 +236,18 @@ export class JenkinsBuildsApi {
           : await this.context.requestPostWithCrumb(url);
         return { queueLocation: response.location };
       } catch (error) {
-        if (allowEmptyParams && !hasParams && error instanceof JenkinsRequestError) {
-          if (error.statusCode === 400 || error.statusCode === 404) {
-            const fallbackUrl = buildActionUrl(jobUrl, "build");
-            const fallbackResponse = await this.context.requestPostWithCrumb(fallbackUrl);
-            return { queueLocation: fallbackResponse.location };
-          }
+        if (
+          allowEmptyParams &&
+          !hasParams &&
+          error instanceof JenkinsRequestError &&
+          (error.statusCode === 400 || error.statusCode === 404)
+        ) {
+          return this.triggerParameterlessBuild(jobUrl);
         }
         throw error;
       }
     }
-    const url = buildActionUrl(jobUrl, "build");
-    const response = await this.context.requestPostWithCrumb(url);
-    return { queueLocation: response.location };
+    return this.triggerParameterlessBuild(jobUrl);
   }
 
   async stopBuild(buildUrl: string): Promise<void> {
@@ -307,6 +298,12 @@ export class JenkinsBuildsApi {
     await this.pendingInputClient.abortInput(buildUrl, inputId, abortUrl);
   }
 
+  private async triggerParameterlessBuild(jobUrl: string): Promise<{ queueLocation?: string }> {
+    const url = buildActionUrl(jobUrl, "build");
+    const response = await this.context.requestPostWithCrumb(url);
+    return { queueLocation: response.location };
+  }
+
   private buildFlowNodeLogUrl(buildUrl: string, nodeId: string): string {
     return buildActionUrl(
       buildUrl,
@@ -327,12 +324,15 @@ export class JenkinsBuildsApi {
   ): Promise<string | undefined> {
     const url = this.buildFlowNodeLogUrl(buildUrl, nodeId);
     const snapshot = await this.context.requestJson<Pick<JenkinsFlowNodeLog, "consoleUrl">>(url);
-    return snapshot.consoleUrl
-      ? resolveTrustedJenkinsUrl(
-          this.context.baseUrl,
-          snapshot.consoleUrl,
-          ensureTrailingSlash(buildUrl)
-        )
+    return this.resolveTrustedFlowNodeConsoleUrl(buildUrl, snapshot.consoleUrl);
+  }
+
+  private resolveTrustedFlowNodeConsoleUrl(
+    buildUrl: string,
+    consoleUrl: string | undefined
+  ): string | undefined {
+    return consoleUrl
+      ? resolveTrustedJenkinsUrl(this.context.baseUrl, consoleUrl, ensureTrailingSlash(buildUrl))
       : undefined;
   }
 }

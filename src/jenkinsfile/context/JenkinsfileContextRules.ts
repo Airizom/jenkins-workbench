@@ -1,5 +1,7 @@
 import { DECLARATIVE_NON_STEP_BLOCKS, STEP_BLOCKS } from "./JenkinsfileContextConstants";
 
+const NODE_CONTEXT_BLOCKS = new Set(["node", "steps", "script", "post"]);
+
 export function computeIsStepAllowed(blockPath: string[]): boolean {
   if (blockPath.some((label) => DECLARATIVE_NON_STEP_BLOCKS.has(label))) {
     return false;
@@ -17,10 +19,5 @@ export function computeIsStepAllowed(blockPath: string[]): boolean {
 }
 
 export function computeHasNodeContext(blockPath: string[]): boolean {
-  return (
-    blockPath.includes("node") ||
-    blockPath.includes("steps") ||
-    blockPath.includes("script") ||
-    blockPath.includes("post")
-  );
+  return blockPath.some((label) => NODE_CONTEXT_BLOCKS.has(label));
 }

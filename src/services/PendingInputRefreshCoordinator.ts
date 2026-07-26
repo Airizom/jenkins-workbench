@@ -18,6 +18,7 @@ export type PendingInputSummaryListener = (change: PendingInputSummaryChange) =>
 const DEFAULT_STALE_AFTER_MS = 10_000;
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_REFRESH_THROTTLE_MS = 1000;
+const QUEUE_COMPACT_THRESHOLD = 1024;
 
 interface RefreshWorkItem {
   environment: JenkinsEnvironmentRef;
@@ -38,13 +39,13 @@ export class PendingInputRefreshCoordinator
 {
   private readonly queue: RefreshWorkItem[] = [];
   private readonly queuedKeys = new Set<string>();
-  private readonly inFlightKeys = new Set<string>();
   private readonly inFlightPromises = new Map<string, Promise<PendingInputSummary>>();
   private readonly actionPromises = new Map<string, Promise<PendingInputAction[]>>();
   private readonly listeners = new Set<PendingInputSummaryListener>();
   private readonly refreshAt = new Map<string, number>();
   private readonly pendingChanges = new Map<string, Map<string, PendingInputSummaryChange>>();
   private readonly pendingTimers = new Map<string, NodeJS.Timeout>();
+  private queueHead = 0;
   private inFlight = 0;
   private processing = false;
   private disposed = false;
@@ -75,8 +76,8 @@ export class PendingInputRefreshCoordinator
     this.pendingChanges.clear();
     this.listeners.clear();
     this.queue.length = 0;
+    this.queueHead = 0;
     this.queuedKeys.clear();
-    this.inFlightKeys.clear();
     this.inFlightPromises.clear();
     this.actionPromises.clear();
     this.refreshAt.clear();
@@ -98,7 +99,7 @@ export class PendingInputRefreshCoordinator
         continue;
       }
       const key = this.buildKey(environment, buildUrl);
-      if (this.queuedKeys.has(key) || this.inFlightKeys.has(key)) {
+      if (this.queuedKeys.has(key) || this.inFlightPromises.has(key)) {
         continue;
       }
       this.queue.push({ environment, buildUrl, previous });
@@ -114,7 +115,7 @@ export class PendingInputRefreshCoordinator
     options?: { maxAgeMs?: number; notify?: boolean }
   ): Promise<PendingInputSummary> {
     if (this.disposed) {
-      return { awaitingInput: false, count: 0, fetchedAt: 0 };
+      return createEmptySummary();
     }
     if (options?.notify === false) {
       return this.dataService.getPendingInputSummary(environment, buildUrl, {
@@ -145,7 +146,7 @@ export class PendingInputRefreshCoordinator
     if (this.disposed) {
       const empty = new Map<string, PendingInputSummary>();
       for (const buildUrl of buildUrls) {
-        empty.set(buildUrl, { awaitingInput: false, count: 0, fetchedAt: 0 });
+        empty.set(buildUrl, createEmptySummary());
       }
       return empty;
     }
@@ -158,7 +159,7 @@ export class PendingInputRefreshCoordinator
           });
           summariesByUrl.set(buildUrl, summary);
         } catch {
-          summariesByUrl.set(buildUrl, { awaitingInput: false, count: 0, fetchedAt: 0 });
+          summariesByUrl.set(buildUrl, createEmptySummary());
         }
       })
     );
@@ -201,7 +202,7 @@ export class PendingInputRefreshCoordinator
     previous?: PendingInputSummary
   ): Promise<PendingInputSummary> {
     if (this.disposed) {
-      return { awaitingInput: false, count: 0, fetchedAt: 0 };
+      return createEmptySummary();
     }
     const key = this.buildKey(environment, buildUrl);
     const inFlight = this.inFlightPromises.get(key);
@@ -219,31 +220,27 @@ export class PendingInputRefreshCoordinator
       })
       .finally(() => {
         this.inFlightPromises.delete(key);
-        this.inFlightKeys.delete(key);
       });
 
     this.inFlightPromises.set(key, promise);
-    this.inFlightKeys.add(key);
     return promise;
   }
 
   private async processQueue(): Promise<void> {
-    if (this.disposed) {
-      return;
-    }
-    if (this.processing) {
+    if (this.disposed || this.processing) {
       return;
     }
     this.processing = true;
     try {
-      while (this.inFlight < this.concurrency && this.queue.length > 0) {
-        const item = this.queue.shift();
+      while (this.inFlight < this.concurrency && this.queueHead < this.queue.length) {
+        const item = this.queue[this.queueHead];
+        this.queueHead += 1;
         if (!item) {
           break;
         }
         const key = this.buildKey(item.environment, item.buildUrl);
         this.queuedKeys.delete(key);
-        if (this.inFlightKeys.has(key)) {
+        if (this.inFlightPromises.has(key)) {
           continue;
         }
         this.inFlight += 1;
@@ -259,7 +256,17 @@ export class PendingInputRefreshCoordinator
       }
     } finally {
       this.processing = false;
-      if (this.queue.length > 0 && this.inFlight < this.concurrency) {
+      if (this.queueHead === this.queue.length) {
+        this.queue.length = 0;
+        this.queueHead = 0;
+      } else if (
+        this.queueHead >= QUEUE_COMPACT_THRESHOLD &&
+        this.queueHead * 2 >= this.queue.length
+      ) {
+        this.queue.splice(0, this.queueHead);
+        this.queueHead = 0;
+      }
+      if (this.queueHead < this.queue.length && this.inFlight < this.concurrency) {
         void this.processQueue();
       }
     }
@@ -280,36 +287,54 @@ export class PendingInputRefreshCoordinator
   }
 
   private notifyChange(change: PendingInputSummaryChange): void {
-    const key = `${change.environment.scope}:${change.environment.environmentId}`;
+    const environmentKey = `${change.environment.scope}:${change.environment.environmentId}`;
     const now = Date.now();
-    const last = this.refreshAt.get(key) ?? 0;
+    const last = this.refreshAt.get(environmentKey) ?? 0;
     const elapsed = now - last;
     if (elapsed < this.refreshThrottleMs) {
-      const pendingForEnv =
-        this.pendingChanges.get(key) ?? new Map<string, PendingInputSummaryChange>();
+      const pendingForEnv = this.getOrCreatePendingChanges(environmentKey);
       pendingForEnv.set(change.buildUrl, change);
-      this.pendingChanges.set(key, pendingForEnv);
-      if (!this.pendingTimers.has(key)) {
+      if (!this.pendingTimers.has(environmentKey)) {
         const delay = Math.max(0, this.refreshThrottleMs - elapsed);
         const timer = setTimeout(() => {
-          this.pendingTimers.delete(key);
-          const pending = this.pendingChanges.get(key);
-          this.pendingChanges.delete(key);
-          if (!pending || pending.size === 0) {
-            return;
-          }
-          this.refreshAt.set(key, Date.now());
-          for (const changeToEmit of pending.values()) {
-            for (const listener of this.listeners) {
-              listener(changeToEmit);
-            }
-          }
+          this.flushPendingChanges(environmentKey);
         }, delay);
-        this.pendingTimers.set(key, timer);
+        this.pendingTimers.set(environmentKey, timer);
       }
       return;
     }
-    this.refreshAt.set(key, now);
+    this.refreshAt.set(environmentKey, now);
+    this.emitChange(change);
+  }
+
+  private getOrCreatePendingChanges(
+    environmentKey: string
+  ): Map<string, PendingInputSummaryChange> {
+    const existing = this.pendingChanges.get(environmentKey);
+    if (existing) {
+      return existing;
+    }
+
+    const pending = new Map<string, PendingInputSummaryChange>();
+    this.pendingChanges.set(environmentKey, pending);
+    return pending;
+  }
+
+  private flushPendingChanges(environmentKey: string): void {
+    this.pendingTimers.delete(environmentKey);
+    const pending = this.pendingChanges.get(environmentKey);
+    this.pendingChanges.delete(environmentKey);
+    if (!pending || pending.size === 0) {
+      return;
+    }
+
+    this.refreshAt.set(environmentKey, Date.now());
+    for (const change of pending.values()) {
+      this.emitChange(change);
+    }
+  }
+
+  private emitChange(change: PendingInputSummaryChange): void {
     for (const listener of this.listeners) {
       listener(change);
     }
@@ -318,4 +343,8 @@ export class PendingInputRefreshCoordinator
   private buildKey(environment: JenkinsEnvironmentRef, buildUrl: string): string {
     return `${environment.scope}:${environment.environmentId}:${buildUrl}`;
   }
+}
+
+function createEmptySummary(): PendingInputSummary {
+  return { awaitingInput: false, count: 0, fetchedAt: 0 };
 }

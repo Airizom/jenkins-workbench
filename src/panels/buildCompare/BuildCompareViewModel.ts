@@ -1,5 +1,5 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { BuildCompareBackend } from "./BuildCompareBackend";
+import type { BuildInspectionBackend as BuildCompareBackend } from "../shared/backend/BuildInspectionBackend";
 import { buildChangesetsSection } from "./BuildCompareChangesetsSection";
 import {
   buildConsoleComparisonSection,
@@ -24,30 +24,33 @@ export async function loadBuildCompareViewModel(
   backend: BuildCompareBackend,
   options: BuildCompareLoadOptions
 ): Promise<BuildCompareViewModel> {
-  const [baselineDetails, targetDetails] = await Promise.all([
+  const [
+    baselineDetails,
+    targetDetails,
+    baselineTestReport,
+    targetTestReport,
+    baselineWorkflowRun,
+    targetWorkflowRun
+  ] = await Promise.all([
     backend.status.getBuildDetails(options.environment, options.baselineBuildUrl, {
       includeParameters: true
     }),
     backend.status.getBuildDetails(options.environment, options.targetBuildUrl, {
       includeParameters: true
-    })
+    }),
+    loadOptionalData(() =>
+      backend.tests.getTestReport(options.environment, options.baselineBuildUrl)
+    ),
+    loadOptionalData(() =>
+      backend.tests.getTestReport(options.environment, options.targetBuildUrl)
+    ),
+    loadOptionalData(() =>
+      backend.status.getWorkflowRun(options.environment, options.baselineBuildUrl)
+    ),
+    loadOptionalData(() =>
+      backend.status.getWorkflowRun(options.environment, options.targetBuildUrl)
+    )
   ]);
-
-  const [baselineTestReport, targetTestReport, baselineWorkflowRun, targetWorkflowRun] =
-    await Promise.all([
-      loadOptionalData(() =>
-        backend.tests.getTestReport(options.environment, options.baselineBuildUrl)
-      ),
-      loadOptionalData(() =>
-        backend.tests.getTestReport(options.environment, options.targetBuildUrl)
-      ),
-      loadOptionalData(() =>
-        backend.status.getWorkflowRun(options.environment, options.baselineBuildUrl)
-      ),
-      loadOptionalData(() =>
-        backend.status.getWorkflowRun(options.environment, options.targetBuildUrl)
-      )
-    ]);
 
   return {
     title: "Build Compare",

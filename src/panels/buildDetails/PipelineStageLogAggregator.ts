@@ -1,7 +1,8 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsWorkflowStage, JenkinsWorkflowStep } from "../../jenkins/types";
+import { uniqueNonEmptyStrings } from "../../shared/arrays";
+import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
-import { escapeHtml, uniqueStrings } from "./PipelineNodeLogContent";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
@@ -61,12 +62,18 @@ export class PipelineStageLogAggregator {
     });
     const nodesToFetch = this.takeRefreshBatch(refreshCandidates);
 
-    for (const nodeId of nodesToFetch) {
-      const snapshot = await this.options.backend.getFlowNodeLog(
-        this.options.environment,
-        this.options.buildUrl,
-        nodeId
-      );
+    const fetchedNodes = await Promise.all(
+      nodesToFetch.map(async (nodeId) => ({
+        nodeId,
+        snapshot: await this.options.backend.getFlowNodeLog(
+          this.options.environment,
+          this.options.buildUrl,
+          nodeId
+        )
+      }))
+    );
+
+    for (const { nodeId, snapshot } of fetchedNodes) {
       if (!snapshot) {
         this.nodeCache.set(nodeId, {
           html: "",
@@ -148,13 +155,16 @@ export class PipelineStageLogAggregator {
   }
 
   private async resolveStageNodeIds(target: PipelineLogTargetViewModel): Promise<string[]> {
-    const explicitChildNodeIds = uniqueStrings(target.childNodeIds ?? []);
+    const explicitChildNodeIds = uniqueNonEmptyStrings(target.childNodeIds ?? []);
     if (!target.nodeId) {
       return explicitChildNodeIds;
     }
 
     const discoveredChildNodeIds = await this.discoverChildNodeIds(target.nodeId);
-    const childNodeIds = uniqueStrings([...explicitChildNodeIds, ...discoveredChildNodeIds]);
+    const childNodeIds = uniqueNonEmptyStrings([
+      ...explicitChildNodeIds,
+      ...discoveredChildNodeIds
+    ]);
     if (childNodeIds.length > 0) {
       return childNodeIds;
     }
@@ -174,7 +184,7 @@ export class PipelineStageLogAggregator {
       nodeId
     );
     const childNodeIds = details ? collectFlowNodeChildIds(details) : [];
-    const mergedChildNodeIds = uniqueStrings([...(cached?.nodeIds ?? []), ...childNodeIds]);
+    const mergedChildNodeIds = uniqueNonEmptyStrings([...(cached?.nodeIds ?? []), ...childNodeIds]);
     this.childNodeIdsCache.set(nodeId, {
       nodeIds: mergedChildNodeIds,
       complete: details ? isWorkflowNodeComplete(details) : true

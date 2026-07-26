@@ -1,4 +1,5 @@
 import * as React from "react";
+import { EmptyState } from "../../../../shared/webview/components/EmptyState";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Switch } from "../../../../shared/webview/components/ui/switch";
 import {
@@ -10,6 +11,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   SearchIcon,
+  TerminalIcon,
   XIcon
 } from "../../../../shared/webview/icons";
 import type { PipelineNodeLogViewModel } from "../../../shared/BuildDetailsContracts";
@@ -37,15 +39,20 @@ export function PipelineNodeLogPane({
 
   if (!log.target) {
     return (
-      <aside className="rounded border border-dashed border-mutedBorder bg-muted-soft px-3 py-4 text-sm text-muted-foreground">
-        Select a stage or step log from the pipeline.
+      <aside>
+        <EmptyState
+          icon={<TerminalIcon className="h-4 w-4" />}
+          title="No log selected"
+          description="Choose a stage or step in the pipeline to stream its log here."
+          className="py-6"
+        />
       </aside>
     );
   }
   const target = log.target;
 
   return (
-    <aside className="rounded border border-card-border bg-card shadow-widget">
+    <aside className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
       <ConsoleLogViewer
         text={log.text}
         htmlModel={htmlModel}

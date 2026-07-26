@@ -1,9 +1,9 @@
-import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
+import type { PendingInputAction } from "../../jenkins/JenkinsDataService";
+import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PipelineRun } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsBuildDetails, JenkinsTestReport } from "../../jenkins/types";
 import { areStringArraysEqual } from "../../shared/arrays";

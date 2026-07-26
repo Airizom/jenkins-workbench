@@ -15,38 +15,35 @@ import {
   getCanonicalTreeJobUrl,
   getJobTreeItemKind,
   getTreeItemLabel,
+  getTreeJobUrlAliases,
   removeJobScopedState,
   withActionErrorMessage
 } from "../CommandUtils";
+
+async function applyToJobUrlAliases(
+  item: JobTreeItem | PipelineTreeItem | StalePinnedJobTreeItem,
+  operation: (jobUrl: string) => Promise<boolean>
+): Promise<boolean> {
+  const results = await Promise.all(getTreeJobUrlAliases(item).map(operation));
+  return results.some(Boolean);
+}
 
 async function isPinnedJob(
   pinStore: JenkinsPinStore,
   item: JobTreeItem | PipelineTreeItem
 ): Promise<boolean> {
-  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
-  const [hasRawPin, hasCanonicalPin] = await Promise.all([
-    pinStore.isPinned(item.environment.scope, item.environment.environmentId, item.jobUrl),
-    canonicalJobUrl === item.jobUrl
-      ? Promise.resolve(false)
-      : pinStore.isPinned(item.environment.scope, item.environment.environmentId, canonicalJobUrl)
-  ]);
-
-  return hasRawPin || hasCanonicalPin;
+  return applyToJobUrlAliases(item, (jobUrl) =>
+    pinStore.isPinned(item.environment.scope, item.environment.environmentId, jobUrl)
+  );
 }
 
 async function removePinnedJob(
   pinStore: JenkinsPinStore,
   item: JobTreeItem | PipelineTreeItem | StalePinnedJobTreeItem
 ): Promise<boolean> {
-  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
-  const [removedRawPin, removedCanonicalPin] = await Promise.all([
-    pinStore.removePin(item.environment.scope, item.environment.environmentId, item.jobUrl),
-    canonicalJobUrl === item.jobUrl
-      ? Promise.resolve(false)
-      : pinStore.removePin(item.environment.scope, item.environment.environmentId, canonicalJobUrl)
-  ]);
-
-  return removedRawPin || removedCanonicalPin;
+  return applyToJobUrlAliases(item, (jobUrl) =>
+    pinStore.removePin(item.environment.scope, item.environment.environmentId, jobUrl)
+  );
 }
 
 export async function pinJob(

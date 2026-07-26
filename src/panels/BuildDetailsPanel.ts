@@ -3,9 +3,11 @@ import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefresh
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
-import type { TestSourceNavigationService } from "../services/TestSourceNavigationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
-import { buildTestSourceNavigationContext } from "../services/TestSourceResolver";
+import {
+  buildTestSourceNavigationContext,
+  type TestSourceResolver
+} from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
@@ -48,7 +50,7 @@ interface BuildDetailsPanelShowOptions {
   coverageDecorationService: CoverageDecorationService;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
-  testSourceNavigationService?: TestSourceNavigationService;
+  testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
@@ -64,46 +66,48 @@ interface BuildDetailsPanelReviveOptions {
   coverageDecorationService: CoverageDecorationService;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
-  testSourceNavigationService?: TestSourceNavigationService;
+  testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
+}
+
+interface BuildDetailsPanelMutableServices {
+  consoleExporter: BuildConsoleExporter;
+  refreshHost: EnvironmentScopedRefreshHost | undefined;
+  pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
+  testSourceResolver?: TestSourceResolver;
+  testSourceNavigationUiService?: TestSourceNavigationUiService;
 }
 
 export class BuildDetailsPanel {
   private static currentPanel: BuildDetailsPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
-  private consoleExporter: BuildConsoleExporter;
+  private mutableServices!: BuildDetailsPanelMutableServices;
   private readonly controller: BuildDetailsPanelController;
   private readonly actions: BuildDetailsPanelActions;
   private readonly messageRouter: BuildDetailsMessageRouter;
   private readonly disposables: vscode.Disposable[] = [];
   private artifactActionHandler?: ArtifactActionHandler;
-  private refreshHost?: EnvironmentScopedRefreshHost;
   private serializedState?: BuildDetailsPanelSerializedState;
-  private testSourceNavigationService?: TestSourceNavigationService;
-  private testSourceNavigationUiService?: TestSourceNavigationUiService;
   private readonly canOpenTestSource: BuildDetailsCanOpenTestSource;
 
   static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
     const {
       backend,
       artifactActionHandler,
-      consoleExporter,
-      refreshHost,
-      pendingInputProvider,
       coverageDecorationService,
-      testSourceNavigationService,
-      testSourceNavigationUiService,
       environment,
       buildUrl,
       extensionUri,
       label,
       pipelineNodeSelection
     } = options;
+    const mutableServices = getMutableServices(options);
 
-    if (!BuildDetailsPanel.currentPanel) {
+    let activePanel = BuildDetailsPanel.currentPanel;
+    if (!activePanel) {
       const panel = vscode.window.createWebviewPanel(
         "jenkinsWorkbench.buildDetails",
         "Build Details",
@@ -115,24 +119,17 @@ export class BuildDetailsPanel {
         }
       );
       configureWebviewPanel(panel, extensionUri, "terminal");
-      BuildDetailsPanel.currentPanel = new BuildDetailsPanel(
+      activePanel = new BuildDetailsPanel(
         panel,
         extensionUri,
-        consoleExporter,
         coverageDecorationService,
-        testSourceNavigationService,
-        testSourceNavigationUiService
+        mutableServices
       );
+      BuildDetailsPanel.currentPanel = activePanel;
+    } else {
+      activePanel.configure(mutableServices);
     }
 
-    const activePanel = BuildDetailsPanel.currentPanel;
-    activePanel.configure(
-      consoleExporter,
-      refreshHost,
-      pendingInputProvider,
-      testSourceNavigationService,
-      testSourceNavigationUiService
-    );
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(
       backend,
@@ -155,19 +152,10 @@ export class BuildDetailsPanel {
     const revived = new BuildDetailsPanel(
       panel,
       options.extensionUri,
-      options.consoleExporter,
       options.coverageDecorationService,
-      options.testSourceNavigationService,
-      options.testSourceNavigationUiService
+      getMutableServices(options)
     );
     BuildDetailsPanel.currentPanel = revived;
-    revived.configure(
-      options.consoleExporter,
-      options.refreshHost,
-      options.pendingInputProvider,
-      options.testSourceNavigationService,
-      options.testSourceNavigationUiService
-    );
 
     const restored = await resolveRestoredPanelEnvironment({
       panel: revived.panel,
@@ -198,20 +186,15 @@ export class BuildDetailsPanel {
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    consoleExporter: BuildConsoleExporter,
     coverageDecorationService: CoverageDecorationService,
-    testSourceNavigationService?: TestSourceNavigationService,
-    testSourceNavigationUiService?: TestSourceNavigationUiService
+    mutableServices: BuildDetailsPanelMutableServices
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
-    this.consoleExporter = consoleExporter;
-    this.testSourceNavigationService = testSourceNavigationService;
-    this.testSourceNavigationUiService = testSourceNavigationUiService;
     this.canOpenTestSource = (environment, buildUrl, className) =>
       Boolean(
         environment &&
-          this.testSourceNavigationService?.canNavigate(
+          this.mutableServices.testSourceResolver?.canResolve(
             buildTestSourceNavigationContext(environment, buildUrl),
             className
           )
@@ -222,12 +205,13 @@ export class BuildDetailsPanel {
       coverageDecorationService,
       this.canOpenTestSource
     );
+    this.configure(mutableServices);
     this.actions = new BuildDetailsPanelActions({
       controller: this.controller,
       getArtifactActionHandler: () => this.artifactActionHandler,
-      getConsoleExporter: () => this.consoleExporter,
-      getRefreshHost: () => this.refreshHost,
-      getTestSourceNavigationUiService: () => this.testSourceNavigationUiService
+      getConsoleExporter: () => this.mutableServices.consoleExporter,
+      getRefreshHost: () => this.mutableServices.refreshHost,
+      getTestSourceNavigationUiService: () => this.mutableServices.testSourceNavigationUiService
     });
     this.messageRouter = new BuildDetailsMessageRouter({
       onArtifactAction: (message) => {
@@ -329,18 +313,9 @@ export class BuildDetailsPanel {
     disposePanelResources(this.disposables);
   }
 
-  private configure(
-    consoleExporter: BuildConsoleExporter,
-    refreshHost: EnvironmentScopedRefreshHost | undefined,
-    pendingInputProvider: BuildDetailsPendingInputProvider | undefined,
-    testSourceNavigationService?: TestSourceNavigationService,
-    testSourceNavigationUiService?: TestSourceNavigationUiService
-  ): void {
-    this.consoleExporter = consoleExporter;
-    this.refreshHost = refreshHost;
-    this.testSourceNavigationService = testSourceNavigationService;
-    this.testSourceNavigationUiService = testSourceNavigationUiService;
-    this.controller.setPendingInputProvider(pendingInputProvider);
+  private configure(mutableServices: BuildDetailsPanelMutableServices): void {
+    this.mutableServices = mutableServices;
+    this.controller.setPendingInputProvider(mutableServices.pendingInputProvider);
   }
 
   private async load(
@@ -380,6 +355,18 @@ export class BuildDetailsPanel {
       });
     }
   }
+}
+
+function getMutableServices(
+  options: BuildDetailsPanelMutableServices
+): BuildDetailsPanelMutableServices {
+  return {
+    consoleExporter: options.consoleExporter,
+    refreshHost: options.refreshHost,
+    pendingInputProvider: options.pendingInputProvider,
+    testSourceResolver: options.testSourceResolver,
+    testSourceNavigationUiService: options.testSourceNavigationUiService
+  };
 }
 
 function toPipelineLogTargetViewModel(

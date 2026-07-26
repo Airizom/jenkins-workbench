@@ -7,12 +7,12 @@ import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import type { TreeViewSummary } from "../tree/TreeDataProvider";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
 import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
+import { createExtensionContainer } from "./container/ExtensionContainer";
+import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 import { registerExtensionCommands } from "./ExtensionCommands";
 import type { ExtensionRuntimeOptions } from "./ExtensionServices";
 import { registerExtensionProviders } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
-import { createExtensionContainer } from "./container/ExtensionContainer";
-import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 
 const JENKINSFILE_DOCUMENT_SELECTORS = [
   { scheme: "file" },

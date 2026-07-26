@@ -1,5 +1,6 @@
+import type * as React from "react";
 import { Skeleton } from "../../../../../shared/webview/components/ui/skeleton";
-export function PipelineStagesPlaceholder(): JSX.Element {
+export function PipelineStagesPlaceholder(): React.JSX.Element {
   return (
     <div className="space-y-2">
       {[1, 2, 3].map((i) => (

@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
+import { BuildActionError } from "../jenkins/errors";
 import type { JenkinsConsoleTextClient } from "../jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { BuildActionError } from "../jenkins/errors";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 
 export interface BuildConsoleWriteStream {

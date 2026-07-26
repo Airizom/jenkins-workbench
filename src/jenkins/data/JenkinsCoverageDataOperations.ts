@@ -1,8 +1,8 @@
-import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../coverage/JenkinsCoverageTypes";
+import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 

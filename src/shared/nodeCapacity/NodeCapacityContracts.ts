@@ -1,4 +1,7 @@
-import type { QueueWorkItemViewModel } from "../queueWork/QueueWorkContracts";
+import type {
+  NodeQueuedWorkViewModel,
+  QueueWorkItemViewModel
+} from "../queueWork/QueueWorkContracts";
 
 export type NodeCapacitySeverity = "critical" | "warning" | "normal";
 
@@ -19,7 +22,7 @@ export interface NodeCapacityExecutorViewModel {
   workUrl?: string;
 }
 
-export interface NodeCapacityNodeViewModel {
+export interface NodeCapacityNodeViewModel extends NodeQueuedWorkViewModel {
   displayName: string;
   name: string;
   nodeUrl?: string;
@@ -37,9 +40,6 @@ export interface NodeCapacityNodeViewModel {
   executorSummary: string;
   executorsLoaded: boolean;
   executors: NodeCapacityExecutorViewModel[];
-  matchingQueueItems: QueueWorkItemViewModel[];
-  anyQueueItems: QueueWorkItemViewModel[];
-  selfLabelQueueItems: QueueWorkItemViewModel[];
 }
 
 export interface NodeCapacityPoolViewModel {

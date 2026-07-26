@@ -1,3 +1,5 @@
+import type * as React from "react";
+import { TabCountBadge } from "../../../../shared/webview/components/TabCountBadge";
 import {
   Tabs,
   TabsContent,
@@ -27,30 +29,12 @@ import type {
 } from "../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
+import { resolveBuildDetailsSelectedTab } from "./buildDetailsTabsModel";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
+import { OverviewTab } from "./overview/OverviewTab";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineSection } from "./PipelineSection";
 import { TestResultsSection } from "./TestResultsSection";
-import { resolveBuildDetailsSelectedTab } from "./buildDetailsTabsModel";
-import { OverviewTab } from "./overview/OverviewTab";
-
-function TabCountBadge({
-  count,
-  tone
-}: {
-  count: number;
-  tone: "warning" | "failure";
-}): JSX.Element {
-  const toneClass =
-    tone === "warning" ? "bg-warning-badge text-warning" : "bg-failure-soft text-failure";
-  return (
-    <span
-      className={`inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[11px] font-medium ${toneClass}`}
-    >
-      {count}
-    </span>
-  );
-}
 
 function PipelineTabStatus({
   failedCount,
@@ -58,7 +42,7 @@ function PipelineTabStatus({
 }: {
   failedCount: number;
   loading: boolean;
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   if (failedCount > 0) {
     return <TabCountBadge count={failedCount} tone="failure" />;
   }
@@ -68,7 +52,11 @@ function PipelineTabStatus({
   return null;
 }
 
-function TestsTabStatus({ summary }: { summary: BuildTestsSummaryViewModel }): JSX.Element | null {
+function TestsTabStatus({
+  summary
+}: {
+  summary: BuildTestsSummaryViewModel;
+}): React.JSX.Element | null {
   if (summary.failedCount > 0) {
     return <TabCountBadge count={summary.failedCount} tone="failure" />;
   }
@@ -153,7 +141,7 @@ export function BuildDetailsTabs({
   onArtifactAction,
   onReloadTestResults,
   onOpenTestSource
-}: BuildDetailsTabsProps): JSX.Element {
+}: BuildDetailsTabsProps): React.JSX.Element {
   const activeTab = resolveBuildDetailsSelectedTab(selectedTab, {
     hasPendingInputs,
     hasPipelineStages,
@@ -166,37 +154,41 @@ export function BuildDetailsTabs({
       onValueChange={(value) => onTabChange(value as BuildDetailsTab)}
       className="space-y-3"
     >
-      <TabsList className="w-full justify-start">
-        <TabsTrigger value="overview" className="gap-1.5 text-xs">
-          <GaugeIcon className="h-3.5 w-3.5" />
-          Overview
-        </TabsTrigger>
-        {hasPendingInputs ? (
-          <TabsTrigger value="inputs" className="relative gap-1.5 text-xs">
-            <AlertCircleIcon className="h-3.5 w-3.5" />
-            Inputs
-            <TabCountBadge count={pendingInputs.length} tone="warning" />
+      {/* Docked below the hero so tab switching stays reachable while reading a
+       * long console log or test list. */}
+      <div className="build-details-tabs-bar">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="overview" className="text-xs">
+            <GaugeIcon className="h-3.5 w-3.5" />
+            Overview
           </TabsTrigger>
-        ) : null}
-        {hasPipelineStages ? (
-          <TabsTrigger value="pipeline" className="gap-1.5 text-xs">
-            <WorkflowIcon className="h-3.5 w-3.5" />
-            Pipeline
-            <PipelineTabStatus failedCount={stripFailedCount} loading={pipelineStagesLoading} />
+          {hasPendingInputs ? (
+            <TabsTrigger value="inputs" className="text-xs">
+              <AlertCircleIcon className="h-3.5 w-3.5" />
+              Inputs
+              <TabCountBadge count={pendingInputs.length} tone="warning" />
+            </TabsTrigger>
+          ) : null}
+          {hasPipelineStages ? (
+            <TabsTrigger value="pipeline" className="text-xs">
+              <WorkflowIcon className="h-3.5 w-3.5" />
+              Pipeline
+              <PipelineTabStatus failedCount={stripFailedCount} loading={pipelineStagesLoading} />
+            </TabsTrigger>
+          ) : null}
+          <TabsTrigger value="console" className="text-xs">
+            <TerminalIcon className="h-3.5 w-3.5" />
+            Console
           </TabsTrigger>
-        ) : null}
-        <TabsTrigger value="console" className="gap-1.5 text-xs">
-          <TerminalIcon className="h-3.5 w-3.5" />
-          Console
-        </TabsTrigger>
-        {hasTests ? (
-          <TabsTrigger value="tests" className="relative gap-1.5 text-xs">
-            <TestTubeIcon className="h-3.5 w-3.5" />
-            Tests
-            <TestsTabStatus summary={testsSummary} />
-          </TabsTrigger>
-        ) : null}
-      </TabsList>
+          {hasTests ? (
+            <TabsTrigger value="tests" className="text-xs">
+              <TestTubeIcon className="h-3.5 w-3.5" />
+              Tests
+              <TestsTabStatus summary={testsSummary} />
+            </TabsTrigger>
+          ) : null}
+        </TabsList>
+      </div>
 
       <TabsContent value="overview" className="space-y-3">
         <OverviewTab

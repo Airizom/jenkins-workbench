@@ -1,30 +1,48 @@
-import type {
-  BuildCompareTestDiffItem,
-  BuildCompareTestsSectionViewModel
-} from "../../../shared/BuildCompareContracts";
+import type { BuildCompareTestsSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { EmptyState } from "./shared/EmptyState";
 import { SectionCard } from "./shared/SectionCard";
 import { SummaryStat } from "./shared/SummaryStat";
 import { DiffList } from "./testDiff/DiffList";
 
-const DIFF_GROUPS: Array<{
-  title: string;
-  emptyLabel: string;
-  select: (section: BuildCompareTestsSectionViewModel) => BuildCompareTestDiffItem[];
-}> = [
-  { title: "New Failures", emptyLabel: "No new failures.", select: (s) => s.newFailures },
-  { title: "Still Failing", emptyLabel: "No still-failing tests.", select: (s) => s.stillFailing },
-  { title: "Newly Passing", emptyLabel: "No newly passing tests.", select: (s) => s.newPasses },
-  { title: "Added Tests", emptyLabel: "No added tests.", select: (s) => s.addedTests },
-  { title: "Removed Tests", emptyLabel: "No removed tests.", select: (s) => s.removedTests }
-];
+const DIFF_GROUPS = [
+  { title: "New Failures", emptyLabel: "No new failures.", itemsKey: "newFailures" },
+  { title: "Still Failing", emptyLabel: "No still-failing tests.", itemsKey: "stillFailing" },
+  { title: "Newly Passing", emptyLabel: "No newly passing tests.", itemsKey: "newPasses" },
+  { title: "Added Tests", emptyLabel: "No added tests.", itemsKey: "addedTests" },
+  { title: "Removed Tests", emptyLabel: "No removed tests.", itemsKey: "removedTests" }
+] as const;
+
+function TestChangesSummary({
+  section,
+  hasTestChanges
+}: {
+  section: BuildCompareTestsSectionViewModel;
+  hasTestChanges: boolean;
+}) {
+  const comparisonAvailable = section.status === "available" || section.status === "empty";
+
+  if (!comparisonAvailable) {
+    return <EmptyState label={section.detail ?? section.summaryLabel} />;
+  }
+
+  if (!hasTestChanges) {
+    return <EmptyState tone="success" label="No test changes between these builds." />;
+  }
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      <SummaryStat label="Other test changes" value={String(section.otherChangesCount)} />
+      <SummaryStat label="Unchanged tests" value={String(section.unchangedCount)} />
+    </div>
+  );
+}
+
 export function TestDiffSection({ section }: { section: BuildCompareTestsSectionViewModel }) {
   const visibleGroups = DIFF_GROUPS.map((group) => ({
     ...group,
-    items: group.select(section)
+    items: section[group.itemsKey]
   })).filter((group) => group.items.length > 0);
   const hasTestChanges = visibleGroups.length > 0 || section.otherChangesCount > 0;
-  const comparisonAvailable = section.status === "available" || section.status === "empty";
 
   return (
     <SectionCard
@@ -45,16 +63,7 @@ export function TestDiffSection({ section }: { section: BuildCompareTestsSection
           emptyLabel={group.emptyLabel}
         />
       ))}
-      {!comparisonAvailable ? (
-        <EmptyState label={section.detail ?? section.summaryLabel} />
-      ) : hasTestChanges ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          <SummaryStat label="Other test changes" value={String(section.otherChangesCount)} />
-          <SummaryStat label="Unchanged tests" value={String(section.unchangedCount)} />
-        </div>
-      ) : (
-        <EmptyState tone="success" label="No test changes between these builds." />
-      )}
+      <TestChangesSummary section={section} hasTestChanges={hasTestChanges} />
     </SectionCard>
   );
 }

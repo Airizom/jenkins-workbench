@@ -1,6 +1,5 @@
 import { resolveSeverityBadgeClass } from "../lib/statusStyles";
-import { cn } from "../lib/utils";
-import { Badge } from "./ui/badge";
+import { ToneBadge } from "./ToneBadge";
 export function SeverityBadge({
   label,
   severity,
@@ -11,12 +10,10 @@ export function SeverityBadge({
   className?: string;
 }) {
   return (
-    <Badge
-      variant="outline"
-      size="sm"
-      className={cn(resolveSeverityBadgeClass(severity), className)}
-    >
-      {label}
-    </Badge>
+    <ToneBadge
+      label={label}
+      badgeClassName={resolveSeverityBadgeClass(severity)}
+      className={className}
+    />
   );
 }

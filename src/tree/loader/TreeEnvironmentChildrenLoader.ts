@@ -4,7 +4,6 @@ import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentSt
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { ActivityDisplaySummary } from "../ActivityTypes";
 import type { EnvironmentSummaryStore } from "../EnvironmentSummaryStore";
-import { type TreeViewCurationOptions, curateTreeViews } from "../TreeViewCuration";
 import { JenkinsViewTreeItem } from "../items/TreeJobItems";
 import { NodeTreeItem } from "../items/TreeNodeItems";
 import {
@@ -17,6 +16,7 @@ import {
   ViewsFolderTreeItem
 } from "../items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { curateTreeViews, type TreeViewCurationOptions } from "../TreeViewCuration";
 import { mapQueueItemsToTreeItems } from "./TreeChildrenMapping";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
 

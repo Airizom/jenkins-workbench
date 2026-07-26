@@ -35,7 +35,8 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
       return;
     }
 
-    const targetUrlValue = this.getUrlParam(uri);
+    const queryParams = parseUriQueryParams(uri.query);
+    const targetUrlValue = this.getQueryParam(queryParams, "url");
     if (!targetUrlValue) {
       void vscode.window.showErrorMessage("Missing required 'url' query parameter.");
       return;
@@ -56,7 +57,7 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
       await this.buildHandler.openBuildDetails(
         environment,
         targetUrl.toString(),
-        this.getPipelineNodeSelectionParam(uri)
+        this.getPipelineNodeSelectionParam(queryParams)
       );
       return;
     }
@@ -82,21 +83,20 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
     }
   }
 
-  private getUrlParam(uri: vscode.Uri): string | undefined {
-    const params = parseUriQueryParams(uri.query);
-    const value = params.get("url")?.trim();
-    return value && value.length > 0 ? value : undefined;
+  private getQueryParam(params: ReadonlyMap<string, string>, key: string): string | undefined {
+    return params.get(key)?.trim() || undefined;
   }
 
-  private getPipelineNodeSelectionParam(uri: vscode.Uri): PipelineNodeSelection | undefined {
-    const params = parseUriQueryParams(uri.query);
-    const nodeId = params.get("nodeId")?.trim();
+  private getPipelineNodeSelectionParam(
+    params: ReadonlyMap<string, string>
+  ): PipelineNodeSelection | undefined {
+    const nodeId = this.getQueryParam(params, "nodeId");
     if (!nodeId) {
       return undefined;
     }
-    const kindParam = params.get("nodeKind")?.trim().toLowerCase();
+    const kindParam = this.getQueryParam(params, "nodeKind")?.toLowerCase();
     const kind = kindParam === "step" ? "step" : "stage";
-    const name = params.get("nodeName")?.trim() || undefined;
+    const name = this.getQueryParam(params, "nodeName");
     return {
       kind,
       nodeId,

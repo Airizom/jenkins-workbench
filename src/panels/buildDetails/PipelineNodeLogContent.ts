@@ -1,6 +1,3 @@
-import { uniqueNonEmptyStrings } from "../../shared/arrays";
-import { escapeHtml } from "../../shared/html";
-
 export function htmlToText(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
@@ -11,10 +8,4 @@ export function htmlToText(html: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
-}
-
-export { escapeHtml };
-
-export function uniqueStrings(values: string[]): string[] {
-  return uniqueNonEmptyStrings(values);
 }

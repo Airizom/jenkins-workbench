@@ -206,10 +206,6 @@ export class JenkinsParameterPresetStore {
     const previous = existingIndex >= 0 ? entry.presets[existingIndex] : undefined;
     const previousSecretKeys = previous?.secretKeys ?? {};
     const preparedSecrets = await this.secrets.prepare({
-      scope,
-      environmentId,
-      jobUrl,
-      presetId,
       values: input.values,
       secretValues: input.secretValues,
       keepSecretNames: input.keepSecretNames,

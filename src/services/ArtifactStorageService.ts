@@ -1,10 +1,14 @@
 import type { IncomingHttpHeaders } from "node:http";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
+import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { normalizePosixRelativePath } from "../shared/posixPaths";
 import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactPathUtils";
-import type { ArtifactRetrievalService } from "./ArtifactRetrievalService";
+
+const INVALID_PATH_MESSAGE = "Artifact path is invalid and cannot be saved.";
+const INVALID_ROOT_MESSAGE =
+  "Artifact download location is invalid. Check your Jenkins Workbench settings.";
 
 export interface ArtifactFilesystem {
   createDirectory(path: string): Thenable<void>;
@@ -44,14 +48,14 @@ export class ArtifactStorageError extends Error {
 
 export class ArtifactStorageService {
   constructor(
-    private readonly retrievalService: ArtifactRetrievalService,
+    private readonly dataService: Pick<JenkinsDataService, "getArtifactStream">,
     private readonly filesystem: ArtifactFilesystem
   ) {}
 
   async downloadArtifact(request: ArtifactDownloadRequest): Promise<ArtifactDownloadResult> {
     const resolved = resolveArtifactTargetPath(request);
 
-    const response = await this.retrievalService.getArtifactStream(
+    const response = await this.dataService.getArtifactStream(
       request.environment,
       request.buildUrl,
       request.relativePath,
@@ -98,16 +102,13 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
 } {
   const normalizedRelativePath = normalizePosixRelativePath(request.relativePath);
   if (!normalizedRelativePath) {
-    throw new ArtifactStorageError("invalidPath", "Artifact path is invalid and cannot be saved.");
+    throw new ArtifactStorageError("invalidPath", INVALID_PATH_MESSAGE);
   }
   const safeRelativePath = sanitizeArtifactRelativePath(normalizedRelativePath);
 
   const resolvedRoot = resolveDownloadRoot(request.workspaceRoot, request.downloadRoot);
   if (!resolvedRoot) {
-    throw new ArtifactStorageError(
-      "invalidRoot",
-      "Artifact download location is invalid. Check your Jenkins Workbench settings."
-    );
+    throw new ArtifactStorageError("invalidRoot", INVALID_ROOT_MESSAGE);
   }
 
   const buildSegment =
@@ -118,15 +119,12 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
   const jobSegment = buildArtifactJobSegment(request.buildUrl, request.jobNameHint);
   const targetRoot = path.resolve(resolvedRoot, environmentSegment, jobSegment, buildSegment);
   if (!isPathInside(resolvedRoot, targetRoot)) {
-    throw new ArtifactStorageError(
-      "invalidRoot",
-      "Artifact download location is invalid. Check your Jenkins Workbench settings."
-    );
+    throw new ArtifactStorageError("invalidRoot", INVALID_ROOT_MESSAGE);
   }
 
   const targetPath = path.resolve(targetRoot, ...safeRelativePath.split("/"));
   if (!isPathInside(targetRoot, targetPath)) {
-    throw new ArtifactStorageError("invalidPath", "Artifact path is invalid and cannot be saved.");
+    throw new ArtifactStorageError("invalidPath", INVALID_PATH_MESSAGE);
   }
 
   const label = request.fileName || path.basename(safeRelativePath) || safeRelativePath;
@@ -139,10 +137,7 @@ function sanitizeArtifactRelativePath(relativePath: string): string {
   // content into the target root. Replace ':' with '_' (matching the '_' substitution
   // used for the surrounding directory segments) on every platform so downloads land
   // at the same path everywhere; POSIX names containing ':' are renamed accordingly.
-  return relativePath
-    .split("/")
-    .map((segment) => segment.replace(/:/g, "_"))
-    .join("/");
+  return relativePath.replace(/:/g, "_");
 }
 
 function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): string | undefined {
@@ -170,7 +165,7 @@ function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): strin
 
 function isPathInside(rootPath: string, filePath: string): boolean {
   const relative = path.relative(rootPath, filePath);
-  if (!relative || relative === "") {
+  if (!relative) {
     return true;
   }
   return !relative.startsWith("..") && !path.isAbsolute(relative);

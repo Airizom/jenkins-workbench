@@ -57,9 +57,6 @@ function createCompletionItem(
     : undefined;
   item.insertText = buildStepSnippet(step);
   item.sortText = `${step.isAdvanced ? "z" : "a"}:${step.name}`;
-  if (step.isAdvanced) {
-    item.tags = [vscode.CompletionItemTag.Deprecated];
-  }
   return item;
 }
 
@@ -74,12 +71,11 @@ function buildStepSnippet(step: JenkinsfileStepDefinition): vscode.SnippetString
   }
 
   const parameters = signature.parameters.filter((parameter) => !parameter.isBody);
-  const takesClosure = signature.takesClosure;
 
   if (signature.usesNamedArgs && parameters.length > 0) {
     const snippet = createCallSnippet(step.name);
     appendNamedArgument(snippet, parameters[0].name, "value");
-    appendBody(snippet, takesClosure);
+    appendBody(snippet, signature.takesClosure);
     return snippet;
   }
 
@@ -87,18 +83,12 @@ function buildStepSnippet(step: JenkinsfileStepDefinition): vscode.SnippetString
     const snippet = createCallSnippet(step.name);
     snippet.appendPlaceholder(parameters[0].name === "message" ? "message" : "value");
     closeCallSnippet(snippet);
-    appendBody(snippet, takesClosure);
-    return snippet;
-  }
-
-  if (parameters.length === 0) {
-    const snippet = new vscode.SnippetString(`${step.name}()`);
-    appendBody(snippet, takesClosure);
+    appendBody(snippet, signature.takesClosure);
     return snippet;
   }
 
   const snippet = new vscode.SnippetString(`${step.name}()`);
-  appendBody(snippet, takesClosure);
+  appendBody(snippet, signature.takesClosure);
   return snippet;
 }
 

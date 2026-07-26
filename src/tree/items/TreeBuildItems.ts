@@ -2,9 +2,9 @@ import * as vscode from "vscode";
 import type { JenkinsBuild } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { type BuildTooltipOptions, buildBuildTooltip } from "../BuildTooltips";
-import { TREE_FOLDER_ICON, resolveTreeFileIcon } from "../TreeFileIcons";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import { buildIcon, formatBuildDescription } from "../formatters";
+import { resolveTreeFileIcon, TREE_FOLDER_ICON } from "../TreeFileIcons";
+import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 export class BuildTreeItem extends vscode.TreeItem {
@@ -38,11 +38,8 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
     this.id = BuildTreeItem.buildId(environment, build.url, jobScope);
-    this.contextValue = this.awaitingInput
-      ? `${this.isBuilding ? "buildRunning" : "build"} awaitingInput`
-      : this.isBuilding
-        ? "buildRunning"
-        : "build";
+    const contextValue = this.isBuilding ? "buildRunning" : "build";
+    this.contextValue = this.awaitingInput ? `${contextValue} awaitingInput` : contextValue;
     this.description = formatBuildDescription(build, awaitingInput);
     this.iconPath = buildIcon(build, awaitingInput);
     this.tooltip = buildBuildTooltip(build, tooltipOptions);
@@ -82,10 +79,11 @@ export class BuildArtifactsFolderTreeItem extends vscode.TreeItem {
     this.contextValue = "artifactFolder";
     this.iconPath = TREE_FOLDER_ICON;
     if (typeof artifactCount === "number") {
-      this.description =
-        artifactCount > 0
-          ? `${artifactCount} item${artifactCount === 1 ? "" : "s"}`
-          : "No artifacts";
+      if (artifactCount > 0) {
+        this.description = `${artifactCount} item${artifactCount === 1 ? "" : "s"}`;
+      } else {
+        this.description = "No artifacts";
+      }
     }
   }
 }

@@ -92,7 +92,7 @@ export class JobConfigUpdateWorkflow {
       return;
     }
 
-    const errorCount = await this.countXmlErrors(targetUri);
+    const errorCount = this.countXmlErrors(targetUri);
     const confirmDecision = await this.showSubmitConfirmation(draft.label, errorCount);
     if (!confirmDecision) {
       return;
@@ -243,45 +243,9 @@ export class JobConfigUpdateWorkflow {
     });
   }
 
-  private async countXmlErrors(uri: vscode.Uri): Promise<number> {
-    const diagnostics = await this.waitForDiagnostics(uri, 1500);
-    return diagnostics.filter((d) => d.severity === vscode.DiagnosticSeverity.Error).length;
-  }
-
-  private async waitForDiagnostics(
-    uri: vscode.Uri,
-    timeoutMs: number
-  ): Promise<vscode.Diagnostic[]> {
-    const existing = vscode.languages.getDiagnostics(uri);
-    if (existing.length > 0) {
-      return existing;
-    }
-
-    return new Promise<vscode.Diagnostic[]>((resolve) => {
-      let settled = false;
-      const settle = (result: vscode.Diagnostic[]) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(timer);
-        subscription.dispose();
-        resolve(result);
-      };
-
-      const subscription = vscode.languages.onDidChangeDiagnostics((event) => {
-        if (!event.uris.some((u) => u.toString() === uri.toString())) {
-          return;
-        }
-        const updated = vscode.languages.getDiagnostics(uri);
-        if (updated.length > 0) {
-          settle(updated);
-        }
-      });
-
-      const timer = setTimeout(() => {
-        settle(vscode.languages.getDiagnostics(uri));
-      }, timeoutMs);
-    });
+  private countXmlErrors(uri: vscode.Uri): number {
+    return vscode.languages
+      .getDiagnostics(uri)
+      .filter((diagnostic) => diagnostic.severity === vscode.DiagnosticSeverity.Error).length;
   }
 }

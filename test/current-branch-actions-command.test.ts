@@ -186,7 +186,18 @@ describe("showCurrentBranchActions", () => {
 
     await runActionsCommand(stub, "Open Latest Build Details");
 
-    assert.ok(lastQuickPickItems.some((item) => item.action === "openLatestBuild"));
+    assert.deepEqual(
+      lastQuickPickItems.map((item) => item.action),
+      [
+        "openBranch",
+        "triggerBuild",
+        "openLatestBuild",
+        "openLastFailed",
+        "refresh",
+        "relink",
+        "unlink"
+      ]
+    );
     assert.deepEqual(methodCalls(stub, "openLatestBuild")[0]?.args, [state, extensionUri]);
   });
 

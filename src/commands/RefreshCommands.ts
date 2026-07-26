@@ -16,30 +16,23 @@ export function registerRefreshCommands(
       async (item?: JenkinsEnvironmentRef) => {
         const snapshot = expansionState.snapshot();
         const refreshWaiter = provider.createRefreshWaiter();
+        const refreshRequest: Parameters<ExtensionRefreshHost["fullEnvironmentRefresh"]>[0] = item
+          ? {
+              environmentId: item.environmentId,
+              trigger: "manual",
+              refreshToken: refreshWaiter.token
+            }
+          : {
+              trigger: "manual",
+              refreshToken: refreshWaiter.token
+            };
+        const result = refreshHost.fullEnvironmentRefresh(refreshRequest);
 
-        if (item) {
-          const result = refreshHost.fullEnvironmentRefresh({
-            environmentId: item.environmentId,
-            trigger: "manual",
-            refreshToken: refreshWaiter.token
-          });
-          if (!result.executed) {
-            refreshWaiter.dispose();
-            return;
-          }
-          await refreshWaiter.promise;
-          await expansionState.restore(snapshot);
-          return;
-        }
-
-        const result = refreshHost.fullEnvironmentRefresh({
-          trigger: "manual",
-          refreshToken: refreshWaiter.token
-        });
         if (!result.executed) {
           refreshWaiter.dispose();
           return;
         }
+
         await refreshWaiter.promise;
         await expansionState.restore(snapshot);
       }

@@ -3,16 +3,13 @@ import { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../../jenkins/JenkinsDataService";
-import { ArtifactActionService } from "../../services/ArtifactActionService";
 import { createFileArtifactFilesystem } from "../../services/ArtifactFilesystem";
-import { DefaultArtifactRetrievalService } from "../../services/ArtifactRetrievalService";
 import { ArtifactStorageService } from "../../services/ArtifactStorageService";
 import { BrowserSsoAuthenticationService } from "../../services/BrowserSsoAuthenticationService";
 import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
 } from "../../services/BuildConsoleExporter";
-import { BuildLogService } from "../../services/BuildLogService";
 import { BuildParameterRequestPreparerService } from "../../services/BuildParameterRequestPreparerService";
 import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 import { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
@@ -23,10 +20,8 @@ import { ReplayDraftFilesystem } from "../../services/ReplayDraftFilesystem";
 import { ReplayDraftManager } from "../../services/ReplayDraftManager";
 import { WorkspaceTestSourceFileMatchConfig } from "../../services/TestSourceFileMatchConfig";
 import { DefaultTestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
-import { TestSourceNavigationService } from "../../services/TestSourceNavigationService";
 import { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { TestSourceResolver } from "../../services/TestSourceResolver";
-import { DefaultWorkspaceRetrievalService } from "../../services/WorkspaceRetrievalService";
 import { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -37,11 +32,11 @@ import {
   type ArtifactActionOptionsProvider,
   DefaultArtifactActionHandler
 } from "../../ui/ArtifactActionHandler";
+import { ArtifactPreviewer, type ArtifactPreviewOptionsProvider } from "../../ui/ArtifactPreviewer";
 import {
   ArtifactPreviewProvider,
   type ArtifactPreviewProviderOptions
 } from "../../ui/ArtifactPreviewProvider";
-import { type ArtifactPreviewOptionsProvider, ArtifactPreviewer } from "../../ui/ArtifactPreviewer";
 import { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { WorkspacePreviewer } from "../../ui/WorkspacePreviewer";
@@ -81,21 +76,20 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
       new BuildConsoleExporter(container.get("dataService"), createNodeBuildConsoleFilesystem(), {
         maxConsoleChars: MAX_CONSOLE_CHARS
       }),
-    buildLogService: (container) => new BuildLogService(container.get("dataService")),
-    artifactRetrievalService: (container) =>
-      new DefaultArtifactRetrievalService(container.get("dataService")),
-    workspaceRetrievalService: (container) =>
-      new DefaultWorkspaceRetrievalService(container.get("dataService")),
-    artifactStorageService: (container) =>
-      new ArtifactStorageService(
-        container.get("artifactRetrievalService"),
+    artifactStorageService: (container) => {
+      const dataService = container.get("dataService");
+      return new ArtifactStorageService(
+        {
+          getArtifactStream: (...args) => dataService.getArtifactStream(...args)
+        },
         createFileArtifactFilesystem()
-      ),
+      );
+    },
     artifactPreviewProvider: (_container) =>
       new ArtifactPreviewProvider(options.artifactPreviewCacheOptions),
     buildLogPreviewer: (container) =>
       new BuildLogPreviewer(
-        container.get("buildLogService"),
+        container.get("dataService"),
         container.get("artifactPreviewProvider"),
         MAX_CONSOLE_CHARS
       ),
@@ -103,7 +97,7 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
       new JobConfigPreviewer(container.get("artifactPreviewProvider")),
     workspacePreviewer: (container) =>
       new WorkspacePreviewer(
-        container.get("workspaceRetrievalService"),
+        container.get("dataService"),
         container.get("artifactPreviewProvider"),
         options.artifactPreviewOptionsProvider
       ),
@@ -127,10 +121,8 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
         container.get("repositoryLinkStore"),
         container.get("testSourceFileMatchStrategy")
       ),
-    testSourceNavigationService: (container) =>
-      new TestSourceNavigationService(container.get("testSourceResolver")),
     testSourceNavigationUiService: (container) =>
-      new TestSourceNavigationUiService(container.get("testSourceNavigationService")),
+      new TestSourceNavigationUiService(container.get("testSourceResolver")),
     replayBuildWorkflow: (container) =>
       new ReplayBuildWorkflow(
         container.get("dataService"),
@@ -138,17 +130,17 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
         container.get("queuedBuildWaiter")
       ),
     artifactActionHandler: (container) => {
-      const artifactActionService = new ArtifactActionService(
-        container.get("artifactStorageService")
-      );
+      const dataService = container.get("dataService");
       const artifactPreviewer = new ArtifactPreviewer(
-        container.get("artifactRetrievalService"),
+        {
+          getArtifact: (...args) => dataService.getArtifact(...args)
+        },
         container.get("artifactPreviewProvider"),
         options.artifactPreviewOptionsProvider
       );
 
       return new DefaultArtifactActionHandler(
-        artifactActionService,
+        container.get("artifactStorageService"),
         artifactPreviewer,
         options.artifactActionOptionsProvider
       );

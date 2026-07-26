@@ -53,11 +53,11 @@ export function mapPendingInputActions(actions: JenkinsPendingInputAction[]): Pe
 }
 
 function mapPendingInputParameters(action: JenkinsPendingInputAction): JobParameter[] {
-  const rawParameters = Array.isArray(action.parameters)
-    ? action.parameters
-    : Array.isArray(action.inputs)
-      ? action.inputs
-      : [];
+  const rawParameters = Array.isArray(action.parameters) ? action.parameters : action.inputs;
+  if (!Array.isArray(rawParameters)) {
+    return [];
+  }
+
   const results: JobParameter[] = [];
   for (const parameter of rawParameters) {
     if (!parameter || !parameter.name) {

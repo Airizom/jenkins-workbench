@@ -2,9 +2,12 @@ import type { IncomingMessage } from "node:http";
 import { PassThrough } from "node:stream";
 import { JenkinsMaxBytesError, JenkinsRequestError } from "../errors";
 import { executeRequestLifecycle } from "./requestLifecycle";
-import { normalizeMaxBytes, rejectOversizedResponse } from "./responseLimits";
-import { createSafePromiseSettlers } from "./safePromise";
-import { DEFAULT_TIMEOUT_MS, buildRequestHeaders, createTimeoutError } from "./transport";
+import {
+  collectBoundedResponseText,
+  normalizeMaxBytes,
+  rejectOversizedResponse
+} from "./responseLimits";
+import { buildRequestHeaders, createTimeoutError, DEFAULT_TIMEOUT_MS } from "./transport";
 import type { JenkinsStreamRequestOptions, JenkinsStreamResponse } from "./types";
 
 export function requestJenkinsStream(
@@ -115,30 +118,5 @@ function collectErrorText(
   statusCode: number,
   maxBytes: number | undefined
 ): Promise<string> {
-  const oversizedResponse = rejectOversizedResponse(response, statusCode, maxBytes);
-  if (oversizedResponse) {
-    return oversizedResponse;
-  }
-
-  return new Promise((resolve, reject) => {
-    const safe = createSafePromiseSettlers(resolve, reject);
-    let text = "";
-    let receivedBytes = 0;
-    response.setEncoding("utf8");
-    response.on("data", (chunk) => {
-      receivedBytes += Buffer.byteLength(chunk, "utf8");
-      if (maxBytes !== undefined && receivedBytes > maxBytes) {
-        safe.reject(new JenkinsMaxBytesError(maxBytes, statusCode));
-        response.destroy();
-        return;
-      }
-      text += chunk;
-    });
-    response.on("end", () => {
-      safe.resolve(text);
-    });
-    response.on("error", () => {
-      safe.resolve(text);
-    });
-  });
+  return collectBoundedResponseText(response, statusCode, maxBytes, "resolvePartialText");
 }

@@ -20,16 +20,16 @@ export function RawJsonCard({
   rawJson,
   advancedLoaded,
   onCopyJson
-}: RawJsonCardProps): JSX.Element {
+}: RawJsonCardProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
 
   return (
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="rounded-lg border border-mutedBorder bg-card shadow-widget overflow-hidden"
+      className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm"
     >
-      <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-mutedBorder bg-muted-soft">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
         <CollapsibleTrigger asChild>
           <button
             type="button"

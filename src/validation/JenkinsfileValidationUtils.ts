@@ -82,24 +82,35 @@ export function mergeSuggestions(
   if (!existing || existing.length === 0) {
     return uniqueSuggestions(incoming);
   }
-  return uniqueSuggestions([...existing, ...incoming]);
+  return collectUniqueSuggestions(existing, incoming);
 }
 
 export function uniqueSuggestions(values: string[]): string[] {
   if (values.length === 0) {
     return values;
   }
+  return collectUniqueSuggestions(values);
+}
+
+function collectUniqueSuggestions(values: string[], additional?: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
-  for (const value of values) {
-    const normalized = value.toLowerCase();
-    if (seen.has(normalized)) {
+  const groupCount = additional ? 2 : 1;
+  for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+    const group = groupIndex === 0 ? values : additional;
+    if (!group) {
       continue;
     }
-    seen.add(normalized);
-    result.push(value);
-    if (result.length >= MAX_SUGGESTIONS) {
-      break;
+    for (const value of group) {
+      const normalized = value.toLowerCase();
+      if (seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      result.push(value);
+      if (result.length >= MAX_SUGGESTIONS) {
+        return result;
+      }
     }
   }
   return result;
@@ -164,18 +175,30 @@ function scanTokenOccurrences(
 }
 
 function parseSuggestionList(value: string): string[] {
-  const trimmed = value.replace(/[\[\]]/g, "").trim();
+  const trimmed = value.replace(/[[\]]/g, "").trim();
   if (!trimmed) {
     return [];
   }
 
-  const quoted = [...trimmed.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1].trim());
-  if (quoted.length > 0) {
-    return quoted.filter((item) => item.length > 0);
+  const quoted: string[] = [];
+  let hasQuotedMatch = false;
+  for (const match of trimmed.matchAll(/['"]([^'"]+)['"]/g)) {
+    hasQuotedMatch = true;
+    const item = match[1].trim();
+    if (item.length > 0) {
+      quoted.push(item);
+    }
+  }
+  if (hasQuotedMatch) {
+    return quoted;
   }
 
-  return trimmed
-    .split(/\s*,\s*|\s+or\s+/i)
-    .map((item) => item.replace(/[?.]$/, "").trim())
-    .filter((item) => item.length > 0);
+  const items: string[] = [];
+  for (const value of trimmed.split(/\s*,\s*|\s+or\s+/i)) {
+    const item = value.replace(/[?.]$/, "").trim();
+    if (item.length > 0) {
+      items.push(item);
+    }
+  }
+  return items;
 }

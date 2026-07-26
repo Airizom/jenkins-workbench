@@ -1,4 +1,17 @@
 export {
+  ArtifactTreeItem,
+  BuildTreeItem
+} from "./items/TreeBuildItems";
+
+export {
+  JenkinsFolderTreeItem,
+  JobTreeItem,
+  PipelineTreeItem,
+  StalePinnedJobTreeItem
+} from "./items/TreeJobItems";
+export { NodeTreeItem } from "./items/TreeNodeItems";
+export { QueueItemTreeItem } from "./items/TreeQueueItems";
+export {
   ActivityFolderTreeItem,
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
@@ -7,19 +20,5 @@ export {
   PinnedJobsFolderTreeItem,
   RootSectionTreeItem
 } from "./items/TreeRootItems";
-
-export {
-  JenkinsFolderTreeItem,
-  JobTreeItem,
-  PipelineTreeItem,
-  StalePinnedJobTreeItem
-} from "./items/TreeJobItems";
-
-export {
-  ArtifactTreeItem,
-  BuildTreeItem
-} from "./items/TreeBuildItems";
 export { WorkspaceFileTreeItem } from "./items/TreeWorkspaceItems";
-export { NodeTreeItem } from "./items/TreeNodeItems";
-export { QueueItemTreeItem } from "./items/TreeQueueItems";
 export type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";

@@ -25,18 +25,11 @@ export class DraftEditorService {
     }
 
     const orderedUris = orderUris(uris, options?.focusUri);
-    const focusDocument = await vscode.workspace.openTextDocument(orderedUris[0]);
-    await vscode.window.showTextDocument(focusDocument, {
-      preview: false,
-      preserveFocus: false,
-      viewColumn: vscode.ViewColumn.Active
-    });
-
-    for (const uri of orderedUris.slice(1)) {
+    for (const [index, uri] of orderedUris.entries()) {
       const document = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(document, {
         preview: false,
-        preserveFocus: true,
+        preserveFocus: index > 0,
         viewColumn: vscode.ViewColumn.Active
       });
     }

@@ -4,6 +4,7 @@ export class JenkinsfileMatcher {
   private patterns: string[] = [];
   private schemes: string[] = [];
   private selector: vscode.DocumentSelector = [];
+  private matchCache = new WeakMap<vscode.TextDocument, boolean>();
 
   constructor(patterns: string[], schemes: string[] = ["file", "untitled"]) {
     this.schemes = [...schemes];
@@ -13,13 +14,20 @@ export class JenkinsfileMatcher {
   updatePatterns(patterns: string[]): void {
     this.patterns = [...patterns];
     this.selector = buildSelector(this.patterns, this.schemes);
+    this.matchCache = new WeakMap<vscode.TextDocument, boolean>();
   }
 
   matches(document: vscode.TextDocument): boolean {
     if (this.patterns.length === 0) {
       return false;
     }
-    return vscode.languages.match(this.selector, document) > 0;
+    const cached = this.matchCache.get(document);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const matches = vscode.languages.match(this.selector, document) > 0;
+    this.matchCache.set(document, matches);
+    return matches;
   }
 }
 

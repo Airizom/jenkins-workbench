@@ -8,7 +8,7 @@ import {
 } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
 import { trimToUndefined } from "../../shared/stringValues";
-import { unionSortedMapKeys } from "./BuildCompareDiff";
+import { forEachKeyedDiff } from "./BuildCompareDiff";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
 import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
 import type {
@@ -48,47 +48,46 @@ function buildAvailableStagesSection(
 ): BuildCompareStagesSectionViewModel {
   const baselineStages = buildStageMap(toPipelineRun(baselineValue));
   const targetStages = buildStageMap(toPipelineRun(targetValue));
-  const items: BuildCompareStageDiffItem[] = unionSortedMapKeys(baselineStages, targetStages).map(
-    (stageKey) => {
-      const baseline = baselineStages.get(stageKey);
-      const target = targetStages.get(stageKey);
-      const displayName = baseline?.path ?? target?.path ?? stageKey;
-      if (!baseline && target) {
-        return {
-          key: stageKey,
-          name: displayName,
-          changeType: "added",
-          targetStatusLabel: target.statusLabel,
-          targetStatusClass: target.statusClass,
-          targetDurationLabel: target.durationLabel
-        };
-      }
-      if (baseline && !target) {
-        return {
-          key: stageKey,
-          name: displayName,
-          changeType: "removed",
-          baselineStatusLabel: baseline.statusLabel,
-          baselineStatusClass: baseline.statusClass,
-          baselineDurationLabel: baseline.durationLabel
-        };
-      }
-      const delta = formatDurationDelta(baseline?.durationMs, target?.durationMs);
-      return {
+  const items: BuildCompareStageDiffItem[] = [];
+
+  forEachKeyedDiff(baselineStages, targetStages, {
+    onAdded: (stageKey, target) => {
+      items.push({
         key: stageKey,
-        name: displayName,
+        name: target.path,
+        changeType: "added",
+        targetStatusLabel: target.statusLabel,
+        targetStatusClass: target.statusClass,
+        targetDurationLabel: target.durationLabel
+      });
+    },
+    onRemoved: (stageKey, baseline) => {
+      items.push({
+        key: stageKey,
+        name: baseline.path,
+        changeType: "removed",
+        baselineStatusLabel: baseline.statusLabel,
+        baselineStatusClass: baseline.statusClass,
+        baselineDurationLabel: baseline.durationLabel
+      });
+    },
+    onBoth: (stageKey, baseline, target) => {
+      const delta = formatDurationDelta(baseline.durationMs, target.durationMs);
+      items.push({
+        key: stageKey,
+        name: baseline.path,
         changeType: "matched",
-        baselineStatusLabel: baseline?.statusLabel,
-        baselineStatusClass: baseline?.statusClass,
-        targetStatusLabel: target?.statusLabel,
-        targetStatusClass: target?.statusClass,
-        baselineDurationLabel: baseline?.durationLabel,
-        targetDurationLabel: target?.durationLabel,
+        baselineStatusLabel: baseline.statusLabel,
+        baselineStatusClass: baseline.statusClass,
+        targetStatusLabel: target.statusLabel,
+        targetStatusClass: target.statusClass,
+        baselineDurationLabel: baseline.durationLabel,
+        targetDurationLabel: target.durationLabel,
         deltaLabel: delta?.label,
         deltaDirection: delta?.direction
-      };
+      });
     }
-  );
+  });
 
   return {
     status: items.length > 0 ? "available" : "empty",

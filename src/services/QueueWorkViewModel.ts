@@ -12,11 +12,16 @@ export interface QueueWorkBuildOptions {
   nodes?: NodeLabelInput[];
 }
 
+interface QueueWorkBuildContext {
+  nodes?: NodeLabelInput[];
+  labelsByNodeName?: Map<string, string[]>;
+}
+
 function buildQueueWorkItemViewModel(
   item: JenkinsQueueItemInfo,
-  options?: QueueWorkBuildOptions
+  context: QueueWorkBuildContext
 ): QueueWorkItemViewModel {
-  const queuedForLabels = resolveQueuedForLabels(item, options);
+  const queuedForLabels = resolveQueuedForLabels(item, context);
   return {
     id: item.id,
     name: item.name,
@@ -38,29 +43,48 @@ export function buildQueueWorkItems(
   items: JenkinsQueueItemInfo[],
   options?: QueueWorkBuildOptions
 ): QueueWorkItemViewModel[] {
-  return items.map((item) => buildQueueWorkItemViewModel(item, options));
+  const context: QueueWorkBuildContext = { nodes: options?.nodes };
+  return items.map((item) => buildQueueWorkItemViewModel(item, context));
 }
 
 export function buildNodeQueuedWorkViewModel(
   queueItems: QueueWorkItemViewModel[],
   labels: NodeLabelClassification
 ): NodeQueuedWorkViewModel {
+  const matchingQueueItems: QueueWorkItemViewModel[] = [];
+  const anyQueueItems: QueueWorkItemViewModel[] = [];
+  const selfLabelQueueItems: QueueWorkItemViewModel[] = [];
+  for (const item of queueItems) {
+    if (hasMatchingLabel(item, labels.poolLabelSet)) {
+      matchingQueueItems.push(item);
+    }
+    if (item.queuedForLabels.length === 0) {
+      anyQueueItems.push(item);
+    }
+    if (hasMatchingLabel(item, labels.hiddenLabelSet)) {
+      selfLabelQueueItems.push(item);
+    }
+  }
   return {
-    matchingQueueItems: queueItems.filter((item) => hasMatchingLabel(item, labels.poolLabelSet)),
-    anyQueueItems: queueItems.filter((item) => item.queuedForLabels.length === 0),
-    selfLabelQueueItems: queueItems.filter((item) => hasMatchingLabel(item, labels.hiddenLabelSet))
+    matchingQueueItems,
+    anyQueueItems,
+    selfLabelQueueItems
   };
 }
 
 function resolveQueuedForLabels(
   item: JenkinsQueueItemInfo,
-  options: QueueWorkBuildOptions | undefined
+  context: QueueWorkBuildContext
 ): string[] {
   const assignedLabel = trimToUndefined(item.assignedLabelName);
   if (assignedLabel) {
     return [assignedLabel];
   }
-  return inferQueuedLabelsFromBlockedNodeReason(item.reason, options?.nodes);
+  if (!item.reason || !Array.isArray(context.nodes) || context.nodes.length === 0) {
+    return [];
+  }
+  context.labelsByNodeName ??= buildPoolLabelsByNodeName(context.nodes);
+  return inferQueuedLabelsFromBlockedNodeReason(item.reason, context.labelsByNodeName);
 }
 
 function hasMatchingLabel(item: QueueWorkItemViewModel, labelKeys: Set<string>): boolean {
@@ -82,13 +106,12 @@ function formatQueueStatus(item: JenkinsQueueItemInfo): string {
 
 function inferQueuedLabelsFromBlockedNodeReason(
   reason: string | undefined,
-  nodes: NodeLabelInput[] | undefined
+  labelsByNodeName: ReadonlyMap<string, string[]>
 ): string[] {
-  if (!reason || !Array.isArray(nodes) || nodes.length === 0) {
+  if (!reason) {
     return [];
   }
 
-  const labelsByNodeName = buildPoolLabelsByNodeName(nodes);
   const nodeNamePattern = /['"‘’]([^'"‘’]+)['"‘’]\s+is offline/gi;
   const labels: string[] = [];
   const seenLabelKeys = new Set<string>();

@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { TerminalIcon, TestTubeIcon, WorkflowIcon } from "../../../../../shared/webview/icons";
 import { isAnalysisBuildResult } from "../../../../../shared/webview/lib/statusStyles";
@@ -32,7 +33,7 @@ export function OverviewTab({
   hasTests,
   onNavigateTab,
   onArtifactAction
-}: OverviewTabProps): JSX.Element {
+}: OverviewTabProps): React.JSX.Element {
   const showTestsCard = hasTests && testsSummary.hasAnyResults;
   const insightsTitle = isAnalysisBuildResult(resultClass) ? "Failure Analysis" : "Build Summary";
 

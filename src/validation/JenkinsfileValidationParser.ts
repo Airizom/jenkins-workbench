@@ -46,7 +46,12 @@ export function parseDeclarativeValidationOutput(text: string): JenkinsfileValid
   const findings: JenkinsfileValidationFinding[] = [];
   let lastFinding: JenkinsfileValidationFinding | undefined;
 
-  for (const rawLine of normalized.split("\n")) {
+  let lineStart = 0;
+  while (lineStart < normalized.length) {
+    const newlineIndex = normalized.indexOf("\n", lineStart);
+    const rawLine =
+      newlineIndex === -1 ? normalized.slice(lineStart) : normalized.slice(lineStart, newlineIndex);
+    lineStart = newlineIndex === -1 ? normalized.length : newlineIndex + 1;
     const line = rawLine.trim();
     if (!line) {
       continue;
@@ -78,30 +83,29 @@ export function parseDeclarativeValidationOutput(text: string): JenkinsfileValid
 }
 
 function parseJsonValidationOutput(text: string): JenkinsfileValidationFinding[] | undefined {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+  if (!text.startsWith("{") && !text.startsWith("[")) {
     return undefined;
   }
 
   try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    const extracted = extractJsonErrors(parsed);
-    if (!extracted) {
+    const parsed = JSON.parse(text) as unknown;
+    const errors = extractJsonErrors(parsed);
+    if (!errors) {
       return undefined;
     }
-    if (extracted.errors.length === 0) {
+    if (errors.length === 0) {
       return [];
     }
 
     const findings: JenkinsfileValidationFinding[] = [];
-    for (const error of extracted.errors) {
+    for (const error of errors) {
       const finding = parseJsonError(error);
       if (finding) {
         findings.push(finding);
       }
     }
-    if (findings.length === 0 && extracted.errors.length > 0) {
-      findings.push({ message: trimmed });
+    if (findings.length === 0 && errors.length > 0) {
+      findings.push({ message: text });
     }
     return findings;
   } catch {
@@ -109,7 +113,7 @@ function parseJsonValidationOutput(text: string): JenkinsfileValidationFinding[]
   }
 }
 
-function extractJsonErrors(value: unknown): { errors: unknown[]; result?: string } | undefined {
+function extractJsonErrors(value: unknown): unknown[] | undefined {
   if (!value || typeof value !== "object") {
     return undefined;
   }
@@ -128,11 +132,11 @@ function extractJsonErrors(value: unknown): { errors: unknown[]; result?: string
     (root.Status as string | undefined);
 
   if (Array.isArray(errors)) {
-    return { errors, result };
+    return errors;
   }
 
   if (result && /success|ok/i.test(result)) {
-    return { errors: [] };
+    return [];
   }
 
   return undefined;

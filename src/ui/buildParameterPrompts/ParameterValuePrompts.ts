@@ -1,7 +1,6 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
-import type { JobParameter } from "../../jenkins/JenkinsDataService";
-import type { BuildParameterPayload } from "../../jenkins/JenkinsDataService";
+import type { BuildParameterPayload, JobParameter } from "../../jenkins/JenkinsDataService";
 import { promptBooleanParameterValue, promptChoiceParameterValue } from "../ParameterPrompts";
 import type {
   BuildParameterPromptOptions,
@@ -29,44 +28,49 @@ export async function promptParameterValues(
       return undefined;
     }
 
-    if (typeof value === "string") {
-      values[parameter.name] = value;
-      if (parameter.kind === "file") {
-        const filePath = value.trim();
-        if (filePath.length === 0) {
-          continue;
-        }
-        payload.files.push({
-          name: parameter.name,
-          filePath,
-          fileName: basename(filePath)
-        });
-        continue;
-      }
-      payload.fields.push({ name: parameter.name, value });
-      continue;
-    }
-
     values[parameter.name] = value;
-    if (value.length === 0) {
-      continue;
+    addParameterToPayload(payload, parameter, value);
+  }
+
+  return { payload, values };
+}
+
+function addParameterToPayload(
+  payload: BuildParameterPayload,
+  parameter: JobParameter,
+  value: ParameterValue
+): void {
+  if (typeof value === "string") {
+    if (parameter.kind !== "file") {
+      payload.fields.push({ name: parameter.name, value });
+      return;
     }
 
+    const filePath = value.trim();
+    if (filePath.length > 0) {
+      payload.files.push({
+        name: parameter.name,
+        filePath,
+        fileName: basename(filePath)
+      });
+    }
+    return;
+  }
+
+  if (value.length > 0) {
     const delimiter = parameter.multiSelectDelimiter?.trim();
-    if (delimiter && delimiter.length > 0) {
+    if (delimiter) {
       payload.fields.push({
         name: parameter.name,
         value: value.join(delimiter)
       });
-      continue;
+      return;
     }
 
     for (const entry of value) {
       payload.fields.push({ name: parameter.name, value: entry });
     }
   }
-
-  return { payload, values };
 }
 
 async function promptParameterValue(
@@ -160,12 +164,13 @@ async function promptForRunParameter(
   parameter: JobParameter,
   presetValue?: ParameterValue
 ): Promise<string | undefined> {
+  const prompt = `Parameter: ${parameter.name}`;
   const defaultValue = resolveSingleDefaultValue(presetValue, parameter.defaultValue);
   const candidates = await fetchRunBuildChoices(options, parameter);
 
   if (candidates.length === 0) {
     return vscode.window.showInputBox({
-      prompt: `Parameter: ${parameter.name}`,
+      prompt,
       placeHolder: parameter.runProjectName
         ? `Enter run value for ${parameter.runProjectName}`
         : "Enter run value",
@@ -189,7 +194,7 @@ async function promptForRunParameter(
   });
 
   const selected = await vscode.window.showQuickPick(picks, {
-    placeHolder: `Parameter: ${parameter.name}`,
+    placeHolder: prompt,
     ignoreFocusOut: true
   });
 
@@ -202,7 +207,7 @@ async function promptForRunParameter(
   }
 
   return vscode.window.showInputBox({
-    prompt: `Parameter: ${parameter.name}`,
+    prompt,
     value: defaultValue,
     ignoreFocusOut: true
   });
@@ -213,9 +218,8 @@ async function promptForFileParameter(
   presetValue?: ParameterValue
 ): Promise<string | undefined> {
   const defaultPath = resolveSingleDefaultValue(presetValue, parameter.defaultValue)?.trim();
-  const hasDefaultPath = Boolean(defaultPath && defaultPath.length > 0);
 
-  if (hasDefaultPath) {
+  if (defaultPath) {
     const pick = await vscode.window.showQuickPick(
       [
         {

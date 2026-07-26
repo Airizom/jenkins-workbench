@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
+import type { JenkinsFlowNodeLog, JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
 import type { BuildDetailsConsoleBackend } from "../src/panels/buildDetails/BuildDetailsBackend";
 import {
   PipelineNodeLogFetcher,
   type PipelineNodeLogFetchResult
 } from "../src/panels/buildDetails/PipelineNodeLogFetcher";
+import { PipelineStageLogAggregator } from "../src/panels/buildDetails/PipelineStageLogAggregator";
 import { MAX_CONSOLE_CHARS } from "../src/services/ConsoleOutputConfig";
 import type {
   PipelineLogTargetViewModel,
@@ -176,5 +177,41 @@ describe("PipelineNodeLogFetcher", () => {
     assert.equal(appendResult.cachedLog?.text.length, MAX_CONSOLE_CHARS);
     assert.ok(appendResult.cachedLog?.text.endsWith("b".repeat(10)));
     assert.equal(appendResult.cachedLog?.truncated, true);
+  });
+});
+
+describe("PipelineStageLogAggregator", () => {
+  it("starts every request in the capped stage-log batch before awaiting results", async () => {
+    const nodeIds = ["1", "2", "3", "4", "5", "6"];
+    const calls: string[] = [];
+    const pending = new Map<string, (value: JenkinsFlowNodeLog) => void>();
+    const backend = {
+      getFlowNodeLog: (_environment: unknown, _buildUrl: string, nodeId: string) => {
+        calls.push(nodeId);
+        return new Promise<JenkinsFlowNodeLog>((resolve) => pending.set(nodeId, resolve));
+      }
+    } as unknown as BuildDetailsConsoleBackend;
+    const aggregator = new PipelineStageLogAggregator({
+      backend,
+      environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl: "https://jenkins.example/job/example/1/"
+    });
+    const fetch = aggregator.fetch(
+      { key: "stage:1", kind: "stage", name: "Stage 1", childNodeIds: nodeIds },
+      true
+    );
+
+    await Promise.resolve();
+    assert.deepEqual(calls, nodeIds);
+
+    for (const nodeId of nodeIds) {
+      pending.get(nodeId)?.({ nodeId, text: `log ${nodeId}`, hasMore: false });
+    }
+    const result = await fetch;
+
+    assert.equal(
+      result.text,
+      nodeIds.map((nodeId) => `===== Node ${nodeId} =====\nlog ${nodeId}`).join("\n\n")
+    );
   });
 });

@@ -1,15 +1,32 @@
 import { formatTestCaseSubtitle } from "../../../../../shared/TestCaseViewModel";
 import {
-  type StatusVisualTone,
-  resolveMetricToneClass
+  resolveMetricToneClass,
+  type StatusVisualTone
 } from "../../../../../shared/TestStatusStyles";
 import type { BuildCompareTestDiffItem } from "../../../../shared/BuildCompareContracts";
 import { CompareDiffRowShell } from "../shared/CompareDiffRowShell";
 import { CompareSideGrid } from "../shared/CompareSideGrid";
 
-function resolveTestStatusClass(tone?: StatusVisualTone): string | undefined {
-  return tone !== undefined ? resolveMetricToneClass(tone) : undefined;
+function TestStatusCell({
+  label,
+  status,
+  tone,
+  duration
+}: {
+  label: string;
+  status: string;
+  tone?: StatusVisualTone;
+  duration?: string;
+}) {
+  return (
+    <div>
+      <p className="text-muted-foreground">{label}</p>
+      <p className={tone !== undefined ? resolveMetricToneClass(tone) : undefined}>{status}</p>
+      {duration ? <p className="text-muted-foreground">{duration}</p> : null}
+    </div>
+  );
 }
+
 export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
   return (
     <CompareDiffRowShell
@@ -19,22 +36,18 @@ export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
       align="center"
     >
       <CompareSideGrid className="text-right">
-        <div>
-          <p className="text-muted-foreground">Baseline</p>
-          <p className={resolveTestStatusClass(item.baselineStatusTone)}>
-            {item.baselineStatusLabel}
-          </p>
-          {item.baselineDurationLabel ? (
-            <p className="text-muted-foreground">{item.baselineDurationLabel}</p>
-          ) : null}
-        </div>
-        <div>
-          <p className="text-muted-foreground">Target</p>
-          <p className={resolveTestStatusClass(item.targetStatusTone)}>{item.targetStatusLabel}</p>
-          {item.targetDurationLabel ? (
-            <p className="text-muted-foreground">{item.targetDurationLabel}</p>
-          ) : null}
-        </div>
+        <TestStatusCell
+          label="Baseline"
+          status={item.baselineStatusLabel}
+          tone={item.baselineStatusTone}
+          duration={item.baselineDurationLabel}
+        />
+        <TestStatusCell
+          label="Target"
+          status={item.targetStatusLabel}
+          tone={item.targetStatusTone}
+          duration={item.targetDurationLabel}
+        />
       </CompareSideGrid>
     </CompareDiffRowShell>
   );

@@ -117,18 +117,6 @@
       ]
     },
     {
-      "implements": "JenkinsDataServiceRuntimeSurface",
-      "members": [
-        "updateCacheTtlMs",
-        "enableJob",
-        "disableJob",
-        "renameJob",
-        "deleteJob",
-        "copyJob",
-        "createItem"
-      ]
-    },
-    {
       "implements": "JenkinsWorkbenchTreeRuntimeSurface",
       "members": [
         "onDidChangeSummary",
@@ -195,10 +183,6 @@
     {
       "implements": "PendingInputActionsRuntimeSurface",
       "members": ["getPendingInputActions"]
-    },
-    {
-      "implements": "TestSourceNavigationRuntimeSurface",
-      "members": ["openTestSource"]
     },
     {
       "implements": "TreeActivityClassificationSurface",

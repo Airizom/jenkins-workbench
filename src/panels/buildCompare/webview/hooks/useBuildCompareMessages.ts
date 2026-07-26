@@ -10,14 +10,8 @@ function reduceBuildCompareMessage(
   message: NonNullable<ReturnType<typeof parseBuildCompareOutgoingMessage>>,
   dispatch: Dispatch<BuildCompareAction>
 ): void {
-  switch (message.type) {
-    case "updateConsoleSection":
-      dispatch({
-        type: "updateConsoleSection",
-        console: message.console
-      });
-      break;
-    default:
-      break;
-  }
+  dispatch({
+    type: "updateConsoleSection",
+    console: message.console
+  });
 }

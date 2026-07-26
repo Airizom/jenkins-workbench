@@ -1,3 +1,4 @@
+import type * as React from "react";
 import type {
   BuildDetailsCoverageStateViewModel,
   BuildTestCaseViewModel,
@@ -27,13 +28,18 @@ export function TestResultsSection({
   onReloadWithLogs: () => void;
   onOpenSource: (testCase: BuildTestCaseViewModel) => void;
 }) {
-  const testResultsView = useTestResultsView({ buildUrl, summary, results });
+  const testResultsView = useTestResultsView({ buildUrl, results });
+  const emptyState = renderTestResultsEmptyState(
+    results,
+    summary,
+    testResultsView.filteredItems.length
+  );
 
   return (
     <section className="space-y-3">
       <CoverageSection coverageState={coverageState} />
 
-      <TestResultsSummaryCard summary={summary} passRate={testResultsView.passRate} />
+      <TestResultsSummaryCard summary={summary} />
 
       <TestResultsToolbar
         summary={summary}
@@ -45,31 +51,7 @@ export function TestResultsSection({
         onReloadWithLogs={onReloadWithLogs}
       />
 
-      {results.loading ? (
-        <TestResultsEmptyState
-          icon="loading"
-          title="Loading detailed test results"
-          message="Fetching Jenkins case-level data for this build."
-        />
-      ) : summary.detailsUnavailable ? (
-        <TestResultsEmptyState
-          icon="info"
-          title="Detailed results unavailable"
-          message="Jenkins reported test counts for this build, but case-level results are unavailable."
-        />
-      ) : !summary.hasAnyResults ? (
-        <TestResultsEmptyState
-          icon="empty"
-          title="No test results"
-          message="This build did not report any tests."
-        />
-      ) : testResultsView.filteredItems.length === 0 ? (
-        <TestResultsEmptyState
-          icon="search"
-          title="No matching tests"
-          message="Adjust the status filter or search query to see more results."
-        />
-      ) : (
+      {emptyState ?? (
         <TestResultsList
           summary={summary}
           filteredItems={testResultsView.filteredItems}
@@ -82,4 +64,52 @@ export function TestResultsSection({
       )}
     </section>
   );
+}
+
+function renderTestResultsEmptyState(
+  results: BuildTestResultsViewModel,
+  summary: BuildTestsSummaryViewModel,
+  filteredItemCount: number
+): React.JSX.Element | undefined {
+  if (results.loading) {
+    return (
+      <TestResultsEmptyState
+        icon="loading"
+        title="Loading detailed test results"
+        message="Fetching Jenkins case-level data for this build."
+      />
+    );
+  }
+
+  if (summary.detailsUnavailable) {
+    return (
+      <TestResultsEmptyState
+        icon="info"
+        title="Detailed results unavailable"
+        message="Jenkins reported test counts for this build, but case-level results are unavailable."
+      />
+    );
+  }
+
+  if (!summary.hasAnyResults) {
+    return (
+      <TestResultsEmptyState
+        icon="empty"
+        title="No test results"
+        message="This build did not report any tests."
+      />
+    );
+  }
+
+  if (filteredItemCount === 0) {
+    return (
+      <TestResultsEmptyState
+        icon="search"
+        title="No matching tests"
+        message="Adjust the status filter or search query to see more results."
+      />
+    );
+  }
+
+  return undefined;
 }

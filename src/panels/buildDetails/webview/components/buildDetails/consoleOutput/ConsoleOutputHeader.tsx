@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Switch } from "../../../../../shared/webview/components/ui/switch";
 import { DownloadIcon, SearchIcon, TerminalIcon } from "../../../../../shared/webview/icons";
@@ -18,7 +19,7 @@ export function ConsoleOutputHeader({
   onSearch,
   onExport,
   onFollowLogChange
-}: ConsoleOutputHeaderProps): JSX.Element {
+}: ConsoleOutputHeaderProps): React.JSX.Element {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex items-center gap-2">

@@ -16,8 +16,8 @@ import {
 } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 import {
-  type JenkinsJobParametersResponse,
-  extractParameterDefinitions
+  extractParameterDefinitions,
+  type JenkinsJobParametersResponse
 } from "./JenkinsParameters";
 
 const JOB_LIST_TREE = "jobs[name,url,_class,color]";

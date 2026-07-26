@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
 import { firstNonEmpty, trimToUndefined } from "../shared/stringValues";
-import type { CurrentBranchRepositoryContext } from "./CurrentBranchTypes";
+import type {
+  CurrentBranchPullRequestInfo,
+  CurrentBranchRepositoryContext
+} from "./CurrentBranchTypes";
 
 const GITHUB_PULL_REQUEST_EXTENSION_IDS = [
   "GitHub.vscode-pull-request-github",
@@ -22,20 +25,13 @@ interface GitHubRepositoryDescription {
   };
 }
 
-export interface CurrentBranchGitHubPullRequestSnapshot {
-  pullRequest?: {
-    number: number;
-    title?: string;
-    url?: string;
-    headBranch?: string;
-  };
-}
-
-export type CurrentBranchGitHubPullRequestLookupResult =
+export type CurrentBranchPullRequestResolution =
   | {
-      kind: "available";
-      snapshot: CurrentBranchGitHubPullRequestSnapshot;
+      kind: "none";
     }
+  | ({
+      kind: "pullRequest";
+    } & CurrentBranchPullRequestInfo)
   | {
       kind: "unavailable";
       reason: "extensionMissing" | "repositoryMetadataUnavailable" | "requestFailed";
@@ -43,9 +39,7 @@ export type CurrentBranchGitHubPullRequestLookupResult =
     };
 
 export interface CurrentBranchGitHubPullRequestAdapter {
-  lookup(
-    repository: CurrentBranchRepositoryContext
-  ): Promise<CurrentBranchGitHubPullRequestLookupResult>;
+  lookup(repository: CurrentBranchRepositoryContext): Promise<CurrentBranchPullRequestResolution>;
 }
 
 export class VscodeCurrentBranchGitHubPullRequestAdapter
@@ -53,7 +47,7 @@ export class VscodeCurrentBranchGitHubPullRequestAdapter
 {
   async lookup(
     repository: CurrentBranchRepositoryContext
-  ): Promise<CurrentBranchGitHubPullRequestLookupResult> {
+  ): Promise<CurrentBranchPullRequestResolution> {
     const extension = findGitHubPullRequestExtension();
     if (!extension) {
       return {
@@ -72,11 +66,14 @@ export class VscodeCurrentBranchGitHubPullRequestAdapter
       }
 
       const description = await exportsValue.getRepositoryDescription(repository.repositoryUri);
+      const pullRequest = normalizeRepositoryPullRequest(description?.pullRequest);
+      if (!pullRequest) {
+        return { kind: "none" };
+      }
+
       return {
-        kind: "available",
-        snapshot: {
-          pullRequest: normalizeRepositoryPullRequest(description?.pullRequest)
-        }
+        kind: "pullRequest",
+        ...pullRequest
       };
     } catch (error) {
       return {
@@ -109,7 +106,7 @@ function isGitHubPullRequestExtensionApi(value: unknown): value is GitHubPullReq
 
 function normalizeRepositoryPullRequest(
   pullRequest: GitHubRepositoryDescription["pullRequest"]
-): CurrentBranchGitHubPullRequestSnapshot["pullRequest"] | undefined {
+): CurrentBranchPullRequestInfo | undefined {
   if (!pullRequest || typeof pullRequest.number !== "number") {
     return undefined;
   }

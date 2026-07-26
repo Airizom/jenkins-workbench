@@ -1,3 +1,4 @@
+import type * as React from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -23,7 +24,7 @@ export function StageStripSegmentButton({
   segment,
   dense,
   onSelect
-}: StageStripSegmentButtonProps): JSX.Element {
+}: StageStripSegmentButtonProps): React.JSX.Element {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -56,7 +57,7 @@ export function StageStripSegmentButton({
 }
 
 // Dense segments hide labels, so surface bad outcomes with a status glyph.
-function DenseStatusGlyph({ segment }: { segment: StageStripSegment }): JSX.Element | null {
+function DenseStatusGlyph({ segment }: { segment: StageStripSegment }): React.JSX.Element | null {
   if (!DENSE_GLYPH_STATUSES.has(segment.statusClass)) {
     return null;
   }
@@ -73,7 +74,7 @@ function DenseStatusGlyph({ segment }: { segment: StageStripSegment }): JSX.Elem
   );
 }
 
-function SegmentLabel({ segment }: { segment: StageStripSegment }): JSX.Element {
+function SegmentLabel({ segment }: { segment: StageStripSegment }): React.JSX.Element {
   return (
     <span className="flex w-full items-center gap-1 text-[11px] leading-tight text-muted-foreground">
       <span className="truncate">{segment.name}</span>

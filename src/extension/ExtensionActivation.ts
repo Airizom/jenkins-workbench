@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import {
+  CONFIG_SECTION,
   getArtifactActionOptions,
   getArtifactMaxDownloadBytes,
   getArtifactPreviewCacheMaxBytes,
@@ -35,9 +36,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const buildListFetchOptions = getBuildListFetchOptions(config);
   const treeViewCurationOptions = getTreeViewCurationOptions(config);
   const activityOptions = getTreeActivityOptions(config);
-  const artifactPreviewCacheMaxEntries = getArtifactPreviewCacheMaxEntries(config);
-  const artifactPreviewCacheMaxBytes = getArtifactPreviewCacheMaxBytes(config);
-  const artifactPreviewCacheTtlMs = getArtifactPreviewCacheTtlMs(config);
+  const artifactPreviewCacheOptions = {
+    maxEntries: getArtifactPreviewCacheMaxEntries(config),
+    maxTotalBytes: getArtifactPreviewCacheMaxBytes(config),
+    ttlMs: getArtifactPreviewCacheTtlMs(config)
+  };
   const currentBranchPullRequestJobNamePatterns =
     getCurrentBranchPullRequestJobNamePatterns(config);
   const jenkinsfileIntelligenceConfig = getJenkinsfileIntelligenceConfig(config);
@@ -45,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const artifactActionOptionsProvider = (
     workspaceFolder: vscode.WorkspaceFolder
   ): { downloadRoot: string; maxBytes?: number } => {
-    const folderConfig = vscode.workspace.getConfiguration("jenkinsWorkbench", workspaceFolder.uri);
+    const folderConfig = vscode.workspace.getConfiguration(CONFIG_SECTION, workspaceFolder.uri);
     return getArtifactActionOptions(folderConfig);
   };
   const artifactPreviewOptionsProvider = (): { maxBytes?: number } => {
@@ -64,11 +67,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     activityOptions,
     artifactActionOptionsProvider,
     artifactPreviewOptionsProvider,
-    artifactPreviewCacheOptions: {
-      maxEntries: artifactPreviewCacheMaxEntries,
-      maxTotalBytes: artifactPreviewCacheMaxBytes,
-      ttlMs: artifactPreviewCacheTtlMs
-    },
+    artifactPreviewCacheOptions,
     buildCompareOptionsProvider,
     jenkinsfileIntelligenceConfig,
     jenkinsfileValidationConfig,

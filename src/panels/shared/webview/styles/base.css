@@ -12,6 +12,10 @@
 
 @theme inline {
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
   --color-input: var(--input);
   --color-input-background: var(--input-background);
   --color-input-foreground: var(--input-foreground);
@@ -96,6 +100,7 @@
   --color-input-info-bg: var(--inputInfoBg);
   --color-input-info-fg: var(--inputInfoFg);
 
+  --radius-xl: calc(var(--radius) + 4px);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -106,7 +111,13 @@
   --text-vscode: var(--vscode-font-size);
   --text-vscode-editor: var(--vscode-editor-font-size, 13px);
 
-  --shadow-widget: var(--vscode-widget-shadow, 0 2px 8px rgba(0, 0, 0, 0.15));
+  /* Kept as an alias of the mid elevation step so the many existing
+   * `shadow-widget` call sites pick up the refined scale. */
+  --shadow-widget: 0 2px 6px -1px var(--shadow-tint), 0 1px 2px var(--shadow-tint-weak);
+  --shadow-xs: 0 1px 1px var(--shadow-tint-weak);
+  --shadow-sm: 0 1px 2px var(--shadow-tint-weak);
+  --shadow-md: 0 2px 6px -1px var(--shadow-tint), 0 1px 2px var(--shadow-tint-weak);
+  --shadow-lg: 0 10px 26px -6px var(--shadow-tint), 0 2px 6px -2px var(--shadow-tint-weak);
 
   --animate-in: enter 200ms ease-out both;
   --animate-out: exit 200ms ease-out both;
@@ -115,6 +126,8 @@
   --animate-collapsible-down: collapsible-down 200ms ease-out;
   --animate-collapsible-up: collapsible-up 200ms ease-out;
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
+  --animate-fade-up: fade-up 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
 @utility fade-in-0 {
@@ -163,6 +176,18 @@
 
 @utility slide-out-to-right-1 {
   --tw-exit-translate-x: calc(var(--spacing) * 1);
+}
+
+/* Setting `overflow-x` makes the other axis compute to `auto` rather than
+ * `visible`, so horizontally scrollable strips sprout a stray vertical
+ * scrollbar whenever a child overflows by even a pixel. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @utility border-mutedBorder {
@@ -250,6 +275,27 @@
   }
 }
 
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
 @keyframes collapsible-down {
   from {
     height: 0;
@@ -316,11 +362,23 @@
     --background: var(--vscode-editor-background);
     --foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
 
-    --card: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-    --card-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
-    --card-border: var(--vscode-editorWidget-border, var(--vscode-panel-border));
+    /* Surfaces are derived from the canvas by mixing toward the text color rather
+     * than taken from `--vscode-editorWidget-background`, which is identical to the
+     * editor background in many themes and leaves cards invisible. Mixing toward
+     * the foreground lifts surfaces in dark themes and deepens them in light ones,
+     * so the hierarchy holds either way. */
+    --surface-sunken: color-mix(in srgb, var(--background) 97%, var(--foreground));
+    --surface: color-mix(in srgb, var(--background) 95%, var(--foreground));
+    --surface-raised: color-mix(in srgb, var(--background) 92%, var(--foreground));
 
-    --popover: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+    --shadow-tint: color-mix(in srgb, #000 22%, transparent);
+    --shadow-tint-weak: color-mix(in srgb, #000 12%, transparent);
+
+    --card: var(--surface);
+    --card-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
+    --card-border: var(--border);
+
+    --popover: var(--vscode-editorWidget-background, var(--surface-raised));
     --popover-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
 
     --primary: var(--vscode-button-background);
@@ -331,11 +389,19 @@
     --secondary-foreground: var(--vscode-button-secondaryForeground);
     --secondary-hover: var(--vscode-button-secondaryHoverBackground);
 
-    --muted: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+    /* Translucent foreground tints, not opaque surfaces. They must stay visible
+     * when layered on either the canvas or a card, which is why skeletons,
+     * progress tracks and gauges use them instead of `--surface`. */
+    --muted-soft: color-mix(in srgb, var(--foreground) 4%, transparent);
+    --muted: color-mix(in srgb, var(--foreground) 8%, transparent);
+    --muted-strong: color-mix(in srgb, var(--foreground) 14%, transparent);
     --muted-foreground: var(--vscode-descriptionForeground);
-    --muted-soft: color-mix(in srgb, var(--muted) 30%, transparent);
-    --muted-strong: color-mix(in srgb, var(--muted) 50%, transparent);
-    --muted-foreground-border: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
+    /* One notch stronger than `--border`, for dashed empty states and nested
+     * wells that need to read as a boundary without competing with card edges. */
+    --muted-foreground-border: var(
+      --vscode-contrastBorder,
+      color-mix(in srgb, var(--foreground) 20%, transparent)
+    );
 
     --accent: var(--vscode-list-hoverBackground, var(--vscode-editor-background));
     --accent-foreground: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));
@@ -345,14 +411,21 @@
     --destructive-foreground: var(--vscode-inputValidation-errorForeground);
     --destructive-border: var(--vscode-inputValidation-errorBorder);
 
-    --border: var(--vscode-panel-border);
-    --input: var(--vscode-input-border, var(--vscode-panel-border));
+    /* `--vscode-panel-border` is absent or near-invisible in several themes, so
+     * borders fall back to a foreground tint. High-contrast themes keep their
+     * mandated `--vscode-contrastBorder`. */
+    --border: var(--vscode-contrastBorder, color-mix(in srgb, var(--foreground) 14%, transparent));
+    --border-strong: var(
+      --vscode-contrastBorder,
+      color-mix(in srgb, var(--foreground) 28%, transparent)
+    );
+    --input: var(--vscode-input-border, var(--border-strong));
     --input-background: var(--vscode-input-background);
     --input-foreground: var(--vscode-input-foreground);
     --input-placeholder: var(--vscode-input-placeholderForeground);
 
     --ring: var(--vscode-focusBorder);
-    --radius: 6px;
+    --radius: 8px;
 
     --link: var(--vscode-textLink-foreground);
     --link-hover: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
@@ -408,8 +481,8 @@
     --inputInfoFg: var(--vscode-inputValidation-infoForeground);
     --inputInfoBorder: var(--vscode-inputValidation-infoBorder);
 
-    --header-bg: var(--vscode-sideBar-background, var(--vscode-editor-background));
-    --toolbar-bg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+    --header-bg: var(--vscode-sideBar-background, var(--surface-raised));
+    --toolbar-bg: var(--surface);
     --progress: var(--vscode-progressBar-background, var(--primary));
     --terminal-bg: var(--vscode-terminal-background, var(--background));
     --terminal-foreground: var(--vscode-terminal-foreground, var(--foreground));
@@ -423,6 +496,22 @@
     color: var(--foreground);
     background-color: var(--background);
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  /* Counts and durations shift constantly during polling; tabular figures stop
+   * the surrounding layout from twitching on every update. */
+  .tabular-nums,
+  time {
+    font-variant-numeric: tabular-nums;
   }
 
   [hidden] {
@@ -465,7 +554,9 @@
 
   ::-webkit-scrollbar-thumb {
     background: var(--vscode-scrollbarSlider-background);
-    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -488,6 +579,50 @@
     z-index: 10;
     background-color: var(--header-bg);
   }
+
+  /* Standard chrome for panels whose header is a plain title bar rather than a
+   * status hero. Translucency plus blur keeps scrolled content legible
+   * underneath without hiding that the page has moved. */
+  .panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: color-mix(in srgb, var(--header-bg) 82%, transparent);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(14px) saturate(160%);
+  }
+
+  @supports not (backdrop-filter: blur(1px)) {
+    .panel-header {
+      background-color: var(--header-bg);
+    }
+  }
+
+  /* Hover lift for cards and rows that navigate or expand. Borders carry the
+   * affordance too, so the cue survives `prefers-reduced-motion`. */
+  .surface-interactive {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
+  }
+
+  .surface-interactive:hover {
+    border-color: var(--border-strong);
+    background-color: var(--surface-raised);
+    box-shadow: var(--shadow-md);
+  }
+
+  .surface-interactive:active {
+    transform: translateY(1px);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
@@ -499,9 +634,19 @@
     .animate-pulse,
     .animate-spin,
     .animate-progress-indeterminate,
+    .animate-fade-up,
+    .animate-shimmer,
     .animate-in,
     .animate-out {
       animation: none;
+    }
+
+    .surface-interactive {
+      transition: none;
+    }
+
+    .surface-interactive:active {
+      transform: none;
     }
 
     /* Indeterminate progress indicators rely on animation to show activity; keep

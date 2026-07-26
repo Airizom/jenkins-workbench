@@ -1,10 +1,10 @@
 import type { JobSearchEntry } from "../../jenkins/JenkinsDataService";
-import { ACTIVITY_GROUP_ORDER } from "../ActivityTypes";
 import type { ActivityGroupKind } from "../ActivityTypes";
-import type { ActivityEntry, ActivityGroups } from "./ActivityCollectionModel";
+import { ACTIVITY_GROUP_ORDER } from "../ActivityTypes";
+import type { ActivityGroups } from "./ActivityCollectionModel";
 
 export function createActivityGroups(): ActivityGroups {
-  const groups = new Map<ActivityGroupKind, ActivityEntry[]>();
+  const groups = new Map<ActivityGroupKind, JobSearchEntry[]>();
   for (const group of ACTIVITY_GROUP_ORDER) {
     groups.set(group, []);
   }
@@ -49,7 +49,7 @@ function promoteCandidatesToAwaitingInput(
     if (!awaitingInputJobUrls.has(entry.url)) {
       continue;
     }
-    awaiting.push({ entry, group: "awaitingInput" });
+    awaiting.push(entry);
     promotedJobUrls.add(entry.url);
   }
   groups.set("awaitingInput", awaiting);
@@ -65,9 +65,7 @@ function removePromotedEntriesFromOtherGroups(
     if (!current) {
       continue;
     }
-    const filtered: ActivityEntry[] = current.filter(
-      (item) => !promotedJobUrls.has(item.entry.url)
-    );
+    const filtered = current.filter((entry) => !promotedJobUrls.has(entry.url));
     groups.set(group, filtered);
   }
 }

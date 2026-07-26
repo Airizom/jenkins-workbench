@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import type { PipelineStageViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import { buildPipelineGraphModel } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/pipelineGraphModel";
 
@@ -24,6 +24,22 @@ function makeStage(
 }
 
 describe("pipelineGraphModel", () => {
+  it("calculates duration normalization bounds once for all nodes", () => {
+    const stages = Array.from({ length: 8 }, (_, index) => ({
+      ...makeStage(`stage-${index}`),
+      durationMs: (index + 1) * 1000
+    }));
+    const logSpy = vi.spyOn(Math, "log");
+
+    try {
+      buildPipelineGraphModel(stages);
+
+      assert.ok(logSpy.mock.calls.length <= stages.length * 2);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it("keeps topology distinct when graph geometry is unchanged", () => {
     const sequentialAfterSingleBranch = buildPipelineGraphModel([
       makeStage("a", [makeStage("b")]),

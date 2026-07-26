@@ -1,9 +1,10 @@
+import type * as React from "react";
 import { PanelErrorList } from "../../../../shared/webview/components/PanelErrorList";
 
 type NodeDetailsAlertsProps = {
   errors: string[];
 };
-export function NodeDetailsAlerts({ errors }: NodeDetailsAlertsProps): JSX.Element | null {
+export function NodeDetailsAlerts({ errors }: NodeDetailsAlertsProps): React.JSX.Element | null {
   if (errors.length === 0) {
     return null;
   }

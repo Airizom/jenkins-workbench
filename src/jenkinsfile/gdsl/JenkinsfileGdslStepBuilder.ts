@@ -20,7 +20,7 @@ export function toStepDefinition(
     return undefined;
   }
 
-  const documentation = asString(named.doc) ?? undefined;
+  const documentation = asString(named.doc);
   const params = toParameterEntries(named.params);
   const namedParams = toNamedParams(named.namedParams);
   const signatures = buildSignatures(stepName, params, namedParams);
@@ -52,12 +52,7 @@ function buildSignatures(
     if (bodyParameter && !parameters.find((parameter) => parameter.name === bodyParameter.name)) {
       parameters.push(bodyParameter);
     }
-    signatures.push({
-      label: `${stepName}(${formatSignatureParameters(parameters)})${takesClosure ? " { ... }" : ""}`,
-      parameters,
-      usesNamedArgs: true,
-      takesClosure
-    });
+    signatures.push(createSignature(stepName, parameters, true, takesClosure));
   }
 
   if (positionalParameters.length > 0 || (takesClosure && namedParams.length === 0)) {
@@ -65,12 +60,7 @@ function buildSignatures(
     if (bodyParameter) {
       parameters.push(bodyParameter);
     }
-    signatures.push({
-      label: `${stepName}(${formatSignatureParameters(parameters)})${takesClosure ? " { ... }" : ""}`,
-      parameters,
-      usesNamedArgs: false,
-      takesClosure
-    });
+    signatures.push(createSignature(stepName, parameters, false, takesClosure));
   }
 
   if (signatures.length === 0) {
@@ -83,6 +73,21 @@ function buildSignatures(
   }
 
   return dedupeSignatures(signatures);
+}
+
+function createSignature(
+  stepName: string,
+  parameters: JenkinsfileStepParameter[],
+  usesNamedArgs: boolean,
+  takesClosure: boolean
+): JenkinsfileStepSignature {
+  const closureLabel = takesClosure ? " { ... }" : "";
+  return {
+    label: `${stepName}(${formatSignatureParameters(parameters)})${closureLabel}`,
+    parameters,
+    usesNamedArgs,
+    takesClosure
+  };
 }
 
 function dedupeSignatures(signatures: JenkinsfileStepSignature[]): JenkinsfileStepSignature[] {
@@ -107,8 +112,7 @@ function toParameterEntries(value: GdslValue | undefined): JenkinsfileStepParame
   if (!value || typeof value !== "object" || Array.isArray(value) || isGdslCall(value)) {
     return [];
   }
-  const entries = Object.entries(value);
-  return entries.map(([name, entryValue]) => {
+  return Object.entries(value).map(([name, entryValue]) => {
     const type = stringifyGdslValue(entryValue);
     const isBody = isBodyParameter(name, type);
     return {
@@ -168,11 +172,7 @@ function isClosureType(type: string | undefined): boolean {
     return false;
   }
   const normalized = type.replace(/\s+/g, "").toLowerCase();
-  return (
-    normalized === "closure" ||
-    normalized === "groovy.lang.closure" ||
-    normalized.endsWith(".closure")
-  );
+  return normalized === "closure" || normalized.endsWith(".closure");
 }
 
 function stringifyGdslValue(value: GdslValue | undefined): string | undefined {

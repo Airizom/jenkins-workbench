@@ -4,23 +4,8 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 import { DisclosureChevron } from "./disclosure-chevron";
 
-type AccordionProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>;
-export const Accordion = React.forwardRef<
-  React.ElementRef<typeof AccordionPrimitive.Root>,
-  AccordionProps
->(({ className, ...props }, ref) => (
-  <AccordionPrimitive.Root ref={ref} className={cn(className)} {...props} />
-));
-Accordion.displayName = "Accordion";
-
-type AccordionItemProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>;
-export const AccordionItem = React.forwardRef<
-  React.ElementRef<typeof AccordionPrimitive.Item>,
-  AccordionItemProps
->(({ className, ...props }, ref) => (
-  <AccordionPrimitive.Item ref={ref} className={cn(className)} {...props} />
-));
-AccordionItem.displayName = "AccordionItem";
+export const Accordion = AccordionPrimitive.Root;
+export const AccordionItem = AccordionPrimitive.Item;
 
 type AccordionTriggerProps = React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> & {
   asChild?: boolean;

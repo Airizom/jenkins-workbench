@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import type { TreeExpansionPath, TreeExpansionResolveResult } from "./TreeDataProviderTypes";
 import { getWorkbenchTreeElementId, isLoadingPlaceholder } from "./TreeDataProviderUtils";
-import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 type TreeParentResolver = (
   element: WorkbenchTreeElement
@@ -24,24 +24,25 @@ export class TreeDataProviderExpansionResolver {
       if (!id) {
         return undefined;
       }
-      path.unshift(id);
+      path.push(id);
       const parent = await this.getParent(current);
       current = parent ?? undefined;
     }
 
-    return path.length > 0 ? path : undefined;
+    return path.length > 0 ? path.reverse() : undefined;
   }
 
   async resolveExpansionPath(path: TreeExpansionPath): Promise<TreeExpansionResolveResult> {
-    let parent: WorkbenchTreeElement | undefined = undefined;
+    let parent: WorkbenchTreeElement | undefined;
 
     for (const id of path) {
       const children = await this.getChildren(parent);
       let match: WorkbenchTreeElement | undefined;
       let pending = false;
       for (const child of children) {
-        if (!match && getWorkbenchTreeElementId(child) === id) {
+        if (getWorkbenchTreeElementId(child) === id) {
           match = child;
+          break;
         }
         pending ||= isLoadingPlaceholder(child);
       }

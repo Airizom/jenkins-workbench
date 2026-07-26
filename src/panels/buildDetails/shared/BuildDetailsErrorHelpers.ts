@@ -12,13 +12,10 @@ export function splitBuildDetailsErrors(errors: string[]): {
       typeof error === "string" &&
       error.toLowerCase().startsWith(CONSOLE_ERROR_PREFIX)
     ) {
-      consoleError = error.replace(/^console output:\s*/i, "").trim();
+      consoleError = error.replace(/^console output:\s*/i, "").trim() || undefined;
     } else {
       displayErrors.push(error);
     }
-  }
-  if (consoleError && consoleError.length === 0) {
-    consoleError = undefined;
   }
   return { consoleError, displayErrors };
 }

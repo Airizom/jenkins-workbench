@@ -2,19 +2,17 @@ import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import {
   JenkinsScopedJobStore,
-  type ScopedJobStoreEntry,
-  mergeScopedJobEntryMetadata
+  mergeScopedJobEntryMetadata,
+  type ScopedJobStoreEntry
 } from "./ScopedJobStore";
 
-export interface StoredPinnedJobEntry extends ScopedJobStoreEntry {}
-
-export interface PinnedJobEntry extends StoredPinnedJobEntry {
+export interface PinnedJobEntry extends ScopedJobStoreEntry {
   scope: EnvironmentScope;
 }
 
 const PINNED_JOBS_KEY = "jenkinsWorkbench.pinnedJobs";
 
-export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry> {
+export class JenkinsPinStore extends JenkinsScopedJobStore<ScopedJobStoreEntry> {
   constructor(context: vscode.ExtensionContext) {
     super(context, PINNED_JOBS_KEY);
   }
@@ -26,7 +24,7 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
   async listPinnedJobsForEnvironment(
     scope: EnvironmentScope,
     environmentId: string
-  ): Promise<StoredPinnedJobEntry[]> {
+  ): Promise<ScopedJobStoreEntry[]> {
     const entries = await this.listPinnedJobs();
     return entries.filter(
       (entry) => entry.scope === scope && entry.environmentId === environmentId
@@ -37,7 +35,7 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<StoredPinnedJobEntry>
     return this.isTracked(scope, environmentId, jobUrl);
   }
 
-  async addPin(scope: EnvironmentScope, entry: StoredPinnedJobEntry): Promise<void> {
+  async addPin(scope: EnvironmentScope, entry: ScopedJobStoreEntry): Promise<void> {
     await this.addOrUpdate(scope, entry, mergeScopedJobEntryMetadata);
   }
 

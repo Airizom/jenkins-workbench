@@ -1,25 +1,16 @@
+import { JenkinsRequestError } from "../../jenkins/errors";
 import type { JenkinsWorkspaceEntry } from "../../jenkins/JenkinsClient";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { JenkinsRequestError } from "../../jenkins/errors";
-import type { TreeJobScope } from "../TreeJobScope";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import { WorkspaceDirectoryTreeItem, WorkspaceFileTreeItem } from "../items/TreeWorkspaceItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
-import {
-  buildWorkspaceDirectoryChildrenKey,
-  buildWorkspaceRootChildrenKey
-} from "./TreeChildrenMapping";
+import type { TreeJobScope } from "../TreeJobScope";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
 
 export class TreeWorkspaceChildrenLoader {
   constructor(
     private readonly dataService: JenkinsDataService,
-    private readonly buildChildrenKey: (
-      kind: string,
-      environment: JenkinsEnvironmentRef,
-      extra?: string
-    ) => string,
     private readonly placeholders: TreePlaceholderFactory
   ) {}
 
@@ -48,29 +39,6 @@ export class TreeWorkspaceChildrenLoader {
     }
   }
 
-  buildWorkspaceRootChildrenKey(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    jobScope: TreeJobScope
-  ): string {
-    return buildWorkspaceRootChildrenKey(this.buildChildrenKey, environment, jobUrl, jobScope);
-  }
-
-  buildWorkspaceDirectoryChildrenKey(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    jobScope: TreeJobScope,
-    relativePath: string
-  ): string {
-    return buildWorkspaceDirectoryChildrenKey(
-      this.buildChildrenKey,
-      environment,
-      jobUrl,
-      jobScope,
-      relativePath
-    );
-  }
-
   private mapWorkspaceEntriesToTreeItems(
     environment: JenkinsEnvironmentRef,
     jobUrl: string,
@@ -78,22 +46,8 @@ export class TreeWorkspaceChildrenLoader {
     entries: JenkinsWorkspaceEntry[]
   ): WorkbenchTreeElement[] {
     return entries.map((entry) => {
-      if (entry.isDirectory) {
-        return new WorkspaceDirectoryTreeItem(
-          environment,
-          jobUrl,
-          entry.relativePath,
-          entry.name,
-          jobScope
-        );
-      }
-      return new WorkspaceFileTreeItem(
-        environment,
-        jobUrl,
-        entry.relativePath,
-        entry.name,
-        jobScope
-      );
+      const TreeItem = entry.isDirectory ? WorkspaceDirectoryTreeItem : WorkspaceFileTreeItem;
+      return new TreeItem(environment, jobUrl, entry.relativePath, entry.name, jobScope);
     });
   }
 

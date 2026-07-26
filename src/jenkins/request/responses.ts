@@ -1,8 +1,11 @@
 import type { IncomingMessage } from "node:http";
 import { JenkinsMaxBytesError, JenkinsRequestError } from "../errors";
 import type { RedirectDecision } from "./redirects";
-import { normalizeMaxBytes, rejectOversizedResponse } from "./responseLimits";
-import { createSafePromiseSettlers } from "./safePromise";
+import {
+  collectBoundedResponseText,
+  normalizeMaxBytes,
+  rejectOversizedResponse
+} from "./responseLimits";
 import type { JenkinsCollectedResponseBody, JenkinsRequestOptions } from "./types";
 
 export type RequestResponseStatusPolicy = "requireSuccessStatus" | "skipStatusCheck";
@@ -16,7 +19,7 @@ export type RequestResponsePlan =
       statusPolicy: RequestResponseStatusPolicy;
     };
 
-export function toError(error: unknown): Error {
+function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
 }
 
@@ -47,15 +50,13 @@ function collectResponseBody(
 ): Promise<JenkinsCollectedResponseBody> {
   const collectBuffer = options.returnBuffer === true;
   const maxBytes = normalizeMaxBytes(options.maxBytes);
-  const oversizedResponse = rejectOversizedResponse(res, statusCode, maxBytes);
-  if (oversizedResponse) {
-    return oversizedResponse;
-  }
+  if (collectBuffer) {
+    const oversizedResponse = rejectOversizedResponse(res, statusCode, maxBytes);
+    if (oversizedResponse) {
+      return oversizedResponse;
+    }
 
-  return new Promise<JenkinsCollectedResponseBody>((resolve, reject) => {
-    const safe = createSafePromiseSettlers(resolve, reject);
-
-    if (collectBuffer) {
+    return new Promise<JenkinsCollectedResponseBody>((resolve, reject) => {
       const maxLength = maxBytes ?? Number.POSITIVE_INFINITY;
       const chunks: Buffer[] = [];
       let receivedBytes = 0;
@@ -63,40 +64,22 @@ function collectResponseBody(
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         receivedBytes += buffer.length;
         if (receivedBytes > maxLength) {
-          safe.reject(new JenkinsMaxBytesError(maxLength, statusCode));
+          reject(new JenkinsMaxBytesError(maxLength, statusCode));
           res.destroy();
           return;
         }
         chunks.push(buffer);
       });
       res.on("end", () => {
-        safe.resolve({ buffer: Buffer.concat(chunks) });
+        resolve({ buffer: Buffer.concat(chunks) });
       });
       res.on("error", (error) => {
-        safe.reject(error instanceof Error ? error : new Error(String(error)));
+        reject(error instanceof Error ? error : new Error(String(error)));
       });
-      return;
-    }
+    });
+  }
 
-    let text = "";
-    let receivedBytes = 0;
-    res.setEncoding("utf8");
-    res.on("data", (chunk) => {
-      receivedBytes += Buffer.byteLength(chunk, "utf8");
-      if (maxBytes !== undefined && receivedBytes > maxBytes) {
-        safe.reject(new JenkinsMaxBytesError(maxBytes, statusCode));
-        res.destroy();
-        return;
-      }
-      text += chunk;
-    });
-    res.on("end", () => {
-      safe.resolve({ text });
-    });
-    res.on("error", (error) => {
-      safe.reject(error instanceof Error ? error : new Error(String(error)));
-    });
-  });
+  return collectBoundedResponseText(res, statusCode, maxBytes, "reject").then((text) => ({ text }));
 }
 
 function materializeResponse<T>(

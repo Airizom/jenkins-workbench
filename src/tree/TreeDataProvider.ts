@@ -11,11 +11,12 @@ import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { TreeActivityOptions } from "./ActivityTypes";
 import type { BuildTooltipOptions } from "./BuildTooltips";
+import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
 import { TreeDataProviderHierarchyState } from "./TreeDataProviderHierarchyState";
-import { TreeDataProviderRefreshCoordinator } from "./TreeDataProviderRefreshCoordinator";
 import type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
+import { TreeDataProviderRefreshCoordinator } from "./TreeDataProviderRefreshCoordinator";
 import { TreeDataProviderSummaryState } from "./TreeDataProviderSummaryState";
 import type {
   FullEnvironmentRefreshRequest,
@@ -30,7 +31,6 @@ import type { JenkinsTreeFilter } from "./TreeFilter";
 import type { JenkinsTreeRevealProvider } from "./TreeNavigator";
 import { JenkinsTreeRevealResolver } from "./TreeRevealResolver";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
-import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
 export type { TreeRefreshWaiter } from "./TreeDataProviderRefreshCoordinator";
 export type {
@@ -38,8 +38,8 @@ export type {
   InvalidateBuildArtifactsRequest,
   RefreshViewOnlyRequest,
   TreeExpansionPath,
-  TreeExpansionResolver,
   TreeExpansionResolveResult,
+  TreeExpansionResolver,
   TreeViewSummary
 } from "./TreeDataProviderTypes";
 
@@ -69,6 +69,9 @@ export class JenkinsWorkbenchTreeDataProvider
     WorkbenchTreeElement | undefined
   >();
   private readonly _onDidChangeSummary = new vscode.EventEmitter<TreeViewSummary>();
+  private readonly emitSummaryChange = (summary: TreeViewSummary): void => {
+    this._onDidChangeSummary.fire(summary);
+  };
   private readonly childrenLoader: JenkinsTreeChildrenLoader;
   private readonly revealResolver: JenkinsTreeRevealResolver;
   private readonly refreshCoordinator: TreeDataProviderRefreshCoordinator;
@@ -149,10 +152,7 @@ export class JenkinsWorkbenchTreeDataProvider
       return false;
     }
 
-    this.dataService.clearCache();
-    this.childrenLoader.clearWatchCacheForEnvironment();
-    this.childrenLoader.clearPinCacheForEnvironment();
-    this.childrenLoader.clearChildrenCacheForEnvironment();
+    this.clearEnvironmentCaches();
     this.emitSummary();
     return true;
   }
@@ -262,19 +262,8 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   onEnvironmentChanged(environmentId?: string, refreshToken?: number): void {
-    if (environmentId) {
-      this.dataService.clearCacheForEnvironment(environmentId);
-      this.childrenLoader.clearWatchCacheForEnvironment(environmentId);
-      this.childrenLoader.clearPinCacheForEnvironment(environmentId);
-      this.childrenLoader.clearChildrenCacheForEnvironment(environmentId);
-      this.hierarchyState.clearEnvironment(environmentId);
-    } else {
-      this.dataService.clearCache();
-      this.childrenLoader.clearWatchCacheForEnvironment();
-      this.childrenLoader.clearPinCacheForEnvironment();
-      this.childrenLoader.clearChildrenCacheForEnvironment();
-      this.hierarchyState.clearEnvironment();
-    }
+    this.clearEnvironmentCaches(environmentId);
+    this.hierarchyState.clearEnvironment(environmentId);
 
     this.refreshCoordinator.scheduleRefresh(
       undefined,
@@ -283,6 +272,17 @@ export class JenkinsWorkbenchTreeDataProvider
       this.invalidateForElement
     );
     this.emitSummary();
+  }
+
+  private clearEnvironmentCaches(environmentId?: string): void {
+    if (environmentId) {
+      this.dataService.clearCacheForEnvironment(environmentId);
+    } else {
+      this.dataService.clearCache();
+    }
+    this.childrenLoader.clearWatchCacheForEnvironment(environmentId);
+    this.childrenLoader.clearPinCacheForEnvironment(environmentId);
+    this.childrenLoader.clearChildrenCacheForEnvironment(environmentId);
   }
 
   getTreeItem(element: WorkbenchTreeElement): vscode.TreeItem {
@@ -343,9 +343,6 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   private emitSummary(): void {
-    this.summaryState.emitSummary(
-      this.childrenLoader.getSummaryTotals(),
-      this._onDidChangeSummary.fire.bind(this._onDidChangeSummary)
-    );
+    this.summaryState.emitSummary(this.childrenLoader.getSummaryTotals(), this.emitSummaryChange);
   }
 }

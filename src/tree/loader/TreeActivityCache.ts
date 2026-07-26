@@ -5,14 +5,12 @@ import {
   type ActivityGroupKind
 } from "../ActivityTypes";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
-import { buildScopedEnvironmentKey, isEnvironmentScopedChildKey } from "./TreeCacheKeys";
+import {
+  buildScopedEnvironmentKey,
+  isEnvironmentScopedChildKey,
+  type TreeChildrenKeyBuilder
+} from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
-
-type BuildChildrenKey = (
-  kind: string,
-  environment: JenkinsEnvironmentRef,
-  extra?: string
-) => string;
 
 export class TreeActivityCache {
   private readonly summaries = new Map<string, ActivityDisplaySummary>();
@@ -20,15 +18,15 @@ export class TreeActivityCache {
 
   constructor(
     private readonly cacheManager: TreeChildrenCacheManager,
-    private readonly buildChildrenKey: BuildChildrenKey
+    private readonly buildChildrenKey: TreeChildrenKeyBuilder
   ) {}
 
   getSummary(environment: JenkinsEnvironmentRef): ActivityDisplaySummary | undefined {
-    return this.summaries.get(this.buildEnvironmentKey(environment));
+    return this.summaries.get(buildScopedEnvironmentKey(environment));
   }
 
   setSummary(environment: JenkinsEnvironmentRef, summary: ActivityDisplaySummary): void {
-    this.summaries.set(this.buildEnvironmentKey(environment), summary);
+    this.summaries.set(buildScopedEnvironmentKey(environment), summary);
   }
 
   getGroupChildren(
@@ -69,7 +67,7 @@ export class TreeActivityCache {
       return;
     }
 
-    this.summaries.delete(this.buildEnvironmentKey(environment));
+    this.summaries.delete(buildScopedEnvironmentKey(environment));
     this.clearChildKey(this.buildActivityRootChildrenKey(environment));
     for (const group of ACTIVITY_GROUP_ORDER) {
       this.clearChildKey(this.buildActivityGroupChildrenKey(environment, group));
@@ -89,10 +87,6 @@ export class TreeActivityCache {
         this.clearChildKey(key);
       }
     }
-  }
-
-  private buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
-    return buildScopedEnvironmentKey(environment);
   }
 
   private trackChildKey(key: string): string {

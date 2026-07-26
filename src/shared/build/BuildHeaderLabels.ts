@@ -6,6 +6,8 @@ import { formatOptionalLocaleTimestamp } from "../../formatters/DisplayFormatter
 import { formatDurationMs } from "../../formatters/DurationFormatters";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 
+const UNKNOWN_LABEL = "Unknown";
+
 export function formatBuildResultLabel(details: JenkinsBuildDetails): string {
   return resolveBuildResultLabel(details.result, details.building);
 }
@@ -20,9 +22,9 @@ export function formatBuildDuration(duration?: number): string {
 
 function formatBuildTimestamp(timestamp?: number): string {
   if (timestamp === undefined) {
-    return "Unknown";
+    return UNKNOWN_LABEL;
   }
-  return formatOptionalLocaleTimestamp(timestamp) || "Unknown";
+  return formatOptionalLocaleTimestamp(timestamp) || UNKNOWN_LABEL;
 }
 
 export interface BuildHeaderViewModel {
@@ -33,10 +35,19 @@ export interface BuildHeaderViewModel {
 }
 
 export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): BuildHeaderViewModel {
+  if (!details) {
+    return {
+      resultLabel: UNKNOWN_LABEL,
+      resultClass: "neutral",
+      durationLabel: UNKNOWN_LABEL,
+      timestampLabel: UNKNOWN_LABEL
+    };
+  }
+
   return {
-    resultLabel: details ? formatBuildResultLabel(details) : "Unknown",
-    resultClass: details ? formatBuildResultClass(details) : "neutral",
-    durationLabel: details ? formatBuildDuration(details.duration) : "Unknown",
-    timestampLabel: details ? formatBuildTimestamp(details.timestamp) : "Unknown"
+    resultLabel: formatBuildResultLabel(details),
+    resultClass: formatBuildResultClass(details),
+    durationLabel: formatBuildDuration(details.duration),
+    timestampLabel: formatBuildTimestamp(details.timestamp)
   };
 }

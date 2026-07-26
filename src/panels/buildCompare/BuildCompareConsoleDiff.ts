@@ -1,6 +1,6 @@
 import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { BuildCompareBackend } from "./BuildCompareBackend";
+import type { BuildInspectionBackend as BuildCompareBackend } from "../shared/backend/BuildInspectionBackend";
 import type { BuildCompareConsoleOptions } from "./BuildCompareOptions";
 import type {
   BuildCompareConsoleSectionViewModel,
@@ -31,8 +31,6 @@ export function createLoadingConsoleComparisonSection(): BuildCompareConsoleSect
 
 class ConsoleComparisonReader {
   private nextStart = 0;
-  private mode: "progressive" | "full" = "full";
-  private loadedFullText = false;
   private loadedBytes = 0;
   public truncatedByLimit = false;
 
@@ -66,7 +64,6 @@ class ConsoleComparisonReader {
         initial.text,
         Boolean(initial.moreData)
       );
-      reader.mode = "progressive";
       reader.loadedBytes = initial.bytesRead;
       reader.nextStart = initial.textSize;
       return reader;
@@ -84,15 +81,10 @@ class ConsoleComparisonReader {
         full.text,
         false
       );
-      reader.loadedFullText = true;
       reader.loadedBytes = full.bytesRead;
       reader.truncatedByLimit = Boolean(full.truncated);
       return reader;
     }
-  }
-
-  async ensureBuffer(): Promise<void> {
-    await this.ensureBufferWithLimit();
   }
 
   async ensureBufferWithLimit(maxBytes?: number): Promise<void> {
@@ -100,10 +92,6 @@ class ConsoleComparisonReader {
       return;
     }
     await this.appendNextChunk(maxBytes);
-  }
-
-  async appendUntilLineCount(lineCount: number): Promise<void> {
-    await this.appendUntilLineCountWithLimit(lineCount);
   }
 
   async appendUntilLineCountWithLimit(lineCount: number, maxBytes?: number): Promise<void> {
@@ -134,39 +122,20 @@ class ConsoleComparisonReader {
   }
 
   private async appendNextChunk(maxBytes?: number): Promise<number> {
-    if (this.mode === "progressive") {
-      if (!this.moreData) {
-        return 0;
-      }
-      const next = await this.backend.console.getConsoleTextProgressive(
-        this.environment,
-        this.buildUrl,
-        this.nextStart,
-        maxBytes
-      );
-      this.nextStart = next.textSize;
-      this.buffer += next.text;
-      this.loadedBytes += next.bytesRead;
-      this.moreData = Boolean(next.moreData);
-      return next.bytesRead;
-    }
-
-    if (this.loadedFullText) {
-      this.moreData = false;
+    if (!this.moreData) {
       return 0;
     }
-
-    const full = await this.backend.console.getConsoleTextHead(
+    const next = await this.backend.console.getConsoleTextProgressive(
       this.environment,
       this.buildUrl,
-      this.maxBytes
+      this.nextStart,
+      maxBytes
     );
-    this.buffer += full.text;
-    this.moreData = false;
-    this.loadedFullText = true;
-    this.loadedBytes += full.bytesRead;
-    this.truncatedByLimit = Boolean(full.truncated);
-    return full.bytesRead;
+    this.nextStart = next.textSize;
+    this.buffer += next.text;
+    this.loadedBytes += next.bytesRead;
+    this.moreData = Boolean(next.moreData);
+    return next.bytesRead;
   }
 }
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import * as path from "node:path";
 import { Readable, Writable } from "node:stream";
 import { describe, it } from "vitest";
-import type { ArtifactRetrievalService } from "../src/services/ArtifactRetrievalService";
+import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import {
   type ArtifactDownloadRequest,
   type ArtifactFilesystem,
@@ -17,12 +17,13 @@ function createService(): {
   writes: string[];
 } {
   const writes: string[] = [];
-  const retrievalService = {
+  const dataService: Pick<JenkinsDataService, "getArtifactStream"> = {
     getArtifactStream: async () => ({
       stream: Readable.from(["artifact content"]),
-      headers: {}
+      headers: {},
+      abort: () => {}
     })
-  } as unknown as ArtifactRetrievalService;
+  };
   const filesystem: ArtifactFilesystem = {
     createDirectory: () => Promise.resolve(),
     createWriteStream: (filePath: string) => {
@@ -35,7 +36,7 @@ function createService(): {
     },
     delete: () => Promise.resolve()
   };
-  return { service: new ArtifactStorageService(retrievalService, filesystem), writes };
+  return { service: new ArtifactStorageService(dataService, filesystem), writes };
 }
 
 function createRequest(relativePath: string): ArtifactDownloadRequest {

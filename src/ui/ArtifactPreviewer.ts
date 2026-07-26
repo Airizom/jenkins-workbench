@@ -1,6 +1,6 @@
 import * as path from "node:path";
+import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { ArtifactRetrievalService } from "../services/ArtifactRetrievalService";
 import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
 import { openBufferedContentPreview } from "./BufferedContentPreviewer";
 
@@ -19,7 +19,7 @@ export type ArtifactPreviewOptionsProvider = () => ArtifactPreviewOptions;
 
 export class ArtifactPreviewer {
   constructor(
-    private readonly retrievalService: ArtifactRetrievalService,
+    private readonly dataService: Pick<JenkinsDataService, "getArtifact">,
     private readonly previewProvider: ArtifactPreviewProvider,
     private readonly optionsProvider: ArtifactPreviewOptionsProvider
   ) {}
@@ -29,7 +29,7 @@ export class ArtifactPreviewer {
     const previewPath = resolvePreviewPath(request);
     const fileName = path.basename(previewPath);
 
-    const response = await this.retrievalService.getArtifact(
+    const response = await this.dataService.getArtifact(
       request.environment,
       request.buildUrl,
       request.relativePath,
@@ -43,22 +43,20 @@ export class ArtifactPreviewer {
 function resolvePreviewPath(request: ArtifactPreviewRequest): string {
   const fileName = normalizeOptionalName(request.fileName);
   const relativePath = normalizeOptionalName(request.relativePath);
-  if (fileName) {
-    if (!relativePath) {
-      return fileName;
-    }
-    if (path.extname(fileName).length > 0) {
-      return fileName;
-    }
-    if (path.extname(relativePath).length > 0) {
-      return relativePath;
-    }
-    return fileName;
+
+  if (!fileName) {
+    return relativePath ?? "artifact";
   }
-  if (relativePath) {
+
+  if (
+    relativePath &&
+    path.extname(fileName).length === 0 &&
+    path.extname(relativePath).length > 0
+  ) {
     return relativePath;
   }
-  return "artifact";
+
+  return fileName;
 }
 
 function normalizeOptionalName(value?: string): string | undefined {
@@ -66,5 +64,5 @@ function normalizeOptionalName(value?: string): string | undefined {
     return undefined;
   }
   const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  return trimmed || undefined;
 }

@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { CoverageStatusBadge } from "../../../../../shared/webview/components/CoverageStatusBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { Button } from "../../../../../shared/webview/components/ui/button";
@@ -17,7 +18,7 @@ type CoverageGlanceCardProps = {
 export function CoverageGlanceCard({
   coverageState,
   onShowTests
-}: CoverageGlanceCardProps): JSX.Element | null {
+}: CoverageGlanceCardProps): React.JSX.Element | null {
   if (coverageState.status === "disabled") {
     return null;
   }
@@ -37,34 +38,7 @@ export function CoverageGlanceCard({
         ) : null}
       </CardHeader>
       <CardContent className="pb-4">
-        {coverageState.status === "loading" || coverageState.status === "idle" ? (
-          <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-            Loading coverage results for this build.
-          </div>
-        ) : coverageState.status === "error" ? (
-          <div className="rounded border border-failure-border-subtle bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-            Coverage data could not be loaded for this build.
-            {coverageState.errorMessage ? ` ${coverageState.errorMessage}` : ""}
-          </div>
-        ) : coverageState.status === "unavailable" ? (
-          <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-            Coverage data is unavailable for this build.
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            <ToneMetricCard label="Project" value={coverageState.projectCoverage} tone="neutral" />
-            <ToneMetricCard
-              label="Modified Files"
-              value={coverageState.modifiedFilesCoverage}
-              tone="neutral"
-            />
-            <ToneMetricCard
-              label="Modified Lines"
-              value={coverageState.modifiedLinesCoverage}
-              tone="neutral"
-            />
-          </div>
-        )}
+        {renderCoverageContent(coverageState)}
         {onShowTests ? (
           <Button
             variant="link"
@@ -78,5 +52,50 @@ export function CoverageGlanceCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function renderCoverageContent(
+  coverageState: BuildDetailsCoverageStateViewModel
+): React.JSX.Element {
+  if (coverageState.status === "loading" || coverageState.status === "idle") {
+    return (
+      <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
+        Loading coverage results for this build.
+      </div>
+    );
+  }
+
+  if (coverageState.status === "error") {
+    return (
+      <div className="rounded border border-failure-border-subtle bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
+        Coverage data could not be loaded for this build.
+        {coverageState.errorMessage ? ` ${coverageState.errorMessage}` : ""}
+      </div>
+    );
+  }
+
+  if (coverageState.status === "unavailable") {
+    return (
+      <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
+        Coverage data is unavailable for this build.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <ToneMetricCard label="Project" value={coverageState.projectCoverage} tone="neutral" />
+      <ToneMetricCard
+        label="Modified Files"
+        value={coverageState.modifiedFilesCoverage}
+        tone="neutral"
+      />
+      <ToneMetricCard
+        label="Modified Lines"
+        value={coverageState.modifiedLinesCoverage}
+        tone="neutral"
+      />
+    </div>
   );
 }

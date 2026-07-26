@@ -41,38 +41,29 @@ export function resolveJobColorStatus(color?: string): JobColorStatus | undefine
     return undefined;
   }
 
-  const isRunning = isRunningJobColor(color);
-  const baseColor = getBaseJobColor(color);
+  if (isRunningJobColor(color)) {
+    return "running";
+  }
 
-  let status: JobColorStatus;
-  switch (baseColor) {
+  switch (getBaseJobColor(color)) {
     case "blue":
     case "green":
-      status = "success";
-      break;
+      return "success";
     case "red":
-      status = "failed";
-      break;
+      return "failed";
     case "yellow":
-      status = "unstable";
-      break;
+      return "unstable";
     case "aborted":
-      status = "aborted";
-      break;
+      return "aborted";
     case "notbuilt":
-      status = "notBuilt";
-      break;
+      return "notBuilt";
     case "disabled":
     case "grey":
     case "gray":
-      status = "disabled";
-      break;
+      return "disabled";
     default:
-      status = "unknown";
-      break;
+      return "unknown";
   }
-
-  return isRunning ? "running" : status;
 }
 
 export function isFailingJobColor(color?: string): boolean {
@@ -123,11 +114,11 @@ export function resolveJobColorIconId(status: JobColorStatus): string {
 }
 
 export function resolveJobColorCodicon(color?: string): string {
-  if (isRunningJobColor(color)) {
+  const status = resolveJobColorStatus(color);
+  if (status === "running") {
     return "sync~spin";
   }
 
-  const status = resolveJobColorStatus(color);
   return status ? resolveJobColorIconId(status) : "symbol-misc";
 }
 

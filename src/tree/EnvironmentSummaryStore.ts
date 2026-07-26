@@ -79,38 +79,35 @@ export class EnvironmentSummaryStore {
   }
 
   private updateJobsSummary(environment: JenkinsEnvironmentRef, jobs: JobsFolderSummary): void {
-    const key = this.buildKey(environment);
-    const current = this.cache.get<EnvironmentSummary>(key);
-    if (current && areJobSummariesEqual(current.jobs, jobs)) {
-      this.cache.set(key, current);
-      return;
-    }
-    const next: EnvironmentSummary = current ? { ...current, jobs } : { jobs };
-    this.cache.set(key, next);
-    this.notify(environment);
+    this.updateSummary(environment, "jobs", jobs, areJobSummariesEqual);
   }
 
   private updateNodesSummary(environment: JenkinsEnvironmentRef, nodes: NodesFolderSummary): void {
-    const key = this.buildKey(environment);
-    const current = this.cache.get<EnvironmentSummary>(key);
-    if (current && areNodeSummariesEqual(current.nodes, nodes)) {
-      this.cache.set(key, current);
-      return;
-    }
-    const next: EnvironmentSummary = current ? { ...current, nodes } : { nodes };
-    this.cache.set(key, next);
-    this.notify(environment);
+    this.updateSummary(environment, "nodes", nodes, areNodeSummariesEqual);
   }
 
   private updateQueueSummary(environment: JenkinsEnvironmentRef, queue: QueueFolderSummary): void {
-    const key = this.buildKey(environment);
-    const current = this.cache.get<EnvironmentSummary>(key);
-    if (current && areQueueSummariesEqual(current.queue, queue)) {
-      this.cache.set(key, current);
+    this.updateSummary(environment, "queue", queue, areQueueSummariesEqual);
+  }
+
+  private updateSummary<SummaryKey extends keyof EnvironmentSummary>(
+    environment: JenkinsEnvironmentRef,
+    key: SummaryKey,
+    value: EnvironmentSummary[SummaryKey],
+    areEqual: (
+      left: EnvironmentSummary[SummaryKey],
+      right: EnvironmentSummary[SummaryKey]
+    ) => boolean
+  ): void {
+    const cacheKey = this.buildKey(environment);
+    const current = this.cache.get<EnvironmentSummary>(cacheKey);
+    if (current && areEqual(current[key], value)) {
+      this.cache.set(cacheKey, current);
       return;
     }
-    const next: EnvironmentSummary = current ? { ...current, queue } : { queue };
-    this.cache.set(key, next);
+
+    const next = current ? { ...current, [key]: value } : { [key]: value };
+    this.cache.set<EnvironmentSummary>(cacheKey, next);
     this.notify(environment);
   }
 

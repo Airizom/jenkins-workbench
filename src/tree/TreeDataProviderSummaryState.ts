@@ -1,11 +1,5 @@
+import type { EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
 import type { TreeViewSummary } from "./TreeDataProviderTypes";
-import { areTreeViewSummariesEqual } from "./TreeDataProviderUtils";
-
-type TreeSummaryTotals = {
-  running: number;
-  queue: number;
-  hasData: boolean;
-};
 
 export class TreeDataProviderSummaryState {
   private watchErrorCount = 0;
@@ -20,18 +14,26 @@ export class TreeDataProviderSummaryState {
     return true;
   }
 
-  emitSummary(totals: TreeSummaryTotals, emit: (summary: TreeViewSummary) => void): void {
-    const nextSummary: TreeViewSummary = {
-      running: totals.running,
-      queue: totals.queue,
-      watchErrors: this.watchErrorCount,
-      hasData: totals.hasData || this.watchErrorCount > 0
-    };
-
-    if (this.lastSummary && areTreeViewSummariesEqual(this.lastSummary, nextSummary)) {
+  emitSummary(totals: EnvironmentSummaryTotals, emit: (summary: TreeViewSummary) => void): void {
+    const { running, queue } = totals;
+    const hasData = totals.hasData || this.watchErrorCount > 0;
+    const previous = this.lastSummary;
+    if (
+      previous &&
+      previous.running === running &&
+      previous.queue === queue &&
+      previous.watchErrors === this.watchErrorCount &&
+      previous.hasData === hasData
+    ) {
       return;
     }
 
+    const nextSummary: TreeViewSummary = {
+      running,
+      queue,
+      watchErrors: this.watchErrorCount,
+      hasData
+    };
     this.lastSummary = nextSummary;
     emit(nextSummary);
   }

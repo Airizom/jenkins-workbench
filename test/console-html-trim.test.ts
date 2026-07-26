@@ -70,4 +70,28 @@ describe("trimConsoleHtmlModelToTail", () => {
       }
     ]);
   });
+
+  it("visits each nested element once while trimming", () => {
+    const depth = 100;
+    let childrenAccesses = 0;
+    let node: ConsoleHtmlModel["nodes"][number] = { type: "text", value: "ab" };
+    for (let index = 0; index < depth; index += 1) {
+      const child: ConsoleHtmlModel["nodes"][number] = node;
+      node = {
+        type: "element",
+        tag: "span",
+        attrs: {},
+        get children(): ConsoleHtmlModel["nodes"] {
+          childrenAccesses += 1;
+          return [child];
+        }
+      };
+    }
+    const model: ConsoleHtmlModel = { nodes: [node], text: "ab" };
+
+    const trimmed = trimConsoleHtmlModelToTail(model, 1);
+
+    assert.equal(trimmed.text, "b");
+    assert.equal(childrenAccesses, depth);
+  });
 });

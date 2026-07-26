@@ -11,7 +11,14 @@ interface InputBoxOptions {
   readonly value?: string;
 }
 
+interface QuickPickItem {
+  readonly label: string;
+  readonly action?: string;
+}
+
 const inputBoxCalls: InputBoxOptions[] = [];
+const quickPickCalls: Array<readonly QuickPickItem[]> = [];
+let quickPickActions: string[] = [];
 let inputBoxValue: string | undefined = "typed-secret";
 let openedTextDocuments = 0;
 
@@ -23,7 +30,11 @@ const vscodeMock = {
     },
     showTextDocument: async () => undefined,
     showInformationMessage: async () => undefined,
-    showQuickPick: async () => undefined,
+    showQuickPick: async (items: readonly QuickPickItem[]) => {
+      quickPickCalls.push(items);
+      const selectedAction = quickPickActions.shift();
+      return items.find((item) => item.action === selectedAction);
+    },
     showOpenDialog: async () => undefined
   },
   workspace: {
@@ -40,6 +51,7 @@ vi.doMock("vscode", () => vscodeMock);
 const { promptParameterValues } = await import(
   "../src/ui/buildParameterPrompts/ParameterValuePrompts"
 );
+const { choosePreset } = await import("../src/ui/buildParameterPrompts/PresetSelectionPrompts");
 
 function createOptions(
   parameters: BuildParameterPromptOptions["parameters"]
@@ -60,8 +72,51 @@ function createOptions(
 
 beforeEach(() => {
   inputBoxCalls.length = 0;
+  quickPickCalls.length = 0;
+  quickPickActions = [];
   inputBoxValue = "typed-secret";
   openedTextDocuments = 0;
+});
+
+describe("choosePreset quick picks", () => {
+  const presets = [{ id: "preset-1", name: "Release", updatedAt: 1 }];
+
+  it("relies on dismissal instead of presenting a cancel action", async () => {
+    const options = createOptions([]);
+    options.presetStore = {
+      listPresets: async () => presets
+    } as unknown as BuildParameterPromptOptions["presetStore"];
+
+    const result = await choosePreset(options);
+
+    assert.equal(result, undefined);
+    assert.deepEqual(
+      quickPickCalls[0].map((item) => item.label),
+      ["Manual entry", "Use preset: Release", "Manage presets"]
+    );
+  });
+
+  it("relies on dismissal instead of presenting a back action when managing presets", async () => {
+    const renamePreset = vi.fn();
+    const deletePreset = vi.fn();
+    const options = createOptions([]);
+    options.presetStore = {
+      listPresets: async () => presets,
+      renamePreset,
+      deletePreset
+    } as unknown as BuildParameterPromptOptions["presetStore"];
+    quickPickActions = ["manage"];
+
+    const result = await choosePreset(options);
+
+    assert.equal(result, undefined);
+    assert.deepEqual(
+      quickPickCalls[1].map((item) => item.label),
+      ["Rename preset", "Delete preset"]
+    );
+    assert.equal(renamePreset.mock.calls.length, 0);
+    assert.equal(deletePreset.mock.calls.length, 0);
+  });
 });
 
 describe("promptParameterValues sensitive parameters", () => {

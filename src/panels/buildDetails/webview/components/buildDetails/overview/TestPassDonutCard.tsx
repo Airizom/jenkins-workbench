@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { Button } from "../../../../../shared/webview/components/ui/button";
@@ -9,14 +10,18 @@ import {
 } from "../../../../../shared/webview/components/ui/card";
 import { TestTubeIcon } from "../../../../../shared/webview/icons";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
-import { getPassRate, getTestDistribution } from "../testResults/testResultsUtils";
+import { getTestDistribution } from "../testResults/testResultsUtils";
 
 type TestPassDonutCardProps = {
   summary: BuildTestsSummaryViewModel;
   onShowTests: () => void;
 };
-export function TestPassDonutCard({ summary, onShowTests }: TestPassDonutCardProps): JSX.Element {
-  const passRate = getPassRate(summary);
+export function TestPassDonutCard({
+  summary,
+  onShowTests
+}: TestPassDonutCardProps): React.JSX.Element {
+  const distribution = getTestDistribution(summary);
+  const passRate = Math.round(distribution.passedPct);
 
   return (
     <Card>
@@ -35,7 +40,7 @@ export function TestPassDonutCard({ summary, onShowTests }: TestPassDonutCardPro
       <CardContent className="pb-4">
         {summary.totalCount > 0 ? (
           <div className="flex flex-wrap items-center gap-4">
-            <TestPassDonut summary={summary} passRate={passRate} />
+            <TestPassDonut summary={summary} passRate={passRate} distribution={distribution} />
             <div className="grid flex-1 grid-cols-3 gap-2 min-w-[180px]">
               <ToneMetricCard label="Failed" value={summary.failedCount} tone="failed" showDot />
               <ToneMetricCard label="Skipped" value={summary.skippedCount} tone="skipped" showDot />
@@ -63,12 +68,14 @@ export function TestPassDonutCard({ summary, onShowTests }: TestPassDonutCardPro
 
 function TestPassDonut({
   summary,
-  passRate
+  passRate,
+  distribution
 }: {
   summary: BuildTestsSummaryViewModel;
   passRate: number;
-}): JSX.Element {
-  const { failedPct, skippedPct, passedPct } = getTestDistribution(summary);
+  distribution: ReturnType<typeof getTestDistribution>;
+}): React.JSX.Element {
+  const { failedPct, skippedPct, passedPct } = distribution;
   const segments = [
     { pct: passedPct, start: 0, className: "text-success" },
     { pct: failedPct, start: passedPct, className: "text-failure" },

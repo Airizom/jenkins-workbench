@@ -48,6 +48,10 @@ export type CurrentBranchOpenRequest =
 
 export type CurrentBranchBuildAction = "triggerBuild" | "openLatestBuild" | "openLastFailedBuild";
 
+const GIT_UNAVAILABLE_MESSAGE = "Git integration is unavailable.";
+const NO_ACTIVE_REPOSITORY_MESSAGE = "No Git repository is active in this window.";
+const DETACHED_HEAD_MESSAGE = "Check out a branch to use current-branch Jenkins actions.";
+
 export class CurrentBranchCommandMapper {
   mapStateToResolution(
     state: CurrentBranchState,
@@ -62,29 +66,23 @@ export class CurrentBranchCommandMapper {
       case "noGit":
         return {
           kind: "message",
-          severity: "info",
-          message: "Git integration is unavailable."
+          ...createInfoMessage(GIT_UNAVAILABLE_MESSAGE)
         };
       case "noRepository":
         return {
           kind: "message",
-          severity: "info",
-          message: "No Git repository is active in this window."
+          ...createInfoMessage(NO_ACTIVE_REPOSITORY_MESSAGE)
         };
       case "unlinked":
         return {
           kind: "resolved",
           state,
-          message: {
-            severity: "info",
-            message: "The active repository is not linked to Jenkins."
-          }
+          message: createInfoMessage("The active repository is not linked to Jenkins.")
         };
       case "detachedHead":
         return {
           kind: "message",
-          severity: "info",
-          message: "Check out a branch to use current-branch Jenkins actions."
+          ...createInfoMessage(DETACHED_HEAD_MESSAGE)
         };
       case "requestFailed":
         return {
@@ -118,8 +116,9 @@ export class CurrentBranchCommandMapper {
     if (state.kind === "branchMissing") {
       return {
         kind: "message",
-        severity: "info",
-        message: `Branch "${state.branchName}" was not found under ${state.link.multibranchLabel}.`
+        ...createInfoMessage(
+          `Branch "${state.branchName}" was not found under ${state.link.multibranchLabel}.`
+        )
       };
     }
 
@@ -145,37 +144,25 @@ export class CurrentBranchCommandMapper {
     switch (state.kind) {
       case "matched":
         // Only the latest-build action can lack a target for matched states.
-        return action === "openLatestBuild" && !state.lastBuild?.url
-          ? {
-              severity: "info",
-              message: `No builds were found for "${state.jobName}" yet.`
-            }
-          : undefined;
+        if (action !== "openLatestBuild" || state.lastBuild?.url) {
+          return undefined;
+        }
+        return createInfoMessage(`No builds were found for "${state.jobName}" yet.`);
       case "branchMissing":
-        return {
-          severity: "info",
-          message: `No Jenkins job found for branch "${state.branchName}" under ${state.link.multibranchLabel}.`
-        };
+        return createInfoMessage(
+          `No Jenkins job found for branch "${state.branchName}" under ${state.link.multibranchLabel}.`
+        );
       case "unlinked":
       case "requestFailed":
         // mapStateToResolution already attaches a user message to these resolved states.
         return undefined;
       case "detachedHead":
-        return {
-          severity: "info",
-          message: "Check out a branch to use current-branch Jenkins actions."
-        };
+        return createInfoMessage(DETACHED_HEAD_MESSAGE);
       case "noGit":
-        return {
-          severity: "info",
-          message: "Git integration is unavailable."
-        };
+        return createInfoMessage(GIT_UNAVAILABLE_MESSAGE);
       case "noRepository":
       case "ambiguousRepository":
-        return {
-          severity: "info",
-          message: "No Git repository is active in this window."
-        };
+        return createInfoMessage(NO_ACTIVE_REPOSITORY_MESSAGE);
     }
   }
 
@@ -212,4 +199,11 @@ export class CurrentBranchCommandMapper {
       label: formatCurrentBranchJobLabel(state)
     };
   }
+}
+
+function createInfoMessage(message: string): CurrentBranchUserMessage {
+  return {
+    severity: "info",
+    message
+  };
 }

@@ -22,7 +22,7 @@ export async function choosePreset(
 
     const picks: Array<
       vscode.QuickPickItem & {
-        action: "manual" | "preset" | "manage" | "cancel";
+        action: "manual" | "preset" | "manage";
         presetId?: string;
       }
     > = [
@@ -50,18 +50,13 @@ export async function choosePreset(
       });
     }
 
-    picks.push({
-      label: "Cancel",
-      action: "cancel"
-    });
-
     const pick = await vscode.window.showQuickPick(picks, {
       placeHolder: `Build parameters for ${options.jobLabel}`,
       ignoreFocusOut: true,
       matchOnDescription: true
     });
 
-    if (!pick || pick.action === "cancel") {
+    if (!pick) {
       return undefined;
     }
 
@@ -111,8 +106,7 @@ async function managePresets(
   const action = await vscode.window.showQuickPick(
     [
       { label: "Rename preset", action: "rename" as const },
-      { label: "Delete preset", action: "delete" as const },
-      { label: "Back", action: "back" as const }
+      { label: "Delete preset", action: "delete" as const }
     ],
     {
       placeHolder: "Manage parameter presets",
@@ -120,7 +114,7 @@ async function managePresets(
     }
   );
 
-  if (!action || action.action === "back") {
+  if (!action) {
     return;
   }
 

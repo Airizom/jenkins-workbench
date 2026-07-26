@@ -9,11 +9,12 @@ import {
   isTokenChar
 } from "../JenkinsfileValidationUtils";
 import {
-  type PipelineBlockContext,
   buildAgentInsertText,
   buildStagesInsertText,
   findPipelineBlock,
   hasTopLevelSection,
+  type PipelineBlockContext,
+  type PipelineTextLocation,
   resolveInsertLocation
 } from "./JenkinsfilePipelineParser";
 
@@ -49,7 +50,7 @@ export class JenkinsfileQuickFixProvider implements vscode.CodeActionProvider {
 
       const missingSection = resolveMissingSection(code);
       if (missingSection) {
-        pipelineContext = resolvePipelineContext(document, pipelineContext);
+        pipelineContext ??= findPipelineBlock(document);
         if (!pipelineContext) {
           continue;
         }
@@ -108,9 +109,17 @@ function createMissingSectionActions(
   section: "agent" | "stages"
 ): vscode.CodeAction[] {
   if (section === "agent") {
+    const location = resolveInsertLocation(document, context, section);
     return [
-      createInsertAgentAction(document, diagnostic, context, "any", 'Insert "agent any"'),
-      createInsertAgentAction(document, diagnostic, context, "none", 'Insert "agent none"')
+      createInsertAgentAction(document, diagnostic, context, "any", 'Insert "agent any"', location),
+      createInsertAgentAction(
+        document,
+        diagnostic,
+        context,
+        "none",
+        'Insert "agent none"',
+        location
+      )
     ];
   }
   return [createInsertStagesAction(document, diagnostic, context)];
@@ -135,11 +144,16 @@ function createInsertAction(
   context: PipelineBlockContext,
   section: "agent" | "stages",
   insertText: string,
-  title: string
+  title: string,
+  location?: PipelineTextLocation
 ): vscode.CodeAction {
   const edit = new vscode.WorkspaceEdit();
-  const location = resolveInsertLocation(document, context, section);
-  edit.insert(document.uri, new vscode.Position(location.line, location.character), insertText);
+  const resolvedLocation = location ?? resolveInsertLocation(document, context, section);
+  edit.insert(
+    document.uri,
+    new vscode.Position(resolvedLocation.line, resolvedLocation.character),
+    insertText
+  );
   return createEditAction(title, diagnostic, edit);
 }
 
@@ -148,10 +162,11 @@ function createInsertAgentAction(
   diagnostic: vscode.Diagnostic,
   context: PipelineBlockContext,
   agentValue: "any" | "none",
-  title: string
+  title: string,
+  location?: PipelineTextLocation
 ): vscode.CodeAction {
   const insertText = buildAgentInsertText(context, agentValue);
-  return createInsertAction(document, diagnostic, context, "agent", insertText, title);
+  return createInsertAction(document, diagnostic, context, "agent", insertText, title, location);
 }
 
 function createInsertStagesAction(
@@ -206,12 +221,7 @@ function resolveReplacementRange(
         diagnosticRange.end.character
       );
       if (tokenInRange !== undefined) {
-        return new vscode.Range(
-          diagnosticRange.start.line,
-          tokenInRange,
-          diagnosticRange.start.line,
-          tokenInRange + tokenHint.length
-        );
+        return buildTokenRange(diagnosticRange.start.line, tokenInRange, tokenHint.length);
       }
     } else {
       return diagnosticRange;
@@ -226,12 +236,7 @@ function resolveReplacementRange(
       diagnosticRange.start.character
     );
     if (tokenIndex !== undefined) {
-      return new vscode.Range(
-        diagnosticRange.start.line,
-        tokenIndex,
-        diagnosticRange.start.line,
-        tokenIndex + tokenHint.length
-      );
+      return buildTokenRange(diagnosticRange.start.line, tokenIndex, tokenHint.length);
     }
   }
 
@@ -242,11 +247,10 @@ function resolveReplacementRange(
   const line = document.lineAt(diagnosticRange.start.line);
   const tokenRange = findTokenRange(line.text, diagnosticRange.start.character);
   if (tokenRange) {
-    return new vscode.Range(
+    return buildTokenRange(
       diagnosticRange.start.line,
       tokenRange.start,
-      diagnosticRange.start.line,
-      tokenRange.end
+      tokenRange.end - tokenRange.start
     );
   }
 
@@ -309,9 +313,6 @@ function isTokenMatch(value: string, token: string): boolean {
   return value.trim().toLowerCase() === token.toLowerCase();
 }
 
-function resolvePipelineContext(
-  document: vscode.TextDocument,
-  existing: PipelineBlockContext | undefined
-): PipelineBlockContext | undefined {
-  return existing ?? findPipelineBlock(document);
+function buildTokenRange(line: number, start: number, length: number): vscode.Range {
+  return new vscode.Range(line, start, line, start + length);
 }

@@ -1,84 +1,23 @@
 import type { JenkinsDataService } from "../../../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsTestReportOptions } from "../../../jenkins/JenkinsTestReportOptions";
-import type {
-  JenkinsBuildDetails,
-  JenkinsConsoleText,
-  JenkinsConsoleTextTail,
-  JenkinsFlowNodeLog,
-  JenkinsProgressiveConsoleHtml,
-  JenkinsProgressiveConsoleText,
-  JenkinsTestReport,
-  JenkinsWorkflowRun,
-  JenkinsWorkflowStage
-} from "../../../jenkins/types";
 
-export interface BuildInspectionStatusBackend {
-  getBuildDetails(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: { includeParameters?: boolean }
-  ): Promise<JenkinsBuildDetails>;
-  getWorkflowRun(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsWorkflowRun | undefined>;
-}
+export type BuildInspectionStatusBackend = Pick<
+  JenkinsDataService,
+  "getBuildDetails" | "getWorkflowRun"
+>;
 
-export interface BuildInspectionTestsBackend {
-  getTestReport(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: JenkinsTestReportOptions
-  ): Promise<JenkinsTestReport | undefined>;
-}
+export type BuildInspectionTestsBackend = Pick<JenkinsDataService, "getTestReport">;
 
-export interface BuildInspectionConsoleBackend {
-  getConsoleText(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars?: number
-  ): Promise<JenkinsConsoleText>;
-  getConsoleTextHead(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxBytes: number
-  ): Promise<JenkinsConsoleText>;
-  getConsoleTextTail(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    maxChars: number
-  ): Promise<JenkinsConsoleTextTail>;
-  getConsoleTextProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number,
-    maxBytes?: number
-  ): Promise<JenkinsProgressiveConsoleText>;
-  getConsoleHtmlProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number,
-    annotator?: string
-  ): Promise<JenkinsProgressiveConsoleHtml>;
-  getFlowNodeLog(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    nodeId: string
-  ): Promise<JenkinsFlowNodeLog | undefined>;
-  getFlowNodeDetails(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    nodeId: string
-  ): Promise<JenkinsWorkflowStage | undefined>;
-  getFlowNodeLogHtmlProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    nodeId: string,
-    start: number,
-    annotator?: string
-  ): Promise<JenkinsProgressiveConsoleHtml | undefined>;
-}
+export type BuildInspectionConsoleBackend = Pick<
+  JenkinsDataService,
+  | "getConsoleText"
+  | "getConsoleTextHead"
+  | "getConsoleTextTail"
+  | "getConsoleTextProgressive"
+  | "getConsoleHtmlProgressive"
+  | "getFlowNodeLog"
+  | "getFlowNodeDetails"
+  | "getFlowNodeLogHtmlProgressive"
+>;
 
 export interface BuildInspectionBackend {
   status: BuildInspectionStatusBackend;

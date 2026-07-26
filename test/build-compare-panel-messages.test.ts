@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import { compareSectionStatuses } from "../src/panels/buildCompare/shared/BuildCompareContracts";
 import {
   isRefreshBuildCompareMessage,
   parseBuildCompareOutgoingMessage
@@ -79,17 +80,7 @@ describe("BuildComparePanelMessages", () => {
   });
 
   it("accepts minimal console sections without optional fields for every status", () => {
-    const statuses = [
-      "loading",
-      "available",
-      "empty",
-      "unavailable",
-      "error",
-      "tooLarge",
-      "identical"
-    ] as const;
-
-    for (const status of statuses) {
+    for (const status of compareSectionStatuses) {
       const message = { type: "updateConsoleSection", console: createConsoleSection({ status }) };
       assert.deepEqual(parseBuildCompareOutgoingMessage(message), message);
     }

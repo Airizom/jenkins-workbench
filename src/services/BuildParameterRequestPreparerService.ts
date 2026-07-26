@@ -12,12 +12,11 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
     params: URLSearchParams | BuildParameterPayload | undefined
   ): Promise<PreparedBuildParametersRequest> {
     const payload = this.normalizeBuildParameterPayload(params);
-    const hasParameters = payload.fields.length > 0 || payload.files.length > 0;
 
     if (payload.files.length > 0) {
       const request = await this.buildMultipartRequest(payload);
       return {
-        hasParameters,
+        hasParameters: true,
         request
       };
     }
@@ -28,7 +27,7 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
         body.append(field.name, field.value);
       }
       return {
-        hasParameters,
+        hasParameters: true,
         request: {
           body: body.toString(),
           headers: {
@@ -71,12 +70,9 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
     };
 
     for (const field of payload.fields) {
-      appendText(`--${boundary}\r\n`);
       appendText(
-        `Content-Disposition: form-data; name="${this.escapeMultipartValue(field.name)}"\r\n\r\n`
+        `--${boundary}\r\nContent-Disposition: form-data; name="${escapeMultipartValue(field.name)}"\r\n\r\n${field.value}\r\n`
       );
-      appendText(field.value);
-      appendText("\r\n");
     }
 
     for (const file of payload.files) {
@@ -93,12 +89,11 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
         throw new Error(`Unable to read file parameter "${file.name}" at ${filePath}: ${detail}`);
       }
 
-      const fileName = file.fileName.trim().length > 0 ? file.fileName.trim() : basename(filePath);
-      appendText(`--${boundary}\r\n`);
+      const configuredFileName = file.fileName.trim();
+      const fileName = configuredFileName.length > 0 ? configuredFileName : basename(filePath);
       appendText(
-        `Content-Disposition: form-data; name="${this.escapeMultipartValue(file.name)}"; filename="${this.escapeMultipartValue(fileName)}"\r\n`
+        `--${boundary}\r\nContent-Disposition: form-data; name="${escapeMultipartValue(file.name)}"; filename="${escapeMultipartValue(fileName)}"\r\nContent-Type: application/octet-stream\r\n\r\n`
       );
-      appendText("Content-Type: application/octet-stream\r\n\r\n");
       chunks.push(data);
       appendText("\r\n");
     }
@@ -111,8 +106,8 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
       }
     };
   }
+}
 
-  private escapeMultipartValue(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-  }
+function escapeMultipartValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

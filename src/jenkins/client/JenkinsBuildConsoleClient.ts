@@ -68,12 +68,12 @@ export class JenkinsBuildConsoleClient {
     const headUrl = this.buildProgressiveTextUrl(buildUrl, 0);
     try {
       const headers = await this.context.requestHeaders(headUrl);
-      const textSize = this.parseTextSize(headers["x-text-size"]);
+      const textSize = parseHeaderInteger(headers["x-text-size"]);
       if (Number.isFinite(textSize) && textSize >= 0) {
         const start = Math.max(0, textSize - this.getTailFetchBytes(maxChars));
         const tailUrl = this.buildProgressiveTextUrl(buildUrl, start);
         const response = await this.context.requestTextWithHeaders(tailUrl);
-        const responseSize = this.parseTextSize(response.headers["x-text-size"]);
+        const responseSize = parseHeaderInteger(response.headers["x-text-size"]);
         const nextStart = Number.isFinite(responseSize)
           ? responseSize
           : start + Buffer.byteLength(response.text, "utf8");
@@ -95,21 +95,13 @@ export class JenkinsBuildConsoleClient {
 
     const url = buildActionUrl(buildUrl, "consoleText");
     const text = await this.context.requestText(url);
-    if (text.length > maxChars) {
-      return {
-        text: text.slice(text.length - maxChars),
-        truncated: true,
-        nextStart: text.length,
-        progressiveSupported: false,
-        bytesRead: Buffer.byteLength(text.slice(text.length - maxChars), "utf8")
-      };
-    }
+    const tailText = this.trimTailText(text, maxChars);
     return {
-      text,
-      truncated: false,
+      text: tailText,
+      truncated: text.length > maxChars,
       nextStart: text.length,
       progressiveSupported: false,
-      bytesRead: Buffer.byteLength(text, "utf8")
+      bytesRead: Buffer.byteLength(tailText, "utf8")
     };
   }
 
@@ -123,24 +115,25 @@ export class JenkinsBuildConsoleClient {
     if (maxBytes !== undefined && maxBytes > 0) {
       const response = await this.context.requestStream(url);
       const prefix = await readTextPrefixFromStream(response, maxBytes);
-      const textSize = this.parseTextSize(response.headers["x-text-size"]);
-      const moreData = this.parseMoreData(response.headers["x-more-data"]);
+      const textSize = parseHeaderInteger(response.headers["x-text-size"]);
+      const moreData = parseHeaderBoolean(response.headers["x-more-data"]);
       const inferredMoreData = Number.isFinite(textSize)
         ? textSize > safeStart + prefix.bytesRead
         : prefix.bytesRead > 0;
+      let nextTextSize = safeStart + prefix.resumeBytes;
+      if (!prefix.truncated && Number.isFinite(textSize)) {
+        nextTextSize = textSize;
+      }
       return {
         text: prefix.text,
-        textSize:
-          prefix.truncated || !Number.isFinite(textSize)
-            ? safeStart + prefix.resumeBytes
-            : textSize,
-        moreData: prefix.truncated || (typeof moreData === "boolean" ? moreData : inferredMoreData),
+        textSize: nextTextSize,
+        moreData: prefix.truncated || (moreData ?? inferredMoreData),
         bytesRead: prefix.bytesRead
       };
     }
     const response = await this.context.requestTextWithHeaders(url);
-    const textSize = this.parseTextSize(response.headers["x-text-size"]);
-    const moreData = this.parseMoreData(response.headers["x-more-data"]);
+    const textSize = parseHeaderInteger(response.headers["x-text-size"]);
+    const moreData = parseHeaderBoolean(response.headers["x-more-data"]);
     return {
       text: response.text,
       textSize: Number.isFinite(textSize)
@@ -165,23 +158,17 @@ export class JenkinsBuildConsoleClient {
   }
 
   private buildProgressiveTextUrl(buildUrl: string, start: number): string {
-    const url = new URL(buildActionUrl(buildUrl, "logText/progressiveText"));
-    url.searchParams.set("start", Math.max(0, Math.floor(start)).toString());
-    return url.toString();
+    return this.buildProgressiveConsoleUrl(buildUrl, "logText/progressiveText", start);
   }
 
   private buildProgressiveHtmlUrl(buildUrl: string, start: number): string {
-    const url = new URL(buildActionUrl(buildUrl, "logText/progressiveHtml"));
+    return this.buildProgressiveConsoleUrl(buildUrl, "logText/progressiveHtml", start);
+  }
+
+  private buildProgressiveConsoleUrl(buildUrl: string, action: string, start: number): string {
+    const url = new URL(buildActionUrl(buildUrl, action));
     url.searchParams.set("start", Math.max(0, Math.floor(start)).toString());
     return url.toString();
-  }
-
-  private parseTextSize(value: string | string[] | undefined): number {
-    return parseHeaderInteger(value);
-  }
-
-  private parseMoreData(value: string | string[] | undefined): boolean | undefined {
-    return parseHeaderBoolean(value);
   }
 
   private getTailFetchBytes(maxChars: number): number {

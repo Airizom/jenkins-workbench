@@ -44,15 +44,9 @@ export function resolveMultiDefaultValue(
 }
 
 function splitMultiValue(value: string, delimiter?: string): string[] {
-  const normalizedDelimiter = delimiter?.trim();
-  if (normalizedDelimiter && normalizedDelimiter.length > 0) {
-    return value
-      .split(normalizedDelimiter)
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-  }
+  const separator = delimiter?.trim() || ",";
   return value
-    .split(",")
+    .split(separator)
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 }

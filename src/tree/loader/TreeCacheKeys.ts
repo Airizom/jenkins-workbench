@@ -1,11 +1,18 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 
+export type TreeChildrenKeyBuilder = (
+  kind: string,
+  environment: JenkinsEnvironmentRef,
+  extra?: string
+) => string;
+
 export function buildScopedEnvironmentKey(environment: JenkinsEnvironmentRef): string {
   return `${environment.scope}:${environment.environmentId}`;
 }
 
 export function isEnvironmentScopedChildKey(key: string, environmentId: string): boolean {
-  if (key.startsWith(`${environmentId}:`)) {
+  const environmentIdLength = environmentId.length;
+  if (key.startsWith(environmentId) && key[environmentIdLength] === ":") {
     return true;
   }
 
@@ -14,5 +21,8 @@ export function isEnvironmentScopedChildKey(key: string, environmentId: string):
   if (firstSeparator < 0 || secondSeparator < 0) {
     return false;
   }
-  return key.slice(firstSeparator + 1, secondSeparator) === environmentId;
+  return (
+    secondSeparator - firstSeparator - 1 === environmentIdLength &&
+    key.startsWith(environmentId, firstSeparator + 1)
+  );
 }

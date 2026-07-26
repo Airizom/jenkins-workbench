@@ -1,6 +1,13 @@
 import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 
-export type ActivityGroupKind = "awaitingInput" | "failing" | "unstable" | "running";
+const ACTIVITY_GROUP_METADATA = [
+  { kind: "awaitingInput", label: "Awaiting Input" },
+  { kind: "failing", label: "Failing" },
+  { kind: "unstable", label: "Unstable" },
+  { kind: "running", label: "Running" }
+] as const;
+
+export type ActivityGroupKind = (typeof ACTIVITY_GROUP_METADATA)[number]["kind"];
 
 export interface ActivityDisplayGroupSummary {
   kind: ActivityGroupKind;
@@ -50,22 +57,10 @@ export interface TreeActivityOptions {
   collection: ActivityCollectionOptions;
 }
 
-export const ACTIVITY_GROUP_ORDER: ActivityGroupKind[] = [
-  "awaitingInput",
-  "failing",
-  "unstable",
-  "running"
-];
+export const ACTIVITY_GROUP_ORDER: ActivityGroupKind[] = ACTIVITY_GROUP_METADATA.map(
+  ({ kind }) => kind
+);
 
 export function formatActivityGroupLabel(kind: ActivityGroupKind): string {
-  switch (kind) {
-    case "awaitingInput":
-      return "Awaiting Input";
-    case "failing":
-      return "Failing";
-    case "unstable":
-      return "Unstable";
-    case "running":
-      return "Running";
-  }
+  return ACTIVITY_GROUP_METADATA.find((group) => group.kind === kind)?.label ?? kind;
 }

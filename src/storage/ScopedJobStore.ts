@@ -121,13 +121,10 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     jobUrl: string
   ): Promise<boolean> {
     return this.mutationQueue(async () => {
-      const entries = await this.readEntries(scope);
-      const next = entries.filter((entry) => !this.isSameJob(entry, { environmentId, jobUrl }));
-      if (next.length === entries.length) {
-        return false;
-      }
-      await this.writeEntries(scope, next);
-      return true;
+      const removed = await this.removeMatchingEntries(scope, (entry) =>
+        this.isSameJob(entry, { environmentId, jobUrl })
+      );
+      return removed > 0;
     });
   }
 
@@ -140,29 +137,17 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
       return 0;
     }
 
-    return this.mutationQueue(async () => {
-      const entries = await this.readEntries(scope);
-      const next = entries.filter(
-        (entry) => entry.environmentId !== environmentId || !jobUrls.has(entry.jobUrl)
-      );
-      const removed = entries.length - next.length;
-      if (removed === 0) {
-        return 0;
-      }
-
-      await this.writeEntries(scope, next);
-      return removed;
-    });
+    return this.mutationQueue(() =>
+      this.removeMatchingEntries(
+        scope,
+        (entry) => entry.environmentId === environmentId && jobUrls.has(entry.jobUrl)
+      )
+    );
   }
 
   protected removeForEnvironment(scope: EnvironmentScope, environmentId: string): Promise<void> {
     return this.mutationQueue(async () => {
-      const entries = await this.readEntries(scope);
-      const next = entries.filter((entry) => entry.environmentId !== environmentId);
-      if (next.length === entries.length) {
-        return;
-      }
-      await this.writeEntries(scope, next);
+      await this.removeMatchingEntries(scope, (entry) => entry.environmentId === environmentId);
     });
   }
 
@@ -239,6 +224,19 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
 
   protected isSameJob(entry: TEntry, other: { environmentId: string; jobUrl: string }): boolean {
     return entry.environmentId === other.environmentId && entry.jobUrl === other.jobUrl;
+  }
+
+  private async removeMatchingEntries(
+    scope: EnvironmentScope,
+    shouldRemove: (entry: TEntry) => boolean
+  ): Promise<number> {
+    const entries = await this.readEntries(scope);
+    const next = entries.filter((entry) => !shouldRemove(entry));
+    const removed = entries.length - next.length;
+    if (removed > 0) {
+      await this.writeEntries(scope, next);
+    }
+    return removed;
   }
 
   private readEntries(scope: EnvironmentScope): Promise<TEntry[]> {

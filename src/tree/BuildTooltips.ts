@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { formatLocaleTimestampWithRelative } from "../formatters/DisplayFormatters";
-import type { JenkinsBuild, JenkinsBuildCause } from "../jenkins/JenkinsClient";
 import { resolveLastBuildChangeset } from "../jenkins/changesets/collectBuildChangesets";
+import type { JenkinsBuild, JenkinsBuildCause } from "../jenkins/JenkinsClient";
 import {
   type BuildParameterFilterOptions,
   visitMatchingBuildParameters
@@ -163,16 +163,18 @@ function resolveParameterSummary(
   build: JenkinsBuild,
   options: BuildParameterSummaryOptions
 ): string | undefined {
-  if (options.maxParameterCount < 0 || !Number.isInteger(options.maxParameterCount)) {
-    return resolveParameterSummaryWithSliceSemantics(build, options);
-  }
+  // Configuration validates this as a count, but programmatic callers can bypass it.
+  // Floor fractional values and clamp negative or non-finite values to zero.
+  const maxParameterCount = Number.isFinite(options.maxParameterCount)
+    ? Math.max(0, Math.floor(options.maxParameterCount))
+    : 0;
 
   const visible: string[] = [];
   let total = 0;
   visitMatchingParameters(build, options, (name, value, isMasked) => {
     const formatted = formatParameterSummary(name, value, isMasked, options);
     total += 1;
-    if (visible.length < options.maxParameterCount) {
+    if (visible.length < maxParameterCount) {
       visible.push(formatted);
     }
   });
@@ -183,29 +185,10 @@ function resolveParameterSummary(
 
   const remaining = total - visible.length;
   const base = visible.join(", ");
-  return remaining > 0 ? `${base} +${remaining} more` : base;
-}
-
-function resolveParameterSummaryWithSliceSemantics(
-  build: JenkinsBuild,
-  options: BuildParameterSummaryOptions
-): string | undefined {
-  const formatted: string[] = [];
-  visitMatchingParameters(build, options, (name, value, isMasked) => {
-    formatted.push(formatParameterSummary(name, value, isMasked, options));
-  });
-
-  if (formatted.length === 0) {
-    return undefined;
+  if (remaining === 0) {
+    return base;
   }
-
-  const visible =
-    options.maxParameterCount >= formatted.length
-      ? formatted
-      : formatted.slice(0, options.maxParameterCount);
-  const remaining = formatted.length - visible.length;
-  const base = visible.join(", ");
-  return remaining > 0 ? `${base} +${remaining} more` : base;
+  return base ? `${base} +${remaining} more` : `+${remaining} more`;
 }
 
 function formatParameterSummary(

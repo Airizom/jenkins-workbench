@@ -6,7 +6,6 @@ import { CurrentBranchJenkinsService } from "../../currentBranch/CurrentBranchJe
 import { CurrentBranchLinkResolver } from "../../currentBranch/CurrentBranchLinkResolver";
 import { CurrentBranchLinkWorkflowService } from "../../currentBranch/CurrentBranchLinkWorkflowService";
 import { CurrentBranchPullRequestJobNameMatcher } from "../../currentBranch/CurrentBranchPullRequestJobMatcher";
-import { CurrentBranchPullRequestService } from "../../currentBranch/CurrentBranchPullRequestService";
 import { CurrentBranchRefreshCoordinator } from "../../currentBranch/CurrentBranchRefreshCoordinator";
 import { CurrentBranchRepositoryResolver } from "../../currentBranch/CurrentBranchRepositoryResolver";
 import { CurrentBranchStatusBar } from "../../currentBranch/CurrentBranchStatusBar";
@@ -18,9 +17,9 @@ import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/Jenki
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
 import { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
 import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
-import { BuildCompareBackendAdapter } from "../../panels/buildCompare/BuildCompareBackend";
 import type { BuildCompareOptions } from "../../panels/buildCompare/BuildCompareOptions";
 import { BuildDetailsBackendAdapter } from "../../panels/buildDetails/BuildDetailsBackend";
+import { BuildInspectionBackendAdapter } from "../../panels/shared/backend/BuildInspectionBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
@@ -29,12 +28,12 @@ import { JenkinsfileQuickFixProvider } from "../../validation/editor/Jenkinsfile
 import { JenkinsfileValidationCodeLensProvider } from "../../validation/editor/JenkinsfileValidationCodeLensProvider";
 import { JenkinsfileValidationHoverProvider } from "../../validation/editor/JenkinsfileValidationHoverProvider";
 import { JenkinsStatusPoller } from "../../watch/JenkinsStatusPoller";
+import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 import { createExtensionRefreshHost } from "../ExtensionRefreshHost";
 import { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLinkBuildHandler";
 import { JenkinsWorkbenchDeepLinkJobHandler } from "../JenkinsWorkbenchDeepLinkJobHandler";
 import { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
 import { VscodeStatusNotifier } from "../VscodeStatusNotifier";
-import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 
 export interface RuntimeProviderOptions {
   extensionUri: vscode.Uri;
@@ -58,15 +57,13 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       ),
     currentBranchGitHubPullRequestAdapter: (_container) =>
       new VscodeCurrentBranchGitHubPullRequestAdapter(),
-    currentBranchPullRequestService: (container) =>
-      new CurrentBranchPullRequestService(container.get("currentBranchGitHubPullRequestAdapter")),
     currentBranchPullRequestJobMatcher: (_container) =>
       new CurrentBranchPullRequestJobNameMatcher(options.currentBranchPullRequestJobNamePatterns),
     currentBranchRefreshCoordinator: (_container) => new CurrentBranchRefreshCoordinator(),
     currentBranchTargetResolver: (container) =>
       new CurrentBranchTargetResolver(
         container.get("dataService"),
-        container.get("currentBranchPullRequestService"),
+        container.get("currentBranchGitHubPullRequestAdapter"),
         container.get("currentBranchPullRequestJobMatcher")
       ),
     currentBranchStatusResolver: (container) =>
@@ -89,7 +86,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         artifactActionHandler: container.get("artifactActionHandler"),
         consoleExporter: container.get("consoleExporter"),
         coverageDecorationService: container.get("coverageDecorationService"),
-        testSourceNavigationService: container.get("testSourceNavigationService"),
+        testSourceResolver: container.get("testSourceResolver"),
         testSourceNavigationUiService: container.get("testSourceNavigationUiService"),
         refreshHost: container.get("refreshHost"),
         pendingInputProvider: container.get("pendingInputCoordinator"),
@@ -98,7 +95,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       }),
     buildComparePanelLauncher: (container) =>
       new BuildComparePanelLauncher({
-        backend: new BuildCompareBackendAdapter(container.get("dataService")),
+        backend: new BuildInspectionBackendAdapter(container.get("dataService")),
         buildDetailsPanelLauncher: container.get("buildDetailsPanelLauncher"),
         getCompareOptions: options.buildCompareOptionsProvider,
         environmentStore: container.get("environmentStore"),

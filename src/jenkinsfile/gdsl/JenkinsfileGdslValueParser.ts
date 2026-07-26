@@ -19,19 +19,7 @@ function parseCall(tokenizer: GdslTokenizer): GdslCall {
   tokenizer.expect("(");
   const args: GdslArgument[] = [];
   while (!tokenizer.peek(")")) {
-    const maybeNamed = tokenizer.peek("identifier") || tokenizer.peek("string");
-    if (maybeNamed && tokenizer.peekAhead(":", 1)) {
-      const argName = tokenizer.next().value;
-      tokenizer.expect(":");
-      args.push({
-        name: argName,
-        value: parseValue(tokenizer)
-      });
-    } else {
-      args.push({
-        value: parseValue(tokenizer)
-      });
-    }
+    args.push(parseArgument(tokenizer));
     if (!tokenizer.peek(",")) {
       break;
     }
@@ -42,6 +30,20 @@ function parseCall(tokenizer: GdslTokenizer): GdslCall {
     kind: "call",
     name,
     args
+  };
+}
+
+function parseArgument(tokenizer: GdslTokenizer): GdslArgument {
+  const maybeNamed = tokenizer.peek("identifier") || tokenizer.peek("string");
+  if (!maybeNamed || !tokenizer.peekAhead(":", 1)) {
+    return { value: parseValue(tokenizer) };
+  }
+
+  const name = tokenizer.next().value;
+  tokenizer.expect(":");
+  return {
+    name,
+    value: parseValue(tokenizer)
   };
 }
 
@@ -91,20 +93,11 @@ function parseBracketValue(tokenizer: GdslTokenizer): GdslValue {
   const items: GdslArgument[] = [];
   let isMap = false;
   while (!tokenizer.peek("]")) {
-    const maybeNamed = tokenizer.peek("identifier") || tokenizer.peek("string");
-    if (maybeNamed && tokenizer.peekAhead(":", 1)) {
+    const item = parseArgument(tokenizer);
+    if (item.name !== undefined) {
       isMap = true;
-      const name = tokenizer.next().value;
-      tokenizer.expect(":");
-      items.push({
-        name,
-        value: parseValue(tokenizer)
-      });
-    } else {
-      items.push({
-        value: parseValue(tokenizer)
-      });
     }
+    items.push(item);
     if (!tokenizer.peek(",")) {
       break;
     }

@@ -6,12 +6,9 @@ import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { TreeActivityOptions } from "./ActivityTypes";
+import { ActivityCollector } from "./activity/ActivityCollector";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
-import type { JenkinsTreeFilter } from "./TreeFilter";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "./TreeJobScope";
-import type { TreeViewCurationOptions } from "./TreeViewCuration";
-import { ActivityCollector } from "./activity/ActivityCollector";
 import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
 import { RootSectionTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
@@ -34,6 +31,9 @@ import { TreeJobCollectionChildrenLoader } from "./loader/TreeJobCollectionChild
 import { TreeJobUrlStateLoader } from "./loader/TreeJobUrlStateLoader";
 import { TreePinnedChildrenLoader } from "./loader/TreePinnedChildrenLoader";
 import { TreeWorkspaceChildrenLoader } from "./loader/TreeWorkspaceChildrenLoader";
+import type { JenkinsTreeFilter } from "./TreeFilter";
+import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "./TreeJobScope";
+import type { TreeViewCurationOptions } from "./TreeViewCuration";
 
 export class JenkinsTreeChildrenLoader {
   private readonly childrenCache = new ScopedCache(
@@ -126,11 +126,7 @@ export class JenkinsTreeChildrenLoader {
       () => this.buildListFetchOptions,
       placeholders
     );
-    const workspaceLoader = new TreeWorkspaceChildrenLoader(
-      dataService,
-      buildChildrenKey,
-      placeholders
-    );
+    const workspaceLoader = new TreeWorkspaceChildrenLoader(dataService, placeholders);
     const pinnedLoader = new TreePinnedChildrenLoader(
       dataService,
       pinStore,

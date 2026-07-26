@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, it } from "vitest";
-import { requestText } from "../src/jenkins/request";
+import { requestText, requestTextWithOptions } from "../src/jenkins/request";
 import { isCrossOriginRedirect } from "../src/jenkins/request/redirects";
 
 describe("isCrossOriginRedirect", () => {
@@ -149,6 +149,33 @@ describe("redirect credential forwarding", () => {
         requestText(`${server.url}/start`, { authHeader: AUTH_HEADER }),
         /redirected to login/i
       );
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("standard request redirect handling", () => {
+  it("passes POST redirects to response handling instead of following them", async () => {
+    let finalRequested = false;
+    const server = await startServer((req, res) => {
+      if (req.url === "/final") {
+        finalRequested = true;
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("unexpected");
+        return;
+      }
+      res.writeHead(302, { Location: "/final", "Content-Type": "text/plain" });
+      res.end("redirect-response");
+    });
+
+    try {
+      const text = await requestTextWithOptions(`${server.url}/start`, {
+        method: "POST"
+      });
+
+      assert.equal(text, "redirect-response");
+      assert.equal(finalRequested, false);
     } finally {
       await server.close();
     }

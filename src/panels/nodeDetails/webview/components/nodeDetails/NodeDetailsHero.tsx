@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { NodeStatusBadge } from "../../../../shared/webview/components/NodeStatusBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
@@ -77,7 +78,7 @@ export function NodeDetailsHero({
   onNodeAction,
   onLaunchAgent,
   onOpen
-}: NodeDetailsHeroProps): JSX.Element {
+}: NodeDetailsHeroProps): React.JSX.Element {
   const statusIconClass = resolveNodeStatusIconClass(statusClass);
 
   return (
@@ -98,12 +99,17 @@ export function NodeDetailsHero({
                 <h1 className="text-lg font-semibold leading-tight truncate">{displayName}</h1>
                 <NodeStatusBadge label={statusLabel} statusClass={statusClass} />
                 {isStale ? (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0 border-warning-border text-warning bg-warning-soft"
-                  >
-                    Stale
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="warning" size="sm">
+                        <AlertTriangleIcon className="h-3 w-3" aria-hidden="true" />
+                        Stale
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      This snapshot has not refreshed recently. Refresh for current node state.
+                    </TooltipContent>
+                  </Tooltip>
                 ) : null}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -138,30 +144,17 @@ export function NodeDetailsHero({
               onClick={onRefresh}
               disabled={loading}
               aria-label="Refresh node details"
-              className="gap-1 h-7 px-2 text-xs"
             >
               <RefreshIcon className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
               Refresh
             </Button>
             {nodeAction ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onNodeAction}
-                disabled={loading}
-                className="h-7 px-2 text-xs"
-              >
+              <Button variant="outline" size="sm" onClick={onNodeAction} disabled={loading}>
                 {nodeAction.label}
               </Button>
             ) : null}
             {canLaunchAgent ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onLaunchAgent}
-                disabled={loading}
-                className="gap-1 h-7 px-2 text-xs"
-              >
+              <Button variant="outline" size="sm" onClick={onLaunchAgent} disabled={loading}>
                 <LaunchIcon className="h-3.5 w-3.5" />
                 Launch
               </Button>
@@ -172,7 +165,6 @@ export function NodeDetailsHero({
               onClick={onOpen}
               disabled={!hasUrl}
               aria-label={canOpenAgentInstructions ? "Open agent instructions" : "Open in Jenkins"}
-              className="gap-1 h-7 px-2 text-xs"
             >
               <ExternalLinkIcon className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">
@@ -183,7 +175,7 @@ export function NodeDetailsHero({
         </div>
 
         {showOfflineBanner ? (
-          <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-soft px-3 py-2">
+          <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 shadow-xs">
             <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
             <div className="min-w-0 text-xs">
               <span className="font-semibold">{statusLabel}.</span>{" "}

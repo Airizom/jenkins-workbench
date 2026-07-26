@@ -1,11 +1,11 @@
 import type * as vscode from "vscode";
-import { withActionErrorMessage } from "../commands/CommandUtils";
 import {
-  type TriggerBuildForTargetOptions,
   openLastFailedBuildForTarget,
+  type TriggerBuildForTargetOptions,
   triggerBuildForTarget
 } from "../commands/build/BuildCommandHandlers";
 import type { BuildCommandRefreshHost } from "../commands/build/BuildCommandTypes";
+import { withActionErrorMessage } from "../commands/CommandUtils";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";

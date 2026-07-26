@@ -1,13 +1,12 @@
+import { EmptyState } from "../../../../../shared/webview/components/EmptyState";
 import { InfoIcon } from "../../../../../shared/webview/icons";
 export function BuildFailureEmptyStateCard() {
   return (
-    <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
-      <div className="flex flex-col items-center gap-2">
-        <InfoIcon className="h-6 w-6" />
-        <div className="text-[11px] text-muted-foreground">
-          No changelog, failed tests, or artifacts reported.
-        </div>
-      </div>
-    </div>
+    <EmptyState
+      icon={<InfoIcon className="h-4 w-4" />}
+      title="Nothing to investigate"
+      description="No changelog, failed tests, or artifacts were reported for this build."
+      className="py-6"
+    />
   );
 }

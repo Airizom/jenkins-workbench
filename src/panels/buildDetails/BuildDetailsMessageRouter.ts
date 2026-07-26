@@ -1,12 +1,6 @@
 import {
   type ApproveInputMessage,
   type ArtifactActionMessage,
-  type OpenTestSourceMessage,
-  type PersistUiStateMessage,
-  type RejectInputMessage,
-  type ReloadTestReportMessage,
-  type RestartPipelineFromStageMessage,
-  type SelectPipelineLogNodeMessage,
   isApproveInputMessage,
   isArtifactActionMessage,
   isClearPipelineLogNodeMessage,
@@ -20,7 +14,13 @@ import {
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
-  isToggleFollowLogMessage
+  isToggleFollowLogMessage,
+  type OpenTestSourceMessage,
+  type PersistUiStateMessage,
+  type RejectInputMessage,
+  type ReloadTestReportMessage,
+  type RestartPipelineFromStageMessage,
+  type SelectPipelineLogNodeMessage
 } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsMessageRouterHandlers {

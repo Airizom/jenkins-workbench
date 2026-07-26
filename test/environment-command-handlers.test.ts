@@ -13,7 +13,12 @@ import type { JenkinsPinStore } from "../src/storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
 
 const errorMessages: string[] = [];
+const warningMessages: string[] = [];
+let quickPickItems: unknown;
 let warningMessageResponse: string | undefined;
+let jenkinsUrlInput = "https://jenkins.example";
+let authModePromptCount = 0;
+let browserSsoLoginPromptCount = 0;
 
 const vscodeMock = {
   window: {
@@ -22,8 +27,14 @@ const vscodeMock = {
       return undefined;
     },
     showInformationMessage: async () => undefined,
-    showWarningMessage: async () => warningMessageResponse,
-    showQuickPick: async () => undefined,
+    showWarningMessage: async (message: string) => {
+      warningMessages.push(message);
+      return warningMessageResponse;
+    },
+    showQuickPick: async (items: unknown) => {
+      quickPickItems = items;
+      return undefined;
+    },
     showInputBox: async () => undefined
   }
 };
@@ -31,15 +42,21 @@ const vscodeMock = {
 const promptsMock = {
   promptScope: async () => "workspace",
   promptRequiredInput: async (prompt: string) =>
-    prompt === "Jenkins URL" ? "https://jenkins.example" : undefined,
-  promptAuthMode: async () => "none",
-  promptBrowserSsoLoginUrl: async () => undefined,
+    prompt === "Jenkins URL" ? jenkinsUrlInput : undefined,
+  promptAuthMode: async () => {
+    authModePromptCount += 1;
+    return "none";
+  },
+  promptBrowserSsoLoginUrl: async () => {
+    browserSsoLoginPromptCount += 1;
+    return undefined;
+  },
   promptHeadersJson: async () => undefined
 };
 
 vi.doMock("vscode", () => vscodeMock);
 vi.doMock("../src/commands/environment/EnvironmentPrompts", () => promptsMock);
-const { addEnvironment, removeEnvironment } = await import(
+const { addEnvironment, removeEnvironment, signInWithBrowserSso } = await import(
   "../src/commands/environment/EnvironmentCommandHandlers"
 );
 
@@ -67,7 +84,12 @@ class FailingAuthEnvironmentStore {
 
 beforeEach(() => {
   errorMessages.length = 0;
+  warningMessages.length = 0;
+  quickPickItems = undefined;
   warningMessageResponse = undefined;
+  jenkinsUrlInput = "https://jenkins.example";
+  authModePromptCount = 0;
+  browserSsoLoginPromptCount = 0;
 });
 
 describe("addEnvironment", () => {
@@ -101,14 +123,85 @@ describe("addEnvironment", () => {
     assert.match(errorMessages[0], /secret storage failed/);
     assert.match(errorMessages[0], /partially added environment was removed/);
   });
+
+  it.each(["https://user@jenkins.example.com", "https://user:secret@jenkins.example.com"])(
+    "rejects a URL containing embedded credentials: %s",
+    async (url) => {
+      jenkinsUrlInput = url;
+      const getEnvironments = vi.fn(async () => []);
+
+      await addEnvironment(
+        { getEnvironments } as unknown as JenkinsEnvironmentStore,
+        {} as BrowserSsoAuthenticator,
+        { fullEnvironmentRefresh: () => ({ executed: true }) }
+      );
+
+      assert.equal(getEnvironments.mock.calls.length, 0);
+      assert.equal(authModePromptCount, 0);
+      assert.equal(errorMessages.length, 1);
+      assert.match(errorMessages[0], /without embedded credentials/);
+      assert.doesNotMatch(errorMessages[0], /user|secret/);
+    }
+  );
+});
+
+describe("signInWithBrowserSso", () => {
+  it("blocks a legacy environment URL containing embedded credentials", async () => {
+    const getAuthConfig = vi.fn(async () => undefined);
+    const authenticate = vi.fn(async () => undefined);
+
+    await signInWithBrowserSso(
+      { getAuthConfig } as unknown as JenkinsEnvironmentStore,
+      { authenticate } as unknown as BrowserSsoAuthenticator,
+      {} as JenkinsClientProvider,
+      { fullEnvironmentRefresh: () => ({ executed: true }) },
+      {
+        environmentId: "env-legacy",
+        scope: "workspace",
+        url: "https://user:secret@jenkins.example.com/"
+      }
+    );
+
+    assert.equal(getAuthConfig.mock.calls.length, 0);
+    assert.equal(authenticate.mock.calls.length, 0);
+    assert.equal(browserSsoLoginPromptCount, 0);
+    assert.equal(errorMessages.length, 1);
+    assert.doesNotMatch(errorMessages[0], /user|secret/);
+  });
 });
 
 describe("removeEnvironment", () => {
+  it("redacts credentials from legacy environment picker labels", async () => {
+    const store = {
+      async listEnvironmentsWithScope() {
+        return [
+          {
+            id: "env-legacy",
+            scope: "workspace",
+            url: "https://user:secret@jenkins.example.com/"
+          }
+        ];
+      }
+    } as unknown as JenkinsEnvironmentStore;
+
+    await removeEnvironment(
+      store,
+      {} as JenkinsParameterPresetStore,
+      {} as JenkinsWatchStore,
+      {} as JenkinsPinStore,
+      {} as JenkinsClientProvider,
+      { fullEnvironmentRefresh: () => ({ executed: true }) }
+    );
+
+    const picks = quickPickItems as Array<{ label: string }>;
+    assert.equal(picks[0].label, "https://jenkins.example.com/");
+  });
+
   it("refreshes removed environment state when related cleanup fails", async () => {
     const target: JenkinsEnvironmentRef = {
       environmentId: "env-1",
       scope: "workspace",
-      url: "https://jenkins.example/"
+      url: "https://user:secret@jenkins.example/"
     };
     const events: string[] = [];
     warningMessageResponse = "Remove Environment";
@@ -180,5 +273,7 @@ describe("removeEnvironment", () => {
     assert.equal(errorMessages.length, 1);
     assert.match(errorMessages[0], /environment was removed/);
     assert.match(errorMessages[0], /preset cleanup failed/);
+    assert.match(warningMessages[0], /https:\/\/jenkins\.example\//);
+    assert.doesNotMatch(warningMessages[0], /user|secret/);
   });
 });

@@ -59,4 +59,18 @@ describe("collectBuildChangesets", () => {
       }
     ]);
   });
+
+  it("does not conflate delimiters in messages and authors", () => {
+    const first = changesetItem(undefined, "a|b", "c");
+    const second = changesetItem(undefined, "a", "b|c");
+
+    const result = collectBuildChangesets({
+      changeSet: { items: [first, second, first] }
+    });
+
+    assert.deepEqual(result, [
+      { message: "a|b", author: "c", commitId: undefined },
+      { message: "a", author: "b|c", commitId: undefined }
+    ]);
+  });
 });

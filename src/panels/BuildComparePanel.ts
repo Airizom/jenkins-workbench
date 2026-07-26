@@ -3,7 +3,6 @@ import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { BuildDetailsPanelLauncher } from "./BuildDetailsPanelLauncher";
-import type { BuildCompareBackend } from "./buildCompare/BuildCompareBackend";
 import type { BuildCompareOptions } from "./buildCompare/BuildCompareOptions";
 import {
   BuildComparePanelController,
@@ -21,6 +20,7 @@ import {
   isBuildComparePanelState,
   updateBuildComparePanelState
 } from "./buildCompare/shared/BuildComparePanelWebviewState";
+import type { BuildInspectionBackend as BuildCompareBackend } from "./shared/backend/BuildInspectionBackend";
 import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
@@ -229,17 +229,11 @@ export class BuildComparePanel {
     }
     await this.buildDetailsPanelLauncher.show({
       environment: this.environment,
-      buildUrl: this.getBuildUrlForSide(side),
+      buildUrl:
+        side === "baseline"
+          ? this.serializedState.baselineBuildUrl
+          : this.serializedState.targetBuildUrl,
       label: side === "baseline" ? "Baseline" : "Target"
     });
-  }
-
-  private getBuildUrlForSide(side: "baseline" | "target"): string {
-    if (!this.serializedState) {
-      return "";
-    }
-    return side === "baseline"
-      ? this.serializedState.baselineBuildUrl
-      : this.serializedState.targetBuildUrl;
   }
 }

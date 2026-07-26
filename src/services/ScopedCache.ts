@@ -1,16 +1,14 @@
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { JenkinsDataCache } from "../jenkins/data/JenkinsDataCache";
+import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 
 export class ScopedCache {
   private readonly cache: JenkinsDataCache;
   private readonly keys = new Set<string>();
-  private readonly maxEntries: number;
   private readonly pruneThreshold: number;
 
   constructor(ttlMs: number, maxEntries: number) {
     this.cache = new JenkinsDataCache(ttlMs, maxEntries);
-    this.maxEntries = Math.max(1, maxEntries);
-    this.pruneThreshold = this.maxEntries * 2;
+    this.pruneThreshold = Math.max(1, maxEntries) * 2;
   }
 
   buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {

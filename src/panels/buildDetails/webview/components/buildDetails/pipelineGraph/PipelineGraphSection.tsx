@@ -8,7 +8,7 @@ import { PipelineGraphInspector } from "./PipelineGraphInspector";
 import type { PipelineGraphLayoutResult } from "./pipelineGraphTypes";
 import { usePipelineGraphLayout } from "./usePipelineGraphLayout";
 
-const { useEffect, useState } = React;
+const { useEffect, useRef } = React;
 
 export function PipelineGraphSection({
   stages,
@@ -26,19 +26,14 @@ export function PipelineGraphSection({
   onGraphError: () => void;
 }) {
   const graphLayout = usePipelineGraphLayout(stages, true);
-  const [lastReadyLayout, setLastReadyLayout] = useState<PipelineGraphLayoutResult | undefined>();
-
-  useEffect(() => {
-    if (graphLayout.status === "ready") {
-      setLastReadyLayout(graphLayout.layout);
-    }
-  }, [graphLayout]);
+  const lastReadyLayoutRef = useRef<PipelineGraphLayoutResult | undefined>(undefined);
 
   useEffect(() => {
     if (graphLayout.status !== "ready") {
       return;
     }
 
+    lastReadyLayoutRef.current = graphLayout.layout;
     const [firstStageKey] = graphLayout.layout.model.orderedStageIds;
     if (!firstStageKey) {
       onSelectStage(undefined);
@@ -58,16 +53,15 @@ export function PipelineGraphSection({
     }
   }, [graphLayout, onGraphError]);
 
-  const activeLayout = graphLayout.status === "ready" ? graphLayout.layout : lastReadyLayout;
-  const selectedStage = activeLayout
-    ? selectedStageKey
-      ? activeLayout.model.stageById.get(selectedStageKey)
-      : undefined
+  const activeLayout =
+    graphLayout.status === "ready" ? graphLayout.layout : lastReadyLayoutRef.current;
+  const selectedStage = selectedStageKey
+    ? activeLayout?.model.stageById.get(selectedStageKey)
     : undefined;
 
   if (!activeLayout) {
     return (
-      <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-sm text-muted-foreground shadow-widget">
+      <div className="rounded-lg border border-card-border bg-card px-4 py-8 text-center text-sm text-muted-foreground shadow-sm">
         Building graph layout from current stage data…
       </div>
     );
@@ -78,7 +72,7 @@ export function PipelineGraphSection({
       <PipelineGraphCanvas
         layout={activeLayout}
         selectedStageKey={selectedStageKey}
-        onSelectStage={(stageKey) => onSelectStage(stageKey)}
+        onSelectStage={onSelectStage}
       />
       <PipelineGraphInspector
         stage={selectedStage}

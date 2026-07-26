@@ -260,19 +260,9 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   ): Promise<JenkinsPostResponse> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
     const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
-
-    try {
-      return await this.requestVoidWithLocation(url, { method: "POST", headers, body });
-    } catch (error) {
-      return this.retryAfterCrumbError(error, async (refreshed) => {
-        const retryHeaders = this.buildHeadersWithCrumb(contentHeaders, refreshed);
-        return this.requestVoidWithLocation(url, {
-          method: "POST",
-          headers: retryHeaders,
-          body
-        });
-      });
-    }
+    return this.requestPostWithCrumbRetry(contentHeaders, headers, (requestHeaders) =>
+      this.requestVoidWithLocation(url, { method: "POST", headers: requestHeaders, body })
+    );
   }
 
   private async requestPostTextWithCrumbInternal(
@@ -283,32 +273,36 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   ): Promise<string> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
     const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
-
     try {
-      return await this.requestTextWithOptions(url, { method: "POST", headers, body });
+      return await this.requestPostWithCrumbRetry(contentHeaders, headers, (requestHeaders) =>
+        this.requestTextWithOptions(url, { method: "POST", headers: requestHeaders, body })
+      );
     } catch (error) {
-      try {
-        return await this.retryAfterCrumbError(error, async (refreshed) => {
-          const retryHeaders = this.buildHeadersWithCrumb(contentHeaders, refreshed);
-          return this.requestTextWithOptions(url, {
-            method: "POST",
-            headers: retryHeaders,
-            body
-          });
-        });
-      } catch (retryError) {
-        // Callers that sniff endpoint availability (e.g. 404 HTML pages) opt in
-        // to receiving specific error bodies as text; everything else throws.
-        if (
-          retryError instanceof JenkinsRequestError &&
-          typeof retryError.responseText === "string" &&
-          retryError.statusCode !== undefined &&
-          options?.acceptErrorStatuses?.includes(retryError.statusCode)
-        ) {
-          return retryError.responseText;
-        }
-        throw retryError;
+      // Callers that sniff endpoint availability (e.g. 404 HTML pages) opt in
+      // to receiving specific error bodies as text; everything else throws.
+      if (
+        error instanceof JenkinsRequestError &&
+        typeof error.responseText === "string" &&
+        error.statusCode !== undefined &&
+        options?.acceptErrorStatuses?.includes(error.statusCode)
+      ) {
+        return error.responseText;
       }
+      throw error;
+    }
+  }
+
+  private async requestPostWithCrumbRetry<T>(
+    contentHeaders: Record<string, string>,
+    headers: Record<string, string>,
+    request: (headers: Record<string, string>) => Promise<T>
+  ): Promise<T> {
+    try {
+      return await request(headers);
+    } catch (error) {
+      return this.retryAfterCrumbError(error, (refreshed) =>
+        request(this.buildHeadersWithCrumb(contentHeaders, refreshed))
+      );
     }
   }
 
@@ -377,7 +371,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     }
 
     for (const key in headers) {
-      if (Object.prototype.hasOwnProperty.call(headers, key)) {
+      if (Object.hasOwn(headers, key)) {
         this.hasBaseHeaders = true;
         if (key.toLowerCase() === "cookie") {
           this.baseHeadersHaveCookie = true;
@@ -392,7 +386,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       return false;
     }
     for (const key in headers) {
-      if (Object.prototype.hasOwnProperty.call(headers, key)) {
+      if (Object.hasOwn(headers, key)) {
         return true;
       }
     }
@@ -404,7 +398,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       return false;
     }
     for (const key in headers) {
-      if (Object.prototype.hasOwnProperty.call(headers, key) && key.toLowerCase() === "cookie") {
+      if (Object.hasOwn(headers, key) && key.toLowerCase() === "cookie") {
         return true;
       }
     }

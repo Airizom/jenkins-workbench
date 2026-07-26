@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { QueueItemTreeItem } from "../../tree/TreeItems";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
-import type { QueueCommandRefreshHost } from "./QueueCommandTypes";
 
 export async function cancelQueueItem(
   dataService: JenkinsDataService,
-  refreshHost: QueueCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: QueueItemTreeItem
 ): Promise<void> {
   const selected = requireSelection(item, "Select a queued item to cancel.");

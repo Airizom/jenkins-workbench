@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeExecutorViewModel } from "../../../shared/NodeDetailsContracts";
@@ -16,7 +17,7 @@ export function ExecutorUtilizationSummary({
   executorsLabel,
   idleLabel,
   isOffline
-}: ExecutorUtilizationSummaryProps): JSX.Element {
+}: ExecutorUtilizationSummaryProps): React.JSX.Element {
   const utilization = summarizeExecutorUtilization(executors, oneOffExecutors);
 
   if (utilization.total === 0) {
@@ -67,7 +68,7 @@ function OneOffExecutorBadge({
   utilization
 }: {
   utilization: ReturnType<typeof summarizeExecutorUtilization>;
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   if (utilization.oneOffTotal === 0) {
     return null;
   }

@@ -6,6 +6,7 @@ import {
   resolveBuildResultBorderColor,
   resolveBuildResultGraphBackground
 } from "../../../../../shared/webview/lib/statusStyles";
+import { cn } from "../../../../../shared/webview/lib/utils";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipelineGraphTypes";
 
@@ -41,7 +42,7 @@ export function PipelineGraphCanvas({
   const [hoveredStageKey, setHoveredStageKey] = useState<string | undefined>();
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const panStateRef = useRef<{ pointerId: number; x: number; y: number } | undefined>();
+  const panStateRef = useRef<{ pointerId: number; x: number; y: number } | undefined>(undefined);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -192,8 +193,8 @@ export function PipelineGraphCanvas({
   };
 
   return (
-    <div className="rounded-lg border border-card-border bg-card shadow-widget">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+    <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Pipeline Graph
@@ -234,7 +235,7 @@ export function PipelineGraphCanvas({
         aria-label="Pipeline graph. Arrow keys pan, plus and minus zoom."
         // biome-ignore lint/a11y/noNoninteractiveTabindex: the canvas must be keyboard-focusable so arrow keys can pan and +/- can zoom without a pointer
         tabIndex={0}
-        className="relative h-[360px] overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--accent)_12%,transparent),transparent_38%),linear-gradient(180deg,color-mix(in_srgb,var(--muted)_75%,transparent),transparent)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring md:h-[440px]"
+        className="pipeline-graph-canvas relative h-[360px] overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:h-[440px]"
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -319,21 +320,24 @@ function PipelineGraphStageNode({
       height={node.height}
       requiredExtensions="http://www.w3.org/1999/xhtml"
     >
-      <div
-        className="h-full w-full"
-        data-stage-node="true"
-        onMouseEnter={() => onHoverChange(node.id)}
-        onMouseLeave={() => onHoverChange(undefined)}
-      >
+      <div className="h-full w-full" data-stage-node="true">
         <button
           type="button"
-          className="flex h-full w-full flex-col overflow-hidden rounded-[18px] border bg-card text-left shadow-widget transition-transform duration-150 hover:-translate-y-px focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className={cn(
+            "flex h-full w-full flex-col overflow-hidden rounded-[18px] border bg-card text-left",
+            "transition-[transform,box-shadow] duration-150 motion-reduce:transition-none",
+            "hover:-translate-y-0.5 hover:shadow-lg motion-reduce:hover:translate-y-0",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            selected ? "shadow-lg" : "shadow-sm"
+          )}
           style={{
             borderColor,
             background,
             borderWidth: `${strokeWidth}px`
           }}
           onClick={() => onSelect(node.id)}
+          onMouseEnter={() => onHoverChange(node.id)}
+          onMouseLeave={() => onHoverChange(undefined)}
         >
           <div
             className="h-[4px] rounded-full bg-[linear-gradient(90deg,var(--primary),color-mix(in_srgb,var(--primary)_40%,transparent))]"

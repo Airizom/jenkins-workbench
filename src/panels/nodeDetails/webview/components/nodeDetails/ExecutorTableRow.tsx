@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Progress } from "../../../../shared/webview/components/ui/progress";
 import { TableCell, TableRow } from "../../../../shared/webview/components/ui/table";
 import { cn } from "../../../../shared/webview/lib/utils";
@@ -9,9 +10,12 @@ type ExecutorTableRowProps = {
   entry: ExecutorEntry;
   onOpenExternal: (url: string) => void;
 };
-export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProps): JSX.Element {
+export function ExecutorTableRow({
+  entry,
+  onOpenExternal
+}: ExecutorTableRowProps): React.JSX.Element {
   const durationLabel = entry.workDurationLabel ?? "—";
-  const hasWork = Boolean(entry.workLabel);
+  const busy = !entry.isIdle;
   const buildLabel = entry.workLabel ?? "Idle";
   const progressPercent =
     typeof entry.progressPercent === "number" ? entry.progressPercent : undefined;
@@ -25,7 +29,7 @@ export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProp
           aria-hidden="true"
           className={cn(
             "inline-block h-2 w-2 rounded-full",
-            hasWork ? "bg-progress" : "bg-muted-foreground/40"
+            busy ? "bg-progress" : "bg-muted-foreground/40"
           )}
         />
       </TableCell>
@@ -34,10 +38,10 @@ export function ExecutorTableRow({ entry, onOpenExternal }: ExecutorTableRowProp
       </TableCell>
       <TableCell className="py-1.5 px-3">
         <div className="flex flex-col">
-          <span className={cn("text-xs", hasWork ? "text-foreground" : "text-muted-foreground")}>
+          <span className={cn("text-xs", busy ? "text-foreground" : "text-muted-foreground")}>
             {buildLabel}
           </span>
-          {!hasWork ? (
+          {!busy ? (
             <span className="text-[11px] text-muted-foreground">{entry.statusLabel}</span>
           ) : null}
         </div>

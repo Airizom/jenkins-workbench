@@ -1,3 +1,6 @@
+import type * as React from "react";
+import { EmptyState } from "../../../../shared/webview/components/EmptyState";
+import { SectionHeading } from "../../../../shared/webview/components/SectionHeading";
 import {
   Accordion,
   AccordionContent,
@@ -12,24 +15,20 @@ type MonitorCardProps = {
   title: string;
   entries: NodeMonitorViewModel[];
 };
-export function MonitorCard({ title, entries }: MonitorCardProps): JSX.Element {
-  if (!entries || entries.length === 0) {
-    return (
-      <div className="rounded border border-dashed border-border bg-muted-soft px-3 py-3 text-center text-xs text-muted-foreground">
-        No {title.toLowerCase()} data available.
-      </div>
-    );
+export function MonitorCard({ title, entries }: MonitorCardProps): React.JSX.Element {
+  if (entries.length === 0) {
+    return <EmptyState title={`No ${title.toLowerCase()} data available`} className="py-5" />;
   }
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[11px] font-medium text-muted-foreground">{title}</div>
+      <SectionHeading title={title} count={entries.length} as="h4" className="mb-1" />
       <Accordion type="multiple" className="space-y-1">
         {entries.map((entry) => (
           <AccordionItem
             key={entry.key}
             value={entry.key}
-            className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors data-[state=open]:border-border data-[state=open]:bg-muted-strong"
+            className="overflow-hidden rounded-md border border-border bg-surface-sunken transition-colors data-[state=open]:border-border-strong data-[state=open]:bg-surface-raised"
           >
             <AccordionTrigger className="w-full px-3 py-1.5 hover:bg-accent-soft">
               <div className="flex flex-1 items-center justify-between gap-2">

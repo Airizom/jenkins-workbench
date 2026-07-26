@@ -7,10 +7,10 @@ import { LoadTokenTracker, PanelLoadTracker } from "../shared/PanelRuntimeHelper
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
 import {
-  MAX_CONSOLE_CHARS,
   getBuildDetailsCoverageEnabled,
   getBuildDetailsRefreshIntervalMs,
-  getTestReportIncludeCaseLogs
+  getTestReportIncludeCaseLogs,
+  MAX_CONSOLE_CHARS
 } from "./BuildDetailsConfig";
 import { formatError } from "./BuildDetailsFormatters";
 import { BuildDetailsPanelRuntime } from "./BuildDetailsPanelRuntime";

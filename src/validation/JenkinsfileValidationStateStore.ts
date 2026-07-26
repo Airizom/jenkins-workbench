@@ -7,12 +7,6 @@ import type {
 import { getValidationEnvironmentIdentity } from "./JenkinsfileValidationEnvironmentIdentity";
 import type { JenkinsfileValidationStatusState } from "./JenkinsfileValidationStatusProvider";
 
-type ResultValidationState = Extract<JenkinsfileValidationStatusState, { kind: "result" }>;
-type RequestFailedValidationState = Extract<
-  JenkinsfileValidationStatusState,
-  { kind: "request-failed" }
->;
-
 export class JenkinsfileValidationStateStore {
   private readonly lastValidatedState = new Map<string, ValidationCacheEntry>();
   private readonly lastStatusState = new Map<string, JenkinsfileValidationStatusState>();
@@ -36,25 +30,7 @@ export class JenkinsfileValidationStateStore {
 
   getValidationState(document: vscode.TextDocument): JenkinsfileValidationStatusState | undefined {
     const state = this.lastStatusState.get(this.getDocumentKey(document));
-    if (!state) {
-      return undefined;
-    }
-    if (state.kind === "no-environment") {
-      return { kind: "no-environment" };
-    }
-    if (state.kind === "request-failed") {
-      return {
-        kind: "request-failed",
-        environment: state.environment,
-        message: state.message
-      };
-    }
-    return {
-      kind: "result",
-      errorCount: state.errorCount,
-      environment: state.environment,
-      stale: state.stale
-    };
+    return state ? { ...state } : undefined;
   }
 
   getStatusState(document: vscode.TextDocument): JenkinsfileValidationStatusState | undefined {
@@ -66,27 +42,23 @@ export class JenkinsfileValidationStateStore {
     errorCount: number,
     environment?: JenkinsEnvironmentRef,
     stale = false
-  ): { changed: boolean; state: ResultValidationState } {
-    const nextState: ResultValidationState = {
+  ): boolean {
+    const nextState: JenkinsfileValidationStatusState = {
       kind: "result",
       errorCount,
       environment,
       stale
     };
-    const changed = this.updateStatusState(document, nextState);
-    return { changed, state: nextState };
+    return this.updateStatusState(document, nextState);
   }
 
-  setResultStaleState(
-    document: vscode.TextDocument,
-    stale: boolean
-  ): { changed: boolean; state?: ResultValidationState } {
+  setResultStaleState(document: vscode.TextDocument, stale: boolean): boolean {
     const lastState = this.getStatusState(document);
     if (!lastState || lastState.kind !== "result") {
-      return { changed: false };
+      return false;
     }
     if (Boolean(lastState.stale) === stale) {
-      return { changed: false, state: lastState };
+      return false;
     }
     return this.setResultState(document, lastState.errorCount, lastState.environment, stale);
   }
@@ -99,14 +71,13 @@ export class JenkinsfileValidationStateStore {
     document: vscode.TextDocument,
     message: string,
     environment?: JenkinsEnvironmentRef
-  ): { changed: boolean; state: RequestFailedValidationState } {
-    const nextState: RequestFailedValidationState = {
+  ): boolean {
+    const nextState: JenkinsfileValidationStatusState = {
       kind: "request-failed",
       environment,
       message
     };
-    const changed = this.updateStatusState(document, nextState);
-    return { changed, state: nextState };
+    return this.updateStatusState(document, nextState);
   }
 
   clearDocumentState(document: vscode.TextDocument): boolean {

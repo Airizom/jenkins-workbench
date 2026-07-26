@@ -1,9 +1,5 @@
-// fallow-ignore-file unused-class-member
-// JenkinsClient is an intentional facade; data operation classes reach these
-// methods through the client provider/runtime context rather than direct calls.
-import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
-import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
 import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
+import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
@@ -16,8 +12,8 @@ import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "./coverage/JenkinsCoverageTypes";
-import type { JenkinsBufferResponse } from "./request";
-import type { JenkinsStreamResponse } from "./request";
+import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
+import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type {
   JenkinsArtifact,
   JenkinsBuild,
@@ -48,11 +44,13 @@ import type {
   ScanMultibranchResult
 } from "./types";
 
+export type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
+export type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 export type {
+  JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildCause,
   JenkinsBuildDetails,
-  JenkinsArtifact,
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
@@ -62,26 +60,23 @@ export type {
   JenkinsJobKind,
   JenkinsNode,
   JenkinsNodeDetails,
+  JenkinsParameterDefinition,
   JenkinsPendingInputAction,
   JenkinsPendingInputParameterDefinition,
-  JenkinsParameterDefinition,
   JenkinsProgressiveConsoleHtml,
-  JenkinsQueueItem,
   JenkinsProgressiveConsoleText,
+  JenkinsQueueItem,
   JenkinsReplayDefinition,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload,
   JenkinsRestartFromStageInfo,
   JenkinsTestReport,
   JenkinsView,
-  JenkinsWorkspaceEntry,
-  JenkinsWorkflowStage,
   JenkinsWorkflowRun,
+  JenkinsWorkflowStage,
+  JenkinsWorkspaceEntry,
   ScanMultibranchResult
 } from "./types";
-
-export type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
-export type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 
 export class JenkinsClient {
   private readonly buildsApi: JenkinsBuildsApi;
@@ -105,26 +100,34 @@ export class JenkinsClient {
     this.coverageApi = new JenkinsCoverageApi(httpClient);
   }
 
+  // Fallow cannot resolve calls made after clients cross provider and data-operation boundaries.
+  // Keep exemptions local so every other facade method remains subject to dead-member analysis.
+  // fallow-ignore-next-line unused-class-member
   async getRootJobs(): Promise<JenkinsJob[]> {
     return this.jobsApi.getRootJobs();
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getViews(): Promise<JenkinsView[]> {
     return this.jobsApi.getViews();
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getFolderJobs(folderUrl: string): Promise<JenkinsJob[]> {
     return this.jobsApi.getFolderJobs(folderUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getFolderJobsInView(folderUrl: string, viewUrl: string): Promise<JenkinsJob[]> {
     return this.jobsApi.getFolderJobsInView(folderUrl, viewUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getViewJobs(viewUrl: string): Promise<JenkinsJob[]> {
     return this.jobsApi.getViewJobs(viewUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getJob(jobUrl: string): Promise<JenkinsJob> {
     return this.jobsApi.getJob(jobUrl);
   }
@@ -208,10 +211,12 @@ export class JenkinsClient {
     return this.buildsApi.getWorkflowRun(buildUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async discoverCoverageActionPath(buildUrl: string): Promise<string | undefined> {
     return this.coverageApi.discoverCoverageActionPath(buildUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getCoverageOverview(
     buildUrl: string,
     actionPath?: string
@@ -219,6 +224,7 @@ export class JenkinsClient {
     return this.coverageApi.getCoverageOverview(buildUrl, actionPath);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getModifiedCoverageFiles(
     buildUrl: string,
     actionPath?: string
@@ -226,6 +232,7 @@ export class JenkinsClient {
     return this.coverageApi.getModifiedCoverageFiles(buildUrl, actionPath);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getPendingInputActions(buildUrl: string): Promise<JenkinsPendingInputAction[]> {
     return this.buildsApi.getPendingInputActions(buildUrl);
   }
@@ -246,6 +253,7 @@ export class JenkinsClient {
     return this.buildsApi.getArtifactStream(buildUrl, relativePath, options);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getWorkspaceEntries(
     jobUrl: string,
     relativePath?: string
@@ -253,6 +261,7 @@ export class JenkinsClient {
     return this.workspaceApi.getWorkspaceEntries(jobUrl, relativePath);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getWorkspaceFile(
     jobUrl: string,
     relativePath: string,
@@ -261,10 +270,12 @@ export class JenkinsClient {
     return this.workspaceApi.getWorkspaceFile(jobUrl, relativePath, options);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getNodes(): Promise<JenkinsNode[]> {
     return this.nodesApi.getNodes();
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getNodeDetails(
     nodeUrl: string,
     options?: { detailLevel?: "basic" | "advanced" }
@@ -272,10 +283,12 @@ export class JenkinsClient {
     return this.nodesApi.getNodeDetails(nodeUrl, options);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async toggleNodeTemporarilyOffline(nodeUrl: string, offlineMessage?: string): Promise<void> {
     await this.nodesApi.toggleNodeTemporarilyOffline(nodeUrl, offlineMessage);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async launchNodeAgent(nodeUrl: string): Promise<void> {
     await this.nodesApi.launchNodeAgent(nodeUrl);
   }
@@ -288,6 +301,7 @@ export class JenkinsClient {
     return this.queueApi.getQueueItem(id);
   }
 
+  // fallow-ignore-next-line unused-class-member
   classifyJob(job: JenkinsJob): JenkinsJobKind {
     return this.jobsApi.classifyJob(job);
   }
@@ -330,6 +344,7 @@ export class JenkinsClient {
     await this.buildsApi.restartPipelineFromStage(buildUrl, stageName);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async proceedInput(
     buildUrl: string,
     inputId: string,
@@ -338,18 +353,22 @@ export class JenkinsClient {
     await this.buildsApi.proceedInput(buildUrl, inputId, options);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async abortInput(buildUrl: string, inputId: string, abortUrl?: string): Promise<void> {
     await this.buildsApi.abortInput(buildUrl, inputId, abortUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getJobParameters(jobUrl: string): Promise<JenkinsParameterDefinition[]> {
     return this.jobsApi.getJobParameters(jobUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async getJobConfigXml(jobUrl: string): Promise<string> {
     return this.jobsApi.getJobConfigXml(jobUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async updateJobConfigXml(jobUrl: string, xml: string): Promise<void> {
     await this.jobsApi.updateJobConfigXml(jobUrl, xml);
   }
@@ -394,10 +413,12 @@ export class JenkinsClient {
     return this.jobsApi.createItem(kind, parentUrl, newName);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async validateDeclarativeJenkinsfile(jenkinsfileText: string): Promise<string> {
     return this.pipelineValidationApi.validateDeclarative(jenkinsfileText);
   }
 
+  // fallow-ignore-next-line unused-class-member
   async fetchPipelineSyntaxGdsl(): Promise<string> {
     return this.pipelineSyntaxApi.fetchGdsl();
   }

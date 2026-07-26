@@ -7,12 +7,13 @@ import type {
   ActivityViewModel,
   TreeActivityOptions
 } from "../ActivityTypes";
-import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
 import type { ActivityCollector } from "../activity/ActivityCollector";
 import { ActivityJobTreeItem, ActivityPipelineTreeItem } from "../items/TreeJobItems";
 import { ActivityFolderTreeItem, ActivityGroupTreeItem } from "../items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
 import { TreeActivityCache } from "./TreeActivityCache";
+import { buildScopedEnvironmentKey, type TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 import type { TreeJobUrlStateLoader } from "./TreeJobUrlStateLoader";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
@@ -27,7 +28,7 @@ export class TreeActivityChildrenLoader {
     private readonly collector: ActivityCollector,
     cacheManager: TreeChildrenCacheManager,
     private readonly jobUrlState: TreeJobUrlStateLoader,
-    buildChildrenKey: (kind: string, environment: JenkinsEnvironmentRef, extra?: string) => string,
+    buildChildrenKey: TreeChildrenKeyBuilder,
     private activityOptions: TreeActivityOptions,
     private readonly getBuildListFetchOptions: () => BuildListFetchOptions,
     private readonly placeholders: TreePlaceholderFactory,
@@ -138,7 +139,7 @@ export class TreeActivityChildrenLoader {
   }
 
   refreshActivityData(environment: JenkinsEnvironmentRef): void {
-    this.refreshEnvironmentKeys.add(this.buildEnvironmentKey(environment));
+    this.refreshEnvironmentKeys.add(buildScopedEnvironmentKey(environment));
     this.clearActivityData(environment);
   }
 
@@ -147,7 +148,7 @@ export class TreeActivityChildrenLoader {
   }
 
   private async collectActivity(environment: JenkinsEnvironmentRef): Promise<ActivityViewModel> {
-    const environmentKey = this.buildEnvironmentKey(environment);
+    const environmentKey = buildScopedEnvironmentKey(environment);
     const shouldBypassCache = this.refreshEnvironmentKeys.delete(environmentKey);
     return this.collector.collect(environment, {
       activityOptions: this.activityOptions,
@@ -202,11 +203,5 @@ export class TreeActivityChildrenLoader {
       this.jobUrlState.getWatchedJobUrls(environment),
       this.jobUrlState.getPinnedJobUrls(environment)
     ]);
-  }
-
-  private buildEnvironmentKey(
-    environment: Pick<JenkinsEnvironmentRef, "environmentId" | "scope">
-  ): string {
-    return `${environment.scope}:${environment.environmentId}`;
   }
 }

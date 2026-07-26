@@ -3,13 +3,6 @@ import { describe, it } from "vitest";
 import { ParameterPresetSecretStore } from "../src/storage/ParameterPresetSecretStore";
 import { createFakeSecretStorage, type FakeSecretStorage } from "./helpers/storageMocks";
 
-const LOCATION = {
-  scope: "workspace" as const,
-  environmentId: "env-1",
-  jobUrl: "https://jenkins.example/job/demo/",
-  presetId: "preset-1"
-};
-
 function createStore(): { store: ParameterPresetSecretStore; secrets: FakeSecretStorage } {
   const secrets = createFakeSecretStorage();
   return { store: new ParameterPresetSecretStore(secrets), secrets };
@@ -20,13 +13,16 @@ describe("ParameterPresetSecretStore.prepare", () => {
     const { store, secrets } = createStore();
 
     const prepared = await store.prepare({
-      ...LOCATION,
       values: { BRANCH: "main", TOKEN: "typed-in-plain" },
       secretValues: { TOKEN: "s3cret" }
     });
 
     assert.deepEqual(prepared.values, { BRANCH: "main" });
     assert.deepEqual(Object.keys(prepared.secretKeys), ["TOKEN"]);
+    assert.match(
+      prepared.secretKeys.TOKEN,
+      /^jenkinsWorkbench\.parameterPresetSecret\.[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
     assert.deepEqual(prepared.newlyStoredKeys, [prepared.secretKeys.TOKEN]);
     assert.equal(secrets.values.get(prepared.secretKeys.TOKEN), JSON.stringify("s3cret"));
   });
@@ -35,7 +31,6 @@ describe("ParameterPresetSecretStore.prepare", () => {
     const { store, secrets } = createStore();
 
     const prepared = await store.prepare({
-      ...LOCATION,
       values: { BRANCH: "main", TOKEN: "updated-secret" },
       previousSecretKeys: { TOKEN: "old-key" }
     });
@@ -50,7 +45,6 @@ describe("ParameterPresetSecretStore.prepare", () => {
     const { store, secrets } = createStore();
 
     const prepared = await store.prepare({
-      ...LOCATION,
       values: { BRANCH: "main" },
       previousSecretKeys: { TOKEN: "old-key" }
     });
@@ -65,7 +59,6 @@ describe("ParameterPresetSecretStore.prepare", () => {
     const { store, secrets } = createStore();
 
     const prepared = await store.prepare({
-      ...LOCATION,
       values: { TOKEN: "typed-in-plain" },
       secretValues: {},
       keepSecretNames: [],
@@ -82,7 +75,6 @@ describe("ParameterPresetSecretStore.prepare", () => {
     const { store } = createStore();
 
     const prepared = await store.prepare({
-      ...LOCATION,
       values: {},
       secretValues: {},
       keepSecretNames: ["TOKEN"],
@@ -96,7 +88,6 @@ describe("ParameterPresetSecretStore.prepare", () => {
     const { store, secrets } = createStore();
 
     const prepared = await store.prepare({
-      ...LOCATION,
       values: {},
       secretValues: { TOKEN: "replacement" },
       keepSecretNames: ["TOKEN"],
@@ -124,7 +115,6 @@ describe("ParameterPresetSecretStore.prepare", () => {
 
     await assert.rejects(
       store.prepare({
-        ...LOCATION,
         values: {},
         secretValues: { FIRST: "one", SECOND: "two" }
       }),

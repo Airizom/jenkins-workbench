@@ -1,4 +1,5 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { type CachedValue, getFreshCachedValue, setCachedValue } from "./CurrentBranchCache";
 import { toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
 import type {
   CurrentBranchResolvedTarget,
@@ -13,15 +14,13 @@ import type {
   CurrentBranchState
 } from "./CurrentBranchTypes";
 
-interface CachedRemoteResolvedState {
-  expiresAt: number;
-  state: CurrentBranchRemoteResolvedState;
-}
-
 const REMOTE_RESOLUTION_CACHE_TTL_MS = 5_000;
 
 export class CurrentBranchStatusResolver {
-  private readonly remoteStateCache = new Map<string, CachedRemoteResolvedState>();
+  private readonly remoteStateCache = new Map<
+    string,
+    CachedValue<CurrentBranchRemoteResolvedState>
+  >();
 
   constructor(
     private readonly dataService: JenkinsDataService,
@@ -41,9 +40,9 @@ export class CurrentBranchStatusResolver {
       const targetResolution = await this.targetResolver.resolve(localState, options);
       const cacheKey = targetResolution.cacheKey;
       if (!options.force) {
-        const cached = this.remoteStateCache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) {
-          return this.materializeRemoteState(localState, cached.state);
+        const cachedState = getFreshCachedValue(this.remoteStateCache, cacheKey);
+        if (cachedState) {
+          return this.materializeRemoteState(localState, cachedState);
         }
       }
 
@@ -56,10 +55,7 @@ export class CurrentBranchStatusResolver {
               link: targetResolution.link,
               environment: targetResolution.environment
             };
-      this.remoteStateCache.set(cacheKey, {
-        expiresAt: Date.now() + REMOTE_RESOLUTION_CACHE_TTL_MS,
-        state: resolved
-      });
+      setCachedValue(this.remoteStateCache, cacheKey, resolved, REMOTE_RESOLUTION_CACHE_TTL_MS);
       return this.materializeRemoteState(localState, resolved);
     } catch (error) {
       return this.materializeRemoteState(localState, {

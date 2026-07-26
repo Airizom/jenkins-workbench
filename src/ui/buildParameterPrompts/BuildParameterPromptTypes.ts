@@ -1,5 +1,8 @@
-import type { BuildParameterPayload, JobParameter } from "../../jenkins/JenkinsDataService";
-import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import type {
+  BuildParameterPayload,
+  JenkinsDataService,
+  JobParameter
+} from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
   JenkinsParameterPresetStore,

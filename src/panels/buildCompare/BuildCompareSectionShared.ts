@@ -36,33 +36,27 @@ function buildComparisonErrorDetail(
   return `${label} comparison failed.`;
 }
 
-function createCompareErrorSection<T>(
+type StandardCompareFallbackSection<F> = F & {
+  status: "error" | "unavailable";
+  summaryLabel: string;
+  detail?: string;
+};
+
+function createCompareSection<F extends object>(
+  status: "error" | "unavailable",
   summaryLabel: string,
   detail: string | undefined,
-  fields: T
-): T & { status: "error"; summaryLabel: string; detail?: string } {
+  fields: F
+): StandardCompareFallbackSection<F> {
   return {
-    status: "error",
+    ...fields,
+    status,
     summaryLabel,
-    detail,
-    ...fields
+    detail
   };
 }
 
-function createCompareUnavailableSection<T>(
-  summaryLabel: string,
-  detail: string | undefined,
-  fields: T
-): T & { status: "unavailable"; summaryLabel: string; detail?: string } {
-  return {
-    status: "unavailable",
-    summaryLabel,
-    detail,
-    ...fields
-  };
-}
-
-type StandardCompareSectionConfig<T, F, R> = {
+type StandardCompareSectionConfig<T, F extends object, R> = {
   dataLabel: string;
   errorSummaryLabel: string;
   unavailableSummaryLabel: string;
@@ -81,34 +75,37 @@ type StandardCompareSectionConfig<T, F, R> = {
   onAvailable: (baseline: T, target: T) => R;
 };
 
-export function evaluateStandardCompareSection<T, F, R>(
+export function evaluateStandardCompareSection<T, F extends object, R>(
   baseline: BuildCompareOptionalResult<T>,
   target: BuildCompareOptionalResult<T>,
   config: StandardCompareSectionConfig<T, F, R>
-): R {
+): R | StandardCompareFallbackSection<F> {
   const resolveErrorFields = config.resolveErrorFields ?? (() => config.emptyFields);
   const resolvePartialFields = config.resolvePartialFields ?? (() => config.emptyFields);
   const bothUnavailableFields = config.bothUnavailableFields ?? config.emptyFields;
 
-  return evaluateOptionalPair<T, R>(baseline, target, {
+  return evaluateOptionalPair<T, R | StandardCompareFallbackSection<F>>(baseline, target, {
     onError: ({ baseline: baselineMessage, target: targetMessage }) =>
-      createCompareErrorSection(
+      createCompareSection(
+        "error",
         config.errorSummaryLabel,
         buildComparisonErrorDetail(config.dataLabel, baselineMessage, targetMessage),
         resolveErrorFields(baseline, target)
-      ) as R,
+      ),
     onBothUnavailable: () =>
-      createCompareUnavailableSection(
+      createCompareSection(
+        "unavailable",
         config.unavailableSummaryLabel,
         config.bothUnavailableDetail,
         bothUnavailableFields
-      ) as R,
+      ),
     onPartialUnavailable: () =>
-      createCompareUnavailableSection(
+      createCompareSection(
+        "unavailable",
         config.unavailableSummaryLabel,
         config.partialUnavailableDetail,
         resolvePartialFields(baseline, target)
-      ) as R,
+      ),
     onAvailable: config.onAvailable
   });
 }

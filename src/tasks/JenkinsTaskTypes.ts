@@ -23,16 +23,8 @@ export interface JenkinsTaskDefinition extends vscode.TaskDefinition {
   parameters?: JenkinsTaskRawParameters;
 }
 
-export interface NormalizedJenkinsTaskDefinition {
-  type: typeof JENKINS_TASK_TYPE;
-  environmentUrl: string;
-  environmentId?: string;
-  jobUrl: string;
-  parameters?: JenkinsTaskRawParameters;
-}
-
 export interface TaskDefinitionResult {
-  definition?: NormalizedJenkinsTaskDefinition;
+  definition?: JenkinsTaskDefinition;
   error?: string;
 }
 

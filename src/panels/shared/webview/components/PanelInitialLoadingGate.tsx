@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { LoadingSkeleton, type LoadingSkeletonProps } from "./ui/loading-skeleton";
 export function PanelInitialLoadingGate({
   loading = false,
@@ -7,7 +8,7 @@ export function PanelInitialLoadingGate({
   loading?: boolean;
   hasLoaded: boolean;
   variant?: LoadingSkeletonProps["variant"];
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   if (loading && !hasLoaded) {
     return <LoadingSkeleton variant={variant} />;
   }

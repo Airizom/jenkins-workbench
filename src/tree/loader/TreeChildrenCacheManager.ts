@@ -1,9 +1,13 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { ScopedCache } from "../../services/ScopedCache";
-import type { TreeJobScope } from "../TreeJobScope";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
-import { buildScopedEnvironmentKey, isEnvironmentScopedChildKey } from "./TreeCacheKeys";
+import type { TreeJobScope } from "../TreeJobScope";
+import {
+  buildScopedEnvironmentKey,
+  isEnvironmentScopedChildKey,
+  type TreeChildrenKeyBuilder
+} from "./TreeCacheKeys";
 import {
   buildWorkspaceDirectoryChildrenKey,
   buildWorkspaceDirectoryChildrenPrefix,
@@ -16,6 +20,8 @@ export class TreeChildrenCacheManager {
   private readonly pinnedUrlsCache = new Map<string, Set<string>>();
   private readonly pendingLoads = new Map<string, Promise<void>>();
   private readonly loadTokens = new Map<string, number>();
+  private readonly buildChildrenKey: TreeChildrenKeyBuilder = (kind, environment, extra) =>
+    this.childrenCache.buildKey(environment, kind, extra);
 
   constructor(
     private readonly childrenCache: ScopedCache,
@@ -47,43 +53,41 @@ export class TreeChildrenCacheManager {
   }
 
   getCachedWatchedJobs(environment: JenkinsEnvironmentRef): Set<string> | undefined {
-    return this.watchedUrlsCache.get(this.environmentCacheKey(environment));
+    return this.watchedUrlsCache.get(buildScopedEnvironmentKey(environment));
   }
 
   setCachedWatchedJobs(environment: JenkinsEnvironmentRef, values: Set<string>): void {
-    this.watchedUrlsCache.set(this.environmentCacheKey(environment), values);
+    this.watchedUrlsCache.set(buildScopedEnvironmentKey(environment), values);
   }
 
   getCachedPinnedJobs(environment: JenkinsEnvironmentRef): Set<string> | undefined {
-    return this.pinnedUrlsCache.get(this.environmentCacheKey(environment));
+    return this.pinnedUrlsCache.get(buildScopedEnvironmentKey(environment));
   }
 
   setCachedPinnedJobs(environment: JenkinsEnvironmentRef, values: Set<string>): void {
-    this.pinnedUrlsCache.set(this.environmentCacheKey(environment), values);
+    this.pinnedUrlsCache.set(buildScopedEnvironmentKey(environment), values);
   }
 
   clearWatchCacheForEnvironment(environmentId?: string): void {
-    if (!environmentId) {
-      this.watchedUrlsCache.clear();
-      return;
-    }
-    const environmentSuffix = `:${environmentId}`;
-    for (const key of this.watchedUrlsCache.keys()) {
-      if (key.endsWith(environmentSuffix)) {
-        this.watchedUrlsCache.delete(key);
-      }
-    }
+    this.clearUrlCacheForEnvironment(this.watchedUrlsCache, environmentId);
   }
 
   clearPinCacheForEnvironment(environmentId?: string): void {
+    this.clearUrlCacheForEnvironment(this.pinnedUrlsCache, environmentId);
+  }
+
+  private clearUrlCacheForEnvironment(
+    cache: Map<string, Set<string>>,
+    environmentId?: string
+  ): void {
     if (!environmentId) {
-      this.pinnedUrlsCache.clear();
+      cache.clear();
       return;
     }
     const environmentSuffix = `:${environmentId}`;
-    for (const key of this.pinnedUrlsCache.keys()) {
+    for (const key of cache.keys()) {
       if (key.endsWith(environmentSuffix)) {
-        this.pinnedUrlsCache.delete(key);
+        cache.delete(key);
       }
     }
   }
@@ -113,16 +117,11 @@ export class TreeChildrenCacheManager {
     jobUrl: string,
     jobScope: TreeJobScope
   ): void {
-    const buildChildrenKey = (
-      kind: string,
-      cacheEnvironment: JenkinsEnvironmentRef,
-      extra?: string
-    ) => this.childrenCache.buildKey(cacheEnvironment, kind, extra);
     this.clearChildrenCache(
-      buildWorkspaceRootChildrenKey(buildChildrenKey, environment, jobUrl, jobScope)
+      buildWorkspaceRootChildrenKey(this.buildChildrenKey, environment, jobUrl, jobScope)
     );
     this.clearChildrenCacheByPrefix(
-      buildWorkspaceDirectoryChildrenPrefix(buildChildrenKey, environment, jobUrl, jobScope)
+      buildWorkspaceDirectoryChildrenPrefix(this.buildChildrenKey, environment, jobUrl, jobScope)
     );
   }
 
@@ -132,14 +131,9 @@ export class TreeChildrenCacheManager {
     jobScope: TreeJobScope,
     relativePath: string
   ): void {
-    const buildChildrenKey = (
-      kind: string,
-      cacheEnvironment: JenkinsEnvironmentRef,
-      extra?: string
-    ) => this.childrenCache.buildKey(cacheEnvironment, kind, extra);
     this.clearChildrenCache(
       buildWorkspaceDirectoryChildrenKey(
-        buildChildrenKey,
+        this.buildChildrenKey,
         environment,
         jobUrl,
         jobScope,
@@ -148,7 +142,7 @@ export class TreeChildrenCacheManager {
     );
     this.clearChildrenCacheByPrefix(
       buildWorkspaceDirectorySubtreePrefix(
-        buildChildrenKey,
+        this.buildChildrenKey,
         environment,
         jobUrl,
         jobScope,
@@ -163,26 +157,21 @@ export class TreeChildrenCacheManager {
   }
 
   private clearPendingAndLoadTokensByPrefix(prefix: string): void {
-    for (const key of this.pendingLoads.keys()) {
-      if (key.startsWith(prefix)) {
-        this.clearChildrenCache(key);
-      }
-    }
-    for (const key of this.loadTokens.keys()) {
-      if (key.startsWith(prefix) && !this.pendingLoads.has(key)) {
-        this.loadTokens.delete(key);
-      }
-    }
+    this.clearPendingAndLoadTokensWhere((key) => key.startsWith(prefix));
   }
 
   private clearPendingAndLoadTokensForEnvironment(environmentId: string): void {
+    this.clearPendingAndLoadTokensWhere((key) => isEnvironmentScopedChildKey(key, environmentId));
+  }
+
+  private clearPendingAndLoadTokensWhere(matches: (key: string) => boolean): void {
     for (const key of this.pendingLoads.keys()) {
-      if (isEnvironmentScopedChildKey(key, environmentId)) {
+      if (matches(key)) {
         this.clearChildrenCache(key);
       }
     }
     for (const key of this.loadTokens.keys()) {
-      if (isEnvironmentScopedChildKey(key, environmentId) && !this.pendingLoads.has(key)) {
+      if (matches(key) && !this.pendingLoads.has(key)) {
         this.loadTokens.delete(key);
       }
     }
@@ -278,9 +267,5 @@ export class TreeChildrenCacheManager {
         clearTimeout(timeoutId);
       }
     });
-  }
-
-  private environmentCacheKey(environment: JenkinsEnvironmentRef): string {
-    return buildScopedEnvironmentKey(environment);
   }
 }

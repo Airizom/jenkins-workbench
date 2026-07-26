@@ -1,5 +1,6 @@
 import { trimToUndefined } from "../../shared/stringValues";
 import type {
+  JenkinsClient,
   JenkinsItemCreateKind,
   JenkinsQueueItem,
   ScanMultibranchResult
@@ -13,64 +14,36 @@ export class JenkinsQueueAndJobManagementOperations {
   constructor(private readonly context: JenkinsDataRuntimeContext) {}
 
   async getQueueItems(environment: JenkinsEnvironmentRef): Promise<JenkinsQueueItemInfo[]> {
-    const client = await this.context.getClient(environment);
-    try {
+    return this.runBuildAction(environment, async (client) => {
       const items = await client.getQueue();
       return this.mapQueueItems(items);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    });
   }
 
   async getQueueItem(
     environment: JenkinsEnvironmentRef,
     queueId: number
   ): Promise<JenkinsQueueItem> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getQueueItem(queueId);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.getQueueItem(queueId));
   }
 
   async cancelQueueItem(environment: JenkinsEnvironmentRef, queueId: number): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.cancelQueueItem(queueId);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    await this.runBuildAction(environment, (client) => client.cancelQueueItem(queueId));
   }
 
   async enableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.enableJob(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    await this.runBuildAction(environment, (client) => client.enableJob(jobUrl));
   }
 
   async disableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.disableJob(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    await this.runBuildAction(environment, (client) => client.disableJob(jobUrl));
   }
 
   async scanMultibranch(
     environment: JenkinsEnvironmentRef,
     folderUrl: string
   ): Promise<ScanMultibranchResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.scanMultibranch(folderUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.scanMultibranch(folderUrl));
   }
 
   async renameJob(
@@ -78,21 +51,11 @@ export class JenkinsQueueAndJobManagementOperations {
     jobUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.renameJob(jobUrl, newName);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
+    return this.runJobManagementAction(environment, (client) => client.renameJob(jobUrl, newName));
   }
 
   async deleteJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.deleteJob(jobUrl);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
+    await this.runJobManagementAction(environment, (client) => client.deleteJob(jobUrl));
   }
 
   async copyJob(
@@ -101,12 +64,9 @@ export class JenkinsQueueAndJobManagementOperations {
     sourceName: string,
     newName: string
   ): Promise<{ newUrl: string }> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.copyJob(parentUrl, sourceName, newName);
-    } catch (error) {
-      throw toJobManagementActionError(error);
-    }
+    return this.runJobManagementAction(environment, (client) =>
+      client.copyJob(parentUrl, sourceName, newName)
+    );
   }
 
   async createItem(
@@ -115,25 +75,46 @@ export class JenkinsQueueAndJobManagementOperations {
     parentUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
+    return this.runJobManagementAction(environment, (client) =>
+      client.createItem(kind, parentUrl, newName)
+    );
+  }
+
+  private runBuildAction<T>(
+    environment: JenkinsEnvironmentRef,
+    action: (client: JenkinsClient) => Promise<T>
+  ): Promise<T> {
+    return this.runAction(environment, action, toBuildActionError);
+  }
+
+  private runJobManagementAction<T>(
+    environment: JenkinsEnvironmentRef,
+    action: (client: JenkinsClient) => Promise<T>
+  ): Promise<T> {
+    return this.runAction(environment, action, toJobManagementActionError);
+  }
+
+  private async runAction<T>(
+    environment: JenkinsEnvironmentRef,
+    action: (client: JenkinsClient) => Promise<T>,
+    mapError: (error: unknown) => Error
+  ): Promise<T> {
     const client = await this.context.getClient(environment);
     try {
-      return await client.createItem(kind, parentUrl, newName);
+      return await action(client);
     } catch (error) {
-      throw toJobManagementActionError(error);
+      throw mapError(error);
     }
   }
 
   private mapQueueItems(items: JenkinsQueueItem[]): JenkinsQueueItemInfo[] {
     return items.map((item, index) => {
-      const name =
-        typeof item.task?.name === "string" && item.task.name.trim().length > 0
-          ? item.task.name.trim()
-          : `Queue item ${item.id}`;
+      const name = trimToUndefined(item.task?.name) ?? `Queue item ${item.id}`;
       return {
         id: item.id,
         name,
         position: index + 1,
-        reason: typeof item.why === "string" ? item.why.trim() || undefined : undefined,
+        reason: trimToUndefined(item.why),
         inQueueSince: typeof item.inQueueSince === "number" ? item.inQueueSince : undefined,
         taskUrl: item.task?.url,
         assignedLabelName:

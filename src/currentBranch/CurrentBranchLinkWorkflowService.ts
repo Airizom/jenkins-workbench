@@ -1,3 +1,4 @@
+import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type {
@@ -110,7 +111,7 @@ export class CurrentBranchLinkWorkflowService {
       return {
         kind: "failed",
         environment,
-        message: error instanceof Error ? error.message : "Unexpected Jenkins error."
+        message: formatError(error)
       };
     }
   }

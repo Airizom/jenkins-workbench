@@ -1,16 +1,13 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type {
-  EnvironmentWithScope,
-  JenkinsEnvironmentStore
-} from "../../storage/JenkinsEnvironmentStore";
+import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import {
   InstanceTreeItem,
   type JenkinsFolderTreeItem,
   JobsFolderTreeItem
 } from "../../tree/TreeItems";
-import { getTreeItemLabel } from "../CommandUtils";
+import { getTreeItemLabel, toJenkinsEnvironmentRef } from "../CommandUtils";
 import type { JobNewItemTarget } from "./JobNewItemWorkflow";
 
 export type JobNewItemTreeTarget = InstanceTreeItem | JobsFolderTreeItem | JenkinsFolderTreeItem;
@@ -70,22 +67,13 @@ export class JobNewItemTargetResolver {
       return undefined;
     }
 
-    const environmentRef = toEnvironmentRef(selected.environment);
+    const environmentRef = toJenkinsEnvironmentRef(selected.environment);
     return {
       environment: environmentRef,
       parentUrl: environmentRef.url,
       locationLabel: formatEnvironmentTargetLabel(environmentRef)
     };
   }
-}
-
-function toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-  return {
-    environmentId: environment.id,
-    scope: environment.scope,
-    url: environment.url,
-    username: environment.username
-  };
 }
 
 function formatEnvironmentTargetLabel(environment: JenkinsEnvironmentRef): string {

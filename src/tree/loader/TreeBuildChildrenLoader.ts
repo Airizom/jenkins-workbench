@@ -3,8 +3,6 @@ import type { BuildListFetchOptions, JenkinsDataService } from "../../jenkins/Je
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { BuildTooltipOptions } from "../BuildTooltips";
-import { resolveTreeItemLabel } from "../TreeItemLabels";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import {
   ArtifactTreeItem,
   BuildArtifactsFolderTreeItem,
@@ -13,6 +11,9 @@ import {
 import type { JobTreeItem, PipelineTreeItem } from "../items/TreeJobItems";
 import { WorkspaceRootTreeItem } from "../items/TreeWorkspaceItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { resolveTreeItemLabel } from "../TreeItemLabels";
+import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
+import type { TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 import {
   buildArtifactChildrenKey,
@@ -26,11 +27,7 @@ export class TreeBuildChildrenLoader {
     private readonly dataService: JenkinsDataService,
     private readonly pendingInputCoordinator: PendingInputRefreshCoordinator,
     private readonly cacheManager: TreeChildrenCacheManager,
-    private readonly buildChildrenKey: (
-      kind: string,
-      environment: JenkinsEnvironmentRef,
-      extra?: string
-    ) => string,
+    private readonly buildChildrenKey: TreeChildrenKeyBuilder,
     private readonly buildLimit: number,
     private readonly getBuildTooltipOptions: () => BuildTooltipOptions,
     private readonly getBuildListFetchOptions: () => BuildListFetchOptions,
@@ -95,14 +92,6 @@ export class TreeBuildChildrenLoader {
         folder.buildUrl,
         folder.jobScope
       );
-      if (artifacts.length === 0) {
-        return [
-          this.placeholders.createEmptyPlaceholder(
-            "No artifacts available.",
-            "This build did not produce any artifacts."
-          )
-        ];
-      }
       const items: ArtifactTreeItem[] = [];
       for (const artifact of artifacts) {
         const relativePath = (artifact.relativePath ?? "").trim();

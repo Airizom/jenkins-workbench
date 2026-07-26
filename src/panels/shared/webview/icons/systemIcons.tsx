@@ -26,9 +26,9 @@ export function TerminalIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-export function CpuIcon({ className, ...props }: IconProps) {
+export function CpuIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
+    <IconBase {...props}>
       <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
       <rect x="9" y="9" width="6" height="6" />
       <line x1="9" y1="1" x2="9" y2="4" />
@@ -42,9 +42,9 @@ export function CpuIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-export function TagIcon({ className, ...props }: IconProps) {
+export function TagIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4" {...props}>
+    <IconBase {...props}>
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
       <line x1="7" y1="7" x2="7.01" y2="7" />
     </IconBase>

@@ -28,11 +28,10 @@ export function ConsoleOutputSection({
   onExportLogs: () => void;
   onOpenExternal: (url: string) => void;
 }) {
-  const displayConsoleText = useMemo(() => stripAnsi(consoleText), [consoleText]);
-
-  const handleExportLogs = () => {
-    onExportLogs();
-  };
+  const displayConsoleText = useMemo(
+    () => (consoleHtmlModel ? consoleText : stripAnsi(consoleText)),
+    [consoleHtmlModel, consoleText]
+  );
 
   return (
     <ConsoleLogViewer
@@ -45,25 +44,14 @@ export function ConsoleOutputSection({
       followLog={followLog}
       isActive={isActive}
       onOpenExternal={onOpenExternal}
-      renderHeader={({
-        hasOutput,
-        lineCount,
-        openSearchToolbar,
-        scrollToBottom,
-        isSearchActive
-      }) => (
+      renderHeader={({ hasOutput, lineCount, openSearchToolbar }) => (
         <ConsoleOutputHeader
           hasConsoleOutput={hasOutput}
           lineCount={lineCount}
           followLog={followLog}
           onSearch={openSearchToolbar}
-          onExport={handleExportLogs}
-          onFollowLogChange={(checked) => {
-            onToggleFollowLog(checked);
-            if (checked && isActive && !isSearchActive) {
-              scrollToBottom();
-            }
-          }}
+          onExport={onExportLogs}
+          onFollowLogChange={onToggleFollowLog}
         />
       )}
     />

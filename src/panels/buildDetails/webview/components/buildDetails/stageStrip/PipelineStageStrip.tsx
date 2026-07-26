@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Skeleton } from "../../../../../shared/webview/components/ui/skeleton";
 import { StageStripSegmentButton } from "./StageStripSegmentButton";
 import type { StageStripSegment } from "./stageStripModel";
@@ -12,7 +13,7 @@ export function PipelineStageStrip({
   segments,
   loading,
   onSelectStage
-}: PipelineStageStripProps): JSX.Element | null {
+}: PipelineStageStripProps): React.JSX.Element | null {
   if (segments.length === 0 && !loading) {
     return null;
   }

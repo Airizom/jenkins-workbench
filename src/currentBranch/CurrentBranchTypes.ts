@@ -105,12 +105,14 @@ type CurrentBranchRemotePublicState = Extract<
   { kind: CurrentBranchRemoteStateKind }
 >;
 
-export type CurrentBranchRemoteResolvedState = CurrentBranchRemotePublicState extends infer State
-  ? State extends CurrentBranchRemotePublicState
+type CurrentBranchRemoteResolvedStateFor<State extends CurrentBranchRemotePublicState> =
+  State extends CurrentBranchRemotePublicState
     ? Omit<State, "repository" | keyof CurrentBranchRemoteResolvedRequirements> &
         CurrentBranchRemoteResolvedRequirements
-    : never
-  : never;
+    : never;
+
+export type CurrentBranchRemoteResolvedState =
+  CurrentBranchRemoteResolvedStateFor<CurrentBranchRemotePublicState>;
 
 export type CurrentBranchRefreshOptions = {
   force?: boolean;

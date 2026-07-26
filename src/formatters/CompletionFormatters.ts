@@ -1,10 +1,9 @@
 import { resolveKnownBuildResult } from "./BuildStatusFormatters";
 import {
-  type JobColorStatus,
   formatJobColorStatusLabel,
+  type JobColorStatus,
   resolveJobColorStatus
 } from "./JobColorFormatters";
-import { normalizeStatusToken } from "./StatusTokenUtils";
 
 type CompletionSeverity = "info" | "warning";
 
@@ -19,20 +18,12 @@ const JOB_COLOR_SEVERITY: Record<JobColorStatus, CompletionSeverity> = {
   unknown: "info"
 };
 
-const normalizeResult = (value: unknown): string | undefined => {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-  return normalizeStatusToken(value);
-};
-
 export function formatCompletionStatus(
   result?: unknown,
   color?: unknown
 ): { label: string; severity: CompletionSeverity } {
-  const normalizedResult = normalizeResult(result);
-  if (normalizedResult) {
-    const knownResult = resolveKnownBuildResult(normalizedResult);
+  if (typeof result === "string") {
+    const knownResult = resolveKnownBuildResult(result);
     if (knownResult) {
       return knownResult;
     }

@@ -14,7 +14,6 @@ import {
 import { ChevronDownIcon, ClockIcon, FileIcon } from "../../../../../shared/webview/icons";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestCaseViewModel } from "../../../../shared/BuildDetailsContracts";
-import { resolveTestResultRowOpenState } from "./testResultRowState";
 import { hasTestDetails } from "./testResultsUtils";
 
 const { memo, useEffect, useState } = React;
@@ -85,7 +84,7 @@ export function TestResultRow({
     if (!initialOpen) {
       return;
     }
-    setOpen((currentOpen) => resolveTestResultRowOpenState(currentOpen, initialOpen));
+    setOpen(true);
   }, [initialOpen]);
 
   const content = (
@@ -100,17 +99,18 @@ export function TestResultRow({
       suiteName={item.suiteName}
     />
   );
+  const sourceButton = item.canOpenSource ? (
+    <Button variant="ghost" size="sm" onClick={() => onOpenSource(item)}>
+      <FileIcon className="h-3.5 w-3.5" />
+      Source
+    </Button>
+  ) : null;
 
   if (!hasDetails) {
     return (
       <div className={cn("flex items-center gap-3 px-3 py-2", borderClass)}>
         <div className="flex min-w-0 flex-1 items-center gap-3">{content}</div>
-        {item.canOpenSource ? (
-          <Button variant="ghost" size="sm" onClick={() => onOpenSource(item)}>
-            <FileIcon className="h-3.5 w-3.5" />
-            Source
-          </Button>
-        ) : null}
+        {sourceButton}
       </div>
     );
   }
@@ -126,12 +126,7 @@ export function TestResultRow({
             {content}
           </button>
         </CollapsibleTrigger>
-        {item.canOpenSource ? (
-          <Button variant="ghost" size="sm" onClick={() => onOpenSource(item)}>
-            <FileIcon className="h-3.5 w-3.5" />
-            Source
-          </Button>
-        ) : null}
+        {sourceButton}
       </div>
       <CollapsibleContent className="border-t border-border bg-muted-soft px-3 py-3">
         <div className="space-y-2">

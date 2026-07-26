@@ -42,6 +42,28 @@
     max-height: max(200px, calc(100vh - 300px));
   }
 
+  /* Bleeds past the main gutter so scrolled content does not show through the
+   * left and right edges of the docked tab bar. */
+  .build-details-tabs-bar {
+    position: sticky;
+    top: var(--sticky-hero-offset, 0px);
+    z-index: 5;
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+    background-color: var(--background);
+  }
+
+  /* A dot grid reads as a pannable canvas and gives the drag interaction a
+   * visible frame of reference, which a flat wash does not. */
+  .pipeline-graph-canvas {
+    background-image: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--foreground) 12%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 16px 16px;
+  }
+
   .stage-strip {
     scrollbar-width: thin;
   }
@@ -66,7 +88,7 @@
     margin: 0.5rem 0;
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    background: var(--muted);
+    background: var(--muted-soft);
     padding: 0.25rem 0.5rem;
     color: var(--muted-foreground);
     font-family: var(--font-mono);

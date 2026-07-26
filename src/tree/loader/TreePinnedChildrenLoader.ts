@@ -1,8 +1,8 @@
+import { JenkinsActionError, JenkinsRequestError } from "../../jenkins/errors";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { JenkinsActionError, JenkinsRequestError } from "../../jenkins/errors";
-import type { JenkinsPinStore, StoredPinnedJobEntry } from "../../storage/JenkinsPinStore";
-import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
+import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
+import type { ScopedJobStoreEntry } from "../../storage/ScopedJobStore";
 import {
   QuickAccessJobTreeItem,
   QuickAccessPipelineTreeItem,
@@ -10,8 +10,9 @@ import {
 } from "../items/TreeJobItems";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
 import { PINNED_ITEM_LOOKUP_CONCURRENCY } from "./TreeChildrenConfig";
-import { type TreeJobUrlStateLoader, getCanonicalPinnedJobUrl } from "./TreeJobUrlStateLoader";
+import { getCanonicalPinnedJobUrl, type TreeJobUrlStateLoader } from "./TreeJobUrlStateLoader";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
 
 export class TreePinnedChildrenLoader {
@@ -49,7 +50,7 @@ export class TreePinnedChildrenLoader {
 
   private async loadPinnedItem(
     environment: JenkinsEnvironmentRef,
-    entry: StoredPinnedJobEntry,
+    entry: ScopedJobStoreEntry,
     watchedJobs: Set<string>,
     pinnedJobs: Set<string>
   ): Promise<WorkbenchTreeElement> {
@@ -65,26 +66,18 @@ export class TreePinnedChildrenLoader {
 
       const isWatched = watchedJobs.has(canonicalJobUrl);
       const isPinned = pinnedJobs.has(canonicalJobUrl);
+      const TreeItem =
+        current.kind === "pipeline" ? QuickAccessPipelineTreeItem : QuickAccessJobTreeItem;
 
-      return current.kind === "pipeline"
-        ? new QuickAccessPipelineTreeItem(
-            environment,
-            current.name,
-            canonicalJobUrl,
-            ROOT_TREE_JOB_SCOPE,
-            current.color,
-            isWatched,
-            isPinned
-          )
-        : new QuickAccessJobTreeItem(
-            environment,
-            current.name,
-            canonicalJobUrl,
-            ROOT_TREE_JOB_SCOPE,
-            current.color,
-            isWatched,
-            isPinned
-          );
+      return new TreeItem(
+        environment,
+        current.name,
+        canonicalJobUrl,
+        ROOT_TREE_JOB_SCOPE,
+        current.color,
+        isWatched,
+        isPinned
+      );
     } catch (error) {
       if (this.isMissingPinnedItemError(error)) {
         return this.createStalePinnedItem(environment, entry);
@@ -96,7 +89,7 @@ export class TreePinnedChildrenLoader {
 
   private createStalePinnedItem(
     environment: JenkinsEnvironmentRef,
-    entry: StoredPinnedJobEntry
+    entry: ScopedJobStoreEntry
   ): StalePinnedJobTreeItem {
     return new StalePinnedJobTreeItem(
       environment,
@@ -107,7 +100,7 @@ export class TreePinnedChildrenLoader {
   }
 
   private createPinnedItemErrorPlaceholder(
-    entry: StoredPinnedJobEntry,
+    entry: ScopedJobStoreEntry,
     error: unknown
   ): PlaceholderTreeItem {
     const label = `Unable to load ${entry.jobName ?? entry.jobUrl}`;
@@ -124,7 +117,7 @@ export class TreePinnedChildrenLoader {
 
   private async loadPinnedItems(
     environment: JenkinsEnvironmentRef,
-    pinnedEntries: StoredPinnedJobEntry[],
+    pinnedEntries: ScopedJobStoreEntry[],
     watchedJobs: Set<string>,
     pinnedJobs: Set<string>
   ): Promise<WorkbenchTreeElement[]> {
@@ -147,7 +140,7 @@ export class TreePinnedChildrenLoader {
 
   private async updatePinnedEntryUrlIfNeeded(
     environment: JenkinsEnvironmentRef,
-    entry: StoredPinnedJobEntry,
+    entry: ScopedJobStoreEntry,
     canonicalJobUrl: string
   ): Promise<void> {
     if (canonicalJobUrl === entry.jobUrl) {

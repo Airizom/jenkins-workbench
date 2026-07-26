@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { ActivityGroupKind } from "../ActivityTypes";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope, createViewTreeJobScope } from "../TreeJobScope";
 import {
   formatMultibranchFolderDescription,
   formatMultibranchFolderTooltip
@@ -15,6 +14,7 @@ import {
   isJobColorDisabled,
   jobIcon
 } from "../formatters";
+import { createViewTreeJobScope, ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 const EYE_ICON = new vscode.ThemeIcon("eye");
@@ -235,7 +235,7 @@ export class StalePinnedJobTreeItem extends vscode.TreeItem {
   }
 }
 
-function buildActivityDescription(
+function buildJobDescriptionWithPathContext(
   pathContext: string | undefined,
   color: string | undefined,
   isWatched: boolean,
@@ -291,7 +291,7 @@ function applyActivityPresentation(
   isPinned: boolean
 ): void {
   item.id = `activity:${group}:${item.id}`;
-  item.description = buildActivityDescription(pathContext, color, isWatched, isPinned);
+  item.description = buildJobDescriptionWithPathContext(pathContext, color, isWatched, isPinned);
   item.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, item.description);
 }
 
@@ -300,16 +300,12 @@ function buildPinnedQuickAccessDescription(
   color?: string,
   isWatched = false
 ): string | undefined {
-  const pathContext = formatPinnedJobPathContext(jobUrl);
-  const statusDescription = formatJobDescription({
-    status: formatJobColor(color),
-    isWatched
-  });
-
-  if (pathContext && statusDescription) {
-    return `${pathContext} • ${statusDescription}`;
-  }
-  return pathContext || statusDescription;
+  return buildJobDescriptionWithPathContext(
+    formatPinnedJobPathContext(jobUrl),
+    color,
+    isWatched,
+    false
+  );
 }
 
 function buildJobContextValue(

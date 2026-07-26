@@ -1,4 +1,5 @@
 import * as React from "react";
+import { EmptyState } from "../../../../shared/webview/components/EmptyState";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { TagIcon } from "../../../../shared/webview/icons";
@@ -10,15 +11,17 @@ const { useState } = React;
 type LabelChipsProps = {
   labels: string[];
 };
-export function LabelChips({ labels }: LabelChipsProps): JSX.Element {
+export function LabelChips({ labels }: LabelChipsProps): React.JSX.Element {
   const [showAll, setShowAll] = useState(false);
 
   if (labels.length === 0) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
-        <TagIcon className="h-4 w-4 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">No labels assigned</span>
-      </div>
+      <EmptyState
+        icon={<TagIcon className="h-4 w-4" />}
+        title="No labels assigned"
+        description="Jobs cannot target this node by label until one is configured."
+        className="py-6"
+      />
     );
   }
 

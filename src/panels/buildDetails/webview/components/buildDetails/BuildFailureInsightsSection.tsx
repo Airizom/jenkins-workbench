@@ -1,4 +1,4 @@
-import { EMPTY_TEST_RESULTS_LABEL } from "../../../../shared/TestReportConstants";
+import { EMPTY_TEST_RESULTS_LABEL } from "../../../../shared/TestReportFormatters";
 import type {
   ArtifactAction,
   BuildFailureArtifact,

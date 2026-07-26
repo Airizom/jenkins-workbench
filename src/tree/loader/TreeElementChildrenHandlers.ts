@@ -16,8 +16,13 @@ import {
 import { WorkspaceDirectoryTreeItem, WorkspaceRootTreeItem } from "../items/TreeWorkspaceItems";
 import type { TreeActivityChildrenLoader } from "./TreeActivityChildrenLoader";
 import type { TreeBuildChildrenLoader } from "./TreeBuildChildrenLoader";
+import type { TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
-import { getJobCollectionElement } from "./TreeChildrenMapping";
+import {
+  buildWorkspaceDirectoryChildrenKey,
+  buildWorkspaceRootChildrenKey,
+  getJobCollectionElement
+} from "./TreeChildrenMapping";
 import type { TreeElementChildrenHandler } from "./TreeElementChildrenHandler";
 import type { TreeEnvironmentChildrenLoader } from "./TreeEnvironmentChildrenLoader";
 import type { TreeJobCollectionChildrenLoader } from "./TreeJobCollectionChildrenLoader";
@@ -32,7 +37,7 @@ export type TreeElementChildrenHandlerDependencies = {
   readonly buildLoader: TreeBuildChildrenLoader;
   readonly workspaceLoader: TreeWorkspaceChildrenLoader;
   readonly pinnedLoader: TreePinnedChildrenLoader;
-  readonly buildChildrenKey: BuildChildrenKey;
+  readonly buildChildrenKey: TreeChildrenKeyBuilder;
   readonly clearChildrenCacheForEnvironment: (environment?: JenkinsEnvironmentRef | string) => void;
   readonly clearQueueCache: (environment: JenkinsEnvironmentRef) => void;
   readonly invalidateBuildArtifacts: (
@@ -41,12 +46,6 @@ export type TreeElementChildrenHandlerDependencies = {
     jobScope: BuildTreeItem["jobScope"]
   ) => void;
 };
-
-type BuildChildrenKey = (
-  kind: string,
-  environment: JenkinsEnvironmentRef,
-  extra?: string
-) => string;
 
 export function createTreeElementChildrenHandlers({
   cacheManager,
@@ -218,7 +217,8 @@ export function createTreeElementChildrenHandlers({
       getChildren: (element) => {
         const workspace = element as WorkspaceRootTreeItem;
         return cacheManager.getOrLoadChildren(
-          workspaceLoader.buildWorkspaceRootChildrenKey(
+          buildWorkspaceRootChildrenKey(
+            buildChildrenKey,
             workspace.environment,
             workspace.jobUrl,
             workspace.jobScope
@@ -247,7 +247,8 @@ export function createTreeElementChildrenHandlers({
       getChildren: (element) => {
         const directory = element as WorkspaceDirectoryTreeItem;
         return cacheManager.getOrLoadChildren(
-          workspaceLoader.buildWorkspaceDirectoryChildrenKey(
+          buildWorkspaceDirectoryChildrenKey(
+            buildChildrenKey,
             directory.environment,
             directory.jobUrl,
             directory.jobScope,

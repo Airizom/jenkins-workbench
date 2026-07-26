@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { QueueItemTreeItem } from "../tree/TreeItems";
 import { cancelQueueItem } from "./queue/QueueCommandHandlers";
-import type { QueueCommandRefreshHost } from "./queue/QueueCommandTypes";
 
 export function registerQueueCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
-  refreshHost: QueueCommandRefreshHost
+  refreshHost: EnvironmentScopedRefreshHost
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -16,5 +16,3 @@ export function registerQueueCommands(
     )
   );
 }
-
-export type { QueueCommandRefreshHost };

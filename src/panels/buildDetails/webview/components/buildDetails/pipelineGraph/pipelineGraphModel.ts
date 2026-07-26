@@ -21,6 +21,12 @@ interface RawNode {
   stage: PipelineStageViewModel;
   order: number;
 }
+
+interface DurationLogBounds {
+  min: number;
+  max: number;
+}
+
 export function buildPipelineGraphModel(stages: PipelineStageViewModel[]): PipelineGraphModel {
   const rawNodes: RawNode[] = [];
   const edges: PipelineGraphEdgeModel[] = [];
@@ -80,8 +86,9 @@ export function buildPipelineGraphModel(stages: PipelineStageViewModel[]): Pipel
     previousExits = current.exits;
   }
 
+  const durationLogBounds = getDurationLogBounds(durationValues);
   const nodes = rawNodes.map((node) =>
-    toNodeModel(node, getDurationRatio(node.stage.durationMs, durationValues))
+    toNodeModel(node, getDurationRatio(node.stage.durationMs, durationLogBounds))
   );
 
   return {
@@ -114,18 +121,33 @@ function resolveNodeWidth(durationMs: number | undefined, durationRatio: number)
   return Math.round(MIN_NODE_WIDTH + durationRatio * (MAX_NODE_WIDTH - MIN_NODE_WIDTH));
 }
 
-function getDurationRatio(durationMs: number | undefined, allDurations: number[]): number {
-  if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || allDurations.length === 0) {
+function getDurationLogBounds(durations: number[]): DurationLogBounds | undefined {
+  if (durations.length === 0) {
+    return undefined;
+  }
+
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const duration of durations) {
+    const loggedDuration = Math.log(duration + 1);
+    min = Math.min(min, loggedDuration);
+    max = Math.max(max, loggedDuration);
+  }
+  return { min, max };
+}
+
+function getDurationRatio(
+  durationMs: number | undefined,
+  bounds: DurationLogBounds | undefined
+): number {
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || !bounds) {
     return 0.24;
   }
 
-  const loggedValues = allDurations.map((value) => Math.log(value + 1));
-  const minLog = Math.min(...loggedValues);
-  const maxLog = Math.max(...loggedValues);
-  if (maxLog <= minLog) {
+  if (bounds.max <= bounds.min) {
     return 0.5;
   }
-  return (Math.log(durationMs + 1) - minLog) / (maxLog - minLog);
+  return (Math.log(durationMs + 1) - bounds.min) / (bounds.max - bounds.min);
 }
 
 function getStageNodeId(stage: PipelineStageViewModel, fallbackIndex: number): string {

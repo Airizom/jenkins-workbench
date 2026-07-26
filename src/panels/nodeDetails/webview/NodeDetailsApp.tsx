@@ -9,8 +9,8 @@ import { toast } from "../../shared/webview/hooks/useToast";
 import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
-import { NodeDetailsHero } from "./components/nodeDetails/NodeDetailsHero";
 import type { NodeAction } from "./components/nodeDetails/NodeDetailsHero";
+import { NodeDetailsHero } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
 import {
   buildOverviewRows,
@@ -22,7 +22,7 @@ import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
 import { getInitialState, nodeDetailsReducer } from "./state/nodeDetailsState";
 
 const { useEffect, useMemo, useReducer, useState } = React;
-export function NodeDetailsApp(): JSX.Element {
+export function NodeDetailsApp(): React.JSX.Element {
   const [state, dispatch] = useReducer(nodeDetailsReducer, undefined, getInitialState);
   const [now, setNow] = useState(() => Date.now());
   const postMessage = usePanelPostMessage<NodeDetailsIncomingMessage>();

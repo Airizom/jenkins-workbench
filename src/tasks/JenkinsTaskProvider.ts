@@ -2,17 +2,14 @@ import * as vscode from "vscode";
 import { getExtensionConfiguration, getJobSearchTuningOptions } from "../extension/ExtensionConfig";
 import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService, JobSearchEntry } from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type {
-  EnvironmentWithScope,
-  JenkinsEnvironmentStore
-} from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import { toJenkinsEnvironmentRef } from "./JenkinsTaskEnvironment";
 import { JenkinsTaskTerminal } from "./JenkinsTaskTerminal";
 import {
+  isJenkinsTaskDefinition,
   JENKINS_TASK_SOURCE,
   JENKINS_TASK_TYPE,
   type JenkinsTaskDefinition,
-  isJenkinsTaskDefinition,
   normalizeEnvironmentUrl,
   normalizeJobUrl
 } from "./JenkinsTaskTypes";
@@ -45,7 +42,7 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
       }
       const scope =
         environment.scope === "workspace" ? vscode.TaskScope.Workspace : vscode.TaskScope.Global;
-      const envRef = toEnvironmentRef(environment);
+      const envRef = toJenkinsEnvironmentRef(environment);
       try {
         for await (const batch of this.dataService.iterateJobsForEnvironment(envRef, {
           cancellation: token,
@@ -107,9 +104,7 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
       return undefined;
     }
 
-    const jobUrlDefinition = normalizedJob.jobUrl.startsWith(environmentUrl)
-      ? normalizedJob.jobUrl.slice(environmentUrl.length)
-      : normalizedJob.jobUrl;
+    const jobUrlDefinition = normalizedJob.jobUrl.slice(environmentUrl.length);
     const definition: JenkinsTaskDefinition = {
       type: JENKINS_TASK_TYPE,
       environmentUrl,
@@ -143,13 +138,4 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
     task.group = vscode.TaskGroup.Build;
     return task;
   }
-}
-
-function toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-  return {
-    environmentId: environment.id,
-    scope: environment.scope,
-    url: environment.url,
-    username: environment.username
-  };
 }

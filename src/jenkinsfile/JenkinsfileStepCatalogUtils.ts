@@ -47,15 +47,17 @@ export function mergeStepCatalogs(
       documentation: liveStep.documentation ?? fallbackStep.documentation,
       signatures: liveStep.signatures.map((signature) => ({
         ...signature,
-        parameters: signature.parameters.map((parameter) => ({
-          ...parameter,
-          description:
-            parameter.description ?? fallbackParameterDocs.get(parameter.name)?.description,
-          required:
-            typeof parameter.required === "boolean"
-              ? parameter.required
-              : fallbackParameterDocs.get(parameter.name)?.required
-        }))
+        parameters: signature.parameters.map((parameter) => {
+          const fallbackParameter = fallbackParameterDocs.get(parameter.name);
+          return {
+            ...parameter,
+            description: parameter.description ?? fallbackParameter?.description,
+            required:
+              typeof parameter.required === "boolean"
+                ? parameter.required
+                : fallbackParameter?.required
+          };
+        })
       }))
     };
 

@@ -1,3 +1,5 @@
+import { trimToUndefined } from "./stringValues";
+
 export function areStringArraysEqual(left: string[], right: string[]): boolean {
   if (left.length !== right.length) {
     return false;
@@ -22,11 +24,8 @@ export function uniqueNonEmptyStrings(values: Iterable<unknown>): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const value of values) {
-    if (typeof value !== "string") {
-      continue;
-    }
-    const trimmed = value.trim();
-    if (!trimmed || seen.has(trimmed)) {
+    const trimmed = trimToUndefined(value);
+    if (trimmed === undefined || seen.has(trimmed)) {
       continue;
     }
     seen.add(trimmed);

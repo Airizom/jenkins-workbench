@@ -1,4 +1,3 @@
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import {
   hasCoverageAction,
   resolveCoverageActionPath
@@ -7,6 +6,7 @@ import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
+import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { BuildDetailsCoverageBackend } from "./BuildDetailsBackend";
 import {

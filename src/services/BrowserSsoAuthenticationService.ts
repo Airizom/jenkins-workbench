@@ -20,7 +20,6 @@ export interface BrowserSsoAuthenticator {
 }
 
 interface CallbackResult {
-  state: string;
   headers: Record<string, string>;
   expiresAt?: number;
 }
@@ -167,11 +166,6 @@ function createCallbackServer(expectedState: string): Promise<{
 }
 
 function parseCallbackResult(url: URL): CallbackResult {
-  const state = url.searchParams.get("state")?.trim();
-  if (!state) {
-    throw new Error("Browser SSO callback was missing state.");
-  }
-
   const headersParam = url.searchParams.get("headers");
   if (headersParam) {
     const parsed = JSON.parse(Buffer.from(headersParam, "base64url").toString("utf8")) as unknown;
@@ -183,7 +177,6 @@ function parseCallbackResult(url: URL): CallbackResult {
       throw new Error("Browser SSO callback did not provide any headers.");
     }
     return {
-      state,
       headers,
       expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
     };
@@ -192,7 +185,6 @@ function parseCallbackResult(url: URL): CallbackResult {
   const cookie = url.searchParams.get("cookie")?.trim();
   if (cookie) {
     return {
-      state,
       headers: { Cookie: cookie },
       expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
     };
@@ -202,7 +194,6 @@ function parseCallbackResult(url: URL): CallbackResult {
   const cookieValue = url.searchParams.get("cookie_value")?.trim();
   if (cookieName && cookieValue) {
     return {
-      state,
       headers: { Cookie: `${cookieName}=${cookieValue}` },
       expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
     };

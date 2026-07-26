@@ -71,10 +71,10 @@ When adding a service, wire it through the appropriate provider catalog (`CorePr
 
 If you touch panel entrypoints, bundle naming, or Vite output:
 
-1. Confirm `vite.config.ts` still emits manifest entries for build compare, build details, and node details.
+1. Confirm `vite.config.ts` still emits manifest entries for build compare, build details, node capacity, and node details.
 2. Run `npm run compile`.
 3. Verify `out/webview/manifest.json` includes expected entries.
-4. Launch Extension Development Host and open the Build Compare, Build Details, and Node Details panels.
+4. Launch Extension Development Host and open the Build Compare, Build Details, Node Capacity, and Node Details panels.
 
 If this is skipped, `resolveWebviewAssets(...)` throws and panel load fails.
 
@@ -115,6 +115,7 @@ Unit tests do not exercise the webview UI or live Jenkins traffic. For changes t
    - watch updates
    - queue visibility
    - build details panel updates
+   - node capacity panel updates
    - artifact preview/download behavior
 
 Reference checklist is in `README.md` (manual testing section + troubleshooting).

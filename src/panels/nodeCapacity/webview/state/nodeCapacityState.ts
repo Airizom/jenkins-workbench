@@ -1,13 +1,14 @@
 import type {
   NodeCapacityExecutorViewModel,
+  NodeCapacityNodeExecutorsUpdateMessage,
   NodeCapacityNodeViewModel,
   NodeCapacityPoolViewModel,
   NodeCapacityViewModel
 } from "../../../../shared/nodeCapacity/NodeCapacityContracts";
 import { createEmptyNodeCapacitySummary } from "../../../../shared/nodeCapacity/NodeCapacityDefaults";
 import {
-  FALLBACK_UPDATED_AT,
-  createLoadingPanelStateHelpers
+  createLoadingPanelStateHelpers,
+  FALLBACK_UPDATED_AT
 } from "../../../shared/webview/state/createPanelStateHelpers";
 
 export type NodeCapacityState = NodeCapacityViewModel & {
@@ -19,7 +20,7 @@ export type NodeCapacityAction =
   | { type: "updateNodeCapacity"; payload: NodeCapacityViewModel }
   | {
       type: "updateNodeCapacityNodeExecutors";
-      payload: Array<{ nodeUrl: string; executors: NodeCapacityExecutorViewModel[] }>;
+      payload: NodeCapacityNodeExecutorsUpdateMessage["payload"];
     };
 
 const FALLBACK_STATE: NodeCapacityState = {
@@ -66,24 +67,9 @@ export function nodeCapacityReducer(
       };
     }
     case "updateNodeCapacityNodeExecutors": {
-      const executorsByNodeUrl = new Map(
-        action.payload.map((entry) => [entry.nodeUrl, entry.executors])
-      );
       return {
         ...state,
-        pools: state.pools.map((pool) => ({
-          ...pool,
-          nodes: pool.nodes.map((node) => {
-            if (!node.nodeUrl || !executorsByNodeUrl.has(node.nodeUrl)) {
-              return node;
-            }
-            return {
-              ...node,
-              executorsLoaded: true,
-              executors: executorsByNodeUrl.get(node.nodeUrl) ?? []
-            };
-          })
-        }))
+        pools: applyExecutorUpdates(state.pools, action.payload)
       };
     }
     default:
@@ -112,6 +98,23 @@ export function isStaleCapacityTimestamp(updatedAt: string | undefined, now: num
   return now - timestamp > NODE_CAPACITY_STALE_AFTER_MS;
 }
 
+function applyExecutorUpdates(
+  pools: NodeCapacityPoolViewModel[],
+  updates: NodeCapacityNodeExecutorsUpdateMessage["payload"]
+): NodeCapacityPoolViewModel[] {
+  const executorsByNodeUrl = new Map(updates.map((entry) => [entry.nodeUrl, entry.executors]));
+  return mapNodesInPools(pools, (node) => {
+    if (!node.nodeUrl || !executorsByNodeUrl.has(node.nodeUrl)) {
+      return node;
+    }
+    return {
+      ...node,
+      executorsLoaded: true,
+      executors: executorsByNodeUrl.get(node.nodeUrl) ?? []
+    };
+  });
+}
+
 /**
  * Full updates rebuild every node with `executorsLoaded: false`; keep previously
  * hydrated executor lists so expanded pools do not flash empty between the
@@ -132,17 +135,24 @@ function carryOverLoadedExecutors(
   if (loadedExecutorsByNodeUrl.size === 0) {
     return nextPools;
   }
-  return nextPools.map((pool) => ({
+  return mapNodesInPools(nextPools, (node) => {
+    if (node.executorsLoaded || !node.nodeUrl) {
+      return node;
+    }
+    const executors = loadedExecutorsByNodeUrl.get(node.nodeUrl);
+    if (!executors) {
+      return node;
+    }
+    return { ...node, executorsLoaded: true, executors };
+  });
+}
+
+function mapNodesInPools(
+  pools: NodeCapacityPoolViewModel[],
+  mapNode: (node: NodeCapacityNodeViewModel) => NodeCapacityNodeViewModel
+): NodeCapacityPoolViewModel[] {
+  return pools.map((pool) => ({
     ...pool,
-    nodes: pool.nodes.map((node): NodeCapacityNodeViewModel => {
-      if (node.executorsLoaded || !node.nodeUrl) {
-        return node;
-      }
-      const executors = loadedExecutorsByNodeUrl.get(node.nodeUrl);
-      if (!executors) {
-        return node;
-      }
-      return { ...node, executorsLoaded: true, executors };
-    })
+    nodes: pool.nodes.map(mapNode)
   }));
 }

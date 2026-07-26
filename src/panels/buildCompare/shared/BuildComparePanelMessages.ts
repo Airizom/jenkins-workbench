@@ -1,7 +1,8 @@
 import { asRecord, hasMessageType } from "../../../shared/runtimeGuards";
-import type {
-  BuildCompareConsoleSectionViewModel,
-  CompareSectionStatus
+import {
+  type BuildCompareConsoleSectionViewModel,
+  type CompareSectionStatus,
+  compareSectionStatuses
 } from "./BuildCompareContracts";
 
 export interface SwapBuildsMessage {
@@ -57,16 +58,6 @@ export function parseBuildCompareOutgoingMessage(
   };
 }
 
-const compareSectionStatuses = new Set<CompareSectionStatus>([
-  "loading",
-  "available",
-  "empty",
-  "unavailable",
-  "error",
-  "tooLarge",
-  "identical"
-]);
-
 function isBuildCompareConsoleSectionViewModel(
   value: unknown
 ): value is BuildCompareConsoleSectionViewModel {
@@ -74,7 +65,7 @@ function isBuildCompareConsoleSectionViewModel(
   return (
     !!record &&
     !Array.isArray(record) &&
-    compareSectionStatuses.has(record.status as CompareSectionStatus) &&
+    compareSectionStatuses.includes(record.status as CompareSectionStatus) &&
     typeof record.summaryLabel === "string" &&
     isOptionalString(record.detail) &&
     isOptionalString(record.divergenceLineLabel) &&

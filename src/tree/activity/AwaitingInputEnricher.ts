@@ -9,7 +9,6 @@ import type { PendingInputRefreshCoordinator } from "../../services/PendingInput
 export interface AwaitingInputEnrichmentOptions {
   buildListFetchOptions: BuildListFetchOptions;
   buildLookupLimit: number;
-  bypassCache?: boolean;
   lookupConcurrency: number;
 }
 

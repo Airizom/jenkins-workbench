@@ -1,4 +1,4 @@
-import { skipGdslComment } from "./JenkinsfileGdslScannerUtils";
+import { readGdslString, skipGdslComment } from "./JenkinsfileGdslScannerUtils";
 import type { Token, TokenType } from "./JenkinsfileGdslTypes";
 
 export class GdslTokenizer {
@@ -24,7 +24,8 @@ export class GdslTokenizer {
   }
 
   peek(type: TokenType): Token | undefined {
-    return this.current().type === type ? this.current() : undefined;
+    const token = this.current();
+    return token.type === type ? token : undefined;
   }
 
   peekAhead(type: TokenType, offset: number): boolean {
@@ -51,7 +52,10 @@ function tokenizeGdsl(text: string): Token[] {
       continue;
     }
     if (character === "'" || character === '"') {
-      const { value, end } = readStringToken(text, index);
+      const { value, end, terminated } = readGdslString(text, index);
+      if (!terminated) {
+        throw new Error("Unterminated GDSL string.");
+      }
       tokens.push({
         type: "string",
         value
@@ -110,41 +114,4 @@ function tokenizeGdsl(text: string): Token[] {
     value: ""
   });
   return tokens;
-}
-
-function readStringToken(text: string, start: number): { value: string; end: number } {
-  const quote = text[start];
-  const triple = text[start + 1] === quote && text[start + 2] === quote;
-  let index = start + (triple ? 3 : 1);
-  let value = "";
-
-  while (index < text.length) {
-    if (!triple && text[index] === "\\") {
-      const escaped = text[index + 1];
-      value += escaped ?? "";
-      index += 2;
-      continue;
-    }
-    if (triple) {
-      if (text[index] === quote && text[index + 1] === quote && text[index + 2] === quote) {
-        return {
-          value,
-          end: index + 3
-        };
-      }
-      value += text[index];
-      index += 1;
-      continue;
-    }
-    if (text[index] === quote) {
-      return {
-        value,
-        end: index + 1
-      };
-    }
-    value += text[index];
-    index += 1;
-  }
-
-  throw new Error("Unterminated GDSL string.");
 }

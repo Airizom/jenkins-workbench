@@ -52,57 +52,54 @@ export function trimConsoleHtmlModelToTail(
   };
 }
 
-function consoleHtmlNodeTextLength(node: ConsoleHtmlNode): number {
-  if (node.type === "text") {
-    return node.value.length;
-  }
-  if (node.type === "br") {
-    return 1;
-  }
-  return node.children.reduce((sum, child) => sum + consoleHtmlNodeTextLength(child), 0);
-}
-
 function trimConsoleHtmlNodesFromStart(
   nodes: ConsoleHtmlNode[],
   charsToRemove: number
 ): ConsoleHtmlNode[] {
+  const state = { remaining: charsToRemove };
+  return trimConsoleHtmlNodes(nodes, state);
+}
+
+function trimConsoleHtmlNodes(
+  nodes: ConsoleHtmlNode[],
+  state: { remaining: number }
+): ConsoleHtmlNode[] {
   const trimmedNodes: ConsoleHtmlNode[] = [];
-  let remaining = charsToRemove;
   for (const node of nodes) {
-    if (remaining <= 0) {
+    if (state.remaining <= 0) {
       trimmedNodes.push(node);
       continue;
     }
 
-    const nodeLength = consoleHtmlNodeTextLength(node);
-    if (nodeLength <= remaining) {
-      remaining -= nodeLength;
-      continue;
+    const trimmedNode = trimConsoleHtmlNodeFromStart(node, state);
+    if (trimmedNode) {
+      trimmedNodes.push(trimmedNode);
     }
-
-    trimmedNodes.push(trimConsoleHtmlNodeFromStart(node, remaining));
-    remaining = 0;
   }
   return trimmedNodes;
 }
 
 function trimConsoleHtmlNodeFromStart(
   node: ConsoleHtmlNode,
-  charsToRemove: number
-): ConsoleHtmlNode {
-  if (charsToRemove <= 0) {
-    return node;
-  }
+  state: { remaining: number }
+): ConsoleHtmlNode | undefined {
   if (node.type === "text") {
-    return { type: "text", value: node.value.slice(charsToRemove) };
+    if (node.value.length <= state.remaining) {
+      state.remaining -= node.value.length;
+      return undefined;
+    }
+    const value = node.value.slice(state.remaining);
+    state.remaining = 0;
+    return { type: "text", value };
   }
   if (node.type === "br") {
-    return node;
+    state.remaining -= 1;
+    return undefined;
   }
-  return {
-    ...node,
-    children: trimConsoleHtmlNodesFromStart(node.children, charsToRemove)
-  };
+  const children = trimConsoleHtmlNodes(node.children, state);
+  return children.length > 0
+    ? { type: "element", tag: node.tag, attrs: node.attrs, children }
+    : undefined;
 }
 
 export function renderConsoleHtmlWithHighlights(
@@ -151,7 +148,7 @@ function renderNodes(nodes: ConsoleHtmlNode[], context: RenderContext): React.Re
       key
     };
     if (node.tag === "a" && context.onOpenExternal) {
-      const url = node.attrs["data-external-url"] ?? node.attrs.href;
+      const url = node.attrs.href;
       if (url) {
         props.onClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
           event.preventDefault();
@@ -275,7 +272,6 @@ function buildElementAttributes(element: HTMLElement, tag: string): Record<strin
     const safeHref = sanitizeConsoleExternalUrl(href);
     if (safeHref) {
       attrs.href = safeHref;
-      attrs["data-external-url"] = safeHref;
     }
     const className = element.getAttribute("class");
     if (className) {

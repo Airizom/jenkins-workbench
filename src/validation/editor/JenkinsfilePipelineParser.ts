@@ -133,7 +133,7 @@ function parsePipelineBlockAtLine(
 }
 
 function matchPipelineHeader(lineText: string): PipelineHeaderMatch | undefined {
-  const signature = stripLineComment(lineText);
+  const signature = codeBeforeLineComment(lineText);
   const pipelineMatch = signature.match(/^\s*pipeline\b/);
   if (!pipelineMatch) {
     return undefined;
@@ -176,7 +176,7 @@ function findOpeningBraceOnFollowingLine(
     return undefined;
   }
   const nextText = source.lineAt(nextLine);
-  if (stripLineComment(nextText).trim() !== "{") {
+  if (codeBeforeLineComment(nextText).trim() !== "{") {
     return undefined;
   }
   return { line: nextLine, character: nextText.indexOf("{") };
@@ -188,7 +188,12 @@ function resolveCloseBrace(
   open: BracePosition,
   pipelineIndentLength: number
 ): BracePosition | undefined {
-  const inlineCloseChar = findInlineCloseBrace(openLineText, open.character);
+  const inlineCloseChar = scanLineCode(
+    openLineText,
+    open.character + 1,
+    openLineText.length,
+    (index, depth) => depth === 0 && openLineText[index] === "}"
+  ).matchedIndex;
   if (inlineCloseChar !== undefined) {
     return { line: open.line, character: inlineCloseChar };
   }
@@ -215,20 +220,40 @@ function hasTopLevelSectionInSource(
   return findTopLevelSectionLine(source, context, token) !== undefined;
 }
 
-interface InlineScanState {
+interface LineScanState {
   depth: number;
   quote: '"' | "'" | undefined;
   inBlockComment: boolean;
 }
 
-/** Exported for unit tests only. */
-export function hasInlineTopLevelSection(
+interface LineScanResult {
+  matchedIndex?: number;
+  lineCommentIndex?: number;
+}
+
+function hasInlineTopLevelSection(
   lineText: string,
   startIndex: number,
   endIndex: number,
   token: string
 ): boolean {
-  const state: InlineScanState = { depth: 0, quote: undefined, inBlockComment: false };
+  return (
+    scanLineCode(
+      lineText,
+      startIndex,
+      endIndex,
+      (index, depth) => depth === 0 && isTokenAt(lineText, index, endIndex, token)
+    ).matchedIndex !== undefined
+  );
+}
+
+function scanLineCode(
+  lineText: string,
+  startIndex = 0,
+  endIndex = lineText.length,
+  matches?: (index: number, depth: number) => boolean
+): LineScanResult {
+  const state: LineScanState = { depth: 0, quote: undefined, inBlockComment: false };
   let index = startIndex;
 
   while (index < endIndex) {
@@ -241,27 +266,23 @@ export function hasInlineTopLevelSection(
       continue;
     }
     if (isLineCommentStart(lineText, index)) {
-      return false;
+      return { lineCommentIndex: index };
+    }
+    if (matches?.(index, state.depth)) {
+      return { matchedIndex: index };
     }
     const consumed = consumeCodeStructure(lineText, index, state);
     if (consumed !== undefined) {
       index = consumed;
       continue;
     }
-    if (isTopLevelTokenAt(lineText, index, endIndex, token, state.depth)) {
-      return true;
-    }
     index += 1;
   }
 
-  return false;
+  return {};
 }
 
-function advanceThroughBlockComment(
-  lineText: string,
-  index: number,
-  state: InlineScanState
-): number {
+function advanceThroughBlockComment(lineText: string, index: number, state: LineScanState): number {
   if (lineText[index] === "*" && lineText[index + 1] === "/") {
     state.inBlockComment = false;
     return index + 2;
@@ -269,7 +290,7 @@ function advanceThroughBlockComment(
   return index + 1;
 }
 
-function advanceThroughQuoted(lineText: string, index: number, state: InlineScanState): number {
+function advanceThroughQuoted(lineText: string, index: number, state: LineScanState): number {
   const char = lineText[index];
   if (char === "\\") {
     return index + 2;
@@ -287,7 +308,7 @@ function isLineCommentStart(lineText: string, index: number): boolean {
 function consumeCodeStructure(
   lineText: string,
   index: number,
-  state: InlineScanState
+  state: LineScanState
 ): number | undefined {
   const char = lineText[index];
   if (char === "/" && lineText[index + 1] === "*") {
@@ -307,16 +328,6 @@ function consumeCodeStructure(
     return index + 1;
   }
   return undefined;
-}
-
-function isTopLevelTokenAt(
-  lineText: string,
-  index: number,
-  endIndex: number,
-  token: string,
-  depth: number
-): boolean {
-  return depth === 0 && isTokenAt(lineText, index, endIndex, token);
 }
 
 function resolveInsertLocationFromSource(
@@ -382,9 +393,11 @@ function findTopLevelSectionLine(
   context: PipelineBlockContext,
   token: string
 ): number | undefined {
+  let tokenPattern: RegExp | undefined;
   return findMatchingTopLevelLine(source, context, (lineText, indent) => {
     const trimmed = lineText.slice(indent.length);
-    if (new RegExp(`^${token}\\b`).test(trimmed)) {
+    tokenPattern ??= new RegExp(`^${token}\\b`);
+    if (tokenPattern.test(trimmed)) {
       return true;
     }
     return false;
@@ -434,7 +447,7 @@ function findSectionEndLine(
       return sectionLine;
     }
     const nextText = source.lineAt(nextLine);
-    const nextSignature = stripLineComment(nextText).trim();
+    const nextSignature = codeBeforeLineComment(nextText).trim();
     if (nextSignature !== "{") {
       return sectionLine;
     }
@@ -453,26 +466,6 @@ function findSectionEndLine(
   return closingLine;
 }
 
-function findInlineCloseBrace(lineText: string, openChar: number): number | undefined {
-  const commentIndex = lineText.indexOf("//");
-  const maxIndex = commentIndex === -1 ? lineText.length : commentIndex;
-  let depth = 0;
-  for (let index = openChar + 1; index < maxIndex; index += 1) {
-    const char = lineText[index];
-    if (char === "{") {
-      depth += 1;
-      continue;
-    }
-    if (char === "}") {
-      if (depth === 0) {
-        return index;
-      }
-      depth -= 1;
-    }
-  }
-  return undefined;
-}
-
 function findClosingBraceLine(
   source: PipelineTextSource,
   startLine: number,
@@ -480,7 +473,7 @@ function findClosingBraceLine(
 ): number | undefined {
   for (let lineIndex = startLine; lineIndex < source.lineCount; lineIndex += 1) {
     const lineText = source.lineAt(lineIndex);
-    const signature = stripLineComment(lineText).trim();
+    const signature = codeBeforeLineComment(lineText).trim();
     if (signature !== "}") {
       continue;
     }
@@ -507,12 +500,9 @@ function findNextNonEmptyLine(
   return undefined;
 }
 
-function stripLineComment(lineText: string): string {
-  const index = lineText.indexOf("//");
-  if (index === -1) {
-    return lineText;
-  }
-  return lineText.slice(0, index);
+function codeBeforeLineComment(lineText: string): string {
+  const commentIndex = scanLineCode(lineText).lineCommentIndex;
+  return lineText.slice(0, commentIndex ?? lineText.length);
 }
 
 function isTokenAt(lineText: string, index: number, endIndex: number, token: string): boolean {

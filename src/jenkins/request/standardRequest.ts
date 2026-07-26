@@ -1,6 +1,5 @@
-import { resolveRequestRedirect } from "./redirects";
 import { executeRequestLifecycle } from "./requestLifecycle";
-import { buildRequestResponsePlan, decodeAndMaterializeResponse, toError } from "./responses";
+import { buildRequestResponsePlan, decodeAndMaterializeResponse } from "./responses";
 import { buildRequestHeaders } from "./transport";
 import type { JenkinsRequestOptions } from "./types";
 
@@ -15,14 +14,20 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
         authHeader: requestOptions.authHeader
       }),
     resolveRedirectAction: ({ redirectDecision }) => {
-      const redirectAction = resolveRequestRedirect(redirectDecision);
-      if (redirectAction.type === "reject") {
+      if (redirectDecision.type === "reject") {
         return {
           type: "abort",
-          error: redirectAction.error
+          error: redirectDecision.error
         };
       }
-      return redirectAction;
+      if (redirectDecision.type === "follow") {
+        return {
+          type: "follow",
+          nextUrl: redirectDecision.nextUrl,
+          redirectCount: redirectDecision.redirectCount
+        };
+      }
+      return { type: "continue" } as const;
     },
     onResponse: ({ response, statusCode, options: requestOptions, redirectDecision }) => {
       const responsePlan = buildRequestResponsePlan(requestOptions, redirectDecision);
@@ -36,7 +41,7 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
         statusCode,
         requestOptions,
         responsePlan.statusPolicy
-      ).catch((error) => Promise.reject(toError(error)));
+      );
     }
   });
 }

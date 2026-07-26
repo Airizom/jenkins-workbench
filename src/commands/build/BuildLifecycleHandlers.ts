@@ -7,14 +7,16 @@ import { refreshEnvironment } from "./BuildCommandRefresh";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 import type { ReplayBuildWorkflow } from "./ReplayBuildWorkflow";
 
+interface BuildActionOptions {
+  errorMessage: string;
+  successMessage: string;
+  action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>;
+}
+
 async function runBuildAction(
   refreshHost: BuildCommandRefreshHost,
   selected: BuildTreeItem,
-  options: {
-    errorMessage: string;
-    successMessage: string;
-    action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>;
-  }
+  options: BuildActionOptions
 ): Promise<void> {
   await withActionErrorMessage(options.errorMessage, async () => {
     await options.action(selected.environment, selected.buildUrl);
@@ -26,9 +28,14 @@ async function runBuildAction(
 async function runPendingInputAction(
   dataService: JenkinsDataService,
   refreshHost: BuildCommandRefreshHost,
-  selected: BuildTreeItem,
+  item: BuildTreeItem | undefined,
   action: "approve" | "reject"
 ): Promise<void> {
+  const selected = requireSelection(item, `Select a build to ${action} input.`);
+  if (!selected) {
+    return;
+  }
+
   await handlePendingInputAction({
     dataService,
     environment: selected.environment,
@@ -39,23 +46,6 @@ async function runPendingInputAction(
       refreshEnvironment(refreshHost, selected.environment.environmentId);
     }
   });
-}
-
-function createBuildActionConfig(
-  label: string,
-  verb: string,
-  successMessage: string,
-  action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>
-): {
-  errorMessage: string;
-  successMessage: string;
-  action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>;
-} {
-  return {
-    errorMessage: `Failed to ${verb} ${label}`,
-    successMessage,
-    action
-  };
 }
 
 export async function stopBuild(
@@ -84,16 +74,11 @@ export async function stopBuild(
     return;
   }
 
-  await runBuildAction(
-    refreshHost,
-    selected,
-    createBuildActionConfig(
-      label,
-      "stop build",
-      `Stopped build ${label}.`,
-      (environment, buildUrl) => dataService.stopBuild(environment, buildUrl)
-    )
-  );
+  await runBuildAction(refreshHost, selected, {
+    errorMessage: `Failed to stop build ${label}`,
+    successMessage: `Stopped build ${label}.`,
+    action: (environment, buildUrl) => dataService.stopBuild(environment, buildUrl)
+  });
 }
 
 export async function approveInput(
@@ -101,12 +86,7 @@ export async function approveInput(
   refreshHost: BuildCommandRefreshHost,
   item?: BuildTreeItem
 ): Promise<void> {
-  const selected = requireSelection(item, "Select a build to approve input.");
-  if (!selected) {
-    return;
-  }
-
-  await runPendingInputAction(dataService, refreshHost, selected, "approve");
+  await runPendingInputAction(dataService, refreshHost, item, "approve");
 }
 
 export async function rejectInput(
@@ -114,12 +94,7 @@ export async function rejectInput(
   refreshHost: BuildCommandRefreshHost,
   item?: BuildTreeItem
 ): Promise<void> {
-  const selected = requireSelection(item, "Select a build to reject input.");
-  if (!selected) {
-    return;
-  }
-
-  await runPendingInputAction(dataService, refreshHost, selected, "reject");
+  await runPendingInputAction(dataService, refreshHost, item, "reject");
 }
 
 export async function replayBuild(
@@ -149,16 +124,11 @@ export async function quickReplayBuild(
   }
 
   const label = getTreeItemLabel(selected);
-  await runBuildAction(
-    refreshHost,
-    selected,
-    createBuildActionConfig(
-      label,
-      "replay build",
-      `Replay requested for ${label}.`,
-      (environment, buildUrl) => dataService.quickReplayBuild(environment, buildUrl)
-    )
-  );
+  await runBuildAction(refreshHost, selected, {
+    errorMessage: `Failed to replay build ${label}`,
+    successMessage: `Replay requested for ${label}.`,
+    action: (environment, buildUrl) => dataService.quickReplayBuild(environment, buildUrl)
+  });
 }
 
 export async function runReplayDraft(
@@ -180,14 +150,9 @@ export async function rebuildBuild(
   }
 
   const label = getTreeItemLabel(selected);
-  await runBuildAction(
-    refreshHost,
-    selected,
-    createBuildActionConfig(
-      label,
-      "rebuild",
-      `Rebuild requested for ${label}.`,
-      (environment, buildUrl) => dataService.rebuildBuild(environment, buildUrl)
-    )
-  );
+  await runBuildAction(refreshHost, selected, {
+    errorMessage: `Failed to rebuild ${label}`,
+    successMessage: `Rebuild requested for ${label}.`,
+    action: (environment, buildUrl) => dataService.rebuildBuild(environment, buildUrl)
+  });
 }

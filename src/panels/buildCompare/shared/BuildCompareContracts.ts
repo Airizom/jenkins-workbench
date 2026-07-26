@@ -2,14 +2,17 @@ import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/Jenk
 import type { BuildHeaderViewModel } from "../../../shared/build/BuildHeaderLabels";
 import type { StatusVisualTone } from "../../shared/TestStatusStyles";
 
-export type CompareSectionStatus =
-  | "loading"
-  | "available"
-  | "empty"
-  | "unavailable"
-  | "error"
-  | "tooLarge"
-  | "identical";
+export const compareSectionStatuses = [
+  "loading",
+  "available",
+  "empty",
+  "unavailable",
+  "error",
+  "tooLarge",
+  "identical"
+] as const;
+
+export type CompareSectionStatus = (typeof compareSectionStatuses)[number];
 
 export interface CompareSectionBaseViewModel {
   status: CompareSectionStatus;

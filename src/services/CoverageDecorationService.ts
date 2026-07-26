@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { getGitApi } from "../git/GitExtensionApi";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsModifiedCoverageFile } from "../jenkins/coverage/JenkinsCoverageTypes";
+import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { normalizePosixPathForComparison } from "../shared/posixPaths";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import { buildTestSourceNavigationContext } from "./TestSourceResolver";
@@ -41,9 +41,13 @@ export class CoverageDecorationService implements vscode.Disposable {
     overviewRulerLane: vscode.OverviewRulerLane.Full
   });
 
+  private readonly decorationTypes = [
+    this.coveredDecorationType,
+    this.missedDecorationType,
+    this.partialDecorationType
+  ];
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly coverageContexts = new Map<string, CoverageDecorationContext>();
-  private readonly activatedOwnerIds = new Set<string>();
   private activationOrder: string[] = [];
   private activeOwnerId: string | undefined;
   private resolveGeneration = 0;
@@ -53,10 +57,10 @@ export class CoverageDecorationService implements vscode.Disposable {
   constructor(private readonly repositoryLinkStore: JenkinsRepositoryLinkStore) {
     this.subscriptions.push(
       this.repositoryLinkStore.onDidChange(() => {
-        this.handleRepositoryLinksChanged();
+        this.handleRepositorySourcesChanged();
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
-        this.handleRepositoryRootsChanged();
+        this.handleRepositorySourcesChanged();
       }),
       vscode.window.onDidChangeVisibleTextEditors(() => {
         void this.applyDecorationsToVisibleEditors(this.resolveGeneration);
@@ -71,9 +75,9 @@ export class CoverageDecorationService implements vscode.Disposable {
     while (this.subscriptions.length > 0) {
       this.subscriptions.pop()?.dispose();
     }
-    this.coveredDecorationType.dispose();
-    this.missedDecorationType.dispose();
-    this.partialDecorationType.dispose();
+    for (const decorationType of this.decorationTypes) {
+      decorationType.dispose();
+    }
   }
 
   setCoverageContext(ownerId: string, context: CoverageDecorationContext): void {
@@ -89,7 +93,6 @@ export class CoverageDecorationService implements vscode.Disposable {
       this.deactivateOwner(ownerId);
       return;
     }
-    this.activatedOwnerIds.add(ownerId);
     this.activationOrder = [ownerId, ...this.activationOrder.filter((id) => id !== ownerId)];
     if (this.activeOwnerId === ownerId) {
       return;
@@ -101,7 +104,6 @@ export class CoverageDecorationService implements vscode.Disposable {
   }
 
   deactivateOwner(ownerId: string): void {
-    this.activatedOwnerIds.delete(ownerId);
     this.activationOrder = this.activationOrder.filter((id) => id !== ownerId);
     if (this.activeOwnerId !== ownerId) {
       return;
@@ -114,7 +116,6 @@ export class CoverageDecorationService implements vscode.Disposable {
     if (!removed) {
       return;
     }
-    this.activatedOwnerIds.delete(ownerId);
     this.activationOrder = this.activationOrder.filter((id) => id !== ownerId);
     if (this.activeOwnerId === ownerId) {
       this.switchActiveOwner(this.findFallbackOwnerId());
@@ -140,11 +141,7 @@ export class CoverageDecorationService implements vscode.Disposable {
     this.linkedRepositoryRootsPromise = undefined;
   }
 
-  private handleRepositoryLinksChanged(): void {
-    this.refreshActiveDecorations();
-  }
-
-  private handleRepositoryRootsChanged(): void {
+  private handleRepositorySourcesChanged(): void {
     this.refreshActiveDecorations();
   }
 
@@ -159,9 +156,9 @@ export class CoverageDecorationService implements vscode.Disposable {
 
   private clearVisibleDecorations(): void {
     for (const editor of vscode.window.visibleTextEditors) {
-      editor.setDecorations(this.coveredDecorationType, []);
-      editor.setDecorations(this.missedDecorationType, []);
-      editor.setDecorations(this.partialDecorationType, []);
+      for (const decorationType of this.decorationTypes) {
+        editor.setDecorations(decorationType, []);
+      }
     }
   }
 
@@ -296,10 +293,10 @@ export class CoverageDecorationService implements vscode.Disposable {
     }
     this.subscriptions.push(
       gitApi.onDidOpenRepository(() => {
-        this.handleRepositoryRootsChanged();
+        this.handleRepositorySourcesChanged();
       }),
       gitApi.onDidCloseRepository(() => {
-        this.handleRepositoryRootsChanged();
+        this.handleRepositorySourcesChanged();
       })
     );
   }
@@ -310,7 +307,7 @@ export class CoverageDecorationService implements vscode.Disposable {
 
   private findFallbackOwnerId(): string | undefined {
     for (const ownerId of this.activationOrder) {
-      if (this.activatedOwnerIds.has(ownerId) && this.coverageContexts.has(ownerId)) {
+      if (this.coverageContexts.has(ownerId)) {
         return ownerId;
       }
     }

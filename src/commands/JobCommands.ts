@@ -14,12 +14,13 @@ import type {
 } from "../tree/TreeItems";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import type { WorkspacePreviewer } from "../ui/WorkspacePreviewer";
+import { createEnvironmentRefreshCallback } from "./CommandUtils";
 import {
-  type JobActionDependencies,
   copyJob,
   deleteJob,
   disableJob,
   enableJob,
+  type JobActionDependencies,
   newItem,
   renameJob,
   scanMultibranch
@@ -49,9 +50,7 @@ export function registerJobCommands(
   const newItemTargetResolver = new JobNewItemTargetResolver(environmentStore);
   const newItemWorkflow = new JobNewItemWorkflow({
     dataService,
-    onEnvironmentChanged: (environmentId) => {
-      refreshHost.fullEnvironmentRefresh({ environmentId });
-    }
+    onEnvironmentChanged: createEnvironmentRefreshCallback(refreshHost)
   });
 
   const actionDeps: JobActionDependencies = {

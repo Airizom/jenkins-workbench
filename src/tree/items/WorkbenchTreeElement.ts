@@ -4,14 +4,9 @@ import type {
   BuildTreeItem
 } from "./TreeBuildItems";
 import type {
-  ActivityJobTreeItem,
-  ActivityPipelineTreeItem,
   JenkinsFolderTreeItem,
   JenkinsViewTreeItem,
   JobTreeItem,
-  PipelineTreeItem,
-  QuickAccessJobTreeItem,
-  QuickAccessPipelineTreeItem,
   StalePinnedJobTreeItem
 } from "./TreeJobItems";
 import type { NodeTreeItem } from "./TreeNodeItems";
@@ -49,11 +44,6 @@ export type WorkbenchTreeElement =
   | PinnedSectionTreeItem
   | JenkinsFolderTreeItem
   | JobTreeItem
-  | PipelineTreeItem
-  | ActivityJobTreeItem
-  | ActivityPipelineTreeItem
-  | QuickAccessJobTreeItem
-  | QuickAccessPipelineTreeItem
   | StalePinnedJobTreeItem
   | BuildTreeItem
   | BuildArtifactsFolderTreeItem

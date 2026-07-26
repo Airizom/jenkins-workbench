@@ -7,9 +7,21 @@ export function Table({ className, ...props }: TableProps) {
   return <table className={cn("w-full caption-bottom text-sm", className)} {...props} />;
 }
 
-export type TableHeaderProps = React.HTMLAttributes<HTMLTableSectionElement>;
-export function TableHeader({ className, ...props }: TableHeaderProps) {
-  return <thead className={cn("bg-muted-soft", className)} {...props} />;
+export type TableHeaderProps = React.HTMLAttributes<HTMLTableSectionElement> & {
+  /** Keeps column labels visible while a long table scrolls inside its container. */
+  sticky?: boolean;
+};
+export function TableHeader({ className, sticky = false, ...props }: TableHeaderProps) {
+  return (
+    <thead
+      className={cn(
+        "bg-surface-raised",
+        sticky && "sticky top-0 z-10 shadow-[inset_0_-1px_0_var(--border)]",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export type TableBodyProps = React.HTMLAttributes<HTMLTableSectionElement>;
@@ -27,7 +39,7 @@ export function TableHead({ className, ...props }: TableHeadProps) {
   return (
     <th
       className={cn(
-        "px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground",
+        "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
         className
       )}
       {...props}
@@ -37,5 +49,5 @@ export function TableHead({ className, ...props }: TableHeadProps) {
 
 export type TableCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
 export function TableCell({ className, ...props }: TableCellProps) {
-  return <td className={cn("px-3 py-2.5 align-middle", className)} {...props} />;
+  return <td className={cn("px-3 py-2 align-middle", className)} {...props} />;
 }

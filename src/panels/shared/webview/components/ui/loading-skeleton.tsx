@@ -1,6 +1,7 @@
-import * as React from "react";
 import type { HTMLAttributes } from "react";
+import * as React from "react";
 import { cn } from "../../lib/utils";
+import { Progress } from "./progress";
 import { Skeleton } from "./skeleton";
 
 export interface LoadingSkeletonProps extends HTMLAttributes<HTMLDivElement> {
@@ -181,7 +182,7 @@ function PanelLoadingShell({
   className,
   children,
   ...props
-}: HTMLAttributes<HTMLElement>): JSX.Element {
+}: HTMLAttributes<HTMLElement>): React.JSX.Element {
   return (
     <output
       aria-label="Loading"
@@ -206,10 +207,10 @@ function PanelLoadingHeader({
   badge?: React.ReactNode;
   actions: React.ReactNode;
   mobileMeta?: React.ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <header className="sticky-header">
-      <LoadingProgressBar />
+      <Progress indeterminate className="h-px rounded-none" />
       <div className="mx-auto max-w-6xl px-4 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -254,14 +255,6 @@ function NodeExecutorRow() {
         <Skeleton className="h-3 w-20" />
       </div>
       <Skeleton className="h-1.5 w-full mt-2" />
-    </div>
-  );
-}
-
-function LoadingProgressBar() {
-  return (
-    <div className="h-px w-full overflow-hidden bg-muted">
-      <div className="h-full w-1/3 animate-progress-indeterminate bg-progress rounded-full" />
     </div>
   );
 }

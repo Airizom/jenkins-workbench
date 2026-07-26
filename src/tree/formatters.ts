@@ -6,9 +6,9 @@ import {
 } from "../formatters/BuildStatusFormatters";
 import { formatDurationMs, formatQueueDuration } from "../formatters/DurationFormatters";
 import {
-  type JobColorStatus,
   formatJobColorStatusLabel,
   isJobColorDisabled,
+  type JobColorStatus,
   resolveJobColorIconId,
   resolveJobColorStatus
 } from "../formatters/JobColorFormatters";
@@ -94,6 +94,9 @@ export function formatJobDescription(options: {
   const parts: string[] = [];
   if (options.status) {
     parts.push(options.status);
+  }
+  if (options.isDisabled && options.status?.toLowerCase() !== "disabled") {
+    parts.push("Disabled");
   }
   if (options.isPinned) {
     parts.push("Pinned");

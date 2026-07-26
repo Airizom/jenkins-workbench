@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { DraftEditorService } from "./DraftEditorService";
-import { JOB_CONFIG_DRAFT_SCHEME } from "./JobConfigDraftFilesystem";
 import type { JobConfigDraftFilesystem } from "./JobConfigDraftFilesystem";
+import { JOB_CONFIG_DRAFT_SCHEME } from "./JobConfigDraftFilesystem";
 
 export type JobConfigDraft = {
   environment: JenkinsEnvironmentRef;

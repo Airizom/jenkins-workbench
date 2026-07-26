@@ -53,28 +53,28 @@ function parseQueueItemId(queueLocation?: string): number | undefined {
   if (!queueLocation) {
     return undefined;
   }
-  const match = queueLocation.match(/\/queue\/item\/(\d+)/);
-  if (match?.[1]) {
-    const parsed = Number.parseInt(match[1], 10);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+
+  const directMatch = parseQueueItemIdFromPath(queueLocation);
+  if (directMatch !== undefined) {
+    return directMatch;
   }
 
   try {
     const url = new URL(queueLocation);
-    const pathMatch = url.pathname.match(/\/queue\/item\/(\d+)/);
-    if (pathMatch?.[1]) {
-      const parsed = Number.parseInt(pathMatch[1], 10);
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
-    }
+    return parseQueueItemIdFromPath(url.pathname);
   } catch {
     return undefined;
   }
+}
 
-  return undefined;
+function parseQueueItemIdFromPath(value: string): number | undefined {
+  const match = value.match(/\/queue\/item\/(\d+)/);
+  if (!match?.[1]) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function delay(ms: number): Promise<void> {

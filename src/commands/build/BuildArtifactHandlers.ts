@@ -1,15 +1,24 @@
 import type { ArtifactTreeItem } from "../../tree/TreeItems";
-import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
+import type { ArtifactActionHandler, ArtifactActionRequest } from "../../ui/ArtifactActionHandler";
 import { requireSelection } from "../CommandUtils";
 
-function getArtifactRequest(item: ArtifactTreeItem) {
+function resolveArtifactRequest(
+  item: ArtifactTreeItem | undefined,
+  action: ArtifactActionRequest["action"]
+): ArtifactActionRequest | undefined {
+  const selected = requireSelection(item, `Select an artifact to ${action}.`);
+  if (!selected) {
+    return undefined;
+  }
+
   return {
-    environment: item.environment,
-    buildUrl: item.buildUrl,
-    buildNumber: item.buildNumber,
-    relativePath: item.relativePath,
-    fileName: item.fileName,
-    jobNameHint: item.jobNameHint
+    action,
+    environment: selected.environment,
+    buildUrl: selected.buildUrl,
+    buildNumber: selected.buildNumber,
+    relativePath: selected.relativePath,
+    fileName: selected.fileName,
+    jobNameHint: selected.jobNameHint
   };
 }
 
@@ -17,28 +26,22 @@ export async function previewArtifact(
   artifactActionHandler: ArtifactActionHandler,
   item?: ArtifactTreeItem
 ): Promise<void> {
-  const selected = requireSelection(item, "Select an artifact to preview.");
-  if (!selected) {
+  const request = resolveArtifactRequest(item, "preview");
+  if (!request) {
     return;
   }
 
-  await artifactActionHandler.handle({
-    action: "preview",
-    ...getArtifactRequest(selected)
-  });
+  await artifactActionHandler.handle(request);
 }
 
 export async function downloadArtifact(
   artifactActionHandler: ArtifactActionHandler,
   item?: ArtifactTreeItem
 ): Promise<void> {
-  const selected = requireSelection(item, "Select an artifact to download.");
-  if (!selected) {
+  const request = resolveArtifactRequest(item, "download");
+  if (!request) {
     return;
   }
 
-  await artifactActionHandler.handle({
-    action: "download",
-    ...getArtifactRequest(selected)
-  });
+  await artifactActionHandler.handle(request);
 }

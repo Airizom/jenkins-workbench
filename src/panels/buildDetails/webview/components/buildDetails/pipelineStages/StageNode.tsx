@@ -6,7 +6,6 @@ import {
   AccordionTrigger
 } from "../../../../../shared/webview/components/ui/accordion";
 import { Button } from "../../../../../shared/webview/components/ui/button";
-import { Toggle } from "../../../../../shared/webview/components/ui/toggle";
 import { ChevronDownIcon, TerminalIcon } from "../../../../../shared/webview/icons";
 import {
   resolveBuildResultConnectorColor,
@@ -21,6 +20,7 @@ import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getStageIcon } from "./PipelineStageIcons";
 import { StepsList } from "./StepsList";
+import { StepsVisibilityToggle } from "./StepsVisibilityToggle";
 export function StageNode({
   stageId,
   stage,
@@ -129,20 +129,16 @@ export function StageNode({
                         Parallel Branches
                       </div>
                       {hasBranchSteps ? (
-                        <Toggle
-                          pressed={showAll}
-                          onPressedChange={(pressed) => onShowAllChange(pressed)}
-                          size="sm"
-                          aria-label={showAll ? "Show failed steps only" : "Show all steps"}
-                        >
-                          {showAll ? "Failed only" : "All steps"}
-                        </Toggle>
+                        <StepsVisibilityToggle
+                          showAll={showAll}
+                          onShowAllChange={onShowAllChange}
+                        />
                       ) : null}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {stage.parallelBranches.map((branch, branchIndex) => (
+                      {stage.parallelBranches.map((branch) => (
                         <BranchCard
-                          key={`${branch.key}-${branchIndex}`}
+                          key={branch.key}
                           branch={branch}
                           showAll={showAll}
                           onSelectPipelineLog={onSelectPipelineLog}
@@ -158,14 +154,7 @@ export function StageNode({
                       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         Steps
                       </div>
-                      <Toggle
-                        pressed={showAll}
-                        onPressedChange={(pressed) => onShowAllChange(pressed)}
-                        size="sm"
-                        aria-label={showAll ? "Show failed steps only" : "Show all steps"}
-                      >
-                        {showAll ? "Failed only" : "All steps"}
-                      </Toggle>
+                      <StepsVisibilityToggle showAll={showAll} onShowAllChange={onShowAllChange} />
                     </div>
                     {steps.length > 0 ? (
                       <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />

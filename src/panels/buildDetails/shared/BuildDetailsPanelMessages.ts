@@ -1,14 +1,15 @@
+import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 import {
   asRecord,
   hasMessageType,
   isOpenExternalMessage,
   parseSetLoadingOutgoingMessage
 } from "../../../shared/runtimeGuards";
-import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 import type {
   ArtifactAction,
   BuildDetailsUpdateMessage,
-  PipelineLogTargetViewModel
+  PipelineLogTargetViewModel,
+  PipelineNodeLogViewModel
 } from "./BuildDetailsContracts";
 import { normalizePipelineLogTarget } from "./BuildDetailsContracts";
 import {
@@ -24,23 +25,12 @@ export type BuildDetailsOutgoingMessage =
   | { type: "appendConsoleHtml"; html: string }
   | { type: "setConsole"; text: string; truncated: boolean }
   | { type: "setConsoleHtml"; html: string; truncated: boolean }
-  | { type: "setPipelineNodeLog"; log: PipelineNodeLogMessagePayload }
+  | { type: "setPipelineNodeLog"; log: PipelineNodeLogViewModel }
   | { type: "appendPipelineNodeLogHtml"; targetKey: string; html: string }
   | { type: "setPipelineNodeLogLoading"; targetKey?: string; loading: boolean }
   | { type: "setPipelineNodeLogError"; targetKey?: string; error: string }
   | { type: "setErrors"; errors: string[] }
   | { type: "setLoading"; value: boolean };
-
-export interface PipelineNodeLogMessagePayload {
-  target?: PipelineLogTargetViewModel;
-  html?: string;
-  text: string;
-  truncated: boolean;
-  loading: boolean;
-  polling?: boolean;
-  error?: string;
-  consoleUrl?: string;
-}
 
 export interface ToggleFollowLogMessage {
   type: "toggleFollowLog";
@@ -313,7 +303,7 @@ export function isPersistUiStateMessage(message: unknown): message is PersistUiS
   return normalizeBuildDetailsPanelUiState(message.uiState) !== undefined;
 }
 
-function parsePipelineNodeLogPayload(value: unknown): PipelineNodeLogMessagePayload | undefined {
+function parsePipelineNodeLogPayload(value: unknown): PipelineNodeLogViewModel | undefined {
   const record = asRecord(value);
   if (!record) {
     return undefined;

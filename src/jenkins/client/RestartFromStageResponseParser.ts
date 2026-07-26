@@ -65,7 +65,7 @@ export class RestartFromStageResponseParser {
 
   private parsePlainTextRestartResponse(responseText: string): RestartPipelineAttemptResult {
     const message = responseText || undefined;
-    if (this.isLikelySuccessfulRestartResponse(responseText)) {
+    if (!responseText || this.isSuccessStatus(responseText)) {
       return this.successResult(message);
     }
     if (this.isHtmlDocument(responseText)) {
@@ -98,14 +98,7 @@ export class RestartFromStageResponseParser {
       return value;
     }
     if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed === "true") {
-        return true;
-      }
-      if (trimmed === "false") {
-        return false;
-      }
-      const normalized = trimmed.toLowerCase();
+      const normalized = value.trim().toLowerCase();
       if (normalized === "true") {
         return true;
       }
@@ -188,28 +181,14 @@ export class RestartFromStageResponseParser {
     );
   }
 
-  private isLikelySuccessfulRestartResponse(trimmedResponse: string): boolean {
-    return !trimmedResponse || this.isSuccessStatus(trimmedResponse);
-  }
-
   private isHtmlDocument(value: string): boolean {
-    if (!value.startsWith("<")) {
-      return false;
-    }
-    if (value.startsWith("<!doctype") || value.startsWith("<html")) {
-      return true;
-    }
-    return (
-      value.slice(0, 9).toLowerCase() === "<!doctype" || value.slice(0, 5).toLowerCase() === "<html"
-    );
+    const normalized = value.slice(0, 9).toLowerCase();
+    return normalized.startsWith("<!doctype") || normalized.startsWith("<html");
   }
 
   private isSuccessStatus(value: string | undefined): boolean {
     if (!value) {
       return false;
-    }
-    if (value === "ok" || value === "success") {
-      return true;
     }
     const normalized = value.toLowerCase();
     return normalized === "ok" || normalized === "success";

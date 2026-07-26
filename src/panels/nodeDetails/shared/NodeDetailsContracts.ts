@@ -17,8 +17,6 @@ export interface NodeMonitorViewModel {
   raw: unknown;
 }
 
-export type NodeDetailsQueuedWorkViewModel = NodeQueuedWorkViewModel;
-
 export interface NodeDetailsViewModel {
   displayName: string;
   name: string;
@@ -42,15 +40,10 @@ export interface NodeDetailsViewModel {
   manualLaunchLabel?: string;
   executors: NodeExecutorViewModel[];
   oneOffExecutors: NodeExecutorViewModel[];
-  queuedWork: NodeDetailsQueuedWorkViewModel;
+  queuedWork: NodeQueuedWorkViewModel;
   monitorData: NodeMonitorViewModel[];
   loadStatistics: NodeMonitorViewModel[];
   rawJson: string;
   errors: string[];
   advancedLoaded: boolean;
-}
-
-export interface NodeDetailsUpdateMessage {
-  type: "updateNodeDetails";
-  payload: NodeDetailsViewModel;
 }

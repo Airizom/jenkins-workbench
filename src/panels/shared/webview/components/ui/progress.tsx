@@ -24,7 +24,7 @@ export const Progress = React.forwardRef<
   return (
     <ProgressPrimitive.Root
       ref={ref}
-      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted", className)}
+      className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted-strong", className)}
       value={indeterminate ? undefined : value}
       max={indeterminate ? undefined : safeMax}
       {...props}

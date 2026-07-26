@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import {
   Tooltip,
@@ -13,7 +14,7 @@ type BuildDetailsScrollToTopButtonProps = {
 export function BuildDetailsScrollToTopButton({
   show,
   onScrollToTop
-}: BuildDetailsScrollToTopButtonProps): JSX.Element | null {
+}: BuildDetailsScrollToTopButtonProps): React.JSX.Element | null {
   if (!show) {
     return null;
   }
@@ -23,12 +24,12 @@ export function BuildDetailsScrollToTopButton({
       <TooltipTrigger asChild>
         <Button
           aria-label="Scroll to top"
-          className="fixed bottom-4 right-4 z-50 rounded-full shadow-widget h-8 w-8"
+          className="fixed bottom-4 right-4 z-50 h-9 w-9 animate-fade-up rounded-full border border-border shadow-lg"
           onClick={onScrollToTop}
           size="icon"
           variant="secondary"
         >
-          <ArrowUpIcon className="h-3.5 w-3.5" />
+          <ArrowUpIcon className="h-4 w-4" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>Scroll to top</TooltipContent>

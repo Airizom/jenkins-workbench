@@ -1,3 +1,4 @@
+import { BARE_CALL_PREFIX_KEYWORDS } from "./JenkinsfileContextConstants";
 import {
   findBareCallArgumentStart,
   findNextMeaningfulIndex,
@@ -6,7 +7,6 @@ import {
 } from "./JenkinsfileContextNavigation";
 import type { JenkinsfileActiveCall, JenkinsfileArgumentContext } from "./JenkinsfileContextTypes";
 
-const BARE_CALL_PREFIX_KEYWORDS = new Set(["else", "return", "throw", "yield"]);
 const BARE_CALL_PREFIX_PAREN_KEYWORDS = new Set(["catch", "for", "if", "switch", "while"]);
 const BARE_CALL_PREFIX_DECLARATION_KEYWORDS = new Set(["def", "final"]);
 const LEADING_NAMED_ARG_PATTERN = /^\s*([A-Za-z_$][\w$]*)\s*:/;
@@ -22,30 +22,7 @@ function extractLeadingNamedArgName(segmentText: string): string | undefined {
   if (!match) {
     return undefined;
   }
-  const colonIndex = match.index + match[0].length - 1;
-  if (segmentText[colonIndex - 1] === "?") {
-    return undefined;
-  }
-  if (containsTopLevelQuestionMark(segmentText.slice(0, colonIndex))) {
-    return undefined;
-  }
   return match[1];
-}
-
-function containsTopLevelQuestionMark(text: string): boolean {
-  const depth = createGroupingDepth();
-
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    if (updateGroupingDepth(depth, character)) {
-      continue;
-    }
-    if (character === "?" && isTopLevel(depth)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 export function analyzeActiveCallArguments(

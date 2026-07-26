@@ -187,7 +187,7 @@ export interface JenkinsPendingInputAction {
   parameters?: JenkinsPendingInputParameterDefinition[];
 }
 
-export interface JenkinsWorkflowStep {
+interface JenkinsWorkflowNode {
   id?: string;
   name?: string;
   status?: string;
@@ -202,20 +202,10 @@ export interface JenkinsWorkflowStep {
   children?: JenkinsWorkflowStage[];
 }
 
-export interface JenkinsWorkflowStage {
-  id?: string;
-  name?: string;
-  status?: string;
-  startTimeMillis?: number;
-  durationMillis?: number;
-  pauseDurationMillis?: number;
+export interface JenkinsWorkflowStep extends JenkinsWorkflowNode {}
+
+export interface JenkinsWorkflowStage extends JenkinsWorkflowNode {
   execNode?: string;
-  execDurationMillis?: number;
-  stageFlowNodes?: JenkinsWorkflowStep[];
-  steps?: JenkinsWorkflowStep[];
-  parallelStages?: JenkinsWorkflowStage[];
-  branches?: JenkinsWorkflowStage[];
-  children?: JenkinsWorkflowStage[];
 }
 
 export interface JenkinsWorkflowRun {
@@ -354,12 +344,8 @@ export interface JenkinsNodeDetails extends JenkinsNode {
   icon?: string;
   iconClassName?: string;
   idle?: boolean;
-  jnlpAgent?: boolean;
-  launchSupported?: boolean;
-  manualLaunchAllowed?: boolean;
   monitorData?: Record<string, unknown>;
   loadStatistics?: Record<string, unknown>;
-  executors?: JenkinsNodeExecutor[];
   oneOffExecutors?: JenkinsNodeExecutor[];
 }
 

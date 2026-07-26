@@ -28,80 +28,67 @@ export class DefaultTestSourceFileMatchStrategy implements TestSourceFileMatchSt
     className: string
   ): Promise<readonly vscode.Uri[]> {
     const settings = this.config.getOptions();
-    const patterns = buildSearchPatterns(className, settings.fileExtensions);
-    if (patterns.length === 0) {
+    const pattern = buildSearchPattern(className, settings.fileExtensions);
+    if (!pattern) {
       return [];
     }
 
     const matches = new Map<string, vscode.Uri>();
+    // Preserve the aggregate bound from the former one-search-per-extension implementation.
+    const maxResultsPerRoot = settings.maxResultsPerPattern * settings.fileExtensions.length;
     for (const root of repositoryRoots) {
-      for (const pattern of patterns) {
-        const found = await vscode.workspace.findFiles(
-          new vscode.RelativePattern(root, pattern),
-          settings.excludeGlob,
-          settings.maxResultsPerPattern
-        );
-        for (const uri of found) {
-          matches.set(uri.toString(), uri);
-        }
+      const found = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(root, pattern),
+        settings.excludeGlob,
+        maxResultsPerRoot
+      );
+      for (const uri of found) {
+        matches.set(uri.toString(), uri);
       }
     }
 
-    return Array.from(matches.values()).sort((left, right) =>
-      compareCandidates(left, right, className, settings.preferredPathScores, this.scoreCandidate)
-    );
-  }
-
-  private scoreCandidate(
-    uri: vscode.Uri,
-    className: string,
-    preferredPathScores: readonly TestSourcePathPreference[]
-  ): number {
-    const normalizedPath = uri.path.toLowerCase();
-    const expectedSuffix = `${className.replace(/\./g, "/").toLowerCase()}.${getExtension(uri)}`;
-    let score = 0;
-    if (normalizedPath.endsWith(expectedSuffix)) {
-      score += 100;
-    }
-    for (const preference of preferredPathScores) {
-      if (normalizedPath.includes(preference.fragment)) {
-        score += preference.score;
-      }
-    }
-    return score;
+    const expectedPath = className.replace(/\./g, "/").toLowerCase();
+    return Array.from(matches.values(), (uri) => ({
+      uri,
+      score: scoreCandidate(uri, expectedPath, settings.preferredPathScores),
+      fsPath: uri.fsPath
+    }))
+      .sort((left, right) => right.score - left.score || left.fsPath.localeCompare(right.fsPath))
+      .map(({ uri }) => uri);
   }
 }
 
-function buildSearchPatterns(
+function buildSearchPattern(
   className: string,
   fileExtensions: readonly string[]
-): readonly string[] {
+): string | undefined {
   const pathSegments = className.split(".").filter(Boolean);
-  if (pathSegments.length === 0) {
-    return [];
+  if (pathSegments.length === 0 || fileExtensions.length === 0) {
+    return undefined;
   }
 
   const fileBase = pathSegments[pathSegments.length - 1];
   const packagePrefix = pathSegments.slice(0, -1);
   const packagePath = packagePrefix.length > 0 ? `${packagePrefix.join("/")}/` : "";
-  return fileExtensions.map((extension) => `**/${packagePath}${fileBase}.${extension}`);
+  const extensionPattern =
+    fileExtensions.length === 1 ? fileExtensions[0] : `{${fileExtensions.join(",")}}`;
+  return `**/${packagePath}${fileBase}.${extensionPattern}`;
 }
 
-function compareCandidates(
-  left: vscode.Uri,
-  right: vscode.Uri,
-  className: string,
-  preferredPathScores: readonly TestSourcePathPreference[],
-  scoreCandidate: (
-    uri: vscode.Uri,
-    candidateClassName: string,
-    candidatePreferredPathScores: readonly TestSourcePathPreference[]
-  ) => number
+function scoreCandidate(
+  uri: vscode.Uri,
+  expectedPath: string,
+  preferredPathScores: readonly TestSourcePathPreference[]
 ): number {
-  const scoreDelta =
-    scoreCandidate(right, className, preferredPathScores) -
-    scoreCandidate(left, className, preferredPathScores);
-  return scoreDelta || left.fsPath.localeCompare(right.fsPath);
+  const normalizedPath = uri.path.toLowerCase();
+  const expectedSuffix = `${expectedPath}.${getExtension(uri)}`;
+  let score = normalizedPath.endsWith(expectedSuffix) ? 100 : 0;
+  for (const preference of preferredPathScores) {
+    if (normalizedPath.includes(preference.fragment)) {
+      score += preference.score;
+    }
+  }
+  return score;
 }
 
 function getExtension(uri: vscode.Uri): string {

@@ -16,7 +16,7 @@ function applyInjectedPanelState(api: VsCodeApi): void {
   const windowWithState = window as {
     __JENKINS_WORKBENCH_PANEL_STATE__?: unknown;
   };
-  if (!Object.prototype.hasOwnProperty.call(windowWithState, "__JENKINS_WORKBENCH_PANEL_STATE__")) {
+  if (!Object.hasOwn(windowWithState, "__JENKINS_WORKBENCH_PANEL_STATE__")) {
     return;
   }
 

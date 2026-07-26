@@ -19,14 +19,16 @@ export interface JenkinsJobParametersResponse {
   property?: JenkinsParameterContainer[];
 }
 
+const PARAMETER_CONTAINER_FIELDS = ["actions", "property"] as const;
+
 export function extractParameterDefinitions(
   response: JenkinsJobParametersResponse
 ): JenkinsParameterDefinition[] {
   const definitions: JenkinsParameterDefinition[] = [];
   const seen = new Set<string>();
 
-  const collectDefinitions = (containers?: JenkinsParameterContainer[]): void => {
-    for (const container of containers ?? []) {
+  for (const field of PARAMETER_CONTAINER_FIELDS) {
+    for (const container of response[field] ?? []) {
       if (!container || !Array.isArray(container.parameterDefinitions)) {
         continue;
       }
@@ -58,10 +60,7 @@ export function extractParameterDefinitions(
         seen.add(definition.name);
       }
     }
-  };
-
-  collectDefinitions(response.actions);
-  collectDefinitions(response.property);
+  }
 
   return definitions;
 }

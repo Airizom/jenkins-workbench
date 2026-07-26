@@ -3,6 +3,7 @@ import {
   formatOptionalDurationMs,
   formatOptionalLocaleTimestamp
 } from "../../formatters/DisplayFormatters";
+import type { JenkinsBuild } from "../../jenkins/JenkinsClient";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { parseBuildUrl } from "../../jenkins/urls";
 import type { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
@@ -82,13 +83,7 @@ export async function compareWithBuild(
 
 async function promptForComparisonBuild(
   selected: BuildTreeItem,
-  builds: Array<{
-    number: number;
-    url: string;
-    result?: string;
-    timestamp?: number;
-    duration?: number;
-  }>
+  builds: JenkinsBuild[]
 ): Promise<CompareBuildQuickPickItem | undefined> {
   const quickPick = vscode.window.createQuickPick<CompareBuildQuickPickItem>();
   quickPick.ignoreFocusOut = true;
@@ -140,13 +135,7 @@ async function promptForComparisonBuild(
   });
 }
 
-function createCompareBuildQuickPickItem(build: {
-  number: number;
-  url: string;
-  result?: string;
-  timestamp?: number;
-  duration?: number;
-}): CompareBuildQuickPickItem {
+function createCompareBuildQuickPickItem(build: JenkinsBuild): CompareBuildQuickPickItem {
   return {
     label: `#${build.number}`,
     description: build.result ?? "Unknown",

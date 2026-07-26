@@ -88,28 +88,44 @@ export function findMatchingDelimiterBackward(
   throw new Error(`Unterminated GDSL delimiter '${closeChar}'.`);
 }
 
-export function skipString(text: string, start: number): number {
+export function readGdslString(
+  text: string,
+  start: number
+): { value: string; end: number; terminated: boolean } {
   const quote = text[start];
   const triple = text[start + 1] === quote && text[start + 2] === quote;
   let index = start + (triple ? 3 : 1);
+  let value = "";
+
   while (index < text.length) {
     if (!triple && text[index] === "\\") {
+      value += text[index + 1] ?? "";
       index += 2;
       continue;
     }
-    if (triple) {
-      if (text[index] === quote && text[index + 1] === quote && text[index + 2] === quote) {
-        return index + 3;
-      }
-      index += 1;
-      continue;
+    if (
+      text[index] === quote &&
+      (!triple || (text[index + 1] === quote && text[index + 2] === quote))
+    ) {
+      return {
+        value,
+        end: index + (triple ? 3 : 1),
+        terminated: true
+      };
     }
-    if (text[index] === quote) {
-      return index + 1;
-    }
+    value += text[index];
     index += 1;
   }
-  return text.length;
+
+  return {
+    value,
+    end: text.length,
+    terminated: false
+  };
+}
+
+export function skipString(text: string, start: number): number {
+  return readGdslString(text, start).end;
 }
 
 function skipLineComment(text: string, start: number): number {

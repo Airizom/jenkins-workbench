@@ -114,17 +114,17 @@ export class JenkinsRepositoryLinkStore {
       const key = this.toRepositoryKey(repositoryUri);
       const storedLink = this.toStoredRepositoryLink(link);
       if (link.environment.scope === "workspace") {
-        await this.updateWorkspaceLinks((links) => {
+        await this.updateLinks("workspace", (links) => {
           links[key] = storedLink;
         });
-        await this.updateGlobalLinks((links) => {
+        await this.updateLinks("global", (links) => {
           delete links[key];
         });
       } else {
-        await this.updateGlobalLinks((links) => {
+        await this.updateLinks("global", (links) => {
           links[key] = storedLink;
         });
-        await this.updateWorkspaceLinks((links) => {
+        await this.updateLinks("workspace", (links) => {
           delete links[key];
         });
       }
@@ -141,10 +141,10 @@ export class JenkinsRepositoryLinkStore {
         return false;
       }
 
-      await this.updateWorkspaceLinks((links) => {
+      await this.updateLinks("workspace", (links) => {
         delete links[key];
       });
-      await this.updateGlobalLinks((links) => {
+      await this.updateLinks("global", (links) => {
         delete links[key];
       });
       this.emitter.fire();
@@ -169,22 +169,15 @@ export class JenkinsRepositoryLinkStore {
     return this.context.workspaceState.get<StoredRepositoryLinksState>(STATE_KEY) ?? {};
   }
 
-  private async updateWorkspaceLinks(
+  private async updateLinks(
+    scope: JenkinsEnvironmentRef["scope"],
     update: (links: Record<string, StoredRepositoryLink>) => void
   ): Promise<void> {
-    const state = this.getWorkspaceState();
+    const state = scope === "workspace" ? this.getWorkspaceState() : this.getGlobalState();
+    const memento = scope === "workspace" ? this.context.workspaceState : this.context.globalState;
     const links = { ...(state.links ?? {}) };
     update(links);
-    await this.context.workspaceState.update(STATE_KEY, { ...state, links });
-  }
-
-  private async updateGlobalLinks(
-    update: (links: Record<string, StoredRepositoryLink>) => void
-  ): Promise<void> {
-    const state = this.getGlobalState();
-    const links = { ...(state.links ?? {}) };
-    update(links);
-    await this.context.globalState.update(STATE_KEY, { ...state, links });
+    await memento.update(STATE_KEY, { ...state, links });
   }
 
   private toRepositoryKey(repositoryUri: vscode.Uri | string): string {

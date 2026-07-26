@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import { type RedirectDecision, decideRedirect, isCrossOriginRedirect } from "./redirects";
+import { decideRedirect, isCrossOriginRedirect, type RedirectDecision } from "./redirects";
 import { createRequestTarget, createTimeoutError } from "./transport";
 
 type RequestMethod = "GET" | "POST" | "HEAD";

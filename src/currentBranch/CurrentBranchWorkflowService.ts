@@ -1,16 +1,16 @@
 import * as vscode from "vscode";
 import type { CurrentBranchActionExecutor } from "./CurrentBranchActionExecutor";
-import type { CurrentBranchCommandMapper } from "./CurrentBranchCommandMapper";
 import type {
   CurrentBranchBuildAction,
+  CurrentBranchCommandMapper,
   CurrentBranchOpenRequest,
   CurrentBranchResolutionResult
 } from "./CurrentBranchCommandMapper";
 import type { CurrentBranchJenkinsService } from "./CurrentBranchJenkinsService";
-import type { CurrentBranchLinkWorkflowService } from "./CurrentBranchLinkWorkflowService";
 import type {
   CurrentBranchEnvironmentDiscoveryResult,
   CurrentBranchLinkableEnvironment,
+  CurrentBranchLinkWorkflowService,
   CurrentBranchMultibranchDiscoveryResult,
   CurrentBranchMultibranchScanResult,
   CurrentBranchMultibranchTarget

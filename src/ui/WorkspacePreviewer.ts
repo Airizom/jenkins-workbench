@@ -1,12 +1,12 @@
+import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { WorkspaceRetrievalService } from "../services/WorkspaceRetrievalService";
-import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
 import type { ArtifactPreviewOptionsProvider } from "./ArtifactPreviewer";
+import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
 import { openBufferedContentPreview } from "./BufferedContentPreviewer";
 
 export class WorkspacePreviewer {
   constructor(
-    private readonly retrievalService: WorkspaceRetrievalService,
+    private readonly dataService: JenkinsDataService,
     private readonly previewProvider: ArtifactPreviewProvider,
     private readonly optionsProvider: ArtifactPreviewOptionsProvider
   ) {}
@@ -19,14 +19,9 @@ export class WorkspacePreviewer {
   ): Promise<void> {
     const options = this.optionsProvider();
     const previewPath = fileName?.trim() || relativePath || "workspace-file";
-    const response = await this.retrievalService.getWorkspaceFile(
-      environment,
-      jobUrl,
-      relativePath,
-      {
-        maxBytes: options.maxBytes
-      }
-    );
+    const response = await this.dataService.getWorkspaceFile(environment, jobUrl, relativePath, {
+      maxBytes: options.maxBytes
+    });
 
     await openBufferedContentPreview(this.previewProvider, response, previewPath, "workspace-file");
   }

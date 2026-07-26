@@ -1,11 +1,9 @@
 import {
-  FALLBACK_UPDATED_AT,
-  createLoadingPanelStateHelpers
+  createLoadingPanelStateHelpers,
+  FALLBACK_UPDATED_AT
 } from "../../../shared/webview/state/createPanelStateHelpers";
-import type {
-  NodeDetailsUpdateMessage,
-  NodeDetailsViewModel
-} from "../../shared/NodeDetailsContracts";
+import type { NodeDetailsViewModel } from "../../shared/NodeDetailsContracts";
+import type { NodeDetailsUpdateMessage } from "../../shared/NodeDetailsPanelMessages";
 
 export type NodeDetailsState = NodeDetailsViewModel & {
   loading: boolean;

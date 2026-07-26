@@ -1,7 +1,5 @@
-import { WORD_CHAR_PATTERN } from "./JenkinsfileContextConstants";
+import { BARE_CALL_PREFIX_KEYWORDS, WORD_CHAR_PATTERN } from "./JenkinsfileContextConstants";
 import type { JenkinsfileClosedCall, JenkinsfileIdentifier } from "./JenkinsfileContextTypes";
-
-const ALLOWED_IDENTIFIER_PREFIXES = new Set(["else", "return", "throw", "yield"]);
 
 export function findIdentifierAt(
   maskedText: string,
@@ -55,8 +53,7 @@ export function resolveCallName(maskedText: string, openParen: number): string |
   if (previous === undefined || !WORD_CHAR_PATTERN.test(maskedText[previous])) {
     return undefined;
   }
-  const identifier = readIdentifier(maskedText, previous);
-  return identifier.end === previous + 1 ? identifier.name : undefined;
+  return readIdentifier(maskedText, previous).name;
 }
 
 export function resolveBraceLabel(
@@ -144,7 +141,7 @@ export function isValidStepStart(maskedText: string, offset: number): boolean {
   }
   if (WORD_CHAR_PATTERN.test(character)) {
     const previousIdentifier = readIdentifier(maskedText, previous);
-    return ALLOWED_IDENTIFIER_PREFIXES.has(previousIdentifier.name);
+    return BARE_CALL_PREFIX_KEYWORDS.has(previousIdentifier.name);
   }
   return true;
 }

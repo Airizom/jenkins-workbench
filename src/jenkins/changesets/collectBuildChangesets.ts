@@ -8,7 +8,7 @@ export interface BuildChangesetSource {
 }
 
 function changesetDedupeKey(message: string, author: string, commitId?: string): string {
-  return commitId ? `id:${commitId}|${message}|${author}` : `${message}|${author}`;
+  return JSON.stringify([commitId ?? null, message, author]);
 }
 
 function toViewModel(item: JenkinsChangeSetItem): JenkinsChangesetViewModel {

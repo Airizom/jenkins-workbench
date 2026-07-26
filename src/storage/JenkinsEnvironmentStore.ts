@@ -161,20 +161,12 @@ export class JenkinsEnvironmentStore {
       const authConfig = parseAuthConfig(parsed);
       if (!authConfig) {
         console.warn(`Invalid auth config for environment ${id}. Clearing secret.`);
-        try {
-          await this.deleteAuthConfig(scope, id);
-        } catch (error) {
-          console.warn(`Failed to clear invalid auth config for environment ${id}.`, error);
-        }
+        await this.clearInvalidAuthConfig(scope, id);
       }
       return authConfig;
     } catch (error) {
       console.warn(`Invalid auth config for environment ${id}. Clearing secret.`, error);
-      try {
-        await this.deleteAuthConfig(scope, id);
-      } catch (clearError) {
-        console.warn(`Failed to clear invalid auth config for environment ${id}.`, clearError);
-      }
+      await this.clearInvalidAuthConfig(scope, id);
       return undefined;
     }
   }
@@ -204,10 +196,8 @@ export class JenkinsEnvironmentStore {
             };
             await this.setAuthConfig(scope, environment.id, authConfig);
             await this.deleteToken(scope, environment.id);
-            if (environment.username) {
-              environment.username = undefined;
-              didUpdate = true;
-            }
+            environment.username = undefined;
+            didUpdate = true;
             return;
           }
         }
@@ -244,6 +234,14 @@ export class JenkinsEnvironmentStore {
     const key = this.getAuthRevisionKey(scope, id);
     const current = this.authConfigRevisions.get(key) ?? 0;
     this.authConfigRevisions.set(key, current + 1);
+  }
+
+  private async clearInvalidAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
+    try {
+      await this.deleteAuthConfig(scope, id);
+    } catch (error) {
+      console.warn(`Failed to clear invalid auth config for environment ${id}.`, error);
+    }
   }
 
   private fireEnvironmentChange(

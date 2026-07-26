@@ -31,6 +31,7 @@ interface BuildDetailsPanelRuntimeOptions {
 export class BuildDetailsPanelRuntime {
   private readonly completionPoller: BuildDetailsCompletionPoller;
   private readonly coverageCoordinator: BuildDetailsCoverageCoordinator;
+  private testReportRefreshGeneration = 0;
 
   constructor(private readonly options: BuildDetailsPanelRuntimeOptions) {
     this.completionPoller = new BuildDetailsCompletionPoller({
@@ -53,6 +54,7 @@ export class BuildDetailsPanelRuntime {
   }
 
   dispose(): void {
+    this.testReportRefreshGeneration += 1;
     this.stopCompletionPolling();
     this.coverageCoordinator.dispose();
   }
@@ -152,6 +154,7 @@ export class BuildDetailsPanelRuntime {
     ) {
       return;
     }
+    const refreshGeneration = ++this.testReportRefreshGeneration;
     if (options?.showLoading) {
       const changed = this.options.state.setTestResultsLoading(true);
       if (changed && this.options.view.isVisible()) {
@@ -165,7 +168,7 @@ export class BuildDetailsPanelRuntime {
           : undefined;
       const { report: testReport, effectiveOptions } =
         await pollingController.fetchTestReport(fetchOptions);
-      if (!this.options.isTokenCurrent(token)) {
+      if (this.isTestReportRefreshStale(token, refreshGeneration)) {
         return;
       }
       this.options.state.setTestReport(testReport, {
@@ -174,7 +177,7 @@ export class BuildDetailsPanelRuntime {
       this.options.state.setTestResultsLoading(false);
       this.postStateUpdate();
     } catch {
-      if (this.options.isTokenCurrent(token)) {
+      if (!this.isTestReportRefreshStale(token, refreshGeneration)) {
         this.options.state.markTestReportFetchAttempted();
         if (options?.showLoading) {
           const changed = this.options.state.setTestResultsLoading(false);
@@ -187,6 +190,12 @@ export class BuildDetailsPanelRuntime {
       }
       return;
     }
+  }
+
+  private isTestReportRefreshStale(token: number, refreshGeneration: number): boolean {
+    return (
+      !this.options.isTokenCurrent(token) || refreshGeneration !== this.testReportRefreshGeneration
+    );
   }
 
   async refreshCoverage(token: number, options?: { showLoading?: boolean }): Promise<void> {
@@ -239,6 +248,10 @@ export class BuildDetailsPanelRuntime {
     if (!this.options.state.takeCompletionToastSlot()) {
       return;
     }
+    const buildUrl = this.options.state.currentBuildUrl;
+    if (!buildUrl) {
+      return;
+    }
     const title = details.fullDisplayName ?? details.displayName ?? "Build";
     const resultLabel = formatBuildResultLabel(details);
     const action = "Open in Jenkins";
@@ -246,10 +259,10 @@ export class BuildDetailsPanelRuntime {
       `${title} finished with status ${resultLabel}.`,
       action
     );
-    if (selection !== action || !this.options.state.currentBuildUrl) {
+    if (selection !== action) {
       return;
     }
-    await openExternalHttpUrlWithWarning(this.options.state.currentBuildUrl, {
+    await openExternalHttpUrlWithWarning(buildUrl, {
       targetLabel: "Jenkins URL",
       sourceLabel: "Build Details"
     });

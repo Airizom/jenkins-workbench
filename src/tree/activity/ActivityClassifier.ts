@@ -1,10 +1,9 @@
-import { isRunningJobColor, resolveJobColorStatus } from "../../formatters/JobColorFormatters";
+import { resolveJobColorStatus } from "../../formatters/JobColorFormatters";
 import type { JobSearchEntry } from "../../jenkins/JenkinsDataService";
 import type { ActivityGroupKind } from "../ActivityTypes";
 
 export interface ActivityClassification {
   group: ActivityGroupKind;
-  isRunning: boolean;
 }
 
 interface TreeActivityClassificationSurface {
@@ -13,22 +12,15 @@ interface TreeActivityClassificationSurface {
 
 export class ActivityClassifier implements TreeActivityClassificationSurface {
   classify(entry: Pick<JobSearchEntry, "color">): ActivityClassification | undefined {
-    const color = entry.color;
-    if (!color) {
-      return undefined;
+    const status = resolveJobColorStatus(entry.color);
+    if (status === "running") {
+      return { group: "running" };
     }
-
-    const isRunning = isRunningJobColor(color);
-    if (isRunning) {
-      return { group: "running", isRunning };
-    }
-
-    const status = resolveJobColorStatus(color);
     if (status === "failed") {
-      return { group: "failing", isRunning };
+      return { group: "failing" };
     }
     if (status === "unstable") {
-      return { group: "unstable", isRunning };
+      return { group: "unstable" };
     }
     return undefined;
   }

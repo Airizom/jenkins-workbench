@@ -1,12 +1,12 @@
 import * as React from "react";
 import type { ConsoleSearchState } from "../hooks/useConsoleSearch";
-import { ConsoleSearchToolbar } from "./ConsoleSearchToolbar";
 import {
   ConsoleOutputEmptyState,
   ConsoleOutputErrorNotice,
   ConsoleOutputNotice,
   ConsoleOutputViewport
 } from "./buildDetails/consoleOutput";
+import { ConsoleSearchToolbar } from "./ConsoleSearchToolbar";
 export function ConsoleLogSearchBody({
   consoleSearch,
   note,
@@ -27,7 +27,7 @@ export function ConsoleLogSearchBody({
   onScrollToTop: () => void;
   segments: React.ReactNode[];
   className?: string;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <div className={className}>
       <ConsoleSearchToolbar

@@ -35,26 +35,28 @@ export function SectionCard({
   return (
     <Card>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <CardTitle>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    className="group flex min-w-0 items-center justify-start text-left"
-                  >
-                    <DisclosureChevron className="h-4 w-4" />
-                    <span className="min-w-0 truncate">{title}</span>
-                  </button>
-                </CollapsibleTrigger>
-              </CardTitle>
-              <CardDescription className="pl-6">{summary}</CardDescription>
-              {detail ? <p className="mt-2 pl-6 text-xs text-muted-foreground">{detail}</p> : null}
-            </div>
-            <ToneBadge label={statusBadge.label} tone={statusBadge.tone} />
-          </div>
-        </CardHeader>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="focus-ring group w-full rounded-lg text-left transition-colors hover:bg-accent-soft"
+          >
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start">
+                  <DisclosureChevron className="mt-0.5 h-4 w-4" />
+                  <div className="min-w-0">
+                    <CardTitle className="truncate">{title}</CardTitle>
+                    <CardDescription>{summary}</CardDescription>
+                    {detail ? (
+                      <p className="mt-1.5 text-xs text-muted-foreground">{detail}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <ToneBadge label={statusBadge.label} tone={statusBadge.tone} />
+              </div>
+            </CardHeader>
+          </button>
+        </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="space-y-3">{children}</CardContent>
         </CollapsibleContent>

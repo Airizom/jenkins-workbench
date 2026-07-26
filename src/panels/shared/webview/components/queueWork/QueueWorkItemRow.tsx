@@ -1,3 +1,4 @@
+import type * as React from "react";
 import type { QueueWorkItemViewModel } from "../../../../../shared/queueWork/QueueWorkContracts";
 import { ExternalLinkIcon } from "../../icons";
 import { Badge } from "../ui/badge";
@@ -14,8 +15,8 @@ export function QueueWorkItemRow({
   onOpenExternal,
   action = "open-button",
   className
-}: QueueWorkItemRowProps): JSX.Element {
-  const renderTaskAction = (taskUrl: string): JSX.Element =>
+}: QueueWorkItemRowProps): React.JSX.Element {
+  const renderTaskAction = (taskUrl: string): React.JSX.Element =>
     action === "external-icon" ? (
       <Button
         aria-label={`Open ${item.name} in Jenkins`}

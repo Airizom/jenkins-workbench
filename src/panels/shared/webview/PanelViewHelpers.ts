@@ -1,10 +1,10 @@
 import type * as vscode from "vscode";
 import type { LoadingSkeletonVariant } from "./LoadingSkeletonHtml";
-import { type WebviewEntryName, resolveWebviewAssets } from "./WebviewAssets";
+import { resolveWebviewAssets, type WebviewEntryName } from "./WebviewAssets";
 import {
+  assignWebviewPanelManifestErrorHtml,
   type PanelDetailsRenderOptions,
   type PanelManifestErrorOptions,
-  assignWebviewPanelManifestErrorHtml,
   renderPanelLoadingHtml
 } from "./WebviewHtml";
 

@@ -1,8 +1,8 @@
 import type { BrowserSsoAuthenticator } from "../services/BrowserSsoAuthenticationService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import { buildAuthSignature } from "./auth";
 import { JenkinsClient } from "./JenkinsClient";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
-import { buildAuthSignature } from "./auth";
 import type { JenkinsAuthConfig } from "./types";
 
 export interface JenkinsClientProviderOptions {
@@ -16,27 +16,17 @@ interface JenkinsAuthMaterial {
   token: string | undefined;
 }
 
+interface JenkinsClientCacheEntry {
+  client?: JenkinsClient;
+  authSignature: string;
+  authConfigRevision: number;
+  token?: string;
+  url: string;
+  username?: string;
+}
+
 export class JenkinsClientProvider {
-  private readonly clientCache = new Map<
-    string,
-    {
-      client: JenkinsClient;
-      authSignature?: string;
-      authConfigRevision?: number;
-      token?: string;
-      url: string;
-      username?: string;
-    }
-  >();
-  private readonly authSignatureCache = new Map<
-    string,
-    {
-      authSignature: string;
-      authConfigRevision: number;
-      url: string;
-      username?: string;
-    }
-  >();
+  private readonly clientCache = new Map<string, JenkinsClientCacheEntry>();
   private requestTimeoutMs?: number;
   private readonly browserSsoAuthenticator?: BrowserSsoAuthenticator;
 
@@ -54,30 +44,29 @@ export class JenkinsClientProvider {
       environment.scope,
       environment.environmentId
     );
-    const cachedClient = this.clientCache.get(cacheKey);
+    const cached = this.clientCache.get(cacheKey);
     if (
-      cachedClient?.authSignature &&
-      cachedClient.authConfigRevision === authConfigRevision &&
-      cachedClient.url === environment.url &&
-      cachedClient.username === environment.username
+      cached?.authConfigRevision === authConfigRevision &&
+      cached.url === environment.url &&
+      cached.username === environment.username
     ) {
-      return cachedClient.authSignature;
+      return cached.authSignature;
     }
 
-    const cachedSignature = this.authSignatureCache.get(cacheKey);
-    if (
-      cachedSignature?.authSignature &&
-      cachedSignature.authConfigRevision === authConfigRevision &&
-      cachedSignature.url === environment.url &&
-      cachedSignature.username === environment.username
-    ) {
-      return cachedSignature.authSignature;
-    }
-
-    const { authSignature } = await this.resolveAuthMaterial(environment);
-    this.authSignatureCache.set(cacheKey, {
+    const { authSignature, token } = await this.resolveAuthMaterial(environment);
+    const client =
+      cached?.client &&
+      cached.authSignature === authSignature &&
+      cached.token === token &&
+      cached.url === environment.url &&
+      cached.username === environment.username
+        ? cached.client
+        : undefined;
+    this.clientCache.set(cacheKey, {
+      client,
       authSignature,
       authConfigRevision,
+      token,
       url: environment.url,
       username: environment.username
     });
@@ -89,18 +78,31 @@ export class JenkinsClientProvider {
       environment.scope,
       environment.environmentId
     );
-    const { authConfig, authSignature, token } = await this.resolveAuthMaterial(environment);
-
     const cacheKey = `${environment.scope}:${environment.environmentId}`;
     const cached = this.clientCache.get(cacheKey);
 
     if (
-      cached &&
+      cached?.client &&
+      cached.authConfigRevision === authConfigRevision &&
+      cached.url === environment.url &&
+      cached.username === environment.username
+    ) {
+      return cached.client;
+    }
+
+    const { authConfig, authSignature, token } = await this.resolveAuthMaterial(environment);
+
+    if (
+      cached?.client &&
       cached.authSignature === authSignature &&
       cached.token === token &&
       cached.url === environment.url &&
       cached.username === environment.username
     ) {
+      this.clientCache.set(cacheKey, {
+        ...cached,
+        authConfigRevision
+      });
       return cached.client;
     }
 
@@ -122,12 +124,6 @@ export class JenkinsClientProvider {
       url: environment.url,
       username: environment.username
     });
-    this.authSignatureCache.set(cacheKey, {
-      authSignature,
-      authConfigRevision,
-      url: environment.url,
-      username: environment.username
-    });
 
     return client;
   }
@@ -135,7 +131,6 @@ export class JenkinsClientProvider {
   invalidateClient(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
     const cacheKey = `${scope}:${environmentId}`;
     this.clientCache.delete(cacheKey);
-    this.authSignatureCache.delete(cacheKey);
   }
 
   private async refreshBrowserSsoAuthConfig(

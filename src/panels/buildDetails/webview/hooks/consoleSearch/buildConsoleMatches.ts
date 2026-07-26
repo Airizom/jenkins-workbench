@@ -11,7 +11,6 @@ const UNSAFE_REGEX_MESSAGE =
 type GroupFrame = {
   hasAlternation: boolean;
   hasQuantifier: boolean;
-  isLookaround: boolean;
 };
 
 type PendingAtom = {
@@ -210,9 +209,7 @@ function hasUnsafeRegexShape(query: string): boolean {
       markOpenGroupsWithQuantifier();
       if (
         pendingAtom.group &&
-        (pendingAtom.group.hasAlternation ||
-          pendingAtom.group.hasQuantifier ||
-          pendingAtom.group.isLookaround)
+        (pendingAtom.group.hasAlternation || pendingAtom.group.hasQuantifier)
       ) {
         return true;
       }
@@ -253,7 +250,7 @@ function hasUnsafeRegexShape(query: string): boolean {
       if (groupPrefix.isLookaround) {
         return true;
       }
-      groups.push({ hasAlternation: false, hasQuantifier: false, isLookaround: false });
+      groups.push({ hasAlternation: false, hasQuantifier: false });
       index += groupPrefix.length;
       continue;
     }

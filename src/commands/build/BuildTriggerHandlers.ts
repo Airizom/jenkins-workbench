@@ -111,9 +111,7 @@ async function resolveBuildTriggerOptionsForTarget(
   presetStore: JenkinsParameterPresetStore,
   target: JenkinsJobTarget
 ): Promise<BuildTriggerOptions | undefined> {
-  let parameters: JobParameter[] = [];
-  let useParameters = false;
-  let allowEmptyParams = false;
+  let parameters: JobParameter[];
 
   try {
     parameters = await dataService.getJobParameters(target.environment, target.jobUrl);
@@ -133,14 +131,17 @@ async function resolveBuildTriggerOptionsForTarget(
       return;
     }
 
-    useParameters = decision === buildWithDefaultsLabel;
-    allowEmptyParams = useParameters;
+    const useParameters = decision === buildWithDefaultsLabel;
+    return {
+      useParameters,
+      allowEmptyParams: useParameters
+    };
   }
 
   if (parameters.length === 0) {
     return {
-      useParameters,
-      allowEmptyParams
+      useParameters: false,
+      allowEmptyParams: false
     };
   }
 

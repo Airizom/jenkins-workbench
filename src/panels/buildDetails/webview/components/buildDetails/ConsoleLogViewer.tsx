@@ -12,8 +12,6 @@ export type ConsoleLogViewerHeaderState = {
   hasOutput: boolean;
   lineCount: number;
   openSearchToolbar: () => void;
-  scrollToBottom: () => void;
-  isSearchActive: boolean;
 };
 
 export function ConsoleLogViewer({
@@ -42,7 +40,7 @@ export function ConsoleLogViewer({
   bodyClassName?: string;
   onOpenExternal: (url: string) => void;
   renderHeader?: (state: ConsoleLogViewerHeaderState) => React.ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   const sourceText = htmlModel?.text ?? text;
   const consoleSearch = useConsoleSearch(sourceText, isActive);
 
@@ -93,9 +91,7 @@ export function ConsoleLogViewer({
       {renderHeader?.({
         hasOutput,
         lineCount,
-        openSearchToolbar: consoleSearch.openSearchToolbar,
-        scrollToBottom: scrollConsoleToBottom,
-        isSearchActive: consoleSearch.isSearchActive
+        openSearchToolbar: consoleSearch.openSearchToolbar
       })}
       <ConsoleLogSearchBody
         className={bodyClassName}

@@ -14,7 +14,7 @@ export interface ConsoleSearchToolbarProps {
   isSearchActive: boolean;
   error?: string;
   tooManyMatchesLabel?: string;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   onToggleRegex: () => void;

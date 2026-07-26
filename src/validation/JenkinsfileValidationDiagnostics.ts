@@ -46,29 +46,31 @@ export function buildValidationDiagnostics(
 }
 
 export function buildNoEnvironmentDiagnostic(document: vscode.TextDocument): vscode.Diagnostic {
-  const lineText = document.lineCount > 0 ? document.lineAt(0).text : "";
-  const range = buildLineRange(0, lineText);
-  const diagnostic = new vscode.Diagnostic(
-    range,
+  return buildDocumentWarningDiagnostic(
+    document,
     "Select a Jenkins environment to enable Jenkinsfile validation.",
-    vscode.DiagnosticSeverity.Warning
+    "no-environment"
   );
-  diagnostic.source = JENKINS_DIAGNOSTIC_SOURCE;
-  diagnostic.code = "no-environment";
-  setDiagnosticMetadata(diagnostic, { code: "no-environment" });
-  return diagnostic;
 }
 
 export function buildRequestFailedDiagnostic(
   document: vscode.TextDocument,
   message: string
 ): vscode.Diagnostic {
+  return buildDocumentWarningDiagnostic(document, message, "request-failed");
+}
+
+function buildDocumentWarningDiagnostic(
+  document: vscode.TextDocument,
+  message: string,
+  code: "no-environment" | "request-failed"
+): vscode.Diagnostic {
   const lineText = document.lineCount > 0 ? document.lineAt(0).text : "";
   const range = buildLineRange(0, lineText);
   const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
   diagnostic.source = JENKINS_DIAGNOSTIC_SOURCE;
-  diagnostic.code = "request-failed";
-  setDiagnosticMetadata(diagnostic, { code: "request-failed" });
+  diagnostic.code = code;
+  setDiagnosticMetadata(diagnostic, { code });
   return diagnostic;
 }
 

@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { CalendarIcon, ClockIcon, UserIcon } from "../../../../shared/webview/icons";
 export function BuildDetailsMetaFields({
   idSuffix = "",
@@ -13,11 +14,11 @@ export function BuildDetailsMetaFields({
   culpritsLabel: string;
   className?: string;
   showSeparators?: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
   const showCulprits = culpritsLabel !== "—" && culpritsLabel !== "None";
   const separator = showSeparators ? (
-    <span aria-hidden="true" className="opacity-30">
-      |
+    <span aria-hidden="true" className="opacity-40">
+      ·
     </span>
   ) : null;
 

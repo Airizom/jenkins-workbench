@@ -6,12 +6,16 @@ import type {
   CurrentBranchRepositoryInfo
 } from "./CurrentBranchTypes";
 
+interface RepositoryRegistration {
+  headName: string | undefined;
+  stateSubscription: vscode.Disposable;
+  uiSubscription?: vscode.Disposable;
+}
+
 export class CurrentBranchRepositoryResolver implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly subscriptions: vscode.Disposable[] = [];
-  private readonly repositoryStateSubscriptions = new Map<string, vscode.Disposable>();
-  private readonly repositoryUiSubscriptions = new Map<string, vscode.Disposable>();
-  private readonly repositoryHeadNames = new Map<string, string | undefined>();
+  private readonly repositoryRegistrations = new Map<string, RepositoryRegistration>();
   private gitApi?: GitApi;
   private isDisposed = false;
 
@@ -60,14 +64,10 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
     for (const subscription of this.subscriptions) {
       subscription.dispose();
     }
-    for (const subscription of this.repositoryStateSubscriptions.values()) {
-      subscription.dispose();
+    for (const registration of this.repositoryRegistrations.values()) {
+      disposeRepositoryRegistration(registration);
     }
-    this.repositoryStateSubscriptions.clear();
-    for (const subscription of this.repositoryUiSubscriptions.values()) {
-      subscription.dispose();
-    }
-    this.repositoryUiSubscriptions.clear();
+    this.repositoryRegistrations.clear();
     this.emitter.dispose();
   }
 
@@ -135,45 +135,43 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
 
     for (const repository of gitApi.repositories) {
       const key = repository.rootUri.toString();
-      if (!this.repositoryStateSubscriptions.has(key)) {
-        this.repositoryHeadNames.set(key, getHeadName(repository));
-        const subscription = repository.state.onDidChange(() => {
-          const nextHeadName = getHeadName(repository);
-          const previousHeadName = this.repositoryHeadNames.get(key);
-          if (nextHeadName === previousHeadName) {
-            return;
-          }
-          this.repositoryHeadNames.set(key, nextHeadName);
-          this.emitter.fire();
-        });
-        this.repositoryStateSubscriptions.set(key, subscription);
+      let registration = this.repositoryRegistrations.get(key);
+      if (!registration) {
+        const createdRegistration: RepositoryRegistration = {
+          headName: getHeadName(repository),
+          stateSubscription: repository.state.onDidChange(() => {
+            const nextHeadName = getHeadName(repository);
+            if (nextHeadName === createdRegistration.headName) {
+              return;
+            }
+            createdRegistration.headName = nextHeadName;
+            this.emitter.fire();
+          })
+        };
+        registration = createdRegistration;
+        this.repositoryRegistrations.set(key, registration);
       }
 
-      if (!this.repositoryUiSubscriptions.has(key) && repository.ui?.onDidChange) {
-        const subscription = repository.ui.onDidChange(() => {
+      if (!registration.uiSubscription && repository.ui?.onDidChange) {
+        registration.uiSubscription = repository.ui.onDidChange(() => {
           this.emitter.fire();
         });
-        this.repositoryUiSubscriptions.set(key, subscription);
       }
     }
 
-    for (const [key, subscription] of this.repositoryStateSubscriptions.entries()) {
+    for (const [key, registration] of this.repositoryRegistrations.entries()) {
       if (liveKeys.has(key)) {
         continue;
       }
-      subscription.dispose();
-      this.repositoryStateSubscriptions.delete(key);
-      this.repositoryHeadNames.delete(key);
-    }
-
-    for (const [key, subscription] of this.repositoryUiSubscriptions.entries()) {
-      if (liveKeys.has(key)) {
-        continue;
-      }
-      subscription.dispose();
-      this.repositoryUiSubscriptions.delete(key);
+      disposeRepositoryRegistration(registration);
+      this.repositoryRegistrations.delete(key);
     }
   }
+}
+
+function disposeRepositoryRegistration(registration: RepositoryRegistration): void {
+  registration.stateSubscription.dispose();
+  registration.uiSubscription?.dispose();
 }
 
 function getHeadName(repository: CurrentBranchRepositoryContext["repository"]): string | undefined {

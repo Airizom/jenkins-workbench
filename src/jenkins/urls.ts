@@ -18,22 +18,6 @@ export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
-function splitPathParts(pathname: string): string[] {
-  const pathParts = pathname.split("/");
-  let pathPartCount = 0;
-
-  for (let index = 0; index < pathParts.length; index++) {
-    const part = pathParts[index];
-    if (part.length > 0) {
-      pathParts[pathPartCount] = part;
-      pathPartCount++;
-    }
-  }
-
-  pathParts.length = pathPartCount;
-  return pathParts;
-}
-
 function hasJobPathParts(pathParts: readonly string[], endExclusive = pathParts.length): boolean {
   let firstJobIndex = -1;
   for (let index = 0; index < endExclusive; index++) {
@@ -61,18 +45,6 @@ function hasJobPathParts(pathParts: readonly string[], endExclusive = pathParts.
   }
 
   return hasSegments;
-}
-
-function buildPathFromParts(pathParts: readonly string[], endExclusive: number): string {
-  if (endExclusive <= 0) {
-    return "";
-  }
-
-  let path = "";
-  for (let index = 0; index < endExclusive; index++) {
-    path += `/${pathParts[index]}`;
-  }
-  return path;
 }
 
 function appendJobPathSegments(baseUrl: string, segments: readonly string[]): string {
@@ -167,7 +139,7 @@ export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
     return undefined;
   }
 
-  const pathParts = splitPathParts(url.pathname);
+  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
   const buildNumberPart = pathParts[pathParts.length - 1];
   if (!buildNumberPart || !BUILD_NUMBER_PATTERN.test(buildNumberPart)) {
     return undefined;
@@ -184,7 +156,7 @@ export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
   }
 
   const jobPath =
-    jobPathPartCount > 0 ? `${buildPathFromParts(pathParts, jobPathPartCount)}/` : "/";
+    jobPathPartCount > 0 ? `/${pathParts.slice(0, jobPathPartCount).join("/")}/` : "/";
   const jobUrl = `${url.origin}${jobPath}`;
 
   return {

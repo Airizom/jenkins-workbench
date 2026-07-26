@@ -10,7 +10,7 @@ import type {
   NodesFolderTreeItem,
   QueueItemTreeItem
 } from "../tree/TreeItems";
-import { withActionErrorMessage } from "./CommandUtils";
+import { toJenkinsEnvironmentRef, withActionErrorMessage } from "./CommandUtils";
 
 type NodeCapacityCommandSource =
   | NodesFolderTreeItem
@@ -74,13 +74,7 @@ async function resolveEnvironment(
     return undefined;
   }
   if (environments.length === 1) {
-    const [environment] = environments;
-    return {
-      environmentId: environment.id,
-      scope: environment.scope,
-      url: environment.url,
-      username: environment.username
-    };
+    return toJenkinsEnvironmentRef(environments[0]);
   }
 
   const pick = await vscode.window.showQuickPick(
@@ -95,15 +89,7 @@ async function resolveEnvironment(
     }
   );
 
-  if (!pick) {
-    return undefined;
-  }
-  return {
-    environmentId: pick.environment.id,
-    scope: pick.environment.scope,
-    url: pick.environment.url,
-    username: pick.environment.username
-  };
+  return pick ? toJenkinsEnvironmentRef(pick.environment) : undefined;
 }
 
 function isEnvironmentRef(value: unknown): value is JenkinsEnvironmentRef {

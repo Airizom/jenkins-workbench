@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { BuildListFetchOptions } from "../../jenkins/JenkinsDataService";
 import type { TreeActivityOptions } from "../../tree/ActivityTypes";
+import { ActivityRefreshService } from "../../tree/activity/ActivityRefreshService";
 import type { BuildTooltipOptions } from "../../tree/BuildTooltips";
 import { JenkinsWorkbenchTreeDataProvider } from "../../tree/TreeDataProvider";
 import { TreeExpansionState } from "../../tree/TreeExpansionState";
@@ -8,7 +9,6 @@ import { JenkinsTreeFilter } from "../../tree/TreeFilter";
 import type { WorkbenchTreeElement } from "../../tree/TreeItems";
 import { DefaultJenkinsTreeNavigator } from "../../tree/TreeNavigator";
 import type { TreeViewCurationOptions } from "../../tree/TreeViewCuration";
-import { ActivityRefreshService } from "../../tree/activity/ActivityRefreshService";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
 
 const VIEW_ID = "jenkinsWorkbench.tree";

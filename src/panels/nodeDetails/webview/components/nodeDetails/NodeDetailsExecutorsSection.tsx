@@ -1,3 +1,4 @@
+import type * as React from "react";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorsTableCard } from "./ExecutorsTableCard";
 
@@ -10,7 +11,7 @@ export function NodeDetailsExecutorsSection({
   executors,
   oneOffExecutors,
   onOpenExternal
-}: NodeDetailsExecutorsSectionProps): JSX.Element {
+}: NodeDetailsExecutorsSectionProps): React.JSX.Element {
   return (
     <>
       <ExecutorsTableCard title="Executors" entries={executors} onOpenExternal={onOpenExternal} />

@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { useToast } from "../../hooks/useToast";
 import {
   Toast,
@@ -7,7 +8,7 @@ import {
   ToastTitle,
   ToastViewport
 } from "./toast";
-export function Toaster(): JSX.Element {
+export function Toaster(): React.JSX.Element {
   const { toasts, dismissToast } = useToast();
 
   return (

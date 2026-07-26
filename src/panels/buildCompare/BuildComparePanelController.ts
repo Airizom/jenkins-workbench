@@ -1,9 +1,9 @@
 import type * as vscode from "vscode";
 import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { BuildInspectionBackend as BuildCompareBackend } from "../shared/backend/BuildInspectionBackend";
 import { LoadTokenTracker } from "../shared/PanelRuntimeHelpers";
 import { createNonce } from "../shared/webview/WebviewNonce";
-import type { BuildCompareBackend } from "./BuildCompareBackend";
 import type { BuildCompareOptions } from "./BuildCompareOptions";
 import { BuildComparePanelView } from "./BuildComparePanelView";
 import {

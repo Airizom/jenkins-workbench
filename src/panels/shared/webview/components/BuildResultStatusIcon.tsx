@@ -1,3 +1,4 @@
+import type * as React from "react";
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -14,7 +15,7 @@ type BuildResultStatusIconProps = {
 export function BuildResultStatusIcon({
   status,
   className = "h-4 w-4"
-}: BuildResultStatusIconProps): JSX.Element | null {
+}: BuildResultStatusIconProps): React.JSX.Element | null {
   switch (status) {
     case "success":
       return <CheckCircleIcon className={cn(className)} />;

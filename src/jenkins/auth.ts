@@ -269,7 +269,7 @@ function setNormalizedHeader(target: Record<string, string>, key: string, value:
 
 function hasOwnEntries(record: Record<string, string>): boolean {
   for (const key in record) {
-    if (Object.prototype.hasOwnProperty.call(record, key)) {
+    if (Object.hasOwn(record, key)) {
       return true;
     }
   }

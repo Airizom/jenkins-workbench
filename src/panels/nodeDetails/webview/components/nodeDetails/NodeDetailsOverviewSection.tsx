@@ -1,15 +1,16 @@
+import type * as React from "react";
 import { Alert, AlertDescription } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { CpuIcon, GaugeIcon, StatusIcon, TagIcon } from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorSlotGrid } from "./ExecutorSlotGrid";
+import { summarizeExecutorUtilization } from "./executorUtilization";
 import { LabelChips } from "./LabelChips";
+import type { OverviewRow } from "./nodeDetailsUtils";
 import { OverviewCard } from "./OverviewCard";
 import { QueuePreviewCard } from "./QueuePreviewCard";
-import { summarizeExecutorUtilization } from "./executorUtilization";
-import type { OverviewRow } from "./nodeDetailsUtils";
 
-export type NodeDetailsTabTarget = "executors" | "queue" | "diagnostics";
+type NodeDetailsTabTarget = "executors" | "queue" | "diagnostics";
 
 type NodeDetailsOverviewSectionProps = {
   state: NodeDetailsState;
@@ -22,8 +23,9 @@ export function NodeDetailsOverviewSection({
   overviewRows,
   onOpenExternal,
   onShowTab
-}: NodeDetailsOverviewSectionProps): JSX.Element {
+}: NodeDetailsOverviewSectionProps): React.JSX.Element {
   const utilization = summarizeExecutorUtilization(state.executors, state.oneOffExecutors);
+  const executorSummary = formatExecutorSummary(utilization);
 
   return (
     <div className="space-y-3">
@@ -62,13 +64,7 @@ export function NodeDetailsOverviewSection({
           <OverviewCard
             icon={<CpuIcon className="h-4 w-4" />}
             title="Executors"
-            meta={
-              utilization.total > 0
-                ? `${utilization.busy} busy · ${utilization.idle} idle${
-                    utilization.oneOffTotal > 0 ? ` · ${utilization.oneOffTotal} one-off` : ""
-                  }`
-                : undefined
-            }
+            meta={executorSummary}
           >
             {utilization.total > 0 || utilization.oneOffTotal > 0 ? (
               <ExecutorSlotGrid
@@ -119,13 +115,27 @@ export function NodeDetailsOverviewSection({
   );
 }
 
+function formatExecutorSummary(
+  utilization: ReturnType<typeof summarizeExecutorUtilization>
+): string | undefined {
+  if (utilization.total === 0) {
+    return undefined;
+  }
+
+  let summary = `${utilization.busy} busy · ${utilization.idle} idle`;
+  if (utilization.oneOffTotal > 0) {
+    summary += ` · ${utilization.oneOffTotal} one-off`;
+  }
+  return summary;
+}
+
 function MonitorsTeaser({
   state,
   onShowDiagnostics
 }: {
   state: NodeDetailsState;
   onShowDiagnostics: () => void;
-}): JSX.Element {
+}): React.JSX.Element {
   if (state.advancedLoaded && state.monitorData.length > 0) {
     return (
       <OverviewCard

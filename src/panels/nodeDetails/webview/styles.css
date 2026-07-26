@@ -8,7 +8,7 @@
     position: relative;
     width: 100%;
     height: 6px;
-    background-color: var(--muted);
+    background-color: var(--muted-strong);
     border-radius: 3px;
     overflow: hidden;
   }
@@ -40,11 +40,7 @@
 
   .node-hero {
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--muted) 35%, transparent),
-      transparent
-    );
+    background: linear-gradient(180deg, var(--surface-raised), transparent);
   }
 
   .node-hero[data-status="online"] {

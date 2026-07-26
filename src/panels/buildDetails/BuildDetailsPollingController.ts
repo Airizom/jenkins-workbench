@@ -3,10 +3,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { JenkinsTestReportOptions } from "../../jenkins/JenkinsTestReportOptions";
 import type {
   JenkinsBuildDetails,
-  JenkinsConsoleText,
   JenkinsConsoleTextTail,
-  JenkinsProgressiveConsoleHtml,
-  JenkinsProgressiveConsoleText,
   JenkinsTestReport,
   JenkinsWorkflowRun
 } from "../../jenkins/types";
@@ -17,7 +14,11 @@ import type {
   BuildDetailsStatusBackend,
   BuildDetailsTestsBackend
 } from "./BuildDetailsBackend";
-import { type ConsoleSnapshotResult, ConsoleStreamManager } from "./ConsoleStreamManager";
+import {
+  type ConsoleFetchResult,
+  type ConsoleSnapshotResult,
+  ConsoleStreamManager
+} from "./ConsoleStreamManager";
 
 export interface BuildDetailsPollingCallbacks {
   onWorkflowFetchStart?: () => void;
@@ -326,7 +327,7 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
 
       let details: JenkinsBuildDetails | undefined;
       let detailsError: unknown;
-      let consoleResult: { mode: "html" | "text"; value?: unknown; error?: unknown } | undefined;
+      let consoleResult: ConsoleFetchResult | undefined;
       let consoleError: unknown;
       let workflowRun: JenkinsWorkflowRun | undefined;
       let workflowError: unknown;
@@ -357,8 +358,6 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
         } catch (error) {
           pendingInputsError = error;
         }
-      } else if (this.lastPendingInputsCount > 0) {
-        this.lastPendingInputsCount = 0;
       }
 
       if (!this.isPollCurrent(pollGeneration)) {
@@ -375,13 +374,7 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
       if (consoleFailure) {
         errors.push(`Console output: ${this.formatError(consoleFailure)}`);
       } else if (consoleResult?.value) {
-        this.consoleStreamManager.applyResult(
-          consoleResult.mode,
-          consoleResult.value as
-            | JenkinsProgressiveConsoleHtml
-            | JenkinsProgressiveConsoleText
-            | JenkinsConsoleText
-        );
+        this.consoleStreamManager.applyResult(consoleResult);
       }
       if (pendingInputsError) {
         errors.push(`Pending inputs: ${this.formatError(pendingInputsError)}`);

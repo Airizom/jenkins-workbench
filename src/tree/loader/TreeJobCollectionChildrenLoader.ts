@@ -2,10 +2,11 @@ import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsDataService, JenkinsJobInfo } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentSummaryStore } from "../EnvironmentSummaryStore";
-import type { JenkinsTreeFilter } from "../TreeFilter";
-import type { TreeJobCollectionRequest } from "../TreeJobScope";
 import { JenkinsFolderTreeItem } from "../items/TreeJobItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import type { JenkinsTreeFilter } from "../TreeFilter";
+import type { TreeJobCollectionRequest } from "../TreeJobScope";
+import type { TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 import {
   buildJobCollectionChildrenKey,
@@ -25,11 +26,7 @@ export class TreeJobCollectionChildrenLoader {
     private readonly environmentSummaryStore: EnvironmentSummaryStore,
     private readonly cacheManager: TreeChildrenCacheManager,
     private readonly jobUrlState: TreeJobUrlStateLoader,
-    private readonly buildChildrenKey: (
-      kind: string,
-      environment: JenkinsEnvironmentRef,
-      extra?: string
-    ) => string,
+    private readonly buildChildrenKey: TreeChildrenKeyBuilder,
     private readonly placeholders: TreePlaceholderFactory
   ) {}
 

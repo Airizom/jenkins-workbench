@@ -24,13 +24,12 @@ export function createBuildDetailsPollingCallbacks(
   hooks: BuildDetailsPollingCallbackHooks
 ): BuildDetailsPollingCallbacks {
   const postStateMessage = (): void => {
-    const message = buildUpdateMessageFromState(state, {
-      canOpenSource: hooks.canOpenSource,
-      coverageEnabled: hooks.getCoverageEnabled?.()
-    });
-    if (message) {
-      hooks.postMessage(message);
-    }
+    hooks.postMessage(
+      buildUpdateMessageFromState(state, {
+        canOpenSource: hooks.canOpenSource,
+        coverageEnabled: hooks.getCoverageEnabled?.()
+      })
+    );
   };
 
   return {

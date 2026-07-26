@@ -1,4 +1,4 @@
-export function unionSortedMapKeys<T>(...maps: Array<Map<string, T>>): string[] {
+function unionSortedMapKeys<T>(...maps: Array<Map<string, T>>): string[] {
   const keys = new Set<string>();
   for (const map of maps) {
     for (const key of map.keys()) {

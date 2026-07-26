@@ -33,12 +33,31 @@ type EnvironmentTarget = {
 function parseHttpUrl(url: string): URL | undefined {
   try {
     const parsed = new URL(url.trim());
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0 ||
+      parsed.search.length > 0 ||
+      parsed.hash.length > 0
+    ) {
       return undefined;
     }
     return parsed;
   } catch {
     return undefined;
+  }
+}
+
+function formatJenkinsUrlForDisplay(url: string): string {
+  try {
+    const parsed = new URL(url.trim());
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "Invalid Jenkins URL";
   }
 }
 
@@ -126,13 +145,7 @@ async function promptAuthConfig(
 }
 
 function toEnvironmentTarget(
-  environment:
-    | JenkinsEnvironmentRef
-    | {
-        id: string;
-        url: string;
-        scope: EnvironmentScope;
-      }
+  environment: JenkinsEnvironmentRef | EnvironmentTarget
 ): EnvironmentTarget {
   if ("environmentId" in environment) {
     return {
@@ -159,7 +172,7 @@ async function promptEnvironmentTarget(
   }
 
   const picks = environments.map((environment) => ({
-    label: environment.url,
+    label: formatJenkinsUrlForDisplay(environment.url),
     description: formatScopeLabel(environment.scope),
     target: toEnvironmentTarget(environment)
   }));
@@ -170,15 +183,6 @@ async function promptEnvironmentTarget(
   });
 
   return pick?.target;
-}
-
-async function promptEnvironmentRemovalTarget(
-  store: JenkinsEnvironmentStore
-): Promise<EnvironmentTarget | undefined> {
-  return promptEnvironmentTarget(store, {
-    emptyMessage: "No environments are available to remove.",
-    placeHolder: "Select an environment to remove"
-  });
 }
 
 export async function addEnvironment(
@@ -198,7 +202,7 @@ export async function addEnvironment(
 
   if (!parseHttpUrl(rawUrl)) {
     void vscode.window.showErrorMessage(
-      "Invalid Jenkins URL. Please enter a valid HTTP or HTTPS URL."
+      "Invalid Jenkins URL. Enter an HTTP or HTTPS base URL without embedded credentials, query parameters, or fragments. Configure credentials using the authentication prompts."
     );
     return;
   }
@@ -271,6 +275,13 @@ export async function signInWithBrowserSso(
     return;
   }
 
+  if (!parseHttpUrl(target.url)) {
+    void vscode.window.showErrorMessage(
+      "The selected Jenkins environment has an invalid or unsafe URL. Remove it and add it again without embedded credentials, query parameters, or fragments."
+    );
+    return;
+  }
+
   const existingAuthConfig = await store.getAuthConfig(target.scope, target.id);
   const loginUrl =
     existingAuthConfig?.type === "sso"
@@ -304,14 +315,20 @@ export async function removeEnvironment(
   refreshHost: EnvironmentCommandRefreshHost,
   item?: JenkinsEnvironmentRef
 ): Promise<void> {
-  const target = item ? toEnvironmentTarget(item) : await promptEnvironmentRemovalTarget(store);
+  const target = item
+    ? toEnvironmentTarget(item)
+    : await promptEnvironmentTarget(store, {
+        emptyMessage: "No environments are available to remove.",
+        placeHolder: "Select an environment to remove"
+      });
   if (!target) {
     return;
   }
 
   const confirmLabel = "Remove Environment";
+  const displayUrl = formatJenkinsUrlForDisplay(target.url);
   const confirmation = await vscode.window.showWarningMessage(
-    `Remove the Jenkins environment ${target.url}? Its stored credentials and all pins, watches, and parameter presets for this environment will also be removed.`,
+    `Remove the Jenkins environment ${displayUrl}? Its stored credentials and all pins, watches, and parameter presets for this environment will also be removed.`,
     { modal: true },
     confirmLabel
   );

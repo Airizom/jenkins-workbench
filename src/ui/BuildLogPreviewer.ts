@@ -1,5 +1,5 @@
+import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { BuildLogService } from "../services/BuildLogService";
 import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
 import { openTextPreview } from "./PreviewLifecycle";
 
@@ -10,7 +10,7 @@ export interface BuildLogPreviewResult {
 
 export class BuildLogPreviewer {
   constructor(
-    private readonly logService: BuildLogService,
+    private readonly dataService: Pick<JenkinsDataService, "getConsoleText">,
     private readonly previewProvider: ArtifactPreviewProvider,
     private readonly maxChars: number
   ) {}
@@ -20,7 +20,7 @@ export class BuildLogPreviewer {
     buildUrl: string,
     fileName: string
   ): Promise<BuildLogPreviewResult> {
-    const consoleText = await this.logService.getConsoleText(environment, buildUrl, this.maxChars);
+    const consoleText = await this.dataService.getConsoleText(environment, buildUrl, this.maxChars);
     const data = Buffer.from(consoleText.text, "utf8");
     const uri = this.previewProvider.registerArtifact(data, fileName);
     await openTextPreview(this.previewProvider, uri);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-import type { BuildCompareBackend } from "../src/panels/buildCompare/BuildCompareBackend";
+import type { BuildInspectionBackend as BuildCompareBackend } from "../src/panels/shared/backend/BuildInspectionBackend";
 import { buildConsoleComparisonSection } from "../src/panels/buildCompare/BuildCompareConsoleDiff";
 
 const ENVIRONMENT: JenkinsEnvironmentRef = {
@@ -60,56 +60,52 @@ function createFakeBackend(
 }
 
 describe("buildConsoleComparisonSection", () => {
-  it(
-    "terminates with tooLarge when multibyte logs are byte-identical past the budget",
-    { timeout: 5000 },
-    async () => {
-      // "é" is 1 JS char but 2 UTF-8 bytes, so char-based accounting undercounts
-      // the consumed budget. The baseline server overshoots the 8-byte budget in
-      // one chunk while the target trickles small chunks; before the fix this
-      // left the baseline buffer non-empty and the target buffer empty with an
-      // exhausted byte budget and moreData=true, spinning compareConsoleReaders
-      // forever without yielding to the event loop.
-      const backend = createFakeBackend({
-        [BASELINE_URL]: ["éééééé", "éé", "éé"],
-        [TARGET_URL]: ["éé", "éé", "éé", "éé", "éé"]
-      });
+  it("terminates with tooLarge when multibyte logs are byte-identical past the budget", {
+    timeout: 5000
+  }, async () => {
+    // "é" is 1 JS char but 2 UTF-8 bytes, so char-based accounting undercounts
+    // the consumed budget. The baseline server overshoots the 8-byte budget in
+    // one chunk while the target trickles small chunks; before the fix this
+    // left the baseline buffer non-empty and the target buffer empty with an
+    // exhausted byte budget and moreData=true, spinning compareConsoleReaders
+    // forever without yielding to the event loop.
+    const backend = createFakeBackend({
+      [BASELINE_URL]: ["éééééé", "éé", "éé"],
+      [TARGET_URL]: ["éé", "éé", "éé", "éé", "éé"]
+    });
 
-      const section = await buildConsoleComparisonSection(
-        backend,
-        { maxBytes: 8, maxLines: 1000 },
-        ENVIRONMENT,
-        BASELINE_URL,
-        TARGET_URL
-      );
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 8, maxLines: 1000 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
 
-      assert.equal(section.status, "tooLarge");
-    }
-  );
+    assert.equal(section.status, "tooLarge");
+  });
 
-  it(
-    "counts compared progress in bytes when identical logs drain evenly",
-    { timeout: 5000 },
-    async () => {
-      // Both logs serve identical multibyte chunks and report more data beyond
-      // the byte budget; the comparison must stop at the scan limit.
-      const chunks = ["éé\n", "éé\n", "éé\n", "éé\n"];
-      const backend = createFakeBackend({
-        [BASELINE_URL]: [...chunks],
-        [TARGET_URL]: [...chunks]
-      });
+  it("counts compared progress in bytes when identical logs drain evenly", {
+    timeout: 5000
+  }, async () => {
+    // Both logs serve identical multibyte chunks and report more data beyond
+    // the byte budget; the comparison must stop at the scan limit.
+    const chunks = ["éé\n", "éé\n", "éé\n", "éé\n"];
+    const backend = createFakeBackend({
+      [BASELINE_URL]: [...chunks],
+      [TARGET_URL]: [...chunks]
+    });
 
-      const section = await buildConsoleComparisonSection(
-        backend,
-        { maxBytes: 10, maxLines: 1000 },
-        ENVIRONMENT,
-        BASELINE_URL,
-        TARGET_URL
-      );
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 10, maxLines: 1000 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
 
-      assert.equal(section.status, "tooLarge");
-    }
-  );
+    assert.equal(section.status, "tooLarge");
+  });
 
   it("still reports the first divergence for multibyte logs", async () => {
     const backend = createFakeBackend({
@@ -173,5 +169,47 @@ describe("buildConsoleComparisonSection", () => {
     );
 
     assert.equal(section.status, "identical");
+  });
+
+  it("compares eagerly loaded full text when progressive fetching fails", async () => {
+    const progressiveCalls: string[] = [];
+    const headCalls: string[] = [];
+    const logs = {
+      [BASELINE_URL]: "shared\nbaseline\n",
+      [TARGET_URL]: "shared\ntarget\n"
+    };
+    const backend = {
+      console: {
+        getConsoleTextProgressive: async (
+          _environment: JenkinsEnvironmentRef,
+          buildUrl: string
+        ) => {
+          progressiveCalls.push(buildUrl);
+          throw new Error("Progressive console output is unavailable");
+        },
+        getConsoleTextHead: async (_environment: JenkinsEnvironmentRef, buildUrl: string) => {
+          headCalls.push(buildUrl);
+          const text = logs[buildUrl as keyof typeof logs];
+          return {
+            text,
+            bytesRead: Buffer.byteLength(text, "utf8"),
+            truncated: false
+          };
+        }
+      }
+    } as unknown as BuildCompareBackend;
+
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 10_000, maxLines: 1000 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
+
+    assert.equal(section.status, "available");
+    assert.equal(section.divergenceLineLabel, "First difference at line 2");
+    assert.deepEqual(progressiveCalls, [BASELINE_URL, TARGET_URL]);
+    assert.deepEqual(headCalls, [BASELINE_URL, TARGET_URL]);
   });
 });

@@ -11,12 +11,15 @@ import {
 } from "./context/JenkinsfileContextNavigation";
 import { computeHasNodeContext, computeIsStepAllowed } from "./context/JenkinsfileContextRules";
 import type {
+  JenkinsfileActiveCall,
   JenkinsfileBraceEntry,
   JenkinsfileClosedCall,
   JenkinsfileContextAnalysis,
   JenkinsfileParenEntry
 } from "./context/JenkinsfileContextTypes";
 import { maskGroovyText } from "./context/JenkinsfileGroovyTextMasker";
+
+const CLOSED_CALL_RESET_CHARACTERS = new Set([",", ":", "[", "]", ";"]);
 
 export type { JenkinsfileContextAnalysis } from "./context/JenkinsfileContextTypes";
 
@@ -53,15 +56,7 @@ export function analyzeJenkinsfileContext(
 function scanContextState(
   maskedText: string,
   offset: number
-): {
-  blockPath: string[];
-  activeCall?: {
-    name: string;
-    syntax: "paren" | "bare";
-    callStart: number;
-    openParen?: number;
-  };
-} {
+): { blockPath: string[]; activeCall?: JenkinsfileActiveCall } {
   const braceStack: JenkinsfileBraceEntry[] = [];
   const parenStack: JenkinsfileParenEntry[] = [];
   let lastClosedCall: JenkinsfileClosedCall | undefined;
@@ -119,11 +114,7 @@ function scanContextState(
       continue;
     }
 
-    if (character === "," || character === ":" || character === "[" || character === "]") {
-      lastClosedCall = undefined;
-    }
-
-    if (character === ";") {
+    if (CLOSED_CALL_RESET_CHARACTERS.has(character)) {
       lastClosedCall = undefined;
     }
 

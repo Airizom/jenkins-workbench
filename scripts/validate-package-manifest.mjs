@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
@@ -94,9 +94,9 @@ for (const commandId of declaredCommandIds) {
 
 const collectManifestCommandReferences = (value, pathLabel, references) => {
   if (Array.isArray(value)) {
-    value.forEach((item, index) =>
-      collectManifestCommandReferences(item, `${pathLabel}[${index}]`, references)
-    );
+    value.forEach((item, index) => {
+      collectManifestCommandReferences(item, `${pathLabel}[${index}]`, references);
+    });
     return;
   }
 
@@ -138,116 +138,80 @@ for (const { commandId, pathLabel } of manifestCommandReferences) {
   }
 }
 
-const getSchemaTypes = (schema) => {
-  if (Array.isArray(schema.type)) {
-    return schema.type;
-  }
+const preferredPathScoresSetting =
+  "jenkinsWorkbench.buildDetails.testSourceMatching.preferredPathScores";
 
-  return typeof schema.type === "string" ? [schema.type] : [];
-};
+const isValidConfigurationDefault = (name, schema) => {
+  const value = schema.default;
 
-const matchesSchemaType = (value, type) => {
-  switch (type) {
-    case "array":
-      return Array.isArray(value);
-    case "boolean":
-      return typeof value === "boolean";
-    case "number":
-      return typeof value === "number" && Number.isFinite(value);
-    case "object":
-      return value !== null && typeof value === "object" && !Array.isArray(value);
-    case "string":
-      return typeof value === "string";
-    default:
-      return true;
-  }
-};
-
-const validateValueAgainstSchema = (value, schema, pathLabel) => {
-  if (!schema || typeof schema !== "object") {
-    return [];
-  }
-
-  if (Array.isArray(schema.anyOf)) {
-    if (
-      schema.anyOf.some(
-        (childSchema) => validateValueAgainstSchema(value, childSchema, pathLabel).length === 0
-      )
-    ) {
-      return [];
+  if (schema.type === "array") {
+    if (!Array.isArray(value)) {
+      return false;
     }
 
-    return [`${pathLabel} does not match any allowed schema`];
-  }
-
-  if (Array.isArray(schema.oneOf)) {
-    const matchingSchemaCount = schema.oneOf.filter(
-      (childSchema) => validateValueAgainstSchema(value, childSchema, pathLabel).length === 0
-    ).length;
-
-    return matchingSchemaCount === 1 ? [] : [`${pathLabel} must match exactly one allowed schema`];
-  }
-
-  const validationErrors = [];
-  const types = getSchemaTypes(schema);
-
-  if (types.length > 0 && !types.some((type) => matchesSchemaType(value, type))) {
-    return [`${pathLabel} does not match schema type ${types.join(" | ")}`];
-  }
-
-  if (typeof value === "number") {
-    if (typeof schema.minimum === "number" && value < schema.minimum) {
-      validationErrors.push(`${pathLabel} ${value} is below minimum ${schema.minimum}`);
-    }
-
-    if (typeof schema.maximum === "number" && value > schema.maximum) {
-      validationErrors.push(`${pathLabel} ${value} is above maximum ${schema.maximum}`);
-    }
-  }
-
-  if (Array.isArray(value) && schema.items) {
-    value.forEach((item, index) => {
-      validationErrors.push(
-        ...validateValueAgainstSchema(item, schema.items, `${pathLabel}[${index}]`)
+    if (name === preferredPathScoresSetting) {
+      return value.every(
+        (entry) =>
+          entry !== null &&
+          typeof entry === "object" &&
+          !Array.isArray(entry) &&
+          Object.keys(entry).length === 2 &&
+          typeof entry.fragment === "string" &&
+          typeof entry.score === "number" &&
+          Number.isFinite(entry.score)
       );
-    });
-  }
-
-  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-    for (const requiredKey of schema.required ?? []) {
-      if (!Object.hasOwn(value, requiredKey)) {
-        validationErrors.push(`${pathLabel} is missing required key ${requiredKey}`);
-      }
     }
 
-    const properties = schema.properties ?? {};
-    for (const [key, childValue] of Object.entries(value)) {
-      if (Object.hasOwn(properties, key)) {
-        validationErrors.push(
-          ...validateValueAgainstSchema(childValue, properties[key], `${pathLabel}.${key}`)
-        );
-        continue;
-      }
-
-      if (schema.additionalProperties === false) {
-        validationErrors.push(`${pathLabel} contains unsupported key ${key}`);
-        continue;
-      }
-
-      if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
-        validationErrors.push(
-          ...validateValueAgainstSchema(
-            childValue,
-            schema.additionalProperties,
-            `${pathLabel}.${key}`
-          )
-        );
-      }
-    }
+    return schema.items?.type === "string" && value.every((item) => typeof item === "string");
   }
 
-  return validationErrors;
+  if (schema.type === "boolean") {
+    return typeof value === "boolean";
+  }
+
+  if (schema.type === "string") {
+    return (
+      typeof value === "string" &&
+      (typeof schema.pattern !== "string" || new RegExp(schema.pattern).test(value))
+    );
+  }
+
+  if (schema.type !== "number" && schema.type !== "integer") {
+    return false;
+  }
+
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    (schema.type !== "integer" || Number.isInteger(value)) &&
+    (typeof schema.minimum !== "number" || value >= schema.minimum) &&
+    (typeof schema.maximum !== "number" || value <= schema.maximum)
+  );
 };
+
+const hasExactValues = (values, expectedValues) =>
+  Array.isArray(values) &&
+  values.length === expectedValues.length &&
+  expectedValues.every((value) => values.includes(value));
+
+const hasExactSchemaTypes = (schema, expectedTypes) => hasExactValues(schema?.type, expectedTypes);
+
+const supportsTaskParameterValue = (schema) =>
+  hasExactSchemaTypes(schema, ["string", "number", "boolean", "array"]) &&
+  hasExactSchemaTypes(schema.items, ["string", "number", "boolean"]);
+
+const supportsTaskParameterMap = (schema) =>
+  schema?.type === "object" &&
+  (schema.required?.length ?? 0) === 0 &&
+  supportsTaskParameterValue(schema.additionalProperties);
+
+const supportsNamedTaskParameters = (schema) =>
+  schema?.type === "array" &&
+  schema.items?.type === "object" &&
+  hasExactValues(schema.items.required, ["name", "value"]) &&
+  schema.items.properties?.name?.type === "string" &&
+  supportsTaskParameterValue(schema.items.properties?.value) &&
+  schema.items.additionalProperties === false;
 
 const configurationProperties = packageJson.contributes?.configuration?.properties ?? {};
 
@@ -257,12 +221,8 @@ for (const [name, schema] of Object.entries(configurationProperties)) {
     continue;
   }
 
-  for (const error of validateValueAgainstSchema(
-    schema.default,
-    schema,
-    `contributes.configuration.properties.${name}.default`
-  )) {
-    fail(error);
+  if (!isValidConfigurationDefault(name, schema)) {
+    fail(`contributes.configuration.properties.${name}.default does not match its schema`);
   }
 }
 
@@ -274,26 +234,15 @@ const taskParametersSchema = jenkinsTaskDefinition?.properties?.parameters;
 if (!taskParametersSchema) {
   fail("jenkinsWorkbench task definition must declare parameters schema");
 } else {
-  const validTaskParameterExamples = [
-    { branch: "main", retry: 2, deploy: true, targets: ["qa", "prod"] },
-    [
-      { name: "branch", value: "main" },
-      { name: "retry", value: 2 },
-      { name: "deploy", value: true }
-    ]
-  ];
+  const taskParameterForms = taskParametersSchema.anyOf ?? [];
 
-  validTaskParameterExamples.forEach((example, index) => {
-    if (
-      validateValueAgainstSchema(
-        example,
-        taskParametersSchema,
-        `jenkinsWorkbench task parameters example ${index + 1}`
-      ).length > 0
-    ) {
-      fail(`jenkinsWorkbench task parameters schema rejects supported example ${index + 1}`);
-    }
-  });
+  if (!taskParameterForms.some(supportsTaskParameterMap)) {
+    fail("jenkinsWorkbench task parameters schema rejects supported example 1");
+  }
+
+  if (!taskParameterForms.some(supportsNamedTaskParameters)) {
+    fail("jenkinsWorkbench task parameters schema rejects supported example 2");
+  }
 }
 
 if (errors.length > 0) {

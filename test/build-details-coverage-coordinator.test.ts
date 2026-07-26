@@ -16,9 +16,7 @@ vi.doMock("vscode", () => ({
   workspace: {
     getConfiguration: () => ({
       get: <T>(key: string, defaultValue?: T): T =>
-        Object.prototype.hasOwnProperty.call(configValues, key)
-          ? (configValues[key] as T)
-          : (defaultValue as T)
+        Object.hasOwn(configValues, key) ? (configValues[key] as T) : (defaultValue as T)
     })
   }
 }));

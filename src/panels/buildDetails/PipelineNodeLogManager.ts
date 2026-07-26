@@ -3,9 +3,9 @@ import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
 import { PipelineNodeLogFetcher } from "./PipelineNodeLogFetcher";
 import { PipelineStageLogAggregator } from "./PipelineStageLogAggregator";
 import {
+  normalizePipelineLogTarget,
   type PipelineLogTargetViewModel,
-  type PipelineNodeLogViewModel,
-  normalizePipelineLogTarget
+  type PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
 
 const CACHE_LIMIT = 8;

@@ -1,14 +1,12 @@
 import * as path from "node:path";
-import * as vscode from "vscode";
 import type { WorkspaceFolder } from "vscode";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import * as vscode from "vscode";
 import { JenkinsMaxBytesError } from "../jenkins/errors";
-import type {
-  ArtifactActionOptions,
-  ArtifactActionService,
-  ArtifactDownloadActionRequest
-} from "../services/ArtifactActionService";
-import { ArtifactStorageError } from "../services/ArtifactStorageService";
+import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import {
+  ArtifactStorageError,
+  type ArtifactStorageService
+} from "../services/ArtifactStorageService";
 import type { ArtifactPreviewer } from "./ArtifactPreviewer";
 
 export interface ArtifactActionRequest {
@@ -25,13 +23,18 @@ export interface ArtifactActionHandler {
   handle(request: ArtifactActionRequest): Promise<void>;
 }
 
+export interface ArtifactActionOptions {
+  downloadRoot: string;
+  maxBytes?: number;
+}
+
 export type ArtifactActionOptionsProvider = (
   workspaceFolder: WorkspaceFolder
 ) => ArtifactActionOptions;
 
 export class DefaultArtifactActionHandler implements ArtifactActionHandler {
   constructor(
-    private readonly actionService: ArtifactActionService,
+    private readonly storageService: ArtifactStorageService,
     private readonly previewer: ArtifactPreviewer,
     private readonly optionsProvider: ArtifactActionOptionsProvider
   ) {}
@@ -62,19 +65,17 @@ export class DefaultArtifactActionHandler implements ArtifactActionHandler {
       }
 
       const options = this.optionsProvider(workspaceFolder);
-      const downloadRequest: ArtifactDownloadActionRequest = {
+      const result = await this.storageService.downloadArtifact({
         environment: request.environment,
         buildUrl: request.buildUrl,
         buildNumber: request.buildNumber,
         relativePath: request.relativePath,
         fileName: request.fileName,
-        jobNameHint: request.jobNameHint
-      };
-      const result = await this.actionService.execute(
-        downloadRequest,
-        options,
-        workspaceFolder.uri.fsPath
-      );
+        jobNameHint: request.jobNameHint,
+        workspaceRoot: workspaceFolder.uri.fsPath,
+        downloadRoot: options.downloadRoot,
+        maxBytes: options.maxBytes
+      });
 
       void vscode.window.showInformationMessage(
         `Downloaded ${result.label} to ${result.targetPath}.`

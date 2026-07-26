@@ -1,3 +1,4 @@
+import type * as React from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -20,7 +21,7 @@ export function ExecutorSlotGrid({
   onOpenExternal,
   onViewAll,
   maxSlots = DEFAULT_MAX_SLOTS
-}: ExecutorSlotGridProps): JSX.Element | null {
+}: ExecutorSlotGridProps): React.JSX.Element | null {
   const allExecutors = [
     ...executors.map((executor) => ({ executor, key: `executor:${executor.id}` })),
     ...oneOffExecutors.map((executor) => ({ executor, key: `one-off:${executor.id}` }))
@@ -63,7 +64,7 @@ function ExecutorSlot({
 }: {
   executor: NodeExecutorViewModel;
   onOpenExternal: (url: string) => void;
-}): JSX.Element {
+}): React.JSX.Element {
   const busy = !executor.isIdle;
   const label = executor.workLabel
     ? `${executor.id} — ${executor.workLabel}`

@@ -26,7 +26,7 @@ const packageJson = JSON.parse(readFileSync(`${process.cwd()}/package.json`, "ut
 function createConfig(values: Record<string, unknown>): vscode.WorkspaceConfiguration {
   return {
     get: <T>(key: string, defaultValue?: T): T =>
-      Object.prototype.hasOwnProperty.call(values, key) ? (values[key] as T) : (defaultValue as T)
+      Object.hasOwn(values, key) ? (values[key] as T) : (defaultValue as T)
   } as vscode.WorkspaceConfiguration;
 }
 

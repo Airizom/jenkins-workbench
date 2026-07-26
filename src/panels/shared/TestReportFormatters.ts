@@ -1,6 +1,7 @@
 import { formatNumber } from "../../formatters/DisplayFormatters";
 import { formatCompactDurationFromTotalSeconds } from "../../formatters/DurationFormatters";
-import { EMPTY_TEST_RESULTS_LABEL } from "./TestReportConstants";
+
+export const EMPTY_TEST_RESULTS_LABEL = "No test results.";
 
 export function formatTestDuration(durationSeconds?: number): string | undefined {
   if (durationSeconds === undefined || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
@@ -15,8 +16,6 @@ export function formatTestDuration(durationSeconds?: number): string | undefined
   }
   return formatCompactDurationFromTotalSeconds(Math.round(durationSeconds));
 }
-
-export { EMPTY_TEST_RESULTS_LABEL } from "./TestReportConstants";
 
 export interface TestReportCountSummaryInput {
   failed?: number;

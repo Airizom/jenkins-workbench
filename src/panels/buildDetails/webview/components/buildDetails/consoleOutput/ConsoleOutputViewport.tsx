@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import type { JSX, ReactNode, RefObject } from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
   Tooltip,
@@ -8,7 +8,7 @@ import {
 import { ArrowUpIcon } from "../../../../../shared/webview/icons";
 
 type ConsoleOutputViewportProps = {
-  consoleOutputRef: RefObject<HTMLPreElement>;
+  consoleOutputRef: RefObject<HTMLPreElement | null>;
   showScrollToTop: boolean;
   followLog: boolean;
   onScrollToTop: () => void;

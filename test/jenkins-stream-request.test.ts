@@ -113,8 +113,58 @@ describe("requestJenkinsStream", () => {
       await new Promise((resolve) => setImmediate(resolve));
       response.write("123");
       response.write("456");
+      response.emit("error", new Error("late response error"));
 
       await rejection;
+    } finally {
+      restoreHttpRequest();
+      response.destroy();
+    }
+  });
+
+  it("collects split multibyte error text at the exact byte limit", async () => {
+    const response = createResponse();
+    response.statusCode = 500;
+    response.statusMessage = "Internal Server Error";
+    const restoreHttpRequest = mockHttpRequest(response);
+
+    try {
+      const result = requestJenkinsStream("http://jenkins.example/error", {
+        maxBytes: 4
+      });
+      const bytes = Buffer.from("🙂");
+
+      await new Promise((resolve) => setImmediate(resolve));
+      response.write(bytes.subarray(0, 2));
+      response.end(bytes.subarray(2));
+
+      await assert.rejects(
+        result,
+        (error) => error instanceof JenkinsRequestError && error.responseText === "🙂"
+      );
+    } finally {
+      restoreHttpRequest();
+      response.destroy();
+    }
+  });
+
+  it("returns partial error text when the response transport errors", async () => {
+    const response = createResponse();
+    response.statusCode = 500;
+    response.statusMessage = "Internal Server Error";
+    const restoreHttpRequest = mockHttpRequest(response);
+
+    try {
+      const result = requestJenkinsStream("http://jenkins.example/error", {});
+
+      await new Promise((resolve) => setImmediate(resolve));
+      response.write("partial");
+      response.emit("error", new Error("connection reset"));
+
+      await assert.rejects(
+        result,
+        (error) => error instanceof JenkinsRequestError && error.responseText === "partial"
+      );
     } finally {
       restoreHttpRequest();
       response.destroy();

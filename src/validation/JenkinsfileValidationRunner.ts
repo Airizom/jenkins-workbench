@@ -102,11 +102,6 @@ export class JenkinsfileValidationRunner {
 
       this.logger.logValidation(document, environment, output, options.reason);
 
-      const activeBeforeApply = this.getActiveOutcome(document, options, key, token, callbacks);
-      if (activeBeforeApply) {
-        return activeBeforeApply;
-      }
-
       const findings = parseDeclarativeValidationOutput(output);
       if (document.isClosed) {
         return { status: "skipped", reason: "closed" };

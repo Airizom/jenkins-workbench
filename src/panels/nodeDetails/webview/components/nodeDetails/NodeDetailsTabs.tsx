@@ -1,5 +1,6 @@
 import * as React from "react";
 import { countQueuedWorkItems } from "../../../../../shared/queueWork/QueueWorkContracts";
+import { TabCountBadge } from "../../../../shared/webview/components/TabCountBadge";
 import {
   Tabs,
   TabsContent,
@@ -10,7 +11,6 @@ import { ClockIcon, CpuIcon, GaugeIcon, StatusIcon } from "../../../../shared/we
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { NodeDetailsAdvancedSection } from "./NodeDetailsAdvancedSection";
 import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
-import type { NodeDetailsTabTarget } from "./NodeDetailsOverviewSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
 import { NodeDetailsQueuedWorkSection } from "./NodeDetailsQueuedWorkSection";
 import type { OverviewRow } from "./nodeDetailsUtils";
@@ -30,7 +30,7 @@ export function NodeDetailsTabs({
   onDiagnosticsToggle,
   onCopyJson,
   onOpenExternal
-}: NodeDetailsTabsProps): JSX.Element {
+}: NodeDetailsTabsProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState("overview");
   const queuedWorkCount = countQueuedWorkItems(state.queuedWork);
 
@@ -41,33 +41,28 @@ export function NodeDetailsTabs({
     onDiagnosticsToggle(value);
   };
 
-  const handleShowTab = (tab: NodeDetailsTabTarget) => {
-    handleValueChange(tab);
-  };
-
   return (
     <Tabs value={activeTab} onValueChange={handleValueChange} className="space-y-3">
       <div className="sticky-header -mx-4 px-4 py-1">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="overview" className="gap-1.5 text-xs">
+          <TabsTrigger value="overview" className="text-xs">
             <StatusIcon className="h-3.5 w-3.5" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="executors" className="gap-1.5 text-xs">
+          <TabsTrigger value="executors" className="text-xs">
             <CpuIcon className="h-3.5 w-3.5" />
             Executors
-            <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border border-border bg-muted-soft px-1 text-[10px] text-muted-foreground">
-              {state.executors.length + state.oneOffExecutors.length}
-            </span>
+            <TabCountBadge count={state.executors.length + state.oneOffExecutors.length} />
           </TabsTrigger>
-          <TabsTrigger value="queue" className="gap-1.5 text-xs">
+          <TabsTrigger value="queue" className="text-xs">
             <ClockIcon className="h-3.5 w-3.5" />
             Queue
-            <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border border-border bg-muted-soft px-1 text-[10px] text-muted-foreground">
-              {queuedWorkCount}
-            </span>
+            <TabCountBadge
+              count={queuedWorkCount}
+              tone={queuedWorkCount > 0 ? "warning" : "neutral"}
+            />
           </TabsTrigger>
-          <TabsTrigger value="diagnostics" className="gap-1.5 text-xs">
+          <TabsTrigger value="diagnostics" className="text-xs">
             <GaugeIcon className="h-3.5 w-3.5" />
             Diagnostics
           </TabsTrigger>
@@ -79,7 +74,7 @@ export function NodeDetailsTabs({
           state={state}
           overviewRows={overviewRows}
           onOpenExternal={onOpenExternal}
-          onShowTab={handleShowTab}
+          onShowTab={handleValueChange}
         />
       </TabsContent>
 

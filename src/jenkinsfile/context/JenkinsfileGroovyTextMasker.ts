@@ -3,7 +3,7 @@ type GroovyMaskMode =
   | { type: "double" }
   | { type: "triple-single" }
   | { type: "triple-double" }
-  | { type: "interpolation"; parent: "double" | "triple-double"; depth: number };
+  | { type: "interpolation"; depth: number };
 
 export function maskGroovyText(text: string): string {
   const chars = text.split("");
@@ -48,11 +48,18 @@ export function maskGroovyText(text: string): string {
         index += 2;
         continue;
       }
+
       if (character === "/" && next === "*") {
         chars[index] = " ";
         chars[index + 1] = " ";
         inBlockComment = true;
         index += 2;
+        continue;
+      }
+
+      const nextIndex = enterStringMode(text, chars, index, modeStack);
+      if (nextIndex !== undefined) {
+        index = nextIndex;
         continue;
       }
     }
@@ -93,7 +100,6 @@ export function maskGroovyText(text: string): string {
         chars[index + 1] = "{";
         modeStack.push({
           type: "interpolation",
-          parent: currentMode.type,
           depth: 1
         });
         index += 2;
@@ -125,11 +131,6 @@ export function maskGroovyText(text: string): string {
     }
 
     if (currentMode?.type === "interpolation") {
-      const nextIndex = enterStringMode(text, chars, index, modeStack);
-      if (nextIndex !== undefined) {
-        index = nextIndex;
-        continue;
-      }
       if (character === "{") {
         currentMode.depth += 1;
       } else if (character === "}") {
@@ -139,12 +140,6 @@ export function maskGroovyText(text: string): string {
         }
       }
       index += 1;
-      continue;
-    }
-
-    const nextIndex = enterStringMode(text, chars, index, modeStack);
-    if (nextIndex !== undefined) {
-      index = nextIndex;
       continue;
     }
 

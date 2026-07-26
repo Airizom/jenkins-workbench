@@ -26,11 +26,8 @@ export async function requestJson<T>(
   options?: JenkinsSimpleRequestOptions
 ): Promise<T> {
   return requestInternal<T>(url, {
-    parseJson: true,
-    authHeader: options?.authHeader,
-    headers: options?.headers,
-    timeoutMs: options?.timeoutMs,
-    maxBytes: options?.maxBytes
+    ...options,
+    parseJson: true
   });
 }
 
@@ -39,12 +36,9 @@ export async function requestText(
   options?: JenkinsSimpleRequestOptions
 ): Promise<string> {
   return requestInternal<string>(url, {
+    ...options,
     parseJson: false,
-    returnText: true,
-    authHeader: options?.authHeader,
-    headers: options?.headers,
-    timeoutMs: options?.timeoutMs,
-    maxBytes: options?.maxBytes
+    returnText: true
   });
 }
 
@@ -53,15 +47,9 @@ export async function requestTextWithOptions(
   options: JenkinsTextRequestOptions
 ): Promise<string> {
   return requestInternal<string>(url, {
-    method: options.method,
+    ...options,
     parseJson: false,
-    returnText: true,
-    headers: options.headers,
-    body: options.body,
-    redirectCount: options.redirectCount,
-    authHeader: options.authHeader,
-    timeoutMs: options.timeoutMs,
-    maxBytes: options.maxBytes
+    returnText: true
   });
 }
 
@@ -70,13 +58,10 @@ export async function requestTextWithHeaders(
   options?: JenkinsSimpleRequestOptions
 ): Promise<JenkinsTextResponse> {
   return requestInternal<JenkinsTextResponse>(url, {
+    ...options,
     parseJson: false,
     returnText: true,
-    returnHeaders: true,
-    authHeader: options?.authHeader,
-    headers: options?.headers,
-    timeoutMs: options?.timeoutMs,
-    maxBytes: options?.maxBytes
+    returnHeaders: true
   });
 }
 
@@ -85,13 +70,10 @@ export async function requestBufferWithHeaders(
   options?: JenkinsSimpleRequestOptions
 ): Promise<JenkinsBufferResponse> {
   return requestInternal(url, {
+    ...options,
     parseJson: false,
     returnBuffer: true,
-    returnHeaders: true,
-    authHeader: options?.authHeader,
-    headers: options?.headers,
-    timeoutMs: options?.timeoutMs,
-    maxBytes: options?.maxBytes
+    returnHeaders: true
   });
 }
 
@@ -99,12 +81,7 @@ export async function requestStream(
   url: string,
   options?: JenkinsSimpleRequestOptions
 ): Promise<JenkinsStreamResponse> {
-  return requestJenkinsStream(url, {
-    authHeader: options?.authHeader,
-    headers: options?.headers,
-    timeoutMs: options?.timeoutMs,
-    maxBytes: options?.maxBytes
-  });
+  return requestJenkinsStream(url, { ...options });
 }
 
 export async function requestHeaders(
@@ -112,12 +89,10 @@ export async function requestHeaders(
   options?: JenkinsSimpleRequestOptions
 ): Promise<IncomingHttpHeaders> {
   return requestInternal<IncomingHttpHeaders>(url, {
+    ...options,
     method: "HEAD",
     parseJson: false,
-    returnHeaders: true,
-    authHeader: options?.authHeader,
-    headers: options?.headers,
-    timeoutMs: options?.timeoutMs
+    returnHeaders: true
   });
 }
 

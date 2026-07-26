@@ -22,21 +22,23 @@ export interface NormalizedJobSearchOptions {
 export const normalizeJobSearchOptions = (
   options?: JobSearchOptions
 ): NormalizedJobSearchOptions => {
-  const maxResults = resolveNonNegativeInt(options?.maxResults, DEFAULT_JOB_SEARCH_MAX_RESULTS);
-  const batchSize = resolvePositiveInt(options?.batchSize, DEFAULT_JOB_SEARCH_BATCH_SIZE);
+  const maxResults = resolveBoundedInt(options?.maxResults, DEFAULT_JOB_SEARCH_MAX_RESULTS, 0);
+  const batchSize = resolveBoundedInt(options?.batchSize, DEFAULT_JOB_SEARCH_BATCH_SIZE, 1);
   const concurrency = resolveBoundedInt(
     options?.concurrency,
     DEFAULT_JOB_SEARCH_CONCURRENCY,
     1,
     MAX_JOB_SEARCH_CONCURRENCY
   );
-  const backoffBaseMs = resolveNonNegativeInt(
+  const backoffBaseMs = resolveBoundedInt(
     options?.backoffBaseMs,
-    DEFAULT_JOB_SEARCH_BACKOFF_BASE_MS
+    DEFAULT_JOB_SEARCH_BACKOFF_BASE_MS,
+    0
   );
-  const backoffMaxMs = resolveNonNegativeInt(
+  const backoffMaxMs = resolveBoundedInt(
     options?.backoffMaxMs,
-    DEFAULT_JOB_SEARCH_BACKOFF_MAX_MS
+    DEFAULT_JOB_SEARCH_BACKOFF_MAX_MS,
+    0
   );
   const maxRetries = resolveBoundedInt(
     options?.maxRetries,
@@ -56,28 +58,14 @@ export const normalizeJobSearchOptions = (
   };
 };
 
-const resolvePositiveInt = (value: number | undefined, fallback: number): number => {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-  return Math.max(1, Math.floor(value as number));
-};
-
-const resolveNonNegativeInt = (value: number | undefined, fallback: number): number => {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-  return Math.max(0, Math.floor(value as number));
-};
-
 const resolveBoundedInt = (
   value: number | undefined,
   fallback: number,
   minimum: number,
-  maximum: number
+  maximum = Number.POSITIVE_INFINITY
 ): number => {
-  if (!Number.isFinite(value)) {
+  if (value === undefined || !Number.isFinite(value)) {
     return fallback;
   }
-  return Math.min(maximum, Math.max(minimum, Math.floor(value as number)));
+  return Math.min(maximum, Math.max(minimum, Math.floor(value)));
 };

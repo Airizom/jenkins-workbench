@@ -5,13 +5,10 @@ import { TestTubeIcon } from "../../../../../shared/webview/icons";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
 import { getTestDistribution } from "./testResultsUtils";
 
-export function TestResultsSummaryCard({
-  summary,
-  passRate
-}: {
-  summary: BuildTestsSummaryViewModel;
-  passRate: number;
-}) {
+export function TestResultsSummaryCard({ summary }: { summary: BuildTestsSummaryViewModel }) {
+  const { failedPct, skippedPct, passedPct } = getTestDistribution(summary);
+  const passedPercent = Math.round(passedPct);
+
   return (
     <MetricsSummarySection
       icon={<TestTubeIcon className="h-4 w-4" />}
@@ -19,7 +16,7 @@ export function TestResultsSummaryCard({
       badge={
         summary.hasAnyResults ? (
           <ToneBadge
-            label={`${passRate}% passed`}
+            label={`${passedPercent}% passed`}
             tone={summary.failedCount > 0 ? "failed" : "passed"}
           />
         ) : undefined
@@ -33,41 +30,45 @@ export function TestResultsSummaryCard({
           <ToneMetricCard label="Total" value={summary.totalCount} tone="neutral" />
         </>
       }
-      footer={summary.hasAnyResults ? <TestDistributionBar summary={summary} /> : undefined}
+      footer={
+        summary.hasAnyResults ? (
+          <>
+            <meter
+              aria-label={`${passedPercent}% tests passed`}
+              aria-valuenow={passedPercent}
+              className="sr-only"
+              min={0}
+              max={100}
+              value={passedPercent}
+            >
+              {passedPercent}% tests passed
+            </meter>
+            <div
+              aria-hidden="true"
+              className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
+            >
+              {failedPct > 0 ? (
+                <div
+                  className="bg-failure transition-all duration-300"
+                  style={{ width: `${failedPct}%` }}
+                />
+              ) : null}
+              {skippedPct > 0 ? (
+                <div
+                  className="bg-warning transition-all duration-300"
+                  style={{ width: `${skippedPct}%` }}
+                />
+              ) : null}
+              {passedPct > 0 ? (
+                <div
+                  className="bg-success transition-all duration-300"
+                  style={{ width: `${passedPct}%` }}
+                />
+              ) : null}
+            </div>
+          </>
+        ) : undefined
+      }
     />
-  );
-}
-
-function TestDistributionBar({ summary }: { summary: BuildTestsSummaryViewModel }) {
-  const { failedPct, skippedPct, passedPct } = getTestDistribution(summary);
-
-  return (
-    <div
-      className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
-      role="meter"
-      aria-label={`${Math.round(passedPct)}% tests passed`}
-      aria-valuenow={Math.round(passedPct)}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
-      {failedPct > 0 ? (
-        <div
-          className="bg-failure transition-all duration-300"
-          style={{ width: `${failedPct}%` }}
-        />
-      ) : null}
-      {skippedPct > 0 ? (
-        <div
-          className="bg-warning transition-all duration-300"
-          style={{ width: `${skippedPct}%` }}
-        />
-      ) : null}
-      {passedPct > 0 ? (
-        <div
-          className="bg-success transition-all duration-300"
-          style={{ width: `${passedPct}%` }}
-        />
-      ) : null}
-    </div>
   );
 }

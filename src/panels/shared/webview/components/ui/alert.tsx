@@ -1,21 +1,25 @@
-import { type VariantProps, cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "../../lib/utils";
 
-const alertVariants = cva("relative w-full rounded-md border p-3 text-sm", {
-  variants: {
-    variant: {
-      default: "border-border bg-muted text-foreground",
-      destructive: "border-inputErrorBorder bg-inputErrorBg text-inputErrorFg",
-      warning: "border-inputWarningBorder bg-inputWarningBg text-inputWarningFg",
-      info: "border-inputInfoBorder bg-inputInfoBg text-inputInfoFg"
+const alertVariants = cva(
+  "relative w-full overflow-hidden rounded-lg border p-3 pl-3.5 text-sm shadow-xs before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
+  {
+    variants: {
+      variant: {
+        default: "border-border bg-surface text-foreground before:bg-border-strong",
+        destructive: "border-inputErrorBorder bg-inputErrorBg text-inputErrorFg before:bg-failure",
+        warning:
+          "border-inputWarningBorder bg-inputWarningBg text-inputWarningFg before:bg-warning",
+        info: "border-inputInfoBorder bg-inputInfoBg text-inputInfoFg before:bg-progress"
+      }
+    },
+    defaultVariants: {
+      variant: "default"
     }
-  },
-  defaultVariants: {
-    variant: "default"
   }
-});
+);
 
 type AlertProps = React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>;
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(

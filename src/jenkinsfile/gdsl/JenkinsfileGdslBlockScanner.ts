@@ -24,7 +24,6 @@ const NON_STEP_GUARD_NAMES = new Set([
   "triggers",
   "when"
 ]);
-const NODE_CONTEXT_GUARD_NAMES = new Set(["node"]);
 const IDENTIFIER_PATTERN = /[A-Za-z_$][\w$]*/y;
 
 export function scanContributorBlocks(text: string): ContributorBlock[] {
@@ -108,7 +107,7 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
     if (!shouldSuppressMethod(activeGuardNames)) {
       calls.push({
         call: parseCallExpression(body.slice(match, closeParen + 1)),
-        requiresNodeContext: activeGuardNames.some((name) => NODE_CONTEXT_GUARD_NAMES.has(name))
+        requiresNodeContext: activeGuardNames.includes("node")
       });
     }
     index = closeParen + 1;

@@ -10,6 +10,8 @@ const targetUri: UriLike = {
 let documentText = "<project><description>edited</description></project>";
 let remoteXml = "<project><description>original</description></project>";
 let warningChoice: string | undefined;
+let diagnostics = [{ severity: 1 }];
+let quickPickCalls = 0;
 const informationMessages: string[] = [];
 
 const vscodeMock = {
@@ -26,7 +28,10 @@ const vscodeMock = {
       return undefined;
     },
     showErrorMessage: async () => undefined,
-    showQuickPick: async (items: unknown[]) => items[0],
+    showQuickPick: async (items: unknown[]) => {
+      quickPickCalls += 1;
+      return items[0];
+    },
     showWarningMessage: async () => warningChoice,
     withProgress: async (_options: unknown, task: () => Promise<unknown>) => task()
   },
@@ -37,7 +42,7 @@ const vscodeMock = {
     onDidCloseTextDocument: () => ({ dispose: () => undefined })
   },
   languages: {
-    getDiagnostics: () => [{ severity: 1 }],
+    getDiagnostics: () => diagnostics,
     onDidChangeDiagnostics: () => ({ dispose: () => undefined }),
     setTextDocumentLanguage: async () => undefined
   },
@@ -129,6 +134,8 @@ beforeEach(() => {
   documentText = "<project><description>edited</description></project>";
   remoteXml = "<project><description>original</description></project>";
   warningChoice = undefined;
+  diagnostics = [{ severity: 1 }];
+  quickPickCalls = 0;
   informationMessages.length = 0;
 });
 
@@ -139,6 +146,25 @@ describe("JobConfigUpdateWorkflow submitDraft", () => {
     await workflow.submitDraft(refreshHost, targetUri as never);
 
     assertSuccessfulSubmit(calls);
+  });
+
+  it("requests confirmation immediately when the document has no diagnostics", async () => {
+    diagnostics = [];
+    vi.useFakeTimers();
+    const { workflow, refreshHost, calls } = createWorkflow();
+
+    try {
+      const submission = workflow.submitDraft(refreshHost, targetUri as never);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      assert.equal(quickPickCalls, 1);
+      assert.equal(vi.getTimerCount(), 0);
+      await submission;
+      assertSuccessfulSubmit(calls);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("blocks submission when the remote config changed after the draft opened", async () => {

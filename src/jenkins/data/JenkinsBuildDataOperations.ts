@@ -1,8 +1,10 @@
+import { JenkinsRequestError } from "../errors";
 import type {
   JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsBuildTriggerOptions,
+  JenkinsClient,
   JenkinsReplayDefinition,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload,
@@ -11,7 +13,6 @@ import type {
 } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
-import { JenkinsRequestError } from "../errors";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type { JenkinsTestReport } from "../types";
 import { callOptionalBuildEndpoint, toBuildActionError } from "./JenkinsDataErrors";
@@ -149,12 +150,7 @@ export class JenkinsBuildDataOperations {
     buildUrl: string,
     maxChars?: number
   ): Promise<ConsoleTextResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getConsoleText(buildUrl, maxChars);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.getConsoleText(buildUrl, maxChars));
   }
 
   async getConsoleTextHead(
@@ -162,12 +158,9 @@ export class JenkinsBuildDataOperations {
     buildUrl: string,
     maxBytes: number
   ): Promise<ConsoleTextResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getConsoleTextHead(buildUrl, maxBytes);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) =>
+      client.getConsoleTextHead(buildUrl, maxBytes)
+    );
   }
 
   async getConsoleTextTail(
@@ -175,12 +168,9 @@ export class JenkinsBuildDataOperations {
     buildUrl: string,
     maxChars: number
   ): Promise<ConsoleTextTailResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getConsoleTextTail(buildUrl, maxChars);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) =>
+      client.getConsoleTextTail(buildUrl, maxChars)
+    );
   }
 
   async getConsoleTextProgressive(
@@ -189,12 +179,9 @@ export class JenkinsBuildDataOperations {
     start: number,
     maxBytes?: number
   ): Promise<ProgressiveConsoleTextResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getConsoleTextProgressive(buildUrl, start, maxBytes);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) =>
+      client.getConsoleTextProgressive(buildUrl, start, maxBytes)
+    );
   }
 
   async getConsoleHtmlProgressive(
@@ -203,12 +190,9 @@ export class JenkinsBuildDataOperations {
     start: number,
     annotator?: string
   ): Promise<ProgressiveConsoleHtmlResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getConsoleHtmlProgressive(buildUrl, start, annotator);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) =>
+      client.getConsoleHtmlProgressive(buildUrl, start, annotator)
+    );
   }
 
   async getFlowNodeLog(
@@ -246,12 +230,7 @@ export class JenkinsBuildDataOperations {
     environment: JenkinsEnvironmentRef,
     jobUrl: string
   ): Promise<JenkinsBuild | undefined> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getLastFailedBuild(jobUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.getLastFailedBuild(jobUrl));
   }
 
   async getTestReport(
@@ -289,42 +268,22 @@ export class JenkinsBuildDataOperations {
     jobUrl: string,
     options: JenkinsBuildTriggerOptions
   ): Promise<{ queueLocation?: string }> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.triggerBuild(jobUrl, options);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.triggerBuild(jobUrl, options));
   }
 
   async stopBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.stopBuild(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    await this.runBuildAction(environment, (client) => client.stopBuild(buildUrl));
   }
 
   async quickReplayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.quickReplayBuild(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    await this.runBuildAction(environment, (client) => client.quickReplayBuild(buildUrl));
   }
 
   async getReplayDefinition(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsReplayDefinition> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getReplayDefinition(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.getReplayDefinition(buildUrl));
   }
 
   async runReplay(
@@ -332,33 +291,18 @@ export class JenkinsBuildDataOperations {
     buildUrl: string,
     payload: JenkinsReplaySubmissionPayload
   ): Promise<JenkinsReplayResult> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.runReplay(buildUrl, payload);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.runReplay(buildUrl, payload));
   }
 
   async rebuildBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.rebuildBuild(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    await this.runBuildAction(environment, (client) => client.rebuildBuild(buildUrl));
   }
 
   async getRestartFromStageInfo(
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<JenkinsRestartFromStageInfo> {
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getRestartFromStageInfo(buildUrl);
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runBuildAction(environment, (client) => client.getRestartFromStageInfo(buildUrl));
   }
 
   async restartPipelineFromStage(
@@ -366,9 +310,18 @@ export class JenkinsBuildDataOperations {
     buildUrl: string,
     stageName: string
   ): Promise<void> {
+    await this.runBuildAction(environment, (client) =>
+      client.restartPipelineFromStage(buildUrl, stageName)
+    );
+  }
+
+  private async runBuildAction<T>(
+    environment: JenkinsEnvironmentRef,
+    action: (client: JenkinsClient) => Promise<T>
+  ): Promise<T> {
     const client = await this.context.getClient(environment);
     try {
-      await client.restartPipelineFromStage(buildUrl, stageName);
+      return await action(client);
     } catch (error) {
       throw toBuildActionError(error);
     }

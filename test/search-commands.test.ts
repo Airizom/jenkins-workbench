@@ -1,9 +1,9 @@
-import assert from "node:assert/strict";
-import { describe, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentStore } from "../src/storage/JenkinsEnvironmentStore";
 import type { JenkinsViewStateStore } from "../src/storage/JenkinsViewStateStore";
 import type { JenkinsTreeNavigator } from "../src/tree/TreeNavigator";
+import * as vscodeStub from "./helpers/vscodeStub";
 
 class TestCancellationTokenSource {
   readonly token = { isCancellationRequested: false };
@@ -57,6 +57,7 @@ describe("registerSearchCommands", () => {
     let goToJobCommand: (() => Promise<void>) | undefined;
 
     const vscodeMock = {
+      ...vscodeStub,
       CancellationError: class CancellationError extends Error {},
       CancellationTokenSource: class extends TestCancellationTokenSource {
         constructor() {
@@ -116,13 +117,15 @@ describe("registerSearchCommands", () => {
       {} as JenkinsTreeNavigator
     );
 
-    assert.ok(goToJobCommand);
+    if (!goToJobCommand) {
+      throw new Error("Go to Job command was not registered.");
+    }
     await goToJobCommand();
     quickPick.hide();
 
-    assert.equal(tokenSources.length, 1);
-    assert.equal(tokenSources[0].cancelCalled, true);
-    assert.equal(tokenSources[0].disposeCalled, true);
-    assert.equal(quickPick.disposed, true);
+    expect(tokenSources).toHaveLength(1);
+    expect(tokenSources[0].cancelCalled).toBe(true);
+    expect(tokenSources[0].disposeCalled).toBe(true);
+    expect(quickPick.disposed).toBe(true);
   });
 });

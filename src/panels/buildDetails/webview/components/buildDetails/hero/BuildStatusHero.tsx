@@ -19,7 +19,7 @@ import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
 const { useEffect, useRef } = React;
 
 // Secondary sticky toolbars dock below the hero via this custom property.
-function useStickyHeroOffset(): React.RefObject<HTMLElement> {
+function useStickyHeroOffset(): React.RefObject<HTMLElement | null> {
   const heroRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export function BuildStatusHero({
   stageCount,
   onOpenBuild,
   children
-}: BuildStatusHeroProps): JSX.Element {
+}: BuildStatusHeroProps): React.JSX.Element {
   const testsPill = describeTestsPill(testsSummary);
   const heroRef = useStickyHeroOffset();
 
@@ -107,7 +107,7 @@ export function BuildStatusHero({
             <div className="flex items-center gap-3 min-w-0">
               <div
                 className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs",
                   resolveResultBadgeClass(resultClass),
                   isRunning && "hero-status-glyph--running"
                 )}
@@ -150,7 +150,7 @@ export function BuildStatusHero({
               {stageCount > 0 ? (
                 <Badge
                   variant="outline"
-                  className="hidden sm:inline-flex text-[11px] font-medium border-border bg-muted-soft text-muted-foreground"
+                  className="hidden sm:inline-flex text-[11px] font-medium border-border bg-muted-strong text-muted-foreground"
                 >
                   {stageCount === 1 ? "1 stage" : `${stageCount} stages`}
                 </Badge>
@@ -161,7 +161,6 @@ export function BuildStatusHero({
                 onClick={onOpenBuild}
                 disabled={!buildUrl}
                 aria-label="Open in Jenkins"
-                className="gap-1.5 h-7 px-2.5 text-xs"
               >
                 <ExternalLinkIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Open in Jenkins</span>

@@ -3,22 +3,6 @@ import type {
   BuildParameterRequestPreparer
 } from "./BuildParameterRequests";
 import type {
-  JenkinsArtifact,
-  JenkinsBuild,
-  JenkinsBuildDetails,
-  JenkinsItemCreateKind,
-  JenkinsJob,
-  JenkinsNodeDetails,
-  JenkinsQueueItem,
-  JenkinsRestartFromStageInfo,
-  JenkinsWorkflowRun,
-  JenkinsWorkspaceEntry,
-  ScanMultibranchResult
-} from "./JenkinsClient";
-import type { JenkinsClientProvider } from "./JenkinsClientProvider";
-import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
-import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
-import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "./coverage/JenkinsCoverageTypes";
@@ -49,11 +33,26 @@ import type {
 } from "./data/JenkinsDataTypes";
 import { JenkinsJobDataOperations } from "./data/JenkinsJobDataOperations";
 import { JenkinsJobIndex } from "./data/JenkinsJobIndex";
-import { JenkinsNodeDataOperations } from "./data/JenkinsNodeDataOperations";
 import type { NodeLaunchResult, NodeOfflineToggleResult } from "./data/JenkinsNodeDataOperations";
+import { JenkinsNodeDataOperations } from "./data/JenkinsNodeDataOperations";
 import { JenkinsPendingInputDataOperations } from "./data/JenkinsPendingInputDataOperations";
 import { JenkinsQueueAndJobManagementOperations } from "./data/JenkinsQueueAndJobManagementOperations";
-import { JenkinsWorkspaceDataOperations } from "./data/JenkinsWorkspaceDataOperations";
+import type {
+  JenkinsArtifact,
+  JenkinsBuild,
+  JenkinsBuildDetails,
+  JenkinsItemCreateKind,
+  JenkinsJob,
+  JenkinsNodeDetails,
+  JenkinsQueueItem,
+  JenkinsRestartFromStageInfo,
+  JenkinsWorkflowRun,
+  JenkinsWorkspaceEntry,
+  ScanMultibranchResult
+} from "./JenkinsClient";
+import type { JenkinsClientProvider } from "./JenkinsClientProvider";
+import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
+import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type {
   JenkinsReplayDefinition,
@@ -67,6 +66,11 @@ export type {
   BuildParameterRequestPreparer
 } from "./BuildParameterRequests";
 export type {
+  JenkinsCoverageOverview,
+  JenkinsModifiedCoverageFile
+} from "./coverage/JenkinsCoverageTypes";
+export type { JenkinsCoverageRequestOptions } from "./data/JenkinsCoverageDataOperations";
+export type {
   ConsoleTextResult,
   ConsoleTextTailResult,
   JenkinsJobCollectionRequest,
@@ -76,25 +80,20 @@ export type {
   JenkinsQueueItemInfo,
   JenkinsViewInfo,
   JobParameter,
+  JobPathSegment,
+  JobSearchEntry,
+  JobSearchOptions,
   PendingInputAction,
   PendingInputSummary,
   ProgressiveConsoleHtmlResult,
-  ProgressiveConsoleTextResult,
-  JobPathSegment,
-  JobSearchEntry,
-  JobSearchOptions
+  ProgressiveConsoleTextResult
 } from "./data/JenkinsDataTypes";
-export type { JenkinsCoverageRequestOptions } from "./data/JenkinsCoverageDataOperations";
-export type {
-  JenkinsCoverageOverview,
-  JenkinsModifiedCoverageFile
-} from "./coverage/JenkinsCoverageTypes";
+export { CancellationError } from "./errors";
 export type {
   JenkinsReplayDefinition,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload
 } from "./types";
-export { CancellationError } from "./errors";
 
 export interface JenkinsDataServiceOptions {
   buildParameterRequestPreparer: BuildParameterRequestPreparer;
@@ -108,31 +107,7 @@ export interface BuildListFetchOptions {
   bypassCache?: boolean;
 }
 
-interface JenkinsDataServiceRuntimeSurface {
-  updateCacheTtlMs(cacheTtlMs?: number): void;
-  enableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void>;
-  disableJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void>;
-  renameJob(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    newName: string
-  ): Promise<{ newUrl: string }>;
-  deleteJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void>;
-  copyJob(
-    environment: JenkinsEnvironmentRef,
-    parentUrl: string,
-    sourceName: string,
-    newName: string
-  ): Promise<{ newUrl: string }>;
-  createItem(
-    kind: JenkinsItemCreateKind,
-    environment: JenkinsEnvironmentRef,
-    parentUrl: string,
-    newName: string
-  ): Promise<{ newUrl: string }>;
-}
-
-export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
+export class JenkinsDataService {
   private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
   private readonly buildOperations: JenkinsBuildDataOperations;
@@ -141,7 +116,6 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
   private readonly nodeOperations: JenkinsNodeDataOperations;
   private readonly jobOperations: JenkinsJobDataOperations;
   private readonly queueAndJobManagementOperations: JenkinsQueueAndJobManagementOperations;
-  private readonly workspaceOperations: JenkinsWorkspaceDataOperations;
 
   constructor(clientProvider: JenkinsClientProvider, options: JenkinsDataServiceOptions) {
     this.runtimeContext = new JenkinsDataRuntimeContext(clientProvider, options);
@@ -154,7 +128,6 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
     this.queueAndJobManagementOperations = new JenkinsQueueAndJobManagementOperations(
       this.runtimeContext
     );
-    this.workspaceOperations = new JenkinsWorkspaceDataOperations(this.runtimeContext);
   }
 
   clearCache(): void {
@@ -165,6 +138,8 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
     this.runtimeContext.clearCacheForEnvironment(environmentId);
   }
 
+  // Called by configuration subscriptions that Fallow cannot trace through the service container.
+  // fallow-ignore-next-line unused-class-member
   updateCacheTtlMs(cacheTtlMs?: number): void {
     this.runtimeContext.setCacheTtlMs(cacheTtlMs);
   }
@@ -338,7 +313,8 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
     jobUrl: string,
     relativePath?: string
   ): Promise<JenkinsWorkspaceEntry[]> {
-    return this.workspaceOperations.getWorkspaceEntries(environment, jobUrl, relativePath);
+    const client = await this.runtimeContext.getClient(environment);
+    return client.getWorkspaceEntries(jobUrl, relativePath);
   }
 
   async getWorkspaceFile(
@@ -347,7 +323,8 @@ export class JenkinsDataService implements JenkinsDataServiceRuntimeSurface {
     relativePath: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse> {
-    return this.workspaceOperations.getWorkspaceFile(environment, jobUrl, relativePath, options);
+    const client = await this.runtimeContext.getClient(environment);
+    return client.getWorkspaceFile(jobUrl, relativePath, options);
   }
 
   async getConsoleText(

@@ -27,10 +27,10 @@ export function BuildFailureChangelogCard({
 function ChangelogList({ items }: { items: BuildFailureChangelogItem[] }) {
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
-      {items.map((item, index) => (
+      {items.map((item) => (
         <li
           className="rounded border border-mutedBorder bg-muted-soft px-2.5 py-1.5"
-          key={`${item.message}-${index}`}
+          key={item.commitId ?? `${item.author}:${item.message}`}
         >
           <div className="text-xs text-foreground line-clamp-2">{item.message}</div>
           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">

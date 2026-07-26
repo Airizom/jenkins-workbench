@@ -1,5 +1,5 @@
-import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { JenkinsRequestError } from "../errors";
+import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 import type { PendingInputAction, PendingInputSummary } from "./JenkinsDataTypes";
@@ -34,11 +34,7 @@ export class JenkinsPendingInputDataOperations {
     if (cached && options?.mode !== "refresh") {
       return cached;
     }
-    return this.fetchPendingInputActions(environment, buildUrl, {
-      cacheKey: keys.cacheKey,
-      summaryKey: keys.summaryKey,
-      unsupportedKey: keys.unsupportedKey
-    });
+    return this.fetchPendingInputActions(environment, buildUrl, keys);
   }
 
   async getPendingInputSummary(
@@ -76,12 +72,16 @@ export class JenkinsPendingInputDataOperations {
     const actions = await this.getPendingInputActions(environment, buildUrl, {
       mode: "refresh"
     });
-    const summary = this.buildPendingInputSummary(actions);
     const cacheKey = await this.context.buildCacheKey(
       environment,
       "pending-input-summary",
       buildUrl
     );
+    const cached = this.context.getCache().get<PendingInputSummary>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const summary = this.buildPendingInputSummary(actions);
     this.context.getCache().set(cacheKey, summary, PENDING_INPUT_SUMMARY_TTL_MS);
     return summary;
   }
@@ -137,10 +137,7 @@ export class JenkinsPendingInputDataOperations {
     try {
       const actions = await client.getPendingInputActions(buildUrl);
       const mapped = mapPendingInputActions(actions);
-      this.context.getCache().set(keys.cacheKey, mapped, PENDING_INPUT_ACTIONS_TTL_MS);
-      this.context
-        .getCache()
-        .set(keys.summaryKey, this.buildPendingInputSummary(mapped), PENDING_INPUT_SUMMARY_TTL_MS);
+      this.cachePendingInputActions(keys, mapped);
       return mapped;
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
@@ -151,10 +148,7 @@ export class JenkinsPendingInputDataOperations {
             true,
             this.context.getCacheTtlMs() ?? PENDING_INPUT_UNSUPPORTED_TTL_MS
           );
-        this.context.getCache().set(keys.cacheKey, [], PENDING_INPUT_ACTIONS_TTL_MS);
-        this.context
-          .getCache()
-          .set(keys.summaryKey, this.buildPendingInputSummary([]), PENDING_INPUT_SUMMARY_TTL_MS);
+        this.cachePendingInputActions(keys, []);
         return [];
       }
       throw toBuildActionError(error);
@@ -177,6 +171,19 @@ export class JenkinsPendingInputDataOperations {
       buildUrl
     );
     return { cacheKey, summaryKey, unsupportedKey };
+  }
+
+  private cachePendingInputActions(
+    keys: PendingInputCacheKeys,
+    actions: PendingInputAction[]
+  ): void {
+    const cache = this.context.getCache();
+    cache.set(keys.cacheKey, actions, PENDING_INPUT_ACTIONS_TTL_MS);
+    cache.set(
+      keys.summaryKey,
+      this.buildPendingInputSummary(actions),
+      PENDING_INPUT_SUMMARY_TTL_MS
+    );
   }
 
   private buildPendingInputSummary(

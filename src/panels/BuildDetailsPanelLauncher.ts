@@ -3,8 +3,8 @@ import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefresh
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
-import type { TestSourceNavigationService } from "../services/TestSourceNavigationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
+import type { TestSourceResolver } from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import { BuildDetailsPanel } from "./BuildDetailsPanel";
@@ -28,7 +28,7 @@ export interface BuildDetailsPanelLauncherOptions {
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
   coverageDecorationService: CoverageDecorationService;
-  testSourceNavigationService: TestSourceNavigationService;
+  testSourceResolver: TestSourceResolver;
   testSourceNavigationUiService: TestSourceNavigationUiService;
   refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
@@ -71,7 +71,7 @@ export class BuildDetailsPanelLauncher implements BuildDetailsPanelRevivalSurfac
       refreshHost: this.options.refreshHost,
       pendingInputProvider: this.options.pendingInputProvider,
       testSourceNavigationUiService: this.options.testSourceNavigationUiService,
-      testSourceNavigationService: this.options.testSourceNavigationService
+      testSourceResolver: this.options.testSourceResolver
     };
   }
 }

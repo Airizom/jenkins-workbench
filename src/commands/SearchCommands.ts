@@ -8,15 +8,14 @@ import {
   type JobSearchOptions
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type {
-  EnvironmentWithScope,
-  JenkinsEnvironmentStore
-} from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsViewStateStore, JobFilterMode } from "../storage/JenkinsViewStateStore";
+import { formatJobColor } from "../tree/formatters";
+import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import type { JenkinsTreeNavigator } from "../tree/TreeNavigator";
-import { formatJobColor } from "../tree/formatters";
 import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
+import { toJenkinsEnvironmentRef } from "./CommandUtils";
 
 type JobQuickPickItem = vscode.QuickPickItem & {
   environment: JenkinsEnvironmentRef;
@@ -38,7 +37,7 @@ export function registerSearchCommands(
       goToJob(store, dataService, navigator)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.filterJobsAll", () =>
-      setJobFilterMode(viewStateStore, "all")
+      viewStateStore.setJobFilterMode("all")
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.filterJobsFailing", () =>
       toggleJobFilterMode(viewStateStore, "failing")
@@ -93,7 +92,7 @@ async function goToJob(
       return;
     }
     quickPick.hide();
-    const revealed = await revealJobInTree(navigator, selection.environment, selection.entry);
+    const revealed = await navigator.revealJobPath(selection.environment, selection.entry);
     if (!revealed) {
       await openExternalHttpUrlWithWarning(selection.entry.url, {
         targetLabel: "selected Jenkins job URL"
@@ -135,7 +134,7 @@ async function goToJob(
   };
 
   for (const environment of environments) {
-    const envRef = toEnvironmentRef(environment);
+    const envRef = toJenkinsEnvironmentRef(environment);
     const seenEntries = new Set<string>();
     const appendEntries = (entries: JobSearchEntry[]): void => {
       if (cancellationToken.isCancellationRequested) {
@@ -190,21 +189,6 @@ async function loadEnvironmentJobs(
   }
 }
 
-function revealJobInTree(
-  navigator: JenkinsTreeNavigator,
-  environment: JenkinsEnvironmentRef,
-  entry: JobSearchEntry
-): Promise<boolean> {
-  return navigator.revealJobPath(environment, entry);
-}
-
-async function setJobFilterMode(
-  viewStateStore: JenkinsViewStateStore,
-  mode: JobFilterMode
-): Promise<void> {
-  await viewStateStore.setJobFilterMode(mode);
-}
-
 async function toggleJobFilterMode(
   viewStateStore: JenkinsViewStateStore,
   mode: JobFilterMode
@@ -255,7 +239,7 @@ async function promptBranchFilter(
     return;
   }
 
-  const folderLabel = getItemLabel(item);
+  const folderLabel = resolveTreeItemLabel(item) ?? "folder";
   const existing =
     viewStateStore.getBranchFilter(item.environment.environmentId, item.folderUrl) ?? "";
   const input = await vscode.window.showInputBox({
@@ -289,23 +273,4 @@ async function clearBranchFilter(
   }
 
   await viewStateStore.clearBranchFilter(item.environment.environmentId, item.folderUrl);
-}
-
-function toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-  return {
-    environmentId: environment.id,
-    scope: environment.scope,
-    url: environment.url,
-    username: environment.username
-  };
-}
-
-function getItemLabel(item: vscode.TreeItem): string {
-  if (typeof item.label === "string") {
-    return item.label;
-  }
-  if (item.label?.label) {
-    return item.label.label;
-  }
-  return "folder";
 }

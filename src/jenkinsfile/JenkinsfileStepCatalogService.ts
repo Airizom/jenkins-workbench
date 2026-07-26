@@ -79,7 +79,7 @@ export class JenkinsfileStepCatalogService implements JenkinsfileStepCatalogInva
         this.ensureCatalogLoaded(environment, key);
         return createFallbackLoadingResult(environment);
       }
-      return createFallbackLoadFailedResult(environment, loadError);
+      return createFallbackLoadFailedResult(environment, loadError.error);
     }
     this.ensureCatalogLoaded(environment, key);
     return createFallbackLoadingResult(environment);
@@ -242,9 +242,6 @@ function createLiveResult(
 }
 
 function normalizeCatalogError(error: unknown): Error {
-  if (isLoadErrorEntry(error)) {
-    return error.error;
-  }
   if (error instanceof Error) {
     return error;
   }
@@ -253,15 +250,4 @@ function normalizeCatalogError(error: unknown): Error {
 
 function shouldRetryAfterLoadError(loadError: LoadErrorEntry | undefined): boolean {
   return !loadError || loadError.retryAfter <= Date.now();
-}
-
-function isLoadErrorEntry(error: unknown): error is LoadErrorEntry {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "error" in error &&
-    "retryAfter" in error &&
-    error.error instanceof Error &&
-    typeof error.retryAfter === "number"
-  );
 }

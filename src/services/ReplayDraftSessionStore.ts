@@ -211,7 +211,7 @@ function buildReadablePath(displayName: string, isMainScript: boolean): string {
 }
 
 function sanitizeSegment(segment: string): string {
-  return segment.trim().replace(/[<>:\"|?*%#]+/g, "_");
+  return segment.trim().replace(/[<>:"|?*%#]+/g, "_");
 }
 
 function reserveUniquePath(path: string, usedPaths: Set<string>): string {

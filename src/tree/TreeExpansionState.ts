@@ -1,6 +1,6 @@
 import type * as vscode from "vscode";
-import type { TreeExpansionPath, TreeExpansionResolver } from "./TreeDataProviderTypes";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import type { TreeExpansionPath, TreeExpansionResolver } from "./TreeDataProviderTypes";
 
 type TreeRevealOptions = {
   expand: boolean;
@@ -18,17 +18,22 @@ type ExpansionOperation = {
   path?: TreeExpansionPath;
 };
 
+type CollapsedPathOperation = {
+  operationVersion: number;
+  path: TreeExpansionPath;
+};
+
 const RESTORE_RETRY_LIMIT = 3;
 const RESTORE_RETRY_TIMEOUT_MS = 4000;
 
 export class TreeExpansionState implements vscode.Disposable {
   private readonly expandedPaths = new Map<string, TreeExpansionPath>();
   private readonly expandedPathVersions = new Map<string, number>();
-  private readonly collapsedPathVersions = new Map<string, number>();
+  private readonly collapsedPathOperations = new Map<string, CollapsedPathOperation>();
   private readonly elementOperationVersions = new WeakMap<WorkbenchTreeElement, number>();
+  private readonly activeProgrammaticReveals = new WeakMap<WorkbenchTreeElement, number>();
   private readonly disposables: vscode.Disposable[] = [];
   private nextOperationVersion = 0;
-  private isRestoring = false;
 
   constructor(
     private readonly treeView: vscode.TreeView<WorkbenchTreeElement>,
@@ -61,32 +66,34 @@ export class TreeExpansionState implements vscode.Disposable {
     }
 
     const sortedPaths = [...paths].sort((left, right) => left.length - right.length);
-    this.isRestoring = true;
-    try {
-      for (const path of sortedPaths) {
-        const key = this.buildKey(path);
-        this.expandedPaths.set(key, path);
-        this.expandedPathVersions.delete(key);
-        const outcome = await this.resolvePathWithRetry(path);
-        if (!outcome.element) {
-          if (!outcome.wasPending) {
-            this.expandedPaths.delete(key);
-            this.expandedPathVersions.delete(key);
-          }
-          continue;
-        }
-        try {
-          await this.treeView.reveal(outcome.element, this.buildRevealOptions());
-          this.expandedPaths.set(key, path);
-          this.expandedPathVersions.delete(key);
-        } catch {
-          // Ignore reveal failures for missing/virtual elements.
-          this.expandedPaths.delete(key);
-          this.expandedPathVersions.delete(key);
-        }
+    const operationVersion = ++this.nextOperationVersion;
+    for (const path of sortedPaths) {
+      const key = this.buildKey(path);
+      const currentVersion = this.expandedPathVersions.get(key) ?? 0;
+      if (
+        currentVersion > operationVersion ||
+        this.hasNewerCollapsedPrefix(path, operationVersion)
+      ) {
+        continue;
       }
-    } finally {
-      this.isRestoring = false;
+      this.expandedPaths.set(key, path);
+      this.expandedPathVersions.set(key, operationVersion);
+      const outcome = await this.resolvePathWithRetry(path);
+      if (!outcome.element) {
+        if (!outcome.wasPending) {
+          this.clearRestoredPath(key, operationVersion);
+        }
+        continue;
+      }
+      if (this.expandedPathVersions.get(key) !== operationVersion) {
+        continue;
+      }
+      try {
+        await this.revealForRestore(outcome.element);
+      } catch {
+        // Ignore reveal failures for missing/virtual elements.
+        this.clearRestoredPath(key, operationVersion);
+      }
     }
   }
 
@@ -99,6 +106,9 @@ export class TreeExpansionState implements vscode.Disposable {
   }
 
   private async trackExpanded(element: WorkbenchTreeElement): Promise<void> {
+    if (this.activeProgrammaticReveals.has(element)) {
+      return;
+    }
     const operation = await this.startExpansionOperation(element);
     if (
       !operation?.path ||
@@ -116,7 +126,10 @@ export class TreeExpansionState implements vscode.Disposable {
     if (!operation?.path) {
       return;
     }
-    this.collapsedPathVersions.set(this.buildKey(operation.path), operation.operationVersion);
+    this.collapsedPathOperations.set(this.buildKey(operation.path), {
+      operationVersion: operation.operationVersion,
+      path: [...operation.path]
+    });
     for (const [key, storedPath] of this.expandedPaths) {
       const expandedVersion = this.expandedPathVersions.get(key) ?? 0;
       if (
@@ -137,15 +150,35 @@ export class TreeExpansionState implements vscode.Disposable {
 
   private async startExpansionOperation(
     element: WorkbenchTreeElement
-  ): Promise<ExpansionOperation | undefined> {
-    if (this.isRestoring) {
-      return undefined;
-    }
+  ): Promise<ExpansionOperation> {
     const operationVersion = this.startElementOperation(element);
     return {
       operationVersion,
       path: await this.buildCurrentExpansionPath(element, operationVersion)
     };
+  }
+
+  private async revealForRestore(element: WorkbenchTreeElement): Promise<void> {
+    const activeRevealCount = this.activeProgrammaticReveals.get(element) ?? 0;
+    this.activeProgrammaticReveals.set(element, activeRevealCount + 1);
+    try {
+      await this.treeView.reveal(element, this.buildRevealOptions());
+    } finally {
+      const remainingRevealCount = (this.activeProgrammaticReveals.get(element) ?? 1) - 1;
+      if (remainingRevealCount === 0) {
+        this.activeProgrammaticReveals.delete(element);
+      } else {
+        this.activeProgrammaticReveals.set(element, remainingRevealCount);
+      }
+    }
+  }
+
+  private clearRestoredPath(key: string, operationVersion: number): void {
+    if (this.expandedPathVersions.get(key) !== operationVersion) {
+      return;
+    }
+    this.expandedPaths.delete(key);
+    this.expandedPathVersions.delete(key);
   }
 
   private async buildCurrentExpansionPath(
@@ -167,8 +200,8 @@ export class TreeExpansionState implements vscode.Disposable {
   }
 
   private hasNewerCollapsedPrefix(path: TreeExpansionPath, operationVersion: number): boolean {
-    for (const [collapsedKey, collapsedVersion] of this.collapsedPathVersions) {
-      if (collapsedVersion > operationVersion && isPathPrefix(JSON.parse(collapsedKey), path)) {
+    for (const collapsed of this.collapsedPathOperations.values()) {
+      if (collapsed.operationVersion > operationVersion && isPathPrefix(collapsed.path, path)) {
         return true;
       }
     }

@@ -1,5 +1,6 @@
+import type { CurrentBranchPullRequestResolution } from "./CurrentBranchGitHubPullRequestAdapter";
+import { decodeJenkinsJobName } from "./CurrentBranchJenkinsJobUtils";
 import { DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS } from "./CurrentBranchPullRequestJobPatterns";
-import type { CurrentBranchPullRequestResolution } from "./CurrentBranchPullRequestService";
 
 export interface CurrentBranchPullRequestJobRef {
   name: string;
@@ -65,12 +66,4 @@ function normalizeJobNamePatterns(jobNamePatterns: readonly string[]): readonly 
 
 function normalizeJobName(jobName: string): string {
   return decodeJenkinsJobName(jobName).trim().toLowerCase();
-}
-
-function decodeJenkinsJobName(jobName: string): string {
-  try {
-    return decodeURIComponent(jobName);
-  } catch {
-    return jobName;
-  }
 }

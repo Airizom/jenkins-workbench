@@ -12,6 +12,7 @@ type BuildResultStyle = {
   graphBackground: string;
   borderColor: string;
 };
+type NodeStatusStyle = { badge: string; icon: string; accent: string };
 
 function normalizeBuildResultClass(resultClass?: string): BuildResultClassKey {
   switch (resultClass) {
@@ -25,6 +26,18 @@ function normalizeBuildResultClass(resultClass?: string): BuildResultClassKey {
       return "neutral";
   }
 }
+
+const WARNING_BUILD_RESULT_STYLE: Omit<BuildResultStyle, "stageNode"> = {
+  badge: "border-warning-border bg-warning-soft text-warning-foreground",
+  text: "text-warning-foreground",
+  iconText: "text-warning",
+  accent: "bg-warning",
+  connectorColor: "var(--warning)",
+  graphBackground:
+    "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
+  borderColor: "var(--warning-border)"
+};
+const WARNING_STAGE_NODE_CLASS = "border-warning-border bg-warning-soft text-warning";
 
 const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
   success: {
@@ -50,15 +63,8 @@ const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
     borderColor: "var(--failure-border)"
   },
   unstable: {
-    badge: "border-warning-border bg-warning-soft text-warning-foreground",
-    text: "text-warning-foreground",
-    iconText: "text-warning",
-    accent: "bg-warning",
-    stageNode: "border-warning-border bg-warning-soft text-warning",
-    connectorColor: "var(--warning)",
-    graphBackground:
-      "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
-    borderColor: "var(--warning-border)"
+    ...WARNING_BUILD_RESULT_STYLE,
+    stageNode: WARNING_STAGE_NODE_CLASS
   },
   aborted: {
     badge: "border-aborted-border bg-aborted-soft text-aborted-foreground",
@@ -72,15 +78,8 @@ const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
     borderColor: "var(--aborted-border)"
   },
   running: {
-    badge: "border-warning-border bg-warning-soft text-warning-foreground",
-    text: "text-warning-foreground",
-    iconText: "text-warning",
-    accent: "bg-warning",
-    stageNode: "border-warning-border bg-warning-soft text-warning animate-pulse",
-    connectorColor: "var(--warning)",
-    graphBackground:
-      "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
-    borderColor: "var(--warning-border)"
+    ...WARNING_BUILD_RESULT_STYLE,
+    stageNode: `${WARNING_STAGE_NODE_CLASS} animate-pulse`
   },
   neutral: {
     badge: "border-border bg-muted text-muted-foreground",
@@ -95,34 +94,31 @@ const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
   }
 };
 
-const NODE_STATUS_STYLES: Record<NodeStatusClass, { badge: string; icon: string; accent: string }> =
-  {
-    online: {
-      badge: "border-success-border text-success bg-success-soft",
-      icon: "text-success",
-      accent: "bg-success"
-    },
-    idle: {
-      badge: "border-warning-border text-warning bg-warning-soft",
-      icon: "text-warning",
-      accent: "bg-warning"
-    },
-    temporary: {
-      badge: "border-warning-border text-warning bg-warning-soft",
-      icon: "text-warning",
-      accent: "bg-warning"
-    },
-    offline: {
-      badge: "border-failure-border text-failure bg-failure-soft",
-      icon: "text-failure",
-      accent: "bg-failure"
-    },
-    unknown: {
-      badge: "border-border text-foreground bg-muted",
-      icon: "text-muted-foreground",
-      accent: "bg-border"
-    }
-  };
+const WARNING_NODE_STATUS_STYLE: NodeStatusStyle = {
+  badge: "border-warning-border text-warning bg-warning-soft",
+  icon: "text-warning",
+  accent: "bg-warning"
+};
+
+const NODE_STATUS_STYLES: Record<NodeStatusClass, NodeStatusStyle> = {
+  online: {
+    badge: "border-success-border text-success bg-success-soft",
+    icon: "text-success",
+    accent: "bg-success"
+  },
+  idle: WARNING_NODE_STATUS_STYLE,
+  temporary: WARNING_NODE_STATUS_STYLE,
+  offline: {
+    badge: "border-failure-border text-failure bg-failure-soft",
+    icon: "text-failure",
+    accent: "bg-failure"
+  },
+  unknown: {
+    badge: "border-border text-foreground bg-muted",
+    icon: "text-muted-foreground",
+    accent: "bg-border"
+  }
+};
 export function resolveResultBadgeClass(resultClass: string): string {
   return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].badge;
 }

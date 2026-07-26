@@ -1,13 +1,16 @@
+import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 import {
   asRecord,
   hasMessageType,
   isOpenExternalMessage,
   parseSetLoadingOutgoingMessage
 } from "../../../shared/runtimeGuards";
-import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
-import type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
+import type { NodeDetailsViewModel } from "./NodeDetailsContracts";
 
-export type { NodeDetailsUpdateMessage } from "./NodeDetailsContracts";
+export interface NodeDetailsUpdateMessage {
+  type: "updateNodeDetails";
+  payload: NodeDetailsViewModel;
+}
 
 export type NodeDetailsOutgoingMessage =
   | NodeDetailsUpdateMessage

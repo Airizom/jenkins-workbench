@@ -8,6 +8,7 @@ import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
+import { toJenkinsEnvironmentRef } from "./JenkinsTaskEnvironment";
 import {
   type JenkinsTaskDefinition,
   normalizeEnvironmentUrl,
@@ -182,7 +183,7 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
           error: `environmentUrl does not match the environmentId ${normalizedEnvironmentId}.`
         };
       }
-      return { environment: this.toEnvironmentRef(resolved) };
+      return { environment: toJenkinsEnvironmentRef(resolved) };
     }
 
     const matches = environments
@@ -201,7 +202,7 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
 
     const workspaceMatches = matches.filter((match) => match.environment.scope === "workspace");
     if (workspaceMatches.length === 1) {
-      return { environment: this.toEnvironmentRef(workspaceMatches[0].environment) };
+      return { environment: toJenkinsEnvironmentRef(workspaceMatches[0].environment) };
     }
     if (workspaceMatches.length > 1) {
       return {
@@ -210,20 +211,11 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
     }
 
     if (matches.length === 1) {
-      return { environment: this.toEnvironmentRef(matches[0].environment) };
+      return { environment: toJenkinsEnvironmentRef(matches[0].environment) };
     }
 
     return {
       error: `Multiple Jenkins environments match ${target}. Set environmentId to disambiguate.`
-    };
-  }
-
-  private toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-    return {
-      environmentId: environment.id,
-      scope: environment.scope,
-      url: environment.url,
-      username: environment.username
     };
   }
 

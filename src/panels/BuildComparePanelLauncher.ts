@@ -3,8 +3,8 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { BuildComparePanel } from "./BuildComparePanel";
 import type { BuildDetailsPanelLauncher } from "./BuildDetailsPanelLauncher";
-import type { BuildCompareBackend } from "./buildCompare/BuildCompareBackend";
 import type { BuildCompareOptions } from "./buildCompare/BuildCompareOptions";
+import type { BuildInspectionBackend as BuildCompareBackend } from "./shared/backend/BuildInspectionBackend";
 
 export interface BuildComparePanelLaunchRequest {
   environment: JenkinsEnvironmentRef;

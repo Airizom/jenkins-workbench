@@ -264,7 +264,6 @@ describe("ActivityCollector.collect", () => {
     assert.deepEqual(enricherCalls[0].options, {
       buildListFetchOptions: { detailLevel: "summary" },
       buildLookupLimit: 7,
-      bypassCache: true,
       lookupConcurrency: 3
     });
   });

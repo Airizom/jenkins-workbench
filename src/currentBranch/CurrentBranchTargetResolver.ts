@@ -1,25 +1,20 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { CurrentBranchPullRequestJobMatcher } from "./CurrentBranchPullRequestJobMatcher";
+import { type CachedValue, getFreshCachedValue, setCachedValue } from "./CurrentBranchCache";
 import type {
-  CurrentBranchPullRequestResolution,
-  CurrentBranchPullRequestService
-} from "./CurrentBranchPullRequestService";
+  CurrentBranchGitHubPullRequestAdapter,
+  CurrentBranchPullRequestResolution
+} from "./CurrentBranchGitHubPullRequestAdapter";
+import { decodeJenkinsJobName } from "./CurrentBranchJenkinsJobUtils";
+import type {
+  CurrentBranchPullRequestJobMatcher,
+  CurrentBranchPullRequestJobRef
+} from "./CurrentBranchPullRequestJobMatcher";
 import type {
   CurrentBranchLinkedContext,
   CurrentBranchPullRequestInfo,
   CurrentBranchRefreshOptions,
   CurrentBranchSelectedTargetInfo
 } from "./CurrentBranchTypes";
-
-interface CachedPullRequestContext {
-  expiresAt: number;
-  context: CurrentBranchPullRequestResolution;
-}
-
-interface CachedTargetResolution {
-  expiresAt: number;
-  resolution: CurrentBranchTargetResolution;
-}
 
 const PULL_REQUEST_CONTEXT_CACHE_TTL_MS = 5_000;
 const TARGET_RESOLUTION_CACHE_TTL_MS = 5_000;
@@ -46,12 +41,18 @@ export type CurrentBranchTargetResolution =
     };
 
 export class CurrentBranchTargetResolver {
-  private readonly pullRequestContextCache = new Map<string, CachedPullRequestContext>();
-  private readonly targetResolutionCache = new Map<string, CachedTargetResolution>();
+  private readonly pullRequestContextCache = new Map<
+    string,
+    CachedValue<CurrentBranchPullRequestResolution>
+  >();
+  private readonly targetResolutionCache = new Map<
+    string,
+    CachedValue<CurrentBranchTargetResolution>
+  >();
 
   constructor(
     private readonly dataService: JenkinsDataService,
-    private readonly pullRequestService: CurrentBranchPullRequestService,
+    private readonly pullRequestAdapter: CurrentBranchGitHubPullRequestAdapter,
     private readonly pullRequestJobMatcher: CurrentBranchPullRequestJobMatcher
   ) {}
 
@@ -67,17 +68,19 @@ export class CurrentBranchTargetResolver {
     const pullRequestContext = await this.resolvePullRequestContext(localState, options);
     const cacheKey = buildTargetResolutionCacheKey(localState, pullRequestContext);
     if (!options.force) {
-      const cached = this.targetResolutionCache.get(cacheKey);
-      if (cached && cached.expiresAt > Date.now()) {
-        return cached.resolution;
+      const cachedResolution = getFreshCachedValue(this.targetResolutionCache, cacheKey);
+      if (cachedResolution) {
+        return cachedResolution;
       }
     }
 
     const resolution = await this.fetchTargetResolution(localState, pullRequestContext, cacheKey);
-    this.targetResolutionCache.set(cacheKey, {
-      expiresAt: Date.now() + TARGET_RESOLUTION_CACHE_TTL_MS,
-      resolution
-    });
+    setCachedValue(
+      this.targetResolutionCache,
+      cacheKey,
+      resolution,
+      TARGET_RESOLUTION_CACHE_TTL_MS
+    );
     return resolution;
   }
 
@@ -87,17 +90,19 @@ export class CurrentBranchTargetResolver {
   ): Promise<CurrentBranchPullRequestResolution> {
     const cacheKey = buildPullRequestContextCacheKey(localState);
     if (!options.force) {
-      const cached = this.pullRequestContextCache.get(cacheKey);
-      if (cached && cached.expiresAt > Date.now()) {
-        return cached.context;
+      const cachedContext = getFreshCachedValue(this.pullRequestContextCache, cacheKey);
+      if (cachedContext) {
+        return cachedContext;
       }
     }
 
-    const context = await this.pullRequestService.resolve(localState.repository);
-    this.pullRequestContextCache.set(cacheKey, {
-      expiresAt: Date.now() + PULL_REQUEST_CONTEXT_CACHE_TTL_MS,
-      context
-    });
+    const context = await this.pullRequestAdapter.lookup(localState.repository);
+    setCachedValue(
+      this.pullRequestContextCache,
+      cacheKey,
+      context,
+      PULL_REQUEST_CONTEXT_CACHE_TTL_MS
+    );
     return context;
   }
 
@@ -142,7 +147,7 @@ export class CurrentBranchTargetResolver {
 
   private selectPullRequestTarget(
     localState: CurrentBranchLinkedContext,
-    jobs: Array<{ name: string; url: string; color?: string }>,
+    jobs: CurrentBranchPullRequestJobRef[],
     pullRequestContext: CurrentBranchPullRequestResolution
   ): CurrentBranchResolvedTarget | undefined {
     const pullRequestMatch = this.pullRequestJobMatcher.findMatch(jobs, pullRequestContext);
@@ -165,7 +170,7 @@ export class CurrentBranchTargetResolver {
 
   private selectBranchTarget(
     localState: CurrentBranchLinkedContext,
-    jobs: Array<{ name: string; url: string; color?: string }>,
+    jobs: CurrentBranchPullRequestJobRef[],
     branchName: string
   ): CurrentBranchResolvedTarget | undefined {
     const branchMatch = jobs.find((job) => matchesBranchName(job.name, branchName));
@@ -224,7 +229,7 @@ function buildPullRequestContextCacheDiscriminator(
 }
 
 function createSelectedTargetInfo(
-  job: { name: string; url: string; color?: string },
+  job: CurrentBranchPullRequestJobRef,
   kind: CurrentBranchSelectedTargetInfo["kind"],
   pullRequest?: CurrentBranchPullRequestInfo
 ): CurrentBranchSelectedTargetInfo {
@@ -239,12 +244,4 @@ function createSelectedTargetInfo(
 
 function matchesBranchName(jobName: string, branchName: string): boolean {
   return jobName === branchName || decodeJenkinsJobName(jobName) === branchName;
-}
-
-function decodeJenkinsJobName(jobName: string): string {
-  try {
-    return decodeURIComponent(jobName);
-  } catch {
-    return jobName;
-  }
 }

@@ -1,10 +1,10 @@
+import { scanContributorBlocks, scanMethodCalls } from "./gdsl/JenkinsfileGdslBlockScanner";
+import { toStepDefinition } from "./gdsl/JenkinsfileGdslStepBuilder";
 import type {
   JenkinsfileStepCatalog,
   JenkinsfileStepDefinition
 } from "./JenkinsfileIntelligenceTypes";
 import { createStepCatalog } from "./JenkinsfileStepCatalogUtils";
-import { scanContributorBlocks, scanMethodCalls } from "./gdsl/JenkinsfileGdslBlockScanner";
-import { toStepDefinition } from "./gdsl/JenkinsfileGdslStepBuilder";
 
 export function parseJenkinsfileGdsl(text: string): JenkinsfileStepCatalog {
   const steps: JenkinsfileStepDefinition[] = [];

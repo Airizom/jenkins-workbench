@@ -72,7 +72,6 @@ export class ActivityCollector {
       {
         buildListFetchOptions: options.buildListFetchOptions,
         buildLookupLimit: collectionOptions.pendingInputBuildLookupLimit,
-        bypassCache: options.bypassCache,
         lookupConcurrency: collectionOptions.pendingInputLookupConcurrency
       }
     );
@@ -123,13 +122,16 @@ function collectEntry(
     return;
   }
 
-  if (classification.isRunning && scan.runningCandidates.length < scan.pendingInputCandidateLimit) {
+  if (
+    classification.group === "running" &&
+    scan.runningCandidates.length < scan.pendingInputCandidateLimit
+  ) {
     scan.runningCandidates.push(entry);
   }
 
   const groupItems = scan.groups.get(classification.group);
   if (groupItems && groupItems.length < scan.collectionLimit) {
-    groupItems.push({ entry, group: classification.group });
+    groupItems.push(entry);
   }
 
   if (hasCollectedEnough(scan)) {

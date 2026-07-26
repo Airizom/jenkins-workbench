@@ -1,14 +1,16 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { NodeDetailsPanel } from "../../panels/NodeDetailsPanel";
 import { NodeActionService, type NodeActionTarget } from "../../services/NodeActionService";
 import { NodeTreeItem } from "../../tree/TreeItems";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
-import type { NodeCommandRefreshHost } from "./NodeCommandTypes";
+
+type NodeActionMethod = "takeNodeOffline" | "bringNodeOnline" | "launchNodeAgent";
 
 export async function showNodeDetails(
   dataService: JenkinsDataService,
-  refreshHost: NodeCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   extensionUri: vscode.Uri,
   item?: NodeTreeItem
 ): Promise<void> {
@@ -38,41 +40,41 @@ export async function showNodeDetails(
 
 export async function takeNodeOffline(
   dataService: JenkinsDataService,
-  refreshHost: NodeCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: NodeTreeItem
 ): Promise<boolean> {
-  const target = resolveNodeActionTarget(item, "take offline");
-  if (!target) {
-    return false;
-  }
-  const actionService = new NodeActionService(dataService);
-  return actionService.takeNodeOffline(target, refreshHost);
+  return runNodeAction(dataService, refreshHost, item, "take offline", "takeNodeOffline");
 }
 
 export async function bringNodeOnline(
   dataService: JenkinsDataService,
-  refreshHost: NodeCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: NodeTreeItem
 ): Promise<boolean> {
-  const target = resolveNodeActionTarget(item, "bring online");
-  if (!target) {
-    return false;
-  }
-  const actionService = new NodeActionService(dataService);
-  return actionService.bringNodeOnline(target, refreshHost);
+  return runNodeAction(dataService, refreshHost, item, "bring online", "bringNodeOnline");
 }
 
 export async function launchNodeAgent(
   dataService: JenkinsDataService,
-  refreshHost: NodeCommandRefreshHost,
+  refreshHost: EnvironmentScopedRefreshHost,
   item?: NodeTreeItem
 ): Promise<boolean> {
-  const target = resolveNodeActionTarget(item, "launch agent");
+  return runNodeAction(dataService, refreshHost, item, "launch agent", "launchNodeAgent");
+}
+
+async function runNodeAction(
+  dataService: JenkinsDataService,
+  refreshHost: EnvironmentScopedRefreshHost,
+  item: NodeTreeItem | undefined,
+  actionLabel: string,
+  action: NodeActionMethod
+): Promise<boolean> {
+  const target = resolveNodeActionTarget(item, actionLabel);
   if (!target) {
     return false;
   }
-  const actionService = new NodeActionService(dataService);
-  return actionService.launchNodeAgent(target, refreshHost);
+
+  return new NodeActionService(dataService)[action](target, refreshHost);
 }
 
 function resolveNodeActionTarget(

@@ -8,16 +8,10 @@ import { CompareDiffRowShell } from "./shared/CompareDiffRowShell";
 import { CompareSideGrid } from "./shared/CompareSideGrid";
 import { CompareValueCellShell } from "./shared/CompareValueCellShell";
 
-function resolveDeltaToneClass(direction?: BuildCompareStageDeltaDirection): string {
-  switch (direction) {
-    case "slower":
-      return "text-failure";
-    case "faster":
-      return "text-success";
-    default:
-      return "text-muted-foreground";
-  }
-}
+const DELTA_PRESENTATIONS = {
+  slower: { icon: ArrowUpIcon, toneClass: "text-failure" },
+  faster: { icon: ArrowDownIcon, toneClass: "text-success" }
+};
 
 function StageDeltaCell({
   label,
@@ -26,13 +20,13 @@ function StageDeltaCell({
   label?: string;
   direction?: BuildCompareStageDeltaDirection;
 }) {
-  const DirectionIcon =
-    direction === "slower" ? ArrowUpIcon : direction === "faster" ? ArrowDownIcon : undefined;
+  const presentation = direction ? DELTA_PRESENTATIONS[direction] : undefined;
+  const DirectionIcon = presentation?.icon;
+  const toneClass = presentation?.toneClass ?? "text-muted-foreground";
+
   return (
     <CompareValueCellShell label="Delta">
-      <p
-        className={`flex items-center gap-1 break-all font-mono text-vscode-editor ${resolveDeltaToneClass(direction)}`}
-      >
+      <p className={`flex items-center gap-1 break-all font-mono text-vscode-editor ${toneClass}`}>
         {DirectionIcon ? <DirectionIcon className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
         <span>{label ?? "-"}</span>
         {direction ? <span className="sr-only">({direction})</span> : null}

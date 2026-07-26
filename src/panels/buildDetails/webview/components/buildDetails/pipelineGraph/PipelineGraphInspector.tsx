@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle
 } from "../../../../../shared/webview/components/ui/card";
-import { Toggle } from "../../../../../shared/webview/components/ui/toggle";
 import { TerminalIcon } from "../../../../../shared/webview/icons";
 import type {
   PipelineLogTargetViewModel,
@@ -16,6 +15,7 @@ import type {
 import { BranchCard } from "../pipelineStages/BranchCard";
 import { EmptyStepsMessage } from "../pipelineStages/EmptyStepsMessage";
 import { StepsList } from "../pipelineStages/StepsList";
+import { StepsVisibilityToggle } from "../pipelineStages/StepsVisibilityToggle";
 
 const { useEffect, useState } = React;
 export function PipelineGraphInspector({
@@ -101,20 +101,13 @@ export function PipelineGraphInspector({
                 Parallel Branches
               </div>
               {hasBranchSteps ? (
-                <Toggle
-                  pressed={showAllSteps}
-                  onPressedChange={(pressed) => setShowAllSteps(pressed)}
-                  size="sm"
-                  aria-label={showAllSteps ? "Show failed steps only" : "Show all steps"}
-                >
-                  {showAllSteps ? "Failed only" : "All steps"}
-                </Toggle>
+                <StepsVisibilityToggle showAll={showAllSteps} onShowAllChange={setShowAllSteps} />
               ) : null}
             </div>
             <div className="grid gap-2 xl:grid-cols-2">
-              {stage.parallelBranches.map((branch, index) => (
+              {stage.parallelBranches.map((branch) => (
                 <BranchCard
-                  key={`${branch.key}-${index}`}
+                  key={branch.key}
                   branch={branch}
                   showAll={showAllSteps}
                   onSelectPipelineLog={onSelectPipelineLog}
@@ -130,14 +123,7 @@ export function PipelineGraphInspector({
               <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Steps
               </div>
-              <Toggle
-                pressed={showAllSteps}
-                onPressedChange={(pressed) => setShowAllSteps(pressed)}
-                size="sm"
-                aria-label={showAllSteps ? "Show failed steps only" : "Show all steps"}
-              >
-                {showAllSteps ? "Failed only" : "All steps"}
-              </Toggle>
+              <StepsVisibilityToggle showAll={showAllSteps} onShowAllChange={setShowAllSteps} />
             </div>
             {steps.length > 0 ? (
               <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />

@@ -14,6 +14,16 @@ import type { PendingInputViewModel } from "../../../shared/BuildDetailsContract
 const { useEffect, useRef, useState } = React;
 
 const PROCESSING_TIMEOUT_MS = 5000;
+type ProcessingAction = "approve" | "reject";
+const ACTION_LABELS: Record<ProcessingAction, string> = {
+  approve: "Approve",
+  reject: "Reject"
+};
+const PROCESSING_LABELS: Record<ProcessingAction, string> = {
+  approve: "Approving...",
+  reject: "Rejecting..."
+};
+
 export function PendingInputsSection({
   pendingInputs,
   onApprove,
@@ -23,24 +33,12 @@ export function PendingInputsSection({
   onApprove: (inputId: string) => void;
   onReject: (inputId: string) => void;
 }) {
-  const [processingIds, setProcessingIds] = useState<Record<string, boolean>>({});
-  const [processingActions, setProcessingActions] = useState<Record<string, "approve" | "reject">>(
-    {}
-  );
+  const [processingActions, setProcessingActions] = useState<Record<string, ProcessingAction>>({});
   const processingTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    setProcessingIds((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const input of pendingInputs) {
-        if (prev[input.id]) {
-          next[input.id] = true;
-        }
-      }
-      return next;
-    });
     setProcessingActions((prev) => {
-      const next: Record<string, "approve" | "reject"> = {};
+      const next: Record<string, ProcessingAction> = {};
       for (const input of pendingInputs) {
         const action = prev[input.id];
         if (action) {
@@ -68,20 +66,12 @@ export function PendingInputsSection({
     };
   }, []);
 
-  const markProcessing = (inputId: string, action: "approve" | "reject") => {
-    setProcessingIds((prev) => ({ ...prev, [inputId]: true }));
+  const markProcessing = (inputId: string, action: ProcessingAction) => {
     setProcessingActions((prev) => ({ ...prev, [inputId]: action }));
     if (processingTimers.current[inputId]) {
       window.clearTimeout(processingTimers.current[inputId]);
     }
     processingTimers.current[inputId] = window.setTimeout(() => {
-      setProcessingIds((prev) => {
-        if (!prev[inputId]) {
-          return prev;
-        }
-        const { [inputId]: _, ...rest } = prev;
-        return rest;
-      });
       setProcessingActions((prev) => {
         if (!prev[inputId]) {
           return prev;
@@ -93,107 +83,115 @@ export function PendingInputsSection({
     }, PROCESSING_TIMEOUT_MS);
   };
 
+  const handleInputAction = (inputId: string, action: ProcessingAction) => {
+    if (processingActions[inputId]) {
+      return;
+    }
+    markProcessing(inputId, action);
+    if (action === "approve") {
+      onApprove(inputId);
+    } else {
+      onReject(inputId);
+    }
+  };
+
   if (pendingInputs.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-2">
-      {pendingInputs.map((input) => (
-        <div
-          key={input.id}
-          className="rounded border border-warning-border overflow-hidden"
-          aria-busy={Boolean(processingIds[input.id])}
-        >
-          <div className="flex items-center justify-between gap-2 bg-warning-surface px-3 py-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <AlertCircleIcon className="h-4 w-4" />
-              <span className="text-xs font-medium truncate">{input.message}</span>
-              {input.submitterLabel ? (
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
-                  <UserIcon className="h-3.5 w-3.5" />
-                  {input.submitterLabel}
-                </span>
-              ) : null}
-            </div>
-            <ResultBadge label="Pending" status="running" className="text-[11px] shrink-0" />
-          </div>
+      {pendingInputs.map((input) => {
+        const processingAction = processingActions[input.id];
+        const handleAction = (action: ProcessingAction) => handleInputAction(input.id, action);
 
-          <div className="flex items-center justify-between gap-2 px-3 py-2 bg-card">
-            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-              {input.parameters.length > 0 ? (
-                <>
-                  {input.parameters.map((param) => (
-                    <Badge
-                      key={`${input.id}-${param.name}`}
-                      variant="secondary"
-                      className="font-mono text-[11px] px-1.5 py-0"
-                    >
-                      {param.name}
-                    </Badge>
-                  ))}
-                  {input.parametersLabel ? (
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      {input.parametersLabel}
-                    </span>
-                  ) : null}
-                </>
-              ) : null}
+        return (
+          <div
+            key={input.id}
+            className="rounded border border-warning-border overflow-hidden"
+            aria-busy={Boolean(processingAction)}
+          >
+            <div className="flex items-center justify-between gap-2 bg-warning-surface px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertCircleIcon className="h-4 w-4" />
+                <span className="text-xs font-medium truncate">{input.message}</span>
+                {input.submitterLabel ? (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
+                    <UserIcon className="h-3.5 w-3.5" />
+                    {input.submitterLabel}
+                  </span>
+                ) : null}
+              </div>
+              <ResultBadge label="Pending" status="running" className="text-[11px] shrink-0" />
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (processingIds[input.id]) {
-                    return;
-                  }
-                  markProcessing(input.id, "approve");
-                  onApprove(input.id);
-                }}
-                className="gap-1 h-6 px-2 text-[11px]"
-                disabled={Boolean(processingIds[input.id])}
-              >
-                {processingActions[input.id] === "approve" ? (
+
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-card">
+              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                {input.parameters.length > 0 ? (
                   <>
-                    <RefreshIcon className="h-4 w-4 animate-spin" />
-                    Approving...
+                    {input.parameters.map((param) => (
+                      <Badge
+                        key={`${input.id}-${param.name}`}
+                        variant="secondary"
+                        className="font-mono text-[11px] px-1.5 py-0"
+                      >
+                        {param.name}
+                      </Badge>
+                    ))}
+                    {input.parametersLabel ? (
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        {input.parametersLabel}
+                      </span>
+                    ) : null}
                   </>
-                ) : (
-                  <>
-                    <CheckIcon className="h-4 w-4" />
-                    Approve
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (processingIds[input.id]) {
-                    return;
-                  }
-                  markProcessing(input.id, "reject");
-                  onReject(input.id);
-                }}
-                className="gap-1 h-6 px-2 text-[11px]"
-                disabled={Boolean(processingIds[input.id])}
-              >
-                {processingActions[input.id] === "reject" ? (
-                  <>
-                    <RefreshIcon className="h-4 w-4 animate-spin" />
-                    Rejecting...
-                  </>
-                ) : (
-                  <>
-                    <XIcon className="h-4 w-4" />
-                    Reject
-                  </>
-                )}
-              </Button>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <PendingInputActionButton
+                  action="approve"
+                  processingAction={processingAction}
+                  onAction={handleAction}
+                />
+                <PendingInputActionButton
+                  action="reject"
+                  processingAction={processingAction}
+                  onAction={handleAction}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
+  );
+}
+
+function PendingInputActionButton({
+  action,
+  processingAction,
+  onAction
+}: {
+  action: ProcessingAction;
+  processingAction?: ProcessingAction;
+  onAction: (action: ProcessingAction) => void;
+}): React.JSX.Element {
+  const isProcessing = processingAction === action;
+  const ActionIcon = action === "approve" ? CheckIcon : XIcon;
+
+  return (
+    <Button
+      variant={action === "approve" ? "default" : "outline"}
+      size="sm"
+      onClick={() => onAction(action)}
+      className="gap-1 h-6 px-2 text-[11px]"
+      disabled={Boolean(processingAction)}
+    >
+      {isProcessing ? (
+        <RefreshIcon className="h-4 w-4 animate-spin" />
+      ) : (
+        <ActionIcon className="h-4 w-4" />
+      )}
+      {isProcessing ? PROCESSING_LABELS[action] : ACTION_LABELS[action]}
+    </Button>
   );
 }

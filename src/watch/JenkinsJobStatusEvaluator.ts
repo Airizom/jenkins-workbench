@@ -3,7 +3,7 @@ import {
   resolveWatchStatusFromJobColor
 } from "../formatters/JobColorFormatters";
 import type { JenkinsBuildSummary } from "../jenkins/types";
-import type { WatchStatusKind, WatchedJobEntry } from "../storage/JenkinsWatchStore";
+import type { WatchedJobEntry, WatchStatusKind } from "../storage/JenkinsWatchStore";
 import type { StatusNotifier } from "./StatusNotifier";
 import { formatWatchJobLabel } from "./WatchJobLabelFormatter";
 
@@ -34,15 +34,13 @@ export class JenkinsJobStatusEvaluator {
     const currentIsBuilding = resolveBuildingFromJobColor(color);
     const previousIsBuilding = entry.lastIsBuilding;
 
-    const buildNumberChanged =
+    const shouldUpdateCompletion =
       typeof currentCompletedBuildNumber === "number" &&
       currentCompletedBuildNumber !== previousCompletedBuildNumber;
+    const shouldUpdateBuilding =
+      typeof currentIsBuilding === "boolean" && currentIsBuilding !== previousIsBuilding;
     const hasCompletionHistory =
       previousCompletedBuildNumber !== undefined || previousIsBuilding !== undefined;
-    const buildingChanged =
-      previousIsBuilding !== undefined &&
-      typeof currentIsBuilding === "boolean" &&
-      previousIsBuilding !== currentIsBuilding;
 
     const notifiedFailure = shouldNotifyFailure(previousStatus, currentStatus);
     if (notifiedFailure) {
@@ -58,7 +56,7 @@ export class JenkinsJobStatusEvaluator {
       );
     }
 
-    if (buildNumberChanged && hasCompletionHistory && !notifiedFailure && !notifiedRecovery) {
+    if (shouldUpdateCompletion && hasCompletionHistory && !notifiedFailure && !notifiedRecovery) {
       this.notifier.notifyCompletion({
         jobLabel: formatWatchJobLabel(entry, jobName),
         environmentUrl,
@@ -73,27 +71,13 @@ export class JenkinsJobStatusEvaluator {
     // transition would skip its failure/recovery notification.
     const shouldUpdateStatus =
       statusChanged && !(currentStatus === "other" && isTerminalWatchStatus(previousStatus));
-    const shouldSeedCompletion =
-      previousCompletedBuildNumber === undefined && typeof currentCompletedBuildNumber === "number";
-    const shouldUpdateCompletion =
-      typeof currentCompletedBuildNumber === "number" &&
-      currentCompletedBuildNumber !== previousCompletedBuildNumber;
-    const shouldSeedBuilding =
-      previousIsBuilding === undefined && typeof currentIsBuilding === "boolean";
-    const shouldUpdateBuilding =
-      typeof currentIsBuilding === "boolean" && currentIsBuilding !== previousIsBuilding;
-    const shouldRefresh =
-      shouldUpdateStatus ||
-      shouldUpdateCompletion ||
-      shouldUpdateBuilding ||
-      (buildNumberChanged && hasCompletionHistory) ||
-      buildingChanged;
+    const shouldRefresh = shouldUpdateStatus || shouldUpdateCompletion || shouldUpdateBuilding;
 
     return {
       nextStatus: currentStatus,
       shouldUpdateStatus,
-      shouldUpdateCompletion: shouldUpdateCompletion || shouldSeedCompletion,
-      shouldUpdateBuilding: shouldUpdateBuilding || shouldSeedBuilding,
+      shouldUpdateCompletion,
+      shouldUpdateBuilding,
       shouldRefresh,
       currentCompletedBuildNumber,
       currentIsBuilding

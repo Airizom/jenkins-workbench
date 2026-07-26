@@ -102,7 +102,7 @@ export function composeProviderCatalog<TGroups extends readonly PartialExtension
   const seenTokens = new Set<ExtensionToken>();
   const duplicateTokens = new Set<ExtensionToken>();
 
-  for (const group of groups as readonly PartialExtensionProviderCatalog[]) {
+  for (const group of groups) {
     for (const token of Object.keys(group) as ExtensionToken[]) {
       const factory = group[token];
       if (!factory) {

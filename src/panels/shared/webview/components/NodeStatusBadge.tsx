@@ -1,7 +1,6 @@
 import type { NodeStatusClass } from "../../../nodeDetails/shared/NodeDetailsContracts";
 import { resolveNodeStatusBadgeClass } from "../lib/statusStyles";
-import { cn } from "../lib/utils";
-import { Badge } from "./ui/badge";
+import { ToneBadge } from "./ToneBadge";
 export function NodeStatusBadge({
   label,
   statusClass,
@@ -12,12 +11,10 @@ export function NodeStatusBadge({
   className?: string;
 }) {
   return (
-    <Badge
-      variant="outline"
-      size="sm"
-      className={cn(resolveNodeStatusBadgeClass(statusClass), className)}
-    >
-      {label}
-    </Badge>
+    <ToneBadge
+      label={label}
+      badgeClassName={resolveNodeStatusBadgeClass(statusClass)}
+      className={className}
+    />
   );
 }

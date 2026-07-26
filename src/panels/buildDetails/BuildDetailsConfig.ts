@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { CONFIG_SECTION } from "../../extension/ExtensionConfig";
+
 export { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 5;

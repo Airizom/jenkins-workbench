@@ -29,7 +29,6 @@ export function formatBuildParameterValueForTooltip(value: unknown): string {
       return normalizeWhitespace(value);
     case "number":
     case "boolean":
-      return value.toString();
     case "bigint":
       return value.toString();
     case "symbol":

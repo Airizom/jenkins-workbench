@@ -25,7 +25,7 @@ export function CompareItemsSection<TItem>({
   emptyLabel,
   renderItem,
   itemKey
-}: CompareItemsSectionProps<TItem>): JSX.Element {
+}: CompareItemsSectionProps<TItem>): React.JSX.Element {
   return (
     <SectionCard title={title} summary={summary} detail={detail} status={status}>
       {items.length > 0 ? (

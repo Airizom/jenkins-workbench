@@ -50,7 +50,61 @@ describe("NodeCapacityViewModelBuilder", () => {
     assert.equal(linuxPool.nodes.map((node) => node.name).join(","), "agent-b");
     assert.deepEqual(viewModel.hiddenLabelQueueItems, []);
   });
+
+  it("keeps shared queue metrics consistent between a pool and the overall summary", () => {
+    const nodes: JenkinsNodeInfo[] = [
+      buildNode({ numExecutors: 2, busyExecutors: 1 }),
+      buildNode({ name: "offline-agent", offline: true, numExecutors: 3 })
+    ];
+    const queueItems: JenkinsQueueItemInfo[] = [
+      { id: 1, name: "stuck", position: 1, stuck: true },
+      { id: 2, name: "blocked", position: 2, blocked: true },
+      { id: 3, name: "buildable", position: 3, buildable: true },
+      {
+        id: 4,
+        name: "all-states",
+        position: 4,
+        stuck: true,
+        blocked: true,
+        buildable: true
+      }
+    ];
+
+    const viewModel = buildNodeCapacityViewModel(
+      environment,
+      nodes,
+      queueItems,
+      "2026-06-14T20:00:00.000Z"
+    );
+    const anyPool = viewModel.pools.find((pool) => pool.kind === "any");
+    assert.ok(anyPool);
+    const expectedQueueTotals = {
+      queuedCount: 4,
+      stuckCount: 2,
+      blockedCount: 2,
+      buildableCount: 2
+    };
+
+    assert.deepEqual(selectQueueTotals(anyPool), expectedQueueTotals);
+    assert.deepEqual(selectQueueTotals(viewModel.summary), expectedQueueTotals);
+    assert.equal(anyPool.totalExecutors, 5);
+    assert.equal(viewModel.summary.totalExecutors, 2);
+  });
 });
+
+function selectQueueTotals(value: {
+  queuedCount: number;
+  stuckCount: number;
+  blockedCount: number;
+  buildableCount: number;
+}): typeof value {
+  return {
+    queuedCount: value.queuedCount,
+    stuckCount: value.stuckCount,
+    blockedCount: value.blockedCount,
+    buildableCount: value.buildableCount
+  };
+}
 
 function buildNode(overrides: Partial<JenkinsNodeInfo>): JenkinsNodeInfo {
   return {

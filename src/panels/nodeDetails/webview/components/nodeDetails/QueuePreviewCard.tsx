@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { countQueuedWorkItems } from "../../../../../shared/queueWork/QueueWorkContracts";
 import { QueueWorkItemRow } from "../../../../shared/webview/components/queueWork/QueueWorkItemRow";
 import { Button } from "../../../../shared/webview/components/ui/button";
@@ -16,7 +17,7 @@ export function QueuePreviewCard({
   queuedWork,
   onOpenExternal,
   onShowQueue
-}: QueuePreviewCardProps): JSX.Element {
+}: QueuePreviewCardProps): React.JSX.Element {
   const total = countQueuedWorkItems(queuedWork);
   // Matching-label items are the most relevant to this node, so they lead.
   const items = [

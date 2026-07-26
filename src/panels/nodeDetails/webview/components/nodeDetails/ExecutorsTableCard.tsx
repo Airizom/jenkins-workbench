@@ -1,4 +1,6 @@
 import * as React from "react";
+import { EmptyState } from "../../../../shared/webview/components/EmptyState";
+import { Badge } from "../../../../shared/webview/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -33,48 +35,45 @@ export function ExecutorsTableCard({
   title,
   entries,
   onOpenExternal
-}: ExecutorsTableCardProps): JSX.Element {
+}: ExecutorsTableCardProps): React.JSX.Element {
   const [filter, setFilter] = React.useState<ExecutorFilter>("all");
   const filteredEntries = React.useMemo(() => {
-    const sourceEntries = entries ?? [];
-
     if (filter === "all") {
-      return sourceEntries;
+      return entries;
     }
     if (filter === "busy") {
-      return sourceEntries.filter((entry) => Boolean(entry.workLabel));
+      return entries.filter((entry) => !entry.isIdle);
     }
-    return sourceEntries.filter((entry) => !entry.workLabel);
+    return entries.filter((entry) => entry.isIdle);
   }, [entries, filter]);
 
-  if (!entries || entries.length === 0) {
+  if (entries.length === 0) {
     return (
-      <div className="flex items-center justify-center gap-2 rounded border border-dashed border-border bg-muted-soft px-3 py-6 text-center">
-        <CpuIcon className="h-4 w-4 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">
-          No {title.toLowerCase()} data available
-        </span>
-      </div>
+      <EmptyState
+        icon={<CpuIcon className="h-4 w-4" />}
+        title={`No ${title.toLowerCase()} data`}
+        className="py-6"
+      />
     );
   }
 
-  const busyCount = entries.filter((entry) => Boolean(entry.workLabel)).length;
+  const busyCount = entries.filter((entry) => !entry.isIdle).length;
 
   return (
-    <div className="rounded-lg border border-mutedBorder bg-card shadow-widget overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted-soft border-b border-mutedBorder">
+    <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-raised px-3 py-2">
         <div className="flex items-center gap-1.5">
           <CpuIcon className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">{title}</span>
           <span className="text-[11px] text-muted-foreground">({filteredEntries.length})</span>
           {busyCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-warning-border bg-warning-soft px-1.5 text-[10px] font-medium text-warning-foreground">
+            <Badge variant="warning" size="sm">
               {busyCount} busy
-            </span>
+            </Badge>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-success-border bg-success-soft px-1.5 text-[10px] font-medium text-success-foreground">
+            <Badge variant="success" size="sm">
               all idle
-            </span>
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-1.5">
@@ -116,13 +115,11 @@ export function ExecutorsTableCard({
               <TableHead className="py-1.5 pl-3 pr-0 w-4">
                 <span className="sr-only">Status</span>
               </TableHead>
-              <TableHead className="text-[11px] py-1.5 px-3">#</TableHead>
-              <TableHead className="text-[11px] py-1.5 px-3">Build</TableHead>
-              <TableHead className="hidden md:table-cell text-[11px] py-1.5 px-3">
-                Duration
-              </TableHead>
-              <TableHead className="text-[11px] py-1.5 px-3">Progress</TableHead>
-              <TableHead className="text-[11px] py-1.5 px-3">Link</TableHead>
+              <TableHead className="py-1.5">#</TableHead>
+              <TableHead className="py-1.5">Build</TableHead>
+              <TableHead className="hidden py-1.5 md:table-cell">Duration</TableHead>
+              <TableHead className="py-1.5">Progress</TableHead>
+              <TableHead className="py-1.5">Link</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

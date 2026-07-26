@@ -35,17 +35,15 @@ export function filterTestResults(
 }
 export function getAutoExpandIds(items: BuildTestCaseViewModel[]): Set<string> {
   const ids = new Set<string>();
-  let count = 0;
   for (const item of items) {
-    if (item.status === "failed" && hasTestDetails(item) && count < AUTO_EXPAND_FAILED_LIMIT) {
+    if (item.status === "failed" && hasTestDetails(item)) {
       ids.add(item.id);
-      count++;
+      if (ids.size >= AUTO_EXPAND_FAILED_LIMIT) {
+        break;
+      }
     }
   }
   return ids;
-}
-export function getPassRate(summary: BuildTestsSummaryViewModel): number {
-  return summary.totalCount > 0 ? Math.round((summary.passedCount / summary.totalCount) * 100) : 0;
 }
 export function getTestDistribution(summary: BuildTestsSummaryViewModel): {
   failedPct: number;

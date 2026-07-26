@@ -1,4 +1,4 @@
-import { EMPTY_TEST_RESULTS_LABEL } from "../../../shared/TestReportConstants";
+import { EMPTY_TEST_RESULTS_LABEL } from "../../../shared/TestReportFormatters";
 import { readInitialPanelState } from "../../../shared/webview/state/createPanelStateHelpers";
 import type {
   BuildDetailsCoverageStateViewModel,
@@ -267,14 +267,10 @@ export function buildDetailsReducer(
   }
 }
 export function getInitialState(): BuildDetailsViewModel {
-  return readInitialPanelState(FALLBACK_STATE, mergeInitialViewModel);
+  return readInitialPanelState(FALLBACK_STATE, mergeBuildDetailsDefaults);
 }
 
-function mergeInitialViewModel(candidate: BuildDetailsViewModel): BuildDetailsViewModel {
-  return mergeBuildDetailsDefaults(candidate);
-}
-
-function mergeBuildDetailsDefaults<T extends BuildDetailsViewModel>(candidate: T): T {
+function mergeBuildDetailsDefaults(candidate: BuildDetailsViewModel): BuildDetailsViewModel {
   return {
     ...FALLBACK_STATE,
     ...candidate,

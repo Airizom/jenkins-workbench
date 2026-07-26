@@ -1,5 +1,5 @@
-import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api";
 import ELK from "elkjs/lib/elk.bundled.js";
+import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api";
 import * as React from "react";
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 import { buildPipelineGraphModel } from "./pipelineGraphModel";
@@ -27,7 +27,7 @@ export function usePipelineGraphLayout(
     () => (enabled ? buildPipelineGraphModel(stages) : createEmptyGraphModel()),
     [enabled, stages]
   );
-  const previousLayoutRef = useRef<PipelineGraphLayoutResult | undefined>();
+  const previousLayoutRef = useRef<PipelineGraphLayoutResult | undefined>(undefined);
   const [state, setState] = useState<PipelineGraphLayoutState>(() =>
     enabled ? { status: "loading", model } : { status: "idle", model }
   );
@@ -232,41 +232,12 @@ function updateLayoutForModel(
       y: previousNode.y
     };
   });
-  const nodeLookup = new Map(nodes.map((node) => [node.id, node]));
-  const edges = model.edges.flatMap((edge) => {
-    const path = buildEdgePath(
-      { id: edge.id, sources: [edge.source], targets: [edge.target] },
-      edge,
-      nodeLookup
-    );
-    if (!path) {
-      return [];
-    }
-    return {
-      ...edge,
-      path
-    };
-  });
 
   return {
-    width: Math.max(previousLayout.width, getLayoutWidth(nodes)),
-    height: Math.max(previousLayout.height, getLayoutHeight(nodes)),
+    width: previousLayout.width,
+    height: previousLayout.height,
     model,
     nodes,
-    edges
+    edges: previousLayout.edges
   };
-}
-
-function getLayoutWidth(nodes: PipelineGraphLayoutNode[]): number {
-  if (nodes.length === 0) {
-    return 0;
-  }
-  return Math.max(...nodes.map((node) => node.x + node.width)) + 28;
-}
-
-function getLayoutHeight(nodes: PipelineGraphLayoutNode[]): number {
-  if (nodes.length === 0) {
-    return 0;
-  }
-  return Math.max(...nodes.map((node) => node.y + node.height)) + 28;
 }

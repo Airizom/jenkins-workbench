@@ -22,6 +22,33 @@ function resolveConsoleEmptyLabel(status: BuildCompareConsoleSectionViewModel["s
       return "Console comparison did not produce a snippet.";
   }
 }
+
+function DivergenceIndicator({ label, canJump }: { label?: string; canJump: boolean }) {
+  if (!label) {
+    return null;
+  }
+
+  if (!canJump) {
+    return (
+      <Badge variant="outline" className="mb-3">
+        {label}
+      </Badge>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="mb-3"
+      onClick={() => scrollConsoleSnippetsToDivergence()}
+    >
+      <ArrowDownIcon className="h-3.5 w-3.5" />
+      Jump to divergence ({label})
+    </Button>
+  );
+}
+
 export function ConsoleDivergenceSection({
   section
 }: {
@@ -46,23 +73,7 @@ export function ConsoleDivergenceSection({
       detail={section.detail}
       status={section.status}
     >
-      {section.divergenceLineLabel ? (
-        hasSnippets ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="mb-3"
-            onClick={() => scrollConsoleSnippetsToDivergence()}
-          >
-            <ArrowDownIcon className="h-3.5 w-3.5" />
-            Jump to divergence ({section.divergenceLineLabel})
-          </Button>
-        ) : (
-          <Badge variant="outline" className="mb-3">
-            {section.divergenceLineLabel}
-          </Badge>
-        )
-      ) : null}
+      <DivergenceIndicator label={section.divergenceLineLabel} canJump={hasSnippets} />
       {hasSnippets ? (
         <ConsoleComparison section={section} />
       ) : (

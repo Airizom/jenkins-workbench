@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Alert, AlertDescription } from "../../../../../shared/webview/components/ui/alert";
 import { AlertCircleIcon } from "../../../../../shared/webview/icons";
 
@@ -10,7 +11,7 @@ type ConsoleOutputErrorNoticeProps = {
 };
 export function ConsoleOutputTruncationNotice({
   note
-}: ConsoleOutputNoticeProps): JSX.Element | null {
+}: ConsoleOutputNoticeProps): React.JSX.Element | null {
   if (!note) {
     return null;
   }
@@ -27,7 +28,7 @@ export function ConsoleOutputTruncationNotice({
 
 export function ConsoleOutputErrorNotice({
   error
-}: ConsoleOutputErrorNoticeProps): JSX.Element | null {
+}: ConsoleOutputErrorNoticeProps): React.JSX.Element | null {
   if (!error) {
     return null;
   }

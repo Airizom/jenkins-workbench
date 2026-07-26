@@ -43,20 +43,6 @@ export interface RedirectDecisionInput {
   redirectCount: number;
 }
 
-export type RequestRedirectResolution =
-  | {
-      type: "reject";
-      error: JenkinsRequestError;
-    }
-  | {
-      type: "follow";
-      nextUrl: string;
-      redirectCount: number;
-    }
-  | {
-      type: "continue";
-    };
-
 export function isCrossOriginRedirect(currentUrl: string, nextUrl: string): boolean {
   try {
     // URL.origin covers protocol, host, and port (normalizing default ports),
@@ -129,23 +115,4 @@ export function decideRedirect({
     nextUrl,
     redirectCount: redirectCount + 1
   };
-}
-
-export function resolveRequestRedirect(
-  redirectDecision: RedirectDecision
-): RequestRedirectResolution {
-  if (redirectDecision.type === "reject") {
-    return {
-      type: "reject",
-      error: redirectDecision.error
-    };
-  }
-  if (redirectDecision.type === "follow") {
-    return {
-      type: "follow",
-      nextUrl: redirectDecision.nextUrl,
-      redirectCount: redirectDecision.redirectCount
-    };
-  }
-  return { type: "continue" };
 }

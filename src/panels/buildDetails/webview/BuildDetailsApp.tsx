@@ -12,18 +12,9 @@ import type {
 } from "../shared/BuildDetailsContracts";
 import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
 import {
-  buildApproveInputMessage,
   buildArtifactActionMessage,
-  buildClearPipelineLogNodeMessage,
-  buildExportConsoleMessage,
-  buildExportPipelineNodeLogMessage,
   buildOpenTestSourceMessage,
-  buildRefreshBuildDetailsMessage,
-  buildRejectInputMessage,
-  buildReloadTestReportMessage,
-  buildRestartPipelineFromStageMessage,
-  buildSelectPipelineLogNodeMessage,
-  buildToggleFollowLogMessage
+  buildReloadTestReportMessage
 } from "./buildDetailsWebviewMessages";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
@@ -38,10 +29,10 @@ import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
 import { useBuildDetailsTabs } from "./hooks/useBuildDetailsTabs";
 import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
 import {
-  DEFAULT_COVERAGE_STATE,
-  DEFAULT_INSIGHTS,
   buildDetailsReducer,
-  buildInitialState
+  buildInitialState,
+  DEFAULT_COVERAGE_STATE,
+  DEFAULT_INSIGHTS
 } from "./state/buildDetailsState";
 
 const { useCallback, useMemo, useReducer } = React;
@@ -88,22 +79,22 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
 
   const handleToggleFollowLog = (value: boolean) => {
     dispatch({ type: "setFollowLog", value });
-    postMessage(buildToggleFollowLogMessage(value));
+    postMessage({ type: "toggleFollowLog", value });
   };
 
   const handleExportConsole = () => {
-    postMessage(buildExportConsoleMessage());
+    postMessage({ type: "exportConsole" });
     toast({ title: "Console export requested" });
   };
 
   const handleRetry = () => {
-    postMessage(buildRefreshBuildDetailsMessage());
+    postMessage({ type: "refreshBuildDetails" });
   };
 
   // Stable identity: PipelineSection uses this callback in effect dependencies.
   const handleSelectPipelineLog = useCallback(
     (target: PipelineLogTargetViewModel) => {
-      postMessage(buildSelectPipelineLogNodeMessage(target));
+      postMessage({ type: "selectPipelineLogNode", target });
     },
     [postMessage]
   );
@@ -191,15 +182,15 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             consoleError={state.consoleError}
             followLog={state.followLog}
             isConsoleTabActive={selectedTab === "console"}
-            onApproveInput={(inputId) => postMessage(buildApproveInputMessage(inputId))}
-            onRejectInput={(inputId) => postMessage(buildRejectInputMessage(inputId))}
+            onApproveInput={(inputId) => postMessage({ type: "approveInput", inputId })}
+            onRejectInput={(inputId) => postMessage({ type: "rejectInput", inputId })}
             onRestartStage={(stageName) =>
-              postMessage(buildRestartPipelineFromStageMessage(stageName))
+              postMessage({ type: "restartPipelineFromStage", stageName })
             }
             onSelectPipelineLog={handleSelectPipelineLog}
-            onClearPipelineLog={() => postMessage(buildClearPipelineLogNodeMessage())}
+            onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
             onExportPipelineLog={() => {
-              postMessage(buildExportPipelineNodeLogMessage());
+              postMessage({ type: "exportPipelineNodeLog" });
               toast({ title: "Log export requested" });
             }}
             onToggleFollowLog={handleToggleFollowLog}

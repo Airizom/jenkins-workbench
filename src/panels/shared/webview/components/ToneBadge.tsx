@@ -1,4 +1,4 @@
-import { type StatusVisualTone, resolveStatusBadgeClass } from "../../TestStatusStyles";
+import { resolveStatusBadgeClass, type StatusVisualTone } from "../../TestStatusStyles";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 export function ToneBadge({

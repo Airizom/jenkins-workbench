@@ -6,23 +6,22 @@ import {
 } from "../../shared/NodeCapacityPanelMessages";
 import type { NodeCapacityAction } from "../state/nodeCapacityState";
 export function useNodeCapacityMessages(dispatch: Dispatch<NodeCapacityAction>): void {
-  usePanelMessages(parseNodeCapacityOutgoingMessage, dispatch, mapMessageToAction);
+  usePanelMessages(parseNodeCapacityOutgoingMessage, dispatch, dispatchNodeCapacityMessage);
 }
 
-function mapMessageToAction(
+function dispatchNodeCapacityMessage(
   message: NodeCapacityOutgoingMessage,
   dispatch: Dispatch<NodeCapacityAction>
 ): void {
-  dispatch(mapNodeCapacityMessageToAction(message));
-}
-
-function mapNodeCapacityMessageToAction(message: NodeCapacityOutgoingMessage): NodeCapacityAction {
   switch (message.type) {
     case "updateNodeCapacity":
-      return { type: "updateNodeCapacity", payload: message.payload };
+      dispatch({ type: "updateNodeCapacity", payload: message.payload });
+      break;
     case "updateNodeCapacityNodeExecutors":
-      return { type: "updateNodeCapacityNodeExecutors", payload: message.payload };
+      dispatch({ type: "updateNodeCapacityNodeExecutors", payload: message.payload });
+      break;
     case "setLoading":
-      return { type: "setLoading", value: message.value };
+      dispatch({ type: "setLoading", value: message.value });
+      break;
   }
 }

@@ -19,20 +19,8 @@ export function buildParametersSection(
   targetDetails: JenkinsBuildDetails,
   options: BuildParameterRedactionOptions
 ): BuildCompareParametersSectionViewModel {
-  const baselineParameters = buildParameterMap(
-    baselineDetails.actions,
-    options.allowList,
-    options.denyList,
-    options.maskPatterns,
-    options.maskValue
-  );
-  const targetParameters = buildParameterMap(
-    targetDetails.actions,
-    options.allowList,
-    options.denyList,
-    options.maskPatterns,
-    options.maskValue
-  );
+  const baselineParameters = buildParameterMap(baselineDetails.actions, options);
+  const targetParameters = buildParameterMap(targetDetails.actions, options);
   const items: BuildCompareParameterDiffItem[] = [];
   let unchangedCount = 0;
 
@@ -74,18 +62,19 @@ export function buildParametersSection(
 
 function buildParameterMap(
   actions: Array<JenkinsBuildAction | null> | null | undefined,
-  allowList: string[],
-  denyList: string[],
-  maskPatterns: string[],
-  maskValue: string
+  options: BuildParameterRedactionOptions
 ): Map<string, NormalizedParameterValue> {
   const result = new Map<string, NormalizedParameterValue>();
   visitMatchingBuildParameters(
     actions,
-    { allowList, denyList, maskPatterns },
+    {
+      allowList: options.allowList,
+      denyList: options.denyList,
+      maskPatterns: options.maskPatterns
+    },
     (name, parameter, isMasked) => {
       const comparisonValue = formatBuildParameterValueForCompare(parameter);
-      const displayValue = isMasked ? maskValue : comparisonValue;
+      const displayValue = isMasked ? options.maskValue : comparisonValue;
       result.set(name, {
         comparisonValue,
         displayValue

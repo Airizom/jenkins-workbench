@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
   Tooltip,
@@ -41,7 +42,7 @@ function ArtifactsList({
 }) {
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-1">
-      {items.map((item, index) => {
+      {items.map((item) => {
         const displayName = item.name ?? "Artifact";
         const relativePath = item.relativePath ?? displayName;
         const artifactLabel =
@@ -52,7 +53,7 @@ function ArtifactsList({
         return (
           <li
             className="flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-muted-soft px-2 py-1.5"
-            key={`${item.relativePath}-${index}`}
+            key={item.relativePath}
           >
             <Tooltip>
               <TooltipTrigger asChild>
@@ -66,38 +67,54 @@ function ArtifactsList({
               </TooltipContent>
             </Tooltip>
             <div className="flex items-center gap-0.5 shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onArtifactAction("preview", item)}
-                    className="h-6 w-6 p-0"
-                    aria-label={`Preview artifact: ${artifactLabel}`}
-                  >
-                    <EyeIcon className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Preview</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onArtifactAction("download", item)}
-                    className="h-6 w-6 p-0"
-                    aria-label={`Download artifact: ${artifactLabel}`}
-                  >
-                    <DownloadIcon className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Download</TooltipContent>
-              </Tooltip>
+              <ArtifactActionButton
+                action="preview"
+                artifact={item}
+                artifactLabel={artifactLabel}
+                onArtifactAction={onArtifactAction}
+              />
+              <ArtifactActionButton
+                action="download"
+                artifact={item}
+                artifactLabel={artifactLabel}
+                onArtifactAction={onArtifactAction}
+              />
             </div>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+function ArtifactActionButton({
+  action,
+  artifact,
+  artifactLabel,
+  onArtifactAction
+}: {
+  action: ArtifactAction;
+  artifact: BuildFailureArtifact;
+  artifactLabel: string;
+  onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
+}): React.JSX.Element {
+  const actionLabel = action === "preview" ? "Preview" : "Download";
+  const ActionIcon = action === "preview" ? EyeIcon : DownloadIcon;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onArtifactAction(action, artifact)}
+          className="h-6 w-6 p-0"
+          aria-label={`${actionLabel} artifact: ${artifactLabel}`}
+        >
+          <ActionIcon className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{actionLabel}</TooltipContent>
+    </Tooltip>
   );
 }

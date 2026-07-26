@@ -4,8 +4,8 @@ import type {
 } from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import {
-  type BuildDetailsSectionsInput,
-  assembleBuildDetailsSections
+  assembleBuildDetailsSections,
+  type BuildDetailsSectionsInput
 } from "./BuildDetailsViewModel";
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 

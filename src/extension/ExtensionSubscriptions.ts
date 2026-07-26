@@ -6,8 +6,13 @@ import {
   InstanceTreeItem,
   RootSectionTreeItem
 } from "../tree/TreeItems";
+import type { ExtensionContainer } from "./container/ExtensionContainer";
+import type { ExtensionTokenMap } from "./container/ExtensionTokenMap";
+import { syncJenkinsfileContext } from "./contextKeys";
 import {
   buildConfigKey,
+  CONFIG_KEYS,
+  type ConfigKey,
   getBuildListFetchOptions,
   getBuildTooltipOptions,
   getCacheTtlMs,
@@ -21,78 +26,34 @@ import {
   getTreeViewCurationOptions,
   getWatchErrorThreshold
 } from "./ExtensionConfig";
-import type { ExtensionContainer } from "./container/ExtensionContainer";
-import type { ExtensionTokenMap } from "./container/ExtensionTokenMap";
-import { syncJenkinsfileContext } from "./contextKeys";
-
-const CACHE_TTL_CONFIG_KEY = "cacheTtlSeconds";
-const STATUS_REFRESH_INTERVAL_CONFIG_KEY = "pollIntervalSeconds";
-const WATCH_ERROR_THRESHOLD_CONFIG_KEY = "watchErrorThreshold";
-const QUEUE_POLL_INTERVAL_CONFIG_KEY = "queuePollIntervalSeconds";
-const CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY =
-  "currentBranch.pullRequestJobNamePatterns";
-const BUILD_TOOLTIP_DETAILS_CONFIG_KEY = "buildTooltips.includeDetails";
-const BUILD_TOOLTIP_PARAMETERS_ENABLED_CONFIG_KEY = "buildTooltips.parameters.enabled";
-const BUILD_TOOLTIP_PARAMETERS_ALLOW_LIST_CONFIG_KEY = "buildTooltips.parameters.allowList";
-const BUILD_TOOLTIP_PARAMETERS_DENY_LIST_CONFIG_KEY = "buildTooltips.parameters.denyList";
-const BUILD_TOOLTIP_PARAMETERS_MASK_PATTERNS_CONFIG_KEY = "buildTooltips.parameters.maskPatterns";
-const BUILD_TOOLTIP_PARAMETERS_MASK_VALUE_CONFIG_KEY = "buildTooltips.parameters.maskValue";
-const TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY = "treeViews.excludedNames";
-const ACTIVITY_MAX_ITEMS_PER_GROUP_CONFIG_KEY = "activity.maxItemsPerGroup";
-const ACTIVITY_MAX_SCAN_RESULTS_CONFIG_KEY = "activity.maxScanResults";
-const ACTIVITY_JOB_SEARCH_BATCH_SIZE_CONFIG_KEY = "activity.jobSearchBatchSize";
-const ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT_CONFIG_KEY = "activity.pendingInputCandidateLimit";
-const ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY_CONFIG_KEY =
-  "activity.pendingInputLookupConcurrency";
-const ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT_CONFIG_KEY =
-  "activity.pendingInputBuildLookupLimit";
-const ACTIVITY_REFRESH_INTERVAL_SECONDS_CONFIG_KEY = "activity.refreshIntervalSeconds";
-const JENKINSFILE_VALIDATION_ENABLED_CONFIG_KEY = "jenkinsfileValidation.enabled";
-const JENKINSFILE_VALIDATION_RUN_ON_SAVE_CONFIG_KEY = "jenkinsfileValidation.runOnSave";
-const JENKINSFILE_VALIDATION_CHANGE_DEBOUNCE_CONFIG_KEY = "jenkinsfileValidation.changeDebounceMs";
-const JENKINSFILE_VALIDATION_FILE_PATTERNS_CONFIG_KEY = "jenkinsfileValidation.filePatterns";
-const JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY = "jenkinsfile.intelligence.enabled";
 
 const BUILD_TOOLTIP_CONFIG_KEYS = [
-  BUILD_TOOLTIP_DETAILS_CONFIG_KEY,
-  BUILD_TOOLTIP_PARAMETERS_ENABLED_CONFIG_KEY,
-  BUILD_TOOLTIP_PARAMETERS_ALLOW_LIST_CONFIG_KEY,
-  BUILD_TOOLTIP_PARAMETERS_DENY_LIST_CONFIG_KEY,
-  BUILD_TOOLTIP_PARAMETERS_MASK_PATTERNS_CONFIG_KEY,
-  BUILD_TOOLTIP_PARAMETERS_MASK_VALUE_CONFIG_KEY
+  CONFIG_KEYS.buildTooltipDetails,
+  CONFIG_KEYS.buildTooltipParametersEnabled,
+  CONFIG_KEYS.buildTooltipParametersAllowList,
+  CONFIG_KEYS.buildTooltipParametersDenyList,
+  CONFIG_KEYS.buildTooltipParametersMaskPatterns,
+  CONFIG_KEYS.buildTooltipParametersMaskValue
 ] as const;
 
 const JENKINSFILE_VALIDATION_CONFIG_KEYS = [
-  JENKINSFILE_VALIDATION_ENABLED_CONFIG_KEY,
-  JENKINSFILE_VALIDATION_RUN_ON_SAVE_CONFIG_KEY,
-  JENKINSFILE_VALIDATION_CHANGE_DEBOUNCE_CONFIG_KEY,
-  JENKINSFILE_VALIDATION_FILE_PATTERNS_CONFIG_KEY
+  CONFIG_KEYS.jenkinsfileValidationEnabled,
+  CONFIG_KEYS.jenkinsfileValidationRunOnSave,
+  CONFIG_KEYS.jenkinsfileValidationChangeDebounce,
+  CONFIG_KEYS.jenkinsfileValidationFilePatterns
 ] as const;
 
 const ACTIVITY_CONFIG_KEYS = [
-  ACTIVITY_MAX_ITEMS_PER_GROUP_CONFIG_KEY,
-  ACTIVITY_MAX_SCAN_RESULTS_CONFIG_KEY,
-  ACTIVITY_JOB_SEARCH_BATCH_SIZE_CONFIG_KEY,
-  ACTIVITY_PENDING_INPUT_CANDIDATE_LIMIT_CONFIG_KEY,
-  ACTIVITY_PENDING_INPUT_LOOKUP_CONCURRENCY_CONFIG_KEY,
-  ACTIVITY_PENDING_INPUT_BUILD_LOOKUP_LIMIT_CONFIG_KEY,
-  ACTIVITY_REFRESH_INTERVAL_SECONDS_CONFIG_KEY
+  CONFIG_KEYS.activityMaxItemsPerGroup,
+  CONFIG_KEYS.activityMaxScanResults,
+  CONFIG_KEYS.activityJobSearchBatchSize,
+  CONFIG_KEYS.activityPendingInputCandidateLimit,
+  CONFIG_KEYS.activityPendingInputLookupConcurrency,
+  CONFIG_KEYS.activityPendingInputBuildLookupLimit,
+  CONFIG_KEYS.activityRefreshIntervalSeconds
 ] as const;
 
-type BuildTooltipConfigKey = (typeof BUILD_TOOLTIP_CONFIG_KEYS)[number];
-type JenkinsfileValidationConfigKey = (typeof JENKINSFILE_VALIDATION_CONFIG_KEYS)[number];
-type ActivityConfigKey = (typeof ACTIVITY_CONFIG_KEYS)[number];
-type ConfigReactionKey =
-  | typeof CACHE_TTL_CONFIG_KEY
-  | typeof STATUS_REFRESH_INTERVAL_CONFIG_KEY
-  | typeof WATCH_ERROR_THRESHOLD_CONFIG_KEY
-  | typeof QUEUE_POLL_INTERVAL_CONFIG_KEY
-  | typeof CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY
-  | typeof TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY
-  | typeof JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY
-  | BuildTooltipConfigKey
-  | ActivityConfigKey
-  | JenkinsfileValidationConfigKey;
+type ConfigReactionKey = ConfigKey;
 
 interface ConfigReactionContext {
   config: vscode.WorkspaceConfiguration;
@@ -165,14 +126,14 @@ export function registerExtensionSubscriptions(
 
   const configReactions: ConfigReaction[] = [
     {
-      keys: [CACHE_TTL_CONFIG_KEY],
+      keys: [CONFIG_KEYS.cacheTtlSeconds],
       run: (reactionContext) => {
         reactionContext.dataService.updateCacheTtlMs(getCacheTtlMs(reactionContext.config));
         reactionContext.refreshHost.fullEnvironmentRefresh({ trigger: "system" });
       }
     },
     {
-      keys: [STATUS_REFRESH_INTERVAL_CONFIG_KEY],
+      keys: [CONFIG_KEYS.statusRefreshIntervalSeconds],
       run: (reactionContext) => {
         reactionContext.statusRefreshService.updateRefreshIntervalSeconds(
           getStatusRefreshIntervalSeconds(reactionContext.config)
@@ -180,7 +141,7 @@ export function registerExtensionSubscriptions(
       }
     },
     {
-      keys: [WATCH_ERROR_THRESHOLD_CONFIG_KEY],
+      keys: [CONFIG_KEYS.watchErrorThreshold],
       run: (reactionContext) => {
         reactionContext.poller.updateMaxConsecutiveErrors(
           getWatchErrorThreshold(reactionContext.config)
@@ -188,7 +149,7 @@ export function registerExtensionSubscriptions(
       }
     },
     {
-      keys: [QUEUE_POLL_INTERVAL_CONFIG_KEY],
+      keys: [CONFIG_KEYS.queuePollIntervalSeconds],
       run: (reactionContext) => {
         reactionContext.queuePoller.updatePollIntervalSeconds(
           getQueuePollIntervalSeconds(reactionContext.config)
@@ -196,7 +157,7 @@ export function registerExtensionSubscriptions(
       }
     },
     {
-      keys: [CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS_CONFIG_KEY],
+      keys: [CONFIG_KEYS.currentBranchPullRequestJobNamePatterns],
       run: (reactionContext) => {
         reactionContext.currentBranchPullRequestJobMatcher.updatePatterns(
           getCurrentBranchPullRequestJobNamePatterns(reactionContext.config)
@@ -214,15 +175,15 @@ export function registerExtensionSubscriptions(
           getBuildListFetchOptions(reactionContext.config)
         );
         const shouldClearDataCache =
-          changedKeys.has(BUILD_TOOLTIP_DETAILS_CONFIG_KEY) ||
-          changedKeys.has(BUILD_TOOLTIP_PARAMETERS_ENABLED_CONFIG_KEY);
+          changedKeys.has(CONFIG_KEYS.buildTooltipDetails) ||
+          changedKeys.has(CONFIG_KEYS.buildTooltipParametersEnabled);
         reactionContext.refreshHost.refreshViewOnly({
           clearDataCache: shouldClearDataCache
         });
       }
     },
     {
-      keys: [TREE_VIEWS_EXCLUDED_NAMES_CONFIG_KEY],
+      keys: [CONFIG_KEYS.treeViewsExcludedNames],
       run: (reactionContext) => {
         reactionContext.treeDataProvider.updateViewCurationOptions(
           getTreeViewCurationOptions(reactionContext.config)
@@ -240,7 +201,7 @@ export function registerExtensionSubscriptions(
       }
     },
     {
-      keys: [JENKINSFILE_INTELLIGENCE_ENABLED_CONFIG_KEY],
+      keys: [CONFIG_KEYS.jenkinsfileIntelligenceEnabled],
       run: (reactionContext) => {
         reactionContext.jenkinsfileIntelligenceConfigState.updateConfig(
           getJenkinsfileIntelligenceConfig(reactionContext.config)

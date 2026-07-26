@@ -1,10 +1,10 @@
 import type * as vscode from "vscode";
 import type { JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { isLoadingPlaceholder } from "./TreeDataProviderUtils";
 import { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
 import { InstanceTreeItem, JobsFolderTreeItem, RootSectionTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import { isLoadingPlaceholder } from "./TreeDataProviderUtils";
 
 type GetChildrenInternal = (element?: WorkbenchTreeElement) => Promise<WorkbenchTreeElement[]>;
 
@@ -14,6 +14,7 @@ type TreeChangeWaiter = {
 };
 
 const LOAD_RETRY_TIMEOUT_MS = 4000;
+const LOAD_RETRY_LIMIT = 3;
 
 export class JenkinsTreeRevealResolver {
   constructor(
@@ -87,19 +88,30 @@ export class JenkinsTreeRevealResolver {
   // Loads children through the provider's normal caching path so that the subsequent
   // treeView.reveal resolves the same cached instances. Cold caches return a loading
   // placeholder immediately; wait for the tree change fired when the load lands and
-  // re-read. Timeouts only trigger another poll so slow Jenkins folders are not
-  // treated as absent while the underlying load is still in flight.
+  // re-read. Retry slow Jenkins folders, but stop after a bounded number of waits
+  // so a stale loading placeholder cannot leave reveal pending forever.
   private async getLoadedChildren(element?: WorkbenchTreeElement): Promise<WorkbenchTreeElement[]> {
-    for (;;) {
+    for (let attempt = 0; attempt <= LOAD_RETRY_LIMIT; attempt += 1) {
       // Subscribe before fetching so a load completing immediately is not missed.
       const waiter = this.createTreeChangeWaiter(LOAD_RETRY_TIMEOUT_MS);
-      const children = await this.getChildrenInternal(element);
+      let children: WorkbenchTreeElement[];
+      try {
+        children = await this.getChildrenInternal(element);
+      } catch (error) {
+        waiter.dispose();
+        throw error;
+      }
       if (!children.some(isLoadingPlaceholder)) {
         waiter.dispose();
         return children;
       }
+      if (attempt === LOAD_RETRY_LIMIT) {
+        waiter.dispose();
+        return [];
+      }
       await waiter.didChange;
     }
+    return [];
   }
 
   private createTreeChangeWaiter(timeoutMs: number): TreeChangeWaiter {

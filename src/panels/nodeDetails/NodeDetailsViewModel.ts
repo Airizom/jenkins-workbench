@@ -1,4 +1,5 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
+import { collectAssignedLabelNames } from "../../jenkins/labels";
 import {
   buildBaseNodeExecutorSummaries,
   formatExecutorWorkLabel
@@ -9,7 +10,6 @@ import {
   formatNodeOfflineReason,
   resolveNodeStatusDescriptor
 } from "../../jenkins/NodeFormatters";
-import { collectAssignedLabelNames } from "../../jenkins/labels";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import type {
   JenkinsNodeDetails,
@@ -17,19 +17,16 @@ import type {
   JenkinsNodeExecutor
 } from "../../jenkins/types";
 import { clampPercent, isFiniteNumber } from "../../shared/numbers";
+import type { NodeQueuedWorkViewModel } from "../../shared/queueWork/QueueWorkContracts";
 import { isPlainRecord } from "../../shared/runtimeGuards";
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
 import type {
-  NodeDetailsQueuedWorkViewModel,
   NodeDetailsViewModel,
   NodeExecutorViewModel,
   NodeMonitorViewModel
 } from "./shared/NodeDetailsContracts";
 
-export type {
-  NodeDetailsViewModel,
-  NodeDetailsQueuedWorkViewModel
-} from "./shared/NodeDetailsContracts";
+export type { NodeDetailsViewModel } from "./shared/NodeDetailsContracts";
 
 export interface NodeDetailsViewModelInput {
   details?: JenkinsNodeDetails;
@@ -38,7 +35,7 @@ export interface NodeDetailsViewModelInput {
   fallbackUrl?: string;
   advancedLoaded?: boolean;
   nowMs?: number;
-  queuedWork?: NodeDetailsQueuedWorkViewModel;
+  queuedWork?: NodeQueuedWorkViewModel;
 }
 
 const UNKNOWN_LABEL = "Not available";
@@ -99,7 +96,7 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
   };
 }
 
-function createEmptyQueuedWork(): NodeDetailsQueuedWorkViewModel {
+function createEmptyQueuedWork(): NodeQueuedWorkViewModel {
   return {
     matchingQueueItems: [],
     anyQueueItems: [],
@@ -198,7 +195,7 @@ function enrichExecutorViewModel(
   return {
     ...base,
     progressPercent,
-    progressLabel: formatProgress(progressPercent),
+    progressLabel: progressPercent === undefined ? undefined : `${progressPercent}%`,
     workLabel: formatWorkLabel(workItem) ?? base.workLabel,
     workUrl: trimToUndefined(workItem?.url) ?? base.workUrl,
     workDurationLabel: workDuration.label,
@@ -211,13 +208,6 @@ function normalizeProgressPercent(progress?: number): number | undefined {
     return undefined;
   }
   return clampPercent(progress);
-}
-
-function formatProgress(progressPercent?: number): string | undefined {
-  if (!isFiniteNumber(progressPercent)) {
-    return undefined;
-  }
-  return `${progressPercent}%`;
 }
 
 function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
@@ -299,8 +289,7 @@ function summarizeMonitorValue(value: unknown): string {
     return value.length > 0 ? `${value.length} items` : "Empty list";
   }
   if (isPlainRecord(value)) {
-    const candidate =
-      pickString(value, MONITOR_STRING_KEYS) ?? pickNumber(value, MONITOR_NUMBER_KEYS);
+    const candidate = pickMonitorSummary(value);
     if (candidate !== undefined) {
       return candidate;
     }
@@ -310,18 +299,15 @@ function summarizeMonitorValue(value: unknown): string {
   return UNKNOWN_LABEL;
 }
 
-function pickString(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
-  for (const key of keys) {
+function pickMonitorSummary(record: Record<string, unknown>): string | undefined {
+  for (const key of MONITOR_STRING_KEYS) {
     const value = trimToUndefined(record[key]);
     if (value !== undefined) {
       return value;
     }
   }
-  return undefined;
-}
 
-function pickNumber(record: Record<string, unknown>, keys: readonly string[]): string | undefined {
-  for (const key of keys) {
+  for (const key of MONITOR_NUMBER_KEYS) {
     const value = record[key];
     if (isFiniteNumber(value)) {
       return String(value);

@@ -26,10 +26,7 @@ export function useBuildDetailsTabs({
   hasPipelineStages,
   hasTests
 }: UseBuildDetailsTabsParams): UseBuildDetailsTabsResult {
-  const defaultTab: BuildDetailsTab = useMemo(
-    () => (hasPendingInputs ? "inputs" : "overview"),
-    [hasPendingInputs]
-  );
+  const defaultTab: BuildDetailsTab = hasPendingInputs ? "inputs" : "overview";
 
   const availableTabs: BuildDetailsTab[] = useMemo(() => {
     const tabs: BuildDetailsTab[] = ["overview"];

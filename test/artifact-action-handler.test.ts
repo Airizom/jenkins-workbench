@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type {
-  ArtifactActionService,
-  ArtifactDownloadActionRequest
-} from "../src/services/ArtifactActionService";
+  ArtifactDownloadRequest,
+  ArtifactStorageService
+} from "../src/services/ArtifactStorageService";
 import type { ArtifactPreviewer } from "../src/ui/ArtifactPreviewer";
 import * as vscodeStub from "./helpers/vscodeStub";
 
@@ -57,20 +57,13 @@ function createFolder(name: string, options?: { scheme?: string }): TestWorkspac
   };
 }
 
-function createHandler(options?: {
-  previewError?: unknown;
-  downloadError?: unknown;
-}): {
+function createHandler(options?: { previewError?: unknown; downloadError?: unknown }): {
   handler: InstanceType<typeof DefaultArtifactActionHandler>;
   previewRequests: unknown[];
-  downloadCalls: { request: ArtifactDownloadActionRequest; options: unknown; root: string }[];
+  downloadCalls: ArtifactDownloadRequest[];
 } {
   const previewRequests: unknown[] = [];
-  const downloadCalls: {
-    request: ArtifactDownloadActionRequest;
-    options: unknown;
-    root: string;
-  }[] = [];
+  const downloadCalls: ArtifactDownloadRequest[] = [];
 
   const previewer = {
     preview: async (request: unknown) => {
@@ -81,21 +74,17 @@ function createHandler(options?: {
     }
   } as unknown as ArtifactPreviewer;
 
-  const actionService = {
-    execute: async (
-      request: ArtifactDownloadActionRequest,
-      actionOptions: unknown,
-      root: string
-    ) => {
+  const storageService = {
+    downloadArtifact: async (request: ArtifactDownloadRequest) => {
       if (options?.downloadError) {
         throw options.downloadError;
       }
-      downloadCalls.push({ request, options: actionOptions, root });
+      downloadCalls.push(request);
       return { label: "report.html", targetPath: "/workspace/app/artifacts/report.html" };
     }
-  } as unknown as ArtifactActionService;
+  } as unknown as ArtifactStorageService;
 
-  const handler = new DefaultArtifactActionHandler(actionService, previewer, (folder) => ({
+  const handler = new DefaultArtifactActionHandler(storageService, previewer, (folder) => ({
     downloadRoot: `${folder.name}-artifacts`,
     maxBytes: 1024
   }));
@@ -222,16 +211,17 @@ describe("DefaultArtifactActionHandler.handle", () => {
     });
 
     assert.equal(downloadCalls.length, 1);
-    assert.deepEqual(downloadCalls[0].request, {
+    assert.deepEqual(downloadCalls[0], {
       environment,
       buildUrl: "https://jenkins.example/job/app/42/",
       buildNumber: 42,
       relativePath: "reports/report.html",
       fileName: "report.html",
-      jobNameHint: "app"
+      jobNameHint: "app",
+      workspaceRoot: "/workspace/lib",
+      downloadRoot: "lib-artifacts",
+      maxBytes: 1024
     });
-    assert.deepEqual(downloadCalls[0].options, { downloadRoot: "lib-artifacts", maxBytes: 1024 });
-    assert.equal(downloadCalls[0].root, "/workspace/lib");
     assert.deepEqual(infoMessages, [
       "Downloaded report.html to /workspace/app/artifacts/report.html."
     ]);

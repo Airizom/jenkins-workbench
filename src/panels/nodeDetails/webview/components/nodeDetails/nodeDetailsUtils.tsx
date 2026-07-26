@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { ExecutorsIcon, IdleIcon, LaunchIcon, StatusIcon } from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 
@@ -6,8 +7,9 @@ const STALE_AFTER_MS = 5 * 60 * 1000;
 export interface OverviewRow {
   label: string;
   value: string;
-  icon: JSX.Element;
+  icon: React.JSX.Element;
 }
+
 export function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
   const rows: OverviewRow[] = [
     { label: "Status", value: state.statusLabel, icon: <StatusIcon className="h-3.5 w-3.5" /> },
@@ -19,29 +21,27 @@ export function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
     }
   ];
 
-  if (state.jnlpAgentLabel) {
+  const launchDetails = [
+    { label: "JNLP Agent", value: state.jnlpAgentLabel },
+    { label: "Launch Supported", value: state.launchSupportedLabel },
+    { label: "Manual Launch", value: state.manualLaunchLabel }
+  ];
+  let hasLaunchDetails = false;
+
+  for (const detail of launchDetails) {
+    if (!detail.value) {
+      continue;
+    }
+
+    hasLaunchDetails = true;
     rows.push({
-      label: "JNLP Agent",
-      value: state.jnlpAgentLabel,
-      icon: <LaunchIcon className="h-3.5 w-3.5" />
-    });
-  }
-  if (state.launchSupportedLabel) {
-    rows.push({
-      label: "Launch Supported",
-      value: state.launchSupportedLabel,
-      icon: <LaunchIcon className="h-3.5 w-3.5" />
-    });
-  }
-  if (state.manualLaunchLabel) {
-    rows.push({
-      label: "Manual Launch",
-      value: state.manualLaunchLabel,
+      label: detail.label,
+      value: detail.value,
       icon: <LaunchIcon className="h-3.5 w-3.5" />
     });
   }
 
-  if (!state.jnlpAgentLabel && !state.launchSupportedLabel && !state.manualLaunchLabel) {
+  if (!hasLaunchDetails) {
     rows.push({
       label: "Launch",
       value: "Not available",
@@ -51,6 +51,7 @@ export function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
 
   return rows;
 }
+
 export function formatJson(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2) ?? "";
@@ -58,6 +59,7 @@ export function formatJson(value: unknown): string {
     return String(value ?? "");
   }
 }
+
 export function parseDate(value: string | undefined): Date | undefined {
   if (!value) {
     return undefined;

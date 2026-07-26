@@ -1,25 +1,6 @@
 import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
-export type TreeViewSummaryShape = {
-  running: number;
-  queue: number;
-  watchErrors: number;
-  hasData: boolean;
-};
-
-export function areTreeViewSummariesEqual(
-  left: TreeViewSummaryShape,
-  right: TreeViewSummaryShape
-): boolean {
-  return (
-    left.running === right.running &&
-    left.queue === right.queue &&
-    left.watchErrors === right.watchErrors &&
-    left.hasData === right.hasData
-  );
-}
-
 export function getWorkbenchTreeElementId(element: WorkbenchTreeElement): string | undefined {
   return typeof element.id === "string" && element.id.length > 0 ? element.id : undefined;
 }

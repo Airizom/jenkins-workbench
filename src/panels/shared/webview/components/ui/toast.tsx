@@ -1,5 +1,5 @@
 import * as ToastPrimitive from "@radix-ui/react-toast";
-import { type VariantProps, cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 import { XIcon } from "../../icons";
@@ -23,7 +23,7 @@ export const ToastViewport = React.forwardRef<
 ToastViewport.displayName = "ToastViewport";
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-lg border p-4 shadow-widget bg-popover text-popover-foreground opacity-100 before:absolute before:inset-y-0 before:left-0 before:w-1 before:content-['']",
+  "group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-lg border p-3.5 pl-4 shadow-lg bg-popover text-popover-foreground opacity-100 transition-opacity before:absolute before:inset-y-0 before:left-0 before:w-1 before:content-['']",
   {
     variants: {
       variant: {
@@ -82,18 +82,18 @@ type ToastCloseProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive.Clos
 export const ToastClose = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Close>,
   ToastCloseProps
->(({ className, ...props }, ref) => (
+>(({ className, children = <XIcon className="h-4 w-4" />, ...props }, ref) => (
   <ToastPrimitive.Close
     ref={ref}
     className={cn(
       "ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md",
-      "text-muted-foreground hover:text-foreground hover:bg-accent-soft",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      "text-muted-foreground transition-colors hover:text-foreground hover:bg-accent-soft",
+      "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
       className
     )}
     {...props}
   >
-    <XIcon className="h-4 w-4" />
+    {children}
   </ToastPrimitive.Close>
 ));
 ToastClose.displayName = "ToastClose";

@@ -60,6 +60,7 @@ export class NodeActionService {
     }
   }
 
+  // fallow-ignore-next-line unused-class-member
   async bringNodeOnline(
     target: NodeActionTarget,
     refreshHost?: NodeActionRefreshHost
@@ -95,6 +96,7 @@ export class NodeActionService {
     }
   }
 
+  // fallow-ignore-next-line unused-class-member
   async launchNodeAgent(
     target: NodeActionTarget,
     refreshHost?: NodeActionRefreshHost

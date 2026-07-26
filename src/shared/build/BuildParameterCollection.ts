@@ -1,3 +1,5 @@
+import { isRecord } from "../runtimeGuards";
+import { normalizeWhitespace } from "../stringValues";
 import { shouldIncludeBuildParameter, shouldMaskBuildParameter } from "./BuildParameterFilters";
 
 export interface BuildParameterFilterOptions {
@@ -11,25 +13,21 @@ export interface BuildParameterRecord {
   value?: unknown;
 }
 
-interface BuildParameterAction {
-  parameters?: unknown;
-}
-
 function normalizeBuildParameterName(name: unknown): string | undefined {
   if (typeof name !== "string") {
     return undefined;
   }
-  const normalized = name.replace(/\s+/g, " ").trim();
+  const normalized = normalizeWhitespace(name);
   return normalized.length > 0 ? normalized : undefined;
 }
 
 function isActionWithBuildParameters(
   action: unknown
 ): action is { parameters: BuildParameterRecord[] } {
-  if (!action || typeof action !== "object") {
+  if (!isRecord(action)) {
     return false;
   }
-  return "parameters" in action && Array.isArray((action as BuildParameterAction).parameters);
+  return "parameters" in action && Array.isArray(action.parameters);
 }
 
 export function visitMatchingBuildParameters(

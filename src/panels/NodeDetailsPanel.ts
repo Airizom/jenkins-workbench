@@ -10,14 +10,14 @@ import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
 import {
-  type NodeDetailsOutgoingMessage,
   isBringNodeOnlineMessage,
   isCopyNodeJsonMessage,
   isLaunchNodeAgentMessage,
   isLoadAdvancedNodeDetailsMessage,
   isOpenExternalMessage,
   isRefreshNodeDetailsMessage,
-  isTakeNodeOfflineMessage
+  isTakeNodeOfflineMessage,
+  type NodeDetailsOutgoingMessage
 } from "./nodeDetails/shared/NodeDetailsPanelMessages";
 import {
   createNodeDetailsPanelState,
@@ -25,11 +25,11 @@ import {
 } from "./nodeDetails/shared/NodeDetailsPanelWebviewState";
 import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
-  type PanelLoadTracker,
   attachPanelLifecycle,
   bindEnvironmentRefresh,
   createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
+  type PanelLoadTracker,
   shouldRefreshVisibleEnvironmentPanel
 } from "./shared/PanelRuntimeHelpers";
 import { resolvePanelAssetsAndRenderLoading } from "./shared/webview/PanelViewHelpers";
@@ -241,7 +241,7 @@ export class NodeDetailsPanel {
     }
     const { scriptUri, styleUris } = assets;
 
-    const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel: "basic" });
+    const model = await this.fetchNodeDetails(token, "basic");
     if (!model || !this.loadTracker.isCurrent(token)) {
       return;
     }
@@ -281,7 +281,7 @@ export class NodeDetailsPanel {
       this.loadTracker.beginLoading();
     }
     try {
-      const model = await this.fetchNodeDetails(token, { mode: "refresh", detailLevel });
+      const model = await this.fetchNodeDetails(token, detailLevel);
       if (!model || !this.loadTracker.isCurrent(token)) {
         return;
       }
@@ -304,12 +304,18 @@ export class NodeDetailsPanel {
     this.loadTracker.beginLoading();
     try {
       const { nodeActionService, refreshHost } = this;
-      const actions = {
-        takeNodeOffline: () => nodeActionService.takeNodeOffline(target, refreshHost),
-        bringNodeOnline: () => nodeActionService.bringNodeOnline(target, refreshHost),
-        launchNodeAgent: () => nodeActionService.launchNodeAgent(target, refreshHost)
-      };
-      const didToggle = await actions[action]();
+      let didToggle: boolean;
+      switch (action) {
+        case "takeNodeOffline":
+          didToggle = await nodeActionService.takeNodeOffline(target, refreshHost);
+          break;
+        case "bringNodeOnline":
+          didToggle = await nodeActionService.bringNodeOnline(target, refreshHost);
+          break;
+        case "launchNodeAgent":
+          didToggle = await nodeActionService.launchNodeAgent(target, refreshHost);
+          break;
+      }
       if (didToggle) {
         await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });
       }
@@ -322,15 +328,14 @@ export class NodeDetailsPanel {
 
   private async fetchNodeDetails(
     token: number,
-    options?: { mode?: "refresh"; detailLevel?: "basic" | "advanced" }
+    detailLevel: "basic" | "advanced"
   ): Promise<ReturnType<typeof buildNodeDetailsViewModel> | undefined> {
     if (!this.dataService || !this.environment || !this.nodeUrl) {
       return undefined;
     }
     try {
-      const detailLevel = options?.detailLevel ?? this.currentDetailLevel;
       const details = await this.dataService.getNodeDetails(this.environment, this.nodeUrl, {
-        mode: options?.mode,
+        mode: "refresh",
         detailLevel
       });
       if (!this.loadTracker.isCurrent(token)) {

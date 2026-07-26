@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { NodeTreeItem } from "../tree/TreeItems";
 import {
@@ -7,12 +8,11 @@ import {
   showNodeDetails,
   takeNodeOffline
 } from "./node/NodeCommandHandlers";
-import type { NodeCommandRefreshHost } from "./node/NodeCommandTypes";
 
 export function registerNodeCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
-  refreshHost: NodeCommandRefreshHost
+  refreshHost: EnvironmentScopedRefreshHost
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("jenkinsWorkbench.showNodeDetails", (item?: NodeTreeItem) =>

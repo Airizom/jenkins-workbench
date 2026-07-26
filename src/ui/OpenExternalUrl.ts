@@ -1,57 +1,6 @@
 import * as vscode from "vscode";
 
-interface ExternalHttpUrlValidationMessageOptions {
-  invalidUrlMessage: string;
-  unsupportedSchemeMessage?: string;
-}
-
-type ExternalHttpUrlValidationResult =
-  | {
-      ok: true;
-      uri: vscode.Uri;
-    }
-  | {
-      ok: false;
-      reason: "invalidUrl" | "unsupportedScheme";
-    };
-
-type ExternalHttpUrlValidationFailure = Extract<ExternalHttpUrlValidationResult, { ok: false }>;
-export type ExternalHttpUrlValidationFailureReason = ExternalHttpUrlValidationFailure["reason"];
-
-function validateExternalHttpUrl(url: string): ExternalHttpUrlValidationResult {
-  let parsed: vscode.Uri;
-  try {
-    parsed = vscode.Uri.parse(url);
-  } catch {
-    return {
-      ok: false,
-      reason: "invalidUrl"
-    };
-  }
-
-  const scheme = parsed.scheme.toLowerCase();
-  if (scheme !== "http" && scheme !== "https") {
-    return {
-      ok: false,
-      reason: "unsupportedScheme"
-    };
-  }
-
-  return {
-    ok: true,
-    uri: parsed
-  };
-}
-
-function getExternalHttpUrlValidationMessage(
-  reason: ExternalHttpUrlValidationFailureReason,
-  options: ExternalHttpUrlValidationMessageOptions
-): string {
-  if (reason === "unsupportedScheme") {
-    return options.unsupportedSchemeMessage ?? options.invalidUrlMessage;
-  }
-  return options.invalidUrlMessage;
-}
+export type ExternalHttpUrlValidationFailureReason = "invalidUrl" | "unsupportedScheme";
 
 export type OpenExternalHttpUrlResult =
   | {
@@ -63,21 +12,6 @@ export type OpenExternalHttpUrlResult =
       reason: ExternalHttpUrlValidationFailureReason;
     };
 
-async function openExternalHttpUrl(url: string): Promise<OpenExternalHttpUrlResult> {
-  const validation = validateExternalHttpUrl(url);
-  if (!validation.ok) {
-    return {
-      ok: false,
-      reason: validation.reason
-    };
-  }
-
-  return {
-    ok: true,
-    opened: await vscode.env.openExternal(validation.uri)
-  };
-}
-
 export interface OpenExternalHttpUrlWarningOptions {
   targetLabel?: string;
   sourceLabel?: string;
@@ -86,47 +20,51 @@ export interface OpenExternalHttpUrlWarningOptions {
   showWarningMessage?: (message: string) => Thenable<unknown>;
 }
 
-function getWarningTargetLabel(options: OpenExternalHttpUrlWarningOptions): string {
-  const targetLabel = options.targetLabel?.trim();
-  return targetLabel && targetLabel.length > 0 ? targetLabel : "external URL";
-}
-
-function getWarningSourceSuffix(options: OpenExternalHttpUrlWarningOptions): string {
-  const sourceLabel = options.sourceLabel?.trim();
-  if (!sourceLabel || sourceLabel.length === 0) {
-    return "";
-  }
-  return ` in ${sourceLabel}`;
-}
-
-function getDefaultInvalidUrlMessage(options: OpenExternalHttpUrlWarningOptions): string {
-  return `Unable to open ${getWarningTargetLabel(options)}${getWarningSourceSuffix(
-    options
-  )} because it is invalid.`;
-}
-
-function getDefaultUnsupportedSchemeMessage(options: OpenExternalHttpUrlWarningOptions): string {
-  return `Blocked a non-http(s) ${getWarningTargetLabel(options)}${getWarningSourceSuffix(
-    options
-  )}.`;
-}
-
-function getOpenExternalHttpUrlWarningMessage(
-  reason: ExternalHttpUrlValidationFailureReason,
+async function openExternalHttpUrl(
+  url: string,
   options: OpenExternalHttpUrlWarningOptions
-): string {
-  return getExternalHttpUrlValidationMessage(reason, {
-    invalidUrlMessage: options.invalidUrlMessage ?? getDefaultInvalidUrlMessage(options),
-    unsupportedSchemeMessage:
-      options.unsupportedSchemeMessage ?? getDefaultUnsupportedSchemeMessage(options)
-  });
+): Promise<OpenExternalHttpUrlResult> {
+  let uri: vscode.Uri | undefined;
+  let reason: ExternalHttpUrlValidationFailureReason;
+  try {
+    uri = vscode.Uri.parse(url);
+  } catch {
+    uri = undefined;
+  }
+
+  if (uri) {
+    const scheme = uri.scheme.toLowerCase();
+    if (scheme === "http" || scheme === "https") {
+      return {
+        ok: true,
+        opened: await vscode.env.openExternal(uri)
+      };
+    }
+    reason = "unsupportedScheme";
+  } else {
+    reason = "invalidUrl";
+  }
+
+  const targetLabel = options.targetLabel?.trim() || "external URL";
+  const sourceLabel = options.sourceLabel?.trim();
+  const sourceSuffix = sourceLabel ? ` in ${sourceLabel}` : "";
+  const warningMessage =
+    reason === "unsupportedScheme"
+      ? (options.unsupportedSchemeMessage ?? `Blocked a non-http(s) ${targetLabel}${sourceSuffix}.`)
+      : (options.invalidUrlMessage ??
+        `Unable to open ${targetLabel}${sourceSuffix} because it is invalid.`);
+  const showWarning =
+    options.showWarningMessage ?? ((message: string) => vscode.window.showWarningMessage(message));
+  await showWarning(warningMessage);
+
+  return { ok: false, reason };
 }
 
 export async function openJenkinsWorkbenchUrl(
   url: string,
   sourceLabel: string
 ): Promise<OpenExternalHttpUrlResult> {
-  return openExternalHttpUrlWithWarning(url, {
+  return openExternalHttpUrl(url, {
     targetLabel: "Jenkins URL",
     sourceLabel
   });
@@ -136,12 +74,5 @@ export async function openExternalHttpUrlWithWarning(
   url: string,
   options: OpenExternalHttpUrlWarningOptions = {}
 ): Promise<OpenExternalHttpUrlResult> {
-  const openResult = await openExternalHttpUrl(url);
-  if (openResult.ok) {
-    return openResult;
-  }
-  const showWarning =
-    options.showWarningMessage ?? ((message: string) => vscode.window.showWarningMessage(message));
-  await showWarning(getOpenExternalHttpUrlWarningMessage(openResult.reason, options));
-  return openResult;
+  return openExternalHttpUrl(url, options);
 }

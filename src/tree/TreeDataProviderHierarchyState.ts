@@ -63,9 +63,10 @@ export class TreeDataProviderHierarchyState {
 
   clearEnvironment(environmentId?: string): void {
     if (environmentId) {
+      const environmentSuffix = `:${environmentId}`;
       for (const map of [this.instanceItems, this.queueFolderItems, this.activityFolderItems]) {
         for (const key of map.keys()) {
-          if (key.endsWith(`:${environmentId}`)) {
+          if (key.endsWith(environmentSuffix)) {
             map.delete(key);
           }
         }

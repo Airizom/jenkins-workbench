@@ -18,16 +18,12 @@ const BUILD_RESULT_BY_TOKEN: Record<string, { class: BuildResultClass; label: st
   NOT_BUILT: { class: "neutral", label: "Not built" }
 };
 
-function normalizeBuildResultToken(result?: string): string {
-  return normalizeStatusToken(result);
-}
-
 export function resolveBuildResultClass(result?: string, building?: boolean): BuildResultClass {
   if (building) {
     return "running";
   }
 
-  return BUILD_RESULT_BY_TOKEN[normalizeBuildResultToken(result)]?.class ?? "neutral";
+  return BUILD_RESULT_BY_TOKEN[normalizeStatusToken(result)]?.class ?? "neutral";
 }
 
 export function resolveBuildResultLabel(result?: string, building?: boolean): string {
@@ -35,21 +31,22 @@ export function resolveBuildResultLabel(result?: string, building?: boolean): st
     return "Running";
   }
 
-  const normalized = normalizeBuildResultToken(result);
+  const normalized = normalizeStatusToken(result);
   return BUILD_RESULT_BY_TOKEN[normalized]?.label ?? (result?.trim() || "Unknown");
 }
 
 export type BuildResultCompletionSeverity = "info" | "warning";
 
-function resolveBuildResultCompletionSeverity(result?: string): BuildResultCompletionSeverity {
-  const resultClass = resolveBuildResultClass(result);
+function resolveBuildResultCompletionSeverity(
+  resultClass: BuildResultClass
+): BuildResultCompletionSeverity {
   return resultClass === "success" || resultClass === "neutral" ? "info" : "warning";
 }
 
 export function resolveKnownBuildResult(
   result?: string
 ): { label: string; severity: BuildResultCompletionSeverity } | undefined {
-  const normalized = normalizeBuildResultToken(result);
+  const normalized = normalizeStatusToken(result);
   const entry = BUILD_RESULT_BY_TOKEN[normalized];
   if (!entry) {
     return undefined;
@@ -57,12 +54,8 @@ export function resolveKnownBuildResult(
 
   return {
     label: entry.label,
-    severity: resolveBuildResultCompletionSeverity(normalized)
+    severity: resolveBuildResultCompletionSeverity(entry.class)
   };
-}
-
-function isFailedBuildResult(result?: string): boolean {
-  return isFailedStatusToken(result);
 }
 
 function toTitleCase(value: string): string {
@@ -78,7 +71,7 @@ export function normalizePipelineStatus(status?: string): {
   className: BuildResultClass;
   isFailed: boolean;
 } {
-  const normalized = normalizeBuildResultToken(status);
+  const normalized = normalizeStatusToken(status);
   if (!normalized) {
     return { label: "Unknown", className: "neutral", isFailed: false };
   }
@@ -102,7 +95,7 @@ export function normalizePipelineStatus(status?: string): {
     return {
       label: resolveBuildResultLabel(normalized),
       className,
-      isFailed: isFailedBuildResult(normalized)
+      isFailed: isFailedStatusToken(normalized)
     };
   }
 

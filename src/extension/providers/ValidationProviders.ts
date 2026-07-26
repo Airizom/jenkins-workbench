@@ -6,6 +6,7 @@ import { REPLAY_DRAFT_SCHEME } from "../../services/ReplayDraftFilesystem";
 import { JenkinsfileEnvironmentResolver } from "../../validation/JenkinsfileEnvironmentResolver";
 import { JenkinsfileMatcher } from "../../validation/JenkinsfileMatcher";
 import { JenkinsfileValidationCoordinator } from "../../validation/JenkinsfileValidationCoordinator";
+import { JenkinsfileValidationStateStore } from "../../validation/JenkinsfileValidationStateStore";
 import { JenkinsfileValidationStatusBar } from "../../validation/JenkinsfileValidationStatusBar";
 import type { JenkinsfileValidationConfig } from "../../validation/JenkinsfileValidationTypes";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
@@ -30,14 +31,19 @@ export function createValidationProviderCatalog(options: ValidationProviderOptio
         "untitled",
         REPLAY_DRAFT_SCHEME
       ]),
+    jenkinsfileValidationStateStore: (_container) => new JenkinsfileValidationStateStore(),
     jenkinsfileValidationStatusBar: (container) =>
-      new JenkinsfileValidationStatusBar(container.get("jenkinsfileMatcher")),
+      new JenkinsfileValidationStatusBar(
+        container.get("jenkinsfileMatcher"),
+        container.get("jenkinsfileValidationStateStore")
+      ),
     jenkinsfileIntelligenceConfigState: (_container) =>
       new JenkinsfileIntelligenceConfigState(options.jenkinsfileIntelligenceConfig),
     jenkinsfileValidationCoordinator: (container) =>
       new JenkinsfileValidationCoordinator(
         container.get("clientProvider"),
         container.get("jenkinsfileEnvironmentResolver"),
+        container.get("jenkinsfileValidationStateStore"),
         container.get("jenkinsfileValidationStatusBar"),
         container.get("jenkinsfileMatcher"),
         options.jenkinsfileValidationConfig

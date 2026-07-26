@@ -4,8 +4,8 @@ import type {
   PipelineLogTargetViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
-import { StageNode } from "./pipelineStages/StageNode";
 import { getStageId, pruneStageFlags } from "./pipelineStages/pipelineStagesUtils";
+import { StageNode } from "./pipelineStages/StageNode";
 
 const { useEffect, useMemo, useState } = React;
 export function PipelineStagesSection({

@@ -1,4 +1,5 @@
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
+import { isPlainRecord } from "../../../shared/runtimeGuards";
 import type { SerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
 import {
   createEnvironmentScopedPanelState,
@@ -6,8 +7,8 @@ import {
   validateEnvironmentScopedPanelState
 } from "../../shared/webview/WebviewPanelState";
 import {
-  type PipelineLogTargetViewModel,
-  normalizePipelineLogTarget
+  normalizePipelineLogTarget,
+  type PipelineLogTargetViewModel
 } from "./BuildDetailsContracts";
 
 export type PipelinePresentation = "graph" | "list";
@@ -54,21 +55,19 @@ export function isBuildDetailsPanelState(
 export function normalizeBuildDetailsPanelUiState(
   value: unknown
 ): BuildDetailsPanelUiState | undefined {
-  if (!value || typeof value !== "object") {
+  if (!isPlainRecord(value)) {
     return undefined;
   }
 
-  const record = value as Record<string, unknown>;
-  const selectedTab = isBuildDetailsTab(record.selectedTab) ? record.selectedTab : undefined;
-  const pipelinePresentation = isPipelinePresentation(record.pipelinePresentation)
-    ? record.pipelinePresentation
+  const selectedTab = isBuildDetailsTab(value.selectedTab) ? value.selectedTab : undefined;
+  const pipelinePresentation = isPipelinePresentation(value.pipelinePresentation)
+    ? value.pipelinePresentation
     : undefined;
   const selectedGraphStageKey =
-    typeof record.selectedGraphStageKey === "string" &&
-    record.selectedGraphStageKey.trim().length > 0
-      ? record.selectedGraphStageKey.trim()
+    typeof value.selectedGraphStageKey === "string" && value.selectedGraphStageKey.trim().length > 0
+      ? value.selectedGraphStageKey.trim()
       : undefined;
-  const selectedPipelineLogTarget = normalizePipelineLogTarget(record.selectedPipelineLogTarget);
+  const selectedPipelineLogTarget = normalizePipelineLogTarget(value.selectedPipelineLogTarget);
 
   if (
     !selectedTab &&
@@ -118,7 +117,10 @@ export function mergeBuildDetailsPanelState(
 }
 
 function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelUiState {
-  return normalizeBuildDetailsPanelUiState(value) !== undefined || isEmptyObject(value);
+  return (
+    isPlainRecord(value) &&
+    (normalizeBuildDetailsPanelUiState(value) !== undefined || Object.keys(value).length === 0)
+  );
 }
 
 function isPipelinePresentation(value: unknown): value is PipelinePresentation {
@@ -133,8 +135,4 @@ function isBuildDetailsTab(value: unknown): value is BuildDetailsTab {
     value === "console" ||
     value === "tests"
   );
-}
-
-function isEmptyObject(value: unknown): boolean {
-  return typeof value === "object" && value !== null && Object.keys(value).length === 0;
 }

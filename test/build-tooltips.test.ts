@@ -15,6 +15,28 @@ function causeTooltipValue(build: JenkinsBuild): string {
   return buildBuildTooltip(build).value;
 }
 
+function parameterBuild(): JenkinsBuild {
+  return createBuild({
+    actions: [
+      {
+        parameters: [
+          { name: "BRANCH", value: "main" },
+          { name: "API_TOKEN", value: "sensitive" },
+          { name: "MODE", value: "fast" }
+        ]
+      }
+    ]
+  });
+}
+
+function parameterTooltipValue(maxParameterCount: number): string {
+  return buildBuildTooltip(parameterBuild(), {
+    includeParameters: true,
+    maxParameterCount,
+    parameterMaskPatterns: ["token"]
+  }).value;
+}
+
 describe("buildBuildTooltip cause summaries", () => {
   it("falls back to the build url when there are no actions", () => {
     const build = createBuild();
@@ -106,5 +128,25 @@ describe("buildBuildTooltip cause summaries", () => {
     });
 
     assert.equal(causeTooltipValue(build), "**Cause:** Started by timer (bo b)");
+  });
+});
+
+describe("buildBuildTooltip parameter limits", () => {
+  it("supports limits of zero and one", () => {
+    assert.equal(parameterTooltipValue(0), "**Parameters:** +3 more");
+    assert.equal(parameterTooltipValue(1), "**Parameters:** BRANCH=main +2 more");
+  });
+
+  it("clamps negative and non-finite limits to zero", () => {
+    assert.equal(parameterTooltipValue(-1), "**Parameters:** +3 more");
+    assert.equal(parameterTooltipValue(Number.NaN), "**Parameters:** +3 more");
+    assert.equal(parameterTooltipValue(Number.POSITIVE_INFINITY), "**Parameters:** +3 more");
+  });
+
+  it("floors fractional limits and preserves masking", () => {
+    assert.equal(
+      parameterTooltipValue(2.9),
+      "**Parameters:** BRANCH=main, API_TOKEN=[redacted] +1 more"
+    );
   });
 });

@@ -2,8 +2,8 @@ import type { JenkinsTestReport, JenkinsTestReportCase } from "../../jenkins/typ
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
 import { formatTestDuration } from "./TestReportFormatters";
 import {
-  type NormalizedTestStatus,
   formatTestStatusLabel,
+  type NormalizedTestStatus,
   normalizeTestStatus
 } from "./TestStatusFormatters";
 

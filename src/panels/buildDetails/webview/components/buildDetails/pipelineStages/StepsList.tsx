@@ -12,7 +12,6 @@ import type {
   PipelineStageStepViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import { getStageIcon } from "./PipelineStageIcons";
-import { buildStepRows, getStepRowPaddingClass } from "./stepsListModel";
 export function StepsList({
   steps,
   compact = false,
@@ -22,49 +21,51 @@ export function StepsList({
   compact?: boolean;
   onSelectPipelineLog?: (target: PipelineLogTargetViewModel) => void;
 }) {
-  const paddingClass = getStepRowPaddingClass(compact);
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-1">
-      {buildStepRows(steps).map((row) => (
-        <li
-          className={cn(
-            "flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-background",
-            paddingClass
-          )}
-          key={row.key}
-        >
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div
-              className={cn(
-                "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[10px]",
-                getResultBadgeClass(row.statusClass)
-              )}
-            >
-              {getStageIcon(row.statusClass)}
+      {steps.map((step) => {
+        const logTarget = step.logTarget;
+        return (
+          <li
+            className={cn(
+              "flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-background",
+              compact ? "px-2 py-1" : "px-2.5 py-1.5"
+            )}
+            key={step.key}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div
+                className={cn(
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  getResultBadgeClass(step.statusClass)
+                )}
+              >
+                {getStageIcon(step.statusClass)}
+              </div>
+              <span className="text-[11px] truncate">{step.name || "Step"}</span>
             </div>
-            <span className="text-[11px] truncate">{row.name}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <span className="text-[11px] text-muted-foreground">{row.durationLabel}</span>
-            {row.logTarget && onSelectPipelineLog ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={row.logLabel}
-                    className="h-5 w-5"
-                    onClick={() => row.logTarget && onSelectPipelineLog(row.logTarget)}
-                  >
-                    <TerminalIcon className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Open step log</TooltipContent>
-              </Tooltip>
-            ) : null}
-          </div>
-        </li>
-      ))}
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="text-[11px] text-muted-foreground">{step.durationLabel || "—"}</span>
+              {logTarget && onSelectPipelineLog ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Open log for ${step.name.trim() || "step"}`}
+                      className="h-5 w-5"
+                      onClick={() => onSelectPipelineLog(logTarget)}
+                    >
+                      <TerminalIcon className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open step log</TooltipContent>
+                </Tooltip>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
