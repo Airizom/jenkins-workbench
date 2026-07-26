@@ -65,7 +65,7 @@ jobs:
         run: |
           set +e
           for i in 1 2 3 4 5; do
-            ./node_modules/.bin/vsce package -o "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
+            ./node_modules/.bin/vsce package --no-dependencies -o "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
             status=$?
             if [ "$status" -eq 0 ]; then
               break

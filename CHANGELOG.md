@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.49.1] - 2026-07-26
+
+### Fixed
+
+- fix: harden Jenkins URL handling, changeset deduplication, stale test refreshes, tree restoration, reveal retries, console output, and persisted panel state
+- fix: keep VS Code API types aligned with the extension's minimum supported VS Code version
+
+### Changed
+
+- refactor: consolidate Jenkins clients, caching, build actions, configuration, tree, current-branch, validation, and panel architecture
+- refactor: share UI primitives across Build Compare, Build Details, Node Capacity, and Node Details while reducing redundant data loading and workspace scans
+- chore: upgrade React, TypeScript, Biome, Vite, Tailwind, Radix, and related tooling
+- chore: preserve dynamically dispatched runtime interfaces for Fallow and clean up unused webview primitives
+- chore: make VSIX packaging independent of optional development dependency tree reporting
+
+### Tests
+
+- test: expand unit coverage and panel validation documentation
+
 ## [1.49.0] - 2026-07-12
 
 ### Added

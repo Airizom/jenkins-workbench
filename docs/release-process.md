@@ -51,8 +51,9 @@ This document defines the exact steps the agent should perform when you need to 
 
 5. Package locally
 
-- `vsce package -o ./jenkins-workbench-X.Y.Z.vsix`
-- Alternative: `npx vsce package -o ./jenkins-workbench-X.Y.Z.vsix`
+- `vsce package --no-dependencies -o ./jenkins-workbench-X.Y.Z.vsix`
+- Alternative: `npx vsce package --no-dependencies -o ./jenkins-workbench-X.Y.Z.vsix`
+- The extension has no runtime npm dependencies and excludes `node_modules`; disabling dependency detection avoids npm tree errors from optional development tooling.
 - Use this to test install if desired.
 - The `.vsix` is for verification only; do not commit it.
 
