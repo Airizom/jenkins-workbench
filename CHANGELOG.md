@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-07-26
+
+### Added
+
+- feat(tasks): run Jenkins tasks through the full queue and build lifecycle with console streaming, pending inputs, restarts, and replay handling
+
+### Fixed
+
+- fix: harden task-related URL and identifier handling, artifact paths, response parsing, typechecking, and release validation
+
+### Tests
+
+- test: expand unit and integration coverage for queued Jenkins task execution
+
 ## [1.49.1] - 2026-07-26
 
 ### Fixed
