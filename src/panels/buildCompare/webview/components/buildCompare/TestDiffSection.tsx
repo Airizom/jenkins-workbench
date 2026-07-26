@@ -1,5 +1,5 @@
 import type { BuildCompareTestsSectionViewModel } from "../../../shared/BuildCompareContracts";
-import { EmptyState } from "./shared/EmptyState";
+import { CompareEmptyState } from "./shared/CompareEmptyState";
 import { SectionCard } from "./shared/SectionCard";
 import { SummaryStat } from "./shared/SummaryStat";
 import { DiffList } from "./testDiff/DiffList";
@@ -22,11 +22,11 @@ function TestChangesSummary({
   const comparisonAvailable = section.status === "available" || section.status === "empty";
 
   if (!comparisonAvailable) {
-    return <EmptyState label={section.detail ?? section.summaryLabel} />;
+    return <CompareEmptyState label={section.detail ?? section.summaryLabel} />;
   }
 
   if (!hasTestChanges) {
-    return <EmptyState tone="success" label="No test changes between these builds." />;
+    return <CompareEmptyState tone="success" label="No test changes between these builds." />;
   }
 
   return (

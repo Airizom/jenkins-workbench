@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import * as React from "react";
 import type { CompareSectionStatus } from "../../../../shared/BuildCompareContracts";
-import { EmptyState } from "./EmptyState";
+import { CompareEmptyState } from "./CompareEmptyState";
 import { SectionCard } from "./SectionCard";
 
 const { Fragment } = React;
@@ -35,7 +35,7 @@ export function CompareItemsSection<TItem>({
           ))}
         </div>
       ) : (
-        <EmptyState label={emptyLabel} />
+        <CompareEmptyState label={emptyLabel} />
       )}
     </SectionCard>
   );

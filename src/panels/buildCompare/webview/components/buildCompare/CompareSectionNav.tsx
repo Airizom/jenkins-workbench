@@ -8,18 +8,16 @@ export type CompareSectionNavItem = {
   status: CompareSectionStatus;
 };
 
-const STATUS_DETAILS: Record<
-  CompareSectionStatus,
-  { dotClassName: string; description: string }
-> = {
-  loading: { dotClassName: "bg-muted-foreground animate-shimmer", description: "loading" },
-  available: { dotClassName: "bg-progress", description: "has differences" },
-  empty: { dotClassName: "bg-muted-foreground/50", description: "no differences" },
-  unavailable: { dotClassName: "bg-muted-foreground/50", description: "no data" },
-  error: { dotClassName: "bg-failure", description: "failed to load" },
-  tooLarge: { dotClassName: "bg-warning", description: "too large to compare" },
-  identical: { dotClassName: "bg-success", description: "identical" }
-};
+const STATUS_DETAILS: Record<CompareSectionStatus, { dotClassName: string; description: string }> =
+  {
+    loading: { dotClassName: "bg-muted-foreground animate-shimmer", description: "loading" },
+    available: { dotClassName: "bg-progress", description: "has differences" },
+    empty: { dotClassName: "bg-muted-foreground/50", description: "no differences" },
+    unavailable: { dotClassName: "bg-muted-foreground/50", description: "no data" },
+    error: { dotClassName: "bg-failure", description: "failed to load" },
+    tooLarge: { dotClassName: "bg-warning", description: "too large to compare" },
+    identical: { dotClassName: "bg-success", description: "identical" }
+  };
 
 /**
  * The comparison is a long single-column scroll. This rail gives an at-a-glance

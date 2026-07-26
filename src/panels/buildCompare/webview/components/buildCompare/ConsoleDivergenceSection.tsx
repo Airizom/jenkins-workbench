@@ -5,7 +5,7 @@ import { ArrowDownIcon } from "../../../../shared/webview/icons";
 import type { BuildCompareConsoleSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { ConsoleComparison } from "./console/ConsoleComparison";
 import { scrollConsoleSnippetsToDivergence } from "./console/consoleDivergenceScroll";
-import { EmptyState } from "./shared/EmptyState";
+import { CompareEmptyState } from "./shared/CompareEmptyState";
 import { SectionCard } from "./shared/SectionCard";
 
 const { useEffect } = React;
@@ -77,7 +77,7 @@ export function ConsoleDivergenceSection({
       {hasSnippets ? (
         <ConsoleComparison section={section} />
       ) : (
-        <EmptyState label={resolveConsoleEmptyLabel(section.status)} />
+        <CompareEmptyState label={resolveConsoleEmptyLabel(section.status)} />
       )}
     </SectionCard>
   );

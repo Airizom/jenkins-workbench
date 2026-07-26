@@ -38,8 +38,9 @@
     "react-dom",
     "tailwindcss"
   ],
-  // VS Code invokes these methods/properties by interface, so normal call graph
-  // analysis cannot see the runtime call path.
+  // VS Code and internal runtime adapters invoke these methods/properties by
+  // interface or computed dispatch, so normal call graph analysis cannot see
+  // every runtime call path.
   "usedClassMembers": [
     {
       "implements": "vscode.CodeActionProvider",
@@ -157,6 +158,10 @@
       "members": ["getOrLoad"]
     },
     {
+      "implements": "JenkinsArtifactRetrievalRuntimeSurface",
+      "members": ["getArtifact", "getArtifactStream"]
+    },
+    {
       "implements": "JenkinsfileIntelligenceConfigRuntimeSurface",
       "members": ["updateConfig"]
     },
@@ -179,6 +184,10 @@
     {
       "implements": "NodeCapacityExecutorHydrationSurface",
       "members": ["hydrateNodeExecutors"]
+    },
+    {
+      "implements": "NodeActionRuntimeSurface",
+      "members": ["takeNodeOffline", "bringNodeOnline", "launchNodeAgent"]
     },
     {
       "implements": "PendingInputActionsRuntimeSurface",

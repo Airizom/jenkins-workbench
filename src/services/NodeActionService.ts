@@ -14,7 +14,15 @@ export type NodeActionTarget = {
 
 export interface NodeActionRefreshHost extends EnvironmentScopedRefreshHost {}
 
-export class NodeActionService {
+// Commands and panel messages select these actions through computed dispatch.
+// Declaring the runtime surface keeps that call path visible to Fallow.
+interface NodeActionRuntimeSurface {
+  takeNodeOffline(target: NodeActionTarget, refreshHost?: NodeActionRefreshHost): Promise<boolean>;
+  bringNodeOnline(target: NodeActionTarget, refreshHost?: NodeActionRefreshHost): Promise<boolean>;
+  launchNodeAgent(target: NodeActionTarget, refreshHost?: NodeActionRefreshHost): Promise<boolean>;
+}
+
+export class NodeActionService implements NodeActionRuntimeSurface {
   constructor(private readonly dataService: JenkinsDataService) {}
 
   async takeNodeOffline(
@@ -60,7 +68,6 @@ export class NodeActionService {
     }
   }
 
-  // fallow-ignore-next-line unused-class-member
   async bringNodeOnline(
     target: NodeActionTarget,
     refreshHost?: NodeActionRefreshHost
@@ -96,7 +103,6 @@ export class NodeActionService {
     }
   }
 
-  // fallow-ignore-next-line unused-class-member
   async launchNodeAgent(
     target: NodeActionTarget,
     refreshHost?: NodeActionRefreshHost

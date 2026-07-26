@@ -1,6 +1,7 @@
 import { EmptyState as SharedEmptyState } from "../../../../../shared/webview/components/EmptyState";
 import { CheckCircleIcon, MinusIcon } from "../../../../../shared/webview/icons";
-export function EmptyState({
+
+export function CompareEmptyState({
   label,
   tone = "muted"
 }: {

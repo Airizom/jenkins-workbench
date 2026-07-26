@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Badge } from "../../../../../shared/webview/components/ui/badge";
-import { EmptyState } from "./EmptyState";
+import { CompareEmptyState } from "./CompareEmptyState";
 export function CompareSectionFrame({
   title,
   count,
@@ -18,7 +18,11 @@ export function CompareSectionFrame({
         <h3 className="text-sm font-semibold">{title}</h3>
         <Badge variant="muted">{count}</Badge>
       </div>
-      {count > 0 ? <div className="space-y-2">{children}</div> : <EmptyState label={emptyLabel} />}
+      {count > 0 ? (
+        <div className="space-y-2">{children}</div>
+      ) : (
+        <CompareEmptyState label={emptyLabel} />
+      )}
     </div>
   );
 }

@@ -107,7 +107,24 @@ export interface BuildListFetchOptions {
   bypassCache?: boolean;
 }
 
-export class JenkinsDataService {
+// Artifact consumers receive structural adapters from the DI catalog, so Fallow
+// needs an explicit runtime surface to retain these live facade methods.
+interface JenkinsArtifactRetrievalRuntimeSurface {
+  getArtifact(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsBufferResponse>;
+  getArtifactStream(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    relativePath: string,
+    options?: { maxBytes?: number }
+  ): Promise<JenkinsStreamResponse>;
+}
+
+export class JenkinsDataService implements JenkinsArtifactRetrievalRuntimeSurface {
   private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
   private readonly buildOperations: JenkinsBuildDataOperations;
