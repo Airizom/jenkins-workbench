@@ -2,7 +2,11 @@ import { JenkinsRequestError } from "../errors";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
-import type { PendingInputAction, PendingInputSummary } from "./JenkinsDataTypes";
+import type {
+  PendingInputAction,
+  PendingInputSummary,
+  PendingInputSummaryEntry
+} from "./JenkinsDataTypes";
 import { mapPendingInputActions } from "./JenkinsParameterMapping";
 
 const PENDING_INPUT_ACTIONS_TTL_MS = 5000;
@@ -72,17 +76,16 @@ export class JenkinsPendingInputDataOperations {
     const actions = await this.getPendingInputActions(environment, buildUrl, {
       mode: "refresh"
     });
-    const cacheKey = await this.context.buildCacheKey(
-      environment,
-      "pending-input-summary",
-      buildUrl
-    );
-    const cached = this.context.getCache().get<PendingInputSummary>(cacheKey);
+    const keys = await this.buildPendingInputCacheKeys(environment, buildUrl);
+    const cached = this.context.getCache().get<PendingInputSummary>(keys.summaryKey);
     if (cached) {
       return cached;
     }
-    const summary = this.buildPendingInputSummary(actions);
-    this.context.getCache().set(cacheKey, summary, PENDING_INPUT_SUMMARY_TTL_MS);
+    const availability = this.context.getCache().has(keys.unsupportedKey)
+      ? "unsupported"
+      : "supported";
+    const summary = this.buildPendingInputSummary(actions, Date.now(), availability);
+    this.context.getCache().set(keys.summaryKey, summary, PENDING_INPUT_SUMMARY_TTL_MS);
     return summary;
   }
 
@@ -137,7 +140,7 @@ export class JenkinsPendingInputDataOperations {
     try {
       const actions = await client.getPendingInputActions(buildUrl);
       const mapped = mapPendingInputActions(actions);
-      this.cachePendingInputActions(keys, mapped);
+      this.cachePendingInputActions(keys, mapped, "supported");
       return mapped;
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
@@ -148,7 +151,7 @@ export class JenkinsPendingInputDataOperations {
             true,
             this.context.getCacheTtlMs() ?? PENDING_INPUT_UNSUPPORTED_TTL_MS
           );
-        this.cachePendingInputActions(keys, []);
+        this.cachePendingInputActions(keys, [], "unsupported");
         return [];
       }
       throw toBuildActionError(error);
@@ -175,33 +178,39 @@ export class JenkinsPendingInputDataOperations {
 
   private cachePendingInputActions(
     keys: PendingInputCacheKeys,
-    actions: PendingInputAction[]
+    actions: PendingInputAction[],
+    availability: "supported" | "unsupported"
   ): void {
     const cache = this.context.getCache();
     cache.set(keys.cacheKey, actions, PENDING_INPUT_ACTIONS_TTL_MS);
     cache.set(
       keys.summaryKey,
-      this.buildPendingInputSummary(actions),
+      this.buildPendingInputSummary(actions, Date.now(), availability),
       PENDING_INPUT_SUMMARY_TTL_MS
     );
   }
 
   private buildPendingInputSummary(
     actions: PendingInputAction[],
-    fetchedAt = Date.now()
+    fetchedAt = Date.now(),
+    availability?: "supported" | "unsupported"
   ): PendingInputSummary {
-    const signature = this.buildPendingInputSignature(actions);
+    const inputs = this.buildPendingInputEntries(actions);
+    const signature =
+      inputs.length > 0 ? inputs.map((input) => input.signature).join("|") : undefined;
     const message = actions[0]?.message;
     return {
+      availability,
       awaitingInput: actions.length > 0,
       count: actions.length,
       signature,
       message,
+      inputs,
       fetchedAt
     };
   }
 
-  private buildPendingInputSignature(actions: PendingInputAction[]): string | undefined {
+  private buildPendingInputEntries(actions: PendingInputAction[]): PendingInputSummaryEntry[] {
     const normalizedActions = actions.map((action) => ({
       id: action.id.trim(),
       message: action.message,
@@ -222,9 +231,10 @@ export class JenkinsPendingInputDataOperations {
       (a, b) => a.id.localeCompare(b.id) || a.message.localeCompare(b.message)
     );
 
-    const parts = normalizedActions
-      .map((action) => JSON.stringify(action))
-      .filter((part) => part.length > 0);
-    return parts.length > 0 ? parts.join("|") : undefined;
+    return normalizedActions.map((action) => ({
+      id: action.id,
+      signature: JSON.stringify(action),
+      message: action.message
+    }));
   }
 }

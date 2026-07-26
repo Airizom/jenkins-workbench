@@ -13,9 +13,45 @@ export interface ParsedBuildUrl {
 }
 
 const BUILD_NUMBER_PATTERN = /^\d+$/;
+const QUEUE_ITEM_ID_PATTERN = /^\d+$/;
+const RELATIVE_URL_BASE = "https://jenkins.invalid/";
 
 export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
+}
+
+export function parseQueueItemId(queueLocation?: string): number | undefined {
+  if (!queueLocation || queueLocation.trim() !== queueLocation) {
+    return undefined;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(queueLocation, RELATIVE_URL_BASE);
+  } catch {
+    return undefined;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return undefined;
+  }
+
+  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
+  if (
+    pathParts.length < 3 ||
+    pathParts[pathParts.length - 3] !== "queue" ||
+    pathParts[pathParts.length - 2] !== "item"
+  ) {
+    return undefined;
+  }
+
+  const idPart = pathParts[pathParts.length - 1];
+  if (!QUEUE_ITEM_ID_PATTERN.test(idPart)) {
+    return undefined;
+  }
+
+  const queueItemId = Number(idPart);
+  return Number.isSafeInteger(queueItemId) && queueItemId > 0 ? queueItemId : undefined;
 }
 
 function hasJobPathParts(pathParts: readonly string[], endExclusive = pathParts.length): boolean {

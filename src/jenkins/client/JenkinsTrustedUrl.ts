@@ -8,6 +8,9 @@ export function resolveTrustedJenkinsUrl(
   try {
     const trustedOrigin = new URL(trustedBaseUrl).origin;
     const resolvedUrl = new URL(candidateUrl, relativeTo);
+    if (resolvedUrl.protocol !== "http:" && resolvedUrl.protocol !== "https:") {
+      throw new JenkinsRequestError("Jenkins returned a URL with an unsupported protocol.");
+    }
     if (resolvedUrl.origin !== trustedOrigin) {
       throw new JenkinsRequestError("Jenkins returned a URL for an untrusted origin.");
     }

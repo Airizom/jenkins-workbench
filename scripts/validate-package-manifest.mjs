@@ -42,6 +42,23 @@ for (const scriptName of [
   assertNonEmptyString(scripts[scriptName], `scripts.${scriptName}`);
 }
 
+const supportedContributionPoints = new Set([
+  "commands",
+  "configuration",
+  "keybindings",
+  "menus",
+  "taskDefinitions",
+  "views",
+  "viewsContainers",
+  "viewsWelcome"
+]);
+
+for (const contributionPoint of Object.keys(packageJson.contributes ?? {})) {
+  if (!supportedContributionPoints.has(contributionPoint)) {
+    fail(`contributes.${contributionPoint} is not a supported VS Code contribution point`);
+  }
+}
+
 const contributedCommands = packageJson.contributes?.commands ?? [];
 
 if (!Array.isArray(contributedCommands) || contributedCommands.length === 0) {

@@ -31,4 +31,13 @@ describe("extension smoke", () => {
     const missing = expected.filter((command) => !registered.has(command));
     assert.deepEqual(missing, [], `commands not registered: ${missing.join(", ")}`);
   });
+
+  it("registers the Jenkins task provider", async () => {
+    const extension = vscode.extensions.getExtension(EXTENSION_ID);
+    assert.ok(extension);
+    await extension.activate();
+
+    const tasks = await vscode.tasks.fetchTasks({ type: "jenkinsWorkbench" });
+    assert.ok(Array.isArray(tasks));
+  });
 });

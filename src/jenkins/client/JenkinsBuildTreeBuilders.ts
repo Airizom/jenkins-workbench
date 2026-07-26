@@ -35,7 +35,12 @@ export function buildBuildsTree(options?: {
 export function buildBuildDetailsTree(options?: {
   includeCauses?: boolean;
   includeParameters?: boolean;
+  statusOnly?: boolean;
 }): string {
+  if (options?.statusOnly) {
+    return "number,url,result,building";
+  }
+
   const actionParts = buildActionFields({
     extraFields: ["failCount", "skipCount", "totalCount"],
     includeCauses: options?.includeCauses,

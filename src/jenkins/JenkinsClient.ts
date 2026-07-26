@@ -142,7 +142,7 @@ export class JenkinsClient {
 
   async getBuildDetails(
     buildUrl: string,
-    options?: { includeCauses?: boolean; includeParameters?: boolean }
+    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
   ): Promise<JenkinsBuildDetails> {
     return this.buildsApi.getBuildDetails(buildUrl, options);
   }

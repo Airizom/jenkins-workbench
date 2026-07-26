@@ -14,6 +14,7 @@ export interface JenkinsTaskParameterEntry {
 }
 
 export type JenkinsTaskRawParameters = JenkinsTaskParameters | JenkinsTaskParameterEntry[];
+export type JenkinsTaskInputStepPolicy = "wait" | "abort";
 
 export interface JenkinsTaskDefinition extends vscode.TaskDefinition {
   type: typeof JENKINS_TASK_TYPE;
@@ -21,10 +22,18 @@ export interface JenkinsTaskDefinition extends vscode.TaskDefinition {
   environmentId?: string;
   jobUrl: string;
   parameters?: JenkinsTaskRawParameters;
+  waitForCompletion?: boolean;
+  inputStepPolicy?: JenkinsTaskInputStepPolicy;
+  inputTimeoutSeconds?: number;
+}
+
+export interface NormalizedJenkinsTaskDefinition extends JenkinsTaskDefinition {
+  waitForCompletion: boolean;
+  inputStepPolicy: JenkinsTaskInputStepPolicy;
 }
 
 export interface TaskDefinitionResult {
-  definition?: JenkinsTaskDefinition;
+  definition?: NormalizedJenkinsTaskDefinition;
   error?: string;
 }
 
@@ -77,13 +86,41 @@ export function normalizeTaskDefinition(definition: vscode.TaskDefinition): Task
     };
   }
 
+  const taskDefinition = definition as JenkinsTaskDefinition;
+  if (
+    taskDefinition.waitForCompletion !== undefined &&
+    typeof taskDefinition.waitForCompletion !== "boolean"
+  ) {
+    return { error: "waitForCompletion must be a boolean." };
+  }
+
+  if (
+    taskDefinition.inputStepPolicy !== undefined &&
+    taskDefinition.inputStepPolicy !== "wait" &&
+    taskDefinition.inputStepPolicy !== "abort"
+  ) {
+    return { error: 'inputStepPolicy must be either "wait" or "abort".' };
+  }
+
+  if (
+    taskDefinition.inputTimeoutSeconds !== undefined &&
+    (typeof taskDefinition.inputTimeoutSeconds !== "number" ||
+      !Number.isFinite(taskDefinition.inputTimeoutSeconds) ||
+      taskDefinition.inputTimeoutSeconds <= 0)
+  ) {
+    return { error: "inputTimeoutSeconds must be a positive finite number." };
+  }
+
   return {
     definition: {
       type: JENKINS_TASK_TYPE,
       environmentUrl: normalizedEnvironmentUrl,
-      environmentId: normalizeOptionalString((definition as JenkinsTaskDefinition).environmentId),
+      environmentId: normalizeOptionalString(taskDefinition.environmentId),
       jobUrl: normalizedJob.jobUrl,
-      parameters: (definition as JenkinsTaskDefinition).parameters
+      parameters: taskDefinition.parameters,
+      waitForCompletion: taskDefinition.waitForCompletion ?? true,
+      inputStepPolicy: taskDefinition.inputStepPolicy ?? "wait",
+      inputTimeoutSeconds: taskDefinition.inputTimeoutSeconds
     }
   };
 }

@@ -23,7 +23,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Go to Job...** — Quick search across all configured Jenkins environments
 - **Pin Jobs & Pipelines** — Keep critical items in a top-level pinned section for quick access
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
-- **Deep Links** — Open builds and jobs directly in VS Code via `airizom.jenkins-workbench://` URIs
+- **Deep Links** — Open builds and jobs through supported VS Code extension URIs (`vscode://airizom.jenkins-workbench/...`)
 - **Summary Badges** — Running, queued, and watch-error counts displayed on tree sections
 
 ### Current Branch Workflow
@@ -117,9 +117,9 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 
 ## Tasks
 
-Jenkins jobs and pipelines appear in **Run Task...** under the Jenkins Workbench task type (up to 2000 per environment). Tasks run without prompts, and parameterized builds only use values provided in `tasks.json`.
+Jenkins jobs and pipelines appear in **Run Task...** under the Jenkins Workbench task type (up to 2000 per environment). By default, a task follows the complete Jenkins lifecycle: it triggers the job, follows the exact queue item, streams the build console, waits for completion, and reports the Jenkins result through the task exit code. This makes Jenkins tasks suitable for `preLaunchTask`, task dependencies, and build gates.
 
-Advanced parameter forms and reusable presets apply to the **Trigger Build** flow. They are not used by pending-input prompts or `tasks.json` in this version.
+Tasks run without local prompts, and parameterized builds only use values provided in `tasks.json`. Advanced parameter forms and reusable presets apply to the **Trigger Build** flow; they are not used by tasks or pending Jenkins input steps.
 
 Example `tasks.json`:
 
@@ -136,14 +136,82 @@ Example `tasks.json`:
       "parameters": {
         "BRANCH": "main",
         "DEPLOY": true
-      }
+      },
+      "waitForCompletion": true,
+      "inputStepPolicy": "wait",
+      "inputTimeoutSeconds": 900,
+      "problemMatcher": "$gcc"
     }
   ]
 }
 ```
 
-Canceling a Jenkins task does not stop the Jenkins build.
 If multiple environments share the same URL, set `environmentId` to disambiguate.
+
+Task options:
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `waitForCompletion` | `true` | Follow the queue and build, stream console output, and return the Jenkins result. Set to `false` to return successfully as soon as Jenkins accepts the build. |
+| `inputStepPolicy` | `"wait"` | Use `"wait"` to remain attached at Pipeline input steps, or `"abort"` to stop the build when an input step is detected. |
+| `inputTimeoutSeconds` | unset | Optional positive timeout for each distinct input step. The timer resets when Jenkins reaches a different input step. On expiry, the task stops the build. |
+
+When a task waits at an input step, approve or reject it from the Jenkins Workbench tree. Tasks do not collect input parameters in the terminal.
+
+Task exit codes:
+
+| Jenkins/task outcome | Exit code |
+|----------------------|----------:|
+| `SUCCESS` | 0 |
+| `UNSTABLE` | 1 |
+| `FAILURE`, `FAILED`, or `ERROR` | 2 |
+| `NOT_BUILT` | 3 |
+| `ABORTED` or a queue item canceled outside VS Code | 4 |
+| Definition, queue attribution, Jenkins API, console, or unknown-result error | 5 |
+| User canceled the VS Code task | 130 |
+
+Canceling a task closes the VS Code task immediately with exit code 130. Jenkins queue items are left queued because Jenkins may merge identical triggers. After a build starts, cleanup requests a stop only when Jenkins reports a single trigger cause; shared or unverifiable work remains active and Jenkins Workbench reports that cleanup was skipped.
+
+### Problem Matchers
+
+Jenkins console lines are written without extension prefixes so standard VS Code problem matchers can process them. Lifecycle messages use a separate `[Jenkins Workbench]` prefix. Add any built-in matcher accepted by the tool running on Jenkins:
+
+```json
+{
+  "label": "Jenkins: Native Build",
+  "type": "jenkinsWorkbench",
+  "environmentUrl": "https://jenkins.example.com/",
+  "jobUrl": "job/native-build/",
+  "problemMatcher": "$gcc"
+}
+```
+
+You can also use a custom matcher:
+
+```json
+{
+  "label": "Jenkins: Custom Build",
+  "type": "jenkinsWorkbench",
+  "environmentUrl": "https://jenkins.example.com/",
+  "jobUrl": "job/custom-build/",
+  "problemMatcher": {
+    "owner": "jenkins",
+    "fileLocation": ["relative", "${workspaceFolder}"],
+    "pattern": {
+      "regexp": "^(.+):(\\d+):(\\d+):\\s+(error|warning):\\s+(.*)$",
+      "file": 1,
+      "line": 2,
+      "column": 3,
+      "severity": 4,
+      "message": 5
+    }
+  }
+}
+```
+
+The paths printed by the remote Jenkins agent must map to files in the local workspace. Adjust `fileLocation` or the build’s output format when remote and local paths differ.
+
+If Jenkins does not support progressive console retrieval, task output falls back to a bounded full-console read. Logs larger than 32 MiB fail the task with infrastructure exit code 5 instead of repeatedly downloading an unbounded response.
 
 ## Parameter Presets & Secrets
 
@@ -179,6 +247,8 @@ If multiple environments share the same URL, set `environmentId` to disambiguate
 | `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for shared Jenkins status refreshes, including watched jobs and current-branch status. |
 | `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
 | `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
+| `jenkinsWorkbench.taskRunner.pollIntervalSeconds` | 2 | Polling interval while a task follows its queue item, build status, and console output. |
+| `jenkinsWorkbench.taskRunner.maxConsecutiveErrors` | 5 | Consecutive Jenkins API errors allowed per task-runner operation before cleanup and failure. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
 | `jenkinsWorkbench.buildDetails.testReport.includeCaseLogs` | false | Include per-test stack traces and stdout/stderr when fetching test reports. |
 
@@ -488,6 +558,14 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 9. Preview or download a build artifact
 10. Browse a classic job workspace, expand nested folders, and preview a workspace file
 11. Pin and unpin a job or pipeline, then verify the pinned section and remove any missing pins
+12. Run a successful Jenkins task and confirm it streams console output, exits with code 0, and allows a dependent task or `preLaunchTask` to continue
+13. Run failure, unstable, aborted, and not-built jobs and confirm the documented exit codes
+14. Run a task while its required executor is unavailable and confirm the Jenkins queue reason appears
+15. Cancel one task while queued and another while running; confirm queued work remains active and Jenkins only stops a build with a single verified trigger
+16. Exercise input-step `"wait"`, `"abort"`, and timeout behavior
+17. Configure a built-in or custom problem matcher and confirm Jenkins compiler or test output populates the Problems panel
+18. Set `waitForCompletion` to `false` and confirm the task returns after Jenkins accepts the trigger
+19. Confirm a trigger response without an attributable queue item fails without attaching to a different build
 
 ## License
 

@@ -76,6 +76,13 @@ jobs:
           set -e
           test -f "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vsix
+          path: ./*.vsix
+          overwrite: true
+
       - name: Verify publishing credentials
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
@@ -94,19 +101,19 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
-          ./node_modules/.bin/vsce publish --pat "$VSCE_PAT" --packagePath "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
+          ./node_modules/.bin/vsce publish --skip-duplicate --pat "$VSCE_PAT" --packagePath "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
 
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
-          ./node_modules/.bin/ovsx publish "jenkins-workbench-${GITHUB_REF_NAME}.vsix" -p "$OVSX_PAT"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vsix
-          path: ./*.vsix
+          VERSION=${GITHUB_REF_NAME#v}
+          EXTENSION_ID=$(node -p "require('./package.json').publisher + '.' + require('./package.json').name")
+          if ./node_modules/.bin/ovsx get "$EXTENSION_ID" --versionRange "$VERSION" --metadata >/dev/null 2>&1; then
+            echo "$EXTENSION_ID@$VERSION is already published to Open VSX; skipping."
+          else
+            ./node_modules/.bin/ovsx publish "jenkins-workbench-${GITHUB_REF_NAME}.vsix" -p "$OVSX_PAT"
+          fi
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2

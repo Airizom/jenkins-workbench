@@ -86,6 +86,9 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
         : resolved.detail);
     resolved.group = task.group ?? resolved.group;
     resolved.presentationOptions = task.presentationOptions;
+    resolved.problemMatchers = [...task.problemMatchers];
+    resolved.runOptions = task.runOptions;
+    resolved.isBackground = task.isBackground;
     return resolved;
   }
 
@@ -123,10 +126,10 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
     scope: vscode.TaskScope | vscode.WorkspaceFolder,
     name: string
   ): vscode.Task {
-    const execution = new vscode.CustomExecution(() =>
+    const execution = new vscode.CustomExecution((resolvedDefinition) =>
       Promise.resolve(
         new JenkinsTaskTerminal(
-          definition,
+          resolvedDefinition as JenkinsTaskDefinition,
           this.environmentStore,
           this.dataService,
           this.refreshHost

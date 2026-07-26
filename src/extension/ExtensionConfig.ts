@@ -19,6 +19,8 @@ export const CONFIG_KEYS = {
   statusRefreshIntervalSeconds: "pollIntervalSeconds",
   watchErrorThreshold: "watchErrorThreshold",
   queuePollIntervalSeconds: "queuePollIntervalSeconds",
+  taskRunnerPollIntervalSeconds: "taskRunner.pollIntervalSeconds",
+  taskRunnerMaxConsecutiveErrors: "taskRunner.maxConsecutiveErrors",
   currentBranchPullRequestJobNamePatterns: "currentBranch.pullRequestJobNamePatterns",
   buildTooltipDetails: "buildTooltips.includeDetails",
   buildTooltipParametersEnabled: "buildTooltips.parameters.enabled",
@@ -49,6 +51,10 @@ const MIN_STATUS_REFRESH_INTERVAL_SECONDS = 5;
 const DEFAULT_WATCH_ERROR_THRESHOLD = 3;
 const DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 10;
 const MIN_QUEUE_POLL_INTERVAL_SECONDS = 2;
+const DEFAULT_TASK_RUNNER_POLL_INTERVAL_SECONDS = 2;
+const MIN_TASK_RUNNER_POLL_INTERVAL_SECONDS = 1;
+const DEFAULT_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS = 5;
+const MIN_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS = 1;
 const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
 const DEFAULT_MAX_CACHE_ENTRIES = 1000;
 const MAX_CACHE_ENTRIES = 100_000;
@@ -155,6 +161,28 @@ export function getQueuePollIntervalSeconds(config: vscode.WorkspaceConfiguratio
   return Math.max(MIN_QUEUE_POLL_INTERVAL_SECONDS, pollIntervalSeconds);
 }
 
+export function getJenkinsTaskRunnerOptions(
+  config: vscode.WorkspaceConfiguration = getExtensionConfiguration()
+): {
+  pollIntervalMs: number;
+  maxConsecutiveErrors: number;
+} {
+  const pollIntervalSeconds = getFiniteNumberConfigValue(
+    config,
+    CONFIG_KEYS.taskRunnerPollIntervalSeconds,
+    DEFAULT_TASK_RUNNER_POLL_INTERVAL_SECONDS
+  );
+  return {
+    pollIntervalMs: Math.max(MIN_TASK_RUNNER_POLL_INTERVAL_SECONDS, pollIntervalSeconds) * 1000,
+    maxConsecutiveErrors: getBoundedIntegerConfigValue(
+      config,
+      CONFIG_KEYS.taskRunnerMaxConsecutiveErrors,
+      DEFAULT_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS,
+      MIN_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS
+    )
+  };
+}
+
 export function getRequestTimeoutMs(config: vscode.WorkspaceConfiguration): number {
   const timeoutSeconds = getFiniteNumberConfigValue(
     config,
@@ -190,9 +218,10 @@ function getBuildTooltipParametersEnabled(config: vscode.WorkspaceConfiguration)
 }
 
 function getArtifactDownloadRoot(config: vscode.WorkspaceConfiguration): string {
-  return (
-    trimToUndefined(config.get<unknown>("artifactDownloadRoot")) ?? DEFAULT_ARTIFACT_DOWNLOAD_ROOT
-  );
+  const configuredRoot = config.get<unknown>("artifactDownloadRoot");
+  return typeof configuredRoot === "string" && configuredRoot.trim()
+    ? configuredRoot
+    : DEFAULT_ARTIFACT_DOWNLOAD_ROOT;
 }
 
 export function getArtifactActionOptions(config: vscode.WorkspaceConfiguration): {

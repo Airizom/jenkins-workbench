@@ -72,6 +72,19 @@ describe("JenkinsBuildsApi getBuilds tree range", () => {
 });
 
 describe("Jenkins build tree builders", () => {
+  it("requests only status fields for lightweight build polling", async () => {
+    const { context, requestedUrls } = createContextHarness();
+    const api = new JenkinsBuildsApi(context);
+
+    await api.getBuildDetails("https://jenkins.example.com/job/demo/15/", {
+      statusOnly: true
+    });
+
+    assert.equal(requestedUrls.length, 1);
+    assert.equal(getTreeParameter(requestedUrls[0]), "number,url,result,building");
+    assert.equal(buildBuildDetailsTree({ statusOnly: true }), "number,url,result,building");
+  });
+
   it("includes shared change set and action fragments for build lists with details", () => {
     assert.equal(
       buildBuildsTree({ includeDetails: true, includeParameters: true }),

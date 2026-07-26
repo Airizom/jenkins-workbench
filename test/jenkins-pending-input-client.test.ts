@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { JenkinsPendingInputClient } from "../src/jenkins/client/JenkinsPendingInputClient";
+import { JenkinsRequestError } from "../src/jenkins/errors";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
 const BUILD_URL = "https://jenkins.example.com/job/demo/15/";
@@ -36,5 +37,27 @@ describe("JenkinsPendingInputClient", () => {
         { name: "proceed", value: "custom-proceed" }
       ]
     });
+  });
+
+  it("uses the generated proceed endpoint when an explicit proceed URL returns 404", async () => {
+    const requests: string[] = [];
+    const context = createJenkinsClientContext({
+      requestVoidWithCrumb: async (url) => {
+        requests.push(url);
+        if (requests.length === 1) {
+          throw new JenkinsRequestError("Not found", 404);
+        }
+      }
+    });
+    const client = new JenkinsPendingInputClient(context);
+
+    await client.proceedInput(BUILD_URL, "approval/id", {
+      proceedUrl: "input/approval/proceedEmpty"
+    });
+
+    assert.deepEqual(requests, [
+      "https://jenkins.example.com/job/demo/15/input/approval/proceedEmpty",
+      "https://jenkins.example.com/job/demo/15/input/approval%2Fid/proceed"
+    ]);
   });
 });

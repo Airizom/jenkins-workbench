@@ -3,38 +3,10 @@ import type {
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload
 } from "../types";
-import {
-  buildActionUrl,
-  buildApiUrlFromBase,
-  canonicalizeBuildUrlForEnvironment,
-  ensureTrailingSlash
-} from "../urls";
+import { buildActionUrl, ensureTrailingSlash } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
+import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
 import { parseReplayDefinitionPage } from "./ReplayPageParser";
-
-const REPLAY_QUEUE_DISCOVERY_POLL_INTERVAL_MS = 500;
-const REPLAY_QUEUE_DISCOVERY_TIMEOUT_MS = 5000;
-const REPLAY_QUEUE_DISCOVERY_SETTLE_MS = 1000;
-
-interface JenkinsReplayQueueSnapshot {
-  knownIds: Set<number>;
-  normalizedJobUrl: string;
-}
-
-interface JenkinsQueueDiscoveryItem {
-  id: number;
-  taskUrl?: string;
-}
-
-interface ReplayQueueCandidateScan {
-  candidateId?: number;
-  hasMultipleCandidates: boolean;
-}
-
-interface ReplayQueueSettleState {
-  candidateId: number;
-  observedAt: number;
-}
 
 export class JenkinsReplayClient {
   constructor(private readonly context: JenkinsClientContext) {}
@@ -50,16 +22,12 @@ export class JenkinsReplayClient {
     payload: JenkinsReplaySubmissionPayload
   ): Promise<JenkinsReplayResult> {
     const url = buildActionUrl(buildUrl, "replay/run");
-    const replayQueueSnapshot = await this.captureReplayQueueSnapshot(buildUrl);
     const response = await this.context.requestPostWithCrumb(url, this.buildReplayRunBody(payload));
-    const resolvedLocation = resolveActionLocation(url, response.location);
-    let queueLocation = isQueueLocation(resolvedLocation) ? resolvedLocation : undefined;
+    const resolvedLocation = resolveActionLocation(this.context.baseUrl, url, response.location);
+    const queueLocation = isQueueLocation(resolvedLocation) ? resolvedLocation : undefined;
     const buildLocation = queueLocation
       ? undefined
       : classifyReplayBuildLocation(buildUrl, resolvedLocation);
-    if (!queueLocation && !buildLocation && replayQueueSnapshot) {
-      queueLocation = await this.findReplayQueueLocation(replayQueueSnapshot);
-    }
     const location = queueLocation ?? buildLocation;
     return {
       location,
@@ -83,179 +51,21 @@ export class JenkinsReplayClient {
     }
     return body.toString();
   }
-
-  private async captureReplayQueueSnapshot(
-    buildUrl: string
-  ): Promise<JenkinsReplayQueueSnapshot | undefined> {
-    const jobUrl = resolveReplayJobUrl(this.context.baseUrl, buildUrl);
-    if (!jobUrl) {
-      return undefined;
-    }
-
-    try {
-      const items = await this.getQueueDiscoveryItems();
-      const normalizedJobUrl = normalizeLocationForComparison(jobUrl);
-      const knownIds = new Set<number>();
-      for (const item of items) {
-        if (isSameNormalizedQueueTask(item.taskUrl, normalizedJobUrl)) {
-          knownIds.add(item.id);
-        }
-      }
-      return {
-        knownIds,
-        normalizedJobUrl
-      };
-    } catch {
-      return undefined;
-    }
-  }
-
-  private async findReplayQueueLocation(
-    snapshot: JenkinsReplayQueueSnapshot
-  ): Promise<string | undefined> {
-    const deadline = Date.now() + REPLAY_QUEUE_DISCOVERY_TIMEOUT_MS;
-    let settleState: ReplayQueueSettleState | undefined;
-
-    while (Date.now() < deadline) {
-      try {
-        const scan = scanReplayQueueCandidates(await this.getQueueDiscoveryItems(), snapshot);
-        if (scan.hasMultipleCandidates) {
-          return undefined;
-        }
-        if (
-          scan.candidateId === undefined &&
-          settleState &&
-          (await this.hasReplayQueueCandidateStarted(settleState.candidateId, snapshot))
-        ) {
-          return buildQueueItemLocation(this.context.baseUrl, settleState.candidateId);
-        }
-        settleState = advanceReplayQueueSettleState(settleState, scan.candidateId, Date.now());
-        if (
-          settleState &&
-          Date.now() - settleState.observedAt >= REPLAY_QUEUE_DISCOVERY_SETTLE_MS
-        ) {
-          return buildQueueItemLocation(this.context.baseUrl, settleState.candidateId);
-        }
-      } catch {
-        return undefined;
-      }
-      await delay(REPLAY_QUEUE_DISCOVERY_POLL_INTERVAL_MS);
-    }
-    return undefined;
-  }
-
-  private async hasReplayQueueCandidateStarted(
-    candidateId: number,
-    snapshot: JenkinsReplayQueueSnapshot
-  ): Promise<boolean> {
-    const tree = "id,task[url],executable[url]";
-    const url = buildApiUrlFromBase(
-      this.context.baseUrl,
-      `queue/item/${Math.floor(candidateId)}/api/json`,
-      tree
-    );
-    const response = await this.context.requestJson<{
-      id?: number;
-      task?: { url?: string };
-      executable?: { url?: string };
-    }>(url);
-    return (
-      response.id === candidateId &&
-      isSameNormalizedQueueTask(response.task?.url, snapshot.normalizedJobUrl) &&
-      typeof response.executable?.url === "string"
-    );
-  }
-
-  private async getQueueDiscoveryItems(): Promise<JenkinsQueueDiscoveryItem[]> {
-    const tree = "items[id,task[url]]";
-    const url = buildApiUrlFromBase(this.context.baseUrl, "queue/api/json", tree);
-    const response = await this.context.requestJson<{
-      items?: Array<{ id?: number; task?: { url?: string } }>;
-    }>(url);
-    if (!Array.isArray(response.items)) {
-      return [];
-    }
-    const items: JenkinsQueueDiscoveryItem[] = [];
-    for (const item of response.items) {
-      const id = typeof item.id === "number" && Number.isFinite(item.id) ? item.id : undefined;
-      if (id === undefined) {
-        continue;
-      }
-      items.push({ id, taskUrl: item.task?.url });
-    }
-    return items;
-  }
 }
 
 function resolveActionLocation(
+  trustedBaseUrl: string,
   requestUrl: string,
   location: string | undefined
 ): string | undefined {
   if (!location) {
     return undefined;
   }
-  try {
-    return new URL(location, requestUrl).toString();
-  } catch {
-    return location;
-  }
+  return resolveTrustedJenkinsUrl(trustedBaseUrl, location, requestUrl);
 }
 
 function isQueueLocation(location: string | undefined): boolean {
-  return Boolean(location && /\/queue\/item\/\d+/.test(location));
-}
-
-function resolveReplayJobUrl(environmentUrl: string, buildUrl: string): string | undefined {
-  try {
-    const canonicalBuildUrl =
-      canonicalizeBuildUrlForEnvironment(environmentUrl, buildUrl) ?? ensureTrailingSlash(buildUrl);
-    return new URL("../", canonicalBuildUrl).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-function isSameNormalizedQueueTask(taskUrl: string | undefined, normalizedJobUrl: string): boolean {
-  return Boolean(taskUrl && normalizeLocationForComparison(taskUrl) === normalizedJobUrl);
-}
-
-// Find the single queue item that appeared after the replay was submitted.
-// More than one new item for the same job makes the replay's item ambiguous.
-function scanReplayQueueCandidates(
-  items: readonly JenkinsQueueDiscoveryItem[],
-  snapshot: JenkinsReplayQueueSnapshot
-): ReplayQueueCandidateScan {
-  let candidateId: number | undefined;
-  for (const item of items) {
-    if (
-      snapshot.knownIds.has(item.id) ||
-      !isSameNormalizedQueueTask(item.taskUrl, snapshot.normalizedJobUrl)
-    ) {
-      continue;
-    }
-    if (candidateId === undefined) {
-      candidateId = item.id;
-    } else if (candidateId !== item.id) {
-      return { candidateId, hasMultipleCandidates: true };
-    }
-  }
-  return { candidateId, hasMultipleCandidates: false };
-}
-
-// Track how long the same candidate has been observed; any change (including
-// the candidate disappearing) restarts the settle window.
-function advanceReplayQueueSettleState(
-  state: ReplayQueueSettleState | undefined,
-  nextCandidateId: number | undefined,
-  now: number
-): ReplayQueueSettleState | undefined {
-  if (nextCandidateId === undefined) {
-    return undefined;
-  }
-  if (state?.candidateId === nextCandidateId) {
-    return state;
-  }
-  return { candidateId: nextCandidateId, observedAt: now };
+  return Boolean(location && locationPathMatches(location, /\/queue\/item\/\d+\/?$/));
 }
 
 function classifyReplayBuildLocation(
@@ -269,7 +79,15 @@ function classifyReplayBuildLocation(
 }
 
 function isBuildLocation(location: string): boolean {
-  return /\/job\/.+\/\d+\/?$/.test(location);
+  return locationPathMatches(location, /\/job\/.+\/\d+\/?$/);
+}
+
+function locationPathMatches(location: string, pattern: RegExp): boolean {
+  try {
+    return pattern.test(new URL(location).pathname);
+  } catch {
+    return false;
+  }
 }
 
 function areEquivalentLocations(left: string, right: string): boolean {
@@ -286,12 +104,4 @@ function normalizeLocationForComparison(value: string): string {
   } catch {
     return ensureTrailingSlash(value.split(/[?#]/, 1)[0] ?? value);
   }
-}
-
-function buildQueueItemLocation(baseUrl: string, queueId: number): string {
-  return new URL(`queue/item/${Math.floor(queueId)}/`, ensureTrailingSlash(baseUrl)).toString();
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

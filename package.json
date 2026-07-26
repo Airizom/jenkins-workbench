@@ -37,9 +37,6 @@
   "activationEvents": ["onStartupFinished", "onUri"],
   "main": "./out/extension.js",
   "contributes": {
-    "uriHandler": {
-      "scheme": "airizom.jenkins-workbench"
-    },
     "commands": [
       {
         "command": "jenkinsWorkbench.addEnvironment",
@@ -371,6 +368,22 @@
                 }
               }
             ]
+          },
+          "waitForCompletion": {
+            "type": "boolean",
+            "default": true,
+            "description": "Wait for the queued Jenkins build to finish, stream its console output, and report its result as the task exit code. Set to false for submit-only behavior."
+          },
+          "inputStepPolicy": {
+            "type": "string",
+            "enum": ["wait", "abort"],
+            "default": "wait",
+            "description": "Wait for Jenkins Pipeline input steps or stop the build when one is detected."
+          },
+          "inputTimeoutSeconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Optional timeout in seconds for each distinct Jenkins Pipeline input step. When it expires, the task stops the build."
           }
         }
       }
@@ -403,6 +416,18 @@
           "default": 10,
           "minimum": 2,
           "description": "Polling interval in seconds for the build queue while the Build Queue folder is expanded."
+        },
+        "jenkinsWorkbench.taskRunner.pollIntervalSeconds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "description": "Polling interval in seconds while a Jenkins task follows its queue item, build status, and console output."
+        },
+        "jenkinsWorkbench.taskRunner.maxConsecutiveErrors": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "description": "Consecutive Jenkins API errors allowed per task-runner operation before the task fails and attempts to stop its Jenkins work."
         },
         "jenkinsWorkbench.watchErrorThreshold": {
           "type": "number",
@@ -542,8 +567,8 @@
         "jenkinsWorkbench.artifactDownloadRoot": {
           "type": "string",
           "default": "jenkins-artifacts",
-          "pattern": "^(?!\\s*$)(?![\\\\/])(?![A-Za-z]:)(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$)).+$",
-          "patternErrorMessage": "Use a non-empty workspace-relative folder without parent (..) segments.",
+          "pattern": "^(?!\\s*$)(?![\\\\/])(?![A-Za-z]:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[<>:\"|?*\\x00-\\x1F])(?!.*(?:^|[\\\\/])(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.[^\\\\/]*)?(?:[\\\\/]|$))(?!.*[. ](?:[\\\\/]|$)).+$",
+          "patternErrorMessage": "Use a non-empty workspace-relative folder with valid path components and without parent (..) segments.",
           "description": "Workspace-relative folder for downloaded artifacts."
         },
         "jenkinsWorkbench.artifactMaxDownloadMb": {

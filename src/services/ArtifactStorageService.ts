@@ -8,7 +8,9 @@ import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactP
 
 const INVALID_PATH_MESSAGE = "Artifact path is invalid and cannot be saved.";
 const INVALID_ROOT_MESSAGE =
-  "Artifact download location is invalid. Check your Jenkins Workbench settings.";
+  "Artifact download location is invalid. Configure a workspace-relative folder with valid path component names.";
+const WINDOWS_FORBIDDEN_PATH_CHARACTERS = /[<>:"|?*]/;
+const WINDOWS_RESERVED_PATH_COMPONENT = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 
 export interface ArtifactFilesystem {
   createDirectory(path: string): Thenable<void>;
@@ -141,18 +143,18 @@ function sanitizeArtifactRelativePath(relativePath: string): string {
 }
 
 function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): string | undefined {
-  const trimmedRoot = downloadRoot.trim();
-  const rootSegments = trimmedRoot.replace(/\\/g, "/").split("/");
+  const rootSegments = downloadRoot.replace(/\\/g, "/").split("/");
   if (
-    !trimmedRoot ||
-    path.posix.isAbsolute(trimmedRoot) ||
-    path.win32.parse(trimmedRoot).root !== "" ||
-    rootSegments.includes("..")
+    !downloadRoot.trim() ||
+    path.posix.isAbsolute(downloadRoot) ||
+    path.win32.parse(downloadRoot).root !== "" ||
+    rootSegments.includes("..") ||
+    rootSegments.some((segment) => segment.length > 0 && !isWindowsCompatiblePathComponent(segment))
   ) {
     return undefined;
   }
 
-  const normalized = normalizePosixRelativePath(trimmedRoot);
+  const normalized = normalizePosixRelativePath(downloadRoot);
   if (!normalized) {
     return undefined;
   }
@@ -161,6 +163,16 @@ function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): strin
     return undefined;
   }
   return resolved;
+}
+
+function isWindowsCompatiblePathComponent(component: string): boolean {
+  return (
+    !WINDOWS_FORBIDDEN_PATH_CHARACTERS.test(component) &&
+    ![...component].some((character) => character.charCodeAt(0) < 32) &&
+    !component.endsWith(".") &&
+    !component.endsWith(" ") &&
+    !WINDOWS_RESERVED_PATH_COMPONENT.test(component)
+  );
 }
 
 function isPathInside(rootPath: string, filePath: string): boolean {

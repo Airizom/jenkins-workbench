@@ -5,6 +5,7 @@ import type * as vscode from "vscode";
 
 vi.doMock("vscode", () => ({ workspace: { getConfiguration: () => undefined } }));
 const {
+  getArtifactActionOptions,
   getArtifactPreviewCacheMaxEntries,
   getCurrentBranchPullRequestJobNamePatterns,
   getMaxCacheEntries,
@@ -104,12 +105,33 @@ describe("artifact download root configuration schema", () => {
     "C:\\outside",
     "C:outside",
     "../outside",
-    "safe/../outside"
+    "safe/../outside",
+    "NUL",
+    "CON",
+    "aux.txt",
+    "downloads/NUL/logs",
+    "downloads.",
+    "downloads ",
+    "downloads/inva<lid",
+    "downloads/inva>lid",
+    'downloads/inva"lid',
+    "downloads/inva:lid",
+    "downloads/inva|lid",
+    "downloads/inva?lid",
+    "downloads/inva*lid",
+    "downloads/inva\u0001lid"
   ])("rejects invalid root %j", (value) => {
     assert.equal(pattern.test(value), false);
   });
 
   it("accepts a nested workspace-relative root", () => {
     assert.equal(pattern.test("downloads/artifacts"), true);
+  });
+
+  it("preserves invalid trailing whitespace for runtime validation", () => {
+    assert.equal(
+      getArtifactActionOptions(createConfig({ artifactDownloadRoot: "downloads " })).downloadRoot,
+      "downloads "
+    );
   });
 });

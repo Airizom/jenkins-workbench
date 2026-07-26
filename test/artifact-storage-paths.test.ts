@@ -97,7 +97,21 @@ describe("ArtifactStorageService path sanitization", () => {
     "C:\\outside",
     "C:outside",
     "../outside",
-    "safe/../outside"
+    "safe/../outside",
+    "NUL",
+    "CON",
+    "aux.txt",
+    "downloads/NUL/logs",
+    "downloads.",
+    "downloads ",
+    "downloads/inva<lid",
+    "downloads/inva>lid",
+    'downloads/inva"lid',
+    "downloads/inva:lid",
+    "downloads/inva|lid",
+    "downloads/inva?lid",
+    "downloads/inva*lid",
+    "downloads/inva\u0001lid"
   ])("rejects invalid download root %j", async (downloadRoot) => {
     const { service, writes } = createService();
     const request = { ...createRequest("report.txt"), downloadRoot };

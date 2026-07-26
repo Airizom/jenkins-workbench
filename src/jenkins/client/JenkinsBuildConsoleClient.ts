@@ -59,7 +59,7 @@ export class JenkinsBuildConsoleClient {
       return {
         text,
         truncated: false,
-        nextStart: text.length,
+        nextStart: Buffer.byteLength(text, "utf8"),
         progressiveSupported: false,
         bytesRead: Buffer.byteLength(text, "utf8")
       };
@@ -80,7 +80,7 @@ export class JenkinsBuildConsoleClient {
         const tailText = this.trimTailText(response.text, maxChars);
         return {
           text: tailText,
-          truncated: start > 0 || response.text.length > tailText.length,
+          truncated: start > 0 || response.text !== tailText,
           nextStart,
           progressiveSupported: true,
           bytesRead: Buffer.byteLength(tailText, "utf8")
@@ -98,8 +98,8 @@ export class JenkinsBuildConsoleClient {
     const tailText = this.trimTailText(text, maxChars);
     return {
       text: tailText,
-      truncated: text.length > maxChars,
-      nextStart: text.length,
+      truncated: text !== tailText,
+      nextStart: Buffer.byteLength(text, "utf8"),
       progressiveSupported: false,
       bytesRead: Buffer.byteLength(tailText, "utf8")
     };
@@ -176,7 +176,10 @@ export class JenkinsBuildConsoleClient {
   }
 
   private trimTailText(text: string, maxChars: number): string {
-    return text.length > maxChars ? text.slice(text.length - maxChars) : text;
+    const characters = Array.from(text);
+    return characters.length > maxChars
+      ? characters.slice(characters.length - maxChars).join("")
+      : text;
   }
 
   private isUnsupportedProgressiveHeadError(error: unknown): boolean {

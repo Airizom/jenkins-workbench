@@ -32,12 +32,11 @@ export class RestartFromStageResponseParser {
 
   parseRestartPipelineResponse(responseText: string): RestartPipelineAttemptResult {
     const trimmedResponse = responseText.trim();
-    if (this.isMissingRestartEndpointResponse(trimmedResponse)) {
-      return this.failureResult(RestartFromStageResponseParser.MISSING_ENDPOINT_MESSAGE, true);
-    }
-
     const parsed = this.tryParseJson(trimmedResponse);
     if (parsed === undefined) {
+      if (this.isMissingRestartEndpointResponse(trimmedResponse)) {
+        return this.failureResult(RestartFromStageResponseParser.MISSING_ENDPOINT_MESSAGE, true);
+      }
       return this.parsePlainTextRestartResponse(trimmedResponse);
     }
 
@@ -54,7 +53,7 @@ export class RestartFromStageResponseParser {
     }
 
     const status = this.parseString(response.status);
-    if (this.isSuccessStatus(status) && (!message || this.isSuccessStatus(message))) {
+    if (this.isSuccessStatus(status)) {
       return this.successResult(message);
     }
 
@@ -174,11 +173,7 @@ export class RestartFromStageResponseParser {
       return false;
     }
 
-    return (
-      this.isHtmlDocument(normalized) ||
-      normalized.includes("not found") ||
-      normalized.includes("http error")
-    );
+    return this.isHtmlDocument(normalized) || normalized.includes("http error");
   }
 
   private isHtmlDocument(value: string): boolean {

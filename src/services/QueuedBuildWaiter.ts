@@ -1,5 +1,6 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { parseQueueItemId } from "../jenkins/urls";
 
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -47,34 +48,6 @@ export class QueuedBuildWaiter {
       await delay(this.pollIntervalMs);
     }
   }
-}
-
-function parseQueueItemId(queueLocation?: string): number | undefined {
-  if (!queueLocation) {
-    return undefined;
-  }
-
-  const directMatch = parseQueueItemIdFromPath(queueLocation);
-  if (directMatch !== undefined) {
-    return directMatch;
-  }
-
-  try {
-    const url = new URL(queueLocation);
-    return parseQueueItemIdFromPath(url.pathname);
-  } catch {
-    return undefined;
-  }
-}
-
-function parseQueueItemIdFromPath(value: string): number | undefined {
-  const match = value.match(/\/queue\/item\/(\d+)/);
-  if (!match?.[1]) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(match[1], 10);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function delay(ms: number): Promise<void> {

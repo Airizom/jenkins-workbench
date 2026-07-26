@@ -49,11 +49,19 @@ export interface PendingInputAction {
 }
 
 export interface PendingInputSummary {
+  availability?: "supported" | "unsupported";
   awaitingInput: boolean;
   count: number;
   signature?: string;
   message?: string;
+  inputs?: PendingInputSummaryEntry[];
   fetchedAt: number;
+}
+
+export interface PendingInputSummaryEntry {
+  id: string;
+  signature: string;
+  message?: string;
 }
 
 export type ConsoleTextResult = JenkinsConsoleText;

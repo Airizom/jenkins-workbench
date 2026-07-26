@@ -223,7 +223,7 @@ export class JenkinsDataService implements JenkinsArtifactRetrievalRuntimeSurfac
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    options?: { includeParameters?: boolean }
+    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
   ): Promise<JenkinsBuildDetails> {
     return this.buildOperations.getBuildDetails(environment, buildUrl, options);
   }

@@ -1,4 +1,8 @@
 import * as vscode from "vscode";
+import {
+  getExtensionConfiguration,
+  getJenkinsTaskRunnerOptions
+} from "../extension/ExtensionConfig";
 import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHost";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
@@ -9,6 +13,7 @@ import type {
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
 import { toJenkinsEnvironmentRef } from "./JenkinsTaskEnvironment";
+import { JENKINS_TASK_EXIT_CODES, JenkinsTaskRunner } from "./JenkinsTaskRunner";
 import {
   type JenkinsTaskDefinition,
   normalizeEnvironmentUrl,
@@ -17,12 +22,17 @@ import {
   parseTaskParameters
 } from "./JenkinsTaskTypes";
 
+const STATUS_PREFIX = "[Jenkins Workbench]";
+
 export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
   private readonly writeEmitter = new vscode.EventEmitter<string>();
-  private readonly closeEmitter = new vscode.EventEmitter<void>();
+  private readonly closeEmitter = new vscode.EventEmitter<number>();
   private isClosed = false;
   private isRunning = false;
   private isCanceled = false;
+  private isAtLineStart = true;
+  private pendingCarriageReturn = false;
+  private runner: JenkinsTaskRunner | undefined;
 
   readonly onDidWrite = this.writeEmitter.event;
   readonly onDidClose = this.closeEmitter.event;
@@ -47,48 +57,105 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
       return;
     }
     this.isCanceled = true;
-    this.writeLine("Task canceled. Jenkins builds are not stopped by task cancellation.");
-    this.signalClose();
+    this.writeStatus("Task cancellation requested; stopping the owned Jenkins work.");
+    this.runner?.cancel();
+    this.signalClose(JENKINS_TASK_EXIT_CODES.canceled);
   }
 
-  private writeLine(message: string): void {
+  private writeStatus(message: string): void {
     if (this.isClosed) {
       return;
     }
-    this.writeEmitter.fire(`${message}\r\n`);
+    this.ensureLineStart();
+    const lines = message.split(/\r\n|\r|\n/);
+    if (lines.length > 1 && lines.at(-1) === "") {
+      lines.pop();
+    }
+    this.writeEmitter.fire(lines.map((line) => `${STATUS_PREFIX} ${line}\r\n`).join(""));
+    this.isAtLineStart = true;
   }
 
-  private signalClose(): void {
+  private writeConsole(text: string): void {
+    if (this.isClosed || text.length === 0) {
+      return;
+    }
+
+    let normalized = "";
+    for (const character of text) {
+      if (this.pendingCarriageReturn) {
+        normalized += "\r\n";
+        this.pendingCarriageReturn = false;
+        if (character === "\n") {
+          continue;
+        }
+      }
+
+      if (character === "\r") {
+        this.pendingCarriageReturn = true;
+      } else if (character === "\n") {
+        normalized += "\r\n";
+      } else {
+        normalized += character;
+      }
+    }
+
+    if (normalized.length === 0) {
+      return;
+    }
+    this.writeEmitter.fire(normalized);
+    this.isAtLineStart = normalized.endsWith("\r\n");
+  }
+
+  private ensureLineStart(): void {
+    if (this.pendingCarriageReturn) {
+      this.writeEmitter.fire("\r\n");
+      this.pendingCarriageReturn = false;
+      this.isAtLineStart = true;
+      return;
+    }
+    if (!this.isAtLineStart) {
+      this.writeEmitter.fire("\r\n");
+      this.isAtLineStart = true;
+    }
+  }
+
+  private signalClose(exitCode: number): void {
     if (this.isClosed) {
       return;
+    }
+    if (this.pendingCarriageReturn) {
+      this.writeEmitter.fire("\r\n");
+      this.pendingCarriageReturn = false;
     }
     this.isClosed = true;
-    this.closeEmitter.fire();
+    this.closeEmitter.fire(exitCode);
   }
 
   private async execute(): Promise<void> {
-    this.writeLine("Starting Jenkins task...");
+    this.writeStatus("Starting Jenkins task...");
     if (this.isCanceled) {
-      this.signalClose();
-      return;
-    }
-    const normalized = normalizeTaskDefinition(this.definition);
-    if (!normalized.definition) {
-      this.fail(normalized.error ?? "Invalid Jenkins task definition.");
+      this.signalClose(JENKINS_TASK_EXIT_CODES.canceled);
       return;
     }
 
-    const environmentResult = await this.resolveEnvironment(
-      normalized.definition.environmentUrl,
-      normalized.definition.environmentId
-    );
-    if ("error" in environmentResult) {
-      this.fail(environmentResult.error);
-      return;
-    }
-
-    const environment = environmentResult.environment;
+    let environment: JenkinsEnvironmentRef | undefined;
     try {
+      const normalized = normalizeTaskDefinition(this.definition);
+      if (!normalized.definition) {
+        this.fail(normalized.error ?? "Invalid Jenkins task definition.");
+        return;
+      }
+
+      const environmentResult = await this.resolveEnvironment(
+        normalized.definition.environmentUrl,
+        normalized.definition.environmentId
+      );
+      if ("error" in environmentResult) {
+        this.fail(environmentResult.error);
+        return;
+      }
+
+      environment = environmentResult.environment;
       if (this.isCanceled) {
         return;
       }
@@ -102,45 +169,64 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
         return;
       }
 
-      this.writeLine(`Environment: ${normalized.definition.environmentUrl}`);
-      this.writeLine(`Job: ${jobLabel}`);
+      this.writeStatus(`Environment: ${normalized.definition.environmentUrl}`);
+      this.writeStatus(`Job: ${jobLabel}`);
       if (parametersResult.allowEmptyParams) {
         const paramKeys = parametersResult.params
           ? Array.from(new Set(parametersResult.params.keys()))
           : [];
-        this.writeLine(
+        this.writeStatus(
           paramKeys.length > 0
             ? `Parameters: ${paramKeys.join(", ")}`
             : "Parameters: (none specified)"
         );
       }
-      this.writeLine("Canceling this task will not stop the Jenkins build.");
 
       if (this.isCanceled) {
         return;
       }
-      try {
-        const result = parametersResult.allowEmptyParams
-          ? await this.dataService.triggerBuildWithParameters(
-              environment,
-              jobUrl,
-              parametersResult.params,
-              { allowEmptyParams: parametersResult.allowEmptyParams }
-            )
-          : await this.dataService.triggerBuild(environment, jobUrl);
 
-        if (result.queueLocation) {
-          this.writeLine(`Queued at: ${result.queueLocation}`);
-        }
-        this.writeLine("Build triggered successfully.");
-      } catch (error) {
-        const message = formatActionError(error);
-        this.writeLine(`Error: ${message}`);
-        void vscode.window.showErrorMessage(`Failed to trigger Jenkins build: ${message}`);
+      this.runner = new JenkinsTaskRunner(
+        this.dataService,
+        getJenkinsTaskRunnerOptions(getExtensionConfiguration())
+      );
+      if (this.isCanceled) {
+        this.runner.cancel();
+        await this.runner.waitForCleanup();
+        return;
       }
+
+      const result = await this.runner.run(
+        {
+          environment,
+          jobUrl,
+          parameters: parametersResult.params,
+          allowEmptyParams: parametersResult.allowEmptyParams,
+          waitForCompletion: normalized.definition.waitForCompletion,
+          inputStepPolicy: normalized.definition.inputStepPolicy,
+          inputTimeoutSeconds: normalized.definition.inputTimeoutSeconds
+        },
+        {
+          writeStatus: (message) => this.writeStatus(message),
+          writeConsole: (text) => this.writeConsole(text),
+          onCleanupError: (message, error) => this.reportCleanupError(message, error)
+        }
+      );
+
+      await this.runner.waitForCleanup();
+      this.signalClose(result.exitCode);
+    } catch (error) {
+      if (this.isCanceled) {
+        return;
+      }
+      const message = formatActionError(error);
+      this.writeStatus(`Error: ${message}`);
+      void vscode.window.showErrorMessage(`Jenkins task failed: ${message}`);
+      this.signalClose(JENKINS_TASK_EXIT_CODES.error);
     } finally {
-      this.refreshHost.fullEnvironmentRefresh({ environmentId: environment.environmentId });
-      this.signalClose();
+      if (environment) {
+        this.refreshHost.fullEnvironmentRefresh({ environmentId: environment.environmentId });
+      }
     }
   }
 
@@ -220,8 +306,14 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
   }
 
   private fail(message: string): void {
-    this.writeLine(`Error: ${message}`);
+    this.writeStatus(`Error: ${message}`);
     void vscode.window.showErrorMessage(message);
-    this.signalClose();
+    this.signalClose(JENKINS_TASK_EXIT_CODES.error);
+  }
+
+  private reportCleanupError(message: string, error: unknown): void {
+    const detail = formatActionError(error);
+    console.error(`${message}: ${detail}`, error);
+    void vscode.window.showErrorMessage(`${message}: ${detail}`);
   }
 }

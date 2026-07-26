@@ -57,6 +57,7 @@ const BUILD_DETAILS_TREE_TEMPLATES = [
   buildBuildDetailsTree({ includeParameters: true }),
   buildBuildDetailsTree({ includeCauses: true, includeParameters: true })
 ];
+const BUILD_STATUS_TREE = buildBuildDetailsTree({ statusOnly: true });
 
 const TEST_REPORT_TREES = [buildTestReportTree(), buildTestReportTree({ includeCaseLogs: true })];
 
@@ -99,7 +100,7 @@ export class JenkinsBuildsApi {
 
   async getBuildDetails(
     buildUrl: string,
-    options?: { includeCauses?: boolean; includeParameters?: boolean }
+    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
   ): Promise<JenkinsBuildDetails> {
     const tree = getBuildDetailsTree(options);
     const url = buildApiUrlFromItem(buildUrl, tree);
@@ -348,7 +349,11 @@ function getBuildsTreePrefix(options?: {
 function getBuildDetailsTree(options?: {
   includeCauses?: boolean;
   includeParameters?: boolean;
+  statusOnly?: boolean;
 }): string {
+  if (options?.statusOnly) {
+    return BUILD_STATUS_TREE;
+  }
   const key = getBooleanOptionKey(options?.includeCauses, options?.includeParameters);
   return BUILD_DETAILS_TREE_TEMPLATES[key];
 }

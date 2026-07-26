@@ -67,13 +67,18 @@ export class JenkinsBuildDataOperations {
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    options?: { includeParameters?: boolean }
+    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
   ): Promise<JenkinsBuildDetails> {
-    const cacheKey = await this.context.buildCacheKey(
-      environment,
-      options?.includeParameters ? "build-details-params" : "build-details",
-      buildUrl
-    );
+    const cacheKind = options?.statusOnly
+      ? "build-status"
+      : options?.includeCauses
+        ? options.includeParameters
+          ? "build-details-causes-params"
+          : "build-details-causes"
+        : options?.includeParameters
+          ? "build-details-params"
+          : "build-details";
+    const cacheKey = await this.context.buildCacheKey(environment, cacheKind, buildUrl);
     const cached = this.context.getCache().get<JenkinsBuildDetails>(cacheKey);
     if (cached && !cached.building) {
       return cached;

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -98,6 +98,24 @@ describe("package manifest validator", () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("jenkinsWorkbench.test.default does not match its schema");
+  });
+
+  it("rejects an unsupported contribution point", async () => {
+    const cwd = await createFixture({ type: "boolean", default: true }, [
+      parameterMapSchema,
+      namedParametersSchema
+    ]);
+    const packageJsonPath = path.join(cwd, "package.json");
+    const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+    packageJson.contributes.uriHandler = { scheme: "airizom.jenkins-workbench" };
+    await writeFile(packageJsonPath, JSON.stringify(packageJson));
+
+    const result = runValidator(cwd);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "contributes.uriHandler is not a supported VS Code contribution point"
+    );
   });
 
   it.each([

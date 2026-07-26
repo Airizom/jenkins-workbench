@@ -18,6 +18,37 @@ const firstPublishIndex = Math.min(
   source.indexOf("./node_modules/.bin/vsce publish"),
   source.indexOf("./node_modules/.bin/ovsx publish")
 );
+const artifactUploadIndex = source.indexOf("uses: actions/upload-artifact@");
+
+if (
+  artifactUploadIndex === -1 ||
+  firstPublishIndex === -1 ||
+  artifactUploadIndex > firstPublishIndex
+) {
+  errors.push(`${workflowPath} must upload the VSIX artifact before marketplace publication`);
+}
+
+if (
+  !/uses: actions\/upload-artifact@[^\n]+\n\s*with:\n\s*name: vsix\n\s*path: \.\/\*\.vsix\n\s*overwrite: true/.test(
+    source
+  )
+) {
+  errors.push(`${workflowPath} must overwrite the VSIX artifact safely on workflow reruns`);
+}
+
+if (!/\.\/node_modules\/\.bin\/vsce publish[^\n]*--skip-duplicate/.test(source)) {
+  errors.push(`${workflowPath} must make VS Code Marketplace publication duplicate-safe`);
+}
+
+if (
+  !/if \.\/node_modules\/\.bin\/ovsx get "\$EXTENSION_ID" --versionRange "\$VERSION" --metadata[\s\S]*?\n\s*else\n\s*\.\/node_modules\/\.bin\/ovsx publish/.test(
+    source
+  )
+) {
+  errors.push(
+    `${workflowPath} must skip Open VSX publication when the exact version already exists`
+  );
+}
 
 for (const secret of publishingSecrets) {
   const validationIndex = source.indexOf(`if [ -z "$${secret}" ]; then`);
