@@ -18,11 +18,15 @@ interface JenkinsAuthMaterial {
 
 interface JenkinsClientCacheEntry {
   client?: JenkinsClient;
-  authSignature: string;
+  authMaterial: JenkinsAuthMaterial;
   authConfigRevision: number;
-  token?: string;
   url: string;
   username?: string;
+}
+
+interface JenkinsClientCacheResolution {
+  cacheKey: string;
+  entry: JenkinsClientCacheEntry;
 }
 
 export class JenkinsClientProvider {
@@ -39,73 +43,17 @@ export class JenkinsClientProvider {
   }
 
   async getAuthSignature(environment: JenkinsEnvironmentRef): Promise<string> {
-    const cacheKey = `${environment.scope}:${environment.environmentId}`;
-    const authConfigRevision = this.store.getAuthConfigRevision(
-      environment.scope,
-      environment.environmentId
-    );
-    const cached = this.clientCache.get(cacheKey);
-    if (
-      cached?.authConfigRevision === authConfigRevision &&
-      cached.url === environment.url &&
-      cached.username === environment.username
-    ) {
-      return cached.authSignature;
-    }
-
-    const { authSignature, token } = await this.resolveAuthMaterial(environment);
-    const client =
-      cached?.client &&
-      cached.authSignature === authSignature &&
-      cached.token === token &&
-      cached.url === environment.url &&
-      cached.username === environment.username
-        ? cached.client
-        : undefined;
-    this.clientCache.set(cacheKey, {
-      client,
-      authSignature,
-      authConfigRevision,
-      token,
-      url: environment.url,
-      username: environment.username
-    });
-    return authSignature;
+    const { entry } = await this.resolveClientCache(environment);
+    return entry.authMaterial.authSignature;
   }
 
   async getClient(environment: JenkinsEnvironmentRef): Promise<JenkinsClient> {
-    const authConfigRevision = this.store.getAuthConfigRevision(
-      environment.scope,
-      environment.environmentId
-    );
-    const cacheKey = `${environment.scope}:${environment.environmentId}`;
-    const cached = this.clientCache.get(cacheKey);
-
-    if (
-      cached?.client &&
-      cached.authConfigRevision === authConfigRevision &&
-      cached.url === environment.url &&
-      cached.username === environment.username
-    ) {
-      return cached.client;
+    const { cacheKey, entry } = await this.resolveClientCache(environment);
+    if (entry.client) {
+      return entry.client;
     }
 
-    const { authConfig, authSignature, token } = await this.resolveAuthMaterial(environment);
-
-    if (
-      cached?.client &&
-      cached.authSignature === authSignature &&
-      cached.token === token &&
-      cached.url === environment.url &&
-      cached.username === environment.username
-    ) {
-      this.clientCache.set(cacheKey, {
-        ...cached,
-        authConfigRevision
-      });
-      return cached.client;
-    }
-
+    const { authConfig, token } = entry.authMaterial;
     const client = new JenkinsClient({
       baseUrl: environment.url,
       username: environment.username,
@@ -117,12 +65,8 @@ export class JenkinsClientProvider {
     });
 
     this.clientCache.set(cacheKey, {
-      client,
-      authSignature,
-      authConfigRevision,
-      token,
-      url: environment.url,
-      username: environment.username
+      ...entry,
+      client
     });
 
     return client;
@@ -167,5 +111,40 @@ export class JenkinsClientProvider {
       token
     });
     return { authConfig, authSignature, token };
+  }
+
+  private async resolveClientCache(
+    environment: JenkinsEnvironmentRef
+  ): Promise<JenkinsClientCacheResolution> {
+    const cacheKey = `${environment.scope}:${environment.environmentId}`;
+    const authConfigRevision = this.store.getAuthConfigRevision(
+      environment.scope,
+      environment.environmentId
+    );
+    const cached = this.clientCache.get(cacheKey);
+    const identityMatches =
+      cached?.url === environment.url && cached.username === environment.username;
+
+    if (identityMatches && cached.authConfigRevision === authConfigRevision) {
+      return { cacheKey, entry: cached };
+    }
+
+    const authMaterial = await this.resolveAuthMaterial(environment);
+    const client =
+      identityMatches &&
+      cached.client &&
+      cached.authMaterial.authSignature === authMaterial.authSignature &&
+      cached.authMaterial.token === authMaterial.token
+        ? cached.client
+        : undefined;
+    const entry: JenkinsClientCacheEntry = {
+      client,
+      authMaterial,
+      authConfigRevision,
+      url: environment.url,
+      username: environment.username
+    };
+    this.clientCache.set(cacheKey, entry);
+    return { cacheKey, entry };
   }
 }

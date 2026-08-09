@@ -43,8 +43,6 @@ export function mergeStepCatalogs(
 
     const enrichedLiveStep = {
       ...liveStep,
-      displayName: liveStep.displayName || fallbackStep.displayName,
-      documentation: liveStep.documentation ?? fallbackStep.documentation,
       signatures: liveStep.signatures.map((signature) => ({
         ...signature,
         parameters: signature.parameters.map((parameter) => {

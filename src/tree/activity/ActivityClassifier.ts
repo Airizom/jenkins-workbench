@@ -6,11 +6,7 @@ export interface ActivityClassification {
   group: ActivityGroupKind;
 }
 
-interface TreeActivityClassificationSurface {
-  classify(entry: Pick<JobSearchEntry, "color">): ActivityClassification | undefined;
-}
-
-export class ActivityClassifier implements TreeActivityClassificationSurface {
+export class ActivityClassifier {
   classify(entry: Pick<JobSearchEntry, "color">): ActivityClassification | undefined {
     const status = resolveJobColorStatus(entry.color);
     if (status === "running") {

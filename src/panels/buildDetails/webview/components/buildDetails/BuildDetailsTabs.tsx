@@ -17,6 +17,7 @@ import {
 import type {
   ArtifactAction,
   BuildDetailsCoverageStateViewModel,
+  BuildDiagnosticsViewModel,
   BuildFailureArtifact,
   BuildFailureInsightsViewModel,
   BuildTestCaseViewModel,
@@ -84,6 +85,7 @@ type BuildDetailsTabsProps = {
   testResults: BuildTestResultsViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
+  diagnostics: BuildDiagnosticsViewModel;
   consoleText: string;
   consoleHtmlModel?: ConsoleHtmlModel;
   consoleTruncated: boolean;
@@ -103,6 +105,9 @@ type BuildDetailsTabsProps = {
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
   onReloadTestResults: () => void;
   onOpenTestSource: (testCase: BuildTestCaseViewModel) => void;
+  onOpenDiagnosticSource: (targetId: string) => void;
+  onShowDiagnosticProblems: () => void;
+  onConfigureBuildDiagnostics: () => void;
 };
 export function BuildDetailsTabs({
   selectedTab,
@@ -122,6 +127,7 @@ export function BuildDetailsTabs({
   testResults,
   coverageState,
   insights,
+  diagnostics,
   consoleText,
   consoleHtmlModel,
   consoleTruncated,
@@ -140,7 +146,10 @@ export function BuildDetailsTabs({
   onOpenExternal,
   onArtifactAction,
   onReloadTestResults,
-  onOpenTestSource
+  onOpenTestSource,
+  onOpenDiagnosticSource,
+  onShowDiagnosticProblems,
+  onConfigureBuildDiagnostics
 }: BuildDetailsTabsProps): React.JSX.Element {
   const activeTab = resolveBuildDetailsSelectedTab(selectedTab, {
     hasPendingInputs,
@@ -196,10 +205,14 @@ export function BuildDetailsTabs({
           testsSummary={testsSummary}
           coverageState={coverageState}
           insights={insights}
+          diagnostics={diagnostics}
           hasPipelineStages={hasPipelineStages}
           hasTests={hasTests}
           onNavigateTab={onTabChange}
           onArtifactAction={onArtifactAction}
+          onOpenDiagnosticSource={onOpenDiagnosticSource}
+          onShowDiagnosticProblems={onShowDiagnosticProblems}
+          onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
         />
       </TabsContent>
 
@@ -242,6 +255,8 @@ export function BuildDetailsTabs({
           onToggleFollowLog={onToggleFollowLog}
           onExportLogs={onExportLogs}
           onOpenExternal={onOpenExternal}
+          sourceReferences={diagnostics.consoleReferences}
+          onOpenDiagnosticSource={onOpenDiagnosticSource}
         />
       </TabsContent>
 

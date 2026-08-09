@@ -5,31 +5,26 @@ import type {
   BuildDetailsTestStateViewModel,
   BuildDetailsUpdateMessage,
   BuildDetailsViewModel,
+  BuildDiagnosticsViewModel,
   BuildFailureInsightsViewModel,
   BuildTestsSummaryViewModel
 } from "../../shared/BuildDetailsContracts";
+import { EMPTY_BUILD_DIAGNOSTICS } from "../../shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "../../shared/BuildDetailsErrorHelpers";
+import type { BuildDetailsStateMessage } from "../../shared/BuildDetailsPanelMessages";
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
 import { parseConsoleHtml, trimConsoleHtmlModelToTail } from "../lib/consoleHtml";
 
-export type BuildDetailsState = BuildDetailsViewModel & {
+export type BuildDetailsState = Omit<BuildDetailsViewModel, "diagnostics"> & {
+  diagnostics: BuildDiagnosticsViewModel;
   consoleHtmlModel?: ConsoleHtmlModel;
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   hasLoaded: boolean;
 };
 
 export type BuildDetailsAction =
-  | { type: "appendConsole"; text: string }
-  | { type: "appendConsoleHtml"; html: string }
-  | { type: "setConsole"; text: string; truncated: boolean }
-  | { type: "setConsoleHtml"; html: string; truncated: boolean }
-  | { type: "setPipelineNodeLog"; log: BuildDetailsViewModel["pipelineNodeLog"] }
-  | { type: "appendPipelineNodeLogHtml"; targetKey: string; html: string }
-  | { type: "setPipelineNodeLogLoading"; targetKey?: string; loading: boolean }
-  | { type: "setPipelineNodeLogError"; targetKey?: string; error: string }
-  | { type: "setErrors"; errors: string[] }
+  | BuildDetailsStateMessage
   | { type: "setFollowLog"; value: boolean }
-  | { type: "setLoading"; value: boolean }
   | { type: "updateDetails"; payload: BuildDetailsUpdateMessage };
 export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
@@ -86,6 +81,7 @@ const FALLBACK_STATE: BuildDetailsState = {
   testState: DEFAULT_TEST_STATE,
   coverageState: DEFAULT_COVERAGE_STATE,
   insights: DEFAULT_INSIGHTS,
+  diagnostics: EMPTY_BUILD_DIAGNOSTICS,
   pendingInputs: [],
   consoleText: "",
   consoleHtml: undefined,
@@ -103,6 +99,7 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
   const pipelineNodeLog = mergedDefaults.pipelineNodeLog;
   const merged: BuildDetailsState = {
     ...mergedDefaults,
+    diagnostics: mergedDefaults.diagnostics ?? EMPTY_BUILD_DIAGNOSTICS,
     pipelineNodeLog,
     pipelineNodeLogHtmlModel: pipelineNodeLog.html
       ? parseConsoleHtml(pipelineNodeLog.html)
@@ -232,6 +229,9 @@ export function buildDetailsReducer(
         consoleError
       };
     }
+    case "setBuildDiagnostics": {
+      return { ...state, diagnostics: action.diagnostics };
+    }
     case "setFollowLog": {
       return { ...state, followLog: action.value };
     }
@@ -277,6 +277,7 @@ function mergeBuildDetailsDefaults(candidate: BuildDetailsViewModel): BuildDetai
     testState: candidate.testState ?? DEFAULT_TEST_STATE,
     coverageState: candidate.coverageState ?? DEFAULT_COVERAGE_STATE,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,
+    diagnostics: candidate.diagnostics ?? EMPTY_BUILD_DIAGNOSTICS,
     pipelineNodeLog: candidate.pipelineNodeLog ?? FALLBACK_STATE.pipelineNodeLog,
     pendingInputs: candidate.pendingInputs ?? [],
     loading: candidate.loading ?? false

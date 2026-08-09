@@ -171,8 +171,8 @@ function resolveParameterSummary(
 
   const visible: string[] = [];
   let total = 0;
-  visitMatchingParameters(build, options, (name, value, isMasked) => {
-    const formatted = formatParameterSummary(name, value, isMasked, options);
+  visitMatchingBuildParameters(build.actions, options, (name, parameter, isMasked) => {
+    const formatted = formatParameterSummary(name, parameter.value, isMasked, options);
     total += 1;
     if (visible.length < maxParameterCount) {
       visible.push(formatted);
@@ -217,11 +217,11 @@ function resolveEstimatedDurationLabel(build: JenkinsBuild): string | undefined 
     return estimatedLabel;
   }
   const elapsed = resolveBuildElapsedMs(build);
-  if (!Number.isFinite(elapsed)) {
+  if (elapsed === undefined) {
     return estimatedLabel;
   }
 
-  const elapsedLabel = formatDurationMs(Math.max(0, elapsed as number));
+  const elapsedLabel = formatDurationMs(elapsed);
   return `Elapsed ${elapsedLabel} | Estimated ${estimatedLabel}`;
 }
 
@@ -241,16 +241,6 @@ function resolveTimingSummary(build: JenkinsBuild): { label: string; value: stri
     : timestamp;
   const completedLabel = formatLocaleTimestampWithRelative(completedAt, true);
   return { label: "Completed", value: completedLabel };
-}
-
-function visitMatchingParameters(
-  build: JenkinsBuild,
-  options: BuildParameterSummaryOptions,
-  visitor: (name: string, value: unknown, isMasked: boolean) => void
-): void {
-  visitMatchingBuildParameters(build.actions, options, (name, parameter, isMasked) => {
-    visitor(name, parameter.value, isMasked);
-  });
 }
 
 function isActionWithCauses(action: BuildAction | null): action is { causes: JenkinsBuildCause[] } {

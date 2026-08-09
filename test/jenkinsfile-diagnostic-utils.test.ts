@@ -6,6 +6,7 @@ import {
   JENKINS_DIAGNOSTIC_SOURCE,
   resolveDiagnosticCode
 } from "../src/validation/JenkinsfileDiagnosticUtils";
+import { JENKINSFILE_VALIDATION_CODES } from "../src/validation/JenkinsfileValidationTypes";
 
 interface TestDiagnostic {
   source?: string;
@@ -35,6 +36,12 @@ describe("JenkinsfileDiagnosticUtils resolveDiagnosticCode", () => {
       resolveDiagnosticCode(createDiagnostic({ code: { value: "unknown-dsl-method" } })),
       "unknown-dsl-method"
     );
+  });
+
+  it("resolves every shared validation code", () => {
+    for (const code of JENKINSFILE_VALIDATION_CODES) {
+      assert.equal(resolveDiagnosticCode(createDiagnostic({ code })), code);
+    }
   });
 
   it("derives a code from Jenkins diagnostic messages when explicit codes are unavailable", () => {

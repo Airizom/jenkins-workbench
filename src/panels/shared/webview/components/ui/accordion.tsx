@@ -1,8 +1,11 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import * as React from "react";
 
-import { cn } from "../../lib/utils";
-import { DisclosureChevron } from "./disclosure-chevron";
+import {
+  disclosureContentClassName,
+  disclosureTriggerChildren,
+  disclosureTriggerClassName
+} from "./disclosure";
 
 export const Accordion = AccordionPrimitive.Root;
 export const AccordionItem = AccordionPrimitive.Item;
@@ -18,22 +21,10 @@ export const AccordionTrigger = React.forwardRef<
     <AccordionPrimitive.Trigger
       ref={ref}
       asChild={asChild}
-      className={cn(
-        "group flex flex-1 items-center justify-between gap-2 text-left transition-colors cursor-pointer",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        "disabled:pointer-events-none disabled:opacity-50",
-        className
-      )}
+      className={disclosureTriggerClassName("flex-1 gap-2", className)}
       {...props}
     >
-      {asChild ? (
-        children
-      ) : (
-        <>
-          {children}
-          <DisclosureChevron />
-        </>
-      )}
+      {disclosureTriggerChildren(children, asChild)}
     </AccordionPrimitive.Trigger>
   </AccordionPrimitive.Header>
 ));
@@ -46,8 +37,8 @@ export const AccordionContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <AccordionPrimitive.Content
     ref={ref}
-    className={cn(
-      "overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down",
+    className={disclosureContentClassName(
+      "data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down",
       className
     )}
     {...props}

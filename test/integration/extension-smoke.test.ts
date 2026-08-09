@@ -26,7 +26,10 @@ describe("extension smoke", () => {
       "jenkinsWorkbench.addEnvironment",
       "jenkinsWorkbench.removeEnvironment",
       "jenkinsWorkbench.triggerBuild",
-      "jenkinsWorkbench.abortBuild"
+      "jenkinsWorkbench.abortBuild",
+      "jenkinsWorkbench.configureBuildDiagnostics",
+      "jenkinsWorkbench.refreshBuildDiagnostics",
+      "jenkinsWorkbench.showBuildDiagnosticOutput"
     ];
     const missing = expected.filter((command) => !registered.has(command));
     assert.deepEqual(missing, [], `commands not registered: ${missing.join(", ")}`);

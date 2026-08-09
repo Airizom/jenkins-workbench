@@ -1,4 +1,5 @@
 import type * as vscode from "vscode";
+import { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
 import { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
 import { VscodeCurrentBranchGitHubPullRequestAdapter } from "../../currentBranch/CurrentBranchGitHubPullRequestAdapter";
@@ -80,6 +81,15 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
     currentBranchCommandMapper: (_container) => new CurrentBranchCommandMapper(),
     coverageDecorationService: (container) =>
       new CoverageDecorationService(container.get("repositoryLinkStore")),
+    buildDiagnosticsCoordinator: (container) =>
+      new BuildDiagnosticsCoordinator(
+        container.get("dataService"),
+        container.get("currentBranchService"),
+        container.get("currentBranchRepositoryResolver"),
+        container.get("diagnosticBindingStore"),
+        container.get("repositoryLinkStore"),
+        container.get("statusRefreshService")
+      ),
     buildDetailsPanelLauncher: (container) =>
       new BuildDetailsPanelLauncher({
         backend: new BuildDetailsBackendAdapter(container.get("dataService")),
@@ -91,6 +101,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         refreshHost: container.get("refreshHost"),
         pendingInputProvider: container.get("pendingInputCoordinator"),
         environmentStore: container.get("environmentStore"),
+        buildDiagnosticsCoordinator: container.get("buildDiagnosticsCoordinator"),
         extensionUri: options.extensionUri
       }),
     buildComparePanelLauncher: (container) =>

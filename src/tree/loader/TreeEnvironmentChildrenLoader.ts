@@ -90,10 +90,15 @@ export class TreeEnvironmentChildrenLoader {
     }
   }
 
-  async loadNodes(environment: JenkinsEnvironmentRef): Promise<WorkbenchTreeElement[]> {
+  async loadNodes(
+    environment: JenkinsEnvironmentRef,
+    isCurrentLoad: () => boolean = () => true
+  ): Promise<WorkbenchTreeElement[]> {
     try {
       const nodes = await this.dataService.getNodes(environment);
-      this.environmentSummaryStore.updateFromNodes(environment, nodes);
+      if (isCurrentLoad()) {
+        this.environmentSummaryStore.updateFromNodes(environment, nodes);
+      }
       if (nodes.length === 0) {
         return [
           this.placeholders.createEmptyPlaceholder(
@@ -109,11 +114,14 @@ export class TreeEnvironmentChildrenLoader {
   }
 
   async loadQueueForEnvironment(
-    environment: JenkinsEnvironmentRef
+    environment: JenkinsEnvironmentRef,
+    isCurrentLoad: () => boolean = () => true
   ): Promise<WorkbenchTreeElement[]> {
     try {
       const items = await this.dataService.getQueueItems(environment);
-      this.environmentSummaryStore.updateFromQueue(environment, items);
+      if (isCurrentLoad()) {
+        this.environmentSummaryStore.updateFromQueue(environment, items);
+      }
       if (items.length === 0) {
         return [
           this.placeholders.createEmptyPlaceholder(

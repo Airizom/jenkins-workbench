@@ -12,31 +12,7 @@ import type { PipelineNodeLogViewModel } from "./shared/BuildDetailsContracts";
 
 export type PipelineRestartAvailability = "unknown" | "supported" | "unsupported";
 
-interface BuildDetailsPanelStateRuntimeSurface {
-  readonly lastDetailsBuilding: boolean;
-  setTestReport(
-    testReport: JenkinsTestReport | undefined,
-    options?: { logsIncluded?: boolean }
-  ): void;
-  markTestReportFetchAttempted(): void;
-  setTestResultsLoading(value: boolean): boolean;
-  setCoverage(
-    overview: JenkinsCoverageOverview | undefined,
-    modifiedFiles: JenkinsModifiedCoverageFile[] | undefined
-  ): void;
-  setCoverageActionPath(actionPath: string | undefined): boolean;
-  setCoverageError(error: string): void;
-  setCoverageLoading(value: boolean): boolean;
-  setPipelineLoading(value: boolean): boolean;
-  setPipelineRestartInfo(
-    restartEnabled: boolean,
-    restartableStages: string[],
-    availability: PipelineRestartAvailability
-  ): boolean;
-  takeCompletionToastSlot(): boolean;
-}
-
-export class BuildDetailsPanelState implements BuildDetailsPanelStateRuntimeSurface {
+export class BuildDetailsPanelState {
   private environmentValue: JenkinsEnvironmentRef | undefined;
   private currentBuildUrlValue: string | undefined;
   private currentDetailsValue: JenkinsBuildDetails | undefined;
@@ -322,11 +298,10 @@ export class BuildDetailsPanelState implements BuildDetailsPanelStateRuntimeSurf
   ): boolean {
     const normalizedStages: string[] = [];
     for (const stage of restartableStages) {
-      const trimmed = stage.trim();
-      if (!trimmed || normalizedStages.includes(trimmed)) {
+      if (!stage.trim() || normalizedStages.includes(stage)) {
         continue;
       }
-      normalizedStages.push(trimmed);
+      normalizedStages.push(stage);
     }
     const availabilityChanged = this.pipelineRestartAvailabilityValue !== availability;
     const restartEnabledChanged = this.pipelineRestartEnabledValue !== restartEnabled;

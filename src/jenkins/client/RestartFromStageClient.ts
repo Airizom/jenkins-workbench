@@ -2,7 +2,10 @@ import { JenkinsRequestError } from "../errors";
 import type { JenkinsRestartFromStageInfo } from "../types";
 import { buildActionUrl } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
-import { RestartFromStageResponseParser } from "./RestartFromStageResponseParser";
+import {
+  RestartFromStageResponseParser,
+  type RestartPipelineAttemptResult
+} from "./RestartFromStageResponseParser";
 
 export class RestartFromStageClient {
   private readonly parser = new RestartFromStageResponseParser();
@@ -23,11 +26,10 @@ export class RestartFromStageClient {
   }
 
   async restartPipelineFromStage(buildUrl: string, stageName: string): Promise<void> {
-    const trimmedStageName = stageName.trim();
-    if (!trimmedStageName) {
+    if (!stageName.trim()) {
       throw new JenkinsRequestError("A stage name is required to restart a pipeline.");
     }
-    const body = new URLSearchParams({ stageName: trimmedStageName }).toString();
+    const body = new URLSearchParams({ stageName }).toString();
     const headers = { "Content-Type": "application/x-www-form-urlencoded" };
     const restartUrl = buildActionUrl(buildUrl, "restart/restartPipeline");
     const restartResult = await this.tryRestartPipeline(restartUrl, body, headers);
@@ -39,7 +41,7 @@ export class RestartFromStageClient {
       return;
     }
     throw new JenkinsRequestError(
-      restartResult.message ?? `Jenkins rejected restart from stage "${trimmedStageName}".`
+      restartResult.message ?? `Jenkins rejected restart from stage "${stageName}".`
     );
   }
 
@@ -47,7 +49,7 @@ export class RestartFromStageClient {
     restartUrl: string,
     body: string,
     headers: Record<string, string>
-  ): Promise<{ success: boolean; message?: string; missingEndpoint: boolean }> {
+  ): Promise<RestartPipelineAttemptResult> {
     try {
       const responseText = await this.context.requestPostTextWithCrumbRaw(
         restartUrl,
@@ -59,7 +61,6 @@ export class RestartFromStageClient {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
         return {
           success: false,
-          message: "The restart endpoint is unavailable.",
           missingEndpoint: true
         };
       }

@@ -1,13 +1,19 @@
+import type { ActivityGroupKind } from "./ActivityTypes";
+
 export interface RootTreeJobScope {
   kind: "root";
+  presentation?: TreeJobPresentation;
 }
 
 export interface ViewTreeJobScope {
   kind: "view";
   viewUrl: string;
+  presentation?: TreeJobPresentation;
 }
 
 export type TreeJobScope = RootTreeJobScope | ViewTreeJobScope;
+
+export type TreeJobPresentation = "pinned" | `activity:${ActivityGroupKind}`;
 
 export interface TreeJobCollectionRequest {
   scope: TreeJobScope;
@@ -28,12 +34,23 @@ export function createViewTreeJobScope(viewUrl: string): ViewTreeJobScope {
   };
 }
 
+export function withTreeJobPresentation(
+  scope: TreeJobScope,
+  presentation: TreeJobPresentation
+): TreeJobScope {
+  return {
+    ...scope,
+    presentation
+  };
+}
+
 export function buildTreeJobScopeKey(scope: TreeJobScope): string {
+  const presentationSuffix = scope.presentation ? `:${scope.presentation}` : "";
   switch (scope.kind) {
     case "view":
-      return `view:${scope.viewUrl}`;
+      return `view:${scope.viewUrl}${presentationSuffix}`;
     case "root":
-      return "root";
+      return `root${presentationSuffix}`;
   }
 }
 

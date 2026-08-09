@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
+  BUILD_DETAILS_TABS,
+  PIPELINE_PRESENTATIONS,
   isBuildDetailsPanelState,
   normalizeBuildDetailsPanelUiState
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
@@ -31,12 +33,18 @@ describe("BuildDetailsTabs", () => {
     assert.equal(resolveBuildDetailsSelectedTab("tests", availability), "inputs");
   });
 
-  it("normalizes persisted active tabs", () => {
-    assert.equal(
-      normalizeBuildDetailsPanelUiState({ selectedTab: "console" })?.selectedTab,
-      "console"
-    );
+  it("normalizes every declared persisted tab and pipeline presentation", () => {
+    for (const selectedTab of BUILD_DETAILS_TABS) {
+      assert.equal(normalizeBuildDetailsPanelUiState({ selectedTab })?.selectedTab, selectedTab);
+    }
+    for (const pipelinePresentation of PIPELINE_PRESENTATIONS) {
+      assert.equal(
+        normalizeBuildDetailsPanelUiState({ pipelinePresentation })?.pipelinePresentation,
+        pipelinePresentation
+      );
+    }
     assert.equal(normalizeBuildDetailsPanelUiState({ selectedTab: "invalid" }), undefined);
+    assert.equal(normalizeBuildDetailsPanelUiState({ pipelinePresentation: "invalid" }), undefined);
   });
 
   it("accepts an empty UI-state record but rejects an empty array", () => {

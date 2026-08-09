@@ -118,9 +118,9 @@ export function EyeIcon(props: IconProps) {
     </IconBase>
   );
 }
-export function LaunchIcon({ className, ...props }: IconProps) {
+export function LaunchIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M22 2L11 13" />
       <path d="M22 2L15 22 11 13 2 9 22 2z" />
     </IconBase>

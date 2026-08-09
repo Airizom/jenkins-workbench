@@ -5,8 +5,21 @@ const HTML_BUFFER_MULTIPLIER = 2;
 const HTML_RETRY_COOLDOWN_MS = 30000;
 
 export interface HtmlConsoleStreamCallbacks {
-  onConsoleHtmlAppend(html: string): void;
-  onConsoleHtmlSet(payload: { html: string; truncated: boolean }): void;
+  onConsoleHtmlAppend(
+    html: string,
+    textRange: ConsoleTextByteRange,
+    appendedTextRange: ConsoleTextByteRange
+  ): void;
+  onConsoleHtmlSet(payload: {
+    html: string;
+    truncated: boolean;
+    textRange: ConsoleTextByteRange;
+  }): void;
+}
+
+export interface ConsoleTextByteRange {
+  start: number;
+  end: number;
 }
 
 export interface HtmlConsoleStreamDataService {
@@ -41,7 +54,7 @@ async function fetchConsoleHtmlSnapshot(
   consoleTextResult: JenkinsConsoleTextTail | undefined
 ): Promise<HtmlConsoleSnapshot | undefined> {
   const htmlStart = consoleTextResult
-    ? Math.max(0, consoleTextResult.nextStart - consoleTextResult.text.length)
+    ? Math.max(0, consoleTextResult.nextStart - consoleTextResult.bytesRead)
     : 0;
   const htmlResult = await dataService.getConsoleHtmlProgressive(environment, buildUrl, htmlStart);
   if (!htmlResult.textSizeKnown) {
@@ -93,6 +106,13 @@ export class HtmlConsoleStream {
 
   shouldContinuePolling(): boolean {
     return this.consoleHtmlSupported && this.consoleHtmlNeedsReset;
+  }
+
+  getTextByteRange(): ConsoleTextByteRange {
+    return {
+      start: this.consoleHtmlStart,
+      end: this.consoleHtmlOffset
+    };
   }
 
   async tryInitialize(
@@ -155,6 +175,7 @@ export class HtmlConsoleStream {
       this.handleError();
       return false;
     }
+    const previousOffset = this.consoleHtmlOffset;
     this.consoleHtmlOffset = chunk.textSize;
     if (chunk.annotator) {
       this.consoleAnnotator = chunk.annotator;
@@ -176,7 +197,10 @@ export class HtmlConsoleStream {
       return true;
     }
     this.consoleHtmlBufferLength = nextBufferLength;
-    this.callbacks.onConsoleHtmlAppend(chunk.html);
+    this.callbacks.onConsoleHtmlAppend(chunk.html, this.getTextByteRange(), {
+      start: previousOffset,
+      end: this.consoleHtmlOffset
+    });
     return true;
   }
 
@@ -187,7 +211,8 @@ export class HtmlConsoleStream {
         this.consoleHtmlNeedsReset = false;
         this.callbacks.onConsoleHtmlSet({
           html: "",
-          truncated: this.consoleHtmlStart > 0
+          truncated: this.consoleHtmlStart > 0,
+          textRange: this.getTextByteRange()
         });
       }
       return;
@@ -196,7 +221,8 @@ export class HtmlConsoleStream {
     this.consoleHtmlNeedsReset = false;
     this.callbacks.onConsoleHtmlSet({
       html: chunk.html,
-      truncated: this.consoleHtmlStart > 0
+      truncated: this.consoleHtmlStart > 0,
+      textRange: this.getTextByteRange()
     });
   }
 

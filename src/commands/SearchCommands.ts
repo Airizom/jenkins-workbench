@@ -78,7 +78,6 @@ async function goToJob(
   const cancellationToken = cancellationSource.token;
   const picks: JobQuickPickItem[] = [];
   let pending = environments.length;
-  let loadFailedCount = 0;
   let cleanupCompleted = false;
 
   quickPick.placeholder = "Search jobs across all Jenkins environments";
@@ -126,11 +125,8 @@ async function goToJob(
       return;
     }
 
-    if (loadFailedCount > 0) {
-      void vscode.window.showWarningMessage(
-        `Failed to load jobs from ${loadFailedCount} Jenkins environment(s).`
-      );
-    }
+    picks.sort((a, b) => a.label.localeCompare(b.label));
+    quickPick.items = picks;
   };
 
   for (const environment of environments) {
@@ -155,15 +151,12 @@ async function goToJob(
           entry
         });
       }
-      picks.sort((a, b) => a.label.localeCompare(b.label));
-      quickPick.items = picks;
     };
     void loadEnvironmentJobs(dataService, envRef, cancellationToken, searchOptions, appendEntries)
       .catch((error) => {
         if (error instanceof CancellationError || error instanceof vscode.CancellationError) {
           return;
         }
-        loadFailedCount += 1;
         void vscode.window.showWarningMessage(
           `Unable to load jobs for ${envRef.url}: ${formatError(error)}`
         );

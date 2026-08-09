@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import Ajv from "ajv";
 
 const rootDir = process.cwd();
 const packagePath = path.join(rootDir, "package.json");
@@ -155,80 +156,16 @@ for (const { commandId, pathLabel } of manifestCommandReferences) {
   }
 }
 
-const preferredPathScoresSetting =
-  "jenkinsWorkbench.buildDetails.testSourceMatching.preferredPathScores";
+const manifestSchemaId = "https://jenkins-workbench.invalid/package.json";
+const ajv = new Ajv({ strict: false });
+ajv.addSchema(packageJson, manifestSchemaId);
 
-const isValidConfigurationDefault = (name, schema) => {
-  const value = schema.default;
-
-  if (schema.type === "array") {
-    if (!Array.isArray(value)) {
-      return false;
-    }
-
-    if (name === preferredPathScoresSetting) {
-      return value.every(
-        (entry) =>
-          entry !== null &&
-          typeof entry === "object" &&
-          !Array.isArray(entry) &&
-          Object.keys(entry).length === 2 &&
-          typeof entry.fragment === "string" &&
-          typeof entry.score === "number" &&
-          Number.isFinite(entry.score)
-      );
-    }
-
-    return schema.items?.type === "string" && value.every((item) => typeof item === "string");
-  }
-
-  if (schema.type === "boolean") {
-    return typeof value === "boolean";
-  }
-
-  if (schema.type === "string") {
-    return (
-      typeof value === "string" &&
-      (typeof schema.pattern !== "string" || new RegExp(schema.pattern).test(value))
-    );
-  }
-
-  if (schema.type !== "number" && schema.type !== "integer") {
-    return false;
-  }
-
-  return (
-    typeof value === "number" &&
-    Number.isFinite(value) &&
-    (schema.type !== "integer" || Number.isInteger(value)) &&
-    (typeof schema.minimum !== "number" || value >= schema.minimum) &&
-    (typeof schema.maximum !== "number" || value <= schema.maximum)
+const escapeJsonPointerSegment = (segment) => segment.replaceAll("~", "~0").replaceAll("/", "~1");
+const validatesAgainstManifestSchema = (pathSegments, value) =>
+  ajv.validate(
+    { $ref: `${manifestSchemaId}#/${pathSegments.map(escapeJsonPointerSegment).join("/")}` },
+    value
   );
-};
-
-const hasExactValues = (values, expectedValues) =>
-  Array.isArray(values) &&
-  values.length === expectedValues.length &&
-  expectedValues.every((value) => values.includes(value));
-
-const hasExactSchemaTypes = (schema, expectedTypes) => hasExactValues(schema?.type, expectedTypes);
-
-const supportsTaskParameterValue = (schema) =>
-  hasExactSchemaTypes(schema, ["string", "number", "boolean", "array"]) &&
-  hasExactSchemaTypes(schema.items, ["string", "number", "boolean"]);
-
-const supportsTaskParameterMap = (schema) =>
-  schema?.type === "object" &&
-  (schema.required?.length ?? 0) === 0 &&
-  supportsTaskParameterValue(schema.additionalProperties);
-
-const supportsNamedTaskParameters = (schema) =>
-  schema?.type === "array" &&
-  schema.items?.type === "object" &&
-  hasExactValues(schema.items.required, ["name", "value"]) &&
-  schema.items.properties?.name?.type === "string" &&
-  supportsTaskParameterValue(schema.items.properties?.value) &&
-  schema.items.additionalProperties === false;
 
 const configurationProperties = packageJson.contributes?.configuration?.properties ?? {};
 
@@ -238,7 +175,12 @@ for (const [name, schema] of Object.entries(configurationProperties)) {
     continue;
   }
 
-  if (!isValidConfigurationDefault(name, schema)) {
+  if (
+    !validatesAgainstManifestSchema(
+      ["contributes", "configuration", "properties", name],
+      schema.default
+    )
+  ) {
     fail(`contributes.configuration.properties.${name}.default does not match its schema`);
   }
 }
@@ -251,15 +193,30 @@ const taskParametersSchema = jenkinsTaskDefinition?.properties?.parameters;
 if (!taskParametersSchema) {
   fail("jenkinsWorkbench task definition must declare parameters schema");
 } else {
-  const taskParameterForms = taskParametersSchema.anyOf ?? [];
+  const taskParameterExamples = [
+    { branch: "main", attempts: 2, dryRun: true, labels: ["linux", 2, true] },
+    [
+      { name: "branch", value: "main" },
+      { name: "labels", value: ["linux", 2, true] }
+    ]
+  ];
 
-  if (!taskParameterForms.some(supportsTaskParameterMap)) {
-    fail("jenkinsWorkbench task parameters schema rejects supported example 1");
-  }
-
-  if (!taskParameterForms.some(supportsNamedTaskParameters)) {
-    fail("jenkinsWorkbench task parameters schema rejects supported example 2");
-  }
+  taskParameterExamples.forEach((example, index) => {
+    if (
+      !validatesAgainstManifestSchema(
+        [
+          "contributes",
+          "taskDefinitions",
+          String(packageJson.contributes.taskDefinitions.indexOf(jenkinsTaskDefinition)),
+          "properties",
+          "parameters"
+        ],
+        example
+      )
+    ) {
+      fail(`jenkinsWorkbench task parameters schema rejects supported example ${index + 1}`);
+    }
+  });
 }
 
 if (errors.length > 0) {

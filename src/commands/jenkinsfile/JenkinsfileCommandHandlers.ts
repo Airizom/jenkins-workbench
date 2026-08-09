@@ -7,12 +7,6 @@ import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentSt
 import type { JenkinsfileEnvironmentResolver } from "../../validation/JenkinsfileEnvironmentResolver";
 import type { JenkinsfileValidationCoordinator } from "../../validation/JenkinsfileValidationCoordinator";
 
-export async function validateActiveJenkinsfile(
-  coordinator: JenkinsfileValidationCoordinator
-): Promise<void> {
-  await coordinator.validateActiveEditor();
-}
-
 export async function selectValidationEnvironment(
   resolver: JenkinsfileEnvironmentResolver,
   store: JenkinsEnvironmentStore,
@@ -85,16 +79,6 @@ export async function selectValidationEnvironment(
   } else {
     coordinator?.revalidateFallbackState();
   }
-}
-
-export function clearJenkinsfileDiagnostics(coordinator: JenkinsfileValidationCoordinator): void {
-  coordinator.clearDiagnostics();
-}
-
-export function showJenkinsfileValidationOutput(
-  coordinator: JenkinsfileValidationCoordinator
-): void {
-  coordinator.showOutputChannel();
 }
 
 async function pickWorkspaceFolder(): Promise<vscode.WorkspaceFolder | null | undefined> {

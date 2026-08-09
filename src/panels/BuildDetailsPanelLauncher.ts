@@ -1,4 +1,5 @@
 import type * as vscode from "vscode";
+import type { BuildDiagnosticsCoordinator } from "../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
@@ -8,13 +9,16 @@ import type { TestSourceResolver } from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import { BuildDetailsPanel } from "./BuildDetailsPanel";
-import type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
 import type {
   BuildDetailsBackend,
   BuildDetailsPendingInputProvider
 } from "./buildDetails/BuildDetailsBackend";
 
-export type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
+export interface PipelineNodeSelection {
+  kind: "stage" | "step";
+  nodeId: string;
+  name?: string;
+}
 
 export interface BuildDetailsPanelLaunchRequest {
   environment: JenkinsEnvironmentRef;
@@ -33,14 +37,11 @@ export interface BuildDetailsPanelLauncherOptions {
   refreshHost: EnvironmentScopedRefreshHost | undefined;
   pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
   environmentStore: JenkinsEnvironmentStore;
+  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
   extensionUri: vscode.Uri;
 }
 
-interface BuildDetailsPanelRevivalSurface {
-  revive(panel: vscode.WebviewPanel, state: unknown): Promise<void>;
-}
-
-export class BuildDetailsPanelLauncher implements BuildDetailsPanelRevivalSurface {
+export class BuildDetailsPanelLauncher {
   constructor(private readonly options: BuildDetailsPanelLauncherOptions) {}
 
   async show(request: BuildDetailsPanelLaunchRequest): Promise<void> {
@@ -71,7 +72,8 @@ export class BuildDetailsPanelLauncher implements BuildDetailsPanelRevivalSurfac
       refreshHost: this.options.refreshHost,
       pendingInputProvider: this.options.pendingInputProvider,
       testSourceNavigationUiService: this.options.testSourceNavigationUiService,
-      testSourceResolver: this.options.testSourceResolver
+      testSourceResolver: this.options.testSourceResolver,
+      buildDiagnosticsCoordinator: this.options.buildDiagnosticsCoordinator
     };
   }
 }

@@ -6,6 +6,7 @@ import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider"
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsAuthConfig } from "../../jenkins/types";
 import type { BrowserSsoAuthenticator } from "../../services/BrowserSsoAuthenticationService";
+import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type {
   EnvironmentScope,
   JenkinsEnvironment,
@@ -308,6 +309,7 @@ export async function signInWithBrowserSso(
 
 export async function removeEnvironment(
   store: JenkinsEnvironmentStore,
+  bindingStore: JenkinsDiagnosticProfileBindingStore,
   presetStore: JenkinsParameterPresetStore,
   watchStore: JenkinsWatchStore,
   pinStore: JenkinsPinStore,
@@ -328,7 +330,7 @@ export async function removeEnvironment(
   const confirmLabel = "Remove Environment";
   const displayUrl = formatJenkinsUrlForDisplay(target.url);
   const confirmation = await vscode.window.showWarningMessage(
-    `Remove the Jenkins environment ${displayUrl}? Its stored credentials and all pins, watches, and parameter presets for this environment will also be removed.`,
+    `Remove the Jenkins environment ${displayUrl}? Its stored credentials and all pins, watches, parameter presets, and diagnostic profile bindings for this environment will also be removed.`,
     { modal: true },
     confirmLabel
   );
@@ -343,6 +345,7 @@ export async function removeEnvironment(
   }
 
   const cleanupResults = await Promise.allSettled([
+    bindingStore.removeBindingsForEnvironment(target.scope, target.id),
     presetStore.removePresetsForEnvironment(target.scope, target.id),
     watchStore.removeWatchesForEnvironment(target.scope, target.id),
     pinStore.removePinsForEnvironment(target.scope, target.id)

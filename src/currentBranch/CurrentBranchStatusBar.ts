@@ -3,15 +3,13 @@ import {
   resolveJobColorCodicon,
   resolveJobColorStatusBarThemeColorKey
 } from "../formatters/JobColorFormatters";
-import type {
-  CurrentBranchJenkinsService,
-  CurrentBranchState
-} from "./CurrentBranchJenkinsService";
+import type { CurrentBranchJenkinsService } from "./CurrentBranchJenkinsService";
 import {
   formatCurrentBranchTooltip,
   formatPullRequestLabel,
   isCurrentBranchBuilding
 } from "./CurrentBranchPresentation";
+import type { CurrentBranchState } from "./CurrentBranchTypes";
 
 const ACTION_COMMAND = "jenkinsWorkbench.currentBranchActions";
 

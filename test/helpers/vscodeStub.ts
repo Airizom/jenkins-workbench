@@ -114,6 +114,13 @@ export class Uri {
     );
   }
 
+  static joinPath(base: Uri, ...pathSegments: string[]): Uri {
+    const joined = [base.path.replace(/\/+$/, ""), ...pathSegments]
+      .join("/")
+      .replace(/\/{2,}/g, "/");
+    return new Uri(base.scheme, base.authority, joined, "", "");
+  }
+
   with(change: Partial<Pick<Uri, "scheme" | "authority" | "path" | "query" | "fragment">>): Uri {
     return new Uri(
       change.scheme ?? this.scheme,
@@ -131,3 +138,89 @@ export class Uri {
     return `${this.scheme}:${authority}${this.path}${query}${fragment}`;
   }
 }
+
+export class Position {
+  constructor(
+    readonly line: number,
+    readonly character: number
+  ) {}
+}
+
+export class Range {
+  readonly start: Position;
+  readonly end: Position;
+
+  constructor(
+    startLineOrPosition: number | Position,
+    startCharacterOrEndPosition: number | Position,
+    endLine?: number,
+    endCharacter?: number
+  ) {
+    if (
+      startLineOrPosition instanceof Position &&
+      startCharacterOrEndPosition instanceof Position
+    ) {
+      this.start = startLineOrPosition;
+      this.end = startCharacterOrEndPosition;
+      return;
+    }
+    this.start = new Position(startLineOrPosition as number, startCharacterOrEndPosition as number);
+    this.end = new Position(endLine ?? 0, endCharacter ?? 0);
+  }
+}
+
+export class Selection extends Range {}
+
+export class Location {
+  constructor(
+    readonly uri: Uri,
+    readonly range: Range
+  ) {}
+}
+
+export class DiagnosticRelatedInformation {
+  constructor(
+    readonly location: Location,
+    readonly message: string
+  ) {}
+}
+
+export class Diagnostic {
+  source?: string;
+  code?: string | number;
+  relatedInformation?: DiagnosticRelatedInformation[];
+
+  constructor(
+    readonly range: Range,
+    readonly message: string,
+    readonly severity?: number
+  ) {}
+}
+
+export class RelativePattern {
+  constructor(
+    readonly base: Uri,
+    readonly pattern: string
+  ) {}
+}
+
+export const DiagnosticSeverity = {
+  Error: 0,
+  Warning: 1,
+  Information: 2,
+  Hint: 3
+} as const;
+
+export const FileType = {
+  Unknown: 0,
+  File: 1,
+  Directory: 2,
+  SymbolicLink: 64
+} as const;
+
+export const TextEditorRevealType = {
+  Default: 0,
+  InCenter: 1,
+  InCenterIfOutsideViewport: 2,
+  AtTop: 3
+} as const;

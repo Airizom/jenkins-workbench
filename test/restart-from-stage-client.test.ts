@@ -1,17 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { RestartFromStageClient } from "../src/jenkins/client/RestartFromStageClient";
+import { RestartFromStageResponseParser } from "../src/jenkins/client/RestartFromStageResponseParser";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
 interface RestartHarness {
   client: RestartFromStageClient;
   modernRequests: string[];
+  modernRequestBodies: string[];
   legacyRequests: Array<{ url: string; body?: string | Uint8Array }>;
 }
 
 function createRestartHarness(modernResponse?: string): RestartHarness {
   const modernRequests: string[] = [];
+  const modernRequestBodies: string[] = [];
   const legacyRequests: Array<{ url: string; body?: string | Uint8Array }> = [];
   const context = createJenkinsClientContext({
     requestPostWithCrumb: async (url, body) => {
@@ -19,16 +22,37 @@ function createRestartHarness(modernResponse?: string): RestartHarness {
       return {};
     },
     requestPostWithCrumbRaw: async () => ({}),
-    requestPostTextWithCrumbRaw: async (url) => {
+    requestPostTextWithCrumbRaw: async (url, body) => {
       modernRequests.push(url);
+      if (typeof body !== "string") {
+        throw new Error("Expected a string restart request body.");
+      }
+      modernRequestBodies.push(body);
       if (modernResponse !== undefined) {
         return modernResponse;
       }
       throw new JenkinsRequestError("Not Found", 404, "");
     }
   });
-  return { client: new RestartFromStageClient(context), modernRequests, legacyRequests };
+  return {
+    client: new RestartFromStageClient(context),
+    modernRequests,
+    modernRequestBodies,
+    legacyRequests
+  };
 }
+
+describe("RestartFromStageResponseParser", () => {
+  it("preserves distinct nonblank stage identifiers exactly", () => {
+    const parser = new RestartFromStageResponseParser();
+
+    const result = parser.parseRestartFromStageInfo({
+      restartableStages: ["Build", " Build ", "Build", "   "]
+    });
+
+    assert.deepEqual(result.restartableStages, ["Build", " Build "]);
+  });
+});
 
 describe("RestartFromStageClient", () => {
   it("falls back to the legacy restart URL when the modern endpoint returns 404", async () => {
@@ -68,5 +92,23 @@ describe("RestartFromStageClient", () => {
     await client.restartPipelineFromStage("https://jenkins.example.com/job/demo/15/", "Deploy");
 
     assert.deepEqual(legacyRequests, []);
+  });
+
+  it("submits the exact nonblank stage identifier", async () => {
+    const { client, modernRequestBodies } = createRestartHarness(JSON.stringify({ success: true }));
+
+    await client.restartPipelineFromStage("https://jenkins.example.com/job/demo/15/", " Build ");
+
+    assert.equal(new URLSearchParams(modernRequestBodies[0]).get("stageName"), " Build ");
+  });
+
+  it("rejects a whitespace-only stage identifier", async () => {
+    const { client, modernRequests } = createRestartHarness();
+
+    await assert.rejects(
+      client.restartPipelineFromStage("https://jenkins.example.com/job/demo/15/", "   "),
+      /A stage name is required/
+    );
+    assert.deepEqual(modernRequests, []);
   });
 });

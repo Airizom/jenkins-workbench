@@ -6,29 +6,15 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const validatorPath = path.resolve("scripts/validate-package-manifest.mjs");
 const fixtureDirectories: string[] = [];
+const canonicalPackageJson = JSON.parse(await readFile(path.resolve("package.json"), "utf8"));
+const canonicalTaskParametersSchema = canonicalPackageJson.contributes.taskDefinitions.find(
+  (definition: { type?: string }) => definition.type === "jenkinsWorkbench"
+).properties.parameters;
 
-const parameterValueSchema = {
-  type: ["string", "number", "boolean", "array"],
-  items: { type: ["string", "number", "boolean"] }
-};
-const parameterMapSchema = {
-  type: "object",
-  additionalProperties: parameterValueSchema
-};
-const namedParametersSchema = {
-  type: "array",
-  items: {
-    type: "object",
-    required: ["name", "value"],
-    properties: {
-      name: { type: "string" },
-      value: parameterValueSchema
-    },
-    additionalProperties: false
-  }
-};
-
-const createFixture = async (configurationSchema: object, taskParameterForms: object[]) => {
+const createFixture = async (
+  configurationSchema: object,
+  taskParametersSchema: object = canonicalTaskParametersSchema
+) => {
   const fixtureDirectory = await mkdtemp(path.join(tmpdir(), "jenkins-workbench-manifest-"));
   fixtureDirectories.push(fixtureDirectory);
 
@@ -49,7 +35,7 @@ const createFixture = async (configurationSchema: object, taskParameterForms: ob
       taskDefinitions: [
         {
           type: "jenkinsWorkbench",
-          properties: { parameters: { anyOf: taskParameterForms } }
+          properties: { parameters: taskParametersSchema }
         }
       ]
     }
@@ -78,10 +64,7 @@ afterEach(async () => {
 
 describe("package manifest validator", () => {
   it("accepts a valid default and both supported task parameter forms", async () => {
-    const cwd = await createFixture({ type: "number", default: 2, minimum: 1, maximum: 3 }, [
-      parameterMapSchema,
-      namedParametersSchema
-    ]);
+    const cwd = await createFixture({ type: "number", default: 2, minimum: 1, maximum: 3 });
 
     const result = runValidator(cwd);
 
@@ -89,10 +72,7 @@ describe("package manifest validator", () => {
   });
 
   it("rejects an invalid configuration default", async () => {
-    const cwd = await createFixture({ type: "number", default: 0, minimum: 1 }, [
-      parameterMapSchema,
-      namedParametersSchema
-    ]);
+    const cwd = await createFixture({ type: "number", default: 0, minimum: 1 });
 
     const result = runValidator(cwd);
 
@@ -101,10 +81,7 @@ describe("package manifest validator", () => {
   });
 
   it("rejects an unsupported contribution point", async () => {
-    const cwd = await createFixture({ type: "boolean", default: true }, [
-      parameterMapSchema,
-      namedParametersSchema
-    ]);
+    const cwd = await createFixture({ type: "boolean", default: true });
     const packageJsonPath = path.join(cwd, "package.json");
     const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
     packageJson.contributes.uriHandler = { scheme: "airizom.jenkins-workbench" };
@@ -119,10 +96,18 @@ describe("package manifest validator", () => {
   });
 
   it.each([
-    ["map", [namedParametersSchema], "supported example 1"],
-    ["named list", [parameterMapSchema], "supported example 2"]
-  ])("rejects a task schema without the %s form", async (_name, forms, expectedError) => {
-    const cwd = await createFixture({ type: "boolean", default: true }, forms);
+    [
+      "map",
+      { ...canonicalTaskParametersSchema, anyOf: [canonicalTaskParametersSchema.anyOf[1]] },
+      "supported example 1"
+    ],
+    [
+      "named list",
+      { ...canonicalTaskParametersSchema, anyOf: [canonicalTaskParametersSchema.anyOf[0]] },
+      "supported example 2"
+    ]
+  ])("rejects a task schema without the %s form", async (_name, schema, expectedError) => {
+    const cwd = await createFixture({ type: "boolean", default: true }, schema);
 
     const result = runValidator(cwd);
 

@@ -1,16 +1,16 @@
 import { IconBase } from "./IconBase";
 import type { IconProps } from "./types";
-export function UserIcon({ className, ...props }: IconProps) {
+export function UserIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </IconBase>
   );
 }
-export function ServerIcon({ className, ...props }: IconProps) {
+export function ServerIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-5 w-5" {...props}>
+    <IconBase defaultClassName="h-5 w-5" {...props}>
       <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
       <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
       <line x1="6" y1="6" x2="6.01" y2="6" />
@@ -18,9 +18,9 @@ export function ServerIcon({ className, ...props }: IconProps) {
     </IconBase>
   );
 }
-export function TerminalIcon({ className, ...props }: IconProps) {
+export function TerminalIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <polyline points="4 17 10 11 4 5" />
       <line x1="12" y1="19" x2="20" y2="19" />
     </IconBase>
@@ -50,52 +50,52 @@ export function TagIcon(props: IconProps) {
     </IconBase>
   );
 }
-export function FileIcon({ className, ...props }: IconProps) {
+export function FileIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
     </IconBase>
   );
 }
-export function GitCommitIcon({ className, ...props }: IconProps) {
+export function GitCommitIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <circle cx="12" cy="12" r="4" />
       <line x1="1.05" y1="12" x2="7" y2="12" />
       <line x1="17.01" y1="12" x2="22.96" y2="12" />
     </IconBase>
   );
 }
-export function TestTubeIcon({ className, ...props }: IconProps) {
+export function TestTubeIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5h0c-1.4 0-2.5-1.1-2.5-2.5V2" />
       <path d="M8.5 2h7" />
       <path d="M14.5 16h-5" />
     </IconBase>
   );
 }
-export function GaugeIcon({ className, ...props }: IconProps) {
+export function GaugeIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <path d="m12 14 4-4" />
       <path d="M3.34 19a10 10 0 1 1 17.32 0" />
     </IconBase>
   );
 }
-export function WorkflowIcon({ className, ...props }: IconProps) {
+export function WorkflowIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <rect x="3" y="3" width="8" height="8" rx="2" />
       <path d="M7 11v4a2 2 0 0 0 2 2h4" />
       <rect x="13" y="13" width="8" height="8" rx="2" />
     </IconBase>
   );
 }
-export function ExecutorsIcon({ className, ...props }: IconProps) {
+export function ExecutorsIcon(props: IconProps) {
   return (
-    <IconBase className={className} defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
+    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
       <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
       <rect x="9" y="9" width="6" height="6" />
     </IconBase>

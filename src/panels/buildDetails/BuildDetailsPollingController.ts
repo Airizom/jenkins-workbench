@@ -17,7 +17,8 @@ import type {
 import {
   type ConsoleFetchResult,
   type ConsoleSnapshotResult,
-  ConsoleStreamManager
+  ConsoleStreamManager,
+  type ConsoleTextByteRange
 } from "./ConsoleStreamManager";
 
 export interface BuildDetailsPollingCallbacks {
@@ -29,8 +30,16 @@ export interface BuildDetailsPollingCallbacks {
   onTitle(title: string): void;
   onConsoleAppend(text: string): void;
   onConsoleSet(payload: { text: string; truncated: boolean }): void;
-  onConsoleHtmlAppend(html: string): void;
-  onConsoleHtmlSet(payload: { html: string; truncated: boolean }): void;
+  onConsoleHtmlAppend(
+    html: string,
+    textRange: ConsoleTextByteRange,
+    appendedTextRange: ConsoleTextByteRange
+  ): void;
+  onConsoleHtmlSet(payload: {
+    html: string;
+    truncated: boolean;
+    textRange: ConsoleTextByteRange;
+  }): void;
   onErrors(errors: string[]): void;
   onComplete(details: JenkinsBuildDetails): void;
 }
@@ -65,20 +74,10 @@ export interface BuildDetailsTestReportFetchResult {
   effectiveOptions: JenkinsTestReportOptions | undefined;
 }
 
-interface BuildDetailsPollingRuntimeSurface {
-  refreshConsoleSnapshot(): Promise<{
-    consoleTextResult?: JenkinsConsoleTextTail;
-    consoleHtmlResult?: { html: string; truncated: boolean };
-  }>;
-  fetchTestReport(options?: JenkinsTestReportOptions): Promise<BuildDetailsTestReportFetchResult>;
-  fetchWorkflowRunWithCallbacks(token: number): Promise<void>;
-  refreshPendingInputs(): Promise<void>;
-}
-
 const WORKFLOW_REFRESH_MULTIPLIER = 3;
 const MIN_WORKFLOW_REFRESH_MS = 5000;
 
-export class BuildDetailsPollingController implements BuildDetailsPollingRuntimeSurface {
+export class BuildDetailsPollingController {
   private readonly statusBackend: BuildDetailsStatusBackend;
   private readonly testsBackend: BuildDetailsTestsBackend;
   private readonly pendingInputProvider: BuildDetailsPendingInputProvider;
@@ -125,6 +124,7 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
     });
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
   async refreshConsoleSnapshot(): Promise<{
     consoleTextResult?: JenkinsConsoleTextTail;
     consoleHtmlResult?: { html: string; truncated: boolean };
@@ -132,6 +132,7 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
     return this.consoleStreamManager.refreshSnapshot();
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
   async fetchTestReport(
     options?: JenkinsTestReportOptions
   ): Promise<BuildDetailsTestReportFetchResult> {
@@ -150,7 +151,8 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
     return options ?? this.testReportOptions;
   }
 
-  async fetchWorkflowRunWithCallbacks(_token: number): Promise<void> {
+  // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
+  async fetchWorkflowRunWithCallbacks(): Promise<void> {
     if (this.disposed) {
       return;
     }
@@ -169,6 +171,7 @@ export class BuildDetailsPollingController implements BuildDetailsPollingRuntime
     }
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
   async refreshPendingInputs(): Promise<void> {
     try {
       const pendingInputs = await this.pendingInputProvider.getPendingInputActions(

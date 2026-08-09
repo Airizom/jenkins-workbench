@@ -175,6 +175,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             testResults={state.testState.results}
             coverageState={coverageState}
             insights={insights}
+            diagnostics={state.diagnostics}
             consoleText={state.consoleText}
             consoleHtmlModel={state.consoleHtmlModel}
             consoleTruncated={state.consoleTruncated}
@@ -207,6 +208,11 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               toast({ title: "Reloading test report" });
             }}
             onOpenTestSource={(testCase) => postMessage(buildOpenTestSourceMessage(testCase))}
+            onOpenDiagnosticSource={(targetId) =>
+              postMessage({ type: "openDiagnosticSource", targetId })
+            }
+            onShowDiagnosticProblems={() => postMessage({ type: "showBuildDiagnosticProblems" })}
+            onConfigureBuildDiagnostics={() => postMessage({ type: "configureBuildDiagnostics" })}
           />
         </main>
 

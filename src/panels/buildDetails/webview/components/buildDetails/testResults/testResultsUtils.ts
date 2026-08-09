@@ -5,12 +5,6 @@ import type {
 import type { TestStatusFilter } from "./testResultsTypes";
 export const RENDER_BATCH_SIZE = 500;
 const AUTO_EXPAND_FAILED_LIMIT = 3;
-export function getTestResultsDatasetKey(
-  buildUrl: string | undefined,
-  items: BuildTestCaseViewModel[]
-): string {
-  return [buildUrl ?? "", ...items.map((item) => item.id)].join("::");
-}
 export function filterTestResults(
   items: BuildTestCaseViewModel[],
   statusFilter: TestStatusFilter,

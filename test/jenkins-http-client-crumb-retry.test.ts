@@ -25,7 +25,7 @@ const requestMock = {
       headers: {}
     };
   },
-  requestTextWithOptions: async (
+  requestText: async (
     url: string,
     options?: { body?: string | Uint8Array; headers?: Record<string, string> }
   ): Promise<string> => {

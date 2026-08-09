@@ -18,7 +18,10 @@
     "node": ">=24",
     "vscode": "^1.85.0"
   },
-  "categories": ["Other", "Visualization"],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
   "keywords": [
     "jenkins",
     "ci",
@@ -34,7 +37,10 @@
     "color": "#1a1a2e",
     "theme": "dark"
   },
-  "activationEvents": ["onStartupFinished", "onUri"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onUri"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -317,12 +323,29 @@
       {
         "command": "jenkinsWorkbench.jenkinsfile.showValidationOutput",
         "title": "Jenkins: Show Jenkinsfile Validation Output"
+      },
+      {
+        "command": "jenkinsWorkbench.configureBuildDiagnostics",
+        "title": "Jenkins: Configure Build Diagnostics",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "jenkinsWorkbench.refreshBuildDiagnostics",
+        "title": "Jenkins: Refresh Build Diagnostics",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "jenkinsWorkbench.showBuildDiagnosticOutput",
+        "title": "Jenkins: Show Build Diagnostic Output"
       }
     ],
     "taskDefinitions": [
       {
         "type": "jenkinsWorkbench",
-        "required": ["environmentUrl", "jobUrl"],
+        "required": [
+          "environmentUrl",
+          "jobUrl"
+        ],
         "properties": {
           "environmentUrl": {
             "type": "string",
@@ -342,9 +365,18 @@
               {
                 "type": "object",
                 "additionalProperties": {
-                  "type": ["string", "number", "boolean", "array"],
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array"
+                  ],
                   "items": {
-                    "type": ["string", "number", "boolean"]
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
                   }
                 }
               },
@@ -352,15 +384,27 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": ["name", "value"],
+                  "required": [
+                    "name",
+                    "value"
+                  ],
                   "properties": {
                     "name": {
                       "type": "string"
                     },
                     "value": {
-                      "type": ["string", "number", "boolean", "array"],
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array"
+                      ],
                       "items": {
-                        "type": ["string", "number", "boolean"]
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean"
+                        ]
                       }
                     }
                   },
@@ -376,7 +420,10 @@
           },
           "inputStepPolicy": {
             "type": "string",
-            "enum": ["wait", "abort"],
+            "enum": [
+              "wait",
+              "abort"
+            ],
             "default": "wait",
             "description": "Wait for Jenkins Pipeline input steps or stop the build when one is detected."
           },
@@ -440,6 +487,238 @@
           "default": 5,
           "minimum": 2,
           "description": "Polling interval in seconds for refreshing build details and streaming logs."
+        },
+        "jenkinsWorkbench.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Parse the active Jenkins build console and publish uniquely resolved source diagnostics to the VS Code Problems panel."
+        },
+        "jenkinsWorkbench.diagnostics.maxLogBytes": {
+          "type": "integer",
+          "default": 33554432,
+          "minimum": 65536,
+          "maximum": 536870912,
+          "description": "Maximum number of Jenkins console bytes scanned for build diagnostics."
+        },
+        "jenkinsWorkbench.diagnostics.maxProblems": {
+          "type": "integer",
+          "default": 500,
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Maximum number of unique Jenkins build diagnostics published to the Problems panel."
+        },
+        "jenkinsWorkbench.diagnostics.profiles": {
+          "type": "object",
+          "default": {},
+          "description": "Reusable build diagnostic profiles. Omit builtIns to extend the broad built-in parser set; use an empty array to disable built-ins for a profile.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "builtIns": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/definitions/parserName"
+                }
+              },
+              "searchExcludeGlob": {
+                "type": "string"
+              },
+              "pathMappings": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "remote"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "prefix"
+                        },
+                        "remote": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "local": {
+                          "type": "string",
+                          "default": "."
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "remote",
+                        "replace"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "regex"
+                        },
+                        "remote": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "replace": {
+                          "type": "string"
+                        },
+                        "local": {
+                          "type": "string",
+                          "default": "."
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "matchers": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "name"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "base": {
+                      "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/definitions/parserName"
+                    },
+                    "source": {
+                      "type": "string",
+                      "maxLength": 256
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "error",
+                        "warning",
+                        "info"
+                      ]
+                    },
+                    "pattern": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/problemPattern"
+                        },
+                        {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 16,
+                          "items": {
+                            "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/problemPattern"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false,
+                  "definitions": {
+                    "problemPattern": {
+                      "type": "object",
+                      "required": [
+                        "regexp"
+                      ],
+                      "properties": {
+                        "regexp": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "file",
+                            "location"
+                          ]
+                        },
+                        "file": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "location": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "line": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "column": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "endLine": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "endColumn": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "severity": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "code": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "message": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "loop": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            },
+            "definitions": {
+              "parserName": {
+                "type": "string",
+                "enum": [
+                  "generic",
+                  "gcc-clang",
+                  "msvc",
+                  "typescript",
+                  "eslint",
+                  "rust",
+                  "go",
+                  "jvm-stack",
+                  "javascript-stack",
+                  "python-traceback",
+                  "dotnet-stack"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "jenkinsWorkbench.buildDetails.testReport.includeCaseLogs": {
           "type": "boolean",
@@ -518,7 +797,10 @@
           ],
           "items": {
             "type": "object",
-            "required": ["fragment", "score"],
+            "required": [
+              "fragment",
+              "score"
+            ],
             "properties": {
               "fragment": {
                 "type": "string"
@@ -655,7 +937,9 @@
           "items": {
             "type": "string"
           },
-          "default": ["all"],
+          "default": [
+            "all"
+          ],
           "description": "Case-insensitive Jenkins view names to hide from the Views section."
         },
         "jenkinsWorkbench.activity.maxItemsPerGroup": {
@@ -712,7 +996,9 @@
           "items": {
             "type": "string"
           },
-          "default": ["pr-{number}"],
+          "default": [
+            "pr-{number}"
+          ],
           "description": "Job-name patterns to use when resolving current-branch pull request jobs. Use {number} as the pull request number placeholder."
         },
         "jenkinsWorkbench.jenkinsfileValidation.enabled": {
@@ -741,7 +1027,11 @@
           "items": {
             "type": "string"
           },
-          "default": ["**/Jenkinsfile", "**/*.jenkinsfile", "**/Jenkinsfile.*"],
+          "default": [
+            "**/Jenkinsfile",
+            "**/*.jenkinsfile",
+            "**/Jenkinsfile.*"
+          ],
           "description": "Glob patterns used to detect Jenkinsfile documents for validation and language intelligence."
         }
       }
@@ -919,6 +1209,11 @@
           "command": "jenkinsWorkbench.unwatchJob",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)watched(\\s|$)/",
           "group": "2_watch@0"
+        },
+        {
+          "command": "jenkinsWorkbench.configureBuildDiagnostics",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
+          "group": "2_watch@1"
         },
         {
           "command": "jenkinsWorkbench.abortBuild",
@@ -1154,6 +1449,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
+    "ajv": "^8.20.0",
     "class-variance-authority": "^0.7.1",
     "concurrently": "^10.0.4",
     "elkjs": "^0.12.0",

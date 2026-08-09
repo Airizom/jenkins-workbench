@@ -7,7 +7,6 @@
     "outDir": "out",
     "sourceMap": true,
     "strict": true,
-    "noImplicitAny": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

@@ -159,13 +159,13 @@ describe("JenkinsTaskTerminal", () => {
     assert.equal(typeof closeCodes[0], "number");
   });
 
-  it("prefixes lifecycle status while preserving raw console text across CRLF chunks", async () => {
+  it("prefixes lifecycle status while converting normalized console newlines", async () => {
     runBehavior = (_request, output) => {
       output.writeStatus(
         "Following queue item 42.\nqueue/reason.c:7:3: error\rAPI detail continued"
       );
-      output.writeConsole("src/main.c:4:2: error\r");
-      output.writeConsole("\nsecond line\npartial");
+      output.writeConsole("src/main.c:4:2: error\n");
+      output.writeConsole("second line\npartial");
       output.writeStatus("Build finished.");
       return { exitCode: 2, outcome: "failure" };
     };

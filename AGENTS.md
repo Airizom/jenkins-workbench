@@ -4,7 +4,7 @@ This file is intentionally non-generic. It records only details that are easy to
 
 ## 1) The Real Runtime Shape (Do Not Assume Typical VS Code Extension Layout)
 
-- The extension backend is TypeScript (`src/**`) and the panel UI is a separate Vite bundle under `src/panels/**`.
+- The extension backend is TypeScript (`src/**`), and the four panel UIs are entries in one Vite build under `src/panels/**`.
 - Webview assets are resolved from `out/webview/manifest.json` at runtime (`src/panels/shared/webview/WebviewAssets.ts`).
 - If the manifest or entry names drift, panels fail with missing assets.
 - `npm run compile` is the command that keeps everything in sync:
@@ -23,10 +23,10 @@ If you change one side, update the others in the same pass.
   - Risk: changing signatures/endpoints can silently break watch updates or panel refresh behavior.
 
 - Build Details backend/frontend contract:
-  - Contract: `src/panels/buildDetails/shared/BuildDetailsPanelMessages.ts`
-  - Backend producer: `src/panels/buildDetails/BuildDetailsPanelController.ts`
+  - Contract: `src/panels/buildDetails/shared/BuildDetailsContracts.ts`, `src/panels/buildDetails/shared/BuildDetailsPanelMessages.ts`, `src/panels/buildDetails/shared/BuildDetailsPanelWebviewState.ts`
+  - Backend producers/router: `src/panels/buildDetails/BuildDetailsPanelController.ts`, `src/panels/buildDetails/BuildDetailsPanelRuntime.ts`, `src/panels/buildDetails/BuildDetailsPanelView.ts`, `src/panels/buildDetails/BuildDetailsMessageRouter.ts`
   - Frontend consumer: `src/panels/buildDetails/webview/state/buildDetailsState.ts` and hooks/components in `src/panels/buildDetails/webview/**`
-  - Rule: add/remove message fields in the shared contract module and consume from both backend and webview.
+  - Rule: add/remove message, view-model, or persisted-state fields in the shared contract modules and consume them from both backend and webview.
 
 - Build Compare backend/frontend contract:
   - Contract: `src/panels/buildCompare/shared/BuildCompareContracts.ts`, `src/panels/buildCompare/shared/BuildComparePanelMessages.ts`, `src/panels/buildCompare/shared/BuildComparePanelWebviewState.ts`
@@ -35,10 +35,16 @@ If you change one side, update the others in the same pass.
   - Rule: add/remove view-model or message fields in the shared contract modules and consume them from both backend and webview.
 
 - Node Details backend/frontend contract:
-  - Contract: `src/panels/nodeDetails/shared/NodeDetailsPanelMessages.ts`
+  - Contract: `src/panels/nodeDetails/shared/NodeDetailsContracts.ts`, `src/panels/nodeDetails/shared/NodeDetailsPanelMessages.ts`, `src/panels/nodeDetails/shared/NodeDetailsPanelWebviewState.ts`
   - Backend producer: `src/panels/NodeDetailsPanel.ts`
-  - Frontend consumer: hooks/components in `src/panels/nodeDetails/webview/**`
-  - Rule: add/remove message fields in the shared contract module and consume from both backend and webview.
+  - Frontend consumer: `src/panels/nodeDetails/webview/state/nodeDetailsState.ts` and hooks/components in `src/panels/nodeDetails/webview/**`
+  - Rule: add/remove message, view-model, or persisted-state fields in the shared contract modules and consume them from both backend and webview.
+
+- Node Capacity backend/frontend contract:
+  - Contract: `src/shared/nodeCapacity/NodeCapacityContracts.ts`, `src/panels/nodeCapacity/shared/NodeCapacityPanelMessages.ts`
+  - Backend producer: `src/panels/NodeCapacityPanel.ts`
+  - Frontend consumer: `src/panels/nodeCapacity/webview/state/nodeCapacityState.ts` and hooks/components in `src/panels/nodeCapacity/webview/**`
+  - Rule: add/remove view-model or message fields in the shared contract modules and consume them from both backend and webview.
 
 - Tree cache + refresh orchestration:
   - Provider: `src/tree/TreeDataProvider.ts`
@@ -52,13 +58,13 @@ If you change one side, update the others in the same pass.
 - Manual refresh is rate-limited (2s cooldown) in `TreeDataProvider.refresh()`. Repeated refresh requests may be ignored by design.
 - Pending input refreshes are queued/throttled with concurrency limits in `PendingInputRefreshCoordinator`; this protects Jenkins from burst traffic.
 - Build Details uses load tokens and panel-visibility-aware polling. If you alter refresh timing, preserve token checks to avoid stale postMessage updates.
-- Task cancellation in task terminals does not cancel Jenkins builds (`src/tasks/JenkinsTaskTerminal.ts`).
+- Task cancellation closes the local task immediately, never cancels the Jenkins queue item, and only stops a running build when `JenkinsTaskRunner` verifies that it has a single trigger. Shared or unverifiable work is left active (`src/tasks/JenkinsTaskTerminal.ts`, `src/tasks/JenkinsTaskRunner.ts`).
 - Artifact downloads require a workspace folder, but previews do not (`README.md` settings/troubleshooting sections).
 - Environment auth migration exists (`migrateLegacyAuthConfigs`) and moves old token/username style auth into secret-backed auth config (`src/storage/JenkinsEnvironmentStore.ts`).
 
 ## 4) DI Container Constraints (Easy Failure Mode)
 
-- Provider registration is locked after container creation (`seal()`); late registration throws.
+- Provider registration is locked when `createExtensionContainer(...)` seals the container; registration after `seal()` throws.
 - Duplicate tokens in composed catalogs throw during startup.
 - Missing tokens fail at first `container.get(...)`.
 - Source:
@@ -76,7 +82,7 @@ If you touch panel entrypoints, bundle naming, or Vite output:
 3. Verify `out/webview/manifest.json` includes expected entries.
 4. Launch Extension Development Host and open the Build Compare, Build Details, Node Capacity, and Node Details panels.
 
-If this is skipped, `resolveWebviewAssets(...)` throws and panel load fails.
+If this is skipped, `resolveWebviewAssets(...)` throws; panel helpers catch the error and render a load-error view instead of the interactive panel.
 
 ## 6) Practical Edit Playbooks
 
@@ -114,8 +120,10 @@ Unit tests do not exercise the webview UI or live Jenkins traffic. For changes t
    - tree load/refresh
    - watch updates
    - queue visibility
+   - build compare panel updates
    - build details panel updates
    - node capacity panel updates
+   - node details panel updates
    - artifact preview/download behavior
 
 Reference checklist is in `README.md` (manual testing section + troubleshooting).

@@ -1,7 +1,3 @@
-import type {
-  JenkinsCoverageOverview,
-  JenkinsModifiedCoverageFile
-} from "../../jenkins/coverage/JenkinsCoverageTypes";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import {
   assembleBuildDetailsSections,
@@ -10,22 +6,13 @@ import {
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsUpdateOptions {
-  testReportFetched?: boolean;
-  testReportLogsIncluded?: boolean;
-  testResultsLoading?: boolean;
-  coverageOverview?: JenkinsCoverageOverview;
-  modifiedCoverageFiles?: JenkinsModifiedCoverageFile[];
-  coverageActionPath?: string;
-  coverageFetched?: boolean;
-  coverageLoading?: boolean;
-  coverageError?: string;
   coverageEnabled?: boolean;
   canOpenSource?: (className?: string) => boolean;
 }
 
 function buildSectionsInputFromPanelState(
   state: BuildDetailsPanelState,
-  options?: Pick<BuildDetailsUpdateOptions, "canOpenSource" | "coverageEnabled">
+  options?: BuildDetailsUpdateOptions
 ): BuildDetailsSectionsInput {
   return {
     details: state.currentDetails,
@@ -52,7 +39,7 @@ function buildSectionsInputFromPanelState(
 
 export function buildUpdateMessageFromState(
   state: BuildDetailsPanelState,
-  options?: Pick<BuildDetailsUpdateOptions, "canOpenSource" | "coverageEnabled">
+  options?: BuildDetailsUpdateOptions
 ): BuildDetailsOutgoingMessage {
   return {
     type: "updateDetails",

@@ -139,8 +139,8 @@ export class BuildDetailsPanelActions {
       );
       return;
     }
-    const stageName = message.stageName.trim();
-    if (!stageName) {
+    const stageName = message.stageName;
+    if (!stageName.trim()) {
       void vscode.window.showErrorMessage("Select a valid stage to restart from.");
       return;
     }

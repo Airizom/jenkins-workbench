@@ -64,6 +64,12 @@ function reduceBuildDetailsMessage(
         errors: message.errors
       });
       break;
+    case "setBuildDiagnostics":
+      dispatch({
+        type: "setBuildDiagnostics",
+        diagnostics: message.diagnostics
+      });
+      break;
     case "setLoading":
       dispatch({ type: "setLoading", value: message.value });
       break;

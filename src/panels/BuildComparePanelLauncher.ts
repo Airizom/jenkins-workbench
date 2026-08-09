@@ -21,11 +21,7 @@ export interface BuildComparePanelLauncherOptions {
   extensionUri: vscode.Uri;
 }
 
-interface BuildComparePanelRevivalSurface {
-  revive(panel: vscode.WebviewPanel, state: unknown): Promise<void>;
-}
-
-export class BuildComparePanelLauncher implements BuildComparePanelRevivalSurface {
+export class BuildComparePanelLauncher {
   constructor(private readonly options: BuildComparePanelLauncherOptions) {}
 
   async show(request: BuildComparePanelLaunchRequest): Promise<void> {

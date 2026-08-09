@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- feat(diagnostics): publish failed Jenkins build locations as local Problems with safe path mappings, configurable parsers, Build Details insights, and clickable console source links
+
+### Tests
+
+- test(diagnostics): cover profile validation, built-in and custom parsing, worker isolation, scoped bindings, path resolution, bounded scanning, aggregation, ownership, panel contracts, and console link rendering
+
 ## [1.50.0] - 2026-07-26
 
 ### Added

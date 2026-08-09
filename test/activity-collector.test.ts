@@ -204,6 +204,8 @@ describe("ActivityCollector.collect", () => {
       createEntry("unstable-2", "yellow"),
       createEntry("running-1", "red_anime"),
       createEntry("running-2", "blue_anime"),
+      createEntry("running-3", "red_anime"),
+      createEntry("running-4", "blue_anime"),
       createEntry("failing-late", "red")
     ];
     const { collector, yieldedBatchIndexes } = createCollector([
@@ -278,6 +280,72 @@ describe("ActivityCollector.collect", () => {
     assert.deepEqual(groupNames(viewModel), [
       { kind: "awaitingInput", names: ["deploy"] },
       { kind: "running", names: ["build"] }
+    ]);
+  });
+
+  it("retains later running jobs to replace promoted pending-input candidates", async () => {
+    const awaitingFirst = createEntry("awaiting-1", "red_anime");
+    const awaitingSecond = createEntry("awaiting-2", "blue_anime");
+    const runningFirst = createEntry("running-1", "blue_anime");
+    const runningSecond = createEntry("running-2", "blue_anime");
+    const runningThird = createEntry("running-3", "blue_anime");
+    const { collector } = createCollector(
+      [[awaitingFirst, awaitingSecond, runningFirst, runningSecond, runningThird]],
+      new Set([awaitingFirst.url, awaitingSecond.url])
+    );
+
+    const viewModel = await collector.collect(
+      environment,
+      createCollectorOptions({
+        maxItemsPerGroup: 2,
+        collection: {
+          maxScanResults: 100,
+          jobSearchBatchSize: 10,
+          pendingInputCandidateLimit: 2,
+          pendingInputLookupConcurrency: 2,
+          pendingInputBuildLookupLimit: 5,
+          refreshMinIntervalMs: 0
+        }
+      })
+    );
+
+    assert.deepEqual(groupNames(viewModel), [
+      { kind: "awaitingInput", names: ["awaiting-1", "awaiting-2"] },
+      { kind: "running", names: ["running-1", "running-2"] }
+    ]);
+    assert.equal(viewModel.groups.find((group) => group.kind === "running")?.isTruncated, true);
+    assert.equal(viewModel.summary.isTruncated, true);
+  });
+
+  it("promotes enriched candidates beyond the running backfill window", async () => {
+    const runningEntries = Array.from({ length: 7 }, (_, index) =>
+      createEntry(`running-${index + 1}`, "blue_anime")
+    );
+    const awaiting = runningEntries[6];
+    const { collector, enricherCalls } = createCollector([runningEntries], new Set([awaiting.url]));
+
+    const viewModel = await collector.collect(
+      environment,
+      createCollectorOptions({
+        maxItemsPerGroup: 2,
+        collection: {
+          maxScanResults: 100,
+          jobSearchBatchSize: 10,
+          pendingInputCandidateLimit: 7,
+          pendingInputLookupConcurrency: 2,
+          pendingInputBuildLookupLimit: 5,
+          refreshMinIntervalMs: 0
+        }
+      })
+    );
+
+    assert.deepEqual(
+      enricherCalls[0].runningCandidates.map((entry) => entry.name),
+      runningEntries.map((entry) => entry.name)
+    );
+    assert.deepEqual(groupNames(viewModel), [
+      { kind: "awaitingInput", names: ["running-7"] },
+      { kind: "running", names: ["running-1", "running-2"] }
     ]);
   });
 });

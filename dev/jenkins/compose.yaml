@@ -1,0 +1,29 @@
+name: jenkins-workbench
+
+services:
+  jenkins:
+    build:
+      context: .
+    container_name: jenkins-workbench
+    restart: unless-stopped
+    environment:
+      JENKINS_ADMIN_ID: "${JENKINS_ADMIN_ID:-admin}"
+      JENKINS_ADMIN_PASSWORD: "${JENKINS_ADMIN_PASSWORD:-jenkins-workbench}"
+      JENKINS_API_TOKEN: "${JENKINS_API_TOKEN:-11decafbaddecafbaddecafbaddecafbad}"
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Dhudson.model.DirectoryBrowserSupport.CSP=
+    ports:
+      - "${JENKINS_BIND_ADDRESS:-127.0.0.1}:${JENKINS_HTTP_PORT:-8080}:8080"
+      - "${JENKINS_BIND_ADDRESS:-127.0.0.1}:${JENKINS_AGENT_PORT:-50000}:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8080/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  jenkins_home:

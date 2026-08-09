@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { type GitExtension, type GitRepository, getGitApi } from "../git/GitExtensionApi";
+import { type GitApi, getGitApi } from "../git/GitExtensionApi";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { parseBuildUrl, parseJobUrl } from "../jenkins/urls";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
@@ -33,13 +33,23 @@ export function buildTestSourceNavigationContext(
 }
 
 export class TestSourceResolver {
+  private readonly gitApiPromise: Promise<GitApi | undefined>;
+  private gitApi: GitApi | undefined;
+
   constructor(
     private readonly repositoryLinkStore: JenkinsRepositoryLinkStore,
     private readonly fileMatchStrategy: TestSourceFileMatchStrategy
-  ) {}
+  ) {
+    this.gitApiPromise = getGitApi().then((gitApi) => {
+      this.gitApi = gitApi;
+      return gitApi;
+    });
+  }
 
   canResolve(context: TestSourceNavigationContext, className?: string): boolean {
-    return Boolean(normalizeClassName(className)) && this.getOpenLinkedRepositoryRoots(context);
+    return (
+      Boolean(normalizeClassName(className)) && this.collectRepositoryRoots(context).length > 0
+    );
   }
 
   async resolve(
@@ -74,30 +84,14 @@ export class TestSourceResolver {
       .map((link) => vscode.Uri.parse(link.repositoryUri));
   }
 
-  private getOpenLinkedRepositoryRoots(context: TestSourceNavigationContext): boolean {
-    const linkedRepositoryRootKeys = this.getLinkedRepositoryRootKeys(context);
-    if (linkedRepositoryRootKeys.size === 0) {
-      return false;
-    }
-
-    for (const folder of vscode.workspace.workspaceFolders ?? []) {
-      if (linkedRepositoryRootKeys.has(toRepositoryRootKey(folder.uri))) {
-        return true;
-      }
-    }
-
-    for (const repository of getActiveGitRepositories()) {
-      if (linkedRepositoryRootKeys.has(toRepositoryRootKey(repository.rootUri))) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   private async getRepositoryRoots(
     context: TestSourceNavigationContext
   ): Promise<readonly vscode.Uri[]> {
+    await this.gitApiPromise;
+    return this.collectRepositoryRoots(context);
+  }
+
+  private collectRepositoryRoots(context: TestSourceNavigationContext): readonly vscode.Uri[] {
     const linkedRepositoryRootKeys = this.getLinkedRepositoryRootKeys(context);
     if (linkedRepositoryRootKeys.size === 0) {
       return [];
@@ -109,8 +103,7 @@ export class TestSourceResolver {
       addIfLinkedRoot(roots, linkedRepositoryRootKeys, folder.uri);
     }
 
-    const gitApi = await getGitApi();
-    for (const repository of gitApi?.repositories ?? []) {
+    for (const repository of this.gitApi?.repositories ?? []) {
       addIfLinkedRoot(roots, linkedRepositoryRootKeys, repository.rootUri);
     }
 
@@ -131,14 +124,6 @@ function addIfLinkedRoot(
   if (linkedRepositoryRootKeys.has(key)) {
     roots.set(key, uri);
   }
-}
-
-function getActiveGitRepositories(): readonly GitRepository[] {
-  const extension = vscode.extensions.getExtension<GitExtension>("vscode.git");
-  if (!extension?.isActive) {
-    return [];
-  }
-  return extension.exports?.getAPI?.(1)?.repositories ?? [];
 }
 
 function resolveMultibranchFolderUrl(buildUrl?: string): string | undefined {

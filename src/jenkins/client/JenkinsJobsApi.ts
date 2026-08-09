@@ -153,19 +153,7 @@ export class JenkinsJobsApi {
     sourceName: string,
     newName: string
   ): Promise<{ newUrl: string }> {
-    const url = buildActionUrl(parentUrl, "createItem");
-    const params = new URLSearchParams();
-    params.set("name", newName);
-    params.set("mode", "copy");
-    params.set("from", sourceName);
-    const fullUrl = `${url}?${params.toString()}`;
-    const response = await this.context.requestPostWithCrumb(fullUrl);
-
-    if (response.location) {
-      return { newUrl: response.location };
-    }
-
-    return { newUrl: buildJobUrl(parentUrl, newName) };
+    return this.createItemWithMode(parentUrl, newName, "copy", sourceName);
   }
 
   async createItem(
@@ -189,12 +177,16 @@ export class JenkinsJobsApi {
   private async createItemWithMode(
     parentUrl: string,
     newName: string,
-    mode: string
+    mode: string,
+    sourceName?: string
   ): Promise<{ newUrl: string }> {
     const url = buildActionUrl(parentUrl, "createItem");
     const params = new URLSearchParams();
     params.set("name", newName);
     params.set("mode", mode);
+    if (sourceName !== undefined) {
+      params.set("from", sourceName);
+    }
     const fullUrl = `${url}?${params.toString()}`;
     const response = await this.context.requestPostWithCrumb(fullUrl, "");
 

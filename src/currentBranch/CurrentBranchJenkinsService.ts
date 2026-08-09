@@ -19,7 +19,7 @@ interface PendingRefresh {
   reject: (error: unknown) => void;
 }
 
-export type { CurrentBranchRepositoryInfo, CurrentBranchState } from "./CurrentBranchTypes";
+export type { CurrentBranchRepositoryInfo } from "./CurrentBranchTypes";
 
 export class CurrentBranchJenkinsService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<CurrentBranchState>();

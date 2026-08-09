@@ -3,7 +3,7 @@ import type {
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload
 } from "../types";
-import { buildActionUrl, ensureTrailingSlash } from "../urls";
+import { buildActionUrl, normalizeJenkinsUrlForComparison } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
 import { parseReplayDefinitionPage } from "./ReplayPageParser";
@@ -91,17 +91,5 @@ function locationPathMatches(location: string, pattern: RegExp): boolean {
 }
 
 function areEquivalentLocations(left: string, right: string): boolean {
-  return normalizeLocationForComparison(left) === normalizeLocationForComparison(right);
-}
-
-function normalizeLocationForComparison(value: string): string {
-  try {
-    const url = new URL(value);
-    url.search = "";
-    url.hash = "";
-    url.pathname = ensureTrailingSlash(url.pathname);
-    return url.toString();
-  } catch {
-    return ensureTrailingSlash(value.split(/[?#]/, 1)[0] ?? value);
-  }
+  return normalizeJenkinsUrlForComparison(left) === normalizeJenkinsUrlForComparison(right);
 }

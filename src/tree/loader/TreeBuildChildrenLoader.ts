@@ -61,12 +61,16 @@ export class TreeBuildChildrenLoader {
     );
   }
 
-  async loadArtifactsSummaryForBuild(build: BuildTreeItem): Promise<WorkbenchTreeElement[]> {
+  async loadArtifactsSummaryForBuild(
+    build: BuildTreeItem,
+    isCurrentLoad: () => boolean = () => true
+  ): Promise<WorkbenchTreeElement[]> {
     try {
       const artifacts = await this.getArtifactsForBuild(
         build.environment,
         build.buildUrl,
-        build.jobScope
+        build.jobScope,
+        isCurrentLoad
       );
       return [
         new BuildArtifactsFolderTreeItem(
@@ -84,13 +88,15 @@ export class TreeBuildChildrenLoader {
   }
 
   async loadArtifactsForBuild(
-    folder: BuildArtifactsFolderTreeItem
+    folder: BuildArtifactsFolderTreeItem,
+    isCurrentLoad: () => boolean = () => true
   ): Promise<WorkbenchTreeElement[]> {
     try {
       const artifacts = await this.getArtifactsForBuild(
         folder.environment,
         folder.buildUrl,
-        folder.jobScope
+        folder.jobScope,
+        isCurrentLoad
       );
       const items: ArtifactTreeItem[] = [];
       for (const artifact of artifacts) {
@@ -203,7 +209,8 @@ export class TreeBuildChildrenLoader {
   private async getArtifactsForBuild(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE
+    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
+    isCurrentLoad: () => boolean = () => true
   ): Promise<JenkinsArtifact[]> {
     const key = this.buildArtifactChildrenKey(environment, buildUrl, jobScope);
     const cached = this.cacheManager.getCachedArtifacts<JenkinsArtifact[]>(key);
@@ -211,7 +218,9 @@ export class TreeBuildChildrenLoader {
       return cached;
     }
     const artifacts = await this.dataService.getBuildArtifacts(environment, buildUrl);
-    this.cacheManager.setCachedArtifacts(key, artifacts);
+    if (isCurrentLoad()) {
+      this.cacheManager.setCachedArtifacts(key, artifacts);
+    }
     return artifacts;
   }
 }

@@ -181,45 +181,21 @@ function stripLineReference(value: string): string {
   return value.replace(/\s*@ line \d+(?:, column \d+)?/gi, "").trim();
 }
 
-function buildFindingFromLine(
-  line: string,
-  message: string,
-  resolvedLine: number,
-  resolvedColumn?: number
-): JenkinsfileValidationFinding {
-  const resolvedMessage = message || line;
-  return buildFinding(resolvedMessage, resolvedLine, resolvedColumn);
-}
-
 function parseFindingLine(line: string): JenkinsfileValidationFinding | undefined {
   const workflowMatch = line.match(/^WorkflowScript:\s*(\d+):\s*(.*)$/);
-  if (workflowMatch) {
-    const parsedLine = Number.parseInt(workflowMatch[1], 10);
-    const detail = workflowMatch[2].trim();
-    const refMatch = detail.match(/@ line (\d+)(?:, column (\d+))?/i);
-    const resolvedLine = refMatch ? Number.parseInt(refMatch[1], 10) : parsedLine;
-    const resolvedColumn = refMatch?.[2] ? Number.parseInt(refMatch[2], 10) : undefined;
-    const message = stripLineReference(detail);
-    return buildFindingFromLine(line, message, resolvedLine, resolvedColumn);
+  const detail = workflowMatch ? workflowMatch[2].trim() : line;
+  const locationMatch =
+    detail.match(/@ line (\d+)(?:, column (\d+))?/i) ??
+    (workflowMatch ? undefined : detail.match(/\bline (\d+)(?:, column (\d+))?/i));
+  const resolvedLineText = locationMatch?.[1] ?? workflowMatch?.[1];
+  if (!resolvedLineText) {
+    return undefined;
   }
 
-  const atMatch = line.match(/@ line (\d+)(?:, column (\d+))?/i);
-  if (atMatch) {
-    const resolvedLine = Number.parseInt(atMatch[1], 10);
-    const resolvedColumn = atMatch[2] ? Number.parseInt(atMatch[2], 10) : undefined;
-    const message = stripLineReference(line);
-    return buildFindingFromLine(line, message, resolvedLine, resolvedColumn);
-  }
-
-  const lineMatch = line.match(/\bline (\d+)(?:, column (\d+))?/i);
-  if (lineMatch) {
-    const resolvedLine = Number.parseInt(lineMatch[1], 10);
-    const resolvedColumn = lineMatch[2] ? Number.parseInt(lineMatch[2], 10) : undefined;
-    const message = stripLineReference(line);
-    return buildFindingFromLine(line, message, resolvedLine, resolvedColumn);
-  }
-
-  return undefined;
+  const resolvedLine = Number.parseInt(resolvedLineText, 10);
+  const resolvedColumn = locationMatch?.[2] ? Number.parseInt(locationMatch[2], 10) : undefined;
+  const message = stripLineReference(detail);
+  return buildFinding(message || line, resolvedLine, resolvedColumn);
 }
 
 function buildFinding(

@@ -10,7 +10,7 @@ export function CompareSectionFrame({
   title: string;
   count: number;
   children: React.ReactNode;
-  emptyLabel: string;
+  emptyLabel?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -20,9 +20,9 @@ export function CompareSectionFrame({
       </div>
       {count > 0 ? (
         <div className="space-y-2">{children}</div>
-      ) : (
+      ) : emptyLabel ? (
         <CompareEmptyState label={emptyLabel} />
-      )}
+      ) : null}
     </div>
   );
 }

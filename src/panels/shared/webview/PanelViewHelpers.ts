@@ -18,17 +18,13 @@ export interface EnvironmentPanelRenderOptions {
   panelState?: unknown;
 }
 
-export type EnvironmentPanelLoadingRenderOptions = EnvironmentPanelRenderOptions & {
-  styleUris: string[];
-};
-
 export interface PanelLoadingShellOptions {
   panel: vscode.WebviewPanel;
   extensionUri: vscode.Uri;
   entryName: WebviewEntryName;
   nonce: string;
   panelState?: unknown;
-  errorOptions: PanelManifestErrorOptions;
+  errorOptions?: PanelManifestErrorOptions;
   renderLoadingHtml: (options: PanelDetailsRenderOptions) => string;
 }
 
@@ -43,11 +39,21 @@ export class EnvironmentPanelView<TModel> {
   ) {}
 
   resolveAssets(): PanelViewAssets | undefined {
-    return resolvePanelViewAssets(this.panel.webview, this.extensionUri, this.entryName);
+    return resolvePanelAssets(this.panel, this.extensionUri, this.entryName);
   }
 
-  renderLoading(options: EnvironmentPanelLoadingRenderOptions): void {
-    assignPanelLoadingHtml(this.panel, this.skeletonVariant, options);
+  resolveAssetsAndRenderLoading(
+    options: EnvironmentPanelRenderOptions
+  ): PanelViewAssets | undefined {
+    return resolvePanelAssetsAndRenderLoading({
+      panel: this.panel,
+      extensionUri: this.extensionUri,
+      entryName: this.entryName,
+      nonce: options.nonce,
+      panelState: options.panelState,
+      renderLoadingHtml: (renderOptions) =>
+        renderPanelLoadingHtml(renderOptions, this.skeletonVariant)
+    });
   }
 
   renderModel(
@@ -69,28 +75,18 @@ export class EnvironmentPanelView<TModel> {
   }
 }
 
-function resolvePanelViewAssets(
-  webview: vscode.Webview,
-  extensionUri: vscode.Uri,
-  entryName: WebviewEntryName
-): PanelViewAssets | undefined {
-  try {
-    return resolveWebviewAssets(webview, extensionUri, entryName);
-  } catch {
-    return undefined;
-  }
-}
-
-function resolvePanelWebviewAssetsOrError(
+function resolvePanelAssets(
   panel: vscode.WebviewPanel,
   extensionUri: vscode.Uri,
   entryName: WebviewEntryName,
-  errorOptions: PanelManifestErrorOptions
+  errorOptions?: PanelManifestErrorOptions
 ): PanelViewAssets | undefined {
   try {
     return resolveWebviewAssets(panel.webview, extensionUri, entryName);
   } catch {
-    assignWebviewPanelManifestErrorHtml(panel, extensionUri, entryName, errorOptions);
+    if (errorOptions) {
+      assignWebviewPanelManifestErrorHtml(panel, extensionUri, entryName, errorOptions);
+    }
     return undefined;
   }
 }
@@ -98,21 +94,22 @@ function resolvePanelWebviewAssetsOrError(
 export function resolvePanelAssetsAndRenderLoading(
   options: PanelLoadingShellOptions
 ): PanelViewAssets | undefined {
-  const assets = resolvePanelWebviewAssetsOrError(
+  const assets = resolvePanelAssets(
     options.panel,
     options.extensionUri,
     options.entryName,
-    {
-      ...options.errorOptions,
-      panelState: options.panelState
-    }
+    options.errorOptions
+      ? {
+          ...options.errorOptions,
+          panelState: options.panelState
+        }
+      : undefined
   );
   if (!assets) {
     return undefined;
   }
 
-  options.panel.webview.html = options.renderLoadingHtml({
-    cspSource: options.panel.webview.cspSource,
+  assignPanelLoadingHtml(options.panel, options.renderLoadingHtml, {
     nonce: options.nonce,
     styleUris: assets.styleUris,
     panelState: options.panelState
@@ -122,14 +119,11 @@ export function resolvePanelAssetsAndRenderLoading(
 
 function assignPanelLoadingHtml(
   panel: vscode.WebviewPanel,
-  skeletonVariant: LoadingSkeletonVariant,
-  options: Omit<PanelDetailsRenderOptions, "cspSource"> & { styleUris: string[] }
+  renderLoadingHtml: (options: PanelDetailsRenderOptions) => string,
+  options: Omit<PanelDetailsRenderOptions, "cspSource" | "scriptUri">
 ): void {
-  panel.webview.html = renderPanelLoadingHtml(
-    {
-      ...options,
-      cspSource: panel.webview.cspSource
-    },
-    skeletonVariant
-  );
+  panel.webview.html = renderLoadingHtml({
+    ...options,
+    cspSource: panel.webview.cspSource
+  });
 }

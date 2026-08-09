@@ -1,5 +1,6 @@
 import * as React from "react";
-import { stripAnsi } from "../../lib/ansi";
+import { stripConsoleControlSequences as stripAnsi } from "../../../../../buildDiagnostics/BuildDiagnosticConsoleText";
+import type { BuildDiagnosticConsoleReference } from "../../../shared/BuildDetailsContracts";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { ConsoleLogViewer } from "./ConsoleLogViewer";
 import { ConsoleOutputHeader } from "./consoleOutput";
@@ -15,7 +16,9 @@ export function ConsoleOutputSection({
   isActive,
   onToggleFollowLog,
   onExportLogs,
-  onOpenExternal
+  onOpenExternal,
+  sourceReferences,
+  onOpenDiagnosticSource
 }: {
   consoleText: string;
   consoleHtmlModel?: ConsoleHtmlModel;
@@ -27,6 +30,8 @@ export function ConsoleOutputSection({
   onToggleFollowLog: (value: boolean) => void;
   onExportLogs: () => void;
   onOpenExternal: (url: string) => void;
+  sourceReferences?: BuildDiagnosticConsoleReference[];
+  onOpenDiagnosticSource?: (targetId: string) => void;
 }) {
   const displayConsoleText = useMemo(
     () => (consoleHtmlModel ? consoleText : stripAnsi(consoleText)),
@@ -44,6 +49,8 @@ export function ConsoleOutputSection({
       followLog={followLog}
       isActive={isActive}
       onOpenExternal={onOpenExternal}
+      sourceReferences={sourceReferences}
+      onOpenDiagnosticSource={onOpenDiagnosticSource}
       renderHeader={({ hasOutput, lineCount, openSearchToolbar }) => (
         <ConsoleOutputHeader
           hasConsoleOutput={hasOutput}

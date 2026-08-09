@@ -41,7 +41,6 @@ export interface CoverageRefreshRequest {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   details: JenkinsBuildDetails | undefined;
-  buildCompleted: boolean;
   coverageEnabled: boolean;
   decorationsEnabled: boolean;
   showLoading: boolean;
@@ -71,7 +70,6 @@ export function planCoverageRefresh(context: CoverageRefreshContext): CoverageRe
       environment,
       buildUrl,
       details,
-      buildCompleted,
       coverageEnabled: context.coverageEnabled,
       decorationsEnabled: context.decorationsEnabled,
       showLoading: Boolean(context.showLoadingRequested && context.coverageEnabled)
@@ -134,7 +132,7 @@ export class BuildDetailsCoverageCoordinator {
       : await request.coverageBackend.discoverCoverageActionPath(
           request.environment,
           request.buildUrl,
-          { buildCompleted: request.buildCompleted }
+          { buildCompleted: true }
         );
     if (this.isStale(token, refreshGeneration)) {
       return;
@@ -153,7 +151,6 @@ export class BuildDetailsCoverageCoordinator {
       coverageBackend: request.coverageBackend,
       environment: request.environment,
       buildUrl: request.buildUrl,
-      buildCompleted: request.buildCompleted,
       actionPath,
       coverageEnabled: request.coverageEnabled,
       decorationsEnabled: request.decorationsEnabled
@@ -186,7 +183,6 @@ export class BuildDetailsCoverageCoordinator {
       environment: request.environment,
       buildUrl: request.buildUrl,
       modifiedCoverageFiles,
-      coverageOverview,
       decorationsEnabled: request.decorationsEnabled
     });
     if (this.options.isViewVisible()) {
@@ -232,7 +228,6 @@ interface BuildDetailsCoverageLoadRequest {
   coverageBackend: BuildDetailsCoverageBackend;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
-  buildCompleted: boolean;
   actionPath: string;
   coverageEnabled: boolean;
   decorationsEnabled: boolean;
@@ -242,14 +237,13 @@ async function loadCoverage({
   coverageBackend,
   environment,
   buildUrl,
-  buildCompleted,
   actionPath,
   coverageEnabled,
   decorationsEnabled
 }: BuildDetailsCoverageLoadRequest): Promise<BuildDetailsCoverageLoadResult> {
   const coverageOverview = coverageEnabled
     ? await coverageBackend.getCoverageOverview(environment, buildUrl, {
-        buildCompleted,
+        buildCompleted: true,
         actionPath
       })
     : undefined;
@@ -261,7 +255,7 @@ async function loadCoverage({
         environment,
         buildUrl,
         {
-          buildCompleted,
+          buildCompleted: true,
           actionPath
         }
       );

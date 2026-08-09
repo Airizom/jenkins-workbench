@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import { retryOnTreeChange } from "./TreeChangeRetry";
 import type { TreeExpansionPath, TreeExpansionResolver } from "./TreeDataProviderTypes";
 
 type TreeRevealOptions = {
@@ -22,9 +23,6 @@ type CollapsedPathOperation = {
   operationVersion: number;
   path: TreeExpansionPath;
 };
-
-const RESTORE_RETRY_LIMIT = 3;
-const RESTORE_RETRY_TIMEOUT_MS = 4000;
 
 export class TreeExpansionState implements vscode.Disposable {
   private readonly expandedPaths = new Map<string, TreeExpansionPath>();
@@ -209,52 +207,18 @@ export class TreeExpansionState implements vscode.Disposable {
   }
 
   private async resolvePathWithRetry(path: TreeExpansionPath): Promise<ResolvePathOutcome> {
-    let attempts = 0;
-    let wasPending = false;
-    while (attempts <= RESTORE_RETRY_LIMIT) {
-      const result = await this.treeDataProvider.resolveExpansionPath(path);
-      if (result.element) {
-        return { element: result.element, wasPending };
-      }
-      if (!result.pending) {
-        return { element: undefined, wasPending: false };
-      }
-      wasPending = true;
-      attempts += 1;
-      const didChange = await this.waitForTreeChange(RESTORE_RETRY_TIMEOUT_MS);
-      if (!didChange) {
-        return { element: undefined, wasPending: true };
-      }
-    }
-    return { element: undefined, wasPending: true };
+    const result = await retryOnTreeChange({
+      operation: () => this.treeDataProvider.resolveExpansionPath(path),
+      onDidChangeTreeData: this.treeDataProvider.onDidChangeTreeData,
+      shouldRetry: (attempt) => !attempt.element && attempt.pending,
+      getPendingElement: (attempt) => attempt.pendingElement,
+      waitAfterRetryExhausted: true
+    });
+    return { element: result.element, wasPending: result.pending };
   }
 
   private buildKey(path: TreeExpansionPath): string {
     return JSON.stringify(path);
-  }
-
-  private async waitForTreeChange(timeoutMs: number): Promise<boolean> {
-    return await new Promise<boolean>((resolve) => {
-      let done = false;
-      const disposable = this.treeDataProvider.onDidChangeTreeData(() => {
-        if (done) {
-          return;
-        }
-        done = true;
-        disposable.dispose();
-        clearTimeout(timer);
-        resolve(true);
-      });
-
-      const timer = setTimeout(() => {
-        if (done) {
-          return;
-        }
-        done = true;
-        disposable.dispose();
-        resolve(false);
-      }, timeoutMs);
-    });
   }
 }
 

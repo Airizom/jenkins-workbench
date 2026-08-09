@@ -66,6 +66,7 @@ export async function activateRuntime(
   const buildComparePanelLauncher = container.get("buildComparePanelLauncher");
   const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
   const coverageDecorationService = container.get("coverageDecorationService");
+  const buildDiagnosticsCoordinator = container.get("buildDiagnosticsCoordinator");
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
@@ -132,6 +133,7 @@ export async function activateRuntime(
   void currentBranchService.start().catch((error) => {
     console.warn("Failed to initialize current-branch state.", error);
   });
+  buildDiagnosticsCoordinator.start();
   poller.start();
   statusRefreshService.start();
   void viewStateStore.syncFilterContext();
@@ -151,6 +153,7 @@ export async function activateRuntime(
     jobConfigDraftManager,
     replayDraftManager,
     coverageDecorationService,
+    buildDiagnosticsCoordinator,
     treeSummarySubscription,
     jobConfigDraftFilesystemRegistration,
     replayDraftFilesystemRegistration,

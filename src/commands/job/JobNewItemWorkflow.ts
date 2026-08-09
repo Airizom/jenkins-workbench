@@ -13,34 +13,28 @@ interface NewItemKindDefinition {
   defaultName: string;
 }
 
-const NEW_ITEM_KIND_BY_TYPE: Record<JenkinsItemCreateKind, NewItemKindDefinition> = {
-  job: {
+const NEW_ITEM_KIND_DEFINITIONS = [
+  {
     itemType: "job",
     label: "Job",
     description: "Freestyle job",
     promptLabel: "job",
     defaultName: "new-job"
   },
-  pipeline: {
+  {
     itemType: "pipeline",
     label: "Pipeline",
     description: "Pipeline job",
     promptLabel: "pipeline",
     defaultName: "new-pipeline"
   }
-};
-
-const NEW_ITEM_KIND_DEFINITIONS = Object.values(NEW_ITEM_KIND_BY_TYPE);
+] as const satisfies readonly NewItemKindDefinition[];
 
 export interface JobNewItemTarget {
   environment: JenkinsEnvironmentRef;
   parentUrl: string;
   locationLabel: string;
 }
-
-type NewItemCreateKindPick = vscode.QuickPickItem & {
-  itemType: JenkinsItemCreateKind;
-};
 
 export interface JobNewItemWorkflowDependencies {
   dataService: JenkinsDataService;
@@ -51,11 +45,10 @@ export class JobNewItemWorkflow {
   constructor(private readonly deps: JobNewItemWorkflowDependencies) {}
 
   async run(target: JobNewItemTarget): Promise<void> {
-    const kind = await promptNewItemKind();
-    if (!kind) {
+    const kindDefinition = await promptNewItemKind();
+    if (!kindDefinition) {
       return;
     }
-    const kindDefinition = NEW_ITEM_KIND_BY_TYPE[kind];
 
     const newName = await vscode.window.showInputBox({
       prompt: `Enter a name for the new ${kindDefinition.promptLabel}`,
@@ -78,7 +71,7 @@ export class JobNewItemWorkflow {
 
     try {
       const { newUrl } = await this.deps.dataService.createItem(
-        kind,
+        kindDefinition.itemType,
         target.environment,
         target.parentUrl,
         newName
@@ -95,13 +88,9 @@ export class JobNewItemWorkflow {
   }
 }
 
-async function promptNewItemKind(): Promise<JenkinsItemCreateKind | undefined> {
-  const picks: NewItemCreateKindPick[] = NEW_ITEM_KIND_DEFINITIONS.map(
-    ({ label, description, itemType }) => ({ label, description, itemType })
-  );
-  const pick = await vscode.window.showQuickPick(picks, {
+async function promptNewItemKind(): Promise<NewItemKindDefinition | undefined> {
+  return vscode.window.showQuickPick(NEW_ITEM_KIND_DEFINITIONS, {
     placeHolder: "Select an item type to create",
     ignoreFocusOut: true
   });
-  return pick?.itemType;
 }

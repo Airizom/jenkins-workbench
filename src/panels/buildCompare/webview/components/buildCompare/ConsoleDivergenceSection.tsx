@@ -64,7 +64,7 @@ export function ConsoleDivergenceSection({
     // Wait a frame so the snippets are laid out before measuring offsets.
     const frame = requestAnimationFrame(() => scrollConsoleSnippetsToDivergence());
     return () => cancelAnimationFrame(frame);
-  }, [hasSnippets, section]);
+  }, [hasSnippets]);
 
   return (
     <SectionCard

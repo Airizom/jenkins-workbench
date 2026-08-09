@@ -1,9 +1,11 @@
+import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type { EnvironmentScope } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 
 export interface JobMetadataStores {
+  bindingStore: JenkinsDiagnosticProfileBindingStore;
   presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;
   watchStore: JenkinsWatchStore;
@@ -41,6 +43,13 @@ export async function updateJobMetadataOnRename(
 ): Promise<JobMetadataUpdateResult> {
   return settleJobMetadataOperations([
     () =>
+      stores.bindingStore.updateBindingUrl(
+        context.scope,
+        context.environmentId,
+        context.jobUrl,
+        newJobUrl
+      ),
+    () =>
       stores.presetStore.updatePresetUrl(
         context.scope,
         context.environmentId,
@@ -71,6 +80,12 @@ export async function removeJobMetadataOnDelete(
   context: JobMetadataContext
 ): Promise<JobMetadataUpdateResult> {
   return settleJobMetadataOperations([
+    () =>
+      stores.bindingStore.removeBindingsForJob(
+        context.scope,
+        context.environmentId,
+        context.jobUrl
+      ),
     () =>
       stores.presetStore.removePresetsForJob(context.scope, context.environmentId, context.jobUrl),
     () => stores.pinStore.removePin(context.scope, context.environmentId, context.jobUrl),

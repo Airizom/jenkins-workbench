@@ -21,6 +21,10 @@ export const CONFIG_KEYS = {
   queuePollIntervalSeconds: "queuePollIntervalSeconds",
   taskRunnerPollIntervalSeconds: "taskRunner.pollIntervalSeconds",
   taskRunnerMaxConsecutiveErrors: "taskRunner.maxConsecutiveErrors",
+  diagnosticsEnabled: "diagnostics.enabled",
+  diagnosticsMaxLogBytes: "diagnostics.maxLogBytes",
+  diagnosticsMaxProblems: "diagnostics.maxProblems",
+  diagnosticsProfiles: "diagnostics.profiles",
   currentBranchPullRequestJobNamePatterns: "currentBranch.pullRequestJobNamePatterns",
   buildTooltipDetails: "buildTooltips.includeDetails",
   buildTooltipParametersEnabled: "buildTooltips.parameters.enabled",
@@ -55,6 +59,11 @@ const DEFAULT_TASK_RUNNER_POLL_INTERVAL_SECONDS = 2;
 const MIN_TASK_RUNNER_POLL_INTERVAL_SECONDS = 1;
 const DEFAULT_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS = 5;
 const MIN_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS = 1;
+const DEFAULT_DIAGNOSTICS_MAX_LOG_BYTES = 32 * 1024 * 1024;
+const MIN_DIAGNOSTICS_MAX_LOG_BYTES = 64 * 1024;
+const MAX_DIAGNOSTICS_MAX_LOG_BYTES = 512 * 1024 * 1024;
+const DEFAULT_DIAGNOSTICS_MAX_PROBLEMS = 500;
+const MAX_DIAGNOSTICS_MAX_PROBLEMS = 500;
 const DEFAULT_REQUEST_TIMEOUT_SECONDS = 30;
 const DEFAULT_MAX_CACHE_ENTRIES = 1000;
 const MAX_CACHE_ENTRIES = 100_000;
@@ -180,6 +189,36 @@ export function getJenkinsTaskRunnerOptions(
       DEFAULT_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS,
       MIN_TASK_RUNNER_MAX_CONSECUTIVE_ERRORS
     )
+  };
+}
+
+export interface BuildDiagnosticsConfig {
+  enabled: boolean;
+  maxLogBytes: number;
+  maxProblems: number;
+  profiles: unknown;
+}
+
+export function getBuildDiagnosticsConfig(
+  config: vscode.WorkspaceConfiguration = getExtensionConfiguration()
+): BuildDiagnosticsConfig {
+  return {
+    enabled: config.get<boolean>(CONFIG_KEYS.diagnosticsEnabled, true),
+    maxLogBytes: getClampedIntegerConfigValue(
+      config,
+      CONFIG_KEYS.diagnosticsMaxLogBytes,
+      DEFAULT_DIAGNOSTICS_MAX_LOG_BYTES,
+      MIN_DIAGNOSTICS_MAX_LOG_BYTES,
+      MAX_DIAGNOSTICS_MAX_LOG_BYTES
+    ),
+    maxProblems: getClampedIntegerConfigValue(
+      config,
+      CONFIG_KEYS.diagnosticsMaxProblems,
+      DEFAULT_DIAGNOSTICS_MAX_PROBLEMS,
+      1,
+      MAX_DIAGNOSTICS_MAX_PROBLEMS
+    ),
+    profiles: config.get<unknown>(CONFIG_KEYS.diagnosticsProfiles, {})
   };
 }
 

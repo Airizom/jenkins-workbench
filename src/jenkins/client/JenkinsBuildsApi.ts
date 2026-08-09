@@ -44,23 +44,6 @@ const LAST_FAILED_BUILD_TREE = "lastFailedBuild[number,url,result,building,times
 const REBUILD_AUTOREBUILD_BODY = "autorebuild=true";
 const BUILD_LIST_LIMIT_TOKEN = "{limit}";
 
-const BUILD_LIST_TREE_PREFIXES = [
-  buildBuildsTree(),
-  buildBuildsTree({ includeDetails: true }),
-  buildBuildsTree({ includeParameters: true }),
-  buildBuildsTree({ includeDetails: true, includeParameters: true })
-].map((tree) => tree.slice(0, -BUILD_LIST_LIMIT_TOKEN.length));
-
-const BUILD_DETAILS_TREE_TEMPLATES = [
-  buildBuildDetailsTree(),
-  buildBuildDetailsTree({ includeCauses: true }),
-  buildBuildDetailsTree({ includeParameters: true }),
-  buildBuildDetailsTree({ includeCauses: true, includeParameters: true })
-];
-const BUILD_STATUS_TREE = buildBuildDetailsTree({ statusOnly: true });
-
-const TEST_REPORT_TREES = [buildTestReportTree(), buildTestReportTree({ includeCaseLogs: true })];
-
 export type JenkinsBuildTriggerOptions =
   | { mode: "build" }
   | {
@@ -92,7 +75,7 @@ export class JenkinsBuildsApi {
       return [];
     }
     // Stapler tree ranges {M,N} are exclusive of N, so {0,limit} returns `limit` builds.
-    const tree = `${getBuildsTreePrefix(options)}{0,${safeLimit}}`;
+    const tree = buildBuildsTree(options).replace(BUILD_LIST_LIMIT_TOKEN, `{0,${safeLimit}}`);
     const url = buildApiUrlFromItem(jobUrl, tree);
     const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
     return Array.isArray(response.builds) ? response.builds : [];
@@ -102,7 +85,7 @@ export class JenkinsBuildsApi {
     buildUrl: string,
     options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
   ): Promise<JenkinsBuildDetails> {
-    const tree = getBuildDetailsTree(options);
+    const tree = buildBuildDetailsTree(options);
     const url = buildApiUrlFromItem(buildUrl, tree);
     return this.context.requestJson<JenkinsBuildDetails>(url);
   }
@@ -118,7 +101,7 @@ export class JenkinsBuildsApi {
     options?: JenkinsTestReportOptions
   ): Promise<JenkinsTestReport> {
     const url = new URL("testReport/api/json", ensureTrailingSlash(buildUrl));
-    url.searchParams.set("tree", getTestReportTree(options));
+    url.searchParams.set("tree", buildTestReportTree(options));
     return this.context.requestJson<JenkinsTestReport>(url.toString());
   }
 
@@ -336,32 +319,4 @@ export class JenkinsBuildsApi {
       ? resolveTrustedJenkinsUrl(this.context.baseUrl, consoleUrl, ensureTrailingSlash(buildUrl))
       : undefined;
   }
-}
-
-function getBuildsTreePrefix(options?: {
-  includeDetails?: boolean;
-  includeParameters?: boolean;
-}): string {
-  const key = getBooleanOptionKey(options?.includeDetails, options?.includeParameters);
-  return BUILD_LIST_TREE_PREFIXES[key];
-}
-
-function getBuildDetailsTree(options?: {
-  includeCauses?: boolean;
-  includeParameters?: boolean;
-  statusOnly?: boolean;
-}): string {
-  if (options?.statusOnly) {
-    return BUILD_STATUS_TREE;
-  }
-  const key = getBooleanOptionKey(options?.includeCauses, options?.includeParameters);
-  return BUILD_DETAILS_TREE_TEMPLATES[key];
-}
-
-function getTestReportTree(options?: JenkinsTestReportOptions): string {
-  return TEST_REPORT_TREES[options?.includeCaseLogs ? 1 : 0];
-}
-
-function getBooleanOptionKey(first?: boolean, second?: boolean): number {
-  return (first ? 1 : 0) | (second ? 2 : 0);
 }

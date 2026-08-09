@@ -63,16 +63,13 @@ export class BuildComparePanelController {
     const token = this.loadTokenTracker.next();
     this.loadedConsoleSection = undefined;
     const nonce = createNonce();
-    const assets = this.view.resolveAssets();
+    const assets = this.view.resolveAssetsAndRenderLoading({
+      nonce,
+      panelState: options?.panelState
+    });
     if (!assets) {
       return { status: "missingAssets" };
     }
-
-    this.view.renderLoading({
-      nonce,
-      styleUris: assets.styleUris,
-      panelState: options?.panelState
-    });
 
     let model: BuildCompareViewModel;
     try {

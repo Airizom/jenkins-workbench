@@ -11,21 +11,7 @@ import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMess
 
 export type BuildDetailsPanelRenderOptions = EnvironmentPanelRenderOptions;
 
-interface BuildDetailsPanelViewRuntimeSurface {
-  postStateUpdate(
-    state: BuildDetailsPanelState,
-    options?: { canOpenSource?: (className?: string) => boolean; coverageEnabled?: boolean }
-  ): void;
-  postConsoleSnapshot(snapshot: {
-    consoleTextResult?: { text: string; truncated: boolean };
-    consoleHtmlResult?: { html: string; truncated: boolean };
-  }): void;
-}
-
-export class BuildDetailsPanelView
-  extends EnvironmentPanelView<BuildDetailsViewModel>
-  implements BuildDetailsPanelViewRuntimeSurface
-{
+export class BuildDetailsPanelView extends EnvironmentPanelView<BuildDetailsViewModel> {
   constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     super(panel, extensionUri, "buildDetails", "build", "Build Details", renderBuildDetailsHtml);
   }

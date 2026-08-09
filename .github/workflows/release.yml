@@ -63,17 +63,7 @@ jobs:
           NPM_CONFIG_PRODUCTION: "false"
           NODE_ENV: "development"
         run: |
-          set +e
-          for i in 1 2 3 4 5; do
-            ./node_modules/.bin/vsce package --no-dependencies -o "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
-            status=$?
-            if [ "$status" -eq 0 ]; then
-              break
-            fi
-            echo "vsce packaging failed (attempt $i, exit $status). Retrying in $((i*15))s..."
-            sleep $((i*15))
-          done
-          set -e
+          ./node_modules/.bin/vsce package --no-dependencies -o "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
           test -f "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
 
       - name: Upload artifact

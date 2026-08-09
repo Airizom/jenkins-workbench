@@ -121,25 +121,16 @@ export class RestartFromStageResponseParser {
       return [];
     }
     const stages: string[] = [];
-    let seen: Set<string> | undefined;
+    const seen = new Set<string>();
     for (const entry of value) {
       if (typeof entry !== "string") {
         continue;
       }
-      const trimmed = entry.trim();
-      if (trimmed.length === 0) {
+      if (entry.trim().length === 0 || seen.has(entry)) {
         continue;
       }
-      if (stages.length === 0) {
-        stages.push(trimmed);
-        continue;
-      }
-      seen ??= new Set(stages);
-      if (seen.has(trimmed)) {
-        continue;
-      }
-      seen.add(trimmed);
-      stages.push(trimmed);
+      seen.add(entry);
+      stages.push(entry);
     }
     return stages;
   }

@@ -65,8 +65,20 @@ type PendingResolve = {
 class ControlledExpansionResolver implements TreeExpansionResolver {
   readonly pendingBuilds: PendingBuild[] = [];
   readonly pendingResolves: PendingResolve[] = [];
+  private readonly treeChangeListeners = new Set<
+    (element: WorkbenchTreeElement | undefined) => void
+  >();
 
-  readonly onDidChangeTreeData = (): Disposable => ({ dispose: () => undefined });
+  readonly onDidChangeTreeData = (
+    listener: (element: WorkbenchTreeElement | undefined) => void
+  ): Disposable => {
+    this.treeChangeListeners.add(listener);
+    return {
+      dispose: () => {
+        this.treeChangeListeners.delete(listener);
+      }
+    };
+  };
 
   async buildExpansionPath(element: WorkbenchTreeElement): Promise<TreeExpansionPath | undefined> {
     return await new Promise<TreeExpansionPath | undefined>((resolve) => {
@@ -79,10 +91,16 @@ class ControlledExpansionResolver implements TreeExpansionResolver {
       this.pendingResolves.push({ path, resolve });
     });
   }
+
+  fireTreeChange(element?: WorkbenchTreeElement): void {
+    for (const listener of this.treeChangeListeners) {
+      listener(element);
+    }
+  }
 }
 
-function createElement(): WorkbenchTreeElement {
-  return {} as WorkbenchTreeElement;
+function createElement(id?: string): WorkbenchTreeElement {
+  return { id } as WorkbenchTreeElement;
 }
 
 async function flushPromises(): Promise<void> {
@@ -194,6 +212,66 @@ describe("TreeExpansionState", () => {
     assert.equal(resolver.pendingBuilds.length, 0);
     assert.deepEqual(state.snapshot(), [path]);
 
+    state.dispose();
+  });
+
+  it("waits for the pending path element instead of unrelated targeted changes", async () => {
+    const treeView = new TestTreeView();
+    const resolver = new ControlledExpansionResolver();
+    const state = new TreeExpansionState(
+      treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+      resolver
+    );
+    const pendingElement = createElement("jobs");
+    const resolvedElement = createElement();
+    const path = ["env", "jobs", "folder"];
+
+    const restore = state.restore([path]);
+    resolver.pendingResolves[0].resolve({
+      pending: true,
+      pendingElement
+    });
+    await flushPromises();
+
+    resolver.fireTreeChange(createElement("activity"));
+    resolver.fireTreeChange(createElement("queue"));
+    resolver.fireTreeChange(createElement("nodes"));
+    await flushPromises();
+    assert.equal(resolver.pendingResolves.length, 1);
+
+    const equivalentPendingElement = createElement("jobs");
+    assert.notEqual(equivalentPendingElement, pendingElement);
+    resolver.fireTreeChange(equivalentPendingElement);
+    await flushPromises();
+    assert.equal(resolver.pendingResolves.length, 2);
+    resolver.pendingResolves[1].resolve({ element: resolvedElement, pending: false });
+
+    await restore;
+    assert.deepEqual(state.snapshot(), [path]);
+    state.dispose();
+  });
+
+  it("observes a tree change fired while a pending path resolution completes", async () => {
+    const treeView = new TestTreeView();
+    const resolver = new ControlledExpansionResolver();
+    const state = new TreeExpansionState(
+      treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+      resolver
+    );
+    const pendingElement = createElement("jobs");
+    const resolvedElement = createElement("folder");
+    const path = ["env", "jobs", "folder"];
+
+    const restore = state.restore([path]);
+    resolver.pendingResolves[0].resolve({ pending: true, pendingElement });
+    resolver.fireTreeChange(pendingElement);
+    await flushPromises();
+
+    assert.equal(resolver.pendingResolves.length, 2);
+    resolver.pendingResolves[1].resolve({ element: resolvedElement, pending: false });
+    await restore;
+
+    assert.deepEqual(state.snapshot(), [path]);
     state.dispose();
   });
 });

@@ -31,7 +31,6 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
   private isRunning = false;
   private isCanceled = false;
   private isAtLineStart = true;
-  private pendingCarriageReturn = false;
   private runner: JenkinsTaskRunner | undefined;
 
   readonly onDidWrite = this.writeEmitter.event;
@@ -80,39 +79,12 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
       return;
     }
 
-    let normalized = "";
-    for (const character of text) {
-      if (this.pendingCarriageReturn) {
-        normalized += "\r\n";
-        this.pendingCarriageReturn = false;
-        if (character === "\n") {
-          continue;
-        }
-      }
-
-      if (character === "\r") {
-        this.pendingCarriageReturn = true;
-      } else if (character === "\n") {
-        normalized += "\r\n";
-      } else {
-        normalized += character;
-      }
-    }
-
-    if (normalized.length === 0) {
-      return;
-    }
+    const normalized = text.replace(/\n/g, "\r\n");
     this.writeEmitter.fire(normalized);
-    this.isAtLineStart = normalized.endsWith("\r\n");
+    this.isAtLineStart = text.endsWith("\n");
   }
 
   private ensureLineStart(): void {
-    if (this.pendingCarriageReturn) {
-      this.writeEmitter.fire("\r\n");
-      this.pendingCarriageReturn = false;
-      this.isAtLineStart = true;
-      return;
-    }
     if (!this.isAtLineStart) {
       this.writeEmitter.fire("\r\n");
       this.isAtLineStart = true;
@@ -122,10 +94,6 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
   private signalClose(exitCode: number): void {
     if (this.isClosed) {
       return;
-    }
-    if (this.pendingCarriageReturn) {
-      this.writeEmitter.fire("\r\n");
-      this.pendingCarriageReturn = false;
     }
     this.isClosed = true;
     this.closeEmitter.fire(exitCode);
@@ -190,11 +158,6 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
         this.dataService,
         getJenkinsTaskRunnerOptions(getExtensionConfiguration())
       );
-      if (this.isCanceled) {
-        this.runner.cancel();
-        await this.runner.waitForCleanup();
-        return;
-      }
 
       const result = await this.runner.run(
         {

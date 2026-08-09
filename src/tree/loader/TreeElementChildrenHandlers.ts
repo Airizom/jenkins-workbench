@@ -23,7 +23,10 @@ import {
   buildWorkspaceRootChildrenKey,
   getJobCollectionElement
 } from "./TreeChildrenMapping";
-import type { TreeElementChildrenHandler } from "./TreeElementChildrenHandler";
+import {
+  createTreeElementChildrenHandler,
+  type TreeElementChildrenHandler
+} from "./TreeElementChildrenHandler";
 import type { TreeEnvironmentChildrenLoader } from "./TreeEnvironmentChildrenLoader";
 import type { TreeJobCollectionChildrenLoader } from "./TreeJobCollectionChildrenLoader";
 import type { TreePinnedChildrenLoader } from "./TreePinnedChildrenLoader";
@@ -61,20 +64,16 @@ export function createTreeElementChildrenHandlers({
   invalidateBuildArtifacts
 }: TreeElementChildrenHandlerDependencies): TreeElementChildrenHandler[] {
   return [
-    {
-      matches: (element) => element instanceof RootSectionTreeItem,
+    createTreeElementChildrenHandler(RootSectionTreeItem, {
       getChildren: () => environmentLoader.getInstanceItems(),
       invalidate: () => clearChildrenCacheForEnvironment()
-    },
-    {
-      matches: (element) => element instanceof InstanceTreeItem,
-      getChildren: (element) => environmentLoader.getInstanceChildren(element as InstanceTreeItem),
-      invalidate: (element) => clearChildrenCacheForEnvironment(element as InstanceTreeItem)
-    },
-    {
-      matches: (element) => element instanceof ActivityFolderTreeItem,
-      getChildren: (element) => {
-        const folder = element as ActivityFolderTreeItem;
+    }),
+    createTreeElementChildrenHandler(InstanceTreeItem, {
+      getChildren: (element) => environmentLoader.getInstanceChildren(element),
+      invalidate: (element) => clearChildrenCacheForEnvironment(element)
+    }),
+    createTreeElementChildrenHandler(ActivityFolderTreeItem, {
+      getChildren: (folder) => {
         return cacheManager.getOrLoadChildren(
           activityLoader.buildActivityRootChildrenKey(folder.environment),
           folder,
@@ -82,14 +81,12 @@ export function createTreeElementChildrenHandlers({
           "Loading activity..."
         );
       },
-      invalidate: (element) => {
-        activityLoader.clearActivityData((element as ActivityFolderTreeItem).environment);
+      invalidate: (folder) => {
+        activityLoader.clearActivityData(folder.environment);
       }
-    },
-    {
-      matches: (element) => element instanceof ActivityGroupTreeItem,
-      getChildren: (element) => {
-        const group = element as ActivityGroupTreeItem;
+    }),
+    createTreeElementChildrenHandler(ActivityGroupTreeItem, {
+      getChildren: (group) => {
         return cacheManager.getOrLoadChildren(
           activityLoader.buildActivityGroupChildrenKey(group.environment, group.group),
           group,
@@ -97,17 +94,14 @@ export function createTreeElementChildrenHandlers({
           "Loading activity group..."
         );
       },
-      invalidate: (element) => {
-        const group = element as ActivityGroupTreeItem;
+      invalidate: (group) => {
         cacheManager.clearChildrenCache(
           activityLoader.buildActivityGroupChildrenKey(group.environment, group.group)
         );
       }
-    },
-    {
-      matches: (element) => element instanceof PinnedJobsFolderTreeItem,
-      getChildren: (element) => {
-        const folder = element as PinnedJobsFolderTreeItem;
+    }),
+    createTreeElementChildrenHandler(PinnedJobsFolderTreeItem, {
+      getChildren: (folder) => {
         return cacheManager.getOrLoadChildren(
           buildChildrenKey("pinned-root", folder.environment),
           folder,
@@ -115,15 +109,11 @@ export function createTreeElementChildrenHandlers({
           "Loading pinned jobs..."
         );
       },
-      invalidate: (element) =>
-        cacheManager.clearChildrenCache(
-          buildChildrenKey("pinned-root", (element as PinnedJobsFolderTreeItem).environment)
-        )
-    },
-    {
-      matches: (element) => element instanceof ViewsFolderTreeItem,
-      getChildren: (element) => {
-        const folder = element as ViewsFolderTreeItem;
+      invalidate: (folder) =>
+        cacheManager.clearChildrenCache(buildChildrenKey("pinned-root", folder.environment))
+    }),
+    createTreeElementChildrenHandler(ViewsFolderTreeItem, {
+      getChildren: (folder) => {
         return cacheManager.getOrLoadChildren(
           buildChildrenKey("views", folder.environment),
           folder,
@@ -131,32 +121,26 @@ export function createTreeElementChildrenHandlers({
           "Loading views..."
         );
       },
-      invalidate: (element) =>
-        cacheManager.clearChildrenCache(
-          buildChildrenKey("views", (element as ViewsFolderTreeItem).environment)
-        )
-    },
+      invalidate: (folder) =>
+        cacheManager.clearChildrenCache(buildChildrenKey("views", folder.environment))
+    }),
     {
       matches: (element) => Boolean(getJobCollectionElement(element)),
       getChildren: (element) => jobCollectionLoader.getJobCollectionChildren(element),
       invalidate: (element) => jobCollectionLoader.invalidateJobCollectionChildren(element)
     },
-    {
-      matches: (element) => element instanceof JobTreeItem,
-      getChildren: (element) => buildLoader.loadJobChildrenWithWorkspace(element as JobTreeItem),
-      invalidate: (element) => {
-        const job = element as JobTreeItem;
+    createTreeElementChildrenHandler(JobTreeItem, {
+      getChildren: (job) => buildLoader.loadJobChildrenWithWorkspace(job),
+      invalidate: (job) => {
         cacheManager.clearChildrenCache(
           buildLoader.buildBuildsChildrenKey(job.environment, job.jobUrl, job.jobScope)
         );
         cacheManager.clearWorkspaceChildrenForJob(job.environment, job.jobUrl, job.jobScope);
       }
-    },
-    {
-      matches: (element) => element instanceof PipelineTreeItem,
-      getChildren: (element) => buildLoader.loadBuildChildren(element as PipelineTreeItem),
-      invalidate: (element) => {
-        const pipeline = element as PipelineTreeItem;
+    }),
+    createTreeElementChildrenHandler(PipelineTreeItem, {
+      getChildren: (pipeline) => buildLoader.loadBuildChildren(pipeline),
+      invalidate: (pipeline) => {
         cacheManager.clearChildrenCache(
           buildLoader.buildBuildsChildrenKey(
             pipeline.environment,
@@ -165,34 +149,26 @@ export function createTreeElementChildrenHandlers({
           )
         );
       }
-    },
-    {
-      matches: (element) => element instanceof StalePinnedJobTreeItem,
-      invalidate: (element) =>
-        cacheManager.clearChildrenCache(
-          buildChildrenKey("pinned-root", (element as StalePinnedJobTreeItem).environment)
-        )
-    },
-    {
-      matches: (element) => element instanceof BuildTreeItem,
-      getChildren: (element) => {
-        const build = element as BuildTreeItem;
+    }),
+    createTreeElementChildrenHandler(StalePinnedJobTreeItem, {
+      invalidate: (job) =>
+        cacheManager.clearChildrenCache(buildChildrenKey("pinned-root", job.environment))
+    }),
+    createTreeElementChildrenHandler(BuildTreeItem, {
+      getChildren: (build) => {
         return cacheManager.getOrLoadChildren(
           buildLoader.buildBuildArtifactsKey(build.environment, build.buildUrl, build.jobScope),
           build,
-          () => buildLoader.loadArtifactsSummaryForBuild(build),
+          (isCurrentLoad) => buildLoader.loadArtifactsSummaryForBuild(build, isCurrentLoad),
           "Loading artifacts..."
         );
       },
-      invalidate: (element) => {
-        const build = element as BuildTreeItem;
+      invalidate: (build) => {
         invalidateBuildArtifacts(build.environment, build.buildUrl, build.jobScope);
       }
-    },
-    {
-      matches: (element) => element instanceof BuildArtifactsFolderTreeItem,
-      getChildren: (element) => {
-        const folder = element as BuildArtifactsFolderTreeItem;
+    }),
+    createTreeElementChildrenHandler(BuildArtifactsFolderTreeItem, {
+      getChildren: (folder) => {
         return cacheManager.getOrLoadChildren(
           buildLoader.buildArtifactChildrenKey(
             folder.environment,
@@ -200,22 +176,16 @@ export function createTreeElementChildrenHandlers({
             folder.jobScope
           ),
           folder,
-          () => buildLoader.loadArtifactsForBuild(folder),
+          (isCurrentLoad) => buildLoader.loadArtifactsForBuild(folder, isCurrentLoad),
           "Loading artifacts..."
         );
       },
-      invalidate: (element) => {
-        const folder = element as BuildArtifactsFolderTreeItem;
+      invalidate: (folder) => {
         invalidateBuildArtifacts(folder.environment, folder.buildUrl, folder.jobScope);
-        cacheManager.clearChildrenCache(
-          buildLoader.buildArtifactChildrenKey(folder.environment, folder.buildUrl, folder.jobScope)
-        );
       }
-    },
-    {
-      matches: (element) => element instanceof WorkspaceRootTreeItem,
-      getChildren: (element) => {
-        const workspace = element as WorkspaceRootTreeItem;
+    }),
+    createTreeElementChildrenHandler(WorkspaceRootTreeItem, {
+      getChildren: (workspace) => {
         return cacheManager.getOrLoadChildren(
           buildWorkspaceRootChildrenKey(
             buildChildrenKey,
@@ -233,19 +203,16 @@ export function createTreeElementChildrenHandlers({
           "Loading workspace..."
         );
       },
-      invalidate: (element) => {
-        const workspace = element as WorkspaceRootTreeItem;
+      invalidate: (workspace) => {
         cacheManager.clearWorkspaceChildrenForJob(
           workspace.environment,
           workspace.jobUrl,
           workspace.jobScope
         );
       }
-    },
-    {
-      matches: (element) => element instanceof WorkspaceDirectoryTreeItem,
-      getChildren: (element) => {
-        const directory = element as WorkspaceDirectoryTreeItem;
+    }),
+    createTreeElementChildrenHandler(WorkspaceDirectoryTreeItem, {
+      getChildren: (directory) => {
         return cacheManager.getOrLoadChildren(
           buildWorkspaceDirectoryChildrenKey(
             buildChildrenKey,
@@ -265,8 +232,7 @@ export function createTreeElementChildrenHandlers({
           "Loading workspace folder..."
         );
       },
-      invalidate: (element) => {
-        const directory = element as WorkspaceDirectoryTreeItem;
+      invalidate: (directory) => {
         cacheManager.clearWorkspaceDirectorySubtree(
           directory.environment,
           directory.jobUrl,
@@ -274,46 +240,37 @@ export function createTreeElementChildrenHandlers({
           directory.relativePath
         );
       }
-    },
-    {
-      matches: (element) => element instanceof NodesFolderTreeItem,
-      getChildren: (element) => {
-        const folder = element as NodesFolderTreeItem;
+    }),
+    createTreeElementChildrenHandler(NodesFolderTreeItem, {
+      getChildren: (folder) => {
         return cacheManager.getOrLoadChildren(
           buildChildrenKey("nodes", folder.environment),
           folder,
-          () => environmentLoader.loadNodes(folder.environment),
+          (isCurrentLoad) => environmentLoader.loadNodes(folder.environment, isCurrentLoad),
           "Loading nodes..."
         );
       },
-      invalidate: (element) =>
-        cacheManager.clearChildrenCache(
-          buildChildrenKey("nodes", (element as NodesFolderTreeItem).environment)
-        )
-    },
-    {
-      matches: (element) => element instanceof NodeTreeItem,
-      invalidate: (element) =>
-        cacheManager.clearChildrenCache(
-          buildChildrenKey("nodes", (element as NodeTreeItem).environment)
-        )
-    },
-    {
-      matches: (element) => element instanceof BuildQueueFolderTreeItem,
-      getChildren: (element) => {
-        const folder = element as BuildQueueFolderTreeItem;
+      invalidate: (folder) =>
+        cacheManager.clearChildrenCache(buildChildrenKey("nodes", folder.environment))
+    }),
+    createTreeElementChildrenHandler(NodeTreeItem, {
+      invalidate: (node) =>
+        cacheManager.clearChildrenCache(buildChildrenKey("nodes", node.environment))
+    }),
+    createTreeElementChildrenHandler(BuildQueueFolderTreeItem, {
+      getChildren: (folder) => {
         return cacheManager.getOrLoadChildren(
           buildChildrenKey("queue", folder.environment),
           folder,
-          () => environmentLoader.loadQueueForEnvironment(folder.environment),
+          (isCurrentLoad) =>
+            environmentLoader.loadQueueForEnvironment(folder.environment, isCurrentLoad),
           "Loading build queue..."
         );
       },
-      invalidate: (element) => clearQueueCache((element as BuildQueueFolderTreeItem).environment)
-    },
-    {
-      matches: (element) => element instanceof QueueItemTreeItem,
-      invalidate: (element) => clearQueueCache((element as QueueItemTreeItem).environment)
-    }
+      invalidate: (folder) => clearQueueCache(folder.environment)
+    }),
+    createTreeElementChildrenHandler(QueueItemTreeItem, {
+      invalidate: (item) => clearQueueCache(item.environment)
+    })
   ];
 }

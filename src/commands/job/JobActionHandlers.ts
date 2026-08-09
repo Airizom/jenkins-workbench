@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { parseJobUrl } from "../../jenkins/urls";
+import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
@@ -18,6 +19,7 @@ import type { JobNewItemTargetResolver, JobNewItemTreeTarget } from "./JobNewIte
 import type { JobNewItemWorkflow } from "./JobNewItemWorkflow";
 
 export interface JobActionDependencies {
+  bindingStore: JenkinsDiagnosticProfileBindingStore;
   dataService: JenkinsDataService;
   newItemTargetResolver: JobNewItemTargetResolver;
   newItemWorkflow: JobNewItemWorkflow;
@@ -33,6 +35,14 @@ interface JobSelectionContext {
   selected: JobActionTreeItem;
   label: string;
   environmentId: string;
+}
+
+interface JobStateActionDefinition {
+  verb: "enable" | "disable";
+  actionLabel: "Enable" | "Disable";
+  successVerb: "Enabled" | "Disabled";
+  confirmationDetail?: string;
+  operation: "enableJob" | "disableJob";
 }
 
 function refreshEnvironment(deps: JobActionDependencies, environmentId: string): void {
@@ -61,11 +71,17 @@ async function confirmModalAction(prompt: string, actionLabel: string): Promise<
 }
 
 function getMetadataStores(deps: JobActionDependencies): {
+  bindingStore: JenkinsDiagnosticProfileBindingStore;
   presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;
   watchStore: JenkinsWatchStore;
 } {
-  return { presetStore: deps.presetStore, pinStore: deps.pinStore, watchStore: deps.watchStore };
+  return {
+    bindingStore: deps.bindingStore,
+    presetStore: deps.presetStore,
+    pinStore: deps.pinStore,
+    watchStore: deps.watchStore
+  };
 }
 
 function showMetadataFailureWarning(
@@ -94,6 +110,41 @@ async function runJobActionWithRefresh(
     await action();
     refreshEnvironment(deps, context.environmentId);
   });
+}
+
+async function runJobStateAction(
+  deps: JobActionDependencies,
+  item: JobActionTreeItem | undefined,
+  definition: JobStateActionDefinition
+): Promise<void> {
+  const context = getJobSelectionContext(item, `Select a job or pipeline to ${definition.verb}.`);
+  if (!context) {
+    return;
+  }
+
+  const confirmationDetail = definition.confirmationDetail
+    ? ` ${definition.confirmationDetail}`
+    : "";
+  const confirmed = await confirmModalAction(
+    `Are you sure you want to ${definition.verb} "${context.label}"?${confirmationDetail}`,
+    definition.actionLabel
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  await runJobActionWithRefresh(
+    deps,
+    context,
+    `Failed to ${definition.verb} "${context.label}"`,
+    async () => {
+      await deps.dataService[definition.operation](
+        context.selected.environment,
+        context.selected.jobUrl
+      );
+      void vscode.window.showInformationMessage(`${definition.successVerb} "${context.label}".`);
+    }
+  );
 }
 
 export async function newItem(
@@ -136,22 +187,11 @@ export async function enableJob(
   deps: JobActionDependencies,
   item?: JobActionTreeItem
 ): Promise<void> {
-  const context = getJobSelectionContext(item, "Select a job or pipeline to enable.");
-  if (!context) {
-    return;
-  }
-
-  const confirmed = await confirmModalAction(
-    `Are you sure you want to enable "${context.label}"?`,
-    "Enable"
-  );
-  if (!confirmed) {
-    return;
-  }
-
-  await runJobActionWithRefresh(deps, context, `Failed to enable "${context.label}"`, async () => {
-    await deps.dataService.enableJob(context.selected.environment, context.selected.jobUrl);
-    void vscode.window.showInformationMessage(`Enabled "${context.label}".`);
+  await runJobStateAction(deps, item, {
+    verb: "enable",
+    actionLabel: "Enable",
+    successVerb: "Enabled",
+    operation: "enableJob"
   });
 }
 
@@ -159,22 +199,12 @@ export async function disableJob(
   deps: JobActionDependencies,
   item?: JobActionTreeItem
 ): Promise<void> {
-  const context = getJobSelectionContext(item, "Select a job or pipeline to disable.");
-  if (!context) {
-    return;
-  }
-
-  const confirmed = await confirmModalAction(
-    `Are you sure you want to disable "${context.label}"? Disabled jobs cannot be built until re-enabled.`,
-    "Disable"
-  );
-  if (!confirmed) {
-    return;
-  }
-
-  await runJobActionWithRefresh(deps, context, `Failed to disable "${context.label}"`, async () => {
-    await deps.dataService.disableJob(context.selected.environment, context.selected.jobUrl);
-    void vscode.window.showInformationMessage(`Disabled "${context.label}".`);
+  await runJobStateAction(deps, item, {
+    verb: "disable",
+    actionLabel: "Disable",
+    successVerb: "Disabled",
+    confirmationDetail: "Disabled jobs cannot be built until re-enabled.",
+    operation: "disableJob"
   });
 }
 

@@ -2,6 +2,7 @@ import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "../coverage/JenkinsCoverageTypes";
+import type { JenkinsClient } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
@@ -22,30 +23,15 @@ export class JenkinsCoverageDataOperations {
     buildUrl: string,
     options?: JenkinsCoverageRequestOptions
   ): Promise<JenkinsCoverageOverview | undefined> {
-    const buildCompleted = Boolean(options?.buildCompleted);
     const actionPath = normalizeCoverageActionPath(options?.actionPath);
-    const cacheKey = await this.buildCacheKey(
+    return this.loadCoverageData(
       environment,
       "coverage-overview",
       buildUrl,
-      actionPath
+      actionPath,
+      options?.buildCompleted,
+      (client) => client.getCoverageOverview(buildUrl, actionPath)
     );
-    const cached = this.getCompletedBuildCacheEntry<JenkinsCoverageOverview>(
-      cacheKey,
-      buildCompleted
-    );
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const client = await this.runtimeContext.getClient(environment);
-    try {
-      const overview = await client.getCoverageOverview(buildUrl, actionPath);
-      this.updateCompletedBuildCache(cacheKey, overview, buildCompleted);
-      return overview;
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
   }
 
   async getModifiedCoverageFiles(
@@ -53,30 +39,15 @@ export class JenkinsCoverageDataOperations {
     buildUrl: string,
     options?: JenkinsCoverageRequestOptions
   ): Promise<JenkinsModifiedCoverageFile[] | undefined> {
-    const buildCompleted = Boolean(options?.buildCompleted);
     const actionPath = normalizeCoverageActionPath(options?.actionPath);
-    const cacheKey = await this.buildCacheKey(
+    return this.loadCoverageData(
       environment,
       "coverage-modified",
       buildUrl,
-      actionPath
+      actionPath,
+      options?.buildCompleted,
+      (client) => client.getModifiedCoverageFiles(buildUrl, actionPath)
     );
-    const cached = this.getCompletedBuildCacheEntry<JenkinsModifiedCoverageFile[]>(
-      cacheKey,
-      buildCompleted
-    );
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const client = await this.runtimeContext.getClient(environment);
-    try {
-      const files = await client.getModifiedCoverageFiles(buildUrl, actionPath);
-      this.updateCompletedBuildCache(cacheKey, files, buildCompleted);
-      return files;
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
   }
 
   async discoverCoverageActionPath(
@@ -84,18 +55,36 @@ export class JenkinsCoverageDataOperations {
     buildUrl: string,
     options?: JenkinsCoverageRequestOptions
   ): Promise<string | undefined> {
-    const buildCompleted = Boolean(options?.buildCompleted);
-    const cacheKey = await this.buildCacheKey(environment, "coverage-action-path", buildUrl, "");
-    const cached = this.getCompletedBuildCacheEntry<string>(cacheKey, buildCompleted);
+    return this.loadCoverageData(
+      environment,
+      "coverage-action-path",
+      buildUrl,
+      "",
+      options?.buildCompleted,
+      (client) => client.discoverCoverageActionPath(buildUrl)
+    );
+  }
+
+  private async loadCoverageData<T>(
+    environment: JenkinsEnvironmentRef,
+    cacheKind: string,
+    buildUrl: string,
+    actionPath: string,
+    buildCompleted: boolean | undefined,
+    operation: (client: JenkinsClient) => Promise<T | undefined>
+  ): Promise<T | undefined> {
+    const completed = Boolean(buildCompleted);
+    const cacheKey = await this.buildCacheKey(environment, cacheKind, buildUrl, actionPath);
+    const cached = this.getCompletedBuildCacheEntry<T>(cacheKey, completed);
     if (cached !== undefined) {
       return cached;
     }
 
     const client = await this.runtimeContext.getClient(environment);
     try {
-      const actionPath = await client.discoverCoverageActionPath(buildUrl);
-      this.updateCompletedBuildCache(cacheKey, actionPath, buildCompleted);
-      return actionPath;
+      const value = await operation(client);
+      this.updateCompletedBuildCache(cacheKey, value, completed);
+      return value;
     } catch (error) {
       throw toBuildActionError(error);
     }

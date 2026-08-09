@@ -6,7 +6,6 @@ import {
   StopCircleIcon,
   XCircleIcon
 } from "../icons";
-import { cn } from "../lib/utils";
 
 type BuildResultStatusIconProps = {
   status?: string;
@@ -18,15 +17,15 @@ export function BuildResultStatusIcon({
 }: BuildResultStatusIconProps): React.JSX.Element | null {
   switch (status) {
     case "success":
-      return <CheckCircleIcon className={cn(className)} />;
+      return <CheckCircleIcon className={className} />;
     case "failure":
-      return <XCircleIcon className={cn(className)} />;
+      return <XCircleIcon className={className} />;
     case "unstable":
-      return <AlertTriangleIcon className={cn(className)} />;
+      return <AlertTriangleIcon className={className} />;
     case "aborted":
-      return <StopCircleIcon className={cn(className)} />;
+      return <StopCircleIcon className={className} />;
     case "running":
-      return <PlayCircleIcon className={cn(className)} />;
+      return <PlayCircleIcon className={className} />;
     default:
       return null;
   }

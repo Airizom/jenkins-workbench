@@ -9,14 +9,7 @@ const DEFAULT_POLL_INTERVAL_SECONDS = 10;
 const MIN_POLL_INTERVAL_SECONDS = 2;
 const DEFAULT_POLL_INTERVAL_MS = DEFAULT_POLL_INTERVAL_SECONDS * 1000;
 
-interface JenkinsQueuePollerRuntimeSurface {
-  trackExpanded(environment: JenkinsEnvironmentRef): void;
-  trackCollapsed(environment: JenkinsEnvironmentRef): void;
-  clearAll(): void;
-  updatePollIntervalSeconds(pollIntervalSeconds: number): void;
-}
-
-export class JenkinsQueuePoller implements vscode.Disposable, JenkinsQueuePollerRuntimeSurface {
+export class JenkinsQueuePoller implements vscode.Disposable {
   private intervalId: NodeJS.Timeout | undefined;
   private isPolling = false;
   private pollIntervalMs: number;

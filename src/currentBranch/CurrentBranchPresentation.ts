@@ -2,8 +2,7 @@ import { resolveBuildResultLabel } from "../formatters/BuildStatusFormatters";
 import { isRunningJobColor } from "../formatters/JobColorFormatters";
 import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
 import { formatJobColor } from "../tree/formatters";
-import type { CurrentBranchState } from "./CurrentBranchJenkinsService";
-import type { CurrentBranchPullRequestInfo } from "./CurrentBranchTypes";
+import type { CurrentBranchPullRequestInfo, CurrentBranchState } from "./CurrentBranchTypes";
 
 export function formatCurrentBranchJobLabel(
   state: Extract<CurrentBranchState, { kind: "matched" | "branchMissing" }>

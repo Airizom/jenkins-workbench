@@ -72,7 +72,7 @@ function buildSignatures(
     });
   }
 
-  return dedupeSignatures(signatures);
+  return signatures;
 }
 
 function createSignature(
@@ -88,17 +88,6 @@ function createSignature(
     usesNamedArgs,
     takesClosure
   };
-}
-
-function dedupeSignatures(signatures: JenkinsfileStepSignature[]): JenkinsfileStepSignature[] {
-  const seen = new Set<string>();
-  return signatures.filter((signature) => {
-    if (seen.has(signature.label)) {
-      return false;
-    }
-    seen.add(signature.label);
-    return true;
-  });
 }
 
 function formatSignatureParameters(parameters: JenkinsfileStepParameter[]): string {

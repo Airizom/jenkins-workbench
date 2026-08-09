@@ -23,8 +23,10 @@ import {
 } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { buildBuildDetailsViewModel } from "./BuildDetailsViewModel";
+import type { ConsoleTextByteRange } from "./ConsoleStreamManager";
 import { PipelineNodeLogManager } from "./PipelineNodeLogManager";
 import type {
+  BuildDiagnosticsViewModel,
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
@@ -41,6 +43,24 @@ export type BuildDetailsPanelLoadResult =
   | {
       status: "missingAssets";
     };
+
+type BuildDetailsResolvedAssets = Parameters<BuildDetailsPanelView["renderBuildDetails"]>[1];
+
+interface DiagnosticConsoleSyncOperation {
+  backend: BuildDetailsBackend["console"];
+  environment: JenkinsEnvironmentRef;
+  buildUrl: string;
+  textRange: ConsoleTextByteRange;
+  appendedTextRange?: ConsoleTextByteRange;
+  loadToken: number;
+  syncGeneration: number;
+}
+
+interface DiagnosticConsoleSyncRange {
+  append: boolean;
+  start: number;
+  end: number;
+}
 
 export interface BuildDetailsPanelControllerAccess {
   getBackend(): BuildDetailsBackend | undefined;
@@ -76,12 +96,18 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private pollingController?: BuildDetailsPollingController;
   private pipelineNodeLogManager?: PipelineNodeLogManager;
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
+  private diagnosticConsoleText = "";
+  private diagnosticConsoleSyncGeneration = 0;
+  private diagnosticConsoleSyncQueue: Promise<void> = Promise.resolve();
+  private diagnosticConsoleTextSynchronized = true;
 
   constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     coverageDecorationService: CoverageDecorationService,
-    getCanOpenTestSource?: BuildDetailsCanOpenTestSource
+    getCanOpenTestSource?: BuildDetailsCanOpenTestSource,
+    private readonly onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void,
+    private readonly onDiagnosticConsoleTextChanged?: () => void
   ) {
     this.canOpenTestSource = getCanOpenTestSource;
     this.view = new BuildDetailsPanelView(panel, extensionUri);
@@ -94,11 +120,14 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       getPollingController: () => this.pollingController,
       getCurrentToken: () => this.loadTokenTracker.current,
       isTokenCurrent: (token) => this.loadTokenTracker.isCurrent(token),
-      canOpenTestSource: getCanOpenTestSource
+      canOpenTestSource: getCanOpenTestSource,
+      onBuildDetailsChanged,
+      onConsoleTextSet: (text) => this.replaceDiagnosticConsoleText(text)
     });
   }
 
   dispose(): void {
+    this.diagnosticConsoleSyncGeneration += 1;
     this.pollingController?.dispose();
     this.pollingController = undefined;
     this.pipelineNodeLogManager?.dispose();
@@ -135,6 +164,14 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
   getCurrentDetails(): JenkinsBuildDetails | undefined {
     return this.state.currentDetails;
+  }
+
+  getDiagnosticConsoleText(): string {
+    return this.diagnosticConsoleText;
+  }
+
+  postBuildDiagnostics(diagnostics: BuildDiagnosticsViewModel): void {
+    this.view.postMessage({ type: "setBuildDiagnostics", diagnostics });
   }
 
   getLoadToken(): number {
@@ -191,6 +228,34 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     buildUrl: string,
     options?: BuildDetailsPanelLoadOptions
   ): Promise<BuildDetailsPanelLoadResult> {
+    const token = this.prepareLoad(backend, environment, buildUrl);
+
+    const assets = this.view.resolveAssetsAndRenderLoading({
+      nonce: this.state.currentNonce,
+      panelState: options?.panelState
+    });
+    if (!assets) {
+      return { status: "missingAssets" };
+    }
+
+    this.pipelineNodeLogManager = this.createPipelineNodeLogManager(backend, environment, buildUrl);
+    this.pollingController = this.createPollingController(backend, environment, buildUrl, token);
+
+    const initialState: BuildDetailsInitialState = await this.pollingController.loadInitial();
+    if (!this.loadTokenTracker.isCurrent(token)) {
+      return { status: "ok" };
+    }
+    const details = this.applyInitialStateAndRender(initialState, assets, options, token);
+    await this.activateInitialRuntime(details, initialState.workflowError, token);
+
+    return { status: "ok" };
+  }
+
+  private prepareLoad(
+    backend: BuildDetailsBackend,
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): number {
     const token = this.loadTokenTracker.next();
     this.pollingController?.dispose();
     this.pollingController = undefined;
@@ -200,19 +265,19 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.backend = backend;
     this.loadTracker.resetLoadingRequests();
     this.state.resetForLoad(environment, buildUrl, createNonce());
+    this.diagnosticConsoleSyncGeneration += 1;
+    this.diagnosticConsoleSyncQueue = Promise.resolve();
+    this.diagnosticConsoleTextSynchronized = true;
+    this.diagnosticConsoleText = "";
+    return token;
+  }
 
-    const assets = this.view.resolveAssets();
-    if (!assets) {
-      return { status: "missingAssets" };
-    }
-
-    this.view.renderLoading({
-      nonce: this.state.currentNonce,
-      styleUris: assets.styleUris,
-      panelState: options?.panelState
-    });
-
-    this.pipelineNodeLogManager = new PipelineNodeLogManager({
+  private createPipelineNodeLogManager(
+    backend: BuildDetailsBackend,
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): PipelineNodeLogManager {
+    return new PipelineNodeLogManager({
       backend: backend.console,
       environment,
       buildUrl,
@@ -234,18 +299,21 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
           this.view.postMessage({ type: "setPipelineNodeLogLoading", targetKey, loading });
         },
         onError: (targetKey, error) => {
-          const nextLog = {
-            ...this.state.pipelineNodeLog,
-            loading: false,
-            error
-          };
+          const nextLog = { ...this.state.pipelineNodeLog, loading: false, error };
           this.state.setPipelineNodeLog(nextLog);
           this.view.postMessage({ type: "setPipelineNodeLogError", targetKey, error });
         }
       }
     });
+  }
 
-    this.pollingController = new BuildDetailsPollingController({
+  private createPollingController(
+    backend: BuildDetailsBackend,
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    token: number
+  ): BuildDetailsPollingController {
+    return new BuildDetailsPollingController({
       statusBackend: backend.status,
       testsBackend: backend.tests,
       consoleBackend: backend.console,
@@ -272,34 +340,58 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
         canOpenSource: (className) =>
           this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
           false,
-        onPipelineLoading: (currentToken) => this.runtime.handlePipelineLoading(currentToken)
+        onPipelineLoading: (currentToken) => this.runtime.handlePipelineLoading(currentToken),
+        onBuildDetailsChanged: (nextDetails) => this.onBuildDetailsChanged?.(nextDetails),
+        onConsoleTextAppend: (text) => this.appendDiagnosticConsoleText(text),
+        onConsoleTextSet: (text) => this.replaceDiagnosticConsoleText(text),
+        onConsoleHtmlChanged: (textRange, appendedTextRange) => {
+          void this.syncDiagnosticConsoleText(textRange, appendedTextRange);
+        }
       })
     });
+  }
 
-    const initialState: BuildDetailsInitialState = await this.pollingController.loadInitial();
-
-    if (!this.loadTokenTracker.isCurrent(token)) {
-      return { status: "ok" };
-    }
-
-    const consoleTextResult = initialState.consoleTextResult;
-    const consoleHtmlResult = initialState.consoleHtmlResult;
-    const pipelineRun = toPipelineRun(initialState.workflowRun);
-    const pipelineError = initialState.workflowError
-      ? `Pipeline stages: ${formatError(initialState.workflowError)}`
-      : undefined;
-    this.state.applyInitialState(initialState, pipelineRun, pipelineError);
-
+  private applyInitialStateAndRender(
+    initialState: BuildDetailsInitialState,
+    assets: BuildDetailsResolvedAssets,
+    options: BuildDetailsPanelLoadOptions | undefined,
+    token: number
+  ): JenkinsBuildDetails | undefined {
+    this.applyInitialPanelState(initialState);
     const details = this.state.currentDetails;
-    this.view.setTitle(details?.fullDisplayName ?? details?.displayName ?? options?.label);
+    this.notifyInitialBuildDetails(details);
+    this.view.setTitle(resolveInitialPanelTitle(details, options?.label));
+    this.view.renderBuildDetails(this.buildInitialViewModel(initialState), assets, {
+      nonce: this.state.currentNonce,
+      panelState: options?.panelState
+    });
+    void this.runtime.refreshRestartFromStageInfo(token, { postUpdate: true });
+    return details;
+  }
 
-    const viewModel = buildBuildDetailsViewModel({
-      details,
+  private applyInitialPanelState(initialState: BuildDetailsInitialState): void {
+    this.state.applyInitialState(
+      initialState,
+      toPipelineRun(initialState.workflowRun),
+      formatInitialPipelineError(initialState.workflowError)
+    );
+    this.setDiagnosticConsoleText(initialState.consoleTextResult?.text ?? "");
+  }
+
+  private notifyInitialBuildDetails(details: JenkinsBuildDetails | undefined): void {
+    if (details) {
+      this.onBuildDetailsChanged?.(details);
+    }
+  }
+
+  private buildInitialViewModel(initialState: BuildDetailsInitialState) {
+    return buildBuildDetailsViewModel({
+      details: this.state.currentDetails,
       buildUrl: this.state.currentBuildUrl,
       pipelineRun: this.state.currentPipelineRun,
       pipelineLoading: this.state.pipelineLoading,
-      consoleTextResult,
-      consoleHtmlResult,
+      consoleTextResult: initialState.consoleTextResult,
+      consoleHtmlResult: initialState.consoleHtmlResult,
       errors: this.state.currentErrors,
       maxConsoleChars: MAX_CONSOLE_CHARS,
       followLog: this.state.followLog,
@@ -321,34 +413,39 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
         this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
         false
     });
-    this.view.renderBuildDetails(viewModel, assets, {
-      nonce: this.state.currentNonce,
-      panelState: options?.panelState
-    });
-    void this.runtime.refreshRestartFromStageInfo(token, { postUpdate: true });
+  }
 
-    if (details && !details.building && initialState.workflowError) {
-      if (this.view.isVisible()) {
-        this.pollingController.start();
-      }
+  private async activateInitialRuntime(
+    details: JenkinsBuildDetails | undefined,
+    workflowError: unknown,
+    token: number
+  ): Promise<void> {
+    if (!details) {
+      return;
     }
-
-    if (details && !details.building) {
-      await Promise.all([
-        this.runtime.refreshTestReport(token, { showLoading: true }),
-        this.runtime.refreshCoverage(token, { showLoading: true })
-      ]);
+    if (details.building) {
+      this.activateRunningBuild(token);
+      return;
     }
+    await this.activateCompletedBuild(workflowError, token);
+  }
 
-    if (details?.building) {
-      if (this.view.isVisible()) {
-        this.pollingController.start();
-      } else {
-        this.runtime.handlePanelHidden(token);
-      }
+  private async activateCompletedBuild(workflowError: unknown, token: number): Promise<void> {
+    if (workflowError && this.view.isVisible()) {
+      this.pollingController?.start();
     }
+    await Promise.all([
+      this.runtime.refreshTestReport(token, { showLoading: true }),
+      this.runtime.refreshCoverage(token, { showLoading: true })
+    ]);
+  }
 
-    return { status: "ok" };
+  private activateRunningBuild(token: number): void {
+    if (this.view.isVisible()) {
+      this.pollingController?.start();
+      return;
+    }
+    this.runtime.handlePanelHidden(token);
   }
 
   handlePanelHidden(): void {
@@ -387,6 +484,137 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     }
   }
 
+  private appendDiagnosticConsoleText(text: string): void {
+    this.setDiagnosticConsoleText(this.diagnosticConsoleText + text);
+    this.onDiagnosticConsoleTextChanged?.();
+  }
+
+  private replaceDiagnosticConsoleText(text: string): void {
+    this.setDiagnosticConsoleText(text);
+    this.onDiagnosticConsoleTextChanged?.();
+  }
+
+  private setDiagnosticConsoleText(text: string): void {
+    this.diagnosticConsoleSyncGeneration += 1;
+    this.applyDiagnosticConsoleText(text);
+    this.diagnosticConsoleTextSynchronized = true;
+  }
+
+  private applyDiagnosticConsoleText(text: string): void {
+    this.diagnosticConsoleText =
+      text.length > MAX_CONSOLE_CHARS ? text.slice(text.length - MAX_CONSOLE_CHARS) : text;
+  }
+
+  private syncDiagnosticConsoleText(
+    textRange: ConsoleTextByteRange,
+    appendedTextRange?: ConsoleTextByteRange
+  ): Promise<void> {
+    const backend = this.backend?.console;
+    const environment = this.state.environment;
+    const buildUrl = this.state.currentBuildUrl;
+    if (!backend || !environment || !buildUrl) {
+      return Promise.resolve();
+    }
+    const loadToken = this.loadTokenTracker.current;
+    if (!appendedTextRange) {
+      this.diagnosticConsoleSyncGeneration += 1;
+    }
+    const request: DiagnosticConsoleSyncOperation = {
+      backend,
+      environment,
+      buildUrl,
+      textRange,
+      appendedTextRange,
+      loadToken,
+      syncGeneration: this.diagnosticConsoleSyncGeneration
+    };
+    const sync = () => this.performDiagnosticConsoleSync(request);
+    const queued = this.diagnosticConsoleSyncQueue.then(sync, sync);
+    this.diagnosticConsoleSyncQueue = queued.then(
+      () => undefined,
+      () => undefined
+    );
+    return queued;
+  }
+
+  private async performDiagnosticConsoleSync(
+    operation: DiagnosticConsoleSyncOperation
+  ): Promise<void> {
+    if (!this.isDiagnosticConsoleSyncCurrent(operation)) {
+      return;
+    }
+    const range = this.resolveDiagnosticConsoleSyncRange(operation);
+    if (range.end === range.start) {
+      this.applyEmptyDiagnosticConsoleSync(range.append);
+      return;
+    }
+    try {
+      const result = await operation.backend.getConsoleTextProgressive(
+        operation.environment,
+        operation.buildUrl,
+        range.start,
+        range.end - range.start
+      );
+      this.applyDiagnosticConsoleSyncResult(operation, result.text, range.append);
+    } catch {
+      this.applyDiagnosticConsoleSyncFailure(operation);
+    }
+  }
+
+  private resolveDiagnosticConsoleSyncRange(
+    operation: DiagnosticConsoleSyncOperation
+  ): DiagnosticConsoleSyncRange {
+    const append = Boolean(operation.appendedTextRange && this.diagnosticConsoleTextSynchronized);
+    const requestedRange = append ? operation.appendedTextRange : operation.textRange;
+    const start = Math.max(0, Math.floor(requestedRange?.start ?? 0));
+    const end = Math.max(start, Math.floor(requestedRange?.end ?? start));
+    return { append, start, end };
+  }
+
+  private applyDiagnosticConsoleSyncResult(
+    operation: DiagnosticConsoleSyncOperation,
+    text: string,
+    append: boolean
+  ): void {
+    if (this.isDiagnosticConsoleSyncCurrent(operation)) {
+      this.applySuccessfulDiagnosticConsoleSync(text, append);
+    }
+  }
+
+  private applyDiagnosticConsoleSyncFailure(operation: DiagnosticConsoleSyncOperation): void {
+    if (this.isDiagnosticConsoleSyncCurrent(operation)) {
+      this.applyFailedDiagnosticConsoleSync();
+    }
+  }
+
+  private isDiagnosticConsoleSyncCurrent(operation: DiagnosticConsoleSyncOperation): boolean {
+    return (
+      operation.syncGeneration === this.diagnosticConsoleSyncGeneration &&
+      this.loadTokenTracker.isCurrent(operation.loadToken)
+    );
+  }
+
+  private applyEmptyDiagnosticConsoleSync(append: boolean): void {
+    if (append) {
+      return;
+    }
+    this.applyDiagnosticConsoleText("");
+    this.diagnosticConsoleTextSynchronized = true;
+    this.onDiagnosticConsoleTextChanged?.();
+  }
+
+  private applySuccessfulDiagnosticConsoleSync(text: string, append: boolean): void {
+    this.applyDiagnosticConsoleText(append ? this.diagnosticConsoleText + text : text);
+    this.diagnosticConsoleTextSynchronized = true;
+    this.onDiagnosticConsoleTextChanged?.();
+  }
+
+  private applyFailedDiagnosticConsoleSync(): void {
+    this.applyDiagnosticConsoleText("");
+    this.diagnosticConsoleTextSynchronized = false;
+    this.onDiagnosticConsoleTextChanged?.();
+  }
+
   beginLoading(): void {
     this.loadTracker.beginLoading();
   }
@@ -394,4 +622,15 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   endLoading(): void {
     this.loadTracker.endLoading();
   }
+}
+
+function formatInitialPipelineError(error: unknown): string | undefined {
+  return error ? `Pipeline stages: ${formatError(error)}` : undefined;
+}
+
+function resolveInitialPanelTitle(
+  details: JenkinsBuildDetails | undefined,
+  fallback: string | undefined
+): string | undefined {
+  return details?.fullDisplayName ?? details?.displayName ?? fallback;
 }

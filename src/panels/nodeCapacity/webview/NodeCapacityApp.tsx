@@ -59,35 +59,24 @@ const POOL_SEVERITY_BORDER_CLASSES: Record<NodeCapacitySeverity, string> = {
   normal: "border-border"
 };
 
-function postLoadExecutors(
-  postMessage: (message: NodeCapacityIncomingMessage) => void,
-  nodeUrls: string[]
-): void {
-  if (nodeUrls.length === 0) {
-    return;
-  }
-  postMessage({
-    type: "loadNodeCapacityExecutors",
-    nodeUrls: [...new Set(nodeUrls)]
-  });
-}
-
-export function createExecutorLoadRequestKey(updatedAt: string, nodeUrls: string[]): string {
-  return JSON.stringify([updatedAt, [...new Set(nodeUrls)].sort()]);
-}
-
 export function postLoadExecutorsIfChanged(
   postMessage: (message: NodeCapacityIncomingMessage) => void,
   lastRequestKey: { current: string | undefined },
   updatedAt: string,
   nodeUrls: string[]
 ): void {
-  const requestKey = createExecutorLoadRequestKey(updatedAt, nodeUrls);
+  const normalizedNodeUrls = [...new Set(nodeUrls)].sort();
+  const requestKey = JSON.stringify([updatedAt, normalizedNodeUrls]);
   if (lastRequestKey.current === requestKey) {
     return;
   }
   lastRequestKey.current = requestKey;
-  postLoadExecutors(postMessage, nodeUrls);
+  if (normalizedNodeUrls.length > 0) {
+    postMessage({
+      type: "loadNodeCapacityExecutors",
+      nodeUrls: normalizedNodeUrls
+    });
+  }
 }
 
 export function NodeCapacityApp(): React.JSX.Element {
@@ -329,8 +318,8 @@ function PoolPanel({
       onToggle={handleToggle}
     >
       <summary className="cursor-pointer list-none rounded-lg px-4 py-3 transition-colors hover:bg-accent-soft">
-        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1.4fr)_repeat(4,minmax(90px,0.55fr))] lg:items-center">
-          <div className="flex min-w-0 items-start gap-2">
+        <div className="grid gap-3 lg:grid-cols-6 lg:items-center">
+          <div className="flex min-w-0 items-start gap-2 lg:col-span-2">
             <ChevronDownIcon
               aria-hidden="true"
               className="capacity-pool-chevron mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
@@ -360,7 +349,7 @@ function PoolPanel({
         </div>
       </summary>
 
-      <div className="grid gap-4 border-t border-border p-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+      <div className="grid gap-4 border-t border-border p-4 lg:grid-cols-2">
         <NodeList
           nodes={pool.nodes}
           onOpenNodeDetails={onOpenNodeDetails}

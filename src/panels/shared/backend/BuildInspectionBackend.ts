@@ -31,22 +31,8 @@ export class BuildInspectionBackendAdapter implements BuildInspectionBackend {
   readonly console: BuildInspectionConsoleBackend;
 
   constructor(dataService: JenkinsDataService) {
-    this.status = {
-      getBuildDetails: (...args) => dataService.getBuildDetails(...args),
-      getWorkflowRun: (...args) => dataService.getWorkflowRun(...args)
-    };
-    this.tests = {
-      getTestReport: (...args) => dataService.getTestReport(...args)
-    };
-    this.console = {
-      getConsoleText: (...args) => dataService.getConsoleText(...args),
-      getConsoleTextHead: (...args) => dataService.getConsoleTextHead(...args),
-      getConsoleTextTail: (...args) => dataService.getConsoleTextTail(...args),
-      getConsoleTextProgressive: (...args) => dataService.getConsoleTextProgressive(...args),
-      getConsoleHtmlProgressive: (...args) => dataService.getConsoleHtmlProgressive(...args),
-      getFlowNodeLog: (...args) => dataService.getFlowNodeLog(...args),
-      getFlowNodeDetails: (...args) => dataService.getFlowNodeDetails(...args),
-      getFlowNodeLogHtmlProgressive: (...args) => dataService.getFlowNodeLogHtmlProgressive(...args)
-    };
+    this.status = dataService;
+    this.tests = dataService;
+    this.console = dataService;
   }
 }

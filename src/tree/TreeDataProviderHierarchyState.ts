@@ -22,26 +22,42 @@ export class TreeDataProviderHierarchyState {
 
   withParent(
     parent: WorkbenchTreeElement | undefined,
-    children: WorkbenchTreeElement[]
+    children: WorkbenchTreeElement[],
+    trackRenderedItems = true
   ): WorkbenchTreeElement[] {
-    if (parent instanceof RootSectionTreeItem && parent.section === "instances") {
-      this.instanceItems.clear();
+    if (trackRenderedItems) {
+      this.prepareRenderedItems(parent);
     }
 
     for (const child of children) {
       this.parentMap.set(child, parent);
-      if (child instanceof InstanceTreeItem) {
-        this.instanceItems.set(this.buildEnvironmentKey(child), child);
-      }
-      if (child instanceof BuildQueueFolderTreeItem) {
-        this.queueFolderItems.set(this.buildEnvironmentKey(child.environment), child);
-      }
-      if (child instanceof ActivityFolderTreeItem) {
-        this.activityFolderItems.set(this.buildEnvironmentKey(child.environment), child);
+      if (trackRenderedItems) {
+        this.trackRenderedItem(child);
       }
     }
 
     return children;
+  }
+
+  private prepareRenderedItems(parent: WorkbenchTreeElement | undefined): void {
+    if (!(parent instanceof RootSectionTreeItem) || parent.section !== "instances") {
+      return;
+    }
+    this.instanceItems.clear();
+    this.queueFolderItems.clear();
+    this.activityFolderItems.clear();
+  }
+
+  private trackRenderedItem(child: WorkbenchTreeElement): void {
+    if (child instanceof InstanceTreeItem) {
+      this.instanceItems.set(this.buildEnvironmentKey(child), child);
+    }
+    if (child instanceof BuildQueueFolderTreeItem) {
+      this.queueFolderItems.set(this.buildEnvironmentKey(child.environment), child);
+    }
+    if (child instanceof ActivityFolderTreeItem) {
+      this.activityFolderItems.set(this.buildEnvironmentKey(child.environment), child);
+    }
   }
 
   notifyEnvironmentInstance(environment: JenkinsEnvironmentRef): InstanceTreeItem | undefined {

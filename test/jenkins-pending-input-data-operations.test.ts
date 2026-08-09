@@ -14,7 +14,7 @@ const environment: JenkinsEnvironmentRef = {
 };
 
 describe("JenkinsPendingInputDataOperations", () => {
-  it("writes the pending-input summary once during a forced refresh", async () => {
+  it("reuses cache keys and returns the newly cached summary on a cache miss", async () => {
     const buildUrl = "https://jenkins.example.com/job/demo/15/";
     const client = {
       getPendingInputActions: async () => [
@@ -33,9 +33,11 @@ describe("JenkinsPendingInputDataOperations", () => {
     });
     const summaryKey = await context.buildCacheKey(environment, "pending-input-summary", buildUrl);
     const setSpy = vi.spyOn(context.getCache(), "set");
+    const getSpy = vi.spyOn(context.getCache(), "get");
+    const buildCacheKeySpy = vi.spyOn(context, "buildCacheKey");
     const operations = new JenkinsPendingInputDataOperations(context);
 
-    const summary = await operations.refreshPendingInputSummary(environment, buildUrl);
+    const summary = await operations.getPendingInputSummary(environment, buildUrl);
 
     assert.equal(summary.awaitingInput, true);
     assert.equal(summary.count, 2);
@@ -52,6 +54,8 @@ describe("JenkinsPendingInputDataOperations", () => {
     assert.equal(summary.signature, summary.inputs?.map((input) => input.signature).join("|"));
     assert.equal(summary.availability, "supported");
     assert.equal(setSpy.mock.calls.filter(([key]) => key === summaryKey).length, 1);
+    assert.equal(buildCacheKeySpy.mock.calls.length, 3);
+    assert.equal(getSpy.mock.calls.filter(([key]) => key === summaryKey).length, 1);
   });
 
   it("preserves unsupported pending-input capability in refreshed summaries", async () => {

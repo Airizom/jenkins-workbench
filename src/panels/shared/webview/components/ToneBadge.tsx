@@ -4,23 +4,17 @@ import { Badge } from "./ui/badge";
 export function ToneBadge({
   label,
   tone,
-  badgeClassName,
   className
 }: {
   label: string;
   tone?: StatusVisualTone;
-  badgeClassName?: string;
   className?: string;
 }) {
   return (
     <Badge
       variant="outline"
       size="sm"
-      className={cn(
-        tone !== undefined ? resolveStatusBadgeClass(tone) : undefined,
-        badgeClassName,
-        className
-      )}
+      className={cn(tone !== undefined ? resolveStatusBadgeClass(tone) : undefined, className)}
     >
       {label}
     </Badge>

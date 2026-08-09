@@ -4,8 +4,10 @@ import {
   isApproveInputMessage,
   isArtifactActionMessage,
   isClearPipelineLogNodeMessage,
+  isConfigureBuildDiagnosticsMessage,
   isExportConsoleMessage,
   isExportPipelineNodeLogMessage,
+  isOpenDiagnosticSourceMessage,
   isOpenExternalMessage,
   isOpenTestSourceMessage,
   isPersistUiStateMessage,
@@ -14,7 +16,9 @@ import {
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
+  isShowBuildDiagnosticProblemsMessage,
   isToggleFollowLogMessage,
+  type OpenDiagnosticSourceMessage,
   type OpenTestSourceMessage,
   type PersistUiStateMessage,
   type RejectInputMessage,
@@ -35,69 +39,73 @@ export interface BuildDetailsMessageRouterHandlers {
   onExportPipelineNodeLog(): void;
   onReloadTestReport(message: ReloadTestReportMessage): void;
   onOpenTestSource(message: OpenTestSourceMessage): void;
+  onOpenDiagnosticSource(message: OpenDiagnosticSourceMessage): void;
+  onConfigureBuildDiagnostics(): void;
+  onShowBuildDiagnosticProblems(): void;
   onPersistUiState(message: PersistUiStateMessage): void;
   onRefreshBuildDetails(): void;
   onToggleFollowLog(value: unknown): void;
 }
 
 export class BuildDetailsMessageRouter {
-  constructor(private readonly handlers: BuildDetailsMessageRouterHandlers) {}
+  private readonly routes: Array<(message: unknown) => boolean>;
+
+  constructor(handlers: BuildDetailsMessageRouterHandlers) {
+    this.routes = createMessageRoutes(handlers);
+  }
 
   route(message: unknown): void {
-    if (isArtifactActionMessage(message)) {
-      this.handlers.onArtifactAction(message);
-      return;
-    }
-    if (isOpenExternalMessage(message)) {
-      this.handlers.onOpenExternal(message.url);
-      return;
-    }
-    if (isExportConsoleMessage(message)) {
-      this.handlers.onExportConsole();
-      return;
-    }
-    if (isRefreshBuildDetailsMessage(message)) {
-      this.handlers.onRefreshBuildDetails();
-      return;
-    }
-    if (isApproveInputMessage(message)) {
-      this.handlers.onApproveInput(message);
-      return;
-    }
-    if (isRejectInputMessage(message)) {
-      this.handlers.onRejectInput(message);
-      return;
-    }
-    if (isRestartPipelineFromStageMessage(message)) {
-      this.handlers.onRestartPipelineFromStage(message);
-      return;
-    }
-    if (isSelectPipelineLogNodeMessage(message)) {
-      this.handlers.onSelectPipelineLogNode(message);
-      return;
-    }
-    if (isClearPipelineLogNodeMessage(message)) {
-      this.handlers.onClearPipelineLogNode();
-      return;
-    }
-    if (isExportPipelineNodeLogMessage(message)) {
-      this.handlers.onExportPipelineNodeLog();
-      return;
-    }
-    if (isReloadTestReportMessage(message)) {
-      this.handlers.onReloadTestReport(message);
-      return;
-    }
-    if (isOpenTestSourceMessage(message)) {
-      this.handlers.onOpenTestSource(message);
-      return;
-    }
-    if (isPersistUiStateMessage(message)) {
-      this.handlers.onPersistUiState(message);
-      return;
-    }
-    if (isToggleFollowLogMessage(message)) {
-      this.handlers.onToggleFollowLog(message.value);
-    }
+    this.routes.some((route) => route(message));
   }
+}
+
+function createMessageRoutes(
+  handlers: BuildDetailsMessageRouterHandlers
+): Array<(message: unknown) => boolean> {
+  return [
+    createMessageRoute(isArtifactActionMessage, (message) => handlers.onArtifactAction(message)),
+    createMessageRoute(isOpenExternalMessage, (message) => handlers.onOpenExternal(message.url)),
+    createMessageRoute(isExportConsoleMessage, () => handlers.onExportConsole()),
+    createMessageRoute(isRefreshBuildDetailsMessage, () => handlers.onRefreshBuildDetails()),
+    createMessageRoute(isApproveInputMessage, (message) => handlers.onApproveInput(message)),
+    createMessageRoute(isRejectInputMessage, (message) => handlers.onRejectInput(message)),
+    createMessageRoute(isRestartPipelineFromStageMessage, (message) =>
+      handlers.onRestartPipelineFromStage(message)
+    ),
+    createMessageRoute(isSelectPipelineLogNodeMessage, (message) =>
+      handlers.onSelectPipelineLogNode(message)
+    ),
+    createMessageRoute(isClearPipelineLogNodeMessage, () => handlers.onClearPipelineLogNode()),
+    createMessageRoute(isExportPipelineNodeLogMessage, () => handlers.onExportPipelineNodeLog()),
+    createMessageRoute(isReloadTestReportMessage, (message) =>
+      handlers.onReloadTestReport(message)
+    ),
+    createMessageRoute(isOpenTestSourceMessage, (message) => handlers.onOpenTestSource(message)),
+    createMessageRoute(isOpenDiagnosticSourceMessage, (message) =>
+      handlers.onOpenDiagnosticSource(message)
+    ),
+    createMessageRoute(isConfigureBuildDiagnosticsMessage, () =>
+      handlers.onConfigureBuildDiagnostics()
+    ),
+    createMessageRoute(isShowBuildDiagnosticProblemsMessage, () =>
+      handlers.onShowBuildDiagnosticProblems()
+    ),
+    createMessageRoute(isPersistUiStateMessage, (message) => handlers.onPersistUiState(message)),
+    createMessageRoute(isToggleFollowLogMessage, (message) =>
+      handlers.onToggleFollowLog(message.value)
+    )
+  ];
+}
+
+function createMessageRoute<Message>(
+  guard: (message: unknown) => message is Message,
+  handle: (message: Message) => void
+): (message: unknown) => boolean {
+  return (message) => {
+    if (!guard(message)) {
+      return false;
+    }
+    handle(message);
+    return true;
+  };
 }

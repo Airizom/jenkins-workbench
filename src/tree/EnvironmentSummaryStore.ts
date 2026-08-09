@@ -36,15 +36,15 @@ export class EnvironmentSummaryStore {
   }
 
   updateFromJobs(environment: JenkinsEnvironmentRef, jobs: JenkinsJobInfo[]): void {
-    this.updateJobsSummary(environment, buildJobsSummary(jobs));
+    this.updateSummary(environment, "jobs", buildJobsSummary(jobs), areJobSummariesEqual);
   }
 
   updateFromNodes(environment: JenkinsEnvironmentRef, nodes: JenkinsNodeInfo[]): void {
-    this.updateNodesSummary(environment, buildNodesSummary(nodes));
+    this.updateSummary(environment, "nodes", buildNodesSummary(nodes), areNodeSummariesEqual);
   }
 
   updateFromQueue(environment: JenkinsEnvironmentRef, items: JenkinsQueueItemInfo[]): void {
-    this.updateQueueSummary(environment, { total: items.length });
+    this.updateSummary(environment, "queue", { total: items.length }, areQueueSummariesEqual);
   }
 
   clearAll(): void {
@@ -76,18 +76,6 @@ export class EnvironmentSummaryStore {
     }
 
     return { running, queue, hasData };
-  }
-
-  private updateJobsSummary(environment: JenkinsEnvironmentRef, jobs: JobsFolderSummary): void {
-    this.updateSummary(environment, "jobs", jobs, areJobSummariesEqual);
-  }
-
-  private updateNodesSummary(environment: JenkinsEnvironmentRef, nodes: NodesFolderSummary): void {
-    this.updateSummary(environment, "nodes", nodes, areNodeSummariesEqual);
-  }
-
-  private updateQueueSummary(environment: JenkinsEnvironmentRef, queue: QueueFolderSummary): void {
-    this.updateSummary(environment, "queue", queue, areQueueSummariesEqual);
   }
 
   private updateSummary<SummaryKey extends keyof EnvironmentSummary>(

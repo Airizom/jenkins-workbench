@@ -9,4 +9,11 @@ describe("splitBuildDetailsErrors", () => {
       displayErrors: []
     });
   });
+
+  it("strips the console output prefix case-insensitively", () => {
+    assert.deepEqual(splitBuildDetailsErrors(["Console Output:  unavailable  "]), {
+      consoleError: "unavailable",
+      displayErrors: []
+    });
+  });
 });

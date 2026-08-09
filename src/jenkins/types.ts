@@ -127,11 +127,23 @@ export interface JenkinsCoverageBuildAction {
   urlName?: string;
 }
 
+export interface JenkinsGitRevision {
+  SHA1?: string;
+}
+
+export interface JenkinsGitBuildDataAction {
+  _class?: string;
+  urlName?: string;
+  lastBuiltRevision?: JenkinsGitRevision;
+  remoteUrls?: string[];
+}
+
 export type JenkinsBuildAction =
   | JenkinsCauseAction
   | JenkinsParametersAction
   | JenkinsTestSummaryAction
-  | JenkinsCoverageBuildAction;
+  | JenkinsCoverageBuildAction
+  | JenkinsGitBuildDataAction;
 
 export interface JenkinsTestReportCase {
   name?: string;

@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import { registerBuildCommands } from "../commands/BuildCommands";
+import { registerBuildDiagnosticCommands } from "../commands/BuildDiagnosticCommands";
 import { registerCurrentBranchCommands } from "../commands/CurrentBranchCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
 import { registerJenkinsfileCommands } from "../commands/JenkinsfileCommands";
@@ -43,10 +44,13 @@ export function registerExtensionCommands(
   const jobConfigUpdateWorkflow = container.get("jobConfigUpdateWorkflow");
   const refreshHost = container.get("refreshHost");
   const currentBranchWorkflowService = container.get("currentBranchWorkflowService");
+  const diagnosticBindingStore = container.get("diagnosticBindingStore");
+  const buildDiagnosticsCoordinator = container.get("buildDiagnosticsCoordinator");
 
   registerEnvironmentCommands(
     context,
     environmentStore,
+    diagnosticBindingStore,
     browserSsoAuthenticator,
     presetStore,
     watchStore,
@@ -81,8 +85,11 @@ export function registerExtensionCommands(
     jobConfigUpdateWorkflow,
     presetStore,
     pinStore,
-    watchStore
+    watchStore,
+    diagnosticBindingStore
   );
+
+  registerBuildDiagnosticCommands(context, buildDiagnosticsCoordinator);
 
   registerNodeCommands(context, dataService, refreshHost);
   registerNodeCapacityCommands(context, dataService, environmentStore, refreshHost);

@@ -1,8 +1,11 @@
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import * as React from "react";
 
-import { cn } from "../../lib/utils";
-import { DisclosureChevron } from "./disclosure-chevron";
+import {
+  disclosureContentClassName,
+  disclosureTriggerChildren,
+  disclosureTriggerClassName
+} from "./disclosure";
 
 export const Collapsible = CollapsiblePrimitive.Root;
 
@@ -18,22 +21,10 @@ export const CollapsibleTrigger = React.forwardRef<
   <CollapsiblePrimitive.Trigger
     ref={ref}
     asChild={asChild}
-    className={cn(
-      "group flex w-full items-center justify-between text-left transition-colors cursor-pointer",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-      "disabled:pointer-events-none disabled:opacity-50",
-      className
-    )}
+    className={disclosureTriggerClassName("w-full", className)}
     {...props}
   >
-    {asChild ? (
-      children
-    ) : (
-      <>
-        {children}
-        <DisclosureChevron />
-      </>
-    )}
+    {disclosureTriggerChildren(children, asChild)}
   </CollapsiblePrimitive.Trigger>
 ));
 CollapsibleTrigger.displayName = "CollapsibleTrigger";
@@ -45,8 +36,8 @@ export const CollapsibleContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <CollapsiblePrimitive.Content
     ref={ref}
-    className={cn(
-      "overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down",
+    className={disclosureContentClassName(
+      "data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down",
       className
     )}
     {...props}

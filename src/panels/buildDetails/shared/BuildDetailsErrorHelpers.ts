@@ -7,12 +7,8 @@ export function splitBuildDetailsErrors(errors: string[]): {
   let consoleError: string | undefined;
   const displayErrors: string[] = [];
   for (const error of errors) {
-    if (
-      !consoleError &&
-      typeof error === "string" &&
-      error.toLowerCase().startsWith(CONSOLE_ERROR_PREFIX)
-    ) {
-      consoleError = error.replace(/^console output:\s*/i, "").trim() || undefined;
+    if (!consoleError && error.toLowerCase().startsWith(CONSOLE_ERROR_PREFIX)) {
+      consoleError = error.slice(CONSOLE_ERROR_PREFIX.length).trim() || undefined;
     } else {
       displayErrors.push(error);
     }

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-export interface GitExtension {
+interface GitExtension {
   getAPI(version: 1): GitApi;
 }
 
@@ -34,6 +34,7 @@ enum GitRefType {
 
 export interface GitRef {
   name?: string;
+  commit?: string;
   type?: GitRefType;
 }
 

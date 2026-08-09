@@ -6,8 +6,8 @@ const stripAnsiMock = vi.fn((value: string): string => `stripped:${value}`);
 vi.doMock("react", () => ({
   useMemo: <T>(factory: () => T): T => factory()
 }));
-vi.doMock("../src/panels/buildDetails/webview/lib/ansi", () => ({
-  stripAnsi: stripAnsiMock
+vi.doMock("../src/buildDiagnostics/BuildDiagnosticConsoleText", () => ({
+  stripConsoleControlSequences: stripAnsiMock
 }));
 vi.doMock("../src/panels/buildDetails/webview/components/buildDetails/ConsoleLogViewer", () => ({
   ConsoleLogViewer: () => null

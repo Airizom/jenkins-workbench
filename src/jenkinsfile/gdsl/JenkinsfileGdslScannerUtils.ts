@@ -5,15 +5,20 @@ export function findCallStart(text: string, name: string, start: number): number
     if (candidate === -1) {
       return undefined;
     }
-    if (
-      isIdentifierBoundary(text, candidate - 1) &&
-      isIdentifierBoundary(text, candidate + name.length)
-    ) {
+    if (isCallStartAt(text, name, candidate)) {
       return candidate;
     }
     index = candidate + name.length;
   }
   return undefined;
+}
+
+export function isCallStartAt(text: string, name: string, index: number): boolean {
+  return (
+    text.startsWith(name, index) &&
+    isIdentifierBoundary(text, index - 1) &&
+    isIdentifierBoundary(text, index + name.length)
+  );
 }
 
 export function skipWhitespace(text: string, index: number): number {

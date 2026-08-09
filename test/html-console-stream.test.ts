@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-import type { JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
+import type { JenkinsConsoleTextTail, JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
 import {
+  type ConsoleTextByteRange,
   HtmlConsoleStream,
   type HtmlConsoleStreamDataService
 } from "../src/panels/buildDetails/HtmlConsoleStream";
@@ -24,15 +25,24 @@ describe("HtmlConsoleStream", () => {
     const dataService: HtmlConsoleStreamDataService = {
       getConsoleHtmlProgressive: async () => snapshot
     };
-    const appended: string[] = [];
-    const sets: Array<{ html: string; truncated: boolean }> = [];
+    const appended: Array<{
+      html: string;
+      textRange: ConsoleTextByteRange;
+      appendedTextRange: ConsoleTextByteRange;
+    }> = [];
+    const sets: Array<{
+      html: string;
+      truncated: boolean;
+      textRange: ConsoleTextByteRange;
+    }> = [];
     const stream = new HtmlConsoleStream({
       dataService,
       environment,
       buildUrl: "https://jenkins.example/job/example/1/",
       maxConsoleChars: 10,
       callbacks: {
-        onConsoleHtmlAppend: (html) => appended.push(html),
+        onConsoleHtmlAppend: (html, textRange, appendedTextRange) =>
+          appended.push({ html, textRange, appendedTextRange }),
         onConsoleHtmlSet: (payload) => sets.push(payload)
       }
     });
@@ -55,7 +65,13 @@ describe("HtmlConsoleStream", () => {
       textSizeKnown: true,
       moreData: true
     });
-    assert.deepEqual(appended, [appendedHtml]);
+    assert.deepEqual(appended, [
+      {
+        html: appendedHtml,
+        textRange: { start: 0, end: 5 },
+        appendedTextRange: { start: 4, end: 5 }
+      }
+    ]);
     assert.equal(state.consoleHtmlBufferLength, snapshot.html.length + appendedHtml.length);
 
     stream.applyResult({ html: "", textSize: 15, textSizeKnown: true, moreData: true });
@@ -69,12 +85,55 @@ describe("HtmlConsoleStream", () => {
       textSizeKnown: true,
       moreData: false
     });
-    assert.deepEqual(sets, [{ html: resetHtml, truncated: true }]);
+    assert.deepEqual(sets, [
+      { html: resetHtml, truncated: true, textRange: { start: 5, end: 15 } }
+    ]);
     assert.equal(state.consoleHtmlBufferLength, resetHtml.length);
 
     stream.applyResult({ html: "", textSize: 26, textSizeKnown: true, moreData: true });
     stream.applyResult({ html: "", textSize: 26, textSizeKnown: true, moreData: false });
-    assert.deepEqual(sets.at(-1), { html: "", truncated: true });
+    assert.deepEqual(sets.at(-1), {
+      html: "",
+      truncated: true,
+      textRange: { start: 16, end: 26 }
+    });
     assert.equal(state.consoleHtmlBufferLength, 0);
+  });
+
+  it("uses UTF-8 bytes to align the initial HTML window with the text tail", async () => {
+    let requestedStart = -1;
+    const dataService: HtmlConsoleStreamDataService = {
+      getConsoleHtmlProgressive: async (_environment, _buildUrl, start) => {
+        requestedStart = start;
+        return {
+          html: "<span>éx</span>",
+          textSize: 10,
+          textSizeKnown: true,
+          moreData: false
+        };
+      }
+    };
+    const stream = new HtmlConsoleStream({
+      dataService,
+      environment,
+      buildUrl: "https://jenkins.example/job/example/1/",
+      maxConsoleChars: 10,
+      callbacks: {
+        onConsoleHtmlAppend: () => undefined,
+        onConsoleHtmlSet: () => undefined
+      }
+    });
+    const textTail: JenkinsConsoleTextTail = {
+      text: "éx",
+      truncated: true,
+      bytesRead: 3,
+      nextStart: 10,
+      progressiveSupported: true
+    };
+
+    await stream.tryInitialize(textTail);
+
+    assert.equal(requestedStart, 7);
+    assert.deepEqual(stream.getTextByteRange(), { start: 7, end: 10 });
   });
 });

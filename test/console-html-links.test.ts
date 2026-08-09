@@ -92,4 +92,86 @@ describe("sanitizeConsoleExternalUrl", () => {
       globalThis.Node = originalNode;
     }
   });
+
+  it("renders sanitized console source ranges around search highlights", () => {
+    const originalDOMParser = globalThis.DOMParser;
+    const originalNode = globalThis.Node;
+
+    class TestDOMParser {
+      parseFromString(): Document {
+        return {
+          body: {
+            childNodes: [{ nodeType: 3, textContent: "src/main.ts:12" }]
+          }
+        } as unknown as Document;
+      }
+    }
+
+    globalThis.DOMParser = TestDOMParser as unknown as typeof DOMParser;
+    globalThis.Node = {
+      TEXT_NODE: 3,
+      ELEMENT_NODE: 1
+    } as unknown as typeof Node;
+
+    try {
+      const model = parseConsoleHtml("src/main.ts:12");
+      let openedTarget: string | undefined;
+      const rendered = renderConsoleHtmlWithHighlights(
+        model,
+        [{ start: 4, end: 11 }],
+        0,
+        undefined,
+        [{ targetId: "target-1", startOffset: 0, endOffset: 14 }],
+        (targetId) => {
+          openedTarget = targetId;
+        }
+      );
+
+      const linkedMatchSegment = rendered[1];
+      assert.ok(isValidElement<{ children: unknown }>(linkedMatchSegment));
+      const button = linkedMatchSegment.props.children;
+      assert.ok(isValidElement<{ children: unknown; onClick: () => void }>(button));
+      assert.equal(button.type, "button");
+      assert.ok(isValidElement(button.props.children));
+
+      button.props.onClick();
+      assert.equal(openedTarget, "target-1");
+    } finally {
+      globalThis.DOMParser = originalDOMParser;
+      globalThis.Node = originalNode;
+    }
+  });
+
+  it("inspects ordered highlight ranges linearly while rendering", () => {
+    const matchCount = 1_000;
+    const text = "x".repeat(matchCount * 2);
+    let rangePropertyReads = 0;
+    const matches = Array.from(
+      { length: matchCount },
+      (_, index) =>
+        new Proxy(
+          { start: index * 2, end: index * 2 + 1 },
+          {
+            get(target, property, receiver) {
+              if (property === "start" || property === "end") {
+                rangePropertyReads += 1;
+              }
+              return Reflect.get(target, property, receiver);
+            }
+          }
+        )
+    );
+    const model = {
+      nodes: [{ type: "text" as const, value: text }],
+      text
+    };
+
+    const rendered = renderConsoleHtmlWithHighlights(model, matches, -1);
+
+    assert.equal(rendered.length, matchCount * 2);
+    assert.ok(
+      rangePropertyReads <= matchCount * 12,
+      `read range properties ${rangePropertyReads} times`
+    );
+  });
 });

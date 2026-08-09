@@ -1,6 +1,9 @@
 import type * as vscode from "vscode";
 import { getDiagnosticMetadata } from "./JenkinsfileDiagnosticMetadata";
-import type { JenkinsfileValidationCode } from "./JenkinsfileValidationTypes";
+import {
+  JENKINSFILE_VALIDATION_CODES,
+  type JenkinsfileValidationCode
+} from "./JenkinsfileValidationTypes";
 import {
   deriveValidationCode,
   extractSuggestionsFromText,
@@ -9,16 +12,7 @@ import {
 
 export const JENKINS_DIAGNOSTIC_SOURCE = "jenkins";
 
-const VALIDATION_CODES = new Set<JenkinsfileValidationCode>([
-  "missing-agent",
-  "missing-stages",
-  "invalid-section-definition",
-  "blocked-step",
-  "unknown-dsl-method",
-  "invalid-step",
-  "request-failed",
-  "no-environment"
-]);
+const VALIDATION_CODES = new Set<JenkinsfileValidationCode>(JENKINSFILE_VALIDATION_CODES);
 
 function isValidationCode(value: string): value is JenkinsfileValidationCode {
   return VALIDATION_CODES.has(value as JenkinsfileValidationCode);

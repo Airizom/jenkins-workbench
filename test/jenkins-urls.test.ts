@@ -3,6 +3,17 @@ import { describe, it } from "vitest";
 import { parseBuildUrl, parseJobUrl } from "../src/jenkins/urls";
 
 describe("Jenkins URL parsers", () => {
+  it("parses nested job paths with a Jenkins context path", () => {
+    assert.deepEqual(
+      parseJobUrl("https://jenkins.example/jenkins/job/folder/job/encoded%20name/"),
+      {
+        parentUrl: "https://jenkins.example/jenkins/job/folder/",
+        jobName: "encoded name",
+        fullPath: ["folder", "encoded name"]
+      }
+    );
+  });
+
   it.each([
     {
       buildUrl: "https://jenkins.example/job/project/42/",

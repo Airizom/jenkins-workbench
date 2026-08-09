@@ -47,23 +47,12 @@ const BUILD_LIMIT = 20;
 const REFRESH_DEBOUNCE_MS = 150;
 const MANUAL_REFRESH_COOLDOWN_MS = 2000;
 
-interface JenkinsWorkbenchTreeRuntimeSurface {
-  readonly onDidChangeSummary: vscode.Event<TreeViewSummary>;
-  refreshActivity(environment: JenkinsEnvironmentRef): void;
-  updateBuildTooltipOptions(options: BuildTooltipOptions): void;
-  updateBuildListFetchOptions(options: BuildListFetchOptions): void;
-  updateViewCurationOptions(options: TreeViewCurationOptions): void;
-  updateActivityOptions(options: TreeActivityOptions): void;
-  setWatchErrorCount(count: number): void;
-}
-
 export class JenkinsWorkbenchTreeDataProvider
   implements
     vscode.TreeDataProvider<WorkbenchTreeElement>,
     JenkinsTreeRevealProvider,
     TreeExpansionResolver,
-    vscode.Disposable,
-    JenkinsWorkbenchTreeRuntimeSurface
+    vscode.Disposable
 {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
     WorkbenchTreeElement | undefined
@@ -82,6 +71,7 @@ export class JenkinsWorkbenchTreeDataProvider
   private pendingInputUnsubscribe: (() => void) | undefined;
 
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+  // fallow-ignore-next-line unused-class-member -- consumed by extension runtime subscriptions
   readonly onDidChangeSummary = this._onDidChangeSummary.event;
 
   constructor(
@@ -125,12 +115,12 @@ export class JenkinsWorkbenchTreeDataProvider
     });
 
     this.revealResolver = new JenkinsTreeRevealResolver(
-      this.getChildrenInternal.bind(this),
+      this.getChildrenForTraversal.bind(this),
       this._onDidChangeTreeData.event
     );
     this.expansionResolver = new TreeDataProviderExpansionResolver(
       this.getParent.bind(this),
-      this.getChildrenInternal.bind(this)
+      this.getChildrenForTraversal.bind(this)
     );
   }
 
@@ -160,13 +150,20 @@ export class JenkinsWorkbenchTreeDataProvider
   fullEnvironmentRefresh(request?: FullEnvironmentRefreshRequest): boolean {
     const environmentId = request?.environmentId;
     const refreshToken = request?.refreshToken;
-    if (environmentId) {
+    if (request?.trigger === "manual") {
+      if (!environmentId) {
+        return this.refresh(refreshToken);
+      }
+      if (!this.refreshCoordinator.beginManualRefresh(refreshToken, MANUAL_REFRESH_COOLDOWN_MS)) {
+        return false;
+      }
       this.onEnvironmentChanged(environmentId, refreshToken);
       return true;
     }
 
-    if (request?.trigger === "manual") {
-      return this.refresh(refreshToken);
+    if (environmentId) {
+      this.onEnvironmentChanged(environmentId, refreshToken);
+      return true;
     }
 
     this.onEnvironmentChanged(undefined, refreshToken);
@@ -174,7 +171,7 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   refreshView(): void {
-    this.childrenLoader.clearChildrenCacheForEnvironment();
+    this.childrenLoader.clearViewCache();
     this.refreshCoordinator.scheduleRefresh(
       undefined,
       undefined,
@@ -203,6 +200,7 @@ export class JenkinsWorkbenchTreeDataProvider
     );
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through the tree refresh host
   refreshActivity(environment: JenkinsEnvironmentRef): void {
     this.childrenLoader.refreshActivityCache(environment);
     this.notifyEnvironmentFolder(
@@ -241,24 +239,28 @@ export class JenkinsWorkbenchTreeDataProvider
     this.emitSummary();
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through configuration reactions
   updateBuildTooltipOptions(options: BuildTooltipOptions): void {
     this.childrenLoader.updateBuildTooltipOptions(options);
-    this.childrenLoader.clearChildrenCacheForEnvironment();
+    this.childrenLoader.clearViewCache();
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through configuration reactions
   updateBuildListFetchOptions(options: BuildListFetchOptions): void {
     this.childrenLoader.updateBuildListFetchOptions(options);
-    this.childrenLoader.clearChildrenCacheForEnvironment();
+    this.childrenLoader.clearViewCache();
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through configuration reactions
   updateViewCurationOptions(options: TreeViewCurationOptions): void {
     this.childrenLoader.updateViewCurationOptions(options);
-    this.childrenLoader.clearChildrenCacheForEnvironment();
+    this.childrenLoader.clearViewCache();
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through configuration reactions
   updateActivityOptions(options: TreeActivityOptions): void {
     this.childrenLoader.updateActivityOptions(options);
-    this.childrenLoader.clearChildrenCacheForEnvironment();
+    this.childrenLoader.clearViewCache();
   }
 
   onEnvironmentChanged(environmentId?: string, refreshToken?: number): void {
@@ -289,6 +291,7 @@ export class JenkinsWorkbenchTreeDataProvider
     return element;
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through watch status callbacks
   setWatchErrorCount(count: number): void {
     const didUpdate = this.summaryState.setWatchErrorCount(count);
     if (!didUpdate) {
@@ -320,11 +323,18 @@ export class JenkinsWorkbenchTreeDataProvider
     return this.getChildrenInternal(element);
   }
 
-  private async getChildrenInternal(
+  private async getChildrenForTraversal(
     element?: WorkbenchTreeElement
   ): Promise<WorkbenchTreeElement[]> {
+    return this.getChildrenInternal(element, false);
+  }
+
+  private async getChildrenInternal(
+    element?: WorkbenchTreeElement,
+    trackRenderedItems = true
+  ): Promise<WorkbenchTreeElement[]> {
     const items = await this.childrenLoader.getChildren(element);
-    const withParent = this.hierarchyState.withParent(element, items);
+    const withParent = this.hierarchyState.withParent(element, items, trackRenderedItems);
     this.emitSummary();
     return withParent;
   }

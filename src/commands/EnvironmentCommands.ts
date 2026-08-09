@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BrowserSsoAuthenticator } from "../services/BrowserSsoAuthenticationService";
+import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
@@ -16,6 +17,7 @@ import type { EnvironmentCommandRefreshHost } from "./environment/EnvironmentCom
 export function registerEnvironmentCommands(
   context: vscode.ExtensionContext,
   store: JenkinsEnvironmentStore,
+  bindingStore: JenkinsDiagnosticProfileBindingStore,
   browserSsoAuthenticator: BrowserSsoAuthenticator,
   presetStore: JenkinsParameterPresetStore,
   watchStore: JenkinsWatchStore,
@@ -37,6 +39,7 @@ export function registerEnvironmentCommands(
       (item?: JenkinsEnvironmentRef) =>
         removeEnvironment(
           store,
+          bindingStore,
           presetStore,
           watchStore,
           pinStore,

@@ -4,6 +4,7 @@ import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
 import { htmlToText } from "./PipelineNodeLogContent";
+import { isWorkflowNodeActive } from "./PipelineWorkflowStatus";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
@@ -181,19 +182,8 @@ export class PipelineNodeLogFetcher {
       text,
       truncated: Boolean(snapshot.hasMore),
       loading: false,
-      polling: Boolean(snapshot.hasMore) || isFlowNodeLogActive(snapshot.nodeStatus),
+      polling: Boolean(snapshot.hasMore) || isWorkflowNodeActive(snapshot.nodeStatus),
       consoleUrl: snapshot.consoleUrl
     };
   }
-}
-
-function isFlowNodeLogActive(status: string | undefined): boolean {
-  const normalized = status?.trim().toUpperCase();
-  return (
-    normalized === "IN_PROGRESS" ||
-    normalized === "PAUSED_PENDING_INPUT" ||
-    normalized === "QUEUED" ||
-    normalized === "NOT_STARTED" ||
-    normalized === "RUNNING"
-  );
 }

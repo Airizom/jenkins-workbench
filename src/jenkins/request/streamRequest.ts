@@ -1,4 +1,3 @@
-import type { IncomingMessage } from "node:http";
 import { PassThrough } from "node:stream";
 import { JenkinsMaxBytesError, JenkinsRequestError } from "../errors";
 import { executeRequestLifecycle } from "./requestLifecycle";
@@ -48,7 +47,12 @@ export function requestJenkinsStream(
     },
     onResponse: ({ response, statusCode }) => {
       if (statusCode < 200 || statusCode >= 300) {
-        return collectErrorText(response, statusCode, maxBytes).then((responseText) =>
+        return collectBoundedResponseText(
+          response,
+          statusCode,
+          maxBytes,
+          "resolvePartialText"
+        ).then((responseText) =>
           Promise.reject(
             new JenkinsRequestError(
               `Jenkins API request failed (${statusCode} ${response.statusMessage ?? ""})`,
@@ -111,12 +115,4 @@ export function requestJenkinsStream(
       return Promise.resolve({ stream, headers: response.headers, abort });
     }
   });
-}
-
-function collectErrorText(
-  response: IncomingMessage,
-  statusCode: number,
-  maxBytes: number | undefined
-): Promise<string> {
-  return collectBoundedResponseText(response, statusCode, maxBytes, "resolvePartialText");
 }

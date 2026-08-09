@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "entry": [
+    "src/buildDiagnostics/BuildDiagnosticCustomMatcherWorker.ts",
     "src/panels/buildCompare/webview/index.tsx",
     "src/panels/buildDetails/webview/index.tsx",
     "src/panels/nodeCapacity/webview/index.tsx",
@@ -15,10 +16,12 @@
     "resources/**",
     "*.vsix"
   ],
-  // These packages are runtime imports in source, but Vite bundles them into
-  // the generated webview assets. They must remain development dependencies so
-  // VS Code packaging does not ship a redundant node_modules tree.
   "ignoreDependencies": [
+    // Used only by the development-time package manifest validator.
+    "ajv",
+    // These packages are runtime imports in source, but Vite bundles them into
+    // the generated webview assets. They must remain development dependencies so
+    // VS Code packaging does not ship a redundant node_modules tree.
     "@radix-ui/react-accordion",
     "@radix-ui/react-checkbox",
     "@radix-ui/react-collapsible",
@@ -88,71 +91,9 @@
       "implements": "BuildDetailsCoverageDecorationsSurface",
       "members": ["dispose", "activate", "deactivate", "apply"]
     },
-    {
-      "implements": "BuildDetailsPanelStateRuntimeSurface",
-      "members": [
-        "lastDetailsBuilding",
-        "setTestReport",
-        "markTestReportFetchAttempted",
-        "setTestResultsLoading",
-        "setCoverage",
-        "setCoverageActionPath",
-        "setCoverageError",
-        "setCoverageLoading",
-        "setPipelineLoading",
-        "setPipelineRestartInfo",
-        "takeCompletionToastSlot"
-      ]
-    },
-    {
-      "implements": "BuildDetailsPanelViewRuntimeSurface",
-      "members": ["postStateUpdate", "postConsoleSnapshot"]
-    },
-    {
-      "implements": "BuildDetailsPollingRuntimeSurface",
-      "members": [
-        "refreshConsoleSnapshot",
-        "fetchTestReport",
-        "fetchWorkflowRunWithCallbacks",
-        "refreshPendingInputs"
-      ]
-    },
-    {
-      "implements": "JenkinsWorkbenchTreeRuntimeSurface",
-      "members": [
-        "onDidChangeSummary",
-        "refreshActivity",
-        "updateBuildTooltipOptions",
-        "updateBuildListFetchOptions",
-        "updateViewCurationOptions",
-        "updateActivityOptions",
-        "setWatchErrorCount"
-      ]
-    },
-    {
-      "implements": "ActivityRefreshSubscriptionSurface",
-      "members": [
-        "updateOptions",
-        "handleActivityFolderExpanded",
-        "handleActivityFolderCollapsed",
-        "handleEnvironmentCollapsed",
-        "handleAllEnvironmentsCollapsed",
-        "handleEnvironmentStoreChange",
-        "handleStatusTick"
-      ]
-    },
-    {
-      "implements": "BuildComparePanelRevivalSurface",
-      "members": ["revive"]
-    },
-    {
-      "implements": "BuildConsoleExporterActionSurface",
-      "members": ["getDefaultFileName", "exportToFile"]
-    },
-    {
-      "implements": "BuildDetailsPanelRevivalSurface",
-      "members": ["revive"]
-    },
+    "revive",
+    "getDefaultFileName",
+    "exportToFile",
     {
       "implements": "JenkinsDataCacheRuntimeSurface",
       "members": ["getOrLoad"]
@@ -160,10 +101,6 @@
     {
       "implements": "JenkinsArtifactRetrievalRuntimeSurface",
       "members": ["getArtifact", "getArtifactStream"]
-    },
-    {
-      "implements": "JenkinsfileIntelligenceConfigRuntimeSurface",
-      "members": ["updateConfig"]
     },
     {
       "implements": "JenkinsfileStepCatalogInvalidationSurface",
@@ -177,30 +114,9 @@
       "implements": "JenkinsStatusPollerRuntimeSurface",
       "members": ["onDidChangeWatchErrorCount", "updateMaxConsecutiveErrors", "start"]
     },
-    {
-      "implements": "JenkinsStatusRefreshRuntimeSurface",
-      "members": ["updateRefreshIntervalSeconds"]
-    },
-    {
-      "implements": "NodeCapacityExecutorHydrationSurface",
-      "members": ["hydrateNodeExecutors"]
-    },
-    {
-      "implements": "NodeActionRuntimeSurface",
-      "members": ["takeNodeOffline", "bringNodeOnline", "launchNodeAgent"]
-    },
-    {
-      "implements": "PendingInputActionsRuntimeSurface",
-      "members": ["getPendingInputActions"]
-    },
-    {
-      "implements": "TreeActivityClassificationSurface",
-      "members": ["classify"]
-    },
-    {
-      "implements": "TreeActivityPendingInputEnrichmentSurface",
-      "members": ["findAwaitingInputJobUrls"]
-    }
+    "updateRefreshIntervalSeconds",
+    "handleEnvironmentCollapsed",
+    "handleAllEnvironmentsCollapsed"
   ],
   "rules": {
     "unresolved-imports": "error",

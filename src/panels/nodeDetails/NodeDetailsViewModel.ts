@@ -321,21 +321,7 @@ function stringifyNodeDetails(details?: JenkinsNodeDetails): string {
     return "";
   }
 
-  const seen = new WeakSet<object>();
-  return JSON.stringify(
-    details,
-    (_key, value) => {
-      if (!isPlainRecord(value)) {
-        return value;
-      }
-      if (seen.has(value)) {
-        return "[Circular]";
-      }
-      seen.add(value);
-      return value;
-    },
-    2
-  );
+  return JSON.stringify(details, null, 2);
 }
 
 function resolveNowMs(nowMs: number | undefined, updatedAt: string): number {

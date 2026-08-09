@@ -3,12 +3,7 @@ import type { JenkinsfileStepCatalogService } from "../jenkinsfile/JenkinsfileSt
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsfileEnvironmentResolver } from "../validation/JenkinsfileEnvironmentResolver";
 import type { JenkinsfileValidationCoordinator } from "../validation/JenkinsfileValidationCoordinator";
-import {
-  clearJenkinsfileDiagnostics,
-  selectValidationEnvironment,
-  showJenkinsfileValidationOutput,
-  validateActiveJenkinsfile
-} from "./jenkinsfile/JenkinsfileCommandHandlers";
+import { selectValidationEnvironment } from "./jenkinsfile/JenkinsfileCommandHandlers";
 
 export function registerJenkinsfileCommands(
   context: vscode.ExtensionContext,
@@ -19,17 +14,17 @@ export function registerJenkinsfileCommands(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("jenkinsWorkbench.jenkinsfile.validateActive", () =>
-      validateActiveJenkinsfile(coordinator)
+      coordinator.validateActiveEditor()
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment",
       () => selectValidationEnvironment(resolver, environmentStore, coordinator, stepCatalogService)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.jenkinsfile.clearDiagnostics", () =>
-      clearJenkinsfileDiagnostics(coordinator)
+      coordinator.clearDiagnostics()
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.jenkinsfile.showValidationOutput", () =>
-      showJenkinsfileValidationOutput(coordinator)
+      coordinator.showOutputChannel()
     )
   );
 }

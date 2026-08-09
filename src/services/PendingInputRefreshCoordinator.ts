@@ -26,17 +26,7 @@ interface RefreshWorkItem {
   previous?: PendingInputSummary;
 }
 
-interface PendingInputActionsRuntimeSurface {
-  getPendingInputActions(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: { mode?: "cached" | "refresh" }
-  ): Promise<PendingInputAction[]>;
-}
-
-export class PendingInputRefreshCoordinator
-  implements vscode.Disposable, PendingInputActionsRuntimeSurface
-{
+export class PendingInputRefreshCoordinator implements vscode.Disposable {
   private readonly queue: RefreshWorkItem[] = [];
   private readonly queuedKeys = new Set<string>();
   private readonly inFlightPromises = new Map<string, Promise<PendingInputSummary>>();
@@ -171,6 +161,7 @@ export class PendingInputRefreshCoordinator
     return summariesByUrl;
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through pending-input providers
   async getPendingInputActions(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,

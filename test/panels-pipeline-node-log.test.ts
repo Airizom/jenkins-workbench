@@ -7,6 +7,7 @@ import {
   type PipelineNodeLogFetchResult
 } from "../src/panels/buildDetails/PipelineNodeLogFetcher";
 import { PipelineStageLogAggregator } from "../src/panels/buildDetails/PipelineStageLogAggregator";
+import { isWorkflowNodeActive } from "../src/panels/buildDetails/PipelineWorkflowStatus";
 import { MAX_CONSOLE_CHARS } from "../src/services/ConsoleOutputConfig";
 import type {
   PipelineLogTargetViewModel,
@@ -99,6 +100,13 @@ async function fetchFreshAfterReset(
 }
 
 describe("PipelineNodeLogFetcher", () => {
+  it.each(["IN_PROGRESS", "PAUSED_PENDING_INPUT", "QUEUED", "NOT_STARTED", "RUNNING"])(
+    "polls while workflow status is %s",
+    (status) => {
+      assert.equal(isWorkflowNodeActive(` ${status.toLowerCase()} `), true);
+    }
+  );
+
   it("discards in-flight completions after reset so the next fetch starts at offset 0", async () => {
     const fake = createFakeBackend();
     const fetcher = createFetcher(fake.backend);
@@ -181,6 +189,42 @@ describe("PipelineNodeLogFetcher", () => {
 });
 
 describe("PipelineStageLogAggregator", () => {
+  it("rediscovers children while a stage is RUNNING", async () => {
+    let detailsCallCount = 0;
+    const logCalls: string[] = [];
+    const backend = {
+      getFlowNodeDetails: async () => {
+        detailsCallCount += 1;
+        return detailsCallCount === 1
+          ? { id: "stage-1", status: "RUNNING", stageFlowNodes: [] }
+          : { id: "stage-1", status: "RUNNING", stageFlowNodes: [{ id: "child-1" }] };
+      },
+      getFlowNodeLog: async (_environment: unknown, _buildUrl: string, nodeId: string) => {
+        logCalls.push(nodeId);
+        return { nodeId, text: `log ${nodeId}`, hasMore: false };
+      }
+    } as unknown as BuildDetailsConsoleBackend;
+    const aggregator = new PipelineStageLogAggregator({
+      backend,
+      environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl: "https://jenkins.example/job/example/1/"
+    });
+    const target: PipelineLogTargetViewModel = {
+      key: "stage:stage-1",
+      kind: "stage",
+      name: "Stage 1",
+      nodeId: "stage-1"
+    };
+
+    const firstResult = await aggregator.fetch(target, true);
+    const secondResult = await aggregator.fetch(target, false);
+
+    assert.equal(firstResult.polling, true);
+    assert.equal(detailsCallCount, 2);
+    assert.deepEqual(logCalls, ["stage-1", "child-1"]);
+    assert.match(secondResult.text, /log child-1/);
+  });
+
   it("starts every request in the capped stage-log batch before awaiting results", async () => {
     const nodeIds = ["1", "2", "3", "4", "5", "6"];
     const calls: string[] = [];

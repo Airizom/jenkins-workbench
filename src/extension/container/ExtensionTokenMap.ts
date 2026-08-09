@@ -1,4 +1,5 @@
 import type * as vscode from "vscode";
+import type { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import type { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import type { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
@@ -38,6 +39,7 @@ import type { TestSourceFileMatchConfig } from "../../services/TestSourceFileMat
 import type { TestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import type { TestSourceResolver } from "../../services/TestSourceResolver";
+import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
@@ -72,6 +74,7 @@ import type { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 
 export interface ExtensionTokenMap {
   environmentStore: JenkinsEnvironmentStore;
+  diagnosticBindingStore: JenkinsDiagnosticProfileBindingStore;
   browserSsoAuthenticator: BrowserSsoAuthenticationService;
   clientProvider: JenkinsClientProvider;
   dataService: JenkinsDataService;
@@ -97,6 +100,7 @@ export interface ExtensionTokenMap {
   artifactActionHandler: ArtifactActionHandler;
   buildComparePanelLauncher: BuildComparePanelLauncher;
   buildDetailsPanelLauncher: BuildDetailsPanelLauncher;
+  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
   watchStore: JenkinsWatchStore;
   presetStore: JenkinsParameterPresetStore;
   pinStore: JenkinsPinStore;

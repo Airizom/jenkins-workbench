@@ -49,7 +49,8 @@ export class TreeDataProviderExpansionResolver {
       if (!match) {
         return {
           element: undefined,
-          pending
+          pending,
+          pendingElement: pending ? parent : undefined
         };
       }
       parent = match;

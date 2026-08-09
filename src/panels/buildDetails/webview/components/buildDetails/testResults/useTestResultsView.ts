@@ -1,12 +1,7 @@
 import * as React from "react";
 import type { BuildTestResultsViewModel } from "../../../../shared/BuildDetailsContracts";
 import type { TestResultsView, TestStatusFilter } from "./testResultsTypes";
-import {
-  filterTestResults,
-  getAutoExpandIds,
-  getTestResultsDatasetKey,
-  RENDER_BATCH_SIZE
-} from "./testResultsUtils";
+import { filterTestResults, getAutoExpandIds, RENDER_BATCH_SIZE } from "./testResultsUtils";
 
 const { useEffect, useMemo, useState } = React;
 
@@ -20,10 +15,6 @@ export function useTestResultsView({
   const [statusFilter, setStatusFilter] = useState<TestStatusFilter>("all");
   const [query, setQuery] = useState("");
   const [renderCount, setRenderCount] = useState(RENDER_BATCH_SIZE);
-  const datasetKey = useMemo(
-    () => getTestResultsDatasetKey(buildUrl, results.items),
-    [buildUrl, results.items]
-  );
 
   const filteredItems = useMemo(
     () => filterTestResults(results.items, statusFilter, query),
@@ -40,7 +31,7 @@ export function useTestResultsView({
     setStatusFilter("all");
     setQuery("");
     setRenderCount(RENDER_BATCH_SIZE);
-  }, [datasetKey]);
+  }, [buildUrl]);
 
   const visibleItems = filteredItems.slice(0, renderCount);
   const hasMore = filteredItems.length > visibleItems.length;

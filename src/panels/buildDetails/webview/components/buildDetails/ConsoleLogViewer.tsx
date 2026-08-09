@@ -1,4 +1,6 @@
 import * as React from "react";
+import type { BuildDiagnosticConsoleReference } from "../../../shared/BuildDetailsContracts";
+import { buildConsoleSegments } from "../../hooks/consoleSearch/buildConsoleSegments";
 import { useConsoleOutputScroll } from "../../hooks/useConsoleOutputScroll";
 import { useConsoleSearch } from "../../hooks/useConsoleSearch";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
@@ -7,6 +9,7 @@ import { ConsoleLogSearchBody } from "../ConsoleLogSearchBody";
 import { buildConsoleTruncationNote, countConsoleLines } from "./consoleOutput/consoleOutputUtils";
 
 const { useEffect, useMemo } = React;
+const EMPTY_SOURCE_REFERENCES: BuildDiagnosticConsoleReference[] = [];
 
 export type ConsoleLogViewerHeaderState = {
   hasOutput: boolean;
@@ -26,6 +29,8 @@ export function ConsoleLogViewer({
   className,
   bodyClassName,
   onOpenExternal,
+  sourceReferences = EMPTY_SOURCE_REFERENCES,
+  onOpenDiagnosticSource,
   renderHeader
 }: {
   text: string;
@@ -39,6 +44,8 @@ export function ConsoleLogViewer({
   className?: string;
   bodyClassName?: string;
   onOpenExternal: (url: string) => void;
+  sourceReferences?: BuildDiagnosticConsoleReference[];
+  onOpenDiagnosticSource?: (targetId: string) => void;
   renderHeader?: (state: ConsoleLogViewerHeaderState) => React.ReactNode;
 }): React.JSX.Element {
   const sourceText = htmlModel?.text ?? text;
@@ -50,16 +57,27 @@ export function ConsoleLogViewer({
         htmlModel,
         consoleSearch.matches,
         consoleSearch.activeMatchIndex,
-        onOpenExternal
+        onOpenExternal,
+        sourceReferences,
+        onOpenDiagnosticSource
       );
     }
-    return consoleSearch.consoleSegments;
+    return buildConsoleSegments(
+      sourceText,
+      consoleSearch.matches,
+      consoleSearch.activeMatchIndex,
+      consoleSearch.isSearchActive,
+      sourceReferences,
+      onOpenDiagnosticSource
+    );
   }, [
     htmlModel,
     consoleSearch.matches,
     consoleSearch.activeMatchIndex,
-    consoleSearch.consoleSegments,
-    onOpenExternal
+    consoleSearch.isSearchActive,
+    onOpenExternal,
+    sourceReferences,
+    onOpenDiagnosticSource
   ]);
 
   const scrollKey = useMemo(() => {

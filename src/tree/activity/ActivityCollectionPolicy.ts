@@ -21,17 +21,36 @@ export function promoteAwaitingInputJobs(
     return;
   }
 
-  const promotedJobUrls = promoteCandidatesToAwaitingInput(
-    groups,
-    runningCandidates,
-    awaitingInputJobUrls,
-    maxItems
-  );
-  if (promotedJobUrls.size === 0) {
+  promoteCandidatesToAwaitingInput(groups, runningCandidates, awaitingInputJobUrls, maxItems);
+  removeAwaitingInputEntriesFromOtherGroups(groups, awaitingInputJobUrls);
+  backfillRunningEntries(groups, runningCandidates, awaitingInputJobUrls, maxItems);
+}
+
+function backfillRunningEntries(
+  groups: ActivityGroups,
+  runningCandidates: JobSearchEntry[],
+  excludedJobUrls: ReadonlySet<string>,
+  maxItems: number
+): void {
+  const current = groups.get("running");
+  if (!current) {
     return;
   }
 
-  removePromotedEntriesFromOtherGroups(groups, promotedJobUrls);
+  const backfilled: JobSearchEntry[] = [];
+  const includedJobUrls = new Set<string>();
+  for (const entry of [...runningCandidates, ...current]) {
+    if (
+      backfilled.length >= maxItems ||
+      excludedJobUrls.has(entry.url) ||
+      includedJobUrls.has(entry.url)
+    ) {
+      continue;
+    }
+    backfilled.push(entry);
+    includedJobUrls.add(entry.url);
+  }
+  groups.set("running", backfilled);
 }
 
 function promoteCandidatesToAwaitingInput(
@@ -39,9 +58,8 @@ function promoteCandidatesToAwaitingInput(
   runningCandidates: JobSearchEntry[],
   awaitingInputJobUrls: ReadonlySet<string>,
   maxItems: number
-): Set<string> {
+): void {
   const awaiting = groups.get("awaitingInput") ?? [];
-  const promotedJobUrls = new Set<string>();
   for (const entry of runningCandidates) {
     if (awaiting.length >= maxItems) {
       break;
@@ -50,22 +68,20 @@ function promoteCandidatesToAwaitingInput(
       continue;
     }
     awaiting.push(entry);
-    promotedJobUrls.add(entry.url);
   }
   groups.set("awaitingInput", awaiting);
-  return promotedJobUrls;
 }
 
-function removePromotedEntriesFromOtherGroups(
+function removeAwaitingInputEntriesFromOtherGroups(
   groups: ActivityGroups,
-  promotedJobUrls: ReadonlySet<string>
+  awaitingInputJobUrls: ReadonlySet<string>
 ): void {
   for (const group of ["failing", "unstable", "running"] as const) {
     const current = groups.get(group);
     if (!current) {
       continue;
     }
-    const filtered = current.filter((entry) => !promotedJobUrls.has(entry.url));
+    const filtered = current.filter((entry) => !awaitingInputJobUrls.has(entry.url));
     groups.set(group, filtered);
   }
 }

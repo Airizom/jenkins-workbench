@@ -3,6 +3,7 @@ import {
   findMatchingDelimiter,
   findMatchingDelimiterBackward,
   findPreviousMeaningfulIndex,
+  isCallStartAt,
   readIdentifierBackward,
   skipGdslComment,
   skipString,
@@ -90,15 +91,14 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
       continue;
     }
 
-    const match = findCallStart(body, "method", index);
-    if (match !== index) {
+    if (!isCallStartAt(body, "method", index)) {
       index += 1;
       continue;
     }
 
-    const openParen = skipWhitespace(body, match + "method".length);
+    const openParen = skipWhitespace(body, index + "method".length);
     if (body[openParen] !== "(") {
-      index = match + "method".length;
+      index += "method".length;
       continue;
     }
 
@@ -106,7 +106,7 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
     const activeGuardNames = guardStack.flat();
     if (!shouldSuppressMethod(activeGuardNames)) {
       calls.push({
-        call: parseCallExpression(body.slice(match, closeParen + 1)),
+        call: parseCallExpression(body.slice(index, closeParen + 1)),
         requiresNodeContext: activeGuardNames.includes("node")
       });
     }

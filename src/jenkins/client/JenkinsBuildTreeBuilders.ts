@@ -5,7 +5,7 @@ const BUILD_CHANGE_SET_FIELDS = [
   "changeSets[items[commitId,msg,author[fullName]]]"
 ];
 
-const BUILD_ACTION_BASE_FIELDS = ["_class", "urlName"];
+const BUILD_ACTION_BASE_FIELDS = ["_class", "urlName", "lastBuiltRevision[SHA1]", "remoteUrls"];
 const BUILD_ACTION_CAUSE_FIELD = "causes[shortDescription,userId,userName]";
 const BUILD_ACTION_PARAMETER_FIELD = "parameters[name,value]";
 

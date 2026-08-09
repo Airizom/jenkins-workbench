@@ -79,19 +79,8 @@ export class BuildDetailsBackendAdapter implements BuildDetailsBackend {
     this.status = inspection.status;
     this.tests = inspection.tests;
     this.console = inspection.console;
-    this.coverage = {
-      discoverCoverageActionPath: (...args) => dataService.discoverCoverageActionPath(...args),
-      getCoverageOverview: (...args) => dataService.getCoverageOverview(...args),
-      getModifiedCoverageFiles: (...args) => dataService.getModifiedCoverageFiles(...args)
-    };
-    this.pendingInputs = {
-      getPendingInputActions: (...args) => dataService.getPendingInputActions(...args),
-      approveInput: (...args) => dataService.approveInput(...args),
-      rejectInput: (...args) => dataService.rejectInput(...args)
-    };
-    this.restart = {
-      getRestartFromStageInfo: (...args) => dataService.getRestartFromStageInfo(...args),
-      restartPipelineFromStage: (...args) => dataService.restartPipelineFromStage(...args)
-    };
+    this.coverage = dataService;
+    this.pendingInputs = dataService;
+    this.restart = dataService;
   }
 }

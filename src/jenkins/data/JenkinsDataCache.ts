@@ -6,14 +6,15 @@ interface CacheEntry<T> {
   lastAccessedAt: number;
 }
 
-const DEFAULT_MAX_ENTRIES = 1000;
-
-interface JenkinsDataCacheRuntimeSurface {
-  getOrLoad<T>(key: string, loader: () => Promise<T>, ttlMs?: number): Promise<T>;
+interface PendingLoad {
+  isValid: boolean;
 }
 
-export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
+const DEFAULT_MAX_ENTRIES = 1000;
+
+export class JenkinsDataCache {
   private readonly cache = new Map<string, CacheEntry<unknown>>();
+  private readonly pendingLoads = new Map<string, Set<PendingLoad>>();
   private readonly maxEntries: number;
 
   constructor(
@@ -24,12 +25,15 @@ export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
   }
 
   clear(): void {
+    this.invalidatePendingLoads();
     this.cache.clear();
   }
 
   clearForEnvironment(environmentId: string): void {
+    const prefix = `${environmentId}:`;
+    this.invalidatePendingLoads(prefix);
     for (const key of this.cache.keys()) {
-      if (key.startsWith(`${environmentId}:`)) {
+      if (key.startsWith(prefix)) {
         this.cache.delete(key);
       }
     }
@@ -44,6 +48,11 @@ export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
   }
 
   set<T>(key: string, value: T, ttlMs?: number): void {
+    this.invalidatePendingLoad(key);
+    this.setEntry(key, value, ttlMs);
+  }
+
+  private setEntry<T>(key: string, value: T, ttlMs?: number): void {
     const resolvedTtl = this.resolveTtlMs(ttlMs);
     if (resolvedTtl === 0) {
       this.cache.delete(key);
@@ -56,6 +65,7 @@ export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
   }
 
   delete(key: string): void {
+    this.invalidatePendingLoad(key);
     this.cache.delete(key);
   }
 
@@ -69,13 +79,15 @@ export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
       return entry.value;
     }
 
+    const pendingLoad = this.registerPendingLoad(key);
     try {
       const result = await loader();
-      this.set(key, result, ttlMs);
+      if (pendingLoad.isValid) {
+        this.setEntry(key, result, ttlMs);
+      }
       return result;
-    } catch (error) {
-      this.cache.delete(key);
-      throw error;
+    } finally {
+      this.unregisterPendingLoad(key, pendingLoad);
     }
   }
 
@@ -110,6 +122,46 @@ export class JenkinsDataCache implements JenkinsDataCacheRuntimeSurface {
       return 0;
     }
     return resolvedTtl;
+  }
+
+  private registerPendingLoad(key: string): PendingLoad {
+    const pendingLoad = { isValid: true };
+    const loadsForKey = this.pendingLoads.get(key) ?? new Set<PendingLoad>();
+    loadsForKey.add(pendingLoad);
+    this.pendingLoads.set(key, loadsForKey);
+    return pendingLoad;
+  }
+
+  private unregisterPendingLoad(key: string, pendingLoad: PendingLoad): void {
+    const loadsForKey = this.pendingLoads.get(key);
+    if (!loadsForKey) {
+      return;
+    }
+    loadsForKey.delete(pendingLoad);
+    if (loadsForKey.size === 0) {
+      this.pendingLoads.delete(key);
+    }
+  }
+
+  private invalidatePendingLoad(key: string): void {
+    const loadsForKey = this.pendingLoads.get(key);
+    if (!loadsForKey) {
+      return;
+    }
+    for (const pendingLoad of loadsForKey) {
+      pendingLoad.isValid = false;
+    }
+  }
+
+  private invalidatePendingLoads(prefix?: string): void {
+    for (const [key, loadsForKey] of this.pendingLoads) {
+      if (prefix && !key.startsWith(prefix)) {
+        continue;
+      }
+      for (const pendingLoad of loadsForKey) {
+        pendingLoad.isValid = false;
+      }
+    }
   }
 
   private evictIfNeeded(): void {

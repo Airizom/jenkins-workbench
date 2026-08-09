@@ -3,19 +3,31 @@ import type { JenkinsfileValidationCode } from "./JenkinsfileValidationTypes";
 const MAX_SUGGESTIONS = 10;
 const MISSING_SECTION_PATTERN = /Missing required section ['"]([^'"]+)['"]/i;
 const INVALID_SECTION_DEFINITION_PATTERN = /Not a valid section definition:\s*['"]([^'"]+)['"]/i;
-const BLOCKED_STEP_PATTERN =
-  /Invalid step ['"]?([A-Za-z0-9_-]+)['"]? used - not allowed in this context/i;
-const UNKNOWN_DSL_PATTERNS = [
-  /No such DSL method\b/i,
-  /No such step\b/i,
-  /Unknown step\b/i,
-  /found among steps\b/i
-];
-const INVALID_STEP_TOKEN_PATTERNS = [
-  /Invalid step ['"]?([A-Za-z0-9_-]+)['"]?/i,
-  /No such DSL method ['"]?([A-Za-z0-9_-]+)['"]?/i,
-  /No such step ['"]?([A-Za-z0-9_-]+)['"]?/i,
-  /Unknown step ['"]?([A-Za-z0-9_-]+)['"]?/i
+const INVALID_STEP_RULES: ReadonlyArray<{
+  pattern: RegExp;
+  code: JenkinsfileValidationCode;
+}> = [
+  {
+    pattern: /Invalid step ['"]?([A-Za-z0-9_-]+)['"]? used - not allowed in this context/i,
+    code: "blocked-step"
+  },
+  {
+    pattern: /No such DSL method\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
+    code: "unknown-dsl-method"
+  },
+  {
+    pattern: /No such step\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
+    code: "unknown-dsl-method"
+  },
+  {
+    pattern: /Unknown step\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
+    code: "unknown-dsl-method"
+  },
+  { pattern: /found among steps\b/i, code: "unknown-dsl-method" },
+  {
+    pattern: /Invalid step\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
+    code: "invalid-step"
+  }
 ];
 const TOKEN_CHAR_PATTERN = /[A-Za-z0-9_-]/;
 
@@ -35,19 +47,7 @@ export function deriveValidationCode(message: string): JenkinsfileValidationCode
     return "invalid-section-definition";
   }
 
-  if (BLOCKED_STEP_PATTERN.test(message)) {
-    return "blocked-step";
-  }
-
-  if (UNKNOWN_DSL_PATTERNS.some((pattern) => pattern.test(message))) {
-    return "unknown-dsl-method";
-  }
-
-  if (/Invalid step\b/i.test(message)) {
-    return "invalid-step";
-  }
-
-  return undefined;
+  return parseInvalidStepMessage(message)?.code;
 }
 
 export function extractSuggestionsFromLine(line: string): string[] {
@@ -117,10 +117,16 @@ function collectUniqueSuggestions(values: string[], additional?: string[]): stri
 }
 
 export function extractInvalidStepToken(message: string): string | undefined {
-  for (const pattern of INVALID_STEP_TOKEN_PATTERNS) {
-    const match = message.match(pattern);
-    if (match?.[1]) {
-      return match[1];
+  return parseInvalidStepMessage(message)?.token;
+}
+
+function parseInvalidStepMessage(
+  message: string
+): { code: JenkinsfileValidationCode; token?: string } | undefined {
+  for (const rule of INVALID_STEP_RULES) {
+    const match = message.match(rule.pattern);
+    if (match) {
+      return { code: rule.code, token: match[1] };
     }
   }
   return undefined;

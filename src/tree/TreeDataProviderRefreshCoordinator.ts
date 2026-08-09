@@ -59,6 +59,15 @@ export class TreeDataProviderRefreshCoordinator {
   }
 
   refresh(refreshToken: number | undefined, manualCooldownMs: number): boolean {
+    if (!this.beginManualRefresh(refreshToken, manualCooldownMs)) {
+      return false;
+    }
+
+    this.notifyTreeChange(undefined);
+    return true;
+  }
+
+  beginManualRefresh(refreshToken: number | undefined, manualCooldownMs: number): boolean {
     const now = Date.now();
     if (now - this.lastManualRefreshAt < manualCooldownMs) {
       this.onRefreshCooldown(manualCooldownMs);
@@ -67,7 +76,6 @@ export class TreeDataProviderRefreshCoordinator {
 
     this.lastManualRefreshAt = now;
     this.registerPendingRefreshWaiter(refreshToken);
-    this.notifyTreeChange(undefined);
     return true;
   }
 

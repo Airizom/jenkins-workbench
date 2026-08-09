@@ -1,5 +1,6 @@
 import type { JenkinsChangesetViewModel } from "../../../jenkins/changesets/JenkinsChangesetViewModel";
 import { uniqueNonEmptyStrings } from "../../../shared/arrays";
+import type { BuildDiagnosticSeverity } from "../../../shared/BuildDiagnosticContracts";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
 import type { NormalizedTestStatus } from "../../shared/TestStatusFormatters";
 
@@ -94,6 +95,68 @@ export interface BuildFailureInsightsViewModel {
   artifacts: BuildFailureArtifact[];
   artifactsOverflow: number;
 }
+
+export const BUILD_DIAGNOSTIC_SCAN_STATUSES = [
+  "idle",
+  "scanning",
+  "available",
+  "disabled",
+  "needsRepository",
+  "truncated",
+  "error"
+] as const;
+
+export type BuildDiagnosticScanStatus = (typeof BUILD_DIAGNOSTIC_SCAN_STATUSES)[number];
+
+/** A concise, serializable diagnostic rendered in the Build Details overview. */
+export interface BuildDiagnosticInsightItem {
+  severity: BuildDiagnosticSeverity;
+  message: string;
+  locationLabel?: string;
+  source?: string;
+  code?: string;
+  /** Opaque to the webview. The extension validates it against the active scan. */
+  targetId?: string;
+}
+
+/**
+ * A source link range in the currently displayed console text. Offsets are
+ * zero-based UTF-16 indices, matching JavaScript string slicing semantics.
+ */
+export interface BuildDiagnosticConsoleReference {
+  targetId: string;
+  startOffset: number;
+  endOffset: number;
+}
+
+export interface BuildDiagnosticsViewModel {
+  status: BuildDiagnosticScanStatus;
+  errorCount: number;
+  warningCount: number;
+  informationCount: number;
+  resolvedCount: number;
+  unresolvedCount: number;
+  omittedCount: number;
+  /** At most the first five actionable diagnostics, in log order. */
+  items: BuildDiagnosticInsightItem[];
+  warnings: string[];
+  /** Uniquely resolved references in the displayed console text. */
+  consoleReferences: BuildDiagnosticConsoleReference[];
+  message?: string;
+}
+
+export const EMPTY_BUILD_DIAGNOSTICS: BuildDiagnosticsViewModel = {
+  status: "idle",
+  errorCount: 0,
+  warningCount: 0,
+  informationCount: 0,
+  resolvedCount: 0,
+  unresolvedCount: 0,
+  omittedCount: 0,
+  items: [],
+  warnings: [],
+  consoleReferences: []
+};
 
 export type TestResultStatus = NormalizedTestStatus;
 
@@ -194,6 +257,7 @@ export interface BuildDetailsViewModel {
   testState: BuildDetailsTestStateViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
+  diagnostics?: BuildDiagnosticsViewModel;
   pendingInputs: PendingInputViewModel[];
   consoleText: string;
   consoleHtml?: string;

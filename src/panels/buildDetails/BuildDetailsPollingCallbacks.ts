@@ -4,6 +4,7 @@ import { formatError } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import type { BuildDetailsPollingCallbacks } from "./BuildDetailsPollingController";
 import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
+import type { ConsoleTextByteRange } from "./ConsoleStreamManager";
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsPollingCallbackHooks {
@@ -16,6 +17,13 @@ export interface BuildDetailsPollingCallbackHooks {
   canOpenSource?: (className?: string) => boolean;
   getCoverageEnabled?: () => boolean;
   onPipelineLoading?: (token: number) => void;
+  onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void;
+  onConsoleTextAppend?: (text: string) => void;
+  onConsoleTextSet?: (text: string) => void;
+  onConsoleHtmlChanged?: (
+    textRange: ConsoleTextByteRange,
+    appendedTextRange?: ConsoleTextByteRange
+  ) => void;
 }
 
 export function createBuildDetailsPollingCallbacks(
@@ -38,6 +46,7 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       state.updateDetails(details);
+      hooks.onBuildDetailsChanged?.(details);
       postStateMessage();
     },
     onWorkflowFetchStart: () => {
@@ -73,12 +82,14 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       hooks.postMessage({ type: "appendConsole", text });
+      hooks.onConsoleTextAppend?.(text);
     },
-    onConsoleHtmlAppend: (html) => {
+    onConsoleHtmlAppend: (html, textRange, appendedTextRange) => {
       if (!hooks.isTokenCurrent(token)) {
         return;
       }
       hooks.postMessage({ type: "appendConsoleHtml", html });
+      hooks.onConsoleHtmlChanged?.(textRange, appendedTextRange);
     },
     onConsoleSet: (payload) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -89,6 +100,7 @@ export function createBuildDetailsPollingCallbacks(
         text: payload.text,
         truncated: payload.truncated
       });
+      hooks.onConsoleTextSet?.(payload.text);
     },
     onConsoleHtmlSet: (payload) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -99,6 +111,7 @@ export function createBuildDetailsPollingCallbacks(
         html: payload.html,
         truncated: payload.truncated
       });
+      hooks.onConsoleHtmlChanged?.(payload.textRange);
     },
     onErrors: (errors) => {
       if (!hooks.isTokenCurrent(token)) {

@@ -159,9 +159,11 @@ pipeline {
     assert.equal(environmentAnalysis.isStepAllowed, false);
     assert.equal(environmentAnalysis.hasNodeContext, false);
     assert.equal(computeIsStepAllowed(["pipeline"]), false);
-    assert.equal(computeIsStepAllowed(["pipeline", "post", "always"]), true);
+    for (const label of ["node", "steps", "script", "post"]) {
+      assert.equal(computeIsStepAllowed(["pipeline", label]), true);
+      assert.equal(computeHasNodeContext(["pipeline", label]), true);
+    }
     assert.equal(computeIsStepAllowed(["pipeline", "environment"]), false);
-    assert.equal(computeHasNodeContext(["pipeline", "steps"]), true);
     assert.equal(computeHasNodeContext(["pipeline", "environment"]), false);
   });
 

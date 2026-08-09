@@ -4,7 +4,6 @@ import { capListWithOverflow } from "../../shared/arrays";
 import { EMPTY_TEST_RESULTS_LABEL } from "../shared/TestReportFormatters";
 import type {
   BuildFailureArtifact,
-  BuildFailureChangelogItem,
   BuildFailureInsightsViewModel,
   BuildTestsSummaryViewModel
 } from "./shared/BuildDetailsContracts";
@@ -15,7 +14,7 @@ export function buildBuildFailureInsights(
   details?: JenkinsBuildDetails,
   testsSummary?: BuildTestsSummaryViewModel
 ): BuildFailureInsightsViewModel {
-  const changelogItems = buildChangelog(details);
+  const changelogItems = collectBuildChangesets(details);
   const cappedChangelog = capListWithOverflow(changelogItems, INSIGHTS_LIST_LIMIT);
 
   const artifacts = buildArtifacts(details);
@@ -34,10 +33,6 @@ export function buildBuildFailureInsights(
   };
 }
 
-function buildChangelog(details?: JenkinsBuildDetails): BuildFailureChangelogItem[] {
-  return collectBuildChangesets(details);
-}
-
 function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {
   if (!details?.artifacts || details.artifacts.length === 0) {
     return [];
@@ -49,7 +44,7 @@ function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {
       continue;
     }
     const fileName = artifact.fileName?.trim();
-    const name = fileName || relativePath || "Artifact";
+    const name = fileName || relativePath;
     const entry: BuildFailureArtifact = {
       name,
       relativePath

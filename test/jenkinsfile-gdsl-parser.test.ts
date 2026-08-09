@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import { parseJenkinsfileGdsl } from "../src/jenkinsfile/JenkinsfileGdslParser";
+import { scanMethodCalls } from "../src/jenkinsfile/gdsl/JenkinsfileGdslBlockScanner";
 import { readGdslString, skipString } from "../src/jenkinsfile/gdsl/JenkinsfileGdslScannerUtils";
 import { GdslTokenizer } from "../src/jenkinsfile/gdsl/JenkinsfileGdslTokenizer";
 
@@ -28,6 +29,52 @@ contributor(context(type: 'org.jenkinsci.plugins.workflow.cps.CpsScript')) {
       usesNamedArgs: false,
       takesClosure: false
     });
+  });
+
+  it("preserves named and positional signatures with identical labels", () => {
+    const catalog = parseJenkinsfileGdsl(`
+contributor(context(type: 'org.jenkinsci.plugins.workflow.cps.CpsScript')) {
+  method(
+    name: 'echoValue',
+    params: [value: 'String'],
+    namedParams: [parameter(name: 'value', type: 'String')]
+  )
+}
+`);
+
+    const step = catalog.steps.get("echoValue");
+
+    assert.ok(step);
+    assert.deepEqual(
+      step.signatures.map(({ label, usesNamedArgs }) => ({ label, usesNamedArgs })),
+      [
+        { label: "echoValue(value: String)", usesNamedArgs: true },
+        { label: "echoValue(value: String)", usesNamedArgs: false }
+      ]
+    );
+  });
+
+  it("recognizes method calls only at identifier boundaries", () => {
+    const calls = scanMethodCalls(`
+amethod(name: 'prefixed')
+methodCall(name: 'suffixed')
+method(name: 'valid')
+`);
+
+    assert.deepEqual(
+      calls.map(({ call }) => call.args[0]?.value),
+      ["valid"]
+    );
+  });
+
+  it("does not search the remaining suffix at each position", () => {
+    const indexOf = vi.spyOn(String.prototype, "indexOf");
+    try {
+      assert.deepEqual(scanMethodCalls("x".repeat(10_000)), []);
+      assert.equal(indexOf.mock.calls.length, 0);
+    } finally {
+      indexOf.mockRestore();
+    }
   });
 
   it("uses the shared string reader for escaped and triple-quoted strings", () => {

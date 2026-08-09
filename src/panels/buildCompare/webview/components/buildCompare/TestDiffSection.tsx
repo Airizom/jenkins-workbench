@@ -5,11 +5,11 @@ import { SummaryStat } from "./shared/SummaryStat";
 import { DiffList } from "./testDiff/DiffList";
 
 const DIFF_GROUPS = [
-  { title: "New Failures", emptyLabel: "No new failures.", itemsKey: "newFailures" },
-  { title: "Still Failing", emptyLabel: "No still-failing tests.", itemsKey: "stillFailing" },
-  { title: "Newly Passing", emptyLabel: "No newly passing tests.", itemsKey: "newPasses" },
-  { title: "Added Tests", emptyLabel: "No added tests.", itemsKey: "addedTests" },
-  { title: "Removed Tests", emptyLabel: "No removed tests.", itemsKey: "removedTests" }
+  { title: "New Failures", itemsKey: "newFailures" },
+  { title: "Still Failing", itemsKey: "stillFailing" },
+  { title: "Newly Passing", itemsKey: "newPasses" },
+  { title: "Added Tests", itemsKey: "addedTests" },
+  { title: "Removed Tests", itemsKey: "removedTests" }
 ] as const;
 
 function TestChangesSummary({
@@ -56,12 +56,7 @@ export function TestDiffSection({ section }: { section: BuildCompareTestsSection
         <SummaryStat label="Target" value={section.targetSummaryLabel} />
       </div>
       {visibleGroups.map((group) => (
-        <DiffList
-          key={group.title}
-          title={group.title}
-          items={group.items}
-          emptyLabel={group.emptyLabel}
-        />
+        <DiffList key={group.title} title={group.title} items={group.items} />
       ))}
       <TestChangesSummary section={section} hasTestChanges={hasTestChanges} />
     </SectionCard>

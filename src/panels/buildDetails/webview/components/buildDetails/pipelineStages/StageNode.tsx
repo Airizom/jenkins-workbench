@@ -45,8 +45,8 @@ export function StageNode({
   const stageIcon = getStageIcon(stage.statusClass);
   const nodeStyle = resolveBuildResultStageNodeClass(stage.statusClass);
   const connectorColor = resolveBuildResultConnectorColor(stage.statusClass);
-  const stageName = stage.name.trim();
-  const canRestartStage = stage.canRestartFromStage && stageName.length > 0;
+  const stageName = stage.name;
+  const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
   const stageLogTarget = stage.logTarget;
   const hasStageActions = Boolean(stageLogTarget) || canRestartStage;
 

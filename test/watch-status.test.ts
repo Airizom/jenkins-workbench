@@ -353,6 +353,48 @@ describe("JenkinsStatusPoller", () => {
 
     assert.equal(fixture.notifier.calls.pendingInputs.length, 3);
   });
+
+  it("keeps notifications and error counts stable across a complete watch lifecycle", async () => {
+    const entry = watchedEntry();
+    const watched = [entry];
+    let buildUrl = "job/demo/8/";
+    const fixture = createPollerFixture({
+      watched,
+      maxConsecutiveErrors: 2,
+      getJob: async () => {
+        throw new Error("network");
+      },
+      getPendingInputSummary: async () => ({
+        awaitingInput: true,
+        count: 1,
+        signature: "input-a",
+        fetchedAt: 1
+      })
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+
+    fixture.getJob = async () => ({
+      ...runningJob(),
+      lastBuild: { number: 8, url: buildUrl, building: true }
+    });
+    await fixture.poller.poll();
+    buildUrl = "job/demo/9/";
+    await fixture.poller.poll();
+
+    watched.splice(0, 1);
+    await fixture.poller.poll();
+    watched.push(entry);
+    await fixture.poller.poll();
+
+    assert.equal(fixture.notifier.calls.watchErrors.length, 1);
+    assert.deepEqual(errorCounts, [1, 0]);
+    assert.equal(fixture.notifier.calls.pendingInputs.length, 3);
+  });
 });
 
 function runningJob(jobUrl = "job/demo/"): JenkinsJob {

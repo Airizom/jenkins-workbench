@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, it } from "vitest";
-import { requestText, requestTextWithOptions } from "../src/jenkins/request";
+import { requestText } from "../src/jenkins/request";
 import { isCrossOriginRedirect } from "../src/jenkins/request/redirects";
 
 describe("isCrossOriginRedirect", () => {
@@ -170,7 +170,7 @@ describe("standard request redirect handling", () => {
     });
 
     try {
-      const text = await requestTextWithOptions(`${server.url}/start`, {
+      const text = await requestText(`${server.url}/start`, {
         method: "POST"
       });
 

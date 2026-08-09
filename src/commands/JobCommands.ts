@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
+import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
@@ -45,7 +46,8 @@ export function registerJobCommands(
   workflow: JobConfigUpdateWorkflow,
   presetStore: JenkinsParameterPresetStore,
   pinStore: JenkinsPinStore,
-  watchStore: JenkinsWatchStore
+  watchStore: JenkinsWatchStore,
+  bindingStore: JenkinsDiagnosticProfileBindingStore
 ): void {
   const newItemTargetResolver = new JobNewItemTargetResolver(environmentStore);
   const newItemWorkflow = new JobNewItemWorkflow({
@@ -60,6 +62,7 @@ export function registerJobCommands(
     presetStore,
     pinStore,
     watchStore,
+    bindingStore,
     refreshHost
   };
 

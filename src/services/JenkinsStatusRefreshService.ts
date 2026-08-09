@@ -4,13 +4,7 @@ const DEFAULT_REFRESH_INTERVAL_SECONDS = 60;
 const MIN_REFRESH_INTERVAL_SECONDS = 5;
 const DEFAULT_REFRESH_INTERVAL_MS = DEFAULT_REFRESH_INTERVAL_SECONDS * 1000;
 
-interface JenkinsStatusRefreshRuntimeSurface {
-  updateRefreshIntervalSeconds(refreshIntervalSeconds: number): void;
-}
-
-export class JenkinsStatusRefreshService
-  implements vscode.Disposable, JenkinsStatusRefreshRuntimeSurface
-{
+export class JenkinsStatusRefreshService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   private intervalId: NodeJS.Timeout | undefined;
   private refreshIntervalMs: number;

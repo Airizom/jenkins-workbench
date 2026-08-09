@@ -34,8 +34,6 @@ export function createNodeBuildConsoleFilesystem(): BuildConsoleFilesystem {
   };
 }
 
-export type BuildConsoleExportClient = JenkinsConsoleTextClient;
-
 export type BuildConsoleExportMode = "progressive" | "full" | "tail";
 
 export type BuildConsoleExportResult = {
@@ -52,22 +50,13 @@ export interface BuildConsoleExporterOptions {
 const DEFAULT_PROGRESSIVE_EMPTY_RETRIES = 3;
 const DEFAULT_PROGRESSIVE_EMPTY_DELAY_MS = 500;
 
-interface BuildConsoleExporterActionSurface {
-  getDefaultFileName(details?: JenkinsBuildDetails): string;
-  exportToFile(options: {
-    environment: JenkinsEnvironmentRef;
-    buildUrl: string;
-    targetPath: string;
-  }): Promise<BuildConsoleExportResult>;
-}
-
-export class BuildConsoleExporter implements BuildConsoleExporterActionSurface {
+export class BuildConsoleExporter {
   private readonly maxConsoleChars: number;
   private readonly progressiveEmptyRetries: number;
   private readonly progressiveEmptyDelayMs: number;
 
   constructor(
-    private readonly client: BuildConsoleExportClient,
+    private readonly client: JenkinsConsoleTextClient,
     private readonly filesystem: BuildConsoleFilesystem,
     options: BuildConsoleExporterOptions
   ) {

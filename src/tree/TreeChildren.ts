@@ -208,6 +208,11 @@ export class JenkinsTreeChildrenLoader {
     this.environmentSummaryStore.clearForEnvironment(environmentId);
   }
 
+  clearViewCache(): void {
+    this.cacheManager.clearChildrenCacheForEnvironment();
+    this.activityLoader.clearActivityData();
+  }
+
   clearQueueCache(environment: JenkinsEnvironmentRef): void {
     const key = this.buildChildrenKey("queue", environment);
     this.cacheManager.clearChildrenCache(key);
@@ -234,9 +239,13 @@ export class JenkinsTreeChildrenLoader {
     this.cacheManager.clearChildrenCache(
       this.buildLoader.buildBuildArtifactsKey(environment, buildUrl, jobScope)
     );
-    this.cacheManager.deleteArtifact(
-      this.buildLoader.buildArtifactChildrenKey(environment, buildUrl, jobScope)
+    const artifactChildrenKey = this.buildLoader.buildArtifactChildrenKey(
+      environment,
+      buildUrl,
+      jobScope
     );
+    this.cacheManager.clearChildrenCache(artifactChildrenKey);
+    this.cacheManager.deleteArtifact(artifactChildrenKey);
   }
 
   invalidateForElement(element?: WorkbenchTreeElement): void {

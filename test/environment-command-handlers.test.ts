@@ -8,6 +8,7 @@ import type {
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../src/storage/JenkinsEnvironmentStore";
+import type { JenkinsDiagnosticProfileBindingStore } from "../src/storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsParameterPresetStore } from "../src/storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../src/storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
@@ -186,6 +187,7 @@ describe("removeEnvironment", () => {
 
     await removeEnvironment(
       store,
+      {} as JenkinsDiagnosticProfileBindingStore,
       {} as JenkinsParameterPresetStore,
       {} as JenkinsWatchStore,
       {} as JenkinsPinStore,
@@ -221,6 +223,15 @@ describe("removeEnvironment", () => {
         throw new Error("preset cleanup failed");
       }
     } as unknown as JenkinsParameterPresetStore;
+    const bindingStore = {
+      async removeBindingsForEnvironment(
+        scope: EnvironmentScope,
+        environmentId: string
+      ): Promise<boolean> {
+        events.push(`bindings:${scope}:${environmentId}`);
+        return true;
+      }
+    } as unknown as JenkinsDiagnosticProfileBindingStore;
     const watchStore = {
       async removeWatchesForEnvironment(
         scope: EnvironmentScope,
@@ -245,6 +256,7 @@ describe("removeEnvironment", () => {
 
     await removeEnvironment(
       store,
+      bindingStore,
       presetStore,
       watchStore,
       pinStore,
@@ -263,6 +275,7 @@ describe("removeEnvironment", () => {
 
     assert.deepEqual(events, [
       "remove:workspace:env-1",
+      "bindings:workspace:env-1",
       "presets:workspace:env-1",
       "watches:workspace:env-1",
       "pins:workspace:env-1",

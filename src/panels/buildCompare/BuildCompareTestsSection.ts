@@ -78,20 +78,14 @@ export function buildTestsSection(
       ...EMPTY_TEST_DIFF_LISTS,
       ...UNAVAILABLE_TEST_SUMMARY_LABELS
     },
-    bothUnavailableFields: {
-      ...UNAVAILABLE_TEST_SUMMARY_LABELS,
-      ...EMPTY_TEST_DIFF_LISTS
-    },
     resolveErrorFields: () => testSummaryFields,
     resolvePartialFields: () => testSummaryFields,
     onAvailable: (baselineValue, targetValue) =>
-      buildAvailableTestsSection(baselineReport, targetReport, baselineValue, targetValue)
+      buildAvailableTestsSection(baselineValue, targetValue)
   });
 }
 
 function buildAvailableTestsSection(
-  baselineReport: BuildCompareOptionalResult<JenkinsTestReport>,
-  targetReport: BuildCompareOptionalResult<JenkinsTestReport>,
   baselineValue: JenkinsTestReport,
   targetValue: JenkinsTestReport
 ): BuildCompareTestsSectionViewModel {
@@ -145,8 +139,8 @@ function buildAvailableTestsSection(
       otherChangesCount > 0
         ? `${formatNumber(otherChangesCount)} additional test changes were not classified as failures or newly passing results.`
         : undefined,
-    baselineSummaryLabel: buildTestSummaryLabel(baselineReport),
-    targetSummaryLabel: buildTestSummaryLabel(targetReport),
+    baselineSummaryLabel: formatAvailableTestReportCountsSummary(baselineValue),
+    targetSummaryLabel: formatAvailableTestReportCountsSummary(targetValue),
     newFailures,
     stillFailing,
     newPasses,

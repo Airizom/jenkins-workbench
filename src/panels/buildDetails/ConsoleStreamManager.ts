@@ -6,15 +6,25 @@ import type {
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText
 } from "../../jenkins/types";
-import { HtmlConsoleStream } from "./HtmlConsoleStream";
+import { type ConsoleTextByteRange, HtmlConsoleStream } from "./HtmlConsoleStream";
 import { TextConsoleStream } from "./TextConsoleStream";
 
 export interface ConsoleStreamCallbacks {
   onConsoleAppend(text: string): void;
   onConsoleSet(payload: { text: string; truncated: boolean }): void;
-  onConsoleHtmlAppend(html: string): void;
-  onConsoleHtmlSet(payload: { html: string; truncated: boolean }): void;
+  onConsoleHtmlAppend(
+    html: string,
+    textRange: ConsoleTextByteRange,
+    appendedTextRange: ConsoleTextByteRange
+  ): void;
+  onConsoleHtmlSet(payload: {
+    html: string;
+    truncated: boolean;
+    textRange: ConsoleTextByteRange;
+  }): void;
 }
+
+export type { ConsoleTextByteRange } from "./HtmlConsoleStream";
 
 export interface ConsoleStreamDataService extends JenkinsConsoleTextClient {
   getConsoleHtmlProgressive(
@@ -180,7 +190,8 @@ export class ConsoleStreamManager {
       }
       this.callbacks.onConsoleHtmlSet({
         html: htmlResult.html,
-        truncated: htmlResult.truncated
+        truncated: htmlResult.truncated,
+        textRange: this.htmlConsoleStream.getTextByteRange()
       });
       return true;
     } catch {

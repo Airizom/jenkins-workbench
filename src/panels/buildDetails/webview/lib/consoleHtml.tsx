@@ -1,5 +1,8 @@
 import * as React from "react";
+import type { BuildDiagnosticConsoleReference } from "../../shared/BuildDetailsContracts";
+import { normalizeConsoleSourceReferences } from "../hooks/consoleSearch/buildConsoleSegments";
 import type { ConsoleMatch } from "../hooks/useConsoleSearch";
+import { advanceRangeIndex, buildRangeIntervals } from "./consoleRangeUtils";
 
 type ConsoleHtmlNode =
   | { type: "text"; value: string }
@@ -106,15 +109,21 @@ export function renderConsoleHtmlWithHighlights(
   model: ConsoleHtmlModel,
   matches: ConsoleMatch[],
   activeMatchIndex: number,
-  onOpenExternal?: (url: string) => void
+  onOpenExternal?: (url: string) => void,
+  sourceReferences: BuildDiagnosticConsoleReference[] = [],
+  onOpenDiagnosticSource?: (targetId: string) => void
 ): React.ReactNode[] {
   const context = {
     matches,
     activeMatchIndex,
     cursor: 0,
     matchPointer: 0,
+    sourceReferences: normalizeConsoleSourceReferences(sourceReferences, model.text.length),
+    sourcePointer: 0,
     keyIndex: 0,
-    onOpenExternal
+    onOpenExternal,
+    onOpenDiagnosticSource,
+    externalLinkDepth: 0
   };
   return renderNodes(model.nodes, context);
 }
@@ -124,8 +133,12 @@ type RenderContext = {
   activeMatchIndex: number;
   cursor: number;
   matchPointer: number;
+  sourceReferences: BuildDiagnosticConsoleReference[];
+  sourcePointer: number;
   keyIndex: number;
   onOpenExternal?: (url: string) => void;
+  onOpenDiagnosticSource?: (targetId: string) => void;
+  externalLinkDepth: number;
 };
 
 function renderNodes(nodes: ConsoleHtmlNode[], context: RenderContext): React.ReactNode[] {
@@ -142,7 +155,14 @@ function renderNodes(nodes: ConsoleHtmlNode[], context: RenderContext): React.Re
       context.cursor += 1;
       continue;
     }
+    const isExternalLink = node.tag === "a";
+    if (isExternalLink) {
+      context.externalLinkDepth += 1;
+    }
     const children = renderNodes(node.children, context);
+    if (isExternalLink) {
+      context.externalLinkDepth -= 1;
+    }
     const props: Record<string, unknown> = {
       ...node.attrs,
       key
@@ -171,51 +191,100 @@ function renderTextNode(
   }
   const nodes: React.ReactNode[] = [];
   const matches = context.matches;
+  const references = context.sourceReferences;
   const textStart = context.cursor;
   const textEnd = textStart + text.length;
-  let localIndex = 0;
-  while (context.matchPointer < matches.length && matches[context.matchPointer].end <= textStart) {
-    context.matchPointer += 1;
-  }
+  context.matchPointer = advanceRangeIndex(
+    matches,
+    context.matchPointer,
+    textStart,
+    (match) => match.end
+  );
+  context.sourcePointer = advanceRangeIndex(
+    references,
+    context.sourcePointer,
+    textStart,
+    (reference) => reference.endOffset
+  );
 
-  while (context.matchPointer < matches.length) {
-    const match = matches[context.matchPointer];
+  const boundaries = new Set<number>([textStart, textEnd]);
+  for (let index = context.matchPointer; index < matches.length; index += 1) {
+    const match = matches[index];
     if (match.start >= textEnd) {
       break;
     }
-    const startInText = Math.max(0, match.start - textStart);
-    const endInText = Math.min(text.length, match.end - textStart);
-    if (startInText > localIndex) {
-      nodes.push(text.slice(localIndex, startInText));
+    boundaries.add(Math.max(textStart, match.start));
+    boundaries.add(Math.min(textEnd, match.end));
+  }
+  for (let index = context.sourcePointer; index < references.length; index += 1) {
+    const reference = references[index];
+    if (reference.startOffset >= textEnd) {
+      break;
     }
-    if (endInText > startInText) {
-      const matchText = text.slice(startInText, endInText);
-      nodes.push(
+    boundaries.add(Math.max(textStart, reference.startOffset));
+    boundaries.add(Math.min(textEnd, reference.endOffset));
+  }
+  let matchIndex = context.matchPointer;
+  let referenceIndex = context.sourcePointer;
+
+  for (const { start, end } of buildRangeIntervals(boundaries)) {
+    matchIndex = advanceRangeIndex(matches, matchIndex, start, (match) => match.end);
+    referenceIndex = advanceRangeIndex(
+      references,
+      referenceIndex,
+      start,
+      (reference) => reference.endOffset
+    );
+    const match = matches[matchIndex];
+    const reference = references[referenceIndex];
+    const coveredByMatch = match && match.start <= start && match.end >= end;
+    const coveredByReference =
+      reference && reference.startOffset <= start && reference.endOffset >= end;
+    let content: React.ReactNode = text.slice(start - textStart, end - textStart);
+    if (coveredByMatch) {
+      content = (
         <mark
           className={`console-match${
-            matchIndexIsActive(context.activeMatchIndex, context.matchPointer)
-              ? " console-match--active"
-              : ""
+            matchIndexIsActive(context.activeMatchIndex, matchIndex) ? " console-match--active" : ""
           }`}
-          data-match-index={context.matchPointer}
-          key={`${keyPrefix}-match-${context.matchPointer}-${startInText}`}
+          data-match-index={matchIndex}
         >
-          {matchText}
+          {content}
         </mark>
       );
     }
-    localIndex = Math.max(localIndex, endInText);
-    if (match.end <= textEnd) {
-      context.matchPointer += 1;
-    } else {
-      break;
+    if (coveredByReference && context.onOpenDiagnosticSource && context.externalLinkDepth === 0) {
+      content = (
+        <button
+          type="button"
+          className="console-source-link"
+          data-source-target-id={reference.targetId}
+          title="Open local source"
+          onClick={() => context.onOpenDiagnosticSource?.(reference.targetId)}
+        >
+          {content}
+        </button>
+      );
     }
+    nodes.push(
+      <React.Fragment key={`${keyPrefix}-segment-${start}-${end}`}>{content}</React.Fragment>
+    );
   }
 
-  if (localIndex < text.length) {
-    nodes.push(text.slice(localIndex));
-  }
-
+  context.matchPointer = matchIndex;
+  context.sourcePointer = referenceIndex;
+  context.matchPointer = advanceRangeIndex(
+    matches,
+    context.matchPointer,
+    textEnd,
+    (match) => match.end
+  );
+  context.sourcePointer = advanceRangeIndex(
+    references,
+    context.sourcePointer,
+    textEnd,
+    (reference) => reference.endOffset
+  );
   context.cursor = textEnd;
   return nodes;
 }

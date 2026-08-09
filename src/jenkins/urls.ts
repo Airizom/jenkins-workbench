@@ -20,6 +20,18 @@ export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
+export function normalizeJenkinsUrlForComparison(value: string): string {
+  try {
+    const url = new URL(value);
+    url.search = "";
+    url.hash = "";
+    url.pathname = ensureTrailingSlash(url.pathname);
+    return url.toString();
+  } catch {
+    return ensureTrailingSlash(value.split(/[?#]/, 1)[0] ?? value);
+  }
+}
+
 export function parseQueueItemId(queueLocation?: string): number | undefined {
   if (!queueLocation || queueLocation.trim() !== queueLocation) {
     return undefined;
@@ -54,7 +66,10 @@ export function parseQueueItemId(queueLocation?: string): number | undefined {
   return Number.isSafeInteger(queueItemId) && queueItemId > 0 ? queueItemId : undefined;
 }
 
-function hasJobPathParts(pathParts: readonly string[], endExclusive = pathParts.length): boolean {
+function parseJobPathParts(
+  pathParts: readonly string[],
+  endExclusive = pathParts.length
+): { firstJobIndex: number; segments: string[] } | undefined {
   let firstJobIndex = -1;
   for (let index = 0; index < endExclusive; index++) {
     if (pathParts[index] === "job") {
@@ -64,23 +79,22 @@ function hasJobPathParts(pathParts: readonly string[], endExclusive = pathParts.
   }
 
   if (firstJobIndex < 0) {
-    return false;
+    return undefined;
   }
 
-  let hasSegments = false;
+  const segments: string[] = [];
   for (let index = firstJobIndex; index < endExclusive; index++) {
     if (pathParts[index] === "job" && index + 1 < endExclusive) {
       try {
-        decodeURIComponent(pathParts[index + 1]);
+        segments.push(decodeURIComponent(pathParts[index + 1]));
       } catch {
-        return false;
+        return undefined;
       }
-      hasSegments = true;
       index++;
     }
   }
 
-  return hasSegments;
+  return segments.length > 0 ? { firstJobIndex, segments } : undefined;
 }
 
 function appendJobPathSegments(baseUrl: string, segments: readonly string[]): string {
@@ -99,30 +113,13 @@ export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
     return undefined;
   }
   const pathParts = url.pathname.split("/").filter((p) => p.length > 0);
-
-  const firstJobIndex = pathParts.indexOf("job");
-
-  if (firstJobIndex < 0) {
+  const parsedJobPath = parseJobPathParts(pathParts);
+  if (!parsedJobPath) {
     return undefined;
   }
 
+  const { firstJobIndex, segments } = parsedJobPath;
   const baseParts = pathParts.slice(0, firstJobIndex);
-  const segments: string[] = [];
-  for (let i = firstJobIndex; i < pathParts.length; i++) {
-    if (pathParts[i] === "job" && i + 1 < pathParts.length) {
-      try {
-        segments.push(decodeURIComponent(pathParts[i + 1]));
-      } catch {
-        return undefined;
-      }
-      i++;
-    }
-  }
-
-  if (segments.length === 0) {
-    return undefined;
-  }
-
   const jobName = segments[segments.length - 1];
   const parentSegments = segments.slice(0, -1);
 
@@ -187,7 +184,8 @@ export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
   }
 
   const jobPathPartCount = pathParts.length - 1;
-  if (url.origin === "null" || !hasJobPathParts(pathParts, jobPathPartCount)) {
+  const parsedJobPath = parseJobPathParts(pathParts, jobPathPartCount);
+  if (url.origin === "null" || !parsedJobPath) {
     return undefined;
   }
 

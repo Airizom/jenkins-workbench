@@ -3,6 +3,9 @@ import type {
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
 import type { PipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
+
+export { isPipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
+
 import { hasPipelineLogTarget } from "./pipelineLogTargets";
 
 export type PipelineSectionBodyKind = "placeholder" | "graph" | "list";
@@ -31,10 +34,6 @@ export function derivePipelineSectionView(
     showLoadingBanner: loading && hasStages,
     body
   };
-}
-
-export function isPipelinePresentation(value: unknown): value is PipelinePresentation {
-  return value === "graph" || value === "list";
 }
 
 export function resolvePersistedPipelineLogTarget({

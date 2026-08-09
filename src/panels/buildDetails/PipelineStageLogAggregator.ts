@@ -3,6 +3,7 @@ import type { JenkinsWorkflowStage, JenkinsWorkflowStep } from "../../jenkins/ty
 import { uniqueNonEmptyStrings } from "../../shared/arrays";
 import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
+import { isWorkflowNodeActive } from "./PipelineWorkflowStatus";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
@@ -113,7 +114,7 @@ export class PipelineStageLogAggregator {
         continue;
       }
       const header = `Node ${nodeId}`;
-      parts.push(`<div class="pipeline-node-log-divider">${escapeHtml(header)}</div>`);
+      parts.push(renderLogDivider(header));
       parts.push(snapshot.html);
       textParts.push(`===== ${header} =====\n${snapshot.text}`);
       truncated = truncated || Boolean(snapshot.hasMore);
@@ -123,14 +124,14 @@ export class PipelineStageLogAggregator {
 
     if (omittedNodeCount > 0) {
       const note = `Showing first ${MAX_AGGREGATED_NODE_COUNT} pipeline nodes; ${omittedNodeCount} additional nodes were omitted to limit Jenkins API fan-out.`;
-      parts.push(`<div class="pipeline-node-log-divider">${escapeHtml(note)}</div>`);
+      parts.push(renderLogDivider(note));
       textParts.push(note);
       truncated = true;
     }
 
     if (pendingNodeCount > 0) {
       const note = `Loading ${pendingNodeCount} remaining pipeline node logs.`;
-      parts.push(`<div class="pipeline-node-log-divider">${escapeHtml(note)}</div>`);
+      parts.push(renderLogDivider(note));
       textParts.push(note);
     }
 
@@ -207,15 +208,13 @@ export class PipelineStageLogAggregator {
   }
 }
 
+function renderLogDivider(text: string): string {
+  return `<span class="my-2 block border-border border-y bg-muted-soft px-2 py-1 font-mono text-muted-foreground text-xs leading-snug">${escapeHtml(text)}</span>`;
+}
+
 function isWorkflowNodeComplete(node: JenkinsWorkflowStage | undefined): boolean {
   const status = node?.status?.trim().toUpperCase();
-  return Boolean(
-    status &&
-      status !== "IN_PROGRESS" &&
-      status !== "PAUSED_PENDING_INPUT" &&
-      status !== "QUEUED" &&
-      status !== "NOT_STARTED"
-  );
+  return Boolean(status && !isWorkflowNodeActive(status));
 }
 
 function collectFlowNodeChildIds(node: JenkinsWorkflowStage | JenkinsWorkflowStep): string[] {

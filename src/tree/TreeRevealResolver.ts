@@ -4,17 +4,10 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
 import { InstanceTreeItem, JobsFolderTreeItem, RootSectionTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import { retryOnTreeChange } from "./TreeChangeRetry";
 import { isLoadingPlaceholder } from "./TreeDataProviderUtils";
 
 type GetChildrenInternal = (element?: WorkbenchTreeElement) => Promise<WorkbenchTreeElement[]>;
-
-type TreeChangeWaiter = {
-  didChange: Promise<boolean>;
-  dispose: () => void;
-};
-
-const LOAD_RETRY_TIMEOUT_MS = 4000;
-const LOAD_RETRY_LIMIT = 3;
 
 export class JenkinsTreeRevealResolver {
   constructor(
@@ -91,46 +84,14 @@ export class JenkinsTreeRevealResolver {
   // re-read. Retry slow Jenkins folders, but stop after a bounded number of waits
   // so a stale loading placeholder cannot leave reveal pending forever.
   private async getLoadedChildren(element?: WorkbenchTreeElement): Promise<WorkbenchTreeElement[]> {
-    for (let attempt = 0; attempt <= LOAD_RETRY_LIMIT; attempt += 1) {
-      // Subscribe before fetching so a load completing immediately is not missed.
-      const waiter = this.createTreeChangeWaiter(LOAD_RETRY_TIMEOUT_MS);
-      let children: WorkbenchTreeElement[];
-      try {
-        children = await this.getChildrenInternal(element);
-      } catch (error) {
-        waiter.dispose();
-        throw error;
-      }
-      if (!children.some(isLoadingPlaceholder)) {
-        waiter.dispose();
-        return children;
-      }
-      if (attempt === LOAD_RETRY_LIMIT) {
-        waiter.dispose();
-        return [];
-      }
-      await waiter.didChange;
-    }
-    return [];
-  }
-
-  private createTreeChangeWaiter(timeoutMs: number): TreeChangeWaiter {
-    let settle: ((didChange: boolean) => void) | undefined;
-    const didChange = new Promise<boolean>((resolve) => {
-      settle = resolve;
+    const children = await retryOnTreeChange({
+      operation: () => this.getChildrenInternal(element),
+      onDidChangeTreeData: this.onDidChangeTreeData,
+      shouldRetry: (result) => result.some(isLoadingPlaceholder),
+      getPendingElement: () => element,
+      getPendingElementBeforeOperation: () => element,
+      retryAfterTimeout: true
     });
-    const finish = (result: boolean) => {
-      if (!settle) {
-        return;
-      }
-      const resolve = settle;
-      settle = undefined;
-      subscription.dispose();
-      clearTimeout(timer);
-      resolve(result);
-    };
-    const subscription = this.onDidChangeTreeData(() => finish(true));
-    const timer = setTimeout(() => finish(false), timeoutMs);
-    return { didChange, dispose: () => finish(false) };
+    return children.some(isLoadingPlaceholder) ? [] : children;
   }
 }

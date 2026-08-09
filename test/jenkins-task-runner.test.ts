@@ -597,6 +597,21 @@ describe("JenkinsTaskRunner lifecycle", () => {
     assert.ok(completionIndex > consoleIndex);
   });
 
+  it("normalizes CRLF, bare CR, LF, and chunk-split CRLF console newlines", async () => {
+    const backend = new FakeBackend();
+    backend.progressiveResults = [
+      { text: "crlf\r", textSize: 5, moreData: true, bytesRead: 5 },
+      { text: "\nbare\rline\n", textSize: 16, moreData: true, bytesRead: 11 },
+      { text: "", textSize: 16, moreData: false, bytesRead: 0 }
+    ];
+    const collected = outputCollector();
+
+    const result = await immediateRunner(backend).run(baseRequest, collected.output);
+
+    assert.equal(result.exitCode, JENKINS_TASK_EXIT_CODES.success);
+    assert.equal(collected.console.join(""), "crlf\nbare\nline\n");
+  });
+
   it("streams unterminated console chunks without buffering the whole line", async () => {
     const backend = new FakeBackend();
     const firstChunk = "x".repeat(4096);

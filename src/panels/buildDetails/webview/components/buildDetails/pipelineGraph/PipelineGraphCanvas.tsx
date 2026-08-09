@@ -39,7 +39,6 @@ export function PipelineGraphCanvas({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef(layout);
   const hasAutoFittedRef = useRef(false);
-  const [hoveredStageKey, setHoveredStageKey] = useState<string | undefined>();
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStateRef = useRef<{ pointerId: number; x: number; y: number } | undefined>(undefined);
@@ -235,7 +234,7 @@ export function PipelineGraphCanvas({
         aria-label="Pipeline graph. Arrow keys pan, plus and minus zoom."
         // biome-ignore lint/a11y/noNoninteractiveTabindex: the canvas must be keyboard-focusable so arrow keys can pan and +/- can zoom without a pointer
         tabIndex={0}
-        className="pipeline-graph-canvas relative h-[360px] overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:h-[440px]"
+        className="pipeline-graph-canvas relative h-90 overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:h-110"
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -278,8 +277,6 @@ export function PipelineGraphCanvas({
                 key={node.id}
                 node={node}
                 selected={selectedStageKey === node.id}
-                hovered={hoveredStageKey === node.id}
-                onHoverChange={setHoveredStageKey}
                 onSelect={onSelectStage}
               />
             ))}
@@ -293,14 +290,10 @@ export function PipelineGraphCanvas({
 function PipelineGraphStageNode({
   node,
   selected,
-  hovered,
-  onHoverChange,
   onSelect
 }: {
   node: PipelineGraphLayoutNode;
   selected: boolean;
-  hovered: boolean;
-  onHoverChange: (stageKey?: string) => void;
   onSelect: (stageKey: string) => void;
 }) {
   const statusClass = getResultBadgeClass(node.stage.statusClass);
@@ -310,7 +303,6 @@ function PipelineGraphStageNode({
   const accentWidth = Math.round(28 + node.durationRatio * 72);
   const borderColor = resolveBuildResultBorderColor(node.stage.statusClass);
   const background = resolveBuildResultGraphBackground(node.stage.statusClass);
-  const strokeWidth = selected ? 2.4 : hovered ? 1.8 : 1.4;
 
   return (
     <foreignObject
@@ -324,29 +316,26 @@ function PipelineGraphStageNode({
         <button
           type="button"
           className={cn(
-            "flex h-full w-full flex-col overflow-hidden rounded-[18px] border bg-card text-left",
-            "transition-[transform,box-shadow] duration-150 motion-reduce:transition-none",
+            "flex h-full w-full flex-col overflow-hidden rounded-xl bg-card text-left",
+            "transition duration-150 motion-reduce:transition-none",
             "hover:-translate-y-0.5 hover:shadow-lg motion-reduce:hover:translate-y-0",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-            selected ? "shadow-lg" : "shadow-sm"
+            selected ? "border-2 shadow-lg" : "border shadow-sm hover:border-2"
           )}
           style={{
             borderColor,
-            background,
-            borderWidth: `${strokeWidth}px`
+            background
           }}
           onClick={() => onSelect(node.id)}
-          onMouseEnter={() => onHoverChange(node.id)}
-          onMouseLeave={() => onHoverChange(undefined)}
         >
           <div
-            className="h-[4px] rounded-full bg-[linear-gradient(90deg,var(--primary),color-mix(in_srgb,var(--primary)_40%,transparent))]"
+            className="h-1 rounded-full bg-linear-to-r from-primary to-primary/40"
             style={{ width: `${accentWidth}%` }}
           />
           <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="truncate text-[12px] font-semibold text-foreground">
+                <div className="truncate text-xs font-semibold text-foreground">
                   {node.stage.name || "Stage"}
                 </div>
                 <div className="truncate text-[11px] text-muted-foreground">
@@ -354,7 +343,7 @@ function PipelineGraphStageNode({
                 </div>
               </div>
               <div
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] ${statusClass}`}
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${statusClass}`}
               >
                 {statusIcon}
               </div>

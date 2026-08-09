@@ -217,7 +217,6 @@ describe("planCoverageRefresh", () => {
       createPlanContext({ details: undefined, showLoadingRequested: true })
     );
     assert.ok(plan.kind === "load");
-    assert.equal(plan.request.buildCompleted, true);
     assert.equal(plan.request.showLoading, true);
   });
 
@@ -282,7 +281,6 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
         environment: createEnvironment(),
         buildUrl: "https://jenkins.example/job/app/12/",
         modifiedCoverageFiles: createModifiedFiles(),
-        coverageOverview: createOverview(),
         decorationsEnabled: true
       }
     ]);
@@ -426,7 +424,6 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
     assert.deepEqual(setCoverageArgs, [[undefined, undefined]]);
     assert.equal(applyOptions.length, 1);
     assert.deepEqual(applyOptions[0].modifiedCoverageFiles, createModifiedFiles());
-    assert.equal(applyOptions[0].coverageOverview, undefined);
   });
 
   it("swallows modified-file errors when the overview loaded successfully", async () => {

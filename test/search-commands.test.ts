@@ -22,13 +22,23 @@ class TestCancellationTokenSource {
 
 class TestQuickPick {
   selectedItems: unknown[] = [];
-  items: unknown[] = [];
+  private currentItems: unknown[] = [];
+  itemAssignmentCount = 0;
   placeholder = "";
   matchOnDescription = false;
   matchOnDetail = false;
   busy = false;
   disposed = false;
   private hideListener: (() => void) | undefined;
+
+  get items(): unknown[] {
+    return this.currentItems;
+  }
+
+  set items(value: unknown[]) {
+    this.currentItems = value;
+    this.itemAssignmentCount += 1;
+  }
 
   onDidAccept(): { dispose(): void } {
     return { dispose: () => undefined };
@@ -94,6 +104,7 @@ describe("registerSearchCommands", () => {
       }
     };
 
+    vi.resetModules();
     vi.doMock("vscode", () => vscodeMock);
     const { registerSearchCommands } = await import("../src/commands/SearchCommands");
 
@@ -127,5 +138,157 @@ describe("registerSearchCommands", () => {
     expect(tokenSources[0].cancelCalled).toBe(true);
     expect(tokenSources[0].disposeCalled).toBe(true);
     expect(quickPick.disposed).toBe(true);
+  });
+
+  it("publishes streamed job results once after loading completes", async () => {
+    const quickPick = new TestQuickPick();
+    let goToJobCommand: (() => Promise<void>) | undefined;
+    let releaseFinalBatch: (() => void) | undefined;
+    const finalBatchGate = new Promise<void>((resolve) => {
+      releaseFinalBatch = resolve;
+    });
+
+    const vscodeMock = {
+      ...vscodeStub,
+      CancellationError: class CancellationError extends Error {},
+      CancellationTokenSource: TestCancellationTokenSource,
+      commands: {
+        registerCommand: (command: string, callback: () => Promise<void>) => {
+          if (command === "jenkinsWorkbench.goToJob") {
+            goToJobCommand = callback;
+          }
+          return { dispose: () => undefined };
+        }
+      },
+      window: {
+        createQuickPick: () => quickPick,
+        showInformationMessage: async () => undefined,
+        showWarningMessage: async () => undefined
+      },
+      workspace: {
+        getConfiguration: () => ({
+          get: () => undefined
+        })
+      }
+    };
+
+    vi.resetModules();
+    vi.doMock("vscode", () => vscodeMock);
+    const { registerSearchCommands } = await import("../src/commands/SearchCommands");
+
+    registerSearchCommands(
+      { subscriptions: [] } as never,
+      {
+        listEnvironmentsWithScope: async () => [
+          {
+            id: "env-1",
+            scope: "workspace",
+            url: "https://jenkins.example/"
+          }
+        ]
+      } as JenkinsEnvironmentStore,
+      {
+        async *iterateJobsForEnvironment() {
+          yield [
+            {
+              name: "Zulu",
+              fullName: "Zulu",
+              url: "https://jenkins.example/job/zulu/"
+            }
+          ];
+          await finalBatchGate;
+          yield [
+            {
+              name: "Alpha",
+              fullName: "Alpha",
+              url: "https://jenkins.example/job/alpha/"
+            }
+          ];
+        }
+      } as unknown as JenkinsDataService,
+      {} as JenkinsViewStateStore,
+      {} as JenkinsTreeNavigator
+    );
+
+    if (!goToJobCommand || !releaseFinalBatch) {
+      throw new Error("Go to Job test setup failed.");
+    }
+    await goToJobCommand();
+    await vi.waitFor(() => expect(quickPick.busy).toBe(true));
+
+    expect(quickPick.items).toEqual([]);
+    expect(quickPick.itemAssignmentCount).toBe(0);
+
+    releaseFinalBatch();
+    await vi.waitFor(() => expect(quickPick.busy).toBe(false));
+
+    expect(quickPick.itemAssignmentCount).toBe(1);
+    expect(quickPick.items).toMatchObject([{ label: "Alpha" }, { label: "Zulu" }]);
+  });
+
+  it("shows only the detailed warning when an environment fails to load", async () => {
+    const quickPick = new TestQuickPick();
+    const showWarningMessage = vi.fn(async () => undefined);
+    let goToJobCommand: (() => Promise<void>) | undefined;
+
+    const vscodeMock = {
+      ...vscodeStub,
+      CancellationError: class CancellationError extends Error {},
+      CancellationTokenSource: TestCancellationTokenSource,
+      commands: {
+        registerCommand: (command: string, callback: () => Promise<void>) => {
+          if (command === "jenkinsWorkbench.goToJob") {
+            goToJobCommand = callback;
+          }
+          return { dispose: () => undefined };
+        }
+      },
+      window: {
+        createQuickPick: () => quickPick,
+        showInformationMessage: async () => undefined,
+        showWarningMessage
+      },
+      workspace: {
+        getConfiguration: () => ({
+          get: () => undefined
+        })
+      }
+    };
+
+    vi.resetModules();
+    vi.doMock("vscode", () => vscodeMock);
+    const { registerSearchCommands } = await import("../src/commands/SearchCommands");
+
+    registerSearchCommands(
+      { subscriptions: [] } as never,
+      {
+        listEnvironmentsWithScope: async () => [
+          {
+            id: "env-1",
+            scope: "workspace",
+            url: "https://jenkins.example/"
+          }
+        ]
+      } as JenkinsEnvironmentStore,
+      {
+        async *iterateJobsForEnvironment() {
+          await Promise.reject(new Error("connection failed"));
+          yield [];
+        }
+      } as unknown as JenkinsDataService,
+      {} as JenkinsViewStateStore,
+      {} as JenkinsTreeNavigator
+    );
+
+    if (!goToJobCommand) {
+      throw new Error("Go to Job command was not registered.");
+    }
+    await goToJobCommand();
+    await vi.waitFor(() => expect(quickPick.busy).toBe(false));
+
+    expect(showWarningMessage).toHaveBeenCalledTimes(1);
+    expect(showWarningMessage).toHaveBeenCalledWith(
+      "Unable to load jobs for https://jenkins.example/: connection failed"
+    );
   });
 });

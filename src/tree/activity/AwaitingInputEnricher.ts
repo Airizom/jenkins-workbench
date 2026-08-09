@@ -14,15 +14,7 @@ export interface AwaitingInputEnrichmentOptions {
 
 type PendingInputSummaries = Awaited<ReturnType<PendingInputRefreshCoordinator["getSummaries"]>>;
 
-interface TreeActivityPendingInputEnrichmentSurface {
-  findAwaitingInputJobUrls(
-    environment: JenkinsEnvironmentRef,
-    runningCandidates: JobSearchEntry[],
-    options: AwaitingInputEnrichmentOptions
-  ): Promise<Set<string>>;
-}
-
-export class AwaitingInputEnricher implements TreeActivityPendingInputEnrichmentSurface {
+export class AwaitingInputEnricher {
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly pendingInputCoordinator: PendingInputRefreshCoordinator

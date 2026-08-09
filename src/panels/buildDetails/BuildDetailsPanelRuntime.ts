@@ -26,6 +26,8 @@ interface BuildDetailsPanelRuntimeOptions {
   getCurrentToken: () => number;
   isTokenCurrent: (token: number) => boolean;
   canOpenTestSource?: BuildDetailsCanOpenTestSource;
+  onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void;
+  onConsoleTextSet?: (text: string) => void;
 }
 
 export class BuildDetailsPanelRuntime {
@@ -77,7 +79,7 @@ export class BuildDetailsPanelRuntime {
       this.refreshConsoleSnapshot(token),
       this.refreshTestReport(token, { showLoading: true }),
       this.refreshCoverage(token, { showLoading: true }),
-      this.refreshWorkflowRun(token),
+      this.refreshWorkflowRun(),
       this.options.getPollingController()?.refreshPendingInputs()
     ]);
     void this.refreshRestartFromStageInfo(token, { postUpdate: true });
@@ -95,8 +97,8 @@ export class BuildDetailsPanelRuntime {
     this.applyDetailsUpdate(details, true);
   }
 
-  async refreshWorkflowRun(token: number): Promise<void> {
-    await this.options.getPollingController()?.fetchWorkflowRunWithCallbacks(token);
+  async refreshWorkflowRun(): Promise<void> {
+    await this.options.getPollingController()?.fetchWorkflowRunWithCallbacks();
   }
 
   handlePipelineLoading(token: number): void {
@@ -125,6 +127,9 @@ export class BuildDetailsPanelRuntime {
       const snapshot = await pollingController.refreshConsoleSnapshot();
       if (!this.options.isTokenCurrent(token)) {
         return;
+      }
+      if (snapshot.consoleTextResult) {
+        this.options.onConsoleTextSet?.(snapshot.consoleTextResult.text);
       }
       this.options.view.postConsoleSnapshot(snapshot);
     } catch {
@@ -313,6 +318,7 @@ export class BuildDetailsPanelRuntime {
 
   private applyDetailsUpdate(details: JenkinsBuildDetails, updateUi: boolean): void {
     const { wasBuilding, isBuilding } = this.options.state.updateDetails(details);
+    this.options.onBuildDetailsChanged?.(details);
     if (updateUi && this.options.view.isVisible()) {
       this.postStateUpdate();
       this.options.view.setTitle(details.fullDisplayName ?? details.displayName);

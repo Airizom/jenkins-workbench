@@ -92,7 +92,7 @@ export function buildNodeCapacityExecutorViewModels(
   return [
     ...buildBaseNodeExecutorSummaries(details.executors, "Executor"),
     ...buildBaseNodeExecutorSummaries(details.oneOffExecutors, "One-off")
-  ].map((executor) => ({ ...executor }));
+  ];
 }
 
 function buildNodeViewModel(

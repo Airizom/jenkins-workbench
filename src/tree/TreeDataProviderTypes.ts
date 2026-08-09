@@ -15,6 +15,7 @@ export type TreeExpansionPath = string[];
 export type TreeExpansionResolveResult = {
   element?: WorkbenchTreeElement;
   pending: boolean;
+  pendingElement?: WorkbenchTreeElement;
 };
 
 export interface TreeExpansionResolver {

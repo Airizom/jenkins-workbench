@@ -1,48 +1,81 @@
 const MINUTE_MS = 60_000;
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
 
-function getAgeMs(timestampMs: number, now: number): number {
-  return Math.max(0, now - timestampMs);
+interface RelativeTimeBucket {
+  divisor: number;
+  rounding: "floor" | "round";
+  maxExclusive?: number;
+  format: (value: number) => string;
 }
 
-function formatRelativeMinutesAge(ageMs: number): string | undefined {
+interface RelativeTimePolicy {
+  justNow: string;
+  buckets: readonly RelativeTimeBucket[];
+  fallback: (timestampMs: number) => string;
+}
+
+function formatElapsedTimestamp(
+  timestampMs: number,
+  now: number,
+  policy: RelativeTimePolicy
+): string {
+  const ageMs = Math.max(0, now - timestampMs);
   if (ageMs < MINUTE_MS) {
-    return "just now";
+    return policy.justNow;
   }
 
-  if (ageMs < HOUR_MS) {
-    return `${Math.floor(ageMs / MINUTE_MS)}m ago`;
+  let elapsed = ageMs;
+  for (const bucket of policy.buckets) {
+    elapsed =
+      bucket.rounding === "floor"
+        ? Math.floor(elapsed / bucket.divisor)
+        : Math.round(elapsed / bucket.divisor);
+    if (bucket.maxExclusive === undefined || elapsed < bucket.maxExclusive) {
+      return bucket.format(elapsed);
+    }
   }
 
-  return undefined;
+  return policy.fallback(timestampMs);
 }
+
+const TIMESTAMP_POLICY: RelativeTimePolicy = {
+  justNow: "just now",
+  buckets: [
+    { divisor: MINUTE_MS, rounding: "floor", maxExclusive: 60, format: (value) => `${value}m ago` },
+    { divisor: 60, rounding: "floor", maxExclusive: 24, format: (value) => `${value}h ago` },
+    {
+      divisor: 24,
+      rounding: "floor",
+      maxExclusive: 7,
+      format: (value) => (value === 1 ? "yesterday" : `${value} days ago`)
+    }
+  ],
+  fallback: (timestampMs) => new Date(timestampMs).toLocaleDateString()
+};
+
+const DATE_POLICY: RelativeTimePolicy = {
+  justNow: "Just now",
+  buckets: [
+    { divisor: MINUTE_MS, rounding: "round", maxExclusive: 60, format: (value) => `${value}m ago` },
+    { divisor: 60, rounding: "round", maxExclusive: 48, format: (value) => `${value}h ago` },
+    { divisor: 24, rounding: "round", format: (value) => `${value}d ago` }
+  ],
+  fallback: () => "Unknown"
+};
+
+const ISO_POLICY: RelativeTimePolicy = {
+  justNow: "just now",
+  buckets: [
+    { divisor: MINUTE_MS, rounding: "floor", maxExclusive: 60, format: (value) => `${value}m ago` }
+  ],
+  fallback: (timestampMs) => new Date(timestampMs).toLocaleTimeString()
+};
 
 export function formatRelativeTimestampMs(timestampMs: number): string | undefined {
   if (!Number.isFinite(timestampMs)) {
     return undefined;
   }
 
-  const ageMs = getAgeMs(timestampMs, Date.now());
-  const minuteLabel = formatRelativeMinutesAge(ageMs);
-  if (minuteLabel) {
-    return minuteLabel;
-  }
-
-  if (ageMs < DAY_MS) {
-    const hours = Math.floor(ageMs / HOUR_MS);
-    return `${hours}h ago`;
-  }
-
-  const days = Math.floor(ageMs / DAY_MS);
-  if (days === 1) {
-    return "yesterday";
-  }
-  if (days < 7) {
-    return `${days} days ago`;
-  }
-
-  return new Date(timestampMs).toLocaleDateString();
+  return formatElapsedTimestamp(timestampMs, Date.now(), TIMESTAMP_POLICY);
 }
 
 export function formatRelativeDate(date: Date | undefined, now: number): string {
@@ -55,23 +88,7 @@ export function formatRelativeDate(date: Date | undefined, now: number): string 
     return "Unknown";
   }
 
-  const ageMs = getAgeMs(timestampMs, now);
-  if (ageMs < MINUTE_MS) {
-    return "Just now";
-  }
-
-  const minutes = Math.round(ageMs / MINUTE_MS);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) {
-    return `${hours}h ago`;
-  }
-
-  const days = Math.round(hours / 24);
-  return `${days}d ago`;
+  return formatElapsedTimestamp(timestampMs, now, DATE_POLICY);
 }
 
 export function formatRelativeIsoTimestamp(value: string): string {
@@ -80,11 +97,5 @@ export function formatRelativeIsoTimestamp(value: string): string {
     return "unknown";
   }
 
-  const ageMs = getAgeMs(parsed, Date.now());
-  const minuteLabel = formatRelativeMinutesAge(ageMs);
-  if (minuteLabel) {
-    return minuteLabel;
-  }
-
-  return new Date(parsed).toLocaleTimeString();
+  return formatElapsedTimestamp(parsed, Date.now(), ISO_POLICY);
 }

@@ -22,6 +22,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Curated Jenkins Views** — Browse Jenkins views in a dedicated section and hide noisy defaults
 - **Go to Job...** — Quick search across all configured Jenkins environments
 - **Pin Jobs & Pipelines** — Keep critical items in a top-level pinned section for quick access
+- **Node Capacity** — Inspect executor utilization, queued work, offline impact, and label bottlenecks across an environment
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
 - **Deep Links** — Open builds and jobs through supported VS Code extension URIs (`vscode://airizom.jenkins-workbench/...`)
 - **Summary Badges** — Running, queued, and watch-error counts displayed on tree sections
@@ -50,13 +51,16 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Build Progress** — Estimated progress and duration for running builds
 - **Richer Tooltips** — Optional build tooltips with causes, changes, and parameters
 - **Console Search & Export** — Quickly search logs or export console output from build details
-- **Failure Insights** — Focused cards that summarize why a build failed, with empty states when no data is available
+- **Failure Insights** — Focused diagnostics, change, test, and artifact cards that help explain failed and unstable builds
+- **Build Comparison** — Compare parameters, changes, stages, tests, and the first console divergence between two builds
+- **Coverage Insights** — View Jenkins Coverage plugin summaries and decorate modified source lines by coverage status
 - **Artifact Preview & Download** — Open images/text artifacts or download them to your workspace
 - **Workspace Browsing** — Browse a classic job's current Jenkins workspace and preview files without leaving VS Code
 
 ### Build Details Panel
 
 - **Live Console Streaming** — Watch build output in real-time with automatic scrolling
+- **Failure-to-Source Diagnostics** — Turn compiler, linter, and stack-trace failures into local Problems and clickable console/source links
 - **Pipeline Visualization** — View stage-by-stage progress for Pipeline jobs
 - **Restart From Stage** — Restart failed/unstable Declarative runs from eligible stages
 - **Stage Load Feedback** — Inline loading states while pipeline stages resolve
@@ -252,6 +256,76 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
 | `jenkinsWorkbench.buildDetails.testReport.includeCaseLogs` | false | Include per-test stack traces and stdout/stderr when fetching test reports. |
 
+### Build Details & Comparison
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.buildDetails.coverage.enabled` | true | Show Jenkins Coverage plugin summaries and modified-file coverage in completed Build Details views. |
+| `jenkinsWorkbench.buildDetails.coverageDecorations.enabled` | true | Decorate linked workspace files with covered, missed, and partial modified lines from the active Build Details coverage context. |
+| `jenkinsWorkbench.buildCompare.console.maxBytes` | 5242880 | Maximum console bytes to scan per build while locating the first Build Compare divergence. |
+| `jenkinsWorkbench.buildCompare.console.maxLines` | 50000 | Maximum console lines to scan per build while locating the first Build Compare divergence. |
+| `jenkinsWorkbench.buildDetails.testSourceMatching.fileExtensions` | `["java","kt","groovy","scala","js","jsx","ts","tsx","py","rb","php","cs","cc","cpp","cxx"]` | File extensions considered when resolving Jenkins test results to local source files. |
+| `jenkinsWorkbench.buildDetails.testSourceMatching.excludeGlob` | `**/{node_modules,.git,out,dist,coverage}/**` | Workspace glob excluded while searching for test source files. |
+| `jenkinsWorkbench.buildDetails.testSourceMatching.maxResultsPerPattern` | 10 | Maximum file matches collected per test-source search pattern. |
+| `jenkinsWorkbench.buildDetails.testSourceMatching.preferredPathScores` | `[{"fragment":"/src/test/","score":10},{"fragment":"/test/","score":5}]` | Path fragments and scores used to rank candidate test source files. |
+
+### Build Diagnostics
+
+Build diagnostics are enabled by default. An open Build Details panel owns the Problems collection until it closes, including while the panel is hidden. Otherwise, diagnostics follow the active repository's latest running, failed, or unstable current-branch build; successful, aborted, and not-built current-branch results clear the collection.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.diagnostics.enabled` | true | Parse the active Jenkins build and publish uniquely resolved local Problems. |
+| `jenkinsWorkbench.diagnostics.maxLogBytes` | 33554432 | Maximum console bytes scanned for one build. Reaching the cap is reported in Build Details. |
+| `jenkinsWorkbench.diagnostics.maxProblems` | 500 | Maximum unique local diagnostics published to Problems. |
+| `jenkinsWorkbench.diagnostics.profiles` | `{}` | Named parser, path-mapping, exclusion, and custom-matcher profiles. |
+
+Automatic mode recognizes generic source locations, GCC/Clang, MSVC, TypeScript, ESLint stylish output, Rust, Go, JVM/JavaScript/Python/.NET stack traces, Jenkins timestamps and Pipeline prefixes, Maven/Gradle severity prefixes, ANSI output, and Windows or container paths. Use `Jenkins: Configure Build Diagnostics` on a job or pipeline to bind a repository and optionally select a named profile. A multibranch binding is stored at the parent project and applies to its branch and PR jobs.
+
+Omitting `builtIns` from a profile keeps the automatic parser set. An explicit list selects parsers, while `[]` disables built-ins for that profile. Prefix and regex mappings are evaluated in order and must produce repository-relative files. If no mapping or direct path succeeds, Jenkins Workbench performs a bounded unique-suffix lookup; ambiguous and missing paths remain visible in Build Details but are not published as Problems.
+
+```json
+{
+  "jenkinsWorkbench.diagnostics.profiles": {
+    "container-typescript": {
+      "description": "TypeScript from the CI container",
+      "builtIns": ["typescript", "eslint", "javascript-stack", "generic"],
+      "searchExcludeGlob": "**/{node_modules,dist,vendor}/**",
+      "pathMappings": [
+        {
+          "type": "prefix",
+          "remote": "/workspace/service/",
+          "local": "."
+        },
+        {
+          "type": "regex",
+          "remote": "^/agent/[^/]+/(.*)$",
+          "replace": "$1",
+          "local": "packages/service"
+        }
+      ],
+      "matchers": [
+        {
+          "name": "acme",
+          "source": "Acme Compiler",
+          "severity": "error",
+          "pattern": {
+            "regexp": "^ACME (.+):(\\d+):(\\d+) \\[(\\w+)\\] (.*)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "code": 4,
+            "message": 5
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Custom matchers support one pattern or an ordered multiline pattern array with the documented file, location/range, severity, code, message, `kind`, and final-pattern `loop` captures. Expressions are prevalidated and executed in an isolated worker with bounded batches and a timeout. A timed-out custom matcher is disabled for that scan while trusted built-ins continue. Console contents and credentials are never written to the diagnostic output channel.
+
 ### Job Search
 
 | Setting | Default | Description |
@@ -339,10 +413,14 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | `Jenkins: Rebuild` | Rebuild with the same parameters |
 | `Jenkins: Preview Build Logs` | Open console output in a read-only preview |
 | `Jenkins: View Build Details` | Open the build details panel |
+| `Jenkins: Compare With Build` | Compare the selected build with another build of the same job |
 | `Jenkins: Open Last Failed Build` | Jump to the last failed build |
 | `Jenkins: Cancel Queue Item` | Remove a build from the queue |
 | `Jenkins: Approve Input` | Approve a pending input step for a running build |
 | `Jenkins: Reject Input` | Reject a pending input step for a running build |
+| `Jenkins: Configure Build Diagnostics` | Bind a local repository and choose automatic, named-profile, or disabled diagnostics for a job |
+| `Jenkins: Refresh Build Diagnostics` | Clear and rescan the active diagnostic owner |
+| `Jenkins: Show Build Diagnostic Output` | Open the bounded diagnostic pipeline's status and validation log |
 
 ### Job Actions
 
@@ -392,6 +470,7 @@ Current-branch PR awareness is optional and uses the GitHub Pull Requests extens
 | Command | Description |
 |---------|-------------|
 | `Jenkins: View Node Details` | Open the node details panel |
+| `Jenkins: View Node Capacity` | Open the environment-wide node capacity panel |
 | `Jenkins: Take Node Offline...` | Mark the selected Jenkins node temporarily offline |
 | `Jenkins: Bring Node Online` | Return a temporarily offline node to service |
 | `Jenkins: Launch Node Agent` | Ask Jenkins to launch the selected node agent |
@@ -493,6 +572,14 @@ Security notes:
 - Increase `jobSearchBackoffBaseMs` if you see rate limiting
 - Large Jenkins instances may take longer to index
 
+### Build Diagnostics Do Not Open Source
+
+- Run `Jenkins: Configure Build Diagnostics` and confirm the intended local Git repository is open
+- Add a prefix or regex path mapping when Jenkins prints agent or container paths
+- Ambiguous suffix matches are intentionally not published; exclude generated/vendor trees or add an explicit mapping
+- Check the Diagnostics card for byte/problem caps, profile validation errors, unresolved paths, or a checkout-revision mismatch
+- Run `Jenkins: Show Build Diagnostic Output` for owner changes, scan byte counts, fallback use, truncation, and safe failure details
+
 ## Contributing
 
 Contributions are welcome! Please follow these guidelines:
@@ -508,9 +595,15 @@ Contributions are welcome! Please follow these guidelines:
 
 ### Development Setup
 
-The extension backend is TypeScript. The webview panels (Build Details, Node Details) are a separate Vite bundle using React, Tailwind CSS, and Radix UI. [Biome](https://biomejs.dev/) is used for linting and formatting (not ESLint/Prettier).
+The extension backend is TypeScript. Build Compare, Build Details, Node Capacity, and Node Details are four entries in a shared Vite build using React, Tailwind CSS, and Radix UI. [Biome](https://biomejs.dev/) is used for linting and formatting (not ESLint/Prettier).
 
 **Prerequisites:** Node 24 or later.
+
+For extension testing, the repository includes a preconfigured local Jenkins LTS fixture with representative jobs and the required plugins. See [dev/jenkins/README.md](dev/jenkins/README.md), or start it directly with:
+
+```bash
+docker compose -f dev/jenkins/compose.yaml up --detach --build --wait
+```
 
 ```bash
 # Install dependencies
@@ -534,7 +627,7 @@ npm run fallow
 # Lint and format with fixes (Biome)
 npm run check:fix
 
-# Run the test suite (manifest validation + unit tests)
+# Run manifest/workflow validation, test typechecking, and coverage-backed unit tests
 npm test
 
 # Launch Extension Development Host
@@ -566,6 +659,18 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 17. Configure a built-in or custom problem matcher and confirm Jenkins compiler or test output populates the Problems panel
 18. Set `waitForCompletion` to `false` and confirm the task returns after Jenkins accepts the trigger
 19. Confirm a trigger response without an attributable queue item fails without attaching to a different build
+20. Fail a current-branch build without a diagnostics profile and confirm Problems populates automatically
+21. Open a different Build Details build and confirm its Problems replace current-branch findings immediately
+22. Hide Build Details while editing source and confirm its diagnostic ownership remains; close it and confirm current-branch findings return
+23. Complete the current-branch build successfully and confirm prior Problems clear
+24. Configure one multibranch parent binding and verify both branch and PR builds use it
+25. Verify prefix and regex mappings open the intended local range while ambiguous suffixes stay non-clickable and absent from Problems
+26. Exercise compiler warnings/errors, grouped stack traces, a custom multiline matcher, malformed matcher validation, and a running build that appends findings without duplicates
+27. Exercise a long/noisy console and verify the byte and Problem caps are reported explicitly
+28. In both plain and Jenkins-annotated HTML console modes, verify source links compose with search highlighting, ANSI styling, and external Jenkins links
+29. Compare two builds and verify parameter, change, stage, test, and console-difference sections
+30. Open Node Capacity and verify queue, executor, offline-node, and label-pool summaries
+31. Open a completed build with Jenkins Coverage data and verify its summary, modified-file data, and editor decorations
 
 ## License
 

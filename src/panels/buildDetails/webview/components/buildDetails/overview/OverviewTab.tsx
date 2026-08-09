@@ -5,6 +5,7 @@ import { isAnalysisBuildResult } from "../../../../../shared/webview/lib/statusS
 import type {
   ArtifactAction,
   BuildDetailsCoverageStateViewModel,
+  BuildDiagnosticsViewModel,
   BuildFailureArtifact,
   BuildFailureInsightsViewModel,
   BuildTestsSummaryViewModel
@@ -19,20 +20,28 @@ type OverviewTabProps = {
   testsSummary: BuildTestsSummaryViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
+  diagnostics: BuildDiagnosticsViewModel;
   hasPipelineStages: boolean;
   hasTests: boolean;
   onNavigateTab: (tab: BuildDetailsTab) => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
+  onOpenDiagnosticSource: (targetId: string) => void;
+  onShowDiagnosticProblems: () => void;
+  onConfigureBuildDiagnostics: () => void;
 };
 export function OverviewTab({
   resultClass,
   testsSummary,
   coverageState,
   insights,
+  diagnostics,
   hasPipelineStages,
   hasTests,
   onNavigateTab,
-  onArtifactAction
+  onArtifactAction,
+  onOpenDiagnosticSource,
+  onShowDiagnosticProblems,
+  onConfigureBuildDiagnostics
 }: OverviewTabProps): React.JSX.Element {
   const showTestsCard = hasTests && testsSummary.hasAnyResults;
   const insightsTitle = isAnalysisBuildResult(resultClass) ? "Failure Analysis" : "Build Summary";
@@ -86,7 +95,14 @@ export function OverviewTab({
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {insightsTitle}
         </h2>
-        <BuildFailureInsightsSection insights={insights} onArtifactAction={onArtifactAction} />
+        <BuildFailureInsightsSection
+          insights={insights}
+          diagnostics={diagnostics}
+          onArtifactAction={onArtifactAction}
+          onOpenDiagnosticSource={onOpenDiagnosticSource}
+          onShowDiagnosticProblems={onShowDiagnosticProblems}
+          onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
+        />
       </section>
     </div>
   );

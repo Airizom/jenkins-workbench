@@ -46,8 +46,8 @@ export function PipelineGraphInspector({
     );
   }
 
-  const stageName = stage.name.trim();
-  const canRestartStage = stage.canRestartFromStage && stageName.length > 0;
+  const stageName = stage.name;
+  const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
   const steps = showAllSteps ? stage.stepsAll : stage.stepsFailedOnly;
   const hasDirectSteps = stage.stepsAll.length > 0;
   const hasParallelBranches = stage.parallelBranches.length > 0;

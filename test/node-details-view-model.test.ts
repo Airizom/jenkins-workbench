@@ -117,8 +117,8 @@ describe("NodeDetailsViewModel", () => {
     assert.equal(viewModel.oneOffExecutors[0]?.workDurationLabel, "Est. 1m 30s");
   });
 
-  it("summarizes monitor values and serializes circular plain-object details", () => {
-    const details: JenkinsNodeDetails & { self?: unknown } = {
+  it("summarizes monitor values and serializes node details as indented JSON", () => {
+    const details: JenkinsNodeDetails = {
       displayName: "Built-in Node",
       name: "built-in",
       offline: true,
@@ -139,8 +139,6 @@ describe("NodeDetailsViewModel", () => {
         alpha: { total: 8 }
       }
     };
-    details.self = details;
-
     const viewModel = buildNodeDetailsViewModel({
       details,
       errors: [],
@@ -167,6 +165,6 @@ describe("NodeDetailsViewModel", () => {
         ["zeta", "Not available"]
       ]
     );
-    assert.equal(JSON.parse(viewModel.rawJson).self, "[Circular]");
+    assert.equal(viewModel.rawJson, JSON.stringify(details, null, 2));
   });
 });

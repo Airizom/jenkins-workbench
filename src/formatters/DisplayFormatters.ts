@@ -16,8 +16,7 @@ export function formatLocaleTimestampWithRelative(
   timestampMs: number,
   includeRelative: boolean
 ): string {
-  const absolute =
-    formatOptionalLocaleTimestamp(timestampMs) || new Date(timestampMs).toLocaleString();
+  const absolute = formatOptionalLocaleTimestamp(timestampMs);
   if (!includeRelative) {
     return absolute;
   }

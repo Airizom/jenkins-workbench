@@ -44,8 +44,8 @@ export class TreeJobCollectionChildrenLoader {
     return await this.cacheManager.getOrLoadChildren(
       this.buildJobCollectionChildrenKey(jobCollectionElement.environment, request),
       jobCollectionElement,
-      () =>
-        this.loadJobsForCollection(jobCollectionElement.environment, request, {
+      (isCurrentLoad) =>
+        this.loadJobsForCollection(jobCollectionElement.environment, request, isCurrentLoad, {
           parentFolderKind
         }),
       getJobCollectionLoadingLabel(request)
@@ -69,6 +69,7 @@ export class TreeJobCollectionChildrenLoader {
   private async loadJobsForCollection(
     environment: JenkinsEnvironmentRef,
     request: TreeJobCollectionRequest,
+    isCurrentLoad: () => boolean,
     options?: {
       parentFolderKind?: JenkinsJobKind;
     }
@@ -78,7 +79,7 @@ export class TreeJobCollectionChildrenLoader {
         environment,
         toJenkinsJobCollectionRequest(request)
       );
-      if (!request.folderUrl && request.scope.kind === "root") {
+      if (!request.folderUrl && request.scope.kind === "root" && isCurrentLoad()) {
         this.environmentSummaryStore.updateFromJobs(environment, jobs);
       }
       return await this.mapJobsToTreeItems(environment, jobs, {

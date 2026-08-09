@@ -13,7 +13,6 @@ import {
   requestStream as requestStreamInternal,
   requestText as requestTextInternal,
   requestTextWithHeaders as requestTextWithHeadersInternal,
-  requestTextWithOptions as requestTextWithOptionsInternal,
   requestVoidWithLocation as requestVoidWithLocationInternal
 } from "../request";
 import type { JenkinsAuthConfig, JenkinsAuthConfigRefresh, JenkinsClientOptions } from "../types";
@@ -23,6 +22,7 @@ const EMPTY_HEADERS: Record<string, string> = {};
 
 export class JenkinsHttpClient implements JenkinsClientContext {
   public readonly baseUrl: string;
+  private readonly baseOrigin: string;
   private readonly username?: string;
   private readonly token?: string;
   private readonly requestTimeoutMs?: number;
@@ -43,6 +43,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   constructor(options: JenkinsClientOptions) {
     this.baseUrl = options.baseUrl.trim();
+    this.baseOrigin = this.parseBaseOrigin(this.baseUrl);
     const username = options.username?.trim();
     const token = options.token?.trim();
     this.username = username && username.length > 0 ? username : undefined;
@@ -61,22 +62,26 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   }
 
   async requestJson<T>(url: string): Promise<T> {
-    return this.requestWithSsoRetry(() => requestJsonInternal<T>(url, this.getRequestOptions()));
+    return this.requestWithSsoRetry(url, () =>
+      requestJsonInternal<T>(url, this.getRequestOptions())
+    );
   }
 
   async requestHeaders(url: string): Promise<IncomingHttpHeaders> {
-    return this.requestWithSsoRetry(() => requestHeadersInternal(url, this.getRequestOptions()));
+    return this.requestWithSsoRetry(url, () =>
+      requestHeadersInternal(url, this.getRequestOptions())
+    );
   }
 
   async requestText(url: string): Promise<string> {
-    return this.requestWithSsoRetry(() => requestTextInternal(url, this.getRequestOptions()));
+    return this.requestWithSsoRetry(url, () => requestTextInternal(url, this.getRequestOptions()));
   }
 
   async requestTextWithHeaders(
     url: string,
     options?: { headers?: Record<string, string> }
   ): Promise<{ text: string; headers: IncomingHttpHeaders }> {
-    return this.requestWithSsoRetry(() =>
+    return this.requestWithSsoRetry(url, () =>
       requestTextWithHeadersInternal(url, this.getRequestOptions(options?.headers))
     );
   }
@@ -85,7 +90,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     url: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse> {
-    return this.requestWithSsoRetry(() =>
+    return this.requestWithSsoRetry(url, () =>
       this.requestWithCrumbRetry((crumbHeaders) =>
         requestBufferWithHeadersInternal(
           url,
@@ -99,7 +104,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     url: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
-    return this.requestWithSsoRetry(() =>
+    return this.requestWithSsoRetry(url, () =>
       this.requestWithCrumbRetry((crumbHeaders) =>
         requestStreamInternal(url, this.getRequestOptions(crumbHeaders, options?.maxBytes))
       )
@@ -107,7 +112,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   }
 
   async requestVoidWithCrumb(url: string, body?: string | Uint8Array): Promise<void> {
-    await this.requestWithSsoRetry(async () => {
+    await this.requestWithSsoRetry(url, async () => {
       await this.requestPostWithCrumbInternal(url, body, this.buildContentHeaders(body));
     });
   }
@@ -116,7 +121,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     url: string,
     body?: string | Uint8Array
   ): Promise<JenkinsPostResponse> {
-    return this.requestWithSsoRetry(() =>
+    return this.requestWithSsoRetry(url, () =>
       this.requestPostWithCrumbInternal(url, body, this.buildContentHeaders(body))
     );
   }
@@ -126,7 +131,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     body: string | Uint8Array,
     headers?: Record<string, string>
   ): Promise<JenkinsPostResponse> {
-    return this.requestWithSsoRetry(() => {
+    return this.requestWithSsoRetry(url, () => {
       const contentHeaders = this.buildRawContentHeaders(body, headers);
       return this.requestPostWithCrumbInternal(url, body, contentHeaders);
     });
@@ -138,7 +143,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     headers?: Record<string, string>,
     options?: { acceptErrorStatuses?: number[] }
   ): Promise<string> {
-    return this.requestWithSsoRetry(() => {
+    return this.requestWithSsoRetry(url, () => {
       const contentHeaders = this.buildRawContentHeaders(body, headers);
       return this.requestPostTextWithCrumbInternal(url, body, contentHeaders, options);
     });
@@ -243,7 +248,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       redirectCount?: number;
     }
   ): Promise<string> {
-    return requestTextWithOptionsInternal(url, {
+    return requestTextInternal(url, {
       method: options.method,
       headers: this.mergeHeaders(options.headers),
       body: options.body,
@@ -457,7 +462,8 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     throw error;
   }
 
-  private async requestWithSsoRetry<T>(requestFn: () => Promise<T>): Promise<T> {
+  private async requestWithSsoRetry<T>(url: string, requestFn: () => Promise<T>): Promise<T> {
+    this.assertTrustedRequestUrl(url);
     const authConfig = this.currentAuthConfig;
     try {
       return await requestFn();
@@ -466,6 +472,40 @@ export class JenkinsHttpClient implements JenkinsClientContext {
         throw error;
       }
       return requestFn();
+    }
+  }
+
+  private parseBaseOrigin(baseUrl: string): string {
+    let parsed: URL;
+    try {
+      parsed = new URL(baseUrl);
+    } catch {
+      throw new JenkinsRequestError("Jenkins base URL is invalid.");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new JenkinsRequestError("Jenkins base URL must use HTTP or HTTPS.");
+    }
+    if (parsed.username || parsed.password) {
+      throw new JenkinsRequestError("Jenkins base URL must not contain embedded credentials.");
+    }
+    return parsed.origin;
+  }
+
+  private assertTrustedRequestUrl(url: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new JenkinsRequestError("Refusing to send Jenkins credentials to an invalid URL.");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new JenkinsRequestError("Refusing to send Jenkins credentials over this protocol.");
+    }
+    if (parsed.username || parsed.password) {
+      throw new JenkinsRequestError("Refusing a Jenkins request URL with embedded credentials.");
+    }
+    if (parsed.origin !== this.baseOrigin) {
+      throw new JenkinsRequestError("Refusing to send Jenkins credentials to an untrusted origin.");
     }
   }
 

@@ -14,7 +14,12 @@ import {
   isJobColorDisabled,
   jobIcon
 } from "../formatters";
-import { createViewTreeJobScope, ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
+import {
+  createViewTreeJobScope,
+  ROOT_TREE_JOB_SCOPE,
+  type TreeJobScope,
+  withTreeJobPresentation
+} from "../TreeJobScope";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 const EYE_ICON = new vscode.ThemeIcon("eye");
@@ -78,6 +83,7 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
 }
 
 type JobTreePresentation = "job" | "pipeline";
+type JobTreeVariant = "default" | "quickAccess" | "activity";
 
 function buildJobLikeTreeItemId(
   presentation: JobTreePresentation,
@@ -89,127 +95,115 @@ function buildJobLikeTreeItemId(
 }
 
 abstract class JobLikeTreeItem extends vscode.TreeItem {
+  protected static readonly treeVariant: JobTreeVariant = "default";
+
   public readonly isWatched: boolean;
   public readonly isPinned: boolean;
   public readonly isDisabled: boolean;
+  public readonly jobScope: TreeJobScope;
 
   protected constructor(
     presentation: JobTreePresentation,
     public readonly environment: JenkinsEnvironmentRef,
     label: string,
     public readonly jobUrl: string,
-    public readonly jobScope: TreeJobScope,
-    color: string | undefined,
-    isWatched: boolean,
-    isPinned: boolean
-  ) {
-    super(label, vscode.TreeItemCollapsibleState.Collapsed);
-    const contextBase = presentation === "pipeline" ? "pipelineItem" : "jobItem";
-    this.isWatched = isWatched;
-    this.isPinned = isPinned;
-    this.isDisabled = isJobColorDisabled(color);
-    this.id = buildJobLikeTreeItemId(presentation, environment, jobUrl, jobScope);
-    this.contextValue = buildJobContextValue(contextBase, isWatched, isPinned, this.isDisabled);
-    this.description = formatJobDescription({
-      status: formatJobColor(color),
-      isWatched,
-      isPinned,
-      isDisabled: this.isDisabled
-    });
-    this.iconPath = jobIcon(presentation, color);
-  }
-}
-
-export class JobTreeItem extends JobLikeTreeItem {
-  constructor(
-    environment: JenkinsEnvironmentRef,
-    label: string,
-    jobUrl: string,
     jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
     color?: string,
     isWatched = false,
-    isPinned = false
+    isPinned?: boolean,
+    group: ActivityGroupKind = "running",
+    pathContext?: string
   ) {
-    super("job", environment, label, jobUrl, jobScope, color, isWatched, isPinned);
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    const treeVariant = (new.target as typeof JobLikeTreeItem).treeVariant;
+    const resolvedIsPinned = isPinned ?? treeVariant === "quickAccess";
+    this.jobScope = resolveJobTreeVariantScope(treeVariant, jobScope, group);
+    const contextBase = presentation === "pipeline" ? "pipelineItem" : "jobItem";
+    this.isWatched = isWatched;
+    this.isPinned = resolvedIsPinned;
+    this.isDisabled = isJobColorDisabled(color);
+    this.id = buildJobLikeTreeItemId(presentation, environment, jobUrl, this.jobScope);
+    this.contextValue = buildJobContextValue(
+      contextBase,
+      isWatched,
+      resolvedIsPinned,
+      this.isDisabled
+    );
+    this.description = formatJobDescription({
+      status: formatJobColor(color),
+      isWatched,
+      isPinned: resolvedIsPinned,
+      isDisabled: this.isDisabled
+    });
+    this.iconPath = jobIcon(presentation, color);
+    if (treeVariant === "quickAccess") {
+      applyQuickAccessPresentation(this, label, jobUrl, color, isWatched);
+    } else if (treeVariant === "activity") {
+      applyActivityPresentation(
+        this,
+        label,
+        jobUrl,
+        pathContext,
+        color,
+        isWatched,
+        resolvedIsPinned
+      );
+    }
+  }
+}
+
+type JobTreeItemArguments = [
+  environment: JenkinsEnvironmentRef,
+  label: string,
+  jobUrl: string,
+  jobScope?: TreeJobScope,
+  color?: string,
+  isWatched?: boolean,
+  isPinned?: boolean,
+  group?: ActivityGroupKind,
+  pathContext?: string
+];
+
+export class JobTreeItem extends JobLikeTreeItem {
+  constructor(...args: JobTreeItemArguments) {
+    super("job", ...args);
   }
 }
 
 export class PipelineTreeItem extends JobLikeTreeItem {
-  constructor(
-    environment: JenkinsEnvironmentRef,
-    label: string,
-    jobUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
-    color?: string,
-    isWatched = false,
-    isPinned = false
-  ) {
-    super("pipeline", environment, label, jobUrl, jobScope, color, isWatched, isPinned);
+  constructor(...args: JobTreeItemArguments) {
+    super("pipeline", ...args);
   }
 }
 
 export class QuickAccessJobTreeItem extends JobTreeItem {
-  constructor(
-    environment: JenkinsEnvironmentRef,
-    label: string,
-    jobUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
-    color?: string,
-    isWatched = false,
-    isPinned = true
-  ) {
-    super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    applyQuickAccessPresentation(this, label, jobUrl, color, isWatched);
-  }
+  protected static override readonly treeVariant: JobTreeVariant = "quickAccess";
 }
 
 export class QuickAccessPipelineTreeItem extends PipelineTreeItem {
-  constructor(
-    environment: JenkinsEnvironmentRef,
-    label: string,
-    jobUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
-    color?: string,
-    isWatched = false,
-    isPinned = true
-  ) {
-    super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    applyQuickAccessPresentation(this, label, jobUrl, color, isWatched);
-  }
+  protected static override readonly treeVariant: JobTreeVariant = "quickAccess";
 }
 
 export class ActivityJobTreeItem extends JobTreeItem {
-  constructor(
-    environment: JenkinsEnvironmentRef,
-    label: string,
-    jobUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
-    color?: string,
-    isWatched = false,
-    isPinned = false,
-    group: ActivityGroupKind = "running",
-    pathContext?: string
-  ) {
-    super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    applyActivityPresentation(this, label, jobUrl, group, pathContext, color, isWatched, isPinned);
-  }
+  protected static override readonly treeVariant: JobTreeVariant = "activity";
 }
 
 export class ActivityPipelineTreeItem extends PipelineTreeItem {
-  constructor(
-    environment: JenkinsEnvironmentRef,
-    label: string,
-    jobUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
-    color?: string,
-    isWatched = false,
-    isPinned = false,
-    group: ActivityGroupKind = "running",
-    pathContext?: string
-  ) {
-    super(environment, label, jobUrl, jobScope, color, isWatched, isPinned);
-    applyActivityPresentation(this, label, jobUrl, group, pathContext, color, isWatched, isPinned);
+  protected static override readonly treeVariant: JobTreeVariant = "activity";
+}
+
+function resolveJobTreeVariantScope(
+  treeVariant: JobTreeVariant,
+  jobScope: TreeJobScope,
+  group: ActivityGroupKind
+): TreeJobScope {
+  if (treeVariant === "quickAccess") {
+    return withTreeJobPresentation(jobScope, "pinned");
   }
+  if (treeVariant === "activity") {
+    return withTreeJobPresentation(jobScope, `activity:${group}`);
+  }
+  return jobScope;
 }
 
 export class StalePinnedJobTreeItem extends vscode.TreeItem {
@@ -269,28 +263,25 @@ function formatActivityJobTooltip(
 }
 
 function applyQuickAccessPresentation(
-  item: JobTreeItem | PipelineTreeItem,
+  item: JobLikeTreeItem,
   label: string,
   jobUrl: string,
   color?: string,
   isWatched = false
 ): void {
-  item.id = `quick-access:${item.id}`;
   item.description = buildPinnedQuickAccessDescription(jobUrl, color, isWatched);
   item.tooltip = formatPinnedJobTooltip(label, jobUrl, item.description);
 }
 
 function applyActivityPresentation(
-  item: JobTreeItem | PipelineTreeItem,
+  item: JobLikeTreeItem,
   label: string,
   jobUrl: string,
-  group: ActivityGroupKind,
   pathContext: string | undefined,
   color: string | undefined,
   isWatched: boolean,
   isPinned: boolean
 ): void {
-  item.id = `activity:${group}:${item.id}`;
   item.description = buildJobDescriptionWithPathContext(pathContext, color, isWatched, isPinned);
   item.tooltip = formatActivityJobTooltip(label, jobUrl, pathContext, item.description);
 }

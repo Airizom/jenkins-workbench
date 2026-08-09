@@ -33,18 +33,7 @@ export async function requestJson<T>(
 
 export async function requestText(
   url: string,
-  options?: JenkinsSimpleRequestOptions
-): Promise<string> {
-  return requestInternal<string>(url, {
-    ...options,
-    parseJson: false,
-    returnText: true
-  });
-}
-
-export async function requestTextWithOptions(
-  url: string,
-  options: JenkinsTextRequestOptions
+  options?: JenkinsSimpleRequestOptions | JenkinsTextRequestOptions
 ): Promise<string> {
   return requestInternal<string>(url, {
     ...options,

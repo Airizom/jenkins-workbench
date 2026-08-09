@@ -11,8 +11,11 @@ import {
   type PipelineLogTargetViewModel
 } from "./BuildDetailsContracts";
 
-export type PipelinePresentation = "graph" | "list";
-export type BuildDetailsTab = "overview" | "inputs" | "pipeline" | "console" | "tests";
+export const PIPELINE_PRESENTATIONS = ["graph", "list"] as const;
+export type PipelinePresentation = (typeof PIPELINE_PRESENTATIONS)[number];
+
+export const BUILD_DETAILS_TABS = ["overview", "inputs", "pipeline", "console", "tests"] as const;
+export type BuildDetailsTab = (typeof BUILD_DETAILS_TABS)[number];
 
 export interface BuildDetailsPanelUiState {
   selectedTab?: BuildDetailsTab;
@@ -123,16 +126,10 @@ function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelU
   );
 }
 
-function isPipelinePresentation(value: unknown): value is PipelinePresentation {
-  return value === "graph" || value === "list";
+export function isPipelinePresentation(value: unknown): value is PipelinePresentation {
+  return PIPELINE_PRESENTATIONS.some((presentation) => presentation === value);
 }
 
 function isBuildDetailsTab(value: unknown): value is BuildDetailsTab {
-  return (
-    value === "overview" ||
-    value === "inputs" ||
-    value === "pipeline" ||
-    value === "console" ||
-    value === "tests"
-  );
+  return BUILD_DETAILS_TABS.some((tab) => tab === value);
 }

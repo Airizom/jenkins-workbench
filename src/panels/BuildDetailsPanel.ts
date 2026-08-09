@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
+import type { BuildDiagnosticsCoordinator } from "../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { normalizeJenkinsUrlForComparison } from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
@@ -10,7 +12,7 @@ import {
 } from "../services/TestSourceResolver";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
-import type { PipelineNodeSelection } from "./BuildDetailsPanelLaunchTypes";
+import type { PipelineNodeSelection } from "./BuildDetailsPanelLauncher";
 import type {
   BuildDetailsBackend,
   BuildDetailsPendingInputProvider
@@ -57,6 +59,7 @@ interface BuildDetailsPanelShowOptions {
   extensionUri: vscode.Uri;
   label?: string;
   pipelineNodeSelection?: PipelineNodeSelection;
+  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
 }
 
 interface BuildDetailsPanelReviveOptions {
@@ -70,6 +73,7 @@ interface BuildDetailsPanelReviveOptions {
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
+  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
 }
 
 interface BuildDetailsPanelMutableServices {
@@ -123,7 +127,8 @@ export class BuildDetailsPanel {
         panel,
         extensionUri,
         coverageDecorationService,
-        mutableServices
+        mutableServices,
+        options.buildDiagnosticsCoordinator
       );
       BuildDetailsPanel.currentPanel = activePanel;
     } else {
@@ -153,7 +158,8 @@ export class BuildDetailsPanel {
       panel,
       options.extensionUri,
       options.coverageDecorationService,
-      getMutableServices(options)
+      getMutableServices(options),
+      options.buildDiagnosticsCoordinator
     );
     BuildDetailsPanel.currentPanel = revived;
 
@@ -187,7 +193,8 @@ export class BuildDetailsPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     coverageDecorationService: CoverageDecorationService,
-    mutableServices: BuildDetailsPanelMutableServices
+    mutableServices: BuildDetailsPanelMutableServices,
+    private readonly buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
@@ -203,7 +210,14 @@ export class BuildDetailsPanel {
       panel,
       extensionUri,
       coverageDecorationService,
-      this.canOpenTestSource
+      this.canOpenTestSource,
+      (details) => {
+        this.buildDiagnosticsCoordinator.updatePanelBuildStatus(
+          details,
+          this.controller.getBuildUrl()
+        );
+      },
+      () => this.postCurrentBuildDiagnostics()
     );
     this.configure(mutableServices);
     this.actions = new BuildDetailsPanelActions({
@@ -254,6 +268,18 @@ export class BuildDetailsPanel {
       onOpenTestSource: (message) => {
         void this.actions.handleOpenTestSource(message);
       },
+      onOpenDiagnosticSource: (message) => {
+        void this.buildDiagnosticsCoordinator.openSourceTarget(
+          message.targetId,
+          this.controller.getBuildUrl()
+        );
+      },
+      onConfigureBuildDiagnostics: () => {
+        void this.buildDiagnosticsCoordinator.configure();
+      },
+      onShowBuildDiagnosticProblems: () => {
+        this.buildDiagnosticsCoordinator.showProblems();
+      },
       onPersistUiState: (message) => {
         if (!this.serializedState) {
           return;
@@ -285,6 +311,13 @@ export class BuildDetailsPanel {
       this.disposables
     );
     this.disposables.push(
+      this.buildDiagnosticsCoordinator.onDidChange((event) => {
+        const buildUrl = this.controller.getBuildUrl();
+        if (!buildUrl || (event.buildUrl && !areBuildUrlsEqual(event.buildUrl, buildUrl))) {
+          return;
+        }
+        this.postCurrentBuildDiagnostics();
+      }),
       vscode.workspace.onDidChangeConfiguration((event) => {
         const affectsTestReport = event.affectsConfiguration(
           getTestReportIncludeCaseLogsConfigKey()
@@ -308,9 +341,11 @@ export class BuildDetailsPanel {
   }
 
   private dispose(): void {
+    const buildUrl = this.controller.getBuildUrl();
+    disposePanelResources(this.disposables);
     this.controller.dispose();
     BuildDetailsPanel.currentPanel = undefined;
-    disposePanelResources(this.disposables);
+    this.buildDiagnosticsCoordinator.clearPanelOwner(buildUrl);
   }
 
   private configure(mutableServices: BuildDetailsPanelMutableServices): void {
@@ -327,6 +362,7 @@ export class BuildDetailsPanel {
     pipelineNodeSelection?: PipelineNodeSelection
   ): Promise<void> {
     this.artifactActionHandler = artifactActionHandler;
+    this.buildDiagnosticsCoordinator.setPanelOwner(environment, buildUrl);
     let panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
     const pipelineLogTarget = toPipelineLogTargetViewModel(pipelineNodeSelection);
     if (pipelineLogTarget) {
@@ -353,7 +389,22 @@ export class BuildDetailsPanel {
         hint: "Open the build again from Jenkins Workbench to continue.",
         panelState: panelState ?? this.serializedState
       });
+      return;
     }
+    this.postCurrentBuildDiagnostics();
+  }
+
+  private postCurrentBuildDiagnostics(): void {
+    const buildUrl = this.controller.getBuildUrl();
+    if (!buildUrl) {
+      return;
+    }
+    this.controller.postBuildDiagnostics(
+      this.buildDiagnosticsCoordinator.getDiagnostics(
+        buildUrl,
+        this.controller.getDiagnosticConsoleText()
+      )
+    );
   }
 }
 
@@ -367,6 +418,10 @@ function getMutableServices(
     testSourceResolver: options.testSourceResolver,
     testSourceNavigationUiService: options.testSourceNavigationUiService
   };
+}
+
+function areBuildUrlsEqual(left: string, right: string): boolean {
+  return normalizeJenkinsUrlForComparison(left) === normalizeJenkinsUrlForComparison(right);
 }
 
 function toPipelineLogTargetViewModel(

@@ -91,14 +91,38 @@ describe("promoteAwaitingInputJobs", () => {
     assert.deepEqual(groups.get("running"), [first]);
   });
 
-  it("stops promoting once the awaiting group reaches the item limit", () => {
-    const { groups, first, second } = promoteTwoRunningJobs((a, b) => new Set([a.url, b.url]), 1);
+  it("excludes awaiting-input jobs beyond the awaiting group item limit", () => {
+    const groups = createActivityGroups();
+    const first = createEntry("first", "red_anime");
+    const second = createEntry("second", "blue_anime");
+    const running = createEntry("running", "blue_anime");
+    groups.get("running")?.push(first, second);
+
+    promoteAwaitingInputJobs(groups, [first, second, running], new Set([first.url, second.url]), 1);
 
     assert.deepEqual(groups.get("awaitingInput"), [first]);
-    assert.deepEqual(groups.get("running"), [second]);
+    assert.deepEqual(groups.get("running"), [running]);
   });
 
-  it("leaves other groups untouched when the awaiting group is already full", () => {
+  it("backfills the running group from later unpromoted candidates", () => {
+    const groups = createActivityGroups();
+    const awaitingFirst = createEntry("awaiting-first", "red_anime");
+    const awaitingSecond = createEntry("awaiting-second", "red_anime");
+    const running = createEntry("still-running", "blue_anime");
+    groups.get("running")?.push(awaitingFirst, awaitingSecond);
+
+    promoteAwaitingInputJobs(
+      groups,
+      [awaitingFirst, awaitingSecond, running],
+      new Set([awaitingFirst.url, awaitingSecond.url]),
+      2
+    );
+
+    assert.deepEqual(groups.get("awaitingInput"), [awaitingFirst, awaitingSecond]);
+    assert.deepEqual(groups.get("running"), [running]);
+  });
+
+  it("removes confirmed awaiting-input jobs when the awaiting group is already full", () => {
     const groups = createActivityGroups();
     const existing = createEntry("existing", "red_anime");
     const candidate = createEntry("candidate", "blue_anime");
@@ -108,7 +132,7 @@ describe("promoteAwaitingInputJobs", () => {
     promoteAwaitingInputJobs(groups, [candidate], new Set([candidate.url]), 1);
 
     assert.deepEqual(groups.get("awaitingInput"), [existing]);
-    assert.deepEqual(groups.get("running"), [candidate]);
+    assert.deepEqual(groups.get("running"), []);
   });
 
   it("tolerates group maps that are missing group entries", () => {

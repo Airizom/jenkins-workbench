@@ -92,7 +92,7 @@ export function buildPipelineGraphModel(stages: PipelineStageViewModel[]): Pipel
   );
 
   return {
-    topologyKey: buildTopologyKey(stages),
+    topologyKey: buildTopologyKey(orderedStageIds, edges),
     geometryKey: buildGeometryKey(nodes),
     nodes,
     edges,
@@ -162,18 +162,11 @@ function getStageNodeId(stage: PipelineStageViewModel, fallbackIndex: number): s
   return `stage:${fallbackIndex}`;
 }
 
-function buildTopologyKey(stages: PipelineStageViewModel[]): string {
-  return stages.map((stage, index) => buildStageTopologyKey(stage, index)).join("|");
-}
-
-function buildStageTopologyKey(stage: PipelineStageViewModel, index: number): string {
-  const stageId = getStageNodeId(stage, index);
-  if (stage.parallelBranches.length === 0) {
-    return stageId;
-  }
-  return `${stageId}[${stage.parallelBranches
-    .map((branch, branchIndex) => buildStageTopologyKey(branch, branchIndex))
-    .join(",")}]`;
+function buildTopologyKey(orderedStageIds: string[], edges: PipelineGraphEdgeModel[]): string {
+  return JSON.stringify([
+    orderedStageIds,
+    edges.map((edge) => [edge.source, edge.target, edge.kind])
+  ]);
 }
 
 function buildGeometryKey(nodes: PipelineGraphNodeModel[]): string {
