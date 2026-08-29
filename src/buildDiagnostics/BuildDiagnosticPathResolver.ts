@@ -7,6 +7,7 @@ import type {
 } from "./BuildDiagnosticTypes";
 
 const DEFAULT_SUFFIX_SEARCH_LIMIT = 200;
+const DEFAULT_CACHE_TTL_MS = 5_000;
 
 export type DiagnosticPathResolutionReason = "unsafe" | "missing" | "ambiguous" | "notFile";
 
@@ -16,15 +17,26 @@ export type DiagnosticPathResolution =
 
 export interface BuildDiagnosticPathResolverOptions {
   suffixSearchLimit?: number;
+  cacheTtlMs?: number;
+  now?: () => number;
+}
+
+interface DiagnosticPathCacheEntry {
+  pending: Promise<DiagnosticPathResolution>;
+  expiresAt: number;
 }
 
 /** Resolves remote build paths without ever allowing a result outside the bound repository. */
 export class BuildDiagnosticPathResolver {
-  private readonly cache = new Map<string, Promise<DiagnosticPathResolution>>();
+  private readonly cache = new Map<string, DiagnosticPathCacheEntry>();
   private readonly suffixSearchLimit: number;
+  private readonly cacheTtlMs: number;
+  private readonly now: () => number;
 
   constructor(options: BuildDiagnosticPathResolverOptions = {}) {
     this.suffixSearchLimit = Math.max(1, options.suffixSearchLimit ?? DEFAULT_SUFFIX_SEARCH_LIMIT);
+    this.cacheTtlMs = Math.max(0, options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS);
+    this.now = options.now ?? Date.now;
   }
 
   clear(): void {
@@ -37,14 +49,22 @@ export class BuildDiagnosticPathResolver {
     diagnostic: Pick<RawBuildDiagnostic, "rawPath">
   ): Promise<DiagnosticPathResolution> {
     const key = `${repositoryUri.toString()}\0${profileResolutionKey(profile)}\0${diagnostic.rawPath}`;
-    let pending = this.cache.get(key);
-    if (!pending) {
-      pending = this.resolveUncached(repositoryUri, profile, diagnostic.rawPath).catch((error) => {
-        this.cache.delete(key);
-        throw error;
-      });
-      this.cache.set(key, pending);
+    const cached = this.cache.get(key);
+    if (cached && cached.expiresAt > this.now()) {
+      return cached.pending;
     }
+
+    const pending = this.resolveUncached(repositoryUri, profile, diagnostic.rawPath);
+    const entry: DiagnosticPathCacheEntry = {
+      pending,
+      expiresAt: this.now() + this.cacheTtlMs
+    };
+    this.cache.set(key, entry);
+    void pending.catch(() => {
+      if (this.cache.get(key) === entry) {
+        this.cache.delete(key);
+      }
+    });
     return pending;
   }
 
@@ -72,11 +92,7 @@ export class BuildDiagnosticPathResolver {
       return direct;
     }
 
-    return this.resolveUniqueSuffix(
-      repositoryUri,
-      normalizedRemotePath,
-      profile.searchExcludeGlob ?? profile.excludeGlob
-    );
+    return this.resolveUniqueSuffix(repositoryUri, normalizedRemotePath, profile.searchExcludeGlob);
   }
 
   private async resolveFromMappings(
@@ -133,15 +149,18 @@ export class BuildDiagnosticPathResolver {
         return { status: "unresolved", reason: "notFile" };
       }
       return { status: "resolved", uri: candidate, strategy: "direct" };
-    } catch {
-      return { status: "unresolved", reason: "missing" };
+    } catch (error) {
+      if (error instanceof vscode.FileSystemError && error.code === "FileNotFound") {
+        return { status: "unresolved", reason: "missing" };
+      }
+      throw error;
     }
   }
 
   private async resolveUniqueSuffix(
     repositoryUri: vscode.Uri,
     normalizedRemotePath: string,
-    excludeGlob?: string
+    searchExcludeGlob?: string
   ): Promise<DiagnosticPathResolution> {
     const remoteSegments = normalizedRemotePath.split("/").filter(Boolean);
     const basename = getSafeBasename(remoteSegments);
@@ -151,7 +170,7 @@ export class BuildDiagnosticPathResolver {
     const include = new vscode.RelativePattern(repositoryUri, `**/${escapeGlobSegment(basename)}`);
     const matches = await vscode.workspace.findFiles(
       include,
-      excludeGlob || undefined,
+      searchExcludeGlob || undefined,
       this.suffixSearchLimit + 1
     );
     if (matches.length > this.suffixSearchLimit) {
@@ -317,7 +336,7 @@ function escapeGlobSegment(value: string): string {
 function profileResolutionKey(profile: NormalizedDiagnosticProfile): string {
   return JSON.stringify({
     id: profile.id,
-    searchExcludeGlob: profile.searchExcludeGlob ?? profile.excludeGlob,
+    searchExcludeGlob: profile.searchExcludeGlob,
     pathMappings: profile.pathMappings.map((mapping) =>
       mapping.type === "prefix"
         ? mapping

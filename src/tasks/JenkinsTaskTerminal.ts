@@ -17,7 +17,6 @@ import { JENKINS_TASK_EXIT_CODES, JenkinsTaskRunner } from "./JenkinsTaskRunner"
 import {
   type JenkinsTaskDefinition,
   normalizeEnvironmentUrl,
-  normalizeOptionalString,
   normalizeTaskDefinition,
   parseTaskParameters
 } from "./JenkinsTaskTypes";
@@ -204,32 +203,26 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
       };
     }
 
-    const target = normalizeEnvironmentUrl(environmentUrl);
-    if (!target) {
-      return { error: "environmentUrl must be a valid http(s) URL." };
-    }
+    const target = environmentUrl;
 
-    const normalizedEnvironmentId = normalizeOptionalString(environmentId);
-    if (normalizedEnvironmentId) {
-      const matches = environments.filter(
-        (environment) => environment.id === normalizedEnvironmentId
-      );
+    if (environmentId) {
+      const matches = environments.filter((environment) => environment.id === environmentId);
       if (matches.length === 0) {
         return {
-          error: `No Jenkins environment matches environmentId ${normalizedEnvironmentId}.`
+          error: `No Jenkins environment matches environmentId ${environmentId}.`
         };
       }
       const workspaceMatch = matches.find((match) => match.scope === "workspace");
       const resolved = workspaceMatch ?? (matches.length === 1 ? matches[0] : undefined);
       if (!resolved) {
         return {
-          error: `Multiple Jenkins environments share environmentId ${normalizedEnvironmentId}.`
+          error: `Multiple Jenkins environments share environmentId ${environmentId}.`
         };
       }
       const resolvedUrl = normalizeEnvironmentUrl(resolved.url);
       if (resolvedUrl && resolvedUrl !== target) {
         return {
-          error: `environmentUrl does not match the environmentId ${normalizedEnvironmentId}.`
+          error: `environmentUrl does not match the environmentId ${environmentId}.`
         };
       }
       return { environment: toJenkinsEnvironmentRef(resolved) };

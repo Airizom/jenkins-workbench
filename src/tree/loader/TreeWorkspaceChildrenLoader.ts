@@ -1,5 +1,4 @@
 import { JenkinsRequestError } from "../../jenkins/errors";
-import type { JenkinsWorkspaceEntry } from "../../jenkins/JenkinsClient";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
@@ -32,23 +31,14 @@ export class TreeWorkspaceChildrenLoader {
           )
         ];
       }
-      return this.mapWorkspaceEntriesToTreeItems(environment, jobUrl, jobScope, entries);
+      return entries.map((entry) => {
+        const TreeItem = entry.isDirectory ? WorkspaceDirectoryTreeItem : WorkspaceFileTreeItem;
+        return new TreeItem(environment, jobUrl, entry.relativePath, entry.name, jobScope);
+      });
     } catch (error) {
       const placeholder = this.createWorkspacePlaceholderForError(error, relativePath);
       return [placeholder];
     }
-  }
-
-  private mapWorkspaceEntriesToTreeItems(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    jobScope: TreeJobScope,
-    entries: JenkinsWorkspaceEntry[]
-  ): WorkbenchTreeElement[] {
-    return entries.map((entry) => {
-      const TreeItem = entry.isDirectory ? WorkspaceDirectoryTreeItem : WorkspaceFileTreeItem;
-      return new TreeItem(environment, jobUrl, entry.relativePath, entry.name, jobScope);
-    });
   }
 
   private createWorkspacePlaceholderForError(

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "vitest";
 import {
   AUTOMATIC_DIAGNOSTIC_PROFILE,
@@ -7,6 +8,24 @@ import {
   resolveDiagnosticProfile
 } from "../src/buildDiagnostics/BuildDiagnosticProfiles";
 import { validateDiagnosticRegexp } from "../src/buildDiagnostics/BuildDiagnosticRegexSafety";
+
+const packageJson = JSON.parse(readFileSync(`${process.cwd()}/package.json`, "utf8")) as {
+  contributes: {
+    configuration: {
+      properties: {
+        "jenkinsWorkbench.diagnostics.profiles": {
+          additionalProperties: {
+            properties: {
+              matchers: {
+                items: { properties: { severity: { enum: string[] } } };
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+};
 
 describe("diagnostic profile normalization", () => {
   it("uses broad-core parsing automatically and when builtIns is omitted", () => {
@@ -47,7 +66,6 @@ describe("diagnostic profile normalization", () => {
 
     assert.equal(profile?.valid, true);
     assert.equal(profile?.searchExcludeGlob, "**/{vendor,node_modules}/**");
-    assert.equal(profile?.excludeGlob, "**/{vendor,node_modules}/**");
     assert.equal(profile?.pathMappings[0].type, "prefix");
     assert.equal(profile?.pathMappings[1].type, "regex");
     const regexMapping = profile?.pathMappings[1];
@@ -55,6 +73,56 @@ describe("diagnostic profile normalization", () => {
       regexMapping?.type === "regex" && regexMapping.regexp.test("/container/a.ts"),
       true
     );
+  });
+
+  it("rejects undocumented aliases while accepting the manifest property names", () => {
+    const normalized = normalizeDiagnosticProfiles({
+      canonical: {
+        searchExcludeGlob: "**/vendor/**",
+        pathMappings: [
+          { type: "prefix", remote: "/agent", local: "src" },
+          { type: "regex", remote: "^/agent/(.*)$", replace: "$1", local: "." }
+        ],
+        matchers: [{ name: "compiler", base: "gcc-clang" }]
+      },
+      aliases: {
+        excludeGlob: "**/vendor/**",
+        pathMappings: [
+          {
+            type: "prefix",
+            remote: "/agent",
+            local: "src",
+            remotePrefix: "/legacy",
+            localRoot: "legacy"
+          },
+          {
+            type: "regex",
+            remote: "^/agent/(.*)$",
+            replace: "$1",
+            local: ".",
+            pattern: "^/legacy/(.*)$",
+            replacement: "$1",
+            localRoot: "legacy"
+          }
+        ],
+        matchers: [{ name: "compiler", id: "legacy", base: "gcc-clang" }]
+      }
+    });
+
+    assert.equal(normalized.profiles.get("canonical")?.valid, true);
+    assert.equal(normalized.profiles.get("aliases")?.valid, false);
+    const unsupportedPaths = normalized.issues
+      .filter((issue) => issue.message.startsWith("Unsupported property"))
+      .map((issue) => issue.path);
+    assert.deepEqual(unsupportedPaths, [
+      "profiles.aliases.excludeGlob",
+      "profiles.aliases.pathMappings[0].remotePrefix",
+      "profiles.aliases.pathMappings[0].localRoot",
+      "profiles.aliases.pathMappings[1].pattern",
+      "profiles.aliases.pathMappings[1].replacement",
+      "profiles.aliases.pathMappings[1].localRoot",
+      "profiles.aliases.matchers[0].id"
+    ]);
   });
 
   it("rejects mappings that can escape the repository", () => {
@@ -100,6 +168,25 @@ describe("diagnostic profile normalization", () => {
     assert.equal(matchers?.[0].id, "acme");
     assert.equal(matchers?.[0].source, "Acme Compiler");
     assert.equal(matchers?.[1].base, "gcc-clang");
+  });
+
+  it("keeps public matcher severity spellings aligned with the manifest", () => {
+    const severityEnum =
+      packageJson.contributes.configuration.properties["jenkinsWorkbench.diagnostics.profiles"]
+        .additionalProperties.properties.matchers.items.properties.severity.enum;
+
+    assert.deepEqual(severityEnum, ["error", "warning", "info", "information"]);
+    for (const severity of severityEnum) {
+      const normalized = normalizeDiagnosticProfiles({
+        test: { matchers: [{ name: "severity", base: "generic", severity }] }
+      });
+
+      assert.equal(normalized.issues.length, 0, severity);
+      assert.equal(
+        normalized.profiles.get("test")?.matchers[0].severity,
+        severity === "info" ? "information" : severity
+      );
+    }
   });
 
   it("marks unsupported fields, captures, parser IDs, and unsafe regexes invalid", () => {
@@ -191,22 +278,21 @@ describe("diagnostic profile normalization", () => {
     assert.ok(normalized.issues.some((issue) => issue.message.includes("1 through 100")));
   });
 
-  it("rejects matcher IDs, names, and sources that exceed worker metadata limits", () => {
+  it("rejects matcher names and sources that exceed worker metadata limits", () => {
     const pattern = { regexp: "^(.+)$", file: 1 };
     const normalized = normalizeDiagnosticProfiles({
       longName: { matchers: [{ name: "n".repeat(257), pattern }] },
-      longId: { matchers: [{ id: "i".repeat(257), pattern }] },
       longSource: {
         matchers: [{ name: "valid", source: "s".repeat(257), pattern }]
       }
     });
 
-    for (const profileId of ["longName", "longId", "longSource"]) {
+    for (const profileId of ["longName", "longSource"]) {
       assert.equal(normalized.profiles.get(profileId)?.valid, false);
     }
     assert.equal(
       normalized.issues.filter((issue) => issue.message.includes("at most 256 characters")).length,
-      3
+      2
     );
   });
 });
@@ -224,5 +310,22 @@ describe("diagnostic regular expression safety", () => {
     assert.equal(validateDiagnosticRegexp("^(a{1,})+$").safe, false);
     assert.equal(validateDiagnosticRegexp("^((a+))+$").safe, false);
     assert.equal(validateDiagnosticRegexp("a".repeat(2049)).safe, false);
+  });
+
+  it("rejects variable-width quantifiers inside repeated groups", () => {
+    const unsafeExpressions = [
+      "(a{1,2})+$",
+      "((ab){2,3})*$",
+      "(a?)+$",
+      "(a{9007199254740992,9007199254740993})+$"
+    ];
+    for (const expression of unsafeExpressions) {
+      assert.equal(validateDiagnosticRegexp(expression).safe, false, expression);
+    }
+
+    const fixedWidthExpressions = ["(a{2})+$", "(a{2,2})+$"];
+    for (const expression of fixedWidthExpressions) {
+      assert.equal(validateDiagnosticRegexp(expression).safe, true, expression);
+    }
   });
 });

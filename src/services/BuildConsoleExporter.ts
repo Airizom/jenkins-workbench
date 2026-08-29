@@ -1,29 +1,15 @@
 import * as fs from "node:fs";
+import { pipeline } from "node:stream/promises";
 import { BuildActionError } from "../jenkins/errors";
 import type { JenkinsConsoleTextClient } from "../jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 
-export interface BuildConsoleWriteStream {
-  destroyed: boolean;
-  once(event: "open", listener: () => void): this;
-  once(event: "error", listener: (error: Error) => void): this;
-  once(event: "drain", listener: () => void): this;
-  once(event: "close", listener: () => void): this;
-  off(event: "error", listener: (error: Error) => void): this;
-  off(event: "drain", listener: () => void): this;
-  write(chunk: string): boolean;
-  end(cb?: () => void): this;
-  end(data: string | Uint8Array, cb?: () => void): this;
-  end(str: string, encoding?: BufferEncoding, cb?: () => void): this;
-  destroy(error?: Error): this;
-}
-
 export interface BuildConsoleFilesystem {
   createWriteStream(
     targetPath: string,
     options?: { encoding?: BufferEncoding }
-  ): BuildConsoleWriteStream;
+  ): NodeJS.WritableStream;
   writeFile(targetPath: string, data: string, encoding: BufferEncoding): Promise<void>;
 }
 
@@ -102,37 +88,38 @@ export class BuildConsoleExporter {
     buildUrl: string
   ): Promise<BuildConsoleExportResult> {
     const writeStream = this.filesystem.createWriteStream(targetPath, { encoding: "utf8" });
-    await this.waitForWriteStreamOpen(writeStream);
-    try {
-      let start = 0;
-      let emptyAttempts = 0;
-      let truncated = false;
-      while (true) {
-        const response = await this.client.getConsoleTextProgressive(environment, buildUrl, start);
-        const nextStart = Math.max(start, response.textSize);
-        if (response.moreData && nextStart === start) {
-          emptyAttempts += 1;
-          if (emptyAttempts > this.progressiveEmptyRetries) {
-            truncated = true;
-            break;
-          }
-          await this.delay(this.progressiveEmptyDelayMs);
-          continue;
+    const state = { truncated: false };
+    await pipeline(this.getProgressiveConsoleChunks(environment, buildUrl, state), writeStream);
+    return { mode: "progressive", truncated: state.truncated };
+  }
+
+  private async *getProgressiveConsoleChunks(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    state: { truncated: boolean }
+  ): AsyncGenerator<string> {
+    let start = 0;
+    let emptyAttempts = 0;
+    while (true) {
+      const response = await this.client.getConsoleTextProgressive(environment, buildUrl, start);
+      const nextStart = Math.max(start, response.textSize);
+      if (response.moreData && nextStart === start) {
+        emptyAttempts += 1;
+        if (emptyAttempts > this.progressiveEmptyRetries) {
+          state.truncated = true;
+          return;
         }
-        if (response.text.length > 0) {
-          await this.writeStreamChunk(writeStream, response.text);
-          emptyAttempts = 0;
-        }
-        if (!response.moreData) {
-          break;
-        }
-        start = nextStart;
+        await this.delay(this.progressiveEmptyDelayMs);
+        continue;
       }
-      await this.finalizeWriteStream(writeStream);
-      return { mode: "progressive", truncated };
-    } catch (error) {
-      await this.destroyWriteStream(writeStream);
-      throw error;
+      if (response.text.length > 0) {
+        yield response.text;
+        emptyAttempts = 0;
+      }
+      if (!response.moreData) {
+        return;
+      }
+      start = nextStart;
     }
   }
 
@@ -141,64 +128,17 @@ export class BuildConsoleExporter {
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<BuildConsoleExportResult> {
+    let snapshot: { text: string; truncated: boolean };
+    let mode: "full" | "tail";
     try {
-      const consoleText = await this.client.getConsoleText(environment, buildUrl);
-      await this.filesystem.writeFile(targetPath, consoleText.text, "utf8");
-      return { mode: "full", truncated: consoleText.truncated };
+      snapshot = await this.client.getConsoleText(environment, buildUrl);
+      mode = "full";
     } catch {
-      const tail = await this.client.getConsoleTextTail(
-        environment,
-        buildUrl,
-        this.maxConsoleChars
-      );
-      await this.filesystem.writeFile(targetPath, tail.text, "utf8");
-      return { mode: "tail", truncated: tail.truncated };
+      snapshot = await this.client.getConsoleTextTail(environment, buildUrl, this.maxConsoleChars);
+      mode = "tail";
     }
-  }
-
-  private async waitForWriteStreamOpen(writeStream: BuildConsoleWriteStream): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      writeStream.once("open", () => resolve());
-      writeStream.once("error", reject);
-    });
-  }
-
-  private async writeStreamChunk(
-    writeStream: BuildConsoleWriteStream,
-    chunk: string
-  ): Promise<void> {
-    if (writeStream.write(chunk)) {
-      return;
-    }
-    await new Promise<void>((resolve, reject) => {
-      const onDrain = (): void => {
-        writeStream.off("error", onError);
-        resolve();
-      };
-      const onError = (error: Error): void => {
-        writeStream.off("drain", onDrain);
-        reject(error);
-      };
-      writeStream.once("drain", onDrain);
-      writeStream.once("error", onError);
-    });
-  }
-
-  private async finalizeWriteStream(writeStream: BuildConsoleWriteStream): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      writeStream.once("error", reject);
-      writeStream.end(() => resolve());
-    });
-  }
-
-  private async destroyWriteStream(writeStream: BuildConsoleWriteStream): Promise<void> {
-    if (writeStream.destroyed) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      writeStream.once("close", () => resolve());
-      writeStream.destroy();
-    });
+    await this.filesystem.writeFile(targetPath, snapshot.text, "utf8");
+    return { mode, truncated: snapshot.truncated };
   }
 
   private async delay(durationMs: number): Promise<void> {

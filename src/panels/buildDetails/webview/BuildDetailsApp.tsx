@@ -182,7 +182,6 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             consoleMaxChars={state.consoleMaxChars}
             consoleError={state.consoleError}
             followLog={state.followLog}
-            isConsoleTabActive={selectedTab === "console"}
             onApproveInput={(inputId) => postMessage({ type: "approveInput", inputId })}
             onRejectInput={(inputId) => postMessage({ type: "rejectInput", inputId })}
             onRestartStage={(stageName) =>

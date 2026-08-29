@@ -3,12 +3,6 @@ import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { retryOnTreeChange } from "./TreeChangeRetry";
 import type { TreeExpansionPath, TreeExpansionResolver } from "./TreeDataProviderTypes";
 
-type TreeRevealOptions = {
-  expand: boolean;
-  focus: false;
-  select: false;
-};
-
 type ResolvePathOutcome = {
   element?: WorkbenchTreeElement;
   wasPending: boolean;
@@ -95,14 +89,6 @@ export class TreeExpansionState implements vscode.Disposable {
     }
   }
 
-  private buildRevealOptions(): TreeRevealOptions {
-    return {
-      expand: true,
-      focus: false,
-      select: false
-    };
-  }
-
   private async trackExpanded(element: WorkbenchTreeElement): Promise<void> {
     if (this.activeProgrammaticReveals.has(element)) {
       return;
@@ -160,7 +146,11 @@ export class TreeExpansionState implements vscode.Disposable {
     const activeRevealCount = this.activeProgrammaticReveals.get(element) ?? 0;
     this.activeProgrammaticReveals.set(element, activeRevealCount + 1);
     try {
-      await this.treeView.reveal(element, this.buildRevealOptions());
+      await this.treeView.reveal(element, {
+        expand: true,
+        focus: false,
+        select: false
+      });
     } finally {
       const remainingRevealCount = (this.activeProgrammaticReveals.get(element) ?? 1) - 1;
       if (remainingRevealCount === 0) {

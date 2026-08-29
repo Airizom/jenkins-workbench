@@ -50,13 +50,13 @@ function findUnsafeRegexpShape(source: string): string | undefined {
 }
 
 interface RegexpGroupState {
-  containsUnboundedRepetition: boolean;
+  containsVariableRepetition: boolean;
   containsAlternation: boolean;
 }
 
 interface RegexpQuantifier {
   endIndex: number;
-  unbounded: boolean;
+  variable: boolean;
 }
 
 interface RegexpScanResult {
@@ -88,7 +88,7 @@ function scanRegexpToken(
 ): RegexpScanResult {
   const char = source[index];
   if (char === "(") {
-    groups.push({ containsUnboundedRepetition: false, containsAlternation: false });
+    groups.push({ containsVariableRepetition: false, containsAlternation: false });
     return { endIndex: index };
   }
   if (char === "|") {
@@ -130,7 +130,7 @@ function findRepeatedGroupIssue(
   group: RegexpGroupState,
   quantifier: RegexpQuantifier | undefined
 ): string | undefined {
-  if (quantifier && group.containsUnboundedRepetition) {
+  if (quantifier && group.containsVariableRepetition) {
     return "Nested repetition is not allowed in diagnostic matchers.";
   }
   if (quantifier && group.containsAlternation) {
@@ -145,8 +145,8 @@ function propagateGroupRepetition(
   quantifier: RegexpQuantifier | undefined
 ): void {
   const parent = groups.at(-1);
-  if (parent && (closed.containsUnboundedRepetition || quantifier?.unbounded)) {
-    parent.containsUnboundedRepetition = true;
+  if (parent && (closed.containsVariableRepetition || quantifier?.variable)) {
+    parent.containsVariableRepetition = true;
   }
 }
 
@@ -159,29 +159,29 @@ function scanRegexpAtom(
   if (!quantifier) {
     return { endIndex: index };
   }
-  if (quantifier.unbounded) {
-    markUnboundedRepetition(groups);
+  if (quantifier.variable) {
+    markVariableRepetition(groups);
   }
   return { endIndex: quantifier.endIndex };
 }
 
-function markUnboundedRepetition(groups: RegexpGroupState[]): void {
+function markVariableRepetition(groups: RegexpGroupState[]): void {
   const current = groups.at(-1);
   if (current) {
-    current.containsUnboundedRepetition = true;
+    current.containsVariableRepetition = true;
   }
 }
 
 function isQuantifierCharacter(char: string): boolean {
-  return char === "*" || char === "+" || char === "{" || char === "}";
+  return char === "*" || char === "+" || char === "?" || char === "{" || char === "}";
 }
 
 function readRegexpQuantifier(source: string, startIndex: number): RegexpQuantifier | undefined {
   const char = source[startIndex];
-  if (char === "*" || char === "+") {
+  if (char === "*" || char === "+" || char === "?") {
     return {
-      endIndex: source[startIndex + 1] === "?" ? startIndex + 1 : startIndex,
-      unbounded: true
+      endIndex: char !== "?" && source[startIndex + 1] === "?" ? startIndex + 1 : startIndex,
+      variable: true
     };
   }
   if (char !== "{") {
@@ -197,10 +197,17 @@ function readRegexpQuantifier(source: string, startIndex: number): RegexpQuantif
     return undefined;
   }
   const lazy = source[closingIndex + 1] === "?";
+  const minimum = normalizeDecimalBound(bounds[1]);
+  const maximum =
+    bounds[2] === undefined || bounds[2] === "" ? bounds[2] : normalizeDecimalBound(bounds[2]);
   return {
     endIndex: lazy ? closingIndex + 1 : closingIndex,
-    unbounded: body.includes(",") && bounds[2] === ""
+    variable: maximum === "" || (maximum !== undefined && minimum !== maximum)
   };
+}
+
+function normalizeDecimalBound(bound: string): string {
+  return bound.replace(/^0+(?=\d)/, "");
 }
 
 function stripEscapesAndCharacterClasses(source: string): string {

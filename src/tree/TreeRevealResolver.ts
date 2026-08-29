@@ -1,7 +1,7 @@
 import type * as vscode from "vscode";
 import type { JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
+import { JenkinsFolderTreeItem, JobTreeItem } from "./items/TreeJobItems";
 import { InstanceTreeItem, JobsFolderTreeItem, RootSectionTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { retryOnTreeChange } from "./TreeChangeRetry";
@@ -60,9 +60,7 @@ export class JenkinsTreeRevealResolver {
         // Children come from the regular (cached, filtered) loading path, so a job hidden
         // by an active job/branch filter resolves to undefined and callers fall back.
         return children.find(
-          (item): item is JobTreeItem | PipelineTreeItem =>
-            (item instanceof JobTreeItem || item instanceof PipelineTreeItem) &&
-            item.jobUrl === segment.url
+          (item): item is JobTreeItem => item instanceof JobTreeItem && item.jobUrl === segment.url
         );
       }
 

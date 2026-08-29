@@ -16,7 +16,7 @@ export function capListWithOverflow<T>(
   }
   return {
     items: items.slice(0, limit),
-    overflow: Math.max(0, items.length - limit)
+    overflow: items.length - limit
   };
 }
 

@@ -3,17 +3,24 @@ import { describe, it } from "vitest";
 import { parseTaskParameters } from "../src/tasks/JenkinsTaskTypes";
 
 describe("parseTaskParameters", () => {
-  it("expands object-form array parameter values", () => {
-    const result = parseTaskParameters({ CHOICE: ["a", "b"] });
+  it("normalizes equivalent object and name/value array definitions identically", () => {
+    const objectResult = parseTaskParameters({ " COUNT ": 2, CHOICE: ["a", false] });
+    const arrayResult = parseTaskParameters([
+      { name: " COUNT ", value: 2 },
+      { name: "CHOICE", value: ["a", false] }
+    ]);
 
-    assert.equal(result.error, undefined);
-    assert.deepEqual(result.params?.getAll("CHOICE"), ["a", "b"]);
+    assert.equal(objectResult.error, undefined);
+    assert.equal(arrayResult.error, undefined);
+    assert.equal(objectResult.params?.toString(), "COUNT=2&CHOICE=a&CHOICE=false");
+    assert.equal(arrayResult.params?.toString(), objectResult.params?.toString());
   });
 
-  it("expands array-form name/value array parameter values", () => {
-    const result = parseTaskParameters([{ name: "CHOICE", value: ["a", "b"] }]);
+  it("rejects blank names consistently across both encodings", () => {
+    const objectResult = parseTaskParameters({ "   ": "value" });
+    const arrayResult = parseTaskParameters([{ name: "   ", value: "value" }]);
 
-    assert.equal(result.error, undefined);
-    assert.deepEqual(result.params?.getAll("CHOICE"), ["a", "b"]);
+    assert.equal(objectResult.error, "Invalid parameter values for: parameters.");
+    assert.equal(arrayResult.error, objectResult.error);
   });
 });

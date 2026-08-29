@@ -193,6 +193,22 @@ describe("built-in build diagnostic parsers", () => {
     assert.deepEqual([second[0].sequence, final[0].sequence], [1, 2]);
   });
 
+  it("bounds incomplete lines and resumes parsing after the next newline", () => {
+    const parser = new BuildDiagnosticLogParser({
+      maxLineChars: 12
+    });
+
+    assert.deepEqual(parser.acceptChunk("1234"), []);
+    assert.deepEqual(parser.acceptChunk("5678"), []);
+    assert.deepEqual(parser.acceptChunk("9abcdef"), []);
+    const findings = parser.acceptChunk("\na.go:2: bad\n");
+
+    assert.equal(parser.didTruncateLine, true);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].parserId, "go");
+    assert.equal(findings[0].logLine, 2);
+  });
+
   it("honors parser selection and emits deterministic deduplication keys", () => {
     const findings = parseBuildLog("a.go:4:2: broken\na.go:4:2: broken\n", {
       builtIns: ["go"]

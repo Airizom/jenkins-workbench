@@ -6,20 +6,46 @@ const existingFiles = new Set<string>();
 const directories = new Set<string>();
 let searchResults: vscodeStub.Uri[] = [];
 const findFiles = vi.fn(async () => searchResults);
+let statError: Error | undefined;
+
+class FileSystemError extends Error {
+  private constructor(
+    message: string,
+    readonly code: string
+  ) {
+    super(message);
+  }
+
+  static FileNotFound(uri: vscodeStub.Uri): FileSystemError {
+    return new FileSystemError(`File not found: ${uri.toString()}`, "FileNotFound");
+  }
+
+  static Unavailable(message: string): FileSystemError {
+    return new FileSystemError(message, "Unavailable");
+  }
+}
+
+const stat = vi.fn(async (uri: vscodeStub.Uri) => {
+  if (statError) {
+    const error = statError;
+    statError = undefined;
+    throw error;
+  }
+  if (existingFiles.has(uri.toString())) {
+    return { type: vscodeStub.FileType.File };
+  }
+  if (directories.has(uri.toString())) {
+    return { type: vscodeStub.FileType.Directory };
+  }
+  throw FileSystemError.FileNotFound(uri);
+});
 
 vi.doMock("vscode", () => ({
   ...vscodeStub,
+  FileSystemError,
   workspace: {
     fs: {
-      stat: async (uri: vscodeStub.Uri) => {
-        if (existingFiles.has(uri.toString())) {
-          return { type: vscodeStub.FileType.File };
-        }
-        if (directories.has(uri.toString())) {
-          return { type: vscodeStub.FileType.Directory };
-        }
-        throw new Error("missing");
-      }
+      stat
     },
     findFiles
   }
@@ -46,6 +72,8 @@ describe("BuildDiagnosticPathResolver", () => {
     directories.clear();
     searchResults = [];
     findFiles.mockClear();
+    stat.mockClear();
+    statError = undefined;
   });
 
   it("applies ordered prefix and regex mappings inside the repository", async () => {
@@ -229,5 +257,75 @@ describe("BuildDiagnosticPathResolver", () => {
     assert.equal(retried.status, "resolved");
     assert.equal(retried.status === "resolved" && retried.uri.toString(), target.toString());
     assert.equal(findFiles.mock.calls.length, 2);
+  });
+
+  it("retries transient stat failures instead of treating them as missing", async () => {
+    const repository = vscodeStub.Uri.file("/workspace/repo");
+    const target = vscodeStub.Uri.file("/workspace/repo/src/retry.ts");
+    existingFiles.add(target.toString());
+    statError = FileSystemError.Unavailable("remote filesystem unavailable");
+    const resolver = new BuildDiagnosticPathResolver();
+    const diagnostic = { rawPath: "src/retry.ts" };
+
+    await assert.rejects(
+      resolver.resolve(repository as never, profile(), diagnostic),
+      /remote filesystem unavailable/
+    );
+    const retried = await resolver.resolve(repository as never, profile(), diagnostic);
+
+    assert.equal(retried.status, "resolved");
+    assert.equal(retried.status === "resolved" && retried.uri.toString(), target.toString());
+    assert.equal(stat.mock.calls.length, 2);
+  });
+
+  it("revalidates a resolved path after the file is deleted", async () => {
+    const repository = vscodeStub.Uri.file("/workspace/repo");
+    const target = vscodeStub.Uri.file("/workspace/repo/src/deleted.ts");
+    existingFiles.add(target.toString());
+    let now = 0;
+    const resolver = new BuildDiagnosticPathResolver({ cacheTtlMs: 10, now: () => now });
+    const diagnostic = { rawPath: "src/deleted.ts" };
+
+    assert.equal(
+      (await resolver.resolve(repository as never, profile(), diagnostic)).status,
+      "resolved"
+    );
+    existingFiles.delete(target.toString());
+    assert.equal(
+      (await resolver.resolve(repository as never, profile(), diagnostic)).status,
+      "resolved"
+    );
+    now = 10;
+    const afterDeletion = await resolver.resolve(repository as never, profile(), diagnostic);
+
+    assert.deepEqual(afterDeletion, {
+      status: "unresolved",
+      reason: "missing",
+      candidates: 0
+    });
+    assert.equal(stat.mock.calls.length, 2);
+  });
+
+  it("revalidates a missing path after the file is created", async () => {
+    const repository = vscodeStub.Uri.file("/workspace/repo");
+    const target = vscodeStub.Uri.file("/workspace/repo/src/created.ts");
+    let now = 0;
+    const resolver = new BuildDiagnosticPathResolver({ cacheTtlMs: 10, now: () => now });
+    const diagnostic = { rawPath: "src/created.ts" };
+
+    assert.equal(
+      (await resolver.resolve(repository as never, profile(), diagnostic)).status,
+      "unresolved"
+    );
+    existingFiles.add(target.toString());
+    now = 10;
+    const afterCreation = await resolver.resolve(repository as never, profile(), diagnostic);
+
+    assert.equal(afterCreation.status, "resolved");
+    assert.equal(
+      afterCreation.status === "resolved" && afterCreation.uri.toString(),
+      target.toString()
+    );
+    assert.equal(stat.mock.calls.length, 2);
   });
 });

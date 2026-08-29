@@ -6,7 +6,6 @@ export function ConsoleSnippet({
   title: string;
   lines: BuildCompareConsoleSectionViewModel["baselineLines"];
 }) {
-  const divergenceLineNumber = lines.find((line) => line.highlight)?.lineNumber;
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-terminal">
       <div className="border-b border-border px-3 py-2 text-sm font-medium text-terminal-foreground">
@@ -16,7 +15,7 @@ export function ConsoleSnippet({
         {lines.map((line) => (
           <div
             key={`${title}:${line.lineNumber}`}
-            data-divergence-line={line.lineNumber === divergenceLineNumber ? "true" : undefined}
+            data-divergence-line={line.highlight ? "true" : undefined}
             className={`console-line grid grid-cols-[5rem_1fr] gap-3 border-l-2 px-3 py-1.5 font-mono text-vscode-editor leading-5 ${
               line.highlight ? "border-l-warning bg-warning-soft" : "border-l-transparent"
             }`}

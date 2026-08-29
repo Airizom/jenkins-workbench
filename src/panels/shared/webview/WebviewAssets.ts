@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import path from "node:path";
 import * as vscode from "vscode";
 
 export type WebviewEntryName = "buildCompare" | "buildDetails" | "nodeCapacity" | "nodeDetails";
@@ -28,11 +27,13 @@ function loadManifest(extensionUri: vscode.Uri): ViteManifest {
   if (manifestCache) {
     return manifestCache;
   }
-  const extensionPath = extensionUri.fsPath;
-  if (!extensionPath) {
+  if (!extensionUri.fsPath) {
     throw new Error("Extension path is missing (fsPath is empty).");
   }
-  const manifestPath = path.join(extensionPath, "out", "webview", "manifest.json");
+  const manifestPath = vscode.Uri.joinPath(
+    getWebviewAssetsRoot(extensionUri),
+    "manifest.json"
+  ).fsPath;
   const raw = readFileSync(manifestPath, "utf8");
   const parsed = JSON.parse(raw) as unknown;
   if (!parsed || typeof parsed !== "object") {
@@ -111,7 +112,7 @@ function toWebviewAssetUri(
   assetPath: string
 ): vscode.Uri {
   return webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, "out", "webview", ...assetPath.split("/"))
+    vscode.Uri.joinPath(getWebviewAssetsRoot(extensionUri), ...assetPath.split("/"))
   );
 }
 

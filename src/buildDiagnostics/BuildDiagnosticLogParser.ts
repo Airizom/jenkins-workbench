@@ -1,53 +1,30 @@
 import type { BuildDiagnosticSeverity } from "../shared/BuildDiagnosticContracts";
-import { stripConsoleControlSequences } from "./BuildDiagnosticConsoleText";
+import {
+  type CustomCaptureState,
+  capturesFromPattern,
+  customDraft,
+  type DiagnosticDraft,
+  fileUrlToPath,
+  looksLikeStandaloneSourcePath,
+  mergeCaptures,
+  type NormalizedLogLine,
+  normalizeBuildLogLine,
+  parseGccClang,
+  parseGeneric,
+  parseGo,
+  parseMsvc,
+  parseTypeScript,
+  positiveInteger,
+  type StackState,
+  severityFromText,
+  stackDraft
+} from "./BuildDiagnosticParserSupport";
 import { BROAD_CORE_DIAGNOSTIC_PARSERS } from "./BuildDiagnosticProfiles";
 import type {
-  BuildDiagnosticKind,
   BuiltInDiagnosticParserId,
   NormalizedCustomDiagnosticMatcher,
-  NormalizedCustomDiagnosticPattern,
   RawBuildDiagnostic
 } from "./BuildDiagnosticTypes";
-
-interface DiagnosticDraft {
-  parserId: string;
-  source: string;
-  severity: BuildDiagnosticSeverity;
-  message: string;
-  rawPath: string;
-  line: number;
-  column?: number;
-  endLine?: number;
-  endColumn?: number;
-  code?: string;
-  kind?: BuildDiagnosticKind;
-  priority: number;
-  stackTraceId?: string;
-  stackFrameIndex?: number;
-}
-
-interface NormalizedLogLine {
-  text: string;
-  prefixSeverity?: BuildDiagnosticSeverity;
-}
-
-interface StackState {
-  id: string;
-  message: string;
-  nextFrame: number;
-}
-
-interface CustomCaptureState {
-  rawPath?: string;
-  location?: string;
-  line?: string;
-  column?: string;
-  endLine?: string;
-  endColumn?: string;
-  severity?: string;
-  code?: string;
-  message?: string;
-}
 
 interface CustomMatcherState {
   patternIndex: number;
@@ -58,7 +35,10 @@ export interface BuildDiagnosticLogParserOptions {
   builtIns?: readonly BuiltInDiagnosticParserId[];
   customMatchers?: readonly NormalizedCustomDiagnosticMatcher[];
   maxDiagnosticsPerCall?: number;
+  maxLineChars?: number;
 }
+
+export const MAX_DIAGNOSTIC_LOG_LINE_CHARS = 1024 * 1024;
 
 /**
  * Stateful line parser suitable for Jenkins progressive-console chunks. It
@@ -69,8 +49,12 @@ export class BuildDiagnosticLogParser {
   private readonly enabledBuiltIns: ReadonlySet<BuiltInDiagnosticParserId>;
   private readonly customMatchers: readonly NormalizedCustomDiagnosticMatcher[];
   private readonly maxDiagnosticsPerCall: number;
+  private readonly maxLineChars: number;
   private readonly customStates = new Map<string, CustomMatcherState>();
-  private remainder = "";
+  private remainderParts: string[] = [];
+  private remainderLength = 0;
+  private discardingOversizedLine = false;
+  private lineTruncated = false;
   private lineNumber = 0;
   private sequence = 0;
   private stackCounter = 0;
@@ -91,6 +75,10 @@ export class BuildDiagnosticLogParser {
       Number.isFinite(options.maxDiagnosticsPerCall)
         ? Math.max(1, Math.floor(options.maxDiagnosticsPerCall))
         : Number.POSITIVE_INFINITY;
+    this.maxLineChars =
+      typeof options.maxLineChars === "number" && Number.isFinite(options.maxLineChars)
+        ? Math.max(1, Math.floor(options.maxLineChars))
+        : MAX_DIAGNOSTIC_LOG_LINE_CHARS;
     for (const matcher of this.customMatchers) {
       if (matcher.base) {
         enabled.add(matcher.base);
@@ -100,41 +88,91 @@ export class BuildDiagnosticLogParser {
     this.enabledBuiltIns = enabled;
   }
 
+  get didTruncateLine(): boolean {
+    return this.lineTruncated;
+  }
+
   acceptChunk(chunk: string): RawBuildDiagnostic[] {
     if (!chunk) {
       return [];
     }
-    const input = this.remainder + chunk;
     const diagnostics: RawBuildDiagnostic[] = [];
     let offset = 0;
-    for (;;) {
-      const newline = input.indexOf("\n", offset);
-      if (newline < 0) {
-        break;
+    while (offset < chunk.length) {
+      if (this.discardingOversizedLine) {
+        const newline = chunk.indexOf("\n", offset);
+        if (newline < 0) {
+          return diagnostics;
+        }
+        this.discardingOversizedLine = false;
+        this.lineNumber += 1;
+        offset = newline + 1;
+        continue;
       }
-      let line = input.slice(offset, newline);
+
+      const newline = chunk.indexOf("\n", offset);
+      const end = newline < 0 ? chunk.length : newline;
+      const segment = chunk.slice(offset, end);
+      if (this.remainderLength + segment.length > this.maxLineChars) {
+        this.clearRemainder();
+        this.lineTruncated = true;
+        if (newline < 0) {
+          this.discardingOversizedLine = true;
+          return diagnostics;
+        }
+        this.lineNumber += 1;
+        offset = newline + 1;
+        continue;
+      }
+      if (newline < 0) {
+        this.appendRemainder(segment);
+        return diagnostics;
+      }
+
+      let line = this.consumeRemainder(segment);
       if (line.endsWith("\r")) {
         line = line.slice(0, -1);
       }
       this.appendDiagnostics(diagnostics, this.parseLine(line));
       offset = newline + 1;
     }
-    this.remainder = input.slice(offset);
     return diagnostics;
   }
 
   finish(): RawBuildDiagnostic[] {
-    if (!this.remainder) {
+    if (this.discardingOversizedLine) {
+      this.discardingOversizedLine = false;
+      this.lineNumber += 1;
       return [];
     }
-    let line = this.remainder;
-    this.remainder = "";
+    if (this.remainderLength === 0) {
+      return [];
+    }
+    let line = this.consumeRemainder("");
     if (line.endsWith("\r")) {
       line = line.slice(0, -1);
     }
     const diagnostics: RawBuildDiagnostic[] = [];
     this.appendDiagnostics(diagnostics, this.parseLine(line));
     return diagnostics;
+  }
+
+  private appendRemainder(segment: string): void {
+    if (segment) {
+      this.remainderParts.push(segment);
+      this.remainderLength += segment.length;
+    }
+  }
+
+  private consumeRemainder(segment: string): string {
+    const line = this.remainderLength === 0 ? segment : [...this.remainderParts, segment].join("");
+    this.clearRemainder();
+    return line;
+  }
+
+  private clearRemainder(): void {
+    this.remainderParts = [];
+    this.remainderLength = 0;
   }
 
   private appendDiagnostics(
@@ -167,24 +205,68 @@ export class BuildDiagnosticLogParser {
 
   private parseBuiltIn(line: NormalizedLogLine): DiagnosticDraft | undefined {
     const text = line.text;
-    const attempts: Array<[BuiltInDiagnosticParserId, () => DiagnosticDraft | undefined]> = [
-      ["typescript", () => parseTypeScript(text)],
-      ["msvc", () => parseMsvc(text)],
-      ["gcc-clang", () => parseGccClang(text, line.prefixSeverity)],
-      ["eslint", () => this.parseEslint(text)],
-      ["rust", () => this.parseRust(text)],
-      ["go", () => parseGo(text, line.prefixSeverity)],
-      ["jvm-stack", () => this.parseJvmStack(text)],
-      ["javascript-stack", () => this.parseJavaScriptStack(text)],
-      ["python-traceback", () => this.parsePythonStack(text)],
-      ["dotnet-stack", () => this.parseDotnetStack(text)],
-      ["generic", () => parseGeneric(text, line.prefixSeverity)]
-    ];
-    for (const [parserId, parse] of attempts) {
-      if (!this.enabledBuiltIns.has(parserId)) {
-        continue;
+    if (this.enabledBuiltIns.has("typescript")) {
+      const result = parseTypeScript(text);
+      if (result) {
+        return result;
       }
-      const result = parse();
+    }
+    if (this.enabledBuiltIns.has("msvc")) {
+      const result = parseMsvc(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("gcc-clang")) {
+      const result = parseGccClang(text, line.prefixSeverity);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("eslint")) {
+      const result = this.parseEslint(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("rust")) {
+      const result = this.parseRust(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("go")) {
+      const result = parseGo(text, line.prefixSeverity);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("jvm-stack")) {
+      const result = this.parseJvmStack(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("javascript-stack")) {
+      const result = this.parseJavaScriptStack(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("python-traceback")) {
+      const result = this.parsePythonStack(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("dotnet-stack")) {
+      const result = this.parseDotnetStack(text);
+      if (result) {
+        return result;
+      }
+    }
+    if (this.enabledBuiltIns.has("generic")) {
+      const result = parseGeneric(text, line.prefixSeverity);
       if (result) {
         return result;
       }
@@ -421,344 +503,4 @@ export function parseBuildLog(
   return [...parser.acceptChunk(text), ...parser.finish()];
 }
 
-export function normalizeBuildLogLine(rawLine: string): NormalizedLogLine {
-  let text = stripConsoleControlSequences(rawLine);
-  let prefixSeverity: BuildDiagnosticSeverity | undefined;
-  let previous = "";
-  while (previous !== text) {
-    previous = text;
-    text = text.replace(/^\s*\[(?:\d{4}-\d{2}-\d{2}[T ][^\]]+|Pipeline(?:\s+[^\]]*)?)\]\s*/i, "");
-    text = text.replace(/^\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s+/, "");
-    const severityPrefix = text.match(/^\s*\[(ERROR|WARN(?:ING)?|INFO)\]\s*/i);
-    if (severityPrefix) {
-      prefixSeverity = severityFromText(severityPrefix[1]);
-      text = text.slice(severityPrefix[0].length);
-      continue;
-    }
-    text = text.replace(/^\s*\[(?:javac|maven|gradle|cargo|eslint|pytest)\]\s*/i, "");
-  }
-  return { text, prefixSeverity };
-}
-
-function parseTypeScript(text: string): DiagnosticDraft | undefined {
-  const parenthesized = text.match(/^(.+?)\((\d+),(\d+)\):\s*(error|warning)\s+TS(\d+):\s*(.+)$/i);
-  const colon = text.match(/^(.+?):(\d+):(\d+)\s+-\s+(error|warning)\s+TS(\d+):\s*(.+)$/i);
-  const match = parenthesized ?? colon;
-  if (!match) {
-    return undefined;
-  }
-  return {
-    parserId: "typescript",
-    source: "typescript",
-    severity: severityFromText(match[4]),
-    message: match[6].trim(),
-    rawPath: match[1].trim(),
-    line: positiveInteger(match[2]),
-    column: positiveInteger(match[3]),
-    code: `TS${match[5]}`,
-    priority: 100
-  };
-}
-
-function parseMsvc(text: string): DiagnosticDraft | undefined {
-  const match = text.match(
-    /^(.+?)\((\d+)(?:,(\d+))?\)\s*:\s*(fatal error|error|warning)\s+([A-Za-z]+\d+)\s*:\s*(.+)$/i
-  );
-  if (!match) {
-    return undefined;
-  }
-  return {
-    parserId: "msvc",
-    source: "msvc",
-    severity: severityFromText(match[4]),
-    message: match[6].trim(),
-    rawPath: match[1].trim(),
-    line: positiveInteger(match[2]),
-    column: optionalPositiveInteger(match[3]),
-    code: match[5],
-    priority: 110
-  };
-}
-
-function parseGccClang(
-  text: string,
-  prefixSeverity?: BuildDiagnosticSeverity
-): DiagnosticDraft | undefined {
-  const bracketed = text.match(/^(.+?):\[(\d+),(\d+)\]\s*(?:(error|warning)\s*:\s*)?(.+)$/i);
-  if (bracketed) {
-    return {
-      parserId: "gcc-clang",
-      source: "compiler",
-      severity: prefixSeverity ?? severityFromText(bracketed[4] ?? "error"),
-      message: bracketed[5].trim(),
-      rawPath: bracketed[1].trim(),
-      line: positiveInteger(bracketed[2]),
-      column: positiveInteger(bracketed[3]),
-      priority: 120
-    };
-  }
-  const match = text.match(
-    /^(.+?):(\d+)(?::(\d+))?:\s*(fatal error|error|warning|note|info(?:rmation)?)\s*:\s*(.+?)(?:\s+\[([^\]]+)\])?\s*$/i
-  );
-  if (!match) {
-    return undefined;
-  }
-  return {
-    parserId: "gcc-clang",
-    source: "compiler",
-    severity: prefixSeverity ?? severityFromText(match[4]),
-    message: match[5].trim(),
-    rawPath: match[1].trim(),
-    line: positiveInteger(match[2]),
-    column: optionalPositiveInteger(match[3]),
-    code: match[6],
-    priority: 120
-  };
-}
-
-function parseGo(
-  text: string,
-  prefixSeverity?: BuildDiagnosticSeverity
-): DiagnosticDraft | undefined {
-  const match = text.match(/^(.+?\.go):(\d+)(?::(\d+))?:\s*(.+)$/i);
-  if (!match) {
-    return undefined;
-  }
-  return {
-    parserId: "go",
-    source: "go",
-    severity: prefixSeverity ?? "error",
-    message: match[4].trim(),
-    rawPath: match[1].trim(),
-    line: positiveInteger(match[2]),
-    column: optionalPositiveInteger(match[3]),
-    priority: 150
-  };
-}
-
-function parseGeneric(
-  text: string,
-  prefixSeverity?: BuildDiagnosticSeverity
-): DiagnosticDraft | undefined {
-  const explicit = text.match(
-    /^(.+?):(\d+)(?::(\d+))?\s*[:-]\s*(error|warning|warn|info(?:rmation)?)\b\s*:?\s*(.+)$/i
-  );
-  if (explicit && looksLikeSourcePath(explicit[1])) {
-    return {
-      parserId: "generic",
-      source: "build",
-      severity: prefixSeverity ?? severityFromText(explicit[4]),
-      message: explicit[5].trim(),
-      rawPath: explicit[1].trim(),
-      line: positiveInteger(explicit[2]),
-      column: optionalPositiveInteger(explicit[3]),
-      priority: 900
-    };
-  }
-
-  const prefixed = text.match(/^(.+?):(\d+)(?::(\d+))?:\s*(.+)$/);
-  if (prefixed && prefixSeverity && looksLikeSourcePath(prefixed[1])) {
-    return {
-      parserId: "generic",
-      source: "build",
-      severity: prefixSeverity,
-      message: prefixed[4].trim(),
-      rawPath: prefixed[1].trim(),
-      line: positiveInteger(prefixed[2]),
-      column: optionalPositiveInteger(prefixed[3]),
-      priority: 910
-    };
-  }
-  return undefined;
-}
-
-function stackDraft(
-  parserId: BuiltInDiagnosticParserId,
-  source: string,
-  rawPath: string,
-  line: string,
-  column: string | undefined,
-  stack: StackState,
-  priority: number
-): DiagnosticDraft {
-  const frameIndex = stack.nextFrame;
-  stack.nextFrame += 1;
-  return {
-    parserId,
-    source,
-    severity: "error",
-    message: stack.message,
-    rawPath: rawPath.trim(),
-    line: positiveInteger(line),
-    column: optionalPositiveInteger(column),
-    kind: "stack-frame",
-    stackTraceId: stack.id,
-    stackFrameIndex: frameIndex,
-    priority
-  };
-}
-
-function capturesFromPattern(
-  pattern: NormalizedCustomDiagnosticPattern,
-  match: RegExpExecArray
-): CustomCaptureState {
-  return {
-    rawPath: captured(match, pattern.file),
-    location: captured(match, pattern.location),
-    line: captured(match, pattern.line),
-    column: captured(match, pattern.column),
-    endLine: captured(match, pattern.endLine),
-    endColumn: captured(match, pattern.endColumn),
-    severity: captured(match, pattern.severity),
-    code: captured(match, pattern.code),
-    message: captured(match, pattern.message)
-  };
-}
-
-function mergeCaptures(earlier: CustomCaptureState, later: CustomCaptureState): CustomCaptureState {
-  const result = { ...earlier };
-  for (const [key, value] of Object.entries(later) as [
-    keyof CustomCaptureState,
-    string | undefined
-  ][]) {
-    if (typeof value !== "undefined") {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-function customDraft(
-  matcher: NormalizedCustomDiagnosticMatcher,
-  pattern: NormalizedCustomDiagnosticPattern,
-  captures: CustomCaptureState,
-  lineText: string
-): DiagnosticDraft | undefined {
-  if (!captures.rawPath) {
-    return undefined;
-  }
-  const location = parseLocation(captures.location);
-  const position = resolveCustomDiagnosticPosition(pattern.kind, captures, location);
-  return {
-    parserId: `custom:${matcher.id}`,
-    source: matcher.source ?? matcher.id,
-    severity: resolveCustomDiagnosticSeverity(matcher, captures),
-    message: resolveCustomDiagnosticMessage(captures.message, lineText),
-    rawPath: captures.rawPath.trim(),
-    ...position,
-    code: normalizeOptionalText(captures.code),
-    priority: 10
-  };
-}
-
-function resolveCustomDiagnosticPosition(
-  kind: NormalizedCustomDiagnosticPattern["kind"],
-  captures: CustomCaptureState,
-  location: ReturnType<typeof parseLocation>
-): Pick<DiagnosticDraft, "line" | "column" | "endLine" | "endColumn"> {
-  if (kind === "file") {
-    return { line: 1, column: 1 };
-  }
-  return {
-    line: positiveInteger(captures.line ?? location.line ?? "1"),
-    column: optionalPositiveInteger(captures.column ?? location.column),
-    endLine: optionalPositiveInteger(captures.endLine ?? location.endLine),
-    endColumn: optionalPositiveInteger(captures.endColumn ?? location.endColumn)
-  };
-}
-
-function resolveCustomDiagnosticSeverity(
-  matcher: NormalizedCustomDiagnosticMatcher,
-  captures: CustomCaptureState
-): BuildDiagnosticSeverity {
-  return capturedSeverity(captures.severity) ?? matcher.severity ?? "error";
-}
-
-function resolveCustomDiagnosticMessage(message: string | undefined, lineText: string): string {
-  return normalizeOptionalText(message) ?? lineText.trim();
-}
-
-function normalizeOptionalText(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized || undefined;
-}
-
-function parseLocation(value: string | undefined): {
-  line?: string;
-  column?: string;
-  endLine?: string;
-  endColumn?: string;
-} {
-  if (!value) {
-    return {};
-  }
-  const parts = value.split(/\s*[, :]\s*/).filter(Boolean);
-  return {
-    line: parts[0],
-    column: parts[1],
-    endLine: parts[2],
-    endColumn: parts[3]
-  };
-}
-
-function captured(match: RegExpExecArray, index: number | undefined): string | undefined {
-  if (typeof index === "undefined") {
-    return undefined;
-  }
-  const value = match[index];
-  return value ? value : undefined;
-}
-
-function capturedSeverity(value: string | undefined): BuildDiagnosticSeverity | undefined {
-  if (!value) {
-    return undefined;
-  }
-  if (/^(?:error|fatal)$/i.test(value)) {
-    return "error";
-  }
-  if (/^(?:warning|warn)$/i.test(value)) {
-    return "warning";
-  }
-  if (/^(?:info|information|note)$/i.test(value)) {
-    return "information";
-  }
-  return undefined;
-}
-
-function severityFromText(value: string): BuildDiagnosticSeverity {
-  return capturedSeverity(value) ?? "error";
-}
-
-function positiveInteger(value: string): number {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-}
-
-function optionalPositiveInteger(value: string | undefined): number | undefined {
-  return typeof value === "undefined" ? undefined : positiveInteger(value);
-}
-
-function looksLikeStandaloneSourcePath(value: string): boolean {
-  const text = value.trim();
-  return (
-    looksLikeSourcePath(text) &&
-    (/^(?:\/|\.\.?[\\/]|[A-Za-z]:[\\/])/.test(text) || !/\s/.test(text))
-  );
-}
-
-function looksLikeSourcePath(value: string): boolean {
-  return /(?:^|[\\/])[^\\/]+\.[A-Za-z0-9_+-]{1,12}$/.test(value.trim());
-}
-
-function fileUrlToPath(value: string): string {
-  if (!value.toLowerCase().startsWith("file://")) {
-    return value;
-  }
-  try {
-    const url = new URL(value);
-    const decoded = decodeURIComponent(url.pathname);
-    return /^\/[A-Za-z]:\//.test(decoded) ? decoded.slice(1) : decoded;
-  } catch {
-    return value.replace(/^file:\/\//i, "");
-  }
-}
+export { normalizeBuildLogLine } from "./BuildDiagnosticParserSupport";

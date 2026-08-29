@@ -1,14 +1,12 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { PendingInputAction } from "../jenkins/JenkinsDataService";
+import type { JenkinsPendingInputActionRuntimeSurface } from "../jenkins/JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { PendingInputActionService } from "../shared/PendingInputActionService";
 import { promptForParameters } from "./ParameterPrompts";
 
-export type { PendingInputActionService } from "../shared/PendingInputActionService";
-
 export interface PendingInputActionOptions {
-  dataService: PendingInputActionService;
+  dataService: JenkinsPendingInputActionRuntimeSurface;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   label?: string;

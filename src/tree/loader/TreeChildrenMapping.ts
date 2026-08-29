@@ -4,12 +4,7 @@ import type {
   JenkinsQueueItemInfo
 } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import {
-  JenkinsFolderTreeItem,
-  JenkinsViewTreeItem,
-  JobTreeItem,
-  PipelineTreeItem
-} from "../items/TreeJobItems";
+import { JenkinsFolderTreeItem, JenkinsViewTreeItem, JobTreeItem } from "../items/TreeJobItems";
 import { QueueItemTreeItem } from "../items/TreeQueueItems";
 import { JobsFolderTreeItem, PinnedSectionTreeItem } from "../items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
@@ -239,30 +234,34 @@ function createJobTreeItem(
     case "multibranch":
       return createFolderTreeItem(environment, job, treeFilter, jobScope);
     case "pipeline":
-      return new PipelineTreeItem(
+      return new JobTreeItem({
+        presentation: "pipeline",
+        variant: "default",
         environment,
-        job.name,
-        job.url,
+        label: job.name,
+        jobUrl: job.url,
         jobScope,
-        job.color,
+        color: job.color,
         isWatched,
         isPinned
-      );
+      });
     default:
-      return new JobTreeItem(
+      return new JobTreeItem({
+        presentation: "job",
+        variant: "default",
         environment,
-        job.name,
-        job.url,
+        label: job.name,
+        jobUrl: job.url,
         jobScope,
-        job.color,
+        color: job.color,
         isWatched,
         isPinned
-      );
+      });
   }
 }
 
-function isPinnedJobTreeItem(item: WorkbenchTreeElement): item is JobTreeItem | PipelineTreeItem {
-  return item instanceof JobTreeItem || item instanceof PipelineTreeItem;
+function isPinnedJobTreeItem(item: WorkbenchTreeElement): item is JobTreeItem {
+  return item instanceof JobTreeItem;
 }
 
 function createFolderTreeItem(

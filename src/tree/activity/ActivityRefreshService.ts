@@ -10,9 +10,13 @@ export interface ActivityRefreshServiceOptions {
   refreshActivity: (environment: JenkinsEnvironmentRef) => void;
 }
 
+interface ActivityRefreshState {
+  environment: JenkinsEnvironmentRef;
+  lastRefreshAt: number;
+}
+
 export class ActivityRefreshService {
-  private readonly expandedEnvironments = new Map<string, JenkinsEnvironmentRef>();
-  private readonly lastRefreshByEnvironment = new Map<string, number>();
+  private readonly refreshStateByEnvironment = new Map<string, ActivityRefreshState>();
   private refreshMinIntervalMs: number;
 
   constructor(private readonly options: ActivityRefreshServiceOptions) {
@@ -28,7 +32,12 @@ export class ActivityRefreshService {
   }
 
   handleActivityFolderExpanded(environment: JenkinsEnvironmentRef): void {
-    this.expandedEnvironments.set(buildEnvironmentKey(environment), environment);
+    const key = buildEnvironmentKey(environment);
+    const previous = this.refreshStateByEnvironment.get(key);
+    this.refreshStateByEnvironment.set(key, {
+      environment,
+      lastRefreshAt: previous?.lastRefreshAt ?? 0
+    });
   }
 
   handleActivityFolderCollapsed(environment: JenkinsEnvironmentRef): void {
@@ -62,25 +71,22 @@ export class ActivityRefreshService {
 
   handleStatusTick(): void {
     const now = Date.now();
-    for (const [key, environment] of this.expandedEnvironments) {
-      const lastRefreshAt = this.lastRefreshByEnvironment.get(key) ?? 0;
-      if (now - lastRefreshAt < this.refreshMinIntervalMs) {
+    for (const state of this.refreshStateByEnvironment.values()) {
+      if (now - state.lastRefreshAt < this.refreshMinIntervalMs) {
         continue;
       }
-      this.lastRefreshByEnvironment.set(key, now);
-      this.options.refreshActivity(environment);
+      state.lastRefreshAt = now;
+      this.options.refreshActivity(state.environment);
     }
   }
 
   private clearEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
     const key = buildEnvironmentKeyParts(scope, environmentId);
-    this.expandedEnvironments.delete(key);
-    this.lastRefreshByEnvironment.delete(key);
+    this.refreshStateByEnvironment.delete(key);
   }
 
   private clearAll(): void {
-    this.expandedEnvironments.clear();
-    this.lastRefreshByEnvironment.clear();
+    this.refreshStateByEnvironment.clear();
   }
 }
 

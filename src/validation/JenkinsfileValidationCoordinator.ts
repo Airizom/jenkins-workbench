@@ -303,7 +303,7 @@ export class JenkinsfileValidationCoordinator
   }
 
   showOutputChannel(): void {
-    this.logger.show();
+    this.outputChannel.show(true);
   }
 
   private setResultState(
@@ -319,7 +319,7 @@ export class JenkinsfileValidationCoordinator
 
   private setResultStaleState(document: vscode.TextDocument, stale: boolean): void {
     const changed = this.stateStore.setResultStaleState(document, stale);
-    if (this.stateStore.getStatusState(document)?.kind !== "result") {
+    if (this.stateStore.getValidationState(document)?.kind !== "result") {
       return;
     }
     this.statusBar.refresh(document);

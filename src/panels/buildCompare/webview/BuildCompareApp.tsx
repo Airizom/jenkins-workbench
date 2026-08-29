@@ -20,14 +20,6 @@ import { buildCompareReducer } from "./state/buildCompareState";
 
 const { useEffect, useReducer } = React;
 
-const SECTION_IDS = {
-  tests: "compare-section-tests",
-  parameters: "compare-section-parameters",
-  changesets: "compare-section-changesets",
-  stages: "compare-section-stages",
-  console: "compare-section-console"
-} as const;
-
 export function BuildCompareApp({ initialState }: { initialState: BuildCompareViewModel }) {
   const [state, dispatch] = useReducer(buildCompareReducer, initialState);
   const postMessage = usePanelPostMessage<BuildCompareIncomingMessage>();
@@ -43,24 +35,48 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
     postMessage({ type: "refreshBuildCompare" });
     toast({ title: "Refreshing comparison" });
   };
-  const sectionErrors = [
-    state.tests,
-    state.parameters,
-    state.changesets,
-    state.stages,
-    state.console
-  ].flatMap((section) =>
+  const sections = [
+    {
+      id: "compare-section-tests",
+      label: "Tests",
+      section: state.tests,
+      content: <TestDiffSection section={state.tests} />
+    },
+    {
+      id: "compare-section-parameters",
+      label: "Parameters",
+      section: state.parameters,
+      content: <ParameterDiffSection section={state.parameters} />
+    },
+    {
+      id: "compare-section-changesets",
+      label: "Changes",
+      section: state.changesets,
+      content: <ChangesetsSection section={state.changesets} />
+    },
+    {
+      id: "compare-section-stages",
+      label: "Stages",
+      section: state.stages,
+      content: <StageTimingSection section={state.stages} />
+    },
+    {
+      id: "compare-section-console",
+      label: "Console",
+      section: state.console,
+      content: <ConsoleDivergenceSection section={state.console} />
+    }
+  ];
+  const sectionErrors = sections.flatMap(({ section }) =>
     section.status === "error" ? [section.detail ?? section.summaryLabel] : []
   );
   const isLoading = state.console.status === "loading";
 
-  const navItems: CompareSectionNavItem[] = [
-    { id: SECTION_IDS.tests, label: "Tests", status: state.tests.status },
-    { id: SECTION_IDS.parameters, label: "Parameters", status: state.parameters.status },
-    { id: SECTION_IDS.changesets, label: "Changes", status: state.changesets.status },
-    { id: SECTION_IDS.stages, label: "Stages", status: state.stages.status },
-    { id: SECTION_IDS.console, label: "Console", status: state.console.status }
-  ];
+  const navItems: CompareSectionNavItem[] = sections.map(({ id, label, section }) => ({
+    id,
+    label,
+    status: section.status
+  }));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -87,21 +103,11 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
         />
         <BuildCompareBuildPair baseline={state.baseline} target={state.target} />
         <CompareSectionNav items={navItems} />
-        <div id={SECTION_IDS.tests} className="scroll-mt-20">
-          <TestDiffSection section={state.tests} />
-        </div>
-        <div id={SECTION_IDS.parameters} className="scroll-mt-20">
-          <ParameterDiffSection section={state.parameters} />
-        </div>
-        <div id={SECTION_IDS.changesets} className="scroll-mt-20">
-          <ChangesetsSection section={state.changesets} />
-        </div>
-        <div id={SECTION_IDS.stages} className="scroll-mt-20">
-          <StageTimingSection section={state.stages} />
-        </div>
-        <div id={SECTION_IDS.console} className="scroll-mt-20">
-          <ConsoleDivergenceSection section={state.console} />
-        </div>
+        {sections.map(({ id, content }) => (
+          <div key={id} id={id} className="scroll-mt-20">
+            {content}
+          </div>
+        ))}
       </main>
       <Toaster />
     </div>

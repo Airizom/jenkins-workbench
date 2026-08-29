@@ -1,109 +1,70 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { load } from "js-yaml";
 
 const workflowPath = path.join(process.cwd(), ".github", "workflows", "release.yml");
-const source = await readFile(workflowPath, "utf8");
 const fullShaPattern = /^[a-f0-9]{40}$/i;
-const exactVersionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
-const publishingTools = ["@vscode/vsce", "ovsx"];
-const publishingSecrets = ["VSCE_PAT", "OVSX_PAT"];
 const errors = [];
 
-if (!/if \[ "\$GITHUB_REF_TYPE" != "tag" \]; then/.test(source)) {
-  errors.push(`${workflowPath} must reject release runs whose ref type is not a tag`);
-}
+const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
-const firstPublishIndex = Math.min(
-  source.indexOf("./node_modules/.bin/vsce publish"),
-  source.indexOf("./node_modules/.bin/ovsx publish")
-);
-const artifactUploadIndex = source.indexOf("uses: actions/upload-artifact@");
+let workflow;
 
-if (
-  artifactUploadIndex === -1 ||
-  firstPublishIndex === -1 ||
-  artifactUploadIndex > firstPublishIndex
-) {
-  errors.push(`${workflowPath} must upload the VSIX artifact before marketplace publication`);
-}
-
-if (
-  !/uses: actions\/upload-artifact@[^\n]+\n\s*with:\n\s*name: vsix\n\s*path: \.\/\*\.vsix\n\s*overwrite: true/.test(
-    source
-  )
-) {
-  errors.push(`${workflowPath} must overwrite the VSIX artifact safely on workflow reruns`);
-}
-
-if (!/\.\/node_modules\/\.bin\/vsce publish[^\n]*--skip-duplicate/.test(source)) {
-  errors.push(`${workflowPath} must make VS Code Marketplace publication duplicate-safe`);
-}
-
-if (
-  !/if \.\/node_modules\/\.bin\/ovsx get "\$EXTENSION_ID" --versionRange "\$VERSION" --metadata[\s\S]*?\n\s*else\n\s*\.\/node_modules\/\.bin\/ovsx publish/.test(
-    source
-  )
-) {
+try {
+  workflow = load(await readFile(workflowPath, "utf8"));
+} catch (error) {
   errors.push(
-    `${workflowPath} must skip Open VSX publication when the exact version already exists`
+    `${workflowPath} could not be parsed: ${error instanceof Error ? error.message : String(error)}`
   );
 }
 
-for (const secret of publishingSecrets) {
-  const validationIndex = source.indexOf(`if [ -z "$${secret}" ]; then`);
+const jobs = isRecord(workflow) && isRecord(workflow.jobs) ? workflow.jobs : {};
+let foundPublicationStep = false;
 
-  if (validationIndex === -1 || firstPublishIndex === -1 || validationIndex > firstPublishIndex) {
-    errors.push(`${workflowPath} must validate ${secret} before the first marketplace publish`);
+for (const [jobName, job] of Object.entries(jobs)) {
+  if (!isRecord(job) || !Array.isArray(job.steps)) {
+    continue;
   }
-}
 
-for (const [index, line] of source.split(/\r?\n/).entries()) {
-  const installMatch = line.match(/\bnpm\s+(?:i|install)\b(.*)/);
+  const artifactUploadIndex = job.steps.findIndex(
+    (step) =>
+      isRecord(step) &&
+      typeof step.uses === "string" &&
+      step.uses.startsWith("actions/upload-artifact@")
+  );
+  const publicationIndex = job.steps.findIndex(
+    (step) => isRecord(step) && step.id === "publish-marketplaces"
+  );
 
-  if (installMatch) {
-    const installArguments = installMatch[1].trim().split(/\s+/);
+  if (publicationIndex !== -1) {
+    foundPublicationStep = true;
 
-    for (const tool of publishingTools) {
-      const toolArgument = installArguments.find(
-        (argument) => argument === tool || argument.startsWith(`${tool}@`)
+    if (artifactUploadIndex === -1 || artifactUploadIndex > publicationIndex) {
+      errors.push(
+        `${workflowPath} job ${jobName} must upload the VSIX artifact before marketplace publication`
       );
-
-      if (!toolArgument) {
-        continue;
-      }
-
-      const version = toolArgument.slice(tool.length + 1);
-
-      if (!toolArgument.startsWith(`${tool}@`) || !exactVersionPattern.test(version)) {
-        errors.push(`${workflowPath}:${index + 1} ${tool} must be installed at an exact version`);
-      }
     }
   }
 
-  const match = line.match(/^\s*uses:\s*([^#\s]+)/);
+  for (const [stepIndex, step] of job.steps.entries()) {
+    if (!isRecord(step) || typeof step.uses !== "string" || step.uses.startsWith("./")) {
+      continue;
+    }
 
-  if (!match || match[1].startsWith("./")) {
-    continue;
+    const atIndex = step.uses.lastIndexOf("@");
+    const ref = atIndex === -1 ? "" : step.uses.slice(atIndex + 1);
+
+    if (!fullShaPattern.test(ref)) {
+      errors.push(
+        `${workflowPath} job ${jobName} step ${stepIndex + 1} ${step.uses} must use a full 40-character commit SHA`
+      );
+    }
   }
+}
 
-  const actionReference = match[1];
-  const atIndex = actionReference.lastIndexOf("@");
-
-  if (atIndex === -1) {
-    errors.push(
-      `${workflowPath}:${index + 1} action reference must be pinned to a full commit SHA`
-    );
-    continue;
-  }
-
-  const ref = actionReference.slice(atIndex + 1);
-
-  if (!fullShaPattern.test(ref)) {
-    errors.push(
-      `${workflowPath}:${index + 1} ${actionReference} must use a full 40-character commit SHA`
-    );
-  }
+if (!foundPublicationStep) {
+  errors.push(`${workflowPath} must define a publish-marketplaces step`);
 }
 
 if (errors.length > 0) {

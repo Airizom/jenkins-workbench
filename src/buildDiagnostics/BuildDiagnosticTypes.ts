@@ -79,8 +79,7 @@ export interface CustomDiagnosticPatternDefinition {
 }
 
 export interface CustomDiagnosticMatcherDefinition {
-  id?: string;
-  name?: string;
+  name: string;
   base?: string;
   source?: string;
   severity?: BuildDiagnosticSeverity | "info";
@@ -108,8 +107,6 @@ export interface NormalizedDiagnosticProfile {
   builtIns: readonly BuiltInDiagnosticParserId[];
   pathMappings: readonly NormalizedDiagnosticPathMapping[];
   searchExcludeGlob?: string;
-  /** @deprecated Compatibility alias for searchExcludeGlob. */
-  excludeGlob?: string;
   matchers: readonly NormalizedCustomDiagnosticMatcher[];
   valid: boolean;
 }

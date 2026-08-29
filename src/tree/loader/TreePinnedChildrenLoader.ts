@@ -3,12 +3,7 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { ScopedJobStoreEntry } from "../../storage/ScopedJobStore";
-import {
-  QuickAccessJobTreeItem,
-  QuickAccessPipelineTreeItem,
-  StalePinnedJobTreeItem
-} from "../items/TreeJobItems";
-import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
+import { JobTreeItem, StalePinnedJobTreeItem } from "../items/TreeJobItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
 import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
 import { PINNED_ITEM_LOOKUP_CONCURRENCY } from "./TreeChildrenConfig";
@@ -66,24 +61,26 @@ export class TreePinnedChildrenLoader {
 
       const isWatched = watchedJobs.has(canonicalJobUrl);
       const isPinned = pinnedJobs.has(canonicalJobUrl);
-      const TreeItem =
-        current.kind === "pipeline" ? QuickAccessPipelineTreeItem : QuickAccessJobTreeItem;
-
-      return new TreeItem(
+      return new JobTreeItem({
+        presentation: current.kind,
+        variant: "quickAccess",
         environment,
-        current.name,
-        canonicalJobUrl,
-        ROOT_TREE_JOB_SCOPE,
-        current.color,
+        label: current.name,
+        jobUrl: canonicalJobUrl,
+        jobScope: ROOT_TREE_JOB_SCOPE,
+        color: current.color,
         isWatched,
         isPinned
-      );
+      });
     } catch (error) {
       if (this.isMissingPinnedItemError(error)) {
         return this.createStalePinnedItem(environment, entry);
       }
 
-      return this.createPinnedItemErrorPlaceholder(entry, error);
+      return this.placeholders.createErrorPlaceholder(
+        `Unable to load ${entry.jobName ?? entry.jobUrl}`,
+        error
+      );
     }
   }
 
@@ -97,14 +94,6 @@ export class TreePinnedChildrenLoader {
       entry.jobUrl,
       entry.jobKind ?? "job"
     );
-  }
-
-  private createPinnedItemErrorPlaceholder(
-    entry: ScopedJobStoreEntry,
-    error: unknown
-  ): PlaceholderTreeItem {
-    const label = `Unable to load ${entry.jobName ?? entry.jobUrl}`;
-    return this.placeholders.createErrorPlaceholder(label, error);
   }
 
   private isMissingPinnedItemError(error: unknown): boolean {

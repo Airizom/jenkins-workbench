@@ -3,17 +3,11 @@ import { describe, it } from "vitest";
 import type { JenkinsBuild } from "../src/jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import { BuildTreeItem } from "../src/tree/items/TreeBuildItems";
-import {
-  ActivityJobTreeItem,
-  ActivityPipelineTreeItem,
-  JobTreeItem,
-  PipelineTreeItem,
-  QuickAccessJobTreeItem,
-  QuickAccessPipelineTreeItem
-} from "../src/tree/items/TreeJobItems";
+import { JobTreeItem } from "../src/tree/items/TreeJobItems";
 import { buildEnvironmentTreeItemId } from "../src/tree/items/TreeItemIds";
 import { WorkspaceRootTreeItem } from "../src/tree/items/TreeWorkspaceItems";
 import { buildBuildsChildrenKey } from "../src/tree/loader/TreeChildrenMapping";
+import { ROOT_TREE_JOB_SCOPE, withTreeJobPresentation } from "../src/tree/TreeJobScope";
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -29,41 +23,98 @@ const build: JenkinsBuild = {
 };
 
 describe("alternate job presentation identities", () => {
-  it("uses the job scope as the sole presentation discriminator", () => {
-    const items = [
-      new QuickAccessJobTreeItem(environment, "demo", jobUrl),
-      new QuickAccessPipelineTreeItem(environment, "demo", jobUrl),
-      new ActivityJobTreeItem(environment, "demo", jobUrl),
-      new ActivityPipelineTreeItem(environment, "demo", jobUrl)
+  it("preserves all presentation and variant combinations", () => {
+    const cases = [
+      {
+        variant: "default" as const,
+        color: "blue_anime",
+        isWatched: true,
+        isPinned: true,
+        scope: ROOT_TREE_JOB_SCOPE,
+        contextFlags: "pinned watched enabled",
+        description: "Running • Pinned • Watched",
+        tooltip: undefined,
+        iconColor: "charts.blue"
+      },
+      {
+        variant: "quickAccess" as const,
+        color: "red",
+        isWatched: true,
+        scope: withTreeJobPresentation(ROOT_TREE_JOB_SCOPE, "pinned"),
+        contextFlags: "pinned watched enabled",
+        description: "Failed • Watched",
+        tooltip: "demo\nFailed • Watched",
+        iconColor: "charts.red"
+      },
+      {
+        variant: "activity" as const,
+        group: "running" as const,
+        pathContext: "team / demo",
+        color: "disabled",
+        isWatched: true,
+        isPinned: true,
+        scope: withTreeJobPresentation(ROOT_TREE_JOB_SCOPE, "activity:running"),
+        contextFlags: "pinned watched disabled",
+        description: "team / demo • Disabled • Pinned • Watched",
+        tooltip: `demo\nteam / demo\nteam / demo • Disabled • Pinned • Watched\n${jobUrl}`,
+        iconColor: "charts.gray"
+      }
     ];
 
-    for (const item of items) {
-      const kind =
-        item instanceof QuickAccessPipelineTreeItem || item instanceof ActivityPipelineTreeItem
-          ? "pipeline"
-          : "job";
-      assert.equal(item.id, buildEnvironmentTreeItemId(kind, environment, item.jobScope, jobUrl));
-    }
+    for (const presentation of ["job", "pipeline"] as const) {
+      for (const testCase of cases) {
+        const item = new JobTreeItem({
+          presentation,
+          environment,
+          label: "demo",
+          jobUrl,
+          ...testCase
+        });
+        const icon = item.iconPath as { id: string; color?: { id: string } };
 
-    assert.ok(items[0] instanceof JobTreeItem);
-    assert.ok(items[1] instanceof PipelineTreeItem);
-    assert.ok(items[2] instanceof JobTreeItem);
-    assert.ok(items[3] instanceof PipelineTreeItem);
+        assert.equal(item.presentation, presentation);
+        assert.deepEqual(item.jobScope, testCase.scope);
+        assert.equal(
+          item.id,
+          buildEnvironmentTreeItemId(presentation, environment, testCase.scope, jobUrl)
+        );
+        assert.equal(
+          item.contextValue,
+          `${presentation === "pipeline" ? "pipelineItem" : "jobItem"} ${testCase.contextFlags}`
+        );
+        assert.equal(item.description, testCase.description);
+        assert.equal(item.tooltip, testCase.tooltip);
+        assert.equal(icon.id, presentation === "pipeline" ? "symbol-structure" : "gear");
+        assert.equal(icon.color?.id, testCase.iconColor);
+      }
+    }
   });
 
   it("namespaces descendant ids and child caches by the parent presentation", () => {
-    const jobsItem = new JobTreeItem(environment, "demo", jobUrl);
-    const pinnedItem = new QuickAccessJobTreeItem(environment, "demo", jobUrl);
-    const activityItem = new ActivityJobTreeItem(
+    const jobsItem = new JobTreeItem({
+      presentation: "job",
+      variant: "default",
       environment,
-      "demo",
+      label: "demo",
+      jobUrl
+    });
+    const pinnedItem = new JobTreeItem({
+      presentation: "job",
+      variant: "quickAccess",
+      environment,
+      label: "demo",
+      jobUrl
+    });
+    const activityItem = new JobTreeItem({
+      presentation: "job",
+      variant: "activity",
+      environment,
+      label: "demo",
       jobUrl,
-      undefined,
-      "blue_anime",
-      false,
-      true,
-      "running"
-    );
+      color: "blue_anime",
+      isPinned: true,
+      group: "running"
+    });
     const parents = [jobsItem, pinnedItem, activityItem];
 
     const cacheKeys = parents.map((parent) =>

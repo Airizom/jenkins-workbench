@@ -158,11 +158,7 @@ function decodeHtmlEntities(input: string): string {
       if (!isValidUnicodeScalar(value)) {
         return `&${entity};`;
       }
-      try {
-        return String.fromCodePoint(value);
-      } catch {
-        return `&${entity};`;
-      }
+      return String.fromCodePoint(value);
     }
 
     switch (entity) {
@@ -175,7 +171,6 @@ function decodeHtmlEntities(input: string): string {
       case "quot":
         return '"';
       case "apos":
-      case "#39":
         return "'";
       case "nbsp":
         return " ";

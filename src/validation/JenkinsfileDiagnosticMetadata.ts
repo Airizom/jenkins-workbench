@@ -1,8 +1,6 @@
 import type * as vscode from "vscode";
-import type { JenkinsfileValidationCode } from "./JenkinsfileValidationTypes";
 
 export interface JenkinsfileDiagnosticMetadata {
-  code?: JenkinsfileValidationCode;
   suggestions?: string[];
   invalidStepToken?: string;
 }

@@ -2,7 +2,6 @@ import * as React from "react";
 import type { BuildDiagnosticConsoleReference } from "../../shared/BuildDetailsContracts";
 import { normalizeConsoleSourceReferences } from "../hooks/consoleSearch/buildConsoleSegments";
 import type { ConsoleMatch } from "../hooks/useConsoleSearch";
-import { advanceRangeIndex, buildRangeIntervals } from "./consoleRangeUtils";
 
 type ConsoleHtmlNode =
   | { type: "text"; value: string }
@@ -29,7 +28,7 @@ export function parseConsoleHtml(html: string): ConsoleHtmlModel {
   const document = parser.parseFromString(html, "text/html");
   const nodes: ConsoleHtmlNode[] = [];
   const textParts: string[] = [];
-  for (const child of Array.from(document.body.childNodes)) {
+  for (const child of document.body.childNodes) {
     appendSanitizedNode(child, nodes, textParts);
   }
   return { nodes, text: textParts.join("") };
@@ -194,21 +193,35 @@ function renderTextNode(
   const references = context.sourceReferences;
   const textStart = context.cursor;
   const textEnd = textStart + text.length;
-  context.matchPointer = advanceRangeIndex(
-    matches,
-    context.matchPointer,
-    textStart,
-    (match) => match.end
-  );
-  context.sourcePointer = advanceRangeIndex(
-    references,
-    context.sourcePointer,
-    textStart,
-    (reference) => reference.endOffset
-  );
+  let matchIndex = context.matchPointer;
+  while (matchIndex < matches.length && matches[matchIndex].end <= textStart) {
+    matchIndex += 1;
+  }
+  let referenceIndex = context.sourcePointer;
+  while (referenceIndex < references.length && references[referenceIndex].endOffset <= textStart) {
+    referenceIndex += 1;
+  }
+
+  const nextMatch = matches[matchIndex];
+  const nextReference = references[referenceIndex];
+  const hasOverlap =
+    (nextMatch !== undefined && nextMatch.start < textEnd) ||
+    (nextReference !== undefined && nextReference.startOffset < textEnd);
+  if (!hasOverlap) {
+    while (matchIndex < matches.length && matches[matchIndex].end <= textEnd) {
+      matchIndex += 1;
+    }
+    while (referenceIndex < references.length && references[referenceIndex].endOffset <= textEnd) {
+      referenceIndex += 1;
+    }
+    context.matchPointer = matchIndex;
+    context.sourcePointer = referenceIndex;
+    context.cursor = textEnd;
+    return [text];
+  }
 
   const boundaries = new Set<number>([textStart, textEnd]);
-  for (let index = context.matchPointer; index < matches.length; index += 1) {
+  for (let index = matchIndex; index < matches.length; index += 1) {
     const match = matches[index];
     if (match.start >= textEnd) {
       break;
@@ -216,7 +229,7 @@ function renderTextNode(
     boundaries.add(Math.max(textStart, match.start));
     boundaries.add(Math.min(textEnd, match.end));
   }
-  for (let index = context.sourcePointer; index < references.length; index += 1) {
+  for (let index = referenceIndex; index < references.length; index += 1) {
     const reference = references[index];
     if (reference.startOffset >= textEnd) {
       break;
@@ -224,17 +237,16 @@ function renderTextNode(
     boundaries.add(Math.max(textStart, reference.startOffset));
     boundaries.add(Math.min(textEnd, reference.endOffset));
   }
-  let matchIndex = context.matchPointer;
-  let referenceIndex = context.sourcePointer;
-
-  for (const { start, end } of buildRangeIntervals(boundaries)) {
-    matchIndex = advanceRangeIndex(matches, matchIndex, start, (match) => match.end);
-    referenceIndex = advanceRangeIndex(
-      references,
-      referenceIndex,
-      start,
-      (reference) => reference.endOffset
-    );
+  const sortedBoundaries = [...boundaries].sort((left, right) => left - right);
+  for (let index = 0; index < sortedBoundaries.length - 1; index += 1) {
+    const start = sortedBoundaries[index];
+    const end = sortedBoundaries[index + 1];
+    while (matchIndex < matches.length && matches[matchIndex].end <= start) {
+      matchIndex += 1;
+    }
+    while (referenceIndex < references.length && references[referenceIndex].endOffset <= start) {
+      referenceIndex += 1;
+    }
     const match = matches[matchIndex];
     const reference = references[referenceIndex];
     const coveredByMatch = match && match.start <= start && match.end >= end;
@@ -271,20 +283,14 @@ function renderTextNode(
     );
   }
 
+  while (matchIndex < matches.length && matches[matchIndex].end <= textEnd) {
+    matchIndex += 1;
+  }
+  while (referenceIndex < references.length && references[referenceIndex].endOffset <= textEnd) {
+    referenceIndex += 1;
+  }
   context.matchPointer = matchIndex;
   context.sourcePointer = referenceIndex;
-  context.matchPointer = advanceRangeIndex(
-    matches,
-    context.matchPointer,
-    textEnd,
-    (match) => match.end
-  );
-  context.sourcePointer = advanceRangeIndex(
-    references,
-    context.sourcePointer,
-    textEnd,
-    (reference) => reference.endOffset
-  );
   context.cursor = textEnd;
   return nodes;
 }
@@ -314,7 +320,7 @@ function appendSanitizedNode(
   const element = node as HTMLElement;
   const tag = element.tagName.toLowerCase();
   if (!ALLOWED_TAGS.has(tag)) {
-    for (const child of Array.from(element.childNodes)) {
+    for (const child of element.childNodes) {
       appendSanitizedNode(child, output, textParts);
     }
     return;
@@ -328,7 +334,7 @@ function appendSanitizedNode(
 
   const attrs = buildElementAttributes(element, tag);
   const children: ConsoleHtmlNode[] = [];
-  for (const child of Array.from(element.childNodes)) {
+  for (const child of element.childNodes) {
     appendSanitizedNode(child, children, textParts);
   }
   output.push({ type: "element", tag, attrs, children });

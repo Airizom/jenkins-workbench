@@ -23,11 +23,11 @@ function createDiagnostic(overrides: Partial<TestDiagnostic> = {}): vscode.Diagn
 }
 
 describe("JenkinsfileDiagnosticUtils resolveDiagnosticCode", () => {
-  it("prefers diagnostic metadata", () => {
+  it("resolves diagnostic codes independently of metadata", () => {
     const diagnostic = createDiagnostic({ code: "missing-agent" });
-    setDiagnosticMetadata(diagnostic, { code: "missing-stages" });
+    setDiagnosticMetadata(diagnostic, { suggestions: ["stage"] });
 
-    assert.equal(resolveDiagnosticCode(diagnostic), "missing-stages");
+    assert.equal(resolveDiagnosticCode(diagnostic), "missing-agent");
   });
 
   it("resolves string and object diagnostic codes from Jenkins diagnostics", () => {

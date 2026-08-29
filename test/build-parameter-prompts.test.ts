@@ -96,6 +96,20 @@ describe("choosePreset quick picks", () => {
     );
   });
 
+  it("returns the selected preset as the sole preset identity", async () => {
+    const preset = { ...presets[0], values: { BRANCH: "main" } };
+    const options = createOptions([]);
+    options.presetStore = {
+      listPresets: async () => presets,
+      getPreset: async () => preset
+    } as unknown as BuildParameterPromptOptions["presetStore"];
+    quickPickActions = ["preset"];
+
+    const result = await choosePreset(options);
+
+    assert.deepEqual(result, { preset });
+  });
+
   it("relies on dismissal instead of presenting a back action when managing presets", async () => {
     const renamePreset = vi.fn();
     const deletePreset = vi.fn();
@@ -166,6 +180,30 @@ describe("promptParameterValues sensitive parameters", () => {
 });
 
 describe("fetchRunBuildChoices run parameter lookup", () => {
+  it("queries the canonical Jenkins job URL first for a simple project name", async () => {
+    const requestedJobUrls: string[] = [];
+    const options = createOptions([
+      {
+        name: "RUN_BUILD",
+        kind: "run",
+        runProjectName: "foo"
+      }
+    ]);
+    options.dataService = {
+      getBuildsForJob: async (
+        _environment: BuildParameterPromptOptions["environment"],
+        jobUrl: string
+      ) => {
+        requestedJobUrls.push(jobUrl);
+        return [{ number: 42 }];
+      }
+    } as unknown as BuildParameterPromptOptions["dataService"];
+
+    await fetchRunBuildChoices(options, options.parameters[0]);
+
+    assert.deepEqual(requestedJobUrls, ["https://jenkins.example/job/foo/"]);
+  });
+
   it("does not request external absolute runProjectName URLs", async () => {
     const requestedJobUrls: string[] = [];
     const options = createOptions([
@@ -187,11 +225,6 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
 
     await fetchRunBuildChoices(options, options.parameters[0]);
 
-    assert.ok(requestedJobUrls.length > 0);
-    assert.equal(requestedJobUrls.includes("https://example.invalid/job/x/"), false);
-    assert.deepEqual(
-      requestedJobUrls.filter((jobUrl) => new URL(jobUrl).origin !== "https://jenkins.example"),
-      []
-    );
+    assert.deepEqual(requestedJobUrls, [options.jobUrl]);
   });
 });

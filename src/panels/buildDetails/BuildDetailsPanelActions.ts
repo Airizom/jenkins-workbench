@@ -48,26 +48,23 @@ export class BuildDetailsPanelActions {
   }
 
   async handleApproveInput(message: { inputId: string }): Promise<void> {
-    const context = this.getPendingInputContext();
-    if (!context) {
-      void vscode.window.showErrorMessage("Build details are not ready for input approval.");
-      return;
-    }
-    await handlePendingInputAction({
-      dataService: context.pendingInputService,
-      environment: context.environment,
-      buildUrl: context.buildUrl,
-      label: context.label,
-      inputId: message.inputId,
-      action: "approve",
-      onRefresh: () => this.refreshAfterPendingInputAction(context.environmentId)
-    });
+    await this.handlePendingInput(message, "approve", "approval");
   }
 
   async handleRejectInput(message: { inputId: string }): Promise<void> {
+    await this.handlePendingInput(message, "reject", "rejection");
+  }
+
+  private async handlePendingInput(
+    message: { inputId: string },
+    action: "approve" | "reject",
+    readinessAction: "approval" | "rejection"
+  ): Promise<void> {
     const context = this.getPendingInputContext();
     if (!context) {
-      void vscode.window.showErrorMessage("Build details are not ready for input rejection.");
+      void vscode.window.showErrorMessage(
+        `Build details are not ready for input ${readinessAction}.`
+      );
       return;
     }
     await handlePendingInputAction({
@@ -76,7 +73,7 @@ export class BuildDetailsPanelActions {
       buildUrl: context.buildUrl,
       label: context.label,
       inputId: message.inputId,
-      action: "reject",
+      action,
       onRefresh: () => this.refreshAfterPendingInputAction(context.environmentId)
     });
   }

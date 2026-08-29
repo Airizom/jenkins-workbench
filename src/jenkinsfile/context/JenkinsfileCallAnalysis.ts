@@ -1,6 +1,5 @@
 import { BARE_CALL_PREFIX_KEYWORDS } from "./JenkinsfileContextConstants";
 import {
-  findBareCallArgumentStart,
   findNextMeaningfulIndex,
   isValidStepStart,
   readIdentifier
@@ -33,7 +32,7 @@ export function analyzeActiveCallArguments(
   const segment =
     activeCall.syntax === "paren"
       ? maskedText.slice((activeCall.openParen ?? activeCall.callStart) + 1, offset)
-      : maskedText.slice(findBareCallArgumentStart(maskedText, activeCall.callStart), offset);
+      : maskedText.slice(activeCall.callStart + activeCall.name.length, offset);
   const depth = createGroupingDepth();
   let commaCount = 0;
   let currentSegmentStart = 0;

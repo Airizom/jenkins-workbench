@@ -182,12 +182,21 @@ export function parseTaskParameters(parameters: unknown): TaskParametersResult {
   const params = new URLSearchParams();
   const invalidKeys = new Set<string>();
 
-  const appendValue = (key: string, value: unknown): void => {
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      params.append(key, String(value));
+  const appendParameter = (rawName: unknown, rawValue: unknown): void => {
+    const name = typeof rawName === "string" ? rawName.trim() : "";
+    if (!name) {
+      invalidKeys.add("parameters");
       return;
     }
-    invalidKeys.add(key);
+
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        params.append(name, String(value));
+      } else {
+        invalidKeys.add(name);
+      }
+    }
   };
 
   if (Array.isArray(parameters)) {
@@ -197,33 +206,11 @@ export function parseTaskParameters(parameters: unknown): TaskParametersResult {
         continue;
       }
       const record = entry as Record<string, unknown>;
-      const name = typeof record.name === "string" ? record.name.trim() : "";
-      if (!name) {
-        invalidKeys.add("parameters");
-        continue;
-      }
-      const { value } = record;
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          appendValue(name, item);
-        }
-      } else {
-        appendValue(name, value);
-      }
+      appendParameter(record.name, record.value);
     }
   } else if (typeof parameters === "object") {
     for (const [key, value] of Object.entries(parameters as Record<string, unknown>)) {
-      const name = key.trim();
-      if (!name) {
-        continue;
-      }
-      if (Array.isArray(value)) {
-        for (const entry of value) {
-          appendValue(name, entry);
-        }
-      } else {
-        appendValue(name, value);
-      }
+      appendParameter(key, value);
     }
   } else {
     return {

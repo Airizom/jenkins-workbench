@@ -13,15 +13,5 @@ function dispatchNodeCapacityMessage(
   message: NodeCapacityOutgoingMessage,
   dispatch: Dispatch<NodeCapacityAction>
 ): void {
-  switch (message.type) {
-    case "updateNodeCapacity":
-      dispatch({ type: "updateNodeCapacity", payload: message.payload });
-      break;
-    case "updateNodeCapacityNodeExecutors":
-      dispatch({ type: "updateNodeCapacityNodeExecutors", payload: message.payload });
-      break;
-    case "setLoading":
-      dispatch({ type: "setLoading", value: message.value });
-      break;
-  }
+  dispatch(message);
 }

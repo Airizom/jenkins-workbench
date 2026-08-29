@@ -110,14 +110,6 @@ function findStatementStart(text: string, offset: number): number {
   return 0;
 }
 
-export function findBareCallArgumentStart(text: string, callStart: number): number {
-  let current = callStart;
-  while (current < text.length && WORD_CHAR_PATTERN.test(text[current])) {
-    current += 1;
-  }
-  return current;
-}
-
 export function isValidStepStart(maskedText: string, offset: number): boolean {
   const partial = findPartialIdentifier(maskedText, offset);
   const anchor = partial?.start ?? offset;

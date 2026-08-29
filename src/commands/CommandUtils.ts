@@ -4,7 +4,7 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { canonicalizeJobUrlForEnvironment } from "../jenkins/urls";
 import type { EnvironmentWithScope } from "../storage/JenkinsEnvironmentStore";
 import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
-import { BuildTreeItem, type JobTreeItem, NodeTreeItem, PipelineTreeItem } from "../tree/TreeItems";
+import { BuildTreeItem, type JobTreeItem, NodeTreeItem } from "../tree/TreeItems";
 
 export { formatActionError };
 
@@ -12,9 +12,7 @@ interface FullEnvironmentRefreshHost {
   fullEnvironmentRefresh(options: { environmentId: string }): void;
 }
 
-export function getOpenUrl(
-  item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem
-): string | undefined {
+export function getOpenUrl(item?: JobTreeItem | BuildTreeItem | NodeTreeItem): string | undefined {
   if (!item) {
     return undefined;
   }
@@ -43,8 +41,8 @@ export function getTreeJobUrlAliases(item: JobScopedStateItem): string[] {
   return canonicalJobUrl === item.jobUrl ? [item.jobUrl] : [item.jobUrl, canonicalJobUrl];
 }
 
-export function getJobTreeItemKind(item: JobTreeItem | PipelineTreeItem): "job" | "pipeline" {
-  return item instanceof PipelineTreeItem ? "pipeline" : "job";
+export function getJobTreeItemKind(item: JobTreeItem): "job" | "pipeline" {
+  return item.presentation;
 }
 
 export function createEnvironmentRefreshCallback(

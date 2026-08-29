@@ -70,20 +70,6 @@ async function confirmModalAction(prompt: string, actionLabel: string): Promise<
   return choice === actionLabel;
 }
 
-function getMetadataStores(deps: JobActionDependencies): {
-  bindingStore: JenkinsDiagnosticProfileBindingStore;
-  presetStore: JenkinsParameterPresetStore;
-  pinStore: JenkinsPinStore;
-  watchStore: JenkinsWatchStore;
-} {
-  return {
-    bindingStore: deps.bindingStore,
-    presetStore: deps.presetStore,
-    pinStore: deps.pinStore,
-    watchStore: deps.watchStore
-  };
-}
-
 function showMetadataFailureWarning(
   successMessage: string,
   metadataAction: "updated" | "removed",
@@ -244,7 +230,7 @@ export async function renameJob(
     refreshEnvironment(deps, context.environmentId);
 
     const metadataResult = await updateJobMetadataOnRename(
-      getMetadataStores(deps),
+      deps,
       {
         scope: context.selected.environment.scope,
         environmentId: context.environmentId,
@@ -297,7 +283,7 @@ export async function deleteJob(
     await deps.dataService.deleteJob(context.selected.environment, context.selected.jobUrl);
     refreshEnvironment(deps, context.environmentId);
 
-    const metadataResult = await removeJobMetadataOnDelete(getMetadataStores(deps), {
+    const metadataResult = await removeJobMetadataOnDelete(deps, {
       scope: context.selected.environment.scope,
       environmentId: context.environmentId,
       jobUrl: context.selected.jobUrl

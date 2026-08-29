@@ -5,10 +5,6 @@ import type { ValidationReason } from "./JenkinsfileValidationCoordinatorTypes";
 export class JenkinsfileValidationOutputLogger {
   constructor(private readonly outputChannel: vscode.OutputChannel) {}
 
-  show(): void {
-    this.outputChannel.show(true);
-  }
-
   logNoEnvironment(document: vscode.TextDocument, reason: ValidationReason): void {
     this.appendLogHeader(document, reason);
     this.outputChannel.appendLine("No Jenkins environment configured for validation.");

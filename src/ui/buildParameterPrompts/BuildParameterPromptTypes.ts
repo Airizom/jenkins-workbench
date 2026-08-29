@@ -6,15 +6,13 @@ import type {
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
   JenkinsParameterPresetStore,
-  ParameterPreset,
-  ParameterPresetSummary
+  ParameterPreset
 } from "../../storage/JenkinsParameterPresetStore";
 
 export type ParameterValue = string | string[];
 
 export interface BuildParameterPromptSelection {
   preset?: ParameterPreset;
-  presetSummary?: ParameterPresetSummary;
 }
 
 export interface BuildParameterPromptValues {

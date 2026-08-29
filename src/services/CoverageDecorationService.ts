@@ -97,10 +97,7 @@ export class CoverageDecorationService implements vscode.Disposable {
     if (this.activeOwnerId === ownerId) {
       return;
     }
-    this.activeOwnerId = ownerId;
-    this.resetActiveResolution();
-    this.clearVisibleDecorations();
-    void this.applyDecorationsToVisibleEditors(this.resolveGeneration);
+    this.switchActiveOwner(ownerId);
   }
 
   deactivateOwner(ownerId: string): void {

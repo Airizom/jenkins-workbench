@@ -162,10 +162,8 @@ function findGuardAliasAssignment(
 ): { name: string; guardNames: string[]; end: number } | undefined {
   IDENTIFIER_PATTERN.lastIndex = index;
   let match = IDENTIFIER_PATTERN.exec(text);
-  let hasDefKeyword = false;
 
   if (match?.[0] === "def") {
-    hasDefKeyword = true;
     const nextIdentifierIndex = skipWhitespace(text, IDENTIFIER_PATTERN.lastIndex);
     IDENTIFIER_PATTERN.lastIndex = nextIdentifierIndex;
     match = IDENTIFIER_PATTERN.exec(text);
@@ -176,11 +174,6 @@ function findGuardAliasAssignment(
   }
 
   const assignmentName = match[0];
-  const assignmentStart = hasDefKeyword ? index : match.index;
-  if (assignmentStart !== index) {
-    return undefined;
-  }
-
   const equalsIndex = skipWhitespace(text, IDENTIFIER_PATTERN.lastIndex);
   if (text[equalsIndex] !== "=") {
     return undefined;

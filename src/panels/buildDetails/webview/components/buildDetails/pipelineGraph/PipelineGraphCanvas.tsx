@@ -10,12 +10,18 @@ import { cn } from "../../../../../shared/webview/lib/utils";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipelineGraphTypes";
 
-const { useEffect, useRef, useState } = React;
+const { memo, useCallback, useEffect, useMemo, useRef, useState } = React;
 
 const CANVAS_PADDING = 40;
 const MIN_SCALE = 0.45;
 const MAX_SCALE = 1.85;
 const KEYBOARD_PAN_STEP = 40;
+
+const STAGE_NODE_BUTTON_BASE_CLASS =
+  "flex h-full w-full flex-col overflow-hidden rounded-xl bg-card text-left " +
+  "transition duration-150 motion-reduce:transition-none " +
+  "hover:-translate-y-0.5 hover:shadow-lg motion-reduce:hover:translate-y-0 " +
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 const IS_MAC_PLATFORM = /Mac|iPhone|iPad/i.test(
   typeof navigator === "undefined" ? "" : navigator.platform
@@ -43,9 +49,20 @@ export function PipelineGraphCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const panStateRef = useRef<{ pointerId: number; x: number; y: number } | undefined>(undefined);
 
+  // Keep a stable node-selection callback so memoized stage nodes skip
+  // re-renders even when the caller passes a fresh handler each render.
+  const onSelectStageRef = useRef(onSelectStage);
+  const handleNodeSelect = useCallback((stageKey: string) => {
+    onSelectStageRef.current(stageKey);
+  }, []);
+
   useEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
+
+  useEffect(() => {
+    onSelectStageRef.current = onSelectStage;
+  }, [onSelectStage]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -191,6 +208,25 @@ export function PipelineGraphCanvas({
     }
   };
 
+  // Edge geometry only changes with the layout, so keep the elements stable
+  // across pan/zoom/selection re-renders and let React skip reconciling them.
+  const edgePaths = useMemo(
+    () =>
+      layout.edges.map((edge) => (
+        <path
+          key={edge.id}
+          d={edge.path}
+          fill="none"
+          stroke={EDGE_STROKE_COLORS[edge.kind]}
+          strokeWidth={edge.kind === "parallel" ? 2.4 : 1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={edge.kind === "join" ? 0.68 : 0.84}
+        />
+      )),
+    [layout.edges]
+  );
+
   return (
     <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
@@ -260,24 +296,13 @@ export function PipelineGraphCanvas({
             transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.scale})`}
             style={{ transformOrigin: "0 0" }}
           >
-            {layout.edges.map((edge) => (
-              <path
-                key={edge.id}
-                d={edge.path}
-                fill="none"
-                stroke={resolveEdgeColor(edge.kind)}
-                strokeWidth={edge.kind === "parallel" ? 2.4 : 1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={edge.kind === "join" ? 0.68 : 0.84}
-              />
-            ))}
+            {edgePaths}
             {layout.nodes.map((node) => (
               <PipelineGraphStageNode
                 key={node.id}
                 node={node}
                 selected={selectedStageKey === node.id}
-                onSelect={onSelectStage}
+                onSelect={handleNodeSelect}
               />
             ))}
           </g>
@@ -287,7 +312,7 @@ export function PipelineGraphCanvas({
   );
 }
 
-function PipelineGraphStageNode({
+const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
   node,
   selected,
   onSelect
@@ -316,10 +341,7 @@ function PipelineGraphStageNode({
         <button
           type="button"
           className={cn(
-            "flex h-full w-full flex-col overflow-hidden rounded-xl bg-card text-left",
-            "transition duration-150 motion-reduce:transition-none",
-            "hover:-translate-y-0.5 hover:shadow-lg motion-reduce:hover:translate-y-0",
-            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            STAGE_NODE_BUTTON_BASE_CLASS,
             selected ? "border-2 shadow-lg" : "border shadow-sm hover:border-2"
           )}
           style={{
@@ -363,7 +385,7 @@ function PipelineGraphStageNode({
       </div>
     </foreignObject>
   );
-}
+});
 
 function createFittedViewport(
   layout: PipelineGraphLayoutResult,
@@ -385,13 +407,8 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function resolveEdgeColor(kind: "sequential" | "parallel" | "join"): string {
-  switch (kind) {
-    case "parallel":
-      return "color-mix(in srgb, var(--primary) 55%, var(--border))";
-    case "join":
-      return "color-mix(in srgb, var(--foreground) 28%, var(--border))";
-    default:
-      return "color-mix(in srgb, var(--foreground) 18%, var(--border))";
-  }
-}
+const EDGE_STROKE_COLORS: Record<"sequential" | "parallel" | "join", string> = {
+  sequential: "color-mix(in srgb, var(--foreground) 18%, var(--border))",
+  parallel: "color-mix(in srgb, var(--primary) 55%, var(--border))",
+  join: "color-mix(in srgb, var(--foreground) 28%, var(--border))"
+};

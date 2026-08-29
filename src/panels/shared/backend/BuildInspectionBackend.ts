@@ -1,14 +1,18 @@
 import type { JenkinsDataService } from "../../../jenkins/JenkinsDataService";
+import type { JenkinsBuildInspectionRuntimeSurface } from "../../../jenkins/JenkinsDataServiceRuntimeSurfaces";
 
 export type BuildInspectionStatusBackend = Pick<
-  JenkinsDataService,
+  JenkinsBuildInspectionRuntimeSurface,
   "getBuildDetails" | "getWorkflowRun"
 >;
 
-export type BuildInspectionTestsBackend = Pick<JenkinsDataService, "getTestReport">;
+export type BuildInspectionTestsBackend = Pick<
+  JenkinsBuildInspectionRuntimeSurface,
+  "getTestReport"
+>;
 
 export type BuildInspectionConsoleBackend = Pick<
-  JenkinsDataService,
+  JenkinsBuildInspectionRuntimeSurface,
   | "getConsoleText"
   | "getConsoleTextHead"
   | "getConsoleTextTail"

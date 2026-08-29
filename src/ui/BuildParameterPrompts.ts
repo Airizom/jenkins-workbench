@@ -22,7 +22,7 @@ export async function promptForBuildParameters(
     return undefined;
   }
 
-  const triggerMode = await selectTriggerMode(presetSelection.presetSummary);
+  const triggerMode = await selectTriggerMode(presetSelection.preset);
   if (!triggerMode) {
     return undefined;
   }
@@ -31,7 +31,7 @@ export async function promptForBuildParameters(
     const saved = await handlePresetSave(options, {
       mode: triggerMode,
       prompted,
-      selectedPreset: presetSelection.presetSummary
+      selectedPreset: presetSelection.preset
     });
     if (!saved) {
       const decision = await vscode.window.showWarningMessage(

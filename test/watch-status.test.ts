@@ -12,7 +12,9 @@ interface PollerConstructor {
 }
 interface PollerHarness {
   poll(): Promise<void>;
+  updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
+  watchStates: Map<string, { pendingInput: { buildUrl: string; signature: string } | undefined }>;
 }
 
 vi.doMock("vscode", () => createEventEmitterVscodeMock());
@@ -302,6 +304,87 @@ describe("JenkinsStatusPoller", () => {
     assert.deepEqual(errorCounts, [1, 0]);
   });
 
+  it("updates the derived error count once when watches are pruned or cleared", async () => {
+    const watched = [watchedEntry(), watchedEntry({ jobUrl: "job/other/", jobName: "other" })];
+    const fixture = createPollerFixture({
+      watched,
+      maxConsecutiveErrors: 1,
+      getJob: async () => {
+        throw new Error("network");
+      }
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+
+    await fixture.poller.poll();
+    watched.splice(0, 1);
+    await fixture.poller.poll();
+    watched.splice(0, 1);
+    await fixture.poller.poll();
+
+    assert.deepEqual(errorCounts, [1, 2, 1, 0]);
+  });
+
+  it("updates the derived error count once when an errored watch is removed", async () => {
+    const fixture = createPollerFixture({
+      maxConsecutiveErrors: 1,
+      getJob: async () => {
+        throw new Error("network");
+      }
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+
+    await fixture.poller.poll();
+    fixture.getJob = async () => {
+      throw new JenkinsRequestError("missing", 404);
+    };
+    await fixture.poller.poll();
+
+    assert.deepEqual(errorCounts, [1, 0]);
+  });
+
+  it("updates the derived error count once when an environment is removed", async () => {
+    const environments = [
+      { id: "env-1", scope: "workspace" as const, url: "https://jenkins.example" }
+    ];
+    const fixture = createPollerFixture({
+      environments,
+      maxConsecutiveErrors: 1,
+      getJob: async () => {
+        throw new Error("network");
+      }
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+
+    await fixture.poller.poll();
+    environments.splice(0, 1);
+    await fixture.poller.poll();
+
+    assert.deepEqual(errorCounts, [1, 0]);
+  });
+
+  it("resets failure counts and emits only effective changes when the threshold changes", async () => {
+    const fixture = createPollerFixture({
+      maxConsecutiveErrors: 1,
+      getJob: async () => {
+        throw new Error("network");
+      }
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+
+    await fixture.poller.poll();
+    fixture.poller.updateMaxConsecutiveErrors(2);
+    fixture.poller.updateMaxConsecutiveErrors(2);
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+
+    assert.deepEqual(errorCounts, [1, 0, 1]);
+    assert.equal(fixture.notifier.calls.watchErrors.length, 2);
+  });
+
   it("deduplicates pending input notifications by build signature", async () => {
     const fixtureSignature = "input-a";
     const fixture = createPollerFixture({
@@ -329,7 +412,41 @@ describe("JenkinsStatusPoller", () => {
     assert.equal(fixture.notifier.calls.pendingInputs.length, 2);
   });
 
-  it("prunes pending input signatures when a watched job is removed", async () => {
+  it("retains only the current build pending input identity", async () => {
+    let buildNumber = 8;
+    const fixture = createPollerFixture({
+      getJob: async () => ({
+        ...runningJob(),
+        lastBuild: {
+          number: buildNumber,
+          url: `job/demo/${buildNumber}/`,
+          building: true
+        }
+      }),
+      getPendingInputSummary: async (_environment, buildUrl) => ({
+        awaitingInput: true,
+        count: 1,
+        signature: `input-${buildUrl}`,
+        fetchedAt: 1
+      })
+    });
+
+    await fixture.poller.poll();
+    buildNumber = 9;
+    await fixture.poller.poll();
+    buildNumber = 10;
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+
+    const state = fixture.poller.watchStates.get("workspace:env-1:job/demo/");
+    assert.deepEqual(state?.pendingInput, {
+      buildUrl: "job/demo/10/",
+      signature: "input-job/demo/10/"
+    });
+    assert.equal(fixture.notifier.calls.pendingInputs.length, 3);
+  });
+
+  it("clears the pending input identity when a watched job is removed", async () => {
     const removedJob = watchedEntry();
     const activeJob = watchedEntry({ jobUrl: "job/other/", jobName: "other" });
     const watched = [removedJob, activeJob];

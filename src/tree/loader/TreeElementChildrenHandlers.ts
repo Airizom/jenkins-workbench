@@ -1,6 +1,6 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { BuildArtifactsFolderTreeItem, BuildTreeItem } from "../items/TreeBuildItems";
-import { JobTreeItem, PipelineTreeItem, StalePinnedJobTreeItem } from "../items/TreeJobItems";
+import { JobTreeItem, StalePinnedJobTreeItem } from "../items/TreeJobItems";
 import { NodeTreeItem } from "../items/TreeNodeItems";
 import { QueueItemTreeItem } from "../items/TreeQueueItems";
 import {
@@ -130,24 +130,17 @@ export function createTreeElementChildrenHandlers({
       invalidate: (element) => jobCollectionLoader.invalidateJobCollectionChildren(element)
     },
     createTreeElementChildrenHandler(JobTreeItem, {
-      getChildren: (job) => buildLoader.loadJobChildrenWithWorkspace(job),
+      getChildren: (job) =>
+        job.presentation === "job"
+          ? buildLoader.loadJobChildrenWithWorkspace(job)
+          : buildLoader.loadBuildChildren(job),
       invalidate: (job) => {
         cacheManager.clearChildrenCache(
           buildLoader.buildBuildsChildrenKey(job.environment, job.jobUrl, job.jobScope)
         );
-        cacheManager.clearWorkspaceChildrenForJob(job.environment, job.jobUrl, job.jobScope);
-      }
-    }),
-    createTreeElementChildrenHandler(PipelineTreeItem, {
-      getChildren: (pipeline) => buildLoader.loadBuildChildren(pipeline),
-      invalidate: (pipeline) => {
-        cacheManager.clearChildrenCache(
-          buildLoader.buildBuildsChildrenKey(
-            pipeline.environment,
-            pipeline.jobUrl,
-            pipeline.jobScope
-          )
-        );
+        if (job.presentation === "job") {
+          cacheManager.clearWorkspaceChildrenForJob(job.environment, job.jobUrl, job.jobScope);
+        }
       }
     }),
     createTreeElementChildrenHandler(StalePinnedJobTreeItem, {

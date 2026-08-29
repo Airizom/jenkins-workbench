@@ -92,7 +92,6 @@ type BuildDetailsTabsProps = {
   consoleMaxChars: number;
   consoleError?: string;
   followLog: boolean;
-  isConsoleTabActive: boolean;
   onApproveInput: (inputId: string) => void;
   onRejectInput: (inputId: string) => void;
   onRestartStage: (stageName: string) => void;
@@ -134,7 +133,6 @@ export function BuildDetailsTabs({
   consoleMaxChars,
   consoleError,
   followLog,
-  isConsoleTabActive,
   onApproveInput,
   onRejectInput,
   onRestartStage,
@@ -251,7 +249,7 @@ export function BuildDetailsTabs({
           consoleMaxChars={consoleMaxChars}
           consoleError={consoleError}
           followLog={followLog}
-          isActive={isConsoleTabActive}
+          isActive={activeTab === "console"}
           onToggleFollowLog={onToggleFollowLog}
           onExportLogs={onExportLogs}
           onOpenExternal={onOpenExternal}

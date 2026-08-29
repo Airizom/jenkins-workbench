@@ -338,18 +338,28 @@ export async function removeEnvironment(
     return;
   }
 
-  const removed = await store.removeEnvironment(target.scope, target.id);
-  if (!removed) {
-    void vscode.window.showWarningMessage("The selected environment no longer exists.");
-    return;
-  }
-
   const cleanupResults = await Promise.allSettled([
     bindingStore.removeBindingsForEnvironment(target.scope, target.id),
     presetStore.removePresetsForEnvironment(target.scope, target.id),
     watchStore.removeWatchesForEnvironment(target.scope, target.id),
     pinStore.removePinsForEnvironment(target.scope, target.id)
   ]);
+  const cleanupFailures = cleanupResults.filter((result) => result.status === "rejected");
+  if (cleanupFailures.length > 0) {
+    void vscode.window.showErrorMessage(
+      `The environment was not removed because some related records could not be removed. Retry removing the environment: ${cleanupFailures
+        .map((failure) => formatError(failure.reason))
+        .join("; ")}`
+    );
+    return;
+  }
+
+  const removed = await store.removeEnvironment(target.scope, target.id);
+  if (!removed) {
+    void vscode.window.showWarningMessage("The selected environment no longer exists.");
+    return;
+  }
+
   clientProvider.invalidateClient(target.scope, target.id);
   refreshHost.onEnvironmentRemoved?.({
     environmentId: target.id,
@@ -357,13 +367,4 @@ export async function removeEnvironment(
     url: target.url
   });
   refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
-
-  const cleanupFailures = cleanupResults.filter((result) => result.status === "rejected");
-  if (cleanupFailures.length > 0) {
-    void vscode.window.showErrorMessage(
-      `The environment was removed, but some related records could not be removed: ${cleanupFailures
-        .map((failure) => formatError(failure.reason))
-        .join("; ")}`
-    );
-  }
 }

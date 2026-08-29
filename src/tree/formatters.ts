@@ -39,10 +39,6 @@ export function formatJobColor(color?: string): string | undefined {
   return formatJobColorStatusLabel(status);
 }
 
-function formatBuildStatus(build: JenkinsBuild): string {
-  return resolveBuildResultLabel(build.result, build.building);
-}
-
 export function formatBuildDescription(build: JenkinsBuild, awaitingInput = false): string {
   if (build.building) {
     const elapsedMs = resolveBuildElapsedMs(build);
@@ -63,7 +59,7 @@ export function formatBuildDescription(build: JenkinsBuild, awaitingInput = fals
     return awaitingInput ? `${base} • Awaiting input` : base;
   }
 
-  const status = formatBuildStatus(build);
+  const status = resolveBuildResultLabel(build.result, build.building);
   const durationLabel = formatDurationLabel(build.duration);
   return durationLabel ? `${status} • ${durationLabel}` : status;
 }
@@ -116,11 +112,7 @@ export function formatPinnedJobPathContext(jobUrl: string): string | undefined {
   return parsed.fullPath.slice(0, -1).join(" / ");
 }
 
-export function formatPinnedJobTooltip(
-  label: string,
-  jobUrl: string,
-  details?: string
-): string | undefined {
+export function formatPinnedJobTooltip(label: string, jobUrl: string, details?: string): string {
   const parsed = parseJobUrl(jobUrl);
   const fullPath = parsed?.fullPath.join(" / ");
   const lines = [label];
@@ -133,7 +125,7 @@ export function formatPinnedJobTooltip(
     lines.push(details);
   }
 
-  return lines.length > 0 ? lines.join("\n") : undefined;
+  return lines.join("\n");
 }
 
 export function formatQueueItemDescription(

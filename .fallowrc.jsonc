@@ -87,10 +87,6 @@
       "implements": "vscode.UriHandler",
       "members": ["handleUri"]
     },
-    {
-      "implements": "BuildDetailsCoverageDecorationsSurface",
-      "members": ["dispose", "activate", "deactivate", "apply"]
-    },
     "revive",
     "getDefaultFileName",
     "exportToFile",
@@ -101,6 +97,38 @@
     {
       "implements": "JenkinsArtifactRetrievalRuntimeSurface",
       "members": ["getArtifact", "getArtifactStream"]
+    },
+    {
+      "implements": "JenkinsBuildInspectionRuntimeSurface",
+      "members": [
+        "getBuildDetails",
+        "getWorkflowRun",
+        "getConsoleText",
+        "getConsoleTextHead",
+        "getConsoleTextTail",
+        "getConsoleTextProgressive",
+        "getConsoleHtmlProgressive",
+        "getFlowNodeLog",
+        "getFlowNodeDetails",
+        "getFlowNodeLogHtmlProgressive",
+        "getTestReport"
+      ]
+    },
+    {
+      "implements": "JenkinsCoverageRuntimeSurface",
+      "members": ["discoverCoverageActionPath", "getCoverageOverview", "getModifiedCoverageFiles"]
+    },
+    {
+      "implements": "JenkinsPendingInputActionRuntimeSurface",
+      "members": ["getPendingInputActions", "approveInput", "rejectInput"]
+    },
+    {
+      "implements": "JenkinsPipelineRestartRuntimeSurface",
+      "members": ["getRestartFromStageInfo", "restartPipelineFromStage"]
+    },
+    {
+      "implements": "JenkinsJobStateRuntimeSurface",
+      "members": ["enableJob", "disableJob"]
     },
     {
       "implements": "JenkinsfileStepCatalogInvalidationSurface",

@@ -33,10 +33,6 @@ export class JenkinsfileValidationStateStore {
     return state ? { ...state } : undefined;
   }
 
-  getStatusState(document: vscode.TextDocument): JenkinsfileValidationStatusState | undefined {
-    return this.lastStatusState.get(this.getDocumentKey(document));
-  }
-
   setResultState(
     document: vscode.TextDocument,
     errorCount: number,
@@ -53,8 +49,8 @@ export class JenkinsfileValidationStateStore {
   }
 
   setResultStaleState(document: vscode.TextDocument, stale: boolean): boolean {
-    const lastState = this.getStatusState(document);
-    if (!lastState || lastState.kind !== "result") {
+    const lastState = this.getValidationState(document);
+    if (lastState?.kind !== "result") {
       return false;
     }
     if (Boolean(lastState.stale) === stale) {

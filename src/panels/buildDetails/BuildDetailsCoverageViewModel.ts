@@ -148,23 +148,28 @@ function buildCoverageFileViewModel(
   return files
     .map((file) => ({
       path: file.path,
-      coveredCount: countModifiedCoverageLines(file.blocks, "covered"),
-      missedCount: countModifiedCoverageLines(file.blocks, "missed"),
-      partialCount: countModifiedCoverageLines(file.blocks, "partial")
+      ...countModifiedCoverageLines(file.blocks)
     }))
     .sort((left, right) => left.path.localeCompare(right.path));
 }
 
 function countModifiedCoverageLines(
-  blocks: JenkinsModifiedCoverageFile["blocks"],
-  type: JenkinsModifiedCoverageFile["blocks"][number]["type"]
-): number {
-  return blocks.reduce((total, block) => {
-    if (block.type !== type) {
-      return total;
-    }
-    return total + (block.endLine - block.startLine + 1);
-  }, 0);
+  blocks: JenkinsModifiedCoverageFile["blocks"]
+): Omit<BuildCoverageFileViewModel, "path"> {
+  return blocks.reduce<Omit<BuildCoverageFileViewModel, "path">>(
+    (counts, block) => {
+      const lineCount = block.endLine - block.startLine + 1;
+      if (block.type === "covered") {
+        counts.coveredCount += lineCount;
+      } else if (block.type === "missed") {
+        counts.missedCount += lineCount;
+      } else {
+        counts.partialCount += lineCount;
+      }
+      return counts;
+    },
+    { coveredCount: 0, missedCount: 0, partialCount: 0 }
+  );
 }
 
 function formatCoverageThresholdLabel(threshold?: number, value?: string): string | undefined {

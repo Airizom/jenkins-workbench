@@ -199,94 +199,123 @@ describe("removeEnvironment", () => {
     assert.equal(picks[0].label, "https://jenkins.example.com/");
   });
 
-  it("refreshes removed environment state when related cleanup fails", async () => {
-    const target: JenkinsEnvironmentRef = {
-      environmentId: "env-1",
-      scope: "workspace",
-      url: "https://user:secret@jenkins.example/"
-    };
-    const events: string[] = [];
-    warningMessageResponse = "Remove Environment";
+  it.each(["bindings", "presets", "watches", "pins"] as const)(
+    "keeps removal retryable when %s cleanup fails",
+    async (failingCleanup) => {
+      const target: JenkinsEnvironmentRef = {
+        environmentId: "env-1",
+        scope: "workspace",
+        url: "https://user:secret@jenkins.example/"
+      };
+      const events: string[] = [];
+      const cleanupAttempts = new Map<string, number>();
+      warningMessageResponse = "Remove Environment";
 
-    const store = {
-      async removeEnvironment(scope: EnvironmentScope, id: string): Promise<boolean> {
-        events.push(`remove:${scope}:${id}`);
-        return true;
-      }
-    } as unknown as JenkinsEnvironmentStore;
-    const presetStore = {
-      async removePresetsForEnvironment(
+      const runCleanup = async (
+        cleanup: "bindings" | "presets" | "watches" | "pins",
         scope: EnvironmentScope,
         environmentId: string
-      ): Promise<void> {
-        events.push(`presets:${scope}:${environmentId}`);
-        throw new Error("preset cleanup failed");
-      }
-    } as unknown as JenkinsParameterPresetStore;
-    const bindingStore = {
-      async removeBindingsForEnvironment(
-        scope: EnvironmentScope,
-        environmentId: string
-      ): Promise<boolean> {
-        events.push(`bindings:${scope}:${environmentId}`);
-        return true;
-      }
-    } as unknown as JenkinsDiagnosticProfileBindingStore;
-    const watchStore = {
-      async removeWatchesForEnvironment(
-        scope: EnvironmentScope,
-        environmentId: string
-      ): Promise<void> {
-        events.push(`watches:${scope}:${environmentId}`);
-      }
-    } as unknown as JenkinsWatchStore;
-    const pinStore = {
-      async removePinsForEnvironment(
-        scope: EnvironmentScope,
-        environmentId: string
-      ): Promise<void> {
-        events.push(`pins:${scope}:${environmentId}`);
-      }
-    } as unknown as JenkinsPinStore;
-    const clientProvider = {
-      invalidateClient(scope: EnvironmentScope, environmentId: string): void {
-        events.push(`invalidate:${scope}:${environmentId}`);
-      }
-    } as unknown as JenkinsClientProvider;
-
-    await removeEnvironment(
-      store,
-      bindingStore,
-      presetStore,
-      watchStore,
-      pinStore,
-      clientProvider,
-      {
-        onEnvironmentRemoved: (environment) => {
-          events.push(`removed:${environment.scope}:${environment.environmentId}`);
-        },
-        fullEnvironmentRefresh: (request) => {
-          events.push(`refresh:${request?.environmentId}`);
-          return { executed: true };
+      ): Promise<void> => {
+        events.push(`${cleanup}:${scope}:${environmentId}`);
+        const attempt = (cleanupAttempts.get(cleanup) ?? 0) + 1;
+        cleanupAttempts.set(cleanup, attempt);
+        if (cleanup === failingCleanup && attempt === 1) {
+          throw new Error(`${cleanup} cleanup failed`);
         }
-      },
-      target
-    );
+      };
 
-    assert.deepEqual(events, [
-      "remove:workspace:env-1",
-      "bindings:workspace:env-1",
-      "presets:workspace:env-1",
-      "watches:workspace:env-1",
-      "pins:workspace:env-1",
-      "invalidate:workspace:env-1",
-      "removed:workspace:env-1",
-      "refresh:env-1"
-    ]);
-    assert.equal(errorMessages.length, 1);
-    assert.match(errorMessages[0], /environment was removed/);
-    assert.match(errorMessages[0], /preset cleanup failed/);
-    assert.match(warningMessages[0], /https:\/\/jenkins\.example\//);
-    assert.doesNotMatch(warningMessages[0], /user|secret/);
-  });
+      const store = {
+        async removeEnvironment(scope: EnvironmentScope, id: string): Promise<boolean> {
+          events.push(`remove:${scope}:${id}`);
+          return true;
+        }
+      } as unknown as JenkinsEnvironmentStore;
+      const presetStore = {
+        async removePresetsForEnvironment(
+          scope: EnvironmentScope,
+          environmentId: string
+        ): Promise<void> {
+          await runCleanup("presets", scope, environmentId);
+        }
+      } as unknown as JenkinsParameterPresetStore;
+      const bindingStore = {
+        async removeBindingsForEnvironment(
+          scope: EnvironmentScope,
+          environmentId: string
+        ): Promise<boolean> {
+          await runCleanup("bindings", scope, environmentId);
+          return true;
+        }
+      } as unknown as JenkinsDiagnosticProfileBindingStore;
+      const watchStore = {
+        async removeWatchesForEnvironment(
+          scope: EnvironmentScope,
+          environmentId: string
+        ): Promise<void> {
+          await runCleanup("watches", scope, environmentId);
+        }
+      } as unknown as JenkinsWatchStore;
+      const pinStore = {
+        async removePinsForEnvironment(
+          scope: EnvironmentScope,
+          environmentId: string
+        ): Promise<void> {
+          await runCleanup("pins", scope, environmentId);
+        }
+      } as unknown as JenkinsPinStore;
+      const clientProvider = {
+        invalidateClient(scope: EnvironmentScope, environmentId: string): void {
+          events.push(`invalidate:${scope}:${environmentId}`);
+        }
+      } as unknown as JenkinsClientProvider;
+
+      const runRemoval = () =>
+        removeEnvironment(
+          store,
+          bindingStore,
+          presetStore,
+          watchStore,
+          pinStore,
+          clientProvider,
+          {
+            onEnvironmentRemoved: (environment) => {
+              events.push(`removed:${environment.scope}:${environment.environmentId}`);
+            },
+            fullEnvironmentRefresh: (request) => {
+              events.push(`refresh:${request?.environmentId}`);
+              return { executed: true };
+            }
+          },
+          target
+        );
+
+      await runRemoval();
+
+      assert.deepEqual(events, [
+        "bindings:workspace:env-1",
+        "presets:workspace:env-1",
+        "watches:workspace:env-1",
+        "pins:workspace:env-1"
+      ]);
+      assert.equal(errorMessages.length, 1);
+      assert.match(errorMessages[0], /environment was not removed/);
+      assert.match(errorMessages[0], new RegExp(`${failingCleanup} cleanup failed`));
+
+      await runRemoval();
+
+      assert.deepEqual(events.slice(4), [
+        "bindings:workspace:env-1",
+        "presets:workspace:env-1",
+        "watches:workspace:env-1",
+        "pins:workspace:env-1",
+        "remove:workspace:env-1",
+        "invalidate:workspace:env-1",
+        "removed:workspace:env-1",
+        "refresh:env-1"
+      ]);
+      assert.equal(errorMessages.length, 1);
+      assert.match(warningMessages[0], /https:\/\/jenkins\.example\//);
+      assert.doesNotMatch(warningMessages[0], /user|secret/);
+    }
+  );
 });

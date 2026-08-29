@@ -2,11 +2,12 @@ import { type JSX, memo } from "react";
 import {
   type CoverageStatusClass,
   coverageStatusClassToVisualTone,
+  resolveCoverageStatusBadgeClass,
   resolveCoverageStatusClass,
   resolveMetricToneClass
 } from "../../../../../shared/TestStatusStyles";
-import { CoverageStatusBadge } from "../../../../../shared/webview/components/CoverageStatusBadge";
 import { MetricsSummarySection } from "../../../../../shared/webview/components/MetricsSummarySection";
+import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { FileIcon } from "../../../../../shared/webview/icons";
 import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/BuildDetailsContracts";
@@ -42,9 +43,9 @@ export function CoverageSection({
         title="Coverage"
         badge={
           overallQualityGateStatusLabel ? (
-            <CoverageStatusBadge
+            <ToneBadge
               label={overallQualityGateStatusLabel}
-              statusClass={overallQualityGateStatusClass}
+              className={resolveCoverageStatusBadgeClass(overallQualityGateStatusClass)}
             />
           ) : undefined
         }
@@ -108,9 +109,9 @@ function renderCoverageFooter(coverageState: BuildDetailsCoverageStateViewModel)
             >
               <div className="font-medium text-foreground">{qualityGate.name}</div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-muted-foreground">
-                <CoverageStatusBadge
+                <ToneBadge
                   label={qualityGate.statusLabel}
-                  statusClass={qualityGate.statusClass}
+                  className={resolveCoverageStatusBadgeClass(qualityGate.statusClass)}
                 />
                 {qualityGate.valueLabel ? <span>Value {qualityGate.valueLabel}</span> : null}
                 {qualityGate.thresholdLabel ? (

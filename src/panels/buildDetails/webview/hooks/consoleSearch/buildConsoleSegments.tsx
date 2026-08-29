@@ -1,6 +1,5 @@
 import * as React from "react";
 import type { BuildDiagnosticConsoleReference } from "../../../shared/BuildDetailsContracts";
-import { advanceRangeIndex, buildRangeIntervals } from "../../lib/consoleRangeUtils";
 import type { ConsoleMatch } from "./consoleSearchTypes";
 
 export function buildConsoleSegments(
@@ -18,27 +17,33 @@ export function buildConsoleSegments(
   }
 
   const boundaries = buildConsoleBoundaries(consoleText.length, validMatches, references);
+  const sortedBoundaries = [...boundaries].sort((left, right) => left - right);
   let matchIndex = 0;
   let referenceIndex = 0;
-  return buildRangeIntervals(boundaries).map(({ start, end }) => {
-    matchIndex = advanceRangeIndex(validMatches, matchIndex, start, (match) => match.end);
-    referenceIndex = advanceRangeIndex(
-      references,
-      referenceIndex,
-      start,
-      (reference) => reference.endOffset
+  const segments: React.ReactNode[] = [];
+  for (let index = 0; index < sortedBoundaries.length - 1; index += 1) {
+    const start = sortedBoundaries[index];
+    const end = sortedBoundaries[index + 1];
+    while (matchIndex < validMatches.length && validMatches[matchIndex].end <= start) {
+      matchIndex += 1;
+    }
+    while (referenceIndex < references.length && references[referenceIndex].endOffset <= start) {
+      referenceIndex += 1;
+    }
+    segments.push(
+      renderConsoleSegment({
+        consoleText,
+        start,
+        end,
+        match: validMatches[matchIndex],
+        matchIndex,
+        activeMatchIndex,
+        reference: references[referenceIndex],
+        onOpenDiagnosticSource
+      })
     );
-    return renderConsoleSegment({
-      consoleText,
-      start,
-      end,
-      match: validMatches[matchIndex],
-      matchIndex,
-      activeMatchIndex,
-      reference: references[referenceIndex],
-      onOpenDiagnosticSource
-    });
-  });
+  }
+  return segments;
 }
 
 function buildConsoleBoundaries(

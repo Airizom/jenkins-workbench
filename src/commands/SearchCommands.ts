@@ -4,8 +4,7 @@ import { formatError } from "../formatters/ErrorFormatters";
 import {
   CancellationError,
   type JenkinsDataService,
-  type JobSearchEntry,
-  type JobSearchOptions
+  type JobSearchEntry
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -137,11 +136,10 @@ async function goToJob(
         return;
       }
       for (const entry of entries) {
-        const key = `${envRef.environmentId}:${entry.url}`;
-        if (seenEntries.has(key)) {
+        if (seenEntries.has(entry.url)) {
           continue;
         }
-        seenEntries.add(key);
+        seenEntries.add(entry.url);
         const statusLabel = formatJobColor(entry.color) ?? "Unknown";
         picks.push({
           label: entry.name,
@@ -152,7 +150,16 @@ async function goToJob(
         });
       }
     };
-    void loadEnvironmentJobs(dataService, envRef, cancellationToken, searchOptions, appendEntries)
+    void (async () => {
+      for await (const batch of dataService.iterateJobsForEnvironment(envRef, {
+        cancellation: cancellationToken,
+        maxResults: MAX_JOB_RESULTS,
+        batchSize: BATCH_SIZE,
+        ...searchOptions
+      })) {
+        appendEntries(batch);
+      }
+    })()
       .catch((error) => {
         if (error instanceof CancellationError || error instanceof vscode.CancellationError) {
           return;
@@ -162,23 +169,6 @@ async function goToJob(
         );
       })
       .finally(onLoadCompleted);
-  }
-}
-
-async function loadEnvironmentJobs(
-  dataService: JenkinsDataService,
-  environment: JenkinsEnvironmentRef,
-  cancellation: vscode.CancellationToken,
-  searchOptions: JobSearchOptions,
-  onBatch: (entries: JobSearchEntry[]) => void
-): Promise<void> {
-  for await (const batch of dataService.iterateJobsForEnvironment(environment, {
-    cancellation,
-    maxResults: MAX_JOB_RESULTS,
-    batchSize: BATCH_SIZE,
-    ...searchOptions
-  })) {
-    onBatch(batch);
   }
 }
 

@@ -22,17 +22,11 @@ export class JenkinsBuildConsoleClient {
   constructor(private readonly context: JenkinsClientContext) {}
 
   async getConsoleText(buildUrl: string, maxChars?: number): Promise<JenkinsConsoleText> {
-    if (maxChars === undefined || maxChars <= 0) {
-      const url = buildActionUrl(buildUrl, "consoleText");
-      const text = await this.context.requestText(url);
-      return { text, truncated: false, bytesRead: Buffer.byteLength(text, "utf8") };
-    }
-
-    const tail = await this.getConsoleTextTail(buildUrl, maxChars);
+    const tail = await this.getConsoleTextTail(buildUrl, maxChars ?? 0);
     return {
       text: tail.text,
       truncated: tail.truncated,
-      bytesRead: Buffer.byteLength(tail.text, "utf8")
+      bytesRead: tail.bytesRead
     };
   }
 
@@ -56,12 +50,13 @@ export class JenkinsBuildConsoleClient {
     if (maxChars <= 0) {
       const url = buildActionUrl(buildUrl, "consoleText");
       const text = await this.context.requestText(url);
+      const textBytes = Buffer.byteLength(text, "utf8");
       return {
         text,
         truncated: false,
-        nextStart: Buffer.byteLength(text, "utf8"),
+        nextStart: textBytes,
         progressiveSupported: false,
-        bytesRead: Buffer.byteLength(text, "utf8")
+        bytesRead: textBytes
       };
     }
 

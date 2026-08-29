@@ -35,7 +35,6 @@ export function buildValidationDiagnostics(
       ];
     }
     setDiagnosticMetadata(diagnostic, {
-      code: finding.code,
       suggestions: finding.suggestions,
       invalidStepToken: finding.invalidStepToken
     });
@@ -70,7 +69,6 @@ function buildDocumentWarningDiagnostic(
   const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
   diagnostic.source = JENKINS_DIAGNOSTIC_SOURCE;
   diagnostic.code = code;
-  setDiagnosticMetadata(diagnostic, { code });
   return diagnostic;
 }
 

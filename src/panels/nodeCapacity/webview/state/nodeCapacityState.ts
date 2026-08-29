@@ -10,18 +10,13 @@ import {
   createLoadingPanelStateHelpers,
   FALLBACK_UPDATED_AT
 } from "../../../shared/webview/state/createPanelStateHelpers";
+import type { NodeCapacityOutgoingMessage } from "../../shared/NodeCapacityPanelMessages";
 
 export type NodeCapacityState = NodeCapacityViewModel & {
   hasLoaded: boolean;
 };
 
-export type NodeCapacityAction =
-  | { type: "setLoading"; value: boolean }
-  | { type: "updateNodeCapacity"; payload: NodeCapacityViewModel }
-  | {
-      type: "updateNodeCapacityNodeExecutors";
-      payload: NodeCapacityNodeExecutorsUpdateMessage["payload"];
-    };
+export type NodeCapacityAction = NodeCapacityOutgoingMessage;
 
 const FALLBACK_STATE: NodeCapacityState = {
   environmentLabel: "Jenkins",

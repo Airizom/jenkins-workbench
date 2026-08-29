@@ -361,23 +361,28 @@
           },
           "parameters": {
             "description": "Optional build parameters passed to Jenkins.",
+            "definitions": {
+              "parameterValue": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array"
+                ],
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              }
+            },
             "anyOf": [
               {
                 "type": "object",
                 "additionalProperties": {
-                  "type": [
-                    "string",
-                    "number",
-                    "boolean",
-                    "array"
-                  ],
-                  "items": {
-                    "type": [
-                      "string",
-                      "number",
-                      "boolean"
-                    ]
-                  }
+                  "$ref": "#/contributes/taskDefinitions/0/properties/parameters/definitions/parameterValue"
                 }
               },
               {
@@ -393,19 +398,7 @@
                       "type": "string"
                     },
                     "value": {
-                      "type": [
-                        "string",
-                        "number",
-                        "boolean",
-                        "array"
-                      ],
-                      "items": {
-                        "type": [
-                          "string",
-                          "number",
-                          "boolean"
-                        ]
-                      }
+                      "$ref": "#/contributes/taskDefinitions/0/properties/parameters/definitions/parameterValue"
                     }
                   },
                   "additionalProperties": false
@@ -606,7 +599,8 @@
                       "enum": [
                         "error",
                         "warning",
-                        "info"
+                        "info",
+                        "information"
                       ]
                     },
                     "pattern": {
@@ -627,6 +621,11 @@
                   },
                   "additionalProperties": false,
                   "definitions": {
+                    "captureGroupIndex": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    },
                     "problemPattern": {
                       "type": "object",
                       "required": [
@@ -645,49 +644,31 @@
                           ]
                         },
                         "file": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "location": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "line": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "column": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "endLine": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "endColumn": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "severity": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "code": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "message": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 100
+                          "$ref": "#/contributes/configuration/properties/jenkinsWorkbench.diagnostics.profiles/additionalProperties/properties/matchers/items/definitions/captureGroupIndex"
                         },
                         "loop": {
                           "type": "boolean"
@@ -1454,8 +1435,10 @@
     "concurrently": "^10.0.4",
     "elkjs": "^0.12.0",
     "fallow": "^3.9.1",
+    "js-yaml": "^4.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "redos-detector": "^6.1.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",

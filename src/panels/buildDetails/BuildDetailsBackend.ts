@@ -1,12 +1,9 @@
+import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type {
-  JenkinsCoverageOverview,
-  JenkinsCoverageRequestOptions,
-  JenkinsDataService,
-  JenkinsModifiedCoverageFile
-} from "../../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsRestartFromStageInfo } from "../../jenkins/types";
-import type { PendingInputActionService } from "../../shared/PendingInputActionService";
+  JenkinsCoverageRuntimeSurface,
+  JenkinsPendingInputActionRuntimeSurface,
+  JenkinsPipelineRestartRuntimeSurface
+} from "../../jenkins/JenkinsDataServiceRuntimeSurfaces";
 import {
   BuildInspectionBackendAdapter,
   type BuildInspectionConsoleBackend,
@@ -20,37 +17,11 @@ export type {
   BuildInspectionTestsBackend as BuildDetailsTestsBackend
 } from "../shared/backend/BuildInspectionBackend";
 
-export interface BuildDetailsCoverageBackend {
-  discoverCoverageActionPath(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: JenkinsCoverageRequestOptions
-  ): Promise<string | undefined>;
-  getCoverageOverview(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: JenkinsCoverageRequestOptions
-  ): Promise<JenkinsCoverageOverview | undefined>;
-  getModifiedCoverageFiles(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    options?: JenkinsCoverageRequestOptions
-  ): Promise<JenkinsModifiedCoverageFile[] | undefined>;
-}
+export type BuildDetailsCoverageBackend = JenkinsCoverageRuntimeSurface;
 
-export type BuildDetailsPendingInputsBackend = PendingInputActionService;
+export type BuildDetailsPendingInputsBackend = JenkinsPendingInputActionRuntimeSurface;
 
-export interface BuildDetailsRestartBackend {
-  getRestartFromStageInfo(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): Promise<JenkinsRestartFromStageInfo>;
-  restartPipelineFromStage(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    stageName: string
-  ): Promise<void>;
-}
+export type BuildDetailsRestartBackend = JenkinsPipelineRestartRuntimeSurface;
 
 export interface BuildDetailsBackend {
   status: BuildInspectionStatusBackend;

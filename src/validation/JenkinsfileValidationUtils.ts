@@ -12,15 +12,8 @@ const INVALID_STEP_RULES: ReadonlyArray<{
     code: "blocked-step"
   },
   {
-    pattern: /No such DSL method\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
-    code: "unknown-dsl-method"
-  },
-  {
-    pattern: /No such step\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
-    code: "unknown-dsl-method"
-  },
-  {
-    pattern: /Unknown step\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
+    pattern:
+      /(?:No such DSL method|No such step|Unknown step)\b(?:\s+['"]?([A-Za-z0-9_-]+)['"]?)?/i,
     code: "unknown-dsl-method"
   },
   { pattern: /found among steps\b/i, code: "unknown-dsl-method" },

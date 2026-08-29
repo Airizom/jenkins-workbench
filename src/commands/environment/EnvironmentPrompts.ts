@@ -145,7 +145,11 @@ export async function promptBrowserSsoLoginUrl(
 
 function resolveDefaultBrowserSsoLoginUrl(environmentUrl: string): string {
   try {
-    return new URL("__sso/login", environmentUrl).toString();
+    const baseUrl = new URL(environmentUrl);
+    if (!baseUrl.pathname.endsWith("/")) {
+      baseUrl.pathname = `${baseUrl.pathname}/`;
+    }
+    return new URL("__sso/login", baseUrl).toString();
   } catch {
     return environmentUrl;
   }

@@ -27,6 +27,16 @@ describe("buildConsoleMatches", () => {
     ]);
   });
 
+  it("handles regex syntax and backreferences through the shared analyzer", () => {
+    const invalid = buildConsoleMatches("ERROR", "[", true);
+    assert.match(invalid.error ?? "", /Invalid regular expression/);
+    assert.deepEqual(invalid.matches, []);
+
+    const backreference = buildConsoleMatches("ERROR ERROR", "(ERROR) \\1", true);
+    assert.equal(backreference.error, undefined);
+    assert.deepEqual(backreference.matches, [{ start: 0, end: 11 }]);
+  });
+
   it("rejects regex shapes that can cause catastrophic backtracking", () => {
     const consoleText = `${"a".repeat(30)}!`;
     const unsafePatterns = ["(a+)+$", "(a|aa)+$", "a*a*a*a*b", "^(a+){10}$", "^(a|aa){30}$"];
@@ -44,6 +54,14 @@ describe("buildConsoleMatches", () => {
     const result = buildConsoleMatches("x".repeat(200001), "x", true);
 
     assert.match(result.error ?? "", /limited to 200,000 console characters/);
+    assert.deepEqual(result.matches, []);
+    assert.equal(result.tooManyMatches, false);
+  });
+
+  it("skips regex search with oversized patterns", () => {
+    const result = buildConsoleMatches("x", "x".repeat(301), true);
+
+    assert.match(result.error ?? "", /limited to 300 pattern characters/);
     assert.deepEqual(result.matches, []);
     assert.equal(result.tooManyMatches, false);
   });

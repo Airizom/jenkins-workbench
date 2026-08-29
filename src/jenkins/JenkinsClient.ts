@@ -211,12 +211,10 @@ export class JenkinsClient {
     return this.buildsApi.getWorkflowRun(buildUrl);
   }
 
-  // fallow-ignore-next-line unused-class-member
   async discoverCoverageActionPath(buildUrl: string): Promise<string | undefined> {
     return this.coverageApi.discoverCoverageActionPath(buildUrl);
   }
 
-  // fallow-ignore-next-line unused-class-member
   async getCoverageOverview(
     buildUrl: string,
     actionPath?: string
@@ -224,7 +222,6 @@ export class JenkinsClient {
     return this.coverageApi.getCoverageOverview(buildUrl, actionPath);
   }
 
-  // fallow-ignore-next-line unused-class-member
   async getModifiedCoverageFiles(
     buildUrl: string,
     actionPath?: string

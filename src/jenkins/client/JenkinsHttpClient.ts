@@ -17,8 +17,13 @@ import {
 } from "../request";
 import type { JenkinsAuthConfig, JenkinsAuthConfigRefresh, JenkinsClientOptions } from "../types";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
-
-const EMPTY_HEADERS: Record<string, string> = {};
+import {
+  buildContentHeaders,
+  buildHeadersWithCrumb,
+  buildRawContentHeaders,
+  getHeaderFlags
+} from "./JenkinsHttpHeaders";
+import { assertTrustedJenkinsRequestUrl, parseJenkinsBaseOrigin } from "./JenkinsRequestUrlPolicy";
 
 export class JenkinsHttpClient implements JenkinsClientContext {
   public readonly baseUrl: string;
@@ -33,8 +38,6 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   private hasBaseHeaders = false;
   private baseHeadersHaveCookie = false;
   private requestOptions!: JenkinsSimpleRequestOptions;
-  private cachedCrumbHeader?: JenkinsCrumbHeader;
-  private cachedCrumbRequestHeaders?: Record<string, string>;
   private ssoLoginUrlText?: string;
   private ssoLoginPath?: string;
   private ssoLoginMatchersCached = false;
@@ -43,7 +46,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   constructor(options: JenkinsClientOptions) {
     this.baseUrl = options.baseUrl.trim();
-    this.baseOrigin = this.parseBaseOrigin(this.baseUrl);
+    this.baseOrigin = parseJenkinsBaseOrigin(this.baseUrl);
     const username = options.username?.trim();
     const token = options.token?.trim();
     this.username = username && username.length > 0 ? username : undefined;
@@ -91,12 +94,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse> {
     return this.requestWithSsoRetry(url, () =>
-      this.requestWithCrumbRetry((crumbHeaders) =>
-        requestBufferWithHeadersInternal(
-          url,
-          this.getRequestOptions(crumbHeaders, options?.maxBytes)
-        )
-      )
+      requestBufferWithHeadersInternal(url, this.getRequestOptions(undefined, options?.maxBytes))
     );
   }
 
@@ -105,15 +103,13 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
     return this.requestWithSsoRetry(url, () =>
-      this.requestWithCrumbRetry((crumbHeaders) =>
-        requestStreamInternal(url, this.getRequestOptions(crumbHeaders, options?.maxBytes))
-      )
+      requestStreamInternal(url, this.getRequestOptions(undefined, options?.maxBytes))
     );
   }
 
   async requestVoidWithCrumb(url: string, body?: string | Uint8Array): Promise<void> {
     await this.requestWithSsoRetry(url, async () => {
-      await this.requestPostWithCrumbInternal(url, body, this.buildContentHeaders(body));
+      await this.requestPostWithCrumbInternal(url, body, buildContentHeaders(body));
     });
   }
 
@@ -122,7 +118,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     body?: string | Uint8Array
   ): Promise<JenkinsPostResponse> {
     return this.requestWithSsoRetry(url, () =>
-      this.requestPostWithCrumbInternal(url, body, this.buildContentHeaders(body))
+      this.requestPostWithCrumbInternal(url, body, buildContentHeaders(body))
     );
   }
 
@@ -132,7 +128,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     headers?: Record<string, string>
   ): Promise<JenkinsPostResponse> {
     return this.requestWithSsoRetry(url, () => {
-      const contentHeaders = this.buildRawContentHeaders(body, headers);
+      const contentHeaders = buildRawContentHeaders(body, headers);
       return this.requestPostWithCrumbInternal(url, body, contentHeaders);
     });
   }
@@ -144,38 +140,9 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options?: { acceptErrorStatuses?: number[] }
   ): Promise<string> {
     return this.requestWithSsoRetry(url, () => {
-      const contentHeaders = this.buildRawContentHeaders(body, headers);
+      const contentHeaders = buildRawContentHeaders(body, headers);
       return this.requestPostTextWithCrumbInternal(url, body, contentHeaders, options);
     });
-  }
-
-  private buildContentHeaders(body: string | Uint8Array | undefined): Record<string, string> {
-    if (body === undefined) {
-      return EMPTY_HEADERS;
-    }
-
-    const contentLength = this.getBodyLength(body).toString();
-    return typeof body === "string"
-      ? {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Content-Length": contentLength
-        }
-      : { "Content-Length": contentLength };
-  }
-
-  private buildRawContentHeaders(
-    body: string | Uint8Array,
-    headers?: Record<string, string>
-  ): Record<string, string> {
-    if (!headers) {
-      return { "Content-Length": this.getBodyLength(body).toString() };
-    }
-
-    const contentHeaders: Record<string, string> = { ...headers };
-    if (!("Content-Length" in contentHeaders)) {
-      contentHeaders["Content-Length"] = this.getBodyLength(body).toString();
-    }
-    return contentHeaders;
   }
 
   private updateAuthHeaders(): void {
@@ -184,7 +151,9 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       token: this.token
     });
     this.authHeader = authHeaders.authHeader;
-    this.updateBaseHeaderFlags(authHeaders.headers);
+    const headerFlags = getHeaderFlags(authHeaders.headers);
+    this.hasBaseHeaders = headerFlags.hasHeaders;
+    this.baseHeadersHaveCookie = headerFlags.hasCookie;
     this.baseHeaders = this.hasBaseHeaders ? authHeaders.headers : undefined;
     this.requestOptions = {
       authHeader: this.authHeader,
@@ -264,7 +233,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     contentHeaders: Record<string, string>
   ): Promise<JenkinsPostResponse> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
+    const headers = buildHeadersWithCrumb(contentHeaders, crumbHeader, this.baseHeadersHaveCookie);
     return this.requestPostWithCrumbRetry(contentHeaders, headers, (requestHeaders) =>
       this.requestVoidWithLocation(url, { method: "POST", headers: requestHeaders, body })
     );
@@ -277,7 +246,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options?: { acceptErrorStatuses?: number[] }
   ): Promise<string> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = this.buildHeadersWithCrumb(contentHeaders, crumbHeader);
+    const headers = buildHeadersWithCrumb(contentHeaders, crumbHeader, this.baseHeadersHaveCookie);
     try {
       return await this.requestPostWithCrumbRetry(contentHeaders, headers, (requestHeaders) =>
         this.requestTextWithOptions(url, { method: "POST", headers: requestHeaders, body })
@@ -306,7 +275,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       return await request(headers);
     } catch (error) {
       return this.retryAfterCrumbError(error, (refreshed) =>
-        request(this.buildHeadersWithCrumb(contentHeaders, refreshed))
+        request(buildHeadersWithCrumb(contentHeaders, refreshed, this.baseHeadersHaveCookie))
       );
     }
   }
@@ -335,112 +304,13 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       return headers;
     }
     const baseHeaders = this.baseHeaders;
-    if (!headers || !this.hasAnyHeader(headers)) {
+    if (!headers || !getHeaderFlags(headers).hasHeaders) {
       return baseHeaders;
     }
     return {
       ...baseHeaders,
       ...headers
     };
-  }
-
-  private buildHeadersWithCrumb(
-    contentHeaders: Record<string, string>,
-    crumbHeader?: { field: string; value: string; cookie?: string }
-  ): Record<string, string> {
-    if (!crumbHeader) {
-      return contentHeaders;
-    }
-
-    const headers = {
-      ...contentHeaders,
-      [crumbHeader.field]: crumbHeader.value
-    };
-
-    if (
-      crumbHeader.cookie &&
-      !this.baseHeadersHaveCookie &&
-      !this.hasCookieHeader(contentHeaders)
-    ) {
-      headers.Cookie = crumbHeader.cookie;
-    }
-
-    return headers;
-  }
-
-  private updateBaseHeaderFlags(headers: Record<string, string> | undefined): void {
-    this.hasBaseHeaders = false;
-    this.baseHeadersHaveCookie = false;
-    if (!headers) {
-      return;
-    }
-
-    for (const key in headers) {
-      if (Object.hasOwn(headers, key)) {
-        this.hasBaseHeaders = true;
-        if (key.toLowerCase() === "cookie") {
-          this.baseHeadersHaveCookie = true;
-          return;
-        }
-      }
-    }
-  }
-
-  private hasAnyHeader(headers: Record<string, string> | undefined): boolean {
-    if (!headers) {
-      return false;
-    }
-    for (const key in headers) {
-      if (Object.hasOwn(headers, key)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private hasCookieHeader(headers: Record<string, string> | undefined): boolean {
-    if (!headers) {
-      return false;
-    }
-    for (const key in headers) {
-      if (Object.hasOwn(headers, key) && key.toLowerCase() === "cookie") {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private getCrumbRequestHeaders(crumbHeader: JenkinsCrumbHeader): Record<string, string> {
-    if (this.cachedCrumbHeader === crumbHeader && this.cachedCrumbRequestHeaders) {
-      return this.cachedCrumbRequestHeaders;
-    }
-
-    const headers = {
-      [crumbHeader.field]: crumbHeader.value
-    };
-    this.cachedCrumbHeader = crumbHeader;
-    this.cachedCrumbRequestHeaders = headers;
-    return headers;
-  }
-
-  private clearCachedCrumbRequestHeaders(): void {
-    this.cachedCrumbHeader = undefined;
-    this.cachedCrumbRequestHeaders = undefined;
-  }
-
-  private async requestWithCrumbRetry<T>(
-    requestFn: (headers?: Record<string, string>) => Promise<T>
-  ): Promise<T> {
-    const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = crumbHeader ? this.getCrumbRequestHeaders(crumbHeader) : undefined;
-
-    try {
-      return await requestFn(headers);
-    } catch (error) {
-      return this.retryAfterCrumbError(error, async (refreshed) =>
-        requestFn(this.getCrumbRequestHeaders(refreshed))
-      );
-    }
   }
 
   private async retryAfterCrumbError<T>(
@@ -450,7 +320,6 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     if (error instanceof JenkinsRequestError) {
       if (error.statusCode === 401 || error.statusCode === 403) {
         this.crumbService.invalidate();
-        this.clearCachedCrumbRequestHeaders();
       }
       if (error.statusCode === 403) {
         const refreshed = await this.crumbService.getCrumbHeader(true);
@@ -463,7 +332,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   }
 
   private async requestWithSsoRetry<T>(url: string, requestFn: () => Promise<T>): Promise<T> {
-    this.assertTrustedRequestUrl(url);
+    assertTrustedJenkinsRequestUrl(url, this.baseOrigin);
     const authConfig = this.currentAuthConfig;
     try {
       return await requestFn();
@@ -472,40 +341,6 @@ export class JenkinsHttpClient implements JenkinsClientContext {
         throw error;
       }
       return requestFn();
-    }
-  }
-
-  private parseBaseOrigin(baseUrl: string): string {
-    let parsed: URL;
-    try {
-      parsed = new URL(baseUrl);
-    } catch {
-      throw new JenkinsRequestError("Jenkins base URL is invalid.");
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new JenkinsRequestError("Jenkins base URL must use HTTP or HTTPS.");
-    }
-    if (parsed.username || parsed.password) {
-      throw new JenkinsRequestError("Jenkins base URL must not contain embedded credentials.");
-    }
-    return parsed.origin;
-  }
-
-  private assertTrustedRequestUrl(url: string): void {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new JenkinsRequestError("Refusing to send Jenkins credentials to an invalid URL.");
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new JenkinsRequestError("Refusing to send Jenkins credentials over this protocol.");
-    }
-    if (parsed.username || parsed.password) {
-      throw new JenkinsRequestError("Refusing a Jenkins request URL with embedded credentials.");
-    }
-    if (parsed.origin !== this.baseOrigin) {
-      throw new JenkinsRequestError("Refusing to send Jenkins credentials to an untrusted origin.");
     }
   }
 
@@ -538,7 +373,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   private async performSsoAuthRefresh(authConfig: JenkinsAuthConfig): Promise<boolean> {
     const refreshed = await this.refreshAuthConfig?.(authConfig);
-    if (!refreshed || refreshed.type !== "sso") {
+    if (refreshed?.type !== "sso") {
       return false;
     }
 
@@ -549,7 +384,6 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     this.currentAuthConfig = refreshed;
     this.updateAuthHeaders();
     this.crumbService.invalidate();
-    this.clearCachedCrumbRequestHeaders();
     return true;
   }
 
@@ -615,9 +449,5 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       responseText.includes(this.ssoLoginUrlText) ||
       (this.ssoLoginPath !== undefined && responseText.includes(this.ssoLoginPath))
     );
-  }
-
-  private getBodyLength(body: string | Uint8Array): number {
-    return typeof body === "string" ? Buffer.byteLength(body) : body.byteLength;
   }
 }

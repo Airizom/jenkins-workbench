@@ -36,21 +36,25 @@ port.on("message", handleMessage);
 function handleMessage(value: unknown): void {
   const requestId = readRequestId(value);
   try {
-    const { id, diagnostics } = processRequest(value);
-    postDiagnostics(id, diagnostics);
+    const { id, diagnostics, lineTruncated } = processRequest(value);
+    postDiagnostics(id, diagnostics, lineTruncated);
   } catch (error) {
     postError(requestId, error);
   }
 }
 
-function processRequest(value: unknown): { id: number; diagnostics: RawBuildDiagnostic[] } {
+function processRequest(value: unknown): {
+  id: number;
+  diagnostics: RawBuildDiagnostic[];
+  lineTruncated: boolean;
+} {
   const request = parseCustomMatcherWorkerRequest(value, maxBatchChars);
   const activeParser = getActiveParser();
   const diagnostics = readDiagnostics(activeParser, request);
   if (request.type === "finish") {
     finished = true;
   }
-  return { id: request.id, diagnostics };
+  return { id: request.id, diagnostics, lineTruncated: activeParser.didTruncateLine };
 }
 
 function getActiveParser(): BuildDiagnosticLogParser {
@@ -87,7 +91,11 @@ function postError(id: number, error: unknown): void {
   port.postMessage(response);
 }
 
-function postDiagnostics(id: number, diagnostics: RawBuildDiagnostic[]): void {
+function postDiagnostics(
+  id: number,
+  diagnostics: RawBuildDiagnostic[],
+  lineTruncated: boolean
+): void {
   if (diagnostics.length > MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH) {
     throw new Error(
       `Custom matchers exceeded ${MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH} diagnostics in one batch.`
@@ -97,7 +105,8 @@ function postDiagnostics(id: number, diagnostics: RawBuildDiagnostic[]): void {
     protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
     id,
     ok: true,
-    diagnostics
+    diagnostics,
+    lineTruncated
   };
   port.postMessage(response);
 }

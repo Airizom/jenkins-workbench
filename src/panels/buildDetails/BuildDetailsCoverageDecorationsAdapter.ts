@@ -9,16 +9,7 @@ interface ApplyCoverageDecorationsOptions {
   decorationsEnabled: boolean;
 }
 
-interface BuildDetailsCoverageDecorationsSurface {
-  dispose(): void;
-  activate(): void;
-  deactivate(): void;
-  apply(options: ApplyCoverageDecorationsOptions): void;
-}
-
-export class BuildDetailsCoverageDecorationsAdapter
-  implements BuildDetailsCoverageDecorationsSurface
-{
+export class BuildDetailsCoverageDecorationsAdapter {
   private readonly ownerId = `build-details:${Math.random().toString(36).slice(2)}`;
   private active = false;
 

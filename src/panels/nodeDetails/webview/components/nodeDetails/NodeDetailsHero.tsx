@@ -1,5 +1,5 @@
 import type * as React from "react";
-import { NodeStatusBadge } from "../../../../shared/webview/components/NodeStatusBadge";
+import { ToneBadge } from "../../../../shared/webview/components/ToneBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import {
@@ -15,7 +15,10 @@ import {
   RefreshIcon,
   ServerIcon
 } from "../../../../shared/webview/icons";
-import { resolveNodeStatusIconClass } from "../../../../shared/webview/lib/statusStyles";
+import {
+  resolveNodeStatusBadgeClass,
+  resolveNodeStatusIconClass
+} from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeExecutorViewModel, NodeStatusClass } from "../../../shared/NodeDetailsContracts";
 import { ExecutorUtilizationSummary } from "./ExecutorUtilizationSummary";
@@ -97,7 +100,10 @@ export function NodeDetailsHero({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <h1 className="text-lg font-semibold leading-tight truncate">{displayName}</h1>
-                <NodeStatusBadge label={statusLabel} statusClass={statusClass} />
+                <ToneBadge
+                  label={statusLabel}
+                  className={resolveNodeStatusBadgeClass(statusClass)}
+                />
                 {isStale ? (
                   <Tooltip>
                     <TooltipTrigger asChild>

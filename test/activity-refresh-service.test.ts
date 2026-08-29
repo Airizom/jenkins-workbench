@@ -79,4 +79,27 @@ describe("ActivityRefreshService", () => {
 
     assert.deepEqual(refreshed, []);
   });
+
+  it("preserves the refresh timestamp when an expanded environment reference is updated", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const refreshed: JenkinsEnvironmentRef[] = [];
+    const service = new ActivityRefreshService({
+      activityOptions: createActivityOptions(10_000),
+      refreshActivity: (environment) => refreshed.push(environment)
+    });
+    const original = createEnvironment("workspace");
+    const updated = { ...original, url: "https://updated.jenkins.example/" };
+
+    service.handleActivityFolderExpanded(original);
+    service.handleStatusTick();
+    vi.advanceTimersByTime(5_000);
+    service.handleActivityFolderExpanded(updated);
+    service.handleStatusTick();
+    assert.deepEqual(refreshed, [original]);
+
+    vi.advanceTimersByTime(5_000);
+    service.handleStatusTick();
+    assert.deepEqual(refreshed, [original, updated]);
+  });
 });

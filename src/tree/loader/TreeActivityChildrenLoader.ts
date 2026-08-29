@@ -8,7 +8,7 @@ import type {
   TreeActivityOptions
 } from "../ActivityTypes";
 import type { ActivityCollector } from "../activity/ActivityCollector";
-import { ActivityJobTreeItem, ActivityPipelineTreeItem } from "../items/TreeJobItems";
+import { JobTreeItem } from "../items/TreeJobItems";
 import { ActivityFolderTreeItem, ActivityGroupTreeItem } from "../items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
 import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
@@ -171,30 +171,19 @@ export class TreeActivityChildrenLoader {
     return entries.map((entry) => {
       const isWatched = watchedJobs.has(entry.url);
       const isPinned = pinnedJobs.has(entry.url);
-      if (entry.kind === "pipeline") {
-        return new ActivityPipelineTreeItem(
-          environment,
-          entry.name,
-          entry.url,
-          ROOT_TREE_JOB_SCOPE,
-          entry.color,
-          isWatched,
-          isPinned,
-          entry.group,
-          entry.pathContext
-        );
-      }
-      return new ActivityJobTreeItem(
+      return new JobTreeItem({
+        presentation: entry.kind === "pipeline" ? "pipeline" : "job",
+        variant: "activity",
         environment,
-        entry.name,
-        entry.url,
-        ROOT_TREE_JOB_SCOPE,
-        entry.color,
+        label: entry.name,
+        jobUrl: entry.url,
+        jobScope: ROOT_TREE_JOB_SCOPE,
+        color: entry.color,
         isWatched,
         isPinned,
-        entry.group,
-        entry.pathContext
-      );
+        group: entry.group,
+        pathContext: entry.pathContext
+      });
     });
   }
 

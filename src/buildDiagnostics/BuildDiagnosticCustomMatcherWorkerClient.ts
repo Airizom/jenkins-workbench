@@ -34,6 +34,7 @@ export interface BuildDiagnosticCustomMatcherWorkerClientOptions {
   batchTimeoutMs?: number;
   batchChars?: number;
   onDisabled?: (reason: CustomMatcherWorkerDisableReason) => void;
+  onLineTruncated?: () => void;
   /** Test seam. Production callers should use the default worker_threads factory. */
   workerFactory?: (data: CustomMatcherWorkerData) => CustomMatcherWorkerHandle;
 }
@@ -54,12 +55,14 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
   private readonly batchTimeoutMs: number;
   private readonly batchChars: number;
   private readonly onDisabled: ((reason: CustomMatcherWorkerDisableReason) => void) | undefined;
+  private readonly onLineTruncated: (() => void) | undefined;
   private readonly pending = new Map<number, PendingRequest>();
   private worker: CustomMatcherWorkerHandle | undefined;
   private state: ClientState;
   private nextRequestId = 1;
   private operationTail: Promise<void> = Promise.resolve();
   private disableReason: CustomMatcherWorkerDisableReason | undefined;
+  private lineTruncationReported = false;
 
   constructor(options: BuildDiagnosticCustomMatcherWorkerClientOptions) {
     this.batchTimeoutMs = boundedInteger(
@@ -75,6 +78,7 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
       MAX_CUSTOM_MATCHER_BATCH_CHARS
     );
     this.onDisabled = options.onDisabled;
+    this.onLineTruncated = options.onLineTruncated;
     if (options.matchers.length === 0) {
       this.state = "inactive";
       return;
@@ -221,6 +225,14 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
       pending.resolve([]);
       this.disable({ kind: "workerError", message: value.error });
       return;
+    }
+    if (value.lineTruncated && !this.lineTruncationReported) {
+      this.lineTruncationReported = true;
+      try {
+        this.onLineTruncated?.();
+      } catch {
+        // Warning reporting must not destabilize custom matching.
+      }
     }
     pending.resolve(value.diagnostics);
   }

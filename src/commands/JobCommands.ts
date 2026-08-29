@@ -26,7 +26,7 @@ import {
   renameJob,
   scanMultibranch
 } from "./job/JobActionHandlers";
-import { submitJobConfigDraft, updateJobConfig, viewJobConfig } from "./job/JobCommandHandlers";
+import { viewJobConfig } from "./job/JobCommandHandlers";
 import type { JobConfigUpdateWorkflow } from "./job/JobConfigUpdateWorkflow";
 import {
   JobNewItemTargetResolver,
@@ -74,10 +74,10 @@ export function registerJobCommands(
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.updateJobConfig",
-      (item?: JobTreeItem | PipelineTreeItem) => updateJobConfig(workflow, item)
+      (item?: JobTreeItem | PipelineTreeItem) => workflow.startUpdate(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.submitJobConfig", (uri?: vscode.Uri) =>
-      submitJobConfigDraft(workflow, refreshHost, uri)
+      workflow.submitDraft(refreshHost, uri)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.newItem", (item?: JobNewItemTreeTarget) =>
       newItem(actionDeps, item)
@@ -114,7 +114,7 @@ export function registerJobCommands(
 
   context.subscriptions.push(
     draftManager.onDidRequestSubmit((uri) => {
-      void submitJobConfigDraft(workflow, refreshHost, uri);
+      void workflow.submitDraft(refreshHost, uri);
     })
   );
 }

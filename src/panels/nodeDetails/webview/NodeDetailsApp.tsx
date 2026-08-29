@@ -19,6 +19,7 @@ import {
   parseDate
 } from "./components/nodeDetails/nodeDetailsUtils";
 import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
+import { loadAdvancedNodeDetailsForTab, type NodeDetailsTab } from "./nodeDetailsTabValues";
 import { getInitialState, nodeDetailsReducer } from "./state/nodeDetailsState";
 
 const { useEffect, useMemo, useReducer, useState } = React;
@@ -103,10 +104,10 @@ export function NodeDetailsApp(): React.JSX.Element {
     });
   };
 
-  const handleDiagnosticsToggle = (value: string) => {
-    if (value === "diagnostics" && !state.advancedLoaded) {
+  const handleDiagnosticsToggle = (value: NodeDetailsTab) => {
+    loadAdvancedNodeDetailsForTab(value, state.advancedLoaded, () => {
       postMessage({ type: "loadAdvancedNodeDetails" });
-    }
+    });
   };
 
   return (

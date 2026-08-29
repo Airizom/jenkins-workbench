@@ -139,7 +139,7 @@ export class CurrentBranchWorkflowService {
   }
 
   async openLastFailedBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
-    const target = this.commandMapper.getLastFailedBuildTarget(state);
+    const target = this.commandMapper.getBuildTarget(state);
     if (!target) {
       this.showActionUnavailableMessage(state, "openLastFailedBuild");
       return;

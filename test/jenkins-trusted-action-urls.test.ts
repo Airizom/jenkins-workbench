@@ -49,6 +49,28 @@ describe("server-provided Jenkins action URLs", () => {
     ]);
   });
 
+  it("rejects unsupported protocols and embedded credentials in pending-input URLs", async () => {
+    const requests: string[] = [];
+    const context = createJenkinsClientContext({
+      requestVoidWithCrumb: async (url) => {
+        requests.push(url);
+      }
+    });
+    const client = new JenkinsPendingInputClient(context);
+
+    await assert.rejects(
+      client.proceedInput(BUILD_URL, "approval", { proceedUrl: "file:///tmp/action" }),
+      /protocol/i
+    );
+    await assert.rejects(
+      client.proceedInput(BUILD_URL, "approval", {
+        proceedUrl: "https://user:secret@jenkins.example.com/job/demo/15/input/approval/proceed"
+      }),
+      /embedded credentials/i
+    );
+    assert.deepEqual(requests, []);
+  });
+
   it("rejects a cross-origin flow-node console URL before requesting console text", async () => {
     const textRequests: string[] = [];
     const context = createJenkinsClientContext({

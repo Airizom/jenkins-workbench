@@ -5,7 +5,10 @@ import {
   BuildDiagnosticCustomMatcherWorkerClient,
   type CustomMatcherWorkerDisableReason
 } from "./BuildDiagnosticCustomMatcherWorkerClient";
-import { BuildDiagnosticLogParser } from "./BuildDiagnosticLogParser";
+import {
+  BuildDiagnosticLogParser,
+  MAX_DIAGNOSTIC_LOG_LINE_CHARS
+} from "./BuildDiagnosticLogParser";
 import type { NormalizedDiagnosticProfile, RawBuildDiagnostic } from "./BuildDiagnosticTypes";
 
 const DEFAULT_CHUNK_BYTES = 256 * 1024;
@@ -21,6 +24,7 @@ export interface BuildDiagnosticScanSnapshot {
   complete: boolean;
   fallbackUsed: boolean;
   customMatcherWarning?: string;
+  lineTruncationWarning?: string;
 }
 
 export interface BuildDiagnosticCustomMatcherRunner {
@@ -45,7 +49,6 @@ export interface BuildDiagnosticScanSessionOptions {
 }
 
 interface ProgressiveDrainState {
-  requestCount: number;
   serverHasMore: boolean;
 }
 
@@ -72,8 +75,10 @@ export class BuildDiagnosticScanSession {
   private complete = false;
   private fallbackUsed = false;
   private progressiveState: "unknown" | "supported" | "unsupported" = "unknown";
+  private progressiveRequestCount = 0;
   private finishApplied = false;
   private customMatcherWarning: string | undefined;
+  private lineTruncationWarning: string | undefined;
   private disposed = false;
   private readonly customMatcherRunnerFactory: BuildDiagnosticScanSessionOptions["customMatcherRunnerFactory"];
 
@@ -134,7 +139,7 @@ export class BuildDiagnosticScanSession {
   }
 
   private async drainProgressive(building: boolean): Promise<void> {
-    const state: ProgressiveDrainState = { requestCount: 0, serverHasMore: true };
+    const state: ProgressiveDrainState = { serverHasMore: true };
     while (this.canDrainProgressive(state)) {
       const shouldStop = await this.drainNextProgressiveChunk(state, building);
       if (shouldStop) {
@@ -155,7 +160,7 @@ export class BuildDiagnosticScanSession {
     return (
       state.serverHasMore &&
       this.bytesRead < this.maxLogBytes &&
-      state.requestCount < MAX_DRAIN_REQUESTS &&
+      this.progressiveRequestCount < MAX_DRAIN_REQUESTS &&
       !this.disposed
     );
   }
@@ -166,6 +171,7 @@ export class BuildDiagnosticScanSession {
   ): Promise<boolean> {
     const remaining = this.maxLogBytes - this.bytesRead;
     const previousOffset = this.nextOffset;
+    this.progressiveRequestCount += 1;
     const result = await this.dataService.getConsoleTextProgressive(
       this.environment,
       this.buildUrl,
@@ -175,7 +181,6 @@ export class BuildDiagnosticScanSession {
     if (this.disposed) {
       return true;
     }
-    state.requestCount += 1;
     const actualBytes = Math.max(0, Math.floor(result.bytesRead));
     await this.acceptProgressiveText(result.text, actualBytes);
     if (this.disposed) {
@@ -205,7 +210,10 @@ export class BuildDiagnosticScanSession {
   }
 
   private finishProgressiveDrain(serverHasMore: boolean, building: boolean): void {
-    if (this.bytesRead >= this.maxLogBytes && (serverHasMore || building)) {
+    if (
+      (this.bytesRead >= this.maxLogBytes || this.progressiveRequestCount >= MAX_DRAIN_REQUESTS) &&
+      (serverHasMore || building)
+    ) {
       this.truncated = true;
     }
     if ((!building && !serverHasMore) || this.truncated) {
@@ -242,10 +250,11 @@ export class BuildDiagnosticScanSession {
   }
 
   private async acceptChunk(text: string): Promise<void> {
-    const [builtIns, custom] = await Promise.all([
-      Promise.resolve(this.parser.acceptChunk(text)),
-      this.customMatcherRunner.acceptChunk(text)
-    ]);
+    const builtIns = this.parser.acceptChunk(text);
+    if (this.parser.didTruncateLine) {
+      this.recordLineTruncation();
+    }
+    const custom = await this.customMatcherRunner.acceptChunk(text);
     this.retainDiagnostics(builtIns);
     this.retainDiagnostics(custom);
   }
@@ -255,10 +264,11 @@ export class BuildDiagnosticScanSession {
       return;
     }
     this.finishApplied = true;
-    const [builtIns, custom] = await Promise.all([
-      Promise.resolve(this.parser.finish()),
-      this.customMatcherRunner.finish()
-    ]);
+    const builtIns = this.parser.finish();
+    if (this.parser.didTruncateLine) {
+      this.recordLineTruncation();
+    }
+    const custom = await this.customMatcherRunner.finish();
     this.retainDiagnostics(builtIns);
     this.retainDiagnostics(custom);
   }
@@ -312,8 +322,13 @@ export class BuildDiagnosticScanSession {
     }
     return new BuildDiagnosticCustomMatcherWorkerClient({
       matchers: patternMatchers,
-      onDisabled
+      onDisabled,
+      onLineTruncated: () => this.recordLineTruncation()
     });
+  }
+
+  private recordLineTruncation(): void {
+    this.lineTruncationWarning = `Console lines longer than ${MAX_DIAGNOSTIC_LOG_LINE_CHARS} characters were skipped during diagnostic parsing.`;
   }
 
   private snapshot(): BuildDiagnosticScanSnapshot {
@@ -329,7 +344,8 @@ export class BuildDiagnosticScanSession {
       truncated: this.truncated,
       complete: this.complete,
       fallbackUsed: this.fallbackUsed,
-      customMatcherWarning: this.customMatcherWarning
+      customMatcherWarning: this.customMatcherWarning,
+      lineTruncationWarning: this.lineTruncationWarning
     };
   }
 }

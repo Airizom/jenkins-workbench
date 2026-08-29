@@ -84,14 +84,7 @@ export async function choosePreset(
       continue;
     }
 
-    return {
-      preset,
-      presetSummary: {
-        id: preset.id,
-        name: preset.name,
-        updatedAt: preset.updatedAt
-      }
-    };
+    return { preset };
   }
 }
 

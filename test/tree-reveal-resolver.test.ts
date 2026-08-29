@@ -69,7 +69,13 @@ describe("JenkinsTreeRevealResolver", () => {
       url: environment.url
     });
     const jobs = new JobsFolderTreeItem(environment);
-    const job = new JobTreeItem(environment, entry.name, entry.url);
+    const job = new JobTreeItem({
+      presentation: "job",
+      variant: "default",
+      environment,
+      label: entry.name,
+      jobUrl: entry.url
+    });
     const loading = new PlaceholderTreeItem("Loading jobs", undefined, "loading");
     let jobsLoaded = false;
     let jobsReadCount = 0;

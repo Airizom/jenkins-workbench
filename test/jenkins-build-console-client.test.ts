@@ -5,6 +5,28 @@ import { JenkinsRequestError } from "../src/jenkins/errors";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
 describe("JenkinsBuildConsoleClient", () => {
+  it.each([undefined, 0, -1])(
+    "gets the complete console text once for limit %s",
+    async (maxChars) => {
+      const requestText = vi.fn(async () => "é😀");
+      const requestHeaders = vi.fn(async () => ({}));
+      const client = new JenkinsBuildConsoleClient(
+        createJenkinsClientContext({ requestHeaders, requestText })
+      );
+
+      const result = await client.getConsoleText(
+        "https://jenkins.example.com/job/test/1/",
+        maxChars
+      );
+
+      assert.deepEqual(result, { text: "é😀", truncated: false, bytesRead: 6 });
+      assert.deepEqual(requestText.mock.calls, [
+        ["https://jenkins.example.com/job/test/1/consoleText"]
+      ]);
+      assert.equal(requestHeaders.mock.calls.length, 0);
+    }
+  );
+
   it.each([404, 405])("falls back when progressive HEAD returns %s", async (statusCode) => {
     const requestText = vi.fn(async () => "complete console text");
     const client = new JenkinsBuildConsoleClient(

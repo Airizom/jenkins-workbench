@@ -2,11 +2,10 @@ export {
   ArtifactTreeItem,
   BuildTreeItem
 } from "./items/TreeBuildItems";
-
+export type { PipelineTreeItem } from "./items/TreeJobItems";
 export {
   JenkinsFolderTreeItem,
   JobTreeItem,
-  PipelineTreeItem,
   StalePinnedJobTreeItem
 } from "./items/TreeJobItems";
 export { NodeTreeItem } from "./items/TreeNodeItems";

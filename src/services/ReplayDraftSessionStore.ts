@@ -40,9 +40,9 @@ export class ReplayDraftSessionStore {
   constructor(private readonly filesystem: ReplayDraftFilesystem) {}
 
   dispose(): void {
-    this.sessions.clear();
-    this.sessionsByBuildKey.clear();
-    this.drafts.clear();
+    for (const sessionId of Array.from(this.sessions.keys())) {
+      this.discardSession(sessionId);
+    }
   }
 
   hasDraft(uri: vscode.Uri): boolean {
@@ -75,25 +75,39 @@ export class ReplayDraftSessionStore {
     const sessionId = `replay-${Date.now()}-${this.nextSessionId++}`;
     const buildKey = buildReplaySessionKey(environment, buildUrl);
     const usedPaths = new Set<string>();
+    const scripts: ReplayDraftScript[] = [];
 
-    const mainScript = this.createScriptDraft(
-      sessionId,
-      "Jenkinsfile",
-      "mainScript",
-      definition.mainScript,
-      true,
-      usedPaths
-    );
-    const loadedScripts = definition.loadedScripts.map((script) =>
-      this.createScriptDraft(
-        sessionId,
-        script.displayName,
-        script.postField,
-        script.script,
-        false,
-        usedPaths
-      )
-    );
+    try {
+      scripts.push(
+        this.createScriptDraft(
+          sessionId,
+          "Jenkinsfile",
+          "mainScript",
+          definition.mainScript,
+          true,
+          usedPaths
+        )
+      );
+      for (const script of definition.loadedScripts) {
+        scripts.push(
+          this.createScriptDraft(
+            sessionId,
+            script.displayName,
+            script.postField,
+            script.script,
+            false,
+            usedPaths
+          )
+        );
+      }
+    } catch (error) {
+      for (const script of scripts) {
+        if (this.filesystem.hasDraft(script.uri)) {
+          this.filesystem.removeDraft(script.uri);
+        }
+      }
+      throw error;
+    }
 
     const session: ReplayDraftSession = {
       sessionId,
@@ -101,7 +115,7 @@ export class ReplayDraftSessionStore {
       environment,
       buildUrl,
       label,
-      scripts: [mainScript, ...loadedScripts]
+      scripts
     };
 
     this.sessions.set(sessionId, session);

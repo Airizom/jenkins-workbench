@@ -8,13 +8,14 @@ interface CacheEntry<T> {
 
 interface PendingLoad {
   isValid: boolean;
+  promise?: Promise<unknown>;
 }
 
 const DEFAULT_MAX_ENTRIES = 1000;
 
 export class JenkinsDataCache {
   private readonly cache = new Map<string, CacheEntry<unknown>>();
-  private readonly pendingLoads = new Map<string, Set<PendingLoad>>();
+  private readonly pendingLoads = new Map<string, PendingLoad>();
   private readonly maxEntries: number;
 
   constructor(
@@ -73,22 +74,32 @@ export class JenkinsDataCache {
     return Boolean(this.getEntry(key));
   }
 
-  async getOrLoad<T>(key: string, loader: () => Promise<T>, ttlMs?: number): Promise<T> {
+  getOrLoad<T>(key: string, loader: () => Promise<T>, ttlMs?: number): Promise<T> {
     const entry = this.getEntry<T>(key);
     if (entry) {
-      return entry.value;
+      return Promise.resolve(entry.value);
     }
 
-    const pendingLoad = this.registerPendingLoad(key);
-    try {
+    const existingLoad = this.pendingLoads.get(key)?.promise;
+    if (existingLoad) {
+      return existingLoad as Promise<T>;
+    }
+
+    const pendingLoad: PendingLoad = { isValid: true };
+    const promise = (async () => {
       const result = await loader();
       if (pendingLoad.isValid) {
         this.setEntry(key, result, ttlMs);
       }
       return result;
-    } finally {
-      this.unregisterPendingLoad(key, pendingLoad);
-    }
+    })();
+    pendingLoad.promise = promise;
+    this.pendingLoads.set(key, pendingLoad);
+    void promise.then(
+      () => this.unregisterPendingLoad(key, pendingLoad),
+      () => this.unregisterPendingLoad(key, pendingLoad)
+    );
+    return promise;
   }
 
   buildKey(
@@ -124,43 +135,28 @@ export class JenkinsDataCache {
     return resolvedTtl;
   }
 
-  private registerPendingLoad(key: string): PendingLoad {
-    const pendingLoad = { isValid: true };
-    const loadsForKey = this.pendingLoads.get(key) ?? new Set<PendingLoad>();
-    loadsForKey.add(pendingLoad);
-    this.pendingLoads.set(key, loadsForKey);
-    return pendingLoad;
-  }
-
   private unregisterPendingLoad(key: string, pendingLoad: PendingLoad): void {
-    const loadsForKey = this.pendingLoads.get(key);
-    if (!loadsForKey) {
-      return;
-    }
-    loadsForKey.delete(pendingLoad);
-    if (loadsForKey.size === 0) {
+    if (this.pendingLoads.get(key) === pendingLoad) {
       this.pendingLoads.delete(key);
     }
   }
 
   private invalidatePendingLoad(key: string): void {
-    const loadsForKey = this.pendingLoads.get(key);
-    if (!loadsForKey) {
+    const pendingLoad = this.pendingLoads.get(key);
+    if (!pendingLoad) {
       return;
     }
-    for (const pendingLoad of loadsForKey) {
-      pendingLoad.isValid = false;
-    }
+    pendingLoad.isValid = false;
+    this.pendingLoads.delete(key);
   }
 
   private invalidatePendingLoads(prefix?: string): void {
-    for (const [key, loadsForKey] of this.pendingLoads) {
+    for (const [key, pendingLoad] of this.pendingLoads) {
       if (prefix && !key.startsWith(prefix)) {
         continue;
       }
-      for (const pendingLoad of loadsForKey) {
-        pendingLoad.isValid = false;
-      }
+      pendingLoad.isValid = false;
+      this.pendingLoads.delete(key);
     }
   }
 

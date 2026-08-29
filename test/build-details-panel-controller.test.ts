@@ -1,6 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import { BuildDetailsDiagnosticConsoleSync } from "../src/panels/buildDetails/BuildDetailsDiagnosticConsoleSync";
 import { BuildDetailsPanelController } from "../src/panels/buildDetails/BuildDetailsPanelController";
+
+const environment = {
+  environmentId: "environment",
+  scope: "workspace",
+  url: "https://jenkins.example/"
+} as const;
+const buildUrl = "https://jenkins.example/job/example/1/";
+
+function createDiagnosticConsoleSync(
+  getConsoleTextProgressive: (...args: unknown[]) => Promise<{ text: string }>,
+  changed: () => void,
+  initialText = ""
+): BuildDetailsDiagnosticConsoleSync {
+  const sync = new BuildDetailsDiagnosticConsoleSync({
+    maxConsoleChars: 100_000,
+    getBackend: () => ({ getConsoleTextProgressive }) as never,
+    getEnvironment: () => environment,
+    getBuildUrl: () => buildUrl,
+    getLoadToken: () => 3,
+    isLoadTokenCurrent: (token) => token === 3,
+    onTextChanged: changed
+  });
+  sync.setText(initialText);
+  return sync;
+}
 
 describe("BuildDetailsPanelController", () => {
   it("retries build details through a full load", async () => {
@@ -27,106 +53,41 @@ describe("BuildDetailsPanelController", () => {
   it("refreshes the exact raw console byte window used for HTML diagnostic offsets", async () => {
     const changed = vi.fn();
     const getConsoleTextProgressive = vi.fn(async () => ({ text: "new HTML-backed text" }));
-    const prototype = BuildDetailsPanelController.prototype;
-    const controller = Object.assign(Object.create(prototype), {
-      backend: { console: { getConsoleTextProgressive } },
-      state: {
-        environment: { environmentId: "environment", scope: "workspace" },
-        currentBuildUrl: "https://jenkins.example/job/example/1/"
-      },
-      loadTokenTracker: { current: 3, isCurrent: (token: number) => token === 3 },
-      diagnosticConsoleText: "old text",
-      diagnosticConsoleSyncGeneration: 0,
-      diagnosticConsoleSyncQueue: Promise.resolve(),
-      diagnosticConsoleTextSynchronized: true,
-      onDiagnosticConsoleTextChanged: changed
-    }) as BuildDetailsPanelController;
-    const syncDiagnosticConsoleText = Reflect.get(prototype, "syncDiagnosticConsoleText") as (
-      this: BuildDetailsPanelController,
-      textRange: { start: number; end: number }
-    ) => Promise<void>;
+    const sync = createDiagnosticConsoleSync(getConsoleTextProgressive, changed, "old text");
 
-    await syncDiagnosticConsoleText.call(controller, { start: 7, end: 29 });
+    await sync.sync({ start: 7, end: 29 });
 
-    assert.equal(controller.getDiagnosticConsoleText(), "new HTML-backed text");
-    assert.deepEqual(getConsoleTextProgressive.mock.calls, [
-      [
-        { environmentId: "environment", scope: "workspace" },
-        "https://jenkins.example/job/example/1/",
-        7,
-        22
-      ]
-    ]);
+    assert.equal(sync.getText(), "new HTML-backed text");
+    assert.deepEqual(getConsoleTextProgressive.mock.calls, [[environment, buildUrl, 7, 22]]);
     assert.equal(changed.mock.calls.length, 1);
   });
 
   it("fetches and appends only the new raw text bytes for HTML append updates", async () => {
     const changed = vi.fn();
     const getConsoleTextProgressive = vi.fn(async () => ({ text: "tail" }));
-    const prototype = BuildDetailsPanelController.prototype;
-    const controller = Object.assign(Object.create(prototype), {
-      backend: { console: { getConsoleTextProgressive } },
-      state: {
-        environment: { environmentId: "environment", scope: "workspace" },
-        currentBuildUrl: "https://jenkins.example/job/example/1/"
-      },
-      loadTokenTracker: { current: 3, isCurrent: (token: number) => token === 3 },
-      diagnosticConsoleText: "seed",
-      diagnosticConsoleSyncGeneration: 0,
-      diagnosticConsoleSyncQueue: Promise.resolve(),
-      diagnosticConsoleTextSynchronized: true,
-      onDiagnosticConsoleTextChanged: changed
-    }) as BuildDetailsPanelController;
-    const syncDiagnosticConsoleText = Reflect.get(prototype, "syncDiagnosticConsoleText") as (
-      this: BuildDetailsPanelController,
-      textRange: { start: number; end: number },
-      appendedTextRange?: { start: number; end: number }
-    ) => Promise<void>;
+    const sync = createDiagnosticConsoleSync(getConsoleTextProgressive, changed, "seed");
 
-    await syncDiagnosticConsoleText.call(controller, { start: 0, end: 8 }, { start: 4, end: 8 });
+    await sync.sync({ start: 0, end: 8 }, { start: 4, end: 8 });
 
-    assert.equal(controller.getDiagnosticConsoleText(), "seedtail");
-    assert.deepEqual(getConsoleTextProgressive.mock.calls, [
-      [
-        { environmentId: "environment", scope: "workspace" },
-        "https://jenkins.example/job/example/1/",
-        4,
-        4
-      ]
-    ]);
+    assert.equal(sync.getText(), "seedtail");
+    assert.deepEqual(getConsoleTextProgressive.mock.calls, [[environment, buildUrl, 4, 4]]);
     assert.equal(changed.mock.calls.length, 1);
   });
 
   it("clears diagnostic console offsets when current HTML text synchronization fails", async () => {
     const changed = vi.fn();
-    const prototype = BuildDetailsPanelController.prototype;
-    const controller = Object.assign(Object.create(prototype), {
-      backend: {
-        console: {
-          getConsoleTextProgressive: async () => {
-            throw new Error("console text unavailable");
-          }
-        }
-      },
-      state: {
-        environment: { environmentId: "environment", scope: "workspace" },
-        currentBuildUrl: "https://jenkins.example/job/example/1/"
-      },
-      loadTokenTracker: { current: 3, isCurrent: (token: number) => token === 3 },
-      diagnosticConsoleText: "stale HTML-backed text",
-      diagnosticConsoleSyncGeneration: 0,
-      diagnosticConsoleSyncQueue: Promise.resolve(),
-      diagnosticConsoleTextSynchronized: true,
-      onDiagnosticConsoleTextChanged: changed
-    }) as BuildDetailsPanelController;
-    const syncDiagnosticConsoleText = Reflect.get(prototype, "syncDiagnosticConsoleText") as (
-      this: BuildDetailsPanelController,
-      textRange: { start: number; end: number }
-    ) => Promise<void>;
+    const getConsoleTextProgressive = async (): Promise<{ text: string }> => {
+      throw new Error("console text unavailable");
+    };
+    const sync = createDiagnosticConsoleSync(
+      getConsoleTextProgressive,
+      changed,
+      "stale HTML-backed text"
+    );
 
-    await syncDiagnosticConsoleText.call(controller, { start: 20, end: 40 });
+    await sync.sync({ start: 20, end: 40 });
 
-    assert.equal(controller.getDiagnosticConsoleText(), "");
+    assert.equal(sync.getText(), "");
     assert.equal(changed.mock.calls.length, 1);
   });
 });

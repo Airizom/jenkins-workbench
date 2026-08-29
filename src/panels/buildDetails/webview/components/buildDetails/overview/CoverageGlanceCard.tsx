@@ -1,5 +1,6 @@
 import type * as React from "react";
-import { CoverageStatusBadge } from "../../../../../shared/webview/components/CoverageStatusBadge";
+import { resolveCoverageStatusBadgeClass } from "../../../../../shared/TestStatusStyles";
+import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
@@ -31,9 +32,9 @@ export function CoverageGlanceCard({
           <CardTitle>Coverage</CardTitle>
         </div>
         {coverageState.overallQualityGateStatusLabel ? (
-          <CoverageStatusBadge
+          <ToneBadge
             label={coverageState.overallQualityGateStatusLabel}
-            statusClass={coverageState.overallQualityGateStatusClass}
+            className={resolveCoverageStatusBadgeClass(coverageState.overallQualityGateStatusClass)}
           />
         ) : null}
       </CardHeader>

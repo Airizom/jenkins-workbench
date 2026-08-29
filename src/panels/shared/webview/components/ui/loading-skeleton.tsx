@@ -7,53 +7,63 @@ import { Skeleton } from "./skeleton";
 export interface LoadingSkeletonProps extends HTMLAttributes<HTMLDivElement> {
   variant?: "build" | "node";
 }
-export function LoadingSkeleton({ className, variant = "build", ...props }: LoadingSkeletonProps) {
+export const LoadingSkeleton = React.memo(function LoadingSkeleton({
+  className,
+  variant = "build",
+  ...props
+}: LoadingSkeletonProps) {
   if (variant === "node") {
     return <NodeLoadingSkeleton className={className} {...props} />;
   }
   return <BuildLoadingSkeleton className={className} {...props} />;
-}
+});
+
+const BUILD_SKELETON_CONTENT = (
+  <>
+    <PanelLoadingHeader
+      leading={<Skeleton className="h-4 w-4 rounded-sm" />}
+      title={<Skeleton className="h-4 w-44 max-w-[48vw]" />}
+      badge={<Skeleton className="h-4 w-16 rounded-full" />}
+      actions={
+        <>
+          <div className="hidden sm:flex items-center gap-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+          <Skeleton className="h-7 w-18 rounded" />
+        </>
+      }
+      mobileMeta={
+        <>
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 w-20" />
+        </>
+      }
+    />
+
+    <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
+      <div className="border-b border-border">
+        <div className="flex w-full flex-nowrap items-center gap-1 py-1">
+          <Skeleton className="h-6 w-16" />
+          <Skeleton className="h-6 w-18" />
+          <Skeleton className="h-6 w-16" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <BuildSkeletonConsoleCard />
+        <BuildSkeletonSummaryCard />
+      </div>
+    </main>
+  </>
+);
 
 function BuildLoadingSkeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <PanelLoadingShell className={className} {...props}>
-      <PanelLoadingHeader
-        leading={<Skeleton className="h-4 w-4 rounded-sm" />}
-        title={<Skeleton className="h-4 w-44 max-w-[48vw]" />}
-        badge={<Skeleton className="h-4 w-16 rounded-full" />}
-        actions={
-          <>
-            <div className="hidden sm:flex items-center gap-2">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-            <Skeleton className="h-7 w-18 rounded" />
-          </>
-        }
-        mobileMeta={
-          <>
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-3 w-20" />
-          </>
-        }
-      />
-
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
-        <div className="border-b border-border">
-          <div className="flex w-full flex-nowrap items-center gap-1 py-1">
-            <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-6 w-18" />
-            <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-6 w-20" />
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <BuildSkeletonConsoleCard />
-          <BuildSkeletonSummaryCard />
-        </div>
-      </main>
+      {BUILD_SKELETON_CONTENT}
     </PanelLoadingShell>
   );
 }
@@ -111,69 +121,75 @@ function BuildSummaryMetric() {
   );
 }
 
+const NODE_SKELETON_CONTENT = (
+  <>
+    <PanelLoadingHeader
+      leading={<Skeleton className="h-7 w-7 rounded" />}
+      title={
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-40 max-w-[44vw]" />
+            <Skeleton className="h-4 w-14 rounded-full" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
+      }
+      actions={
+        <>
+          <Skeleton className="h-7 w-7 rounded" />
+          <Skeleton className="h-7 w-24 rounded" />
+          <Skeleton className="h-7 w-18 rounded" />
+        </>
+      }
+    />
+
+    <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
+      <div className="border-b border-border">
+        <div className="flex w-full flex-nowrap items-center gap-1 py-1">
+          <Skeleton className="h-6 w-18" />
+          <Skeleton className="h-6 w-18" />
+          <Skeleton className="h-6 w-14" />
+          <Skeleton className="h-6 w-18" />
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <NodeOverviewMetric />
+          <NodeOverviewMetric />
+          <NodeOverviewMetric />
+          <NodeOverviewMetric />
+          <NodeOverviewMetric />
+          <NodeOverviewMetric />
+        </div>
+
+        <div className="rounded border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted-soft">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-4 rounded-sm" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-6 w-16 rounded" />
+          </div>
+          <div className="p-3 space-y-2">
+            <NodeExecutorRow />
+            <NodeExecutorRow />
+            <NodeExecutorRow />
+          </div>
+        </div>
+      </div>
+    </main>
+  </>
+);
+
 function NodeLoadingSkeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <PanelLoadingShell className={className} {...props}>
-      <PanelLoadingHeader
-        leading={<Skeleton className="h-7 w-7 rounded" />}
-        title={
-          <div className="min-w-0 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-40 max-w-[44vw]" />
-              <Skeleton className="h-4 w-14 rounded-full" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          </div>
-        }
-        actions={
-          <>
-            <Skeleton className="h-7 w-7 rounded" />
-            <Skeleton className="h-7 w-24 rounded" />
-            <Skeleton className="h-7 w-18 rounded" />
-          </>
-        }
-      />
-
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3">
-        <div className="border-b border-border">
-          <div className="flex w-full flex-nowrap items-center gap-1 py-1">
-            <Skeleton className="h-6 w-18" />
-            <Skeleton className="h-6 w-18" />
-            <Skeleton className="h-6 w-14" />
-            <Skeleton className="h-6 w-18" />
-          </div>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <NodeOverviewMetric />
-            <NodeOverviewMetric />
-            <NodeOverviewMetric />
-            <NodeOverviewMetric />
-            <NodeOverviewMetric />
-            <NodeOverviewMetric />
-          </div>
-
-          <div className="rounded border border-border bg-card overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted-soft">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-4 w-4 rounded-sm" />
-                <Skeleton className="h-3 w-20" />
-              </div>
-              <Skeleton className="h-6 w-16 rounded" />
-            </div>
-            <div className="p-3 space-y-2">
-              <NodeExecutorRow />
-              <NodeExecutorRow />
-              <NodeExecutorRow />
-            </div>
-          </div>
-        </div>
-      </main>
+      {NODE_SKELETON_CONTENT}
     </PanelLoadingShell>
   );
 }

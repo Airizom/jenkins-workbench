@@ -20,9 +20,7 @@ export interface ActivityCollectorOptions {
 
 interface ActivityScanState {
   groups: ActivityGroups;
-  pendingInputCandidates: JobSearchEntry[];
   collectionLimit: number;
-  pendingInputCandidateLimit: number;
   runningCollectionLimit: number;
   stop: boolean;
 }
@@ -67,21 +65,17 @@ export class ActivityCollector {
       }
     }
 
+    const runningEntries = scan.groups.get("running") ?? [];
     const awaitingInputJobUrls = await this.awaitingInputEnricher.findAwaitingInputJobUrls(
       environment,
-      scan.pendingInputCandidates,
+      runningEntries.slice(0, collectionOptions.pendingInputCandidateLimit),
       {
         buildListFetchOptions: options.buildListFetchOptions,
         buildLookupLimit: collectionOptions.pendingInputBuildLookupLimit,
         lookupConcurrency: collectionOptions.pendingInputLookupConcurrency
       }
     );
-    promoteAwaitingInputJobs(
-      scan.groups,
-      scan.groups.get("running") ?? [],
-      awaitingInputJobUrls,
-      collectionLimit
-    );
+    promoteAwaitingInputJobs(scan.groups, runningEntries, awaitingInputJobUrls, collectionLimit);
 
     return buildActivityViewModel(scan.groups, displayLimit);
   }
@@ -93,9 +87,7 @@ function createActivityScanState(
 ): ActivityScanState {
   return {
     groups: createActivityGroups(),
-    pendingInputCandidates: [],
     collectionLimit,
-    pendingInputCandidateLimit,
     // Retain every enrichment candidate and enough entries to refill Running after promotion.
     runningCollectionLimit: Math.max(
       pendingInputCandidateLimit,
@@ -128,13 +120,6 @@ function collectEntry(
     return;
   }
 
-  if (
-    classification.group === "running" &&
-    scan.pendingInputCandidates.length < scan.pendingInputCandidateLimit
-  ) {
-    scan.pendingInputCandidates.push(entry);
-  }
-
   const groupItems = scan.groups.get(classification.group);
   const groupCollectionLimit =
     classification.group === "running" ? scan.runningCollectionLimit : scan.collectionLimit;
@@ -149,7 +134,6 @@ function collectEntry(
 
 function hasCollectedEnough(scan: ActivityScanState): boolean {
   return (
-    scan.pendingInputCandidates.length >= scan.pendingInputCandidateLimit &&
     isGroupFull(scan, "failing", scan.collectionLimit) &&
     isGroupFull(scan, "unstable", scan.collectionLimit) &&
     isGroupFull(scan, "running", scan.runningCollectionLimit)

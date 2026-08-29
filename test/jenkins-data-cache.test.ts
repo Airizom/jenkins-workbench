@@ -3,6 +3,26 @@ import { describe, it } from "vitest";
 import { JenkinsDataCache } from "../src/jenkins/data/JenkinsDataCache";
 
 describe("JenkinsDataCache", () => {
+  it("shares a loader across concurrent misses for the same key", async () => {
+    const cache = new JenkinsDataCache();
+    let loaderCalls = 0;
+    let resolveLoader!: (value: string) => void;
+    const loaderResult = new Promise<string>((resolve) => {
+      resolveLoader = resolve;
+    });
+    const loader = (): Promise<string> => {
+      loaderCalls += 1;
+      return loaderResult;
+    };
+
+    const first = cache.getOrLoad("key", loader);
+    const second = cache.getOrLoad("key", loader);
+    resolveLoader("loaded value");
+
+    assert.equal(loaderCalls, 1);
+    assert.deepEqual(await Promise.all([first, second]), ["loaded value", "loaded value"]);
+  });
+
   it("preserves a newer cache value when a pending loader rejects", async () => {
     const cache = new JenkinsDataCache();
     let rejectLoader!: (error: Error) => void;

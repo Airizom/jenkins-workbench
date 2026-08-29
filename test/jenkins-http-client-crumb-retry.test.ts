@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { PassThrough } from "node:stream";
 import { describe, it, vi } from "vitest";
 import { JenkinsRequestError } from "../src/jenkins/errors";
+import type { JenkinsSimpleRequestOptions } from "../src/jenkins/request";
 
 const BASE_URL = "https://jenkins.example.com/";
 
@@ -13,8 +15,19 @@ interface TextPostAttempt {
 let crumbFetches = 0;
 let postAttempts: TextPostAttempt[] = [];
 let postBehavior: (attempt: TextPostAttempt) => Promise<string> = async () => "";
+const bufferRequest = vi.fn(async (_url: string, _options?: JenkinsSimpleRequestOptions) => ({
+  data: new Uint8Array(),
+  headers: {}
+}));
+const streamRequest = vi.fn(async (_url: string, _options?: JenkinsSimpleRequestOptions) => ({
+  stream: new PassThrough(),
+  headers: {},
+  abort: () => undefined
+}));
 
 const requestMock = {
+  requestBufferWithHeaders: bufferRequest,
+  requestStream: streamRequest,
   requestTextWithHeaders: async () => {
     crumbFetches += 1;
     return {
@@ -39,6 +52,34 @@ vi.doMock("../src/jenkins/request", () => requestMock);
 const { JenkinsHttpClient } = await import("../src/jenkins/client/JenkinsHttpClient");
 
 describe("JenkinsHttpClient crumb retry", () => {
+  it("does not acquire crumbs for authenticated buffer and stream reads", async () => {
+    resetHarness();
+    const client = new JenkinsHttpClient({
+      baseUrl: BASE_URL,
+      authConfig: {
+        type: "headers",
+        headers: { "X-Auth-Token": "secret" }
+      }
+    });
+
+    await client.requestBufferWithHeaders(`${BASE_URL}artifact/file.zip`, { maxBytes: 100 });
+    await client.requestStream(`${BASE_URL}consoleText`, { maxBytes: 200 });
+
+    assert.equal(crumbFetches, 0);
+    assert.deepEqual(bufferRequest.mock.calls[0]?.[1], {
+      authHeader: undefined,
+      headers: { "X-Auth-Token": "secret" },
+      timeoutMs: undefined,
+      maxBytes: 100
+    });
+    assert.deepEqual(streamRequest.mock.calls[0]?.[1], {
+      authHeader: undefined,
+      headers: { "X-Auth-Token": "secret" },
+      timeoutMs: undefined,
+      maxBytes: 200
+    });
+  });
+
   it("retries text posts with a refreshed crumb after 403", async () => {
     resetHarness();
     postBehavior = async () => {
@@ -136,4 +177,6 @@ function resetHarness(): void {
   crumbFetches = 0;
   postAttempts = [];
   postBehavior = async () => "";
+  bufferRequest.mockClear();
+  streamRequest.mockClear();
 }

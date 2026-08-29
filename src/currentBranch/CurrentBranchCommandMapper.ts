@@ -171,7 +171,11 @@ export class CurrentBranchCommandMapper {
       return undefined;
     }
 
-    return this.toJobActionTarget(state);
+    return {
+      environment: state.environment,
+      jobUrl: state.jobUrl,
+      label: formatCurrentBranchJobLabel(state)
+    };
   }
 
   getLatestBuildTarget(state: CurrentBranchState): CurrentBranchBuildDetailsTarget | undefined {
@@ -183,20 +187,6 @@ export class CurrentBranchCommandMapper {
       environment: state.environment,
       buildUrl: state.lastBuild.url,
       label: formatCurrentBranchBuildDetailsLabel(state)
-    };
-  }
-
-  getLastFailedBuildTarget(state: CurrentBranchState): CurrentBranchJobActionTarget | undefined {
-    return this.getBuildTarget(state);
-  }
-
-  private toJobActionTarget(
-    state: Extract<CurrentBranchState, { kind: "matched" }>
-  ): CurrentBranchJobActionTarget {
-    return {
-      environment: state.environment,
-      jobUrl: state.jobUrl,
-      label: formatCurrentBranchJobLabel(state)
     };
   }
 }

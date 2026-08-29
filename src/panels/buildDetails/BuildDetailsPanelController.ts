@@ -1,6 +1,5 @@
 import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { LoadTokenTracker, PanelLoadTracker } from "../shared/PanelRuntimeHelpers";
@@ -12,7 +11,13 @@ import {
   getTestReportIncludeCaseLogs,
   MAX_CONSOLE_CHARS
 } from "./BuildDetailsConfig";
+import { BuildDetailsDiagnosticConsoleSync } from "./BuildDetailsDiagnosticConsoleSync";
 import { formatError } from "./BuildDetailsFormatters";
+import {
+  applyBuildDetailsInitialState,
+  buildInitialBuildDetailsViewModel,
+  resolveInitialPanelTitle
+} from "./BuildDetailsInitialState";
 import { BuildDetailsPanelRuntime } from "./BuildDetailsPanelRuntime";
 import { BuildDetailsPanelState, type PipelineRestartAvailability } from "./BuildDetailsPanelState";
 import { BuildDetailsPanelView } from "./BuildDetailsPanelView";
@@ -22,7 +27,6 @@ import {
   BuildDetailsPollingController
 } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
-import { buildBuildDetailsViewModel } from "./BuildDetailsViewModel";
 import type { ConsoleTextByteRange } from "./ConsoleStreamManager";
 import { PipelineNodeLogManager } from "./PipelineNodeLogManager";
 import type {
@@ -45,22 +49,6 @@ export type BuildDetailsPanelLoadResult =
     };
 
 type BuildDetailsResolvedAssets = Parameters<BuildDetailsPanelView["renderBuildDetails"]>[1];
-
-interface DiagnosticConsoleSyncOperation {
-  backend: BuildDetailsBackend["console"];
-  environment: JenkinsEnvironmentRef;
-  buildUrl: string;
-  textRange: ConsoleTextByteRange;
-  appendedTextRange?: ConsoleTextByteRange;
-  loadToken: number;
-  syncGeneration: number;
-}
-
-interface DiagnosticConsoleSyncRange {
-  append: boolean;
-  start: number;
-  end: number;
-}
 
 export interface BuildDetailsPanelControllerAccess {
   getBackend(): BuildDetailsBackend | undefined;
@@ -96,10 +84,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private pollingController?: BuildDetailsPollingController;
   private pipelineNodeLogManager?: PipelineNodeLogManager;
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
-  private diagnosticConsoleText = "";
-  private diagnosticConsoleSyncGeneration = 0;
-  private diagnosticConsoleSyncQueue: Promise<void> = Promise.resolve();
-  private diagnosticConsoleTextSynchronized = true;
+  private readonly diagnosticConsoleSync: BuildDetailsDiagnosticConsoleSync;
 
   constructor(
     panel: vscode.WebviewPanel,
@@ -110,6 +95,15 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     private readonly onDiagnosticConsoleTextChanged?: () => void
   ) {
     this.canOpenTestSource = getCanOpenTestSource;
+    this.diagnosticConsoleSync = new BuildDetailsDiagnosticConsoleSync({
+      maxConsoleChars: MAX_CONSOLE_CHARS,
+      getBackend: () => this.backend?.console,
+      getEnvironment: () => this.state.environment,
+      getBuildUrl: () => this.state.currentBuildUrl,
+      getLoadToken: () => this.loadTokenTracker.current,
+      isLoadTokenCurrent: (token) => this.loadTokenTracker.isCurrent(token),
+      onTextChanged: () => this.onDiagnosticConsoleTextChanged?.()
+    });
     this.view = new BuildDetailsPanelView(panel, extensionUri);
     this.loadTracker = new PanelLoadTracker((value) => this.view.setLoading(value));
     this.runtime = new BuildDetailsPanelRuntime({
@@ -127,7 +121,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   dispose(): void {
-    this.diagnosticConsoleSyncGeneration += 1;
+    this.diagnosticConsoleSync.dispose();
     this.pollingController?.dispose();
     this.pollingController = undefined;
     this.pipelineNodeLogManager?.dispose();
@@ -167,7 +161,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   getDiagnosticConsoleText(): string {
-    return this.diagnosticConsoleText;
+    return this.diagnosticConsoleSync.getText();
   }
 
   postBuildDiagnostics(diagnostics: BuildDiagnosticsViewModel): void {
@@ -265,10 +259,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.backend = backend;
     this.loadTracker.resetLoadingRequests();
     this.state.resetForLoad(environment, buildUrl, createNonce());
-    this.diagnosticConsoleSyncGeneration += 1;
-    this.diagnosticConsoleSyncQueue = Promise.resolve();
-    this.diagnosticConsoleTextSynchronized = true;
-    this.diagnosticConsoleText = "";
+    this.diagnosticConsoleSync.reset();
     return token;
   }
 
@@ -361,20 +352,20 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     const details = this.state.currentDetails;
     this.notifyInitialBuildDetails(details);
     this.view.setTitle(resolveInitialPanelTitle(details, options?.label));
-    this.view.renderBuildDetails(this.buildInitialViewModel(initialState), assets, {
-      nonce: this.state.currentNonce,
-      panelState: options?.panelState
-    });
+    this.view.renderBuildDetails(
+      buildInitialBuildDetailsViewModel(this.state, initialState, this.canOpenTestSource),
+      assets,
+      {
+        nonce: this.state.currentNonce,
+        panelState: options?.panelState
+      }
+    );
     void this.runtime.refreshRestartFromStageInfo(token, { postUpdate: true });
     return details;
   }
 
   private applyInitialPanelState(initialState: BuildDetailsInitialState): void {
-    this.state.applyInitialState(
-      initialState,
-      toPipelineRun(initialState.workflowRun),
-      formatInitialPipelineError(initialState.workflowError)
-    );
+    applyBuildDetailsInitialState(this.state, initialState);
     this.setDiagnosticConsoleText(initialState.consoleTextResult?.text ?? "");
   }
 
@@ -382,37 +373,6 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     if (details) {
       this.onBuildDetailsChanged?.(details);
     }
-  }
-
-  private buildInitialViewModel(initialState: BuildDetailsInitialState) {
-    return buildBuildDetailsViewModel({
-      details: this.state.currentDetails,
-      buildUrl: this.state.currentBuildUrl,
-      pipelineRun: this.state.currentPipelineRun,
-      pipelineLoading: this.state.pipelineLoading,
-      consoleTextResult: initialState.consoleTextResult,
-      consoleHtmlResult: initialState.consoleHtmlResult,
-      errors: this.state.currentErrors,
-      maxConsoleChars: MAX_CONSOLE_CHARS,
-      followLog: this.state.followLog,
-      pendingInputs: this.state.currentPendingInputs,
-      pipelineRestartEnabled: this.state.pipelineRestartEnabled,
-      pipelineRestartableStages: this.state.pipelineRestartableStages,
-      pipelineNodeLog: this.state.pipelineNodeLog,
-      testReportFetched: this.state.testReportFetched,
-      testReportLogsIncluded: this.state.testReportLogsIncluded,
-      testResultsLoading: this.state.testResultsLoading,
-      coverageOverview: this.state.currentCoverageOverview,
-      modifiedCoverageFiles: this.state.currentModifiedCoverageFiles,
-      coverageActionPath: this.state.currentCoverageActionPath,
-      coverageFetched: this.state.coverageFetched,
-      coverageLoading: this.state.coverageLoading,
-      coverageError: this.state.currentCoverageError,
-      coverageEnabled: getBuildDetailsCoverageEnabled(),
-      canOpenTestSource: (className) =>
-        this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
-        false
-    });
   }
 
   private async activateInitialRuntime(
@@ -485,134 +445,22 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   private appendDiagnosticConsoleText(text: string): void {
-    this.setDiagnosticConsoleText(this.diagnosticConsoleText + text);
-    this.onDiagnosticConsoleTextChanged?.();
+    this.diagnosticConsoleSync.appendAndNotify(text);
   }
 
   private replaceDiagnosticConsoleText(text: string): void {
-    this.setDiagnosticConsoleText(text);
-    this.onDiagnosticConsoleTextChanged?.();
+    this.diagnosticConsoleSync.replaceAndNotify(text);
   }
 
   private setDiagnosticConsoleText(text: string): void {
-    this.diagnosticConsoleSyncGeneration += 1;
-    this.applyDiagnosticConsoleText(text);
-    this.diagnosticConsoleTextSynchronized = true;
-  }
-
-  private applyDiagnosticConsoleText(text: string): void {
-    this.diagnosticConsoleText =
-      text.length > MAX_CONSOLE_CHARS ? text.slice(text.length - MAX_CONSOLE_CHARS) : text;
+    this.diagnosticConsoleSync.setText(text);
   }
 
   private syncDiagnosticConsoleText(
     textRange: ConsoleTextByteRange,
     appendedTextRange?: ConsoleTextByteRange
   ): Promise<void> {
-    const backend = this.backend?.console;
-    const environment = this.state.environment;
-    const buildUrl = this.state.currentBuildUrl;
-    if (!backend || !environment || !buildUrl) {
-      return Promise.resolve();
-    }
-    const loadToken = this.loadTokenTracker.current;
-    if (!appendedTextRange) {
-      this.diagnosticConsoleSyncGeneration += 1;
-    }
-    const request: DiagnosticConsoleSyncOperation = {
-      backend,
-      environment,
-      buildUrl,
-      textRange,
-      appendedTextRange,
-      loadToken,
-      syncGeneration: this.diagnosticConsoleSyncGeneration
-    };
-    const sync = () => this.performDiagnosticConsoleSync(request);
-    const queued = this.diagnosticConsoleSyncQueue.then(sync, sync);
-    this.diagnosticConsoleSyncQueue = queued.then(
-      () => undefined,
-      () => undefined
-    );
-    return queued;
-  }
-
-  private async performDiagnosticConsoleSync(
-    operation: DiagnosticConsoleSyncOperation
-  ): Promise<void> {
-    if (!this.isDiagnosticConsoleSyncCurrent(operation)) {
-      return;
-    }
-    const range = this.resolveDiagnosticConsoleSyncRange(operation);
-    if (range.end === range.start) {
-      this.applyEmptyDiagnosticConsoleSync(range.append);
-      return;
-    }
-    try {
-      const result = await operation.backend.getConsoleTextProgressive(
-        operation.environment,
-        operation.buildUrl,
-        range.start,
-        range.end - range.start
-      );
-      this.applyDiagnosticConsoleSyncResult(operation, result.text, range.append);
-    } catch {
-      this.applyDiagnosticConsoleSyncFailure(operation);
-    }
-  }
-
-  private resolveDiagnosticConsoleSyncRange(
-    operation: DiagnosticConsoleSyncOperation
-  ): DiagnosticConsoleSyncRange {
-    const append = Boolean(operation.appendedTextRange && this.diagnosticConsoleTextSynchronized);
-    const requestedRange = append ? operation.appendedTextRange : operation.textRange;
-    const start = Math.max(0, Math.floor(requestedRange?.start ?? 0));
-    const end = Math.max(start, Math.floor(requestedRange?.end ?? start));
-    return { append, start, end };
-  }
-
-  private applyDiagnosticConsoleSyncResult(
-    operation: DiagnosticConsoleSyncOperation,
-    text: string,
-    append: boolean
-  ): void {
-    if (this.isDiagnosticConsoleSyncCurrent(operation)) {
-      this.applySuccessfulDiagnosticConsoleSync(text, append);
-    }
-  }
-
-  private applyDiagnosticConsoleSyncFailure(operation: DiagnosticConsoleSyncOperation): void {
-    if (this.isDiagnosticConsoleSyncCurrent(operation)) {
-      this.applyFailedDiagnosticConsoleSync();
-    }
-  }
-
-  private isDiagnosticConsoleSyncCurrent(operation: DiagnosticConsoleSyncOperation): boolean {
-    return (
-      operation.syncGeneration === this.diagnosticConsoleSyncGeneration &&
-      this.loadTokenTracker.isCurrent(operation.loadToken)
-    );
-  }
-
-  private applyEmptyDiagnosticConsoleSync(append: boolean): void {
-    if (append) {
-      return;
-    }
-    this.applyDiagnosticConsoleText("");
-    this.diagnosticConsoleTextSynchronized = true;
-    this.onDiagnosticConsoleTextChanged?.();
-  }
-
-  private applySuccessfulDiagnosticConsoleSync(text: string, append: boolean): void {
-    this.applyDiagnosticConsoleText(append ? this.diagnosticConsoleText + text : text);
-    this.diagnosticConsoleTextSynchronized = true;
-    this.onDiagnosticConsoleTextChanged?.();
-  }
-
-  private applyFailedDiagnosticConsoleSync(): void {
-    this.applyDiagnosticConsoleText("");
-    this.diagnosticConsoleTextSynchronized = false;
-    this.onDiagnosticConsoleTextChanged?.();
+    return this.diagnosticConsoleSync.sync(textRange, appendedTextRange);
   }
 
   beginLoading(): void {
@@ -622,15 +470,4 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   endLoading(): void {
     this.loadTracker.endLoading();
   }
-}
-
-function formatInitialPipelineError(error: unknown): string | undefined {
-  return error ? `Pipeline stages: ${formatError(error)}` : undefined;
-}
-
-function resolveInitialPanelTitle(
-  details: JenkinsBuildDetails | undefined,
-  fallback: string | undefined
-): string | undefined {
-  return details?.fullDisplayName ?? details?.displayName ?? fallback;
 }

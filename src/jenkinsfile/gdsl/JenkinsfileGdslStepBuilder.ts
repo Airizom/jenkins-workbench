@@ -127,7 +127,7 @@ function toNamedParams(value: GdslValue | undefined): JenkinsfileStepParameter[]
     if (!name) {
       continue;
     }
-    const type = asString(named.type) ?? stringifyGdslValue(named.type);
+    const type = stringifyGdslValue(named.type);
     parameters.push({
       name,
       type,

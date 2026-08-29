@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
@@ -53,6 +54,65 @@ const definition = {
 };
 
 describe("ReplayDraftSessionStore", () => {
+  it("removes drafts created before session creation fails", () => {
+    class FailingReplayDraftFilesystem extends ReplayDraftFilesystem {
+      readonly createdUris: vscode.Uri[] = [];
+
+      override createDraft(path: string, content: string): vscode.Uri {
+        if (this.createdUris.length === 1) {
+          throw new Error("draft creation failed");
+        }
+        const uri = super.createDraft(path, content);
+        this.createdUris.push(uri);
+        return uri;
+      }
+    }
+
+    const filesystem = new FailingReplayDraftFilesystem();
+    const store = new ReplayDraftSessionStore(filesystem);
+
+    assert.throws(
+      () =>
+        store.createSession(environment, "https://jenkins.example/job/demo/1/", "demo #1", {
+          ...definition,
+          loadedScripts: [
+            { displayName: "vars/helper.groovy", postField: "loadedScript", script: "return 1" }
+          ]
+        }),
+      /draft creation failed/
+    );
+
+    assert.equal(filesystem.hasDraft(filesystem.createdUris[0]), false);
+    assert.equal(store.hasDraft(filesystem.createdUris[0]), false);
+  });
+
+  it("removes all session drafts when disposed", () => {
+    const filesystem = new ReplayDraftFilesystem();
+    const store = new ReplayDraftSessionStore(filesystem);
+    const first = store.createSession(
+      environment,
+      "https://jenkins.example/job/demo/1/",
+      "demo #1",
+      definition
+    );
+    const second = store.createSession(
+      environment,
+      "https://jenkins.example/job/demo/2/",
+      "demo #2",
+      definition
+    );
+
+    store.dispose();
+
+    for (const session of [first, second]) {
+      assert.equal(store.getSession(session.sessionId), undefined);
+      for (const script of session.scripts) {
+        assert.equal(filesystem.hasDraft(script.uri), false);
+        assert.equal(store.hasDraft(script.uri), false);
+      }
+    }
+  });
+
   it("keeps the latest build session indexed when an older duplicate is discarded", () => {
     const store = new ReplayDraftSessionStore(new ReplayDraftFilesystem());
     const buildUrl = "https://jenkins.example/job/demo/1/";

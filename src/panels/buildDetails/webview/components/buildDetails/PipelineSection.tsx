@@ -65,16 +65,20 @@ export function PipelineSection({
   onOpenExternal: (url: string) => void;
   isActive: boolean;
 }) {
+  // Single vscode-state read per mount: these initializers all run in the same
+  // synchronous render, so one validated+normalized read covers all three fields.
+  const [persistedInitial] = useState(readPersistedInitialState);
   const [presentation, setPresentation] = useState<PipelinePresentation>(() =>
-    readPresentationFromState()
+    normalizeInitialPresentation(persistedInitial.pipelinePresentation)
   );
   const [selectedStageKey, setSelectedStageKey] = useState<string | undefined>(() =>
-    readSelectedStageKeyFromState()
+    normalizeInitialStageKey(persistedInitial.selectedGraphStageKey)
   );
-  const [restoredLogTarget] = useState<PipelineLogTargetViewModel | undefined>(() =>
-    readSelectedPipelineLogTargetFromState()
+  const [restoredLogTarget] = useState<PipelineLogTargetViewModel | undefined>(
+    () => persistedInitial.selectedPipelineLogTarget
   );
   const restoredLogConsumedRef = useRef(false);
+  const lastPersistedUiStateRef = useRef<PersistedBuildDetailsState | undefined>(undefined);
   const [fallbackNotice, setFallbackNotice] = useState<string | undefined>();
   const view = derivePipelineSectionView(loading, stages.length, presentation);
   const canValidateLogTarget = view.canValidateLogTarget;
@@ -86,11 +90,27 @@ export function PipelineSection({
       canValidateLogTarget,
       stages
     });
-    setBuildDetailsPanelUiState({
+    const nextUiState: PersistedBuildDetailsState = {
       pipelinePresentation: presentation,
       selectedGraphStageKey: selectedStageKey,
       selectedPipelineLogTarget
-    });
+    };
+    // Polling replaces stages/target identities on every update; skip the
+    // vscode setState + host postMessage when the payload is unchanged.
+    const previous = lastPersistedUiStateRef.current;
+    if (
+      previous &&
+      previous.pipelinePresentation === nextUiState.pipelinePresentation &&
+      previous.selectedGraphStageKey === nextUiState.selectedGraphStageKey &&
+      isSamePersistedLogTarget(
+        previous.selectedPipelineLogTarget,
+        nextUiState.selectedPipelineLogTarget
+      )
+    ) {
+      return;
+    }
+    lastPersistedUiStateRef.current = nextUiState;
+    setBuildDetailsPanelUiState(nextUiState);
   }, [
     canValidateLogTarget,
     presentation,
@@ -258,19 +278,50 @@ function PipelineSectionBody({
   );
 }
 
-function readPresentationFromState(): PipelinePresentation {
-  const persisted = getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
-  const presentation = persisted.pipelinePresentation;
-  return isPipelinePresentation(presentation) ? presentation : DEFAULT_PRESENTATION;
+function readPersistedInitialState(): PersistedBuildDetailsState {
+  return getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
 }
 
-function readSelectedStageKeyFromState(): string | undefined {
-  const persisted = getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
-  const key = persisted.selectedGraphStageKey;
-  return typeof key === "string" && key.trim().length > 0 ? key : undefined;
+function normalizeInitialPresentation(
+  value: PipelinePresentation | undefined
+): PipelinePresentation {
+  return isPipelinePresentation(value) ? value : DEFAULT_PRESENTATION;
 }
 
-function readSelectedPipelineLogTargetFromState(): PipelineLogTargetViewModel | undefined {
-  const persisted = getBuildDetailsPanelUiState() as PersistedBuildDetailsState;
-  return persisted.selectedPipelineLogTarget;
+function normalizeInitialStageKey(value: string | undefined): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+// Compares exactly the fields that survive normalizePipelineLogTarget, so an
+// unchanged payload is only skipped when it would persist identically.
+function isSamePersistedLogTarget(
+  a: PipelineLogTargetViewModel | undefined,
+  b: PipelineLogTargetViewModel | undefined
+): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+  return (
+    a.key === b.key &&
+    a.kind === b.kind &&
+    a.name === b.name &&
+    a.nodeId === b.nodeId &&
+    isSameChildNodeIds(a.childNodeIds, b.childNodeIds)
+  );
+}
+
+function isSameChildNodeIds(
+  a: readonly string[] | undefined,
+  b: readonly string[] | undefined
+): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b || a.length !== b.length) {
+    return false;
+  }
+  return a.every((id, index) => id === b[index]);
 }

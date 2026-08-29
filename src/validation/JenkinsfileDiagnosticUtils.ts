@@ -21,10 +21,6 @@ function isValidationCode(value: string): value is JenkinsfileValidationCode {
 export function resolveDiagnosticCode(
   diagnostic: vscode.Diagnostic
 ): JenkinsfileValidationCode | undefined {
-  const metadata = getDiagnosticMetadata(diagnostic);
-  if (metadata?.code) {
-    return metadata.code;
-  }
   if (diagnostic.source !== JENKINS_DIAGNOSTIC_SOURCE) {
     return undefined;
   }

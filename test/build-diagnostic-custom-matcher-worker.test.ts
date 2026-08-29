@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import {
   CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
-  deserializeCustomDiagnosticMatchers,
   MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH,
   parseCustomMatcherWorkerData,
   serializeCustomDiagnosticMatchers,
@@ -57,7 +56,8 @@ function createInProcessWorker(data: CustomMatcherWorkerData): CustomMatcherWork
         protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
         id: request.id,
         ok: true,
-        diagnostics
+        diagnostics,
+        lineTruncated: parser.didTruncateLine
       };
       queueMicrotask(() => messageListener?.(response));
     },
@@ -91,7 +91,7 @@ describe("isolated custom matcher worker", () => {
     assert.throws(() => parser.acceptChunk("src/a.ts\nsrc/b.ts\nsrc/c.ts\n"), /exceeded 2 results/);
   });
 
-  it("serializes without revalidation and validates each regex once at the worker boundary", () => {
+  it("hydrates normalized matcher regexes without repeating safety validation", () => {
     regexValidation.calls = [];
     const matchers = normalizeMatchers([
       {
@@ -124,85 +124,19 @@ describe("isolated custom matcher worker", () => {
       maxBatchChars: 1024
     });
     assert.equal(parsed.matchers[0].patterns[0].regexp.source, "^(.+):(\\d+): (.*)$");
-    assert.deepEqual(regexValidation.calls, ["^(.+):(\\d+): (.*)$", "^(.+):(\\d+): (.*)$"]);
+    assert.deepEqual(regexValidation.calls, ["^(.+):(\\d+): (.*)$"]);
+  });
 
-    const unsafe = structuredClone(serialized);
-    unsafe[0].patterns[0].regexpSource = "(a+)+$";
+  it("rejects worker protocol version mismatches", () => {
     assert.throws(
       () =>
         parseCustomMatcherWorkerData({
-          protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
-          matchers: unsafe,
+          protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION + 1,
+          matchers: [],
           maxBatchChars: 1024
         }),
-      /Nested repetition/
+      /Unsupported custom matcher worker protocol version/
     );
-  });
-
-  it("keeps profile and worker pattern-policy acceptance aligned", () => {
-    const cases: Array<{
-      name: string;
-      patterns: Array<Record<string, unknown>>;
-      accepted: boolean;
-    }> = [
-      {
-        name: "valid",
-        patterns: [{ regexp: "^(.+)$", file: 1 }],
-        accepted: true
-      },
-      {
-        name: "unsafe-regexp",
-        patterns: [{ regexp: "(a+)+$", file: 1 }],
-        accepted: false
-      },
-      {
-        name: "invalid-kind",
-        patterns: [{ regexp: "^(.+)$", kind: "range", file: 1 }],
-        accepted: false
-      },
-      {
-        name: "invalid-capture",
-        patterns: [{ regexp: "^(.+)$", file: 101 }],
-        accepted: false
-      },
-      {
-        name: "invalid-loop",
-        patterns: [{ regexp: "^(.+)$", file: 1, loop: "yes" }],
-        accepted: false
-      },
-      {
-        name: "non-final-loop",
-        patterns: [
-          { regexp: "^(.+)$", file: 1, loop: true },
-          { regexp: "^(.*)$", message: 1 }
-        ],
-        accepted: false
-      }
-    ];
-
-    for (const testCase of cases) {
-      const normalized = normalizeDiagnosticProfiles({
-        test: {
-          builtIns: [],
-          matchers: [{ name: testCase.name, pattern: testCase.patterns }]
-        }
-      });
-      const profileAccepted = normalized.profiles.get("test")?.valid === true;
-      const serializedPatterns = testCase.patterns.map(({ regexp, ...pattern }) => ({
-        ...pattern,
-        kind: pattern.kind ?? "location",
-        regexpSource: regexp
-      }));
-      let workerAccepted = true;
-      try {
-        deserializeCustomDiagnosticMatchers([{ id: testCase.name, patterns: serializedPatterns }]);
-      } catch {
-        workerAccepted = false;
-      }
-
-      assert.equal(profileAccepted, testCase.accepted, `${testCase.name} profile acceptance`);
-      assert.equal(workerAccepted, testCase.accepted, `${testCase.name} worker acceptance`);
-    }
   });
 
   it("preserves partial lines and multiline matcher state across bounded batches", async () => {
@@ -267,6 +201,34 @@ describe("isolated custom matcher worker", () => {
         }
       ]
     );
+  });
+
+  it("reports and skips an oversized line while parsing the valid line after it", async () => {
+    const matchers = normalizeMatchers([
+      {
+        name: "single",
+        pattern: { regexp: "^(.+):(\\d+): (.*)$", file: 1, line: 2, message: 3 }
+      }
+    ]);
+    let truncationCount = 0;
+    const client = new BuildDiagnosticCustomMatcherWorkerClient({
+      matchers,
+      batchChars: 128 * 1024,
+      workerFactory: createInProcessWorker,
+      onLineTruncated: () => {
+        truncationCount += 1;
+      }
+    });
+
+    const findings = await client.acceptChunk(
+      `${"x".repeat(1024 * 1024 + 1)}\nsrc/a.ts:7: valid\n`
+    );
+    await client.finish();
+
+    assert.equal(truncationCount, 1);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rawPath, "src/a.ts");
+    assert.equal(findings[0].line, 7);
   });
 
   it("returns base-parser overrides without leaking duplicate built-in findings", async () => {

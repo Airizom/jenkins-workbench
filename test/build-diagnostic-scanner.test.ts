@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { CustomMatcherWorkerDisableReason } from "../src/buildDiagnostics/BuildDiagnosticCustomMatcherWorkerClient";
+import { BuildDiagnosticLogParser } from "../src/buildDiagnostics/BuildDiagnosticLogParser";
 import { normalizeDiagnosticProfiles } from "../src/buildDiagnostics/BuildDiagnosticProfiles";
 import {
   BuildDiagnosticScanSession,
@@ -205,9 +206,7 @@ describe("BuildDiagnosticScanSession", () => {
     assert.equal(result.complete, true);
   });
 
-  it("leaves the session resumable when one pass reaches its request budget", async () => {
-    const chunkBytes = 1024;
-    const totalChunks = 257;
+  it("caps progressive requests across the entire session", async () => {
     let calls = 0;
     const session = new BuildDiagnosticScanSession({
       dataService: {
@@ -215,14 +214,14 @@ describe("BuildDiagnosticScanSession", () => {
           _environment: JenkinsEnvironmentRef,
           _buildUrl: string,
           start: number,
-          requestedBytes: number
+          _requestedBytes: number
         ) => {
           calls += 1;
           return {
-            text: "x".repeat(requestedBytes),
-            textSize: start + requestedBytes,
-            moreData: calls < totalChunks,
-            bytesRead: requestedBytes
+            text: "x",
+            textSize: start + 1,
+            moreData: true,
+            bytesRead: 1
           };
         },
         getConsoleTextHead: async () => {
@@ -232,20 +231,18 @@ describe("BuildDiagnosticScanSession", () => {
       environment,
       buildUrl: "https://jenkins.example/job/app/10/",
       profile: profile(),
-      maxLogBytes: totalChunks * chunkBytes,
-      chunkBytes
+      maxLogBytes: 1024 * 1024
     });
 
     const firstPass = await session.scan(false);
     assert.equal(calls, 256);
-    assert.equal(firstPass.complete, false);
-    assert.equal(firstPass.truncated, false);
+    assert.equal(firstPass.complete, true);
+    assert.equal(firstPass.truncated, true);
+    assert.equal(firstPass.bytesRead, 256);
 
-    const completed = await session.scan(false);
-    assert.equal(calls, totalChunks);
-    assert.equal(completed.complete, true);
-    assert.equal(completed.truncated, false);
-    assert.equal(completed.bytesRead, totalChunks * chunkBytes);
+    const repeated = await session.scan(false);
+    assert.equal(calls, 256);
+    assert.deepEqual(repeated, firstPass);
   });
 
   it("keeps built-ins running and records a warning when custom matching is disabled", async () => {
@@ -291,6 +288,33 @@ describe("BuildDiagnosticScanSession", () => {
 
     assert.equal(result.diagnostics[0].parserId, "gcc-clang");
     assert.match(result.customMatcherWarning ?? "", /batch timed out/);
+  });
+
+  it("surfaces a warning when the parser skips an oversized line", async () => {
+    const text = "123456789abcdef\na.go:2: bad\n";
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => ({
+          text,
+          textSize: text.length,
+          moreData: false,
+          bytesRead: text.length
+        }),
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/12/",
+      profile: profile(),
+      maxLogBytes: 1024,
+      parser: new BuildDiagnosticLogParser({ maxLineChars: 12 })
+    });
+
+    const result = await session.scan(false);
+
+    assert.equal(result.diagnostics[0].parserId, "go");
+    assert.match(result.lineTruncationWarning ?? "", /were skipped/);
   });
 
   it("bounds retained diagnostics while keeping higher-severity findings", async () => {

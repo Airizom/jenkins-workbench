@@ -42,51 +42,54 @@ function resolveRunJobCandidates(
   parameter: JobParameter
 ): string[] {
   const values: string[] = [];
-  const seen = new Set<string>();
   const environmentOrigin = resolveOrigin(environment.url);
   const addCandidate = (candidate: string): void => {
     if (!isSameOrigin(candidate, environmentOrigin)) {
       return;
     }
-    if (seen.has(candidate)) {
+    if (values.includes(candidate)) {
       return;
     }
-    seen.add(candidate);
     values.push(candidate);
   };
 
   const raw = parameter.runProjectName?.trim();
   if (raw && raw.length > 0) {
+    let absolute: URL | undefined;
     try {
-      const asUrl = new URL(raw);
-      addCandidate(ensureTrailingSlash(asUrl.toString()));
+      absolute = new URL(raw);
     } catch {
       // Not an absolute URL.
     }
 
-    try {
-      const relative = new URL(raw, ensureTrailingSlash(environment.url));
-      addCandidate(ensureTrailingSlash(relative.toString()));
-    } catch {
-      // Ignore invalid relative URL.
-    }
-
-    const segments = raw
-      .split("/")
-      .map((segment) => segment.trim())
-      .filter((segment) => segment.length > 0 && segment !== "job");
-    if (segments.length > 0) {
-      const base = ensureTrailingSlash(environment.url);
-      const parts = segments.map((segment) => `job/${encodeURIComponent(segment)}`).join("/");
-      try {
-        addCandidate(new URL(`${parts}/`, base).toString());
-      } catch {
-        // Ignore invalid composed candidate.
+    if (absolute) {
+      const candidate = ensureTrailingSlash(absolute.toString());
+      if (parseJobUrl(candidate)) {
+        addCandidate(candidate);
       }
-
-      const parsedCurrent = parseJobUrl(currentJobUrl);
-      if (parsedCurrent && segments.length === 1) {
-        addCandidate(buildJobUrl(parsedCurrent.parentUrl, segments[0]));
+    } else {
+      try {
+        const relative = ensureTrailingSlash(
+          new URL(raw, ensureTrailingSlash(environment.url)).toString()
+        );
+        if (parseJobUrl(relative)) {
+          addCandidate(relative);
+        } else {
+          const segments = raw
+            .split("/")
+            .map((segment) => segment.trim())
+            .filter((segment) => segment.length > 0);
+          if (segments.length > 0) {
+            addCandidate(
+              segments.reduce(
+                (parentUrl, segment) => buildJobUrl(parentUrl, segment),
+                ensureTrailingSlash(environment.url)
+              )
+            );
+          }
+        }
+      } catch {
+        // Ignore invalid relative URL or job name.
       }
     }
   }

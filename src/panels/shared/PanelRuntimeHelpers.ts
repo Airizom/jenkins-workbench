@@ -87,11 +87,11 @@ function logEnvironmentRefreshError(error: unknown): void {
   console.error("Failed to refresh environment-scoped panel.", error);
 }
 
-export function createPanelLoadingTracker<TMessage extends { type: "setLoading"; value: boolean }>(
-  postMessage: (message: TMessage) => void
+export function createPanelLoadingTracker(
+  postMessage: (message: { type: "setLoading"; value: boolean }) => void
 ): PanelLoadTracker {
   return new PanelLoadTracker((value) => {
-    postMessage({ type: "setLoading", value } as TMessage);
+    postMessage({ type: "setLoading", value });
   });
 }
 

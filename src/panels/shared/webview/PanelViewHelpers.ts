@@ -1,6 +1,10 @@
 import type * as vscode from "vscode";
 import type { LoadingSkeletonVariant } from "./LoadingSkeletonHtml";
-import { resolveWebviewAssets, type WebviewEntryName } from "./WebviewAssets";
+import {
+  type ResolvedWebviewAssets,
+  resolveWebviewAssets,
+  type WebviewEntryName
+} from "./WebviewAssets";
 import {
   assignWebviewPanelManifestErrorHtml,
   type PanelDetailsRenderOptions,
@@ -8,10 +12,7 @@ import {
   renderPanelLoadingHtml
 } from "./WebviewHtml";
 
-export interface PanelViewAssets {
-  scriptUri: string;
-  styleUris: string[];
-}
+export type PanelViewAssets = ResolvedWebviewAssets;
 
 export interface EnvironmentPanelRenderOptions {
   nonce: string;

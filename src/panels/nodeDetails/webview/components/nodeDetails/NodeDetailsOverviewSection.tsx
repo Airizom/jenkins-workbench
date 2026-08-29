@@ -2,6 +2,7 @@ import type * as React from "react";
 import { Alert, AlertDescription } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { CpuIcon, GaugeIcon, StatusIcon, TagIcon } from "../../../../shared/webview/icons";
+import { NODE_DETAILS_TABS, type NodeDetailsTab } from "../../nodeDetailsTabValues";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorSlotGrid } from "./ExecutorSlotGrid";
 import { summarizeExecutorUtilization } from "./executorUtilization";
@@ -10,13 +11,11 @@ import type { OverviewRow } from "./nodeDetailsUtils";
 import { OverviewCard } from "./OverviewCard";
 import { QueuePreviewCard } from "./QueuePreviewCard";
 
-type NodeDetailsTabTarget = "executors" | "queue" | "diagnostics";
-
 type NodeDetailsOverviewSectionProps = {
   state: NodeDetailsState;
   overviewRows: OverviewRow[];
   onOpenExternal: (url: string) => void;
-  onShowTab: (tab: NodeDetailsTabTarget) => void;
+  onShowTab: (tab: NodeDetailsTab) => void;
 };
 export function NodeDetailsOverviewSection({
   state,
@@ -71,7 +70,7 @@ export function NodeDetailsOverviewSection({
                 executors={state.executors}
                 oneOffExecutors={state.oneOffExecutors}
                 onOpenExternal={onOpenExternal}
-                onViewAll={() => onShowTab("executors")}
+                onViewAll={() => onShowTab(NODE_DETAILS_TABS.EXECUTORS)}
               />
             ) : (
               <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
@@ -84,7 +83,7 @@ export function NodeDetailsOverviewSection({
               variant="link"
               size="sm"
               className="mt-3 text-xs"
-              onClick={() => onShowTab("executors")}
+              onClick={() => onShowTab(NODE_DETAILS_TABS.EXECUTORS)}
               aria-label="Open the Executors tab"
             >
               View executors
@@ -94,12 +93,15 @@ export function NodeDetailsOverviewSection({
           <QueuePreviewCard
             queuedWork={state.queuedWork}
             onOpenExternal={onOpenExternal}
-            onShowQueue={() => onShowTab("queue")}
+            onShowQueue={() => onShowTab(NODE_DETAILS_TABS.QUEUE)}
           />
         </div>
 
         <div className="md:col-span-2">
-          <MonitorsTeaser state={state} onShowDiagnostics={() => onShowTab("diagnostics")} />
+          <MonitorsTeaser
+            state={state}
+            onShowDiagnostics={() => onShowTab(NODE_DETAILS_TABS.DIAGNOSTICS)}
+          />
         </div>
       </div>
 
