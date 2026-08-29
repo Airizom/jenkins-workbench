@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.2] - 2026-08-29
+
+### Fixed
+
+- fix: make console regex safety analysis deterministic across machines while preserving conservative ReDoS protection
+
 ## [1.51.1] - 2026-08-29
 
 ### Changed
