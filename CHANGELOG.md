@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.1] - 2026-08-29
+
+### Changed
+
+- refactor: streamline diagnostics, Jenkins services, task execution, panel components, and release tooling to improve maintainability and performance
+
 ## [1.51.0] - 2026-08-09
 
 ### Added
