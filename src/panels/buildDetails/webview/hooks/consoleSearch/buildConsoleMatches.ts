@@ -5,8 +5,7 @@ import { MAX_CONSOLE_MATCHES } from "./constants";
 const MAX_REGEX_SEARCH_TEXT_LENGTH = 200_000;
 const MAX_REGEX_PATTERN_LENGTH = 300;
 const MAX_REGEX_ANALYSIS_SCORE = 200;
-const MAX_REGEX_ANALYSIS_STEPS = 10_000;
-const MAX_REGEX_ANALYSIS_TIME_MS = 10;
+const MAX_REGEX_ANALYSIS_STEPS = 500;
 const UNSAFE_REGEX_MESSAGE =
   "Regex search was skipped because this pattern can be too slow for large console logs.";
 
@@ -129,8 +128,7 @@ function isConsoleRegexSafe(query: string): boolean {
   try {
     return isSafePattern(query, {
       maxScore: MAX_REGEX_ANALYSIS_SCORE,
-      maxSteps: MAX_REGEX_ANALYSIS_STEPS,
-      timeout: MAX_REGEX_ANALYSIS_TIME_MS
+      maxSteps: MAX_REGEX_ANALYSIS_STEPS
     }).safe;
   } catch {
     return false;
