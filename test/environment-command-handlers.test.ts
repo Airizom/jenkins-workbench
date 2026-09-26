@@ -13,6 +13,10 @@ import type { JenkinsParameterPresetStore } from "../src/storage/JenkinsParamete
 import type { JenkinsPinStore } from "../src/storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
 
+import { createExtensionContext } from "./helpers/storageMocks";
+import { EventEmitter } from "./helpers/vscodeStub";
+import type { JenkinsAuthConfig } from "../src/jenkins/types";
+
 const errorMessages: string[] = [];
 const warningMessages: string[] = [];
 let quickPickItems: unknown;
@@ -20,8 +24,10 @@ let warningMessageResponse: string | undefined;
 let jenkinsUrlInput = "https://jenkins.example";
 let authModePromptCount = 0;
 let browserSsoLoginPromptCount = 0;
+let browserSsoLoginUrl: string | undefined;
 
 const vscodeMock = {
+  EventEmitter,
   window: {
     showErrorMessage: async (message: string) => {
       errorMessages.push(message);
@@ -50,7 +56,7 @@ const promptsMock = {
   },
   promptBrowserSsoLoginUrl: async () => {
     browserSsoLoginPromptCount += 1;
-    return undefined;
+    return browserSsoLoginUrl;
   },
   promptHeadersJson: async () => undefined
 };
@@ -59,6 +65,10 @@ vi.doMock("vscode", () => vscodeMock);
 vi.doMock("../src/commands/environment/EnvironmentPrompts", () => promptsMock);
 const { addEnvironment, removeEnvironment, signInWithBrowserSso } = await import(
   "../src/commands/environment/EnvironmentCommandHandlers"
+);
+
+const { JenkinsEnvironmentStore: EnvironmentStore } = await import(
+  "../src/storage/JenkinsEnvironmentStore"
 );
 
 class FailingAuthEnvironmentStore {
@@ -91,6 +101,7 @@ beforeEach(() => {
   jenkinsUrlInput = "https://jenkins.example";
   authModePromptCount = 0;
   browserSsoLoginPromptCount = 0;
+  browserSsoLoginUrl = undefined;
 });
 
 describe("addEnvironment", () => {
@@ -147,6 +158,107 @@ describe("addEnvironment", () => {
 });
 
 describe("signInWithBrowserSso", () => {
+  it.each(["not-json", JSON.stringify({ type: "unsupported" })])(
+    "saves credentials on the first sign-in after cleaning invalid auth: %s",
+    async (invalidAuth) => {
+      const context = createExtensionContext();
+      const store = new EnvironmentStore(context);
+      const target = {
+        environmentId: "env-invalid",
+        scope: "workspace" as const,
+        url: "https://jenkins.example/"
+      };
+      await store.addEnvironment(target.scope, { id: target.environmentId, url: target.url });
+      await context.secrets.store(
+        "jenkinsWorkbench.envAuthConfig.workspace.env-invalid",
+        invalidAuth
+      );
+      browserSsoLoginUrl = "https://login.example/";
+      const authConfig: JenkinsAuthConfig = {
+        type: "sso",
+        loginUrl: browserSsoLoginUrl,
+        headers: { Cookie: "session=new" },
+        expiresAt: undefined
+      };
+      const authenticate = vi.fn(async () => authConfig);
+      const invalidateClient = vi.fn();
+      const fullEnvironmentRefresh = vi.fn(() => ({ executed: true }));
+
+      await signInWithBrowserSso(
+        store,
+        { authenticate },
+        { invalidateClient } as unknown as JenkinsClientProvider,
+        { fullEnvironmentRefresh },
+        target
+      );
+
+      assert.equal(store.getAuthConfigRevision(target.scope, target.environmentId), 2);
+      assert.deepEqual(await store.getAuthConfig(target.scope, target.environmentId), authConfig);
+      assert.equal(authenticate.mock.calls.length, 1);
+      assert.equal(browserSsoLoginPromptCount, 1);
+      assert.equal(invalidateClient.mock.calls.length, 1);
+      assert.equal(fullEnvironmentRefresh.mock.calls.length, 1);
+    }
+  );
+
+  it.each(["unchanged", "newer sign-in", "removed"] as const)(
+    "saves pending credentials only when the environment is %s",
+    async (change) => {
+      const store = new EnvironmentStore(createExtensionContext());
+      const target = {
+        environmentId: "env-1",
+        scope: "workspace" as const,
+        url: "https://jenkins.example/"
+      };
+      const auth = (cookie: string): JenkinsAuthConfig => ({
+        type: "sso",
+        loginUrl: "https://login.example/",
+        headers: { Cookie: cookie },
+        expiresAt: undefined
+      });
+      await store.addEnvironment(target.scope, { id: target.environmentId, url: target.url });
+      await store.setAuthConfig(target.scope, target.environmentId, auth("original"));
+      let finish!: (value: JenkinsAuthConfig) => void;
+      let started!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const pending = new Promise<JenkinsAuthConfig>((resolve) => {
+        finish = resolve;
+      });
+      const invalidateClient = vi.fn();
+      const fullEnvironmentRefresh = vi.fn(() => ({ executed: true }));
+      const run = (authenticate: BrowserSsoAuthenticator["authenticate"]) =>
+        signInWithBrowserSso(
+          store,
+          { authenticate },
+          { invalidateClient } as unknown as JenkinsClientProvider,
+          { fullEnvironmentRefresh },
+          target
+        );
+      const first = run(() => {
+        started();
+        return pending;
+      });
+      await ready;
+      if (change === "newer sign-in") {
+        await run(async () => auth("newer"));
+      } else if (change === "removed") {
+        await store.removeEnvironment(target.scope, target.environmentId);
+      }
+      invalidateClient.mockClear();
+      fullEnvironmentRefresh.mockClear();
+      finish(auth("pending"));
+      await first;
+      assert.deepEqual(
+        await store.getAuthConfig(target.scope, target.environmentId),
+        change === "removed" ? undefined : auth(change === "unchanged" ? "pending" : "newer")
+      );
+      assert.equal(invalidateClient.mock.calls.length, change === "unchanged" ? 1 : 0);
+      assert.equal(fullEnvironmentRefresh.mock.calls.length, change === "unchanged" ? 1 : 0);
+    }
+  );
+
   it("blocks a legacy environment URL containing embedded credentials", async () => {
     const getAuthConfig = vi.fn(async () => undefined);
     const authenticate = vi.fn(async () => undefined);

@@ -284,6 +284,8 @@ export async function signInWithBrowserSso(
   }
 
   const existingAuthConfig = await store.getAuthConfig(target.scope, target.id);
+  // Reading invalid credentials may clear them and advance the revision.
+  const authConfigRevision = store.getAuthConfigRevision(target.scope, target.id);
   const loginUrl =
     existingAuthConfig?.type === "sso"
       ? existingAuthConfig.loginUrl
@@ -302,7 +304,15 @@ export async function signInWithBrowserSso(
     return;
   }
 
-  await store.setAuthConfig(target.scope, target.id, authConfig);
+  const saved = await store.setAuthConfigIfRevision(
+    target.scope,
+    target.id,
+    authConfig,
+    authConfigRevision
+  );
+  if (!saved) {
+    return;
+  }
   clientProvider.invalidateClient(target.scope, target.id);
   refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
 }

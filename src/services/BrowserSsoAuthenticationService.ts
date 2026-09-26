@@ -37,19 +37,33 @@ export class BrowserSsoAuthenticationService implements BrowserSsoAuthenticator 
     }
 
     const state = crypto.randomBytes(24).toString("base64url");
-    const callback = await createCallbackServer(state);
-    const signInUrl = this.buildSignInUrl(loginUrl, callback.url, state);
-    const timeout = this.createTimeout(callback.server);
+    let callback: Awaited<ReturnType<typeof createCallbackServer>> | undefined;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let active = true;
 
     try {
-      const opened = await vscode.env.openExternal(vscode.Uri.parse(signInUrl));
-      if (!opened) {
-        void vscode.window.showErrorMessage("Unable to open the browser SSO sign-in page.");
-        callback.server.close();
-        return undefined;
-      }
-
-      const result = await Promise.race([callback.waitForResult(), timeout]);
+      callback = await createCallbackServer(state);
+      const callbackUrl = callback.url;
+      const openBrowser = async (): Promise<void> => {
+        const externalCallback = await vscode.env.asExternalUri(vscode.Uri.parse(callbackUrl));
+        if (!active) {
+          return;
+        }
+        const signInUrl = this.buildSignInUrl(loginUrl, externalCallback.toString(), state);
+        const opened = await vscode.env.openExternal(vscode.Uri.parse(signInUrl));
+        if (!opened) {
+          throw new Error("Unable to open the browser SSO sign-in page.");
+        }
+      };
+      const deadline = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error("Timed out waiting for browser SSO callback."));
+        }, AUTH_TIMEOUT_MS);
+      });
+      const [, result] = await Promise.race([
+        Promise.all([openBrowser(), callback.waitForResult()]),
+        deadline
+      ]);
       return {
         type: "sso",
         loginUrl: loginUrl.toString(),
@@ -61,7 +75,9 @@ export class BrowserSsoAuthenticationService implements BrowserSsoAuthenticator 
       void vscode.window.showErrorMessage(`Browser SSO sign-in failed: ${message}`);
       return undefined;
     } finally {
-      callback.server.close();
+      active = false;
+      clearTimeout(timeout);
+      callback?.server.close();
     }
   }
 
@@ -83,16 +99,6 @@ export class BrowserSsoAuthenticationService implements BrowserSsoAuthenticator 
       return undefined;
     }
   }
-
-  private createTimeout(server: http.Server): Promise<CallbackResult> {
-    return new Promise((_, reject) => {
-      const timeout = setTimeout(() => {
-        server.close();
-        reject(new Error("Timed out waiting for browser SSO callback."));
-      }, AUTH_TIMEOUT_MS);
-      server.once("close", () => clearTimeout(timeout));
-    });
-  }
 }
 
 function createCallbackServer(expectedState: string): Promise<{
@@ -109,7 +115,13 @@ function createCallbackServer(expectedState: string): Promise<{
   });
 
   const server = http.createServer((request, response) => {
-    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    let requestUrl: URL;
+    try {
+      requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    } catch {
+      writeHtml(response, 400, "Jenkins Workbench SSO", "Invalid browser SSO callback URL.");
+      return;
+    }
     if (requestUrl.pathname !== CALLBACK_PATH) {
       writeHtml(response, 404, "Jenkins Workbench SSO", "Unknown browser SSO callback path.");
       return;
