@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.3] - 2026-09-26
+
+### Fixed
+
+- fix: prevent stale asynchronous results across authentication, caches, polling, pending inputs, drafts, and panel refreshes
+- fix: improve Jenkins response handling, console streaming and exports, artifact downloads and previews, and task completion tracking
+- fix: correct tree expansion, current-branch actions, job search, node capacity, build comparisons, pipeline logs, and test result presentation
+- fix: strengthen Jenkinsfile parsing, completion, validation, build diagnostics, and webview message validation
+
+### Changed
+
+- chore: expand regression coverage and tighten release workflow validation
+
 ## [1.51.2] - 2026-08-29
 
 ### Fixed
