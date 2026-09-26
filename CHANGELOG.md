@@ -7,15 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.53.0] - 2026-09-26
+
 ### Added
 
-- Commit-aware current-branch status, based on full Git revisions and repository identity in the newest 50 Jenkins builds.
-- Open Build for Current Commit and persistent, opt-in commit completion watches that retain their original identity across checkout changes and restarts.
-- Working-tree and locally known upstream qualifiers, last-pass revision context, and conservative PR merge verification with an explicit unverified fallback.
+- feat: commit-aware current-branch status, based on full Git revisions and repository identity in the newest 50 Jenkins builds.
+- feat: Open Build for Current Commit and persistent, opt-in commit completion watches that retain their original identity across checkout changes and restarts.
+- feat: working-tree and locally known upstream qualifiers, last-pass revision context, and conservative PR merge verification with an explicit unverified fallback.
 
 ### Changed
 
-- Automatic current-branch diagnostics follow the verified commit build and clear when checkout verification changes.
+- fix: automatic current-branch diagnostics follow the verified commit build and clear when checkout verification changes.
+
+### Fixed
+
+- fix: handle browser SSO callback failures and prevent stale sign-ins from replacing current authentication.
 
 ## [1.52.0] - 2026-09-26
 
