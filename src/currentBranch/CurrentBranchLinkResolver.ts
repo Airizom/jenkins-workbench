@@ -4,6 +4,7 @@ import type {
   JenkinsRepositoryLinkEnvironment,
   JenkinsRepositoryLinkStore
 } from "../storage/JenkinsRepositoryLinkStore";
+import { captureCheckout } from "./CurrentBranchCheckout";
 import { resolveCurrentBranchEnvironmentRef } from "./CurrentBranchEnvironmentResolver";
 import { toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
 import type {
@@ -27,6 +28,7 @@ export class CurrentBranchLinkResolver {
   ): Promise<CurrentBranchState | CurrentBranchLinkedContext> {
     const repositoryInfo = toRepositoryInfo(repository);
     const branchName = getAttachedBranchName(repository.repository.state.HEAD);
+    const checkout = captureCheckout(repository.repository);
     const link = this.linkStore.getLink(repository.repositoryUriString);
     if (!link) {
       return {
@@ -60,6 +62,7 @@ export class CurrentBranchLinkResolver {
 
     return {
       kind: "linked",
+      checkout,
       repository,
       branchName,
       link,

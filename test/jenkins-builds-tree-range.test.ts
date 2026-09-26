@@ -72,6 +72,21 @@ describe("JenkinsBuildsApi getBuilds tree range", () => {
 });
 
 describe("Jenkins build tree builders", () => {
+  it("fetches 50 revision records without changelogs, parameters, artifacts or reports", async () => {
+    const { context, requestedUrls } = createContextHarness();
+    const api = new JenkinsBuildsApi(context);
+    await api.getBuilds("https://jenkins.example.com/job/demo/", 50, { includeRevisions: true });
+    const tree = getTreeParameter(requestedUrls[0]);
+    assert.match(tree, /\{0,50\}$/);
+    assert.match(tree, /lastBuiltRevision\[SHA1\]/);
+    assert.match(tree, /pullHash/);
+    assert.doesNotMatch(tree, /changeSet|parameters|artifacts|failCount/);
+    assert.doesNotMatch(
+      buildBuildDetailsTree({ revisionsOnly: true }),
+      /changeSet|parameters|artifacts|failCount/
+    );
+  });
+
   it("requests only status fields for lightweight build polling", async () => {
     const { context, requestedUrls } = createContextHarness();
     const api = new JenkinsBuildsApi(context);

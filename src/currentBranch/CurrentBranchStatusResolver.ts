@@ -1,5 +1,7 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import { type CachedValue, getFreshCachedValue, setCachedValue } from "./CurrentBranchCache";
+import { captureCheckout } from "./CurrentBranchCheckout";
+import { assessCommit, CurrentBranchCommitHistory } from "./CurrentBranchCommitHistory";
 import { toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
 import type {
   CurrentBranchResolvedTarget,
@@ -25,8 +27,9 @@ export class CurrentBranchStatusResolver {
   private requestId = 0;
 
   constructor(
-    private readonly dataService: JenkinsDataService,
-    private readonly targetResolver: CurrentBranchTargetResolver
+    dataService: JenkinsDataService,
+    private readonly targetResolver: CurrentBranchTargetResolver,
+    private readonly commitHistory = new CurrentBranchCommitHistory(dataService)
   ) {}
 
   dispose(): void {
@@ -36,10 +39,14 @@ export class CurrentBranchStatusResolver {
   }
 
   async resolve(
-    localState: CurrentBranchLinkedContext,
+    context: CurrentBranchLinkedContext,
     options: CurrentBranchRefreshOptions
   ): Promise<CurrentBranchState> {
     const requestId = ++this.requestId;
+    const localState = {
+      ...context,
+      checkout: context.checkout ?? captureCheckout(context.repository.repository)
+    };
     try {
       const targetResolution = await this.targetResolver.resolve(localState, options);
       const cacheKey = targetResolution.cacheKey;
@@ -84,6 +91,12 @@ export class CurrentBranchStatusResolver {
   ): CurrentBranchState {
     return {
       ...remoteState,
+      ...(remoteState.kind === "matched" && remoteState.history && localState.checkout
+        ? {
+            checkout: localState.checkout,
+            commit: assessCommit(remoteState.history, localState.checkout)
+          }
+        : {}),
       repository: toRepositoryInfo(localState.repository)
     };
   }
@@ -92,12 +105,14 @@ export class CurrentBranchStatusResolver {
     target: CurrentBranchResolvedTarget
   ): Promise<CurrentBranchRemoteResolvedState> {
     try {
-      const jobDetails = await this.dataService.getJob(
+      const history = await this.commitHistory.load(
         target.environment,
         target.selectedTarget.jobUrl
       );
+      const jobDetails = history.job;
       return {
         kind: "matched",
+        history,
         branchName: target.branchName,
         link: target.link,
         environment: target.environment,

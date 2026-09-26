@@ -231,6 +231,7 @@ export class BuildDiagnosticScanRunner {
     isCurrent: () => boolean
   ): Promise<BuildDiagnosticScanRunResult> {
     const warnings = [...context.warnings];
+    if (owner.checkoutWarning) warnings.push(owner.checkoutWarning);
     if (scan.customMatcherWarning) {
       warnings.push(scan.customMatcherWarning);
       this.log(scan.customMatcherWarning);

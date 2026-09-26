@@ -156,7 +156,13 @@ export class JenkinsDataServiceReader {
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
+    options?: {
+      includeCauses?: boolean;
+      includeParameters?: boolean;
+      statusOnly?: boolean;
+      revisionsOnly?: boolean;
+      bypassCache?: boolean;
+    }
   ): Promise<JenkinsBuildDetails> {
     return this.buildOperations.getBuildDetails(environment, buildUrl, options);
   }

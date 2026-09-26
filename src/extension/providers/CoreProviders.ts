@@ -22,6 +22,7 @@ import { WorkspaceTestSourceFileMatchConfig } from "../../services/TestSourceFil
 import { DefaultTestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
 import { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { TestSourceResolver } from "../../services/TestSourceResolver";
+import { JenkinsCommitWatchStore } from "../../storage/JenkinsCommitWatchStore";
 import { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
@@ -56,6 +57,7 @@ export interface CoreProviderOptions {
 export function createCoreProviderCatalog(options: CoreProviderOptions) {
   return {
     environmentStore: (_container) => new JenkinsEnvironmentStore(options.context),
+    commitWatchStore: (_container) => new JenkinsCommitWatchStore(options.context.workspaceState),
     diagnosticBindingStore: (_container) =>
       new JenkinsDiagnosticProfileBindingStore(options.context),
     browserSsoAuthenticator: (_container) => new BrowserSsoAuthenticationService(),

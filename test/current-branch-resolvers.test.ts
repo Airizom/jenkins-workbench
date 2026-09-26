@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
+import { captureCheckout } from "../src/currentBranch/CurrentBranchCheckout";
 import type { CurrentBranchPullRequestResolution } from "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import type {
   CurrentBranchPullRequestJobMatcher,
@@ -414,7 +415,7 @@ describe("CurrentBranchStatusResolver", () => {
     assert.equal(jobCalls, 2);
   });
 
-  it("keeps the newer build status when an older job request finishes last", async () => {
+  it("shares in-flight job requests and refreshes again after completion", async () => {
     const localState = createLinkedContext();
     const jobs = [
       createDeferred<{ lastBuild: { number: number } }>(),
@@ -447,16 +448,19 @@ describe("CurrentBranchStatusResolver", () => {
     await flushPromises();
     const newer = resolver.resolve(localState, { force: true });
     await flushPromises();
-    assert.equal(jobCalls, 2);
-
-    jobs[1].resolve({ lastBuild: { number: 2 } });
+    assert.equal(jobCalls, 1);
+    jobs[0].resolve({ lastBuild: { number: 1 } });
     const newerState = await newer;
     assert.equal(newerState.kind, "matched");
-    assert.equal(newerState.lastBuild?.number, 2);
-    jobs[0].resolve({ lastBuild: { number: 1 } });
+    assert.equal(newerState.lastBuild?.number, 1);
     const olderState = await older;
     assert.equal(olderState.kind, "matched");
     assert.equal(olderState.lastBuild?.number, 1);
+
+    const refreshed = resolver.resolve(localState, { force: true });
+    await flushPromises();
+    jobs[1].resolve({ lastBuild: { number: 2 } });
+    await refreshed;
 
     const cached = await resolver.resolve(localState, {});
     assert.equal(cached.kind, "matched");
@@ -466,6 +470,32 @@ describe("CurrentBranchStatusResolver", () => {
 });
 
 describe("CurrentBranchJenkinsService", () => {
+  it("preserves verification during editor navigation but clears it immediately for a new HEAD", async () => {
+    const fixture = createCurrentBranchServiceFixture();
+    try {
+      const refresh = fixture.service.refresh();
+      await fixture.waitForResolveCallCount(1);
+      const state = createMatchedState(fixture.localState, 1);
+      assert.equal(state.kind, "matched");
+      state.checkout = captureCheckout(fixture.localState.repository.repository);
+      state.commit = { kind: "notFound", reason: "No build" };
+      fixture.resolveCalls[0].deferred.resolve(state);
+      await refresh;
+      fixture.repositoryChanged();
+      assert.equal(fixture.service.getState(), state);
+      fixture.localState.repository.repository.state.HEAD = {
+        name: "main",
+        commit: "b".repeat(40)
+      };
+      fixture.repositoryChanged();
+      const invalidated = fixture.service.getState();
+      assert.equal(invalidated.kind, "matched");
+      assert.equal(invalidated.commit, undefined);
+    } finally {
+      fixture.service.dispose();
+    }
+  });
+
   it("reports a scheduled refresh failure from environment lookup", async () => {
     const localState = createLinkedContext();
     let environmentChanged: () => void = () => undefined;
@@ -693,6 +723,7 @@ function createCurrentBranchServiceFixture(): {
     deferred: Deferred<CurrentBranchState>;
   }>;
   waitForResolveCallCount: (count: number) => Promise<void>;
+  repositoryChanged: () => void;
 } {
   const localState = createLinkedContext();
   const resolveCalls: Array<{
@@ -700,10 +731,14 @@ function createCurrentBranchServiceFixture(): {
     deferred: Deferred<CurrentBranchState>;
   }> = [];
   let notifyResolveCall: () => void = () => undefined;
+  let repositoryChanged = () => {};
   const repositoryResolver = {
     dispose: () => undefined,
     initialize: async () => undefined,
-    onDidChange: noopEvent,
+    onDidChange: (listener: () => void) => {
+      repositoryChanged = listener;
+      return { dispose() {} };
+    },
     listRepositories: () => [localState.repository],
     resolveActiveRepository: () => localState.repository
   };
@@ -735,6 +770,7 @@ function createCurrentBranchServiceFixture(): {
 
   return {
     service,
+    repositoryChanged: () => repositoryChanged(),
     localState,
     resolveCalls,
     waitForResolveCallCount: async (count: number) => {

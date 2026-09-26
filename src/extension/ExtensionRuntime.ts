@@ -60,6 +60,7 @@ export async function activateRuntime(
   const jobConfigDraftManager = container.get("jobConfigDraftManager");
   const jobConfigDraftFilesystem = container.get("jobConfigDraftFilesystem");
   const currentBranchService = container.get("currentBranchService");
+  const commitWatchService = container.get("commitWatchService");
   const currentBranchStatusBar = container.get("currentBranchStatusBar");
   const replayDraftManager = container.get("replayDraftManager");
   const replayDraftFilesystem = container.get("replayDraftFilesystem");
@@ -134,6 +135,7 @@ export async function activateRuntime(
     console.warn("Failed to initialize current-branch state.", error);
   });
   buildDiagnosticsCoordinator.start();
+  commitWatchService.start();
   poller.start();
   statusRefreshService.start();
   void viewStateStore.syncFilterContext();
@@ -187,6 +189,7 @@ export async function activateRuntime(
     statusRefreshService,
     watchErrorSubscription,
     currentBranchService,
+    commitWatchService,
     currentBranchStatusBar,
     jenkinsfileValidationCoordinator,
     container.get("jenkinsfileValidationStatusBar"),

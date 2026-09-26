@@ -2,6 +2,8 @@ import type * as vscode from "vscode";
 import { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
 import { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
+import { CurrentBranchCommitHistory } from "../../currentBranch/CurrentBranchCommitHistory";
+import { CurrentBranchCommitWatchService } from "../../currentBranch/CurrentBranchCommitWatchService";
 import { VscodeCurrentBranchGitHubPullRequestAdapter } from "../../currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import { CurrentBranchJenkinsService } from "../../currentBranch/CurrentBranchJenkinsService";
 import { CurrentBranchLinkResolver } from "../../currentBranch/CurrentBranchLinkResolver";
@@ -51,6 +53,16 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       new JenkinsStatusRefreshService(options.statusRefreshIntervalSeconds),
     statusNotifier: (_container) => new VscodeStatusNotifier(),
     currentBranchRepositoryResolver: (_container) => new CurrentBranchRepositoryResolver(),
+    commitHistory: (container) => new CurrentBranchCommitHistory(container.get("dataService")),
+    commitWatchService: (container) =>
+      new CurrentBranchCommitWatchService(
+        container.get("commitWatchStore"),
+        container.get("commitHistory"),
+        container.get("dataService"),
+        container.get("environmentStore"),
+        container.get("statusRefreshService"),
+        container.get("buildDetailsPanelLauncher")
+      ),
     currentBranchLinkResolver: (container) =>
       new CurrentBranchLinkResolver(
         container.get("environmentStore"),
@@ -70,7 +82,8 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
     currentBranchStatusResolver: (container) =>
       new CurrentBranchStatusResolver(
         container.get("dataService"),
-        container.get("currentBranchTargetResolver")
+        container.get("currentBranchTargetResolver"),
+        container.get("commitHistory")
       ),
     currentBranchLinkWorkflowService: (container) =>
       new CurrentBranchLinkWorkflowService(
@@ -134,7 +147,8 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("currentBranchService"),
         container.get("currentBranchLinkWorkflowService"),
         container.get("currentBranchCommandMapper"),
-        container.get("currentBranchActionExecutor")
+        container.get("currentBranchActionExecutor"),
+        container.get("commitWatchService")
       ),
     currentBranchStatusBar: (container) =>
       new CurrentBranchStatusBar(container.get("currentBranchService")),

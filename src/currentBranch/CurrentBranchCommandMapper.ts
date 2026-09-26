@@ -53,6 +53,18 @@ const NO_ACTIVE_REPOSITORY_MESSAGE = "No Git repository is active in this window
 const DETACHED_HEAD_MESSAGE = "Check out a branch to use current-branch Jenkins actions.";
 
 export class CurrentBranchCommandMapper {
+  getCurrentCommitBuildTarget(
+    state: CurrentBranchState
+  ): CurrentBranchBuildDetailsTarget | undefined {
+    if (state.kind !== "matched" || !state.commit?.current) return undefined;
+    const { build } = state.commit.current;
+    return {
+      environment: state.environment,
+      buildUrl: build.url,
+      label: `${state.checkout?.head?.slice(0, 7)} · #${build.number}`
+    };
+  }
+
   mapStateToResolution(
     state: CurrentBranchState,
     repositories?: CurrentBranchRepositoryInfo[]

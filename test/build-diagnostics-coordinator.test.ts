@@ -113,6 +113,19 @@ function matchedState(result: string, buildUrl: string): CurrentBranchState {
     resolvedTargetKind: "branch",
     jobName: "main",
     jobUrl: "https://jenkins.example/job/project/job/main/",
+    commit: {
+      kind: "verified",
+      reason: "Verified test fixture",
+      current: {
+        build: { number: 1, url: buildUrl, result, building: false },
+        evidence: {
+          kind: "checkout",
+          revision: "a".repeat(40),
+          repository: "github.com/team/project",
+          source: "Git BuildData"
+        }
+      }
+    },
     lastBuild: { url: buildUrl, result, building: false }
   };
 }
@@ -228,6 +241,20 @@ async function waitForScans(coordinator: InstanceType<typeof BuildDiagnosticsCoo
 }
 
 describe("BuildDiagnosticsCoordinator ownership", () => {
+  it("clears automatic diagnostics when checkout verification is invalidated", async () => {
+    const currentBuild = "https://jenkins.example/job/project/job/main/1/";
+    const harness = createHarness(matchedState("FAILURE", currentBuild));
+    harness.coordinator.start();
+    await waitForScans(harness.coordinator);
+    assert.equal(collection.entries.size, 1);
+    const state = matchedState("FAILURE", currentBuild);
+    assert.equal(state.kind, "matched");
+    harness.currentBranch.update({ ...state, commit: undefined });
+    await waitForScans(harness.coordinator);
+    assert.equal(collection.entries.size, 0);
+    harness.coordinator.dispose();
+  });
+
   beforeEach(() => {
     collection.clearCount = 0;
     collection.setCount = 0;

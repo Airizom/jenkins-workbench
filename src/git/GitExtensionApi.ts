@@ -18,6 +18,11 @@ export interface GitRepository {
 
 export interface GitRepositoryState {
   HEAD?: GitRef;
+  remotes?: Array<{ name: string; fetchUrl?: string; pushUrl?: string }>;
+  workingTreeChanges?: readonly unknown[];
+  untrackedChanges?: readonly unknown[];
+  indexChanges?: readonly unknown[];
+  mergeChanges?: readonly unknown[];
   onDidChange: vscode.Event<void>;
 }
 
@@ -36,6 +41,9 @@ export interface GitRef {
   name?: string;
   commit?: string;
   type?: GitRefType;
+  upstream?: { name: string; remote: string };
+  ahead?: number;
+  behind?: number;
 }
 
 export async function getGitApi(): Promise<GitApi | undefined> {

@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
-import { type GitApi, getAttachedBranchName, getGitApi } from "../git/GitExtensionApi";
+import { type GitApi, getGitApi } from "../git/GitExtensionApi";
+import { checkoutFingerprint } from "./CurrentBranchCheckout";
 import { isUriInside, toRepositoryContext, toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
 import type {
   CurrentBranchRepositoryContext,
@@ -175,5 +176,5 @@ function disposeRepositoryRegistration(registration: RepositoryRegistration): vo
 }
 
 function getHeadName(repository: CurrentBranchRepositoryContext["repository"]): string | undefined {
-  return getAttachedBranchName(repository.state.HEAD);
+  return checkoutFingerprint(repository);
 }

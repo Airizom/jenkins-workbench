@@ -4,6 +4,8 @@ import type { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkfl
 import type { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import type { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import type { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
+import type { CurrentBranchCommitHistory } from "../../currentBranch/CurrentBranchCommitHistory";
+import type { CurrentBranchCommitWatchService } from "../../currentBranch/CurrentBranchCommitWatchService";
 import type { CurrentBranchGitHubPullRequestAdapter } from "../../currentBranch/CurrentBranchGitHubPullRequestAdapter";
 import type { CurrentBranchJenkinsService } from "../../currentBranch/CurrentBranchJenkinsService";
 import type { CurrentBranchLinkResolver } from "../../currentBranch/CurrentBranchLinkResolver";
@@ -39,6 +41,7 @@ import type { TestSourceFileMatchConfig } from "../../services/TestSourceFileMat
 import type { TestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import type { TestSourceResolver } from "../../services/TestSourceResolver";
+import type { JenkinsCommitWatchStore } from "../../storage/JenkinsCommitWatchStore";
 import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
@@ -107,6 +110,9 @@ export interface ExtensionTokenMap {
   repositoryLinkStore: JenkinsRepositoryLinkStore;
   viewStateStore: JenkinsViewStateStore;
   currentBranchRepositoryResolver: CurrentBranchRepositoryResolver;
+  commitHistory: CurrentBranchCommitHistory;
+  commitWatchStore: JenkinsCommitWatchStore;
+  commitWatchService: CurrentBranchCommitWatchService;
   currentBranchLinkResolver: CurrentBranchLinkResolver;
   currentBranchGitHubPullRequestAdapter: CurrentBranchGitHubPullRequestAdapter;
   currentBranchPullRequestJobMatcher: CurrentBranchPullRequestJobNameMatcher;

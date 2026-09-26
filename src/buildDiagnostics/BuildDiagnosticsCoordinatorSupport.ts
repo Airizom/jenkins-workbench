@@ -4,6 +4,7 @@ import type {
   CurrentBranchState
 } from "../currentBranch/CurrentBranchTypes";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { getUnambiguousCheckoutRevision } from "../jenkins/JenkinsRevisionEvidence";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 import { normalizeJenkinsUrlForComparison } from "../jenkins/urls";
 import type { BuildDiagnosticsViewModel } from "../panels/buildDetails/shared/BuildDetailsContracts";
@@ -17,6 +18,7 @@ export interface BuildDiagnosticOwner {
   building?: boolean;
   result?: string;
   pendingDetails?: JenkinsBuildDetails;
+  checkoutWarning?: string;
 }
 
 export function takePendingOwnerDetails(
@@ -43,16 +45,22 @@ export function formatScanSummary(
 }
 
 export function toCurrentBranchOwner(state: CurrentBranchState): BuildDiagnosticOwner | undefined {
-  if (state.kind !== "matched" || !state.lastBuild?.url) {
+  if (state.kind !== "matched" || !state.commit?.current?.build.url) {
     return undefined;
   }
   return {
     kind: "currentBranch",
     environment: state.environment,
-    buildUrl: state.lastBuild.url,
+    buildUrl: state.commit.current.build.url,
     preferredRepositoryUri: state.repository.repositoryUriString,
-    building: Boolean(state.lastBuild.building),
-    result: state.lastBuild.result
+    building: Boolean(state.commit.current.build.building),
+    result: state.commit.current.build.result,
+    checkoutWarning:
+      state.commit.current.evidence.kind === "prMerge"
+        ? "Jenkins tested a PR merge checkout; source locations may differ from local HEAD."
+        : state.checkout?.dirty
+          ? "Local changes are untested; source locations may differ from the tested checkout."
+          : undefined
   };
 }
 
@@ -99,26 +107,7 @@ export function formatBuildIdentity(details: JenkinsBuildDetails, buildUrl: stri
 }
 
 export function getUnambiguousJenkinsRevision(details: JenkinsBuildDetails): string | undefined {
-  const revisions = new Set<string>();
-  for (const action of details.actions ?? []) {
-    const revision = readJenkinsActionRevision(action);
-    if (revision) {
-      revisions.add(revision);
-    }
-  }
-  return revisions.size === 1 ? revisions.values().next().value : undefined;
-}
-
-function readJenkinsActionRevision(action: unknown): string | undefined {
-  if (!action || typeof action !== "object" || !("lastBuiltRevision" in action)) {
-    return undefined;
-  }
-  const revision = action.lastBuiltRevision;
-  if (!revision || typeof revision !== "object" || !("SHA1" in revision)) {
-    return undefined;
-  }
-  const value = revision.SHA1;
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  return getUnambiguousCheckoutRevision(details);
 }
 
 export function getCheckoutMismatchWarning(

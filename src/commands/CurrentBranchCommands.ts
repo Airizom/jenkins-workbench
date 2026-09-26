@@ -21,6 +21,9 @@ type CurrentBranchAction =
   | "openMultibranch"
   | "triggerBuild"
   | "openLatestBuild"
+  | "openCurrentCommitBuild"
+  | "watchCurrentCommit"
+  | "manageCommitWatches"
   | "openLastFailed"
   | "scanMultibranch"
   | "refresh"
@@ -41,6 +44,9 @@ const COMMON_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
 
 function buildMatchedActionPicks(includeLatestBuild: boolean): readonly CurrentBranchActionPick[] {
   const picks: CurrentBranchActionPick[] = [
+    { label: "Open Build for Current Commit", action: "openCurrentCommitBuild" },
+    { label: "Notify When Current Commit Finishes", action: "watchCurrentCommit" },
+    { label: "Manage Commit Watches", action: "manageCommitWatches" },
     { label: "Open Current Jenkins Job", action: "openBranch" },
     { label: "Trigger Current Jenkins Build", action: "triggerBuild" }
   ];
@@ -68,6 +74,10 @@ const CURRENT_BRANCH_ACTION_RUNNERS: Record<
   CurrentBranchAction,
   (context: CurrentBranchActionContext) => Promise<void>
 > = {
+  openCurrentCommitBuild: ({ workflowService, state, extensionUri }) =>
+    workflowService.openCurrentCommitBuild(state, extensionUri),
+  watchCurrentCommit: ({ workflowService, state }) => workflowService.watchCurrentCommit(state),
+  manageCommitWatches: ({ workflowService }) => workflowService.manageCommitWatches(),
   openBranch: ({ workflowService, state }) =>
     openRequest(workflowService.getOpenBranchRequest(state)),
   openMultibranch: ({ workflowService, state }) =>
@@ -94,6 +104,17 @@ export function registerCurrentBranchCommands(
   workflowService: CurrentBranchWorkflowService
 ): void {
   context.subscriptions.push(
+    vscode.commands.registerCommand("jenkinsWorkbench.openCurrentCommitBuild", async () => {
+      const state = await resolveCurrentBranchState(workflowService);
+      if (state) await workflowService.openCurrentCommitBuild(state, context.extensionUri);
+    }),
+    vscode.commands.registerCommand("jenkinsWorkbench.watchCurrentCommit", async () => {
+      const state = await resolveCurrentBranchState(workflowService);
+      if (state) await workflowService.watchCurrentCommit(state);
+    }),
+    vscode.commands.registerCommand("jenkinsWorkbench.manageCommitWatches", () =>
+      workflowService.manageCommitWatches()
+    ),
     vscode.commands.registerCommand("jenkinsWorkbench.linkCurrentRepository", () =>
       linkCurrentRepository(workflowService)
     ),

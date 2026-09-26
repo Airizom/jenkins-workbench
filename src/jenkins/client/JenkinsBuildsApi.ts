@@ -68,7 +68,7 @@ export class JenkinsBuildsApi {
   async getBuilds(
     jobUrl: string,
     limit = 20,
-    options?: { includeDetails?: boolean; includeParameters?: boolean }
+    options?: { includeDetails?: boolean; includeParameters?: boolean; includeRevisions?: boolean }
   ): Promise<JenkinsBuild[]> {
     const safeLimit = Math.floor(limit);
     if (safeLimit <= 0) {
@@ -83,7 +83,12 @@ export class JenkinsBuildsApi {
 
   async getBuildDetails(
     buildUrl: string,
-    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
+    options?: {
+      includeCauses?: boolean;
+      includeParameters?: boolean;
+      statusOnly?: boolean;
+      revisionsOnly?: boolean;
+    }
   ): Promise<JenkinsBuildDetails> {
     const tree = buildBuildDetailsTree(options);
     const url = buildApiUrlFromItem(buildUrl, tree);

@@ -22,7 +22,7 @@ import {
 
 const JOB_LIST_TREE = "jobs[name,url,_class,color]";
 const JOB_DETAIL_TREE =
-  "name,url,_class,color,lastCompletedBuild[number,result,timestamp],lastBuild[number,url,result,building,timestamp]";
+  "name,url,_class,color,inQueue,lastSuccessfulBuild[number,url,result,building,timestamp],lastCompletedBuild[number,result,timestamp],lastBuild[number,url,result,building,timestamp]";
 const VIEW_LIST_TREE = "views[name,url]";
 const JOB_PARAMETER_TREE =
   "parameterDefinitions[name,type,defaultParameterValue[value],defaultValue,choices,description,projectName,multiSelectDelimiter]";

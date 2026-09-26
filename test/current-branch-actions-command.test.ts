@@ -185,7 +185,17 @@ describe("showCurrentBranchActions", () => {
 
     assert.deepEqual(
       lastQuickPickItems.map((item) => item.action),
-      ["openBranch", "triggerBuild", "openLastFailed", "refresh", "relink", "unlink"]
+      [
+        "openCurrentCommitBuild",
+        "watchCurrentCommit",
+        "manageCommitWatches",
+        "openBranch",
+        "triggerBuild",
+        "openLastFailed",
+        "refresh",
+        "relink",
+        "unlink"
+      ]
     );
     assert.deepEqual(methodCalls(stub, "getOpenBranchRequest")[0]?.args, [state]);
     assert.deepEqual(openExternalCalls, [
@@ -205,6 +215,9 @@ describe("showCurrentBranchActions", () => {
     assert.deepEqual(
       lastQuickPickItems.map((item) => item.action),
       [
+        "openCurrentCommitBuild",
+        "watchCurrentCommit",
+        "manageCommitWatches",
         "openBranch",
         "triggerBuild",
         "openLatestBuild",

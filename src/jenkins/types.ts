@@ -35,6 +35,8 @@ export interface JenkinsJob {
   color?: string;
   lastCompletedBuild?: JenkinsBuildSummary;
   lastBuild?: JenkinsBuildSummary;
+  lastSuccessfulBuild?: JenkinsBuildSummary;
+  inQueue?: boolean;
 }
 
 export interface JenkinsView {
@@ -136,6 +138,7 @@ export interface JenkinsGitBuildDataAction {
   urlName?: string;
   lastBuiltRevision?: JenkinsGitRevision;
   remoteUrls?: string[];
+  revision?: unknown;
 }
 
 export type JenkinsBuildAction =

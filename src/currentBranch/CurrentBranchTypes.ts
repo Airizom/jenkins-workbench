@@ -2,6 +2,8 @@ import type * as vscode from "vscode";
 import type { GitRepository } from "../git/GitExtensionApi";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsRepositoryLink } from "../storage/JenkinsRepositoryLinkStore";
+import type { CurrentBranchCheckout } from "./CurrentBranchCheckout";
+import type { CommitAssessment, CommitHistory } from "./CurrentBranchCommitHistory";
 
 export interface CurrentBranchRepositoryInfo {
   repositoryUriString: string;
@@ -81,11 +83,15 @@ export type CurrentBranchState =
       jobUrl: string;
       jobColor?: string;
       lastBuild?: CurrentBranchBuildInfo;
+      checkout?: CurrentBranchCheckout;
+      commit?: CommitAssessment;
+      history?: CommitHistory;
       pullRequest?: CurrentBranchPullRequestInfo;
     });
 
 export interface CurrentBranchLinkedContext {
   kind: "linked";
+  checkout?: CurrentBranchCheckout;
   repository: CurrentBranchRepositoryContext;
   branchName: string;
   link: JenkinsRepositoryLink;

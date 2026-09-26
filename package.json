@@ -45,6 +45,18 @@
   "contributes": {
     "commands": [
       {
+        "command": "jenkinsWorkbench.openCurrentCommitBuild",
+        "title": "Jenkins: Open Build for Current Commit"
+      },
+      {
+        "command": "jenkinsWorkbench.watchCurrentCommit",
+        "title": "Jenkins: Notify When Current Commit Finishes"
+      },
+      {
+        "command": "jenkinsWorkbench.manageCommitWatches",
+        "title": "Jenkins: Manage Commit Watches"
+      },
+      {
         "command": "jenkinsWorkbench.addEnvironment",
         "title": "Jenkins: Add Environment",
         "icon": "$(add)"

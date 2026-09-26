@@ -1,8 +1,5 @@
 import * as vscode from "vscode";
-import {
-  resolveJobColorCodicon,
-  resolveJobColorStatusBarThemeColorKey
-} from "../formatters/JobColorFormatters";
+import { currentCommitLabel } from "./CurrentBranchCommitPresentation";
 import type { CurrentBranchJenkinsService } from "./CurrentBranchJenkinsService";
 import {
   formatCurrentBranchTooltip,
@@ -90,23 +87,21 @@ function getStatusBarPresentation(
 }
 
 function iconForMatchedState(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
-  return `$(${resolveJobColorCodicon(state.jobColor)})`;
+  const result = state.commit?.current?.build.result;
+  return result === "SUCCESS" ? "$(pass)" : result === "FAILURE" ? "$(error)" : "$(question)";
 }
 
 function colorForMatchedState(
   state: Extract<CurrentBranchState, { kind: "matched" }>
 ): vscode.ThemeColor | undefined {
-  const themeColorKey = resolveJobColorStatusBarThemeColorKey(state.jobColor);
-  return themeColorKey ? new vscode.ThemeColor(themeColorKey) : undefined;
+  const result = state.commit?.current?.build.result;
+  return result === "FAILURE" || result === "UNSTABLE"
+    ? new vscode.ThemeColor("statusBarItem.warningForeground")
+    : undefined;
 }
 
 function formatMatchedStatusLabel(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
-  const pullRequestLabel = formatPullRequestLabel(state.pullRequest);
-  if (state.resolvedTargetKind === "pullRequest" && pullRequestLabel) {
-    return pullRequestLabel;
-  }
-
-  return state.branchName;
+  return currentCommitLabel(state);
 }
 
 function formatFailedStatusLabel(

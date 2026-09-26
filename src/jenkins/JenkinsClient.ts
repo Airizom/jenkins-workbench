@@ -135,14 +135,19 @@ export class JenkinsClient {
   async getBuilds(
     jobUrl: string,
     limit = 20,
-    options?: { includeDetails?: boolean; includeParameters?: boolean }
+    options?: { includeDetails?: boolean; includeParameters?: boolean; includeRevisions?: boolean }
   ): Promise<JenkinsBuild[]> {
     return this.buildsApi.getBuilds(jobUrl, limit, options);
   }
 
   async getBuildDetails(
     buildUrl: string,
-    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
+    options?: {
+      includeCauses?: boolean;
+      includeParameters?: boolean;
+      statusOnly?: boolean;
+      revisionsOnly?: boolean;
+    }
   ): Promise<JenkinsBuildDetails> {
     return this.buildsApi.getBuildDetails(buildUrl, options);
   }

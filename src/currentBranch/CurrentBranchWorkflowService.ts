@@ -6,6 +6,7 @@ import type {
   CurrentBranchOpenRequest,
   CurrentBranchResolutionResult
 } from "./CurrentBranchCommandMapper";
+import type { CurrentBranchCommitWatchService } from "./CurrentBranchCommitWatchService";
 import type { CurrentBranchJenkinsService } from "./CurrentBranchJenkinsService";
 import type {
   CurrentBranchEnvironmentDiscoveryResult,
@@ -38,11 +39,39 @@ export class CurrentBranchWorkflowService {
     private readonly currentBranchService: CurrentBranchJenkinsService,
     private readonly linkWorkflowService: CurrentBranchLinkWorkflowService,
     private readonly commandMapper: CurrentBranchCommandMapper,
-    private readonly actionExecutor: CurrentBranchActionExecutor
+    private readonly actionExecutor: CurrentBranchActionExecutor,
+    private readonly commitWatches?: CurrentBranchCommitWatchService
   ) {}
 
   listRepositories(): CurrentBranchRepositoryInfo[] | undefined {
     return this.currentBranchService.listRepositories();
+  }
+
+  async openCurrentCommitBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
+    const latest = state.repository
+      ? await this.currentBranchService.resolveForRepository(state.repository, { force: true })
+      : state;
+    const target = this.commandMapper.getCurrentCommitBuildTarget(latest);
+    if (!target) {
+      void vscode.window.showInformationMessage(
+        latest.kind === "matched"
+          ? (latest.commit?.reason ?? "Commit verification unavailable")
+          : "No verified build for the selected checkout."
+      );
+      return;
+    }
+    await this.actionExecutor.openLatestBuild(target, extensionUri);
+  }
+
+  async watchCurrentCommit(state: CurrentBranchState): Promise<void> {
+    const latest = state.repository
+      ? await this.currentBranchService.resolveForRepository(state.repository, { force: true })
+      : state;
+    await this.commitWatches?.watch(latest);
+  }
+
+  async manageCommitWatches(): Promise<void> {
+    await this.commitWatches?.manage();
   }
 
   listLinkableEnvironments(): Promise<CurrentBranchEnvironmentDiscoveryResult> {

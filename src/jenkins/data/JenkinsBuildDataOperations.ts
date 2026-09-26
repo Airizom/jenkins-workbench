@@ -35,7 +35,7 @@ export class JenkinsBuildDataOperations {
     jobUrl: string,
     limit: number,
     options?: {
-      detailLevel?: "summary" | "details";
+      detailLevel?: "summary" | "details" | "revisions";
       includeParameters?: boolean;
       bypassCache?: boolean;
     }
@@ -47,6 +47,7 @@ export class JenkinsBuildDataOperations {
     if (bypassCache) {
       return client.getBuilds(jobUrl, limit, {
         includeDetails: detailLevel === "details",
+        includeRevisions: detailLevel === "revisions",
         includeParameters
       });
     }
@@ -57,6 +58,7 @@ export class JenkinsBuildDataOperations {
       async () => {
         return client.getBuilds(jobUrl, limit, {
           includeDetails: detailLevel === "details",
+          includeRevisions: detailLevel === "revisions",
           includeParameters
         });
       },
@@ -67,20 +69,28 @@ export class JenkinsBuildDataOperations {
   async getBuildDetails(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    options?: { includeCauses?: boolean; includeParameters?: boolean; statusOnly?: boolean }
+    options?: {
+      includeCauses?: boolean;
+      includeParameters?: boolean;
+      statusOnly?: boolean;
+      revisionsOnly?: boolean;
+      bypassCache?: boolean;
+    }
   ): Promise<JenkinsBuildDetails> {
-    const cacheKind = options?.statusOnly
-      ? "build-status"
-      : options?.includeCauses
-        ? options.includeParameters
-          ? "build-details-causes-params"
-          : "build-details-causes"
-        : options?.includeParameters
-          ? "build-details-params"
-          : "build-details";
+    const cacheKind = options?.revisionsOnly
+      ? "build-revisions"
+      : options?.statusOnly
+        ? "build-status"
+        : options?.includeCauses
+          ? options.includeParameters
+            ? "build-details-causes-params"
+            : "build-details-causes"
+          : options?.includeParameters
+            ? "build-details-params"
+            : "build-details";
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, buildUrl);
     const cached = this.context.getCache().get<JenkinsBuildDetails>(cacheKey);
-    if (cached && !cached.building) {
+    if (cached && !cached.building && !options?.bypassCache) {
       return cached;
     }
 

@@ -1,7 +1,7 @@
 import { resolveBuildResultLabel } from "../formatters/BuildStatusFormatters";
-import { isRunningJobColor } from "../formatters/JobColorFormatters";
 import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
 import { formatJobColor } from "../tree/formatters";
+import { currentCommitTooltip } from "./CurrentBranchCommitPresentation";
 import type { CurrentBranchPullRequestInfo, CurrentBranchState } from "./CurrentBranchTypes";
 
 export function formatCurrentBranchJobLabel(
@@ -60,11 +60,12 @@ export function formatCurrentBranchTooltip(
 export function isCurrentBranchBuilding(
   state: Extract<CurrentBranchState, { kind: "matched" }>
 ): boolean {
-  return isRunningJobColor(state.jobColor) || state.lastBuild?.building === true;
+  return state.commit?.current?.build.building === true;
 }
 
 function formatMatchedTooltip(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
   const lines = [
+    ...currentCommitTooltip(state),
     `Linked multibranch: ${state.link.multibranchLabel}`,
     `Repository: ${state.repository.repositoryLabel}`,
     `Branch: ${state.branchName}`,

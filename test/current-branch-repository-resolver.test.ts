@@ -30,6 +30,46 @@ interface ListenerCounters {
 }
 
 describe("CurrentBranchRepositoryResolver.initialize", () => {
+  it("refreshes same-branch commits, dirty state, upstream counts and remotes only when changed", async () => {
+    const counters: ListenerCounters = { open: 0, close: 0, state: 0 };
+    const api = createCountingGitApi(counters);
+    const repository = api.repositories[0];
+    let changed = () => {};
+    repository.state.onDidChange = (listener) => {
+      changed = listener;
+      return { dispose() {} };
+    };
+    repository.state.HEAD = { name: "main", commit: "a".repeat(40) };
+    getGitApiImpl = async () => api;
+    const resolver = new CurrentBranchRepositoryResolver();
+    await resolver.initialize();
+    let events = 0;
+    resolver.onDidChange(() => {
+      events++;
+    });
+    changed();
+    assert.equal(events, 0);
+    repository.state.HEAD.commit = "b".repeat(40);
+    changed();
+    repository.state.indexChanges = [{}];
+    changed();
+    repository.state.HEAD.upstream = { name: "main", remote: "origin" };
+    repository.state.HEAD.ahead = 2;
+    changed();
+    repository.state.HEAD.ahead = 0;
+    changed();
+    repository.state.remotes = [{ name: "origin", fetchUrl: "git@github.com:team/app.git" }];
+    changed();
+    changed();
+    assert.equal(events, 5);
+    repository.state.indexChanges = [];
+    changed();
+    repository.state.untrackedChanges = [{}];
+    changed();
+    assert.equal(events, 7);
+    resolver.dispose();
+  });
+
   it("registers no git listeners when disposed before the git API resolves", async () => {
     let resolveGitApi!: (api: GitApi | undefined) => void;
     getGitApiImpl = () =>

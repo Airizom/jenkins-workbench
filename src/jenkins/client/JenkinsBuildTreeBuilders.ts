@@ -6,12 +6,15 @@ const BUILD_CHANGE_SET_FIELDS = [
 ];
 
 const BUILD_ACTION_BASE_FIELDS = ["_class", "urlName", "lastBuiltRevision[SHA1]", "remoteUrls"];
+const REVISION_FIELDS =
+  "_class,lastBuiltRevision[SHA1],remoteUrls,revision[_class,pullHash,mergeHash,head[sourceOwner,sourceRepo,checkoutStrategy]]";
 const BUILD_ACTION_CAUSE_FIELD = "causes[shortDescription,userId,userName]";
 const BUILD_ACTION_PARAMETER_FIELD = "parameters[name,value]";
 
 export function buildBuildsTree(options?: {
   includeDetails?: boolean;
   includeParameters?: boolean;
+  includeRevisions?: boolean;
 }): string {
   const parts: string[] = [
     "builds[",
@@ -24,7 +27,9 @@ export function buildBuildsTree(options?: {
 
   const includeCauses = Boolean(options?.includeDetails);
   const includeParameters = Boolean(options?.includeParameters);
-  if (includeCauses || includeParameters) {
+  if (options?.includeRevisions) {
+    parts.push(`,actions[${REVISION_FIELDS}]`);
+  } else if (includeCauses || includeParameters) {
     parts.push(`,actions[${buildActionFields({ includeCauses, includeParameters }).join(",")}]`);
   }
 
@@ -36,7 +41,11 @@ export function buildBuildDetailsTree(options?: {
   includeCauses?: boolean;
   includeParameters?: boolean;
   statusOnly?: boolean;
+  revisionsOnly?: boolean;
 }): string {
+  if (options?.revisionsOnly) {
+    return `number,url,result,building,timestamp,actions[${REVISION_FIELDS}]`;
+  }
   if (options?.statusOnly) {
     return "number,url,result,building";
   }

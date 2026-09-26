@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import { captureCheckout } from "./CurrentBranchCheckout";
 import type { CurrentBranchLinkResolver } from "./CurrentBranchLinkResolver";
 import type { CurrentBranchRefreshCoordinator } from "./CurrentBranchRefreshCoordinator";
 import type { CurrentBranchRepositoryResolver } from "./CurrentBranchRepositoryResolver";
@@ -45,6 +46,20 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
     this.subscriptions.push(
       this.repositoryResolver,
       this.repositoryResolver.onDidChange(() => {
+        const active = this.repositoryResolver.resolveActiveRepository();
+        if (
+          this.currentState.kind === "matched" &&
+          active &&
+          active.repositoryUriString === this.currentState.repository.repositoryUriString &&
+          JSON.stringify(captureCheckout(active.repository)) ===
+            JSON.stringify(this.currentState.checkout)
+        ) {
+          return;
+        }
+        this.refreshSequence++;
+        if (this.currentState.kind === "matched") {
+          this.updateState({ ...this.currentState, commit: undefined, checkout: undefined });
+        }
         this.scheduleRefresh();
       }),
       environmentStore.onDidChange(() => {
@@ -140,6 +155,14 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
     }
 
     const nextState = await this.statusResolver.resolve(localState, options);
+    if (
+      localState.checkout &&
+      JSON.stringify(localState.checkout) !==
+        JSON.stringify(captureCheckout(localState.repository.repository))
+    ) {
+      this.scheduleRefresh();
+      return this.currentState;
+    }
     if (!this.isDisposed && sequence === this.refreshSequence) {
       this.updateState(nextState);
     }
@@ -191,12 +214,22 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
       return { kind: "noRepository" };
     }
 
-    const localState = await this.linkResolver.resolve(repositoryContext);
-    if (localState.kind !== "linked") {
-      return localState;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const localState = await this.linkResolver.resolve(repositoryContext);
+      if (localState.kind !== "linked") return localState;
+      const state = await this.statusResolver.resolve(localState, options);
+      if (
+        !localState.checkout ||
+        JSON.stringify(localState.checkout) ===
+          JSON.stringify(captureCheckout(repositoryContext.repository))
+      )
+        return state;
     }
-
-    return this.statusResolver.resolve(localState, options);
+    return {
+      kind: "requestFailed",
+      repository,
+      message: "Checkout changed during resolution. Try again once Git has settled."
+    };
   }
 
   private scheduleRefresh(options: CurrentBranchRefreshOptions = {}): void {

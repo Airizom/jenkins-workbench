@@ -294,7 +294,7 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 
 ### Build Diagnostics
 
-Build diagnostics are enabled by default. An open Build Details panel owns the Problems collection until it closes, including while the panel is hidden. Otherwise, diagnostics follow the active repository's latest running, failed, or unstable current-branch build; successful, aborted, and not-built current-branch results clear the collection.
+Build diagnostics are enabled by default. An open Build Details panel owns the Problems collection until it closes, including while the panel is hidden. Otherwise, diagnostics follow the active repository's newest verified current-commit build when it is running, failed, or unstable. Changing HEAD or losing revision verification clears automatic current-branch findings; successful, aborted, and not-built results also clear the collection. PR merge checkouts and local modifications can shift source locations, so their diagnostics carry a warning.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -485,8 +485,25 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 | `Jenkins: Current Branch Actions` | Open the action picker for the active repository's current branch |
 | `Jenkins: Open Current Branch in Jenkins` | Open the resolved current-branch Jenkins job |
 | `Jenkins: Trigger Current Branch Build` | Trigger a build for the resolved current-branch Jenkins job |
+| `Jenkins: Open Build for Current Commit` | Open the newest repository-verified build of local HEAD |
+| `Jenkins: Notify When Current Commit Finishes` | Persist a watch for this exact repository, Jenkins job, and commit |
+| `Jenkins: Manage Commit Watches` | Inspect pending watches and blocked reasons, or cancel a watch |
 
 Current-branch PR awareness is optional and uses the GitHub Pull Requests extension when it is installed and can identify an active pull request for the checked-out repository. Otherwise Jenkins Workbench falls back to branch-based resolution.
+
+#### Commit-aware status
+
+The status bar answers whether Jenkins tested your checked-out commit. Examples include `Jenkins: abc1234 passed · #428`, `Jenkins: abc1234 building · #429`, and `Jenkins: abc1234 passed · local changes untested`. The newest verified attempt takes precedence over an earlier passing attempt. Queue information is job-level only: `Job queued · commit not yet verified`.
+
+Verification requires an exact full Git SHA and matching repository identity from build metadata. HTTPS, SSH, and SCP-style remote URLs are normalized without conflating forks or guessing SSH aliases. Multiple checkouts require unambiguous evidence for the local repository. Missing or conflicting metadata displays `revision unverified`, even when the Jenkins job is green.
+
+The search covers the selected job's newest 50 builds. `No verified build` means no matching build was verified in that window, not that the commit was never tested. The tooltip includes the full SHA, evidence, repository, branch or PR, last passing build, and search limit. The last passing build is fetched separately when outside the window; its SHA is shown only when repository attribution is verified. The existing latest-build action still opens the job's latest build regardless of revision.
+
+GitHub Branch Source PR merge results can display `passed via PR merge` only when the build response supplies source-repository identity, the PR head SHA, merge strategy, and a merge SHA matching the tested checkout. Plugin versions that omit the merge SHA or export only `pullHash` without source or strategy evidence cannot verify that association. They retain the unverified fallback for the PR head. Other providers can qualify through exact repository-aware Git checkout metadata. The extension never uses the PR's current head or a job name as proof of what an older build tested.
+
+Local changes include staged, unstaged, untracked, and conflicted files, but not ignored files or unsaved editor buffers. Ahead/behind counts refer to the locally known upstream without fetching; missing counts mean push status unknown. A commit ahead of that upstream may already exist on another remote.
+
+Commit watches are opt-in and workspace-scoped. They retain the original repository, environment URL, job, and SHA after branch switches, pushes, relinking, and extension restarts. Once a build is observed, the watch follows its concrete URL even if it leaves the history window. The newest verified attempt wins. Completion removes the persisted watch before notification; the notification opens that exact build. Missing environments, changed environment URLs, inaccessible jobs, and absent revision evidence remain visible in Manage Commit Watches. Cancel watches there when no longer needed. Watches require a resolved job and known HEAD; detached-HEAD job resolution is not supported.
 
 ### Nodes
 
