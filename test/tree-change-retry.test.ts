@@ -149,6 +149,30 @@ describe("retryOnTreeChange", () => {
     assert.equal(vi.getTimerCount(), 0);
   });
 
+  it("retries when the resolved pending element changed during an early wait", async () => {
+    vi.useFakeTimers();
+    const changes = new TestTreeChanges();
+    let operationCount = 0;
+    const resolution = retryOnTreeChange({
+      ...createOptions(changes, async () => {
+        operationCount += 1;
+        if (operationCount === 1) {
+          changes.fire(createElement("nodes"));
+          return { pending: true, pendingElement: createElement("nodes") };
+        }
+        return { pending: false, value: "loaded" };
+      }),
+      getPendingElementBeforeOperation: () => createElement("jobs")
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    assert.equal((await resolution).value, "loaded");
+    assert.equal(operationCount, 2);
+    assert.equal(changes.listenerCount, 0);
+    assert.equal(vi.getTimerCount(), 0);
+  });
+
   it("exhausts the retry limit and cleans up each subscription and timer", async () => {
     vi.useFakeTimers();
     const changes = new TestTreeChanges();

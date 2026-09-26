@@ -109,7 +109,12 @@ export class JenkinsBuildConsoleClient {
     const url = this.buildProgressiveTextUrl(buildUrl, safeStart);
     if (maxBytes !== undefined && maxBytes > 0) {
       const response = await this.context.requestStream(url);
-      const prefix = await readTextPrefixFromStream(response, maxBytes);
+      // A smaller budget can end inside the first UTF-8 character and leave
+      // the resume offset unchanged on every subsequent read.
+      const prefix = await readTextPrefixFromStream(
+        response,
+        Math.max(maxBytes, MAX_UTF8_BYTES_PER_CHARACTER)
+      );
       const textSize = parseHeaderInteger(response.headers["x-text-size"]);
       const moreData = parseHeaderBoolean(response.headers["x-more-data"]);
       const inferredMoreData = Number.isFinite(textSize)

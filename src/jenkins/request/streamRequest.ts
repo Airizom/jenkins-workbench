@@ -73,6 +73,7 @@ export function requestJenkinsStream(
       const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       let timeoutId: NodeJS.Timeout | undefined;
       let aborted = false;
+      let responseEnded = false;
       let receivedBytes = 0;
       const clearStreamTimeout = (): void => {
         if (timeoutId) {
@@ -105,12 +106,23 @@ export function requestJenkinsStream(
           abort(new JenkinsMaxBytesError(maxBytes, statusCode));
         }
       });
-      response.on("end", clearStreamTimeout);
+      response.on("end", () => {
+        responseEnded = true;
+        clearStreamTimeout();
+      });
       response.on("close", clearStreamTimeout);
       response.on("error", (error) => {
         abort(error instanceof Error ? error : new Error(String(error)));
       });
-      stream.on("close", clearStreamTimeout);
+      stream.on("close", () => {
+        if (responseEnded) {
+          clearStreamTimeout();
+          return;
+        }
+        // The consumer discarded the stream early; stop the source response so
+        // it does not keep receiving bytes and holding the socket open.
+        abort();
+      });
       response.pipe(stream);
       return Promise.resolve({ stream, headers: response.headers, abort });
     }

@@ -89,7 +89,7 @@ export class JenkinsNodeDataOperations {
       const isTemporarilyOffline = details.temporarilyOffline === true;
 
       if (targetOffline) {
-        if (isTemporarilyOffline || isOffline) {
+        if (isTemporarilyOffline) {
           return { status: "no_change", details };
         }
         this.context.clearCacheForEnvironment(environment.environmentId);

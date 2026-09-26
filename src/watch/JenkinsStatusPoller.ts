@@ -50,7 +50,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     maxConsecutiveErrors = DEFAULT_MAX_CONSECUTIVE_ERRORS
   ) {
     this.maxConsecutiveErrors = this.normalizeMaxConsecutiveErrors(maxConsecutiveErrors);
-    this.evaluator = new JenkinsJobStatusEvaluator(this.notifier);
+    this.evaluator = new JenkinsJobStatusEvaluator();
   }
 
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void {
@@ -109,6 +109,8 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
           this.host.fullEnvironmentRefresh();
         }
       } while (this.hasPendingPoll);
+    } catch (error) {
+      console.warn("Failed to poll watched Jenkins jobs.", error);
     } finally {
       this.isPolling = false;
     }
@@ -208,6 +210,15 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
             : undefined,
           jobName: job.name
         });
+      }
+
+      const notification = evaluation.notification;
+      if (notification?.kind === "failure") {
+        this.notifier.notifyFailure(notification.message);
+      } else if (notification?.kind === "recovery") {
+        this.notifier.notifyRecovery(notification.message);
+      } else if (notification?.kind === "completion") {
+        this.notifier.notifyCompletion(notification.details);
       }
 
       return evaluation.shouldRefresh || jobNameChanged;

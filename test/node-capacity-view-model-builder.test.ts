@@ -11,6 +11,31 @@ const environment: JenkinsEnvironmentRef = {
 };
 
 describe("NodeCapacityViewModelBuilder", () => {
+  it("treats null work as idle and labels offline capacity without claiming it is online", () => {
+    const model = buildNodeCapacityViewModel(
+      environment,
+      [
+        buildNode({
+          numExecutors: 3,
+          busyExecutors: undefined,
+          executors: [
+            { idle: true, currentExecutable: null, currentWorkUnit: null },
+            { idle: false, currentExecutable: { number: 1 } },
+            { idle: true }
+          ]
+        }),
+        buildNode({ name: "offline", offline: true, numExecutors: 2, busyExecutors: undefined })
+      ],
+      [],
+      "2026-09-26T12:00:00.000Z"
+    );
+    assert.equal(model.summary.idleExecutors, 2);
+    assert.equal(model.summary.busyExecutors, 1);
+    assert.equal(model.summary.offlineExecutors, 2);
+    const nodes = model.pools.find((pool) => pool.kind === "any")?.nodes;
+    assert.equal(nodes?.find((node) => node.name === "agent")?.executorSummary, "1/3 busy");
+    assert.equal(nodes?.find((node) => node.name === "offline")?.executorSummary, "2 offline");
+  });
   it("keeps queue items visible when a pool label collides with another node self label", () => {
     const nodes: JenkinsNodeInfo[] = [
       buildNode({
@@ -49,6 +74,55 @@ describe("NodeCapacityViewModelBuilder", () => {
     assert.equal(linuxPool.queueItems[0]?.name, "queued-linux-job");
     assert.equal(linuxPool.nodes.map((node) => node.name).join(","), "agent-b");
     assert.deepEqual(viewModel.hiddenLabelQueueItems, []);
+  });
+
+  it("matches nodes against compound Jenkins label expressions", () => {
+    const nodes: JenkinsNodeInfo[] = [
+      buildNode({
+        name: "linux-x86",
+        displayName: "linux-x86",
+        assignedLabels: [{ name: "linux" }, { name: "x86" }]
+      }),
+      buildNode({
+        name: "linux-arm",
+        displayName: "linux-arm",
+        assignedLabels: [{ name: "linux" }, { name: "arm64" }]
+      })
+    ];
+    const queueItems: JenkinsQueueItemInfo[] = [
+      {
+        id: 7,
+        name: "queued-expression-job",
+        position: 1,
+        assignedLabelName: "linux && (x86 || !linux)",
+        buildable: true
+      }
+    ];
+
+    const viewModel = buildNodeCapacityViewModel(
+      environment,
+      nodes,
+      queueItems,
+      "2026-06-14T20:00:00.000Z"
+    );
+
+    const expressionPool = viewModel.pools.find(
+      (pool) => pool.kind === "label" && pool.label === "linux && (x86 || !linux)"
+    );
+    assert.ok(expressionPool);
+    assert.equal(expressionPool.nodes.map((node) => node.name).join(","), "linux-x86");
+    assert.equal(expressionPool.idleExecutors, 1);
+    assert.equal(expressionPool.queuedCount, 1);
+    assert.notEqual(expressionPool.statusLabel, "Blocked capacity");
+
+    const matchingNode = viewModel.pools
+      .find((pool) => pool.kind === "any")
+      ?.nodes.find((node) => node.name === "linux-x86");
+    assert.equal(matchingNode?.matchingQueueItems.length, 1);
+    const otherNode = viewModel.pools
+      .find((pool) => pool.kind === "any")
+      ?.nodes.find((node) => node.name === "linux-arm");
+    assert.equal(otherNode?.matchingQueueItems.length, 0);
   });
 
   it("keeps shared queue metrics consistent between a pool and the overall summary", () => {

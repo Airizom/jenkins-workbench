@@ -90,7 +90,10 @@ export async function readTextPrefixFromStream(
 
     const onEnd = () => finish();
 
-    const onClose = () => finish();
+    const onClose = () =>
+      finish(
+        truncated ? undefined : new Error("Console response stream closed before completion.")
+      );
 
     const onData = (chunk: unknown) => {
       const buffer = toChunkBuffer(chunk);

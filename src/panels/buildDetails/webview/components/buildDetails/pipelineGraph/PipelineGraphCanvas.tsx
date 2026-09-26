@@ -9,12 +9,10 @@ import {
 import { cn } from "../../../../../shared/webview/lib/utils";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipelineGraphTypes";
+import { clampZoomScale, createFittedViewport, type ViewportState } from "./pipelineGraphViewport";
 
 const { memo, useCallback, useEffect, useMemo, useRef, useState } = React;
 
-const CANVAS_PADDING = 40;
-const MIN_SCALE = 0.45;
-const MAX_SCALE = 1.85;
 const KEYBOARD_PAN_STEP = 40;
 
 const STAGE_NODE_BUTTON_BASE_CLASS =
@@ -28,11 +26,6 @@ const IS_MAC_PLATFORM = /Mac|iPhone|iPad/i.test(
 );
 const ZOOM_HINT = IS_MAC_PLATFORM ? "⌘ + scroll to zoom" : "Ctrl + scroll to zoom";
 
-interface ViewportState {
-  scale: number;
-  x: number;
-  y: number;
-}
 export function PipelineGraphCanvas({
   layout,
   selectedStageKey,
@@ -100,10 +93,9 @@ export function PipelineGraphCanvas({
       const pointerX = event.clientX - rect.left;
       const pointerY = event.clientY - rect.top;
       setViewport((current) => {
-        const nextScale = clamp(
-          current.scale * (event.deltaY < 0 ? 1.1 : 0.92),
-          MIN_SCALE,
-          MAX_SCALE
+        const nextScale = clampZoomScale(
+          current.scale,
+          current.scale * (event.deltaY < 0 ? 1.1 : 0.92)
         );
         const ratio = nextScale / current.scale;
         return {
@@ -120,7 +112,7 @@ export function PipelineGraphCanvas({
   const zoomBy = (factor: number) => {
     setViewport((current) => ({
       ...current,
-      scale: clamp(current.scale * factor, MIN_SCALE, MAX_SCALE)
+      scale: clampZoomScale(current.scale, current.scale * factor)
     }));
   };
 
@@ -256,7 +248,7 @@ export function PipelineGraphCanvas({
               if (!container) {
                 return;
               }
-              setViewport(createFittedViewport(layout, container));
+              setViewport(createFittedViewport(layout, container, { allowBelowMinimum: true }));
             }}
           >
             Fit
@@ -386,26 +378,6 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
     </foreignObject>
   );
 });
-
-function createFittedViewport(
-  layout: PipelineGraphLayoutResult,
-  container: HTMLDivElement
-): ViewportState {
-  if (layout.width <= 0 || layout.height <= 0) {
-    return { scale: 1, x: CANVAS_PADDING, y: CANVAS_PADDING };
-  }
-
-  const width = Math.max(container.clientWidth - CANVAS_PADDING * 2, 1);
-  const height = Math.max(container.clientHeight - CANVAS_PADDING * 2, 1);
-  const scale = clamp(Math.min(width / layout.width, height / layout.height, 1), MIN_SCALE, 1.15);
-  const x = (container.clientWidth - layout.width * scale) / 2;
-  const y = (container.clientHeight - layout.height * scale) / 2;
-  return { scale, x, y };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 const EDGE_STROKE_COLORS: Record<"sequential" | "parallel" | "join", string> = {
   sequential: "color-mix(in srgb, var(--foreground) 18%, var(--border))",

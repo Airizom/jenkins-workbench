@@ -115,7 +115,7 @@ export function parseGccClang(
     return {
       parserId: "gcc-clang",
       source: "compiler",
-      severity: prefixSeverity ?? severityFromText(bracketed[4] ?? "error"),
+      severity: bracketed[4] ? severityFromText(bracketed[4]) : (prefixSeverity ?? "error"),
       message: bracketed[5].trim(),
       rawPath: bracketed[1].trim(),
       line: positiveInteger(bracketed[2]),
@@ -132,7 +132,7 @@ export function parseGccClang(
   return {
     parserId: "gcc-clang",
     source: "compiler",
-    severity: prefixSeverity ?? severityFromText(match[4]),
+    severity: severityFromText(match[4]),
     message: match[5].trim(),
     rawPath: match[1].trim(),
     line: positiveInteger(match[2]),
@@ -173,7 +173,7 @@ export function parseGeneric(
     return {
       parserId: "generic",
       source: "build",
-      severity: prefixSeverity ?? severityFromText(explicit[4]),
+      severity: severityFromText(explicit[4]),
       message: explicit[5].trim(),
       rawPath: explicit[1].trim(),
       line: positiveInteger(explicit[2]),

@@ -12,23 +12,23 @@ describe("postLoadExecutorsIfChanged", () => {
     const postMessage = vi.fn<(message: NodeCapacityIncomingMessage) => void>();
     const lastRequestKey: { current: string | undefined } = { current: undefined };
 
-    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, [nodeB, nodeA, nodeA]);
-    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, [nodeA, nodeB]);
+    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, 0, [nodeB, nodeA, nodeA]);
+    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, 0, [nodeA, nodeB]);
 
     assert.deepEqual(postMessage.mock.calls, [
       [
         {
           type: "loadNodeCapacityExecutors",
+          snapshotGeneration: 0,
           nodeUrls: [nodeA, nodeB]
         }
       ]
     ]);
 
-    postLoadExecutorsIfChanged(postMessage, lastRequestKey, "2026-06-11T00:00:10.000Z", [
-      nodeA,
-      nodeB
-    ]);
+    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, 1, [nodeA, nodeB]);
 
-    assert.equal(postMessage.mock.calls.length, 2);
+    assert.deepEqual(postMessage.mock.calls[1], [
+      { type: "loadNodeCapacityExecutors", snapshotGeneration: 1, nodeUrls: [nodeA, nodeB] }
+    ]);
   });
 });

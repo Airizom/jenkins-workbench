@@ -32,8 +32,7 @@ export function isJobColorDisabled(color?: string): boolean {
   if (!color) {
     return false;
   }
-  const baseColor = getBaseJobColor(color);
-  return baseColor === "disabled" || baseColor === "grey" || baseColor === "gray";
+  return getBaseJobColor(color) === "disabled";
 }
 
 export function resolveJobColorStatus(color?: string): JobColorStatus | undefined {
@@ -56,10 +55,10 @@ export function resolveJobColorStatus(color?: string): JobColorStatus | undefine
     case "aborted":
       return "aborted";
     case "notbuilt":
-      return "notBuilt";
-    case "disabled":
     case "grey":
     case "gray":
+      return "notBuilt";
+    case "disabled":
       return "disabled";
     default:
       return "unknown";

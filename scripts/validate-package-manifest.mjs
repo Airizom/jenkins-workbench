@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { parse } from "@babel/parser";
 import Ajv from "ajv";
 
 const rootDir = process.cwd();
@@ -94,14 +95,46 @@ const readSourceFiles = async (dir) => {
 
 const commandSourceFiles = await readSourceFiles(path.join(rootDir, "src", "commands"));
 const registeredCommandIds = new Set();
-const registerCommandPattern = /\bregisterCommand\(\s*["'`]([^"'`]+)["'`]/g;
 
 for (const sourceFile of commandSourceFiles) {
   const source = await readFile(sourceFile, "utf8");
+  const syntaxTree = parse(source, { sourceType: "unambiguous", plugins: ["typescript"] });
+  const collectRegistrations = (node) => {
+    if (!node || typeof node !== "object") {
+      return;
+    }
 
-  for (const match of source.matchAll(registerCommandPattern)) {
-    registeredCommandIds.add(match[1]);
-  }
+    if (node.type === "CallExpression") {
+      const callee = node.callee;
+      const isRegistration =
+        (callee?.type === "Identifier" && callee.name === "registerCommand") ||
+        (callee?.type === "MemberExpression" &&
+          callee.computed === false &&
+          callee.property.type === "Identifier" &&
+          callee.property.name === "registerCommand");
+      const commandId = node.arguments[0];
+
+      if (isRegistration && commandId?.type === "StringLiteral") {
+        registeredCommandIds.add(commandId.value);
+      } else if (
+        isRegistration &&
+        commandId?.type === "TemplateLiteral" &&
+        commandId.expressions.length === 0
+      ) {
+        registeredCommandIds.add(commandId.quasis[0].value.cooked);
+      }
+    }
+
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) {
+        child.forEach(collectRegistrations);
+      } else if (child && typeof child === "object") {
+        collectRegistrations(child);
+      }
+    }
+  };
+
+  collectRegistrations(syntaxTree);
 }
 
 for (const commandId of declaredCommandIds) {
@@ -158,7 +191,7 @@ for (const { commandId, pathLabel } of manifestCommandReferences) {
 
 const manifestSchemaId = "https://jenkins-workbench.invalid/package.json";
 const ajv = new Ajv({ strict: false });
-ajv.addSchema(packageJson, manifestSchemaId);
+ajv.addSchema({ contributes: packageJson.contributes }, manifestSchemaId);
 
 const escapeJsonPointerSegment = (segment) => segment.replaceAll("~", "~0").replaceAll("/", "~1");
 const validatesAgainstManifestSchema = (pathSegments, value) =>

@@ -30,7 +30,7 @@ export function buildTestCaseKey(
   suiteName: string | undefined,
   name: string
 ): string {
-  return `${className ?? ""}::${suiteName ?? ""}::${name}`;
+  return JSON.stringify([className ?? "", suiteName ?? "", name]);
 }
 
 export function buildTestCaseId(

@@ -12,6 +12,7 @@ interface PollerConstructor {
 }
 interface PollerHarness {
   poll(): Promise<void>;
+  start(): void;
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
   watchStates: Map<string, { pendingInput: { buildUrl: string; signature: string } | undefined }>;
@@ -62,8 +63,7 @@ function watchedEntry(overrides: Partial<WatchedJobEntry> = {}): WatchedJobEntry
 
 describe("JenkinsJobStatusEvaluator", () => {
   it("seeds first-poll status fields without sending transition notifications", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const result = evaluator.evaluate(
       watchedEntry(),
@@ -78,23 +78,20 @@ describe("JenkinsJobStatusEvaluator", () => {
     assert.equal(result.shouldUpdateCompletion, true);
     assert.equal(result.shouldUpdateBuilding, true);
     assert.equal(result.shouldRefresh, true);
-    assert.deepEqual(notifier.calls.failures, []);
-    assert.deepEqual(notifier.calls.recoveries, []);
-    assert.deepEqual(notifier.calls.completions, []);
+    assert.equal(result.notification, undefined);
   });
 
-  it("notifies failures and recoveries while suppressing duplicate completion notifications", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+  it("returns failure and recovery intents while suppressing completion intents", () => {
+    const evaluator = new JenkinsJobStatusEvaluator();
 
-    evaluator.evaluate(
+    const failure = evaluator.evaluate(
       watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 7, lastIsBuilding: false }),
       "demo",
       "red",
       { number: 8, result: "FAILURE" },
       "https://jenkins.example"
     );
-    evaluator.evaluate(
+    const recovery = evaluator.evaluate(
       watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
       "demo",
       "blue",
@@ -102,14 +99,18 @@ describe("JenkinsJobStatusEvaluator", () => {
       "https://jenkins.example"
     );
 
-    assert.deepEqual(notifier.calls.failures, ["Job demo failed in https://jenkins.example."]);
-    assert.deepEqual(notifier.calls.recoveries, ["Job demo recovered in https://jenkins.example."]);
-    assert.deepEqual(notifier.calls.completions, []);
+    assert.deepEqual(failure.notification, {
+      kind: "failure",
+      message: "Job demo failed in https://jenkins.example."
+    });
+    assert.deepEqual(recovery.notification, {
+      kind: "recovery",
+      message: "Job demo recovered in https://jenkins.example."
+    });
   });
 
-  it("notifies completion when a completed build changes without failure or recovery", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+  it("returns a completion intent when a completed build changes without failure or recovery", () => {
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const result = evaluator.evaluate(
       watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 7, lastIsBuilding: true }),
@@ -121,19 +122,19 @@ describe("JenkinsJobStatusEvaluator", () => {
 
     assert.equal(result.shouldUpdateCompletion, true);
     assert.equal(result.shouldUpdateBuilding, true);
-    assert.deepEqual(notifier.calls.completions, [
-      {
+    assert.deepEqual(result.notification, {
+      kind: "completion",
+      details: {
         jobLabel: "Job demo",
         environmentUrl: "https://jenkins.example",
         result: "SUCCESS",
         color: "blue"
       }
-    ]);
+    });
   });
 
   it("keeps a running observation from overwriting a stored terminal status", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const result = evaluator.evaluate(
       watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
@@ -146,13 +147,11 @@ describe("JenkinsJobStatusEvaluator", () => {
     assert.equal(result.nextStatus, "other");
     assert.equal(result.shouldUpdateStatus, false);
     assert.equal(result.shouldUpdateBuilding, true);
-    assert.deepEqual(notifier.calls.failures, []);
-    assert.deepEqual(notifier.calls.recoveries, []);
+    assert.equal(result.notification, undefined);
   });
 
-  it("notifies recovery for failure -> other -> success", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+  it("returns recovery for failure -> other -> success", () => {
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const running = evaluator.evaluate(
       watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
@@ -163,7 +162,8 @@ describe("JenkinsJobStatusEvaluator", () => {
     );
     // The running observation is not persisted, so the stored status stays "failure".
     assert.equal(running.shouldUpdateStatus, false);
-    evaluator.evaluate(
+    assert.equal(running.notification, undefined);
+    const recovered = evaluator.evaluate(
       watchedEntry({ lastStatus: "failure", lastCompletedBuildNumber: 8, lastIsBuilding: true }),
       "demo",
       "blue",
@@ -171,14 +171,14 @@ describe("JenkinsJobStatusEvaluator", () => {
       "https://jenkins.example"
     );
 
-    assert.deepEqual(notifier.calls.failures, []);
-    assert.deepEqual(notifier.calls.recoveries, ["Job demo recovered in https://jenkins.example."]);
-    assert.deepEqual(notifier.calls.completions, []);
+    assert.deepEqual(recovered.notification, {
+      kind: "recovery",
+      message: "Job demo recovered in https://jenkins.example."
+    });
   });
 
-  it("still notifies failure for success -> other -> failure", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+  it("still returns failure for success -> other -> failure", () => {
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const running = evaluator.evaluate(
       watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 8, lastIsBuilding: false }),
@@ -188,7 +188,8 @@ describe("JenkinsJobStatusEvaluator", () => {
       "https://jenkins.example"
     );
     assert.equal(running.shouldUpdateStatus, false);
-    evaluator.evaluate(
+    assert.equal(running.notification, undefined);
+    const failed = evaluator.evaluate(
       watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 8, lastIsBuilding: true }),
       "demo",
       "red",
@@ -196,14 +197,14 @@ describe("JenkinsJobStatusEvaluator", () => {
       "https://jenkins.example"
     );
 
-    assert.deepEqual(notifier.calls.failures, ["Job demo failed in https://jenkins.example."]);
-    assert.deepEqual(notifier.calls.recoveries, []);
-    assert.deepEqual(notifier.calls.completions, []);
+    assert.deepEqual(failed.notification, {
+      kind: "failure",
+      message: "Job demo failed in https://jenkins.example."
+    });
   });
 
   it("still seeds 'other' when no status was stored yet", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const result = evaluator.evaluate(
       watchedEntry(),
@@ -215,13 +216,11 @@ describe("JenkinsJobStatusEvaluator", () => {
 
     assert.equal(result.nextStatus, "other");
     assert.equal(result.shouldUpdateStatus, true);
-    assert.deepEqual(notifier.calls.failures, []);
-    assert.deepEqual(notifier.calls.recoveries, []);
+    assert.equal(result.notification, undefined);
   });
 
   it("keeps unknown colors from overwriting known status", () => {
-    const notifier = createNotifier();
-    const evaluator = new JenkinsJobStatusEvaluator(notifier);
+    const evaluator = new JenkinsJobStatusEvaluator();
 
     const result = evaluator.evaluate(
       watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 7, lastIsBuilding: false }),
@@ -234,17 +233,80 @@ describe("JenkinsJobStatusEvaluator", () => {
     assert.equal(result.nextStatus, "unknown");
     assert.equal(result.shouldUpdateStatus, false);
     assert.equal(result.shouldRefresh, false);
-    assert.deepEqual(notifier.calls, {
-      failures: [],
-      recoveries: [],
-      watchErrors: [],
-      completions: [],
-      pendingInputs: []
-    });
+    assert.equal(result.notification, undefined);
   });
 });
 
 describe("JenkinsStatusPoller", () => {
+  it("handles a watch-store failure on a tick and polls again on the next tick", async () => {
+    let listAttempts = 0;
+    const failure = new Error("watch store unavailable");
+    const fixture = createPollerFixture({
+      listWatchedJobs: async () => {
+        listAttempts += 1;
+        if (listAttempts === 2) {
+          throw failure;
+        }
+        return [watchedEntry()];
+      }
+    });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      fixture.poller.start();
+      await vi.waitFor(() => assert.equal(fixture.hostRefreshes, 1));
+
+      fixture.fireTick();
+      await vi.waitFor(() => assert.equal(warning.mock.calls.length, 1));
+      assert.deepEqual(warning.mock.calls[0], ["Failed to poll watched Jenkins jobs.", failure]);
+
+      fixture.fireTick();
+      await vi.waitFor(() => assert.equal(fixture.hostRefreshes, 2));
+      assert.equal(listAttempts, 3);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it("sends a failure notification only after the watch update succeeds", async () => {
+    const entry = watchedEntry({
+      lastStatus: "success",
+      lastCompletedBuildNumber: 7,
+      lastIsBuilding: false
+    });
+    let updateAttempts = 0;
+    const fixture = createPollerFixture({
+      watched: [entry],
+      getJob: async () => ({
+        name: "demo",
+        url: "job/demo/",
+        color: "red",
+        lastCompletedBuild: { number: 8, result: "FAILURE" }
+      }),
+      updateWatchStatus: async () => {
+        updateAttempts += 1;
+        assert.deepEqual(fixture.notifier.calls.failures, []);
+        if (updateAttempts === 1) {
+          throw new Error("persistence failed");
+        }
+        entry.lastStatus = "failure";
+        entry.lastCompletedBuildNumber = 8;
+      }
+    });
+
+    await fixture.poller.poll();
+    assert.deepEqual(fixture.notifier.calls.failures, []);
+
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+
+    assert.equal(updateAttempts, 2);
+    assert.deepEqual(fixture.notifier.calls.failures, [
+      "Job demo failed in https://jenkins.example."
+    ]);
+    assert.deepEqual(fixture.notifier.calls.completions, []);
+  });
+
   it("removes watches for stale environments and triggers a refresh", async () => {
     const fixture = createPollerFixture({
       environments: [],
@@ -533,6 +595,7 @@ interface PollerFixtureOptions {
     username?: string;
   }>;
   watched?: WatchedJobEntry[];
+  listWatchedJobs?: () => Promise<WatchedJobEntry[]>;
   getJob?: (environment: unknown, jobUrl: string) => Promise<JenkinsJob>;
   getPendingInputSummary?: (
     environment: unknown,
@@ -545,10 +608,12 @@ interface PollerFixtureOptions {
     fetchedAt: number;
   }>;
   maxConsecutiveErrors?: number;
+  updateWatchStatus?: () => Promise<void>;
 }
 
 function createPollerFixture(options: PollerFixtureOptions = {}): {
   poller: PollerHarness;
+  fireTick(): void;
   notifier: StatusNotifier & { calls: NotifierCalls };
   watchStore: {
     removedEnvironments: Array<{ scope: string; environmentId: string }>;
@@ -568,10 +633,11 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
   hostRefreshes: number;
 } {
   const notifier = createNotifier();
+  let tick: (() => void) | undefined;
   const watchStore = {
     removedEnvironments: [] as Array<{ scope: string; environmentId: string }>,
     removedWatches: [] as Array<{ scope: string; environmentId: string; jobUrl: string }>,
-    listWatchedJobs: async () => options.watched ?? [watchedEntry()],
+    listWatchedJobs: options.listWatchedJobs ?? (async () => options.watched ?? [watchedEntry()]),
     removeWatchesForEnvironment: async (scope: string, environmentId: string) => {
       watchStore.removedEnvironments.push({ scope, environmentId });
     },
@@ -579,10 +645,16 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
       watchStore.removedWatches.push({ scope, environmentId, jobUrl });
       return true;
     },
-    updateWatchStatus: async () => undefined
+    updateWatchStatus: options.updateWatchStatus ?? (async () => undefined)
   };
   const fixture = {
     poller: undefined as unknown as PollerHarness,
+    fireTick: () => {
+      if (!tick) {
+        throw new Error("Poller has not started");
+      }
+      tick();
+    },
     notifier,
     watchStore,
     getJob:
@@ -612,7 +684,10 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
     getJob: (environment: unknown, jobUrl: string) => fixture.getJob(environment, jobUrl)
   };
   const statusRefreshService = {
-    onDidTick: () => ({ dispose: () => undefined }),
+    onDidTick: (listener: () => void) => {
+      tick = listener;
+      return { dispose: () => undefined };
+    },
     getRefreshIntervalMs: () => 1000
   };
   const pendingInputCoordinator = {

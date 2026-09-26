@@ -24,6 +24,7 @@ export interface TestReportCountSummaryInput {
 }
 
 export interface TestReportCountSource {
+  passCount?: number;
   failCount?: number;
   totalCount?: number;
   skipCount?: number;
@@ -32,7 +33,11 @@ export interface TestReportCountSource {
 export function formatAvailableTestReportCountsSummary(report: TestReportCountSource): string {
   return formatTestReportCountsSummary({
     failed: report.failCount,
-    total: report.totalCount,
+    total:
+      report.totalCount ??
+      (typeof report.passCount === "number"
+        ? report.passCount + (report.failCount ?? 0) + (report.skipCount ?? 0)
+        : undefined),
     skipped: report.skipCount
   });
 }

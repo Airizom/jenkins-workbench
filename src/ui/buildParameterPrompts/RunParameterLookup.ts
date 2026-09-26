@@ -94,8 +94,9 @@ function resolveRunJobCandidates(
     }
   }
 
-  // Keep current job as the final fallback so explicit runProjectName targets are preferred.
-  addCandidate(currentJobUrl);
+  if (!raw) {
+    addCandidate(currentJobUrl);
+  }
 
   return values;
 }

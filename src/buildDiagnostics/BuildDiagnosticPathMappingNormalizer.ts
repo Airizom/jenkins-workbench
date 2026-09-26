@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { isSafePattern } from "redos-detector";
 import {
   addIssue,
   isRecord,
@@ -85,6 +86,19 @@ function normalizeRegexPathMapping(
   const validation = validateDiagnosticRegexp(pattern);
   if (!validation.safe || !validation.regexp) {
     addIssue(issues, `${mappingPath}.remote`, validation.reason ?? "Unsafe regular expression.");
+    return undefined;
+  }
+  try {
+    if (!isSafePattern(pattern, { maxScore: 200, maxSteps: 500, timeout: 25 }).safe) {
+      addIssue(issues, `${mappingPath}.remote`, "Unsafe regular expression for path mapping.");
+      return undefined;
+    }
+  } catch {
+    addIssue(
+      issues,
+      `${mappingPath}.remote`,
+      "Unable to verify path mapping regular expression safety."
+    );
     return undefined;
   }
   return {

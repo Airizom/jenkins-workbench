@@ -119,6 +119,29 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
    - **Browser SSO** — Sign in through your browser when prompted
 7. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
+## Deep Links
+
+Build and job links use `vscode://airizom.jenkins-workbench/build` and
+`vscode://airizom.jenkins-workbench/job`. For URLs with query parameters, use a
+`payload` query parameter containing base64url-encoded UTF-8 JSON. The JSON
+requires `url` and may include `nodeId`, `nodeKind`, and `nodeName` for a build:
+
+```js
+const payload = Buffer.from(
+  JSON.stringify({
+    url: "https://ci.example/job/app/1/?x=1&nodeId=inner",
+    nodeId: "outer",
+    nodeKind: "stage"
+  }),
+  "utf8"
+).toString("base64url");
+const link = `vscode://airizom.jenkins-workbench/build?payload=${payload}`;
+```
+
+Legacy `?url=...` links remain supported. When the Jenkins URL itself has a
+query string, place outer node parameters before `url` so the nested query
+remains part of the URL.
+
 ## Tasks
 
 Jenkins jobs and pipelines appear in **Run Task...** under the Jenkins Workbench task type (up to 2000 per environment). By default, a task follows the complete Jenkins lifecycle: it triggers the job, follows the exact queue item, streams the build console, waits for completion, and reports the Jenkins result through the task exit code. This makes Jenkins tasks suitable for `preLaunchTask`, task dependencies, and build gates.

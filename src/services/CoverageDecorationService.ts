@@ -197,7 +197,7 @@ export class CoverageDecorationService implements vscode.Disposable {
         partial: []
       };
       for (const block of file.blocks) {
-        ranges[block.type].push(new vscode.Range(block.startLine - 1, 0, block.endLine, 0));
+        ranges[block.type].push(new vscode.Range(block.startLine - 1, 0, block.endLine - 1, 0));
       }
       editorDecorations.set(targetUri.toString(), ranges);
     }
@@ -230,12 +230,18 @@ export class CoverageDecorationService implements vscode.Disposable {
     }
 
     const directMatch = await this.findDirectRepositoryMatch(repositoryRoots, cacheKey);
+    if (generation !== this.resolveGeneration) {
+      return undefined;
+    }
     if (directMatch) {
       this.resolvedFileMap.set(cacheKey, directMatch);
       return directMatch;
     }
 
     const suffixMatch = await this.findSuffixRepositoryMatch(repositoryRoots, cacheKey);
+    if (generation !== this.resolveGeneration) {
+      return undefined;
+    }
     this.resolvedFileMap.set(cacheKey, suffixMatch ?? null);
     return suffixMatch;
   }

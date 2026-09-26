@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { JenkinsClientProvider } from "../src/jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
+import type { JenkinsAuthConfig } from "../src/jenkins/types";
 import type { JenkinsEnvironmentStore } from "../src/storage/JenkinsEnvironmentStore";
 
 describe("JenkinsClientProvider client caching", () => {
@@ -72,5 +73,111 @@ describe("JenkinsClientProvider client caching", () => {
     assert.notEqual(renamedSignature, movedSignature);
     assert.equal(authConfigReads, 4);
     assert.equal(tokenReads, 4);
+  });
+
+  it("does not publish a stale resolution after credentials change mid-read", async () => {
+    let authConfigRevision = 0;
+    let token = "old-token";
+    const firstRead: { release?: () => void } = {};
+    let tokenReads = 0;
+    const store = {
+      getAuthConfigRevision: () => authConfigRevision,
+      getAuthConfig: async () => undefined,
+      getToken: async () => {
+        tokenReads += 1;
+        const snapshot = token;
+        if (tokenReads === 1) {
+          await new Promise<void>((resolve) => {
+            firstRead.release = resolve;
+          });
+        }
+        return snapshot;
+      }
+    } as unknown as JenkinsEnvironmentStore;
+    const provider = new JenkinsClientProvider(store);
+    const environment: JenkinsEnvironmentRef = {
+      environmentId: "environment-1",
+      scope: "global",
+      url: "https://jenkins.example.com/",
+      username: "developer"
+    };
+
+    const staleClientPromise = provider.getClient(environment);
+    await new Promise((resolve) => setImmediate(resolve));
+    const releaseFirstRead = firstRead.release;
+    assert.ok(releaseFirstRead);
+
+    authConfigRevision += 1;
+    token = "new-token";
+    const latestClient = await provider.getClient(environment);
+    const latestSignature = await provider.getAuthSignature(environment);
+
+    releaseFirstRead();
+    const resolvedClient = await staleClientPromise;
+
+    assert.strictEqual(resolvedClient, latestClient);
+    assert.strictEqual(await provider.getClient(environment), latestClient);
+    assert.equal(await provider.getAuthSignature(environment), latestSignature);
+  });
+});
+
+describe("JenkinsClientProvider SSO refresh", () => {
+  it("does not overwrite an auth config saved while SSO reauth was pending", async () => {
+    const originalConfig: JenkinsAuthConfig = {
+      type: "sso",
+      loginUrl: "https://jenkins.example.com/login"
+    };
+    const editedConfig: JenkinsAuthConfig = { type: "bearer", token: "edited-token" };
+    let authConfigRevision = 0;
+    let storedConfig: JenkinsAuthConfig | undefined = originalConfig;
+    const store = {
+      getAuthConfigRevision: () => authConfigRevision,
+      setAuthConfigIfRevision: async (
+        _scope: string,
+        _id: string,
+        authConfig: JenkinsAuthConfig,
+        expectedRevision: number
+      ) => {
+        if (authConfigRevision !== expectedRevision) {
+          return false;
+        }
+        authConfigRevision += 1;
+        storedConfig = authConfig;
+        return true;
+      }
+    } as unknown as JenkinsEnvironmentStore;
+    const pendingAuth: { resolve?: (config: JenkinsAuthConfig) => void } = {};
+    const provider = new JenkinsClientProvider(store, {
+      browserSsoAuthenticator: {
+        authenticate: () =>
+          new Promise<JenkinsAuthConfig>((resolve) => {
+            pendingAuth.resolve = resolve;
+          })
+      }
+    });
+    const environment: JenkinsEnvironmentRef = {
+      environmentId: "environment-1",
+      scope: "global",
+      url: "https://jenkins.example.com/"
+    };
+    const refresh = (
+      provider as unknown as {
+        refreshBrowserSsoAuthConfig(
+          environment: JenkinsEnvironmentRef,
+          currentAuthConfig: JenkinsAuthConfig
+        ): Promise<JenkinsAuthConfig | undefined>;
+      }
+    ).refreshBrowserSsoAuthConfig.bind(provider);
+
+    const refreshPromise = refresh(environment, originalConfig);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(pendingAuth.resolve);
+
+    authConfigRevision += 1;
+    storedConfig = editedConfig;
+    pendingAuth.resolve({ ...originalConfig, headers: { Cookie: "stale-session" } });
+
+    assert.equal(await refreshPromise, undefined);
+    assert.deepEqual(storedConfig, editedConfig);
   });
 });

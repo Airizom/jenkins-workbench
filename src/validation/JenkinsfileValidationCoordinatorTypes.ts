@@ -16,7 +16,7 @@ export interface ValidationCacheEntry {
 }
 
 export type ValidationOutcome =
-  | { status: "skipped"; reason?: "cached" | "closed" | "inactive" }
+  | { status: "skipped"; reason?: "cached" | "closed" | "inactive" | "changed" }
   | { status: "canceled" }
   | {
       status: "completed";

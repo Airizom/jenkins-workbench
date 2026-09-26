@@ -27,6 +27,44 @@ function savePresetWithToken(
 }
 
 describe("JenkinsParameterPresetStore secret handling", () => {
+  it("preserves every preset and secret when a URL merge exceeds the save limit", async () => {
+    const { store, secrets } = createStore();
+    const newJobUrl = "https://jenkins.example/job/renamed/";
+    const sourcePresets = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        store.savePreset("workspace", "env-1", JOB_URL, {
+          name: `Source ${index}`,
+          values: {},
+          secretValues: { TOKEN: `source-${index}` }
+        })
+      )
+    );
+    const targetPreset = await store.savePreset("workspace", "env-1", newJobUrl, {
+      name: "Target",
+      values: {},
+      secretValues: { TOKEN: "target" }
+    });
+
+    assert.equal(await store.updatePresetUrl("workspace", "env-1", JOB_URL, newJobUrl), true);
+    assert.deepEqual(await store.listPresets("workspace", "env-1", JOB_URL), []);
+    const merged = await store.listPresets("workspace", "env-1", newJobUrl);
+    assert.deepEqual(
+      new Set(merged.map((preset) => preset.id)),
+      new Set([...sourcePresets, targetPreset].map((preset) => preset.id))
+    );
+    for (const [index, preset] of sourcePresets.entries()) {
+      assert.deepEqual(
+        (await store.getPreset("workspace", "env-1", newJobUrl, preset.id))?.values,
+        { TOKEN: `source-${index}` }
+      );
+    }
+    assert.deepEqual(
+      (await store.getPreset("workspace", "env-1", newJobUrl, targetPreset.id))?.values,
+      { TOKEN: "target" }
+    );
+    assert.equal(secrets.values.size, 21);
+  });
+
   it("keeps a stored secret when an update lists the parameter in keepSecretNames", async () => {
     const { store, secrets } = createStore();
 

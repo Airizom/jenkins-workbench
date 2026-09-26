@@ -30,6 +30,8 @@ export class JobConfigDraftManager implements vscode.Disposable {
         }
         if (event.reason === vscode.TextDocumentSaveReason.Manual) {
           this.manualSaveQueue.add(event.document.uri.toString());
+        } else {
+          this.manualSaveQueue.delete(event.document.uri.toString());
         }
       }),
       vscode.workspace.onDidSaveTextDocument((document) => {

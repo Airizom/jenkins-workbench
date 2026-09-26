@@ -219,6 +219,32 @@ describe("JenkinsTaskRunner result mapping", () => {
 });
 
 describe("JenkinsTaskRunner lifecycle", () => {
+  it("waits for the final result when a running build reports a provisional result", async () => {
+    const backend = new FakeBackend();
+    backend.buildDetails = [
+      {
+        number: 7,
+        url: "https://jenkins.example/job/example/7/",
+        building: true,
+        result: "UNSTABLE"
+      },
+      {
+        number: 7,
+        url: "https://jenkins.example/job/example/7/",
+        building: false,
+        result: "FAILURE"
+      }
+    ];
+    const collected = outputCollector();
+
+    const result = await immediateRunner(backend).run(baseRequest, collected.output);
+
+    assert.equal(backend.buildCalls, 2);
+    assert.equal(result.exitCode, JENKINS_TASK_EXIT_CODES.failure);
+    assert.equal(result.jenkinsResult, "FAILURE");
+    assert.ok(collected.statuses.includes("Jenkins build completed with result FAILURE."));
+  });
+
   it("follows the exact queue item, streams raw console lines, and reports success", async () => {
     const backend = new FakeBackend();
     backend.queueItems = [

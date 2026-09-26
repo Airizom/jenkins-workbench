@@ -6,6 +6,21 @@ import { SectionCard } from "./SectionCard";
 
 const { Fragment } = React;
 
+function resolveEmptyLabel(status: CompareSectionStatus, emptyLabel: string): string | undefined {
+  switch (status) {
+    case "empty":
+      return emptyLabel;
+    case "loading":
+      return "Comparison is loading.";
+    case "error":
+      return "Comparison failed.";
+    case "unavailable":
+      return "Comparison data is unavailable.";
+    default:
+      return undefined;
+  }
+}
+
 type CompareItemsSectionProps<TItem> = {
   title: string;
   summary: string;
@@ -26,6 +41,8 @@ export function CompareItemsSection<TItem>({
   renderItem,
   itemKey
 }: CompareItemsSectionProps<TItem>): React.JSX.Element {
+  const emptyStateLabel = resolveEmptyLabel(status, emptyLabel);
+
   return (
     <SectionCard title={title} summary={summary} detail={detail} status={status}>
       {items.length > 0 ? (
@@ -34,9 +51,9 @@ export function CompareItemsSection<TItem>({
             <Fragment key={itemKey(item)}>{renderItem(item)}</Fragment>
           ))}
         </div>
-      ) : (
-        <CompareEmptyState label={emptyLabel} />
-      )}
+      ) : emptyStateLabel ? (
+        <CompareEmptyState label={emptyStateLabel} />
+      ) : null}
     </SectionCard>
   );
 }

@@ -319,7 +319,12 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
 
     await coordinator.refresh(1);
 
-    assert.deepEqual(calls, ["adapter.clear", "state.resetCoverage", "postStateUpdate"]);
+    assert.deepEqual(calls, [
+      "adapter.clear",
+      "state.resetCoverage",
+      "state.setCoverage",
+      "postStateUpdate"
+    ]);
   });
 
   it("returns early when the token becomes stale while resolving the action path", async () => {

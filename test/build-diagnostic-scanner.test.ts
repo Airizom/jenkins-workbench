@@ -26,6 +26,39 @@ function profile(definition: unknown = {}) {
 }
 
 describe("BuildDiagnosticScanSession", () => {
+  it("keeps scanning after a path resolution failure", async () => {
+    const log = "src/blocked.ts:1:1: error: blocked\nsrc/a.ts:2:1: error: valid\n";
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => ({
+          text: log,
+          textSize: log.length,
+          moreData: false,
+          bytesRead: log.length
+        }),
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/6/",
+      profile: profile(),
+      maxLogBytes: 1024,
+      resolveDiagnostic: async (diagnostic) => {
+        if (diagnostic.rawPath === "src/blocked.ts") {
+          throw new Error("PermissionDenied");
+        }
+        return `/repo/${diagnostic.rawPath}`;
+      }
+    });
+
+    const result = await session.scan(false);
+    assert.deepEqual(
+      result.diagnostics.map((diagnostic) => diagnostic.message),
+      ["blocked", "valid"]
+    );
+  });
+
   it("stops draining when disposed during a progressive request", async () => {
     let resolveRequest:
       | ((value: { text: string; textSize: number; moreData: boolean; bytesRead: number }) => void)
@@ -206,7 +239,7 @@ describe("BuildDiagnosticScanSession", () => {
     assert.equal(result.complete, true);
   });
 
-  it("caps progressive requests across the entire session", async () => {
+  it("caps progressive requests when draining a completed build", async () => {
     let calls = 0;
     const session = new BuildDiagnosticScanSession({
       dataService: {
@@ -243,6 +276,91 @@ describe("BuildDiagnosticScanSession", () => {
     const repeated = await session.scan(false);
     assert.equal(calls, 256);
     assert.deepEqual(repeated, firstPass);
+  });
+
+  it("resumes a running scan after more than 256 empty polls", async () => {
+    let text = "";
+    const progressive = vi.fn(async () => {
+      const next = text;
+      text = "";
+      return {
+        text: next,
+        textSize: next.length,
+        moreData: false,
+        bytesRead: next.length
+      };
+    });
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: progressive,
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/10/",
+      profile: profile(),
+      maxLogBytes: 1024
+    });
+
+    for (let index = 0; index < 257; index += 1) {
+      const snapshot = await session.scan(true);
+      assert.equal(snapshot.complete, false);
+      assert.equal(snapshot.truncated, false);
+    }
+
+    text = "src/a.ts:1:1: error: late failure\n";
+    const snapshot = await session.scan(true);
+    assert.equal(progressive.mock.calls.length, 258);
+    assert.equal(snapshot.complete, false);
+    assert.equal(snapshot.truncated, false);
+    assert.deepEqual(
+      snapshot.diagnostics.map((diagnostic) => diagnostic.message),
+      ["late failure"]
+    );
+  });
+
+  it("resumes a running scan after its per-drain request cap", async () => {
+    const lateLine = "src/a.ts:1:1: error: late failure\n";
+    let calls = 0;
+    const progressive = vi.fn(
+      async (_environment: JenkinsEnvironmentRef, _url: string, start: number) => {
+        calls += 1;
+        const text = calls <= 256 ? "x\n" : lateLine;
+        return {
+          text,
+          textSize: start + text.length,
+          moreData: calls <= 256,
+          bytesRead: text.length
+        };
+      }
+    );
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: progressive,
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/10/",
+      profile: profile(),
+      maxLogBytes: 1024
+    });
+
+    const capped = await session.scan(true);
+    assert.equal(progressive.mock.calls.length, 256);
+    assert.equal(capped.complete, false);
+    assert.equal(capped.truncated, false);
+
+    const resumed = await session.scan(true);
+    assert.equal(progressive.mock.calls.length, 257);
+    assert.equal(resumed.complete, false);
+    assert.equal(resumed.truncated, false);
+    assert.deepEqual(
+      resumed.diagnostics.map((diagnostic) => diagnostic.message),
+      ["late failure"]
+    );
   });
 
   it("keeps built-ins running and records a warning when custom matching is disabled", async () => {
@@ -377,5 +495,70 @@ describe("BuildDiagnosticScanSession", () => {
       ]
     );
     assert.equal(result.omittedCount, 4);
+  });
+
+  it("keeps later unique findings when alias errors fill the scanner", async () => {
+    const diagnostics: RawBuildDiagnostic[] = Array.from({ length: 2_000 }, (_unused, index) => ({
+      parserId: "generic",
+      source: "build",
+      severity: "error",
+      message: "broken",
+      rawPath: `/agent-${index}/src/a.ts`,
+      line: 1,
+      kind: "problem",
+      priority: 1,
+      logLine: index + 1,
+      rawText: "broken",
+      sequence: index + 1
+    }));
+    diagnostics.push(
+      { ...diagnostics[0], message: "unique error", rawPath: "src/c.ts" },
+      { ...diagnostics[0], rawPath: "src/e.ts" },
+      { ...diagnostics[0], rawPath: "service-a/src/a.ts" },
+      { ...diagnostics[0], rawPath: "service-b/src/a.ts" },
+      ...Array.from({ length: 2_000 }, (_unused, index) => ({
+        ...diagnostics[0],
+        rawPath: `/later-agent-${index}/src/a.ts`
+      })),
+      { ...diagnostics[0], severity: "warning", message: "unique warning", rawPath: "src/b.ts" },
+      { ...diagnostics[0], severity: "warning", message: "second warning", rawPath: "src/d.ts" }
+    );
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => ({
+          text: "dense output",
+          textSize: 12,
+          moreData: false,
+          bytesRead: 12
+        }),
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/12/",
+      profile: profile({ builtIns: [] }),
+      maxLogBytes: 1024,
+      maxDiagnostics: 2_000,
+      resolveDiagnostic: async (diagnostic) =>
+        diagnostic.rawPath.startsWith("/agent-") || diagnostic.rawPath.startsWith("/later-agent-")
+          ? "/repo/src/a.ts"
+          : `/repo/${diagnostic.rawPath}`,
+      customMatcherRunner: {
+        acceptChunk: async () => diagnostics,
+        finish: async () => [],
+        dispose: () => undefined
+      }
+    });
+
+    const result = await session.scan(false);
+    assert.equal(result.diagnostics.length, 7);
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.message === "unique warning"));
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.message === "second warning"));
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.message === "unique error"));
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.rawPath === "src/e.ts"));
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.rawPath === "service-a/src/a.ts"));
+    assert.ok(result.diagnostics.some((diagnostic) => diagnostic.rawPath === "service-b/src/a.ts"));
+    assert.equal(result.omittedCount, 0);
   });
 });

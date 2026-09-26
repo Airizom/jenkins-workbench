@@ -7,6 +7,7 @@ import {
   validateEnvironmentScopedPanelState
 } from "../../shared/webview/WebviewPanelState";
 import {
+  isPipelineLogTargetViewModel,
   normalizePipelineLogTarget,
   type PipelineLogTargetViewModel
 } from "./BuildDetailsContracts";
@@ -26,7 +27,11 @@ export interface BuildDetailsPanelUiState {
 
 export interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
   buildUrl: string;
-  buildDetailsUi?: BuildDetailsPanelUiState;
+  /**
+   * Best-effort UI state restored from an earlier session, possibly written by
+   * an older version. Read it through normalizeBuildDetailsPanelUiState.
+   */
+  buildDetailsUi?: unknown;
 }
 
 function createBuildDetailsPanelState(
@@ -48,10 +53,7 @@ export function isBuildDetailsPanelState(
       return false;
     }
 
-    return (
-      typeof record.buildDetailsUi === "undefined" ||
-      isBuildDetailsPanelUiState(record.buildDetailsUi)
-    );
+    return typeof record.buildDetailsUi === "undefined" || isPlainRecord(record.buildDetailsUi);
   });
 }
 
@@ -96,7 +98,7 @@ export function withBuildDetailsPanelUiState(
   return {
     ...state,
     buildDetailsUi: normalizeBuildDetailsPanelUiState({
-      ...(state.buildDetailsUi ?? {}),
+      ...normalizeBuildDetailsPanelUiState(state.buildDetailsUi),
       ...uiState
     })
   };
@@ -111,18 +113,25 @@ export function mergeBuildDetailsPanelState(
     previousState?.buildUrl === buildUrl &&
     previousState.environmentId === environment.environmentId &&
     previousState.scope === environment.scope;
+  const previousUi = normalizeBuildDetailsPanelUiState(previousState?.buildDetailsUi);
   const previousUiState = samePanelTarget
-    ? previousState.buildDetailsUi
-    : previousState?.buildDetailsUi?.pipelinePresentation
-      ? { pipelinePresentation: previousState.buildDetailsUi.pipelinePresentation }
+    ? previousUi
+    : previousUi?.pipelinePresentation
+      ? { pipelinePresentation: previousUi.pipelinePresentation }
       : undefined;
   return createBuildDetailsPanelState(environment, buildUrl, previousUiState);
 }
 
-function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelUiState {
+export function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelUiState {
   return (
     isPlainRecord(value) &&
-    (normalizeBuildDetailsPanelUiState(value) !== undefined || Object.keys(value).length === 0)
+    (typeof value.selectedTab === "undefined" || isBuildDetailsTab(value.selectedTab)) &&
+    (typeof value.pipelinePresentation === "undefined" ||
+      isPipelinePresentation(value.pipelinePresentation)) &&
+    (typeof value.selectedGraphStageKey === "undefined" ||
+      typeof value.selectedGraphStageKey === "string") &&
+    (typeof value.selectedPipelineLogTarget === "undefined" ||
+      isPipelineLogTargetViewModel(value.selectedPipelineLogTarget))
   );
 }
 

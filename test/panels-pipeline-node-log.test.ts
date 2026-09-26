@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import type { JenkinsFlowNodeLog, JenkinsProgressiveConsoleHtml } from "../src/jenkins/types";
 import type { BuildDetailsConsoleBackend } from "../src/panels/buildDetails/BuildDetailsBackend";
 import {
   PipelineNodeLogFetcher,
   type PipelineNodeLogFetchResult
 } from "../src/panels/buildDetails/PipelineNodeLogFetcher";
+import { PipelineNodeLogManager } from "../src/panels/buildDetails/PipelineNodeLogManager";
 import { PipelineStageLogAggregator } from "../src/panels/buildDetails/PipelineStageLogAggregator";
 import { isWorkflowNodeActive } from "../src/panels/buildDetails/PipelineWorkflowStatus";
 import { MAX_CONSOLE_CHARS } from "../src/services/ConsoleOutputConfig";
@@ -225,6 +226,44 @@ describe("PipelineStageLogAggregator", () => {
     assert.match(secondResult.text, /log child-1/);
   });
 
+  it("keeps refreshing an active child node after it reports no more data", async () => {
+    let logCallCount = 0;
+    const backend = {
+      getFlowNodeDetails: async () => ({
+        id: "stage-1",
+        status: "SUCCESS",
+        stageFlowNodes: [{ id: "child-1" }]
+      }),
+      getFlowNodeLog: async (_environment: unknown, _buildUrl: string, nodeId: string) => {
+        logCallCount += 1;
+        return logCallCount === 1
+          ? { nodeId, text: "first", hasMore: false, nodeStatus: "IN_PROGRESS" }
+          : { nodeId, text: "first\nsecond", hasMore: false, nodeStatus: "SUCCESS" };
+      }
+    } as unknown as BuildDetailsConsoleBackend;
+    const aggregator = new PipelineStageLogAggregator({
+      backend,
+      environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl: "https://jenkins.example/job/example/1/"
+    });
+    const target: PipelineLogTargetViewModel = {
+      key: "stage:stage-1",
+      kind: "stage",
+      name: "Stage 1",
+      nodeId: "stage-1"
+    };
+
+    const firstResult = await aggregator.fetch(target, true);
+    const secondResult = await aggregator.fetch(target, false);
+    const thirdResult = await aggregator.fetch(target, false);
+
+    assert.equal(firstResult.polling, true);
+    assert.match(secondResult.text, /second/);
+    assert.equal(secondResult.polling, false);
+    assert.equal(thirdResult.polling, false);
+    assert.equal(logCallCount, 2);
+  });
+
   it("starts every request in the capped stage-log batch before awaiting results", async () => {
     const nodeIds = ["1", "2", "3", "4", "5", "6"];
     const calls: string[] = [];
@@ -258,4 +297,113 @@ describe("PipelineStageLogAggregator", () => {
       nodeIds.map((nodeId) => `===== Node ${nodeId} =====\nlog ${nodeId}`).join("\n\n")
     );
   });
+});
+
+describe("PipelineNodeLogManager", () => {
+  it("retries an uncached target after its initial fetch fails", async () => {
+    vi.useFakeTimers();
+    try {
+      let snapshotCalls = 0;
+      const backend = {
+        getFlowNodeLogHtmlProgressive: async () => undefined,
+        getFlowNodeLog: async (): Promise<JenkinsFlowNodeLog> => {
+          snapshotCalls += 1;
+          if (snapshotCalls === 1) {
+            throw new Error("temporary outage");
+          }
+          return { text: "recovered", hasMore: false, nodeStatus: "SUCCESS" };
+        }
+      } as unknown as BuildDetailsConsoleBackend;
+      const logs: PipelineNodeLogViewModel[] = [];
+      const errors: string[] = [];
+      const manager = new PipelineNodeLogManager({
+        backend,
+        environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+        buildUrl: "https://jenkins.example/job/example/1/",
+        getRefreshIntervalMs: () => 1000,
+        formatError: (error) => (error instanceof Error ? error.message : String(error)),
+        callbacks: {
+          onSetLog: (log) => logs.push(log),
+          onAppendHtml: () => undefined,
+          onLoading: () => undefined,
+          onError: (_targetKey, error) => errors.push(error)
+        }
+      });
+
+      manager.selectTarget(buildTarget("7"));
+      await vi.advanceTimersByTimeAsync(0);
+      assert.deepEqual(errors, ["temporary outage"]);
+      assert.equal(snapshotCalls, 1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      assert.equal(snapshotCalls, 2);
+      assert.equal(logs.at(-1)?.text, "recovered");
+      assert.equal(manager.getActiveLog()?.text, "recovered");
+
+      await vi.advanceTimersByTimeAsync(5000);
+      assert.equal(snapshotCalls, 2);
+      manager.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops retrying a target after repeated fetch failures", async () => {
+    vi.useFakeTimers();
+    try {
+      let snapshotCalls = 0;
+      const backend = {
+        getFlowNodeLogHtmlProgressive: async () => undefined,
+        getFlowNodeLog: async (): Promise<JenkinsFlowNodeLog> => {
+          snapshotCalls += 1;
+          throw new Error("forbidden");
+        }
+      } as unknown as BuildDetailsConsoleBackend;
+      const manager = new PipelineNodeLogManager({
+        backend,
+        environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+        buildUrl: "https://jenkins.example/job/example/1/",
+        getRefreshIntervalMs: () => 1000,
+        formatError: (error) => (error instanceof Error ? error.message : String(error)),
+        callbacks: {
+          onSetLog: () => undefined,
+          onAppendHtml: () => undefined,
+          onLoading: () => undefined,
+          onError: () => undefined
+        }
+      });
+
+      manager.selectTarget(buildTarget("7"));
+      await vi.advanceTimersByTimeAsync(10_000);
+      assert.equal(snapshotCalls, 4);
+
+      manager.selectTarget(buildTarget("7"));
+      await vi.advanceTimersByTimeAsync(0);
+      assert.equal(snapshotCalls, 5);
+      manager.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+it("renders wfapi timestamp markup as readable stage log text", async () => {
+  const aggregator = new PipelineStageLogAggregator({
+    environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+    buildUrl: "https://jenkins.example/job/example/1/",
+    backend: {
+      getFlowNodeLog: async () => ({
+        text: '<span class="timestamp"><b>12:00:00</b></span> hello &lt;world&gt;\n',
+        hasMore: false
+      })
+    } as unknown as BuildDetailsConsoleBackend
+  });
+  const log = await aggregator.fetch(
+    { key: "stage:1", kind: "stage", name: "Build", childNodeIds: ["2"] },
+    true
+  );
+  assert.ok(log.text.includes("12:00:00 hello <world>"));
+  assert.ok(!log.text.includes("<span"));
+  assert.ok(!log.html?.includes("&lt;span"));
 });

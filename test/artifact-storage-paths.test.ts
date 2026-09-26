@@ -34,6 +34,7 @@ function createService(): {
         }
       });
     },
+    rename: () => Promise.resolve(),
     delete: () => Promise.resolve()
   };
   return { service: new ArtifactStorageService(dataService, filesystem), writes };
@@ -58,7 +59,9 @@ describe("ArtifactStorageService path sanitization", () => {
 
     assert.equal(result.safeRelativePath, "report.txt_payload");
     assert.equal(path.basename(result.targetPath), "report.txt_payload");
-    assert.deepEqual(writes, [result.targetPath]);
+    assert.equal(writes.length, 1);
+    assert.equal(path.dirname(writes[0]), path.dirname(result.targetPath));
+    assert.notEqual(writes[0], result.targetPath);
   });
 
   it("neutralizes colons in every path segment", async () => {

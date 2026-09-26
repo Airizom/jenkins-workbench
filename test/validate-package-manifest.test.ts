@@ -13,7 +13,8 @@ const canonicalTaskParametersSchema = canonicalPackageJson.contributes.taskDefin
 
 const createFixture = async (
   configurationSchema: object,
-  taskParametersSchema: object = canonicalTaskParametersSchema
+  taskParametersSchema: object = canonicalTaskParametersSchema,
+  commandSource = 'registerCommand("jenkinsWorkbench.test", () => undefined);'
 ) => {
   const fixtureDirectory = await mkdtemp(path.join(tmpdir(), "jenkins-workbench-manifest-"));
   fixtureDirectories.push(fixtureDirectory);
@@ -44,10 +45,7 @@ const createFixture = async (
   await mkdir(path.join(fixtureDirectory, "src", "commands"), { recursive: true });
   await Promise.all([
     writeFile(path.join(fixtureDirectory, "package.json"), JSON.stringify(packageJson)),
-    writeFile(
-      path.join(fixtureDirectory, "src", "commands", "test.ts"),
-      'registerCommand("jenkinsWorkbench.test", () => undefined);'
-    )
+    writeFile(path.join(fixtureDirectory, "src", "commands", "test.ts"), commandSource)
   ]);
 
   return fixtureDirectory;
@@ -69,6 +67,22 @@ describe("package manifest validator", () => {
     const result = runValidator(cwd);
 
     expect(result.status).toBe(0);
+  });
+
+  it.each([
+    '// registerCommand("jenkinsWorkbench.test", () => undefined);',
+    "const example = 'registerCommand(\"jenkinsWorkbench.test\", () => undefined)';"
+  ])("rejects a command registration found only in source text", async (commandSource) => {
+    const cwd = await createFixture(
+      { type: "boolean", default: true },
+      canonicalTaskParametersSchema,
+      commandSource
+    );
+
+    const result = runValidator(cwd);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("jenkinsWorkbench.test is contributed but not registered");
   });
 
   it("rejects an invalid configuration default", async () => {

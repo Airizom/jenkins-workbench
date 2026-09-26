@@ -10,6 +10,8 @@ import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 type DraftMetadata = Parameters<JobConfigDraftManager["createDraft"]>[2];
 
 export class JobConfigUpdateWorkflow {
+  private readonly submittingDrafts = new Set<string>();
+
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly previewer: JobConfigPreviewer,
@@ -82,9 +84,25 @@ export class JobConfigUpdateWorkflow {
     }
 
     const { draft, targetUri } = resolved;
+    const key = targetUri.toString();
+    if (this.submittingDrafts.has(key)) {
+      return;
+    }
+    this.submittingDrafts.add(key);
+    try {
+      await this.submitResolvedDraft(refreshHost, draft, targetUri);
+    } finally {
+      this.submittingDrafts.delete(key);
+    }
+  }
 
+  private async submitResolvedDraft(
+    refreshHost: EnvironmentScopedRefreshHost,
+    draft: JobConfigDraft,
+    targetUri: vscode.Uri
+  ): Promise<void> {
     const document = await vscode.workspace.openTextDocument(targetUri);
-    const editedXml = document.getText();
+    let editedXml = document.getText();
     if (editedXml === draft.originalXml) {
       void vscode.window.showInformationMessage(
         `No changes detected for ${draft.label}. Update canceled.`
@@ -114,16 +132,42 @@ export class JobConfigUpdateWorkflow {
         }
       }
 
+      let uploadXml = document.getText();
+      while (uploadXml !== editedXml) {
+        if (uploadXml === draft.originalXml) {
+          void vscode.window.showInformationMessage(
+            `No changes detected for ${draft.label}. Update canceled.`
+          );
+          return;
+        }
+        if (!(await this.showSubmitConfirmation(draft.label, this.countXmlErrors(targetUri)))) {
+          return;
+        }
+        editedXml = uploadXml;
+        uploadXml = document.getText();
+      }
+
+      const submission = this.dataService.updateJobConfigXml(
+        draft.environment,
+        draft.jobUrl,
+        uploadXml
+      );
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: `Submitting config.xml for ${draft.label}...`,
           cancellable: false
         },
-        () => this.dataService.updateJobConfigXml(draft.environment, draft.jobUrl, editedXml)
+        () => submission
       );
-      void vscode.window.showInformationMessage(`Updated config.xml for ${draft.label}.`);
       refreshHost.fullEnvironmentRefresh({ environmentId: draft.environment.environmentId });
+      if (document.getText() !== uploadXml) {
+        void vscode.window.showInformationMessage(
+          `Updated config.xml for ${draft.label}. Newer edits remain open for another submission.`
+        );
+        return;
+      }
+      void vscode.window.showInformationMessage(`Updated config.xml for ${draft.label}.`);
       const closed = await this.closeDraftEditor(targetUri);
       if (closed) {
         this.draftManager.discardDraft(targetUri);

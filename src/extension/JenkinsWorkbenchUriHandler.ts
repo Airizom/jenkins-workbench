@@ -8,7 +8,7 @@ import type {
 } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWorkbenchDeepLinkBuildHandler } from "./JenkinsWorkbenchDeepLinkBuildHandler";
 import type { JenkinsWorkbenchDeepLinkJobHandler } from "./JenkinsWorkbenchDeepLinkJobHandler";
-import { parseUriQueryParams } from "./UriQueryParams";
+import { parseDeepLinkPayload, parseUriQueryParams } from "./UriQueryParams";
 
 interface EnvironmentMatch {
   environment: EnvironmentWithScope;
@@ -18,6 +18,8 @@ interface EnvironmentMatch {
 interface EnvironmentPickItem extends vscode.QuickPickItem {
   environment: EnvironmentWithScope;
 }
+
+const DEEP_LINK_QUERY_KEYS = new Set(["url", "nodeId", "nodeKind", "nodeName"]);
 
 export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
   constructor(
@@ -35,7 +37,13 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
       return;
     }
 
-    const queryParams = parseUriQueryParams(uri.query);
+    const queryParams = uri.query.startsWith("payload=")
+      ? parseDeepLinkPayload(uri.query)
+      : parseUriQueryParams(uri.query, DEEP_LINK_QUERY_KEYS);
+    if (!queryParams) {
+      void vscode.window.showErrorMessage("Invalid Jenkins Workbench link payload.");
+      return;
+    }
     const targetUrlValue = this.getQueryParam(queryParams, "url");
     if (!targetUrlValue) {
       void vscode.window.showErrorMessage("Missing required 'url' query parameter.");

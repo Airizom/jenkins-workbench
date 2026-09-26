@@ -60,7 +60,7 @@ export function buildTestReportTree(options?: JenkinsTestReportOptions): string 
   if (options?.includeCaseLogs) {
     caseFields.push("errorStackTrace", "stdout", "stderr");
   }
-  return `failCount,skipCount,totalCount,suites[cases[${caseFields.join(",")}]]`;
+  return `passCount,failCount,skipCount,totalCount,suites[cases[${caseFields.join(",")}]]`;
 }
 
 function buildActionFields(options?: {

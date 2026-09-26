@@ -190,13 +190,13 @@ export class BuildDetailsPollingController {
   }
 
   async loadInitial(): Promise<BuildDetailsInitialState> {
-    const detailsPromise = this.statusBackend.getBuildDetails(this.environment, this.buildUrl);
-    const workflowPromise = this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
-    const consolePromise = this.consoleStreamManager.loadInitialConsole();
-    const pendingInputsPromise = this.pendingInputProvider.getPendingInputActions(
-      this.environment,
-      this.buildUrl
-    );
+    const [detailsResult, workflowResult, consoleResult, pendingInputsResult] =
+      await Promise.allSettled([
+        this.statusBackend.getBuildDetails(this.environment, this.buildUrl),
+        this.statusBackend.getWorkflowRun(this.environment, this.buildUrl),
+        this.consoleStreamManager.loadInitialConsole(),
+        this.pendingInputProvider.getPendingInputActions(this.environment, this.buildUrl)
+      ]);
 
     const errors: string[] = [];
     let details: JenkinsBuildDetails | undefined;
@@ -209,30 +209,30 @@ export class BuildDetailsPollingController {
     let pendingInputs: PendingInputAction[] = [];
     let pendingInputsError: unknown;
 
-    try {
-      details = await detailsPromise;
-    } catch (error) {
-      detailsError = error;
+    if (detailsResult.status === "fulfilled") {
+      details = detailsResult.value;
+    } else {
+      detailsError = detailsResult.reason;
     }
 
-    try {
-      workflowRun = await workflowPromise;
-    } catch (error) {
-      workflowError = error;
+    if (workflowResult.status === "fulfilled") {
+      workflowRun = workflowResult.value;
+    } else {
+      workflowError = workflowResult.reason;
     }
 
-    try {
-      pendingInputs = await pendingInputsPromise;
+    if (pendingInputsResult.status === "fulfilled") {
+      pendingInputs = pendingInputsResult.value;
       this.lastPendingInputsCount = pendingInputs.length;
-    } catch (error) {
-      pendingInputsError = error;
+    } else {
+      pendingInputsError = pendingInputsResult.reason;
     }
 
     let consoleSnapshot: ConsoleSnapshotResult | undefined;
-    try {
-      consoleSnapshot = await consolePromise;
-    } catch (error) {
-      consoleError = error;
+    if (consoleResult.status === "fulfilled") {
+      consoleSnapshot = consoleResult.value;
+    } else {
+      consoleError = consoleResult.reason;
     }
 
     if (consoleSnapshot) {
@@ -325,8 +325,10 @@ export class BuildDetailsPollingController {
     const pollGeneration = this.pollGeneration;
 
     try {
-      const detailsPromise = this.statusBackend.getBuildDetails(this.environment, this.buildUrl);
-      const consolePromise = this.consoleStreamManager.fetchNext();
+      const [detailsResult, consoleFetchResult] = await Promise.allSettled([
+        this.statusBackend.getBuildDetails(this.environment, this.buildUrl),
+        this.consoleStreamManager.fetchNext()
+      ]);
 
       let details: JenkinsBuildDetails | undefined;
       let detailsError: unknown;
@@ -337,16 +339,16 @@ export class BuildDetailsPollingController {
       let pendingInputs: PendingInputAction[] = [];
       let pendingInputsError: unknown;
 
-      try {
-        details = await detailsPromise;
-      } catch (error) {
-        detailsError = error;
+      if (detailsResult.status === "fulfilled") {
+        details = detailsResult.value;
+      } else {
+        detailsError = detailsResult.reason;
       }
 
-      try {
-        consoleResult = await consolePromise;
-      } catch (error) {
-        consoleError = error;
+      if (consoleFetchResult.status === "fulfilled") {
+        consoleResult = consoleFetchResult.value;
+      } else {
+        consoleError = consoleFetchResult.reason;
       }
 
       const shouldFetchPendingInputs =

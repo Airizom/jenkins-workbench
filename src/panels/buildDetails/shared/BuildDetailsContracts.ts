@@ -75,6 +75,24 @@ export function normalizePipelineLogTarget(value: unknown): PipelineLogTargetVie
   };
 }
 
+export function isPipelineLogTargetViewModel(value: unknown): value is PipelineLogTargetViewModel {
+  if (!isPlainRecord(value)) {
+    return false;
+  }
+  if (
+    typeof value.key !== "string" ||
+    typeof value.name !== "string" ||
+    !isPipelineLogTargetKind(value.kind) ||
+    (typeof value.nodeId !== "undefined" && typeof value.nodeId !== "string") ||
+    (typeof value.childNodeIds !== "undefined" &&
+      (!Array.isArray(value.childNodeIds) ||
+        value.childNodeIds.some((nodeId) => typeof nodeId !== "string")))
+  ) {
+    return false;
+  }
+  return normalizePipelineLogTarget(value) !== undefined;
+}
+
 export interface PipelineNodeLogViewModel {
   target?: PipelineLogTargetViewModel;
   html?: string;

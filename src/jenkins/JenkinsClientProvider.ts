@@ -64,10 +64,14 @@ export class JenkinsClientProvider {
       requestTimeoutMs: this.requestTimeoutMs
     });
 
-    this.clientCache.set(cacheKey, {
-      ...entry,
-      client
-    });
+    // Only publish onto the entry this client was built from; a newer resolution or an
+    // invalidation must not be replaced by a client carrying older credentials.
+    if (this.clientCache.get(cacheKey) === entry) {
+      this.clientCache.set(cacheKey, {
+        ...entry,
+        client
+      });
+    }
 
     return client;
   }
@@ -85,6 +89,10 @@ export class JenkinsClientProvider {
       return undefined;
     }
 
+    const authConfigRevision = this.store.getAuthConfigRevision(
+      environment.scope,
+      environment.environmentId
+    );
     const refreshed = await this.browserSsoAuthenticator.authenticate({
       environmentUrl: environment.url,
       loginUrl: currentAuthConfig.loginUrl,
@@ -95,8 +103,15 @@ export class JenkinsClientProvider {
       return undefined;
     }
 
-    await this.store.setAuthConfig(environment.scope, environment.environmentId, refreshed);
-    return refreshed;
+    // The auth config may have been edited while the browser flow was pending; never
+    // overwrite that newer configuration with credentials from this older attempt.
+    const saved = await this.store.setAuthConfigIfRevision(
+      environment.scope,
+      environment.environmentId,
+      refreshed,
+      authConfigRevision
+    );
+    return saved ? refreshed : undefined;
   }
 
   private async resolveAuthMaterial(
@@ -117,34 +132,61 @@ export class JenkinsClientProvider {
     environment: JenkinsEnvironmentRef
   ): Promise<JenkinsClientCacheResolution> {
     const cacheKey = `${environment.scope}:${environment.environmentId}`;
-    const authConfigRevision = this.store.getAuthConfigRevision(
-      environment.scope,
-      environment.environmentId
-    );
-    const cached = this.clientCache.get(cacheKey);
-    const identityMatches =
-      cached?.url === environment.url && cached.username === environment.username;
+    for (;;) {
+      const authConfigRevision = this.store.getAuthConfigRevision(
+        environment.scope,
+        environment.environmentId
+      );
+      const cached = this.getCurrentCacheEntry(cacheKey, environment, authConfigRevision);
+      if (cached) {
+        return { cacheKey, entry: cached };
+      }
 
-    if (identityMatches && cached.authConfigRevision === authConfigRevision) {
-      return { cacheKey, entry: cached };
+      const authMaterial = await this.resolveAuthMaterial(environment);
+      // Credentials changed while this read was pending; resolve again rather than
+      // publishing material for a revision that is already stale.
+      if (
+        this.store.getAuthConfigRevision(environment.scope, environment.environmentId) !==
+        authConfigRevision
+      ) {
+        continue;
+      }
+      const current = this.getCurrentCacheEntry(cacheKey, environment, authConfigRevision);
+      if (current) {
+        return { cacheKey, entry: current };
+      }
+
+      const previous = this.clientCache.get(cacheKey);
+      const client =
+        previous?.url === environment.url &&
+        previous.username === environment.username &&
+        previous.client &&
+        previous.authMaterial.authSignature === authMaterial.authSignature &&
+        previous.authMaterial.token === authMaterial.token
+          ? previous.client
+          : undefined;
+      const entry: JenkinsClientCacheEntry = {
+        client,
+        authMaterial,
+        authConfigRevision,
+        url: environment.url,
+        username: environment.username
+      };
+      this.clientCache.set(cacheKey, entry);
+      return { cacheKey, entry };
     }
+  }
 
-    const authMaterial = await this.resolveAuthMaterial(environment);
-    const client =
-      identityMatches &&
-      cached.client &&
-      cached.authMaterial.authSignature === authMaterial.authSignature &&
-      cached.authMaterial.token === authMaterial.token
-        ? cached.client
-        : undefined;
-    const entry: JenkinsClientCacheEntry = {
-      client,
-      authMaterial,
-      authConfigRevision,
-      url: environment.url,
-      username: environment.username
-    };
-    this.clientCache.set(cacheKey, entry);
-    return { cacheKey, entry };
+  private getCurrentCacheEntry(
+    cacheKey: string,
+    environment: JenkinsEnvironmentRef,
+    authConfigRevision: number
+  ): JenkinsClientCacheEntry | undefined {
+    const cached = this.clientCache.get(cacheKey);
+    return cached?.url === environment.url &&
+      cached.username === environment.username &&
+      cached.authConfigRevision === authConfigRevision
+      ? cached
+      : undefined;
   }
 }

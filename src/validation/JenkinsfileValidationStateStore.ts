@@ -155,6 +155,7 @@ export class JenkinsfileValidationStateStore {
     tokenSource: vscode.CancellationTokenSource;
   } {
     const key = this.getDocumentKey(document);
+    this.cancelChangeTokenSource(key);
     const tokenSource = new vscode.CancellationTokenSource();
     this.changeTokenSources.set(key, tokenSource);
     return { key, tokenSource };
@@ -163,6 +164,7 @@ export class JenkinsfileValidationStateStore {
   completeChangeValidation(key: string, tokenSource: vscode.CancellationTokenSource): void {
     if (this.changeTokenSources.get(key) === tokenSource) {
       this.changeTokenSources.delete(key);
+      tokenSource.dispose();
     }
   }
 
@@ -173,12 +175,17 @@ export class JenkinsfileValidationStateStore {
       clearTimeout(timer);
       this.pendingChangeTimers.delete(key);
     }
+    this.cancelChangeTokenSource(key);
+  }
+
+  private cancelChangeTokenSource(key: string): void {
     const tokenSource = this.changeTokenSources.get(key);
-    if (tokenSource) {
-      tokenSource.cancel();
-      tokenSource.dispose();
-      this.changeTokenSources.delete(key);
+    if (!tokenSource) {
+      return;
     }
+    this.changeTokenSources.delete(key);
+    tokenSource.cancel();
+    tokenSource.dispose();
   }
 
   private cancelAllChangeValidations(): void {

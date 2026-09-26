@@ -60,6 +60,21 @@ describe("buildTestsSection", () => {
     assert.equal(section.removedTests[0]?.targetStatusTone, undefined);
   });
 
+  it("does not match distinct cases whose fields contain key delimiters", () => {
+    const baseline: JenkinsTestReport = {
+      suites: [{ name: "C", cases: [{ className: "A::B", name: "D", status: "PASSED" }] }]
+    };
+    const target: JenkinsTestReport = {
+      suites: [{ name: "B::C", cases: [{ className: "A", name: "D", status: "FAILED" }] }]
+    };
+
+    const section = buildTestsSection(availableReport(baseline), availableReport(target));
+
+    assert.equal(section.newFailures.length, 0);
+    assert.equal(section.addedTests.length, 1);
+    assert.equal(section.removedTests.length, 1);
+  });
+
   it("does not describe unavailable test reports as unchanged", () => {
     const section = buildTestsSection({ status: "unavailable" }, { status: "unavailable" });
 

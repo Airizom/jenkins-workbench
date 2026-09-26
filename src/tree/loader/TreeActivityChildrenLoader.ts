@@ -47,7 +47,8 @@ export class TreeActivityChildrenLoader {
 
   async loadActivityGroups(
     folder: ActivityFolderTreeItem,
-    isCurrentLoad: () => boolean = () => true
+    isCurrentLoad: () => boolean = () => true,
+    onError?: (error: unknown) => void
   ): Promise<WorkbenchTreeElement[]> {
     try {
       const viewModel = await this.collectActivity(folder.environment);
@@ -96,6 +97,7 @@ export class TreeActivityChildrenLoader {
 
       return groups;
     } catch (error) {
+      onError?.(error);
       return [this.placeholders.createErrorPlaceholder("Unable to load activity.", error)];
     }
   }
@@ -109,9 +111,19 @@ export class TreeActivityChildrenLoader {
       return cached;
     }
 
-    await this.loadActivityGroups(new ActivityFolderTreeItem(groupItem.environment), isCurrentLoad);
+    const failures: unknown[] = [];
+    await this.loadActivityGroups(
+      new ActivityFolderTreeItem(groupItem.environment),
+      isCurrentLoad,
+      (error) => {
+        failures.push(error);
+      }
+    );
     if (!isCurrentLoad()) {
       return [];
+    }
+    if (failures.length > 0) {
+      return [this.placeholders.createErrorPlaceholder("Unable to load activity.", failures[0])];
     }
     return (
       this.activityCache.getGroupChildren(groupItem.environment, groupItem.group) ?? [

@@ -1,10 +1,54 @@
 import assert from "node:assert/strict";
+import { Readable } from "node:stream";
 import { describe, it, vi } from "vitest";
 import { JenkinsBuildConsoleClient } from "../src/jenkins/client/JenkinsBuildConsoleClient";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
 describe("JenkinsBuildConsoleClient", () => {
+  it.each(["é", "😀"])(
+    "advances a one-byte progressive read past an initial %s",
+    async (character) => {
+      const body = Buffer.from(`${character}abcde`);
+      const client = new JenkinsBuildConsoleClient(
+        createJenkinsClientContext({
+          requestStream: async (url) => {
+            const start = Number(new URL(url).searchParams.get("start"));
+            const remaining = body.subarray(start);
+            const stream = Readable.from([remaining]);
+            return {
+              stream,
+              headers: {
+                "content-length": String(remaining.length),
+                "x-text-size": String(body.length),
+                "x-more-data": "false"
+              },
+              abort: () => stream.destroy()
+            };
+          }
+        })
+      );
+
+      let start = 0;
+      let text = "";
+      let moreData = true;
+      while (moreData) {
+        const result = await client.getConsoleTextProgressive(
+          "https://jenkins.example.com/job/test/1/",
+          start,
+          1
+        );
+        assert.ok(result.textSize > start);
+        text += result.text;
+        start = result.textSize;
+        moreData = result.moreData;
+      }
+
+      assert.equal(text, `${character}abcde`);
+      assert.equal(start, body.length);
+    }
+  );
+
   it.each([undefined, 0, -1])(
     "gets the complete console text once for limit %s",
     async (maxChars) => {

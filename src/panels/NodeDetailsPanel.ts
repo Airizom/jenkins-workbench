@@ -78,6 +78,7 @@ export class NodeDetailsPanel {
   private disposed = false;
   private nonce = createNonce();
   private advancedLoaded = false;
+  private advancedRequested = false;
 
   static async show(options: NodeDetailsPanelShowOptions): Promise<void> {
     const { dataService, environment, nodeUrl, extensionUri, label, refreshHost } = options;
@@ -217,6 +218,7 @@ export class NodeDetailsPanel {
     this.nonce = createNonce();
     this.lastDetails = undefined;
     this.advancedLoaded = false;
+    this.advancedRequested = false;
     this.loadTracker.resetLoadingRequests();
     const panelState =
       this.environment && this.nodeUrl
@@ -268,6 +270,7 @@ export class NodeDetailsPanel {
     if (this.advancedLoaded) {
       return;
     }
+    this.advancedRequested = true;
     await this.refreshDetailsWith("advanced");
   }
 
@@ -277,9 +280,7 @@ export class NodeDetailsPanel {
   ): Promise<void> {
     const token = this.loadTracker.nextToken();
     const shouldToggleLoading = !options?.skipLoading;
-    if (shouldToggleLoading) {
-      this.loadTracker.beginLoading();
-    }
+    const loadingRequest = shouldToggleLoading ? this.loadTracker.beginLoading() : undefined;
     try {
       const model = await this.fetchNodeDetails(token, detailLevel);
       if (!model || !this.loadTracker.isCurrent(token)) {
@@ -287,8 +288,8 @@ export class NodeDetailsPanel {
       }
       this.postMessage({ type: "updateNodeDetails", payload: model });
     } finally {
-      if (shouldToggleLoading) {
-        this.loadTracker.endLoading();
+      if (loadingRequest !== undefined) {
+        this.loadTracker.endLoading(loadingRequest);
       }
     }
   }
@@ -301,7 +302,7 @@ export class NodeDetailsPanel {
     }
     const label = this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node";
     const target = { environment: this.environment, nodeUrl: this.nodeUrl, label };
-    this.loadTracker.beginLoading();
+    const loadingRequest = this.loadTracker.beginLoading();
     try {
       const { nodeActionService, refreshHost } = this;
       let didToggle: boolean;
@@ -322,7 +323,7 @@ export class NodeDetailsPanel {
     } catch (error) {
       void vscode.window.showErrorMessage(formatActionError(error));
     } finally {
-      this.loadTracker.endLoading();
+      this.loadTracker.endLoading(loadingRequest);
     }
   }
 
@@ -400,7 +401,9 @@ export class NodeDetailsPanel {
   private async copyJson(content: string): Promise<void> {
     try {
       await vscode.env.clipboard.writeText(content);
+      this.postMessage({ type: "copyNodeJsonResult", success: true });
     } catch (error) {
+      this.postMessage({ type: "copyNodeJsonResult", success: false });
       void vscode.window.showErrorMessage(
         `Failed to copy node details: ${error instanceof Error ? error.message : "Unknown error"}`
       );
@@ -408,7 +411,7 @@ export class NodeDetailsPanel {
   }
 
   private get currentDetailLevel(): "basic" | "advanced" {
-    return this.advancedLoaded ? "advanced" : "basic";
+    return this.advancedRequested || this.advancedLoaded ? "advanced" : "basic";
   }
 
   private setRefreshHost(refreshHost?: NodeDetailsRefreshHost): void {

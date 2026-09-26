@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   findPipelineBlock,
-  hasTopLevelSection
+  hasTopLevelSection,
+  resolveInsertLocation
 } from "../src/validation/editor/JenkinsfilePipelineParser";
 
 function createDocument(text: string): Parameters<typeof findPipelineBlock>[0] {
@@ -111,6 +112,29 @@ describe("Jenkinsfile pipeline parser", () => {
       assert.equal(context.closeLine, 2);
     });
 
+    it("targets the real pipeline after a commented-out block", () => {
+      const document = createDocument("/*\npipeline {\n}\n*/\npipeline {\n  stages {}\n}");
+      const context = findPipelineBlock(document);
+      assert.ok(context);
+      assert.equal(context.openLine, 4);
+      assert.equal(context.closeLine, 6);
+      assert.deepEqual(resolveInsertLocation(document, context, "agent"), {
+        line: 5,
+        character: 0
+      });
+    });
+
+    it("ignores pipeline headers and closing braces in comments and strings", () => {
+      const document = createDocument(
+        '"""\npipeline {\n}\n"""\npipeline {\n  /*\n}\n  */\n  echo "}"\n}'
+      );
+      const context = findPipelineBlock(document);
+      assert.ok(context);
+      assert.equal(context.openLine, 4);
+      assert.equal(context.closeLine, 9);
+      assert.equal(findPipelineBlock(createDocument("/*\npipeline {}\n*/")), undefined);
+    });
+
     it("skips pipeline lines that neither open a brace nor stand alone", () => {
       const context = findPipelineBlock(createDocument("pipeline agent\npipeline {\n}"));
       assert.ok(context);
@@ -143,6 +167,14 @@ describe("Jenkinsfile pipeline parser", () => {
       assert.equal(context.childIndent, "      ");
       assert.equal(context.indentUnit, "    ");
       assert.equal(context.closeLine, 3);
+    });
+
+    it("ignores a differently indented comment when choosing child indentation", () => {
+      const context = findPipelineBlock(
+        createDocument("pipeline {\n    // note\n  agent any\n  stages {}\n}")
+      );
+      assert.ok(context);
+      assert.equal(context.childIndent, "  ");
     });
 
     it("falls back to a two-space child indent when the body is empty or not indented", () => {
@@ -210,6 +242,23 @@ describe("Jenkinsfile pipeline parser", () => {
       assert.equal(hasTopLevelSection(document, context, "agent"), true);
       assert.equal(hasTopLevelSection(document, context, "stages"), true);
       assert.equal(hasTopLevelSection(document, context, "options"), false);
+    });
+
+    it("finds sections by nesting when comments and sections use different indentation", () => {
+      const { document, context } = parsePipeline(
+        "pipeline {\n    // note\n    options {}\n  agent any\n      stages {}\n}"
+      );
+
+      assert.equal(context.childIndent, "    ");
+      assert.equal(hasTopLevelSection(document, context, "agent"), true);
+      assert.equal(hasTopLevelSection(document, context, "stages"), true);
+    });
+
+    it("does not treat a nested section as top-level despite matching indentation", () => {
+      const { document, context } = parsePipeline("pipeline {\n  stages {\n  agent any\n  }\n}");
+
+      assert.equal(hasTopLevelSection(document, context, "stages"), true);
+      assert.equal(hasTopLevelSection(document, context, "agent"), false);
     });
 
     it("ignores inline tokens inside double- and single-quoted strings", () => {

@@ -22,6 +22,12 @@ export function TestPassDonutCard({
 }: TestPassDonutCardProps): React.JSX.Element {
   const distribution = getTestDistribution(summary);
   const passRate = Math.round(distribution.passedPct);
+  const badgeTone =
+    summary.failedCount > 0
+      ? "failed"
+      : summary.passedCount === 0 && summary.skippedCount > 0
+        ? "skipped"
+        : "passed";
 
   return (
     <Card>
@@ -31,10 +37,7 @@ export function TestPassDonutCard({
           <CardTitle>Tests</CardTitle>
         </div>
         {summary.hasAnyResults ? (
-          <ToneBadge
-            label={`${passRate}% passed`}
-            tone={summary.failedCount > 0 ? "failed" : "passed"}
-          />
+          <ToneBadge label={`${passRate}% passed`} tone={badgeTone} />
         ) : null}
       </CardHeader>
       <CardContent className="pb-4">

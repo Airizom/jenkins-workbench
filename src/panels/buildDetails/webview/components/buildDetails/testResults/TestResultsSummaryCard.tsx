@@ -5,9 +5,20 @@ import { TestTubeIcon } from "../../../../../shared/webview/icons";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
 import { getTestDistribution } from "./testResultsUtils";
 
+function getPassedPercent(summary: BuildTestsSummaryViewModel, passedPct: number): number {
+  const rounded = Math.round(passedPct);
+  if (rounded >= 100 && summary.passedCount < summary.totalCount) {
+    return 99;
+  }
+  if (rounded <= 0 && summary.passedCount > 0) {
+    return 1;
+  }
+  return rounded;
+}
+
 export function TestResultsSummaryCard({ summary }: { summary: BuildTestsSummaryViewModel }) {
   const { failedPct, skippedPct, passedPct } = getTestDistribution(summary);
-  const passedPercent = Math.round(passedPct);
+  const passedPercent = getPassedPercent(summary, passedPct);
 
   return (
     <MetricsSummarySection

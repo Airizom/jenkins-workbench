@@ -38,4 +38,37 @@ describe("JenkinsPipelineAdapter", () => {
 
     assert.equal(run?.stages[0]?.steps[0]?.durationMillis, 1250);
   });
+
+  it("uses populated fallback steps when stageFlowNodes is empty", () => {
+    const run = toPipelineRun({
+      stages: [
+        {
+          id: "1",
+          name: "Build",
+          stageFlowNodes: [],
+          steps: [{ id: "2", name: "Shell" }]
+        }
+      ]
+    });
+
+    const stepNames = run?.stages[0]?.steps.map((step) => step.name);
+    assert.deepEqual(stepNames, ["Shell"]);
+  });
+
+  it("uses populated fallback branches when earlier aliases are empty", () => {
+    const run = toPipelineRun({
+      stages: [
+        {
+          id: "1",
+          name: "Parallel",
+          parallelStages: [],
+          branches: [],
+          children: [{ id: "3", name: "Linux" }]
+        }
+      ]
+    });
+
+    const branchNames = run?.stages[0]?.parallelBranches.map((branch) => branch.name);
+    assert.deepEqual(branchNames, ["Linux"]);
+  });
 });

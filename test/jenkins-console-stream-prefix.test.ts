@@ -52,6 +52,16 @@ describe("readTextPrefixFromStream", () => {
     assert.deepEqual(result, { text: "", truncated: false, bytesRead: 0, resumeBytes: 0 });
   });
 
+  it("rejects a premature close after receiving partial data", async () => {
+    const { response, stream } = createStreamResponse();
+
+    const resultPromise = readTextPrefixFromStream(response, 100);
+    stream.emit("data", Buffer.from("partial"));
+    stream.emit("close");
+
+    await assert.rejects(resultPromise, /closed before completion/);
+  });
+
   it("concatenates multiple chunks, converting string chunks to bytes", async () => {
     const { response, stream } = createStreamResponse();
 

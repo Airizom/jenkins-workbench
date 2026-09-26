@@ -4,6 +4,8 @@ import { InMemoryDraftFilesystem } from "./InMemoryDraftFilesystem";
 export const JOB_CONFIG_DRAFT_SCHEME = "jenkins-config";
 
 export class JobConfigDraftFilesystem extends InMemoryDraftFilesystem {
+  private nextDraftId = 0;
+
   constructor() {
     super(JOB_CONFIG_DRAFT_SCHEME, "Renaming job config drafts is not supported.");
   }
@@ -14,7 +16,7 @@ export class JobConfigDraftFilesystem extends InMemoryDraftFilesystem {
         .trim()
         .replace(/[^a-zA-Z0-9-_]+/g, "-")
         .slice(0, 40) || "job";
-    const filename = `jenkins-${safeLabel}-config-${Date.now()}.xml`;
+    const filename = `jenkins-${safeLabel}-config-${Date.now()}-${this.nextDraftId++}.xml`;
     return this.createDraftFile(`/${filename}`, content);
   }
 }

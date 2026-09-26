@@ -186,6 +186,16 @@ function findBareCallStatementStart(maskedText: string, offset: number): number 
       }
       return current + 1;
     }
+    if (
+      character === "\n" &&
+      maskedText
+        .slice(current + 1, offset)
+        .trimStart()
+        .startsWith(",")
+    ) {
+      current -= 1;
+      continue;
+    }
     if (character === "\n" || character === ";" || character === "{") {
       return current + 1;
     }

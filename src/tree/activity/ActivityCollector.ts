@@ -89,10 +89,7 @@ function createActivityScanState(
     groups: createActivityGroups(),
     collectionLimit,
     // Retain every enrichment candidate and enough entries to refill Running after promotion.
-    runningCollectionLimit: Math.max(
-      pendingInputCandidateLimit,
-      collectionLimit + Math.min(collectionLimit, pendingInputCandidateLimit)
-    ),
+    runningCollectionLimit: pendingInputCandidateLimit + collectionLimit,
     stop: false
   };
 }

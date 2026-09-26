@@ -85,6 +85,6 @@ describe("unwatchJob", () => {
       "raw-settled",
       "refresh"
     ]);
-    assert.deepEqual(informationMessages, ["Stopped watching demo."]);
+    assert.deepEqual(informationMessages, []);
   });
 });

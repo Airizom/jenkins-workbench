@@ -12,6 +12,7 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 import { OverflowText } from "./BuildFailureOverflowText";
+import { createUniqueListKeys } from "./buildFailureListKeys";
 export function BuildFailureArtifactsCard({
   items,
   overflowCount,
@@ -40,9 +41,10 @@ function ArtifactsList({
   items: BuildFailureArtifact[];
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
+  const keys = createUniqueListKeys(items, (item) => item.relativePath ?? item.name);
   return (
     <ul className="list-none m-0 p-0 flex flex-col gap-1">
-      {items.map((item) => {
+      {items.map((item, index) => {
         const displayName = item.name ?? "Artifact";
         const relativePath = item.relativePath ?? displayName;
         const artifactLabel =
@@ -53,7 +55,7 @@ function ArtifactsList({
         return (
           <li
             className="flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-muted-soft px-2 py-1.5"
-            key={item.relativePath}
+            key={keys[index]}
           >
             <Tooltip>
               <TooltipTrigger asChild>

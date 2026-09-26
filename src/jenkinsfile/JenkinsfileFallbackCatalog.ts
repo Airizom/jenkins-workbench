@@ -375,15 +375,16 @@ const FALLBACK_STEPS: JenkinsfileStepDefinition[] = [
     isAdvanced: false,
     signatures: [
       {
-        label: "parallel(branches: Map, failFast: boolean)",
+        label: "parallel(branchName: Closure, ..., failFast: boolean)",
         usesNamedArgs: true,
         takesClosure: false,
         parameters: [
           {
-            name: "branches",
-            type: "Map",
+            name: "branchName",
+            type: "Closure",
             required: true,
-            description: "Map of branch names to closures."
+            description:
+              "Name of a parallel branch mapped to the closure it runs. Repeat for each branch."
           },
           {
             name: "failFast",

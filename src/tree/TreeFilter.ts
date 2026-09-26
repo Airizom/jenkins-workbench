@@ -2,6 +2,7 @@ import { isFailingJobColor, isRunningJobColor } from "../formatters/JobColorForm
 import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsJobInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
 import { normalizeBranchFilter } from "./branchFilters";
 
@@ -47,7 +48,7 @@ export class JenkinsTreeFilter {
         return false;
       }
 
-      if (hasBranchFilter && !job.name.toLowerCase().includes(branchNeedle)) {
+      if (hasBranchFilter && !decodeJenkinsJobName(job.name).toLowerCase().includes(branchNeedle)) {
         return false;
       }
 

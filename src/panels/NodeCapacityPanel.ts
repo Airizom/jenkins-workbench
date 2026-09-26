@@ -73,6 +73,7 @@ export class NodeCapacityPanel {
   private capacityService?: NodeCapacityService;
   private environment?: JenkinsEnvironmentRef;
   private readonly loadTracker: PanelLoadTracker;
+  private executorLoadGeneration = 0;
   private capacityRequestCount = 0;
   private hasRendered = false;
   private disposed = false;
@@ -163,7 +164,7 @@ export class NodeCapacityPanel {
           return;
         }
         if (isLoadNodeCapacityExecutorsMessage(message)) {
-          void this.loadNodeExecutors(message.nodeUrls);
+          void this.loadNodeExecutors(message.nodeUrls, message.snapshotGeneration);
         }
       },
       null,
@@ -211,6 +212,7 @@ export class NodeCapacityPanel {
   private async load(): Promise<void> {
     this.stopVisibleRefreshTimer();
     this.beginCapacityRequest();
+    this.executorLoadGeneration += 1;
     const token = this.loadTracker.nextToken();
     this.hasRendered = false;
     this.nonce = createNonce();
@@ -269,9 +271,7 @@ export class NodeCapacityPanel {
     }
     this.beginCapacityRequest();
     const token = this.loadTracker.nextToken();
-    if (!options?.skipLoading) {
-      this.loadTracker.beginLoading();
-    }
+    const loadingRequest = options?.skipLoading ? undefined : this.loadTracker.beginLoading();
     try {
       const model = await this.fetchCapacity(token);
       if (!model || !this.loadTracker.isCurrent(token)) {
@@ -279,8 +279,8 @@ export class NodeCapacityPanel {
       }
       this.postMessage({ type: "updateNodeCapacity", payload: model });
     } finally {
-      if (!options?.skipLoading) {
-        this.loadTracker.endLoading();
+      if (loadingRequest !== undefined) {
+        this.loadTracker.endLoading(loadingRequest);
       }
       this.endCapacityRequest();
     }
@@ -353,13 +353,13 @@ export class NodeCapacityPanel {
     });
   }
 
-  private async loadNodeExecutors(nodeUrls: string[]): Promise<void> {
+  private async loadNodeExecutors(nodeUrls: string[], snapshotGeneration: number): Promise<void> {
     if (!this.capacityService || !this.environment) {
       return;
     }
     const capacityService = this.capacityService;
     const environment = this.environment;
-    const token = this.loadTracker.currentToken;
+    const generation = this.executorLoadGeneration;
     const environmentId = environment.environmentId;
     const candidateNodeUrls = [...new Set(nodeUrls.filter((nodeUrl) => nodeUrl.trim().length > 0))];
     const uniqueNodeUrls = candidateNodeUrls.filter((nodeUrl) =>
@@ -373,12 +373,24 @@ export class NodeCapacityPanel {
     }
     try {
       const entries = await capacityService.hydrateNodeExecutors(environment, uniqueNodeUrls);
-      if (!this.loadTracker.isCurrent(token) || this.environment?.environmentId !== environmentId) {
+      if (
+        this.disposed ||
+        this.executorLoadGeneration !== generation ||
+        this.environment?.environmentId !== environmentId
+      ) {
         return;
       }
-      this.postMessage({ type: "updateNodeCapacityNodeExecutors", payload: entries });
+      this.postMessage({
+        type: "updateNodeCapacityNodeExecutors",
+        snapshotGeneration,
+        payload: entries
+      });
     } catch (error) {
-      if (!this.loadTracker.isCurrent(token) || this.environment?.environmentId !== environmentId) {
+      if (
+        this.disposed ||
+        this.executorLoadGeneration !== generation ||
+        this.environment?.environmentId !== environmentId
+      ) {
         return;
       }
       void vscode.window.showErrorMessage(

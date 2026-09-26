@@ -327,7 +327,11 @@ export class PendingInputRefreshCoordinator implements vscode.Disposable {
 
   private emitChange(change: PendingInputSummaryChange): void {
     for (const listener of this.listeners) {
-      listener(change);
+      try {
+        listener(change);
+      } catch (error) {
+        console.warn("Pending input summary listener failed.", error);
+      }
     }
   }
 

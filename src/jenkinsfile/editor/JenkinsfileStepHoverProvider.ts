@@ -94,7 +94,7 @@ function appendStepSignatures(
 
   markdown.appendMarkdown("**Signatures**\n");
   for (const signature of signatures) {
-    markdown.appendMarkdown(`- \`${escapeCodeFence(signature.label)}\`\n`);
+    markdown.appendMarkdown(`- ${codeSpan(signature.label)}\n`);
     const describedParameters = signature.parameters.filter(
       (parameter) => !parameter.isBody && parameter.description
     );
@@ -108,11 +108,21 @@ function appendStepSignatures(
 }
 
 function escapeMarkdown(value: string): string {
-  return value.replace(/[\\`*_{}[\]()#+\-.!]/g, "\\$&");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[\\`*_{}[\]()#+\-.!]/g, "\\$&");
 }
 
-function escapeCodeFence(value: string): string {
-  return value.replace(/`/g, "\\`");
+function codeSpan(value: string): string {
+  const longestRun = (value.match(/`+/g) ?? []).reduce(
+    (longest, run) => Math.max(longest, run.length),
+    0
+  );
+  const delimiter = "`".repeat(longestRun + 1);
+  const padding = value.startsWith("`") || value.endsWith("`") ? " " : "";
+  return `${delimiter}${padding}${value}${padding}${delimiter}`;
 }
 
 function buildPipelineSyntaxUrl(environmentUrl: string): string | undefined {

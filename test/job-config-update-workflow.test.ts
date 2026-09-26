@@ -12,6 +12,7 @@ let remoteXml = "<project><description>original</description></project>";
 let warningChoice: string | undefined;
 let diagnostics = [{ severity: 1 }];
 let quickPickCalls = 0;
+let quickPickSelections: boolean[] = [];
 const informationMessages: string[] = [];
 
 const vscodeMock = {
@@ -30,7 +31,7 @@ const vscodeMock = {
     showErrorMessage: async () => undefined,
     showQuickPick: async (items: unknown[]) => {
       quickPickCalls += 1;
-      return items[0];
+      return quickPickSelections.shift() === false ? items[1] : items[0];
     },
     showWarningMessage: async () => warningChoice,
     withProgress: async (_options: unknown, task: () => Promise<unknown>) => task()
@@ -70,21 +71,25 @@ const environment = {
   url: "https://jenkins.example/"
 };
 
-function createWorkflow() {
+function createWorkflow(
+  options: { getRemoteXml?: () => Promise<string>; updateConfigXml?: () => Promise<void> } = {}
+) {
   const calls = {
     getJobConfigXml: 0,
     updateJobConfigXml: [] as string[],
     refreshes: [] as string[],
-    discarded: [] as string[]
+    discarded: [] as string[],
+    closed: [] as string[]
   };
 
   const dataService = {
     getJobConfigXml: async () => {
       calls.getJobConfigXml += 1;
-      return remoteXml;
+      return options.getRemoteXml ? options.getRemoteXml() : remoteXml;
     },
     updateJobConfigXml: async (_environment: unknown, _jobUrl: string, xml: string) => {
       calls.updateJobConfigXml.push(xml);
+      await options.updateConfigXml?.();
     }
   };
 
@@ -115,7 +120,10 @@ function createWorkflow() {
   };
 
   const editorService = {
-    closeUris: async () => true
+    closeUris: async (uris: UriLike[]) => {
+      calls.closed.push(...uris.map((uri) => uri.toString()));
+      return true;
+    }
   };
 
   return {
@@ -136,6 +144,7 @@ beforeEach(() => {
   warningChoice = undefined;
   diagnostics = [{ severity: 1 }];
   quickPickCalls = 0;
+  quickPickSelections = [];
   informationMessages.length = 0;
 });
 
@@ -188,7 +197,79 @@ describe("JobConfigUpdateWorkflow submitDraft", () => {
 
     assertSuccessfulSubmit(calls);
   });
+
+  it("keeps a newer edit when confirmation of the changed draft is canceled", async () => {
+    const remote = deferred<string>();
+    quickPickSelections = [true, false];
+    const { workflow, refreshHost, calls } = createWorkflow({ getRemoteXml: () => remote.promise });
+    const submission = workflow.submitDraft(refreshHost, targetUri as never);
+    await vi.waitFor(() => assert.equal(calls.getJobConfigXml, 1));
+
+    documentText = "<project><description>newer edit</description></project>";
+    remote.resolve(remoteXml);
+    await submission;
+
+    assert.equal(quickPickCalls, 2);
+    assert.deepEqual(calls.updateJobConfigXml, []);
+    assert.deepEqual(calls.closed, []);
+    assert.deepEqual(calls.discarded, []);
+  });
+
+  it("submits the current text after confirming an edit made during the remote check", async () => {
+    const remote = deferred<string>();
+    const { workflow, refreshHost, calls } = createWorkflow({ getRemoteXml: () => remote.promise });
+    const submission = workflow.submitDraft(refreshHost, targetUri as never);
+    await vi.waitFor(() => assert.equal(calls.getJobConfigXml, 1));
+
+    documentText = "<project><description>newer edit</description></project>";
+    remote.resolve(remoteXml);
+    await submission;
+
+    assert.equal(quickPickCalls, 2);
+    assertSuccessfulSubmit(calls);
+  });
+
+  it("allows only one submission for a draft at a time", async () => {
+    const remote = deferred<string>();
+    const { workflow, refreshHost, calls } = createWorkflow({ getRemoteXml: () => remote.promise });
+    const first = workflow.submitDraft(refreshHost, targetUri as never);
+    await vi.waitFor(() => assert.equal(calls.getJobConfigXml, 1));
+    const second = workflow.submitDraft(refreshHost, targetUri as never);
+    await second;
+    remote.resolve(remoteXml);
+    await first;
+
+    assertSuccessfulSubmit(calls);
+    assert.equal(quickPickCalls, 1);
+  });
+
+  it("keeps edits made while the upload is pending", async () => {
+    const upload = deferred<void>();
+    const { workflow, refreshHost, calls } = createWorkflow({
+      updateConfigXml: () => upload.promise
+    });
+    const submission = workflow.submitDraft(refreshHost, targetUri as never);
+    await vi.waitFor(() => assert.equal(calls.updateJobConfigXml.length, 1));
+
+    documentText = "<project><description>newer edit</description></project>";
+    upload.resolve();
+    await submission;
+
+    assert.deepEqual(calls.updateJobConfigXml, [
+      "<project><description>edited</description></project>"
+    ]);
+    assert.deepEqual(calls.closed, []);
+    assert.deepEqual(calls.discarded, []);
+  });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 function assertSuccessfulSubmit(calls: ReturnType<typeof createWorkflow>["calls"]): void {
   assert.equal(calls.getJobConfigXml, 1);

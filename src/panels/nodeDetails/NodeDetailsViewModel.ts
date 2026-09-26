@@ -188,7 +188,7 @@ function enrichExecutorViewModel(
   base: ReturnType<typeof buildBaseNodeExecutorSummaries>[number],
   nowMs: number
 ): NodeExecutorViewModel {
-  const workItem = executor?.currentExecutable ?? executor?.currentWorkUnit;
+  const workItem = executor?.currentExecutable ?? executor?.currentWorkUnit ?? undefined;
   const progressPercent = normalizeProgressPercent(executor?.progress);
   const workDuration = resolveWorkDuration(workItem, nowMs);
 

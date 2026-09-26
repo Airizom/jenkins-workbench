@@ -200,7 +200,7 @@ describe("removeEnvironment", () => {
   });
 
   it.each(["bindings", "presets", "watches", "pins"] as const)(
-    "keeps removal retryable when %s cleanup fails",
+    "refreshes a removed environment when %s cleanup fails",
     async (failingCleanup) => {
       const target: JenkinsEnvironmentRef = {
         environmentId: "env-1",
@@ -208,7 +208,8 @@ describe("removeEnvironment", () => {
         url: "https://user:secret@jenkins.example/"
       };
       const events: string[] = [];
-      const cleanupAttempts = new Map<string, number>();
+      const records = new Set(["bindings", "presets", "watches", "pins"]);
+      let environmentExists = true;
       warningMessageResponse = "Remove Environment";
 
       const runCleanup = async (
@@ -217,16 +218,16 @@ describe("removeEnvironment", () => {
         environmentId: string
       ): Promise<void> => {
         events.push(`${cleanup}:${scope}:${environmentId}`);
-        const attempt = (cleanupAttempts.get(cleanup) ?? 0) + 1;
-        cleanupAttempts.set(cleanup, attempt);
-        if (cleanup === failingCleanup && attempt === 1) {
+        if (cleanup === failingCleanup) {
           throw new Error(`${cleanup} cleanup failed`);
         }
+        records.delete(cleanup);
       };
 
       const store = {
         async removeEnvironment(scope: EnvironmentScope, id: string): Promise<boolean> {
           events.push(`remove:${scope}:${id}`);
+          environmentExists = false;
           return true;
         }
       } as unknown as JenkinsEnvironmentStore;
@@ -269,53 +270,84 @@ describe("removeEnvironment", () => {
         }
       } as unknown as JenkinsClientProvider;
 
-      const runRemoval = () =>
-        removeEnvironment(
-          store,
-          bindingStore,
-          presetStore,
-          watchStore,
-          pinStore,
-          clientProvider,
-          {
-            onEnvironmentRemoved: (environment) => {
-              events.push(`removed:${environment.scope}:${environment.environmentId}`);
-            },
-            fullEnvironmentRefresh: (request) => {
-              events.push(`refresh:${request?.environmentId}`);
-              return { executed: true };
-            }
+      await removeEnvironment(
+        store,
+        bindingStore,
+        presetStore,
+        watchStore,
+        pinStore,
+        clientProvider,
+        {
+          onEnvironmentRemoved: (environment) => {
+            events.push(`removed:${environment.scope}:${environment.environmentId}`);
           },
-          target
-        );
-
-      await runRemoval();
+          fullEnvironmentRefresh: (request) => {
+            events.push(`refresh:${request?.environmentId}`);
+            return { executed: true };
+          }
+        },
+        target
+      );
 
       assert.deepEqual(events, [
-        "bindings:workspace:env-1",
-        "presets:workspace:env-1",
-        "watches:workspace:env-1",
-        "pins:workspace:env-1"
-      ]);
-      assert.equal(errorMessages.length, 1);
-      assert.match(errorMessages[0], /environment was not removed/);
-      assert.match(errorMessages[0], new RegExp(`${failingCleanup} cleanup failed`));
-
-      await runRemoval();
-
-      assert.deepEqual(events.slice(4), [
+        "remove:workspace:env-1",
         "bindings:workspace:env-1",
         "presets:workspace:env-1",
         "watches:workspace:env-1",
         "pins:workspace:env-1",
-        "remove:workspace:env-1",
         "invalidate:workspace:env-1",
         "removed:workspace:env-1",
         "refresh:env-1"
       ]);
+      assert.equal(environmentExists, false);
+      assert.deepEqual([...records], [failingCleanup]);
       assert.equal(errorMessages.length, 1);
+      assert.match(errorMessages[0], /environment was removed/);
+      assert.match(errorMessages[0], new RegExp(`${failingCleanup} cleanup failed`));
       assert.match(warningMessages[0], /https:\/\/jenkins\.example\//);
       assert.doesNotMatch(warningMessages[0], /user|secret/);
+    }
+  );
+
+  it.each([false, true])(
+    "handles a removal error according to whether the environment still exists: %s",
+    async (environmentExists) => {
+      warningMessageResponse = "Remove Environment";
+      const cleanup = vi.fn(async () => undefined);
+      const invalidateClient = vi.fn();
+      const onEnvironmentRemoved = vi.fn();
+      const fullEnvironmentRefresh = vi.fn(() => ({ executed: true }));
+      const store = {
+        async removeEnvironment(): Promise<boolean> {
+          throw new Error("environment store failed");
+        },
+        async getEnvironments(): Promise<JenkinsEnvironment[]> {
+          return environmentExists ? [{ id: "env-1", url: "https://jenkins.example/" }] : [];
+        }
+      } as unknown as JenkinsEnvironmentStore;
+
+      await removeEnvironment(
+        store,
+        {
+          removeBindingsForEnvironment: cleanup
+        } as unknown as JenkinsDiagnosticProfileBindingStore,
+        { removePresetsForEnvironment: cleanup } as unknown as JenkinsParameterPresetStore,
+        { removeWatchesForEnvironment: cleanup } as unknown as JenkinsWatchStore,
+        { removePinsForEnvironment: cleanup } as unknown as JenkinsPinStore,
+        { invalidateClient } as unknown as JenkinsClientProvider,
+        { onEnvironmentRemoved, fullEnvironmentRefresh },
+        { environmentId: "env-1", scope: "workspace", url: "https://jenkins.example/" }
+      );
+
+      assert.equal(cleanup.mock.calls.length, environmentExists ? 0 : 4);
+      assert.equal(invalidateClient.mock.calls.length, environmentExists ? 0 : 1);
+      assert.equal(onEnvironmentRemoved.mock.calls.length, environmentExists ? 0 : 1);
+      assert.equal(fullEnvironmentRefresh.mock.calls.length, environmentExists ? 0 : 1);
+      assert.match(
+        errorMessages[0],
+        environmentExists ? /environment was not removed/ : /environment was removed/
+      );
+      assert.match(errorMessages[0], /environment store failed/);
     }
   );
 });

@@ -34,6 +34,7 @@ export class BuildDetailsPanelRuntime {
   private readonly completionPoller: BuildDetailsCompletionPoller;
   private readonly coverageCoordinator: BuildDetailsCoverageCoordinator;
   private testReportRefreshGeneration = 0;
+  private visibilityGeneration = 0;
 
   constructor(private readonly options: BuildDetailsPanelRuntimeOptions) {
     this.completionPoller = new BuildDetailsCompletionPoller({
@@ -62,18 +63,29 @@ export class BuildDetailsPanelRuntime {
   }
 
   handlePanelHidden(token: number): void {
+    // Invalidate any in-flight handlePanelVisible so it cannot restart visible polling after
+    // the panel has already been hidden.
+    this.visibilityGeneration += 1;
     this.coverageCoordinator.handlePanelHidden();
     this.options.getPollingController()?.stop();
     this.startCompletionPolling(token);
   }
 
-  async handlePanelVisible(token: number): Promise<void> {
+  /**
+   * Returns false when the panel was hidden (or a newer visibility transition started) while
+   * this handler was awaiting, in which case no visible-only work was started.
+   */
+  async handlePanelVisible(token: number): Promise<boolean> {
+    const generation = ++this.visibilityGeneration;
     this.coverageCoordinator.handlePanelVisible();
     this.stopCompletionPolling();
     await this.refreshBuildStatus(token);
+    if (!this.isVisibilityCurrent(generation)) {
+      return false;
+    }
     if (this.options.state.lastDetailsBuilding) {
       this.options.getPollingController()?.start();
-      return;
+      return true;
     }
     await Promise.all([
       this.refreshConsoleSnapshot(token),
@@ -82,7 +94,15 @@ export class BuildDetailsPanelRuntime {
       this.refreshWorkflowRun(),
       this.options.getPollingController()?.refreshPendingInputs()
     ]);
+    if (!this.isVisibilityCurrent(generation)) {
+      return false;
+    }
     void this.refreshRestartFromStageInfo(token, { postUpdate: true });
+    return true;
+  }
+
+  private isVisibilityCurrent(generation: number): boolean {
+    return generation === this.visibilityGeneration && this.options.view.isVisible();
   }
 
   async refreshPendingInputs(): Promise<void> {
@@ -184,12 +204,10 @@ export class BuildDetailsPanelRuntime {
     } catch {
       if (!this.isTestReportRefreshStale(token, refreshGeneration)) {
         this.options.state.markTestReportFetchAttempted();
-        if (options?.showLoading) {
-          const changed = this.options.state.setTestResultsLoading(false);
-          if (changed && this.options.view.isVisible()) {
-            this.postStateUpdate();
-          }
-        } else if (this.options.view.isVisible()) {
+        // Always clear the shared loading flag for the current generation: an earlier
+        // showLoading refresh may have set it and then been superseded by this request.
+        this.options.state.setTestResultsLoading(false);
+        if (this.options.view.isVisible()) {
           this.postStateUpdate();
         }
       }

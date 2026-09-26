@@ -54,4 +54,35 @@ describe("ArtifactPreviewProvider", () => {
     assert.equal(state.entries.size, 1);
     provider.dispose();
   });
+
+  it("evicts unused previews to make room for a new preview", () => {
+    const provider = new ArtifactPreviewProvider({ maxTotalBytes: 10 });
+    const firstUri = provider.registerArtifact(new Uint8Array(6), "first.bin");
+
+    const secondUri = provider.registerArtifact(new Uint8Array(5), "second.bin");
+
+    const state = getCacheState(provider);
+    assert.equal(state.totalBytes, 5);
+    assert.equal(state.entries.size, 1);
+    assert.equal(state.entries.has(firstUri.path.split("/")[1]), false);
+    assert.equal(state.entries.has(secondUri.path.split("/")[1]), true);
+    provider.dispose();
+  });
+
+  it("keeps unused previews when active previews leave insufficient capacity", () => {
+    const provider = new ArtifactPreviewProvider({ maxTotalBytes: 10 });
+    const activeUri = provider.registerArtifact(new Uint8Array(6), "active.bin");
+    provider.markInUse(activeUri);
+    provider.registerArtifact(new Uint8Array(2), "idle.bin");
+
+    assert.throws(
+      () => provider.registerArtifact(new Uint8Array(5), "next.bin"),
+      ArtifactPreviewCacheLimitError
+    );
+
+    const state = getCacheState(provider);
+    assert.equal(state.totalBytes, 8);
+    assert.equal(state.entries.size, 2);
+    provider.dispose();
+  });
 });

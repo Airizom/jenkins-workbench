@@ -1,10 +1,10 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
 import { type CachedValue, getFreshCachedValue, setCachedValue } from "./CurrentBranchCache";
 import type {
   CurrentBranchGitHubPullRequestAdapter,
   CurrentBranchPullRequestResolution
 } from "./CurrentBranchGitHubPullRequestAdapter";
-import { decodeJenkinsJobName } from "./CurrentBranchJenkinsJobUtils";
 import type {
   CurrentBranchPullRequestJobMatcher,
   CurrentBranchPullRequestJobRef
@@ -49,6 +49,9 @@ export class CurrentBranchTargetResolver {
     string,
     CachedValue<CurrentBranchTargetResolution>
   >();
+  private readonly latestPullRequestRequest = new Map<string, number>();
+  private readonly latestTargetRequest = new Map<string, number>();
+  private requestId = 0;
 
   constructor(
     private readonly dataService: JenkinsDataService,
@@ -59,13 +62,16 @@ export class CurrentBranchTargetResolver {
   dispose(): void {
     this.pullRequestContextCache.clear();
     this.targetResolutionCache.clear();
+    this.latestPullRequestRequest.clear();
+    this.latestTargetRequest.clear();
   }
 
   async resolve(
     localState: CurrentBranchLinkedContext,
     options: CurrentBranchRefreshOptions
   ): Promise<CurrentBranchTargetResolution> {
-    const pullRequestContext = await this.resolvePullRequestContext(localState, options);
+    const requestId = ++this.requestId;
+    const pullRequestContext = await this.resolvePullRequestContext(localState, options, requestId);
     const cacheKey = buildTargetResolutionCacheKey(localState, pullRequestContext);
     if (!options.force) {
       const cachedResolution = getFreshCachedValue(this.targetResolutionCache, cacheKey);
@@ -74,19 +80,26 @@ export class CurrentBranchTargetResolver {
       }
     }
 
-    const resolution = await this.fetchTargetResolution(localState, pullRequestContext, cacheKey);
-    setCachedValue(
-      this.targetResolutionCache,
+    this.latestTargetRequest.set(
       cacheKey,
-      resolution,
-      TARGET_RESOLUTION_CACHE_TTL_MS
+      Math.max(requestId, this.latestTargetRequest.get(cacheKey) ?? 0)
     );
+    const resolution = await this.fetchTargetResolution(localState, pullRequestContext, cacheKey);
+    if (this.latestTargetRequest.get(cacheKey) === requestId) {
+      setCachedValue(
+        this.targetResolutionCache,
+        cacheKey,
+        resolution,
+        TARGET_RESOLUTION_CACHE_TTL_MS
+      );
+    }
     return resolution;
   }
 
   private async resolvePullRequestContext(
     localState: CurrentBranchLinkedContext,
-    options: CurrentBranchRefreshOptions
+    options: CurrentBranchRefreshOptions,
+    requestId: number
   ): Promise<CurrentBranchPullRequestResolution> {
     const cacheKey = buildPullRequestContextCacheKey(localState);
     if (!options.force) {
@@ -96,13 +109,16 @@ export class CurrentBranchTargetResolver {
       }
     }
 
+    this.latestPullRequestRequest.set(cacheKey, requestId);
     const context = await this.pullRequestAdapter.lookup(localState.repository);
-    setCachedValue(
-      this.pullRequestContextCache,
-      cacheKey,
-      context,
-      PULL_REQUEST_CONTEXT_CACHE_TTL_MS
-    );
+    if (this.latestPullRequestRequest.get(cacheKey) === requestId) {
+      setCachedValue(
+        this.pullRequestContextCache,
+        cacheKey,
+        context,
+        PULL_REQUEST_CONTEXT_CACHE_TTL_MS
+      );
+    }
     return context;
   }
 

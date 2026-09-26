@@ -25,6 +25,7 @@ export class JenkinsCrumbService {
   private crumbFetchPromise?: Promise<JenkinsCrumbHeader | undefined>;
   private crumbFetchAttempted = false;
   private crumbFetchedAt = 0;
+  private crumbFetchGeneration = 0;
 
   constructor(
     private readonly baseUrl: string,
@@ -49,7 +50,8 @@ export class JenkinsCrumbService {
     }
 
     this.crumbFetchAttempted = true;
-    const crumbFetchPromise = this.fetchAndCacheCrumb(now);
+    const generation = ++this.crumbFetchGeneration;
+    const crumbFetchPromise = this.fetchAndCacheCrumb(now, generation);
     this.crumbFetchPromise = crumbFetchPromise;
 
     try {
@@ -62,29 +64,44 @@ export class JenkinsCrumbService {
   }
 
   invalidate(): void {
+    this.crumbFetchGeneration += 1;
     this.crumbHeader = undefined;
     this.crumbFetchPromise = undefined;
     this.crumbFetchAttempted = false;
     this.crumbFetchedAt = 0;
   }
 
-  private async fetchAndCacheCrumb(fetchedAt: number): Promise<JenkinsCrumbHeader | undefined> {
+  private async fetchAndCacheCrumb(
+    fetchedAt: number,
+    generation: number
+  ): Promise<JenkinsCrumbHeader | undefined> {
     try {
       const url = buildApiUrlFromBase(this.baseUrl, "crumbIssuer/api/json");
       const { body: response, headers } = await this.fetchCrumb(url);
+      // A fetch superseded by invalidate() or a newer forced fetch must not
+      // overwrite the cache with an obsolete crumb.
+      const isCurrent = generation === this.crumbFetchGeneration;
       if (response.crumbRequestField && response.crumb) {
-        this.crumbHeader = {
+        const crumbHeader: JenkinsCrumbHeader = {
           field: response.crumbRequestField,
           value: response.crumb,
           cookie: buildCookieHeader(headers?.["set-cookie"])
         };
-        this.crumbFetchedAt = fetchedAt;
-        return this.crumbHeader;
+        if (isCurrent) {
+          this.crumbHeader = crumbHeader;
+          this.crumbFetchedAt = fetchedAt;
+        }
+        return crumbHeader;
       }
-      this.crumbHeader = undefined;
-      this.crumbFetchedAt = 0;
-      this.crumbFetchAttempted = false;
+      if (isCurrent) {
+        this.crumbHeader = undefined;
+        this.crumbFetchedAt = 0;
+        this.crumbFetchAttempted = false;
+      }
     } catch (error) {
+      if (generation !== this.crumbFetchGeneration) {
+        return undefined;
+      }
       this.crumbHeader = undefined;
       this.crumbFetchedAt = 0;
       // A 404 means CSRF protection is disabled; keep crumbFetchAttempted set

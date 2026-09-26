@@ -28,4 +28,11 @@ describe("resolveIconClassName", () => {
       "h-4 w-4 text-foreground"
     );
   });
+
+  it("resolves height and width overrides independently", () => {
+    assert.equal(resolveIconClassName("h-8 w-8 text-success", "h-4"), "w-8 text-success h-4");
+    assert.equal(resolveIconClassName("h-8 w-8 text-success", "w-4"), "h-8 text-success w-4");
+    assert.equal(resolveIconClassName("h-8 w-8 text-success", "h-4 w-4"), "text-success h-4 w-4");
+    assert.equal(resolveIconClassName("h-8 w-8 text-success", "size-4"), "text-success size-4");
+  });
 });

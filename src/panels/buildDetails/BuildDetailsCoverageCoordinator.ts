@@ -138,7 +138,7 @@ export class BuildDetailsCoverageCoordinator {
       return;
     }
     if (!actionPath) {
-      this.clearResolvedCoverage();
+      this.clearResolvedCoverage(true);
       return;
     }
     this.options.state.setCoverageActionPath(actionPath);
@@ -205,9 +205,12 @@ export class BuildDetailsCoverageCoordinator {
     return !this.options.isTokenCurrent(token) || refreshGeneration !== this.refreshGeneration;
   }
 
-  private clearResolvedCoverage(): void {
+  private clearResolvedCoverage(fetched = false): void {
     this.options.decorationsAdapter.clear();
     this.options.state.resetCoverage();
+    if (fetched) {
+      this.options.state.setCoverage(undefined, undefined);
+    }
     this.postStateUpdateIfVisible();
   }
 

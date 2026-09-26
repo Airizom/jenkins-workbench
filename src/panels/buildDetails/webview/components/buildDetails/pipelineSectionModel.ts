@@ -74,7 +74,8 @@ export function planRestoredLogTarget({
   if (alreadyConsumed || !restoredTarget || !canValidateLogTarget) {
     return { consume: false };
   }
-  const shouldRestore = !currentTarget && hasPipelineLogTarget(stages, restoredTarget);
+  const hasValidCurrentTarget = !!currentTarget && hasPipelineLogTarget(stages, currentTarget);
+  const shouldRestore = !hasValidCurrentTarget && hasPipelineLogTarget(stages, restoredTarget);
   return { consume: true, targetToRestore: shouldRestore ? restoredTarget : undefined };
 }
 

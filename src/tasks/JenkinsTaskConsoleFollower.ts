@@ -1,3 +1,4 @@
+import { JenkinsConsoleNoteFilter } from "../jenkins/JenkinsConsoleNotes";
 import type {
   JenkinsTaskRunnerBackend,
   JenkinsTaskRunnerOutput,
@@ -30,11 +31,13 @@ export interface JenkinsTaskPollingControl {
 
 export class ConsoleLineWriter {
   private pendingCarriageReturn = false;
+  private readonly notes = new JenkinsConsoleNoteFilter();
 
   constructor(private readonly write: (text: string) => void) {}
 
   append(text: string): void {
-    let value = this.pendingCarriageReturn ? `\r${text}` : text;
+    const clean = this.notes.append(text);
+    let value = this.pendingCarriageReturn ? `\r${clean}` : clean;
     this.pendingCarriageReturn = false;
     if (value.endsWith("\r")) {
       value = value.slice(0, -1);
@@ -46,6 +49,11 @@ export class ConsoleLineWriter {
   }
 
   flush(): void {
+    const remainder = this.notes.finish();
+    if (remainder) {
+      this.write((this.pendingCarriageReturn ? "\n" : "") + remainder);
+      this.pendingCarriageReturn = false;
+    }
     if (this.pendingCarriageReturn) {
       this.write("\n");
       this.pendingCarriageReturn = false;

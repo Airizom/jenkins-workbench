@@ -21,11 +21,12 @@ export class TreeJobUrlStateLoader {
       return cached;
     }
 
+    const generation = this.cacheManager.getWatchedJobsGeneration();
     const watched = await this.watchStore.getWatchedJobUrls(
       environment.scope,
       environment.environmentId
     );
-    this.cacheManager.setCachedWatchedJobs(environment, watched);
+    this.cacheManager.setCachedWatchedJobsIfCurrent(environment, watched, generation);
     return watched;
   }
 
@@ -35,12 +36,13 @@ export class TreeJobUrlStateLoader {
       return cached;
     }
 
+    const generation = this.cacheManager.getPinnedJobsGeneration();
     const pinnedEntries = await this.pinStore.listPinnedJobsForEnvironment(
       environment.scope,
       environment.environmentId
     );
     const pinned = this.buildPinnedJobUrlSet(environment, pinnedEntries);
-    this.cacheManager.setCachedPinnedJobs(environment, pinned);
+    this.cacheManager.setCachedPinnedJobsIfCurrent(environment, pinned, generation);
     return pinned;
   }
 

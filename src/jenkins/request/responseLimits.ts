@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { StringDecoder } from "node:string_decoder";
 import { JenkinsMaxBytesError } from "../errors";
 
 export type ResponseTextErrorPolicy = "reject" | "resolvePartialText";
@@ -46,17 +47,21 @@ export function collectBoundedResponseText(
   return new Promise((resolve, reject) => {
     let text = "";
     let receivedBytes = 0;
-    response.setEncoding("utf8");
+    // Count raw bytes before decoding; the streaming decoder keeps multibyte
+    // characters intact across chunk boundaries.
+    const decoder = new StringDecoder("utf8");
     response.on("data", (chunk) => {
-      receivedBytes += Buffer.byteLength(chunk, "utf8");
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      receivedBytes += buffer.length;
       if (maxBytes !== undefined && receivedBytes > maxBytes) {
         reject(new JenkinsMaxBytesError(maxBytes, statusCode));
         response.destroy();
         return;
       }
-      text += chunk;
+      text += decoder.write(buffer);
     });
     response.on("end", () => {
+      text += decoder.end();
       resolve(text);
     });
     response.on("error", (error) => {

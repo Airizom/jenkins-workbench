@@ -1,5 +1,10 @@
 import type { TextDocument } from "vscode";
-import { codeBeforeLineComment, scanLineCode } from "./JenkinsfilePipelineScanner";
+import {
+  type CodeMaskState,
+  codeBeforeLineComment,
+  maskNonCode,
+  scanLineCode
+} from "./JenkinsfilePipelineScanner";
 
 export interface PipelineBlockContext {
   openLine: number;
@@ -83,8 +88,16 @@ function createDocumentSource(document: TextDocument): PipelineTextSource {
 }
 
 function findPipelineBlockFromSource(source: PipelineTextSource): PipelineBlockContext | undefined {
+  const state: CodeMaskState = { inBlockComment: false };
+  const codeLines = Array.from({ length: source.lineCount }, (_, line) =>
+    maskNonCode(source.lineAt(line), state)
+  );
+  const codeSource: PipelineTextSource = {
+    lineCount: source.lineCount,
+    lineAt: (line) => codeLines[line]
+  };
   for (let lineIndex = 0; lineIndex < source.lineCount; lineIndex += 1) {
-    const context = parsePipelineBlockAtLine(source, lineIndex);
+    const context = parsePipelineBlockAtLine(codeSource, lineIndex);
     if (context) {
       return context;
     }
@@ -320,17 +333,33 @@ function findMatchingTopLevelLine(
   context: PipelineBlockContext,
   predicate: (lineText: string, indent: string) => boolean
 ): number | undefined {
+  const state: CodeMaskState = { inBlockComment: false };
+  const openingLine = maskNonCode(source.lineAt(context.openLine), state);
+  let depth = braceDepth(openingLine, context.openChar + 1, 0);
   for (let lineIndex = context.openLine + 1; lineIndex < context.closeLine; lineIndex += 1) {
-    const lineText = source.lineAt(lineIndex);
+    const lineText = maskNonCode(source.lineAt(lineIndex), state);
     if (lineText.trim().length === 0) {
       continue;
     }
     const indent = getIndent(lineText);
-    if (indent.length === context.childIndent.length && predicate(lineText, indent)) {
+    if (depth === 0 && predicate(lineText, indent)) {
       return lineIndex;
     }
+    depth = braceDepth(lineText, 0, depth);
   }
   return undefined;
+}
+
+function braceDepth(lineText: string, startIndex: number, depth: number): number {
+  let currentDepth = depth;
+  for (let index = startIndex; index < lineText.length; index += 1) {
+    if (lineText[index] === "{") {
+      currentDepth += 1;
+    } else if (lineText[index] === "}") {
+      currentDepth = Math.max(0, currentDepth - 1);
+    }
+  }
+  return currentDepth;
 }
 
 function findSectionEndLine(

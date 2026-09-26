@@ -5,7 +5,6 @@ import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
-import { toast } from "../../shared/webview/hooks/useToast";
 import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
@@ -97,11 +96,6 @@ export function NodeDetailsApp(): React.JSX.Element {
       return;
     }
     postMessage({ type: "copyNodeJson", content: state.rawJson });
-    toast({
-      title: "Copied",
-      description: "Node JSON copied to clipboard.",
-      variant: "success"
-    });
   };
 
   const handleDiagnosticsToggle = (value: NodeDetailsTab) => {

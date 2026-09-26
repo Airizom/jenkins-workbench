@@ -32,6 +32,17 @@ const POOL_SEVERITY_BORDER_CLASSES: Record<NodeCapacitySeverity, string> = {
 };
 
 /**
+ * `<details>` fires `toggle` for every change to its `open` attribute,
+ * including the ones React applies when the controlled `isOpen` prop changes
+ * (for example a pool auto-expanding on abnormal severity). Only a user
+ * interaction leaves the DOM state out of sync with the prop, so only that
+ * case should be recorded as an explicit override.
+ */
+export function isUserInitiatedPoolToggle(domOpen: boolean, controlledOpen: boolean): boolean {
+  return domOpen !== controlledOpen;
+}
+
+/**
  * Memoized so collapsed/untouched pools skip their whole subtree when the app
  * re-renders on clock ticks, unrelated pool toggles, or header-only updates;
  * pool/node view models keep stable identities between those renders.
@@ -50,7 +61,11 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
   onToggleExpanded: (poolId: string, open: boolean) => void;
 }): React.JSX.Element {
   const handleToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
-    onToggleExpanded(pool.id, event.currentTarget.open);
+    const domOpen = event.currentTarget.open;
+    if (!isUserInitiatedPoolToggle(domOpen, isOpen)) {
+      return;
+    }
+    onToggleExpanded(pool.id, domOpen);
   };
 
   return (

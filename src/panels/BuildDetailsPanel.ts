@@ -217,7 +217,8 @@ export class BuildDetailsPanel {
           this.controller.getBuildUrl()
         );
       },
-      () => this.postCurrentBuildDiagnostics()
+      () => this.postCurrentBuildDiagnostics(),
+      () => this.mutableServices.testSourceResolver?.whenReady() ?? Promise.resolve()
     );
     this.configure(mutableServices);
     this.actions = new BuildDetailsPanelActions({

@@ -95,7 +95,10 @@ export function buildUrlFor(jobUrl: string, buildNumber: number): string {
 }
 
 export function isBuildComplete(details: JenkinsTaskBuildDetails): boolean {
-  return details.building === false || Boolean(details.result?.trim());
+  return (
+    details.building === false ||
+    (details.building === undefined && Boolean(details.result?.trim()))
+  );
 }
 
 export function updateQueueOwnership(

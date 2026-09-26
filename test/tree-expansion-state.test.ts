@@ -1,12 +1,25 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
-import { TreeExpansionState } from "../src/tree/TreeExpansionState";
+import { describe, it, vi } from "vitest";
 import type {
   TreeExpansionPath,
   TreeExpansionResolver,
   TreeExpansionResolveResult
 } from "../src/tree/TreeDataProviderTypes";
 import type { WorkbenchTreeElement } from "../src/tree/items/WorkbenchTreeElement";
+import * as vscodeStub from "./helpers/vscodeStub";
+
+let runCollapseCommand: (() => void) | undefined;
+const collapseCommands: string[] = [];
+vi.doMock("vscode", () => ({
+  ...vscodeStub,
+  commands: {
+    executeCommand: async (command: string) => {
+      collapseCommands.push(command);
+      runCollapseCommand?.();
+    }
+  }
+}));
+const { TreeExpansionState } = await import("../src/tree/TreeExpansionState");
 
 type Disposable = { dispose(): void };
 type TreeElementEvent = { element: WorkbenchTreeElement };
@@ -15,7 +28,10 @@ type TreeElementListener = (event: TreeElementEvent) => void;
 class TestTreeView {
   private readonly expandListeners = new Set<TreeElementListener>();
   private readonly collapseListeners = new Set<TreeElementListener>();
-  onReveal?: (element: WorkbenchTreeElement) => void;
+  onReveal?: (
+    element: WorkbenchTreeElement,
+    options?: { expand?: boolean | number; focus?: boolean; select?: boolean }
+  ) => void | Promise<void>;
 
   readonly onDidExpandElement = (listener: TreeElementListener): Disposable => {
     this.expandListeners.add(listener);
@@ -35,8 +51,11 @@ class TestTreeView {
     };
   };
 
-  async reveal(element: WorkbenchTreeElement): Promise<void> {
-    this.onReveal?.(element);
+  async reveal(
+    element: WorkbenchTreeElement,
+    options?: { expand?: boolean | number; focus?: boolean; select?: boolean }
+  ): Promise<void> {
+    await this.onReveal?.(element, options);
   }
 
   fireExpand(element: WorkbenchTreeElement): void {
@@ -110,6 +129,137 @@ async function flushPromises(): Promise<void> {
 }
 
 describe("TreeExpansionState", () => {
+  it("does not reveal a folder collapsed while its path lookup is pending", async () => {
+    const treeView = new TestTreeView();
+    const resolver = new ControlledExpansionResolver();
+    const state = new TreeExpansionState(
+      treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+      resolver
+    );
+    const element = createElement("folder");
+    const path = ["env", "jobs", "folder"];
+    let revealCount = 0;
+    treeView.onReveal = () => {
+      revealCount += 1;
+    };
+
+    const restore = state.restore([path]);
+    treeView.fireCollapse(element);
+    assert.equal(resolver.pendingBuilds.length, 1);
+    assert.deepEqual(state.snapshot(), []);
+
+    resolver.pendingResolves[0].resolve({ element, pending: false });
+    await restore;
+    assert.equal(revealCount, 0);
+    assert.deepEqual(state.snapshot(), []);
+
+    resolver.pendingBuilds[0].resolve(path);
+    await flushPromises();
+    assert.deepEqual(state.snapshot(), []);
+    state.dispose();
+  });
+
+  it("collapses a folder again when a restore reveal completes after user collapse", async () => {
+    const treeView = new TestTreeView();
+    const resolver = new ControlledExpansionResolver();
+    const element = createElement("folder");
+    let visibleExpanded = false;
+    const state = new TreeExpansionState(
+      treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+      resolver
+    );
+    const path = ["env", "jobs", "folder"];
+    let finishReveal: (() => void) | undefined;
+    treeView.onReveal = (revealedElement, options) => {
+      assert.equal(revealedElement, element);
+      if (options?.expand === false) {
+        assert.equal(options.focus, true);
+        assert.equal(options.select, true);
+        return;
+      }
+      return new Promise<void>((resolve) => {
+        finishReveal = () => {
+          visibleExpanded = true;
+          treeView.fireExpand(element);
+          resolve();
+        };
+      });
+    };
+    collapseCommands.length = 0;
+    runCollapseCommand = () => {
+      visibleExpanded = false;
+    };
+
+    const restore = state.restore([path]);
+    resolver.pendingResolves[0].resolve({ element, pending: false });
+    await flushPromises();
+    assert.ok(finishReveal);
+
+    treeView.fireCollapse(element);
+    finishReveal();
+    await restore;
+    assert.deepEqual(collapseCommands, ["list.collapse"]);
+    assert.equal(visibleExpanded, false);
+    assert.deepEqual(state.snapshot(), []);
+
+    resolver.pendingBuilds[0].resolve(path);
+    await flushPromises();
+    assert.deepEqual(state.snapshot(), []);
+    runCollapseCommand = undefined;
+    state.dispose();
+  });
+
+  it("recollapses an ancestor when a descendant reveal completes later", async () => {
+    const treeView = new TestTreeView();
+    const resolver = new ControlledExpansionResolver();
+    const state = new TreeExpansionState(
+      treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+      resolver
+    );
+    const ancestor = createElement("ancestor");
+    const descendant = createElement("descendant");
+    const path = ["env", "jobs", "ancestor", "descendant"];
+    let finishReveal: (() => void) | undefined;
+    let focusedElement: WorkbenchTreeElement | undefined;
+    let ancestorExpanded = false;
+    treeView.onReveal = (element, options) => {
+      if (options?.expand === false) {
+        focusedElement = element;
+        return;
+      }
+      assert.equal(element, descendant);
+      return new Promise<void>((resolve) => {
+        finishReveal = () => {
+          ancestorExpanded = true;
+          treeView.fireExpand(descendant);
+          resolve();
+        };
+      });
+    };
+    collapseCommands.length = 0;
+    runCollapseCommand = () => {
+      assert.equal(focusedElement, ancestor);
+      ancestorExpanded = false;
+    };
+
+    const restore = state.restore([path]);
+    resolver.pendingResolves[0].resolve({ element: descendant, pending: false });
+    await flushPromises();
+    assert.ok(finishReveal);
+
+    treeView.fireCollapse(ancestor);
+    finishReveal();
+    await restore;
+    assert.deepEqual(collapseCommands, ["list.collapse"]);
+    assert.equal(ancestorExpanded, false);
+    assert.deepEqual(state.snapshot(), []);
+
+    resolver.pendingBuilds[0].resolve(path.slice(0, -1));
+    await flushPromises();
+    runCollapseCommand = undefined;
+    state.dispose();
+  });
+
   it("does not restore an expansion when a later collapse resolves first", async () => {
     const treeView = new TestTreeView();
     const resolver = new ControlledExpansionResolver();

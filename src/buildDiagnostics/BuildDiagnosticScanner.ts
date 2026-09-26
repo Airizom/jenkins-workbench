@@ -40,6 +40,7 @@ export interface BuildDiagnosticScanSessionOptions {
   profile: NormalizedDiagnosticProfile;
   maxLogBytes: number;
   maxDiagnostics?: number;
+  resolveDiagnostic?: (diagnostic: RawBuildDiagnostic) => Promise<string | undefined>;
   chunkBytes?: number;
   parser?: BuildDiagnosticLogParser;
   customMatcherRunner?: BuildDiagnosticCustomMatcherRunner;
@@ -50,6 +51,7 @@ export interface BuildDiagnosticScanSessionOptions {
 
 interface ProgressiveDrainState {
   serverHasMore: boolean;
+  requestCount: number;
 }
 
 /**
@@ -67,6 +69,9 @@ export class BuildDiagnosticScanSession {
   private parser: BuildDiagnosticLogParser;
   private customMatcherRunner: BuildDiagnosticCustomMatcherRunner;
   private diagnosticsBySeverity = createDiagnosticBuckets();
+  private readonly retainedSignatures = new Set<string>();
+  private signatureByDiagnostic = new WeakMap<RawBuildDiagnostic, string>();
+  private readonly resolveDiagnostic?: BuildDiagnosticScanSessionOptions["resolveDiagnostic"];
   private retainedDiagnosticCount = 0;
   private omittedCount = 0;
   private nextOffset = 0;
@@ -75,7 +80,6 @@ export class BuildDiagnosticScanSession {
   private complete = false;
   private fallbackUsed = false;
   private progressiveState: "unknown" | "supported" | "unsupported" = "unknown";
-  private progressiveRequestCount = 0;
   private finishApplied = false;
   private customMatcherWarning: string | undefined;
   private lineTruncationWarning: string | undefined;
@@ -92,6 +96,7 @@ export class BuildDiagnosticScanSession {
       1,
       Math.floor(options.maxDiagnostics ?? DEFAULT_MAX_DIAGNOSTICS)
     );
+    this.resolveDiagnostic = options.resolveDiagnostic;
     this.chunkBytes = Math.max(1024, Math.floor(options.chunkBytes ?? DEFAULT_CHUNK_BYTES));
     this.customMatcherRunnerFactory = options.customMatcherRunnerFactory;
     this.parser = options.parser ?? createBuiltInParser(options.profile);
@@ -139,7 +144,7 @@ export class BuildDiagnosticScanSession {
   }
 
   private async drainProgressive(building: boolean): Promise<void> {
-    const state: ProgressiveDrainState = { serverHasMore: true };
+    const state: ProgressiveDrainState = { serverHasMore: true, requestCount: 0 };
     while (this.canDrainProgressive(state)) {
       const shouldStop = await this.drainNextProgressiveChunk(state, building);
       if (shouldStop) {
@@ -150,7 +155,7 @@ export class BuildDiagnosticScanSession {
     if (this.disposed) {
       return;
     }
-    this.finishProgressiveDrain(state.serverHasMore, building);
+    this.finishProgressiveDrain(state, building);
     if (this.complete) {
       await this.finishParser();
     }
@@ -160,7 +165,7 @@ export class BuildDiagnosticScanSession {
     return (
       state.serverHasMore &&
       this.bytesRead < this.maxLogBytes &&
-      this.progressiveRequestCount < MAX_DRAIN_REQUESTS &&
+      state.requestCount < MAX_DRAIN_REQUESTS &&
       !this.disposed
     );
   }
@@ -171,7 +176,7 @@ export class BuildDiagnosticScanSession {
   ): Promise<boolean> {
     const remaining = this.maxLogBytes - this.bytesRead;
     const previousOffset = this.nextOffset;
-    this.progressiveRequestCount += 1;
+    state.requestCount += 1;
     const result = await this.dataService.getConsoleTextProgressive(
       this.environment,
       this.buildUrl,
@@ -209,14 +214,15 @@ export class BuildDiagnosticScanSession {
     }
   }
 
-  private finishProgressiveDrain(serverHasMore: boolean, building: boolean): void {
+  private finishProgressiveDrain(state: ProgressiveDrainState, building: boolean): void {
     if (
-      (this.bytesRead >= this.maxLogBytes || this.progressiveRequestCount >= MAX_DRAIN_REQUESTS) &&
-      (serverHasMore || building)
+      (this.bytesRead >= this.maxLogBytes ||
+        (!building && state.requestCount >= MAX_DRAIN_REQUESTS)) &&
+      (state.serverHasMore || building)
     ) {
       this.truncated = true;
     }
-    if ((!building && !serverHasMore) || this.truncated) {
+    if ((!building && !state.serverHasMore) || this.truncated) {
       this.complete = true;
     }
   }
@@ -233,6 +239,8 @@ export class BuildDiagnosticScanSession {
     this.fallbackUsed = true;
     this.resetParsers();
     this.diagnosticsBySeverity = createDiagnosticBuckets();
+    this.retainedSignatures.clear();
+    this.signatureByDiagnostic = new WeakMap();
     this.retainedDiagnosticCount = 0;
     this.omittedCount = 0;
     await this.acceptChunk(result.text);
@@ -255,8 +263,8 @@ export class BuildDiagnosticScanSession {
       this.recordLineTruncation();
     }
     const custom = await this.customMatcherRunner.acceptChunk(text);
-    this.retainDiagnostics(builtIns);
-    this.retainDiagnostics(custom);
+    await this.retainDiagnostics(builtIns);
+    await this.retainDiagnostics(custom);
   }
 
   private async finishParser(): Promise<void> {
@@ -269,36 +277,83 @@ export class BuildDiagnosticScanSession {
       this.recordLineTruncation();
     }
     const custom = await this.customMatcherRunner.finish();
-    this.retainDiagnostics(builtIns);
-    this.retainDiagnostics(custom);
+    await this.retainDiagnostics(builtIns);
+    await this.retainDiagnostics(custom);
   }
 
-  private retainDiagnostics(next: readonly RawBuildDiagnostic[]): void {
+  private async retainDiagnostics(next: readonly RawBuildDiagnostic[]): Promise<void> {
     for (const diagnostic of next) {
+      if (this.disposed) {
+        return;
+      }
+      // Keep a failed path for aggregation, which reports it as unresolved and
+      // continues publishing diagnostics whose paths remain accessible.
+      const resolvedPath = this.resolveDiagnostic
+        ? await this.resolveDiagnostic(diagnostic).catch(() => undefined)
+        : undefined;
+      if (this.disposed) {
+        return;
+      }
+      const signature = retentionSignature(diagnostic, resolvedPath ?? diagnostic.rawPath);
+      if (this.retainedSignatures.has(signature)) {
+        continue;
+      }
       if (this.retainedDiagnosticCount < this.maxDiagnostics) {
         this.diagnosticsBySeverity[diagnostic.severity].push(diagnostic);
+        this.retainedSignatures.add(signature);
+        this.signatureByDiagnostic.set(diagnostic, signature);
         this.retainedDiagnosticCount += 1;
         continue;
       }
-      const displaced = this.displaceLowerSeverityDiagnostic(diagnostic.severity);
+      const displaced = this.displaceDiagnostic(diagnostic.severity);
       if (displaced) {
+        const displacedSignature = this.signatureByDiagnostic.get(displaced);
+        if (displacedSignature) {
+          this.retainedSignatures.delete(displacedSignature);
+        }
         this.diagnosticsBySeverity[diagnostic.severity].push(diagnostic);
+        this.retainedSignatures.add(signature);
+        this.signatureByDiagnostic.set(diagnostic, signature);
       }
       this.omittedCount += 1;
     }
   }
 
-  private displaceLowerSeverityDiagnostic(severity: RawBuildDiagnostic["severity"]): boolean {
+  private displaceDiagnostic(
+    severity: RawBuildDiagnostic["severity"]
+  ): RawBuildDiagnostic | undefined {
     if (severity === "error") {
+      if (this.maxDiagnostics <= 2) {
+        return (
+          this.diagnosticsBySeverity.information.pop() ??
+          this.diagnosticsBySeverity.warning.pop() ??
+          this.diagnosticsBySeverity.error.shift()
+        );
+      }
       return (
-        this.diagnosticsBySeverity.information.pop() !== undefined ||
-        this.diagnosticsBySeverity.warning.pop() !== undefined
+        this.diagnosticsBySeverity.error.shift() ??
+        this.diagnosticsBySeverity.information.pop() ??
+        this.diagnosticsBySeverity.warning.pop()
       );
     }
     if (severity === "warning") {
-      return this.diagnosticsBySeverity.information.pop() !== undefined;
+      return (
+        this.diagnosticsBySeverity.information.pop() ??
+        (this.maxDiagnostics > 2 && this.diagnosticsBySeverity.error.length > 1
+          ? this.diagnosticsBySeverity.error.shift()
+          : undefined) ??
+        (this.maxDiagnostics > 2 ? this.diagnosticsBySeverity.warning.shift() : undefined)
+      );
     }
-    return false;
+    return this.maxDiagnostics > 2
+      ? (this.diagnosticsBySeverity.information.shift() ??
+          (this.diagnosticsBySeverity.warning.length > 1
+            ? this.diagnosticsBySeverity.warning.shift()
+            : undefined) ??
+          (this.diagnosticsBySeverity.error.length > 1
+            ? this.diagnosticsBySeverity.error.shift()
+            : undefined))
+      : undefined;
   }
 
   private resetParsers(): void {
@@ -356,6 +411,22 @@ function createDiagnosticBuckets(): Record<RawBuildDiagnostic["severity"], RawBu
     warning: [],
     information: []
   };
+}
+
+function retentionSignature(diagnostic: RawBuildDiagnostic, resolvedPath: string): string {
+  return [
+    diagnostic.severity,
+    resolvedPath,
+    diagnostic.message,
+    diagnostic.line,
+    diagnostic.column ?? "",
+    diagnostic.endLine ?? "",
+    diagnostic.endColumn ?? "",
+    diagnostic.code ?? "",
+    diagnostic.kind,
+    diagnostic.kind === "stack-frame" ? (diagnostic.stackTraceId ?? "") : "",
+    diagnostic.kind === "stack-frame" ? (diagnostic.stackFrameIndex ?? "") : ""
+  ].join("\0");
 }
 
 const NOOP_CUSTOM_MATCHER_RUNNER: BuildDiagnosticCustomMatcherRunner = {

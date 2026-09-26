@@ -23,7 +23,7 @@ export function buildBaseNodeExecutorSummaries(
   }
 
   return executors.map((executor, index) => {
-    const work = executor.currentExecutable ?? executor.currentWorkUnit;
+    const work = executor.currentExecutable ?? executor.currentWorkUnit ?? undefined;
     const isIdle = !work && executor.idle !== false;
     const fallbackLabel = `${labelPrefix} ${index + 1}`;
 

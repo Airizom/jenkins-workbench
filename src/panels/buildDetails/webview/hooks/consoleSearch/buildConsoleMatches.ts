@@ -47,11 +47,11 @@ export function buildConsoleMatches(
         continue;
       }
 
-      matches.push({ start: match.index, end: match.index + matchText.length });
       if (matches.length >= MAX_CONSOLE_MATCHES) {
         tooManyMatches = true;
         break;
       }
+      matches.push({ start: match.index, end: match.index + matchText.length });
 
       match = regex.exec(text);
     }
@@ -72,11 +72,11 @@ export function buildConsoleMatches(
     }
 
     const endIndex = nextIndex + normalizedQuery.length - 1;
-    matches.push({ start: sourceStarts[nextIndex], end: sourceEnds[endIndex] });
     if (matches.length >= MAX_CONSOLE_MATCHES) {
       tooManyMatches = true;
       break;
     }
+    matches.push({ start: sourceStarts[nextIndex], end: sourceEnds[endIndex] });
 
     startIndex = nextIndex + Math.max(1, normalizedQuery.length);
   }

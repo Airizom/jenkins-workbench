@@ -9,6 +9,9 @@ import {
 } from "./shared/BuildDetailsContracts";
 
 const CACHE_LIMIT = 8;
+// Consecutive failed fetches retried for the active target before waiting for
+// the user to reselect it or resume the panel.
+const MAX_FAILED_FETCH_RETRIES = 3;
 
 export interface PipelineNodeLogManagerCallbacks {
   onSetLog(log: PipelineNodeLogViewModel): void;
@@ -33,6 +36,7 @@ export class PipelineNodeLogManager {
   private activeTarget: PipelineLogTargetViewModel | undefined;
   private pollTimer: NodeJS.Timeout | undefined;
   private pollInFlight = false;
+  private consecutiveFetchFailures = 0;
   private queuedFetchInitial: boolean | undefined;
   private disposed = false;
   private paused = false;
@@ -55,6 +59,7 @@ export class PipelineNodeLogManager {
     const targetChanged = this.activeTarget?.key !== normalizedTarget.key;
     this.generation += 1;
     this.paused = false;
+    this.consecutiveFetchFailures = 0;
     this.activeTarget = normalizedTarget;
     this.nodeLogFetcher.reset();
     if (targetChanged) {
@@ -96,6 +101,7 @@ export class PipelineNodeLogManager {
       return;
     }
     this.paused = false;
+    this.consecutiveFetchFailures = 0;
     void this.fetchActive(this.generation, false);
   }
 
@@ -121,6 +127,7 @@ export class PipelineNodeLogManager {
       return;
     }
     this.pollInFlight = true;
+    let retryAfterFailure = false;
     try {
       const log =
         target.kind === "stage"
@@ -129,12 +136,15 @@ export class PipelineNodeLogManager {
       if (generation !== this.generation || this.disposed) {
         return;
       }
+      this.consecutiveFetchFailures = 0;
       if (log) {
         this.remember(log);
         this.options.callbacks.onSetLog(log);
       }
     } catch (error) {
       if (generation === this.generation && !this.disposed) {
+        this.consecutiveFetchFailures += 1;
+        retryAfterFailure = this.consecutiveFetchFailures <= MAX_FAILED_FETCH_RETRIES;
         this.options.callbacks.onError(target.key, this.options.formatError(error));
       }
     } finally {
@@ -144,7 +154,10 @@ export class PipelineNodeLogManager {
         this.queuedFetchInitial = undefined;
         if (queuedInitial !== undefined) {
           void this.fetchActive(this.generation, queuedInitial);
-        } else if (generation === this.generation && this.shouldPollActiveLog()) {
+        } else if (
+          generation === this.generation &&
+          (retryAfterFailure || this.shouldPollActiveLog())
+        ) {
           this.scheduleNext(generation);
         }
       }

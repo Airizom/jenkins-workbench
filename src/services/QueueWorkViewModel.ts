@@ -7,6 +7,7 @@ import type {
 import { trimToUndefined } from "../shared/stringValues";
 import type { NodeLabelClassification, NodeLabelInput } from "./NodeLabelClassification";
 import { classifyNodeLabels, normalizeLabelKey } from "./NodeLabelClassification";
+import { evaluateLabelExpression, parseCompoundLabelExpression } from "./NodeLabelExpression";
 
 export interface QueueWorkBuildOptions {
   nodes?: NodeLabelInput[];
@@ -55,7 +56,10 @@ export function buildNodeQueuedWorkViewModel(
   const anyQueueItems: QueueWorkItemViewModel[] = [];
   const selfLabelQueueItems: QueueWorkItemViewModel[] = [];
   for (const item of queueItems) {
-    if (hasMatchingLabel(item, labels.poolLabelSet)) {
+    if (
+      hasMatchingLabel(item, labels.poolLabelSet) ||
+      hasMatchingLabelExpression(item, labels.allLabels)
+    ) {
       matchingQueueItems.push(item);
     }
     if (item.queuedForLabels.length === 0) {
@@ -89,6 +93,13 @@ function resolveQueuedForLabels(
 
 function hasMatchingLabel(item: QueueWorkItemViewModel, labelKeys: Set<string>): boolean {
   return item.queuedForLabels.some((label) => labelKeys.has(normalizeLabelKey(label)));
+}
+
+function hasMatchingLabelExpression(item: QueueWorkItemViewModel, nodeLabels: string[]): boolean {
+  return item.queuedForLabels.some((label) => {
+    const expression = parseCompoundLabelExpression(label);
+    return expression !== undefined && evaluateLabelExpression(expression, nodeLabels);
+  });
 }
 
 function formatQueueStatus(item: JenkinsQueueItemInfo): string {

@@ -16,7 +16,7 @@ export function ExecutorTableRow({
 }: ExecutorTableRowProps): React.JSX.Element {
   const durationLabel = entry.workDurationLabel ?? "—";
   const busy = !entry.isIdle;
-  const buildLabel = entry.workLabel ?? "Idle";
+  const buildLabel = entry.workLabel ?? (busy ? entry.statusLabel || "Busy" : "Idle");
   const progressPercent =
     typeof entry.progressPercent === "number" ? entry.progressPercent : undefined;
   const progressLabel =

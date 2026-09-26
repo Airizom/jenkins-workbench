@@ -1,6 +1,7 @@
 import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsDataService, JenkinsJobInfo } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { decodeJenkinsJobName } from "../../jenkins/JenkinsJobNames";
 import type { EnvironmentSummaryStore } from "../EnvironmentSummaryStore";
 import { JenkinsFolderTreeItem } from "../items/TreeJobItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
@@ -129,7 +130,9 @@ export class TreeJobCollectionChildrenLoader {
     ]);
     return mapFilteredJobsToTreeItems(
       environment,
-      filteredJobs,
+      options?.parentFolderKind === "multibranch"
+        ? filteredJobs.map((job) => ({ ...job, name: decodeJenkinsJobName(job.name) }))
+        : filteredJobs,
       this.treeFilter,
       options?.jobScope,
       watchedJobs,

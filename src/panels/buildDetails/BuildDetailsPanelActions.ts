@@ -154,7 +154,7 @@ export class BuildDetailsPanelActions {
 
     const environmentId = environment.environmentId;
     const label = details.fullDisplayName ?? details.displayName ?? `#${details.number}`;
-    this.controller.beginLoading();
+    const loadingRequest = this.controller.beginLoading();
     try {
       await restartBackend.restartPipelineFromStage(environment, buildUrl, stageName);
       void vscode.window.showInformationMessage(
@@ -166,7 +166,7 @@ export class BuildDetailsPanelActions {
         `Failed to restart ${label} from stage "${stageName}": ${formatActionError(error)}`
       );
     } finally {
-      this.controller.endLoading();
+      this.controller.endLoading(loadingRequest);
     }
   }
 

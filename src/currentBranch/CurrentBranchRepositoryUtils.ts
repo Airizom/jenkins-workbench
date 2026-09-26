@@ -32,5 +32,8 @@ export function isUriInside(candidate: vscode.Uri, root: vscode.Uri): boolean {
   }
 
   const relative = path.relative(root.fsPath, candidate.fsPath);
-  return relative.length === 0 || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return (
+    relative.length === 0 ||
+    (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
 }

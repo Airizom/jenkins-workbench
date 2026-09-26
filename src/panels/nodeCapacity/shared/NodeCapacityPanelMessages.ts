@@ -29,6 +29,7 @@ export interface OpenNodeDetailsMessage {
 
 export interface LoadNodeCapacityExecutorsMessage {
   type: "loadNodeCapacityExecutors";
+  snapshotGeneration: number;
   nodeUrls: string[];
 }
 
@@ -85,5 +86,11 @@ export function isLoadNodeCapacityExecutorsMessage(
     return false;
   }
   const nodeUrls = message.nodeUrls;
-  return Array.isArray(nodeUrls) && nodeUrls.every((nodeUrl) => typeof nodeUrl === "string");
+  return (
+    typeof message.snapshotGeneration === "number" &&
+    Number.isSafeInteger(message.snapshotGeneration) &&
+    message.snapshotGeneration >= 0 &&
+    Array.isArray(nodeUrls) &&
+    nodeUrls.every((nodeUrl) => typeof nodeUrl === "string")
+  );
 }

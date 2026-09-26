@@ -74,7 +74,7 @@ function buildStepSnippet(step: JenkinsfileStepDefinition): vscode.SnippetString
 
   if (signature.usesNamedArgs && parameters.length > 0) {
     const snippet = createCallSnippet(step.name);
-    appendNamedArgument(snippet, parameters[0].name, "value");
+    appendNamedArgument(snippet, parameters[0].name, "value", parameters[0].type === "Closure");
     appendBody(snippet, signature.takesClosure);
     return snippet;
   }
@@ -101,11 +101,15 @@ function createCallSnippet(stepName: string): vscode.SnippetString {
 function appendNamedArgument(
   snippet: vscode.SnippetString,
   namePlaceholder: string,
-  valuePlaceholder: string
+  valuePlaceholder: string,
+  isClosure: boolean
 ): void {
   snippet.appendPlaceholder(namePlaceholder);
-  snippet.appendText(": ");
+  snippet.appendText(isClosure ? ": { " : ": ");
   snippet.appendPlaceholder(valuePlaceholder);
+  if (isClosure) {
+    snippet.appendText(" }");
+  }
   closeCallSnippet(snippet);
 }
 

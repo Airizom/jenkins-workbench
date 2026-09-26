@@ -113,15 +113,29 @@ describe("ReplayDraftSessionStore", () => {
     }
   });
 
-  it("keeps the latest build session indexed when an older duplicate is discarded", () => {
-    const store = new ReplayDraftSessionStore(new ReplayDraftFilesystem());
+  it("reuses the existing build session and its drafts until discarded", () => {
+    const filesystem = new ReplayDraftFilesystem();
+    const store = new ReplayDraftSessionStore(filesystem);
     const buildUrl = "https://jenkins.example/job/demo/1/";
     const first = store.createSession(environment, buildUrl, "demo #1", definition);
-    const second = store.createSession(environment, buildUrl, "demo #1", definition);
+    const mainScript = first.scripts[0];
+    store.updateDraftContent(mainScript.uri, "edited pipeline");
+    const second = store.createSession(environment, buildUrl, "demo #1", {
+      ...definition,
+      mainScript: "new pipeline"
+    });
 
-    store.discardSession(first.sessionId);
+    assert.equal(second, first);
+    assert.equal(store.getSessionForBuild(environment, buildUrl), first);
+    assert.equal(store.getSessionForUri(mainScript.uri), first);
+    assert.equal(store.buildSubmissionPayload(second).mainScript, "edited pipeline");
+    assert.equal(filesystem.hasDraft(mainScript.uri), true);
 
-    assert.equal(store.getSessionForBuild(environment, buildUrl)?.sessionId, second.sessionId);
-    assert.equal(store.getSession(second.sessionId), second);
+    store.discardSession(second.sessionId);
+
+    assert.equal(store.getSessionForBuild(environment, buildUrl), undefined);
+    assert.equal(store.getSession(first.sessionId), undefined);
+    assert.equal(store.hasDraft(mainScript.uri), false);
+    assert.equal(filesystem.hasDraft(mainScript.uri), false);
   });
 });

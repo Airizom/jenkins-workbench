@@ -54,14 +54,28 @@ describe("PanelLoadTracker", () => {
     const posted: boolean[] = [];
     const tracker = new PanelLoadTracker((value) => posted.push(value));
 
-    tracker.beginLoading();
-    tracker.beginLoading();
-    tracker.endLoading();
+    const first = tracker.beginLoading();
+    const second = tracker.beginLoading();
+    tracker.endLoading(first);
     assert.deepEqual(posted, [true]);
 
-    tracker.endLoading();
-    tracker.endLoading();
+    tracker.endLoading(second);
+    tracker.endLoading(second);
     assert.deepEqual(posted, [true, false]);
+  });
+
+  it("ignores a completion from before a reset while a new load is active", () => {
+    const posted: boolean[] = [];
+    const tracker = new PanelLoadTracker((value) => posted.push(value));
+
+    const oldRequest = tracker.beginLoading();
+    tracker.resetLoadingRequests();
+    const newRequest = tracker.beginLoading();
+    tracker.endLoading(oldRequest);
+
+    assert.deepEqual(posted, [true, false, true]);
+    tracker.endLoading(newRequest);
+    assert.deepEqual(posted, [true, false, true, false]);
   });
 
   it("resets outstanding loads and tracks current load tokens", () => {
@@ -120,11 +134,11 @@ describe("TestCaseViewModel", () => {
   it("builds stable keys, ids, occurrence keys, and subtitles", () => {
     assert.equal(
       buildTestCaseKey("com.example.Tests", "unit", "runs"),
-      "com.example.Tests::unit::runs"
+      '["com.example.Tests","unit","runs"]'
     );
     assert.equal(
       buildTestCaseId("com.example.Tests", "unit", "runs", 2, 3),
-      "com.example.Tests::unit::runs::2::3"
+      '["com.example.Tests","unit","runs"]::2::3'
     );
     assert.equal(
       buildOccurrenceKey("com.example.Tests::unit::runs", 4),
@@ -132,6 +146,19 @@ describe("TestCaseViewModel", () => {
     );
     assert.equal(formatTestCaseSubtitle("com.example.Tests", "unit"), "com.example.Tests • unit");
     assert.equal(formatTestCaseSubtitle(undefined, undefined), "Unnamed suite");
+  });
+
+  it("keeps delimiter-containing case fields distinct in keys and ids", () => {
+    const firstKey = buildTestCaseKey("A::B", "C", "D");
+    const secondKey = buildTestCaseKey("A", "B::C", "D");
+
+    assert.notEqual(firstKey, secondKey);
+    assert.notEqual(
+      buildTestCaseId("A::B", "C", "D", 0, 0),
+      buildTestCaseId("A", "B::C", "D", 0, 0)
+    );
+    assert.equal(normalizeTestCaseBase({ className: "A::B", name: "D" }, "C")?.key, firstKey);
+    assert.equal(normalizeTestCaseBase({ className: "A", name: "D" }, "B::C")?.key, secondKey);
   });
 
   it("normalizes names, class names, statuses, durations, and suite iteration context", () => {
@@ -160,7 +187,7 @@ describe("TestCaseViewModel", () => {
 
     assert.deepEqual(seen, [
       {
-        key: "com.example.Tests::suite-a::runs",
+        key: '["com.example.Tests","suite-a","runs"]',
         name: "runs",
         className: "com.example.Tests",
         suiteName: "suite-a",
@@ -169,7 +196,7 @@ describe("TestCaseViewModel", () => {
         durationLabel: "1.3 s"
       },
       {
-        key: "com.example.Fallback::suite-a::com.example.Fallback",
+        key: '["com.example.Fallback","suite-a","com.example.Fallback"]',
         name: "com.example.Fallback",
         className: "com.example.Fallback",
         suiteName: "suite-a",
@@ -190,7 +217,7 @@ describe("TestCaseViewModel", () => {
     );
     assert.equal(normalizeTestCaseBase(unnamed, undefined), undefined);
     assert.deepEqual(normalizeTestCaseBase(unnamed, undefined, { fallbackToClassName: true }), {
-      key: "::::Unnamed test",
+      key: '["","","Unnamed test"]',
       name: "Unnamed test",
       className: undefined,
       suiteName: undefined,

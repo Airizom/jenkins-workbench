@@ -317,6 +317,44 @@ describe("ActivityCollector.collect", () => {
     assert.equal(viewModel.summary.isTruncated, true);
   });
 
+  it("fills Running when every enrichment candidate is promoted", async () => {
+    const awaiting = Array.from({ length: 10 }, (_, index) =>
+      createEntry(`awaiting-${index + 1}`, "blue_anime")
+    );
+    const running = Array.from({ length: 6 }, (_, index) =>
+      createEntry(`running-${index + 1}`, "blue_anime")
+    );
+    const { collector, enricherCalls } = createCollector(
+      [[...awaiting, ...running]],
+      new Set(awaiting.map((entry) => entry.url))
+    );
+
+    const viewModel = await collector.collect(
+      environment,
+      createCollectorOptions({
+        maxItemsPerGroup: 5,
+        collection: {
+          maxScanResults: 100,
+          jobSearchBatchSize: 20,
+          pendingInputCandidateLimit: 10,
+          pendingInputLookupConcurrency: 2,
+          pendingInputBuildLookupLimit: 5,
+          refreshMinIntervalMs: 0
+        }
+      })
+    );
+
+    assert.deepEqual(
+      enricherCalls[0].runningCandidates.map((entry) => entry.name),
+      awaiting.map((entry) => entry.name)
+    );
+    assert.deepEqual(groupNames(viewModel), [
+      { kind: "awaitingInput", names: awaiting.slice(0, 5).map((entry) => entry.name) },
+      { kind: "running", names: running.slice(0, 5).map((entry) => entry.name) }
+    ]);
+    assert.equal(viewModel.groups.find((group) => group.kind === "running")?.isTruncated, true);
+  });
+
   it("promotes enriched candidates beyond the running backfill window", async () => {
     const runningEntries = Array.from({ length: 7 }, (_, index) =>
       createEntry(`running-${index + 1}`, "blue_anime")

@@ -19,6 +19,7 @@ export type ConsoleHtmlModel = {
 };
 
 const ALLOWED_TAGS = new Set(["a", "span", "b", "strong", "i", "em", "code", "u", "s", "br"]);
+const NON_VISIBLE_TAGS = new Set(["script", "style", "template", "noscript", "head", "title"]);
 
 export function parseConsoleHtml(html: string): ConsoleHtmlModel {
   if (!html) {
@@ -319,6 +320,9 @@ function appendSanitizedNode(
 
   const element = node as HTMLElement;
   const tag = element.tagName.toLowerCase();
+  if (NON_VISIBLE_TAGS.has(tag)) {
+    return;
+  }
   if (!ALLOWED_TAGS.has(tag)) {
     for (const child of element.childNodes) {
       appendSanitizedNode(child, output, textParts);

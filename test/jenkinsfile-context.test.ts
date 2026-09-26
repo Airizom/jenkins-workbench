@@ -64,6 +64,46 @@ describe("Jenkinsfile Groovy context parsing", () => {
     }
   });
 
+  it("keeps escaped triple-quote delimiters and following punctuation masked", () => {
+    for (const delimiter of ["'''", '"""']) {
+      const literal = `${delimiter}before \\${delimiter} , } hidden${delimiter}`;
+      assert.equal(maskGroovyText(`${literal}, visible`), `${" ".repeat(literal.length)}, visible`);
+    }
+  });
+
+  it("ignores slashy string punctuation when finding the active argument", () => {
+    for (const source of [
+      "sh(/a,b}\\/c/, timeout: /*cursor*/2)",
+      "sh /a,b/, timeout: /*cursor*/2",
+      "sh /a,b/.trim(), timeout: /*cursor*/2",
+      "sh /a,b/ as String, timeout: /*cursor*/2",
+      "sh(foo + /a,b/, timeout: /*cursor*/2)",
+      "sh /a,\nb/, timeout: /*cursor*/2",
+      "sh($/a,b}/*c*/$/, timeout: /*cursor*/2)",
+      "sh($/a$$b$/c,} /$, timeout: /*cursor*/2)"
+    ]) {
+      const context = analyzeMarkedText(source);
+      assert.equal(context.argumentContext?.activeIndex, 1);
+      assert.equal(context.argumentContext?.activeName, "timeout");
+      assert.equal(context.argumentContext?.usesNamedArgs, true);
+    }
+  });
+
+  it("keeps slashy string braces out of the block path and preserves interpolation", () => {
+    const interpolation = `\${params.VALUE ?: 'x'}`;
+    for (const literal of [`/} ${interpolation} ,/`, `$/} ${interpolation} ,/$`]) {
+      const context = analyzeMarkedText(`pipeline { steps { sh(${literal}); sh(/*cursor*/) } }`);
+      assert.deepEqual(context.blockPath, ["pipeline", "steps"]);
+      assert.equal(context.activeCall?.name, "sh");
+      assert.equal(context.argumentContext?.activeIndex, 0);
+      assert.ok(context.maskedText.includes("${params.VALUE ?:"));
+    }
+  });
+
+  it("does not treat division as a slashy string", () => {
+    assert.equal(maskGroovyText("value / amount, next"), "value / amount, next");
+  });
+
   it("reports named argument context for parenthesized calls with Elvis and ternary arguments", () => {
     const { text, offset } = withCursor(
       'sh(script: params.CMD ?: "make test", returnStatus: /*cursor*/)'
@@ -159,10 +199,14 @@ pipeline {
     assert.equal(environmentAnalysis.isStepAllowed, false);
     assert.equal(environmentAnalysis.hasNodeContext, false);
     assert.equal(computeIsStepAllowed(["pipeline"]), false);
-    for (const label of ["node", "steps", "script", "post"]) {
+    for (const label of ["node", "steps", "script"]) {
       assert.equal(computeIsStepAllowed(["pipeline", label]), true);
       assert.equal(computeHasNodeContext(["pipeline", label]), true);
     }
+    assert.equal(computeIsStepAllowed(["pipeline", "post"]), false);
+    assert.equal(computeIsStepAllowed(["pipeline", "post", "always"]), true);
+    assert.equal(computeIsStepAllowed(["pipeline", "post", "unknown"]), false);
+    assert.equal(computeHasNodeContext(["pipeline", "post"]), true);
     assert.equal(computeIsStepAllowed(["pipeline", "environment"]), false);
     assert.equal(computeHasNodeContext(["pipeline", "environment"]), false);
   });

@@ -27,6 +27,15 @@ interface EnvironmentStoreHarness {
     token?: string
   ): Promise<void>;
   getEnvironments(scope: "workspace" | "global"): Promise<Array<{ id: string; url: string }>>;
+  getAuthConfig(
+    scope: "workspace" | "global",
+    id: string
+  ): Promise<{ type: "bearer"; token: string } | undefined>;
+  setAuthConfig(
+    scope: "workspace" | "global",
+    id: string,
+    authConfig: { type: "bearer"; token: string }
+  ): Promise<void>;
 }
 
 interface RepositoryLinkStoreConstructor {
@@ -144,6 +153,45 @@ describe("JenkinsEnvironmentStore mutation serialization", () => {
 
     const environments = await store.getEnvironments("workspace");
     assert.deepEqual(environments.map((environment) => environment.id).sort(), ["env-1", "env-2"]);
+  });
+
+  it("keeps a valid auth config saved during a stale invalid read", async () => {
+    const key = "jenkinsWorkbench.envAuthConfig.workspace.env-1";
+    const secrets = new Map([[key, "{invalid"]]);
+    let releaseRead!: () => void;
+    const readHeld = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    let reads = 0;
+    const { context } = createContext();
+    const authContext = {
+      ...context,
+      secrets: {
+        get: async (secretKey: string) => {
+          const value = secrets.get(secretKey);
+          if (reads++ === 0) {
+            await readHeld;
+          }
+          return value;
+        },
+        store: async (secretKey: string, value: string) => {
+          secrets.set(secretKey, value);
+        },
+        delete: async (secretKey: string) => {
+          secrets.delete(secretKey);
+        }
+      }
+    } as unknown as vscode.ExtensionContext;
+    const store = new JenkinsEnvironmentStore(authContext);
+
+    const staleRead = store.getAuthConfig("workspace", "env-1");
+    const validConfig = { type: "bearer" as const, token: "valid" };
+    await store.setAuthConfig("workspace", "env-1", validConfig);
+    releaseRead();
+
+    assert.equal(await staleRead, undefined);
+    assert.deepEqual(await store.getAuthConfig("workspace", "env-1"), validConfig);
+    assert.equal(secrets.get(key), JSON.stringify(validConfig));
   });
 });
 

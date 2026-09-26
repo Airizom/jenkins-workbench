@@ -186,7 +186,15 @@ export class BuildDiagnosticScanRunner {
         buildUrl: owner.buildUrl,
         profile: context.profile,
         maxLogBytes: config.maxLogBytes,
-        maxDiagnostics: getBuildDiagnosticCandidateLimit(config.maxProblems)
+        maxDiagnostics: getBuildDiagnosticCandidateLimit(config.maxProblems),
+        resolveDiagnostic: async (diagnostic) => {
+          const resolution = await this.pathResolver.resolve(
+            context.repositoryUri,
+            context.profile,
+            diagnostic
+          );
+          return resolution.status === "resolved" ? resolution.uri.toString() : undefined;
+        }
       })
     };
   }

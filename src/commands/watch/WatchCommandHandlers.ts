@@ -68,7 +68,7 @@ export async function unwatchJob(
   refreshHost: EnvironmentScopedRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
-  let removalErrors: unknown[] = [];
+  const refreshEnvironment = createEnvironmentRefreshCallback(refreshHost);
   await removeJobScopedState({
     item,
     missingSelectionMessage: "Select a job or pipeline to unwatch.",
@@ -77,16 +77,17 @@ export async function unwatchJob(
     removedMessage: (label) => `Stopped watching ${label}.`,
     remove: async (selected) => {
       const result = await removeWatchedJob(watchStore, selected);
-      if (!result.removed && result.errors.length > 0) {
-        throw new AggregateError(result.errors, "Failed to remove watch aliases.");
+      if (result.errors.length > 0) {
+        if (result.removed) {
+          refreshEnvironment(selected.environment.environmentId);
+        }
+        throw new AggregateError(
+          result.errors,
+          result.removed ? "Failed to remove all watch aliases." : "Failed to remove watch aliases."
+        );
       }
-      removalErrors = result.errors;
       return result.removed;
     },
-    refreshEnvironment: createEnvironmentRefreshCallback(refreshHost)
+    refreshEnvironment
   });
-
-  if (removalErrors.length > 0) {
-    throw new AggregateError(removalErrors, "Failed to remove all watch aliases.");
-  }
 }

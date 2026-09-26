@@ -141,6 +141,46 @@ describe("diagnostic profile normalization", () => {
     assert.equal(normalized.issues.length, 3);
   });
 
+  it("rejects adjacent repetitions in synchronous regex path mappings", () => {
+    const normalized = normalizeDiagnosticProfiles({
+      unsafe: {
+        pathMappings: [
+          { type: "regex", remote: "^a*a*a*a*a*b$", replace: "src/file.ts", local: "." }
+        ]
+      }
+    });
+
+    assert.equal(normalized.profiles.get("unsafe")?.valid, false);
+    assert.equal(normalized.profiles.get("unsafe")?.pathMappings.length, 0);
+    assert.ok(
+      normalized.issues.some(
+        (issue) =>
+          issue.path === "profiles.unsafe.pathMappings[0].remote" &&
+          issue.message.includes("Adjacent repetition")
+      )
+    );
+  });
+
+  it("rejects ambiguous repetitions separated by empty lookaheads in path mappings", () => {
+    const normalized = normalizeDiagnosticProfiles({
+      unsafe: {
+        pathMappings: [
+          { type: "regex", remote: "^a*(?=)a*(?=)a*(?=)a*(?=)a*b$", replace: "src/file.ts" }
+        ]
+      }
+    });
+
+    assert.equal(normalized.profiles.get("unsafe")?.valid, false);
+    assert.equal(normalized.profiles.get("unsafe")?.pathMappings.length, 0);
+    assert.ok(
+      normalized.issues.some(
+        (issue) =>
+          issue.path === "profiles.unsafe.pathMappings[0].remote" &&
+          issue.message.includes("Adjacent repetition")
+      )
+    );
+  });
+
   it("validates the exact matcher subset and derives an ID from name", () => {
     const normalized = normalizeDiagnosticProfiles({
       custom: {
@@ -327,5 +367,30 @@ describe("diagnostic regular expression safety", () => {
     for (const expression of fixedWidthExpressions) {
       assert.equal(validateDiagnosticRegexp(expression).safe, true, expression);
     }
+  });
+
+  it("rejects adjacent variable-width atoms while allowing literal separators", () => {
+    for (const expression of [
+      "^a*a*a*a*a*b$",
+      "^a{1,3}a+$",
+      "^(a+)(a+)$",
+      "^\\w+\\w+$",
+      "^[a-z]+[a-z]+$",
+      "^a*(?:)a*(?:)a*(?:)a*(?:)a*b$",
+      "^a*()a*()a*b$"
+    ]) {
+      assert.equal(validateDiagnosticRegexp(expression).safe, false, expression);
+    }
+    assert.equal(validateDiagnosticRegexp("^a*/a+$").safe, true);
+  });
+
+  it("preserves adjacent repetition across unquantified lookarounds", () => {
+    assert.equal(validateDiagnosticRegexp("^a+(?=a)a+(?=a)a+$").safe, false);
+    for (const assertion of ["(?=a)", "(?!b)", "(?<=a)", "(?<!b)"]) {
+      const expression = `^a+${assertion}a+$`;
+      assert.equal(validateDiagnosticRegexp(expression).safe, false, expression);
+    }
+    assert.equal(validateDiagnosticRegexp("^a+(?:(?=a))a+$").safe, false);
+    assert.equal(validateDiagnosticRegexp("^a+(?=b)b$").safe, true);
   });
 });

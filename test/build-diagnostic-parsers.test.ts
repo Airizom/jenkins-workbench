@@ -52,6 +52,28 @@ describe("built-in build diagnostic parsers", () => {
     );
   });
 
+  it("prefers diagnostic severity over conflicting log prefixes", () => {
+    const findings = parseBuildLog(
+      "[INFO] src/a.c:4: error: failed\n" +
+        "[ERROR] src/b.c:5: warning: suspicious\n" +
+        "[ERROR] src/App.java:[6,2] warning: deprecated\n" +
+        "[ERROR] src/config.yaml:7 - warning: outdated\n" +
+        "[WARN] src/Other.java:[8,3] cannot find symbol\n",
+      { builtIns: ["gcc-clang", "generic"] }
+    );
+
+    assert.deepEqual(
+      findings.map(({ parserId, severity }) => ({ parserId, severity })),
+      [
+        { parserId: "gcc-clang", severity: "error" },
+        { parserId: "gcc-clang", severity: "warning" },
+        { parserId: "gcc-clang", severity: "warning" },
+        { parserId: "generic", severity: "warning" },
+        { parserId: "gcc-clang", severity: "warning" }
+      ]
+    );
+  });
+
   it("parses MSVC and TypeScript formats including Windows drive paths", () => {
     const findings = parseBuildLog(
       "C:\\agent\\src\\main.cpp(42,9): error C2143: syntax error\n" +
@@ -159,6 +181,55 @@ describe("built-in build diagnostic parsers", () => {
     assert.match(findings[1].message, /IllegalStateException: second/);
     assert.match(findings[2].message, /InvalidOperationException: third/);
     assert.match(findings[3].message, /ArgumentException: fourth/);
+  });
+
+  it("ends stack traces at unrelated lines while keeping multiline trace content grouped", () => {
+    const findings = parseBuildLog(
+      "TypeError: nope\n" +
+        "    at handler (/workspace/src/app.ts:11:7)\n" +
+        "[INFO] Building module\n" +
+        "    at later (/workspace/src/later.ts:3:4)\n" +
+        "java.lang.AssertionError: \n" +
+        "Expected: is <1>\n" +
+        "     but: was <2>\n" +
+        "\tat com.acme.First.run(First.java:10)\n" +
+        "\tat com.acme.Native.call(Native Method)\n" +
+        "\t... 12 more\n" +
+        "\tat com.acme.Second.run(Second.java:20)\n" +
+        "Traceback (most recent call last):\n" +
+        '  File "/workspace/a.py", line 5, in execute\n' +
+        "    run()\n" +
+        "    ^^^^^\n" +
+        '  File "/workspace/b.py", line 9, in run\n' +
+        '    raise ValueError("bad")\n' +
+        "ValueError: bad\n" +
+        "Finished: FAILURE\n" +
+        '  File "/workspace/c.py", line 1, in later\n'
+    );
+
+    assert.deepEqual(
+      findings.map((finding) => finding.rawPath),
+      [
+        "/workspace/src/app.ts",
+        "/workspace/src/later.ts",
+        "First.java",
+        "Second.java",
+        "/workspace/a.py",
+        "/workspace/b.py",
+        "/workspace/c.py"
+      ]
+    );
+    const [jsFirst, jsLater, jvmFirst, jvmSecond, pyFirst, pySecond, pyLater] = findings;
+    assert.notEqual(jsLater.stackTraceId, jsFirst.stackTraceId);
+    assert.equal(jsLater.stackFrameIndex, 0);
+    assert.equal(jsLater.message, "JavaScript stack frame");
+    assert.equal(jvmSecond.stackTraceId, jvmFirst.stackTraceId);
+    assert.deepEqual([jvmFirst.stackFrameIndex, jvmSecond.stackFrameIndex], [0, 1]);
+    assert.match(jvmFirst.message, /AssertionError/);
+    assert.equal(pySecond.stackTraceId, pyFirst.stackTraceId);
+    assert.deepEqual([pyFirst.stackFrameIndex, pySecond.stackFrameIndex], [0, 1]);
+    assert.notEqual(pyLater.stackTraceId, pyFirst.stackTraceId);
+    assert.equal(pyLater.stackFrameIndex, 0);
   });
 
   it("strips CSI, OSC, Jenkins timestamps, Pipeline, Maven, and tool prefixes", () => {

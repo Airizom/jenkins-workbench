@@ -32,11 +32,7 @@ export class AdaptiveBackoff {
   }
 
   async wait(cancellation?: CancellationInput): Promise<void> {
-    const delay = this.jitteredDelay();
-    if (delay <= 0) {
-      return;
-    }
-    await waitWithCancellation(delay, cancellation);
+    await waitWithCancellation(this.jitteredDelay(), cancellation);
   }
 
   onSuccess(): void {

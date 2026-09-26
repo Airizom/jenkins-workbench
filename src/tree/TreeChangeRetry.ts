@@ -66,11 +66,10 @@ async function runTreeChangeAttempt<Result>(
     if (!acceptingChanges) {
       return;
     }
-    if (!waiting) {
-      observedChanges.push(changedElement);
-      return;
-    }
-    if (doesTreeChangeMatch(changedElement, pendingElement)) {
+    // Record every change so the resolved pending element can be checked after the
+    // operation, even when an early wait targets a different provisional element.
+    observedChanges.push(changedElement);
+    if (waiting && doesTreeChangeMatch(changedElement, pendingElement)) {
       finishWaiting(true);
     }
   });

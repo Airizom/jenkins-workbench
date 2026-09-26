@@ -255,8 +255,6 @@ export class JenkinsParameterPresetStore {
 
     const source = jobs[sourceIndex];
     const targetIndex = this.state.findJobIndex(jobs, environmentId, newJobUrl);
-    let droppedPresets: StoredParameterPreset[] = [];
-
     if (targetIndex < 0) {
       jobs[sourceIndex] = { ...source, jobUrl: newJobUrl };
     } else {
@@ -266,14 +264,12 @@ export class JenkinsParameterPresetStore {
       );
       jobs[targetIndex] = {
         ...target,
-        presets: sortedPresets.slice(0, MAX_PRESETS_PER_JOB)
+        presets: sortedPresets
       };
-      droppedPresets = sortedPresets.slice(MAX_PRESETS_PER_JOB);
       jobs.splice(sourceIndex, 1);
     }
 
     await this.state.writeJobs(scope, jobs);
-    await this.deletePresetSecrets(droppedPresets);
     return true;
   }
 

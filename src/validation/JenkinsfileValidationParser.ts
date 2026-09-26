@@ -11,9 +11,9 @@ import {
 } from "./JenkinsfileValidationUtils";
 
 const SUCCESS_PATTERNS = [
-  /successfully validated/i,
-  /jenkinsfile is valid/i,
-  /validation (succeeded|successful)/i
+  /^(?:Jenkinsfile )?successfully validated\.?$/i,
+  /^jenkinsfile is valid\.?$/i,
+  /^validation (?:succeeded|successful)\.?$/i
 ];
 
 const IGNORE_PATTERNS = [/^errors encountered validating jenkinsfile/i];
@@ -37,10 +37,6 @@ export function parseDeclarativeValidationOutput(text: string): JenkinsfileValid
   const jsonFindings = parseJsonValidationOutput(normalized);
   if (jsonFindings) {
     return jsonFindings;
-  }
-
-  if (SUCCESS_PATTERNS.some((pattern) => pattern.test(normalized))) {
-    return [];
   }
 
   const findings: JenkinsfileValidationFinding[] = [];
@@ -73,13 +69,11 @@ export function parseDeclarativeValidationOutput(text: string): JenkinsfileValid
     }
   }
 
-  if (findings.length === 0) {
-    findings.push({
-      message: normalized
-    });
+  if (findings.length === 0 && SUCCESS_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return [];
   }
 
-  return findings;
+  return findings.length > 0 ? findings : [{ message: normalized }];
 }
 
 function parseJsonValidationOutput(text: string): JenkinsfileValidationFinding[] | undefined {
@@ -99,10 +93,7 @@ function parseJsonValidationOutput(text: string): JenkinsfileValidationFinding[]
 
     const findings: JenkinsfileValidationFinding[] = [];
     for (const error of errors) {
-      const finding = parseJsonError(error);
-      if (finding) {
-        findings.push(finding);
-      }
+      findings.push(...parseJsonErrors(error));
     }
     if (findings.length === 0 && errors.length > 0) {
       findings.push({ message: text });
@@ -135,11 +126,25 @@ function extractJsonErrors(value: unknown): unknown[] | undefined {
     return errors;
   }
 
-  if (result && /success|ok/i.test(result)) {
+  if (typeof result === "string" && /^(?:success|ok)$/i.test(result.trim())) {
     return [];
   }
 
   return undefined;
+}
+
+function parseJsonErrors(error: unknown): JenkinsfileValidationFinding[] {
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const messages = record.message ?? record.Message ?? record.error ?? record.Error;
+    if (Array.isArray(messages)) {
+      return messages.flatMap((message) =>
+        typeof message === "string" ? parseJsonErrors({ ...record, message }) : []
+      );
+    }
+  }
+  const finding = parseJsonError(error);
+  return finding ? [finding] : [];
 }
 
 function parseJsonError(error: unknown): JenkinsfileValidationFinding | undefined {
@@ -157,13 +162,19 @@ function parseJsonError(error: unknown): JenkinsfileValidationFinding | undefine
     (record.Message as string | undefined) ??
     (record.error as string | undefined) ??
     (record.Error as string | undefined);
-  if (!message) {
+  if (typeof message !== "string" || !message) {
     return undefined;
   }
 
   const line = toNumber(record.line ?? record.Line);
   const column = toNumber(record.column ?? record.Column);
-  return buildFinding(message, line, column);
+  const embedded =
+    line === undefined || column === undefined ? parseFindingLine(message) : undefined;
+  return buildFinding(
+    embedded?.message ?? message,
+    line ?? embedded?.line,
+    column ?? embedded?.column
+  );
 }
 
 function toNumber(value: unknown): number | undefined {

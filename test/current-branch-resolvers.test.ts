@@ -39,6 +39,9 @@ const { CurrentBranchRefreshCoordinator } = await import(
 const { CurrentBranchJenkinsService } = await import(
   "../src/currentBranch/CurrentBranchJenkinsService"
 );
+const { CurrentBranchLinkResolver } = await import(
+  "../src/currentBranch/CurrentBranchLinkResolver"
+);
 const { VscodeCurrentBranchGitHubPullRequestAdapter } = await import(
   "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter"
 );
@@ -67,13 +70,30 @@ describe("CurrentBranchRepositoryResolver", () => {
     resolver.dispose();
   });
 
+  it("selects a repository for an active file in a directory beginning with two dots", () => {
+    const repository = createGitRepository("/workspace/app");
+    const resolver = createRepositoryResolver([
+      repository,
+      createGitRepository("/workspace/other", { selected: true })
+    ]);
+    vscodeMock.window.activeTextEditor = {
+      document: { uri: TestUri.file("/workspace/app/..config/file.ts") }
+    };
+
+    assert.equal(
+      resolver.resolveActiveRepository()?.repositoryUriString,
+      repository.rootUri.toString()
+    );
+    resolver.dispose();
+  });
+
   it("returns undefined for detached active files and ambiguous unselected repositories", () => {
     const resolver = createRepositoryResolver([
       createGitRepository("/workspace/app-a"),
       createGitRepository("/workspace/app-b")
     ]);
     vscodeMock.window.activeTextEditor = {
-      document: { uri: TestUri.file("/tmp/outside.ts") }
+      document: { uri: TestUri.file("/workspace/app-a-sibling/outside.ts") }
     };
 
     assert.equal(resolver.resolveActiveRepository(), undefined);
@@ -180,6 +200,77 @@ describe("CurrentBranchTargetResolver", () => {
     assert.equal(refreshed.target.selectedTarget.jobColor, "red");
     assert.equal(fixture.pullRequestCalls, 2);
     assert.equal(fixture.jobCalls, 2);
+  });
+
+  it("keeps the newer target when an older folder request finishes last", async () => {
+    const jobs = [
+      createDeferred<CurrentBranchPullRequestJobRef[]>(),
+      createDeferred<CurrentBranchPullRequestJobRef[]>()
+    ];
+    let jobCalls = 0;
+    const resolver = new CurrentBranchTargetResolver(
+      {
+        getJobsForFolder: () => jobs[jobCalls++].promise
+      } as unknown as JenkinsDataService,
+      { lookup: async () => ({ kind: "none" as const }) },
+      { findMatch: () => undefined }
+    );
+    const localState = createLinkedContext();
+
+    const older = resolver.resolve(localState, {});
+    await flushPromises();
+    const newer = resolver.resolve(localState, { force: true });
+    await flushPromises();
+    assert.equal(jobCalls, 2);
+
+    jobs[1].resolve([{ name: localState.branchName, url: "job/new/", color: "blue" }]);
+    const newerResult = await newer;
+    assert.equal(newerResult.kind, "selected");
+    assert.equal(newerResult.target.selectedTarget.jobUrl, "job/new/");
+    jobs[0].resolve([{ name: localState.branchName, url: "job/old/", color: "red" }]);
+    const olderResult = await older;
+    assert.equal(olderResult.kind, "selected");
+    assert.equal(olderResult.target.selectedTarget.jobUrl, "job/old/");
+
+    const cached = await resolver.resolve(localState, {});
+    assert.equal(cached.kind, "selected");
+    assert.equal(cached.target.selectedTarget.jobUrl, "job/new/");
+    assert.equal(jobCalls, 2);
+  });
+
+  it("keeps the newer pull request context when an older lookup finishes last", async () => {
+    const lookups = [
+      createDeferred<CurrentBranchPullRequestResolution>(),
+      createDeferred<CurrentBranchPullRequestResolution>()
+    ];
+    let lookupCalls = 0;
+    let jobCalls = 0;
+    const resolver = new CurrentBranchTargetResolver(
+      {
+        getJobsForFolder: async () => {
+          jobCalls += 1;
+          return [{ name: "feature/new", url: "job/new/" }];
+        }
+      } as unknown as JenkinsDataService,
+      { lookup: () => lookups[lookupCalls++].promise },
+      { findMatch: () => undefined }
+    );
+    const localState = createLinkedContext();
+
+    const older = resolver.resolve(localState, {});
+    const newer = resolver.resolve(localState, { force: true });
+    lookups[1].resolve({ kind: "pullRequest", number: 42, headBranch: "feature/new" });
+    const newerResult = await newer;
+    assert.equal(newerResult.kind, "selected");
+    assert.equal(newerResult.target.selectedTarget.jobUrl, "job/new/");
+    lookups[0].resolve({ kind: "none" });
+    assert.equal((await older).kind, "branchMissing");
+
+    const cached = await resolver.resolve(localState, {});
+    assert.equal(cached.kind, "selected");
+    assert.equal(cached.target.selectedTarget.jobUrl, "job/new/");
+    assert.equal(lookupCalls, 2);
+    assert.equal(jobCalls, 2);
   });
 });
 
@@ -322,9 +413,115 @@ describe("CurrentBranchStatusResolver", () => {
     assert.equal(refreshed.lastBuild?.number, 2);
     assert.equal(jobCalls, 2);
   });
+
+  it("keeps the newer build status when an older job request finishes last", async () => {
+    const localState = createLinkedContext();
+    const jobs = [
+      createDeferred<{ lastBuild: { number: number } }>(),
+      createDeferred<{ lastBuild: { number: number } }>()
+    ];
+    let jobCalls = 0;
+    const targetResolver = {
+      dispose: () => undefined,
+      resolve: async () => ({
+        kind: "selected" as const,
+        cacheKey: "target:feature/deploy",
+        target: {
+          branchName: localState.branchName,
+          link: localState.link,
+          environment: localState.environment,
+          selectedTarget: {
+            kind: "branch" as const,
+            jobName: localState.branchName,
+            jobUrl: "job/main/job/feature%2Fdeploy/"
+          }
+        }
+      })
+    };
+    const resolver = new CurrentBranchStatusResolver(
+      { getJob: () => jobs[jobCalls++].promise } as unknown as JenkinsDataService,
+      targetResolver as unknown as InstanceType<typeof CurrentBranchTargetResolver>
+    );
+
+    const older = resolver.resolve(localState, {});
+    await flushPromises();
+    const newer = resolver.resolve(localState, { force: true });
+    await flushPromises();
+    assert.equal(jobCalls, 2);
+
+    jobs[1].resolve({ lastBuild: { number: 2 } });
+    const newerState = await newer;
+    assert.equal(newerState.kind, "matched");
+    assert.equal(newerState.lastBuild?.number, 2);
+    jobs[0].resolve({ lastBuild: { number: 1 } });
+    const olderState = await older;
+    assert.equal(olderState.kind, "matched");
+    assert.equal(olderState.lastBuild?.number, 1);
+
+    const cached = await resolver.resolve(localState, {});
+    assert.equal(cached.kind, "matched");
+    assert.equal(cached.lastBuild?.number, 2);
+    assert.equal(jobCalls, 2);
+  });
 });
 
 describe("CurrentBranchJenkinsService", () => {
+  it("reports a scheduled refresh failure from environment lookup", async () => {
+    const localState = createLinkedContext();
+    let environmentChanged: () => void = () => undefined;
+    const environmentStore = {
+      onDidChange: (listener: () => void) => {
+        environmentChanged = listener;
+        return { dispose: () => undefined };
+      },
+      listEnvironmentsWithScope: async () => {
+        throw new Error("Environment lookup failed");
+      }
+    };
+    const linkResolver = new CurrentBranchLinkResolver(
+      environmentStore as never,
+      {
+        onDidChange: noopEvent,
+        getLink: () => localState.link
+      } as never
+    );
+    const service = new CurrentBranchJenkinsService(
+      {
+        dispose: () => undefined,
+        onDidChange: noopEvent,
+        listRepositories: () => [localState.repository],
+        resolveActiveRepository: () => localState.repository
+      } as never,
+      environmentStore as never,
+      linkResolver,
+      { dispose: () => undefined } as never,
+      {
+        beginRefresh: () => undefined,
+        dispose: () => undefined,
+        scheduleRefresh: (
+          options: { force?: boolean },
+          runRefresh: (options: { force?: boolean }) => void
+        ) => runRefresh(options)
+      } as never,
+      { onDidTick: noopEvent } as never
+    );
+    const showErrorMessage = vi.spyOn(vscodeMock.window, "showErrorMessage");
+
+    try {
+      environmentChanged();
+      await flushPromises();
+
+      assert.equal(showErrorMessage.mock.calls.length, 1);
+      assert.equal(
+        showErrorMessage.mock.calls[0][0],
+        "Unable to refresh current branch Jenkins status: Environment lookup failed"
+      );
+    } finally {
+      service.dispose();
+      showErrorMessage.mockRestore();
+    }
+  });
+
   it("coalesces overlapping refreshes into one forced follow-up", async () => {
     const fixture = createCurrentBranchServiceFixture();
     try {

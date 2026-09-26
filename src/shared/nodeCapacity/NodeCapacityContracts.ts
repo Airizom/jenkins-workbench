@@ -96,6 +96,7 @@ export interface NodeCapacityUpdateMessage {
 
 export interface NodeCapacityNodeExecutorsUpdateMessage {
   type: "updateNodeCapacityNodeExecutors";
+  snapshotGeneration: number;
   payload: Array<{
     nodeUrl: string;
     executors: NodeCapacityExecutorViewModel[];

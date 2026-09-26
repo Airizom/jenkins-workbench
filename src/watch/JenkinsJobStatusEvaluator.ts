@@ -4,7 +4,7 @@ import {
 } from "../formatters/JobColorFormatters";
 import type { JenkinsBuildSummary } from "../jenkins/types";
 import type { WatchedJobEntry, WatchStatusKind } from "../storage/JenkinsWatchStore";
-import type { StatusNotifier } from "./StatusNotifier";
+import type { CompletionNotification } from "./StatusNotifier";
 import { formatWatchJobLabel } from "./WatchJobLabelFormatter";
 
 export interface JobStatusEvaluation {
@@ -15,11 +15,12 @@ export interface JobStatusEvaluation {
   shouldRefresh: boolean;
   currentCompletedBuildNumber?: number;
   currentIsBuilding?: boolean;
+  notification?:
+    | { kind: "failure" | "recovery"; message: string }
+    | { kind: "completion"; details: CompletionNotification };
 }
 
 export class JenkinsJobStatusEvaluator {
-  constructor(private readonly notifier: StatusNotifier) {}
-
   evaluate(
     entry: WatchedJobEntry,
     jobName: string | undefined,
@@ -43,27 +44,28 @@ export class JenkinsJobStatusEvaluator {
       previousCompletedBuildNumber !== undefined || previousIsBuilding !== undefined;
 
     const notifiedFailure = shouldNotifyFailure(previousStatus, currentStatus);
-    if (notifiedFailure) {
-      this.notifier.notifyFailure(
-        `${formatWatchJobLabel(entry, jobName)} failed in ${environmentUrl}.`
-      );
-    }
-
     const notifiedRecovery = shouldNotifyRecovery(previousStatus, currentStatus);
-    if (notifiedRecovery) {
-      this.notifier.notifyRecovery(
-        `${formatWatchJobLabel(entry, jobName)} recovered in ${environmentUrl}.`
-      );
-    }
-
-    if (shouldUpdateCompletion && hasCompletionHistory && !notifiedFailure && !notifiedRecovery) {
-      this.notifier.notifyCompletion({
-        jobLabel: formatWatchJobLabel(entry, jobName),
-        environmentUrl,
-        result: lastCompletedBuild?.result,
-        color
-      });
-    }
+    const notification: JobStatusEvaluation["notification"] = notifiedFailure
+      ? {
+          kind: "failure",
+          message: `${formatWatchJobLabel(entry, jobName)} failed in ${environmentUrl}.`
+        }
+      : notifiedRecovery
+        ? {
+            kind: "recovery",
+            message: `${formatWatchJobLabel(entry, jobName)} recovered in ${environmentUrl}.`
+          }
+        : shouldUpdateCompletion && hasCompletionHistory
+          ? {
+              kind: "completion",
+              details: {
+                jobLabel: formatWatchJobLabel(entry, jobName),
+                environmentUrl,
+                result: lastCompletedBuild?.result,
+                color
+              }
+            }
+          : undefined;
 
     const statusChanged = currentStatus !== "unknown" && currentStatus !== previousStatus;
     // Keep the last terminal status stored: an intervening "other" observation (e.g. a
@@ -80,7 +82,8 @@ export class JenkinsJobStatusEvaluator {
       shouldUpdateBuilding,
       shouldRefresh,
       currentCompletedBuildNumber,
-      currentIsBuilding
+      currentIsBuilding,
+      notification
     };
   }
 }

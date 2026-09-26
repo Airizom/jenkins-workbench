@@ -67,7 +67,9 @@ export class JenkinsDataServiceReader {
 
   constructor(clientProvider: JenkinsClientProvider, options: JenkinsDataServiceOptions) {
     this.runtimeContext = new JenkinsDataRuntimeContext(clientProvider, options);
-    this.jobIndex = new JenkinsJobIndex(this.runtimeContext.getCache(), clientProvider);
+    this.jobIndex = new JenkinsJobIndex(this.runtimeContext.getCache(), clientProvider, () =>
+      this.runtimeContext.getCacheTtlMs()
+    );
     this.buildOperations = new JenkinsBuildDataOperations(this.runtimeContext);
     this.coverageOperations = new JenkinsCoverageDataOperations(this.runtimeContext);
     this.pendingInputOperations = new JenkinsPendingInputDataOperations(this.runtimeContext);

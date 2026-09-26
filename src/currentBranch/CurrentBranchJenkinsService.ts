@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { CurrentBranchLinkResolver } from "./CurrentBranchLinkResolver";
@@ -200,7 +201,13 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
 
   private scheduleRefresh(options: CurrentBranchRefreshOptions = {}): void {
     this.refreshCoordinator.scheduleRefresh(options, (refreshOptions) => {
-      void this.refresh(refreshOptions);
+      void this.refresh(refreshOptions).catch((error: unknown) => {
+        if (!this.isDisposed) {
+          void vscode.window.showErrorMessage(
+            `Unable to refresh current branch Jenkins status: ${formatError(error)}`
+          );
+        }
+      });
     });
   }
 

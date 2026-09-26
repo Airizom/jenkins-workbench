@@ -121,8 +121,8 @@ export function resolveBusyExecutors(
     totalExecutors,
     node.executors.filter(
       (executor) =>
-        executor.currentExecutable !== undefined ||
-        executor.currentWorkUnit !== undefined ||
+        executor.currentExecutable != null ||
+        executor.currentWorkUnit != null ||
         executor.idle === false
     ).length
   );

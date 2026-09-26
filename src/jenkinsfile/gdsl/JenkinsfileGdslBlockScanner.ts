@@ -72,7 +72,7 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
       index = nextIndex;
       continue;
     }
-    const aliasAssignment = findGuardAliasAssignment(body, index);
+    const aliasAssignment = findGuardAliasAssignment(body, index, aliasScopes);
     if (aliasAssignment) {
       aliasScopes[aliasScopes.length - 1].set(aliasAssignment.name, aliasAssignment.guardNames);
       index = aliasAssignment.end;
@@ -137,19 +137,7 @@ function resolveGuardNames(
   }
 
   const condition = text.slice(openParen + 1, previous);
-  const directGuardNames = extractGuardNames(condition);
-  if (directGuardNames.length > 0) {
-    return directGuardNames;
-  }
-
-  const aliasGuardNames = new Set<string>();
-  for (const alias of extractConditionIdentifiers(condition)) {
-    const resolved = resolveGuardAlias(alias, aliasScopes);
-    for (const guardName of resolved) {
-      aliasGuardNames.add(guardName);
-    }
-  }
-  return [...aliasGuardNames];
+  return extractGuardNames(condition, aliasScopes);
 }
 
 function shouldSuppressMethod(guardNames: readonly string[]): boolean {
@@ -158,7 +146,8 @@ function shouldSuppressMethod(guardNames: readonly string[]): boolean {
 
 function findGuardAliasAssignment(
   text: string,
-  index: number
+  index: number,
+  aliasScopes: ReadonlyArray<ReadonlyMap<string, string[]>>
 ): { name: string; guardNames: string[]; end: number } | undefined {
   IDENTIFIER_PATTERN.lastIndex = index;
   let match = IDENTIFIER_PATTERN.exec(text);
@@ -182,7 +171,7 @@ function findGuardAliasAssignment(
   const valueStart = skipWhitespace(text, equalsIndex + 1);
   const lineEnd = findAssignmentEnd(text, valueStart);
   const valueText = text.slice(valueStart, lineEnd);
-  const guardNames = extractGuardNames(valueText);
+  const guardNames = extractGuardNames(valueText, aliasScopes);
   if (guardNames.length === 0) {
     return undefined;
   }
@@ -206,14 +195,58 @@ function findAssignmentEnd(text: string, index: number): number {
   return current;
 }
 
-function extractGuardNames(text: string): string[] {
-  return [...text.matchAll(/enclosingCall(?:Name)?\(\s*['"]([^'"]+)['"]\s*\)/g)].map(
-    (match) => match[1]
-  );
+function extractGuardNames(
+  text: string,
+  aliasScopes: ReadonlyArray<ReadonlyMap<string, string[]>>
+): string[] {
+  const condition = text.trim();
+  const alternatives = splitTopLevel(condition, "||");
+  if (alternatives.length > 1) {
+    const [first, ...rest] = alternatives.map((part) => extractGuardNames(part, aliasScopes));
+    return first.filter((name) => rest.every((names) => names.includes(name)));
+  }
+
+  const conjuncts = splitTopLevel(condition, "&&");
+  if (conjuncts.length > 1) {
+    return [...new Set(conjuncts.flatMap((part) => extractGuardNames(part, aliasScopes)))];
+  }
+
+  if (condition.startsWith("!")) {
+    return [];
+  }
+  if (
+    condition.startsWith("(") &&
+    findMatchingDelimiter(condition, 0, "(", ")") === condition.length - 1
+  ) {
+    return extractGuardNames(condition.slice(1, -1), aliasScopes);
+  }
+
+  const direct = /^enclosingCall(?:Name)?\(\s*['"]([^'"]+)['"]\s*\)$/.exec(condition);
+  if (direct) {
+    return [direct[1]];
+  }
+  return /^[A-Za-z_$][\w$]*$/.test(condition) ? [...resolveGuardAlias(condition, aliasScopes)] : [];
 }
 
-function extractConditionIdentifiers(text: string): string[] {
-  return [...text.matchAll(/\b[A-Za-z_$][\w$]*\b/g)].map((match) => match[0]);
+function splitTopLevel(text: string, operator: "&&" | "||"): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === "'" || text[index] === '"') {
+      index = skipString(text, index) - 1;
+    } else if (text[index] === "(") {
+      depth += 1;
+    } else if (text[index] === ")") {
+      depth -= 1;
+    } else if (depth === 0 && text.startsWith(operator, index)) {
+      parts.push(text.slice(start, index));
+      start = index + operator.length;
+      index += operator.length - 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts;
 }
 
 function resolveGuardAlias(

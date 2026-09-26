@@ -44,7 +44,10 @@ export class JenkinsPendingInputClient {
     }
     const proceedUrl = this.resolveInputUrl(buildUrl, options?.proceedUrl, inputId, "proceedEmpty");
     try {
-      await this.context.requestVoidWithCrumb(proceedUrl);
+      await this.context.requestVoidWithCrumb(
+        proceedUrl,
+        this.buildInputSubmitBody(inputId, new URLSearchParams(), options?.proceedText)
+      );
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
         const fallbackUrl = this.resolveInputUrl(buildUrl, undefined, inputId, "proceed");

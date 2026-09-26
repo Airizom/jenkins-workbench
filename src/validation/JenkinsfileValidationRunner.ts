@@ -33,6 +33,7 @@ export class JenkinsfileValidationRunner {
     callbacks: JenkinsfileValidationRunnerCallbacks
   ): Promise<ValidationOutcome> {
     const text = document.getText();
+    const version = document.version;
     const hash = hashText(text);
     const cached = this.stateStore.getCachedValidation(document);
     const { key, token } = this.stateStore.nextToken(document);
@@ -54,7 +55,14 @@ export class JenkinsfileValidationRunner {
         options.reason === "command"
           ? await this.environmentResolver.resolveForDocument(document)
           : await this.environmentResolver.resolveForDocumentSilently(document);
-      const activeAfterLookup = this.getActiveOutcome(document, options, key, token, callbacks);
+      const activeAfterLookup = this.getActiveOutcome(
+        document,
+        version,
+        options,
+        key,
+        token,
+        callbacks
+      );
       if (activeAfterLookup) {
         return activeAfterLookup;
       }
@@ -83,7 +91,14 @@ export class JenkinsfileValidationRunner {
       } catch (error) {
         const message = `Validation request failed: ${formatError(error)}`;
         this.logger.logValidation(document, environment, message, options.reason);
-        const activeAfterFailure = this.getActiveOutcome(document, options, key, token, callbacks);
+        const activeAfterFailure = this.getActiveOutcome(
+          document,
+          version,
+          options,
+          key,
+          token,
+          callbacks
+        );
         if (activeAfterFailure) {
           return activeAfterFailure;
         }
@@ -95,7 +110,14 @@ export class JenkinsfileValidationRunner {
         };
       }
 
-      const activeAfterRequest = this.getActiveOutcome(document, options, key, token, callbacks);
+      const activeAfterRequest = this.getActiveOutcome(
+        document,
+        version,
+        options,
+        key,
+        token,
+        callbacks
+      );
       if (activeAfterRequest) {
         return activeAfterRequest;
       }
@@ -134,6 +156,7 @@ export class JenkinsfileValidationRunner {
 
   private getActiveOutcome(
     document: vscode.TextDocument,
+    version: number,
     options: ValidationRequestOptions,
     key: string,
     token: number,
@@ -144,6 +167,10 @@ export class JenkinsfileValidationRunner {
     }
     if (!this.stateStore.isActiveToken(key, token)) {
       return { status: "skipped", reason: "inactive" };
+    }
+    if (document.version !== version) {
+      callbacks.onRestoreStatus();
+      return { status: "skipped", reason: "changed" };
     }
     return this.getCancellationOutcome(options, callbacks);
   }

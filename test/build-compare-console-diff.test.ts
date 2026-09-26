@@ -125,6 +125,43 @@ describe("buildConsoleComparisonSection", () => {
     assert.equal(section.divergenceLineLabel, "First difference at line 3");
   });
 
+  it("reports tooLarge when the first divergence lies past the line limit", async () => {
+    const sharedPrefix = "same\n".repeat(101);
+    const backend = createFakeBackend({
+      [BASELINE_URL]: [`${sharedPrefix}baseline\n`],
+      [TARGET_URL]: [`${sharedPrefix}target\n`]
+    });
+
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 10_000, maxLines: 100 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
+
+    assert.equal(section.status, "tooLarge");
+  });
+
+  it("reports a divergence on the last line within the line limit", async () => {
+    const sharedPrefix = "same\n".repeat(99);
+    const backend = createFakeBackend({
+      [BASELINE_URL]: [`${sharedPrefix}baseline\n`],
+      [TARGET_URL]: [`${sharedPrefix}target\n`]
+    });
+
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 10_000, maxLines: 100 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
+
+    assert.equal(section.status, "available");
+    assert.equal(section.divergenceLineLabel, "First difference at line 100");
+  });
+
   it("does not request trailing context after multibyte chunks exhaust the byte budget", async () => {
     const calls: ProgressiveCall[] = [];
     const backend = createFakeBackend(
@@ -152,6 +189,50 @@ describe("buildConsoleComparisonSection", () => {
       calls.filter((call) => call.buildUrl === TARGET_URL).map((call) => call.maxBytes),
       [12, 8]
     );
+  });
+
+  it("stops refetching when a running build returns empty chunks with more data", {
+    timeout: 5000
+  }, async () => {
+    let targetCalls = 0;
+    const backend = {
+      console: {
+        getConsoleTextProgressive: async (
+          _environment: JenkinsEnvironmentRef,
+          buildUrl: string,
+          start: number
+        ) => {
+          if (buildUrl === BASELINE_URL) {
+            const text = "shared\nbaseline\n";
+            return { text, textSize: text.length, moreData: false, bytesRead: text.length };
+          }
+          targetCalls += 1;
+          if (targetCalls > 50) {
+            throw new Error("unbounded refetching of empty progressive chunks");
+          }
+          if (start === 0) {
+            const text = "shared\n";
+            return { text, textSize: text.length, moreData: true, bytesRead: text.length };
+          }
+          return { text: "", textSize: start, moreData: true, bytesRead: 0 };
+        },
+        getConsoleTextHead: async () => {
+          throw new Error("getConsoleTextHead should not be called when progressive succeeds");
+        }
+      }
+    } as unknown as BuildCompareBackend;
+
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 10_000, maxLines: 1000 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
+
+    assert.equal(section.status, "available");
+    assert.equal(section.divergenceLineLabel, "First difference at line 2");
+    assert.ok(targetCalls <= 3, `expected a bounded number of requests, got ${targetCalls}`);
   });
 
   it("reports identical when both logs end within the budget", async () => {
@@ -212,4 +293,19 @@ describe("buildConsoleComparisonSection", () => {
     assert.deepEqual(progressiveCalls, [BASELINE_URL, TARGET_URL]);
     assert.deepEqual(headCalls, [BASELINE_URL, TARGET_URL]);
   });
+});
+
+it("ignores differing serialized notes even when notes span multiple chunks", async () => {
+  const backend = createFakeBackend({
+    [BASELINE_URL]: ["same\n\u001b[8mha:", "payload", "\u001b[0", "mend\n"],
+    [TARGET_URL]: ["same\n\u001b[8mha:different\u001b[0mend\n"]
+  });
+  const result = await buildConsoleComparisonSection(
+    backend,
+    { maxBytes: 10000, maxLines: 100 },
+    ENVIRONMENT,
+    BASELINE_URL,
+    TARGET_URL
+  );
+  assert.equal(result.status, "identical");
 });

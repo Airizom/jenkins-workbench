@@ -14,6 +14,7 @@ import type { NodeCapacityOutgoingMessage } from "../../shared/NodeCapacityPanel
 
 export type NodeCapacityState = NodeCapacityViewModel & {
   hasLoaded: boolean;
+  snapshotGeneration: number;
 };
 
 export type NodeCapacityAction = NodeCapacityOutgoingMessage;
@@ -26,7 +27,8 @@ const FALLBACK_STATE: NodeCapacityState = {
   hiddenLabelQueueItems: [],
   errors: [],
   loading: true,
-  hasLoaded: false
+  hasLoaded: false,
+  snapshotGeneration: 0
 };
 
 export function buildInitialState(initialState: NodeCapacityViewModel): NodeCapacityState {
@@ -38,7 +40,8 @@ export function buildInitialState(initialState: NodeCapacityViewModel): NodeCapa
     hiddenLabelQueueItems: initialState.hiddenLabelQueueItems ?? [],
     errors: initialState.errors ?? [],
     loading: false,
-    hasLoaded: true
+    hasLoaded: true,
+    snapshotGeneration: 0
   };
 }
 
@@ -58,10 +61,14 @@ export function nodeCapacityReducer(
       const next = panelStateHelpers.handleFullUpdate(state, action.payload);
       return {
         ...next,
+        snapshotGeneration: state.snapshotGeneration + 1,
         pools: carryOverLoadedExecutors(state.pools, next.pools)
       };
     }
     case "updateNodeCapacityNodeExecutors": {
+      if (action.snapshotGeneration !== state.snapshotGeneration) {
+        return state;
+      }
       return {
         ...state,
         pools: applyExecutorUpdates(state.pools, action.payload)

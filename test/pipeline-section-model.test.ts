@@ -188,10 +188,25 @@ describe("planRestoredLogTarget", () => {
       restoredTarget: makeTarget(),
       canValidateLogTarget: true,
       currentTarget: makeTarget({ key: "other" }),
-      stages: [makeStage({ logTarget: makeTarget() })]
+      stages: [
+        makeStage({ logTarget: makeTarget() }),
+        makeStage({ key: "other", logTarget: makeTarget({ key: "other" }) })
+      ]
     });
     assert.equal(plan.consume, true);
     assert.equal(plan.targetToRestore, undefined);
+  });
+
+  it("restores a valid persisted target when the current target is stale", () => {
+    const restoredTarget = makeTarget();
+    const plan = planRestoredLogTarget({
+      alreadyConsumed: false,
+      restoredTarget,
+      canValidateLogTarget: true,
+      currentTarget: makeTarget({ key: "stale" }),
+      stages: [makeStage({ logTarget: restoredTarget })]
+    });
+    assert.deepEqual(plan, { consume: true, targetToRestore: restoredTarget });
   });
 
   it("consumes without restoring when the restored target no longer exists", () => {

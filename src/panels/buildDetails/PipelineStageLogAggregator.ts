@@ -3,6 +3,7 @@ import type { JenkinsWorkflowStage, JenkinsWorkflowStep } from "../../jenkins/ty
 import { uniqueNonEmptyStrings } from "../../shared/arrays";
 import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
+import { htmlToText } from "./PipelineNodeLogContent";
 import { isWorkflowNodeActive } from "./PipelineWorkflowStatus";
 import type {
   PipelineLogTargetViewModel,
@@ -16,6 +17,7 @@ interface AggregatedNodeLogSnapshot {
   html: string;
   text: string;
   hasMore: boolean;
+  active: boolean;
   consoleUrl?: string;
 }
 
@@ -59,7 +61,7 @@ export class PipelineStageLogAggregator {
     const omittedNodeCount = Math.max(0, nodeIds.length - selectedNodeIds.length);
     const refreshCandidates = selectedNodeIds.filter((nodeId) => {
       const cached = this.nodeCache.get(nodeId);
-      return initial ? !cached : !cached || cached.hasMore;
+      return initial ? !cached : !cached || cached.hasMore || cached.active;
     });
     const nodesToFetch = this.takeRefreshBatch(refreshCandidates);
 
@@ -79,15 +81,17 @@ export class PipelineStageLogAggregator {
         this.nodeCache.set(nodeId, {
           html: "",
           text: "",
-          hasMore: false
+          hasMore: false,
+          active: false
         });
         continue;
       }
-      const text = snapshot.text ?? "";
+      const text = htmlToText(snapshot.text ?? "");
       this.nodeCache.set(nodeId, {
         html: escapeHtml(text),
         text,
         hasMore: Boolean(snapshot.hasMore),
+        active: isWorkflowNodeActive(snapshot.nodeStatus),
         consoleUrl: snapshot.consoleUrl
       });
     }
@@ -106,6 +110,7 @@ export class PipelineStageLogAggregator {
     let consoleUrl: string | undefined;
     let pendingNodeCount = 0;
     let hasMoreNodeData = false;
+    let hasActiveNode = false;
 
     for (const nodeId of selectedNodeIds) {
       const snapshot = this.nodeCache.get(nodeId);
@@ -119,6 +124,7 @@ export class PipelineStageLogAggregator {
       textParts.push(`===== ${header} =====\n${snapshot.text}`);
       truncated = truncated || Boolean(snapshot.hasMore);
       hasMoreNodeData = hasMoreNodeData || Boolean(snapshot.hasMore);
+      hasActiveNode = hasActiveNode || snapshot.active;
       consoleUrl = consoleUrl ?? snapshot.consoleUrl;
     }
 
@@ -142,7 +148,10 @@ export class PipelineStageLogAggregator {
       truncated,
       loading: pendingNodeCount > 0,
       polling:
-        pendingNodeCount > 0 || hasMoreNodeData || this.isStageChildDiscoveryIncomplete(target),
+        pendingNodeCount > 0 ||
+        hasMoreNodeData ||
+        hasActiveNode ||
+        this.isStageChildDiscoveryIncomplete(target),
       consoleUrl
     };
   }

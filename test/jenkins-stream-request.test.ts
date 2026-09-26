@@ -96,6 +96,58 @@ describe("requestJenkinsStream", () => {
     }
   });
 
+  it("destroys the source response when the returned stream is closed early", async () => {
+    const response = createResponse();
+    const restoreHttpRequest = mockHttpRequest(response);
+
+    try {
+      const streamResponse = await requestJenkinsStream("http://jenkins.example/stream", {
+        timeoutMs: 0
+      });
+      response.write("first chunk");
+      assert.equal(response.destroyed, false);
+
+      (streamResponse.stream as PassThrough).destroy();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      assert.equal(response.destroyed, true);
+    } finally {
+      restoreHttpRequest();
+      response.destroy();
+    }
+  });
+
+  it("does not abort the response when the stream closes after a normal end", async () => {
+    const response = createResponse();
+    const restoreHttpRequest = mockHttpRequest(response);
+    const destroySpy = vi.spyOn(response, "destroy");
+
+    try {
+      const streamResponse = await requestJenkinsStream("http://jenkins.example/stream", {
+        timeoutMs: 0
+      });
+      const chunks: Buffer[] = [];
+      streamResponse.stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+      const streamClosed = new Promise<void>((resolve) => {
+        (streamResponse.stream as PassThrough).once("close", () => resolve());
+      });
+
+      response.end("complete");
+      await streamClosed;
+
+      assert.equal(Buffer.concat(chunks).toString(), "complete");
+      // abort() is idempotent, so a later explicit abort only reaches the
+      // response if closing the stream did not already abort it.
+      const destroyCallsBeforeAbort = destroySpy.mock.calls.length;
+      streamResponse.abort();
+      assert.equal(destroySpy.mock.calls.length, destroyCallsBeforeAbort + 1);
+    } finally {
+      destroySpy.mockRestore();
+      restoreHttpRequest();
+      response.destroy();
+    }
+  });
+
   it("rejects oversized error response bodies without collecting them", async () => {
     const response = createResponse();
     response.statusCode = 500;
@@ -141,6 +193,34 @@ describe("requestJenkinsStream", () => {
       await assert.rejects(
         result,
         (error) => error instanceof JenkinsRequestError && error.responseText === "🙂"
+      );
+    } finally {
+      restoreHttpRequest();
+      response.destroy();
+    }
+  });
+
+  it("limits error text by received bytes rather than decoded characters", async () => {
+    const response = createResponse();
+    response.statusCode = 500;
+    response.statusMessage = "Internal Server Error";
+    response.headers["content-length"] = "1";
+    const restoreHttpRequest = mockHttpRequest(response);
+
+    try {
+      const result = requestJenkinsStream("http://jenkins.example/error", {
+        maxBytes: 2
+      });
+
+      await new Promise((resolve) => setImmediate(resolve));
+      response.end(Buffer.from([0xff]));
+
+      await assert.rejects(
+        result,
+        (error) =>
+          error instanceof JenkinsRequestError &&
+          !(error instanceof JenkinsMaxBytesError) &&
+          error.responseText === "�"
       );
     } finally {
       restoreHttpRequest();

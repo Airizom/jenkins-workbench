@@ -59,9 +59,14 @@ export function mergeStepCatalogs(
       }))
     };
 
+    const mergedStep = mergeStepDefinitions(fallbackStep, enrichedLiveStep);
     merged.set(name, {
-      ...mergeStepDefinitions(fallbackStep, enrichedLiveStep),
-      requiresNodeContext: liveStep.requiresNodeContext
+      ...mergedStep,
+      requiresNodeContext: liveStep.requiresNodeContext,
+      signatures:
+        enrichedLiveStep.signatures.length > 0
+          ? enrichedLiveStep.signatures.map(normalizeSignature)
+          : mergedStep.signatures
     });
   }
 

@@ -129,7 +129,8 @@ export class LoadTokenTracker {
 
 export class PanelLoadTracker {
   private readonly loadTokenTracker = new LoadTokenTracker();
-  private loadingRequests = 0;
+  private readonly loadingRequests = new Set<number>();
+  private nextLoadingRequest = 0;
 
   constructor(private readonly postLoading: (value: boolean) => void) {}
 
@@ -146,26 +147,27 @@ export class PanelLoadTracker {
   }
 
   resetLoadingRequests(): void {
-    if (this.loadingRequests === 0) {
+    if (this.loadingRequests.size === 0) {
       return;
     }
-    this.loadingRequests = 0;
+    this.loadingRequests.clear();
     this.postLoading(false);
   }
 
-  beginLoading(): void {
-    this.loadingRequests += 1;
-    if (this.loadingRequests === 1) {
+  beginLoading(): number {
+    const request = ++this.nextLoadingRequest;
+    this.loadingRequests.add(request);
+    if (this.loadingRequests.size === 1) {
       this.postLoading(true);
     }
+    return request;
   }
 
-  endLoading(): void {
-    if (this.loadingRequests === 0) {
+  endLoading(request: number): void {
+    if (!this.loadingRequests.delete(request)) {
       return;
     }
-    this.loadingRequests -= 1;
-    if (this.loadingRequests === 0) {
+    if (this.loadingRequests.size === 0) {
       this.postLoading(false);
     }
   }

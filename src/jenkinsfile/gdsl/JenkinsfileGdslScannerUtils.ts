@@ -1,14 +1,20 @@
 export function findCallStart(text: string, name: string, start: number): number | undefined {
   let index = start;
   while (index < text.length) {
-    const candidate = text.indexOf(name, index);
-    if (candidate === -1) {
-      return undefined;
+    const character = text[index];
+    if (character === "'" || character === '"') {
+      index = skipString(text, index);
+      continue;
     }
-    if (isCallStartAt(text, name, candidate)) {
-      return candidate;
+    const nextIndex = skipGdslComment(text, index);
+    if (nextIndex !== undefined) {
+      index = nextIndex;
+      continue;
     }
-    index = candidate + name.length;
+    if (isCallStartAt(text, name, index)) {
+      return index;
+    }
+    index += 1;
   }
   return undefined;
 }
@@ -76,19 +82,28 @@ export function findMatchingDelimiterBackward(
   openChar: string,
   closeChar: string
 ): number {
-  let depth = 0;
-  let index = closeIndex;
-  while (index >= 0) {
+  const openIndices: number[] = [];
+  let index = 0;
+  while (index <= closeIndex) {
     const character = text[index];
-    if (character === closeChar) {
-      depth += 1;
-    } else if (character === openChar) {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
+    if (character === "'" || character === '"') {
+      index = skipString(text, index);
+      continue;
+    }
+    const nextIndex = skipGdslComment(text, index);
+    if (nextIndex !== undefined) {
+      index = nextIndex;
+      continue;
+    }
+    if (character === openChar) {
+      openIndices.push(index);
+    } else if (character === closeChar) {
+      const openIndex = openIndices.pop();
+      if (index === closeIndex && openIndex !== undefined) {
+        return openIndex;
       }
     }
-    index -= 1;
+    index += 1;
   }
   throw new Error(`Unterminated GDSL delimiter '${closeChar}'.`);
 }

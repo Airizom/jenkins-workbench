@@ -4,6 +4,7 @@ import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef
 
 const informationMessages: string[] = [];
 const actionCalls: Array<{ action: string; target: { nodeUrl: string; label: string } }> = [];
+const detailsPanelCalls: unknown[] = [];
 
 const vscodeMock = {
   window: {
@@ -45,6 +46,13 @@ vi.doMock("../src/tree/TreeItems", () => ({
   NodeTreeItem: TestNodeTreeItem,
   PipelineTreeItem: class {}
 }));
+vi.doMock("../src/panels/NodeDetailsPanel", () => ({
+  NodeDetailsPanel: {
+    show: async (options: unknown) => {
+      detailsPanelCalls.push(options);
+    }
+  }
+}));
 vi.doMock("../src/services/NodeActionService", () => ({
   NodeActionService: TestNodeActionService
 }));
@@ -63,6 +71,36 @@ const refreshHost = {
 beforeEach(() => {
   informationMessages.length = 0;
   actionCalls.length = 0;
+  detailsPanelCalls.length = 0;
+});
+
+describe("showNodeDetails", () => {
+  it("rejects non-node command targets without opening the panel", async () => {
+    const forgedTarget = {
+      environment,
+      nodeUrl: "computer/agent-1/",
+      label: "agent-1"
+    };
+
+    await handlers.showNodeDetails(
+      {} as never,
+      refreshHost as never,
+      {} as never,
+      forgedTarget as never
+    );
+
+    assert.deepEqual(detailsPanelCalls, []);
+    assert.deepEqual(informationMessages, ["Select a node to view details."]);
+  });
+
+  it("opens the panel for node tree items", async () => {
+    const item = new TestNodeTreeItem(environment, "computer/agent-1/", "agent-1") as never;
+
+    await handlers.showNodeDetails({} as never, refreshHost as never, {} as never, item);
+
+    assert.equal(detailsPanelCalls.length, 1);
+    assert.deepEqual(informationMessages, []);
+  });
 });
 
 describe("node mutating command handlers", () => {

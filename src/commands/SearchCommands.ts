@@ -123,9 +123,6 @@ async function goToJob(
       void vscode.window.showInformationMessage("No jobs found with current search settings.");
       return;
     }
-
-    picks.sort((a, b) => a.label.localeCompare(b.label));
-    quickPick.items = picks;
   };
 
   for (const environment of environments) {
@@ -135,6 +132,7 @@ async function goToJob(
       if (cancellationToken.isCancellationRequested) {
         return;
       }
+      const previousCount = picks.length;
       for (const entry of entries) {
         if (seenEntries.has(entry.url)) {
           continue;
@@ -148,6 +146,10 @@ async function goToJob(
           environment: envRef,
           entry
         });
+      }
+      if (picks.length > previousCount) {
+        picks.sort((a, b) => a.label.localeCompare(b.label));
+        quickPick.items = [...picks];
       }
     };
     void (async () => {

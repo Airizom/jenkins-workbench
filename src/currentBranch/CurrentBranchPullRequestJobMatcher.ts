@@ -1,5 +1,5 @@
+import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
 import type { CurrentBranchPullRequestResolution } from "./CurrentBranchGitHubPullRequestAdapter";
-import { decodeJenkinsJobName } from "./CurrentBranchJenkinsJobUtils";
 import { DEFAULT_CURRENT_BRANCH_PULL_REQUEST_JOB_NAME_PATTERNS } from "./CurrentBranchPullRequestJobPatterns";
 
 export interface CurrentBranchPullRequestJobRef {

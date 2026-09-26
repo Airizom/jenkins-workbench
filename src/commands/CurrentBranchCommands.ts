@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import type { CurrentBranchState } from "../currentBranch/CurrentBranchTypes";
+import { formatCurrentBranchTooltip } from "../currentBranch/CurrentBranchPresentation";
+import type {
+  CurrentBranchRepositoryInfo,
+  CurrentBranchState
+} from "../currentBranch/CurrentBranchTypes";
 import type {
   CurrentBranchLinkableEnvironment,
   CurrentBranchMultibranchTarget,
@@ -56,6 +60,7 @@ const BRANCH_MISSING_ACTION_PICKS: readonly CurrentBranchActionPick[] = [
 interface CurrentBranchActionContext {
   workflowService: CurrentBranchWorkflowService;
   state: CurrentBranchState;
+  selectedRepository?: CurrentBranchRepositoryInfo;
   extensionUri: vscode.Uri;
 }
 
@@ -67,13 +72,17 @@ const CURRENT_BRANCH_ACTION_RUNNERS: Record<
     openRequest(workflowService.getOpenBranchRequest(state)),
   openMultibranch: ({ workflowService, state }) =>
     openRequest(workflowService.getOpenMultibranchRequest(state)),
-  triggerBuild: ({ workflowService, state }) => workflowService.triggerCurrentBranchBuild(state),
+  triggerBuild: ({ workflowService, state }) => triggerBuildForLatestState(workflowService, state),
   openLatestBuild: ({ workflowService, state, extensionUri }) =>
     workflowService.openLatestBuild(state, extensionUri),
   openLastFailed: ({ workflowService, state, extensionUri }) =>
     workflowService.openLastFailedBuild(state, extensionUri),
   scanMultibranch: ({ workflowService, state }) => scanLinkedMultibranch(workflowService, state),
-  refresh: async ({ workflowService }) => {
+  refresh: async ({ workflowService, selectedRepository }) => {
+    if (selectedRepository) {
+      await refreshSelectedRepositoryStatus(workflowService, selectedRepository);
+      return;
+    }
     await workflowService.refreshCurrentBranchStatus(FORCE_REFRESH_OPTIONS);
   },
   relink: ({ workflowService }) => linkCurrentRepository(workflowService),
@@ -216,10 +225,11 @@ async function showCurrentBranchActions(
   workflowService: CurrentBranchWorkflowService,
   extensionUri: vscode.Uri
 ): Promise<void> {
-  const state = await resolveCurrentBranchState(workflowService);
-  if (!state) {
+  const resolved = await resolveCurrentBranchSelection(workflowService);
+  if (!resolved) {
     return;
   }
+  const { state, selectedRepository } = resolved;
 
   const pick = await vscode.window.showQuickPick(buildActionPicks(state), {
     placeHolder: "Select a Jenkins action for the current branch",
@@ -229,7 +239,12 @@ async function showCurrentBranchActions(
     return;
   }
 
-  await CURRENT_BRANCH_ACTION_RUNNERS[pick.action]({ workflowService, state, extensionUri });
+  await CURRENT_BRANCH_ACTION_RUNNERS[pick.action]({
+    workflowService,
+    state,
+    selectedRepository,
+    extensionUri
+  });
 }
 
 async function openCurrentBranchInJenkins(
@@ -246,6 +261,54 @@ async function triggerCurrentBranchBuild(
   await withResolvedCurrentBranchState(workflowService, async (state) => {
     await workflowService.triggerCurrentBranchBuild(state);
   });
+}
+
+async function triggerBuildForLatestState(
+  workflowService: CurrentBranchWorkflowService,
+  state: CurrentBranchState
+): Promise<void> {
+  if (!state.repository) {
+    await workflowService.triggerCurrentBranchBuild(state);
+    return;
+  }
+
+  const latestState = unwrapResolvedState(
+    await workflowService.resolveCurrentBranchStateForRepository(
+      state.repository,
+      FORCE_REFRESH_OPTIONS
+    )
+  );
+  if (!latestState) {
+    return;
+  }
+
+  if (latestState.branchName !== state.branchName) {
+    void vscode.window.showWarningMessage(
+      `The current branch changed from ${state.branchName ?? "an unknown branch"} to ${latestState.branchName ?? "an unknown branch"}. Run Current Branch Actions again to trigger a build.`
+    );
+    return;
+  }
+
+  await workflowService.triggerCurrentBranchBuild(latestState);
+}
+
+/**
+ * The shared status bar cannot represent a repository picked from an ambiguous
+ * workspace, so report the refreshed status for that repository directly.
+ */
+async function refreshSelectedRepositoryStatus(
+  workflowService: CurrentBranchWorkflowService,
+  repository: CurrentBranchRepositoryInfo
+): Promise<void> {
+  const state = unwrapResolvedState(
+    await workflowService.resolveCurrentBranchStateForRepository(repository, FORCE_REFRESH_OPTIONS)
+  );
+  if (state?.kind !== "matched" && state?.kind !== "branchMissing") {
+    return;
+  }
+  void vscode.window.showInformationMessage(
+    formatCurrentBranchTooltip(state).split("\n").join(" • ")
+  );
 }
 
 async function scanLinkedMultibranch(
@@ -339,6 +402,14 @@ async function pickLinkableEnvironment(
 async function resolveCurrentBranchState(
   workflowService: CurrentBranchWorkflowService
 ): Promise<CurrentBranchState | undefined> {
+  return (await resolveCurrentBranchSelection(workflowService))?.state;
+}
+
+async function resolveCurrentBranchSelection(
+  workflowService: CurrentBranchWorkflowService
+): Promise<
+  { state: CurrentBranchState; selectedRepository?: CurrentBranchRepositoryInfo } | undefined
+> {
   const result = await workflowService.resolveCurrentBranchState(FORCE_REFRESH_OPTIONS);
   if (result.kind === "ambiguousRepository") {
     const repository = await pickRepository(
@@ -348,15 +419,17 @@ async function resolveCurrentBranchState(
     if (!repository) {
       return undefined;
     }
-    return unwrapResolvedState(
+    const state = unwrapResolvedState(
       await workflowService.resolveCurrentBranchStateForRepository(
         repository,
         FORCE_REFRESH_OPTIONS
       )
     );
+    return state ? { state, selectedRepository: repository } : undefined;
   }
 
-  return unwrapResolvedState(result);
+  const state = unwrapResolvedState(result);
+  return state ? { state } : undefined;
 }
 
 async function withResolvedCurrentBranchState(

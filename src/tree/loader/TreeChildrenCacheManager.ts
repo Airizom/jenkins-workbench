@@ -18,8 +18,12 @@ import {
 export class TreeChildrenCacheManager {
   private readonly watchedUrlsCache = new Map<string, Set<string>>();
   private readonly pinnedUrlsCache = new Map<string, Set<string>>();
+  private watchedUrlsGeneration = 0;
+  private pinnedUrlsGeneration = 0;
   private readonly pendingLoads = new Map<string, Promise<void>>();
   private readonly loadTokens = new Map<string, number>();
+  private loadSequence = 0;
+  private readonly loadedKeys = new Set<string>();
   private readonly buildChildrenKey: TreeChildrenKeyBuilder = (kind, environment, extra) =>
     this.childrenCache.buildKey(environment, kind, extra);
 
@@ -38,6 +42,7 @@ export class TreeChildrenCacheManager {
 
   setChildren<T>(key: string, items: T[]): void {
     this.childrenCache.set(key, items);
+    this.loadedKeys.add(key);
   }
 
   getCachedArtifacts<T>(key: string): T | undefined {
@@ -56,23 +61,57 @@ export class TreeChildrenCacheManager {
     return this.watchedUrlsCache.get(buildScopedEnvironmentKey(environment));
   }
 
+  getWatchedJobsGeneration(): number {
+    return this.watchedUrlsGeneration;
+  }
+
   setCachedWatchedJobs(environment: JenkinsEnvironmentRef, values: Set<string>): void {
+    this.watchedUrlsGeneration += 1;
     this.watchedUrlsCache.set(buildScopedEnvironmentKey(environment), values);
+  }
+
+  setCachedWatchedJobsIfCurrent(
+    environment: JenkinsEnvironmentRef,
+    values: Set<string>,
+    generation: number
+  ): void {
+    if (generation === this.watchedUrlsGeneration) {
+      this.setCachedWatchedJobs(environment, values);
+    }
   }
 
   getCachedPinnedJobs(environment: JenkinsEnvironmentRef): Set<string> | undefined {
     return this.pinnedUrlsCache.get(buildScopedEnvironmentKey(environment));
   }
 
+  getPinnedJobsGeneration(): number {
+    return this.pinnedUrlsGeneration;
+  }
+
   setCachedPinnedJobs(environment: JenkinsEnvironmentRef, values: Set<string>): void {
+    this.pinnedUrlsGeneration += 1;
     this.pinnedUrlsCache.set(buildScopedEnvironmentKey(environment), values);
   }
 
+  setCachedPinnedJobsIfCurrent(
+    environment: JenkinsEnvironmentRef,
+    values: Set<string>,
+    generation: number
+  ): void {
+    if (generation === this.pinnedUrlsGeneration) {
+      this.setCachedPinnedJobs(environment, values);
+    }
+  }
+
+  // Every watch/pin cache write or invalidation bumps the generation so older in-flight
+  // store reads cannot repopulate the cache with stale URLs.
   clearWatchCacheForEnvironment(environmentId?: string): void {
+    this.watchedUrlsGeneration += 1;
     this.clearUrlCacheForEnvironment(this.watchedUrlsCache, environmentId);
   }
 
   clearPinCacheForEnvironment(environmentId?: string): void {
+    this.pinnedUrlsGeneration += 1;
     this.clearUrlCacheForEnvironment(this.pinnedUrlsCache, environmentId);
   }
 
@@ -199,8 +238,9 @@ export class TreeChildrenCacheManager {
       return Promise.resolve(cached);
     }
 
-    if (this.pendingLoads.has(key)) {
-      return Promise.resolve([this.createLoadingPlaceholder(loadingLabel)]);
+    const existingLoad = this.pendingLoads.get(key);
+    if (existingLoad) {
+      return this.childrenAfterLoad(key, existingLoad, loadingLabel);
     }
 
     const token = this.nextLoadToken(key);
@@ -214,6 +254,7 @@ export class TreeChildrenCacheManager {
           return;
         }
         this.childrenCache.set(key, items);
+        this.loadedKeys.add(key);
       })
       .catch((error) => {
         if (!this.isCurrentLoadToken(key, token)) {
@@ -221,6 +262,7 @@ export class TreeChildrenCacheManager {
         }
         const items = [this.createErrorPlaceholder("Unable to load data.", error)];
         this.childrenCache.set(key, items);
+        this.loadedKeys.add(key);
       })
       .finally(() => {
         if (this.pendingLoads.get(key) === pending) {
@@ -235,11 +277,25 @@ export class TreeChildrenCacheManager {
       });
 
     this.pendingLoads.set(key, pending);
-    return Promise.resolve([this.createLoadingPlaceholder(loadingLabel)]);
+    return this.childrenAfterLoad(key, pending, loadingLabel);
+  }
+
+  private async childrenAfterLoad(
+    key: string,
+    pending: Promise<void>,
+    loadingLabel: string
+  ): Promise<WorkbenchTreeElement[]> {
+    if (!this.loadedKeys.has(key)) {
+      return [this.createLoadingPlaceholder(loadingLabel)];
+    }
+    // Replacing rendered children with a placeholder makes VS Code forget expansion.
+    // Let its native progress indicator cover refreshes while retaining stable IDs.
+    await pending;
+    return this.childrenCache.get<WorkbenchTreeElement[]>(key) ?? [];
   }
 
   private nextLoadToken(key: string): number {
-    const next = (this.loadTokens.get(key) ?? 0) + 1;
+    const next = ++this.loadSequence;
     this.loadTokens.set(key, next);
     return next;
   }

@@ -14,11 +14,13 @@ interface InputBoxOptions {
 interface QuickPickItem {
   readonly label: string;
   readonly action?: string;
+  readonly picked?: boolean;
 }
 
 const inputBoxCalls: InputBoxOptions[] = [];
 const quickPickCalls: Array<readonly QuickPickItem[]> = [];
 let quickPickActions: string[] = [];
+let multiChoicePicks: QuickPickItem[] | undefined;
 let inputBoxValue: string | undefined = "typed-secret";
 let openedTextDocuments = 0;
 
@@ -30,8 +32,11 @@ const vscodeMock = {
     },
     showTextDocument: async () => undefined,
     showInformationMessage: async () => undefined,
-    showQuickPick: async (items: readonly QuickPickItem[]) => {
+    showQuickPick: async (items: readonly QuickPickItem[], options?: { canPickMany?: boolean }) => {
       quickPickCalls.push(items);
+      if (options?.canPickMany) {
+        return multiChoicePicks;
+      }
       const selectedAction = quickPickActions.shift();
       return items.find((item) => item.action === selectedAction);
     },
@@ -74,8 +79,33 @@ beforeEach(() => {
   inputBoxCalls.length = 0;
   quickPickCalls.length = 0;
   quickPickActions = [];
+  multiChoicePicks = undefined;
   inputBoxValue = "typed-secret";
   openedTextDocuments = 0;
+});
+
+describe("promptParameterValues multi-choice parameters", () => {
+  it.each([undefined, ","])(
+    "sends an explicit empty value after clearing a default selection (delimiter: %s)",
+    async (multiSelectDelimiter) => {
+      multiChoicePicks = [];
+      const prompted = await promptParameterValues(
+        createOptions([
+          {
+            name: "TARGETS",
+            kind: "multiChoice",
+            choices: ["alpha", "beta"],
+            defaultValue: "alpha",
+            multiSelectDelimiter
+          }
+        ])
+      );
+
+      assert.deepEqual(prompted?.values.TARGETS, []);
+      assert.deepEqual(prompted?.payload.fields, [{ name: "TARGETS", value: "" }]);
+      assert.equal(quickPickCalls[0][0].picked, true);
+    }
+  );
 });
 
 describe("choosePreset quick picks", () => {
@@ -225,6 +255,44 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
 
     await fetchRunBuildChoices(options, options.parameters[0]);
 
+    assert.deepEqual(requestedJobUrls, []);
+  });
+
+  it("does not offer current-job builds when an explicit target has no builds", async () => {
+    const requestedJobUrls: string[] = [];
+    const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName: "foo" }]);
+    options.dataService = {
+      getBuildsForJob: async (
+        _environment: BuildParameterPromptOptions["environment"],
+        jobUrl: string
+      ) => {
+        requestedJobUrls.push(jobUrl);
+        return jobUrl === options.jobUrl ? [{ number: 42 }] : [];
+      }
+    } as unknown as BuildParameterPromptOptions["dataService"];
+
+    const choices = await fetchRunBuildChoices(options, options.parameters[0]);
+
+    assert.deepEqual(choices, []);
+    assert.deepEqual(requestedJobUrls, ["https://jenkins.example/job/foo/"]);
+  });
+
+  it("uses the current job when no run target is configured", async () => {
+    const requestedJobUrls: string[] = [];
+    const options = createOptions([{ name: "RUN_BUILD", kind: "run" }]);
+    options.dataService = {
+      getBuildsForJob: async (
+        _environment: BuildParameterPromptOptions["environment"],
+        jobUrl: string
+      ) => {
+        requestedJobUrls.push(jobUrl);
+        return [{ number: 42 }];
+      }
+    } as unknown as BuildParameterPromptOptions["dataService"];
+
+    const choices = await fetchRunBuildChoices(options, options.parameters[0]);
+
+    assert.equal(choices[0]?.number, 42);
     assert.deepEqual(requestedJobUrls, [options.jobUrl]);
   });
 });

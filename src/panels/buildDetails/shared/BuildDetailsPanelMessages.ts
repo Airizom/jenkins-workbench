@@ -17,10 +17,12 @@ import type {
 } from "./BuildDetailsContracts";
 import {
   BUILD_DIAGNOSTIC_SCAN_STATUSES,
+  isPipelineLogTargetViewModel,
   normalizePipelineLogTarget
 } from "./BuildDetailsContracts";
 import {
   type BuildDetailsPanelUiState,
+  isBuildDetailsPanelUiState,
   normalizeBuildDetailsPanelUiState
 } from "./BuildDetailsPanelWebviewState";
 
@@ -209,13 +211,16 @@ export function parseBuildDetailsOutgoingMessage(
       };
     }
     case "updateDetails": {
-      return record as unknown as BuildDetailsUpdateMessage;
+      return isBuildDetailsUpdateMessage(record) ? record : undefined;
     }
     case "setErrors": {
-      return {
-        type: "setErrors",
-        errors: Array.isArray(record.errors) ? (record.errors as string[]) : []
-      };
+      if (
+        !Array.isArray(record.errors) ||
+        record.errors.some((error) => typeof error !== "string")
+      ) {
+        return undefined;
+      }
+      return { type: "setErrors", errors: record.errors as string[] };
     }
     case "setBuildDiagnostics": {
       const diagnostics = normalizeBuildDiagnosticsViewModel(record.diagnostics);
@@ -249,8 +254,11 @@ export function isArtifactActionMessage(message: unknown): message is ArtifactAc
   if (!hasMessageType(message, "artifactAction")) {
     return false;
   }
-  const { action, relativePath } = message;
+  const { action, relativePath, fileName } = message;
   if (action !== "preview" && action !== "download") {
+    return false;
+  }
+  if (typeof fileName !== "undefined" && typeof fileName !== "string") {
     return false;
   }
   return typeof relativePath === "string" && relativePath.length > 0;
@@ -288,7 +296,7 @@ export function isSelectPipelineLogNodeMessage(
   if (!hasMessageType(message, "selectPipelineLogNode")) {
     return false;
   }
-  return normalizePipelineLogTarget(message.target) !== undefined;
+  return isPipelineLogTargetViewModel(message.target);
 }
 
 export function isClearPipelineLogNodeMessage(
@@ -354,7 +362,31 @@ export function isPersistUiStateMessage(message: unknown): message is PersistUiS
   if (!hasMessageType(message, "persistUiState")) {
     return false;
   }
-  return normalizeBuildDetailsPanelUiState(message.uiState) !== undefined;
+  return (
+    isBuildDetailsPanelUiState(message.uiState) &&
+    normalizeBuildDetailsPanelUiState(message.uiState) !== undefined
+  );
+}
+
+function isBuildDetailsUpdateMessage(
+  record: Record<string, unknown>
+): record is Record<string, unknown> & BuildDetailsUpdateMessage {
+  const stringFields = [
+    "resultLabel",
+    "resultClass",
+    "durationLabel",
+    "timestampLabel",
+    "culpritsLabel"
+  ] as const;
+  const recordFields = ["testState", "coverageState", "insights", "pipelineNodeLog"] as const;
+  return (
+    record.type === "updateDetails" &&
+    stringFields.every((field) => typeof record[field] === "string") &&
+    typeof record.pipelineStagesLoading === "boolean" &&
+    recordFields.every((field) => asRecord(record[field]) !== undefined) &&
+    Array.isArray(record.pipelineStages) &&
+    Array.isArray(record.pendingInputs)
+  );
 }
 
 function parsePipelineNodeLogPayload(value: unknown): PipelineNodeLogViewModel | undefined {

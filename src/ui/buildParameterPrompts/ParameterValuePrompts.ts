@@ -57,19 +57,22 @@ function addParameterToPayload(
     return;
   }
 
-  if (value.length > 0) {
-    const delimiter = parameter.multiSelectDelimiter?.trim();
-    if (delimiter) {
-      payload.fields.push({
-        name: parameter.name,
-        value: value.join(delimiter)
-      });
-      return;
-    }
+  if (value.length === 0) {
+    payload.fields.push({ name: parameter.name, value: "" });
+    return;
+  }
 
-    for (const entry of value) {
-      payload.fields.push({ name: parameter.name, value: entry });
-    }
+  const delimiter = parameter.multiSelectDelimiter?.trim();
+  if (delimiter) {
+    payload.fields.push({
+      name: parameter.name,
+      value: value.join(delimiter)
+    });
+    return;
+  }
+
+  for (const entry of value) {
+    payload.fields.push({ name: parameter.name, value: entry });
   }
 }
 

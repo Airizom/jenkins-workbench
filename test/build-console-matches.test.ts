@@ -2,12 +2,26 @@ import assert from "node:assert/strict";
 import { isValidElement } from "react";
 import { describe, it } from "vitest";
 import { buildConsoleMatches } from "../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleMatches";
+import { MAX_CONSOLE_MATCHES } from "../src/panels/buildDetails/webview/hooks/consoleSearch/constants";
 import {
   buildConsoleSegments,
   normalizeConsoleSourceReferences
 } from "../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleSegments";
 
 describe("buildConsoleMatches", () => {
+  it.each([false, true])(
+    "reports truncation only beyond the match limit (regex: %s)",
+    (useRegex) => {
+      const exact = buildConsoleMatches("x".repeat(MAX_CONSOLE_MATCHES), "x", useRegex);
+      assert.equal(exact.matches.length, MAX_CONSOLE_MATCHES);
+      assert.equal(exact.tooManyMatches, false);
+
+      const excess = buildConsoleMatches("x".repeat(MAX_CONSOLE_MATCHES + 1), "x", useRegex);
+      assert.equal(excess.matches.length, MAX_CONSOLE_MATCHES);
+      assert.equal(excess.tooManyMatches, true);
+    }
+  );
+
   it("maps plain-text matches back to original offsets after Unicode case folds", () => {
     const result = buildConsoleMatches("İX", "x", false);
 

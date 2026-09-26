@@ -59,6 +59,48 @@ function resolver(resolutions: Record<string, vscodeStub.Uri | undefined>) {
 }
 
 describe("build diagnostic aggregation", () => {
+  it("publishes resolved diagnostics when another path resolution fails", async () => {
+    const collection = new DiagnosticCollection();
+    const validUri = vscodeStub.Uri.file("/repo/src/a.ts");
+    const diagnostics = [
+      raw({ rawPath: "src/blocked.ts", message: "inaccessible", logLine: 1 }),
+      raw({ rawPath: "src/a.ts", message: "published", logLine: 2, sequence: 2 })
+    ];
+    const resolve = vi.fn(
+      async (_repository: unknown, _profile: unknown, item: RawBuildDiagnostic) => {
+        if (item.rawPath === "src/blocked.ts") {
+          throw new Error("PermissionDenied");
+        }
+        return { status: "resolved" as const, uri: validUri, strategy: "direct" as const };
+      }
+    );
+
+    const snapshot = await aggregateAndPublishBuildDiagnostics({
+      collection: collection as never,
+      pathResolver: { resolve } as never,
+      repositoryUri: vscodeStub.Uri.file("/repo") as never,
+      profile: AUTOMATIC_DIAGNOSTIC_PROFILE,
+      diagnostics,
+      maxProblems: 10,
+      generation: 1,
+      buildUrl: "https://jenkins.example/job/app/12/",
+      buildIdentity: "Jenkins app #12",
+      truncated: false
+    });
+
+    assert.equal(snapshot.viewModel.resolvedCount, 1);
+    assert.equal(snapshot.viewModel.unresolvedCount, 1);
+    assert.match(snapshot.viewModel.warnings[0], /1 build diagnostic path.*workspace access error/);
+    assert.equal(
+      snapshot.viewModel.items.find((item) => item.message === "inaccessible")?.targetId,
+      undefined
+    );
+    assert.deepEqual(
+      collection.entries.get(validUri.toString())?.map((item) => item.message),
+      ["published"]
+    );
+  });
+
   it("deduplicates, severity-sorts publication, caps Problems, and preserves provenance", async () => {
     const collection = new DiagnosticCollection();
     const a = vscodeStub.Uri.file("/repo/src/a.ts");
@@ -178,6 +220,51 @@ describe("build diagnostic aggregation", () => {
     assert.equal(resolve.mock.calls.length, 8);
     assert.equal(snapshot.viewModel.omittedCount, 13);
     assert.equal([...collection.entries.values()].flat().length, 2);
+  });
+
+  it("continues past alias paths that resolve to the same problem", async () => {
+    const collection = new DiagnosticCollection();
+    const sharedUri = vscodeStub.Uri.file("/repo/src/a.ts");
+    const warningUri = vscodeStub.Uri.file("/repo/src/b.ts");
+    const diagnostics = [
+      ...Array.from({ length: 2_001 }, (_unused, index) =>
+        raw({ rawPath: `/agent-${index}/src/a.ts`, logLine: index + 1, sequence: index + 1 })
+      ),
+      raw({
+        rawPath: "src/b.ts",
+        severity: "warning",
+        message: "unique warning",
+        logLine: 2_002,
+        sequence: 2_002
+      })
+    ];
+    const resolve = vi.fn(
+      async (_repository: unknown, _profile: unknown, diagnostic: RawBuildDiagnostic) => ({
+        status: "resolved" as const,
+        uri: diagnostic.severity === "warning" ? warningUri : sharedUri,
+        strategy: "direct" as const
+      })
+    );
+
+    const snapshot = await aggregateAndPublishBuildDiagnostics({
+      collection: collection as never,
+      pathResolver: { resolve } as never,
+      repositoryUri: vscodeStub.Uri.file("/repo") as never,
+      profile: AUTOMATIC_DIAGNOSTIC_PROFILE,
+      diagnostics,
+      maxProblems: 500,
+      generation: 1,
+      buildUrl: "https://jenkins.example/job/app/12/",
+      buildIdentity: "Jenkins app #12",
+      truncated: false
+    });
+
+    assert.equal(resolve.mock.calls.length, diagnostics.length);
+    assert.equal(snapshot.viewModel.resolvedCount, 2);
+    assert.deepEqual(
+      [...collection.entries.values()].flat().map((diagnostic) => diagnostic.message),
+      ["broken", "unique warning"]
+    );
   });
 
   it("uses the same primary-frame policy for resolved and unresolved stack traces", async () => {

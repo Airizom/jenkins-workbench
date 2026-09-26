@@ -46,6 +46,20 @@ export class TestSourceResolver {
     });
   }
 
+  /**
+   * Resolves once the Git API has been initialized. `canResolve` is synchronous and only sees
+   * repositories the Git API has already reported, so callers that evaluate availability up front
+   * (for example when rendering a test report) should await this first; otherwise linked
+   * repositories that are not workspace folders look unavailable until an unrelated refresh.
+   */
+  async whenReady(): Promise<void> {
+    try {
+      await this.gitApiPromise;
+    } catch {
+      // The Git API is unavailable; availability falls back to workspace folders only.
+    }
+  }
+
   canResolve(context: TestSourceNavigationContext, className?: string): boolean {
     return (
       Boolean(normalizeClassName(className)) && this.collectRepositoryRoots(context).length > 0

@@ -72,7 +72,12 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
     }
 
     const now = Date.now();
-    this.evictIfNeeded(now);
+    this.purgeExpired(now);
+    const retainedBytes = this.getRetainedBytes();
+    if (retainedBytes + data.byteLength > this.maxTotalBytes) {
+      throw new ArtifactPreviewCacheLimitError(data.byteLength, this.maxTotalBytes, retainedBytes);
+    }
+    this.evictIfNeeded(now, undefined, data.byteLength);
     if (this.totalBytes + data.byteLength > this.maxTotalBytes) {
       throw new ArtifactPreviewCacheLimitError(
         data.byteLength,
@@ -215,19 +220,31 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
     return `${Date.now().toString(36)}-${this.nextId}`;
   }
 
-  private evictIfNeeded(now: number, protectedId?: string): void {
+  private evictIfNeeded(now: number, protectedId?: string, incomingBytes = 0): void {
     this.purgeExpired(now, protectedId);
-    if (this.entries.size <= this.maxEntries && this.totalBytes <= this.maxTotalBytes) {
+    const withinLimits = () =>
+      this.entries.size <= this.maxEntries && this.totalBytes + incomingBytes <= this.maxTotalBytes;
+    if (withinLimits()) {
       return;
     }
 
     const candidates = this.getEvictionCandidates(protectedId);
     for (const id of candidates) {
-      if (this.entries.size <= this.maxEntries && this.totalBytes <= this.maxTotalBytes) {
+      if (withinLimits()) {
         break;
       }
       this.deleteEntry(id);
     }
+  }
+
+  private getRetainedBytes(): number {
+    let retainedBytes = 0;
+    for (const entry of this.entries.values()) {
+      if (entry.inUseCount > 0) {
+        retainedBytes += entry.size;
+      }
+    }
+    return retainedBytes;
   }
 
   private purgeExpired(now: number, protectedId?: string): void {

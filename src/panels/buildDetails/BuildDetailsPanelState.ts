@@ -271,6 +271,10 @@ export class BuildDetailsPanelState {
     this.baseErrorsValue = errors;
   }
 
+  removeBaseErrors(predicate: (error: string) => boolean): void {
+    this.baseErrorsValue = this.baseErrorsValue.filter((error) => !predicate(error));
+  }
+
   setPipelineLoading(value: boolean): boolean {
     if (this.pipelineLoadingValue === value) {
       return false;

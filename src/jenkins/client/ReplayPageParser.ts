@@ -10,8 +10,7 @@ const TEXTAREA_PATTERN = /<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/i;
 const FIELD_NAME_PATTERN = /\bname\s*=\s*(["'])(.*?)\1/i;
 const WHITESPACE_PATTERN = /\s+/g;
 const WINDOWS_NEWLINE_PATTERN = /\r\n?/g;
-const LEADING_TEXTAREA_NEWLINE_PATTERN = /^\n[ \t]*/;
-const TRAILING_TEXTAREA_NEWLINE_PATTERN = /\n[ \t]*$/;
+const LEADING_TEXTAREA_NEWLINE_PATTERN = /^\n/;
 const TAG_PATTERN = /<[^>]+>/g;
 const HTML_ENTITY_PATTERN = /&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g;
 
@@ -140,10 +139,9 @@ function normalizeLabel(input: string | undefined): string | undefined {
 }
 
 function normalizeTextareaContent(input: string): string {
-  return decodeHtmlEntities(input)
-    .replace(WINDOWS_NEWLINE_PATTERN, "\n")
-    .replace(LEADING_TEXTAREA_NEWLINE_PATTERN, "")
-    .replace(TRAILING_TEXTAREA_NEWLINE_PATTERN, "");
+  return decodeHtmlEntities(
+    input.replace(WINDOWS_NEWLINE_PATTERN, "\n").replace(LEADING_TEXTAREA_NEWLINE_PATTERN, "")
+  );
 }
 
 function stripTags(input: string): string {

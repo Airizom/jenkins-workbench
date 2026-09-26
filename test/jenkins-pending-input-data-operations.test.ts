@@ -86,4 +86,50 @@ describe("JenkinsPendingInputDataOperations", () => {
     assert.equal(second.availability, "unsupported");
     assert.equal(calls, 1);
   });
+
+  it("does not cache an in-flight fetch that finishes after an input is approved", async () => {
+    const buildUrl = "https://jenkins.example.com/job/demo/17/";
+    let releaseFetch: (() => void) | undefined;
+    let fetchStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      fetchStarted = resolve;
+    });
+    const client = {
+      getPendingInputActions: async () => {
+        const actions = [{ id: "approval-a", message: "Ready?" }];
+        fetchStarted?.();
+        await new Promise<void>((resolve) => {
+          releaseFetch = resolve;
+        });
+        return actions;
+      },
+      proceedInput: async () => undefined
+    } as unknown as JenkinsClient;
+    const clientProvider = {
+      getClient: async (): Promise<JenkinsClient> => client,
+      getAuthSignature: async (): Promise<string> => "auth"
+    } as unknown as JenkinsClientProvider;
+    const context = new JenkinsDataRuntimeContext(clientProvider, {
+      buildParameterRequestPreparer: {
+        prepareBuildParameters: async () => ({ hasParameters: false })
+      }
+    });
+    const operations = new JenkinsPendingInputDataOperations(context);
+
+    const pending = operations.getPendingInputActions(environment, buildUrl);
+    await started;
+    await operations.approveInput(environment, buildUrl, "approval-a");
+    releaseFetch?.();
+    const actions = await pending;
+
+    assert.equal(actions.length, 1);
+    assert.deepEqual(
+      await operations.getPendingInputActions(environment, buildUrl, { mode: "cached" }),
+      []
+    );
+    const summary = await operations.getPendingInputSummary(environment, buildUrl, {
+      mode: "cached"
+    });
+    assert.equal(summary.awaitingInput, false);
+  });
 });

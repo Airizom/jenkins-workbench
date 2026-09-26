@@ -50,6 +50,7 @@ export function createCurrentBranchVscodeMock(options?: {
   window: {
     activeTextEditor?: { document: { uri: TestUriLike } };
     onDidChangeActiveTextEditor(): { dispose(): void };
+    showErrorMessage(message: string): Promise<undefined>;
   };
   workspace: { onDidChangeWorkspaceFolders(): { dispose(): void } };
 } {
@@ -57,7 +58,8 @@ export function createCurrentBranchVscodeMock(options?: {
     EventEmitter: TestEventEmitter,
     window: {
       activeTextEditor: options?.activeTextEditor,
-      onDidChangeActiveTextEditor: () => ({ dispose: () => undefined })
+      onDidChangeActiveTextEditor: () => ({ dispose: () => undefined }),
+      showErrorMessage: async () => undefined
     },
     workspace: {
       onDidChangeWorkspaceFolders: () => ({ dispose: () => undefined })

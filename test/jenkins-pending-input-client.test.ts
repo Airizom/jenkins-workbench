@@ -61,3 +61,23 @@ describe("JenkinsPendingInputClient", () => {
     ]);
   });
 });
+
+it("submits the form required by a parameterless wfapi approval URL", async () => {
+  let body: string | Uint8Array | undefined;
+  const client = new JenkinsPendingInputClient(
+    createJenkinsClientContext({
+      requestVoidWithCrumb: async (_url, submitted) => {
+        body = submitted;
+      }
+    })
+  );
+  await client.proceedInput(BUILD_URL, "approval", {
+    proceedUrl: "wfapi/inputSubmit?inputId=approval",
+    proceedText: "Approve"
+  });
+  assert.equal(typeof body, "string");
+  const form = new URLSearchParams(body as string);
+  assert.equal(form.get("inputId"), "approval");
+  assert.equal(form.get("proceed"), "Approve");
+  assert.deepEqual(JSON.parse(form.get("json") ?? ""), { parameter: [] });
+});

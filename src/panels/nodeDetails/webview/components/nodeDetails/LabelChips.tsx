@@ -18,8 +18,8 @@ export function LabelChips({ labels }: LabelChipsProps): React.JSX.Element {
     return (
       <EmptyState
         icon={<TagIcon className="h-4 w-4" />}
-        title="No labels assigned"
-        description="Jobs cannot target this node by label until one is configured."
+        title="No shared labels assigned"
+        description="This node has no shared labels. Jobs can still target it by its node-specific label."
         className="py-6"
       />
     );

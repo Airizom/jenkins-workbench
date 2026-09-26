@@ -70,7 +70,24 @@ describe("collectBuildChangesets", () => {
 
     assert.deepEqual(result, [
       { message: "a|b", author: "c", commitId: undefined },
-      { message: "a", author: "b|c", commitId: undefined }
+      { message: "a", author: "b|c", commitId: undefined },
+      { message: "a|b", author: "c", commitId: undefined }
+    ]);
+  });
+
+  it("keeps distinct items with no commit id and matching display text", () => {
+    const result = collectBuildChangesets({
+      changeSet: {
+        items: [
+          changesetItem(undefined, "Update pipeline", "Ada Lovelace"),
+          changesetItem(undefined, "Update pipeline", "Ada Lovelace")
+        ]
+      }
+    });
+
+    assert.deepEqual(result, [
+      { message: "Update pipeline", author: "Ada Lovelace", commitId: undefined },
+      { message: "Update pipeline", author: "Ada Lovelace", commitId: undefined }
     ]);
   });
 });

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JobPathSegment, JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { buildJobUrl, ensureTrailingSlash, parseJobUrl } from "../jenkins/urls";
@@ -28,7 +29,13 @@ export class JenkinsWorkbenchDeepLinkJobHandler {
       path
     };
 
-    const revealed = await this.treeNavigator.revealJobPath(environment, entry);
+    let revealed: boolean;
+    try {
+      revealed = await this.treeNavigator.revealJobPath(environment, entry);
+    } catch (error) {
+      void vscode.window.showErrorMessage(`Unable to open job: ${formatActionError(error)}`);
+      return;
+    }
     if (!revealed) {
       void vscode.window.showWarningMessage(
         "Unable to locate the job in the Jenkins Workbench tree."

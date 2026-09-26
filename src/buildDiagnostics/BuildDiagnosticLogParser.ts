@@ -40,6 +40,14 @@ export interface BuildDiagnosticLogParserOptions {
 
 export const MAX_DIAGNOSTIC_LOG_LINE_CHARS = 1024 * 1024;
 
+/** Lines that may legitimately appear between frames of an already started trace. */
+const JVM_TRACE_CONTINUATION = /^(?:at\s+\S|\.\.\.\s*\d+\s+more\b|(?:Caused by|Suppressed):)/;
+const JAVASCRIPT_TRACE_CONTINUATION = /^at\s+\S/;
+const DOTNET_TRACE_CONTINUATION = /^(?:at\s+\S|--->\s|---\s+End of\b)/;
+const PYTHON_TRACE_FRAME = /^File\s+"/;
+/** A Python frame is followed by at most a source line and a caret marker line. */
+const MAX_PYTHON_TRACE_TAIL_LINES = 2;
+
 /**
  * Stateful line parser suitable for Jenkins progressive-console chunks. It
  * retains only an incomplete line and the small amount of multiline matcher
@@ -65,6 +73,7 @@ export class BuildDiagnosticLogParser {
   private jvmStack: StackState | undefined;
   private javascriptStack: StackState | undefined;
   private pythonStack: StackState | undefined;
+  private pythonTailLines = 0;
   private dotnetStack: StackState | undefined;
 
   constructor(options: BuildDiagnosticLogParserOptions = {}) {
@@ -191,6 +200,7 @@ export class BuildDiagnosticLogParser {
     this.lineNumber += 1;
     const normalized = normalizeBuildLogLine(rawLine);
     const diagnostics: RawBuildDiagnostic[] = [];
+    this.endTerminatedStacks(normalized.text);
 
     for (const matcher of this.customMatchers) {
       diagnostics.push(...this.parseCustomMatcher(matcher, normalized.text, rawLine));
@@ -375,6 +385,7 @@ export class BuildDiagnosticLogParser {
   private parsePythonStack(text: string): DiagnosticDraft | undefined {
     if (/^Traceback \(most recent call last\):\s*$/.test(text.trim())) {
       this.pythonStack = this.newStack("Python traceback");
+      this.pythonTailLines = 0;
       return undefined;
     }
     const frame = text.match(/^\s*File\s+"([^"]+)",\s+line\s+(\d+)(?:,\s+in\s+(.+))?\s*$/);
@@ -406,6 +417,48 @@ export class BuildDiagnosticLogParser {
     this.dotnetStack ??= this.newStack(".NET stack frame");
     const stack = this.dotnetStack;
     return stackDraft("dotnet-stack", "dotnet", frame[1], frame[2], undefined, stack, 240);
+  }
+
+  /**
+   * Ends any active trace once a line arrives that cannot belong to it, so a
+   * later stray frame starts its own group instead of joining an old one.
+   * Traces that have not emitted a frame yet are kept because exception
+   * messages may span several lines before the first frame.
+   */
+  private endTerminatedStacks(text: string): void {
+    const trimmed = text.trim();
+    if (this.jvmStack && this.jvmStack.nextFrame > 0 && !JVM_TRACE_CONTINUATION.test(trimmed)) {
+      this.jvmStack = undefined;
+    }
+    if (
+      this.javascriptStack &&
+      this.javascriptStack.nextFrame > 0 &&
+      !JAVASCRIPT_TRACE_CONTINUATION.test(trimmed)
+    ) {
+      this.javascriptStack = undefined;
+    }
+    if (
+      this.dotnetStack &&
+      this.dotnetStack.nextFrame > 0 &&
+      !DOTNET_TRACE_CONTINUATION.test(trimmed)
+    ) {
+      this.dotnetStack = undefined;
+    }
+    this.endTerminatedPythonStack(trimmed);
+  }
+
+  private endTerminatedPythonStack(trimmed: string): void {
+    if (!this.pythonStack) {
+      return;
+    }
+    if (PYTHON_TRACE_FRAME.test(trimmed)) {
+      this.pythonTailLines = 0;
+      return;
+    }
+    this.pythonTailLines += 1;
+    if (this.pythonStack.nextFrame > 0 && this.pythonTailLines > MAX_PYTHON_TRACE_TAIL_LINES) {
+      this.pythonStack = undefined;
+    }
   }
 
   private newStack(message: string): StackState {

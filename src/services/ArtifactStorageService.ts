@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { IncomingHttpHeaders } from "node:http";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -13,8 +14,9 @@ const WINDOWS_FORBIDDEN_PATH_CHARACTERS = /[<>:"|?*]/;
 const WINDOWS_RESERVED_PATH_COMPONENT = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
 
 export interface ArtifactFilesystem {
-  createDirectory(path: string): Thenable<void>;
+  createDirectory(path: string, workspaceRoot: string): Thenable<void>;
   createWriteStream(filePath: string): NodeJS.WritableStream;
+  rename(sourcePath: string, targetPath: string, workspaceRoot: string): Thenable<void>;
   delete(path: string): Thenable<void>;
 }
 
@@ -64,12 +66,17 @@ export class ArtifactStorageService {
       { maxBytes: resolveMaxBytes(request.maxBytes) }
     );
 
-    await this.filesystem.createDirectory(path.dirname(resolved.targetPath));
-    const writeStream = this.filesystem.createWriteStream(resolved.targetPath);
+    await this.filesystem.createDirectory(path.dirname(resolved.targetPath), request.workspaceRoot);
+    const temporaryPath = path.join(
+      path.dirname(resolved.targetPath),
+      `.${path.basename(resolved.targetPath)}.${randomUUID()}.tmp`
+    );
     try {
+      const writeStream = this.filesystem.createWriteStream(temporaryPath);
       await pipeline(response.stream, writeStream);
+      await this.filesystem.rename(temporaryPath, resolved.targetPath, request.workspaceRoot);
     } catch (error) {
-      await this.safeDelete(resolved.targetPath);
+      await this.safeDelete(temporaryPath);
       throw error;
     }
 

@@ -84,6 +84,46 @@ describe("JenkinsQueuePoller", () => {
     assert.deepEqual(refreshes, []);
   });
 
+  it("continues polling other environments after a refresh throws", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const first = environment();
+    const second = environment({ environmentId: "env-2" });
+    const refreshes: JenkinsEnvironmentRef[] = [];
+    const error = new Error("refresh failed");
+    const poller = new JenkinsQueuePoller(
+      {
+        refreshQueueOnly: (environmentRef) => {
+          refreshes.push(environmentRef);
+          if (environmentRef === first) {
+            throw error;
+          }
+        }
+      },
+      2
+    );
+
+    try {
+      assert.doesNotThrow(() => poller.trackExpanded(first));
+      poller.trackExpanded(second);
+      refreshes.length = 0;
+
+      vi.advanceTimersByTime(2000);
+      assert.deepEqual(refreshes, [first, second]);
+
+      vi.advanceTimersByTime(2000);
+      assert.deepEqual(refreshes, [first, second, first, second]);
+      assert.deepEqual(warning.mock.calls, [
+        ["Failed to refresh Jenkins queue.", error],
+        ["Failed to refresh Jenkins queue.", error],
+        ["Failed to refresh Jenkins queue.", error]
+      ]);
+    } finally {
+      poller.dispose();
+      warning.mockRestore();
+    }
+  });
+
   it("stops polling after clearAll and dispose", () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture();
@@ -124,6 +164,21 @@ describe("JenkinsQueuePoller", () => {
     assert.equal(refreshes.length, 5);
 
     poller.dispose();
+  });
+
+  it("caps oversized polling intervals at the maximum supported timer delay", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    const { poller } = createPollerFixture(2_147_484);
+
+    poller.trackExpanded(environment());
+    assert.equal(setIntervalSpy.mock.calls[0]?.[1], 2_147_483_647);
+
+    poller.updatePollIntervalSeconds(Number.MAX_VALUE);
+    assert.equal(setIntervalSpy.mock.calls.length, 1);
+
+    poller.dispose();
+    setIntervalSpy.mockRestore();
   });
 
   it("uses the latest environment reference for an expanded environment key", () => {

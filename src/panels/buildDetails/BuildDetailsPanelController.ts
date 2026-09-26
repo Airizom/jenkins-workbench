@@ -50,6 +50,9 @@ export type BuildDetailsPanelLoadResult =
 
 type BuildDetailsResolvedAssets = Parameters<BuildDetailsPanelView["renderBuildDetails"]>[1];
 
+const MAX_INITIAL_STATUS_RETRIES = 5;
+const BUILD_DETAILS_ERROR_PREFIX = "Build details: ";
+
 export interface BuildDetailsPanelControllerAccess {
   getBackend(): BuildDetailsBackend | undefined;
   getEnvironment(): JenkinsEnvironmentRef | undefined;
@@ -69,8 +72,8 @@ export interface BuildDetailsPanelControllerAccess {
   ): Promise<void>;
   refreshCoverage(token: number, options?: { showLoading?: boolean }): Promise<void>;
   refreshPendingInputs(): Promise<void>;
-  beginLoading(): void;
-  endLoading(): void;
+  beginLoading(): number;
+  endLoading(request: number): void;
 }
 
 export class BuildDetailsPanelController implements BuildDetailsPanelControllerAccess {
@@ -84,6 +87,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private pollingController?: BuildDetailsPollingController;
   private pipelineNodeLogManager?: PipelineNodeLogManager;
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
+  private initialStatusRetryTimer: NodeJS.Timeout | undefined;
   private readonly diagnosticConsoleSync: BuildDetailsDiagnosticConsoleSync;
 
   constructor(
@@ -92,7 +96,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     coverageDecorationService: CoverageDecorationService,
     getCanOpenTestSource?: BuildDetailsCanOpenTestSource,
     private readonly onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void,
-    private readonly onDiagnosticConsoleTextChanged?: () => void
+    private readonly onDiagnosticConsoleTextChanged?: () => void,
+    private readonly whenTestSourceAvailabilityReady?: () => Promise<void>
   ) {
     this.canOpenTestSource = getCanOpenTestSource;
     this.diagnosticConsoleSync = new BuildDetailsDiagnosticConsoleSync({
@@ -121,6 +126,10 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   dispose(): void {
+    // Invalidate the current load token first so an in-flight load() that resolves after
+    // disposal treats itself as stale and does not render or start runtime work.
+    this.loadTokenTracker.next();
+    this.clearInitialStatusRetry();
     this.diagnosticConsoleSync.dispose();
     this.pollingController?.dispose();
     this.pollingController = undefined;
@@ -235,7 +244,12 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.pipelineNodeLogManager = this.createPipelineNodeLogManager(backend, environment, buildUrl);
     this.pollingController = this.createPollingController(backend, environment, buildUrl, token);
 
-    const initialState: BuildDetailsInitialState = await this.pollingController.loadInitial();
+    // Wait for test-source availability (Git API initialization) alongside the initial fetch so
+    // the first render does not report linked repositories as unavailable.
+    const [initialState]: [BuildDetailsInitialState, unknown] = await Promise.all([
+      this.pollingController.loadInitial(),
+      this.whenTestSourceAvailabilityReady?.() ?? Promise.resolve()
+    ]);
     if (!this.loadTokenTracker.isCurrent(token)) {
       return { status: "ok" };
     }
@@ -251,6 +265,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     buildUrl: string
   ): number {
     const token = this.loadTokenTracker.next();
+    this.clearInitialStatusRetry();
     this.pollingController?.dispose();
     this.pollingController = undefined;
     this.pipelineNodeLogManager?.dispose();
@@ -381,6 +396,9 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     token: number
   ): Promise<void> {
     if (!details) {
+      // The initial details request failed; retry a bounded number of times so a transient
+      // failure does not leave the panel stuck on its initial error state.
+      this.scheduleInitialStatusRetry(workflowError, token, 1);
       return;
     }
     if (details.building) {
@@ -388,6 +406,46 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       return;
     }
     await this.activateCompletedBuild(workflowError, token);
+  }
+
+  private scheduleInitialStatusRetry(workflowError: unknown, token: number, attempt: number): void {
+    if (attempt > MAX_INITIAL_STATUS_RETRIES || !this.loadTokenTracker.isCurrent(token)) {
+      return;
+    }
+    this.clearInitialStatusRetry();
+    this.initialStatusRetryTimer = setTimeout(() => {
+      this.initialStatusRetryTimer = undefined;
+      void this.retryInitialStatus(workflowError, token, attempt);
+    }, getBuildDetailsRefreshIntervalMs());
+  }
+
+  private async retryInitialStatus(
+    workflowError: unknown,
+    token: number,
+    attempt: number
+  ): Promise<void> {
+    if (!this.loadTokenTracker.isCurrent(token)) {
+      return;
+    }
+    await this.runtime.refreshBuildStatus(token);
+    if (!this.loadTokenTracker.isCurrent(token)) {
+      return;
+    }
+    const details = this.state.currentDetails;
+    if (!details) {
+      this.scheduleInitialStatusRetry(workflowError, token, attempt + 1);
+      return;
+    }
+    this.state.removeBaseErrors((error) => error.startsWith(BUILD_DETAILS_ERROR_PREFIX));
+    this.publishErrors();
+    await this.activateInitialRuntime(details, workflowError, token);
+  }
+
+  private clearInitialStatusRetry(): void {
+    if (this.initialStatusRetryTimer) {
+      clearTimeout(this.initialStatusRetryTimer);
+      this.initialStatusRetryTimer = undefined;
+    }
   }
 
   private async activateCompletedBuild(workflowError: unknown, token: number): Promise<void> {
@@ -414,12 +472,16 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   async handlePanelVisible(): Promise<void> {
-    this.beginLoading();
+    const loadingRequest = this.beginLoading();
     try {
-      await this.runtime.handlePanelVisible(this.loadTokenTracker.current);
-      this.pipelineNodeLogManager?.resume();
+      const stillVisible = await this.runtime.handlePanelVisible(this.loadTokenTracker.current);
+      // The panel may have been hidden while the status refresh was in flight; in that case
+      // handlePanelHidden already paused node logs and they must stay paused.
+      if (stillVisible && this.view.isVisible()) {
+        this.pipelineNodeLogManager?.resume();
+      }
     } finally {
-      this.endLoading();
+      this.endLoading(loadingRequest);
     }
   }
 
@@ -463,11 +525,11 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     return this.diagnosticConsoleSync.sync(textRange, appendedTextRange);
   }
 
-  beginLoading(): void {
-    this.loadTracker.beginLoading();
+  beginLoading(): number {
+    return this.loadTracker.beginLoading();
   }
 
-  endLoading(): void {
-    this.loadTracker.endLoading();
+  endLoading(request: number): void {
+    this.loadTracker.endLoading(request);
   }
 }

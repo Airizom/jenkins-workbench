@@ -47,24 +47,18 @@ function normalizeNodeId(value?: string): string | undefined {
 }
 
 function getStageSteps(stage: JenkinsWorkflowStage): JenkinsWorkflowStep[] {
-  if (Array.isArray(stage.stageFlowNodes)) {
-    return stage.stageFlowNodes;
-  }
-  if (Array.isArray(stage.steps)) {
-    return stage.steps;
-  }
-  return [];
+  return pickFirstNonEmptyArray(stage.stageFlowNodes, stage.steps);
 }
 
 function getStageBranches(stage: JenkinsWorkflowStage): JenkinsWorkflowStage[] {
-  if (Array.isArray(stage.parallelStages)) {
-    return stage.parallelStages;
-  }
-  if (Array.isArray(stage.branches)) {
-    return stage.branches;
-  }
-  if (Array.isArray(stage.children)) {
-    return stage.children;
+  return pickFirstNonEmptyArray(stage.parallelStages, stage.branches, stage.children);
+}
+
+function pickFirstNonEmptyArray<T>(...candidates: Array<T[] | undefined>): T[] {
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate;
+    }
   }
   return [];
 }

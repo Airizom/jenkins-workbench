@@ -16,6 +16,7 @@ const warningMessages: string[] = [];
 let quickPickCalls = 0;
 let lastQuickPickItems: readonly ActionPick[] = [];
 let quickPickSelection: string | undefined;
+let queuedRepositorySelection: string | undefined;
 
 vi.doMock("vscode", () => ({
   ...vscodeStub,
@@ -29,7 +30,9 @@ vi.doMock("vscode", () => ({
     showQuickPick: async (items: readonly ActionPick[]) => {
       quickPickCalls += 1;
       lastQuickPickItems = items;
-      return items.find((item) => item.label === quickPickSelection);
+      const selection = queuedRepositorySelection ?? quickPickSelection;
+      queuedRepositorySelection = undefined;
+      return items.find((item) => item.label === selection);
     },
     showInformationMessage: async (message: string) => {
       infoMessages.push(message);
@@ -54,10 +57,20 @@ const { registerCurrentBranchCommands } = await import("../src/commands/CurrentB
 
 const extensionUri = vscodeStub.Uri.file("/extensions/jenkins-workbench");
 
-function createMatchedState(options?: { lastBuildUrl?: string }): CurrentBranchState {
+const repository = {
+  repositoryUriString: "file:///workspace/app",
+  repositoryLabel: "app",
+  repositoryPath: "/workspace/app"
+};
+
+function createMatchedState(options?: {
+  lastBuildUrl?: string;
+  branchName?: string;
+}): CurrentBranchState {
   return {
     kind: "matched",
-    branchName: "feature/deploy",
+    repository,
+    branchName: options?.branchName ?? "feature/deploy",
     lastBuild: options?.lastBuildUrl ? { url: options.lastBuildUrl } : undefined
   } as unknown as CurrentBranchState;
 }
@@ -73,8 +86,10 @@ interface WorkflowServiceStub {
 
 function createWorkflowService(options?: {
   resolution?: CurrentBranchResolutionResult;
+  repositoryResolution?: CurrentBranchResolutionResult;
   openBranchRequest?: CurrentBranchOpenRequest;
   openMultibranchRequest?: CurrentBranchOpenRequest;
+  repositories?: (typeof repository)[];
 }): WorkflowServiceStub {
   const calls: { method: string; args: unknown[] }[] = [];
   const record = (method: string, ...args: unknown[]) => {
@@ -84,6 +99,13 @@ function createWorkflowService(options?: {
     resolveCurrentBranchState: async (refreshOptions: unknown) => {
       record("resolveCurrentBranchState", refreshOptions);
       return options?.resolution ?? { kind: "resolved", state: createMatchedState() };
+    },
+    resolveCurrentBranchStateForRepository: async (repo: unknown, refreshOptions: unknown) => {
+      record("resolveCurrentBranchStateForRepository", repo, refreshOptions);
+      return (
+        options?.repositoryResolution ??
+        options?.resolution ?? { kind: "resolved", state: createMatchedState() }
+      );
     },
     getOpenBranchRequest: (state: CurrentBranchState) => {
       record("getOpenBranchRequest", state);
@@ -112,13 +134,7 @@ function createWorkflowService(options?: {
     },
     listRepositories: () => {
       record("listRepositories");
-      return [
-        {
-          repositoryUriString: "file:///workspace/app",
-          repositoryLabel: "app",
-          repositoryPath: "/workspace/app"
-        }
-      ];
+      return options?.repositories ?? [repository];
     },
     listLinkableEnvironments: async () => {
       record("listLinkableEnvironments");
@@ -212,6 +228,43 @@ describe("showCurrentBranchActions", () => {
     assert.deepEqual(methodCalls(stub, "openLastFailedBuild")[0]?.args, [state, extensionUri]);
   });
 
+  it("re-resolves the branch before triggering a build from the picker", async () => {
+    const state = createMatchedState();
+    const latestState = createMatchedState({
+      lastBuildUrl: "https://jenkins.example/job/main/43/"
+    });
+    const stub = createWorkflowService({
+      resolution: { kind: "resolved", state },
+      repositoryResolution: { kind: "resolved", state: latestState }
+    });
+
+    await runActionsCommand(stub, "Trigger Current Jenkins Build");
+
+    assert.deepEqual(methodCalls(stub, "resolveCurrentBranchStateForRepository")[0]?.args, [
+      repository,
+      { force: true }
+    ]);
+    assert.deepEqual(methodCalls(stub, "triggerCurrentBranchBuild")[0]?.args, [latestState]);
+  });
+
+  it("does not trigger a build when the branch changed while the picker was open", async () => {
+    const state = createMatchedState();
+    const stub = createWorkflowService({
+      resolution: { kind: "resolved", state },
+      repositoryResolution: {
+        kind: "resolved",
+        state: createMatchedState({ branchName: "feature/other" })
+      }
+    });
+
+    await runActionsCommand(stub, "Trigger Current Jenkins Build");
+
+    assert.equal(methodCalls(stub, "triggerCurrentBranchBuild").length, 0);
+    assert.deepEqual(warningMessages, [
+      "The current branch changed from feature/deploy to feature/other. Run Current Branch Actions again to trigger a build."
+    ]);
+  });
+
   it("shows multibranch actions when the branch job is missing", async () => {
     const state = createBranchMissingState();
     const stub = createWorkflowService({
@@ -256,6 +309,42 @@ describe("showCurrentBranchActions", () => {
       ["refresh", "relink", "unlink"]
     );
     assert.deepEqual(methodCalls(stub, "refreshCurrentBranchStatus")[0]?.args, [{ force: true }]);
+  });
+
+  it("refreshes the repository selected for an ambiguous workspace", async () => {
+    const otherRepository = {
+      repositoryUriString: "file:///workspace/api",
+      repositoryLabel: "api",
+      repositoryPath: "/workspace/api"
+    };
+    const stub = createWorkflowService({
+      resolution: { kind: "ambiguousRepository", repositories: [] } as never,
+      repositoryResolution: {
+        kind: "resolved",
+        state: {
+          kind: "branchMissing",
+          repository: otherRepository,
+          branchName: "feature/api",
+          link: { multibranchLabel: "API" }
+        } as unknown as CurrentBranchState
+      },
+      repositories: [repository, otherRepository]
+    });
+
+    queuedRepositorySelection = "api";
+    await runActionsCommand(stub, "Refresh Current Branch Status");
+
+    assert.deepEqual(
+      methodCalls(stub, "resolveCurrentBranchStateForRepository").map((call) => call.args),
+      [
+        [otherRepository, { force: true }],
+        [otherRepository, { force: true }]
+      ]
+    );
+    assert.equal(methodCalls(stub, "refreshCurrentBranchStatus").length, 0);
+    assert.deepEqual(infoMessages, [
+      "Linked multibranch: API • Repository: api • Branch: feature/api • Status: Branch not found in Jenkins"
+    ]);
   });
 
   it("routes relink and unlink through the repository workflows", async () => {

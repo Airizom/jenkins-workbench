@@ -30,7 +30,22 @@ class TestRange {
 }
 
 class TestSnippetString {
-  constructor(readonly value = "") {}
+  constructor(public value = "") {}
+
+  appendText(text: string): this {
+    this.value += text;
+    return this;
+  }
+
+  appendPlaceholder(text: string): this {
+    this.value += `\${${text}}`;
+    return this;
+  }
+
+  appendTabstop(): this {
+    this.value += "$0";
+    return this;
+  }
 }
 
 vi.doMock("vscode", () => ({
@@ -50,6 +65,9 @@ vi.doMock("../src/jenkinsfile/JenkinsfileContextAnalyzer", () => ({
 
 const { JenkinsfileCompletionProvider } = await import(
   "../src/jenkinsfile/editor/JenkinsfileCompletionProvider"
+);
+const { FALLBACK_JENKINSFILE_STEP_CATALOG } = await import(
+  "../src/jenkinsfile/JenkinsfileFallbackCatalog"
 );
 
 describe("JenkinsfileCompletionProvider", () => {
@@ -96,5 +114,28 @@ describe("JenkinsfileCompletionProvider", () => {
     assert.equal(ordinary?.sortText, "a:ordinary");
     assert.equal(advanced?.sortText, "z:advanced");
     assert.equal(advanced?.tags, undefined);
+  });
+
+  it("completes fallback parallel with a named closure branch", async () => {
+    const provider = new JenkinsfileCompletionProvider(
+      { isEnabled: () => true } as never,
+      { matches: () => true } as never,
+      {
+        getCatalogForDocument: async () => ({ catalog: FALLBACK_JENKINSFILE_STEP_CATALOG })
+      } as never
+    );
+    const position = { line: 0, character: 0 };
+
+    const result = await provider.provideCompletionItems(
+      { positionAt: () => position } as never,
+      position as never
+    );
+
+    const parallel = result?.items.find((item) => item.label === "parallel");
+    assert.equal(
+      (parallel?.insertText as TestSnippetString | undefined)?.value,
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: VS Code snippet placeholder syntax.
+      "parallel(${branchName}: { ${value} })"
+    );
   });
 });

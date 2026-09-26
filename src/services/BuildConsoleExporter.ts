@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { BuildActionError } from "../jenkins/errors";
+import { JenkinsConsoleNoteFilter } from "../jenkins/JenkinsConsoleNotes";
 import type { JenkinsConsoleTextClient } from "../jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../jenkins/types";
@@ -100,6 +101,7 @@ export class BuildConsoleExporter {
   ): AsyncGenerator<string> {
     let start = 0;
     let emptyAttempts = 0;
+    const noteFilter = new JenkinsConsoleNoteFilter();
     while (true) {
       const response = await this.client.getConsoleTextProgressive(environment, buildUrl, start);
       const nextStart = Math.max(start, response.textSize);
@@ -107,19 +109,26 @@ export class BuildConsoleExporter {
         emptyAttempts += 1;
         if (emptyAttempts > this.progressiveEmptyRetries) {
           state.truncated = true;
-          return;
+          break;
         }
         await this.delay(this.progressiveEmptyDelayMs);
         continue;
       }
       if (response.text.length > 0) {
-        yield response.text;
+        const text = noteFilter.append(response.text);
+        if (text) {
+          yield text;
+        }
         emptyAttempts = 0;
       }
       if (!response.moreData) {
-        return;
+        break;
       }
       start = nextStart;
+    }
+    const remainder = noteFilter.finish();
+    if (remainder) {
+      yield remainder;
     }
   }
 

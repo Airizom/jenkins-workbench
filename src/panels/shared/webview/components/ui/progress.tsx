@@ -19,13 +19,14 @@ export const Progress = React.forwardRef<
   ProgressProps
 >(({ className, value = 0, max = 100, indeterminate = false, ...props }, ref) => {
   const safeMax = normalizeProgressMax(max);
-  const percentage = Math.min(100, Math.max(0, (value / safeMax) * 100));
+  const safeValue = Number.isFinite(value) ? Math.min(safeMax, Math.max(0, value)) : 0;
+  const percentage = (safeValue / safeMax) * 100;
 
   return (
     <ProgressPrimitive.Root
       ref={ref}
       className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted-strong", className)}
-      value={indeterminate ? undefined : value}
+      value={indeterminate ? undefined : safeValue}
       max={indeterminate ? undefined : safeMax}
       {...props}
     >

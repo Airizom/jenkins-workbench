@@ -72,8 +72,12 @@ export class BuildDetailsCompletionPoller {
     this.pollInFlight = true;
     const pollGeneration = this.pollGeneration;
     try {
-      const details = await this.fetchBuildDetails(token);
+      const details = await this.fetchBuildDetails(token).catch(() => undefined);
       if (pollGeneration !== this.pollGeneration) {
+        return;
+      }
+      if (!this.shouldPoll() || !this.isTokenCurrent(token)) {
+        this.stop();
         return;
       }
       if (!details) {

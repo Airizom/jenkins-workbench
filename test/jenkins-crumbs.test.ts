@@ -103,6 +103,44 @@ describe("JenkinsCrumbService crumb fetch caching", () => {
     assert.equal(getFetchCount(), 2);
   });
 
+  it("does not cache a crumb fetch that completes after invalidate", async () => {
+    const pending: Array<(value: unknown) => void> = [];
+    const { getFetchCount, service } = createCountingCrumbService(
+      () => new Promise((resolve) => pending.push(resolve))
+    );
+
+    const staleRequest = service.getCrumbHeader();
+    service.invalidate();
+    pending[0]?.({ body: { crumbRequestField: "Jenkins-Crumb", crumb: "stale" } });
+    await staleRequest;
+
+    const freshRequest = service.getCrumbHeader();
+    assert.equal(getFetchCount(), 2);
+    pending[1]?.({ body: { crumbRequestField: "Jenkins-Crumb", crumb: "fresh" } });
+    assert.equal((await freshRequest)?.value, "fresh");
+    assert.equal((await service.getCrumbHeader())?.value, "fresh");
+    assert.equal(getFetchCount(), 2);
+  });
+
+  it("does not let an older fetch overwrite a newer forced crumb", async () => {
+    const pending: Array<(value: unknown) => void> = [];
+    const { getFetchCount, service } = createCountingCrumbService(
+      () => new Promise((resolve) => pending.push(resolve))
+    );
+
+    const olderRequest = service.getCrumbHeader();
+    const forcedRequest = service.getCrumbHeader(true);
+    assert.equal(getFetchCount(), 2);
+
+    pending[1]?.({ body: { crumbRequestField: "Jenkins-Crumb", crumb: "newer" } });
+    assert.equal((await forcedRequest)?.value, "newer");
+    pending[0]?.({ body: { crumbRequestField: "Jenkins-Crumb", crumb: "older" } });
+    await olderRequest;
+
+    assert.equal((await service.getCrumbHeader())?.value, "newer");
+    assert.equal(getFetchCount(), 2);
+  });
+
   it("caches a successful crumb fetch", async () => {
     const { getFetchCount, service } = createCountingCrumbService(() => {
       return {

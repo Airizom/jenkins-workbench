@@ -162,6 +162,7 @@ export interface JenkinsTestReportSuite {
 }
 
 export interface JenkinsTestReport {
+  passCount?: number;
   failCount?: number;
   skipCount?: number;
   totalCount?: number;
@@ -338,8 +339,8 @@ export interface JenkinsNodeExecutor {
   number?: number;
   idle?: boolean;
   progress?: number;
-  currentExecutable?: JenkinsNodeExecutable;
-  currentWorkUnit?: JenkinsNodeExecutable;
+  currentExecutable?: JenkinsNodeExecutable | null;
+  currentWorkUnit?: JenkinsNodeExecutable | null;
 }
 
 export interface JenkinsNodeOfflineCause {

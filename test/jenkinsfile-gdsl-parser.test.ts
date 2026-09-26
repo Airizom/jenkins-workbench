@@ -1,11 +1,31 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import { parseJenkinsfileGdsl } from "../src/jenkinsfile/JenkinsfileGdslParser";
-import { scanMethodCalls } from "../src/jenkinsfile/gdsl/JenkinsfileGdslBlockScanner";
+import {
+  scanContributorBlocks,
+  scanMethodCalls
+} from "../src/jenkinsfile/gdsl/JenkinsfileGdslBlockScanner";
 import { readGdslString, skipString } from "../src/jenkinsfile/gdsl/JenkinsfileGdslScannerUtils";
 import { GdslTokenizer } from "../src/jenkinsfile/gdsl/JenkinsfileGdslTokenizer";
 
 describe("Jenkinsfile GDSL parser", () => {
+  it("ignores contributor declarations inside comments and strings", () => {
+    const examples = [
+      "// contributor(context: 'line') { method(name: 'fake') }",
+      "/* contributor(context: 'block') { method(name: 'fake') } */",
+      `"contributor(context: 'string') { method(name: 'fake') }"`,
+      `'''contributor(context: 'triple') { method(name: 'fake') }'''`,
+      "// contributor(context: 'unfinished') {"
+    ];
+
+    for (const example of examples) {
+      assert.deepEqual(scanContributorBlocks(example), []);
+    }
+
+    const text = `${examples.join("\n")}\ncontributor(context: 'real') { method(name: 'real') }`;
+    assert.deepEqual(scanContributorBlocks(text), [{ body: " method(name: 'real') " }]);
+  });
+
   it("parses method parameters with negative numeric literals", () => {
     const catalog = parseJenkinsfileGdsl(`
 contributor(context(type: 'org.jenkinsci.plugins.workflow.cps.CpsScript')) {
@@ -64,6 +84,67 @@ method(name: 'valid')
     assert.deepEqual(
       calls.map(({ call }) => call.args[0]?.value),
       ["valid"]
+    );
+  });
+
+  it("does not treat negated enclosing-call guards as positive context", () => {
+    const calls = scanMethodCalls(`
+if (!enclosingCall('stage')) { method(name: 'outsideStage') }
+if (!enclosingCall('node')) { method(name: 'outsideNode') }
+def outsideNode = !enclosingCall('node')
+if (outsideNode) { method(name: 'aliasedOutsideNode') }
+if (enclosingCall('node')) { method(name: 'insideNode') }
+`);
+
+    assert.deepEqual(
+      calls.map(({ call, requiresNodeContext }) => ({
+        name: call.args[0]?.value,
+        requiresNodeContext
+      })),
+      [
+        { name: "outsideStage", requiresNodeContext: false },
+        { name: "outsideNode", requiresNodeContext: false },
+        { name: "aliasedOutsideNode", requiresNodeContext: false },
+        { name: "insideNode", requiresNodeContext: true }
+      ]
+    );
+  });
+
+  it("infers only guards required by boolean conditions", () => {
+    const calls = scanMethodCalls(`
+if (enclosingCall('stage') || enclosingCall('node')) { method(name: 'either') }
+if (enclosingCall('node') && !enclosingCall('stage')) { method(name: 'nodeOnly') }
+if (enclosingCall('stage') == false) { method(name: 'comparison') }
+`);
+
+    assert.deepEqual(
+      calls.map(({ call, requiresNodeContext }) => ({
+        name: call.args[0]?.value,
+        requiresNodeContext
+      })),
+      [
+        { name: "either", requiresNodeContext: false },
+        { name: "nodeOnly", requiresNodeContext: true },
+        { name: "comparison", requiresNodeContext: false }
+      ]
+    );
+  });
+
+  it("ignores quoted and commented parentheses when resolving guards", () => {
+    const calls = scanMethodCalls(`
+if (enclosingCall('node') && check(')')) { method(name: 'quoted') }
+if (enclosingCall('node') && check(/* ) */ true)) { method(name: 'commented') }
+`);
+
+    assert.deepEqual(
+      calls.map(({ call, requiresNodeContext }) => ({
+        name: call.args[0]?.value,
+        requiresNodeContext
+      })),
+      [
+        { name: "quoted", requiresNodeContext: true },
+        { name: "commented", requiresNodeContext: true }
+      ]
     );
   });
 

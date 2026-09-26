@@ -57,8 +57,12 @@ export function createExtensionRefreshHost(
       if (!executed) {
         return { executed: false };
       }
-      void updateQueueEnvironment(request?.environmentId);
-      void syncNoEnvironmentsContext(environmentStore);
+      void updateQueueEnvironment(request?.environmentId).catch((error) => {
+        console.warn("Failed to update Jenkins queue environment after refresh.", error);
+      });
+      void syncNoEnvironmentsContext(environmentStore).catch((error) => {
+        console.warn("Failed to sync Jenkins no-environments context after refresh.", error);
+      });
       refreshEmitter.fire(request?.environmentId);
       return { executed: true };
     },

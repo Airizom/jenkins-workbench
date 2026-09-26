@@ -21,6 +21,8 @@ export class CurrentBranchStatusResolver {
     string,
     CachedValue<CurrentBranchRemoteResolvedState>
   >();
+  private readonly latestRemoteRequest = new Map<string, number>();
+  private requestId = 0;
 
   constructor(
     private readonly dataService: JenkinsDataService,
@@ -29,6 +31,7 @@ export class CurrentBranchStatusResolver {
 
   dispose(): void {
     this.remoteStateCache.clear();
+    this.latestRemoteRequest.clear();
     this.targetResolver.dispose();
   }
 
@@ -36,6 +39,7 @@ export class CurrentBranchStatusResolver {
     localState: CurrentBranchLinkedContext,
     options: CurrentBranchRefreshOptions
   ): Promise<CurrentBranchState> {
+    const requestId = ++this.requestId;
     try {
       const targetResolution = await this.targetResolver.resolve(localState, options);
       const cacheKey = targetResolution.cacheKey;
@@ -46,6 +50,10 @@ export class CurrentBranchStatusResolver {
         }
       }
 
+      this.latestRemoteRequest.set(
+        cacheKey,
+        Math.max(requestId, this.latestRemoteRequest.get(cacheKey) ?? 0)
+      );
       const resolved =
         targetResolution.kind === "selected"
           ? await this.hydrateSelectedTarget(targetResolution.target)
@@ -55,7 +63,9 @@ export class CurrentBranchStatusResolver {
               link: targetResolution.link,
               environment: targetResolution.environment
             };
-      setCachedValue(this.remoteStateCache, cacheKey, resolved, REMOTE_RESOLUTION_CACHE_TTL_MS);
+      if (this.latestRemoteRequest.get(cacheKey) === requestId) {
+        setCachedValue(this.remoteStateCache, cacheKey, resolved, REMOTE_RESOLUTION_CACHE_TTL_MS);
+      }
       return this.materializeRemoteState(localState, resolved);
     } catch (error) {
       return this.materializeRemoteState(localState, {

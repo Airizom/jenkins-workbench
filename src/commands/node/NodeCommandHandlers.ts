@@ -18,6 +18,10 @@ export async function showNodeDetails(
   if (!selected) {
     return;
   }
+  if (!(selected instanceof NodeTreeItem)) {
+    void vscode.window.showInformationMessage("Select a node to view details.");
+    return;
+  }
   if (!selected.nodeUrl) {
     void vscode.window.showInformationMessage(
       "That node does not expose a stable URL in the Jenkins API."

@@ -26,6 +26,7 @@ import {
   type NodeLabelClassification,
   normalizeLabelKey
 } from "./NodeLabelClassification";
+import { evaluateLabelExpression, parseCompoundLabelExpression } from "./NodeLabelExpression";
 import { buildNodeQueuedWorkViewModel, buildQueueWorkItems } from "./QueueWorkViewModel";
 
 const ANY_POOL_ID = "pool:any";
@@ -63,11 +64,14 @@ export function buildNodeCapacityViewModel(
     }),
     ...poolLabels.map((label) => {
       const key = normalizeLabelKey(label);
+      const expression = parseCompoundLabelExpression(label);
       return buildPool({
         id: `pool:label:${label}`,
         label,
         kind: "label",
-        nodes: nodeViewModelsByLabel.get(key) ?? [],
+        nodes: expression
+          ? nodeViewModels.filter((node) => evaluateLabelExpression(expression, node.labels))
+          : (nodeViewModelsByLabel.get(key) ?? []),
         queueItems: queueItemsByLabel.get(key) ?? []
       });
     })
@@ -123,7 +127,12 @@ function buildNodeViewModel(
     busyExecutors,
     idleExecutors,
     offlineExecutors,
-    executorSummary: formatNodeBusyExecutorRatio(node, { suffix: " busy" }) ?? "Online",
+    executorSummary: isOffline
+      ? `${offlineExecutors} offline`
+      : (formatNodeBusyExecutorRatio(
+          { numExecutors: totalExecutors, busyExecutors },
+          { suffix: " busy" }
+        ) ?? "Online"),
     executorsLoaded: false,
     executors: [],
     ...buildNodeQueuedWorkViewModel(queueItems, labels)

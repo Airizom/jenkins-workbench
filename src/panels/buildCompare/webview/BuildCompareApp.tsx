@@ -70,7 +70,7 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
   const sectionErrors = sections.flatMap(({ section }) =>
     section.status === "error" ? [section.detail ?? section.summaryLabel] : []
   );
-  const isLoading = state.console.status === "loading";
+  const isLoading = sections.some(({ section }) => section.status === "loading");
 
   const navItems: CompareSectionNavItem[] = sections.map(({ id, label, section }) => ({
     id,

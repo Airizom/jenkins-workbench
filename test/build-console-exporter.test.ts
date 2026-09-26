@@ -71,9 +71,11 @@ describe("BuildConsoleExporter", () => {
     assert.deepEqual(stream.chunks, []);
   });
 
-  it("streams multiple progressive chunks through a backpressured writable", async () => {
+  it("strips split Jenkins notes while retaining raw offsets and streaming with backpressure", async () => {
     const starts: number[] = [];
     const stream = new MemoryWriteStream(1);
+    const first = "first\n\u001b[8mha:serialized";
+    const second = "-note\u001b[0msecond\n";
     const client: JenkinsConsoleTextClient = {
       getConsoleText: async () => ({ text: "fallback", truncated: false, bytesRead: 8 }),
       getConsoleTextTail: async () => ({
@@ -86,9 +88,14 @@ describe("BuildConsoleExporter", () => {
       getConsoleTextProgressive: async (_environment, _buildUrl, start) => {
         starts.push(start);
         if (start === 0) {
-          return { text: "first\n", textSize: 6, moreData: true, bytesRead: 6 };
+          return { text: first, textSize: first.length, moreData: true, bytesRead: first.length };
         }
-        return { text: "second\n", textSize: 13, moreData: false, bytesRead: 7 };
+        return {
+          text: second,
+          textSize: first.length + second.length,
+          moreData: false,
+          bytesRead: second.length
+        };
       }
     };
     const filesystem: BuildConsoleFilesystem = {
@@ -104,7 +111,7 @@ describe("BuildConsoleExporter", () => {
     });
 
     assert.deepEqual(result, { mode: "progressive", truncated: false });
-    assert.deepEqual(starts, [0, 6]);
+    assert.deepEqual(starts, [0, first.length]);
     assert.deepEqual(stream.chunks, ["first\n", "second\n"]);
     assert.equal(stream.writableFinished, true);
   });

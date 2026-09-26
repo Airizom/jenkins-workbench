@@ -40,10 +40,11 @@ export function postLoadExecutorsIfChanged(
   postMessage: (message: NodeCapacityIncomingMessage) => void,
   lastRequestKey: { current: string | undefined },
   updatedAt: string,
+  snapshotGeneration: number,
   nodeUrls: string[]
 ): void {
   const normalizedNodeUrls = [...new Set(nodeUrls)].sort();
-  const requestKey = JSON.stringify([updatedAt, normalizedNodeUrls]);
+  const requestKey = JSON.stringify([updatedAt, snapshotGeneration, normalizedNodeUrls]);
   if (lastRequestKey.current === requestKey) {
     return;
   }
@@ -51,6 +52,7 @@ export function postLoadExecutorsIfChanged(
   if (normalizedNodeUrls.length > 0) {
     postMessage({
       type: "loadNodeCapacityExecutors",
+      snapshotGeneration,
       nodeUrls: normalizedNodeUrls
     });
   }
@@ -121,9 +123,10 @@ export function NodeCapacityApp(): React.JSX.Element {
       postMessage,
       lastExecutorLoadRequestKey,
       state.updatedAt,
+      state.snapshotGeneration,
       expandedNodeUrls
     );
-  }, [expandedNodeUrls, postMessage, state.updatedAt]);
+  }, [expandedNodeUrls, postMessage, state.updatedAt, state.snapshotGeneration]);
 
   const handleOpenNodeDetails = useCallback(
     (nodeUrl: string, label?: string) => {

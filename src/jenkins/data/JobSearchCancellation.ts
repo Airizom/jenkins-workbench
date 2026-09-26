@@ -17,6 +17,9 @@ export const waitWithCancellation = async (
   delayMs: number,
   cancellation?: CancellationInput
 ): Promise<void> => {
+  if (isCancellationRequested(cancellation)) {
+    throw new CancellationError();
+  }
   if (delayMs <= 0) {
     return;
   }
@@ -27,6 +30,10 @@ export const waitWithCancellation = async (
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       clearInterval(interval);
+      if (isCancellationRequested(cancellation)) {
+        reject(new CancellationError());
+        return;
+      }
       resolve();
     }, delayMs);
     const interval = setInterval(() => {

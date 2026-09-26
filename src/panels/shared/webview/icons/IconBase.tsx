@@ -10,7 +10,10 @@ type IconBaseProps = IconProps & {
 // cn() does not resolve Tailwind conflicts, so a default like "h-8 w-8" can
 // override a caller's smaller size depending on stylesheet order. Drop the
 // default's size/known color tokens whenever the caller supplies their own.
+const HEIGHT_TOKEN = /^h-/;
+const WIDTH_TOKEN = /^w-/;
 const SIZE_TOKEN = /^(?:h-|w-|size-)/;
+const BOTH_DIMENSIONS_TOKEN = /^size-/;
 const COLOR_TOKEN =
   /^text-(?:aborted|accent|background|badge|border|card|checkbox|current|description|destructive|editor-widget|failure|focus|foreground|header|input(?:ErrorFg|InfoFg|WarningFg)?|link|list|muted|panel-border|popover|primary|progress|ring|secondary|selection|success|terminal|toolbar|warning)(?:$|[-/])/;
 
@@ -20,8 +23,15 @@ export function resolveIconClassName(defaultClassName: string, className?: strin
   }
   const callerTokens = className.split(/\s+/);
   const droppedPrefixes: RegExp[] = [];
-  if (callerTokens.some((token) => SIZE_TOKEN.test(token))) {
+  if (callerTokens.some((token) => BOTH_DIMENSIONS_TOKEN.test(token))) {
     droppedPrefixes.push(SIZE_TOKEN);
+  } else {
+    if (callerTokens.some((token) => HEIGHT_TOKEN.test(token))) {
+      droppedPrefixes.push(HEIGHT_TOKEN);
+    }
+    if (callerTokens.some((token) => WIDTH_TOKEN.test(token))) {
+      droppedPrefixes.push(WIDTH_TOKEN);
+    }
   }
   if (callerTokens.some((token) => COLOR_TOKEN.test(token))) {
     droppedPrefixes.push(COLOR_TOKEN);

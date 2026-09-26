@@ -72,6 +72,11 @@ export class ReplayDraftSessionStore {
     label: string,
     definition: JenkinsReplayDefinition
   ): ReplayDraftSession {
+    const existing = this.getSessionForBuild(environment, buildUrl);
+    if (existing) {
+      return existing;
+    }
+
     const sessionId = `replay-${Date.now()}-${this.nextSessionId++}`;
     const buildKey = buildReplaySessionKey(environment, buildUrl);
     const usedPaths = new Set<string>();

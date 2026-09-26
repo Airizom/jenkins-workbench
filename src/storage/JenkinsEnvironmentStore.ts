@@ -37,6 +37,7 @@ const AUTH_CONFIG_KEY = "jenkinsWorkbench.envAuthConfig";
 
 export class JenkinsEnvironmentStore {
   private readonly authConfigRevisions = new Map<string, number>();
+  private readonly authMutationQueue = createSerialTaskQueue();
   private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<JenkinsEnvironmentStoreChange>();
 
@@ -134,23 +135,53 @@ export class JenkinsEnvironmentStore {
     return this.context.secrets.get(this.getTokenKey(scope, id));
   }
 
-  async setAuthConfig(
-    scope: EnvironmentScope,
-    id: string,
-    authConfig: JenkinsAuthConfig
-  ): Promise<void> {
-    this.bumpAuthConfigRevision(scope, id);
-    await this.context.secrets.store(this.getAuthConfigKey(scope, id), JSON.stringify(authConfig));
-    this.fireEnvironmentChange("auth-config-updated", scope, id);
+  setAuthConfig(scope: EnvironmentScope, id: string, authConfig: JenkinsAuthConfig): Promise<void> {
+    return this.authMutationQueue(async () => {
+      this.bumpAuthConfigRevision(scope, id);
+      await this.context.secrets.store(
+        this.getAuthConfigKey(scope, id),
+        JSON.stringify(authConfig)
+      );
+      this.fireEnvironmentChange("auth-config-updated", scope, id);
+    });
   }
 
-  async deleteAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
+  /**
+   * Stores the auth config only if no other auth mutation has happened since
+   * `expectedRevision` was read. Returns whether the config was stored.
+   */
+  setAuthConfigIfRevision(
+    scope: EnvironmentScope,
+    id: string,
+    authConfig: JenkinsAuthConfig,
+    expectedRevision: number
+  ): Promise<boolean> {
+    return this.authMutationQueue(async () => {
+      if (this.getAuthConfigRevision(scope, id) !== expectedRevision) {
+        return false;
+      }
+      this.bumpAuthConfigRevision(scope, id);
+      await this.context.secrets.store(
+        this.getAuthConfigKey(scope, id),
+        JSON.stringify(authConfig)
+      );
+      this.fireEnvironmentChange("auth-config-updated", scope, id);
+      return true;
+    });
+  }
+
+  deleteAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
+    return this.authMutationQueue(() => this.deleteAuthConfigUnlocked(scope, id));
+  }
+
+  private async deleteAuthConfigUnlocked(scope: EnvironmentScope, id: string): Promise<void> {
     this.bumpAuthConfigRevision(scope, id);
     await this.context.secrets.delete(this.getAuthConfigKey(scope, id));
     this.fireEnvironmentChange("auth-config-deleted", scope, id);
   }
 
   async getAuthConfig(scope: EnvironmentScope, id: string): Promise<JenkinsAuthConfig | undefined> {
+    const revision = this.getAuthConfigRevision(scope, id);
     const stored = await this.context.secrets.get(this.getAuthConfigKey(scope, id));
     if (!stored) {
       return undefined;
@@ -161,12 +192,12 @@ export class JenkinsEnvironmentStore {
       const authConfig = parseAuthConfig(parsed);
       if (!authConfig) {
         console.warn(`Invalid auth config for environment ${id}. Clearing secret.`);
-        await this.clearInvalidAuthConfig(scope, id);
+        await this.clearInvalidAuthConfig(scope, id, stored, revision);
       }
       return authConfig;
     } catch (error) {
       console.warn(`Invalid auth config for environment ${id}. Clearing secret.`, error);
-      await this.clearInvalidAuthConfig(scope, id);
+      await this.clearInvalidAuthConfig(scope, id, stored, revision);
       return undefined;
     }
   }
@@ -236,9 +267,22 @@ export class JenkinsEnvironmentStore {
     this.authConfigRevisions.set(key, current + 1);
   }
 
-  private async clearInvalidAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
+  private async clearInvalidAuthConfig(
+    scope: EnvironmentScope,
+    id: string,
+    invalidValue: string,
+    revision: number
+  ): Promise<void> {
     try {
-      await this.deleteAuthConfig(scope, id);
+      await this.authMutationQueue(async () => {
+        if (this.getAuthConfigRevision(scope, id) !== revision) {
+          return;
+        }
+        if ((await this.context.secrets.get(this.getAuthConfigKey(scope, id))) !== invalidValue) {
+          return;
+        }
+        await this.deleteAuthConfigUnlocked(scope, id);
+      });
     } catch (error) {
       console.warn(`Failed to clear invalid auth config for environment ${id}.`, error);
     }

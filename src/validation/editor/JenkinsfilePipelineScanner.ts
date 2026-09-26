@@ -4,6 +4,50 @@ interface LineScanState {
   inBlockComment: boolean;
 }
 
+export interface CodeMaskState {
+  quote?: '"' | "'" | '"""' | "'''";
+  inBlockComment: boolean;
+}
+
+export function maskNonCode(lineText: string, state: CodeMaskState): string {
+  const code = lineText.split("");
+  for (let index = 0; index < lineText.length; index += 1) {
+    const pair = lineText.slice(index, index + 2);
+    if (state.inBlockComment) {
+      code[index] = " ";
+      if (pair === "*/") {
+        code[++index] = " ";
+        state.inBlockComment = false;
+      }
+    } else if (state.quote) {
+      code[index] = " ";
+      if (lineText[index] === "\\") {
+        if (index + 1 < lineText.length) {
+          code[++index] = " ";
+        }
+      } else if (lineText.startsWith(state.quote, index)) {
+        for (let offset = 1; offset < state.quote.length; offset += 1) {
+          code[++index] = " ";
+        }
+        state.quote = undefined;
+      }
+    } else if (pair === "//") {
+      code.fill(" ", index);
+      break;
+    } else if (pair === "/*") {
+      code[index] = " ";
+      code[++index] = " ";
+      state.inBlockComment = true;
+    } else if (lineText[index] === '"' || lineText[index] === "'") {
+      state.quote = lineText.startsWith(lineText[index].repeat(3), index)
+        ? (lineText[index].repeat(3) as '"""' | "'''")
+        : (lineText[index] as '"' | "'");
+      code[index] = " ";
+    }
+  }
+  return code.join("");
+}
+
 export interface LineScanResult {
   matchedIndex?: number;
   lineCommentIndex?: number;

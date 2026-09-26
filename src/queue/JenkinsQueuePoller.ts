@@ -7,6 +7,7 @@ export interface JenkinsQueuePollerHost {
 
 const DEFAULT_POLL_INTERVAL_SECONDS = 10;
 const MIN_POLL_INTERVAL_SECONDS = 2;
+const MAX_POLL_INTERVAL_MS = 2_147_483_647;
 const DEFAULT_POLL_INTERVAL_MS = DEFAULT_POLL_INTERVAL_SECONDS * 1000;
 
 export class JenkinsQueuePoller implements vscode.Disposable {
@@ -104,7 +105,11 @@ export class JenkinsQueuePoller implements vscode.Disposable {
     this.isPolling = true;
     try {
       for (const environment of this.expandedEnvironments.values()) {
-        this.host.refreshQueueOnly(environment);
+        try {
+          this.host.refreshQueueOnly(environment);
+        } catch (error) {
+          console.warn("Failed to refresh Jenkins queue.", error);
+        }
       }
     } finally {
       this.isPolling = false;
@@ -120,6 +125,6 @@ export class JenkinsQueuePoller implements vscode.Disposable {
       return DEFAULT_POLL_INTERVAL_MS;
     }
     const clamped = Math.max(MIN_POLL_INTERVAL_SECONDS, pollIntervalSeconds);
-    return clamped * 1000;
+    return Math.min(clamped * 1000, MAX_POLL_INTERVAL_MS);
   }
 }

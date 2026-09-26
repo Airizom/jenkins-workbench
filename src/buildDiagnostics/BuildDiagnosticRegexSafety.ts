@@ -8,8 +8,9 @@ export interface DiagnosticRegexpValidation {
 
 /**
  * Performs conservative, synchronous validation before a user expression is
- * handed to the bounded custom-matcher runner. This is defense in depth, not a
- * substitute for the worker timeout used by the runtime integration.
+ * used by path mappings or handed to the bounded custom-matcher runner. Path
+ * mappings execute on the extension host, so their expressions must pass this
+ * check before matching diagnostic paths.
  */
 export function validateDiagnosticRegexp(source: string): DiagnosticRegexpValidation {
   if (!source) {
@@ -50,8 +51,11 @@ function findUnsafeRegexpShape(source: string): string | undefined {
 }
 
 interface RegexpGroupState {
+  startIndex: number;
   containsVariableRepetition: boolean;
   containsAlternation: boolean;
+  containsConsumingAtom: boolean;
+  lastAtomVariableRepetition: boolean;
 }
 
 interface RegexpQuantifier {
@@ -70,7 +74,7 @@ interface RegexpScanResult {
  * (a{1,})+, both of which can catastrophically backtrack.
  */
 function findUnsafeRepeatedGroup(source: string): string | undefined {
-  const groups: RegexpGroupState[] = [];
+  const groups: RegexpGroupState[] = [newRegexpGroupState(-1)];
   for (let index = 0; index < source.length; index += 1) {
     const result = scanRegexpToken(source, index, groups);
     if (result.issue) {
@@ -88,7 +92,7 @@ function scanRegexpToken(
 ): RegexpScanResult {
   const char = source[index];
   if (char === "(") {
-    groups.push({ containsVariableRepetition: false, containsAlternation: false });
+    groups.push(newRegexpGroupState(index));
     return { endIndex: index };
   }
   if (char === "|") {
@@ -105,7 +109,18 @@ function markAlternation(groups: RegexpGroupState[]): void {
   const current = groups.at(-1);
   if (current) {
     current.containsAlternation = true;
+    current.lastAtomVariableRepetition = false;
   }
+}
+
+function newRegexpGroupState(startIndex: number): RegexpGroupState {
+  return {
+    startIndex,
+    containsVariableRepetition: false,
+    containsAlternation: false,
+    containsConsumingAtom: false,
+    lastAtomVariableRepetition: false
+  };
 }
 
 function closeRegexpGroup(
@@ -118,12 +133,25 @@ function closeRegexpGroup(
     return { endIndex: index };
   }
   const quantifier = readRegexpQuantifier(source, index + 1);
+  const body = source.slice(closed.startIndex + 1, index);
+  if (body === "" || body === "?:") {
+    return { endIndex: quantifier?.endIndex ?? index };
+  }
   const issue = findRepeatedGroupIssue(closed, quantifier);
   if (issue) {
     return { endIndex: index, issue };
   }
-  propagateGroupRepetition(groups, closed, quantifier);
-  return { endIndex: quantifier?.endIndex ?? index };
+  if (/^\?(?:[=!]|<[=!])/.test(body)) {
+    // Assertions consume no input, so they cannot separate repeated atoms.
+    return quantifier
+      ? {
+          endIndex: quantifier.endIndex,
+          issue: "Quantified assertions are not allowed in diagnostic matchers."
+        }
+      : { endIndex: index };
+  }
+  const adjacentIssue = propagateGroupRepetition(groups, closed, quantifier);
+  return { endIndex: quantifier?.endIndex ?? index, issue: adjacentIssue };
 }
 
 function findRepeatedGroupIssue(
@@ -143,11 +171,16 @@ function propagateGroupRepetition(
   groups: RegexpGroupState[],
   closed: RegexpGroupState,
   quantifier: RegexpQuantifier | undefined
-): void {
+): string | undefined {
   const parent = groups.at(-1);
-  if (parent && (closed.containsVariableRepetition || quantifier?.variable)) {
-    parent.containsVariableRepetition = true;
+  if (!parent || !closed.containsConsumingAtom) {
+    return undefined;
   }
+  parent.containsConsumingAtom = true;
+  return recordRegexpAtom(
+    parent,
+    closed.containsVariableRepetition || Boolean(quantifier?.variable)
+  );
 }
 
 function scanRegexpAtom(
@@ -155,21 +188,38 @@ function scanRegexpAtom(
   index: number,
   groups: RegexpGroupState[]
 ): RegexpScanResult {
-  const quantifier = readRegexpQuantifier(source, index + 1);
-  if (!quantifier) {
+  const group = groups.at(-1);
+  const prefix = group?.startIndex ?? -1;
+  if (
+    source.slice(prefix, prefix + 3) === "(?:" &&
+    (index === prefix + 1 || index === prefix + 2)
+  ) {
     return { endIndex: index };
   }
-  if (quantifier.variable) {
-    markVariableRepetition(groups);
+  if (group && source[index] !== "^" && source[index] !== "$") {
+    group.containsConsumingAtom = true;
   }
-  return { endIndex: quantifier.endIndex };
+  const quantifier = readRegexpQuantifier(source, index + 1);
+  if (!quantifier) {
+    return { endIndex: index, issue: recordRegexpAtom(groups.at(-1), false) };
+  }
+  return {
+    endIndex: quantifier.endIndex,
+    issue: recordRegexpAtom(groups.at(-1), quantifier.variable)
+  };
 }
 
-function markVariableRepetition(groups: RegexpGroupState[]): void {
-  const current = groups.at(-1);
-  if (current) {
-    current.containsVariableRepetition = true;
+function recordRegexpAtom(
+  group: RegexpGroupState | undefined,
+  variable: boolean
+): string | undefined {
+  if (!group) {
+    return undefined;
   }
+  const adjacent = variable && group.lastAtomVariableRepetition;
+  group.containsVariableRepetition ||= variable;
+  group.lastAtomVariableRepetition = variable;
+  return adjacent ? "Adjacent repetition is not allowed in diagnostic matchers." : undefined;
 }
 
 function isQuantifierCharacter(char: string): boolean {
@@ -216,21 +266,24 @@ function stripEscapesAndCharacterClasses(source: string): string {
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
     if (char === "\\") {
-      result += "__";
+      if (!inClass) {
+        result += "_";
+      }
       index += 1;
       continue;
     }
-    if (char === "[") {
+    if (char === "[" && !inClass) {
       inClass = true;
       result += "_";
       continue;
     }
     if (char === "]" && inClass) {
       inClass = false;
-      result += "_";
       continue;
     }
-    result += inClass ? "_" : char;
+    if (!inClass) {
+      result += char;
+    }
   }
   return result;
 }

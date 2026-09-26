@@ -8,6 +8,25 @@ const fullShaPattern = /^[a-f0-9]{40}$/i;
 const errors = [];
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const stripQuotes = (token) => token.replace(/^(["'])(.*)\1$/, "$2");
+const normalizeScriptPath = (token) => stripQuotes(token).replace(/^\.\//, "");
+const isVsixUpload = (step) =>
+  isRecord(step.with) &&
+  step.with.name === "vsix" &&
+  typeof step.with.path === "string" &&
+  step.with.path.trim().endsWith(".vsix");
+const isPublishCommand = (run) =>
+  typeof run === "string" &&
+  run.split(/\r?\n/).some((line) => {
+    const tokens = line.trim().split(/\s+/);
+    return (
+      tokens.length === 4 &&
+      tokens[0] === "node" &&
+      normalizeScriptPath(tokens[1]) === "scripts/release.mjs" &&
+      stripQuotes(tokens[2]) === "publish" &&
+      stripQuotes(tokens[3]).endsWith(".vsix")
+    );
+  });
 
 let workflow;
 
@@ -20,10 +39,36 @@ try {
 }
 
 const jobs = isRecord(workflow) && isRecord(workflow.jobs) ? workflow.jobs : {};
+const concurrency =
+  isRecord(workflow) && isRecord(workflow.concurrency) ? workflow.concurrency : {};
+if (
+  typeof concurrency.group !== "string" ||
+  !/\$\{\{\s*github\.ref\s*\}\}/.test(concurrency.group) ||
+  concurrency["cancel-in-progress"] !== false
+) {
+  errors.push(
+    `${workflowPath} must define ref-scoped release concurrency with cancel-in-progress: false`
+  );
+}
 let foundPublicationStep = false;
 
 for (const [jobName, job] of Object.entries(jobs)) {
-  if (!isRecord(job) || !Array.isArray(job.steps)) {
+  if (!isRecord(job)) {
+    continue;
+  }
+
+  if (typeof job.uses === "string" && !job.uses.startsWith("./")) {
+    const atIndex = job.uses.lastIndexOf("@");
+    const ref = atIndex === -1 ? "" : job.uses.slice(atIndex + 1);
+
+    if (!fullShaPattern.test(ref)) {
+      errors.push(
+        `${workflowPath} job ${jobName} ${job.uses} must use a full 40-character commit SHA`
+      );
+    }
+  }
+
+  if (!Array.isArray(job.steps)) {
     continue;
   }
 
@@ -43,6 +88,16 @@ for (const [jobName, job] of Object.entries(jobs)) {
     if (artifactUploadIndex === -1 || artifactUploadIndex > publicationIndex) {
       errors.push(
         `${workflowPath} job ${jobName} must upload the VSIX artifact before marketplace publication`
+      );
+    } else if (!isVsixUpload(job.steps[artifactUploadIndex])) {
+      errors.push(
+        `${workflowPath} job ${jobName} artifact upload must use name: vsix and a .vsix path`
+      );
+    }
+
+    if (!isPublishCommand(job.steps[publicationIndex].run)) {
+      errors.push(
+        `${workflowPath} job ${jobName} publish-marketplaces step must run node scripts/release.mjs publish <artifact.vsix>`
       );
     }
   }

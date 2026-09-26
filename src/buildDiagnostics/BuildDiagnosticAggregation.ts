@@ -70,39 +70,56 @@ export async function aggregateAndPublishBuildDiagnostics(
   options: BuildDiagnosticAggregationOptions
 ): Promise<BuildDiagnosticPublishedSnapshot> {
   const maxProblems = getPublishedProblemLimit(options.maxProblems);
-  const candidates = selectResolutionCandidates(
-    options.diagnostics,
-    getBuildDiagnosticCandidateLimit(maxProblems)
-  );
-  const candidateOmittedCount = Math.max(0, options.diagnostics.length - candidates.length);
+  const candidates = selectResolutionCandidates(options.diagnostics);
+  const candidateLimit = getBuildDiagnosticCandidateLimit(maxProblems);
   const resolved: ResolvedRawDiagnostic[] = [];
   const unresolved: RawBuildDiagnostic[] = [];
-  await forEachConcurrent(candidates, RESOLUTION_CONCURRENCY, async (raw) => {
-    const resolution = await options.pathResolver.resolve(
-      options.repositoryUri,
-      options.profile,
-      raw
-    );
-    if (resolution.status !== "resolved") {
-      unresolved.push(raw);
-      return;
-    }
-    const range = toRange(raw);
-    resolved.push({
-      raw,
-      uri: resolution.uri,
-      range,
-      target: {
-        id: randomUUID(),
+  const seen = new Set<string>();
+  let resolutionFailures = 0;
+  let considered = 0;
+  while (considered < candidates.length && seen.size < candidateLimit) {
+    const batch = candidates.slice(considered, considered + RESOLUTION_CONCURRENCY);
+    considered += batch.length;
+    await forEachConcurrent(batch, RESOLUTION_CONCURRENCY, async (raw) => {
+      let resolution: Awaited<ReturnType<BuildDiagnosticPathResolver["resolve"]>>;
+      try {
+        resolution = await options.pathResolver.resolve(
+          options.repositoryUri,
+          options.profile,
+          raw
+        );
+      } catch {
+        resolutionFailures += 1;
+        seen.add(diagnosticKey(raw.rawPath, raw));
+        unresolved.push(raw);
+        return;
+      }
+      if (resolution.status !== "resolved") {
+        const key = diagnosticKey(raw.rawPath, raw);
+        seen.add(key);
+        unresolved.push(raw);
+        return;
+      }
+      const range = toRange(raw);
+      const key = diagnosticKey(resolution.uri.toString(), raw, range);
+      seen.add(key);
+      resolved.push({
+        raw,
         uri: resolution.uri,
         range,
-        generation: options.generation,
-        buildUrl: options.buildUrl,
-        rawPath: raw.rawPath,
-        logLine: raw.logLine
-      }
+        target: {
+          id: randomUUID(),
+          uri: resolution.uri,
+          range,
+          generation: options.generation,
+          buildUrl: options.buildUrl,
+          rawPath: raw.rawPath,
+          logLine: raw.logLine
+        }
+      });
     });
-  });
+  }
+  const candidateOmittedCount = candidates.length - considered;
   resolved.sort(compareResolved);
 
   if (options.isCurrent && !options.isCurrent()) {
@@ -146,6 +163,11 @@ export async function aggregateAndPublishBuildDiagnostics(
 
   const counts = countSeverities([...unique, ...uniqueUnresolved.map((raw) => ({ raw }))]);
   const warnings = [...(options.warnings ?? [])];
+  if (resolutionFailures > 0) {
+    warnings.push(
+      `${resolutionFailures} build diagnostic path${resolutionFailures === 1 ? "" : "s"} could not be resolved because of a workspace access error.`
+    );
+  }
 
   const viewModel: BuildDiagnosticsViewModel = {
     status: options.truncated ? "truncated" : "available",
@@ -177,10 +199,9 @@ function getPublishedProblemLimit(maxProblems: number): number {
 }
 
 function selectResolutionCandidates(
-  diagnostics: readonly RawBuildDiagnostic[],
-  limit: number
+  diagnostics: readonly RawBuildDiagnostic[]
 ): RawBuildDiagnostic[] {
-  if (diagnostics.length <= limit) {
+  if (diagnostics.length < 2) {
     return [...diagnostics];
   }
   const bySeverity: Record<BuildDiagnosticSeverity, RawBuildDiagnostic[]> = {
@@ -190,11 +211,22 @@ function selectResolutionCandidates(
   };
   for (const diagnostic of diagnostics) {
     const bucket = bySeverity[diagnostic.severity];
-    if (bucket.length < limit) {
-      bucket.push(diagnostic);
-    }
+    bucket.push(diagnostic);
   }
-  return [...bySeverity.error, ...bySeverity.warning, ...bySeverity.information].slice(0, limit);
+  return [...bySeverity.error, ...bySeverity.warning, ...bySeverity.information];
+}
+
+function diagnosticKey(path: string, raw: RawBuildDiagnostic, range = toRange(raw)): string {
+  return [
+    path,
+    range.start.line,
+    range.start.character,
+    range.end.line,
+    range.end.character,
+    raw.severity,
+    raw.code ?? "",
+    raw.message
+  ].join("\0");
 }
 
 function aggregateStackTraces(resolved: readonly ResolvedRawDiagnostic[]): AggregatedDiagnostic[] {
@@ -207,16 +239,7 @@ function deduplicateDiagnostics(items: readonly AggregatedDiagnostic[]): Aggrega
   const result: AggregatedDiagnostic[] = [];
   const seen = new Set<string>();
   for (const item of items) {
-    const key = [
-      item.uri.toString(),
-      item.range.start.line,
-      item.range.start.character,
-      item.range.end.line,
-      item.range.end.character,
-      item.raw.severity,
-      item.raw.code ?? "",
-      item.raw.message
-    ].join("\0");
+    const key = diagnosticKey(item.uri.toString(), item.raw, item.range);
     if (seen.has(key)) {
       continue;
     }

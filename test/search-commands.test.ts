@@ -140,12 +140,12 @@ describe("registerSearchCommands", () => {
     expect(quickPick.disposed).toBe(true);
   });
 
-  it("publishes streamed job results once after loading completes", async () => {
+  it("publishes sorted job results while another environment is still loading", async () => {
     const quickPick = new TestQuickPick();
     let goToJobCommand: (() => Promise<void>) | undefined;
-    let releaseFinalBatch: (() => void) | undefined;
-    const finalBatchGate = new Promise<void>((resolve) => {
-      releaseFinalBatch = resolve;
+    let releaseSlowEnvironment: (() => void) | undefined;
+    const slowEnvironmentGate = new Promise<void>((resolve) => {
+      releaseSlowEnvironment = resolve;
     });
 
     const vscodeMock = {
@@ -184,45 +184,53 @@ describe("registerSearchCommands", () => {
             id: "env-1",
             scope: "workspace",
             url: "https://jenkins.example/"
+          },
+          {
+            id: "env-2",
+            scope: "workspace",
+            url: "https://slow.example/"
           }
         ]
       } as JenkinsEnvironmentStore,
       {
-        async *iterateJobsForEnvironment() {
-          yield [
-            {
-              name: "Zulu",
-              fullName: "Zulu",
-              url: "https://jenkins.example/job/zulu/"
-            }
-          ];
-          await finalBatchGate;
-          yield [
-            {
-              name: "Alpha",
-              fullName: "Alpha",
-              url: "https://jenkins.example/job/alpha/"
-            }
-          ];
+        async *iterateJobsForEnvironment(environment: { url: string }) {
+          if (environment.url === "https://slow.example/") {
+            await slowEnvironmentGate;
+            yield [
+              {
+                name: "Alpha",
+                fullName: "Alpha",
+                url: "https://slow.example/job/alpha/"
+              }
+            ];
+          } else {
+            yield [
+              {
+                name: "Zulu",
+                fullName: "Zulu",
+                url: "https://jenkins.example/job/zulu/"
+              }
+            ];
+          }
         }
       } as unknown as JenkinsDataService,
       {} as JenkinsViewStateStore,
       {} as JenkinsTreeNavigator
     );
 
-    if (!goToJobCommand || !releaseFinalBatch) {
+    if (!goToJobCommand || !releaseSlowEnvironment) {
       throw new Error("Go to Job test setup failed.");
     }
     await goToJobCommand();
-    await vi.waitFor(() => expect(quickPick.busy).toBe(true));
+    await vi.waitFor(() => expect(quickPick.items).toMatchObject([{ label: "Zulu" }]));
 
-    expect(quickPick.items).toEqual([]);
-    expect(quickPick.itemAssignmentCount).toBe(0);
+    expect(quickPick.busy).toBe(true);
+    expect(quickPick.itemAssignmentCount).toBe(1);
 
-    releaseFinalBatch();
+    releaseSlowEnvironment();
     await vi.waitFor(() => expect(quickPick.busy).toBe(false));
 
-    expect(quickPick.itemAssignmentCount).toBe(1);
+    expect(quickPick.itemAssignmentCount).toBe(2);
     expect(quickPick.items).toMatchObject([{ label: "Alpha" }, { label: "Zulu" }]);
   });
 

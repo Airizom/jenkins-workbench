@@ -1,4 +1,5 @@
 import { formatError } from "../../formatters/ErrorFormatters";
+import { JenkinsConsoleNoteFilter } from "../../jenkins/JenkinsConsoleNotes";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { BuildInspectionBackend as BuildCompareBackend } from "../shared/backend/BuildInspectionBackend";
 import type { BuildCompareConsoleOptions } from "./BuildCompareOptions";
@@ -30,9 +31,12 @@ export function createLoadingConsoleComparisonSection(): BuildCompareConsoleSect
 }
 
 class ConsoleComparisonReader {
+  private readonly notes = new JenkinsConsoleNoteFilter();
   private nextStart = 0;
   private loadedBytes = 0;
   public truncatedByLimit = false;
+  /** True when the last progressive fetch returned no bytes but still reported more data. */
+  public stalled = false;
 
   private constructor(
     private readonly backend: BuildCompareBackend,
@@ -41,7 +45,12 @@ class ConsoleComparisonReader {
     private readonly maxBytes: number,
     public buffer: string,
     public moreData: boolean
-  ) {}
+  ) {
+    this.buffer = this.notes.append(buffer);
+    if (!moreData) {
+      this.buffer += this.notes.finish();
+    }
+  }
 
   static async create(
     backend: BuildCompareBackend,
@@ -88,10 +97,13 @@ class ConsoleComparisonReader {
   }
 
   async ensureBufferWithLimit(maxBytes?: number): Promise<void> {
-    if (this.buffer.length > 0 || !this.moreData || (maxBytes !== undefined && maxBytes <= 0)) {
-      return;
+    while (this.buffer.length === 0 && this.moreData && !this.stalled) {
+      const remaining = Math.min(maxBytes ?? this.maxBytes, this.getRemainingByteBudget());
+      if (remaining <= 0) {
+        return;
+      }
+      await this.appendNextChunk(remaining);
     }
-    await this.appendNextChunk(maxBytes);
   }
 
   async appendUntilLineCountWithLimit(lineCount: number, maxBytes?: number): Promise<void> {
@@ -132,9 +144,13 @@ class ConsoleComparisonReader {
       maxBytes
     );
     this.nextStart = next.textSize;
-    this.buffer += next.text;
+    this.buffer += this.notes.append(next.text);
+    if (!next.moreData) {
+      this.buffer += this.notes.finish();
+    }
     this.loadedBytes += next.bytesRead;
     this.moreData = Boolean(next.moreData);
+    this.stalled = next.bytesRead <= 0 && this.moreData;
     return next.bytesRead;
   }
 }
@@ -212,6 +228,14 @@ async function compareConsoleReaders(
     if (commonLength < minLength) {
       const beforeDiff = baselineReader.buffer.slice(0, commonLength);
       const divergenceLine = comparedLineBreaks + countLineBreaks(beforeDiff) + 1;
+      // The shared prefix has not been counted yet; a mismatch past either scan
+      // limit must not be reported as a divergence.
+      if (
+        comparedBytes + Buffer.byteLength(beforeDiff, "utf8") >= options.maxBytes ||
+        divergenceLine > options.maxLines
+      ) {
+        return buildConsoleTooLargeResult(options);
+      }
       const leadingContext = trimToLastLines(sharedTail + beforeDiff, LEADING_CONTEXT_LINES);
       baselineReader.consume(commonLength);
       targetReader.consume(commonLength);
@@ -262,7 +286,10 @@ async function compareConsoleReaders(
       continue;
     }
 
-    if (baselineReader.buffer.length === 0 && baselineReader.moreData) {
+    // A stalled reader (zero-byte chunk with moreData, e.g. a running build with
+    // no new output yet) would be refetched forever; treat its available output
+    // as ended so the comparison reports the divergence below instead.
+    if (baselineReader.buffer.length === 0 && baselineReader.moreData && !baselineReader.stalled) {
       if (baselineReader.getRemainingByteBudget() > 0) {
         continue;
       }
@@ -270,7 +297,7 @@ async function compareConsoleReaders(
       // this iteration, so the comparison hit its scan limit.
       return buildConsoleTooLargeResult(options);
     }
-    if (targetReader.buffer.length === 0 && targetReader.moreData) {
+    if (targetReader.buffer.length === 0 && targetReader.moreData && !targetReader.stalled) {
       if (targetReader.getRemainingByteBudget() > 0) {
         continue;
       }

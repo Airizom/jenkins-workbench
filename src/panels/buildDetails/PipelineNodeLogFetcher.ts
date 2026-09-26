@@ -175,7 +175,7 @@ export class PipelineNodeLogFetcher {
         error: "This Jenkins instance did not return a log for the selected pipeline node."
       };
     }
-    const text = snapshot.text ?? "";
+    const text = htmlToText(snapshot.text ?? "");
     return {
       target,
       html: escapeHtml(text),

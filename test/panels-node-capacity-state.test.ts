@@ -107,6 +107,7 @@ describe("nodeCapacityReducer", () => {
 
     const hydrated = nodeCapacityReducer(initial, {
       type: "updateNodeCapacityNodeExecutors",
+      snapshotGeneration: initial.snapshotGeneration,
       payload: [{ nodeUrl: "https://jenkins.example/computer/a/", executors: EXECUTORS }]
     });
 
@@ -187,6 +188,7 @@ describe("nodeCapacityReducer", () => {
     ];
     const rehydrated = nodeCapacityReducer(refreshed, {
       type: "updateNodeCapacityNodeExecutors",
+      snapshotGeneration: refreshed.snapshotGeneration,
       payload: [{ nodeUrl: "https://jenkins.example/computer/a/", executors: freshExecutors }]
     });
 
@@ -230,6 +232,42 @@ describe("nodeCapacityReducer", () => {
 
     const node = findNode(refreshed, "pool:label:linux", "https://jenkins.example/computer/a/");
     assert.deepEqual(node?.executors, freshExecutors);
+  });
+
+  it("ignores an executor response from an older capacity snapshot", () => {
+    const nodeUrl = "https://jenkins.example/computer/a/";
+    const first = buildInitialState(
+      buildViewModel(
+        [buildPool("pool:label:linux", [buildNode(nodeUrl)])],
+        "2026-06-11T00:00:00.000Z"
+      )
+    );
+    const second = nodeCapacityReducer(first, {
+      type: "updateNodeCapacity",
+      payload: buildViewModel(
+        [buildPool("pool:label:linux", [buildNode(nodeUrl)])],
+        "2026-06-11T00:00:10.000Z"
+      )
+    });
+    const freshExecutors: NodeCapacityExecutorViewModel[] = [
+      { id: "0", statusLabel: "Building newer #2", isIdle: false }
+    ];
+    const hydrated = nodeCapacityReducer(second, {
+      type: "updateNodeCapacityNodeExecutors",
+      snapshotGeneration: second.snapshotGeneration,
+      payload: [{ nodeUrl, executors: freshExecutors }]
+    });
+    const afterLateResponse = nodeCapacityReducer(hydrated, {
+      type: "updateNodeCapacityNodeExecutors",
+      snapshotGeneration: first.snapshotGeneration,
+      payload: [{ nodeUrl, executors: EXECUTORS }]
+    });
+
+    assert.equal(afterLateResponse, hydrated);
+    assert.deepEqual(
+      findNode(afterLateResponse, "pool:label:linux", nodeUrl)?.executors,
+      freshExecutors
+    );
   });
 });
 

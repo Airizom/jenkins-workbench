@@ -38,7 +38,7 @@ export function PanelErrorList({
 
   if (variant === "card") {
     return (
-      <Card role="alert" className={className ?? "border-destructive-border"}>
+      <Card id={id} role="alert" className={className ?? "border-destructive-border"}>
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           <CardDescription>{errors.join(" ")}</CardDescription>

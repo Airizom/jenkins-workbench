@@ -29,6 +29,7 @@ export function QueueWorkItemRow({
       </Button>
     ) : (
       <Button
+        aria-label={`Open ${item.name} in Jenkins`}
         variant="outline"
         size="sm"
         className="shrink-0"

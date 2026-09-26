@@ -7,8 +7,8 @@ export interface BuildChangesetSource {
   changeSets?: Array<{ items?: JenkinsChangeSetItem[] }>;
 }
 
-function changesetDedupeKey(message: string, author: string, commitId?: string): string {
-  return JSON.stringify([commitId ?? null, message, author]);
+function changesetDedupeKey(message: string, author: string, commitId: string): string {
+  return JSON.stringify([commitId, message, author]);
 }
 
 function toViewModel(item: JenkinsChangeSetItem): JenkinsChangesetViewModel {
@@ -44,11 +44,13 @@ export function collectBuildChangesets(
 
   for (const item of items) {
     const viewModel = toViewModel(item);
-    const key = changesetDedupeKey(viewModel.message, viewModel.author, viewModel.commitId);
-    if (seen.has(key)) {
-      continue;
+    if (viewModel.commitId) {
+      const key = changesetDedupeKey(viewModel.message, viewModel.author, viewModel.commitId);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
     }
-    seen.add(key);
     results.push(viewModel);
   }
 

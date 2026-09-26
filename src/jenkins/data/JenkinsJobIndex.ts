@@ -54,7 +54,8 @@ interface JobQueueItem {
 export class JenkinsJobIndex {
   constructor(
     private readonly cache: JenkinsDataCache,
-    private readonly clientProvider: JenkinsClientProvider
+    private readonly clientProvider: JenkinsClientProvider,
+    private readonly getCacheTtlMs: () => number | undefined = () => JOB_INDEX_TTL_MS
   ) {}
 
   async getAllJobsForEnvironment(
@@ -105,6 +106,7 @@ export class JenkinsJobIndex {
     options: JobSearchOptions | undefined,
     strategy: JobSearchTraversalStrategy
   ): AsyncIterable<JobSearchEntry[]> {
+    const cacheTtlMs = this.getCacheTtlMs() ?? JOB_INDEX_TTL_MS;
     const authSignature = await this.clientProvider.getAuthSignature(environment);
     const cacheKey = this.cache.buildKey(
       environment,
@@ -112,9 +114,10 @@ export class JenkinsJobIndex {
       undefined,
       authSignature
     );
-    if (options?.mode !== "refresh") {
+    if (options?.mode !== "refresh" && cacheTtlMs > 0) {
       const cached = this.cache.get<JobIndexCacheEntry>(cacheKey);
       if (cached) {
+        this.throwIfCancelled(options?.cancellation);
         const maxResults = options?.maxResults;
         if (cached.complete) {
           const entries = maxResults ? cached.entries.slice(0, maxResults) : cached.entries;
@@ -263,7 +266,7 @@ export class JenkinsJobIndex {
             entries: results,
             complete: !limitReached
           },
-          JOB_INDEX_TTL_MS
+          cacheTtlMs
         );
         output.close();
         return;
@@ -339,7 +342,7 @@ export class JenkinsJobIndex {
           entries: results,
           complete: !limitReached
         },
-        JOB_INDEX_TTL_MS
+        cacheTtlMs
       );
       output.close();
     })().catch((error) => {
