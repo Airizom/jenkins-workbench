@@ -101,6 +101,11 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
                 {pool.onlineNodes}/{pool.totalNodes} nodes online
                 {pool.offlineExecutors > 0 ? ` · ${pool.offlineExecutors} offline executors` : ""}
               </div>
+              <ExecutorCapacityBar
+                total={pool.totalExecutors}
+                busy={pool.busyExecutors}
+                idle={pool.idleExecutors}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 lg:contents">
@@ -148,6 +153,53 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
     </details>
   );
 });
+
+const CAPACITY_SEGMENTS = [
+  { key: "busy", label: "busy", className: "bg-progress" },
+  { key: "idle", label: "idle", className: "bg-muted-strong" },
+  { key: "offline", label: "offline", className: "bg-warning" }
+] as const;
+
+/**
+ * Stacked busy/idle/offline split so saturation reads before the numbers do.
+ * Pool `offlineExecutors` also counts builds still running on draining nodes
+ * (already in `busy`), so the offline segment is whatever capacity remains.
+ */
+function ExecutorCapacityBar({
+  total,
+  busy,
+  idle
+}: {
+  total: number;
+  busy: number;
+  idle: number;
+}): React.JSX.Element | null {
+  if (total <= 0) {
+    return null;
+  }
+  const counts = { busy, idle, offline: Math.max(0, total - busy - idle) };
+  const description = CAPACITY_SEGMENTS.map(
+    (segment) => `${counts[segment.key]} ${segment.label}`
+  ).join(", ");
+  return (
+    <div
+      role="img"
+      aria-label={`Executors: ${description}`}
+      title={description}
+      className="mt-2 flex h-1.5 w-full max-w-64 gap-px overflow-hidden rounded-full bg-muted"
+    >
+      {CAPACITY_SEGMENTS.map((segment) =>
+        counts[segment.key] > 0 ? (
+          <span
+            key={segment.key}
+            className={segment.className}
+            style={{ width: `${(counts[segment.key] / total) * 100}%` }}
+          />
+        ) : null
+      )}
+    </div>
+  );
+}
 
 function PoolMetric({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
@@ -207,7 +259,7 @@ const NodeList = React.memo(function NodeList({
             )}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="truncate text-sm font-medium">{node.displayName}</span>
                   <Badge variant={node.isOffline ? "secondary" : "muted"}>{node.statusLabel}</Badge>
@@ -218,7 +270,8 @@ const NodeList = React.memo(function NodeList({
                     {node.offlineReason}
                   </p>
                 ) : null}
-                {node.executorsLoaded ? (
+                {node.executorsLoaded &&
+                (!node.isOffline || node.executors.some((executor) => !executor.isIdle)) ? (
                   <ExecutorWorkList node={node} onOpenExternal={onOpenExternal} />
                 ) : null}
               </div>
@@ -277,31 +330,31 @@ function ExecutorWorkList({
   }
 
   return (
-    <div className="mt-2 space-y-1">
-      {busyExecutors.map((executor) => (
-        <div
-          key={executor.id}
-          className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface-raised px-2 py-1"
-        >
-          <div className="min-w-0">
-            <span className="text-[11px] text-muted-foreground">{executor.id}</span>
-            <span className="ml-2 truncate text-xs">
-              {executor.workLabel ?? executor.statusLabel}
+    <ul className="mt-2 m-0 list-none space-y-0.5 border-l border-border p-0 pl-2.5">
+      {busyExecutors.map((executor) => {
+        const label = executor.workLabel ?? executor.statusLabel;
+        const workUrl = executor.workUrl;
+        return (
+          <li key={executor.id} className="flex min-w-0 items-center gap-2 text-xs">
+            <span className="w-6 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              {executor.id}
             </span>
-          </div>
-          {executor.workUrl ? (
-            <Button
-              aria-label={`Open running work on ${node.displayName}`}
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0"
-              onClick={() => executor.workUrl && onOpenExternal(executor.workUrl)}
-            >
-              <ExternalLinkIcon className="h-3.5 w-3.5" />
-            </Button>
-          ) : null}
-        </div>
-      ))}
-    </div>
+            {workUrl ? (
+              <button
+                type="button"
+                className="focus-ring group flex min-w-0 items-center gap-1 rounded-sm text-left text-link hover:text-link-hover hover:underline"
+                aria-label={`Open ${label} running on ${node.displayName}`}
+                onClick={() => onOpenExternal(workUrl)}
+              >
+                <span className="truncate">{label}</span>
+                <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+              </button>
+            ) : (
+              <span className="truncate">{label}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

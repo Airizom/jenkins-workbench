@@ -13,6 +13,11 @@ const CHANGE_TYPE_BADGES: Record<
   removed: { label: "Removed", tone: "failed" },
   changed: { label: "Changed", tone: "skipped" }
 };
+export function CompareChangeBadge({ changeType }: { changeType?: CompareDiffChangeType }) {
+  const badge = changeType && changeType !== "matched" ? CHANGE_TYPE_BADGES[changeType] : undefined;
+  return badge ? <ToneBadge label={badge.label} tone={badge.tone} /> : null;
+}
+
 export function CompareDiffRowShell({
   title,
   changeType,
@@ -28,7 +33,6 @@ export function CompareDiffRowShell({
   align?: "start" | "center";
   children?: ReactNode;
 }) {
-  const badge = changeType && changeType !== "matched" ? CHANGE_TYPE_BADGES[changeType] : undefined;
   const alignmentClass = align === "center" ? "items-center" : "items-start";
 
   return (
@@ -36,7 +40,7 @@ export function CompareDiffRowShell({
       <div className={`flex flex-wrap ${alignmentClass} justify-between gap-3`}>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            {badge ? <ToneBadge label={badge.label} tone={badge.tone} /> : null}
+            <CompareChangeBadge changeType={changeType} />
             <p className={`min-w-0 text-sm font-medium ${titleClassName ?? ""}`.trim()}>{title}</p>
           </div>
           {subtitle ? (

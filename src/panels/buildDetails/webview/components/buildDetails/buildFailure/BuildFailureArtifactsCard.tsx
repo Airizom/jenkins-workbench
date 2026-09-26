@@ -108,12 +108,11 @@ function ArtifactActionButton({
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           onClick={() => onArtifactAction(action, artifact)}
-          className="h-6 w-6 p-0"
           aria-label={`${actionLabel} artifact: ${artifactLabel}`}
         >
-          <ActionIcon className="h-4 w-4" />
+          <ActionIcon className="h-3.5 w-3.5" />
         </Button>
       </TooltipTrigger>
       <TooltipContent>{actionLabel}</TooltipContent>

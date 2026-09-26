@@ -13,6 +13,8 @@
     ".vscode-test/**",
     ".vscode-test.mjs",
     "coverage/**",
+    // Dev-only webview preview harness (`npm run preview:webview`).
+    "dev/**",
     "resources/**",
     "*.vsix"
   ],

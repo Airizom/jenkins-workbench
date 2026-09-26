@@ -37,8 +37,6 @@ export function TestResultsSection({
 
   return (
     <section className="space-y-3">
-      <CoverageSection coverageState={coverageState} />
-
       <TestResultsSummaryCard summary={summary} />
 
       <TestResultsToolbar
@@ -62,6 +60,8 @@ export function TestResultsSection({
           onOpenSource={onOpenSource}
         />
       )}
+
+      <CoverageSection coverageState={coverageState} />
     </section>
   );
 }

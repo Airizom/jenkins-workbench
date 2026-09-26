@@ -12,6 +12,7 @@ import { BuildFailureTestsSummaryCard } from "./buildFailure/BuildFailureTestsSu
 export function BuildFailureInsightsSection({
   insights,
   diagnostics,
+  showTestsSummary,
   onArtifactAction,
   onOpenDiagnosticSource,
   onShowDiagnosticProblems,
@@ -19,18 +20,21 @@ export function BuildFailureInsightsSection({
 }: {
   insights: BuildFailureInsightsViewModel;
   diagnostics: BuildDiagnosticsViewModel;
+  /** False when the overview already renders a test summary card above. */
+  showTestsSummary: boolean;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
   onOpenDiagnosticSource: (targetId: string) => void;
   onShowDiagnosticProblems: () => void;
   onConfigureBuildDiagnostics: () => void;
 }) {
   const hasChangelog = insights.changelogItems.length > 0 || insights.changelogOverflow > 0;
-  const hasTests =
+  const hasTestsLabel =
     Boolean(insights.testSummaryLabel) && insights.testSummaryLabel !== EMPTY_TEST_RESULTS_LABEL;
+  const hasTests = hasTestsLabel && (showTestsSummary || Boolean(insights.testResultsHint));
   const hasArtifacts = insights.artifacts.length > 0 || insights.artifactsOverflow > 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-3">
       <BuildFailureDiagnosticsCard
         diagnostics={diagnostics}
         onOpenSource={onOpenDiagnosticSource}

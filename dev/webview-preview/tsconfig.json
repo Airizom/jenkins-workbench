@@ -1,0 +1,7 @@
+{
+  "extends": "../../src/panels/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "react", "react-dom", "vite/client"]
+  },
+  "include": ["*.ts", "fixtures/*.ts"]
+}

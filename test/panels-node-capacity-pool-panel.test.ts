@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
-import type { NodeCapacitySeverity } from "../src/shared/nodeCapacity/NodeCapacityContracts";
-import { isUserInitiatedPoolToggle } from "../src/panels/nodeCapacity/webview/components/NodeCapacityPoolPanel";
+import type {
+  NodeCapacityNodeViewModel,
+  NodeCapacityPoolViewModel,
+  NodeCapacitySeverity
+} from "../src/shared/nodeCapacity/NodeCapacityContracts";
+import {
+  isUserInitiatedPoolToggle,
+  NodeCapacityPoolPanel
+} from "../src/panels/nodeCapacity/webview/components/NodeCapacityPoolPanel";
+import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 
 /**
  * Mirrors how NodeCapacityApp resolves a pool's open state: an explicit user
@@ -59,5 +69,112 @@ describe("isUserInitiatedPoolToggle", () => {
     }
     assert.equal(override, false);
     assert.equal(resolveOpen(override, "critical"), false);
+  });
+});
+
+function drainingNode(): NodeCapacityNodeViewModel {
+  return {
+    displayName: "agent-2",
+    name: "agent-2",
+    nodeUrl: "https://jenkins.example/computer/agent-2/",
+    statusLabel: "Temporarily offline",
+    isOffline: true,
+    isTemporarilyOffline: true,
+    labels: ["linux"],
+    poolLabels: ["linux"],
+    hiddenLabels: [],
+    totalExecutors: 2,
+    busyExecutors: 1,
+    idleExecutors: 0,
+    offlineExecutors: 2,
+    executorSummary: "2 offline",
+    executorsLoaded: true,
+    executors: [
+      {
+        id: "#0",
+        statusLabel: "Busy",
+        isIdle: false,
+        workLabel: "api » main #7",
+        workUrl: "https://jenkins.example/job/api/job/main/7/"
+      },
+      { id: "#1", statusLabel: "Idle", isIdle: true }
+    ],
+    matchingQueueItems: [],
+    anyQueueItems: [],
+    selfLabelQueueItems: []
+  };
+}
+
+function renderPool(
+  nodes: NodeCapacityNodeViewModel[],
+  totals: Partial<NodeCapacityPoolViewModel>
+) {
+  const pool: NodeCapacityPoolViewModel = {
+    id: "linux",
+    label: "linux",
+    kind: "label",
+    severity: "warning",
+    statusLabel: "Busy",
+    nodes,
+    queueItems: [],
+    offlineImpact: [],
+    totalNodes: nodes.length,
+    onlineNodes: 0,
+    offlineNodes: nodes.length,
+    totalExecutors: 0,
+    busyExecutors: 0,
+    idleExecutors: 0,
+    offlineExecutors: 0,
+    queuedCount: 0,
+    stuckCount: 0,
+    blockedCount: 0,
+    buildableCount: 0,
+    ...totals
+  };
+  return renderToStaticMarkup(
+    createElement(
+      TooltipProvider,
+      null,
+      createElement(NodeCapacityPoolPanel, {
+        pool,
+        isOpen: true,
+        onOpenExternal: () => undefined,
+        onOpenNodeDetails: () => undefined,
+        onToggleExpanded: () => undefined
+      })
+    )
+  );
+}
+
+describe("NodeCapacityPoolPanel", () => {
+  it("keeps listing builds still running on a temporarily offline node", () => {
+    const html = renderPool([drainingNode()], {
+      totalExecutors: 2,
+      busyExecutors: 1,
+      offlineExecutors: 2
+    });
+    assert.match(html, /api » main #7/);
+  });
+
+  it("hides the empty work note for offline nodes with nothing running", () => {
+    const node = drainingNode();
+    const idleNode = {
+      ...node,
+      busyExecutors: 0,
+      executors: node.executors.map((executor) => ({ ...executor, isIdle: true }))
+    };
+    const html = renderPool([idleNode], { totalExecutors: 2, offlineExecutors: 2 });
+    assert.doesNotMatch(html, /No running work loaded/);
+  });
+
+  it("does not double-count busy executors on offline nodes in the capacity bar", () => {
+    // Pool totals count a draining node's running build as both busy and offline.
+    const html = renderPool([drainingNode()], {
+      totalExecutors: 6,
+      busyExecutors: 3,
+      idleExecutors: 1,
+      offlineExecutors: 3
+    });
+    assert.match(html, /aria-label="Executors: 3 busy, 1 idle, 2 offline"/);
   });
 });

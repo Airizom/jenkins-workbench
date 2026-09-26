@@ -13,8 +13,7 @@ function renderEmptySection(status: CompareSectionStatus): string {
       status,
       items: [],
       emptyLabel: "No differences",
-      renderItem: (item) => item,
-      itemKey: (item) => item
+      renderItems: (items) => items.join(", ")
     })
   );
 }

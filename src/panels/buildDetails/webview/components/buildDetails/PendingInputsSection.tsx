@@ -1,5 +1,4 @@
 import * as React from "react";
-import { ResultBadge } from "../../../../shared/webview/components/ResultBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import {
@@ -9,7 +8,10 @@ import {
   UserIcon,
   XIcon
 } from "../../../../shared/webview/icons";
-import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
+import type {
+  PendingInputParameterViewModel,
+  PendingInputViewModel
+} from "../../../shared/BuildDetailsContracts";
 
 const { useEffect, useRef, useState } = React;
 
@@ -111,42 +113,20 @@ export function PendingInputsSection({
             className="rounded border border-warning-border overflow-hidden"
             aria-busy={Boolean(processingAction)}
           >
-            <div className="flex items-center justify-between gap-2 bg-warning-surface px-3 py-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <AlertCircleIcon className="h-4 w-4" />
-                <span className="text-xs font-medium truncate">{input.message}</span>
-                {input.submitterLabel ? (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
-                    <UserIcon className="h-3.5 w-3.5" />
-                    {input.submitterLabel}
-                  </span>
-                ) : null}
+            <div className="flex items-start justify-between gap-3 bg-warning-surface px-3 py-2.5">
+              <div className="flex min-w-0 items-start gap-2">
+                <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                <div className="min-w-0 space-y-0.5">
+                  <div className="text-sm font-medium wrap-break-word">{input.message}</div>
+                  {input.submitterLabel ? (
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <UserIcon className="h-3 w-3" />
+                      <span className="truncate">{input.submitterLabel}</span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-              <ResultBadge label="Pending" status="running" className="text-[11px] shrink-0" />
-            </div>
-
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-card">
-              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                {input.parameters.length > 0 ? (
-                  <>
-                    {input.parameters.map((param) => (
-                      <Badge
-                        key={`${input.id}-${param.name}`}
-                        variant="secondary"
-                        className="font-mono text-[11px] px-1.5 py-0"
-                      >
-                        {param.name}
-                      </Badge>
-                    ))}
-                    {input.parametersLabel ? (
-                      <span className="text-[11px] text-muted-foreground truncate">
-                        {input.parametersLabel}
-                      </span>
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <PendingInputActionButton
                   action="approve"
                   processingAction={processingAction}
@@ -159,6 +139,24 @@ export function PendingInputsSection({
                 />
               </div>
             </div>
+
+            {input.parameters.length > 0 ? (
+              <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-warning-border bg-card px-3 py-2.5 text-[11px]">
+                {input.parameters.map((param) => (
+                  <React.Fragment key={`${input.id}-${param.name}`}>
+                    <dt className="flex items-center gap-1.5">
+                      <span className="font-mono font-medium truncate">{param.name}</span>
+                      <Badge variant="secondary" size="sm">
+                        {param.kind}
+                      </Badge>
+                    </dt>
+                    <dd className="m-0 min-w-0 text-muted-foreground wrap-break-word">
+                      {describePendingInputParameter(param)}
+                    </dd>
+                  </React.Fragment>
+                ))}
+              </dl>
+            ) : null}
           </div>
         );
       })}
@@ -183,15 +181,39 @@ function PendingInputActionButton({
       variant={action === "approve" ? "default" : "outline"}
       size="sm"
       onClick={() => onAction(action)}
-      className="gap-1 h-6 px-2 text-[11px]"
       disabled={Boolean(processingAction)}
     >
       {isProcessing ? (
-        <RefreshIcon className="h-4 w-4 animate-spin" />
+        <RefreshIcon className="h-3.5 w-3.5 animate-spin" />
       ) : (
-        <ActionIcon className="h-4 w-4" />
+        <ActionIcon className="h-3.5 w-3.5" />
       )}
       {isProcessing ? PROCESSING_LABELS[action] : ACTION_LABELS[action]}
     </Button>
   );
+}
+
+export function describePendingInputParameter(param: PendingInputParameterViewModel): string {
+  const parts: string[] = [];
+  if (param.description) {
+    parts.push(param.description);
+  }
+  if (param.choices && param.choices.length > 0) {
+    parts.push(`Choices: ${param.choices.join(", ")}`);
+  }
+  const defaultLabel = formatDefaultValue(param.defaultValue);
+  if (defaultLabel) {
+    parts.push(`Default: ${defaultLabel}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "You will be prompted for a value.";
+}
+
+function formatDefaultValue(value: PendingInputParameterViewModel["defaultValue"]): string {
+  if (value === undefined || value === "") {
+    return "";
+  }
+  if (Array.isArray(value)) {
+    return value.join(", ");
+  }
+  return String(value);
 }

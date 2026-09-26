@@ -1,14 +1,34 @@
+import { cn } from "../../../../shared/webview/lib/utils";
 import type { BuildCompareParameterDiffItem } from "../../../shared/BuildCompareContracts";
-import { CompareDiffRowShell } from "./shared/CompareDiffRowShell";
-import { CompareSideGrid } from "./shared/CompareSideGrid";
-import { ValueCell } from "./shared/ValueCell";
+import { CompareChangeBadge } from "./shared/CompareDiffRowShell";
+import { CompareTableEmptyValue } from "./shared/CompareTable";
+
+function ParameterValue({ value, muted }: { value?: string; muted?: boolean }) {
+  if (value === undefined) {
+    return <CompareTableEmptyValue />;
+  }
+  return (
+    <span className={cn("break-all font-mono", muted && "text-muted-foreground")}>
+      {value === "" ? '""' : value}
+    </span>
+  );
+}
+
 export function ParameterDiffRow({ item }: { item: BuildCompareParameterDiffItem }) {
   return (
-    <CompareDiffRowShell title={item.name} changeType={item.changeType}>
-      <CompareSideGrid>
-        <ValueCell label="Baseline" value={item.baselineValue} />
-        <ValueCell label="Target" value={item.targetValue} />
-      </CompareSideGrid>
-    </CompareDiffRowShell>
+    <tr className="align-top">
+      <th scope="row" className="px-3 py-2 text-left font-normal">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="break-all font-mono font-medium">{item.name}</span>
+          <CompareChangeBadge changeType={item.changeType} />
+        </div>
+      </th>
+      <td className="px-3 py-2">
+        <ParameterValue value={item.baselineValue} muted={item.changeType === "changed"} />
+      </td>
+      <td className="px-3 py-2">
+        <ParameterValue value={item.targetValue} />
+      </td>
+    </tr>
   );
 }

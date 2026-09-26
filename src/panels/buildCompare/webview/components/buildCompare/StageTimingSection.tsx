@@ -1,6 +1,15 @@
 import type { BuildCompareStagesSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { StageDiffRow } from "./StageDiffRow";
 import { CompareItemsSection } from "./shared/CompareItemsSection";
+import { CompareTable } from "./shared/CompareTable";
+
+const STAGE_COLUMNS = [
+  { label: "Stage" },
+  { label: "Baseline", className: "w-[24%]" },
+  { label: "Target", className: "w-[24%]" },
+  { label: "Change", className: "w-28 text-right" }
+];
+
 export function StageTimingSection({ section }: { section: BuildCompareStagesSectionViewModel }) {
   return (
     <CompareItemsSection
@@ -10,8 +19,13 @@ export function StageTimingSection({ section }: { section: BuildCompareStagesSec
       status={section.status}
       items={section.items}
       emptyLabel="No pipeline stage data to compare."
-      itemKey={(item) => item.key}
-      renderItem={(item) => <StageDiffRow item={item} />}
+      renderItems={(items) => (
+        <CompareTable caption="Stage timing by build" columns={STAGE_COLUMNS}>
+          {items.map((item) => (
+            <StageDiffRow key={item.key} item={item} />
+          ))}
+        </CompareTable>
+      )}
     />
   );
 }

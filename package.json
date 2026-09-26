@@ -1387,6 +1387,7 @@
     "watch": "concurrently -k \"npm:watch:webview\" \"tsc -watch -p ./\"",
     "build:webview": "vite build",
     "watch:webview": "vite build --watch",
+    "preview:webview": "vite --config dev/webview-preview/vite.config.ts",
     "typecheck:webview": "tsc -p src/panels/tsconfig.json --noEmit",
     "test": "npm run test:manifest && npm run test:workflows && npm run typecheck:test && npm run test:coverage",
     "test:manifest": "node scripts/validate-package-manifest.mjs",

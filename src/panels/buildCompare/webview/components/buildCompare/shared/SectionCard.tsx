@@ -52,7 +52,11 @@ export function SectionCard({
                     ) : null}
                   </div>
                 </div>
-                <ToneBadge label={statusBadge.label} tone={statusBadge.tone} />
+                {/* A populated section speaks for itself; only call out the
+                    states that explain missing or partial content. */}
+                {status === "available" ? null : (
+                  <ToneBadge label={statusBadge.label} tone={statusBadge.tone} />
+                )}
               </div>
             </CardHeader>
           </button>

@@ -1,6 +1,4 @@
 import type * as React from "react";
-import { Button } from "../../../../../shared/webview/components/ui/button";
-import { TerminalIcon, TestTubeIcon, WorkflowIcon } from "../../../../../shared/webview/icons";
 import { isAnalysisBuildResult } from "../../../../../shared/webview/lib/statusStyles";
 import type {
   ArtifactAction,
@@ -21,7 +19,6 @@ type OverviewTabProps = {
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
   diagnostics: BuildDiagnosticsViewModel;
-  hasPipelineStages: boolean;
   hasTests: boolean;
   onNavigateTab: (tab: BuildDetailsTab) => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
@@ -35,7 +32,6 @@ export function OverviewTab({
   coverageState,
   insights,
   diagnostics,
-  hasPipelineStages,
   hasTests,
   onNavigateTab,
   onArtifactAction,
@@ -48,40 +44,6 @@ export function OverviewTab({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Jump to</span>
-        {hasPipelineStages ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 h-7 px-2 text-xs text-muted-foreground"
-            onClick={() => onNavigateTab("pipeline")}
-          >
-            <WorkflowIcon className="h-3.5 w-3.5" />
-            Pipeline
-          </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 h-7 px-2 text-xs text-muted-foreground"
-          onClick={() => onNavigateTab("console")}
-        >
-          <TerminalIcon className="h-3.5 w-3.5" />
-          Console
-        </Button>
-        {hasTests ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 h-7 px-2 text-xs text-muted-foreground"
-            onClick={() => onNavigateTab("tests")}
-          >
-            <TestTubeIcon className="h-3.5 w-3.5" />
-            Tests
-          </Button>
-        ) : null}
-      </div>
       <div className="grid gap-3 lg:grid-cols-2">
         {showTestsCard ? (
           <TestPassDonutCard summary={testsSummary} onShowTests={() => onNavigateTab("tests")} />
@@ -98,6 +60,7 @@ export function OverviewTab({
         <BuildFailureInsightsSection
           insights={insights}
           diagnostics={diagnostics}
+          showTestsSummary={!showTestsCard}
           onArtifactAction={onArtifactAction}
           onOpenDiagnosticSource={onOpenDiagnosticSource}
           onShowDiagnosticProblems={onShowDiagnosticProblems}

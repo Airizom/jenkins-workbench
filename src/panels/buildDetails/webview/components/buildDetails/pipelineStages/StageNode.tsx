@@ -49,6 +49,8 @@ export function StageNode({
   const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
   const stageLogTarget = stage.logTarget;
   const hasStageActions = Boolean(stageLogTarget) || canRestartStage;
+  const didNotRun = isStageNotRun(stage);
+  const stageMeta = describeStageMeta(stage);
 
   return (
     <div className="relative flex" data-stage-key={stage.key}>
@@ -67,11 +69,16 @@ export function StageNode({
           <div className="overflow-hidden rounded border border-mutedBorder bg-card transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
             <AccordionTrigger asChild className="gap-3 px-3 py-2 hover:bg-accent-soft">
               <button type="button">
-                <div className="flex flex-col items-start gap-0.5">
-                  <div className="text-xs font-medium">{stage.name || "Stage"}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {stage.durationLabel || "Unknown"}
+                <div className="flex min-w-0 flex-col items-start gap-0.5">
+                  <div
+                    className={cn(
+                      "truncate text-xs font-medium",
+                      didNotRun && "text-muted-foreground"
+                    )}
+                  >
+                    {stage.name || "Stage"}
                   </div>
+                  <div className="text-[11px] text-muted-foreground tabular-nums">{stageMeta}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <ResultBadge
@@ -174,4 +181,19 @@ export function StageNode({
       </div>
     </div>
   );
+}
+
+// Jenkins reports skipped stages as neutral with a zero duration; "0ms" reads
+// as a real (suspiciously fast) run, so those stages are labelled as not run.
+export function isStageNotRun(stage: PipelineStageViewModel): boolean {
+  return stage.statusClass === "neutral" && stage.durationMs === 0;
+}
+
+export function describeStageMeta(stage: PipelineStageViewModel): string {
+  const parts = [isStageNotRun(stage) ? "Did not run" : stage.durationLabel || "Unknown"];
+  const branchCount = stage.parallelBranches.length;
+  if (branchCount > 0) {
+    parts.push(`${branchCount} parallel ${branchCount === 1 ? "branch" : "branches"}`);
+  }
+  return parts.join(" · ");
 }

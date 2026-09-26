@@ -204,7 +204,6 @@ export function BuildDetailsTabs({
           coverageState={coverageState}
           insights={insights}
           diagnostics={diagnostics}
-          hasPipelineStages={hasPipelineStages}
           hasTests={hasTests}
           onNavigateTab={onTabChange}
           onArtifactAction={onArtifactAction}

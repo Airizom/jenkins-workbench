@@ -1,6 +1,14 @@
 import type { BuildCompareParametersSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { ParameterDiffRow } from "./ParameterDiffRow";
 import { CompareItemsSection } from "./shared/CompareItemsSection";
+import { CompareTable } from "./shared/CompareTable";
+
+const PARAMETER_COLUMNS = [
+  { label: "Parameter", className: "w-[30%]" },
+  { label: "Baseline", className: "w-[35%]" },
+  { label: "Target", className: "w-[35%]" }
+];
+
 export function ParameterDiffSection({
   section
 }: {
@@ -14,8 +22,13 @@ export function ParameterDiffSection({
       status={section.status}
       items={section.items}
       emptyLabel="No changed parameters."
-      itemKey={(item) => `${item.changeType}:${item.name}`}
-      renderItem={(item) => <ParameterDiffRow item={item} />}
+      renderItems={(items) => (
+        <CompareTable caption="Changed build parameters" columns={PARAMETER_COLUMNS}>
+          {items.map((item) => (
+            <ParameterDiffRow key={`${item.changeType}:${item.name}`} item={item} />
+          ))}
+        </CompareTable>
+      )}
     />
   );
 }

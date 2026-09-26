@@ -9,6 +9,7 @@ import {
 } from "../../../../shared/webview/components/ui/accordion";
 import { ScrollArea } from "../../../../shared/webview/components/ui/scroll-area";
 import type { NodeMonitorViewModel } from "../../../shared/NodeDetailsContracts";
+import { formatMonitorLabel } from "./monitorLabels";
 import { formatJson } from "./nodeDetailsUtils";
 
 type MonitorCardProps = {
@@ -32,7 +33,9 @@ export function MonitorCard({ title, entries }: MonitorCardProps): React.JSX.Ele
           >
             <AccordionTrigger className="w-full px-3 py-1.5 hover:bg-accent-soft">
               <div className="flex flex-1 items-center justify-between gap-2">
-                <span className="text-[11px] font-mono text-muted-foreground">{entry.key}</span>
+                <span className="text-xs text-muted-foreground" title={entry.key}>
+                  {formatMonitorLabel(entry.key)}
+                </span>
                 <span className="text-xs font-medium">{entry.summary}</span>
               </div>
             </AccordionTrigger>

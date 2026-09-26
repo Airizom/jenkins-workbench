@@ -7,6 +7,7 @@ import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorSlotGrid } from "./ExecutorSlotGrid";
 import { summarizeExecutorUtilization } from "./executorUtilization";
 import { LabelChips } from "./LabelChips";
+import { formatMonitorLabel } from "./monitorLabels";
 import type { OverviewRow } from "./nodeDetailsUtils";
 import { OverviewCard } from "./OverviewCard";
 import { QueuePreviewCard } from "./QueuePreviewCard";
@@ -161,8 +162,8 @@ function MonitorsTeaser({
               key={monitor.key}
               className="rounded border border-mutedBorder bg-muted-soft px-3 py-2"
             >
-              <div className="truncate font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                {monitor.key}
+              <div className="truncate text-[11px] text-muted-foreground" title={monitor.key}>
+                {formatMonitorLabel(monitor.key)}
               </div>
               <div className="truncate text-xs font-semibold" title={monitor.summary}>
                 {monitor.summary}

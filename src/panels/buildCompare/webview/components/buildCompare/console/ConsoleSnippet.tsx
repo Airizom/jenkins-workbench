@@ -16,7 +16,7 @@ export function ConsoleSnippet({
           <div
             key={`${title}:${line.lineNumber}`}
             data-divergence-line={line.highlight ? "true" : undefined}
-            className={`console-line grid grid-cols-[5rem_1fr] gap-3 border-l-2 px-3 py-1.5 font-mono text-vscode-editor leading-5 ${
+            className={`console-line grid grid-cols-[3rem_1fr] gap-3 border-l-2 px-3 py-0.5 font-mono text-vscode-editor leading-5 ${
               line.highlight ? "border-l-warning bg-warning-soft" : "border-l-transparent"
             }`}
           >

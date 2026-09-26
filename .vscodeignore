@@ -3,6 +3,7 @@
 .github/**
 src/**
 docs/**
+dev/**
 node_modules/**
 out/**/*.map
 out-test/**

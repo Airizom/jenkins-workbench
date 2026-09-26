@@ -49,7 +49,7 @@ export function NodeDetailsTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={handleValueChange} className="space-y-3">
-      <div className="sticky-header -mx-4 px-4 py-1">
+      <div className="sticky top-0 z-10 -mx-4 bg-background px-4 py-1">
         <TabsList className="w-full justify-start">
           <TabsTrigger value={NODE_DETAILS_TABS.OVERVIEW} className="text-xs">
             <StatusIcon className="h-3.5 w-3.5" />
