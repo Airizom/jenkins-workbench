@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.52.0] - 2026-09-26
+
+### Added
+
+- feat(buildCompare): render parameter and stage diffs as tables and flag stage status regressions
+- feat(buildDetails): label skipped stages "Did not run" and list pending input parameters
+- feat(nodeCapacity): add a pool executor capacity bar
+- feat(nodeDetails): show human-readable monitor names
+- feat: add `npm run preview:webview` to render panels with fixtures and VS Code themes
+
 ## [1.51.3] - 2026-09-26
 
 ### Fixed
