@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - fix(release): package production dependencies in the VSIX. 1.54.0 failed to activate with `Cannot find module 'redos-detector'`, so no views or commands were registered. Packaging now fails if the VSIX `node_modules` differs from the production dependency tree, and the manifest check rejects extension-host imports of undeclared packages.
+- fix(release): remove extraneous packages before packaging. npm 11.6 on Linux installs helpers of skipped wasm32 optional dependencies, which vsce would otherwise ship.
 
 ## [1.54.0] - 2026-09-26
 

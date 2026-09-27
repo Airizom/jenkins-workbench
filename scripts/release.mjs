@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -89,7 +89,7 @@ const capture = (command, args) => {
   return result.stdout;
 };
 
-// Extraneous packages are skipped: vsce would ship them, but nothing declared needs them.
+// Extraneous packages are skipped here; removeExtraneousPackages deletes them before packaging.
 const collectProductionDirs = (node, dirs) => {
   for (const dependency of Object.values(node.dependencies ?? {})) {
     if (dependency.extraneous || !dependency.path) {
@@ -112,16 +112,38 @@ const packageDirOf = (file) => {
   return match?.[1];
 };
 
+const readProductionTree = () =>
+  JSON.parse(capture(npmCommand, ["ls", "--omit=dev", "--all", "--long", "--json"]));
+
+const collectExtraneousPaths = (node, paths) => {
+  for (const dependency of Object.values(node.dependencies ?? {})) {
+    if (dependency.extraneous && dependency.path) {
+      paths.push(dependency.path);
+    } else {
+      collectExtraneousPaths(dependency, paths);
+    }
+  }
+
+  return paths;
+};
+
+// Some npm versions (11.6.x on Linux) install the hoisted helpers of skipped
+// wasm32 optional packages as extraneous. vsce ships anything npm lists, so
+// remove them first; by definition nothing installed depends on them.
+const removeExtraneousPackages = async () => {
+  for (const extraneousPath of collectExtraneousPaths(readProductionTree(), [])) {
+    console.log(`Removing extraneous ${path.relative(process.cwd(), extraneousPath)}`);
+    await rm(extraneousPath, { recursive: true, force: true });
+  }
+};
+
 /**
  * The compiled extension loads runtime dependencies from node_modules, so the
  * VSIX must contain exactly the production dependency closure: nothing missing
  * (activation fails) and no development or publishing tooling (bloat).
  */
 const verifyPackagedDependencies = () => {
-  const expected = collectProductionDirs(
-    JSON.parse(capture(npmCommand, ["ls", "--omit=dev", "--all", "--long", "--json"])),
-    new Set()
-  );
+  const expected = collectProductionDirs(readProductionTree(), new Set());
   const packaged = new Set(
     capture(toolPath("vsce"), ["ls"])
       .split(/\r?\n/)
@@ -144,11 +166,12 @@ const verifyPackagedDependencies = () => {
   console.log(`Packaging ${expected.size} runtime dependency packages.`);
 };
 
-const packageExtension = (artifactPath) => {
+const packageExtension = async (artifactPath) => {
   if (!artifactPath) {
     throw new Error("package requires the output path for the VSIX artifact");
   }
 
+  await removeExtraneousPackages();
   verifyPackagedDependencies();
   run(toolPath("vsce"), ["package", "-o", artifactPath]);
 };
@@ -199,7 +222,7 @@ try {
       installTools();
       break;
     case "package":
-      packageExtension(process.argv[3]);
+      await packageExtension(process.argv[3]);
       break;
     case "publish":
       await publish(process.argv[3]);
