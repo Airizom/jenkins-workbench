@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.54.2] - 2026-09-27
+
+### Changed
+
+- chore(resources): refresh the extension icon, use an SVG activity bar icon, and add a README hero image.
+
 ## [1.54.1] - 2026-09-26
 
 ### Fixed
