@@ -149,6 +149,8 @@ export type JenkinsBuildAction =
   | JenkinsGitBuildDataAction;
 
 export interface JenkinsTestReportCase {
+  age?: number;
+  failedSince?: number;
   name?: string;
   className?: string;
   status?: string;

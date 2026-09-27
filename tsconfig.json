@@ -19,6 +19,7 @@
   "exclude": [
     "src/panels/buildCompare/webview/**",
     "src/panels/buildDetails/webview/**",
+    "src/panels/jobHistory/webview/**",
     "src/panels/nodeCapacity/webview/**",
     "src/panels/nodeDetails/webview/**",
     "src/panels/shared/webview/components/**",

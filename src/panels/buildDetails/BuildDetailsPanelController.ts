@@ -67,7 +67,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     getCanOpenTestSource?: BuildDetailsCanOpenTestSource,
     private readonly onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void,
     private readonly onDiagnosticConsoleTextChanged?: () => void,
-    private readonly whenTestSourceAvailabilityReady?: () => Promise<void>
+    private readonly whenTestSourceAvailabilityReady?: () => Promise<void>,
+    onTestReportChanged?: () => void
   ) {
     this.canOpenTestSource = getCanOpenTestSource;
     this.diagnosticConsoleSync = new BuildDetailsDiagnosticConsoleSync({
@@ -82,6 +83,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     this.view = new BuildDetailsPanelView(panel, extensionUri);
     this.loadTracker = new PanelLoadTracker((value) => this.view.setLoading(value));
     this.runtime = new BuildDetailsPanelRuntime({
+      onTestReportChanged,
       state: this.state,
       view: this.view,
       coverageDecorationService,
@@ -132,6 +134,16 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
   getCurrentDetails(): JenkinsBuildDetails | undefined {
     return this.state.currentDetails;
+  }
+  hasFailedTests(): boolean {
+    return (
+      (this.state.currentTestReport?.failCount ?? 0) > 0 ||
+      Boolean(
+        this.state.currentTestReport?.suites?.some((suite) =>
+          suite.cases?.some((test) => ["FAILED", "REGRESSION", "ERROR"].includes(test.status ?? ""))
+        )
+      )
+    );
   }
 
   getDiagnosticConsoleText(): string {

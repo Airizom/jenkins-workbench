@@ -13,6 +13,7 @@ import type {
   BuildDetailsBackend,
   BuildDetailsPendingInputProvider
 } from "./buildDetails/BuildDetailsBackend";
+import type { HistoryDependencies } from "./jobHistory/HistoryController";
 
 export interface PipelineNodeSelection {
   kind: "stage" | "step";
@@ -28,6 +29,7 @@ export interface BuildDetailsPanelLaunchRequest {
 }
 
 export interface BuildDetailsPanelLauncherOptions {
+  historyDependencies?: HistoryDependencies;
   backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
@@ -65,6 +67,7 @@ export class BuildDetailsPanelLauncher {
 
   private getSharedPanelOptions() {
     return {
+      historyDependencies: this.options.historyDependencies,
       backend: this.options.backend,
       artifactActionHandler: this.options.artifactActionHandler,
       consoleExporter: this.options.consoleExporter,

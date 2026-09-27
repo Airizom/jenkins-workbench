@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import * as vscode from "vscode";
 
-export type WebviewEntryName = "buildCompare" | "buildDetails" | "nodeCapacity" | "nodeDetails";
+export type WebviewEntryName =
+  | "buildCompare"
+  | "buildDetails"
+  | "nodeCapacity"
+  | "nodeDetails"
+  | "jobHistory";
 
 type ViteManifestEntry = {
   file: string;

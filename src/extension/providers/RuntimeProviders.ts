@@ -15,6 +15,8 @@ import { CurrentBranchStatusBar } from "../../currentBranch/CurrentBranchStatusB
 import { CurrentBranchStatusResolver } from "../../currentBranch/CurrentBranchStatusResolver";
 import { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBranchTargetResolver";
 import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
+import { HistoryBaselineResolver, HistoryBaselineStore } from "../../history/HistoryBaseline";
+import { HistoryService } from "../../history/HistoryService";
 import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
 import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
@@ -22,6 +24,7 @@ import { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLaunche
 import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { BuildCompareOptions } from "../../panels/buildCompare/BuildCompareOptions";
 import { BuildDetailsBackendAdapter } from "../../panels/buildDetails/BuildDetailsBackend";
+import { JobHistoryPanelLauncher } from "../../panels/JobHistoryPanelLauncher";
 import { BuildInspectionBackendAdapter } from "../../panels/shared/backend/BuildInspectionBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { CoverageDecorationService } from "../../services/CoverageDecorationService";
@@ -39,6 +42,7 @@ import { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
 import { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 
 export interface RuntimeProviderOptions {
+  context: vscode.ExtensionContext;
   extensionUri: vscode.Uri;
   buildCompareOptionsProvider: () => BuildCompareOptions;
   currentBranchPullRequestJobNamePatterns: readonly string[];
@@ -49,6 +53,41 @@ export interface RuntimeProviderOptions {
 
 export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
   return {
+    historyService: (container) => {
+      const service = new HistoryService(container.get("dataService"));
+      options.context.subscriptions.push(
+        service,
+        container.get("environmentStore").onDidChange(() => service.invalidate())
+      );
+      return service;
+    },
+    historyBaselineStore: (_container) => new HistoryBaselineStore(options.context),
+    historyBaselineResolver: (container) =>
+      new HistoryBaselineResolver(
+        container.get("dataService"),
+        container.get("historyService"),
+        container.get("historyBaselineStore")
+      ),
+    historyDependencies: (container) => ({
+      environments: container.get("environmentStore"),
+      history: container.get("historyService"),
+      baseline: container.get("historyBaselineResolver"),
+      data: container.get("dataService"),
+      openBuild: (environment, buildUrl) =>
+        container.get("buildDetailsPanelLauncher").show({ environment, buildUrl }),
+      compare: (environment, baselineBuildUrl, targetBuildUrl) =>
+        container
+          .get("buildComparePanelLauncher")
+          .show({ environment, baselineBuildUrl, targetBuildUrl }),
+      openJob: (environment, jobUrl) =>
+        container.get("jobHistoryPanelLauncher").show(environment, jobUrl)
+    }),
+    jobHistoryPanelLauncher: (container) =>
+      new JobHistoryPanelLauncher(
+        container.get("historyDependencies"),
+        options.extensionUri,
+        container.get("environmentStore")
+      ),
     statusRefreshService: (_container) =>
       new JenkinsStatusRefreshService(options.statusRefreshIntervalSeconds),
     statusNotifier: (_container) => new VscodeStatusNotifier(),
@@ -105,6 +144,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       ),
     buildDetailsPanelLauncher: (container) =>
       new BuildDetailsPanelLauncher({
+        historyDependencies: container.get("historyDependencies"),
         backend: new BuildDetailsBackendAdapter(container.get("dataService")),
         artifactActionHandler: container.get("artifactActionHandler"),
         consoleExporter: container.get("consoleExporter"),

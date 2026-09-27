@@ -1,4 +1,5 @@
 import * as React from "react";
+import { TestHistoryEvidence } from "../../../../../jobHistory/webview/TestHistoryEvidence";
 import { formatTestCaseSubtitle } from "../../../../../shared/TestCaseViewModel";
 import { testStatusToVisualTone } from "../../../../../shared/TestStatusFormatters";
 import { resolveStatusBorderClass } from "../../../../../shared/TestStatusStyles";
@@ -19,6 +20,7 @@ import { hasTestDetails } from "./testResultsUtils";
 const { memo, useEffect, useState } = React;
 
 function TestResultRowHeaderContent({
+  failureHistoryLabel,
   className,
   durationLabel,
   hasDetails,
@@ -28,6 +30,7 @@ function TestResultRowHeaderContent({
   statusLabel,
   suiteName
 }: {
+  failureHistoryLabel?: string;
   className?: string;
   durationLabel?: string;
   hasDetails: boolean;
@@ -44,6 +47,7 @@ function TestResultRowHeaderContent({
         <div className="truncate text-sm font-medium text-foreground">{name}</div>
         <div className="truncate text-xs text-muted-foreground">
           {formatTestCaseSubtitle(className, suiteName)}
+          {failureHistoryLabel && <span> · {failureHistoryLabel}</span>}
         </div>
       </div>
       <TestStatusBadge status={status} label={statusLabel} />
@@ -89,6 +93,7 @@ export function TestResultRow({
 
   const content = (
     <MemoizedTestResultRowHeaderContent
+      failureHistoryLabel={item.failureHistoryLabel}
       className={item.className}
       durationLabel={item.durationLabel}
       hasDetails={hasDetails}
@@ -108,10 +113,17 @@ export function TestResultRow({
 
   if (!hasDetails) {
     return (
-      <div className={cn("flex items-center gap-3 px-3 py-2", borderClass)}>
-        <div className="flex min-w-0 flex-1 items-center gap-3">{content}</div>
-        {sourceButton}
-      </div>
+      <>
+        <div className={cn("flex items-center gap-3 px-3 py-2", borderClass)}>
+          <div className="flex min-w-0 flex-1 items-center gap-3">{content}</div>
+          {sourceButton}
+        </div>
+        <TestHistoryEvidence
+          name={item.name}
+          className={item.className}
+          suiteName={item.suiteName}
+        />
+      </>
     );
   }
 
@@ -142,6 +154,7 @@ export function TestResultRow({
           ) : null}
         </div>
       </CollapsibleContent>
+      <TestHistoryEvidence name={item.name} className={item.className} suiteName={item.suiteName} />
     </Collapsible>
   );
 }

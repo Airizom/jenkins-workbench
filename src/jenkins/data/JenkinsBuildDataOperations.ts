@@ -36,6 +36,7 @@ export class JenkinsBuildDataOperations {
     limit: number,
     options?: {
       detailLevel?: "summary" | "details" | "revisions";
+      offset?: number;
       includeParameters?: boolean;
       bypassCache?: boolean;
     }
@@ -46,17 +47,20 @@ export class JenkinsBuildDataOperations {
     const client = await this.context.getClient(environment);
     if (bypassCache) {
       return client.getBuilds(jobUrl, limit, {
+        offset: options?.offset,
         includeDetails: detailLevel === "details",
         includeRevisions: detailLevel === "revisions",
         includeParameters
       });
     }
-    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}-${limit}`;
+    const rangeKind = options?.offset === undefined ? "recent" : `paged-${options.offset}`;
+    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}-${limit}-${rangeKind}`;
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, jobUrl);
     return this.context.getCache().getOrLoad(
       cacheKey,
       async () => {
         return client.getBuilds(jobUrl, limit, {
+          offset: options?.offset,
           includeDetails: detailLevel === "details",
           includeRevisions: detailLevel === "revisions",
           includeParameters

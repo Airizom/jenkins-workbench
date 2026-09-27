@@ -1,3 +1,4 @@
+import { failureEvidence } from "../../history/HistoryAnalysis";
 import type {
   JenkinsBuildDetails,
   JenkinsTestReport,
@@ -81,6 +82,7 @@ export function buildTestStateViewModel(
 ): BuildDetailsTestStateViewModel {
   const summary = buildTestsSummary(details, testReport, options);
   const results = buildTestResultsViewModel(testReport, {
+    buildNumber: details?.number,
     canOpenSource: options?.canOpenSource,
     loading: options?.loading
   });
@@ -116,7 +118,11 @@ function findTestSummaryAction(
 }
 function buildTestResultsViewModel(
   testReport: JenkinsTestReport | undefined,
-  options?: { canOpenSource?: (className?: string) => boolean; loading?: boolean }
+  options?: {
+    canOpenSource?: (className?: string) => boolean;
+    loading?: boolean;
+    buildNumber?: number;
+  }
 ): BuildTestResultsViewModel {
   if (!testReport) {
     return buildEmptyTestResultsViewModel(options?.loading);
@@ -131,6 +137,19 @@ function buildTestResultsViewModel(
       return;
     }
     items.push({
+      failureHistoryLabel:
+        options?.buildNumber === undefined
+          ? undefined
+          : failureEvidence(
+              {
+                key: normalized.key,
+                name: normalized.name,
+                outcome: normalized.status === "other" ? "unknown" : normalized.status,
+                age: testCase.age,
+                failedSince: testCase.failedSince
+              },
+              options.buildNumber
+            )?.label,
       id: buildTestCaseId(
         normalized.className,
         normalized.suiteName,

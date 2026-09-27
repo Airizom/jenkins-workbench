@@ -45,6 +45,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "jenkinsWorkbench.openJobHistory",
+        "title": "Jenkins: Open Job History"
+      },
+      {
         "command": "jenkinsWorkbench.openCurrentCommitBuild",
         "title": "Jenkins: Open Build for Current Commit"
       },
@@ -1059,6 +1063,11 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "jenkinsWorkbench.openJobHistory",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(job|pipeline|multibranchFolder)(\\s|$)/",
+          "group": "1_actions@5"
+        },
         {
           "command": "jenkinsWorkbench.refresh",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",

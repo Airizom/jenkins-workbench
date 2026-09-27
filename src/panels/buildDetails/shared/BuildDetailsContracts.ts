@@ -192,6 +192,7 @@ export interface BuildTestsSummaryViewModel {
 }
 
 export interface BuildTestCaseViewModel {
+  failureHistoryLabel?: string;
   id: string;
   name: string;
   className?: string;

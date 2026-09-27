@@ -135,7 +135,12 @@ export class JenkinsClient {
   async getBuilds(
     jobUrl: string,
     limit = 20,
-    options?: { includeDetails?: boolean; includeParameters?: boolean; includeRevisions?: boolean }
+    options?: {
+      includeDetails?: boolean;
+      includeParameters?: boolean;
+      includeRevisions?: boolean;
+      offset?: number;
+    }
   ): Promise<JenkinsBuild[]> {
     return this.buildsApi.getBuilds(jobUrl, limit, options);
   }

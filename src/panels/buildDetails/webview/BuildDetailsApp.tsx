@@ -1,4 +1,6 @@
 import * as React from "react";
+import { HistoryProvider } from "../../jobHistory/webview/HistoryContext";
+import { HistoryView } from "../../jobHistory/webview/HistoryView";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
@@ -127,101 +129,104 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   }
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen flex flex-col">
-        <BuildStatusHero
-          displayName={state.displayName}
-          resultLabel={state.resultLabel}
-          resultClass={state.resultClass}
-          durationLabel={state.durationLabel}
-          timestampLabel={state.timestampLabel}
-          culpritsLabel={state.culpritsLabel}
-          loading={Boolean(state.loading)}
-          isRunning={isRunning}
-          buildUrl={buildUrl}
-          testsSummary={state.testState.summary}
-          stageCount={stripSegments.length}
-          onOpenBuild={handleOpenBuild}
-        >
-          <PipelineStageStrip
-            segments={stripSegments}
-            loading={state.pipelineStagesLoading}
-            onSelectStage={handleStripStageSelect}
-          />
-        </BuildStatusHero>
-
-        <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
-          <PanelErrorList
-            errors={state.errors}
-            id="errors"
-            title="Unable to load build details"
-            onRetry={handleRetry}
-          />
-          <BuildDetailsTabs
-            selectedTab={selectedTab}
-            onTabChange={setSelectedTab}
-            hasPendingInputs={hasPendingInputs}
-            hasPipelineStages={hasPipelineStages}
-            hasTests={hasTests}
-            pendingInputs={state.pendingInputs}
-            pipelineStages={state.pipelineStages}
-            pipelineNodeLog={state.pipelineNodeLog}
-            pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
-            pipelineStagesLoading={state.pipelineStagesLoading}
-            stripFailedCount={stripFailedCount}
-            buildUrl={buildUrl}
+    <HistoryProvider>
+      <TooltipProvider>
+        <div className="min-h-screen flex flex-col">
+          <BuildStatusHero
+            displayName={state.displayName}
+            resultLabel={state.resultLabel}
             resultClass={state.resultClass}
+            durationLabel={state.durationLabel}
+            timestampLabel={state.timestampLabel}
+            culpritsLabel={state.culpritsLabel}
+            loading={Boolean(state.loading)}
+            isRunning={isRunning}
+            buildUrl={buildUrl}
             testsSummary={state.testState.summary}
-            testResults={state.testState.results}
-            coverageState={coverageState}
-            insights={insights}
-            diagnostics={state.diagnostics}
-            consoleText={state.consoleText}
-            consoleHtmlModel={state.consoleHtmlModel}
-            consoleTruncated={state.consoleTruncated}
-            consoleMaxChars={state.consoleMaxChars}
-            consoleError={state.consoleError}
-            followLog={state.followLog}
-            onApproveInput={(inputId) => postMessage({ type: "approveInput", inputId })}
-            onRejectInput={(inputId) => postMessage({ type: "rejectInput", inputId })}
-            onRestartStage={(stageName) =>
-              postMessage({ type: "restartPipelineFromStage", stageName })
-            }
-            onSelectPipelineLog={handleSelectPipelineLog}
-            onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
-            onExportPipelineLog={() => {
-              postMessage({ type: "exportPipelineNodeLog" });
-              toast({ title: "Log export requested" });
-            }}
-            onToggleFollowLog={handleToggleFollowLog}
-            onExportLogs={handleExportConsole}
-            onOpenExternal={handleOpenExternal}
-            onArtifactAction={(action, artifact) => {
-              postMessage(buildArtifactActionMessage(action, artifact));
-              if (action === "download") {
-                toast({ title: "Download requested", description: artifact.name });
+            stageCount={stripSegments.length}
+            onOpenBuild={handleOpenBuild}
+          >
+            <PipelineStageStrip
+              segments={stripSegments}
+              loading={state.pipelineStagesLoading}
+              onSelectStage={handleStripStageSelect}
+            />
+          </BuildStatusHero>
+
+          <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
+            <HistoryView embedded />
+            <PanelErrorList
+              errors={state.errors}
+              id="errors"
+              title="Unable to load build details"
+              onRetry={handleRetry}
+            />
+            <BuildDetailsTabs
+              selectedTab={selectedTab}
+              onTabChange={setSelectedTab}
+              hasPendingInputs={hasPendingInputs}
+              hasPipelineStages={hasPipelineStages}
+              hasTests={hasTests}
+              pendingInputs={state.pendingInputs}
+              pipelineStages={state.pipelineStages}
+              pipelineNodeLog={state.pipelineNodeLog}
+              pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
+              pipelineStagesLoading={state.pipelineStagesLoading}
+              stripFailedCount={stripFailedCount}
+              buildUrl={buildUrl}
+              resultClass={state.resultClass}
+              testsSummary={state.testState.summary}
+              testResults={state.testState.results}
+              coverageState={coverageState}
+              insights={insights}
+              diagnostics={state.diagnostics}
+              consoleText={state.consoleText}
+              consoleHtmlModel={state.consoleHtmlModel}
+              consoleTruncated={state.consoleTruncated}
+              consoleMaxChars={state.consoleMaxChars}
+              consoleError={state.consoleError}
+              followLog={state.followLog}
+              onApproveInput={(inputId) => postMessage({ type: "approveInput", inputId })}
+              onRejectInput={(inputId) => postMessage({ type: "rejectInput", inputId })}
+              onRestartStage={(stageName) =>
+                postMessage({ type: "restartPipelineFromStage", stageName })
               }
-            }}
-            onReloadTestResults={() => {
-              postMessage(buildReloadTestReportMessage());
-              toast({ title: "Reloading test report" });
-            }}
-            onOpenTestSource={(testCase) => postMessage(buildOpenTestSourceMessage(testCase))}
-            onOpenDiagnosticSource={(targetId) =>
-              postMessage({ type: "openDiagnosticSource", targetId })
-            }
-            onShowDiagnosticProblems={() => postMessage({ type: "showBuildDiagnosticProblems" })}
-            onConfigureBuildDiagnostics={() => postMessage({ type: "configureBuildDiagnostics" })}
+              onSelectPipelineLog={handleSelectPipelineLog}
+              onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
+              onExportPipelineLog={() => {
+                postMessage({ type: "exportPipelineNodeLog" });
+                toast({ title: "Log export requested" });
+              }}
+              onToggleFollowLog={handleToggleFollowLog}
+              onExportLogs={handleExportConsole}
+              onOpenExternal={handleOpenExternal}
+              onArtifactAction={(action, artifact) => {
+                postMessage(buildArtifactActionMessage(action, artifact));
+                if (action === "download") {
+                  toast({ title: "Download requested", description: artifact.name });
+                }
+              }}
+              onReloadTestResults={() => {
+                postMessage(buildReloadTestReportMessage());
+                toast({ title: "Reloading test report" });
+              }}
+              onOpenTestSource={(testCase) => postMessage(buildOpenTestSourceMessage(testCase))}
+              onOpenDiagnosticSource={(targetId) =>
+                postMessage({ type: "openDiagnosticSource", targetId })
+              }
+              onShowDiagnosticProblems={() => postMessage({ type: "showBuildDiagnosticProblems" })}
+              onConfigureBuildDiagnostics={() => postMessage({ type: "configureBuildDiagnostics" })}
+            />
+          </main>
+
+          <BuildDetailsScrollToTopButton
+            show={showButton && !state.followLog}
+            onScrollToTop={scrollToTop}
           />
-        </main>
 
-        <BuildDetailsScrollToTopButton
-          show={showButton && !state.followLog}
-          onScrollToTop={scrollToTop}
-        />
-
-        <Toaster />
-      </div>
-    </TooltipProvider>
+          <Toaster />
+        </div>
+      </TooltipProvider>
+    </HistoryProvider>
   );
 }

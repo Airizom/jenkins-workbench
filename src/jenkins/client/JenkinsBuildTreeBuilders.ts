@@ -12,12 +12,13 @@ const BUILD_ACTION_CAUSE_FIELD = "causes[shortDescription,userId,userName]";
 const BUILD_ACTION_PARAMETER_FIELD = "parameters[name,value]";
 
 export function buildBuildsTree(options?: {
+  offset?: number;
   includeDetails?: boolean;
   includeParameters?: boolean;
   includeRevisions?: boolean;
 }): string {
   const parts: string[] = [
-    "builds[",
+    options?.offset === undefined ? "builds[" : "allBuilds[",
     "number,url,result,building,timestamp,duration,estimatedDuration"
   ];
 
@@ -65,11 +66,14 @@ export function buildBuildDetailsTree(options?: {
 }
 
 export function buildTestReportTree(options?: JenkinsTestReportOptions): string {
-  const caseFields = ["name", "className", "status", "errorDetails", "duration"];
-  if (options?.includeCaseLogs) {
+  const caseFields = ["name", "className", "status", "age", "failedSince"];
+  if (options?.projection !== "history") {
+    caseFields.push("errorDetails", "duration");
+  }
+  if (options?.includeCaseLogs && options.projection !== "history") {
     caseFields.push("errorStackTrace", "stdout", "stderr");
   }
-  return `passCount,failCount,skipCount,totalCount,suites[cases[${caseFields.join(",")}]]`;
+  return `passCount,failCount,skipCount,totalCount,suites[name,cases[${caseFields.join(",")}]]`;
 }
 
 function buildActionFields(options?: {

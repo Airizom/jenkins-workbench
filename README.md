@@ -67,6 +67,21 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
 
+### Cross-build failure history
+
+Open **Jenkins: Open Job History** from the Command Palette or a job/branch context menu. A multibranch parent prompts for a branch. The panel shows the latest 20 completed builds by default; choose 10, 20, or 50, search tests, or select a build to inspect its baseline evidence. Build and test outcome links open Build Details, and Compare actions use the selected build as the target.
+
+Build Details loads history separately when a visible, completed build has failing tests. Jenkins-reported failure age appears immediately in test rows. Expand **Failure history** for filters and baseline controls, or a test row's history for individual outcomes.
+
+- **New** and **continuing** failures use valid Jenkins `age`/`failedSince` metadata first, then adjacent sampled observations. Without reliable onset evidence, the label is **First observed failure**.
+- **Intermittent** requires at least two pass/fail transitions in one contiguous sequence. Missing reports, missing tests, skipped outcomes, and duplicate test identities break that sequence. It describes observed outcomes, not a proven cause.
+- Baseline detection prefers a sibling `main`, then `master`, in a verified multibranch project. **Select baseline** saves an override for that project or standalone job in its environment's scope; **Reset baseline** restores detection. The baseline build must have completed before the inspected build started. A matching failing test does not prove an identical error or root cause.
+- Job success rate is `SUCCESS / (SUCCESS + UNSTABLE + FAILURE)`. Duration values and the median use those same results. Aborted and not-built runs appear separately. Test failure rate is `failed / (passed + failed)`; skipped and unavailable observations do not count as passes.
+
+History lookup stops after 500 build summaries per job. The panel shows sample sizes, unavailable reports, and lookup truncation. Historical requests omit logs, use at most three concurrent report/list requests per environment, and reuse a bounded five-minute in-memory report cache. Hidden panels stop scheduling work. Refresh reloads the selected window; history reports are not persisted to disk.
+
+Large suites use a bounded active sample of 50,000 observations, divided across the chosen window, and at most 5,000 distinct displayed tests. Failing cases take priority within each report. The panel discloses truncation and treats omitted observations as unavailable.
+
 ### Jenkinsfile Validation
 
 - **Declarative Linting** — Validate Jenkinsfiles against the Jenkins declarative linter

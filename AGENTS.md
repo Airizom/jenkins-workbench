@@ -4,7 +4,7 @@ This file is intentionally non-generic. It records only details that are easy to
 
 ## 1) The Real Runtime Shape (Do Not Assume Typical VS Code Extension Layout)
 
-- The extension backend is TypeScript (`src/**`), and the four panel UIs are entries in one Vite build under `src/panels/**`.
+- The extension backend is TypeScript (`src/**`), and the five panel UIs are entries in one Vite build under `src/panels/**`.
 - Webview assets are resolved from `out/webview/manifest.json` at runtime (`src/panels/shared/webview/WebviewAssets.ts`).
 - If the manifest or entry names drift, panels fail with missing assets.
 - `npm run compile` is the command that keeps everything in sync:
@@ -55,6 +55,9 @@ If you change one side, update the others in the same pass.
 
 ## 3) Surprising Behaviors Worth Remembering
 
+- Jenkins limits the exported `builds` list to 100 entries before applying tree ranges. History requests with an explicit offset use `allBuilds`; keep their cache keys separate from ordinary recent-build requests.
+- Cross-build test identity is suite/class/name. Duplicate identities and omitted observations must remain ambiguous/unavailable; neither implies a pass. History budgets and cancellation are shared by Build Details and Job History (`src/history/**`, `src/panels/jobHistory/**`).
+
 - Manual refresh is rate-limited (2s cooldown) in `TreeDataProvider.refresh()`. Repeated refresh requests may be ignored by design.
 - Pending input refreshes are queued/throttled with concurrency limits in `PendingInputRefreshCoordinator`; this protects Jenkins from burst traffic.
 - Build Details uses load tokens and panel-visibility-aware polling. If you alter refresh timing, preserve token checks to avoid stale postMessage updates.
@@ -77,10 +80,10 @@ When adding a service, wire it through the appropriate provider catalog (`CorePr
 
 If you touch panel entrypoints, bundle naming, or Vite output:
 
-1. Confirm `vite.config.ts` still emits manifest entries for build compare, build details, node capacity, and node details.
+1. Confirm `vite.config.ts` still emits manifest entries for build compare, build details, job history, node capacity, and node details.
 2. Run `npm run compile`.
 3. Verify `out/webview/manifest.json` includes expected entries.
-4. Launch Extension Development Host and open the Build Compare, Build Details, Node Capacity, and Node Details panels.
+4. Launch Extension Development Host and open the Build Compare, Build Details, Job History, Node Capacity, and Node Details panels.
 
 If this is skipped, `resolveWebviewAssets(...)` throws; panel helpers catch the error and render a load-error view instead of the interactive panel.
 
@@ -122,6 +125,7 @@ Unit tests do not exercise the webview UI or live Jenkins traffic. For changes t
    - queue visibility
    - build compare panel updates
    - build details panel updates
+   - job history, baseline selection, and hidden-panel cancellation
    - node capacity panel updates
    - node details panel updates
    - artifact preview/download behavior

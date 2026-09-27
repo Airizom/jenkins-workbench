@@ -7,6 +7,7 @@ export interface JenkinsDataServiceOptions {
 }
 
 export interface BuildListFetchOptions {
+  offset?: number;
   detailLevel?: "summary" | "details" | "revisions";
   includeParameters?: boolean;
   bypassCache?: boolean;

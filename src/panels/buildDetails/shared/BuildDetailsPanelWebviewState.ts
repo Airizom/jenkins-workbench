@@ -1,5 +1,6 @@
 import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
+import { normalizeHistoryUi } from "../../jobHistory/shared/HistoryContracts";
 import type { SerializedEnvironmentState } from "../../shared/webview/WebviewPanelState";
 import {
   createEnvironmentScopedPanelState,
@@ -26,6 +27,7 @@ export interface BuildDetailsPanelUiState {
 }
 
 export interface BuildDetailsPanelSerializedState extends SerializedEnvironmentState {
+  historyUi?: unknown;
   buildUrl: string;
   /**
    * Best-effort UI state restored from an earlier session, possibly written by
@@ -119,7 +121,10 @@ export function mergeBuildDetailsPanelState(
     : previousUi?.pipelinePresentation
       ? { pipelinePresentation: previousUi.pipelinePresentation }
       : undefined;
-  return createBuildDetailsPanelState(environment, buildUrl, previousUiState);
+  const state = createBuildDetailsPanelState(environment, buildUrl, previousUiState);
+  if (samePanelTarget && previousState?.historyUi)
+    state.historyUi = normalizeHistoryUi(previousState.historyUi);
+  return state;
 }
 
 export function isBuildDetailsPanelUiState(value: unknown): value is BuildDetailsPanelUiState {

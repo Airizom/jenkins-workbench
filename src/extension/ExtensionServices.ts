@@ -72,6 +72,7 @@ export function registerExtensionProviders(
   });
 
   const runtimeCatalog = createRuntimeProviderCatalog({
+    context,
     extensionUri: options.extensionUri,
     buildCompareOptionsProvider: options.buildCompareOptionsProvider,
     currentBranchPullRequestJobNamePatterns: options.currentBranchPullRequestJobNamePatterns,

@@ -18,6 +18,7 @@ import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 
 interface BuildDetailsPanelRuntimeOptions {
+  onTestReportChanged?: () => void;
   state: BuildDetailsPanelState;
   view: BuildDetailsPanelView;
   coverageDecorationService: CoverageDecorationService;
@@ -200,6 +201,7 @@ export class BuildDetailsPanelRuntime {
         logsIncluded: Boolean(effectiveOptions?.includeCaseLogs)
       });
       this.options.state.setTestResultsLoading(false);
+      this.options.onTestReportChanged?.();
       this.postStateUpdate();
     } catch {
       if (!this.isTestReportRefreshStale(token, refreshGeneration)) {

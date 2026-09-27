@@ -86,6 +86,12 @@ export async function activateRuntime(
       deserializeWebviewPanel: (panel, state) => buildDetailsPanelLauncher.revive(panel, state)
     }
   );
+  context.subscriptions.push(
+    vscode.window.registerWebviewPanelSerializer("jenkinsWorkbench.jobHistory", {
+      deserializeWebviewPanel: (panel, state) =>
+        container.get("jobHistoryPanelLauncher").revive(panel, state)
+    })
+  );
 
   const nodeDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
     "jenkinsWorkbench.nodeDetails",

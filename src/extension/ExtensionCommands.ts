@@ -3,6 +3,7 @@ import { registerBuildCommands } from "../commands/BuildCommands";
 import { registerBuildDiagnosticCommands } from "../commands/BuildDiagnosticCommands";
 import { registerCurrentBranchCommands } from "../commands/CurrentBranchCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
+import { registerHistoryCommands } from "../commands/HistoryCommands";
 import { registerJenkinsfileCommands } from "../commands/JenkinsfileCommands";
 import { registerJobCommands } from "../commands/JobCommands";
 import { registerNodeCapacityCommands } from "../commands/NodeCapacityCommands";
@@ -73,6 +74,12 @@ export function registerExtensionCommands(
   );
 
   registerCurrentBranchCommands(context, currentBranchWorkflowService);
+  registerHistoryCommands(
+    context,
+    dataService,
+    environmentStore,
+    container.get("jobHistoryPanelLauncher")
+  );
 
   registerJobCommands(
     context,

@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { BuildDiagnosticsCoordinator } from "../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { normalizeJenkinsUrlForComparison } from "../jenkins/urls";
+import { normalizeJenkinsUrlForComparison, parseBuildUrl } from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
@@ -10,6 +10,7 @@ import {
   buildTestSourceNavigationContext,
   type TestSourceResolver
 } from "../services/TestSourceResolver";
+import { isPlainRecord } from "../shared/runtimeGuards";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { PipelineNodeSelection } from "./BuildDetailsPanelLauncher";
@@ -36,6 +37,8 @@ import {
   mergeBuildDetailsPanelState,
   withBuildDetailsPanelUiState
 } from "./buildDetails/shared/BuildDetailsPanelWebviewState";
+import { HistoryController, type HistoryDependencies } from "./jobHistory/HistoryController";
+import { normalizeHistoryUi } from "./jobHistory/shared/HistoryContracts";
 import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
@@ -46,6 +49,7 @@ import {
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 
 interface BuildDetailsPanelShowOptions {
+  historyDependencies?: HistoryDependencies;
   backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
@@ -63,6 +67,7 @@ interface BuildDetailsPanelShowOptions {
 }
 
 interface BuildDetailsPanelReviveOptions {
+  historyDependencies?: HistoryDependencies;
   backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
   consoleExporter: BuildConsoleExporter;
@@ -85,6 +90,9 @@ interface BuildDetailsPanelMutableServices {
 }
 
 export class BuildDetailsPanel {
+  private readonly historyController?: HistoryController;
+  private historyEnvironment?: JenkinsEnvironmentRef;
+  private historyBuildUrl?: string;
   private static currentPanel: BuildDetailsPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
@@ -128,7 +136,8 @@ export class BuildDetailsPanel {
         extensionUri,
         coverageDecorationService,
         mutableServices,
-        options.buildDiagnosticsCoordinator
+        options.buildDiagnosticsCoordinator,
+        options.historyDependencies
       );
       BuildDetailsPanel.currentPanel = activePanel;
     } else {
@@ -159,7 +168,8 @@ export class BuildDetailsPanel {
       options.extensionUri,
       options.coverageDecorationService,
       getMutableServices(options),
-      options.buildDiagnosticsCoordinator
+      options.buildDiagnosticsCoordinator,
+      options.historyDependencies
     );
     BuildDetailsPanel.currentPanel = revived;
 
@@ -194,10 +204,14 @@ export class BuildDetailsPanel {
     extensionUri: vscode.Uri,
     coverageDecorationService: CoverageDecorationService,
     mutableServices: BuildDetailsPanelMutableServices,
-    private readonly buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator
+    private readonly buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator,
+    historyDependencies?: HistoryDependencies
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
+    this.historyController = historyDependencies
+      ? new HistoryController(panel, historyDependencies)
+      : undefined;
     this.canOpenTestSource = (environment, buildUrl, className) =>
       Boolean(
         environment &&
@@ -216,9 +230,11 @@ export class BuildDetailsPanel {
           details,
           this.controller.getBuildUrl()
         );
+        this.updateHistory();
       },
       () => this.postCurrentBuildDiagnostics(),
-      () => this.mutableServices.testSourceResolver?.whenReady() ?? Promise.resolve()
+      () => this.mutableServices.testSourceResolver?.whenReady() ?? Promise.resolve(),
+      () => this.updateHistory()
     );
     this.configure(mutableServices);
     this.actions = new BuildDetailsPanelActions({
@@ -306,6 +322,10 @@ export class BuildDetailsPanel {
     );
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) => {
+        if (isPlainRecord(message) && message.type === "persistHistoryUi" && this.serializedState) {
+          this.serializedState.historyUi = normalizeHistoryUi(message.uiState);
+          return;
+        }
         this.messageRouter.route(message);
       },
       null,
@@ -342,6 +362,7 @@ export class BuildDetailsPanel {
   }
 
   private dispose(): void {
+    this.historyController?.dispose();
     const buildUrl = this.controller.getBuildUrl();
     disposePanelResources(this.disposables);
     this.controller.dispose();
@@ -362,6 +383,9 @@ export class BuildDetailsPanel {
     label?: string,
     pipelineNodeSelection?: PipelineNodeSelection
   ): Promise<void> {
+    this.historyController?.clear();
+    this.historyEnvironment = environment;
+    this.historyBuildUrl = undefined;
     this.artifactActionHandler = artifactActionHandler;
     this.buildDiagnosticsCoordinator.setPanelOwner(environment, buildUrl);
     let panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
@@ -372,6 +396,7 @@ export class BuildDetailsPanel {
       });
     }
     this.serializedState = panelState;
+    this.historyController?.restore(normalizeHistoryUi(panelState.historyUi));
     const result: BuildDetailsPanelLoadResult = await this.controller.load(
       backend,
       environment,
@@ -393,6 +418,25 @@ export class BuildDetailsPanel {
       return;
     }
     this.postCurrentBuildDiagnostics();
+    this.updateHistory();
+  }
+
+  private updateHistory(): void {
+    const details = this.controller.getCurrentDetails();
+    const buildUrl = this.controller.getBuildUrl();
+    const jobUrl = buildUrl ? parseBuildUrl(buildUrl)?.jobUrl : undefined;
+    const hasFailures = this.controller.hasFailedTests();
+    const historyKey = `${buildUrl}:${hasFailures}`;
+    if (
+      !details ||
+      details.building ||
+      !jobUrl ||
+      !this.historyEnvironment ||
+      this.historyBuildUrl === historyKey
+    )
+      return;
+    this.historyBuildUrl = historyKey;
+    this.historyController?.setContext(this.historyEnvironment, jobUrl, details, hasFailures);
   }
 
   private postCurrentBuildDiagnostics(): void {

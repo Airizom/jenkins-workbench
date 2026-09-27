@@ -31,6 +31,26 @@ function getTreeParameter(url: string): string {
 }
 
 describe("JenkinsBuildsApi getBuilds tree range", () => {
+  it("supports exclusive offset ranges for bounded history paging", async () => {
+    const { context, requestedUrls } = createContextHarness();
+    await new JenkinsBuildsApi(context).getBuilds("https://jenkins.example.com/job/demo/", 100, {
+      offset: 100
+    });
+    assert.match(getTreeParameter(requestedUrls[0]), /\{100,200\}$/);
+    assert.match(getTreeParameter(requestedUrls[0]), /^allBuilds\[/);
+  });
+  it("reads the allBuilds response for explicit paging, including the first page", async () => {
+    const builds = [{ number: 401, url: "https://jenkins.example.com/job/demo/401/" }];
+    const context = createJenkinsClientContext({
+      requestJson: async <T>() => ({ allBuilds: builds }) as T
+    });
+    assert.deepEqual(
+      await new JenkinsBuildsApi(context).getBuilds("https://jenkins.example.com/job/demo/", 100, {
+        offset: 0
+      }),
+      builds
+    );
+  });
   it("requests {0,limit} so the exclusive Stapler range returns `limit` builds", async () => {
     const { context, requestedUrls } = createContextHarness();
     const api = new JenkinsBuildsApi(context);

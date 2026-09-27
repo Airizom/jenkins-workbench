@@ -1,4 +1,5 @@
 import * as assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import * as vscode from "vscode";
 
 const EXTENSION_ID = "airizom.jenkins-workbench";
@@ -23,6 +24,7 @@ describe("extension smoke", () => {
 
     const registered = new Set(await vscode.commands.getCommands(true));
     const expected = [
+      "jenkinsWorkbench.openJobHistory",
       "jenkinsWorkbench.addEnvironment",
       "jenkinsWorkbench.removeEnvironment",
       "jenkinsWorkbench.triggerBuild",
@@ -42,5 +44,27 @@ describe("extension smoke", () => {
 
     const tasks = await vscode.tasks.fetchTasks({ type: "jenkinsWorkbench" });
     assert.ok(Array.isArray(tasks));
+  });
+  it("packages all five webview entries", async () => {
+    const extension = vscode.extensions.getExtension(EXTENSION_ID);
+    assert.ok(extension);
+    const manifest = JSON.parse(
+      await readFile(
+        vscode.Uri.joinPath(extension.extensionUri, "out", "webview", "manifest.json").fsPath,
+        "utf8"
+      )
+    ) as Record<string, { file: string; isEntry?: boolean }>;
+    for (const name of [
+      "buildDetails",
+      "buildCompare",
+      "nodeDetails",
+      "nodeCapacity",
+      "jobHistory"
+    ]) {
+      assert.ok(
+        Object.values(manifest).some((entry) => entry.isEntry && entry.file.startsWith(`${name}/`)),
+        `missing webview ${name}`
+      );
+    }
   });
 });

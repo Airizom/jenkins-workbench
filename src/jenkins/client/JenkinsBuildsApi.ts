@@ -68,17 +68,34 @@ export class JenkinsBuildsApi {
   async getBuilds(
     jobUrl: string,
     limit = 20,
-    options?: { includeDetails?: boolean; includeParameters?: boolean; includeRevisions?: boolean }
+    options?: {
+      includeDetails?: boolean;
+      includeParameters?: boolean;
+      includeRevisions?: boolean;
+      offset?: number;
+    }
   ): Promise<JenkinsBuild[]> {
-    const safeLimit = Math.floor(limit);
+    const safeLimit = Number.isFinite(limit) ? Math.floor(limit) : 0;
+    const offset = Number.isFinite(options?.offset)
+      ? Math.max(0, Math.floor(options?.offset ?? 0))
+      : 0;
     if (safeLimit <= 0) {
       return [];
     }
     // Stapler tree ranges {M,N} are exclusive of N, so {0,limit} returns `limit` builds.
-    const tree = buildBuildsTree(options).replace(BUILD_LIST_LIMIT_TOKEN, `{0,${safeLimit}}`);
+    const tree = buildBuildsTree(options).replace(
+      BUILD_LIST_LIMIT_TOKEN,
+      `{${offset},${offset + safeLimit}}`
+    );
     const url = buildApiUrlFromItem(jobUrl, tree);
-    const response = await this.context.requestJson<{ builds?: JenkinsBuild[] }>(url);
-    return Array.isArray(response.builds) ? response.builds : [];
+    const response = await this.context.requestJson<{
+      builds?: JenkinsBuild[];
+      allBuilds?: JenkinsBuild[];
+    }>(url);
+    // Jenkins limits the exported `builds` list to 100 runs before applying tree ranges.
+    // Explicit offset requests use `allBuilds` so bounded history can page beyond that limit.
+    const builds = options?.offset === undefined ? response.builds : response.allBuilds;
+    return Array.isArray(builds) ? builds : [];
   }
 
   async getBuildDetails(
