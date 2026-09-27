@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.54.0] - 2026-09-26
+
+### Added
+
+- feat: Job History panel and Build Details failure history with baseline controls, tracking new, continuing, and intermittent test failures without treating gaps as passes.
+- feat: page through `allBuilds` for history with bounded requests, cache reporting, and sampling; history work stops while panels are hidden.
+
+### Changed
+
+- refactor(src): split diagnostics parser, current-branch commands, and Build Details panel activation, loading, and message contracts into focused modules.
+
 ## [1.53.0] - 2026-09-26
 
 ### Added
