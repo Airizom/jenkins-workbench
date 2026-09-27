@@ -1,35 +1,12 @@
-import type { BuildDiagnosticSeverity } from "../shared/BuildDiagnosticContracts";
-import {
-  type CustomCaptureState,
-  capturesFromPattern,
-  customDraft,
-  type DiagnosticDraft,
-  fileUrlToPath,
-  looksLikeStandaloneSourcePath,
-  mergeCaptures,
-  type NormalizedLogLine,
-  normalizeBuildLogLine,
-  parseGccClang,
-  parseGeneric,
-  parseGo,
-  parseMsvc,
-  parseTypeScript,
-  positiveInteger,
-  type StackState,
-  severityFromText,
-  stackDraft
-} from "./BuildDiagnosticParserSupport";
+import { BuildDiagnosticBuiltInParser } from "./BuildDiagnosticBuiltInParser";
+import { BuildDiagnosticCustomMatcherRunner } from "./BuildDiagnosticCustomMatcherRunner";
+import { type DiagnosticDraft, normalizeBuildLogLine } from "./BuildDiagnosticParserSupport";
 import { BROAD_CORE_DIAGNOSTIC_PARSERS } from "./BuildDiagnosticProfiles";
 import type {
   BuiltInDiagnosticParserId,
   NormalizedCustomDiagnosticMatcher,
   RawBuildDiagnostic
 } from "./BuildDiagnosticTypes";
-
-interface CustomMatcherState {
-  patternIndex: number;
-  captures: CustomCaptureState;
-}
 
 export interface BuildDiagnosticLogParserOptions {
   builtIns?: readonly BuiltInDiagnosticParserId[];
@@ -40,45 +17,25 @@ export interface BuildDiagnosticLogParserOptions {
 
 export const MAX_DIAGNOSTIC_LOG_LINE_CHARS = 1024 * 1024;
 
-/** Lines that may legitimately appear between frames of an already started trace. */
-const JVM_TRACE_CONTINUATION = /^(?:at\s+\S|\.\.\.\s*\d+\s+more\b|(?:Caused by|Suppressed):)/;
-const JAVASCRIPT_TRACE_CONTINUATION = /^at\s+\S/;
-const DOTNET_TRACE_CONTINUATION = /^(?:at\s+\S|--->\s|---\s+End of\b)/;
-const PYTHON_TRACE_FRAME = /^File\s+"/;
-/** A Python frame is followed by at most a source line and a caret marker line. */
-const MAX_PYTHON_TRACE_TAIL_LINES = 2;
-
 /**
  * Stateful line parser suitable for Jenkins progressive-console chunks. It
  * retains only an incomplete line and the small amount of multiline matcher
  * state required between calls.
  */
 export class BuildDiagnosticLogParser {
-  private readonly enabledBuiltIns: ReadonlySet<BuiltInDiagnosticParserId>;
-  private readonly customMatchers: readonly NormalizedCustomDiagnosticMatcher[];
+  private readonly builtIns: BuildDiagnosticBuiltInParser;
+  private readonly customMatchers: BuildDiagnosticCustomMatcherRunner;
   private readonly maxDiagnosticsPerCall: number;
   private readonly maxLineChars: number;
-  private readonly customStates = new Map<string, CustomMatcherState>();
   private remainderParts: string[] = [];
   private remainderLength = 0;
   private discardingOversizedLine = false;
   private lineTruncated = false;
   private lineNumber = 0;
   private sequence = 0;
-  private stackCounter = 0;
-  private eslintPath: string | undefined;
-  private rustHeader:
-    | { severity: BuildDiagnosticSeverity; code?: string; message: string }
-    | undefined;
-  private jvmStack: StackState | undefined;
-  private javascriptStack: StackState | undefined;
-  private pythonStack: StackState | undefined;
-  private pythonTailLines = 0;
-  private dotnetStack: StackState | undefined;
 
   constructor(options: BuildDiagnosticLogParserOptions = {}) {
-    const enabled = new Set(options.builtIns ?? BROAD_CORE_DIAGNOSTIC_PARSERS);
-    this.customMatchers = options.customMatchers ?? [];
+    const customMatchers = options.customMatchers ?? [];
     this.maxDiagnosticsPerCall =
       typeof options.maxDiagnosticsPerCall === "number" &&
       Number.isFinite(options.maxDiagnosticsPerCall)
@@ -88,13 +45,10 @@ export class BuildDiagnosticLogParser {
       typeof options.maxLineChars === "number" && Number.isFinite(options.maxLineChars)
         ? Math.max(1, Math.floor(options.maxLineChars))
         : MAX_DIAGNOSTIC_LOG_LINE_CHARS;
-    for (const matcher of this.customMatchers) {
-      if (matcher.base) {
-        enabled.add(matcher.base);
-      }
-      this.customStates.set(matcher.id, { patternIndex: 0, captures: {} });
-    }
-    this.enabledBuiltIns = enabled;
+    this.customMatchers = new BuildDiagnosticCustomMatcherRunner(customMatchers);
+    this.builtIns = new BuildDiagnosticBuiltInParser(
+      enabledBuiltInParsers(options.builtIns, customMatchers)
+    );
   }
 
   get didTruncateLine(): boolean {
@@ -199,341 +153,17 @@ export class BuildDiagnosticLogParser {
   private parseLine(rawLine: string): RawBuildDiagnostic[] {
     this.lineNumber += 1;
     const normalized = normalizeBuildLogLine(rawLine);
-    const diagnostics: RawBuildDiagnostic[] = [];
-    this.endTerminatedStacks(normalized.text);
+    this.builtIns.endTerminatedStacks(normalized.text);
 
-    for (const matcher of this.customMatchers) {
-      diagnostics.push(...this.parseCustomMatcher(matcher, normalized.text, rawLine));
-    }
+    const diagnostics = this.customMatchers
+      .parseLine(normalized.text)
+      .map((draft) => this.materialize(draft, rawLine));
 
-    const builtIn = this.parseBuiltIn(normalized);
+    const builtIn = this.builtIns.parse(normalized);
     if (builtIn) {
-      diagnostics.push(this.materialize(this.applyBaseMatcher(builtIn), rawLine));
+      diagnostics.push(this.materialize(this.customMatchers.applyBaseMatcher(builtIn), rawLine));
     }
     return diagnostics;
-  }
-
-  private parseBuiltIn(line: NormalizedLogLine): DiagnosticDraft | undefined {
-    const text = line.text;
-    if (this.enabledBuiltIns.has("typescript")) {
-      const result = parseTypeScript(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("msvc")) {
-      const result = parseMsvc(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("gcc-clang")) {
-      const result = parseGccClang(text, line.prefixSeverity);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("eslint")) {
-      const result = this.parseEslint(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("rust")) {
-      const result = this.parseRust(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("go")) {
-      const result = parseGo(text, line.prefixSeverity);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("jvm-stack")) {
-      const result = this.parseJvmStack(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("javascript-stack")) {
-      const result = this.parseJavaScriptStack(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("python-traceback")) {
-      const result = this.parsePythonStack(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("dotnet-stack")) {
-      const result = this.parseDotnetStack(text);
-      if (result) {
-        return result;
-      }
-    }
-    if (this.enabledBuiltIns.has("generic")) {
-      const result = parseGeneric(text, line.prefixSeverity);
-      if (result) {
-        return result;
-      }
-    }
-    return undefined;
-  }
-
-  private parseEslint(text: string): DiagnosticDraft | undefined {
-    const finding = text.match(/^\s*(\d+):(\d+)\s+(error|warning)\s+(.+?)(?:\s{2,}([^\s]+))?\s*$/i);
-    if (finding && this.eslintPath) {
-      return {
-        parserId: "eslint",
-        source: "eslint",
-        severity: severityFromText(finding[3]),
-        message: finding[4].trim(),
-        rawPath: this.eslintPath,
-        line: positiveInteger(finding[1]),
-        column: positiveInteger(finding[2]),
-        code: finding[5],
-        priority: 130
-      };
-    }
-    if (looksLikeStandaloneSourcePath(text)) {
-      this.eslintPath = text.trim();
-    } else if (!text.trim()) {
-      this.eslintPath = undefined;
-    }
-    return undefined;
-  }
-
-  private parseRust(text: string): DiagnosticDraft | undefined {
-    const header = text.match(/^\s*(error|warning)(?:\[([^\]]+)\])?:\s*(.+)$/i);
-    if (header) {
-      this.rustHeader = {
-        severity: severityFromText(header[1]),
-        code: header[2],
-        message: header[3].trim()
-      };
-      return undefined;
-    }
-    const span = text.match(/^\s*-->\s+(.+?):(\d+):(\d+)\s*$/);
-    if (!span || !this.rustHeader) {
-      return undefined;
-    }
-    const result: DiagnosticDraft = {
-      parserId: "rust",
-      source: "rustc",
-      severity: this.rustHeader.severity,
-      message: this.rustHeader.message,
-      rawPath: span[1].trim(),
-      line: positiveInteger(span[2]),
-      column: positiveInteger(span[3]),
-      code: this.rustHeader.code,
-      priority: 140
-    };
-    this.rustHeader = undefined;
-    return result;
-  }
-
-  private parseJvmStack(text: string): DiagnosticDraft | undefined {
-    if (
-      /^(?:Exception in thread\s+"[^"]+"\s+)?(?:Caused by:\s*)?[\w.$]+(?:Exception|Error)(?::\s*.*)?$/.test(
-        text.trim()
-      )
-    ) {
-      this.jvmStack = this.newStack(text.trim());
-      return undefined;
-    }
-    const frame = text.match(/^\s*at\s+[^()]+\(([^():]+\.java):(\d+)\)\s*$/);
-    if (!frame) {
-      return undefined;
-    }
-    this.jvmStack ??= this.newStack("Java stack frame");
-    const stack = this.jvmStack;
-    return stackDraft("jvm-stack", "java", frame[1], frame[2], undefined, stack, 210);
-  }
-
-  private parseJavaScriptStack(text: string): DiagnosticDraft | undefined {
-    if (
-      /^(?:[A-Za-z]*Error|TypeError|RangeError|ReferenceError|SyntaxError):(?:\s*.*)?$/.test(
-        text.trim()
-      )
-    ) {
-      this.javascriptStack = this.newStack(text.trim());
-      return undefined;
-    }
-    const frame = text.match(
-      /^\s*at\s+(?:(?:async\s+)?[^()]+\s+\()?((?:file:\/\/)?(?:[A-Za-z]:[\\/]|\/|\.{0,2}[\\/])?[^()\s]+?\.(?:[cm]?js|jsx|ts|tsx)):(\d+):(\d+)\)?\s*$/i
-    );
-    if (!frame) {
-      return undefined;
-    }
-    this.javascriptStack ??= this.newStack("JavaScript stack frame");
-    const stack = this.javascriptStack;
-    return stackDraft(
-      "javascript-stack",
-      "javascript",
-      fileUrlToPath(frame[1]),
-      frame[2],
-      frame[3],
-      stack,
-      220
-    );
-  }
-
-  private parsePythonStack(text: string): DiagnosticDraft | undefined {
-    if (/^Traceback \(most recent call last\):\s*$/.test(text.trim())) {
-      this.pythonStack = this.newStack("Python traceback");
-      this.pythonTailLines = 0;
-      return undefined;
-    }
-    const frame = text.match(/^\s*File\s+"([^"]+)",\s+line\s+(\d+)(?:,\s+in\s+(.+))?\s*$/);
-    if (!frame) {
-      return undefined;
-    }
-    this.pythonStack ??= this.newStack("Python traceback");
-    const stack = this.pythonStack;
-    const message = frame[3] ? `${stack.message}: ${frame[3].trim()}` : stack.message;
-    return {
-      ...stackDraft("python-traceback", "python", frame[1], frame[2], undefined, stack, 230),
-      message
-    };
-  }
-
-  private parseDotnetStack(text: string): DiagnosticDraft | undefined {
-    if (
-      /^(?:Unhandled exception\.\s+)?(?:--->\s+)?System\.[\w.]+Exception(?::\s*.*)?$/.test(
-        text.trim()
-      )
-    ) {
-      this.dotnetStack = this.newStack(text.trim());
-      return undefined;
-    }
-    const frame = text.match(/^\s*at\s+.+?\s+in\s+(.+?):line\s+(\d+)\s*$/i);
-    if (!frame) {
-      return undefined;
-    }
-    this.dotnetStack ??= this.newStack(".NET stack frame");
-    const stack = this.dotnetStack;
-    return stackDraft("dotnet-stack", "dotnet", frame[1], frame[2], undefined, stack, 240);
-  }
-
-  /**
-   * Ends any active trace once a line arrives that cannot belong to it, so a
-   * later stray frame starts its own group instead of joining an old one.
-   * Traces that have not emitted a frame yet are kept because exception
-   * messages may span several lines before the first frame.
-   */
-  private endTerminatedStacks(text: string): void {
-    const trimmed = text.trim();
-    if (this.jvmStack && this.jvmStack.nextFrame > 0 && !JVM_TRACE_CONTINUATION.test(trimmed)) {
-      this.jvmStack = undefined;
-    }
-    if (
-      this.javascriptStack &&
-      this.javascriptStack.nextFrame > 0 &&
-      !JAVASCRIPT_TRACE_CONTINUATION.test(trimmed)
-    ) {
-      this.javascriptStack = undefined;
-    }
-    if (
-      this.dotnetStack &&
-      this.dotnetStack.nextFrame > 0 &&
-      !DOTNET_TRACE_CONTINUATION.test(trimmed)
-    ) {
-      this.dotnetStack = undefined;
-    }
-    this.endTerminatedPythonStack(trimmed);
-  }
-
-  private endTerminatedPythonStack(trimmed: string): void {
-    if (!this.pythonStack) {
-      return;
-    }
-    if (PYTHON_TRACE_FRAME.test(trimmed)) {
-      this.pythonTailLines = 0;
-      return;
-    }
-    this.pythonTailLines += 1;
-    if (this.pythonStack.nextFrame > 0 && this.pythonTailLines > MAX_PYTHON_TRACE_TAIL_LINES) {
-      this.pythonStack = undefined;
-    }
-  }
-
-  private newStack(message: string): StackState {
-    this.stackCounter += 1;
-    return { id: `stack-${this.stackCounter}`, message, nextFrame: 0 };
-  }
-
-  private parseCustomMatcher(
-    matcher: NormalizedCustomDiagnosticMatcher,
-    line: string,
-    rawLine: string
-  ): RawBuildDiagnostic[] {
-    if (matcher.patterns.length === 0) {
-      return [];
-    }
-    const state = this.customStates.get(matcher.id) ?? { patternIndex: 0, captures: {} };
-    this.customStates.set(matcher.id, state);
-    const result = this.tryCustomPattern(matcher, state, line, rawLine);
-    if (result.matched || state.patternIndex === 0) {
-      return result.diagnostic ? [result.diagnostic] : [];
-    }
-
-    state.patternIndex = 0;
-    state.captures = {};
-    const retry = this.tryCustomPattern(matcher, state, line, rawLine);
-    return retry.diagnostic ? [retry.diagnostic] : [];
-  }
-
-  private applyBaseMatcher(draft: DiagnosticDraft): DiagnosticDraft {
-    const matcher = this.customMatchers.find(
-      (candidate) => candidate.base === draft.parserId && candidate.patterns.length === 0
-    );
-    if (!matcher) {
-      return draft;
-    }
-    return {
-      ...draft,
-      parserId: `custom:${matcher.id}`,
-      source: matcher.source ?? draft.source,
-      severity: matcher.severity ?? draft.severity
-    };
-  }
-
-  private tryCustomPattern(
-    matcher: NormalizedCustomDiagnosticMatcher,
-    state: CustomMatcherState,
-    line: string,
-    rawLine: string
-  ): { matched: boolean; diagnostic?: RawBuildDiagnostic } {
-    const pattern = matcher.patterns[state.patternIndex];
-    pattern.regexp.lastIndex = 0;
-    const match = pattern.regexp.exec(line);
-    if (!match) {
-      return { matched: false };
-    }
-    const priorCaptures = state.captures;
-    const captures = mergeCaptures(priorCaptures, capturesFromPattern(pattern, match));
-    const finalPattern = state.patternIndex === matcher.patterns.length - 1;
-    if (!finalPattern) {
-      state.patternIndex += 1;
-      state.captures = captures;
-      return { matched: true };
-    }
-
-    const draft = customDraft(matcher, pattern, captures, line);
-    if (pattern.loop) {
-      state.captures = priorCaptures;
-    } else {
-      state.patternIndex = 0;
-      state.captures = {};
-    }
-    return {
-      matched: true,
-      diagnostic: draft ? this.materialize(draft, rawLine) : undefined
-    };
   }
 
   private materialize(draft: DiagnosticDraft, rawText: string): RawBuildDiagnostic {
@@ -546,6 +176,20 @@ export class BuildDiagnosticLogParser {
       sequence: this.sequence
     };
   }
+}
+
+/** Built-in parsers requested by the profile plus any that custom matchers extend. */
+function enabledBuiltInParsers(
+  builtIns: readonly BuiltInDiagnosticParserId[] | undefined,
+  customMatchers: readonly NormalizedCustomDiagnosticMatcher[]
+): ReadonlySet<BuiltInDiagnosticParserId> {
+  const enabled = new Set(builtIns ?? BROAD_CORE_DIAGNOSTIC_PARSERS);
+  for (const matcher of customMatchers) {
+    if (matcher.base) {
+      enabled.add(matcher.base);
+    }
+  }
+  return enabled;
 }
 
 export function parseBuildLog(

@@ -5,76 +5,46 @@ import type { CoverageDecorationService } from "../../services/CoverageDecoratio
 import { LoadTokenTracker, PanelLoadTracker } from "../shared/PanelRuntimeHelpers";
 import { createNonce } from "../shared/webview/WebviewNonce";
 import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
-import {
-  getBuildDetailsCoverageEnabled,
-  getBuildDetailsRefreshIntervalMs,
-  getTestReportIncludeCaseLogs,
-  MAX_CONSOLE_CHARS
-} from "./BuildDetailsConfig";
+import { getTestReportIncludeCaseLogs, MAX_CONSOLE_CHARS } from "./BuildDetailsConfig";
 import { BuildDetailsDiagnosticConsoleSync } from "./BuildDetailsDiagnosticConsoleSync";
-import { formatError } from "./BuildDetailsFormatters";
+import { BuildDetailsInitialActivation } from "./BuildDetailsInitialActivation";
 import {
   applyBuildDetailsInitialState,
   buildInitialBuildDetailsViewModel,
   resolveInitialPanelTitle
 } from "./BuildDetailsInitialState";
+import {
+  type BuildDetailsLoadTarget,
+  createBuildDetailsPanelPollingController,
+  createBuildDetailsPipelineNodeLogManager
+} from "./BuildDetailsLoadCollaborators";
+import type {
+  BuildDetailsPanelControllerAccess,
+  BuildDetailsPanelLoadOptions,
+  BuildDetailsPanelLoadResult
+} from "./BuildDetailsPanelControllerTypes";
 import { BuildDetailsPanelRuntime } from "./BuildDetailsPanelRuntime";
 import { BuildDetailsPanelState, type PipelineRestartAvailability } from "./BuildDetailsPanelState";
 import { BuildDetailsPanelView } from "./BuildDetailsPanelView";
-import { createBuildDetailsPollingCallbacks } from "./BuildDetailsPollingCallbacks";
-import {
-  type BuildDetailsInitialState,
+import type {
+  BuildDetailsInitialState,
   BuildDetailsPollingController
 } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
-import type { ConsoleTextByteRange } from "./ConsoleStreamManager";
-import { PipelineNodeLogManager } from "./PipelineNodeLogManager";
+import type { PipelineNodeLogManager } from "./PipelineNodeLogManager";
 import type {
   BuildDiagnosticsViewModel,
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
 
-export interface BuildDetailsPanelLoadOptions {
-  label?: string;
-  panelState?: unknown;
-}
-
-export type BuildDetailsPanelLoadResult =
-  | {
-      status: "ok";
-    }
-  | {
-      status: "missingAssets";
-    };
+export type {
+  BuildDetailsPanelControllerAccess,
+  BuildDetailsPanelLoadOptions,
+  BuildDetailsPanelLoadResult
+} from "./BuildDetailsPanelControllerTypes";
 
 type BuildDetailsResolvedAssets = Parameters<BuildDetailsPanelView["renderBuildDetails"]>[1];
-
-const MAX_INITIAL_STATUS_RETRIES = 5;
-const BUILD_DETAILS_ERROR_PREFIX = "Build details: ";
-
-export interface BuildDetailsPanelControllerAccess {
-  getBackend(): BuildDetailsBackend | undefined;
-  getEnvironment(): JenkinsEnvironmentRef | undefined;
-  getBuildUrl(): string | undefined;
-  getCurrentDetails(): JenkinsBuildDetails | undefined;
-  getLoadToken(): number;
-  getPipelineRestartAvailability(): PipelineRestartAvailability;
-  getPipelineRestartEnabled(): boolean;
-  getPipelineRestartableStages(): string[];
-  getCurrentPipelineNodeLog(): PipelineNodeLogViewModel | undefined;
-  selectPipelineLogTarget(target: PipelineLogTargetViewModel): void;
-  clearPipelineLogTarget(): void;
-  refreshBuildStatus(token: number): Promise<void>;
-  refreshTestReport(
-    token: number,
-    options?: { includeCaseLogs?: boolean; showLoading?: boolean }
-  ): Promise<void>;
-  refreshCoverage(token: number, options?: { showLoading?: boolean }): Promise<void>;
-  refreshPendingInputs(): Promise<void>;
-  beginLoading(): number;
-  endLoading(request: number): void;
-}
 
 export class BuildDetailsPanelController implements BuildDetailsPanelControllerAccess {
   private readonly state = new BuildDetailsPanelState();
@@ -87,7 +57,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private pollingController?: BuildDetailsPollingController;
   private pipelineNodeLogManager?: PipelineNodeLogManager;
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
-  private initialStatusRetryTimer: NodeJS.Timeout | undefined;
+  private initialActivation?: BuildDetailsInitialActivation;
   private readonly diagnosticConsoleSync: BuildDetailsDiagnosticConsoleSync;
 
   constructor(
@@ -121,7 +91,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       isTokenCurrent: (token) => this.loadTokenTracker.isCurrent(token),
       canOpenTestSource: getCanOpenTestSource,
       onBuildDetailsChanged,
-      onConsoleTextSet: (text) => this.replaceDiagnosticConsoleText(text)
+      onConsoleTextSet: (text) => this.diagnosticConsoleSync.replaceAndNotify(text)
     });
   }
 
@@ -129,13 +99,8 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     // Invalidate the current load token first so an in-flight load() that resolves after
     // disposal treats itself as stale and does not render or start runtime work.
     this.loadTokenTracker.next();
-    this.clearInitialStatusRetry();
+    this.disposeLoadScopedResources();
     this.diagnosticConsoleSync.dispose();
-    this.pollingController?.dispose();
-    this.pollingController = undefined;
-    this.pipelineNodeLogManager?.dispose();
-    this.pipelineNodeLogManager = undefined;
-    this.runtime.dispose();
     this.loadTracker.resetLoadingRequests();
   }
 
@@ -241,8 +206,9 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       return { status: "missingAssets" };
     }
 
-    this.pipelineNodeLogManager = this.createPipelineNodeLogManager(backend, environment, buildUrl);
-    this.pollingController = this.createPollingController(backend, environment, buildUrl, token);
+    const target: BuildDetailsLoadTarget = { backend, environment, buildUrl };
+    this.pipelineNodeLogManager = this.createPipelineNodeLogManager(target);
+    this.pollingController = this.createPollingController(target, token);
 
     // Wait for test-source availability (Git API initialization) alongside the initial fetch so
     // the first render does not report linked repositories as unavailable.
@@ -265,12 +231,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     buildUrl: string
   ): number {
     const token = this.loadTokenTracker.next();
-    this.clearInitialStatusRetry();
-    this.pollingController?.dispose();
-    this.pollingController = undefined;
-    this.pipelineNodeLogManager?.dispose();
-    this.pipelineNodeLogManager = undefined;
-    this.runtime.dispose();
+    this.disposeLoadScopedResources();
     this.backend = backend;
     this.loadTracker.resetLoadingRequests();
     this.state.resetForLoad(environment, buildUrl, createNonce());
@@ -278,82 +239,38 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     return token;
   }
 
-  private createPipelineNodeLogManager(
-    backend: BuildDetailsBackend,
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string
-  ): PipelineNodeLogManager {
-    return new PipelineNodeLogManager({
-      backend: backend.console,
-      environment,
-      buildUrl,
-      getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
-      formatError,
-      callbacks: {
-        onSetLog: (log) => {
-          this.state.setPipelineNodeLog(log);
-          this.view.postMessage({ type: "setPipelineNodeLog", log });
-        },
-        onAppendHtml: (targetKey, html) => {
-          const activeLog = this.pipelineNodeLogManager?.getActiveLog();
-          if (activeLog) {
-            this.state.setPipelineNodeLog(activeLog);
-          }
-          this.view.postMessage({ type: "appendPipelineNodeLogHtml", targetKey, html });
-        },
-        onLoading: (targetKey, loading) => {
-          this.view.postMessage({ type: "setPipelineNodeLogLoading", targetKey, loading });
-        },
-        onError: (targetKey, error) => {
-          const nextLog = { ...this.state.pipelineNodeLog, loading: false, error };
-          this.state.setPipelineNodeLog(nextLog);
-          this.view.postMessage({ type: "setPipelineNodeLogError", targetKey, error });
-        }
-      }
+  private disposeLoadScopedResources(): void {
+    this.initialActivation?.dispose();
+    this.initialActivation = undefined;
+    this.pollingController?.dispose();
+    this.pollingController = undefined;
+    this.pipelineNodeLogManager?.dispose();
+    this.pipelineNodeLogManager = undefined;
+    this.runtime.dispose();
+  }
+
+  private createPipelineNodeLogManager(target: BuildDetailsLoadTarget): PipelineNodeLogManager {
+    return createBuildDetailsPipelineNodeLogManager(target, this.state, {
+      postMessage: (message) => this.view.postMessage(message),
+      getActiveLog: () => this.pipelineNodeLogManager?.getActiveLog()
     });
   }
 
   private createPollingController(
-    backend: BuildDetailsBackend,
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
+    target: BuildDetailsLoadTarget,
     token: number
   ): BuildDetailsPollingController {
-    return new BuildDetailsPollingController({
-      statusBackend: backend.status,
-      testsBackend: backend.tests,
-      consoleBackend: backend.console,
-      pendingInputsBackend: backend.pendingInputs,
+    return createBuildDetailsPanelPollingController(target, {
+      state: this.state,
+      token,
+      view: this.view,
+      runtime: this.runtime,
+      diagnosticConsoleSync: this.diagnosticConsoleSync,
       pendingInputProvider: this.pendingInputProvider,
-      environment,
-      buildUrl,
-      maxConsoleChars: MAX_CONSOLE_CHARS,
-      getRefreshIntervalMs: () => getBuildDetailsRefreshIntervalMs(),
-      testReportOptions: { includeCaseLogs: getTestReportIncludeCaseLogs() },
-      formatError,
-      callbacks: createBuildDetailsPollingCallbacks(this.state, token, {
-        postMessage: (message) => this.view.postMessage(message),
-        setTitle: (title) => this.view.setTitle(title),
-        publishErrors: () => this.publishErrors(),
-        isTokenCurrent: (currentToken) => this.loadTokenTracker.isCurrent(currentToken),
-        showCompletionToast: (details) => {
-          void this.runtime.showCompletionToast(details);
-        },
-        handleBuildCompleted: (details, currentToken) => {
-          this.runtime.handleBuildCompleted(details, currentToken);
-        },
-        getCoverageEnabled: () => getBuildDetailsCoverageEnabled(),
-        canOpenSource: (className) =>
-          this.canOpenTestSource?.(this.state.environment, this.state.currentBuildUrl, className) ??
-          false,
-        onPipelineLoading: (currentToken) => this.runtime.handlePipelineLoading(currentToken),
-        onBuildDetailsChanged: (nextDetails) => this.onBuildDetailsChanged?.(nextDetails),
-        onConsoleTextAppend: (text) => this.appendDiagnosticConsoleText(text),
-        onConsoleTextSet: (text) => this.replaceDiagnosticConsoleText(text),
-        onConsoleHtmlChanged: (textRange, appendedTextRange) => {
-          void this.syncDiagnosticConsoleText(textRange, appendedTextRange);
-        }
-      })
+      canOpenTestSource: this.canOpenTestSource,
+      isTokenCurrent: (currentToken) => this.loadTokenTracker.isCurrent(currentToken),
+      publishErrors: () => this.publishErrors(),
+      onBuildDetailsChanged: (details) => this.onBuildDetailsChanged?.(details)
     });
   }
 
@@ -363,9 +280,12 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     options: BuildDetailsPanelLoadOptions | undefined,
     token: number
   ): JenkinsBuildDetails | undefined {
-    this.applyInitialPanelState(initialState);
+    applyBuildDetailsInitialState(this.state, initialState);
+    this.diagnosticConsoleSync.setText(initialState.consoleTextResult?.text ?? "");
     const details = this.state.currentDetails;
-    this.notifyInitialBuildDetails(details);
+    if (details) {
+      this.onBuildDetailsChanged?.(details);
+    }
     this.view.setTitle(resolveInitialPanelTitle(details, options?.label));
     this.view.renderBuildDetails(
       buildInitialBuildDetailsViewModel(this.state, initialState, this.canOpenTestSource),
@@ -379,91 +299,23 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     return details;
   }
 
-  private applyInitialPanelState(initialState: BuildDetailsInitialState): void {
-    applyBuildDetailsInitialState(this.state, initialState);
-    this.setDiagnosticConsoleText(initialState.consoleTextResult?.text ?? "");
-  }
-
-  private notifyInitialBuildDetails(details: JenkinsBuildDetails | undefined): void {
-    if (details) {
-      this.onBuildDetailsChanged?.(details);
-    }
-  }
-
   private async activateInitialRuntime(
     details: JenkinsBuildDetails | undefined,
     workflowError: unknown,
     token: number
   ): Promise<void> {
-    if (!details) {
-      // The initial details request failed; retry a bounded number of times so a transient
-      // failure does not leave the panel stuck on its initial error state.
-      this.scheduleInitialStatusRetry(workflowError, token, 1);
-      return;
-    }
-    if (details.building) {
-      this.activateRunningBuild(token);
-      return;
-    }
-    await this.activateCompletedBuild(workflowError, token);
-  }
-
-  private scheduleInitialStatusRetry(workflowError: unknown, token: number, attempt: number): void {
-    if (attempt > MAX_INITIAL_STATUS_RETRIES || !this.loadTokenTracker.isCurrent(token)) {
-      return;
-    }
-    this.clearInitialStatusRetry();
-    this.initialStatusRetryTimer = setTimeout(() => {
-      this.initialStatusRetryTimer = undefined;
-      void this.retryInitialStatus(workflowError, token, attempt);
-    }, getBuildDetailsRefreshIntervalMs());
-  }
-
-  private async retryInitialStatus(
-    workflowError: unknown,
-    token: number,
-    attempt: number
-  ): Promise<void> {
-    if (!this.loadTokenTracker.isCurrent(token)) {
-      return;
-    }
-    await this.runtime.refreshBuildStatus(token);
-    if (!this.loadTokenTracker.isCurrent(token)) {
-      return;
-    }
-    const details = this.state.currentDetails;
-    if (!details) {
-      this.scheduleInitialStatusRetry(workflowError, token, attempt + 1);
-      return;
-    }
-    this.state.removeBaseErrors((error) => error.startsWith(BUILD_DETAILS_ERROR_PREFIX));
-    this.publishErrors();
-    await this.activateInitialRuntime(details, workflowError, token);
-  }
-
-  private clearInitialStatusRetry(): void {
-    if (this.initialStatusRetryTimer) {
-      clearTimeout(this.initialStatusRetryTimer);
-      this.initialStatusRetryTimer = undefined;
-    }
-  }
-
-  private async activateCompletedBuild(workflowError: unknown, token: number): Promise<void> {
-    if (workflowError && this.view.isVisible()) {
-      this.pollingController?.start();
-    }
-    await Promise.all([
-      this.runtime.refreshTestReport(token, { showLoading: true }),
-      this.runtime.refreshCoverage(token, { showLoading: true })
-    ]);
-  }
-
-  private activateRunningBuild(token: number): void {
-    if (this.view.isVisible()) {
-      this.pollingController?.start();
-      return;
-    }
-    this.runtime.handlePanelHidden(token);
+    this.initialActivation?.dispose();
+    this.initialActivation = new BuildDetailsInitialActivation({
+      token,
+      workflowError,
+      state: this.state,
+      view: this.view,
+      runtime: this.runtime,
+      getPollingController: () => this.pollingController,
+      isTokenCurrent: (currentToken) => this.loadTokenTracker.isCurrent(currentToken),
+      publishErrors: () => this.publishErrors()
+    });
+    await this.initialActivation.activate(details);
   }
 
   handlePanelHidden(): void {
@@ -504,25 +356,6 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     if (nextErrors) {
       this.view.postErrors(nextErrors);
     }
-  }
-
-  private appendDiagnosticConsoleText(text: string): void {
-    this.diagnosticConsoleSync.appendAndNotify(text);
-  }
-
-  private replaceDiagnosticConsoleText(text: string): void {
-    this.diagnosticConsoleSync.replaceAndNotify(text);
-  }
-
-  private setDiagnosticConsoleText(text: string): void {
-    this.diagnosticConsoleSync.setText(text);
-  }
-
-  private syncDiagnosticConsoleText(
-    textRange: ConsoleTextByteRange,
-    appendedTextRange?: ConsoleTextByteRange
-  ): Promise<void> {
-    return this.diagnosticConsoleSync.sync(textRange, appendedTextRange);
   }
 
   beginLoading(): number {
