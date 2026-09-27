@@ -140,5 +140,6 @@ Release procedure is documented and strict in `docs/release-process.md`:
 - version/tag alignment (`package.json.version` == `vX.Y.Z` tag without `v`)
 - local prepublish compile before tagging
 - push with tags and confirm clean/ahead-free status
+- package with `node scripts/release.mjs package`, never `vsce package --no-dependencies`: the extension host is `tsc` output (not bundled) and loads `dependencies` such as `redos-detector` from the VSIX `node_modules`. 1.54.0 shipped without them and failed to activate.
 
 If a release fails in CI, first suspect tag/version mismatch or missing publish secrets (`VSCE_PAT`, `OVSX_PAT`).

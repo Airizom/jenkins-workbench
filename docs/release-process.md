@@ -51,9 +51,10 @@ This document defines the exact steps the agent should perform when you need to 
 
 5. Package locally
 
-- `vsce package --no-dependencies -o ./jenkins-workbench-X.Y.Z.vsix`
-- Alternative: `npx vsce package --no-dependencies -o ./jenkins-workbench-X.Y.Z.vsix`
-- The extension has no runtime npm dependencies and excludes `node_modules`; disabling dependency detection avoids npm tree errors from optional development tooling.
+- `node scripts/release.mjs install-tools`
+- `node scripts/release.mjs package ./jenkins-workbench-X.Y.Z.vsix`
+- The extension host loads production `dependencies` (for example `redos-detector`) from `node_modules`, so the VSIX must include them. Do not package with `--no-dependencies`, and do not install `vsce`/`ovsx` into the project `node_modules`; `install-tools` puts them in a temp directory so vsce does not ship them.
+- `package` fails if the VSIX `node_modules` does not match `npm ls --omit=dev` exactly.
 - Use this to test install if desired.
 - The `.vsix` is for verification only; do not commit it.
 

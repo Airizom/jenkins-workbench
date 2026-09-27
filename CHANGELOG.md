@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- fix(release): package production dependencies in the VSIX. 1.54.0 failed to activate with `Cannot find module 'redos-detector'`, so no views or commands were registered. Packaging now fails if the VSIX `node_modules` differs from the production dependency tree, and the manifest check rejects extension-host imports of undeclared packages.
+
 ## [1.54.0] - 2026-09-26
 
 ### Added

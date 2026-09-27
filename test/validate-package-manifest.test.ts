@@ -128,4 +128,86 @@ describe("package manifest validator", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain(expectedError);
   });
+
+  describe("extension-host runtime imports", () => {
+    const writeSource = async (cwd: string, relativePath: string, source: string) => {
+      await mkdir(path.dirname(path.join(cwd, relativePath)), { recursive: true });
+      await writeFile(path.join(cwd, relativePath), source);
+    };
+    const setDependencies = async (cwd: string, dependencies: Record<string, string>) => {
+      const packageJsonPath = path.join(cwd, "package.json");
+      const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+      packageJson.dependencies = dependencies;
+      await writeFile(packageJsonPath, JSON.stringify(packageJson));
+    };
+
+    it("accepts vscode, node builtins, declared dependencies, type-only and webview imports", async () => {
+      const cwd = await createFixture({ type: "boolean", default: true });
+      await setDependencies(cwd, { "@scope/runtime": "1.0.0" });
+      await writeSource(
+        cwd,
+        "src/host.ts",
+        [
+          'import * as vscode from "vscode";',
+          'import * as path from "node:path";',
+          'import { spawn } from "child_process";',
+          'import { run } from "@scope/runtime/sub";',
+          'import type { Props } from "react";',
+          'import { type Root } from "react-dom/client";',
+          'export type { Other } from "some-dev-dependency";',
+          'import { local } from "./local";'
+        ].join("\n")
+      );
+      await writeSource(cwd, "src/panels/example/webview/App.ts", 'import React from "react";');
+      await writeFile(path.join(cwd, ".vscodeignore"), "src/**\nout/**/*.map\n");
+
+      const result = runValidator(cwd);
+
+      expect(result.stderr).toBe("");
+      expect(result.status).toBe(0);
+    });
+
+    it.each([
+      ['import { isSafePattern } from "redos-detector";', "imports redos-detector"],
+      ['export { thing } from "undeclared";', "imports undeclared"],
+      ['import "side-effect-only";', "imports side-effect-only"]
+    ])("rejects an undeclared runtime import: %s", async (source, expectedError) => {
+      const cwd = await createFixture({ type: "boolean", default: true });
+      await writeSource(cwd, "src/host.ts", source);
+
+      const result = runValidator(cwd);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`src/host.ts ${expectedError}`);
+    });
+
+    it("rejects an undeclared import in a webview-path module the extension host imports", async () => {
+      const cwd = await createFixture({ type: "boolean", default: true });
+      await writeSource(
+        cwd,
+        "src/host.ts",
+        'import { assets } from "./panels/shared/webview/Assets";'
+      );
+      await writeSource(cwd, "src/panels/shared/webview/Assets.ts", 'import "undeclared";');
+
+      const result = runValidator(cwd);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("src/panels/shared/webview/Assets.ts imports undeclared");
+    });
+
+    it.each(["node_modules/**", "/node_modules/", "node_modules"])(
+      "rejects .vscodeignore excluding %s when dependencies are declared",
+      async (pattern) => {
+        const cwd = await createFixture({ type: "boolean", default: true });
+        await setDependencies(cwd, { "redos-detector": "^6.1.4" });
+        await writeFile(path.join(cwd, ".vscodeignore"), `src/**\n${pattern}\n`);
+
+        const result = runValidator(cwd);
+
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain(".vscodeignore must not exclude node_modules");
+      }
+    );
+  });
 });

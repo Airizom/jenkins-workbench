@@ -1,9 +1,18 @@
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
 const publishingTools = ["@vscode/vsce@3.9.2", "ovsx@1.0.2"];
+// Publishing tools live outside the project tree so vsce does not mistake them
+// for runtime dependencies of the extension.
+const toolsDir = path.join(
+  process.env.RUNNER_TEMP ?? os.tmpdir(),
+  "jenkins-workbench-release-tools"
+);
+const toolPath = (name) => path.join(toolsDir, "node_modules", ".bin", name);
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const run = (command, args, options = {}) => {
   const result = spawnSync(command, args, { stdio: "inherit", ...options });
@@ -53,15 +62,95 @@ const requireSecret = (name) => {
 };
 
 const installTools = () => {
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
   run(npmCommand, [
     "install",
-    "--no-save",
+    "--prefix",
+    toolsDir,
     "--prefer-offline",
     "--no-audit",
     "--no-fund",
     ...publishingTools
   ]);
+};
+
+const capture = (command, args) => {
+  const result = spawnSync(command, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    throw new Error(
+      `${command} ${args.join(" ")} exited with status ${result.status}\n${result.stderr}`
+    );
+  }
+
+  return result.stdout;
+};
+
+// Extraneous packages are skipped: vsce would ship them, but nothing declared needs them.
+const collectProductionDirs = (node, dirs) => {
+  for (const dependency of Object.values(node.dependencies ?? {})) {
+    if (dependency.extraneous || !dependency.path) {
+      continue;
+    }
+
+    const dir = path.relative(process.cwd(), dependency.path).split(path.sep).join("/");
+
+    if (!dirs.has(dir)) {
+      dirs.add(dir);
+      collectProductionDirs(dependency, dirs);
+    }
+  }
+
+  return dirs;
+};
+
+const packageDirOf = (file) => {
+  const match = file.match(/^(.*node_modules\/(?:@[^/]+\/)?[^/]+)\/package\.json$/);
+  return match?.[1];
+};
+
+/**
+ * The compiled extension loads runtime dependencies from node_modules, so the
+ * VSIX must contain exactly the production dependency closure: nothing missing
+ * (activation fails) and no development or publishing tooling (bloat).
+ */
+const verifyPackagedDependencies = () => {
+  const expected = collectProductionDirs(
+    JSON.parse(capture(npmCommand, ["ls", "--omit=dev", "--all", "--long", "--json"])),
+    new Set()
+  );
+  const packaged = new Set(
+    capture(toolPath("vsce"), ["ls"])
+      .split(/\r?\n/)
+      .map(packageDirOf)
+      .filter((dir) => dir !== undefined)
+  );
+  const missing = [...expected].filter((dir) => !packaged.has(dir));
+  const unexpected = [...packaged].filter((dir) => !expected.has(dir));
+
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new Error(
+      [
+        "VSIX node_modules do not match the production dependency tree.",
+        ...missing.map((dir) => `  missing: ${dir}`),
+        ...unexpected.map((dir) => `  unexpected: ${dir}`)
+      ].join("\n")
+    );
+  }
+
+  console.log(`Packaging ${expected.size} runtime dependency packages.`);
+};
+
+const packageExtension = (artifactPath) => {
+  if (!artifactPath) {
+    throw new Error("package requires the output path for the VSIX artifact");
+  }
+
+  verifyPackagedDependencies();
+  run(toolPath("vsce"), ["package", "-o", artifactPath]);
 };
 
 const publish = async (artifactPath) => {
@@ -73,9 +162,7 @@ const publish = async (artifactPath) => {
   const version = validateTag(packageJson);
   const vscePat = requireSecret("VSCE_PAT");
   const ovsxPat = requireSecret("OVSX_PAT");
-  const binaryPath = (name) => path.join("node_modules", ".bin", name);
-
-  run(binaryPath("vsce"), [
+  run(toolPath("vsce"), [
     "publish",
     "--skip-duplicate",
     "--pat",
@@ -86,7 +173,7 @@ const publish = async (artifactPath) => {
 
   const extensionId = `${packageJson.publisher}.${packageJson.name}`;
   const lookup = spawnSync(
-    binaryPath("ovsx"),
+    toolPath("ovsx"),
     ["get", extensionId, "--versionRange", version, "--metadata"],
     { stdio: "ignore" }
   );
@@ -100,7 +187,7 @@ const publish = async (artifactPath) => {
     return;
   }
 
-  run(binaryPath("ovsx"), ["publish", artifactPath, "-p", ovsxPat]);
+  run(toolPath("ovsx"), ["publish", artifactPath, "-p", ovsxPat]);
 };
 
 try {
@@ -111,11 +198,16 @@ try {
     case "install-tools":
       installTools();
       break;
+    case "package":
+      packageExtension(process.argv[3]);
+      break;
     case "publish":
       await publish(process.argv[3]);
       break;
     default:
-      throw new Error("Usage: release.mjs <validate-tag|install-tools|publish> [artifact-path]");
+      throw new Error(
+        "Usage: release.mjs <validate-tag|install-tools|package|publish> [artifact-path]"
+      );
   }
 } catch (error) {
   console.error(`Release failed: ${error instanceof Error ? error.message : String(error)}`);

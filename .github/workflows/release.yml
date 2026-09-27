@@ -51,11 +51,8 @@ jobs:
         run: node scripts/release.mjs install-tools
 
       - name: Package VS Code extension (.vsix)
-        env:
-          NPM_CONFIG_PRODUCTION: "false"
-          NODE_ENV: "development"
         run: |
-          ./node_modules/.bin/vsce package --no-dependencies -o "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
+          node scripts/release.mjs package "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
           test -f "jenkins-workbench-${GITHUB_REF_NAME}.vsix"
 
       - name: Upload artifact

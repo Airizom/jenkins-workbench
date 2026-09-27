@@ -1,4 +1,5 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { isBuiltin } from "node:module";
 import path from "node:path";
 import process from "node:process";
 import { parse } from "@babel/parser";
@@ -141,6 +142,94 @@ for (const commandId of declaredCommandIds) {
   if (!registeredCommandIds.has(commandId)) {
     fail(`${commandId} is contributed but not registered in src/commands`);
   }
+}
+
+// Extension-host code is compiled by tsc, not bundled, so its bare imports are
+// resolved from the packaged node_modules at runtime. Only webview code is
+// bundled by Vite and may import development dependencies. Every file outside
+// a webview directory is host code; host code also reaches webview directories
+// (for example panels/shared/webview/WebviewAssets.ts) through relative imports.
+const runtimeDependencies = new Set(Object.keys(packageJson.dependencies ?? {}));
+const packageNameOf = (specifier) =>
+  specifier
+    .split("/")
+    .slice(0, specifier.startsWith("@") ? 2 : 1)
+    .join("/");
+const isRuntimeResolvable = (specifier) =>
+  specifier === "vscode" ||
+  isBuiltin(specifier) ||
+  runtimeDependencies.has(packageNameOf(specifier));
+const isTypeOnlyImport = (node) =>
+  node.importKind === "type" ||
+  node.exportKind === "type" ||
+  (node.specifiers?.length > 0 &&
+    node.specifiers.every(
+      (specifier) => specifier.importKind === "type" || specifier.exportKind === "type"
+    ));
+const resolveRelativeImport = async (fromFile, specifier) => {
+  const base = path.resolve(path.dirname(fromFile), specifier);
+
+  for (const candidate of [`${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]) {
+    if (
+      await stat(candidate).then(
+        (entry) => entry.isFile(),
+        () => false
+      )
+    ) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+};
+
+const pendingHostFiles = (await readSourceFiles(path.join(rootDir, "src"))).filter(
+  (file) => !path.relative(rootDir, file).split(path.sep).includes("webview")
+);
+const visitedHostFiles = new Set();
+
+while (pendingHostFiles.length > 0) {
+  const sourceFile = pendingHostFiles.pop();
+
+  if (visitedHostFiles.has(sourceFile)) {
+    continue;
+  }
+
+  visitedHostFiles.add(sourceFile);
+  const source = await readFile(sourceFile, "utf8");
+  const plugins = sourceFile.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"];
+  const syntaxTree = parse(source, { sourceType: "unambiguous", plugins });
+
+  for (const node of syntaxTree.program.body) {
+    const specifier = node.source?.value;
+
+    if (typeof specifier !== "string" || isTypeOnlyImport(node)) {
+      continue;
+    }
+
+    if (specifier.startsWith(".")) {
+      const resolved = await resolveRelativeImport(sourceFile, specifier);
+
+      if (resolved) {
+        pendingHostFiles.push(resolved);
+      }
+    } else if (!isRuntimeResolvable(specifier)) {
+      fail(
+        `${path.relative(rootDir, sourceFile)} imports ${specifier}, which is not a package.json dependency and will not be packaged`
+      );
+    }
+  }
+}
+
+const vscodeIgnoreLines = (
+  await readFile(path.join(rootDir, ".vscodeignore"), "utf8").catch(() => "")
+).split(/\r?\n/);
+
+if (
+  runtimeDependencies.size > 0 &&
+  vscodeIgnoreLines.some((line) => /^\/?node_modules(\/|$)/.test(line.trim()))
+) {
+  fail(".vscodeignore must not exclude node_modules while package.json declares dependencies");
 }
 
 const collectManifestCommandReferences = (value, pathLabel, references) => {
