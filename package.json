@@ -1382,7 +1382,7 @@
         {
           "id": "jenkinsWorkbench",
           "title": "Jenkins Workbench",
-          "icon": "resources/activity-bar-icon.png"
+          "icon": "resources/activity-bar-icon.svg"
         }
       ]
     },
