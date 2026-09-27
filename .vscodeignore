@@ -26,3 +26,7 @@ coverage/**
 tsconfig.test.json
 tsconfig.integration.json
 vitest.config.ts
+.fallow/**
+.fallowrc.jsonc
+fallow-baselines/**
+.ckignore
