@@ -4,6 +4,7 @@
     "src/buildDiagnostics/BuildDiagnosticCustomMatcherWorker.ts",
     "src/panels/buildCompare/webview/index.tsx",
     "src/panels/buildDetails/webview/index.tsx",
+    "src/panels/jobHistory/webview/index.tsx",
     "src/panels/nodeCapacity/webview/index.tsx",
     "src/panels/nodeDetails/webview/index.tsx"
   ],
@@ -19,8 +20,10 @@
     "*.vsix"
   ],
   "ignoreDependencies": [
-    // Used only by the development-time package manifest validator.
+    // Used only by the development-time validators in scripts/.
+    "@babel/parser",
     "ajv",
+    "js-yaml",
     // These packages are runtime imports in source, but Vite bundles them into
     // the generated webview assets. They must remain development dependencies so
     // VS Code packaging does not ship a redundant node_modules tree.

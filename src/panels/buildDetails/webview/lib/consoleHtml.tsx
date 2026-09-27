@@ -189,111 +189,183 @@ function renderTextNode(
   if (!text) {
     return [];
   }
-  const nodes: React.ReactNode[] = [];
-  const matches = context.matches;
-  const references = context.sourceReferences;
   const textStart = context.cursor;
   const textEnd = textStart + text.length;
-  let matchIndex = context.matchPointer;
-  while (matchIndex < matches.length && matches[matchIndex].end <= textStart) {
-    matchIndex += 1;
-  }
-  let referenceIndex = context.sourcePointer;
-  while (referenceIndex < references.length && references[referenceIndex].endOffset <= textStart) {
-    referenceIndex += 1;
-  }
-
-  const nextMatch = matches[matchIndex];
-  const nextReference = references[referenceIndex];
-  const hasOverlap =
-    (nextMatch !== undefined && nextMatch.start < textEnd) ||
-    (nextReference !== undefined && nextReference.startOffset < textEnd);
-  if (!hasOverlap) {
-    while (matchIndex < matches.length && matches[matchIndex].end <= textEnd) {
-      matchIndex += 1;
-    }
-    while (referenceIndex < references.length && references[referenceIndex].endOffset <= textEnd) {
-      referenceIndex += 1;
-    }
-    context.matchPointer = matchIndex;
-    context.sourcePointer = referenceIndex;
-    context.cursor = textEnd;
+  let matchIndex = skipMatchesEndingBy(context.matches, context.matchPointer, textStart);
+  let referenceIndex = skipReferencesEndingBy(
+    context.sourceReferences,
+    context.sourcePointer,
+    textStart
+  );
+  if (!hasOverlapBefore(context, matchIndex, referenceIndex, textEnd)) {
+    advanceTextCursor(context, matchIndex, referenceIndex, textEnd);
     return [text];
   }
 
-  const boundaries = new Set<number>([textStart, textEnd]);
-  for (let index = matchIndex; index < matches.length; index += 1) {
-    const match = matches[index];
-    if (match.start >= textEnd) {
-      break;
-    }
-    boundaries.add(Math.max(textStart, match.start));
-    boundaries.add(Math.min(textEnd, match.end));
-  }
-  for (let index = referenceIndex; index < references.length; index += 1) {
-    const reference = references[index];
-    if (reference.startOffset >= textEnd) {
-      break;
-    }
-    boundaries.add(Math.max(textStart, reference.startOffset));
-    boundaries.add(Math.min(textEnd, reference.endOffset));
-  }
-  const sortedBoundaries = [...boundaries].sort((left, right) => left - right);
-  for (let index = 0; index < sortedBoundaries.length - 1; index += 1) {
-    const start = sortedBoundaries[index];
-    const end = sortedBoundaries[index + 1];
-    while (matchIndex < matches.length && matches[matchIndex].end <= start) {
-      matchIndex += 1;
-    }
-    while (referenceIndex < references.length && references[referenceIndex].endOffset <= start) {
-      referenceIndex += 1;
-    }
-    const match = matches[matchIndex];
-    const reference = references[referenceIndex];
-    const coveredByMatch = match && match.start <= start && match.end >= end;
-    const coveredByReference =
-      reference && reference.startOffset <= start && reference.endOffset >= end;
-    let content: React.ReactNode = text.slice(start - textStart, end - textStart);
-    if (coveredByMatch) {
-      content = (
-        <mark
-          className={`console-match${
-            matchIndexIsActive(context.activeMatchIndex, matchIndex) ? " console-match--active" : ""
-          }`}
-          data-match-index={matchIndex}
-        >
-          {content}
-        </mark>
-      );
-    }
-    if (coveredByReference && context.onOpenDiagnosticSource && context.externalLinkDepth === 0) {
-      content = (
-        <button
-          type="button"
-          className="console-source-link"
-          data-source-target-id={reference.targetId}
-          title="Open local source"
-          onClick={() => context.onOpenDiagnosticSource?.(reference.targetId)}
-        >
-          {content}
-        </button>
-      );
-    }
+  const nodes: React.ReactNode[] = [];
+  const boundaries = collectSegmentBoundaries(
+    context,
+    matchIndex,
+    referenceIndex,
+    textStart,
+    textEnd
+  );
+  for (let index = 0; index < boundaries.length - 1; index += 1) {
+    const start = boundaries[index];
+    const end = boundaries[index + 1];
+    matchIndex = skipMatchesEndingBy(context.matches, matchIndex, start);
+    referenceIndex = skipReferencesEndingBy(context.sourceReferences, referenceIndex, start);
+    const content = renderTextSegment(
+      text.slice(start - textStart, end - textStart),
+      context,
+      { start, end },
+      matchIndex,
+      context.sourceReferences[referenceIndex]
+    );
     nodes.push(
       <React.Fragment key={`${keyPrefix}-segment-${start}-${end}`}>{content}</React.Fragment>
     );
   }
 
-  while (matchIndex < matches.length && matches[matchIndex].end <= textEnd) {
-    matchIndex += 1;
-  }
-  while (referenceIndex < references.length && references[referenceIndex].endOffset <= textEnd) {
-    referenceIndex += 1;
-  }
-  context.matchPointer = matchIndex;
-  context.sourcePointer = referenceIndex;
-  context.cursor = textEnd;
+  advanceTextCursor(context, matchIndex, referenceIndex, textEnd);
   return nodes;
+}
+
+function hasOverlapBefore(
+  context: RenderContext,
+  matchIndex: number,
+  referenceIndex: number,
+  textEnd: number
+): boolean {
+  const nextMatch = context.matches[matchIndex];
+  const nextReference = context.sourceReferences[referenceIndex];
+  return (
+    (nextMatch !== undefined && nextMatch.start < textEnd) ||
+    (nextReference !== undefined && nextReference.startOffset < textEnd)
+  );
+}
+
+function collectSegmentBoundaries(
+  context: RenderContext,
+  matchIndex: number,
+  referenceIndex: number,
+  textStart: number,
+  textEnd: number
+): number[] {
+  const boundaries = new Set<number>([textStart, textEnd]);
+  const addRange = (start: number, end: number) => {
+    boundaries.add(Math.max(textStart, start));
+    boundaries.add(Math.min(textEnd, end));
+  };
+  const { matches, sourceReferences: references } = context;
+  for (
+    let index = matchIndex;
+    index < matches.length && matches[index].start < textEnd;
+    index += 1
+  ) {
+    addRange(matches[index].start, matches[index].end);
+  }
+  for (
+    let index = referenceIndex;
+    index < references.length && references[index].startOffset < textEnd;
+    index += 1
+  ) {
+    addRange(references[index].startOffset, references[index].endOffset);
+  }
+  return [...boundaries].sort((left, right) => left - right);
+}
+
+type TextSegmentRange = { start: number; end: number };
+
+function renderTextSegment(
+  segment: string,
+  context: RenderContext,
+  range: TextSegmentRange,
+  matchIndex: number,
+  reference: BuildDiagnosticConsoleReference | undefined
+): React.ReactNode {
+  const match = context.matches[matchIndex];
+  let content: React.ReactNode = segment;
+  if (match && coversRange(match.start, match.end, range)) {
+    content = renderMatch(content, context, matchIndex);
+  }
+  if (reference && coversRange(reference.startOffset, reference.endOffset, range)) {
+    content = renderSourceLink(content, context, reference);
+  }
+  return content;
+}
+
+function coversRange(start: number, end: number, range: TextSegmentRange): boolean {
+  return start <= range.start && end >= range.end;
+}
+
+function renderMatch(
+  content: React.ReactNode,
+  context: RenderContext,
+  matchIndex: number
+): React.ReactNode {
+  return (
+    <mark
+      className={`console-match${
+        matchIndexIsActive(context.activeMatchIndex, matchIndex) ? " console-match--active" : ""
+      }`}
+      data-match-index={matchIndex}
+    >
+      {content}
+    </mark>
+  );
+}
+
+function renderSourceLink(
+  content: React.ReactNode,
+  context: RenderContext,
+  reference: BuildDiagnosticConsoleReference
+): React.ReactNode {
+  if (!context.onOpenDiagnosticSource || context.externalLinkDepth !== 0) {
+    return content;
+  }
+  return (
+    <button
+      type="button"
+      className="console-source-link"
+      data-source-target-id={reference.targetId}
+      title="Open local source"
+      onClick={() => context.onOpenDiagnosticSource?.(reference.targetId)}
+    >
+      {content}
+    </button>
+  );
+}
+
+function advanceTextCursor(
+  context: RenderContext,
+  matchIndex: number,
+  referenceIndex: number,
+  textEnd: number
+): void {
+  context.matchPointer = skipMatchesEndingBy(context.matches, matchIndex, textEnd);
+  context.sourcePointer = skipReferencesEndingBy(context.sourceReferences, referenceIndex, textEnd);
+  context.cursor = textEnd;
+}
+
+function skipMatchesEndingBy(matches: ConsoleMatch[], index: number, offset: number): number {
+  let current = index;
+  while (current < matches.length && matches[current].end <= offset) {
+    current += 1;
+  }
+  return current;
+}
+
+function skipReferencesEndingBy(
+  references: BuildDiagnosticConsoleReference[],
+  index: number,
+  offset: number
+): number {
+  let current = index;
+  while (current < references.length && references[current].endOffset <= offset) {
+    current += 1;
+  }
+  return current;
 }
 
 function matchIndexIsActive(activeIndex: number, matchIndex: number): boolean {

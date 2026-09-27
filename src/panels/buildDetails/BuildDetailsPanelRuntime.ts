@@ -122,6 +122,7 @@ export class BuildDetailsPanelRuntime {
     await this.options.getPollingController()?.fetchWorkflowRunWithCallbacks();
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through the polling controller pipeline callbacks
   handlePipelineLoading(token: number): void {
     if (!this.options.isTokenCurrent(token)) {
       return;

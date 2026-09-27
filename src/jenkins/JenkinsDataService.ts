@@ -8,11 +8,7 @@ import type {
 } from "./JenkinsClient";
 import { JenkinsDataServiceReader } from "./JenkinsDataServiceReader";
 import type {
-  JenkinsArtifactRetrievalRuntimeSurface,
-  JenkinsBuildInspectionRuntimeSurface,
-  JenkinsCoverageRuntimeSurface,
   JenkinsJobStateRuntimeSurface,
-  JenkinsPendingInputActionRuntimeSurface,
   JenkinsPipelineRestartRuntimeSurface
 } from "./JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
@@ -22,20 +18,9 @@ import type {
   JenkinsReplaySubmissionPayload
 } from "./types";
 
+export type { BuildParameterPayload } from "./BuildParameterRequests";
 export type {
-  BuildParameterPayload,
-  BuildParameterRequestPreparer
-} from "./BuildParameterRequests";
-export type {
-  JenkinsCoverageOverview,
-  JenkinsModifiedCoverageFile
-} from "./coverage/JenkinsCoverageTypes";
-export type { JenkinsCoverageRequestOptions } from "./data/JenkinsCoverageDataOperations";
-export type {
-  ConsoleTextResult,
-  ConsoleTextTailResult,
   JenkinsJobCollectionRequest,
-  JenkinsJobFetchOptions,
   JenkinsJobInfo,
   JenkinsNodeInfo,
   JenkinsQueueItemInfo,
@@ -45,15 +30,10 @@ export type {
   JobSearchEntry,
   JobSearchOptions,
   PendingInputAction,
-  PendingInputSummary,
-  ProgressiveConsoleHtmlResult,
-  ProgressiveConsoleTextResult
+  PendingInputSummary
 } from "./data/JenkinsDataTypes";
 export { CancellationError } from "./errors";
-export type {
-  BuildListFetchOptions,
-  JenkinsDataServiceOptions
-} from "./JenkinsDataServiceContracts";
+export type { BuildListFetchOptions } from "./JenkinsDataServiceContracts";
 export type {
   JenkinsReplayDefinition,
   JenkinsReplayResult,
@@ -67,13 +47,7 @@ export type {
  */
 export class JenkinsDataService
   extends JenkinsDataServiceReader
-  implements
-    JenkinsArtifactRetrievalRuntimeSurface,
-    JenkinsBuildInspectionRuntimeSurface,
-    JenkinsCoverageRuntimeSurface,
-    JenkinsPendingInputActionRuntimeSurface,
-    JenkinsPipelineRestartRuntimeSurface,
-    JenkinsJobStateRuntimeSurface
+  implements JenkinsPipelineRestartRuntimeSurface, JenkinsJobStateRuntimeSurface
 {
   async getQueueItems(environment: JenkinsEnvironmentRef): Promise<JenkinsQueueItemInfo[]> {
     return this.queueAndJobManagementOperations.getQueueItems(environment);

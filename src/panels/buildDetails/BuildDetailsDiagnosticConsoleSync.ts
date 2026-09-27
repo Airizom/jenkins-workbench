@@ -56,6 +56,7 @@ export class BuildDetailsDiagnosticConsoleSync {
     this.textSynchronized = true;
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through the polling controller console callbacks
   appendAndNotify(text: string): void {
     this.setText(this.text + text);
     this.options.onTextChanged?.();

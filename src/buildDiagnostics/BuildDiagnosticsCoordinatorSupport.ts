@@ -78,7 +78,7 @@ export function ownerKey(owner: BuildDiagnosticOwner | undefined): string {
     : "";
 }
 
-export function revisionsMatch(left: string, right: string): boolean {
+function revisionsMatch(left: string, right: string): boolean {
   const normalizedLeft = left.trim().toLowerCase();
   const normalizedRight = right.trim().toLowerCase();
   return (
@@ -106,7 +106,7 @@ export function formatBuildIdentity(details: JenkinsBuildDetails, buildUrl: stri
   return `Jenkins build #${details.number ?? new URL(buildUrl).pathname.split("/").filter(Boolean).at(-1) ?? "?"}`;
 }
 
-export function getUnambiguousJenkinsRevision(details: JenkinsBuildDetails): string | undefined {
+function getUnambiguousJenkinsRevision(details: JenkinsBuildDetails): string | undefined {
   return getUnambiguousCheckoutRevision(details);
 }
 

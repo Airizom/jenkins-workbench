@@ -6,21 +6,13 @@ export type {
   ApproveInputMessage,
   ArtifactActionMessage,
   BuildDetailsIncomingMessage,
-  ClearPipelineLogNodeMessage,
-  ConfigureBuildDiagnosticsMessage,
-  ExportConsoleMessage,
-  ExportPipelineNodeLogMessage,
   OpenDiagnosticSourceMessage,
-  OpenExternalMessage,
   OpenTestSourceMessage,
   PersistUiStateMessage,
-  RefreshBuildDetailsMessage,
   RejectInputMessage,
   ReloadTestReportMessage,
   RestartPipelineFromStageMessage,
-  SelectPipelineLogNodeMessage,
-  ShowBuildDiagnosticProblemsMessage,
-  ToggleFollowLogMessage
+  SelectPipelineLogNodeMessage
 } from "./BuildDetailsIncomingMessages";
 export {
   isApproveInputMessage,
@@ -43,7 +35,6 @@ export {
 } from "./BuildDetailsIncomingMessages";
 export type {
   BuildDetailsOutgoingMessage,
-  BuildDetailsStateMessage,
-  BuildDetailsUpdateMessage
+  BuildDetailsStateMessage
 } from "./BuildDetailsOutgoingMessages";
 export { parseBuildDetailsOutgoingMessage } from "./BuildDetailsOutgoingMessages";

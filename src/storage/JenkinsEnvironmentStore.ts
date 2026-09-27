@@ -136,14 +136,7 @@ export class JenkinsEnvironmentStore {
   }
 
   setAuthConfig(scope: EnvironmentScope, id: string, authConfig: JenkinsAuthConfig): Promise<void> {
-    return this.authMutationQueue(async () => {
-      this.bumpAuthConfigRevision(scope, id);
-      await this.context.secrets.store(
-        this.getAuthConfigKey(scope, id),
-        JSON.stringify(authConfig)
-      );
-      this.fireEnvironmentChange("auth-config-updated", scope, id);
-    });
+    return this.authMutationQueue(() => this.setAuthConfigUnlocked(scope, id, authConfig));
   }
 
   /**
@@ -160,18 +153,23 @@ export class JenkinsEnvironmentStore {
       if (this.getAuthConfigRevision(scope, id) !== expectedRevision) {
         return false;
       }
-      this.bumpAuthConfigRevision(scope, id);
-      await this.context.secrets.store(
-        this.getAuthConfigKey(scope, id),
-        JSON.stringify(authConfig)
-      );
-      this.fireEnvironmentChange("auth-config-updated", scope, id);
+      await this.setAuthConfigUnlocked(scope, id, authConfig);
       return true;
     });
   }
 
   deleteAuthConfig(scope: EnvironmentScope, id: string): Promise<void> {
     return this.authMutationQueue(() => this.deleteAuthConfigUnlocked(scope, id));
+  }
+
+  private async setAuthConfigUnlocked(
+    scope: EnvironmentScope,
+    id: string,
+    authConfig: JenkinsAuthConfig
+  ): Promise<void> {
+    this.bumpAuthConfigRevision(scope, id);
+    await this.context.secrets.store(this.getAuthConfigKey(scope, id), JSON.stringify(authConfig));
+    this.fireEnvironmentChange("auth-config-updated", scope, id);
   }
 
   private async deleteAuthConfigUnlocked(scope: EnvironmentScope, id: string): Promise<void> {

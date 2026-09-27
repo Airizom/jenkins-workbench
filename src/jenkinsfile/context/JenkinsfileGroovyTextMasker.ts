@@ -31,7 +31,7 @@ export function maskGroovyText(text: string): string {
     }
 
     if (inBlockComment) {
-      chars[index] = character === "\n" ? "\n" : " ";
+      chars[index] = maskCharacter(character);
       if (character === "*" && next === "/") {
         chars[index + 1] = " ";
         inBlockComment = false;
@@ -66,69 +66,26 @@ export function maskGroovyText(text: string): string {
       }
     }
 
-    if (currentMode?.type === "single") {
-      chars[index] = character === "\n" ? "\n" : " ";
+    if (isQuotedMode(currentMode)) {
+      const quote =
+        currentMode.type === "single" || currentMode.type === "triple-single" ? "'" : '"';
+      chars[index] = maskCharacter(character);
       if (character === "\\") {
-        if (index + 1 < chars.length) {
-          chars[index + 1] = next === "\n" ? "\n" : " ";
-        }
-        index += 2;
+        index = maskEscapedCharacter(text, chars, index);
         continue;
       }
-      if (character === "'") {
-        modeStack.pop();
-      }
-      index += 1;
-      continue;
-    }
-
-    if (currentMode?.type === "triple-single") {
-      chars[index] = character === "\n" ? "\n" : " ";
-      if (character === "\\") {
-        if (index + 1 < chars.length) {
-          chars[index + 1] = next === "\n" ? "\n" : " ";
-        }
-        index += 2;
+      if (quote === '"' && character === "$" && next === "{") {
+        index = enterInterpolation(chars, index, modeStack);
         continue;
       }
-      if (character === "'" && next === "'" && nextTwo === "'") {
-        chars[index + 1] = " ";
-        chars[index + 2] = " ";
-        modeStack.pop();
-        index += 3;
-        continue;
-      }
-      index += 1;
-      continue;
-    }
-
-    if (currentMode?.type === "double" || currentMode?.type === "triple-double") {
-      chars[index] = character === "\n" ? "\n" : " ";
-      if (character === "\\") {
-        if (index + 1 < chars.length) {
-          chars[index + 1] = next === "\n" ? "\n" : " ";
-        }
-        index += 2;
-        continue;
-      }
-      if (character === "$" && next === "{") {
-        chars[index] = "$";
-        chars[index + 1] = "{";
-        modeStack.push({
-          type: "interpolation",
-          depth: 1
-        });
-        index += 2;
-        continue;
-      }
-      if (currentMode.type === "double") {
-        if (character === '"') {
+      if (currentMode.type === "single" || currentMode.type === "double") {
+        if (character === quote) {
           modeStack.pop();
         }
         index += 1;
         continue;
       }
-      if (character === '"' && next === '"' && nextTwo === '"') {
+      if (character === quote && next === quote && nextTwo === quote) {
         chars[index + 1] = " ";
         chars[index + 2] = " ";
         modeStack.pop();
@@ -140,12 +97,9 @@ export function maskGroovyText(text: string): string {
     }
 
     if (currentMode?.type === "slashy" || currentMode?.type === "dollar-slashy") {
-      chars[index] = character === "\n" ? "\n" : " ";
+      chars[index] = maskCharacter(character);
       if (currentMode.type === "slashy" && character === "\\") {
-        if (index + 1 < chars.length) {
-          chars[index + 1] = next === "\n" ? "\n" : " ";
-        }
-        index += 2;
+        index = maskEscapedCharacter(text, chars, index);
         continue;
       }
       if (
@@ -158,10 +112,7 @@ export function maskGroovyText(text: string): string {
         continue;
       }
       if (character === "$" && next === "{") {
-        chars[index] = "$";
-        chars[index + 1] = "{";
-        modeStack.push({ type: "interpolation", depth: 1 });
-        index += 2;
+        index = enterInterpolation(chars, index, modeStack);
         continue;
       }
       if (currentMode.type === "slashy" && character === "/") {
@@ -193,6 +144,38 @@ export function maskGroovyText(text: string): string {
   }
 
   return chars.join("");
+}
+
+type QuotedMaskMode = Extract<
+  GroovyMaskMode,
+  { type: "single" | "double" | "triple-single" | "triple-double" }
+>;
+
+function isQuotedMode(mode: GroovyMaskMode | undefined): mode is QuotedMaskMode {
+  return (
+    mode?.type === "single" ||
+    mode?.type === "double" ||
+    mode?.type === "triple-single" ||
+    mode?.type === "triple-double"
+  );
+}
+
+function maskCharacter(character: string | undefined): string {
+  return character === "\n" ? "\n" : " ";
+}
+
+function maskEscapedCharacter(text: string, chars: string[], index: number): number {
+  if (index + 1 < chars.length) {
+    chars[index + 1] = maskCharacter(text[index + 1]);
+  }
+  return index + 2;
+}
+
+function enterInterpolation(chars: string[], index: number, modeStack: GroovyMaskMode[]): number {
+  chars[index] = "$";
+  chars[index + 1] = "{";
+  modeStack.push({ type: "interpolation", depth: 1 });
+  return index + 2;
 }
 
 function enterStringMode(

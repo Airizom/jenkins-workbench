@@ -54,7 +54,6 @@ export class JenkinsfileValidationCoordinator
 
   readonly onDidChangeValidationStatus = this.statusEmitter.event;
 
-  // fallow-ignore-next-line unused-class-member
   start(): void {
     this.subscriptions.push(
       vscode.workspace.onDidSaveTextDocument((document) => {

@@ -27,6 +27,7 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
     private readonly launcher: BuildDetailsPanelLauncher
   ) {}
 
+  // fallow-ignore-next-line unused-class-member -- started by the extension runtime via the service container
   start(): void {
     if (this.subscription || this.disposed) return;
     this.subscription = this.ticks.onDidTick(() => this.schedulePoll());

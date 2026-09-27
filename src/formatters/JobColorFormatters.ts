@@ -112,30 +112,6 @@ export function resolveJobColorIconId(status: JobColorStatus): string {
   }
 }
 
-export function resolveJobColorCodicon(color?: string): string {
-  const status = resolveJobColorStatus(color);
-  if (status === "running") {
-    return "sync~spin";
-  }
-
-  return status ? resolveJobColorIconId(status) : "symbol-misc";
-}
-
-export function resolveJobColorStatusBarThemeColorKey(color?: string): string | undefined {
-  const status = resolveJobColorStatus(color);
-  switch (status) {
-    case "failed":
-      return "statusBarItem.errorForeground";
-    case "unstable":
-      return "statusBarItem.warningForeground";
-    case "aborted":
-    case "disabled":
-      return "statusBarItem.inactiveForeground";
-    default:
-      return undefined;
-  }
-}
-
 export function formatJobColorStatusLabel(status: JobColorStatus): string {
   switch (status) {
     case "success":

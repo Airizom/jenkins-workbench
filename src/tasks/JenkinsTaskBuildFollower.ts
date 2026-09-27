@@ -42,6 +42,7 @@ export class JenkinsTaskBuildFollower {
     this.consoleFollower = new JenkinsTaskConsoleFollower(backend, options, output, control);
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked on the follower returned by JenkinsTaskRunner.createBuildFollower
   async follow(
     request: JenkinsTaskRunRequest,
     buildUrl: string,

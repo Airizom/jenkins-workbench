@@ -1,12 +1,7 @@
 export function findCallStart(text: string, name: string, start: number): number | undefined {
   let index = start;
   while (index < text.length) {
-    const character = text[index];
-    if (character === "'" || character === '"') {
-      index = skipString(text, index);
-      continue;
-    }
-    const nextIndex = skipGdslComment(text, index);
+    const nextIndex = skipStringOrComment(text, index);
     if (nextIndex !== undefined) {
       index = nextIndex;
       continue;
@@ -53,16 +48,12 @@ export function findMatchingDelimiter(
   let depth = 0;
   let index = openIndex;
   while (index < text.length) {
-    const character = text[index];
-    if (character === "'" || character === '"') {
-      index = skipString(text, index);
-      continue;
-    }
-    const nextIndex = skipGdslComment(text, index);
+    const nextIndex = skipStringOrComment(text, index);
     if (nextIndex !== undefined) {
       index = nextIndex;
       continue;
     }
+    const character = text[index];
     if (character === openChar) {
       depth += 1;
     } else if (character === closeChar) {
@@ -85,16 +76,12 @@ export function findMatchingDelimiterBackward(
   const openIndices: number[] = [];
   let index = 0;
   while (index <= closeIndex) {
-    const character = text[index];
-    if (character === "'" || character === '"') {
-      index = skipString(text, index);
-      continue;
-    }
-    const nextIndex = skipGdslComment(text, index);
+    const nextIndex = skipStringOrComment(text, index);
     if (nextIndex !== undefined) {
       index = nextIndex;
       continue;
     }
+    const character = text[index];
     if (character === openChar) {
       openIndices.push(index);
     } else if (character === closeChar) {
@@ -184,6 +171,14 @@ export function readIdentifierBackward(text: string, end: number): string | unde
     start -= 1;
   }
   return text.slice(start, end + 1);
+}
+
+function skipStringOrComment(text: string, index: number): number | undefined {
+  const character = text[index];
+  if (character === "'" || character === '"') {
+    return skipString(text, index);
+  }
+  return skipGdslComment(text, index);
 }
 
 export function skipGdslComment(text: string, index: number): number | undefined {

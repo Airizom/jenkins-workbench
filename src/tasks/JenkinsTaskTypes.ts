@@ -230,7 +230,7 @@ export function parseTaskParameters(parameters: unknown): TaskParametersResult {
   return { params: hasParams ? params : undefined, allowEmptyParams: true };
 }
 
-export function normalizeOptionalString(value: unknown): string | undefined {
+function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
   }

@@ -271,6 +271,7 @@ export class BuildDetailsPanelState {
     this.baseErrorsValue = errors;
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked by BuildDetailsInitialActivation retries
   removeBaseErrors(predicate: (error: string) => boolean): void {
     this.baseErrorsValue = this.baseErrorsValue.filter((error) => !predicate(error));
   }

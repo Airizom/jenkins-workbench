@@ -45,6 +45,12 @@ import type {
   BuildListFetchOptions,
   JenkinsDataServiceOptions
 } from "./JenkinsDataServiceContracts";
+import type {
+  JenkinsArtifactRetrievalRuntimeSurface,
+  JenkinsBuildInspectionRuntimeSurface,
+  JenkinsCoverageRuntimeSurface,
+  JenkinsPendingInputActionRuntimeSurface
+} from "./JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
@@ -55,7 +61,13 @@ import type { JenkinsTestReport } from "./types";
  * concrete service adds build and job mutation methods while inheriting this
  * stable surface.
  */
-export class JenkinsDataServiceReader {
+export class JenkinsDataServiceReader
+  implements
+    JenkinsArtifactRetrievalRuntimeSurface,
+    JenkinsBuildInspectionRuntimeSurface,
+    JenkinsCoverageRuntimeSurface,
+    JenkinsPendingInputActionRuntimeSurface
+{
   private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
   protected readonly buildOperations: JenkinsBuildDataOperations;
@@ -88,8 +100,6 @@ export class JenkinsDataServiceReader {
     this.runtimeContext.clearCacheForEnvironment(environmentId);
   }
 
-  // Called by configuration subscriptions that Fallow cannot trace through the service container.
-  // fallow-ignore-next-line unused-class-member
   updateCacheTtlMs(cacheTtlMs?: number): void {
     this.runtimeContext.setCacheTtlMs(cacheTtlMs);
   }

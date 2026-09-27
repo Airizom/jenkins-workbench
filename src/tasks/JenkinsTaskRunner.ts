@@ -28,8 +28,6 @@ import {
 
 export type {
   JenkinsTaskBuildDetails,
-  JenkinsTaskConsoleTextResult,
-  JenkinsTaskPendingInput,
   JenkinsTaskPendingInputSummary,
   JenkinsTaskProgressiveConsoleResult,
   JenkinsTaskQueueItem,
@@ -37,7 +35,6 @@ export type {
   JenkinsTaskRunnerOptions,
   JenkinsTaskRunnerOutput,
   JenkinsTaskRunnerState,
-  JenkinsTaskRunOutcome,
   JenkinsTaskRunRequest,
   JenkinsTaskRunResult
 } from "./JenkinsTaskRunnerContracts";

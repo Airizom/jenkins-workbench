@@ -1,3 +1,4 @@
+import type * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuild } from "../jenkins/types";
@@ -28,7 +29,7 @@ interface CachedReport {
 }
 
 /** One shared scheduler/cache for all history consumers. */
-export class HistoryService {
+export class HistoryService implements vscode.Disposable {
   private cache = new Map<string, CachedReport>();
   private pending = new Map<
     string,
