@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.55.0] - 2026-09-27
+
 ### Changed
 
+- feat(panels): Build Compare refreshes and swaps builds in place instead of reloading the panel, keeps the last good result when a refresh fails, and remembers collapsed sections. Tests with duplicate suite/class/name identities are flagged as ambiguous.
+- feat(panels): Build Details gets a reworked status hero with an awaiting-input banner, a redesigned pipeline section and stage log pane, and improved console output scrolling. Restart from stage now asks for confirmation, and input approve/reject buttons stay disabled until the action finishes.
+- feat(panels): Job History splits into builds, outcomes, and tests sections, and the baseline section shows whether the baseline job was chosen by you or picked automatically from the multibranch `main`/`master` branch.
+- feat(panels): Node Capacity and Node Details panels get reworked layouts for pools, executors, and utilization. Pools with problems open by default, and running work on busy nodes refreshes with every capacity update.
 - feat(tree): list environments at the root instead of under a "Jenkins Instances" node, and add Collapse All to the view title.
 - feat(tree): context menus drop the "Jenkins:" prefix (commands now use the `Jenkins` category), destructive environment actions move to their own group, and Open in Jenkins works on environments, folders, views, and queue items.
 - feat(tree): section headers keep plain labels with counts in the description; truncated Activity counts show as `N+`.
