@@ -124,17 +124,10 @@ describe("JenkinsQueuePoller", () => {
     }
   });
 
-  it("stops polling after clearAll and dispose", () => {
+  it("stops polling after dispose", () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const { poller, refreshes } = createPollerFixture();
     const first = environment();
-
-    poller.trackExpanded(first);
-    poller.clearAll();
-    refreshes.length = 0;
-
-    vi.advanceTimersByTime(2000);
-    assert.deepEqual(refreshes, []);
 
     poller.trackExpanded(first);
     poller.dispose();

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsNodeInfo } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import {
+  formatNodeBusyExecutorRatio,
   formatNodeOfflineReason,
   formatNodeTreeDescription,
   resolveNodeStatusDescriptor
@@ -37,10 +38,7 @@ export class NodeTreeItem extends vscode.TreeItem {
     this.contextValue = contextValue;
     this.description = formatNodeTreeDescription(node);
     this.iconPath = node.offline ? SERVER_OFFLINE_ICON : SERVER_ICON;
-    const tooltip = buildNodeTooltip(node);
-    if (tooltip) {
-      this.tooltip = tooltip;
-    }
+    this.tooltip = buildNodeTooltip(node);
     this.command = {
       command: "jenkinsWorkbench.showNodeDetails",
       title: "View Node Details",
@@ -49,11 +47,20 @@ export class NodeTreeItem extends vscode.TreeItem {
   }
 }
 
-function buildNodeTooltip(node: JenkinsNodeInfo): string | undefined {
-  if (!node.offline) {
-    return undefined;
-  }
-  const reason = formatNodeOfflineReason(node);
+function buildNodeTooltip(node: JenkinsNodeInfo): string {
   const statusLabel = resolveNodeStatusDescriptor(node).label;
-  return reason ? `${statusLabel}\n${reason}` : statusLabel;
+  const lines = [node.displayName, statusLabel];
+  if (node.offline) {
+    const reason = formatNodeOfflineReason(node);
+    if (reason) {
+      lines.push(reason);
+    }
+  } else {
+    const busy = formatNodeBusyExecutorRatio(node, { prefix: "Executors busy: " });
+    if (busy) {
+      lines.push(busy);
+    }
+  }
+  lines.push("Click to view node details.");
+  return lines.join("\n");
 }

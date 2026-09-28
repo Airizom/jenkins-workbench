@@ -1,6 +1,9 @@
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
+import type {
+  EnvironmentWithScope,
+  JenkinsEnvironmentStore
+} from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { ActivityDisplaySummary } from "../ActivityTypes";
 import type { EnvironmentSummaryStore } from "../EnvironmentSummaryStore";
@@ -10,6 +13,7 @@ import {
   ActivityFolderTreeItem,
   BuildQueueFolderTreeItem,
   InstanceTreeItem,
+  type InstanceTreeItemIssue,
   JobsFolderTreeItem,
   NodesFolderTreeItem,
   PinnedJobsFolderTreeItem,
@@ -33,18 +37,14 @@ export class TreeEnvironmentChildrenLoader {
     private readonly placeholders: TreePlaceholderFactory
   ) {}
 
-  async getInstanceItems(): Promise<WorkbenchTreeElement[]> {
+  async getInstanceItems(
+    resolveIssue?: (environment: EnvironmentWithScope) => InstanceTreeItemIssue | undefined
+  ): Promise<WorkbenchTreeElement[]> {
+    // An empty root lets VS Code render the "Connect your first Jenkins environment" welcome view.
     const environments = await this.store.listEnvironmentsWithScope();
-    if (environments.length === 0) {
-      return [
-        this.placeholders.createEmptyPlaceholder(
-          "No Jenkins environments configured.",
-          "Use the + command to add one."
-        )
-      ];
-    }
-
-    return environments.map((environment) => new InstanceTreeItem(environment));
+    return environments.map(
+      (environment) => new InstanceTreeItem(environment, resolveIssue?.(environment))
+    );
   }
 
   async getInstanceChildren(element: InstanceTreeItem): Promise<WorkbenchTreeElement[]> {
@@ -71,16 +71,23 @@ export class TreeEnvironmentChildrenLoader {
     environment: JenkinsEnvironmentRef
   ): Promise<WorkbenchTreeElement[]> {
     try {
-      const views = curateTreeViews(
-        await this.dataService.getViewsForEnvironment(environment),
-        this.getViewCurationOptions()
-      );
+      const allViews = await this.dataService.getViewsForEnvironment(environment);
+      const views = curateTreeViews(allViews, this.getViewCurationOptions());
       if (views.length === 0) {
         return [
-          this.placeholders.createEmptyPlaceholder(
-            "No curated views found.",
-            "This instance has no curated Jenkins views."
-          )
+          allViews.length > 0
+            ? this.placeholders.createEmptyPlaceholder(
+                "All views are hidden.",
+                "Click to edit the hidden view names.",
+                {
+                  command: {
+                    command: "workbench.action.openSettings",
+                    title: "Edit Hidden Views",
+                    arguments: ["jenkinsWorkbench.treeViews.excludedNames"]
+                  }
+                }
+              )
+            : this.placeholders.createEmptyPlaceholder("No views", "This Jenkins has no views.")
         ];
       }
 

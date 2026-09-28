@@ -1,13 +1,10 @@
+import * as vscode from "vscode";
 import type { JenkinsArtifact } from "../../jenkins/JenkinsClient";
 import type { BuildListFetchOptions, JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { BuildTooltipOptions } from "../BuildTooltips";
-import {
-  ArtifactTreeItem,
-  BuildArtifactsFolderTreeItem,
-  BuildTreeItem
-} from "../items/TreeBuildItems";
+import { ArtifactTreeItem, BuildTreeItem } from "../items/TreeBuildItems";
 import type { JobTreeItem, PipelineTreeItem } from "../items/TreeJobItems";
 import { WorkspaceRootTreeItem } from "../items/TreeWorkspaceItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
@@ -21,6 +18,8 @@ import {
   buildBuildsChildrenKey
 } from "./TreeChildrenMapping";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
+
+const HISTORY_ICON = new vscode.ThemeIcon("history");
 
 export class TreeBuildChildrenLoader {
   constructor(
@@ -41,7 +40,8 @@ export class TreeBuildChildrenLoader {
       element.jobScope
     );
     const builds = await this.loadBuildChildren(element);
-    return [workspaceRoot, ...builds];
+    // Builds are why people expand a job; the workspace browser is secondary.
+    return [...builds, workspaceRoot];
   }
 
   async loadBuildChildren(
@@ -50,18 +50,12 @@ export class TreeBuildChildrenLoader {
     return await this.cacheManager.getOrLoadChildren(
       this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope),
       element,
-      () =>
-        this.loadBuildsForJob(
-          element.environment,
-          element.jobUrl,
-          element.jobScope,
-          resolveTreeItemLabel(element)
-        ),
+      () => this.loadBuildsForJob(element, resolveTreeItemLabel(element)),
       "Loading builds..."
     );
   }
 
-  async loadArtifactsSummaryForBuild(
+  async loadArtifactsForBuild(
     build: BuildTreeItem,
     isCurrentLoad: () => boolean = () => true
   ): Promise<WorkbenchTreeElement[]> {
@@ -70,32 +64,6 @@ export class TreeBuildChildrenLoader {
         build.environment,
         build.buildUrl,
         build.jobScope,
-        isCurrentLoad
-      );
-      return [
-        new BuildArtifactsFolderTreeItem(
-          build.environment,
-          build.buildUrl,
-          build.buildNumber,
-          build.jobScope,
-          build.jobNameHint,
-          artifacts.length
-        )
-      ];
-    } catch (error) {
-      return [this.placeholders.createErrorPlaceholder("Unable to load artifacts.", error)];
-    }
-  }
-
-  async loadArtifactsForBuild(
-    folder: BuildArtifactsFolderTreeItem,
-    isCurrentLoad: () => boolean = () => true
-  ): Promise<WorkbenchTreeElement[]> {
-    try {
-      const artifacts = await this.getArtifactsForBuild(
-        folder.environment,
-        folder.buildUrl,
-        folder.jobScope,
         isCurrentLoad
       );
       const items: ArtifactTreeItem[] = [];
@@ -107,12 +75,12 @@ export class TreeBuildChildrenLoader {
         const fileName = artifact.fileName?.trim();
         items.push(
           new ArtifactTreeItem(
-            folder.environment,
-            folder.buildUrl,
-            folder.buildNumber,
+            build.environment,
+            build.buildUrl,
+            build.buildNumber,
             relativePath,
             fileName || undefined,
-            folder.jobNameHint
+            build.jobNameHint
           )
         );
       }
@@ -120,8 +88,8 @@ export class TreeBuildChildrenLoader {
       if (items.length === 0) {
         return [
           this.placeholders.createEmptyPlaceholder(
-            "No artifacts available.",
-            "This build did not produce any artifacts."
+            "No artifacts",
+            "This build did not archive any artifacts."
           )
         ];
       }
@@ -157,11 +125,10 @@ export class TreeBuildChildrenLoader {
   }
 
   private async loadBuildsForJob(
-    environment: JenkinsEnvironmentRef,
-    jobUrl: string,
-    jobScope: TreeJobScope,
+    job: JobTreeItem | PipelineTreeItem,
     jobNameHint?: string
   ): Promise<WorkbenchTreeElement[]> {
+    const { environment, jobUrl, jobScope } = job;
     try {
       const builds = await this.dataService.getBuildsForJob(
         environment,
@@ -190,7 +157,7 @@ export class TreeBuildChildrenLoader {
             })
           : undefined;
 
-      return builds.map((build) => {
+      const items: WorkbenchTreeElement[] = builds.map((build) => {
         const summary = summariesByUrl?.get(build.url);
         return new BuildTreeItem(
           environment,
@@ -201,6 +168,19 @@ export class TreeBuildChildrenLoader {
           summary?.awaitingInput ?? false
         );
       });
+      if (builds.length >= this.buildLimit) {
+        items.push(
+          this.placeholders.createEmptyPlaceholder("Older builds…", "Open Job History", {
+            icon: HISTORY_ICON,
+            command: {
+              command: "jenkinsWorkbench.openJobHistory",
+              title: "Open Job History",
+              arguments: [job]
+            }
+          })
+        );
+      }
+      return items;
     } catch (error) {
       return [this.placeholders.createErrorPlaceholder("Unable to load builds.", error)];
     }

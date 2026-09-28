@@ -9,6 +9,7 @@ export {
   stopBuild
 } from "./BuildLifecycleHandlers";
 export {
+  type OpenableTreeItem,
   openInJenkins,
   openLastFailedBuild,
   openLastFailedBuildForTarget,

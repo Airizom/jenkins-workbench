@@ -5,6 +5,9 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
 import { formatActivityGroupLabel } from "../ActivityTypes";
+import { AWAITING_INPUT_THEME_COLOR } from "../formatters";
+import { formatBoundedCount, formatCountLabel } from "../TreeCountLabels";
+import { formatEnvironmentIssueLabel, type TreeEnvironmentIssueKind } from "../TreeLoadErrors";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 import type {
   JobsFolderSummary,
@@ -14,7 +17,7 @@ import type {
 
 const ACTIVITY_GROUP_AWAITING_INPUT_ICON = new vscode.ThemeIcon(
   "debug-pause",
-  new vscode.ThemeColor("charts.blue")
+  AWAITING_INPUT_THEME_COLOR
 );
 const ACTIVITY_GROUP_FAILING_ICON = new vscode.ThemeIcon(
   "error",
@@ -33,6 +36,10 @@ const LIST_UNORDERED_ICON = new vscode.ThemeIcon("list-unordered");
 const PINNED_ICON = new vscode.ThemeIcon("pinned");
 const PULSE_ICON = new vscode.ThemeIcon("pulse");
 const SERVER_ENVIRONMENT_ICON = new vscode.ThemeIcon("server-environment");
+const SERVER_ENVIRONMENT_ISSUE_ICON = new vscode.ThemeIcon(
+  "warning",
+  new vscode.ThemeColor("list.warningForeground")
+);
 const SERVER_ICON = new vscode.ThemeIcon("server");
 
 export class ViewsFolderTreeItem extends vscode.TreeItem {
@@ -49,19 +56,9 @@ export class ViewsFolderTreeItem extends vscode.TreeItem {
   }
 }
 
-export class RootSectionTreeItem extends vscode.TreeItem {
-  static buildId(section: "instances"): string {
-    return `root:${section}`;
-  }
-
-  constructor(
-    label: string,
-    public readonly section: "instances"
-  ) {
-    super(label, vscode.TreeItemCollapsibleState.Expanded);
-    this.id = RootSectionTreeItem.buildId(section);
-    this.contextValue = section;
-  }
+export interface InstanceTreeItemIssue {
+  kind: TreeEnvironmentIssueKind;
+  message: string;
 }
 
 export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironmentRef {
@@ -74,7 +71,10 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
   public readonly url: string;
   public readonly username?: string;
 
-  constructor(environment: JenkinsEnvironment & { scope: EnvironmentScope }) {
+  constructor(
+    environment: JenkinsEnvironment & { scope: EnvironmentScope },
+    issue?: InstanceTreeItemIssue
+  ) {
     const label = formatEnvironmentLabel(environment.url);
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.environmentId = environment.id;
@@ -88,9 +88,12 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
       username: environment.username
     });
     this.contextValue = "environment";
-    this.description = formatScopeLabel(environment.scope);
-    this.iconPath = SERVER_ENVIRONMENT_ICON;
-    this.tooltip = buildEnvironmentTooltip(environment);
+    const identity = [formatScopeLabel(environment.scope), environment.username].filter(Boolean);
+    this.description = (
+      issue ? [formatEnvironmentIssueLabel(issue.kind), ...identity] : identity
+    ).join(" • ");
+    this.iconPath = issue ? SERVER_ENVIRONMENT_ISSUE_ICON : SERVER_ENVIRONMENT_ICON;
+    this.tooltip = buildEnvironmentTooltip(environment, issue);
   }
 }
 
@@ -103,8 +106,7 @@ export class JobsFolderTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     summary?: JobsFolderSummary
   ) {
-    const label = summary ? `Jobs (${summary.total})` : "Jobs";
-    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    super("Jobs", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = JobsFolderTreeItem.buildId(environment);
     this.contextValue = "jobs";
     this.iconPath = FOLDER_ICON;
@@ -124,10 +126,7 @@ export class ActivityFolderTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     summary?: ActivityDisplaySummary
   ) {
-    const label = summary
-      ? `Activity (${formatDisplayedCountLabel(summary.displayedTotal)})`
-      : "Activity";
-    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    super("Activity", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = ActivityFolderTreeItem.buildId(environment);
     this.contextValue = "activity";
     this.iconPath = PULSE_ICON;
@@ -150,14 +149,12 @@ export class ActivityGroupTreeItem extends vscode.TreeItem {
     isTruncated = false
   ) {
     const groupLabel = formatActivityGroupLabel(group);
-    super(
-      `${groupLabel} (${formatDisplayedCountLabel(displayedCount)})`,
-      vscode.TreeItemCollapsibleState.Collapsed
-    );
+    super(groupLabel, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = ActivityGroupTreeItem.buildId(environment, group);
     this.contextValue = "activityGroup";
     this.iconPath = resolveActivityGroupIcon(group);
-    this.tooltip = `${formatDisplayedCountTooltip(displayedCount, isTruncated)} ${groupLabel.toLowerCase()} job(s)`;
+    this.description = formatBoundedCount(displayedCount, isTruncated);
+    this.tooltip = formatActivityGroupTooltip(groupLabel, displayedCount, isTruncated);
   }
 }
 
@@ -170,13 +167,11 @@ export class NodesFolderTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     summary?: NodesFolderSummary
   ) {
-    const label = summary
-      ? `Nodes (${summary.online} online, ${summary.offline} offline)`
-      : "Nodes";
-    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    super("Nodes", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = NodesFolderTreeItem.buildId(environment);
     this.contextValue = "nodes";
     this.iconPath = SERVER_ICON;
+    this.description = summary ? formatNodesSummaryDescription(summary) : undefined;
     this.tooltip = summary
       ? `Online: ${summary.online}\nOffline: ${summary.offline}`
       : "View build agents and their status";
@@ -192,12 +187,18 @@ export class BuildQueueFolderTreeItem extends vscode.TreeItem {
     public readonly environment: JenkinsEnvironmentRef,
     summary?: QueueFolderSummary
   ) {
-    const label = summary ? `Build Queue (${summary.total})` : "Build Queue";
-    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    super("Build Queue", vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = "queueFolder";
     this.iconPath = LIST_UNORDERED_ICON;
     this.id = BuildQueueFolderTreeItem.buildId(environment);
-    this.tooltip = summary ? `${summary.total} item(s) waiting` : "Items waiting to be built";
+    this.description = summary
+      ? summary.total > 0
+        ? `${summary.total} waiting`
+        : "Empty"
+      : undefined;
+    this.tooltip = summary
+      ? `${formatCountLabel(summary.total, "item")} waiting to be built`
+      : "Items waiting to be built";
   }
 }
 
@@ -214,11 +215,8 @@ export class PinnedJobsFolderTreeItem extends vscode.TreeItem {
     this.id = PinnedJobsFolderTreeItem.buildId(environment);
     this.contextValue = "pinnedRoot";
     this.iconPath = PINNED_ICON;
-    this.description = typeof count === "number" ? `${count} item(s)` : undefined;
-    this.tooltip =
-      typeof count === "number"
-        ? `${count} pinned job(s) or pipeline(s)`
-        : "Quick access to pinned jobs and pipelines";
+    this.description = typeof count === "number" ? formatCountLabel(count, "job") : undefined;
+    this.tooltip = "Quick access to pinned jobs and pipelines";
   }
 }
 
@@ -231,34 +229,29 @@ export class PinnedSectionTreeItem extends vscode.TreeItem {
 }
 
 function buildEnvironmentTooltip(
-  environment: JenkinsEnvironment & { scope: EnvironmentScope }
+  environment: JenkinsEnvironment & { scope: EnvironmentScope },
+  issue?: InstanceTreeItemIssue
 ): string {
   const scopeLabel = formatScopeLabel(environment.scope);
   const parts = [`${environment.url}`, `Scope: ${scopeLabel}`];
   if (environment.username) {
     parts.push(`User: ${environment.username}`);
   }
+  if (issue) {
+    parts.push("", `${formatEnvironmentIssueLabel(issue.kind)}: ${issue.message}`);
+  }
   return parts.join("\n");
 }
 
-function formatJobsSummaryDescription(summary: JobsFolderSummary): string | undefined {
-  const parts: string[] = [];
-  if (summary.folders > 0) {
-    parts.push(`${summary.folders} folders`);
-  }
-  if (summary.pipelines > 0) {
-    parts.push(`${summary.pipelines} pipelines`);
-  }
-  if (summary.jobs > 0) {
-    parts.push(`${summary.jobs} jobs`);
-  }
+function formatJobsSummaryDescription(summary: JobsFolderSummary): string {
+  const parts = [formatCountLabel(summary.total, "item")];
   if (summary.running > 0) {
     parts.push(`${summary.running} running`);
   }
   if (summary.disabled > 0) {
     parts.push(`${summary.disabled} disabled`);
   }
-  return parts.length > 0 ? parts.join(" • ") : undefined;
+  return parts.join(" • ");
 }
 
 function formatJobsSummaryTooltip(summary: JobsFolderSummary): string {
@@ -277,39 +270,53 @@ function formatJobsSummaryTooltip(summary: JobsFolderSummary): string {
   return parts.join("\n");
 }
 
+function formatNodesSummaryDescription(summary: NodesFolderSummary): string {
+  const parts = [`${summary.online} online`];
+  if (summary.offline > 0) {
+    parts.push(`${summary.offline} offline`);
+  }
+  return parts.join(" • ");
+}
+
 function formatActivitySummaryDescription(summary: ActivityDisplaySummary): string | undefined {
   const parts: string[] = [];
   for (const group of summary.groups) {
     if (group.displayedCount > 0) {
       parts.push(
-        `${formatDisplayedCountLabel(group.displayedCount)} ${formatActivityGroupLabel(group.kind).toLowerCase()}`
+        `${formatBoundedCount(group.displayedCount, group.isTruncated)} ${formatActivityGroupLabel(group.kind).toLowerCase()}`
       );
     }
   }
-  return parts.length > 0 ? parts.join(" • ") : undefined;
+  return parts.length > 0 ? parts.join(" • ") : "No activity";
 }
 
 function formatActivitySummaryTooltip(summary: ActivityDisplaySummary): string {
   if (summary.displayedTotal === 0) {
-    return "No current activity.";
+    return "No jobs are failing, unstable, running, or awaiting input.";
   }
   const parts: string[] = [];
   for (const group of summary.groups) {
     if (group.displayedCount > 0) {
       parts.push(
-        `${formatActivityGroupLabel(group.kind)}: ${formatDisplayedCountTooltip(group.displayedCount, group.isTruncated)}`
+        `${formatActivityGroupLabel(group.kind)}: ${formatBoundedCount(group.displayedCount, group.isTruncated)}`
       );
     }
+  }
+  if (summary.isTruncated) {
+    parts.push("", "Lists are capped; + means more may exist.");
   }
   return parts.join("\n");
 }
 
-function formatDisplayedCountLabel(count: number): string {
-  return `${count} shown`;
-}
-
-function formatDisplayedCountTooltip(count: number, isTruncated: boolean): string {
-  return isTruncated ? `${count} shown, more may exist` : `${count} shown`;
+function formatActivityGroupTooltip(
+  groupLabel: string,
+  displayedCount: number,
+  isTruncated: boolean
+): string {
+  const jobs = formatCountLabel(displayedCount, "job");
+  return isTruncated
+    ? `Showing the first ${jobs} (${groupLabel.toLowerCase()}); more may exist.`
+    : `${jobs} (${groupLabel.toLowerCase()})`;
 }
 
 function resolveActivityGroupIcon(group: ActivityGroupKind): vscode.ThemeIcon {

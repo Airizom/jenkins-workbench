@@ -8,7 +8,6 @@ import type {
   ArtifactTreeItem,
   BuildTreeItem,
   JobTreeItem,
-  NodeTreeItem,
   PipelineTreeItem
 } from "../tree/TreeItems";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
@@ -17,6 +16,7 @@ import { downloadArtifact, previewArtifact } from "./build/BuildArtifactHandlers
 import {
   approveInput,
   compareWithBuild,
+  type OpenableTreeItem,
   openInJenkins,
   openLastFailedBuild,
   previewBuildLog,
@@ -71,9 +71,8 @@ export function registerBuildCommands(
     vscode.commands.registerCommand("jenkinsWorkbench.rebuildBuild", (item?: BuildTreeItem) =>
       rebuildBuild(dataService, refreshHost, item)
     ),
-    vscode.commands.registerCommand(
-      "jenkinsWorkbench.openInJenkins",
-      (item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem) => openInJenkins(item)
+    vscode.commands.registerCommand("jenkinsWorkbench.openInJenkins", (item?: OpenableTreeItem) =>
+      openInJenkins(item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.compareWithBuild", (item?: BuildTreeItem) =>
       compareWithBuild(dataService, buildComparePanelLauncher, item)

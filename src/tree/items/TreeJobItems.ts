@@ -4,7 +4,8 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { ActivityGroupKind } from "../ActivityTypes";
 import {
   formatMultibranchFolderDescription,
-  formatMultibranchFolderTooltip
+  formatMultibranchFolderTooltip,
+  normalizeBranchFilter
 } from "../branchFilters";
 import {
   formatJobColor,
@@ -69,7 +70,12 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = JenkinsFolderTreeItem.buildId(environment, folderUrl, jobScope);
-    this.contextValue = folderKind === "multibranch" ? "multibranchFolder" : "folder";
+    this.contextValue =
+      folderKind === "multibranch"
+        ? normalizeBranchFilter(options?.branchFilter)
+          ? "multibranchFolder branchFiltered"
+          : "multibranchFolder"
+        : "folder";
     this.description =
       folderKind === "multibranch"
         ? formatMultibranchFolderDescription(options?.branchFilter)
@@ -181,7 +187,28 @@ export class JobTreeItem extends vscode.TreeItem {
         this.description
       );
     }
+    this.accessibilityInformation = {
+      label: buildJobAccessibilityLabel(options.label, formatJobColor(color), this.description)
+    };
   }
+}
+
+// Healthy jobs omit their status from the visible description, so screen readers need it
+// spelled out alongside whatever the description does show.
+function buildJobAccessibilityLabel(
+  label: string,
+  status: string | undefined,
+  description: string | boolean | undefined
+): string {
+  const parts = [label];
+  const descriptionText = typeof description === "string" ? description : undefined;
+  if (status && !descriptionText?.includes(status)) {
+    parts.push(status);
+  }
+  if (descriptionText) {
+    parts.push(descriptionText);
+  }
+  return parts.join(", ");
 }
 
 export type PipelineTreeItem = JobTreeItem;

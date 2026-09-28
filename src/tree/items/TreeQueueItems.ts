@@ -20,6 +20,7 @@ export class QueueItemTreeItem extends vscode.TreeItem {
   }
 
   public readonly queueId: number;
+  public readonly taskUrl?: string;
 
   constructor(
     public readonly environment: JenkinsEnvironmentRef,
@@ -27,6 +28,7 @@ export class QueueItemTreeItem extends vscode.TreeItem {
   ) {
     super(item.name, vscode.TreeItemCollapsibleState.None);
     this.queueId = item.id;
+    this.taskUrl = item.taskUrl;
     this.id = QueueItemTreeItem.buildId(environment, item.id);
     this.contextValue = "queueItem";
     this.description = formatQueueItemDescription(item.position, item.inQueueSince);

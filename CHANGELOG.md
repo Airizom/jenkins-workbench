@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- feat(tree): list environments at the root instead of under a "Jenkins Instances" node, and add Collapse All to the view title.
+- feat(tree): context menus drop the "Jenkins:" prefix (commands now use the `Jenkins` category), destructive environment actions move to their own group, and Open in Jenkins works on environments, folders, views, and queue items.
+- feat(tree): section headers keep plain labels with counts in the description; truncated Activity counts show as `N+`.
+- feat(tree): build rows show when a build finished, running builds show elapsed time against the estimate (and when they overrun it) instead of a character progress bar, and healthy jobs no longer repeat "Success".
+- feat(tree): expanding a build lists its artifacts directly; text artifacts preview on click and artifacts/workspace files use the file icon theme. Builds are listed before the job workspace, with an "Older builds…" link to Job History.
+- feat(tree): the view shows the active job filter, the running-jobs badge keeps one meaning, and the banner only appears for watch errors. Empty filter results offer to clear the filter.
+- feat(tree): authentication and connection failures mark the environment row, and error rows retry on click. Environment rows show the username.
+- feat(tree): awaiting-input builds use orange instead of running blue; approve and reject come first among inline build actions; Clear Branch Filter only appears on filtered multibranch folders.
+
+### Fixed
+
+- fix(tree): Open Job History was missing from job and pipeline context menus.
+- fix(tree): multibranch branch jobs in Activity and Pinned showed URL-encoded names (`feature%2Fx`).
+
 ## [1.54.2] - 2026-09-27
 
 ### Changed

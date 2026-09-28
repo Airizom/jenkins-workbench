@@ -27,7 +27,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Node Capacity** — Inspect executor utilization, queued work, offline impact, and label bottlenecks across an environment
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
 - **Deep Links** — Open builds and jobs through supported VS Code extension URIs (`vscode://airizom.jenkins-workbench/...`)
-- **Summary Badges** — Running, queued, and watch-error counts displayed on tree sections
+- **Summary Badges** — Section counts in the tree, a running-jobs badge on the view, and a banner when watched jobs cannot be checked
 
 ### Current Branch Workflow
 
@@ -379,7 +379,7 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `jenkinsWorkbench.treeViews.excludedNames` | `["all"]` | Case-insensitive Jenkins view names to hide from the curated Views section. |
+| `jenkinsWorkbench.treeViews.excludedNames` | `["all"]` | Case-insensitive Jenkins view names to hide from the Views section. |
 | `jenkinsWorkbench.activity.maxItemsPerGroup` | 50 | Maximum jobs to show in each Activity group (clamped to 100). |
 | `jenkinsWorkbench.activity.maxScanResults` | 2000 | Maximum Jenkins jobs to scan while collecting Activity groups. |
 | `jenkinsWorkbench.activity.jobSearchBatchSize` | 50 | Jenkins job search batch size used while collecting Activity groups. |
@@ -587,6 +587,7 @@ Security notes:
 
 ### Empty Tree View
 
+- An environment marked **Sign-in failed** or **Unreachable** could not authenticate or connect; click any warning row beneath it to retry
 - Verify the Jenkins URL is correct and reachable
 - Test that `/api/json` returns JSON data in your browser
 - Check that your network allows connections to Jenkins

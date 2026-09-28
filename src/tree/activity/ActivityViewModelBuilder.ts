@@ -1,4 +1,5 @@
 import type { JobSearchEntry } from "../../jenkins/JenkinsDataService";
+import { decodeJenkinsJobName } from "../../jenkins/JenkinsJobNames";
 import {
   ACTIVITY_GROUP_ORDER,
   type ActivityGroupKind,
@@ -62,7 +63,8 @@ function mapActivityJobs(
 function mapActivityJob(entry: JobSearchEntry, group: ActivityGroupKind): ActivityJobViewModel {
   return {
     group,
-    name: entry.name,
+    // Multibranch jobs are named after the URL-encoded branch (feature%2Fx).
+    name: decodeJenkinsJobName(entry.name),
     url: entry.url,
     color: entry.color,
     kind: entry.kind,

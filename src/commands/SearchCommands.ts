@@ -197,17 +197,19 @@ async function promptJobFilter(viewStateStore: JenkinsViewStateStore): Promise<v
     {
       label: "Failing Jobs",
       description: currentMode === "failing" ? "(current)" : undefined,
+      detail: "Jobs whose last build failed. Unstable jobs are listed under Activity.",
       mode: "failing"
     },
     {
       label: "Running Jobs",
       description: currentMode === "running" ? "(current)" : undefined,
+      detail: "Jobs with a build in progress.",
       mode: "running"
     }
   ];
 
   const selected = await vscode.window.showQuickPick(items, {
-    placeHolder: "Filter jobs by status"
+    placeHolder: "Filter jobs by status (folders stay visible)"
   });
 
   if (selected) {

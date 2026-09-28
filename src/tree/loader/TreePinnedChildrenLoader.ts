@@ -1,6 +1,7 @@
 import { JenkinsActionError, JenkinsRequestError } from "../../jenkins/errors";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { decodeJenkinsJobName } from "../../jenkins/JenkinsJobNames";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { ScopedJobStoreEntry } from "../../storage/ScopedJobStore";
 import { JobTreeItem, StalePinnedJobTreeItem } from "../items/TreeJobItems";
@@ -65,7 +66,7 @@ export class TreePinnedChildrenLoader {
         presentation: current.kind,
         variant: "quickAccess",
         environment,
-        label: current.name,
+        label: decodeJenkinsJobName(current.name),
         jobUrl: canonicalJobUrl,
         jobScope: ROOT_TREE_JOB_SCOPE,
         color: current.color,

@@ -22,7 +22,7 @@ vi.doMock("vscode", () => ({
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 }
 }));
 
-const { InstanceTreeItem, RootSectionTreeItem } = await import("../src/tree/items/TreeRootItems");
+const { InstanceTreeItem, JobsFolderTreeItem } = await import("../src/tree/items/TreeRootItems");
 const { createTreeElementChildrenHandler } = await import(
   "../src/tree/loader/TreeElementChildrenHandler"
 );
@@ -35,20 +35,20 @@ const environment: EnvironmentWithScope = {
 
 describe("createTreeElementChildrenHandler", () => {
   it("matches its constructor and passes the inferred subtype to getChildren", async () => {
-    const root = new RootSectionTreeItem("Instances", "instances");
     const instance = new InstanceTreeItem(environment);
-    let section: "instances" | undefined;
-    const handler = createTreeElementChildrenHandler(RootSectionTreeItem, {
+    const jobs = new JobsFolderTreeItem(instance);
+    let environmentId: string | undefined;
+    const handler = createTreeElementChildrenHandler(InstanceTreeItem, {
       getChildren: async (element) => {
-        section = element.section;
+        environmentId = element.environmentId;
         return [];
       }
     });
 
-    assert.equal(handler.matches(root), true);
-    assert.equal(handler.matches(instance), false);
-    assert.deepEqual(await handler.getChildren?.(root), []);
-    assert.equal(section, "instances");
+    assert.equal(handler.matches(instance), true);
+    assert.equal(handler.matches(jobs), false);
+    assert.deepEqual(await handler.getChildren?.(instance), []);
+    assert.equal(environmentId, "env-1");
   });
 
   it("supports subtype-specific invalidate-only handlers", () => {

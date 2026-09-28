@@ -1,4 +1,3 @@
-import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsDataService, JenkinsJobInfo } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { decodeJenkinsJobName } from "../../jenkins/JenkinsJobNames";
@@ -38,16 +37,14 @@ export class TreeJobCollectionChildrenLoader {
     }
 
     const request = getJobCollectionRequest(jobCollectionElement);
-    const parentFolderKind =
-      jobCollectionElement instanceof JenkinsFolderTreeItem
-        ? jobCollectionElement.folderKind
-        : undefined;
+    const parentFolder =
+      jobCollectionElement instanceof JenkinsFolderTreeItem ? jobCollectionElement : undefined;
     return await this.cacheManager.getOrLoadChildren(
       this.buildJobCollectionChildrenKey(jobCollectionElement.environment, request),
       jobCollectionElement,
       (isCurrentLoad) =>
         this.loadJobsForCollection(jobCollectionElement.environment, request, isCurrentLoad, {
-          parentFolderKind
+          parentFolder
         }),
       getJobCollectionLoadingLabel(request)
     );
@@ -72,7 +69,7 @@ export class TreeJobCollectionChildrenLoader {
     request: TreeJobCollectionRequest,
     isCurrentLoad: () => boolean,
     options?: {
-      parentFolderKind?: JenkinsJobKind;
+      parentFolder?: JenkinsFolderTreeItem;
     }
   ): Promise<WorkbenchTreeElement[]> {
     try {
@@ -84,7 +81,7 @@ export class TreeJobCollectionChildrenLoader {
         this.environmentSummaryStore.updateFromJobs(environment, jobs);
       }
       return await this.mapJobsToTreeItems(environment, jobs, {
-        parentFolderKind: options?.parentFolderKind,
+        parentFolder: options?.parentFolder,
         parentFolderUrl: request.folderUrl,
         jobScope: request.scope
       });
@@ -97,11 +94,12 @@ export class TreeJobCollectionChildrenLoader {
     environment: JenkinsEnvironmentRef,
     jobs: JenkinsJobInfo[],
     options?: {
-      parentFolderKind?: JenkinsJobKind;
+      parentFolder?: JenkinsFolderTreeItem;
       parentFolderUrl?: string;
       jobScope?: TreeJobCollectionRequest["scope"];
     }
   ): Promise<WorkbenchTreeElement[]> {
+    const parentFolderKind = options?.parentFolder?.folderKind;
     if (jobs.length === 0) {
       return [
         this.placeholders.createEmptyPlaceholder(
@@ -112,16 +110,11 @@ export class TreeJobCollectionChildrenLoader {
     }
 
     const filteredJobs = this.treeFilter.filterJobs(environment, jobs, {
-      parentFolderKind: options?.parentFolderKind,
+      parentFolderKind,
       parentFolderUrl: options?.parentFolderUrl
     });
     if (filteredJobs.length === 0) {
-      return [
-        this.placeholders.createEmptyPlaceholder(
-          "No jobs match the current filters.",
-          "Adjust or clear filters via the filter menu."
-        )
-      ];
+      return [this.createNoMatchesPlaceholder(options?.parentFolder)];
     }
 
     const [watchedJobs, pinnedJobs] = await Promise.all([
@@ -130,13 +123,36 @@ export class TreeJobCollectionChildrenLoader {
     ]);
     return mapFilteredJobsToTreeItems(
       environment,
-      options?.parentFolderKind === "multibranch"
+      parentFolderKind === "multibranch"
         ? filteredJobs.map((job) => ({ ...job, name: decodeJenkinsJobName(job.name) }))
         : filteredJobs,
       this.treeFilter,
       options?.jobScope,
       watchedJobs,
       pinnedJobs
+    );
+  }
+
+  // The job filter wins because it hides more; clearing the branch filter alone would still
+  // leave the folder empty.
+  private createNoMatchesPlaceholder(parentFolder?: JenkinsFolderTreeItem): WorkbenchTreeElement {
+    if (this.treeFilter.isJobFilterActive() || parentFolder?.folderKind !== "multibranch") {
+      return this.placeholders.createEmptyPlaceholder(
+        "No jobs match the current filter.",
+        "Click to show all jobs.",
+        { command: { command: "jenkinsWorkbench.filterJobsAll", title: "Show All Jobs" } }
+      );
+    }
+    return this.placeholders.createEmptyPlaceholder(
+      "No branches match the branch filter.",
+      "Click to clear the branch filter.",
+      {
+        command: {
+          command: "jenkinsWorkbench.clearBranchFilter",
+          title: "Clear Branch Filter",
+          arguments: [parentFolder]
+        }
+      }
     );
   }
 

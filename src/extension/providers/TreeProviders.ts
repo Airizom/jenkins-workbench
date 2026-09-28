@@ -38,7 +38,8 @@ export function createTreeProviderCatalog(options: TreeProviderOptions) {
       ),
     treeView: (container) =>
       vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
-        treeDataProvider: container.get("treeDataProvider")
+        treeDataProvider: container.get("treeDataProvider"),
+        showCollapseAll: true
       }),
     treeExpansionState: (container) =>
       new TreeExpansionState(container.get("treeView"), container.get("treeDataProvider")),

@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { resolveTreeFileIcon, TREE_FOLDER_ICON } from "../TreeFileIcons";
+import { applyTreeFileIcon } from "../TreeFileIcons";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
+
+const WORKSPACE_ROOT_ICON = new vscode.ThemeIcon("root-folder");
 
 export class WorkspaceRootTreeItem extends vscode.TreeItem {
   static buildId(
@@ -21,7 +23,7 @@ export class WorkspaceRootTreeItem extends vscode.TreeItem {
     super("Workspace", vscode.TreeItemCollapsibleState.Collapsed);
     this.id = WorkspaceRootTreeItem.buildId(environment, jobUrl, jobScope);
     this.contextValue = "workspaceRoot";
-    this.iconPath = TREE_FOLDER_ICON;
+    this.iconPath = WORKSPACE_ROOT_ICON;
     this.tooltip = "Browse the current Jenkins workspace.";
   }
 }
@@ -47,7 +49,7 @@ export class WorkspaceDirectoryTreeItem extends vscode.TreeItem {
     this.id = WorkspaceDirectoryTreeItem.buildId(environment, jobUrl, jobScope, relativePath);
     this.contextValue = "workspaceDirectory";
     this.description = relativePath !== directoryName ? relativePath : undefined;
-    this.iconPath = TREE_FOLDER_ICON;
+    applyTreeFileIcon(this, relativePath, "folder");
     this.tooltip = relativePath;
   }
 }
@@ -79,7 +81,7 @@ export class WorkspaceFileTreeItem extends vscode.TreeItem {
     this.id = WorkspaceFileTreeItem.buildId(environment, jobUrl, jobScope, relativePath);
     this.contextValue = "workspaceFile";
     this.description = relativePath !== fileName ? relativePath : undefined;
-    this.iconPath = resolveTreeFileIcon(fileName, relativePath);
+    applyTreeFileIcon(this, relativePath, "file");
     this.tooltip = relativePath;
     this.command = {
       command: "jenkinsWorkbench.previewWorkspaceFile",

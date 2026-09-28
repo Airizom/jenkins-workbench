@@ -5,6 +5,7 @@ import { JOB_CONFIG_DRAFT_SCHEME } from "../services/JobConfigDraftFilesystem";
 import { REPLAY_DRAFT_SCHEME } from "../services/ReplayDraftFilesystem";
 import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import type { TreeViewSummary } from "../tree/TreeDataProvider";
+import { formatJobFilterDescription, formatTreeViewSummary } from "../tree/TreeViewPresentation";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
 import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
 import { createExtensionContainer } from "./container/ExtensionContainer";
@@ -79,6 +80,12 @@ export async function activateRuntime(
   const treeSummarySubscription = treeDataProvider.onDidChangeSummary((summary) => {
     applyTreeSummary(treeView, summary);
   });
+
+  const applyJobFilterDescription = (): void => {
+    treeView.description = formatJobFilterDescription(viewStateStore.getJobFilterMode());
+  };
+  applyJobFilterDescription();
+  const jobFilterDescriptionSubscription = viewStateStore.onDidChange(applyJobFilterDescription);
 
   const buildDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
     "jenkinsWorkbench.buildDetails",
@@ -163,6 +170,7 @@ export async function activateRuntime(
     coverageDecorationService,
     buildDiagnosticsCoordinator,
     treeSummarySubscription,
+    jobFilterDescriptionSubscription,
     jobConfigDraftFilesystemRegistration,
     replayDraftFilesystemRegistration,
     buildCompareSerializer,
@@ -229,28 +237,7 @@ export async function activateRuntime(
 }
 
 function applyTreeSummary(treeView: vscode.TreeView<unknown>, summary: TreeViewSummary): void {
-  const hasCounts = summary.watchErrors > 0 || summary.running > 0 || summary.queue > 0;
-  if (!hasCounts) {
-    treeView.badge = undefined;
-    treeView.message = undefined;
-    return;
-  }
-
-  const message = `Running: ${summary.running} | Queue: ${summary.queue} | Watch errors: ${summary.watchErrors}`;
-  treeView.message = message;
-  const badgeValue = resolveTreeViewBadgeValue(summary);
-  treeView.badge = badgeValue > 0 ? { value: badgeValue, tooltip: message } : undefined;
-}
-
-function resolveTreeViewBadgeValue(summary: TreeViewSummary): number {
-  if (summary.watchErrors > 0) {
-    return summary.watchErrors;
-  }
-  if (summary.running > 0) {
-    return summary.running;
-  }
-  if (summary.queue > 0) {
-    return summary.queue;
-  }
-  return 0;
+  const presentation = formatTreeViewSummary(summary);
+  treeView.message = presentation.message;
+  treeView.badge = presentation.badge;
 }

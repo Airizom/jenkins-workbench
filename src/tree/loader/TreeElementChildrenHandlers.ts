@@ -1,5 +1,5 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { BuildArtifactsFolderTreeItem, BuildTreeItem } from "../items/TreeBuildItems";
+import { BuildTreeItem } from "../items/TreeBuildItems";
 import { JobTreeItem, StalePinnedJobTreeItem } from "../items/TreeJobItems";
 import { NodeTreeItem } from "../items/TreeNodeItems";
 import { QueueItemTreeItem } from "../items/TreeQueueItems";
@@ -10,7 +10,6 @@ import {
   InstanceTreeItem,
   NodesFolderTreeItem,
   PinnedJobsFolderTreeItem,
-  RootSectionTreeItem,
   ViewsFolderTreeItem
 } from "../items/TreeRootItems";
 import { WorkspaceDirectoryTreeItem, WorkspaceRootTreeItem } from "../items/TreeWorkspaceItems";
@@ -64,10 +63,6 @@ export function createTreeElementChildrenHandlers({
   invalidateBuildArtifacts
 }: TreeElementChildrenHandlerDependencies): TreeElementChildrenHandler[] {
   return [
-    createTreeElementChildrenHandler(RootSectionTreeItem, {
-      getChildren: () => environmentLoader.getInstanceItems(),
-      invalidate: () => clearChildrenCacheForEnvironment()
-    }),
     createTreeElementChildrenHandler(InstanceTreeItem, {
       getChildren: (element) => environmentLoader.getInstanceChildren(element),
       invalidate: (element) => clearChildrenCacheForEnvironment(element)
@@ -152,29 +147,12 @@ export function createTreeElementChildrenHandlers({
         return cacheManager.getOrLoadChildren(
           buildLoader.buildBuildArtifactsKey(build.environment, build.buildUrl, build.jobScope),
           build,
-          (isCurrentLoad) => buildLoader.loadArtifactsSummaryForBuild(build, isCurrentLoad),
+          (isCurrentLoad) => buildLoader.loadArtifactsForBuild(build, isCurrentLoad),
           "Loading artifacts..."
         );
       },
       invalidate: (build) => {
         invalidateBuildArtifacts(build.environment, build.buildUrl, build.jobScope);
-      }
-    }),
-    createTreeElementChildrenHandler(BuildArtifactsFolderTreeItem, {
-      getChildren: (folder) => {
-        return cacheManager.getOrLoadChildren(
-          buildLoader.buildArtifactChildrenKey(
-            folder.environment,
-            folder.buildUrl,
-            folder.jobScope
-          ),
-          folder,
-          (isCurrentLoad) => buildLoader.loadArtifactsForBuild(folder, isCurrentLoad),
-          "Loading artifacts..."
-        );
-      },
-      invalidate: (folder) => {
-        invalidateBuildArtifacts(folder.environment, folder.buildUrl, folder.jobScope);
       }
     }),
     createTreeElementChildrenHandler(WorkspaceRootTreeItem, {

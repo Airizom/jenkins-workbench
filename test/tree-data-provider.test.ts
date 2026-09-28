@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { JobSearchEntry } from "../src/jenkins/JenkinsDataService";
+import { JenkinsRequestError } from "../src/jenkins/errors";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 class TestTreeItem {
@@ -18,6 +19,9 @@ class TestTreeItem {
 }
 
 class TestThemeIcon {
+  static readonly File = new TestThemeIcon("file");
+  static readonly Folder = new TestThemeIcon("folder");
+
   constructor(
     public readonly iconId: string,
     public readonly color?: unknown
@@ -57,7 +61,13 @@ const vscodeShim = {
   ThemeIcon: TestThemeIcon,
   ThemeColor: TestThemeColor,
   MarkdownString: TestMarkdownString,
-  Uri: { parse: (value: string) => ({ toString: () => value }) },
+  Uri: {
+    parse: (value: string) => ({ toString: () => value }),
+    from: (components: { scheme: string; path: string }) => ({
+      ...components,
+      toString: () => `${components.scheme}:${components.path}`
+    })
+  },
   window: { setStatusBarMessage: () => ({ dispose: () => undefined }) }
 };
 
@@ -102,6 +112,7 @@ const { JenkinsWorkbenchTreeDataProvider } = (await import(
 interface TreeItemView {
   id?: string;
   label?: string;
+  command?: { command: string; arguments?: unknown[] };
   contextValue?: string;
   kind?: string;
   jobUrl?: string;
@@ -174,6 +185,8 @@ interface ProviderFixture {
   jobCollections: Map<string, JobInfoStub[]>;
   jobCollectionDelays: Map<string, number>;
   filterJobs: (jobs: JobInfoStub[]) => JobInfoStub[];
+  jobFilterActive: boolean;
+  nodeError?: unknown;
   events: unknown[];
   summaryEvents: TreeViewSummaryStub[];
 }
@@ -206,6 +219,7 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
     jobCollections: new Map(),
     jobCollectionDelays: new Map(),
     filterJobs: (jobs) => jobs,
+    jobFilterActive: false,
     events: [],
     summaryEvents: []
   };
@@ -238,6 +252,9 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
       const loadIndex = fixture.nodeLoads;
       fixture.nodeLoads += 1;
       await delay(fixture.nodeDelays[loadIndex] ?? 2);
+      if (fixture.nodeError) {
+        throw fixture.nodeError;
+      }
       return fixture.nodeResponses[loadIndex] ?? [];
     },
     getBuildsForJob: async () => fixture.builds,
@@ -256,6 +273,7 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
   };
   const treeFilter = {
     getBranchFilter: () => undefined,
+    isJobFilterActive: () => fixture.jobFilterActive,
     filterJobs: (_environment: unknown, jobs: JobInfoStub[]) => fixture.filterJobs(jobs)
   };
   const activityOptions = {
@@ -306,8 +324,7 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
 }
 
 async function expandToInstance(fixture: ProviderFixture): Promise<unknown> {
-  const rootItems = await fixture.provider.getChildren();
-  const instances = await fixture.provider.getChildren(rootItems[0]);
+  const instances = await fixture.provider.getChildren();
   return instances[0];
 }
 
@@ -389,8 +406,7 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     const { queueFolder } = await expandToFolders(fixture);
     assert.ok(queueFolder);
 
-    const replacementRoots = await fixture.provider.getChildren();
-    const replacementInstances = await fixture.provider.getChildren(replacementRoots[0]);
+    const replacementInstances = await fixture.provider.getChildren();
     const replacementInstance = replacementInstances[0];
     fixture.events.length = 0;
 
@@ -509,7 +525,7 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     await delay(50);
 
     const finalFolders = await expandToFolders(fixture);
-    assert.equal(asItem(finalFolders.jobsFolder).label, "Jobs (1)");
+    assert.equal(asItem(finalFolders.jobsFolder).description, "1 item");
     fixture.provider.dispose();
   });
 
@@ -535,7 +551,7 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     await delay(50);
 
     const finalFolders = await expandToFolders(fixture);
-    assert.equal(asItem(finalFolders.nodesFolder).label, "Nodes (1 online, 0 offline)");
+    assert.equal(asItem(finalFolders.nodesFolder).description, "1 online");
     fixture.provider.dispose();
   });
 
@@ -585,16 +601,7 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     await fixture.provider.getChildren(build);
     await delay(50);
 
-    const buildChildren = await fixture.provider.getChildren(build);
-    const artifactFolder = buildChildren.find(
-      (item) => asItem(item).contextValue === "artifactFolder"
-    );
-    assert.ok(artifactFolder);
-    assert.equal(asItem(artifactFolder).description, "1 item");
-
-    await fixture.provider.getChildren(artifactFolder);
-    await delay(10);
-    const artifacts = await fixture.provider.getChildren(artifactFolder);
+    const artifacts = await fixture.provider.getChildren(build);
     assert.equal(fixture.artifactLoads, 2);
     assert.deepEqual(
       artifacts.map((item) => asItem(item).relativePath),
@@ -603,7 +610,7 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     fixture.provider.dispose();
   });
 
-  it("invalidates an in-flight artifact-folder load through the shared path", async () => {
+  it("invalidates an in-flight build artifact load through the shared path", async () => {
     const fixture = createProviderFixture();
     const jobUrl = "https://jenkins.example/job/demo/";
     const buildUrl = `${jobUrl}1/`;
@@ -643,27 +650,27 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
 
     await fixture.provider.getChildren(build);
     await delay(10);
-    const buildChildren = await fixture.provider.getChildren(build);
-    const artifactFolder = buildChildren.find(
-      (item) => asItem(item).contextValue === "artifactFolder"
+    const initialArtifacts = await fixture.provider.getChildren(build);
+    assert.deepEqual(
+      initialArtifacts.map((item) => asItem(item).relativePath),
+      ["initial.txt"]
     );
-    assert.ok(artifactFolder);
 
     fixture.provider.invalidateBuildArtifacts({
       environment: fixture.environmentRef,
       buildUrl,
       refreshTree: false
     });
-    await fixture.provider.getChildren(artifactFolder);
+    await fixture.provider.getChildren(build);
     fixture.provider.invalidateBuildArtifacts({
       environment: fixture.environmentRef,
       buildUrl,
       refreshTree: false
     });
-    await fixture.provider.getChildren(artifactFolder);
+    await fixture.provider.getChildren(build);
     await delay(50);
 
-    const artifacts = await fixture.provider.getChildren(artifactFolder);
+    const artifacts = await fixture.provider.getChildren(build);
     assert.equal(fixture.artifactLoads, 3);
     assert.deepEqual(
       artifacts.map((item) => asItem(item).relativePath),
@@ -700,8 +707,8 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     fixture.provider.refreshViewOnly();
     const refreshedFolders = await expandToFolders(fixture);
 
-    assert.equal(asItem(refreshedFolders.jobsFolder).label, "Jobs (1)");
-    assert.equal(asItem(refreshedFolders.queueFolder).label, "Build Queue (1)");
+    assert.equal(asItem(refreshedFolders.jobsFolder).description, "1 item • 1 running");
+    assert.equal(asItem(refreshedFolders.queueFolder).description, "1 waiting");
     assert.deepEqual(fixture.summaryEvents.at(-1), {
       running: 1,
       queue: 1,
@@ -803,6 +810,87 @@ describe("JenkinsWorkbenchTreeDataProvider reveal resolution", () => {
     const element = await fixture.provider.resolveJobElement(fixture.environmentRef, entry);
 
     assert.equal(element, undefined);
+    fixture.provider.dispose();
+  });
+});
+
+describe("JenkinsWorkbenchTreeDataProvider presentation", () => {
+  async function loadChildren(fixture: ProviderFixture, element: unknown): Promise<unknown[]> {
+    await fixture.provider.getChildren(element);
+    await delay(20);
+    return fixture.provider.getChildren(element);
+  }
+
+  it("lists environments directly at the root", async () => {
+    const fixture = createProviderFixture();
+    const roots = await fixture.provider.getChildren();
+    assert.equal(roots.length, 1);
+    assert.equal(asItem(roots[0]).contextValue, "environment");
+    fixture.provider.dispose();
+  });
+
+  it("flags the environment and offers a retry when a load fails to authenticate", async () => {
+    const fixture = createProviderFixture();
+    fixture.nodeError = new JenkinsRequestError("Unauthorized", 401);
+    const { nodesFolder } = await expandToFolders(fixture);
+
+    const children = await loadChildren(fixture, nodesFolder);
+    const placeholder = asItem(children[0]);
+    assert.equal(placeholder.kind, "error");
+    assert.equal(placeholder.command?.command, "jenkinsWorkbench.refresh");
+    const retryTarget = placeholder.command?.arguments?.[0] as EnvironmentRef | undefined;
+    assert.equal(retryTarget?.environmentId, fixture.environmentRef.environmentId);
+
+    await Promise.resolve();
+    assert.ok(fixture.events.includes(undefined));
+    const [instance] = await fixture.provider.getChildren();
+    assert.equal(asItem(instance).description, "Sign-in failed • Workspace");
+
+    fixture.nodeError = undefined;
+    fixture.provider.fullEnvironmentRefresh({
+      environmentId: fixture.environmentRef.environmentId,
+      trigger: "system"
+    });
+    const [refreshed] = await fixture.provider.getChildren();
+    assert.equal(asItem(refreshed).description, "Workspace");
+    fixture.provider.dispose();
+  });
+
+  it("lists builds before the workspace and links older builds to Job History", async () => {
+    const fixture = createProviderFixture();
+    const jobUrl = "https://jenkins.example/job/demo/";
+    fixture.jobCollections.set("", [{ name: "demo", url: jobUrl, kind: "job", color: "blue" }]);
+    fixture.builds = Array.from({ length: 20 }, (_, index) => ({
+      number: 20 - index,
+      url: `${jobUrl}${20 - index}/`,
+      building: false,
+      result: "SUCCESS",
+      timestamp: Date.now(),
+      duration: 1000
+    }));
+    const { jobsFolder } = await expandToFolders(fixture);
+    const [job] = await loadChildren(fixture, jobsFolder);
+
+    const children = await loadChildren(fixture, job);
+    assert.equal(asItem(children[0]).contextValue, "build");
+    const olderBuilds = asItem(children.at(-2));
+    assert.equal(olderBuilds.command?.command, "jenkinsWorkbench.openJobHistory");
+    assert.equal(olderBuilds.command?.arguments?.[0], job);
+    assert.equal(asItem(children.at(-1)).contextValue, "workspaceRoot");
+    fixture.provider.dispose();
+  });
+
+  it("offers to show all jobs when the job filter hides everything", async () => {
+    const fixture = createProviderFixture();
+    fixture.jobCollections.set("", [
+      { name: "demo", url: "https://jenkins.example/job/demo/", kind: "job", color: "blue" }
+    ]);
+    fixture.filterJobs = () => [];
+    fixture.jobFilterActive = true;
+    const { jobsFolder } = await expandToFolders(fixture);
+
+    const [placeholder] = await loadChildren(fixture, jobsFolder);
+    assert.equal(asItem(placeholder).command?.command, "jenkinsWorkbench.filterJobsAll");
     fixture.provider.dispose();
   });
 });

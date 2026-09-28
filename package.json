@@ -46,313 +46,381 @@
     "commands": [
       {
         "command": "jenkinsWorkbench.openJobHistory",
-        "title": "Jenkins: Open Job History"
+        "title": "Open Job History",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.openCurrentCommitBuild",
-        "title": "Jenkins: Open Build for Current Commit"
+        "title": "Open Build for Current Commit",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.watchCurrentCommit",
-        "title": "Jenkins: Notify When Current Commit Finishes"
+        "title": "Notify When Current Commit Finishes",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.manageCommitWatches",
-        "title": "Jenkins: Manage Commit Watches"
+        "title": "Manage Commit Watches",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.addEnvironment",
-        "title": "Jenkins: Add Environment",
+        "title": "Add Environment",
+        "category": "Jenkins",
         "icon": "$(add)"
       },
       {
         "command": "jenkinsWorkbench.removeEnvironment",
-        "title": "Jenkins: Remove Environment",
+        "title": "Remove Environment",
+        "category": "Jenkins",
         "icon": "$(trash)"
       },
       {
         "command": "jenkinsWorkbench.signInWithBrowserSso",
-        "title": "Jenkins: Sign in with Browser SSO",
+        "title": "Sign in with Browser SSO",
+        "category": "Jenkins",
         "icon": "$(account)"
       },
       {
         "command": "jenkinsWorkbench.triggerBuild",
-        "title": "Jenkins: Trigger Build",
+        "title": "Trigger Build",
+        "category": "Jenkins",
         "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.abortBuild",
-        "title": "Jenkins: Abort/Stop Build",
+        "title": "Abort/Stop Build",
+        "category": "Jenkins",
         "icon": "$(debug-stop)"
       },
       {
         "command": "jenkinsWorkbench.approveInput",
-        "title": "Jenkins: Approve Input",
+        "title": "Approve Input",
+        "category": "Jenkins",
         "icon": "$(check)"
       },
       {
         "command": "jenkinsWorkbench.rejectInput",
-        "title": "Jenkins: Reject Input",
+        "title": "Reject Input",
+        "category": "Jenkins",
         "icon": "$(close)"
       },
       {
         "command": "jenkinsWorkbench.cancelQueueItem",
-        "title": "Jenkins: Cancel Queue Item",
+        "title": "Cancel Queue Item",
+        "category": "Jenkins",
         "icon": "$(close)"
       },
       {
         "command": "jenkinsWorkbench.replayBuild",
-        "title": "Jenkins: Replay Build"
+        "title": "Replay Build",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.quickReplayBuild",
-        "title": "Jenkins: Quick Replay Build"
+        "title": "Quick Replay Build",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.runReplayDraft",
-        "title": "Jenkins: Run Replay Draft",
+        "title": "Run Replay Draft",
+        "category": "Jenkins",
         "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.rebuildBuild",
-        "title": "Jenkins: Rebuild"
+        "title": "Rebuild",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.openInJenkins",
-        "title": "Jenkins: Open in Jenkins",
+        "title": "Open in Jenkins",
+        "category": "Jenkins",
         "icon": "$(link-external)"
       },
       {
         "command": "jenkinsWorkbench.goToJob",
-        "title": "Jenkins: Go to Job...",
+        "title": "Go to Job...",
+        "category": "Jenkins",
         "icon": "$(search)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsAll",
-        "title": "Jenkins: Show All Jobs",
+        "title": "Show All Jobs",
+        "category": "Jenkins",
         "icon": "$(list-flat)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsFailing",
-        "title": "Jenkins: Show Failing Jobs",
+        "title": "Show Failing Jobs",
+        "category": "Jenkins",
         "icon": "$(error)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsRunning",
-        "title": "Jenkins: Show Running Jobs",
+        "title": "Show Running Jobs",
+        "category": "Jenkins",
         "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.filterJobs",
-        "title": "Jenkins: Filter Jobs",
+        "title": "Filter Jobs",
+        "category": "Jenkins",
         "icon": "$(filter)"
       },
       {
         "command": "jenkinsWorkbench.filterJobsActive",
-        "title": "Jenkins: Filter Jobs",
+        "title": "Filter Jobs",
+        "category": "Jenkins",
         "icon": "$(filter-filled)"
       },
       {
         "command": "jenkinsWorkbench.compareWithBuild",
-        "title": "Jenkins: Compare With Build"
+        "title": "Compare With Build",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.showBuildDetails",
-        "title": "Jenkins: View Build Details"
+        "title": "View Build Details",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.showNodeDetails",
-        "title": "Jenkins: View Node Details"
+        "title": "View Node Details",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.showNodeCapacity",
-        "title": "Jenkins: View Node Capacity",
+        "title": "View Node Capacity",
+        "category": "Jenkins",
         "icon": "$(dashboard)"
       },
       {
         "command": "jenkinsWorkbench.takeNodeOffline",
-        "title": "Jenkins: Take Node Offline...",
+        "title": "Take Node Offline...",
+        "category": "Jenkins",
         "icon": "$(debug-disconnect)"
       },
       {
         "command": "jenkinsWorkbench.bringNodeOnline",
-        "title": "Jenkins: Bring Node Online",
+        "title": "Bring Node Online",
+        "category": "Jenkins",
         "icon": "$(debug-connect)"
       },
       {
         "command": "jenkinsWorkbench.launchNodeAgent",
-        "title": "Jenkins: Launch Node Agent",
+        "title": "Launch Node Agent",
+        "category": "Jenkins",
         "icon": "$(debug-start)"
       },
       {
         "command": "jenkinsWorkbench.previewBuildLog",
-        "title": "Jenkins: Preview Build Logs",
+        "title": "Preview Build Logs",
+        "category": "Jenkins",
         "icon": "$(terminal)"
       },
       {
         "command": "jenkinsWorkbench.openLastFailedBuild",
-        "title": "Jenkins: Open Last Failed Build"
+        "title": "Open Last Failed Build",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.viewJobConfig",
-        "title": "Jenkins: View Job Config",
+        "title": "View Job Config",
+        "category": "Jenkins",
         "icon": "$(file-code)"
       },
       {
         "command": "jenkinsWorkbench.updateJobConfig",
-        "title": "Jenkins: Update Job Config",
+        "title": "Update Job Config",
+        "category": "Jenkins",
         "icon": "$(edit)"
       },
       {
         "command": "jenkinsWorkbench.submitJobConfig",
-        "title": "Jenkins: Submit Job Config",
+        "title": "Submit Job Config",
+        "category": "Jenkins",
         "icon": "$(check)"
       },
       {
         "command": "jenkinsWorkbench.previewArtifact",
-        "title": "Jenkins: Preview Artifact",
+        "title": "Preview Artifact",
+        "category": "Jenkins",
         "icon": "$(eye)"
       },
       {
         "command": "jenkinsWorkbench.downloadArtifact",
-        "title": "Jenkins: Download Artifact",
+        "title": "Download Artifact",
+        "category": "Jenkins",
         "icon": "$(cloud-download)"
       },
       {
         "command": "jenkinsWorkbench.previewWorkspaceFile",
-        "title": "Jenkins: Preview Workspace File",
+        "title": "Preview Workspace File",
+        "category": "Jenkins",
         "icon": "$(eye)"
       },
       {
         "command": "jenkinsWorkbench.filterBranches",
-        "title": "Jenkins: Filter Branches"
+        "title": "Filter Branches",
+        "category": "Jenkins",
+        "icon": "$(filter)"
       },
       {
         "command": "jenkinsWorkbench.scanMultibranch",
-        "title": "Jenkins: Scan Repository Now",
+        "title": "Scan Repository Now",
+        "category": "Jenkins",
         "icon": "$(refresh)"
       },
       {
         "command": "jenkinsWorkbench.clearBranchFilter",
-        "title": "Jenkins: Clear Branch Filter"
+        "title": "Clear Branch Filter",
+        "category": "Jenkins",
+        "icon": "$(clear-all)"
       },
       {
         "command": "jenkinsWorkbench.watchJob",
-        "title": "Jenkins: Watch Job"
+        "title": "Watch Job",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.unwatchJob",
-        "title": "Jenkins: Unwatch Job"
+        "title": "Unwatch Job",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.pinJob",
-        "title": "Jenkins: Pin Job",
+        "title": "Pin Job",
+        "category": "Jenkins",
         "icon": "$(pin)"
       },
       {
         "command": "jenkinsWorkbench.unpinJob",
-        "title": "Jenkins: Unpin Job",
+        "title": "Unpin Job",
+        "category": "Jenkins",
         "icon": "$(pinned)"
       },
       {
         "command": "jenkinsWorkbench.removeMissingPins",
-        "title": "Jenkins: Remove Missing Pins",
+        "title": "Remove Missing Pins",
+        "category": "Jenkins",
         "icon": "$(clear-all)"
       },
       {
         "command": "jenkinsWorkbench.refresh",
-        "title": "Jenkins: Refresh",
+        "title": "Refresh",
+        "category": "Jenkins",
         "icon": "$(refresh)"
       },
       {
         "command": "jenkinsWorkbench.linkCurrentRepository",
-        "title": "Jenkins: Link Current Repository to Multibranch Pipeline",
+        "title": "Link Current Repository to Multibranch Pipeline",
+        "category": "Jenkins",
         "icon": "$(link)"
       },
       {
         "command": "jenkinsWorkbench.linkRepositoryHere",
-        "title": "Jenkins: Link Repository Here",
+        "title": "Link Repository Here",
+        "category": "Jenkins",
         "icon": "$(link)"
       },
       {
         "command": "jenkinsWorkbench.unlinkCurrentRepository",
-        "title": "Jenkins: Unlink Current Repository from Jenkins",
+        "title": "Unlink Current Repository from Jenkins",
+        "category": "Jenkins",
         "icon": "$(circle-slash)"
       },
       {
         "command": "jenkinsWorkbench.currentBranchActions",
-        "title": "Jenkins: Current Branch Actions"
+        "title": "Current Branch Actions",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.openCurrentBranchInJenkins",
-        "title": "Jenkins: Open Current Branch in Jenkins",
+        "title": "Open Current Branch in Jenkins",
+        "category": "Jenkins",
         "icon": "$(link-external)"
       },
       {
         "command": "jenkinsWorkbench.triggerCurrentBranchBuild",
-        "title": "Jenkins: Trigger Current Branch Build",
+        "title": "Trigger Current Branch Build",
+        "category": "Jenkins",
         "icon": "$(play)"
       },
       {
         "command": "jenkinsWorkbench.enableJob",
-        "title": "Jenkins: Enable Job",
+        "title": "Enable Job",
+        "category": "Jenkins",
         "icon": "$(play-circle)"
       },
       {
         "command": "jenkinsWorkbench.disableJob",
-        "title": "Jenkins: Disable Job",
+        "title": "Disable Job",
+        "category": "Jenkins",
         "icon": "$(debug-pause)"
       },
       {
         "command": "jenkinsWorkbench.renameJob",
-        "title": "Jenkins: Rename Job",
+        "title": "Rename Job",
+        "category": "Jenkins",
         "icon": "$(edit)"
       },
       {
         "command": "jenkinsWorkbench.deleteJob",
-        "title": "Jenkins: Delete Job",
+        "title": "Delete Job",
+        "category": "Jenkins",
         "icon": "$(trash)"
       },
       {
         "command": "jenkinsWorkbench.copyJob",
-        "title": "Jenkins: Copy Job",
+        "title": "Copy Job",
+        "category": "Jenkins",
         "icon": "$(copy)"
       },
       {
         "command": "jenkinsWorkbench.newItem",
-        "title": "Jenkins: New Item",
+        "title": "New Item",
+        "category": "Jenkins",
         "icon": "$(new-file)"
       },
       {
         "command": "jenkinsWorkbench.jenkinsfile.validateActive",
-        "title": "Jenkins: Validate Jenkinsfile",
+        "title": "Validate Jenkinsfile",
+        "category": "Jenkins",
         "icon": "$(check)"
       },
       {
         "command": "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment",
-        "title": "Jenkins: Select Jenkinsfile Environment"
+        "title": "Select Jenkinsfile Environment",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.jenkinsfile.clearDiagnostics",
-        "title": "Jenkins: Clear Jenkinsfile Validation Diagnostics"
+        "title": "Clear Jenkinsfile Validation Diagnostics",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.jenkinsfile.showValidationOutput",
-        "title": "Jenkins: Show Jenkinsfile Validation Output"
+        "title": "Show Jenkinsfile Validation Output",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.configureBuildDiagnostics",
-        "title": "Jenkins: Configure Build Diagnostics",
+        "title": "Configure Build Diagnostics",
+        "category": "Jenkins",
         "icon": "$(settings-gear)"
       },
       {
         "command": "jenkinsWorkbench.refreshBuildDiagnostics",
-        "title": "Jenkins: Refresh Build Diagnostics",
+        "title": "Refresh Build Diagnostics",
+        "category": "Jenkins",
         "icon": "$(refresh)"
       },
       {
         "command": "jenkinsWorkbench.showBuildDiagnosticOutput",
-        "title": "Jenkins: Show Build Diagnostic Output"
+        "title": "Show Build Diagnostic Output",
+        "category": "Jenkins"
       }
     ],
     "taskDefinitions": [
@@ -1065,7 +1133,7 @@
       "view/item/context": [
         {
           "command": "jenkinsWorkbench.openJobHistory",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(job|pipeline|multibranchFolder)(\\s|$)/",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem|multibranchFolder)(\\s|$)/",
           "group": "1_actions@5"
         },
         {
@@ -1076,12 +1144,12 @@
         {
           "command": "jenkinsWorkbench.removeEnvironment",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
-          "group": "navigation"
+          "group": "9_danger@0"
         },
         {
           "command": "jenkinsWorkbench.signInWithBrowserSso",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
-          "group": "navigation@1"
+          "group": "1_actions@1"
         },
         {
           "command": "jenkinsWorkbench.newItem",
@@ -1102,6 +1170,21 @@
           "command": "jenkinsWorkbench.triggerBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "inline@0"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(folder|multibranchFolder|view)(\\s|$)/",
+          "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.openInJenkins",
+          "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
+          "group": "1_actions@0"
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
@@ -1221,22 +1304,22 @@
         {
           "command": "jenkinsWorkbench.abortBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/",
-          "group": "inline@0"
+          "group": "inline@3"
         },
         {
           "command": "jenkinsWorkbench.previewBuildLog",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
-          "group": "inline@1"
+          "group": "inline@2"
         },
         {
           "command": "jenkinsWorkbench.approveInput",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
-          "group": "inline@1"
+          "group": "inline@0"
         },
         {
           "command": "jenkinsWorkbench.rejectInput",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)awaitingInput(\\s|$)/",
-          "group": "inline@2"
+          "group": "inline@1"
         },
         {
           "command": "jenkinsWorkbench.cancelQueueItem",
@@ -1290,22 +1373,22 @@
         },
         {
           "command": "jenkinsWorkbench.linkRepositoryHere",
-          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)multibranchFolder(\\s|$)/",
           "group": "navigation@0"
         },
         {
           "command": "jenkinsWorkbench.scanMultibranch",
-          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)multibranchFolder(\\s|$)/",
           "group": "navigation@1"
         },
         {
           "command": "jenkinsWorkbench.filterBranches",
-          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)multibranchFolder(\\s|$)/",
           "group": "navigation@2"
         },
         {
           "command": "jenkinsWorkbench.clearBranchFilter",
-          "when": "view == jenkinsWorkbench.tree && viewItem == multibranchFolder",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)branchFiltered(\\s|$)/",
           "group": "navigation@3"
         }
       ],

@@ -14,6 +14,10 @@ interface TreeFilterOptions {
 export class JenkinsTreeFilter {
   constructor(private readonly viewStateStore: JenkinsViewStateStore) {}
 
+  isJobFilterActive(): boolean {
+    return this.viewStateStore.getJobFilterMode() !== "all";
+  }
+
   getBranchFilter(environmentId: string, folderUrl: string): string | undefined {
     return normalizeBranchFilter(this.viewStateStore.getBranchFilter(environmentId, folderUrl));
   }

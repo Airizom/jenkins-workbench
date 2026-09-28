@@ -5,11 +5,7 @@ import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef
 import { JenkinsTreeRevealResolver } from "../src/tree/TreeRevealResolver";
 import { JobTreeItem } from "../src/tree/items/TreeJobItems";
 import { PlaceholderTreeItem } from "../src/tree/items/TreePlaceholderItem";
-import {
-  InstanceTreeItem,
-  JobsFolderTreeItem,
-  RootSectionTreeItem
-} from "../src/tree/items/TreeRootItems";
+import { InstanceTreeItem, JobsFolderTreeItem } from "../src/tree/items/TreeRootItems";
 import type { WorkbenchTreeElement } from "../src/tree/items/WorkbenchTreeElement";
 import { EventEmitter } from "./helpers/vscodeStub";
 
@@ -62,7 +58,6 @@ describe("JenkinsTreeRevealResolver", () => {
 
   it("accepts an equivalent parent while ignoring unrelated targeted changes", async () => {
     const treeChanges = new EventEmitter<WorkbenchTreeElement | undefined>();
-    const root = new RootSectionTreeItem("Jenkins Instances", "instances");
     const instance = new InstanceTreeItem({
       id: environment.environmentId,
       scope: environment.scope,
@@ -81,9 +76,6 @@ describe("JenkinsTreeRevealResolver", () => {
     let jobsReadCount = 0;
     const resolver = new JenkinsTreeRevealResolver(async (element) => {
       if (!element) {
-        return [root];
-      }
-      if (element === root) {
         return [instance];
       }
       if (element === instance) {

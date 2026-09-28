@@ -3,8 +3,7 @@ import type { JenkinsEnvironmentStoreChange } from "../storage/JenkinsEnvironmen
 import {
   ActivityFolderTreeItem,
   BuildQueueFolderTreeItem,
-  InstanceTreeItem,
-  RootSectionTreeItem
+  InstanceTreeItem
 } from "../tree/TreeItems";
 import type { ExtensionContainer } from "./container/ExtensionContainer";
 import type { ExtensionTokenMap } from "./container/ExtensionTokenMap";
@@ -277,11 +276,6 @@ export function registerExtensionSubscriptions(
     if (event.element instanceof InstanceTreeItem) {
       queuePoller.clearEnvironment(event.element);
       activityRefreshService.handleEnvironmentCollapsed(event.element);
-      return;
-    }
-    if (event.element instanceof RootSectionTreeItem && event.element.section === "instances") {
-      queuePoller.clearAll();
-      activityRefreshService.handleAllEnvironmentsCollapsed();
     }
   });
 

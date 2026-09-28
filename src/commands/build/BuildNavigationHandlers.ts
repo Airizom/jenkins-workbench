@@ -1,22 +1,54 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
-import type { BuildTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
-import { NodeTreeItem } from "../../tree/TreeItems";
+import { JenkinsViewTreeItem } from "../../tree/items/TreeJobItems";
+import {
+  BuildTreeItem,
+  InstanceTreeItem,
+  JenkinsFolderTreeItem,
+  type JobTreeItem,
+  NodeTreeItem,
+  type PipelineTreeItem,
+  QueueItemTreeItem
+} from "../../tree/TreeItems";
 import type { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
-import {
-  getOpenUrl,
-  getTreeItemLabel,
-  requireSelection,
-  withActionErrorMessage
-} from "../CommandUtils";
+import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 import type { JenkinsJobTarget } from "./BuildCommandTargets";
 
-export async function openInJenkins(
-  item?: JobTreeItem | PipelineTreeItem | BuildTreeItem | NodeTreeItem
-): Promise<void> {
-  const selected = requireSelection(item, "Select a job, pipeline, build, or node to open.");
+export type OpenableTreeItem =
+  | JobTreeItem
+  | BuildTreeItem
+  | NodeTreeItem
+  | InstanceTreeItem
+  | JenkinsFolderTreeItem
+  | JenkinsViewTreeItem
+  | QueueItemTreeItem;
+
+function getOpenUrl(item: OpenableTreeItem): string | undefined {
+  if (item instanceof BuildTreeItem) {
+    return item.buildUrl;
+  }
+  if (item instanceof NodeTreeItem) {
+    return item.nodeUrl;
+  }
+  if (item instanceof InstanceTreeItem) {
+    return item.url;
+  }
+  if (item instanceof JenkinsFolderTreeItem) {
+    return item.folderUrl;
+  }
+  if (item instanceof JenkinsViewTreeItem) {
+    return item.viewUrl;
+  }
+  if (item instanceof QueueItemTreeItem) {
+    return item.taskUrl;
+  }
+  return item.jobUrl;
+}
+
+export async function openInJenkins(item?: OpenableTreeItem): Promise<void> {
+  const selected = requireSelection(item, "Select a Jenkins item to open.");
   if (!selected) {
     return;
   }
@@ -30,7 +62,7 @@ export async function openInJenkins(
 
   const url = getOpenUrl(selected);
   if (!url) {
-    void vscode.window.showInformationMessage("Select a job, pipeline, build, or node to open.");
+    void vscode.window.showInformationMessage("That item does not have a Jenkins URL to open.");
     return;
   }
 

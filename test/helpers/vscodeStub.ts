@@ -39,6 +39,9 @@ export class ThemeColor {
 }
 
 export class ThemeIcon {
+  static readonly File = new ThemeIcon("file");
+  static readonly Folder = new ThemeIcon("folder");
+
   constructor(
     readonly id: string,
     readonly color?: ThemeColor
@@ -101,6 +104,22 @@ export class Uri {
 
   static file(fsPath: string): Uri {
     return new Uri("file", "", fsPath, "", "");
+  }
+
+  static from(components: {
+    scheme: string;
+    authority?: string;
+    path?: string;
+    query?: string;
+    fragment?: string;
+  }): Uri {
+    return new Uri(
+      components.scheme,
+      components.authority ?? "",
+      components.path ?? "",
+      components.query ?? "",
+      components.fragment ?? ""
+    );
   }
 
   static parse(value: string): Uri {

@@ -55,14 +55,6 @@ export class JenkinsQueuePoller implements vscode.Disposable {
     this.expandedEnvironments.set(key, environment);
   }
 
-  clearAll(): void {
-    if (this.expandedEnvironments.size === 0) {
-      return;
-    }
-    this.expandedEnvironments.clear();
-    this.stop();
-  }
-
   updatePollIntervalSeconds(pollIntervalSeconds: number): void {
     const next = this.normalizePollIntervalSeconds(pollIntervalSeconds);
     if (next === this.pollIntervalMs) {

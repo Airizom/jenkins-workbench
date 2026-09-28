@@ -2,7 +2,7 @@ import type * as vscode from "vscode";
 import type { JobSearchEntry } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { JenkinsFolderTreeItem, JobTreeItem } from "./items/TreeJobItems";
-import { InstanceTreeItem, JobsFolderTreeItem, RootSectionTreeItem } from "./items/TreeRootItems";
+import { InstanceTreeItem, JobsFolderTreeItem } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { retryOnTreeChange } from "./TreeChangeRetry";
 import { isLoadingPlaceholder } from "./TreeDataProviderUtils";
@@ -19,15 +19,7 @@ export class JenkinsTreeRevealResolver {
     environment: JenkinsEnvironmentRef,
     entry: JobSearchEntry
   ): Promise<WorkbenchTreeElement | undefined> {
-    const rootItems = await this.getLoadedChildren(undefined);
-    const instancesRoot = rootItems.find(
-      (item) => item instanceof RootSectionTreeItem && item.section === "instances"
-    );
-    if (!instancesRoot) {
-      return undefined;
-    }
-
-    const instanceItems = await this.getLoadedChildren(instancesRoot);
+    const instanceItems = await this.getLoadedChildren(undefined);
     const instance = instanceItems.find(
       (item): item is InstanceTreeItem =>
         item instanceof InstanceTreeItem &&

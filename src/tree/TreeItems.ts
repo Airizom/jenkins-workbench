@@ -16,8 +16,7 @@ export {
   InstanceTreeItem,
   JobsFolderTreeItem,
   NodesFolderTreeItem,
-  PinnedJobsFolderTreeItem,
-  RootSectionTreeItem
+  PinnedJobsFolderTreeItem
 } from "./items/TreeRootItems";
 export { WorkspaceFileTreeItem } from "./items/TreeWorkspaceItems";
 export type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";

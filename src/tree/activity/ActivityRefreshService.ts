@@ -50,10 +50,6 @@ export class ActivityRefreshService {
     this.clearEnvironment(environment.scope, environment.environmentId);
   }
 
-  handleAllEnvironmentsCollapsed(): void {
-    this.clearAll();
-  }
-
   handleEnvironmentStoreChange(change: JenkinsEnvironmentStoreChange): void {
     switch (change.kind) {
       case "bulk-update":

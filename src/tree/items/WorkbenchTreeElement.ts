@@ -1,8 +1,4 @@
-import type {
-  ArtifactTreeItem,
-  BuildArtifactsFolderTreeItem,
-  BuildTreeItem
-} from "./TreeBuildItems";
+import type { ArtifactTreeItem, BuildTreeItem } from "./TreeBuildItems";
 import type {
   JenkinsFolderTreeItem,
   JenkinsViewTreeItem,
@@ -21,7 +17,6 @@ import type {
   NodesFolderTreeItem,
   PinnedJobsFolderTreeItem,
   PinnedSectionTreeItem,
-  RootSectionTreeItem,
   ViewsFolderTreeItem
 } from "./TreeRootItems";
 import type {
@@ -31,7 +26,6 @@ import type {
 } from "./TreeWorkspaceItems";
 
 export type WorkbenchTreeElement =
-  | RootSectionTreeItem
   | InstanceTreeItem
   | ActivityFolderTreeItem
   | ActivityGroupTreeItem
@@ -46,7 +40,6 @@ export type WorkbenchTreeElement =
   | JobTreeItem
   | StalePinnedJobTreeItem
   | BuildTreeItem
-  | BuildArtifactsFolderTreeItem
   | ArtifactTreeItem
   | WorkspaceRootTreeItem
   | WorkspaceDirectoryTreeItem

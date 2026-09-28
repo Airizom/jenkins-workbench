@@ -2,8 +2,7 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import {
   ActivityFolderTreeItem,
   BuildQueueFolderTreeItem,
-  InstanceTreeItem,
-  RootSectionTreeItem
+  InstanceTreeItem
 } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 
@@ -40,7 +39,7 @@ export class TreeDataProviderHierarchyState {
   }
 
   private prepareRenderedItems(parent: WorkbenchTreeElement | undefined): void {
-    if (!(parent instanceof RootSectionTreeItem) || parent.section !== "instances") {
+    if (parent !== undefined) {
       return;
     }
     this.instanceItems.clear();

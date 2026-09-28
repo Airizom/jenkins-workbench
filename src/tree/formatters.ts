@@ -12,10 +12,10 @@ import {
   resolveJobColorIconId,
   resolveJobColorStatus
 } from "../formatters/JobColorFormatters";
+import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters";
 import { normalizeStatusToken } from "../formatters/StatusTokenUtils";
 import type { JenkinsBuild } from "../jenkins/JenkinsClient";
 import { parseJobUrl } from "../jenkins/urls";
-import { clampPercent } from "../shared/numbers";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 
 type NormalizedStatus = JobColorStatus;
@@ -31,6 +31,16 @@ const STATUS_THEME_COLORS: Record<NormalizedStatus, vscode.ThemeColor> = {
   unknown: new vscode.ThemeColor("charts.gray")
 };
 
+// The status-colored icon already conveys these; spelling them out on every row buries the
+// failures and running jobs that need attention.
+const QUIET_JOB_STATUS_LABELS = new Set([
+  formatJobColorStatusLabel("success"),
+  formatJobColorStatusLabel("unknown")
+]);
+
+// Awaiting input needs the user, so it must not share running's blue.
+export const AWAITING_INPUT_THEME_COLOR = new vscode.ThemeColor("charts.orange");
+
 export function formatJobColor(color?: string): string | undefined {
   const status = resolveJobColorStatus(color);
   if (!status) {
@@ -41,32 +51,57 @@ export function formatJobColor(color?: string): string | undefined {
 
 export function formatBuildDescription(build: JenkinsBuild, awaitingInput = false): string {
   if (build.building) {
-    const elapsedMs = resolveBuildElapsedMs(build);
-    const estimatedMs = Number.isFinite(build.estimatedDuration)
-      ? (build.estimatedDuration as number)
-      : undefined;
-
-    if (Number.isFinite(elapsedMs) && typeof estimatedMs === "number" && estimatedMs > 0) {
-      const progressPercentRaw = Math.floor(((elapsedMs as number) / estimatedMs) * 100);
-      const progressPercent = clampPercent(progressPercentRaw);
-      const progressBar = formatProgressBar(progressPercent, 10);
-      const base = `Running ${progressPercent}% ${progressBar}`;
-      return awaitingInput ? `${base} • Awaiting input` : base;
+    const parts = awaitingInput ? ["Awaiting input"] : ["Running"];
+    const progress = formatRunningProgress(build);
+    if (progress) {
+      parts.push(progress);
     }
-
-    const elapsedLabel = formatDurationLabel(elapsedMs);
-    const base = elapsedLabel ? `Running ${elapsedLabel}` : "Running";
-    return awaitingInput ? `${base} • Awaiting input` : base;
+    return parts.join(" • ");
   }
 
-  const status = resolveBuildResultLabel(build.result, build.building);
+  const parts = [resolveBuildResultLabel(build.result, build.building)];
   const durationLabel = formatDurationLabel(build.duration);
-  return durationLabel ? `${status} • ${durationLabel}` : status;
+  if (durationLabel) {
+    parts.push(durationLabel);
+  }
+  const finishedAt = resolveBuildFinishedAtMs(build);
+  const relative = finishedAt === undefined ? undefined : formatRelativeTimestampMs(finishedAt);
+  if (relative) {
+    parts.push(relative);
+  }
+  return parts.join(" • ");
+}
+
+// Text-only progress so screen readers do not announce a character-art bar, and so a build
+// that overruns its estimate reads as overdue instead of sitting at a clamped 100%.
+function formatRunningProgress(build: JenkinsBuild): string | undefined {
+  const elapsedMs = resolveBuildElapsedMs(build);
+  const elapsedLabel = formatDurationLabel(elapsedMs);
+  if (elapsedMs === undefined || !elapsedLabel) {
+    return undefined;
+  }
+  const estimatedMs = build.estimatedDuration;
+  if (typeof estimatedMs !== "number" || !Number.isFinite(estimatedMs) || estimatedMs <= 0) {
+    return elapsedLabel;
+  }
+  const estimateLabel = formatDurationMs(estimatedMs);
+  return elapsedMs > estimatedMs
+    ? `${elapsedLabel}, over ~${estimateLabel} estimate`
+    : `${elapsedLabel} of ~${estimateLabel}`;
+}
+
+function resolveBuildFinishedAtMs(build: JenkinsBuild): number | undefined {
+  if (typeof build.timestamp !== "number" || !Number.isFinite(build.timestamp)) {
+    return undefined;
+  }
+  const duration =
+    typeof build.duration === "number" && Number.isFinite(build.duration) ? build.duration : 0;
+  return build.timestamp + Math.max(0, duration);
 }
 
 export function buildIcon(build: JenkinsBuild, awaitingInput = false): vscode.ThemeIcon {
   if (awaitingInput) {
-    return new vscode.ThemeIcon("debug-pause", STATUS_THEME_COLORS.running);
+    return new vscode.ThemeIcon("debug-pause", AWAITING_INPUT_THEME_COLOR);
   }
   const status = resolveBuildStatus(build);
   if (status === "running") {
@@ -88,7 +123,7 @@ export function formatJobDescription(options: {
   isDisabled?: boolean;
 }): string | undefined {
   const parts: string[] = [];
-  if (options.status) {
+  if (options.status && !QUIET_JOB_STATUS_LABELS.has(options.status)) {
     parts.push(options.status);
   }
   if (options.isDisabled && options.status?.toLowerCase() !== "disabled") {
@@ -186,15 +221,6 @@ function formatDurationLabel(durationMs?: number): string | undefined {
     return undefined;
   }
   return formatDurationMs(Math.max(0, durationMs as number));
-}
-
-function formatProgressBar(percent: number, width: number): string {
-  const clamped = clampPercent(percent);
-  const filled = Math.round((clamped / 100) * width);
-  const empty = Math.max(0, width - filled);
-  const filledBar = "#".repeat(filled);
-  const emptyBar = "-".repeat(empty);
-  return `[${filledBar}${emptyBar}]`;
 }
 
 export { formatDurationMs };

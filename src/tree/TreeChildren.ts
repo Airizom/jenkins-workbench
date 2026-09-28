@@ -9,8 +9,8 @@ import type { TreeActivityOptions } from "./ActivityTypes";
 import { ActivityCollector } from "./activity/ActivityCollector";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
-import { PlaceholderTreeItem } from "./items/TreePlaceholderItem";
-import { RootSectionTreeItem } from "./items/TreeRootItems";
+import { PlaceholderTreeItem, type PlaceholderTreeItemOptions } from "./items/TreePlaceholderItem";
+import { InstanceTreeItem, type InstanceTreeItemIssue } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { TreeActivityChildrenLoader } from "./loader/TreeActivityChildrenLoader";
 import { TreeBuildChildrenLoader } from "./loader/TreeBuildChildrenLoader";
@@ -33,6 +33,7 @@ import { TreePinnedChildrenLoader } from "./loader/TreePinnedChildrenLoader";
 import { TreeWorkspaceChildrenLoader } from "./loader/TreeWorkspaceChildrenLoader";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "./TreeJobScope";
+import { describeTreeLoadError } from "./TreeLoadErrors";
 import type { TreeViewCurationOptions } from "./TreeViewCuration";
 
 export class JenkinsTreeChildrenLoader {
@@ -53,6 +54,8 @@ export class JenkinsTreeChildrenLoader {
   >();
   private readonly activityLoader: TreeActivityChildrenLoader;
   private readonly buildLoader: TreeBuildChildrenLoader;
+  private readonly environmentLoader: TreeEnvironmentChildrenLoader;
+  private readonly environmentIssues = new Map<string, InstanceTreeItemIssue>();
 
   constructor(
     private readonly store: JenkinsEnvironmentStore,
@@ -66,7 +69,7 @@ export class JenkinsTreeChildrenLoader {
     private buildTooltipOptions: BuildTooltipOptions,
     private buildListFetchOptions: BuildListFetchOptions,
     pendingInputCoordinator: PendingInputRefreshCoordinator,
-    notify: (element?: WorkbenchTreeElement) => void,
+    private readonly notify: (element?: WorkbenchTreeElement) => void,
     notifyEnvironment: (environment: JenkinsEnvironmentRef) => void
   ) {
     this.cacheManager = new TreeChildrenCacheManager(
@@ -98,7 +101,7 @@ export class JenkinsTreeChildrenLoader {
       placeholders,
       notifyEnvironment
     );
-    const environmentLoader = new TreeEnvironmentChildrenLoader(
+    this.environmentLoader = new TreeEnvironmentChildrenLoader(
       this.store,
       dataService,
       pinStore,
@@ -136,7 +139,7 @@ export class JenkinsTreeChildrenLoader {
 
     this.elementHandlers = createTreeElementChildrenHandlers({
       cacheManager: this.cacheManager,
-      environmentLoader,
+      environmentLoader: this.environmentLoader,
       activityLoader: this.activityLoader,
       jobCollectionLoader,
       buildLoader: this.buildLoader,
@@ -172,15 +175,74 @@ export class JenkinsTreeChildrenLoader {
 
   async getChildren(element?: WorkbenchTreeElement): Promise<WorkbenchTreeElement[]> {
     if (!element) {
-      const environments = await this.store.listEnvironmentsWithScope();
-      if (environments.length === 0) {
-        return [];
-      }
-      return [new RootSectionTreeItem("Jenkins Instances", "instances")];
+      return this.environmentLoader.getInstanceItems((environment) =>
+        this.environmentIssues.get(buildEnvironmentIssueKey(environment.scope, environment.id))
+      );
     }
 
     const handler = this.getElementHandler(element);
-    return (await handler?.getChildren?.(element)) ?? [];
+    const items = (await handler?.getChildren?.(element)) ?? [];
+    const environment = resolveTreeElementEnvironment(element);
+    if (environment) {
+      this.trackErrorPlaceholders(environment, items);
+    }
+    return items;
+  }
+
+  private trackErrorPlaceholders(
+    environment: JenkinsEnvironmentRef,
+    items: WorkbenchTreeElement[]
+  ): void {
+    for (const item of items) {
+      if (!(item instanceof PlaceholderTreeItem) || item.kind !== "error") {
+        continue;
+      }
+      item.attachRetryCommand({
+        command: "jenkinsWorkbench.refresh",
+        title: "Retry",
+        arguments: [
+          {
+            environmentId: environment.environmentId,
+            scope: environment.scope,
+            url: environment.url,
+            username: environment.username
+          } satisfies JenkinsEnvironmentRef
+        ]
+      });
+      if (item.issue) {
+        this.recordEnvironmentIssue(environment, {
+          kind: item.issue,
+          message: typeof item.description === "string" ? item.description : ""
+        });
+      }
+    }
+  }
+
+  // Issues are only cleared when the environment's caches are cleared (refresh). Clearing on
+  // any successful load would let one healthy folder and one failing folder re-render the
+  // root against each other indefinitely.
+  private recordEnvironmentIssue(
+    environment: JenkinsEnvironmentRef,
+    issue: InstanceTreeItemIssue
+  ): void {
+    const key = buildEnvironmentIssueKey(environment.scope, environment.environmentId);
+    if (this.environmentIssues.get(key)?.kind === issue.kind) {
+      return;
+    }
+    this.environmentIssues.set(key, issue);
+    queueMicrotask(() => this.notify(undefined));
+  }
+
+  private clearEnvironmentIssues(environmentId?: string): void {
+    if (!environmentId) {
+      this.environmentIssues.clear();
+      return;
+    }
+    for (const key of this.environmentIssues.keys()) {
+      if (key.endsWith(`:${environmentId}`)) {
+        this.environmentIssues.delete(key);
+      }
+    }
   }
 
   clearWatchCacheForEnvironment(environmentId?: string): void {
@@ -195,6 +257,7 @@ export class JenkinsTreeChildrenLoader {
     const environmentId =
       typeof environment === "string" ? environment : environment?.environmentId;
     this.cacheManager.clearChildrenCacheForEnvironment(environmentId);
+    this.clearEnvironmentIssues(environmentId);
     if (!environment) {
       this.activityLoader.clearActivityData();
       this.environmentSummaryStore.clearAll();
@@ -210,6 +273,7 @@ export class JenkinsTreeChildrenLoader {
 
   clearViewCache(): void {
     this.cacheManager.clearChildrenCacheForEnvironment();
+    this.clearEnvironmentIssues();
     this.activityLoader.clearActivityData();
   }
 
@@ -279,11 +343,28 @@ export class JenkinsTreeChildrenLoader {
   }
 
   private createErrorPlaceholder(label: string, error: unknown): PlaceholderTreeItem {
-    const message = error instanceof Error ? error.message : "Unexpected error.";
-    return new PlaceholderTreeItem(label, message, "error");
+    const { message, hint, issue } = describeTreeLoadError(error);
+    return new PlaceholderTreeItem(label, message, "error", { hint, issue });
   }
 
-  private createEmptyPlaceholder(label: string, description?: string): PlaceholderTreeItem {
-    return new PlaceholderTreeItem(label, description, "empty");
+  private createEmptyPlaceholder(
+    label: string,
+    description?: string,
+    options?: PlaceholderTreeItemOptions
+  ): PlaceholderTreeItem {
+    return new PlaceholderTreeItem(label, description, "empty", options);
   }
+}
+
+function buildEnvironmentIssueKey(scope: string, environmentId: string): string {
+  return `${scope}:${environmentId}`;
+}
+
+function resolveTreeElementEnvironment(
+  element: WorkbenchTreeElement
+): JenkinsEnvironmentRef | undefined {
+  if (element instanceof InstanceTreeItem) {
+    return element;
+  }
+  return "environment" in element ? element.environment : undefined;
 }

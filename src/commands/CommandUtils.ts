@@ -4,28 +4,12 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { canonicalizeJobUrlForEnvironment } from "../jenkins/urls";
 import type { EnvironmentWithScope } from "../storage/JenkinsEnvironmentStore";
 import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
-import { BuildTreeItem, type JobTreeItem, NodeTreeItem } from "../tree/TreeItems";
+import type { JobTreeItem } from "../tree/TreeItems";
 
 export { formatActionError };
 
 interface FullEnvironmentRefreshHost {
   fullEnvironmentRefresh(options: { environmentId: string }): void;
-}
-
-export function getOpenUrl(item?: JobTreeItem | BuildTreeItem | NodeTreeItem): string | undefined {
-  if (!item) {
-    return undefined;
-  }
-
-  if (item instanceof BuildTreeItem) {
-    return item.buildUrl;
-  }
-
-  if (item instanceof NodeTreeItem) {
-    return item.nodeUrl;
-  }
-
-  return item.jobUrl;
 }
 
 export function getTreeItemLabel(item: vscode.TreeItem): string {
