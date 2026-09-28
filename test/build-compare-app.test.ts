@@ -17,6 +17,8 @@ function build(roleLabel: string, displayName: string): BuildCompareBuildViewMod
   return {
     roleLabel,
     displayName,
+    buildNumberLabel: displayName,
+    jobDisplayName: "demo",
     buildUrl: `https://jenkins.example/job/demo/${displayName}/`,
     resultLabel: "Success",
     resultClass: "success",
@@ -43,7 +45,8 @@ function createState(
       newPasses: [],
       addedTests: [],
       removedTests: [],
-      otherChangesCount: 0,
+      otherChanges: [],
+      ambiguousTests: [],
       unchangedCount: 0
     },
     parameters: {
@@ -96,6 +99,37 @@ describe("BuildCompareApp global loading state", () => {
 
     assert.equal(isGloballyLoading(html), true);
     assert.match(html, /role="progressbar"/);
+  });
+
+  it("names the shared job once and keeps both build numbers visible", () => {
+    const html = render(createState({}));
+
+    assert.match(html, /title="demo"[^>]*>demo</);
+    assert.match(html, />#1</);
+    assert.match(html, />#2</);
+  });
+
+  it("labels each nav chip with its section title and a visible status", () => {
+    const html = render(
+      createState({ tests: "unavailable", parameters: "empty", changesets: "error" })
+    );
+
+    assert.match(html, /Tests<span[^>]*>·<\/span><span[^>]*>n\/a</);
+    assert.match(html, /Parameters<span[^>]*>·<\/span><span[^>]*>no changes</);
+    assert.match(html, /Changes<span[^>]*>·<\/span><span[^>]*>error</);
+  });
+
+  it("nests each section disclosure button inside its heading", () => {
+    const html = render(createState({}));
+
+    for (const title of ["Tests", "Parameters", "Changes", "Stages", "Console"]) {
+      assert.match(
+        html,
+        new RegExp(
+          `<h3[^>]*><button[^>]*aria-describedby="[^"]+"[^>]*>.*?${title}</span></button></h3>`
+        )
+      );
+    }
   });
 
   it("reports idle once every section has finished loading", () => {

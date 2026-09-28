@@ -43,6 +43,7 @@ import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
   assignWebviewPanelManifestErrorHtml,
+  createMissingPanelAssetsMessages,
   createPanelRestoreMessages,
   resolveRestoredPanelEnvironment
 } from "./shared/webview/WebviewHtml";
@@ -409,10 +410,10 @@ export class BuildDetailsPanel {
 
     if (result.status === "missingAssets") {
       assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildDetails", {
-        title: "Build Details",
-        message:
-          "Build details webview assets are missing. Run the extension build (npm run compile) and try again.",
-        hint: "Open the build again from Jenkins Workbench to continue.",
+        ...createMissingPanelAssetsMessages({
+          title: "Build Details",
+          panelLabel: "Build Details"
+        }),
         panelState: panelState ?? this.serializedState
       });
       return;

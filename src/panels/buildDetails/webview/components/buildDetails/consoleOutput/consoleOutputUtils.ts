@@ -13,11 +13,17 @@ export function countConsoleLines(text: string): number {
 }
 export function buildConsoleTruncationNote(
   consoleTruncated: boolean,
-  consoleMaxChars: number
+  consoleMaxChars: number | undefined
 ): string {
   if (!consoleTruncated) {
     return "";
   }
-  const maxChars = Number.isFinite(consoleMaxChars) ? consoleMaxChars : 0;
-  return `Showing last ${maxChars.toLocaleString()} characters.`;
+  if (
+    typeof consoleMaxChars !== "number" ||
+    !Number.isFinite(consoleMaxChars) ||
+    consoleMaxChars <= 0
+  ) {
+    return "Earlier output omitted.";
+  }
+  return `Earlier output omitted. Showing the last ${consoleMaxChars.toLocaleString()} characters.`;
 }

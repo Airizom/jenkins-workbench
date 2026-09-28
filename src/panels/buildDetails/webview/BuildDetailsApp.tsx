@@ -1,7 +1,6 @@
 import * as React from "react";
 import { HistoryProvider } from "../../jobHistory/webview/HistoryContext";
 import { HistoryView } from "../../jobHistory/webview/HistoryView";
-import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
@@ -18,6 +17,10 @@ import {
   buildOpenTestSourceMessage,
   buildReloadTestReportMessage
 } from "./buildDetailsWebviewMessages";
+import {
+  BuildDetailsErrors,
+  hasLoadedBuildHeader
+} from "./components/buildDetails/BuildDetailsErrors";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
 import { BuildStatusHero } from "./components/buildDetails/hero/BuildStatusHero";
@@ -29,6 +32,7 @@ import {
 } from "./components/buildDetails/stageStrip/stageStripModel";
 import { useBuildDetailsMessages } from "./hooks/useBuildDetailsMessages";
 import { useBuildDetailsTabs } from "./hooks/useBuildDetailsTabs";
+import { usePendingInputActions } from "./hooks/usePendingInputActions";
 import { useScrollToTopButton } from "./hooks/useScrollToTopButton";
 import {
   buildDetailsReducer,
@@ -66,11 +70,28 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const hasPipelineStages = state.pipelineStages.length > 0 || state.pipelineStagesLoading;
   const hasTests = state.testState.summary.hasAnyResults || coverageState.showTab;
   const buildUrl = state.buildUrl;
+  const pendingInputIds = useMemo(
+    () => state.pendingInputs.map((input) => input.id),
+    [state.pendingInputs]
+  );
   const { selectedTab, setSelectedTab } = useBuildDetailsTabs({
     hasPendingInputs,
+    pendingInputIds,
     hasPipelineStages,
     hasTests
   });
+  const startPendingInputAction = usePendingInputActions(
+    dispatch,
+    postMessage,
+    state.processingInputActions
+  );
+  const awaitingInput = useMemo(
+    () =>
+      hasPendingInputs && isRunning
+        ? { count: state.pendingInputs.length, message: state.pendingInputs[0]?.message ?? "" }
+        : undefined,
+    [hasPendingInputs, isRunning, state.pendingInputs]
+  );
 
   const handleOpenBuild = () => {
     if (!buildUrl) {
@@ -144,6 +165,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             buildUrl={buildUrl}
             testsSummary={state.testState.summary}
             stageCount={stripSegments.length}
+            awaitingInput={awaitingInput}
+            onReviewInputs={selectedTab === "inputs" ? undefined : () => setSelectedTab("inputs")}
             onOpenBuild={handleOpenBuild}
           >
             <PipelineStageStrip
@@ -154,11 +177,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
           </BuildStatusHero>
 
           <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
-            <HistoryView embedded />
-            <PanelErrorList
+            <HistoryView embedded buildRunning={isRunning} />
+            <BuildDetailsErrors
               errors={state.errors}
-              id="errors"
-              title="Unable to load build details"
+              buildLoaded={hasLoadedBuildHeader(state)}
               onRetry={handleRetry}
             />
             <BuildDetailsTabs
@@ -168,6 +190,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               hasPipelineStages={hasPipelineStages}
               hasTests={hasTests}
               pendingInputs={state.pendingInputs}
+              processingInputActions={state.processingInputActions}
               pipelineStages={state.pipelineStages}
               pipelineNodeLog={state.pipelineNodeLog}
               pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
@@ -186,8 +209,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               consoleMaxChars={state.consoleMaxChars}
               consoleError={state.consoleError}
               followLog={state.followLog}
-              onApproveInput={(inputId) => postMessage({ type: "approveInput", inputId })}
-              onRejectInput={(inputId) => postMessage({ type: "rejectInput", inputId })}
+              onApproveInput={(inputId) => startPendingInputAction(inputId, "approve")}
+              onRejectInput={(inputId) => startPendingInputAction(inputId, "reject")}
               onRestartStage={(stageName) =>
                 postMessage({ type: "restartPipelineFromStage", stageName })
               }

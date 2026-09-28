@@ -15,6 +15,7 @@ export type NodeDetailsAction =
   | { type: "updateNodeDetails"; payload: NodeDetailsUpdateMessage };
 
 const FALLBACK_STATE: NodeDetailsState = {
+  detailsAvailable: false,
   displayName: "Node Details",
   name: "Unknown",
   description: undefined,
@@ -29,7 +30,7 @@ const FALLBACK_STATE: NodeDetailsState = {
   canLaunchAgent: false,
   canOpenAgentInstructions: false,
   offlineReason: undefined,
-  idleLabel: "Not available",
+  activityLabel: "Not available",
   executorsLabel: "Not available",
   labels: [],
   jnlpAgentLabel: undefined,

@@ -3,6 +3,7 @@
 @source "../../../buildDetails/webview/**/*.{ts,tsx}";
 @source "../../../buildDetails/BuildDetailsRenderer.ts";
 @source "../../../buildCompare/webview/**/*.{ts,tsx}";
+@source "../../../jobHistory/webview/**/*.{ts,tsx}";
 @source "../../../buildCompare/BuildCompareRenderer.ts";
 @source "../../../nodeCapacity/webview/**/*.{ts,tsx}";
 @source "../../../nodeCapacity/NodeCapacityRenderer.ts";
@@ -88,6 +89,12 @@
   --color-aborted-border: var(--aborted-border);
   --color-muted-border: var(--muted-foreground-border);
   --color-progress: var(--progress);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-hc-border: var(--hc-border);
+  --color-hc-active: var(--hc-active);
   --color-terminal: var(--terminal-bg);
   --color-terminal-foreground: var(--terminal-foreground);
   --color-input-warning-border: var(--inputWarningBorder);
@@ -188,6 +195,12 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* Selected/on marker for high-contrast themes. An inset shadow rather than an
+ * outline so it never competes with the focus outline on the same element. */
+@utility hc-active-ring {
+  box-shadow: inset 0 0 0 1px var(--hc-active);
 }
 
 @utility border-mutedBorder {
@@ -450,18 +463,23 @@
       var(--vscode-button-foreground)
     );
 
+    /* Status `*-foreground` tokens are for text on the 10% `*-soft` tints. The raw
+     * status colors drop to ~2.6:1 there in Light+ at 11px, so text keeps a
+     * hint of the hue but is pulled 60% toward the canvas text color, which
+     * keeps it above 4.5:1 in the default light and dark themes. Icons and
+     * accents that are not text keep the raw status colors. */
     --success: var(--vscode-testing-iconPassed, #4ec9b0);
-    --success-foreground: var(--vscode-editor-foreground);
+    --success-foreground: color-mix(in srgb, var(--success) 40%, var(--foreground));
     --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
     --success-border: color-mix(in srgb, var(--success) 50%, transparent);
     --warning: var(--vscode-editorWarning-foreground, #cca700);
-    --warning-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
+    --warning-foreground: color-mix(in srgb, var(--warning) 40%, var(--foreground));
     --warning-surface: color-mix(in srgb, var(--warning) 5%, transparent);
     --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
     --warning-badge: color-mix(in srgb, var(--warning) 20%, transparent);
     --warning-border: color-mix(in srgb, var(--warning) 50%, transparent);
     --failure: var(--vscode-testing-iconFailed, #f14c4c);
-    --failure-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
+    --failure-foreground: color-mix(in srgb, var(--failure) 40%, var(--foreground));
     --failure-surface: color-mix(in srgb, var(--failure) 5%, transparent);
     --failure-soft: color-mix(in srgb, var(--failure) 10%, transparent);
     --failure-border: color-mix(in srgb, var(--failure) 50%, transparent);
@@ -470,6 +488,17 @@
     --aborted-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
     --aborted-soft: color-mix(in srgb, var(--aborted) 10%, transparent);
     --aborted-border: color-mix(in srgb, var(--aborted) 50%, transparent);
+    /* In-progress work. Kept distinct from `--warning` so a running build never
+     * reads as unstable, including when reduced motion stops the pulse. */
+    --info: var(--vscode-charts-blue, var(--vscode-progressBar-background, #3794ff));
+    --info-foreground: color-mix(in srgb, var(--info) 40%, var(--foreground));
+    --info-soft: color-mix(in srgb, var(--info) 10%, transparent);
+    --info-border: color-mix(in srgb, var(--info) 50%, transparent);
+
+    /* High-contrast outlines. Both resolve to transparent outside HC themes, so
+     * they can be applied unconditionally to fills and selected states. */
+    --hc-border: var(--vscode-contrastBorder, transparent);
+    --hc-active: var(--vscode-contrastActiveBorder, transparent);
 
     --inputErrorBg: var(--vscode-inputValidation-errorBackground);
     --inputErrorFg: var(--vscode-inputValidation-errorForeground);
@@ -623,6 +652,33 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+
+  /* Same ring drawn inside the element, for rows and triggers whose ancestors
+   * clip overflow. */
+  .focus-ring-inset:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  /* Edge fades for horizontally scrolling strips. `useHorizontalOverflow` sets
+   * the data attributes when content is hidden past that edge. */
+  .overflow-fade-x[data-overflow-start] {
+    mask-image: linear-gradient(to right, transparent, #000 24px);
+  }
+
+  .overflow-fade-x[data-overflow-end] {
+    mask-image: linear-gradient(to left, transparent, #000 24px);
+  }
+
+  .overflow-fade-x[data-overflow-start][data-overflow-end] {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 24px,
+      #000 calc(100% - 24px),
+      transparent
+    );
+  }
 }
 
 @layer utilities {
@@ -631,6 +687,7 @@
     .animate-collapsible-up,
     .animate-accordion-down,
     .animate-accordion-up,
+    .animate-ping,
     .animate-pulse,
     .animate-spin,
     .animate-progress-indeterminate,

@@ -3,6 +3,7 @@ import type { NodeDetailsViewModel } from "../../../src/panels/nodeDetails/share
 const now = Date.now();
 
 const online: NodeDetailsViewModel = {
+  detailsAvailable: true,
   displayName: "build-agent-01",
   name: "build-agent-01",
   description: "Ubuntu 24.04 · 16 vCPU · Docker 27",
@@ -16,7 +17,7 @@ const online: NodeDetailsViewModel = {
   canBringOnline: false,
   canLaunchAgent: false,
   canOpenAgentInstructions: false,
-  idleLabel: "Busy",
+  activityLabel: "Running builds",
   executorsLabel: "3 of 4 busy",
   labels: ["linux", "docker", "x86_64", "build-agent-01"],
   jnlpAgentLabel: "No",
@@ -113,7 +114,7 @@ const offline: NodeDetailsViewModel = {
   canLaunchAgent: true,
   canOpenAgentInstructions: true,
   offlineReason: "Disconnected: java.nio.channels.ClosedChannelException",
-  idleLabel: "Idle",
+  activityLabel: "Offline",
   executorsLabel: "4 offline",
   executors: online.executors.map((executor) => ({
     id: executor.id,
@@ -124,4 +125,67 @@ const offline: NodeDetailsViewModel = {
   updatedAt: new Date(now - 20 * 60_000).toISOString()
 };
 
-export const nodeDetailsScenarios: Record<string, NodeDetailsViewModel> = { online, offline };
+const temporary: NodeDetailsViewModel = {
+  ...online,
+  displayName: "build-agent-02",
+  name: "build-agent-02",
+  statusLabel: "Temporarily offline",
+  statusClass: "temporary",
+  isOffline: true,
+  isTemporarilyOffline: true,
+  canTakeOffline: false,
+  canBringOnline: true,
+  offlineReason: "Draining for kernel upgrade (mia)",
+  executorsLabel: "1 busy · 3 offline",
+  executors: online.executors.map((executor, index) =>
+    index === 0 ? executor : { id: executor.id, statusLabel: "Idle", isIdle: true }
+  )
+};
+
+const idle: NodeDetailsViewModel = {
+  ...online,
+  displayName: "Windows build agent",
+  name: "win-agent-01",
+  description: undefined,
+  statusLabel: "Idle",
+  statusClass: "idle",
+  activityLabel: "Idle",
+  executorsLabel: "0 of 4 busy",
+  executors: online.executors.map((executor) => ({
+    id: executor.id,
+    statusLabel: "Idle",
+    isIdle: true
+  })),
+  queuedWork: { matchingQueueItems: [], anyQueueItems: [], selfLabelQueueItems: [] }
+};
+
+const error: NodeDetailsViewModel = {
+  ...online,
+  detailsAvailable: false,
+  displayName: "Node Details",
+  name: "Unknown",
+  description: undefined,
+  statusLabel: "Unknown",
+  statusClass: "unknown",
+  canTakeOffline: false,
+  activityLabel: "Not available",
+  executorsLabel: "Not available",
+  labels: [],
+  jnlpAgentLabel: undefined,
+  launchSupportedLabel: undefined,
+  manualLaunchLabel: undefined,
+  executors: [],
+  queuedWork: { matchingQueueItems: [], anyQueueItems: [], selfLabelQueueItems: [] },
+  monitorData: [],
+  rawJson: "",
+  advancedLoaded: false,
+  errors: ["Request failed with status 404 (Not Found)."]
+};
+
+export const nodeDetailsScenarios: Record<string, NodeDetailsViewModel> = {
+  online,
+  offline,
+  temporary,
+  idle,
+  error
+};

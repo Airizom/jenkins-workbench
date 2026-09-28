@@ -71,7 +71,12 @@ export function ConsoleSearchToolbar({
             Regex
           </label>
         </div>
-        <span className="text-[11px] text-muted-foreground">{matchCountLabel}</span>
+        <span aria-hidden="true" className="text-[11px] text-muted-foreground">
+          {matchCountLabel}
+        </span>
+        <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+          {describeMatchCount(isSearchActive, matchCount, matchCountLabel)}
+        </span>
         <Button
           disabled={!isSearchActive || matchCount === 0}
           onClick={onPrev}
@@ -112,4 +117,18 @@ export function ConsoleSearchToolbar({
       ) : null}
     </div>
   );
+}
+
+function describeMatchCount(
+  isSearchActive: boolean,
+  matchCount: number,
+  matchCountLabel: string
+): string {
+  if (!isSearchActive) {
+    return "";
+  }
+  if (matchCount === 0) {
+    return "No matches";
+  }
+  return `Match ${matchCountLabel.replace(" / ", " of ")}`;
 }

@@ -12,6 +12,7 @@ import type {
   PipelineStageStepViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import { getStageIcon } from "./PipelineStageIcons";
+import { formatStatusText } from "./pipelineStagesUtils";
 export function StepsList({
   steps,
   compact = false,
@@ -25,6 +26,7 @@ export function StepsList({
     <ul className="list-none m-0 p-0 flex flex-col gap-1">
       {steps.map((step) => {
         const logTarget = step.logTarget;
+        const stepName = step.name || "Step";
         return (
           <li
             className={cn(
@@ -35,6 +37,7 @@ export function StepsList({
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <div
+                aria-hidden="true"
                 className={cn(
                   "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[10px]",
                   getResultBadgeClass(step.statusClass)
@@ -42,7 +45,10 @@ export function StepsList({
               >
                 {getStageIcon(step.statusClass)}
               </div>
-              <span className="text-[11px] truncate">{step.name || "Step"}</span>
+              <span className="text-[11px] truncate" title={stepName}>
+                {stepName}
+              </span>
+              <span className="sr-only">, {formatStatusText(step.statusLabel)}</span>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <span className="text-[11px] text-muted-foreground">{step.durationLabel || "—"}</span>

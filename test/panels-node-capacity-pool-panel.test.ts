@@ -14,7 +14,7 @@ import {
 import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 
 /**
- * Mirrors how NodeCapacityApp resolves a pool's open state: an explicit user
+ * Mirrors how `isPoolOpen` resolves a pool's open state: an explicit user
  * override wins, otherwise abnormal severity expands the pool.
  */
 function resolveOpen(override: boolean | undefined, severity: NodeCapacitySeverity): boolean {
@@ -117,7 +117,6 @@ function renderPool(
     statusLabel: "Busy",
     nodes,
     queueItems: [],
-    offlineImpact: [],
     totalNodes: nodes.length,
     onlineNodes: 0,
     offlineNodes: nodes.length,
@@ -140,6 +139,7 @@ function renderPool(
         isOpen: true,
         onOpenExternal: () => undefined,
         onOpenNodeDetails: () => undefined,
+        onRetryExecutors: () => undefined,
         onToggleExpanded: () => undefined
       })
     )
@@ -164,7 +164,7 @@ describe("NodeCapacityPoolPanel", () => {
       executors: node.executors.map((executor) => ({ ...executor, isIdle: true }))
     };
     const html = renderPool([idleNode], { totalExecutors: 2, offlineExecutors: 2 });
-    assert.doesNotMatch(html, /No running work loaded/);
+    assert.doesNotMatch(html, /No builds running/);
   });
 
   it("does not double-count busy executors on offline nodes in the capacity bar", () => {
@@ -176,5 +176,57 @@ describe("NodeCapacityPoolPanel", () => {
       offlineExecutors: 3
     });
     assert.match(html, /aria-label="Executors: 3 busy, 1 idle, 2 offline"/);
+  });
+
+  it("summarizes offline capacity in the header instead of repeating offline nodes", () => {
+    const html = renderPool([drainingNode()], {
+      totalExecutors: 2,
+      busyExecutors: 1,
+      offlineExecutors: 2
+    });
+    assert.match(html, /2 executors unavailable on 1 offline node/);
+    assert.doesNotMatch(html, /Offline capacity impact/);
+  });
+
+  it("renders an inline count summary for narrow layouts with tones on problem values", () => {
+    const html = renderPool([drainingNode()], {
+      totalExecutors: 2,
+      busyExecutors: 1,
+      offlineExecutors: 2,
+      queuedCount: 3
+    });
+    assert.match(html, /lg:hidden/);
+    assert.match(html, /text-failure-foreground[^"]*"><span[^>]*>3<\/span> queued/);
+    assert.match(html, /text-warning-foreground[^"]*"><span[^>]*>2<\/span> offline/);
+  });
+
+  it("makes the node name the Node Details link and keeps one Open in Jenkins action", () => {
+    const html = renderPool([drainingNode()], { totalExecutors: 2, offlineExecutors: 2 });
+    assert.match(
+      html,
+      /<button[^>]*title="agent-2 \(open node details\)"[^>]*>agent-2<span class="sr-only">, open node details<\/span><\/button>/
+    );
+    assert.match(html, /aria-label="Open agent-2 in Jenkins"/);
+    assert.doesNotMatch(html, /Open node details for/);
+  });
+
+  it("shows inline loading and failure states for running work", () => {
+    const online: NodeCapacityNodeViewModel = {
+      ...drainingNode(),
+      isOffline: false,
+      isTemporarilyOffline: false,
+      statusLabel: "Online",
+      executorsLoaded: false,
+      executors: []
+    };
+    const loading = renderPool([{ ...online, executorsLoadState: "loading" }], {});
+    assert.match(loading, /Loading running work…/);
+
+    const failed = renderPool(
+      [{ ...online, executorsLoadState: "error", executorsError: "HTTP 500" }],
+      {}
+    );
+    assert.match(failed, /Couldn(&#x27;|')t load running work/);
+    assert.match(failed, /aria-label="Retry loading running work on agent-2"/);
   });
 });

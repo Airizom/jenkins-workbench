@@ -34,8 +34,47 @@ describe("StageTimingSection", () => {
     assert.equal(html.match(/<thead/g)?.length, 1);
     assert.match(html, /<th scope="row"[^>]*>.*Build/);
     assert.match(html, /\+7s/);
-    assert.match(html, /\(slower\)/);
+    assert.match(html, /\(slower, within normal variation\)/);
+    assert.match(html, /text-muted-foreground[^"]*"><svg/);
+    assert.doesNotMatch(html, /text-failure/);
     assert.doesNotMatch(html, /status regressed/);
+  });
+
+  it("colors only deltas the backend marked significant", () => {
+    const html = render([
+      {
+        key: "tests",
+        name: "Tests",
+        changeType: "matched",
+        baselineStatusLabel: "Success",
+        targetStatusLabel: "Success",
+        baselineStatusClass: "success",
+        targetStatusClass: "success",
+        deltaLabel: "+1m 4s",
+        deltaDirection: "slower",
+        deltaSignificant: true
+      }
+    ]);
+
+    assert.match(html, /text-failure"><svg/);
+    assert.match(html, /\(slower\)/);
+  });
+
+  it("labels a missing timing delta as no change data and labels stacked cells", () => {
+    const html = render([
+      {
+        key: "added",
+        name: "Added",
+        changeType: "added",
+        targetStatusLabel: "Success",
+        targetStatusClass: "success"
+      }
+    ]);
+
+    assert.match(html, /No change data/);
+    assert.match(html, /data-label="Baseline"/);
+    assert.match(html, /data-label="Change"/);
+    assert.match(html, /bc-stack-table/);
   });
 
   it("flags stages whose status regressed and marks added or removed stages", () => {

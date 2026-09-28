@@ -102,3 +102,24 @@ export function findStageLogTarget(
   const stage = stageKey ? findStageByKey(stages, stageKey) : undefined;
   return stage?.logTarget;
 }
+
+/**
+ * The stage worth showing when the Pipeline tab opens with nothing selected:
+ * the running stage of a running build, otherwise the first failed (then
+ * unstable) stage. Successful runs have no default.
+ */
+export function findDefaultPipelineStage(
+  stages: PipelineStageViewModel[],
+  isRunning: boolean
+): PipelineStageViewModel | undefined {
+  const preferredStatuses = isRunning
+    ? ["running", "failure", "unstable"]
+    : ["failure", "unstable"];
+  for (const status of preferredStatuses) {
+    const stage = stages.find((candidate) => candidate.statusClass === status);
+    if (stage) {
+      return stage;
+    }
+  }
+  return undefined;
+}

@@ -5,12 +5,28 @@ import type {
   TestHistory
 } from "../../../history/HistoryAnalysis";
 import type { BaselineEvidence } from "../../../history/HistoryBaseline";
+import { decodeJenkinsJobName } from "../../../jenkins/JenkinsJobNames";
+import { parseJobUrl } from "../../../jenkins/urls";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
+
+export const HISTORY_STATUSES = [
+  "idle",
+  "loading",
+  "paused",
+  "available",
+  "partial",
+  "unavailable",
+  "error"
+] as const;
+export type HistoryStatus = (typeof HISTORY_STATUSES)[number];
+/** Why history is `paused`: the panel was hidden mid-load, or the anchor build is still running. */
+export type HistoryPausedReason = "hidden" | "building";
 
 export interface HistoryViewModel {
   type: "historyUpdate";
   revision: number;
-  status: "idle" | "loading" | "available" | "partial" | "unavailable" | "error";
+  status: HistoryStatus;
+  pausedReason?: HistoryPausedReason;
   jobUrl: string;
   count: 10 | 20 | 50;
   builds: Array<{
@@ -67,7 +83,8 @@ export type HistoryAction = {
     | "compare"
     | "baseline"
     | "resetBaseline"
-    | "openJob";
+    | "openJob"
+    | "openJobInJenkins";
   value?: number;
 };
 export function isHistoryAction(value: unknown): value is HistoryAction {
@@ -84,7 +101,8 @@ export function isHistoryAction(value: unknown): value is HistoryAction {
       "compare",
       "baseline",
       "resetBaseline",
-      "openJob"
+      "openJob",
+      "openJobInJenkins"
     ].includes(String(value.action)) &&
     (value.value === undefined ||
       (typeof value.value === "number" && Number.isSafeInteger(value.value)))
@@ -100,3 +118,9 @@ export const emptyHistory = (): HistoryViewModel => ({
   tests: [],
   evidence: {}
 });
+
+/** Human job name from its URL: folder segments joined with " / ", branch names decoded. */
+export function historyJobDisplayName(jobUrl: string): string {
+  const segments = parseJobUrl(jobUrl)?.fullPath;
+  return segments?.length ? segments.map(decodeJenkinsJobName).join(" / ") : jobUrl;
+}

@@ -42,6 +42,53 @@ export function clampZoomScale(currentScale: number, nextScale: number): number 
   return clamp(nextScale, Math.min(MIN_SCALE, currentScale), MAX_SCALE);
 }
 
+const REVEAL_MARGIN = 24;
+
+export interface ViewportRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Pans (never zooms) so a layout-space rect is fully visible with a margin.
+ * Returns `viewport` unchanged when the rect is already visible, so callers
+ * can pass it straight to a state setter without forcing a re-render.
+ */
+export function revealRectInViewport(
+  viewport: ViewportState,
+  rect: ViewportRect,
+  container: ViewportContainerSize
+): ViewportState {
+  const deltaX = revealDelta(
+    viewport.x + rect.x * viewport.scale,
+    rect.width * viewport.scale,
+    container.clientWidth
+  );
+  const deltaY = revealDelta(
+    viewport.y + rect.y * viewport.scale,
+    rect.height * viewport.scale,
+    container.clientHeight
+  );
+  if (deltaX === 0 && deltaY === 0) {
+    return viewport;
+  }
+  return { ...viewport, x: viewport.x + deltaX, y: viewport.y + deltaY };
+}
+
+function revealDelta(start: number, size: number, available: number): number {
+  const end = start + size;
+  if (start >= REVEAL_MARGIN && end <= available - REVEAL_MARGIN) {
+    return 0;
+  }
+  // Too large to fit: align the start edge.
+  if (size + REVEAL_MARGIN * 2 > available || start < REVEAL_MARGIN) {
+    return REVEAL_MARGIN - start;
+  }
+  return available - REVEAL_MARGIN - end;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

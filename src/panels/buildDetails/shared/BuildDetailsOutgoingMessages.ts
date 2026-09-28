@@ -21,6 +21,9 @@ export type BuildDetailsOutgoingMessage =
   | { type: "setPipelineNodeLogError"; targetKey?: string; error: string }
   | { type: "setErrors"; errors: string[] }
   | { type: "setBuildDiagnostics"; diagnostics: BuildDiagnosticsViewModel }
+  // Sent once the extension finishes handling an approve/reject request (including any
+  // parameter prompt or confirmation), whether it succeeded, failed, or was cancelled.
+  | { type: "pendingInputActionComplete"; inputId: string }
   | { type: "setLoading"; value: boolean };
 
 export type BuildDetailsStateMessage = Exclude<
@@ -107,6 +110,12 @@ export function parseBuildDetailsOutgoingMessage(
     case "setBuildDiagnostics": {
       const diagnostics = normalizeBuildDiagnosticsViewModel(record.diagnostics);
       return diagnostics ? { type: "setBuildDiagnostics", diagnostics } : undefined;
+    }
+    case "pendingInputActionComplete": {
+      const inputId = record.inputId;
+      return typeof inputId === "string" && inputId.length > 0
+        ? { type: "pendingInputActionComplete", inputId }
+        : undefined;
     }
     case "setLoading": {
       return parseSetLoadingOutgoingMessage(record);

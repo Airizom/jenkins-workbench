@@ -233,8 +233,7 @@ export class NodeDetailsPanel {
       panelState,
       errorOptions: createMissingPanelAssetsMessages({
         title: "Node Details",
-        panelLabel: "Node details",
-        reopenHint: "Open the node again from Jenkins Workbench to continue."
+        panelLabel: "Node details"
       }),
       renderLoadingHtml
     });
@@ -302,13 +301,23 @@ export class NodeDetailsPanel {
     }
     const label = this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node";
     const target = { environment: this.environment, nodeUrl: this.nodeUrl, label };
+    const { nodeActionService, refreshHost } = this;
+    // Collect the offline reason before showing progress: a spinner and disabled
+    // buttons while the input box is open would suggest work already started,
+    // and cancelling must leave the panel untouched.
+    let offlineReason: { reason?: string } | undefined;
+    if (action === "takeNodeOffline") {
+      offlineReason = await nodeActionService.promptOfflineReason(label);
+      if (!offlineReason || this.disposed) {
+        return;
+      }
+    }
     const loadingRequest = this.loadTracker.beginLoading();
     try {
-      const { nodeActionService, refreshHost } = this;
       let didToggle: boolean;
       switch (action) {
         case "takeNodeOffline":
-          didToggle = await nodeActionService.takeNodeOffline(target, refreshHost);
+          didToggle = await nodeActionService.takeNodeOffline(target, refreshHost, offlineReason);
           break;
         case "bringNodeOnline":
           didToggle = await nodeActionService.bringNodeOnline(target, refreshHost);

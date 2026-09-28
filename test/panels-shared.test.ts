@@ -37,14 +37,14 @@ describe("TestReportFormatters", () => {
     assert.equal(formatTestReportCountsSummary({ failed: 2, total: 10 }), "Failed 2 / 10");
     assert.equal(
       formatTestReportCountsSummary({ failed: 2, total: 10, skipped: 3 }),
-      "Failed 2 / 10 • Skipped 3"
+      "Failed 2 / 10 · Skipped 3"
     );
     assert.equal(formatTestReportCountsSummary({ total: 7 }), "Total 7 tests");
     assert.equal(formatTestReportCountsSummary({ failed: 4 }), "Failed 4 tests");
     assert.equal(formatTestReportCountsSummary({ skipped: 5 }), "Skipped 5 tests");
     assert.equal(
       formatAvailableTestReportCountsSummary({ failCount: 1, totalCount: 9, skipCount: 2 }),
-      "Failed 1 / 9 • Skipped 2"
+      "Failed 1 / 9 · Skipped 2"
     );
   });
 });
@@ -144,7 +144,7 @@ describe("TestCaseViewModel", () => {
       buildOccurrenceKey("com.example.Tests::unit::runs", 4),
       "com.example.Tests::unit::runs::4"
     );
-    assert.equal(formatTestCaseSubtitle("com.example.Tests", "unit"), "com.example.Tests • unit");
+    assert.equal(formatTestCaseSubtitle("com.example.Tests", "unit"), "com.example.Tests · unit");
     assert.equal(formatTestCaseSubtitle(undefined, undefined), "Unnamed suite");
   });
 

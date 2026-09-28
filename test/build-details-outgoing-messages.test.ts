@@ -46,4 +46,19 @@ describe("Build Details outgoing messages", () => {
       undefined
     );
   });
+
+  it("parses pendingInputActionComplete and rejects it without an input id", () => {
+    assert.deepEqual(
+      parseBuildDetailsOutgoingMessage({ type: "pendingInputActionComplete", inputId: "deploy" }),
+      { type: "pendingInputActionComplete", inputId: "deploy" }
+    );
+    assert.equal(
+      parseBuildDetailsOutgoingMessage({ type: "pendingInputActionComplete", inputId: "" }),
+      undefined
+    );
+    assert.equal(
+      parseBuildDetailsOutgoingMessage({ type: "pendingInputActionComplete" }),
+      undefined
+    );
+  });
 });

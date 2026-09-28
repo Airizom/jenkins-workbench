@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { NodeExecutorViewModel } from "../src/panels/nodeDetails/shared/NodeDetailsContracts";
 import {
-  summarizeExecutorUtilization,
-  utilizationLevel
+  formatExecutorCounts,
+  formatExecutorName,
+  summarizeExecutorUtilization
 } from "../src/panels/nodeDetails/webview/components/nodeDetails/executorUtilization";
 
 function makeExecutor(overrides: Partial<NodeExecutorViewModel> = {}): NodeExecutorViewModel {
@@ -65,13 +66,44 @@ describe("summarizeExecutorUtilization", () => {
   });
 });
 
-describe("utilizationLevel", () => {
-  it("maps ratios to gauge levels", () => {
-    assert.equal(utilizationLevel(0), "low");
-    assert.equal(utilizationLevel(0.49), "low");
-    assert.equal(utilizationLevel(0.5), "medium");
-    assert.equal(utilizationLevel(0.89), "medium");
-    assert.equal(utilizationLevel(0.9), "saturated");
-    assert.equal(utilizationLevel(1), "saturated");
+describe("offline executor utilization", () => {
+  it("reports free executors on an offline node as offline, not idle", () => {
+    const utilization = summarizeExecutorUtilization(
+      [makeExecutor({ id: "0" }), makeExecutor({ id: "1" }), makeExecutor({ id: "2" })],
+      [],
+      true
+    );
+
+    assert.equal(utilization.idle, 0);
+    assert.equal(utilization.offline, 3);
+    assert.equal(formatExecutorCounts(utilization), "3 offline");
+  });
+
+  it("keeps draining builds visible next to the offline count", () => {
+    const utilization = summarizeExecutorUtilization(
+      [makeExecutor({ id: "0", isIdle: false }), makeExecutor({ id: "1" })],
+      [],
+      true
+    );
+
+    assert.equal(formatExecutorCounts(utilization), "1 busy · 1 offline");
+  });
+
+  it("formats online nodes as busy and idle counts", () => {
+    const utilization = summarizeExecutorUtilization(
+      [makeExecutor({ id: "0", isIdle: false }), makeExecutor({ id: "1" })],
+      []
+    );
+
+    assert.equal(utilization.offline, 0);
+    assert.equal(formatExecutorCounts(utilization), "1 busy · 1 idle");
+  });
+});
+
+describe("formatExecutorName", () => {
+  it("prefixes numeric executor ids and keeps fallback labels", () => {
+    assert.equal(formatExecutorName("#2"), "Executor #2");
+    assert.equal(formatExecutorName("3"), "Executor #3");
+    assert.equal(formatExecutorName("One-off 1"), "One-off 1");
   });
 });

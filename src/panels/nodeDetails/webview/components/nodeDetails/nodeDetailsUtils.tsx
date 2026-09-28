@@ -1,5 +1,12 @@
 import type * as React from "react";
-import { ExecutorsIcon, IdleIcon, LaunchIcon, StatusIcon } from "../../../../shared/webview/icons";
+import {
+  ExecutorsIcon,
+  LaunchIcon,
+  PlayIcon,
+  StatusIcon,
+  TerminalIcon,
+  UserIcon
+} from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 
 const STALE_AFTER_MS = 5 * 60 * 1000;
@@ -10,46 +17,43 @@ export interface OverviewRow {
   icon: React.JSX.Element;
 }
 
-export function buildOverviewRows(state: NodeDetailsState): OverviewRow[] {
-  const rows: OverviewRow[] = [
+/** Primary status facts shown first in the Overview Status card. */
+export function buildStatusRows(state: NodeDetailsState): OverviewRow[] {
+  return [
     { label: "Status", value: state.statusLabel, icon: <StatusIcon className="h-3.5 w-3.5" /> },
-    { label: "Idle", value: state.idleLabel, icon: <IdleIcon className="h-3.5 w-3.5" /> },
     {
       label: "Executors",
       value: state.executorsLabel,
       icon: <ExecutorsIcon className="h-3.5 w-3.5" />
+    },
+    {
+      label: "Activity",
+      value: state.activityLabel,
+      icon: <PlayIcon className="h-3.5 w-3.5" />
     }
   ];
+}
 
-  const launchDetails = [
-    { label: "JNLP Agent", value: state.jnlpAgentLabel },
-    { label: "Launch Supported", value: state.launchSupportedLabel },
-    { label: "Manual Launch", value: state.manualLaunchLabel }
-  ];
-  let hasLaunchDetails = false;
-
-  for (const detail of launchDetails) {
-    if (!detail.value) {
-      continue;
+/** Raw Jenkins launch fields, shown as a secondary Connection row when reported. */
+export function buildConnectionRows(state: NodeDetailsState): OverviewRow[] {
+  const rows: Array<{ label: string; value?: string; icon: React.JSX.Element }> = [
+    {
+      label: "Inbound (JNLP) agent",
+      value: state.jnlpAgentLabel,
+      icon: <TerminalIcon className="h-3 w-3" />
+    },
+    {
+      label: "Launch supported",
+      value: state.launchSupportedLabel,
+      icon: <LaunchIcon className="h-3 w-3" />
+    },
+    {
+      label: "Manual launch",
+      value: state.manualLaunchLabel,
+      icon: <UserIcon className="h-3 w-3" />
     }
-
-    hasLaunchDetails = true;
-    rows.push({
-      label: detail.label,
-      value: detail.value,
-      icon: <LaunchIcon className="h-3.5 w-3.5" />
-    });
-  }
-
-  if (!hasLaunchDetails) {
-    rows.push({
-      label: "Launch",
-      value: "Not available",
-      icon: <LaunchIcon className="h-3.5 w-3.5" />
-    });
-  }
-
-  return rows;
+  ];
+  return rows.filter((row): row is OverviewRow => row.value !== undefined);
 }
 
 export function formatJson(value: unknown): string {

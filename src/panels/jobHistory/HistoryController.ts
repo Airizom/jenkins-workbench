@@ -6,6 +6,7 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuild } from "../../jenkins/types";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
+import { openJenkinsWorkbenchUrl } from "../../ui/OpenExternalUrl";
 import { resolveEnvironmentRef } from "../shared/webview/WebviewPanelState";
 import { chooseHistoryBaseline } from "./HistoryBaselinePicker";
 import {
@@ -57,9 +58,21 @@ export class HistoryController {
         if (wasVisible === panel.visible) return;
         wasVisible = panel.visible;
         this.generation++;
-        if (panel.visible && this.context && this.automatic) void this.load();
+        if (!panel.visible) this.pauseWhileHidden();
+        else if (this.context && this.automatic) void this.load();
       })
     );
+  }
+  /** Hiding cancels in-flight work; say so instead of leaving a stale "loading" state. */
+  private pauseWhileHidden(): void {
+    if (this.model.status !== "loading") return;
+    this.model = {
+      ...this.model,
+      status: "paused",
+      pausedReason: "hidden",
+      revision: this.generation
+    };
+    this.post();
   }
   private async rebindEnvironment(): Promise<void> {
     const context = this.context;
@@ -101,7 +114,8 @@ export class HistoryController {
       jobUrl,
       revision: this.generation,
       count: this.model.count,
-      selectedBuild: this.model.selectedBuild
+      selectedBuild: this.model.selectedBuild,
+      ...(anchor?.building ? { status: "paused" as const, pausedReason: "building" as const } : {})
     };
     this.post();
     if (automatic && this.panel.visible && !anchor?.building) void this.load();
@@ -135,6 +149,7 @@ export class HistoryController {
     this.model = {
       ...this.model,
       status: "loading",
+      pausedReason: undefined,
       revision: this.generation,
       message: undefined,
       baseline: undefined
@@ -242,6 +257,10 @@ export class HistoryController {
     }
     if (message.action === "openJob") {
       await this.dependencies.openJob(environment, jobUrl);
+      return;
+    }
+    if (message.action === "openJobInJenkins") {
+      await openJenkinsWorkbenchUrl(jobUrl, "Job History");
       return;
     }
     if (message.action === "baseline" || message.action === "resetBaseline") {

@@ -60,22 +60,31 @@ export class BuildDetailsPanelActions {
     action: "approve" | "reject",
     readinessAction: "approval" | "rejection"
   ): Promise<void> {
-    const context = this.getPendingInputContext();
-    if (!context) {
-      void vscode.window.showErrorMessage(
-        `Build details are not ready for input ${readinessAction}.`
-      );
-      return;
+    try {
+      const context = this.getPendingInputContext();
+      if (!context) {
+        void vscode.window.showErrorMessage(
+          `Build details are not ready for input ${readinessAction}.`
+        );
+        return;
+      }
+      await handlePendingInputAction({
+        dataService: context.pendingInputService,
+        environment: context.environment,
+        buildUrl: context.buildUrl,
+        label: context.label,
+        inputId: message.inputId,
+        action,
+        onRefresh: () => this.refreshAfterPendingInputAction(context.environmentId)
+      });
+    } finally {
+      // The webview keeps the input's buttons disabled until this arrives, so a
+      // parameter prompt or confirmation left open cannot lead to a double submit.
+      this.controller.postMessage({
+        type: "pendingInputActionComplete",
+        inputId: message.inputId
+      });
     }
-    await handlePendingInputAction({
-      dataService: context.pendingInputService,
-      environment: context.environment,
-      buildUrl: context.buildUrl,
-      label: context.label,
-      inputId: message.inputId,
-      action,
-      onRefresh: () => this.refreshAfterPendingInputAction(context.environmentId)
-    });
   }
 
   private async refreshAfterPendingInputAction(environmentId: string): Promise<void> {
@@ -154,6 +163,9 @@ export class BuildDetailsPanelActions {
 
     const environmentId = environment.environmentId;
     const label = details.fullDisplayName ?? details.displayName ?? `#${details.number}`;
+    if (!(await confirmRestartFromStage(label, stageName))) {
+      return;
+    }
     const loadingRequest = this.controller.beginLoading();
     try {
       await restartBackend.restartPipelineFromStage(environment, buildUrl, stageName);
@@ -338,6 +350,17 @@ export class BuildDetailsPanelActions {
       sourceLabel: "Build Details"
     });
   }
+}
+
+const RESTART_CONFIRM_LABEL = "Restart";
+
+async function confirmRestartFromStage(label: string, stageName: string): Promise<boolean> {
+  const choice = await vscode.window.showWarningMessage(
+    `Restart ${label} from stage “${stageName}”? This starts a new build.`,
+    { modal: true },
+    RESTART_CONFIRM_LABEL
+  );
+  return choice === RESTART_CONFIRM_LABEL;
 }
 
 function sanitizeFilePart(value: string): string {

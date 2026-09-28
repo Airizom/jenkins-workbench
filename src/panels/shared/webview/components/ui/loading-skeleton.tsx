@@ -206,6 +206,7 @@ function PanelLoadingShell({
       className={cn("min-h-screen flex flex-col bg-background text-foreground", className)}
       {...props}
     >
+      <span className="sr-only">Loading…</span>
       {children}
     </output>
   );

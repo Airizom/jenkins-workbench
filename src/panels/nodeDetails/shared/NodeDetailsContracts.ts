@@ -18,6 +18,8 @@ export interface NodeMonitorViewModel {
 }
 
 export interface NodeDetailsViewModel {
+  /** False when Jenkins returned no node data yet (for example, the first load failed). */
+  detailsAvailable: boolean;
   displayName: string;
   name: string;
   description?: string;
@@ -32,7 +34,9 @@ export interface NodeDetailsViewModel {
   canLaunchAgent: boolean;
   canOpenAgentInstructions: boolean;
   offlineReason?: string;
-  idleLabel: string;
+  /** "Running builds", "Idle", "Offline", or "Not available". */
+  activityLabel: string;
+  /** "3 of 4 busy", "4 offline", "4 total", or "Not available". */
   executorsLabel: string;
   labels: string[];
   jnlpAgentLabel?: string;

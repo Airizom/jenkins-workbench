@@ -31,7 +31,7 @@ export function TestResultsToolbar({
   return (
     <div className="sticky-header sticky-header--below-hero rounded border border-border bg-background/95 p-3 backdrop-blur">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <ToggleGroup
             type="single"
             value={statusFilter}
@@ -40,7 +40,8 @@ export function TestResultsToolbar({
                 onStatusFilterChange(value as TestStatusFilter);
               }
             }}
-            className="w-full sm:w-auto"
+            aria-label="Filter tests by status"
+            className="w-full flex-wrap sm:w-auto"
           >
             <ToggleGroupItem value="all">
               All ({summary.totalCount.toLocaleString()})
@@ -62,7 +63,7 @@ export function TestResultsToolbar({
               Passed ({summary.passedCount.toLocaleString()})
             </ToggleGroupItem>
           </ToggleGroup>
-          <div className="relative block min-w-[260px] flex-1">
+          <div className="relative block w-full flex-1 sm:w-auto sm:min-w-[260px]">
             <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
             <Input
               aria-label="Search test results"
@@ -74,8 +75,14 @@ export function TestResultsToolbar({
           </div>
         </div>
         {summary.canLoadLogs ? (
-          <Button variant="outline" size="sm" onClick={onReloadWithLogs} disabled={results.loading}>
-            {results.loading ? "Loading Logs..." : "Load Logs"}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onReloadWithLogs}
+            disabled={results.loading}
+            title="Fetch each test's stdout and stderr from Jenkins"
+          >
+            {results.loading ? "Loading test output…" : "Load test output"}
           </Button>
         ) : null}
       </div>

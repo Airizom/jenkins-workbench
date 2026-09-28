@@ -78,26 +78,28 @@ export function isDenseStrip(segmentCount: number): boolean {
   return segmentCount > DENSE_STRIP_THRESHOLD;
 }
 
-function describeSegmentBranches(segment: StageStripSegment): string | undefined {
+export function describeSegmentBranches(segment: StageStripSegment): string | undefined {
   if (segment.branchCount === 0) {
     return undefined;
   }
   return `${segment.branchCount} parallel ${segment.branchCount === 1 ? "branch" : "branches"}`;
 }
 
+/** Stage name plus its parallel fan-out, e.g. "Tests · 3 parallel". */
+export function describeSegmentTitle(segment: StageStripSegment): string {
+  return segment.branchCount > 0
+    ? `${segment.name} · ${segment.branchCount} parallel`
+    : segment.name;
+}
+
 export function describeSegmentAria(segment: StageStripSegment): string {
-  const branches = describeSegmentBranches(segment);
-  return `${segment.name}: ${segment.statusLabel}${branches ? `, ${branches}` : ""}`;
+  return `${describeSegmentTitle(segment)}: ${segment.statusLabel}`;
 }
 
 export function describeSegmentDetail(segment: StageStripSegment): string {
   const parts = [segment.statusLabel];
   if (segment.durationLabel && segment.durationLabel !== "—") {
     parts.push(segment.durationLabel);
-  }
-  const branches = describeSegmentBranches(segment);
-  if (branches) {
-    parts.push(branches);
   }
   return parts.join(" · ");
 }

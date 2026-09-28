@@ -19,8 +19,10 @@ export function CompareTable({
   columns: CompareTableColumn[];
   children: ReactNode;
 }) {
+  // Below the sm breakpoint `bc-stack-table` stacks each row into a card whose
+  // cells show their column name from `data-label` (see styles.css).
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
+    <div className="bc-stack-table overflow-x-auto rounded-md border border-border">
       <table className="w-full border-collapse text-xs">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-surface-sunken">
@@ -45,11 +47,11 @@ export function CompareTable({
   );
 }
 
-export function CompareTableEmptyValue() {
+export function CompareTableEmptyValue({ label = "Not present" }: { label?: string }) {
   return (
     <span className="text-muted-foreground">
       <span aria-hidden="true">—</span>
-      <span className="sr-only">Not present</span>
+      <span className="sr-only">{label}</span>
     </span>
   );
 }

@@ -3,16 +3,23 @@ import type { BuildTestResultsViewModel } from "../../../../shared/BuildDetailsC
 import type { TestResultsView, TestStatusFilter } from "./testResultsTypes";
 import { filterTestResults, getAutoExpandIds, RENDER_BATCH_SIZE } from "./testResultsUtils";
 
-const { useEffect, useMemo, useState } = React;
+const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
 export function useTestResultsView({
   buildUrl,
-  results
+  results,
+  failedCount
 }: {
   buildUrl?: string;
   results: BuildTestResultsViewModel;
+  failedCount: number;
 }): TestResultsView {
-  const [statusFilter, setStatusFilter] = useState<TestStatusFilter>("all");
+  const [statusFilter, setStatusFilterState] = useState<TestStatusFilter>(() =>
+    failedCount > 0 ? "failed" : "all"
+  );
+  // Set once the filter is decided: by the failed-tests default or by the
+  // user. Afterwards the filter only changes when the user changes it.
+  const filterSettledRef = useRef(failedCount > 0);
   const [query, setQuery] = useState("");
   const [renderCount, setRenderCount] = useState(RENDER_BATCH_SIZE);
 
@@ -27,11 +34,32 @@ export function useTestResultsView({
     setRenderCount(RENDER_BATCH_SIZE);
   }, [query, statusFilter]);
 
+  const previousBuildUrlRef = useRef(buildUrl);
   useEffect(() => {
-    setStatusFilter("all");
+    if (previousBuildUrlRef.current === buildUrl) {
+      return;
+    }
+    previousBuildUrlRef.current = buildUrl;
+    filterSettledRef.current = false;
+    setStatusFilterState("all");
     setQuery("");
     setRenderCount(RENDER_BATCH_SIZE);
   }, [buildUrl]);
+
+  // Test results often arrive after the tab mounts; default to failures the
+  // first time any are reported.
+  useEffect(() => {
+    if (filterSettledRef.current || failedCount <= 0) {
+      return;
+    }
+    filterSettledRef.current = true;
+    setStatusFilterState("failed");
+  }, [failedCount]);
+
+  const setStatusFilter = useCallback((value: TestStatusFilter) => {
+    filterSettledRef.current = true;
+    setStatusFilterState(value);
+  }, []);
 
   const visibleItems = filteredItems.slice(0, renderCount);
   const hasMore = filteredItems.length > visibleItems.length;

@@ -32,6 +32,10 @@ describe("NodeCapacityViewModelBuilder", () => {
     assert.equal(model.summary.idleExecutors, 2);
     assert.equal(model.summary.busyExecutors, 1);
     assert.equal(model.summary.offlineExecutors, 2);
+    // Offline capacity with an empty queue is a warning, not a saturated pool.
+    assert.equal(model.pools.find((pool) => pool.kind === "any")?.severity, "warning");
+    assert.equal(model.pools.find((pool) => pool.kind === "any")?.label, "Any node");
+    assert.equal(model.summary.saturatedPoolCount, 0);
     const nodes = model.pools.find((pool) => pool.kind === "any")?.nodes;
     assert.equal(nodes?.find((node) => node.name === "agent")?.executorSummary, "1/3 busy");
     assert.equal(nodes?.find((node) => node.name === "offline")?.executorSummary, "2 offline");
@@ -113,7 +117,7 @@ describe("NodeCapacityViewModelBuilder", () => {
     assert.equal(expressionPool.nodes.map((node) => node.name).join(","), "linux-x86");
     assert.equal(expressionPool.idleExecutors, 1);
     assert.equal(expressionPool.queuedCount, 1);
-    assert.notEqual(expressionPool.statusLabel, "Blocked capacity");
+    assert.notEqual(expressionPool.statusLabel, "No idle executors");
 
     const matchingNode = viewModel.pools
       .find((pool) => pool.kind === "any")

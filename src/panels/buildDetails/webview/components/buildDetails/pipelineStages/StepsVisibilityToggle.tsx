@@ -9,13 +9,15 @@ export function StepsVisibilityToggle({
   onShowAllChange: (showAll: boolean) => void;
 }): React.JSX.Element {
   return (
+    // Fixed label; aria-pressed carries the state (pressed = failed steps only).
     <Toggle
-      pressed={showAll}
-      onPressedChange={onShowAllChange}
+      pressed={!showAll}
+      onPressedChange={(failedOnly) => onShowAllChange(!failedOnly)}
       size="sm"
-      aria-label={showAll ? "Show failed steps only" : "Show all steps"}
+      aria-label="Failed steps only"
+      title="Show only failed steps"
     >
-      {showAll ? "Failed only" : "All steps"}
+      Failed only
     </Toggle>
   );
 }

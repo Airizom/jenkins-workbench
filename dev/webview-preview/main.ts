@@ -1,14 +1,26 @@
 import { buildCompareScenarios } from "./fixtures/buildCompare";
 import { buildDetailsScenarios } from "./fixtures/buildDetails";
+import { jobHistoryScenarios } from "./fixtures/jobHistory";
 import { nodeCapacityScenarios } from "./fixtures/nodeCapacity";
 import { nodeDetailsScenarios } from "./fixtures/nodeDetails";
 import { type PreviewThemeName, previewThemes } from "./themes";
 
-type PanelName = "buildDetails" | "buildCompare" | "nodeCapacity" | "nodeDetails";
+type PanelName =
+  | "buildDetails"
+  | "buildCompare"
+  | "jobHistory"
+  | "jobHistoryEmbedded"
+  | "nodeCapacity"
+  | "nodeDetails";
 
 const panels: Record<
   PanelName,
-  { scenarios: Record<string, unknown>; load: () => Promise<unknown> }
+  {
+    scenarios: Record<string, unknown>;
+    load: () => Promise<unknown>;
+    /** Panels that receive their model by message (not `__INITIAL_STATE__`) get it after "ready". */
+    postScenarioOnReady?: boolean;
+  }
 > = {
   buildDetails: {
     scenarios: buildDetailsScenarios,
@@ -17,6 +29,16 @@ const panels: Record<
   buildCompare: {
     scenarios: buildCompareScenarios,
     load: () => import("../../src/panels/buildCompare/webview/index")
+  },
+  jobHistory: {
+    scenarios: jobHistoryScenarios,
+    load: () => import("../../src/panels/jobHistory/webview/index"),
+    postScenarioOnReady: true
+  },
+  jobHistoryEmbedded: {
+    scenarios: jobHistoryScenarios,
+    load: () => import("./jobHistoryEmbedded"),
+    postScenarioOnReady: true
   },
   nodeCapacity: {
     scenarios: nodeCapacityScenarios,
@@ -45,7 +67,12 @@ let panelState: unknown;
 const globals = window as unknown as Record<string, unknown>;
 globals.__INITIAL_STATE__ = panel.scenarios[scenarioName];
 globals.acquireVsCodeApi = () => ({
-  postMessage: (message: unknown) => console.info("[webview → extension]", message),
+  postMessage: (message: unknown) => {
+    console.info("[webview → extension]", message);
+    const action = (message as { action?: unknown } | null)?.action;
+    if (panel.postScenarioOnReady && action === "ready")
+      setTimeout(() => window.postMessage(panel.scenarios[scenarioName], "*"));
+  },
   getState: () => panelState,
   setState: (state: unknown) => {
     panelState = state;

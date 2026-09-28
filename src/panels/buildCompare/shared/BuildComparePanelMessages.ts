@@ -1,9 +1,14 @@
-import { asRecord, hasMessageType } from "../../../shared/runtimeGuards";
+import { asRecord, hasMessageType, isPlainRecord } from "../../../shared/runtimeGuards";
 import {
   type BuildCompareConsoleSectionViewModel,
+  type BuildCompareViewModel,
   type CompareSectionStatus,
   compareSectionStatuses
 } from "./BuildCompareContracts";
+import {
+  type BuildComparePanelSerializedState,
+  isBuildComparePanelState
+} from "./BuildComparePanelWebviewState";
 
 export interface SwapBuildsMessage {
   type: "swapBuilds";
@@ -29,7 +34,26 @@ export interface UpdateConsoleSectionMessage {
   console: BuildCompareConsoleSectionViewModel;
 }
 
-export type BuildCompareOutgoingMessage = UpdateConsoleSectionMessage;
+/**
+ * Replaces the rendered comparison after a refresh or swap without reloading
+ * the webview, so scroll position, collapsed sections, and toasts survive.
+ */
+export interface UpdateBuildCompareMessage {
+  type: "updateBuildCompare";
+  model: BuildCompareViewModel;
+  panelState: BuildComparePanelSerializedState;
+}
+
+/** A refresh or swap failed; the webview keeps the last good comparison. */
+export interface BuildCompareRefreshFailedMessage {
+  type: "buildCompareRefreshFailed";
+  message: string;
+}
+
+export type BuildCompareOutgoingMessage =
+  | UpdateConsoleSectionMessage
+  | UpdateBuildCompareMessage
+  | BuildCompareRefreshFailedMessage;
 export type BuildCompareIncomingMessage =
   | SwapBuildsMessage
   | OpenBuildDetailsMessage
@@ -44,18 +68,81 @@ export function parseBuildCompareOutgoingMessage(
     return undefined;
   }
 
-  if (record.type !== "updateConsoleSection") {
-    return undefined;
+  switch (record.type) {
+    case "updateConsoleSection":
+      return isBuildCompareConsoleSectionViewModel(record.console)
+        ? { type: "updateConsoleSection", console: record.console }
+        : undefined;
+    case "updateBuildCompare":
+      return isBuildCompareViewModelShape(record.model) &&
+        isBuildComparePanelState(record.panelState)
+        ? { type: "updateBuildCompare", model: record.model, panelState: record.panelState }
+        : undefined;
+    case "buildCompareRefreshFailed":
+      return typeof record.message === "string"
+        ? { type: "buildCompareRefreshFailed", message: record.message }
+        : undefined;
+    default:
+      return undefined;
   }
+}
 
-  if (!isBuildCompareConsoleSectionViewModel(record.console)) {
-    return undefined;
+const LIST_FIELDS_BY_SECTION = {
+  tests: [
+    "newFailures",
+    "stillFailing",
+    "newPasses",
+    "addedTests",
+    "removedTests",
+    "otherChanges",
+    "ambiguousTests"
+  ],
+  parameters: ["items"],
+  changesets: ["baselineItems", "targetItems"],
+  stages: ["items"]
+} as const;
+
+/**
+ * Structural check for host-produced view models: validates the fields the
+ * webview dereferences unconditionally, not every leaf value.
+ */
+function isBuildCompareViewModelShape(value: unknown): value is BuildCompareViewModel {
+  if (!isPlainRecord(value)) {
+    return false;
   }
+  if (!isBuildShape(value.baseline) || !isBuildShape(value.target)) {
+    return false;
+  }
+  if (!Array.isArray(value.errors) || !value.errors.every((error) => typeof error === "string")) {
+    return false;
+  }
+  for (const [sectionKey, listFields] of Object.entries(LIST_FIELDS_BY_SECTION)) {
+    const section = value[sectionKey];
+    if (!isSectionBaseShape(section)) {
+      return false;
+    }
+    if (!listFields.every((field) => Array.isArray(section[field]))) {
+      return false;
+    }
+  }
+  return isBuildCompareConsoleSectionViewModel(value.console);
+}
 
-  return {
-    type: "updateConsoleSection",
-    console: record.console
-  };
+function isBuildShape(value: unknown): boolean {
+  return (
+    isPlainRecord(value) &&
+    typeof value.displayName === "string" &&
+    typeof value.buildNumberLabel === "string" &&
+    typeof value.buildUrl === "string"
+  );
+}
+
+function isSectionBaseShape(value: unknown): value is Record<string, unknown> {
+  return (
+    isPlainRecord(value) &&
+    compareSectionStatuses.includes(value.status as CompareSectionStatus) &&
+    typeof value.summaryLabel === "string"
+  );
 }
 
 function isBuildCompareConsoleSectionViewModel(

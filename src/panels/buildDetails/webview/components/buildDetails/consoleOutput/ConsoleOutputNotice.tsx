@@ -1,5 +1,6 @@
 import type * as React from "react";
 import { Alert, AlertDescription } from "../../../../../shared/webview/components/ui/alert";
+import { Button } from "../../../../../shared/webview/components/ui/button";
 import { AlertCircleIcon } from "../../../../../shared/webview/icons";
 
 type ConsoleOutputNoticeProps = {
@@ -8,7 +9,9 @@ type ConsoleOutputNoticeProps = {
 
 type ConsoleOutputErrorNoticeProps = {
   error?: string;
+  onRetry?: () => void;
 };
+
 export function ConsoleOutputTruncationNotice({
   note
 }: ConsoleOutputNoticeProps): React.JSX.Element | null {
@@ -27,14 +30,22 @@ export function ConsoleOutputTruncationNotice({
 }
 
 export function ConsoleOutputErrorNotice({
-  error
+  error,
+  onRetry
 }: ConsoleOutputErrorNoticeProps): React.JSX.Element | null {
   if (!error) {
     return null;
   }
   return (
     <Alert id="console-error" variant="warning" className="py-2">
-      <AlertDescription className="text-xs">{error}</AlertDescription>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="min-w-0">{error}</span>
+        {onRetry ? (
+          <Button variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={onRetry}>
+            Retry
+          </Button>
+        ) : null}
+      </AlertDescription>
     </Alert>
   );
 }

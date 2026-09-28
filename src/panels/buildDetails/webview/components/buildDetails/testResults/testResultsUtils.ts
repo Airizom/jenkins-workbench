@@ -54,3 +54,32 @@ export function getTestDistribution(summary: BuildTestsSummaryViewModel): {
 export function hasTestDetails(item: BuildTestCaseViewModel): boolean {
   return Boolean(item.errorDetails || item.errorStackTrace || item.stdout || item.stderr);
 }
+
+export interface TestFailureBlock {
+  label: "Failure" | "Stack Trace";
+  value: string;
+}
+
+/**
+ * Jenkins stack traces usually begin with the failure message. Show that
+ * message once: a stack trace that already starts with it is labelled
+ * "Failure" and replaces the separate message block.
+ */
+export function resolveFailureBlocks(
+  errorDetails: string | undefined,
+  errorStackTrace: string | undefined
+): TestFailureBlock[] {
+  const details = errorDetails?.trim() ? errorDetails : undefined;
+  const stackTrace = errorStackTrace?.trim() ? errorStackTrace : undefined;
+  if (details && stackTrace?.trimStart().startsWith(details.trim())) {
+    return [{ label: "Failure", value: stackTrace }];
+  }
+  const blocks: TestFailureBlock[] = [];
+  if (details) {
+    blocks.push({ label: "Failure", value: details });
+  }
+  if (stackTrace) {
+    blocks.push({ label: "Stack Trace", value: stackTrace });
+  }
+  return blocks;
+}

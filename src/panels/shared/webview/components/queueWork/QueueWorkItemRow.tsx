@@ -3,6 +3,7 @@ import type { QueueWorkItemViewModel } from "../../../../../shared/queueWork/Que
 import { ExternalLinkIcon } from "../../icons";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { TruncatedText } from "../ui/truncated-text";
 
 export type QueueWorkItemRowProps = {
   item: QueueWorkItemViewModel;
@@ -19,7 +20,8 @@ export function QueueWorkItemRow({
   const renderTaskAction = (taskUrl: string): React.JSX.Element =>
     action === "external-icon" ? (
       <Button
-        aria-label={`Open ${item.name} in Jenkins`}
+        aria-label={`Open in Jenkins: ${item.name}`}
+        title="Open in Jenkins"
         variant="ghost"
         size="icon"
         className="shrink-0"
@@ -29,13 +31,13 @@ export function QueueWorkItemRow({
       </Button>
     ) : (
       <Button
-        aria-label={`Open ${item.name} in Jenkins`}
+        aria-label={`Open in Jenkins: ${item.name}`}
         variant="outline"
         size="sm"
         className="shrink-0"
         onClick={() => onOpenExternal(taskUrl)}
       >
-        Open
+        Open in Jenkins
       </Button>
     );
 
@@ -43,17 +45,17 @@ export function QueueWorkItemRow({
     <div className={className ?? "flex items-start justify-between gap-3"}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium">{item.name}</span>
-          <Badge variant={item.stuck || item.blocked ? "secondary" : "muted"}>
+          <TruncatedText text={item.name} className="text-sm font-medium" />
+          <Badge variant={item.stuck ? "failure" : item.blocked ? "warning" : "muted"}>
             {item.statusLabel}
           </Badge>
-          {item.queuedForLabels.length > 0 ? (
-            <Badge variant="outline">{item.queuedForLabels.join(", ")}</Badge>
-          ) : null}
+          <Badge variant="outline" className="whitespace-normal wrap-anywhere rounded-md">
+            {item.queuedForLabels.length > 0 ? item.queuedForLabels.join(", ") : "Any node"}
+          </Badge>
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
           #{item.position} in queue
-          {item.queuedDurationLabel ? ` - ${item.queuedDurationLabel}` : ""}
+          {item.queuedDurationLabel ? ` · ${item.queuedDurationLabel}` : ""}
         </div>
         {item.reason ? (
           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.reason}</p>

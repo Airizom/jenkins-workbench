@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 
+import { focusRingInsetClassName } from "../../lib/focus";
 import { cn } from "../../lib/utils";
 import { DisclosureChevron } from "./disclosure-chevron";
 
 const TRIGGER_CLASSES = [
   "group flex items-center justify-between text-left transition-colors cursor-pointer",
-  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+  focusRingInsetClassName,
   "disabled:pointer-events-none disabled:opacity-50"
 ];
 

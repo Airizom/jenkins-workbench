@@ -13,7 +13,7 @@ export function createEmptyNodeCapacitySummary(): NodeCapacitySummaryViewModel {
     stuckCount: 0,
     blockedCount: 0,
     buildableCount: 0,
-    bottleneckCount: 0
+    saturatedPoolCount: 0
   };
 }
 

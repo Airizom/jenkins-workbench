@@ -27,18 +27,6 @@ function normalizeBuildResultClass(resultClass?: string): BuildResultClassKey {
   }
 }
 
-const WARNING_BUILD_RESULT_STYLE: Omit<BuildResultStyle, "stageNode"> = {
-  badge: "border-warning-border bg-warning-soft text-warning-foreground",
-  text: "text-warning-foreground",
-  iconText: "text-warning",
-  accent: "bg-warning",
-  connectorColor: "var(--warning)",
-  graphBackground:
-    "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
-  borderColor: "var(--warning-border)"
-};
-const WARNING_STAGE_NODE_CLASS = "border-warning-border bg-warning-soft text-warning";
-
 const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
   success: {
     badge: "border-success-border bg-success-soft text-success-foreground",
@@ -63,8 +51,15 @@ const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
     borderColor: "var(--failure-border)"
   },
   unstable: {
-    ...WARNING_BUILD_RESULT_STYLE,
-    stageNode: WARNING_STAGE_NODE_CLASS
+    badge: "border-warning-border bg-warning-soft text-warning-foreground",
+    text: "text-warning-foreground",
+    iconText: "text-warning",
+    accent: "bg-warning",
+    stageNode: "border-warning-border bg-warning-soft text-warning",
+    connectorColor: "var(--warning)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--warning-soft) 65%, var(--card)), var(--card))",
+    borderColor: "var(--warning-border)"
   },
   aborted: {
     badge: "border-aborted-border bg-aborted-soft text-aborted-foreground",
@@ -77,9 +72,18 @@ const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
       "linear-gradient(180deg, color-mix(in srgb, var(--aborted-soft) 70%, var(--card)), var(--card))",
     borderColor: "var(--aborted-border)"
   },
+  // In-progress work uses the info (progress blue) tone so it never reads as
+  // unstable, including when reduced motion removes the pulse.
   running: {
-    ...WARNING_BUILD_RESULT_STYLE,
-    stageNode: `${WARNING_STAGE_NODE_CLASS} animate-pulse`
+    badge: "border-info-border bg-info-soft text-info-foreground",
+    text: "text-info-foreground",
+    iconText: "text-info",
+    accent: "bg-info",
+    stageNode: "border-info-border bg-info-soft text-info animate-pulse",
+    connectorColor: "var(--info)",
+    graphBackground:
+      "linear-gradient(180deg, color-mix(in srgb, var(--info-soft) 65%, var(--card)), var(--card))",
+    borderColor: "var(--info-border)"
   },
   neutral: {
     badge: "border-border bg-muted text-muted-foreground",
@@ -94,22 +98,26 @@ const BUILD_RESULT_STYLES: Record<BuildResultClassKey, BuildResultStyle> = {
   }
 };
 
-const WARNING_NODE_STATUS_STYLE: NodeStatusStyle = {
-  badge: "border-warning-border text-warning bg-warning-soft",
-  icon: "text-warning",
-  accent: "bg-warning"
-};
-
 const NODE_STATUS_STYLES: Record<NodeStatusClass, NodeStatusStyle> = {
   online: {
-    badge: "border-success-border text-success bg-success-soft",
+    badge: "border-success-border text-success-foreground bg-success-soft",
     icon: "text-success",
     accent: "bg-success"
   },
-  idle: WARNING_NODE_STATUS_STYLE,
-  temporary: WARNING_NODE_STATUS_STYLE,
+  // Online with no work in progress is healthy, so it stays neutral; amber is
+  // reserved for nodes that were taken temporarily offline.
+  idle: {
+    badge: "border-border text-muted-foreground bg-muted",
+    icon: "text-muted-foreground",
+    accent: "bg-border-strong"
+  },
+  temporary: {
+    badge: "border-warning-border text-warning-foreground bg-warning-soft",
+    icon: "text-warning",
+    accent: "bg-warning"
+  },
   offline: {
-    badge: "border-failure-border text-failure bg-failure-soft",
+    badge: "border-failure-border text-failure-foreground bg-failure-soft",
     icon: "text-failure",
     accent: "bg-failure"
   },

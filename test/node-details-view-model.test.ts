@@ -12,13 +12,14 @@ describe("NodeDetailsViewModel", () => {
       advancedLoaded: false
     });
 
+    assert.equal(viewModel.detailsAvailable, false);
     assert.equal(viewModel.displayName, "Node Details");
     assert.equal(viewModel.name, "Unknown");
     assert.equal(viewModel.url, "https://jenkins.example/computer/missing/");
     assert.equal(viewModel.updatedAt, "2026-05-30T18:00:00.000Z");
     assert.equal(viewModel.statusLabel, "Unknown");
     assert.equal(viewModel.statusClass, "unknown");
-    assert.equal(viewModel.idleLabel, "Not available");
+    assert.equal(viewModel.activityLabel, "Not available");
     assert.equal(viewModel.executorsLabel, "Not available");
     assert.deepEqual(viewModel.queuedWork, {
       matchingQueueItems: [],
@@ -96,8 +97,9 @@ describe("NodeDetailsViewModel", () => {
     assert.equal(viewModel.displayName, "Agent One");
     assert.equal(viewModel.name, "agent-one");
     assert.equal(viewModel.statusLabel, "Online");
-    assert.equal(viewModel.idleLabel, "Busy");
-    assert.equal(viewModel.executorsLabel, "Busy 1/2");
+    assert.equal(viewModel.detailsAvailable, true);
+    assert.equal(viewModel.activityLabel, "Running builds");
+    assert.equal(viewModel.executorsLabel, "1 of 2 busy");
     assert.equal(viewModel.canTakeOffline, true);
     assert.equal(viewModel.advancedLoaded, true);
     assert.equal(viewModel.queuedWork.matchingQueueItems[0]?.name, "queued-job");
@@ -166,5 +168,24 @@ describe("NodeDetailsViewModel", () => {
       ]
     );
     assert.equal(viewModel.rawJson, JSON.stringify(details, null, 2));
+  });
+
+  it("reports offline executors as offline instead of idle", () => {
+    const viewModel = buildNodeDetailsViewModel({
+      details: {
+        displayName: "agent-offline",
+        name: "agent-offline",
+        offline: true,
+        temporarilyOffline: false,
+        idle: true,
+        numExecutors: 4,
+        busyExecutors: 0
+      } as JenkinsNodeDetails,
+      errors: [],
+      updatedAt: "2026-05-30T18:00:00.000Z"
+    });
+
+    assert.equal(viewModel.executorsLabel, "4 offline");
+    assert.equal(viewModel.activityLabel, "Offline");
   });
 });

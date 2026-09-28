@@ -2,6 +2,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import * as React from "react";
 
 import { CheckIcon, ChevronDownIcon } from "../../icons";
+import { focusRingInsetClassName } from "../../lib/focus";
 import { cn } from "../../lib/utils";
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
@@ -16,7 +17,7 @@ export const SelectTrigger = React.forwardRef<
     className={cn(
       "inline-flex h-7 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-xs",
       "text-foreground",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      focusRingInsetClassName,
       "disabled:cursor-not-allowed disabled:opacity-50",
       className
     )}
@@ -62,7 +63,7 @@ export const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       "relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-2 pr-8 text-xs outline-none",
-      "focus:bg-list-hover focus:text-list-hoverForeground",
+      "focus:bg-list-hover focus:text-list-hoverForeground data-highlighted:hc-active-ring",
       "data-disabled:pointer-events-none data-disabled:opacity-50",
       className
     )}

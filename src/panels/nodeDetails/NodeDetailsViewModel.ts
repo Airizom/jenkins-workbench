@@ -4,12 +4,7 @@ import {
   buildBaseNodeExecutorSummaries,
   formatExecutorWorkLabel
 } from "../../jenkins/NodeExecutorFormatters";
-import {
-  formatNodeBusyExecutorRatio,
-  formatNodeIdleLabel,
-  formatNodeOfflineReason,
-  resolveNodeStatusDescriptor
-} from "../../jenkins/NodeFormatters";
+import { formatNodeOfflineReason, resolveNodeStatusDescriptor } from "../../jenkins/NodeFormatters";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
 import type {
   JenkinsNodeDetails,
@@ -49,7 +44,7 @@ interface DurationResult {
 
 type NodeIdentityFields = Pick<
   NodeDetailsViewModel,
-  "displayName" | "name" | "description" | "url" | "updatedAt"
+  "detailsAvailable" | "displayName" | "name" | "description" | "url" | "updatedAt"
 >;
 
 type NodeStatusFields = Pick<
@@ -67,7 +62,7 @@ type NodeStatusFields = Pick<
 
 type NodeOverviewFields = Pick<
   NodeDetailsViewModel,
-  | "idleLabel"
+  | "activityLabel"
   | "executorsLabel"
   | "labels"
   | "jnlpAgentLabel"
@@ -110,6 +105,7 @@ function buildNodeIdentity(
   updatedAt: string
 ): NodeIdentityFields {
   return {
+    detailsAvailable: details !== undefined,
     displayName: firstNonEmpty(details?.displayName, details?.name) ?? "Node Details",
     name: firstNonEmpty(details?.name, details?.displayName) ?? "Unknown",
     description: trimToUndefined(details?.description),
@@ -132,7 +128,7 @@ function buildNodeStatus(details?: JenkinsNodeDetails): NodeStatusFields {
 
 function buildNodeOverview(details?: JenkinsNodeDetails): NodeOverviewFields {
   return {
-    idleLabel: formatNodeIdleLabel(details, UNKNOWN_LABEL),
+    activityLabel: formatActivityLabel(details),
     executorsLabel: formatExecutorsSummary(details),
     labels: collectAssignedLabelNames(details?.assignedLabels),
     jnlpAgentLabel: formatBoolean(details?.jnlpAgent),
@@ -154,16 +150,35 @@ function buildNodeRuntimeFields(
   };
 }
 
-function formatExecutorsSummary(details?: JenkinsNodeDetails): string {
-  const ratio = formatNodeBusyExecutorRatio(details ?? {}, { prefix: "Busy " });
-  if (ratio) {
-    return ratio;
+function formatActivityLabel(details?: JenkinsNodeDetails): string {
+  if (details?.idle === false) {
+    return "Running builds";
   }
-  const total = details?.numExecutors;
-  if (isFiniteNumber(total)) {
-    return `${total} total`;
+  if (details?.offline === true) {
+    return "Offline";
+  }
+  if (details?.idle === true) {
+    return "Idle";
   }
   return UNKNOWN_LABEL;
+}
+
+/** Offline executors are unavailable, not idle, so they are never reported as "0 busy". */
+function formatExecutorsSummary(details?: JenkinsNodeDetails): string {
+  const total = details?.numExecutors;
+  if (!isFiniteNumber(total)) {
+    return UNKNOWN_LABEL;
+  }
+  const busy = details?.busyExecutors;
+  if (details?.offline === true) {
+    return isFiniteNumber(busy) && busy > 0
+      ? `${busy} busy · ${total - busy} offline`
+      : `${total} offline`;
+  }
+  if (isFiniteNumber(busy)) {
+    return `${busy} of ${total} busy`;
+  }
+  return `${total} total`;
 }
 
 function formatBoolean(value?: boolean): string | undefined {

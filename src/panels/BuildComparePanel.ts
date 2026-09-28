@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { BuildDetailsPanelLauncher } from "./BuildDetailsPanelLauncher";
@@ -25,6 +24,7 @@ import { disposePanelResources } from "./shared/PanelRuntimeHelpers";
 import { getWebviewAssetsRoot } from "./shared/webview/WebviewAssets";
 import {
   assignWebviewPanelManifestErrorHtml,
+  createMissingPanelAssetsMessages,
   createPanelRestoreMessages,
   resolveRestoredPanelEnvironment
 } from "./shared/webview/WebviewHtml";
@@ -151,7 +151,7 @@ export class BuildComparePanel {
           return;
         }
         if (isRefreshBuildCompareMessage(message)) {
-          void this.load({ suppressErrors: true });
+          void this.refresh();
           return;
         }
         if (isBuildCompareReadyMessage(message)) {
@@ -188,13 +188,8 @@ export class BuildComparePanel {
         }
       );
     } catch (error) {
+      // The controller already rendered an error page with a Retry button.
       if (options?.suppressErrors) {
-        assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildCompare", {
-          title: BuildComparePanel.PANEL_TITLE,
-          message: `Build comparison could not be loaded. ${formatError(error)}`,
-          hint: "Open the comparison again from Jenkins Workbench to continue.",
-          panelState: this.serializedState
-        });
         return;
       }
       throw error;
@@ -202,25 +197,68 @@ export class BuildComparePanel {
 
     if (result.status === "missingAssets") {
       assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildCompare", {
-        title: BuildComparePanel.PANEL_TITLE,
-        message:
-          "Build compare webview assets are missing. Run the extension build (npm run compile) and try again.",
-        hint: "Open the comparison again from Jenkins Workbench to continue.",
+        ...createMissingPanelAssetsMessages({
+          title: BuildComparePanel.PANEL_TITLE,
+          panelLabel: "Build Compare"
+        }),
         panelState: this.serializedState
       });
     }
+  }
+
+  /**
+   * Re-runs the comparison. Once content is rendered, the update is posted to
+   * the webview so its scroll position and UI state survive; failures surface
+   * inline there. Before that (initial-load error page), it reloads fully.
+   */
+  private async refresh(): Promise<void> {
+    if (!this.serializedState) {
+      return;
+    }
+    if (!this.controller.canUpdateInPlace) {
+      await this.load({ suppressErrors: true });
+      return;
+    }
+    await this.refreshInPlace(this.serializedState);
   }
 
   private async swapBuilds(): Promise<void> {
     if (!this.serializedState) {
       return;
     }
-    this.serializedState = updateBuildComparePanelState(
+    const swappedState = updateBuildComparePanelState(
       this.serializedState,
       this.serializedState.targetBuildUrl,
       this.serializedState.baselineBuildUrl
     );
-    await this.load({ suppressErrors: true });
+    if (!this.controller.canUpdateInPlace) {
+      this.serializedState = swappedState;
+      await this.load({ suppressErrors: true });
+      return;
+    }
+    await this.refreshInPlace(swappedState);
+  }
+
+  /** Commits the requested build pair only after it loads successfully. */
+  private async refreshInPlace(nextState: BuildComparePanelSerializedState): Promise<void> {
+    if (!this.backend || !this.getCompareOptions || !this.environment) {
+      return;
+    }
+    try {
+      const applied = await this.controller.refresh(
+        this.backend,
+        this.getCompareOptions(),
+        this.environment,
+        nextState.baselineBuildUrl,
+        nextState.targetBuildUrl,
+        { label: this.label, panelState: nextState }
+      );
+      if (applied) {
+        this.serializedState = nextState;
+      }
+    } catch {
+      // The webview shows the failure inline and keeps the last good comparison.
+    }
   }
 
   private async openBuildDetails(side: "baseline" | "target"): Promise<void> {

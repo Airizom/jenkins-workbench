@@ -6,23 +6,63 @@ import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMess
 import { toast } from "../../shared/webview/hooks/useToast";
 import type { BuildCompareViewModel } from "../shared/BuildCompareContracts";
 import type { BuildCompareIncomingMessage } from "../shared/BuildComparePanelMessages";
+import type { BuildCompareSectionId } from "../shared/BuildComparePanelWebviewState";
 import { BuildCompareBuildPair } from "./components/buildCompare/BuildCompareBuildPair";
 import { BuildCompareHeader } from "./components/buildCompare/BuildCompareHeader";
 import { ChangesetsSection } from "./components/buildCompare/ChangesetsSection";
 import type { CompareSectionNavItem } from "./components/buildCompare/CompareSectionNav";
 import { CompareSectionNav } from "./components/buildCompare/CompareSectionNav";
 import { ConsoleDivergenceSection } from "./components/buildCompare/ConsoleDivergenceSection";
+import {
+  COMPARE_SECTION_TITLES,
+  resolveCompareSectionNavChip
+} from "./components/buildCompare/compareSectionNavModel";
 import { ParameterDiffSection } from "./components/buildCompare/ParameterDiffSection";
 import { StageTimingSection } from "./components/buildCompare/StageTimingSection";
 import { TestDiffSection } from "./components/buildCompare/TestDiffSection";
 import { useBuildCompareMessages } from "./hooks/useBuildCompareMessages";
-import { buildCompareReducer } from "./state/buildCompareState";
+import { useCollapsedSections } from "./hooks/useCollapsedSections";
+import {
+  type BuildCompareBusyAction,
+  buildCompareReducer,
+  createBuildCompareState
+} from "./state/buildCompareState";
 
 const { useEffect, useReducer } = React;
 
+const SECTION_ORDER: BuildCompareSectionId[] = [
+  "tests",
+  "parameters",
+  "changesets",
+  "stages",
+  "console"
+];
+
+const ACTION_MESSAGES: Record<
+  BuildCompareBusyAction,
+  { message: BuildCompareIncomingMessage; failureTitle: string; successTitle: string }
+> = {
+  refresh: {
+    message: { type: "refreshBuildCompare" },
+    failureTitle: "Refresh failed",
+    successTitle: "Comparison refreshed"
+  },
+  swap: {
+    message: { type: "swapBuilds" },
+    failureTitle: "Swap failed",
+    successTitle: "Swapped baseline and target"
+  }
+};
+
+function sectionAnchorId(id: BuildCompareSectionId): string {
+  return `compare-section-${id}`;
+}
+
 export function BuildCompareApp({ initialState }: { initialState: BuildCompareViewModel }) {
-  const [state, dispatch] = useReducer(buildCompareReducer, initialState);
+  const [state, dispatch] = useReducer(buildCompareReducer, initialState, createBuildCompareState);
+  const { model, busyAction, actionError, completedAction } = state;
   const postMessage = usePanelPostMessage<BuildCompareIncomingMessage>();
+  const { isOpen, setOpen } = useCollapsedSections();
   useBuildCompareMessages(dispatch);
 
   // Declared after useBuildCompareMessages so the message listener is attached
@@ -31,81 +71,79 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
     postMessage({ type: "buildCompareReady" });
   }, [postMessage]);
 
-  const handleRetry = () => {
-    postMessage({ type: "refreshBuildCompare" });
-    toast({ title: "Refreshing comparison" });
-  };
-  const sections = [
-    {
-      id: "compare-section-tests",
-      label: "Tests",
-      section: state.tests,
-      content: <TestDiffSection section={state.tests} />
-    },
-    {
-      id: "compare-section-parameters",
-      label: "Parameters",
-      section: state.parameters,
-      content: <ParameterDiffSection section={state.parameters} />
-    },
-    {
-      id: "compare-section-changesets",
-      label: "Changes",
-      section: state.changesets,
-      content: <ChangesetsSection section={state.changesets} />
-    },
-    {
-      id: "compare-section-stages",
-      label: "Stages",
-      section: state.stages,
-      content: <StageTimingSection section={state.stages} />
-    },
-    {
-      id: "compare-section-console",
-      label: "Console",
-      section: state.console,
-      content: <ConsoleDivergenceSection section={state.console} />
+  useEffect(() => {
+    if (completedAction) {
+      toast({ title: ACTION_MESSAGES[completedAction.action].successTitle });
     }
-  ];
-  const sectionErrors = sections.flatMap(({ section }) =>
-    section.status === "error" ? [section.detail ?? section.summaryLabel] : []
-  );
-  const isLoading = sections.some(({ section }) => section.status === "loading");
+  }, [completedAction]);
 
-  const navItems: CompareSectionNavItem[] = sections.map(({ id, label, section }) => ({
-    id,
-    label,
-    status: section.status
+  const runAction = (action: BuildCompareBusyAction) => {
+    dispatch({ type: "startAction", action });
+    postMessage(ACTION_MESSAGES[action].message);
+  };
+
+  const disclosure = (id: BuildCompareSectionId) => ({
+    open: isOpen(id),
+    onOpenChange: (open: boolean) => setOpen(id, open)
+  });
+
+  const sectionContent: Record<BuildCompareSectionId, React.ReactNode> = {
+    tests: <TestDiffSection section={model.tests} {...disclosure("tests")} />,
+    parameters: <ParameterDiffSection section={model.parameters} {...disclosure("parameters")} />,
+    changesets: <ChangesetsSection section={model.changesets} {...disclosure("changesets")} />,
+    stages: <StageTimingSection section={model.stages} {...disclosure("stages")} />,
+    console: <ConsoleDivergenceSection section={model.console} {...disclosure("console")} />
+  };
+
+  const sectionErrors = SECTION_ORDER.flatMap((id) => {
+    const section = model[id];
+    return section.status === "error" ? [section.detail ?? section.summaryLabel] : [];
+  });
+  const isLoading = SECTION_ORDER.some((id) => model[id].status === "loading");
+  const busy = isLoading || busyAction !== undefined;
+
+  const navItems: CompareSectionNavItem[] = SECTION_ORDER.map((id) => ({
+    id: sectionAnchorId(id),
+    label: COMPARE_SECTION_TITLES[id],
+    chip: resolveCompareSectionNavChip(id, model)
   }));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {isLoading ? (
+      {busy ? (
         <div className="fixed inset-x-0 top-0 z-50">
           <Progress indeterminate className="h-px rounded-none" />
         </div>
       ) : null}
       <BuildCompareHeader
-        baselineDisplayName={state.baseline.displayName}
-        targetDisplayName={state.target.displayName}
-        loading={isLoading}
-        onRefresh={handleRetry}
+        baseline={model.baseline}
+        target={model.target}
+        busy={busy}
+        busyAction={busyAction}
+        onRefresh={() => runAction("refresh")}
+        onSwap={() => runAction("swap")}
       />
 
-      <main
-        className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4"
-        aria-busy={isLoading}
-      >
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4" aria-busy={busy}>
+        {actionError ? (
+          <PanelErrorList
+            errors={[actionError.message]}
+            title={`${ACTION_MESSAGES[actionError.action].failureTitle}. Showing the previous comparison.`}
+            className="flex flex-col gap-1"
+            onRetry={busy ? undefined : () => runAction(actionError.action)}
+          />
+        ) : null}
         <PanelErrorList
-          errors={[...state.errors, ...sectionErrors]}
+          errors={[...model.errors, ...sectionErrors]}
           title="Comparison errors"
-          onRetry={handleRetry}
+          className="flex flex-col gap-1"
+          onRetry={busy ? undefined : () => runAction("refresh")}
         />
-        <BuildCompareBuildPair baseline={state.baseline} target={state.target} />
+        <BuildCompareBuildPair baseline={model.baseline} target={model.target} />
         <CompareSectionNav items={navItems} />
-        {sections.map(({ id, content }) => (
-          <div key={id} id={id} className="scroll-mt-20">
-            {content}
+        {SECTION_ORDER.map((id) => (
+          <div key={id} id={sectionAnchorId(id)} className="scroll-mt-20">
+            {sectionContent[id]}
           </div>
         ))}
       </main>

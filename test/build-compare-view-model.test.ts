@@ -79,5 +79,40 @@ describe("loadBuildCompareViewModel", () => {
 
     assert.equal(viewModel.baseline.buildUrl, BASELINE_URL);
     assert.equal(viewModel.target.buildUrl, TARGET_URL);
+    // Without a full display name the job name falls back to the /job/ URL segments.
+    assert.equal(viewModel.target.buildNumberLabel, "#2");
+    assert.equal(viewModel.target.jobDisplayName, "example");
+  });
+});
+
+describe("buildBuildViewModel", () => {
+  it("strips the build display name from the full display name to get the job", async () => {
+    const { buildBuildViewModel } = await import(
+      "../src/panels/buildCompare/BuildCompareSectionShared"
+    );
+
+    const standard = buildBuildViewModel("Target", {
+      number: 1482,
+      url: "https://jenkins.example/job/web-app/job/main/1482/",
+      displayName: "#1482",
+      fullDisplayName: "web-app » main #1482"
+    });
+    assert.equal(standard.jobDisplayName, "web-app » main");
+    assert.equal(standard.buildNumberLabel, "#1482");
+
+    const custom = buildBuildViewModel("Target", {
+      number: 7,
+      url: "https://jenkins.example/job/web-app/job/feature%2Flogin/7/",
+      displayName: "release candidate",
+      fullDisplayName: "web-app » feature/login release candidate"
+    });
+    assert.equal(custom.jobDisplayName, "web-app » feature/login");
+    assert.equal(custom.buildNumberLabel, "#7");
+
+    const fromUrl = buildBuildViewModel("Target", {
+      number: 3,
+      url: "https://jenkins.example/job/web-app/job/feature%2Flogin/3/"
+    });
+    assert.equal(fromUrl.jobDisplayName, "web-app » feature/login");
   });
 });

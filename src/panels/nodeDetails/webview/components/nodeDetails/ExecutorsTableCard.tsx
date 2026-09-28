@@ -29,11 +29,13 @@ type ExecutorFilter = "all" | "busy" | "idle";
 type ExecutorsTableCardProps = {
   title: string;
   entries: NodeDetailsState["executors"];
+  isOffline: boolean;
   onOpenExternal: (url: string) => void;
 };
 export function ExecutorsTableCard({
   title,
   entries,
+  isOffline,
   onOpenExternal
 }: ExecutorsTableCardProps): React.JSX.Element {
   const [filter, setFilter] = React.useState<ExecutorFilter>("all");
@@ -66,13 +68,14 @@ export function ExecutorsTableCard({
           <CpuIcon className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">{title}</span>
           <span className="text-[11px] text-muted-foreground">({filteredEntries.length})</span>
+          {/* Busy executors are normal work: progress tone, never warning. */}
           {busyCount > 0 ? (
-            <Badge variant="warning" size="sm">
+            <Badge variant="info" size="sm">
               {busyCount} busy
             </Badge>
           ) : (
-            <Badge variant="success" size="sm">
-              all idle
+            <Badge variant="muted" size="sm">
+              {isOffline ? "all offline" : "all idle"}
             </Badge>
           )}
         </div>
@@ -119,13 +122,20 @@ export function ExecutorsTableCard({
               <TableHead className="py-1.5">Build</TableHead>
               <TableHead className="hidden py-1.5 md:table-cell">Duration</TableHead>
               <TableHead className="py-1.5">Progress</TableHead>
-              <TableHead className="py-1.5">Link</TableHead>
+              <TableHead className="py-1.5">
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredEntries.length > 0 ? (
               filteredEntries.map((entry) => (
-                <ExecutorTableRow key={entry.id} entry={entry} onOpenExternal={onOpenExternal} />
+                <ExecutorTableRow
+                  key={entry.id}
+                  entry={entry}
+                  isOffline={isOffline}
+                  onOpenExternal={onOpenExternal}
+                />
               ))
             ) : (
               <TableRow className="hover:bg-transparent">

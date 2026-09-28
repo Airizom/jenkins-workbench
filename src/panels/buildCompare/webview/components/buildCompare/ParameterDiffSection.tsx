@@ -2,6 +2,7 @@ import type { BuildCompareParametersSectionViewModel } from "../../../shared/Bui
 import { ParameterDiffRow } from "./ParameterDiffRow";
 import { CompareItemsSection } from "./shared/CompareItemsSection";
 import { CompareTable } from "./shared/CompareTable";
+import type { SectionCardDisclosureProps } from "./shared/SectionCard";
 
 const PARAMETER_COLUMNS = [
   { label: "Parameter", className: "w-[30%]" },
@@ -10,18 +11,20 @@ const PARAMETER_COLUMNS = [
 ];
 
 export function ParameterDiffSection({
-  section
+  section,
+  ...disclosure
 }: {
   section: BuildCompareParametersSectionViewModel;
-}) {
+} & SectionCardDisclosureProps) {
   return (
     <CompareItemsSection
-      title="Parameter Diff"
+      title="Parameters"
       summary={section.summaryLabel}
       detail={section.detail}
       status={section.status}
       items={section.items}
       emptyLabel="No changed parameters."
+      {...disclosure}
       renderItems={(items) => (
         <CompareTable caption="Changed build parameters" columns={PARAMETER_COLUMNS}>
           {items.map((item) => (

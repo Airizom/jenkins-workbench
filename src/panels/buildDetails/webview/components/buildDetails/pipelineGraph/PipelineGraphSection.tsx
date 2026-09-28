@@ -14,13 +14,17 @@ export function PipelineGraphSection({
   stages,
   selectedStageKey,
   onSelectStage,
+  onSyncSelectedStage,
   onRestartStage,
   onSelectPipelineLog,
   onGraphError
 }: {
   stages: PipelineStageViewModel[];
   selectedStageKey?: string;
+  /** User selection in the canvas; also opens the stage log. */
   onSelectStage: (stageKey: string | undefined) => void;
+  /** Keeps the selection valid for the current layout without opening logs. */
+  onSyncSelectedStage: (stageKey: string | undefined) => void;
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onGraphError: () => void;
@@ -36,16 +40,16 @@ export function PipelineGraphSection({
     lastReadyLayoutRef.current = graphLayout.layout;
     const [firstStageKey] = graphLayout.layout.model.orderedStageIds;
     if (!firstStageKey) {
-      onSelectStage(undefined);
+      if (selectedStageKey !== undefined) {
+        onSyncSelectedStage(undefined);
+      }
       return;
     }
 
-    onSelectStage(
-      selectedStageKey && graphLayout.layout.model.stageById.has(selectedStageKey)
-        ? selectedStageKey
-        : firstStageKey
-    );
-  }, [graphLayout, onSelectStage, selectedStageKey]);
+    if (!selectedStageKey || !graphLayout.layout.model.stageById.has(selectedStageKey)) {
+      onSyncSelectedStage(firstStageKey);
+    }
+  }, [graphLayout, onSyncSelectedStage, selectedStageKey]);
 
   useEffect(() => {
     if (graphLayout.status === "error") {

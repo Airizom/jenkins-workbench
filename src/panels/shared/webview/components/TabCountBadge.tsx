@@ -5,8 +5,8 @@ export type TabCountTone = "neutral" | "warning" | "failure";
 
 const TONE_CLASSES: Record<TabCountTone, string> = {
   neutral: "border-border bg-muted-strong text-muted-foreground",
-  warning: "border-warning-border bg-warning-badge text-warning",
-  failure: "border-failure-border bg-failure-soft text-failure"
+  warning: "border-warning-border bg-warning-badge text-warning-foreground",
+  failure: "border-failure-border bg-failure-soft text-failure-foreground"
 };
 
 export function TabCountBadge({

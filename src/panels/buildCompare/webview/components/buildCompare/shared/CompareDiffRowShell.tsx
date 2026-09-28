@@ -1,26 +1,46 @@
 import type { ReactNode } from "react";
-import type { StatusVisualTone } from "../../../../../shared/TestStatusStyles";
-import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
+import { cn } from "../../../../../shared/webview/lib/utils";
 import { CompareMutedCard } from "./CompareMutedCard";
 
 export type CompareDiffChangeType = "added" | "removed" | "changed" | "matched";
 
+/** Diff badges use SCM decoration colors (styles.css), not pass/fail tones. */
 const CHANGE_TYPE_BADGES: Record<
   Exclude<CompareDiffChangeType, "matched">,
-  { label: string; tone: StatusVisualTone }
+  { label: string; glyph: string }
 > = {
-  added: { label: "Added", tone: "passed" },
-  removed: { label: "Removed", tone: "failed" },
-  changed: { label: "Changed", tone: "skipped" }
+  added: { label: "Added", glyph: "+" },
+  removed: { label: "Removed", glyph: "−" },
+  changed: { label: "Changed", glyph: "~" }
 };
-export function CompareChangeBadge({ changeType }: { changeType?: CompareDiffChangeType }) {
+
+export function CompareChangeBadge({
+  changeType,
+  label
+}: {
+  changeType?: CompareDiffChangeType;
+  /** Overrides the default label, e.g. "New test". */
+  label?: string;
+}) {
   const badge = changeType && changeType !== "matched" ? CHANGE_TYPE_BADGES[changeType] : undefined;
-  return badge ? <ToneBadge label={badge.label} tone={badge.tone} /> : null;
+  if (!badge) {
+    return null;
+  }
+  return (
+    <span
+      data-change={changeType}
+      className="bc-diff-badge inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-4 whitespace-nowrap"
+    >
+      <span aria-hidden="true">{badge.glyph}</span>
+      {label ?? badge.label}
+    </span>
+  );
 }
 
 export function CompareDiffRowShell({
   title,
   changeType,
+  changeLabel,
   subtitle,
   titleClassName,
   align = "start",
@@ -28,6 +48,7 @@ export function CompareDiffRowShell({
 }: {
   title: string;
   changeType?: CompareDiffChangeType;
+  changeLabel?: string;
   subtitle?: string;
   titleClassName?: string;
   align?: "start" | "center";
@@ -37,14 +58,18 @@ export function CompareDiffRowShell({
 
   return (
     <CompareMutedCard>
-      <div className={`flex flex-wrap ${alignmentClass} justify-between gap-3`}>
-        <div className="min-w-0">
+      <div className={cn("flex flex-wrap justify-between gap-3", alignmentClass)}>
+        <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
-            <CompareChangeBadge changeType={changeType} />
-            <p className={`min-w-0 text-sm font-medium ${titleClassName ?? ""}`.trim()}>{title}</p>
+            <CompareChangeBadge changeType={changeType} label={changeLabel} />
+            <p className={cn("min-w-0 text-sm font-medium", titleClassName)} title={title}>
+              {title}
+            </p>
           </div>
           {subtitle ? (
-            <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground" title={subtitle}>
+              {subtitle}
+            </p>
           ) : null}
         </div>
         {children}

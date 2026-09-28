@@ -1,11 +1,19 @@
-import { formatTestCaseSubtitle } from "../../../../../shared/TestCaseViewModel";
 import {
   resolveMetricToneClass,
   type StatusVisualTone
 } from "../../../../../shared/TestStatusStyles";
-import type { BuildCompareTestDiffItem } from "../../../../shared/BuildCompareContracts";
+import type {
+  BuildCompareAmbiguousTestItem,
+  BuildCompareTestDiffItem
+} from "../../../../shared/BuildCompareContracts";
 import { CompareDiffRowShell } from "../shared/CompareDiffRowShell";
 import { CompareSideGrid } from "../shared/CompareSideGrid";
+
+const META_SEPARATOR = " · ";
+
+function formatTestSubtitle(className?: string, suiteName?: string): string {
+  return [className, suiteName].filter(Boolean).join(META_SEPARATOR) || "Unnamed suite";
+}
 
 function TestStatusCell({
   label,
@@ -31,9 +39,11 @@ export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
   return (
     <CompareDiffRowShell
       title={item.name}
-      subtitle={formatTestCaseSubtitle(item.className, item.suiteName)}
+      subtitle={formatTestSubtitle(item.className, item.suiteName)}
       titleClassName="truncate"
       align="center"
+      changeType={item.addedInTarget ? "added" : undefined}
+      changeLabel={item.addedInTarget ? "New test" : undefined}
     >
       <CompareSideGrid className="text-right">
         <TestStatusCell
@@ -48,6 +58,35 @@ export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
           tone={item.targetStatusTone}
           duration={item.targetDurationLabel}
         />
+      </CompareSideGrid>
+    </CompareDiffRowShell>
+  );
+}
+
+function formatOccurrences(labels: string[]): { status: string; count?: string } {
+  if (labels.length === 0) {
+    return { status: "Not present" };
+  }
+  return {
+    status: labels.join(", "),
+    count: labels.length > 1 ? `${labels.length} cases` : undefined
+  };
+}
+
+/** Duplicate identities stay unpaired: show every observed status, no tone. */
+export function AmbiguousTestRow({ item }: { item: BuildCompareAmbiguousTestItem }) {
+  const baseline = formatOccurrences(item.baselineStatusLabels);
+  const target = formatOccurrences(item.targetStatusLabels);
+  return (
+    <CompareDiffRowShell
+      title={item.name}
+      subtitle={formatTestSubtitle(item.className, item.suiteName)}
+      titleClassName="truncate"
+      align="center"
+    >
+      <CompareSideGrid className="text-right">
+        <TestStatusCell label="Baseline" status={baseline.status} duration={baseline.count} />
+        <TestStatusCell label="Target" status={target.status} duration={target.count} />
       </CompareSideGrid>
     </CompareDiffRowShell>
   );

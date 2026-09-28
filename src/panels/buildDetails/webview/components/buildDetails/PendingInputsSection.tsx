@@ -12,11 +12,9 @@ import type {
   PendingInputParameterViewModel,
   PendingInputViewModel
 } from "../../../shared/BuildDetailsContracts";
+import type { PendingInputProcessingAction } from "../../state/buildDetailsState";
 
-const { useEffect, useRef, useState } = React;
-
-const PROCESSING_TIMEOUT_MS = 5000;
-type ProcessingAction = "approve" | "reject";
+type ProcessingAction = PendingInputProcessingAction;
 const ACTION_LABELS: Record<ProcessingAction, string> = {
   approve: "Approve",
   reject: "Reject"
@@ -25,71 +23,28 @@ const PROCESSING_LABELS: Record<ProcessingAction, string> = {
   approve: "Approving...",
   reject: "Rejecting..."
 };
+const ACTION_TITLES: Record<ProcessingAction, string> = {
+  approve: "Approve this input and let the build continue",
+  reject: "Reject this input and abort the build"
+};
+const NO_PROCESSING_ACTIONS: Record<string, ProcessingAction> = {};
 
 export function PendingInputsSection({
   pendingInputs,
+  processingActions = NO_PROCESSING_ACTIONS,
   onApprove,
   onReject
 }: {
   pendingInputs: PendingInputViewModel[];
+  /** Requests still being handled by the extension; their buttons stay disabled. */
+  processingActions?: Record<string, ProcessingAction>;
   onApprove: (inputId: string) => void;
   onReject: (inputId: string) => void;
 }) {
-  const [processingActions, setProcessingActions] = useState<Record<string, ProcessingAction>>({});
-  const processingTimers = useRef<Record<string, number>>({});
-
-  useEffect(() => {
-    setProcessingActions((prev) => {
-      const next: Record<string, ProcessingAction> = {};
-      for (const input of pendingInputs) {
-        const action = prev[input.id];
-        if (action) {
-          next[input.id] = action;
-        }
-      }
-      return next;
-    });
-
-    const activeIds = new Set(pendingInputs.map((input) => input.id));
-    for (const id of Object.keys(processingTimers.current)) {
-      if (!activeIds.has(id)) {
-        window.clearTimeout(processingTimers.current[id]);
-        delete processingTimers.current[id];
-      }
-    }
-  }, [pendingInputs]);
-
-  useEffect(() => {
-    return () => {
-      for (const timeoutId of Object.values(processingTimers.current)) {
-        window.clearTimeout(timeoutId);
-      }
-      processingTimers.current = {};
-    };
-  }, []);
-
-  const markProcessing = (inputId: string, action: ProcessingAction) => {
-    setProcessingActions((prev) => ({ ...prev, [inputId]: action }));
-    if (processingTimers.current[inputId]) {
-      window.clearTimeout(processingTimers.current[inputId]);
-    }
-    processingTimers.current[inputId] = window.setTimeout(() => {
-      setProcessingActions((prev) => {
-        if (!prev[inputId]) {
-          return prev;
-        }
-        const { [inputId]: _, ...rest } = prev;
-        return rest;
-      });
-      delete processingTimers.current[inputId];
-    }, PROCESSING_TIMEOUT_MS);
-  };
-
   const handleInputAction = (inputId: string, action: ProcessingAction) => {
     if (processingActions[inputId]) {
       return;
     }
-    markProcessing(inputId, action);
     if (action === "approve") {
       onApprove(inputId);
     } else {
@@ -182,6 +137,7 @@ function PendingInputActionButton({
       size="sm"
       onClick={() => onAction(action)}
       disabled={Boolean(processingAction)}
+      title={ACTION_TITLES[action]}
     >
       {isProcessing ? (
         <RefreshIcon className="h-3.5 w-3.5 animate-spin" />

@@ -5,7 +5,9 @@ import {
   buildStageStripSegments,
   countFailedSegments,
   describeSegmentAria,
+  describeSegmentBranches,
   describeSegmentDetail,
+  describeSegmentTitle,
   isDenseStrip
 } from "../src/panels/buildDetails/webview/components/buildDetails/stageStrip/stageStripModel";
 
@@ -179,8 +181,11 @@ describe("stageStripModel", () => {
     assert.ok(plain && parallel);
     assert.equal(describeSegmentAria(plain), "Checkout: Success");
     assert.equal(describeSegmentDetail(plain), "Success · 12s");
-    assert.equal(describeSegmentAria(parallel), "Test: Failed, 1 parallel branch");
-    assert.equal(describeSegmentDetail(parallel), "Failed · 1 parallel branch");
+    assert.equal(describeSegmentAria(parallel), "Test · 1 parallel: Failed");
+    assert.equal(describeSegmentDetail(parallel), "Failed");
+    assert.equal(describeSegmentTitle(parallel), "Test · 1 parallel");
+    assert.equal(describeSegmentTitle(plain), "Checkout");
+    assert.equal(describeSegmentBranches(parallel), "1 parallel branch");
   });
 
   it("counts failed segments", () => {

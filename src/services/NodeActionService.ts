@@ -17,21 +17,38 @@ export interface NodeActionRefreshHost extends EnvironmentScopedRefreshHost {}
 export class NodeActionService {
   constructor(private readonly dataService: JenkinsDataService) {}
 
-  // fallow-ignore-next-line unused-class-member -- invoked through node action handlers
-  async takeNodeOffline(
-    target: NodeActionTarget,
-    refreshHost?: NodeActionRefreshHost
-  ): Promise<boolean> {
+  /**
+   * Asks for the optional offline reason. Resolves `undefined` when the user
+   * cancels, so callers can show progress only after the user confirms.
+   */
+  async promptOfflineReason(label: string): Promise<{ reason?: string } | undefined> {
     const reasonInput = await vscode.window.showInputBox({
-      prompt: `Offline reason for ${target.label} (optional)`,
+      prompt: `Offline reason for ${label} (optional)`,
       placeHolder: "Why are you taking this node offline?",
       ignoreFocusOut: true
     });
     if (reasonInput === undefined) {
-      return false;
+      return undefined;
     }
     const trimmedReason = reasonInput.trim();
-    const reason = trimmedReason.length > 0 ? trimmedReason : undefined;
+    return { reason: trimmedReason.length > 0 ? trimmedReason : undefined };
+  }
+
+  /**
+   * Takes the node temporarily offline. Pass `confirmed` when the reason was
+   * already collected with `promptOfflineReason`; otherwise this prompts first.
+   */
+  // fallow-ignore-next-line unused-class-member -- invoked through node action handlers
+  async takeNodeOffline(
+    target: NodeActionTarget,
+    refreshHost?: NodeActionRefreshHost,
+    confirmed?: { reason?: string }
+  ): Promise<boolean> {
+    const input = confirmed ?? (await this.promptOfflineReason(target.label));
+    if (!input) {
+      return false;
+    }
+    const reason = input.reason;
 
     try {
       const result = await this.dataService.setNodeTemporarilyOffline(

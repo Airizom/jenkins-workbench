@@ -69,4 +69,27 @@ describe("PendingInputsSection", () => {
     );
     assert.equal(html, "");
   });
+
+  it("keeps both actions disabled while the extension is handling a request", () => {
+    const html = renderToStaticMarkup(
+      createElement(PendingInputsSection, {
+        pendingInputs: [
+          {
+            id: "deploy",
+            message: "Deploy to production?",
+            submitterLabel: "",
+            parametersLabel: "",
+            parameters: []
+          }
+        ],
+        processingActions: { deploy: "reject" },
+        onApprove: () => undefined,
+        onReject: () => undefined
+      })
+    );
+
+    assert.equal(html.match(/<button[^>]*disabled=""/g)?.length, 2);
+    assert.match(html, /Rejecting\.\.\./);
+    assert.match(html, /aria-busy="true"/);
+  });
 });

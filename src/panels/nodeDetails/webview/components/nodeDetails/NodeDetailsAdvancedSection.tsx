@@ -1,7 +1,8 @@
 import type * as React from "react";
 import { EmptyState } from "../../../../shared/webview/components/EmptyState";
+import { Button } from "../../../../shared/webview/components/ui/button";
 import { Skeleton } from "../../../../shared/webview/components/ui/skeleton";
-import { GaugeIcon } from "../../../../shared/webview/icons";
+import { GaugeIcon, RefreshIcon } from "../../../../shared/webview/icons";
 import type { NodeMonitorViewModel } from "../../../shared/NodeDetailsContracts";
 import { MonitorCard } from "./MonitorCard";
 import { RawJsonCard } from "./RawJsonCard";
@@ -13,6 +14,7 @@ type NodeDetailsAdvancedSectionProps = {
   loadStatistics: NodeMonitorViewModel[];
   rawJson: string;
   onCopyJson: () => void;
+  onRetry: () => void;
 };
 export function NodeDetailsAdvancedSection({
   advancedLoaded,
@@ -20,7 +22,8 @@ export function NodeDetailsAdvancedSection({
   monitorData,
   loadStatistics,
   rawJson,
-  onCopyJson
+  onCopyJson,
+  onRetry
 }: NodeDetailsAdvancedSectionProps): React.JSX.Element {
   let diagnosticsContent: React.JSX.Element;
 
@@ -49,7 +52,13 @@ export function NodeDetailsAdvancedSection({
       <EmptyState
         icon={<GaugeIcon className="h-4 w-4" />}
         title="Diagnostics not loaded"
-        description="Monitor and load statistics have not been fetched yet. Refresh to retry."
+        description="Monitor data and load statistics could not be fetched."
+        action={
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RefreshIcon className="h-3.5 w-3.5" />
+            Retry
+          </Button>
+        }
         className="py-6"
       />
     );

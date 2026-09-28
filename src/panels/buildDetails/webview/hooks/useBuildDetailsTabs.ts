@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState";
+import { hasNewPendingInputs } from "../components/buildDetails/buildDetailsTabsModel";
 import {
   getBuildDetailsPanelUiState,
   setBuildDetailsPanelUiState
@@ -11,6 +12,8 @@ export type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState
 
 type UseBuildDetailsTabsParams = {
   hasPendingInputs: boolean;
+  /** Ids of the currently pending inputs; newly seen ids may select the Inputs tab. */
+  pendingInputIds?: readonly string[];
   hasPipelineStages: boolean;
   hasTests: boolean;
 };
@@ -21,8 +24,11 @@ type UseBuildDetailsTabsResult = {
   defaultTab: BuildDetailsTab;
   availableTabs: BuildDetailsTab[];
 };
+const NO_INPUT_IDS: readonly string[] = [];
+
 export function useBuildDetailsTabs({
   hasPendingInputs,
+  pendingInputIds = NO_INPUT_IDS,
   hasPipelineStages,
   hasTests
 }: UseBuildDetailsTabsParams): UseBuildDetailsTabsResult {
@@ -47,19 +53,39 @@ export function useBuildDetailsTabs({
     () => getBuildDetailsPanelUiState().selectedTab ?? defaultTab
   );
   const selectedTabWasAvailable = useRef(availableTabs.includes(selectedTab));
-  const setSelectedTab = useCallback((tab: BuildDetailsTab) => {
+  // A restored tab counts as a user choice, so reopening a panel keeps its tab.
+  const userChoseTab = useRef(getBuildDetailsPanelUiState().selectedTab !== undefined);
+  const seenInputIds = useRef(new Set<string>());
+
+  const applySelectedTab = useCallback((tab: BuildDetailsTab) => {
     selectedTabWasAvailable.current = true;
     setSelectedTabState(tab);
     setBuildDetailsPanelUiState({ selectedTab: tab });
   }, []);
 
+  const setSelectedTab = useCallback(
+    (tab: BuildDetailsTab) => {
+      userChoseTab.current = true;
+      applySelectedTab(tab);
+    },
+    [applySelectedTab]
+  );
+
+  useEffect(() => {
+    const appeared = hasNewPendingInputs(seenInputIds.current, pendingInputIds);
+    seenInputIds.current = new Set(pendingInputIds);
+    if (appeared && !userChoseTab.current) {
+      applySelectedTab("inputs");
+    }
+  }, [pendingInputIds, applySelectedTab]);
+
   useEffect(() => {
     if (availableTabs.includes(selectedTab)) {
       selectedTabWasAvailable.current = true;
     } else if (selectedTabWasAvailable.current) {
-      setSelectedTab(defaultTab);
+      applySelectedTab(defaultTab);
     }
-  }, [availableTabs, defaultTab, selectedTab, setSelectedTab]);
+  }, [availableTabs, defaultTab, selectedTab, applySelectedTab]);
 
   return {
     selectedTab,

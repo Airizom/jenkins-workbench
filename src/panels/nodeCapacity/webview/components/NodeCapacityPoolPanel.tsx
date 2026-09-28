@@ -14,6 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "../../../shared/webview/components/ui/tooltip";
+import { TruncatedText } from "../../../shared/webview/components/ui/truncated-text";
 import {
   AlertTriangleIcon,
   ChevronDownIcon,
@@ -23,7 +24,11 @@ import {
 import { resolveSeverityBadgeClass } from "../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../shared/webview/lib/utils";
 import { NodeCapacityQueueList } from "./NodeCapacityQueue";
-import type { OpenExternalHandler, OpenNodeDetailsHandler } from "./NodeCapacityViewTypes";
+import type {
+  OpenExternalHandler,
+  OpenNodeDetailsHandler,
+  RetryExecutorsHandler
+} from "./NodeCapacityViewTypes";
 
 const POOL_SEVERITY_BORDER_CLASSES: Record<NodeCapacitySeverity, string> = {
   critical: "border-failure-border",
@@ -52,12 +57,14 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
   isOpen,
   onOpenExternal,
   onOpenNodeDetails,
+  onRetryExecutors,
   onToggleExpanded
 }: {
   pool: NodeCapacityPoolViewModel;
   isOpen: boolean;
   onOpenExternal: OpenExternalHandler;
   onOpenNodeDetails: OpenNodeDetailsHandler;
+  onRetryExecutors: RetryExecutorsHandler;
   onToggleExpanded: (poolId: string, open: boolean) => void;
 }): React.JSX.Element {
   const handleToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
@@ -67,6 +74,7 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
     }
     onToggleExpanded(pool.id, domOpen);
   };
+  const counts = buildPoolCounts(pool);
 
   return (
     <details
@@ -84,23 +92,23 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
               aria-hidden="true"
               className="capacity-pool-chevron mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
             />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-sm font-semibold">{pool.label}</h2>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2
+                  className="min-w-0 max-w-full truncate text-sm font-semibold"
+                  title={pool.label}
+                >
+                  {pool.label}
+                </h2>
                 <ToneBadge
                   label={pool.statusLabel}
                   className={resolveSeverityBadgeClass(pool.severity)}
                 />
-                {pool.kind === "any" ? (
-                  <Badge variant="outline" size="sm">
-                    unassigned
-                  </Badge>
-                ) : null}
               </div>
               <div className="mt-0.5 text-xs text-muted-foreground">
-                {pool.onlineNodes}/{pool.totalNodes} nodes online
-                {pool.offlineExecutors > 0 ? ` · ${pool.offlineExecutors} offline executors` : ""}
+                {formatPoolAvailability(pool)}
               </div>
+              <PoolInlineCounts counts={counts} />
               <ExecutorCapacityBar
                 total={pool.totalExecutors}
                 busy={pool.busyExecutors}
@@ -108,11 +116,10 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 lg:contents">
-            <PoolMetric label="Queued" value={pool.queuedCount} />
-            <PoolMetric label="Idle" value={pool.idleExecutors} />
-            <PoolMetric label="Busy" value={pool.busyExecutors} />
-            <PoolMetric label="Offline" value={pool.offlineExecutors} />
+          <div className="hidden lg:contents">
+            {counts.map((count) => (
+              <PoolMetric key={count.label} count={count} />
+            ))}
           </div>
         </div>
       </summary>
@@ -122,37 +129,74 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
           nodes={pool.nodes}
           onOpenNodeDetails={onOpenNodeDetails}
           onOpenExternal={onOpenExternal}
+          onRetryExecutors={onRetryExecutors}
         />
         <NodeCapacityQueueList items={pool.queueItems} onOpenExternal={onOpenExternal} />
-        {pool.offlineImpact.length > 0 ? (
-          <div className="lg:col-span-2">
-            <SectionHeading
-              title="Offline capacity impact"
-              icon={<AlertTriangleIcon className="h-3.5 w-3.5 text-warning" />}
-              count={pool.offlineImpact.length}
-            />
-            <div className="grid gap-2 md:grid-cols-2">
-              {pool.offlineImpact.map((item) => (
-                <div
-                  key={`${item.nodeName}:${item.executors}`}
-                  className="rounded-md border border-warning-border bg-warning-soft p-3"
-                >
-                  <div className="text-sm font-medium">{item.nodeName}</div>
-                  <div className="mt-1 text-xs text-warning-foreground">
-                    {item.executors} executor{item.executors === 1 ? "" : "s"} unavailable
-                  </div>
-                  {item.reason ? (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.reason}</p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
     </details>
   );
 });
+
+function formatPoolAvailability(pool: NodeCapacityPoolViewModel): string {
+  const parts: string[] = [];
+  if (pool.kind === "any") {
+    parts.push("Unlabeled builds");
+  }
+  parts.push(`${pool.onlineNodes}/${pool.totalNodes} nodes online`);
+  if (pool.offlineNodes > 0) {
+    const nodes = `${pool.offlineNodes} offline node${pool.offlineNodes === 1 ? "" : "s"}`;
+    parts.push(
+      pool.offlineExecutors > 0
+        ? `${pool.offlineExecutors} executor${pool.offlineExecutors === 1 ? "" : "s"} unavailable on ${nodes}`
+        : nodes
+    );
+  }
+  return parts.join(" · ");
+}
+
+type PoolCount = { label: string; value: number; tone?: "warning" | "failure" };
+
+const POOL_COUNT_TONE_CLASSES: Record<NonNullable<PoolCount["tone"]>, string> = {
+  warning: "text-warning-foreground",
+  failure: "text-failure-foreground"
+};
+
+function buildPoolCounts(pool: NodeCapacityPoolViewModel): PoolCount[] {
+  const starved = pool.queuedCount > 0 && pool.idleExecutors === 0;
+  return [
+    {
+      label: "Queued",
+      value: pool.queuedCount,
+      tone:
+        pool.stuckCount > 0 || starved ? "failure" : pool.queuedCount > 0 ? "warning" : undefined
+    },
+    { label: "Idle", value: pool.idleExecutors, tone: starved ? "failure" : undefined },
+    { label: "Busy", value: pool.busyExecutors },
+    {
+      label: "Offline",
+      value: pool.offlineExecutors,
+      tone: pool.offlineExecutors > 0 ? "warning" : undefined
+    }
+  ];
+}
+
+/** Compact one-line counts used below the `lg` breakpoint instead of the tiles. */
+function PoolInlineCounts({ counts }: { counts: PoolCount[] }): React.JSX.Element {
+  return (
+    <p className="mt-1 mb-0 text-xs text-muted-foreground lg:hidden">
+      {counts.map((count, index) => (
+        <React.Fragment key={count.label}>
+          {index > 0 ? <span aria-hidden="true"> · </span> : null}
+          <span className={cn(count.tone && POOL_COUNT_TONE_CLASSES[count.tone])}>
+            <span className="font-semibold tabular-nums">{count.value}</span>{" "}
+            {count.label.toLowerCase()}
+          </span>
+          {index < counts.length - 1 ? <span className="sr-only">,</span> : null}
+        </React.Fragment>
+      ))}
+    </p>
+  );
+}
 
 const CAPACITY_SEGMENTS = [
   { key: "busy", label: "busy", className: "bg-progress" },
@@ -182,31 +226,52 @@ function ExecutorCapacityBar({
     (segment) => `${counts[segment.key]} ${segment.label}`
   ).join(", ");
   return (
-    <div
-      role="img"
-      aria-label={`Executors: ${description}`}
-      title={description}
-      className="mt-2 flex h-1.5 w-full max-w-64 gap-px overflow-hidden rounded-full bg-muted"
-    >
-      {CAPACITY_SEGMENTS.map((segment) =>
-        counts[segment.key] > 0 ? (
-          <span
-            key={segment.key}
-            className={segment.className}
-            style={{ width: `${(counts[segment.key] / total) * 100}%` }}
-          />
-        ) : null
-      )}
+    <div className="mt-2 flex max-w-80 flex-wrap items-center gap-x-3 gap-y-1">
+      <div
+        role="img"
+        aria-label={`Executors: ${description}`}
+        title={description}
+        className="flex h-1.5 w-full max-w-64 gap-px overflow-hidden rounded-full bg-muted"
+      >
+        {CAPACITY_SEGMENTS.map((segment) =>
+          counts[segment.key] > 0 ? (
+            <span
+              key={segment.key}
+              className={segment.className}
+              style={{ width: `${(counts[segment.key] / total) * 100}%` }}
+            />
+          ) : null
+        )}
+      </div>
+      {/* The bar's accessible name already lists the counts; the legend is visual only. */}
+      <ul
+        aria-hidden="true"
+        className="m-0 flex list-none gap-2.5 p-0 text-[10px] leading-none text-muted-foreground"
+      >
+        {CAPACITY_SEGMENTS.map((segment) => (
+          <li key={segment.key} className="flex items-center gap-1">
+            <span className={cn("inline-block h-1.5 w-2.5 rounded-full", segment.className)} />
+            {segment.label}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function PoolMetric({ label, value }: { label: string; value: number }): React.JSX.Element {
+function PoolMetric({ count }: { count: PoolCount }): React.JSX.Element {
   return (
     <div className="rounded-md border border-border bg-surface-sunken px-3 py-1.5">
-      <div className="text-lg font-semibold tabular-nums leading-tight">{value}</div>
+      <div
+        className={cn(
+          "text-lg font-semibold tabular-nums leading-tight",
+          count.tone && POOL_COUNT_TONE_CLASSES[count.tone]
+        )}
+      >
+        {count.value}
+      </div>
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
+        {count.label}
       </div>
     </div>
   );
@@ -220,11 +285,13 @@ function PoolMetric({ label, value }: { label: string; value: number }): React.J
 const NodeList = React.memo(function NodeList({
   nodes,
   onOpenNodeDetails,
-  onOpenExternal
+  onOpenExternal,
+  onRetryExecutors
 }: {
   nodes: NodeCapacityNodeViewModel[];
   onOpenNodeDetails: OpenNodeDetailsHandler;
   onOpenExternal: OpenExternalHandler;
+  onRetryExecutors: RetryExecutorsHandler;
 }): React.JSX.Element {
   if (nodes.length === 0) {
     return (
@@ -260,8 +327,8 @@ const NodeList = React.memo(function NodeList({
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-sm font-medium">{node.displayName}</span>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <NodeName node={node} onOpenNodeDetails={onOpenNodeDetails} />
                   <Badge variant={node.isOffline ? "secondary" : "muted"}>{node.statusLabel}</Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">{node.executorSummary}</div>
@@ -270,45 +337,28 @@ const NodeList = React.memo(function NodeList({
                     {node.offlineReason}
                   </p>
                 ) : null}
-                {node.executorsLoaded &&
-                (!node.isOffline || node.executors.some((executor) => !executor.isIdle)) ? (
-                  <ExecutorWorkList node={node} onOpenExternal={onOpenExternal} />
-                ) : null}
+                <NodeRunningWork
+                  node={node}
+                  onOpenExternal={onOpenExternal}
+                  onRetryExecutors={onRetryExecutors}
+                />
               </div>
-              <div className="flex shrink-0 gap-0.5">
-                {node.nodeUrl ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        aria-label={`Open node details for ${node.displayName}`}
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          node.nodeUrl && onOpenNodeDetails(node.nodeUrl, node.displayName)
-                        }
-                      >
-                        <ServerIcon className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Open node details</TooltipContent>
-                  </Tooltip>
-                ) : null}
-                {node.nodeUrl ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        aria-label={`Open ${node.displayName} in Jenkins`}
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => node.nodeUrl && onOpenExternal(node.nodeUrl)}
-                      >
-                        <ExternalLinkIcon className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Open in Jenkins</TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </div>
+              {node.nodeUrl ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      aria-label={`Open ${node.displayName} in Jenkins`}
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => node.nodeUrl && onOpenExternal(node.nodeUrl)}
+                    >
+                      <ExternalLinkIcon className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open in Jenkins</TooltipContent>
+                </Tooltip>
+              ) : null}
             </div>
           </div>
         ))}
@@ -316,6 +366,77 @@ const NodeList = React.memo(function NodeList({
     </section>
   );
 });
+
+/** The node name doubles as the Node Details link, so each row keeps one icon action. */
+function NodeName({
+  node,
+  onOpenNodeDetails
+}: {
+  node: NodeCapacityNodeViewModel;
+  onOpenNodeDetails: OpenNodeDetailsHandler;
+}): React.JSX.Element {
+  const nodeUrl = node.nodeUrl;
+  if (!nodeUrl) {
+    return <TruncatedText text={node.displayName} className="text-sm font-medium" />;
+  }
+  return (
+    <button
+      type="button"
+      className="focus-ring min-w-0 max-w-full truncate rounded-sm text-left text-sm font-medium text-link underline-offset-2 hover:text-link-hover hover:underline"
+      title={`${node.displayName} (open node details)`}
+      onClick={() => onOpenNodeDetails(nodeUrl, node.displayName)}
+    >
+      {node.displayName}
+      <span className="sr-only">, open node details</span>
+    </button>
+  );
+}
+
+function NodeRunningWork({
+  node,
+  onOpenExternal,
+  onRetryExecutors
+}: {
+  node: NodeCapacityNodeViewModel;
+  onOpenExternal: OpenExternalHandler;
+  onRetryExecutors: RetryExecutorsHandler;
+}): React.JSX.Element | null {
+  const hasLoadedBusyWork =
+    node.executorsLoaded && node.executors.some((executor) => !executor.isIdle);
+  // Offline nodes only list work when a draining build is still running.
+  if (node.isOffline && !hasLoadedBusyWork) {
+    return null;
+  }
+  const nodeUrl = node.nodeUrl;
+  if (node.executorsLoadState === "error" && nodeUrl) {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-x-1 text-xs text-failure-foreground">
+        <span title={node.executorsError}>
+          Couldn't load running work
+          {node.executorsError ? <span className="sr-only">: {node.executorsError}</span> : null}
+        </span>
+        <span aria-hidden="true" className="text-muted-foreground">
+          ·
+        </span>
+        <button
+          type="button"
+          className="focus-ring rounded-sm text-link hover:text-link-hover hover:underline"
+          aria-label={`Retry loading running work on ${node.displayName}`}
+          onClick={() => onRetryExecutors(nodeUrl)}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+  if (node.executorsLoaded) {
+    return <ExecutorWorkList node={node} onOpenExternal={onOpenExternal} />;
+  }
+  if (node.executorsLoadState === "loading") {
+    return <div className="mt-2 text-xs text-muted-foreground">Loading running work…</div>;
+  }
+  return null;
+}
 
 function ExecutorWorkList({
   node,
@@ -326,7 +447,7 @@ function ExecutorWorkList({
 }): React.JSX.Element {
   const busyExecutors = node.executors.filter((executor) => !executor.isIdle);
   if (busyExecutors.length === 0) {
-    return <div className="mt-2 text-xs text-muted-foreground">No running work loaded.</div>;
+    return <div className="mt-2 text-xs text-muted-foreground">No builds running.</div>;
   }
 
   return (
@@ -343,14 +464,15 @@ function ExecutorWorkList({
               <button
                 type="button"
                 className="focus-ring group flex min-w-0 items-center gap-1 rounded-sm text-left text-link hover:text-link-hover hover:underline"
-                aria-label={`Open ${label} running on ${node.displayName}`}
+                aria-label={`Open ${label} in Jenkins (running on ${node.displayName})`}
+                title={label}
                 onClick={() => onOpenExternal(workUrl)}
               >
                 <span className="truncate">{label}</span>
                 <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
               </button>
             ) : (
-              <span className="truncate">{label}</span>
+              <TruncatedText text={label} />
             )}
           </li>
         );

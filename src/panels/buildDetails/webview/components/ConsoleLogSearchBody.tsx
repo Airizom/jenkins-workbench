@@ -12,9 +12,12 @@ export function ConsoleLogSearchBody({
   note,
   error,
   hasOutput,
-  followLog,
+  outputLabel,
   showScrollToTop,
+  showJumpToLatest,
   onScrollToTop,
+  onJumpToLatest,
+  onRetry,
   segments,
   className
 }: {
@@ -22,9 +25,12 @@ export function ConsoleLogSearchBody({
   note?: string;
   error?: string;
   hasOutput: boolean;
-  followLog: boolean;
+  outputLabel?: string;
   showScrollToTop: boolean;
+  showJumpToLatest: boolean;
   onScrollToTop: () => void;
+  onJumpToLatest: () => void;
+  onRetry?: () => void;
   segments: React.ReactNode[];
   className?: string;
 }): React.JSX.Element {
@@ -48,13 +54,15 @@ export function ConsoleLogSearchBody({
         onClear={consoleSearch.handleClearSearch}
       />
       <ConsoleOutputNotice note={note ?? ""} />
-      <ConsoleOutputErrorNotice error={error} />
+      <ConsoleOutputErrorNotice error={error} onRetry={onRetry} />
       {!error && hasOutput ? (
         <ConsoleOutputViewport
           consoleOutputRef={consoleSearch.consoleOutputRef}
           showScrollToTop={showScrollToTop}
-          followLog={followLog}
+          showJumpToLatest={showJumpToLatest}
+          label={outputLabel}
           onScrollToTop={onScrollToTop}
+          onJumpToLatest={onJumpToLatest}
           segments={segments}
         />
       ) : null}

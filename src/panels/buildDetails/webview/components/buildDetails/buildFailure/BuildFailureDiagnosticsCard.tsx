@@ -24,6 +24,10 @@ export function BuildFailureDiagnosticsCard({
   onConfigure: () => void;
 }) {
   const summary = describeBuildDiagnostics(diagnostics);
+  const showProblemsDisabled = diagnostics.resolvedCount === 0;
+  const showProblemsHint = showProblemsDisabled
+    ? describeShowProblemsUnavailable(diagnostics.status)
+    : undefined;
   return (
     <BuildFailureInsightCard
       icon={<AlertCircleIcon className="h-4 w-4 shrink-0" />}
@@ -34,12 +38,16 @@ export function BuildFailureDiagnosticsCard({
         ) : undefined
       }
     >
+      {diagnostics.items.some((item) => item.targetId) ? (
+        <span id={OPENS_IN_EDITOR_HINT_ID} className="sr-only">
+          Opens in editor
+        </span>
+      ) : null}
       {diagnostics.items.length > 0 ? (
         <ul className="space-y-1.5" aria-label="Build diagnostics">
-          {diagnostics.items.slice(0, 5).map((item, index) => (
+          {diagnostics.items.slice(0, 5).map((item) => (
             <DiagnosticInsightRow
               item={item}
-              index={index}
               key={diagnosticItemKey(item)}
               onOpenSource={onOpenSource}
             />
@@ -65,39 +73,71 @@ export function BuildFailureDiagnosticsCard({
           variant="secondary"
           size="sm"
           className="h-7 px-2 text-xs"
-          disabled={diagnostics.resolvedCount === 0}
+          disabled={showProblemsDisabled}
+          aria-describedby={showProblemsHint ? SHOW_PROBLEMS_HINT_ID : undefined}
+          title={showProblemsHint}
           onClick={onShowProblems}
         >
           Show Problems
         </Button>
         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onConfigure}>
-          Configure
+          Configure diagnostics…
         </Button>
+        {showProblemsHint ? (
+          <span id={SHOW_PROBLEMS_HINT_ID} className="sr-only">
+            {showProblemsHint}
+          </span>
+        ) : null}
       </div>
     </BuildFailureInsightCard>
   );
 }
 
+const SHOW_PROBLEMS_HINT_ID = "build-diagnostics-show-problems-hint";
+const OPENS_IN_EDITOR_HINT_ID = "build-diagnostics-opens-in-editor";
+
+function describeShowProblemsUnavailable(status: BuildDiagnosticsViewModel["status"]): string {
+  if (status === "idle" || status === "scanning") {
+    return "Available after the diagnostic scan finishes.";
+  }
+  if (status === "disabled") {
+    return "Build diagnostics are disabled for this job.";
+  }
+  if (status === "needsRepository") {
+    return "Choose a local repository to resolve source paths first.";
+  }
+  if (status === "error") {
+    return "Build diagnostics could not be loaded.";
+  }
+  return "No diagnostics were resolved to local source files.";
+}
+
+const SEVERITY_PREFIXES: Record<BuildDiagnosticInsightItem["severity"], string> = {
+  error: "Error:",
+  warning: "Warning:",
+  information: "Info:"
+};
+
 function DiagnosticInsightRow({
   item,
-  index,
   onOpenSource
 }: {
   item: BuildDiagnosticInsightItem;
-  index: number;
   onOpenSource: (targetId: string) => void;
 }) {
+  const locationLine = [item.locationLabel, item.source, item.code].filter(Boolean).join(" · ");
   const content = (
-    <>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs text-foreground">{item.message}</span>
-        {item.locationLabel || item.source || item.code ? (
-          <span className="block truncate text-[11px] text-muted-foreground">
-            {[item.locationLabel, item.source, item.code].filter(Boolean).join(" · ")}
-          </span>
-        ) : null}
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-xs text-foreground" title={item.message}>
+        <span className="sr-only">{SEVERITY_PREFIXES[item.severity]} </span>
+        {item.message}
       </span>
-    </>
+      {locationLine ? (
+        <span className="block truncate text-[11px] text-muted-foreground" title={locationLine}>
+          {locationLine}
+        </span>
+      ) : null}
+    </span>
   );
   const className =
     "flex w-full min-w-0 items-start gap-2 rounded border border-border bg-muted-soft px-2 py-1.5 text-left";
@@ -107,7 +147,7 @@ function DiagnosticInsightRow({
         <button
           type="button"
           className={`${className} hover:border-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring`}
-          aria-label={`Open diagnostic ${index + 1} in local source`}
+          aria-describedby={OPENS_IN_EDITOR_HINT_ID}
           onClick={() => onOpenSource(item.targetId as string)}
         >
           <DiagnosticSeverityIcon severity={item.severity} />

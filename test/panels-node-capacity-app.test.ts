@@ -1,34 +1,72 @@
 import assert from "node:assert/strict";
-import { describe, it, vi } from "vitest";
-import type { NodeCapacityIncomingMessage } from "../src/panels/nodeCapacity/shared/NodeCapacityPanelMessages";
-import { postLoadExecutorsIfChanged } from "../src/panels/nodeCapacity/webview/NodeCapacityApp";
+import { describe, it } from "vitest";
+import { planExecutorLoads } from "../src/panels/nodeCapacity/webview/hooks/useNodeCapacityExecutorLoading";
 
-describe("postLoadExecutorsIfChanged", () => {
-  const updatedAt = "2026-06-11T00:00:00.000Z";
+describe("planExecutorLoads", () => {
   const nodeA = "https://jenkins.example/computer/a/";
   const nodeB = "https://jenkins.example/computer/b/";
 
-  it("posts deduplicated URLs, suppresses equivalent requests, and permits refreshes", () => {
-    const postMessage = vi.fn<(message: NodeCapacityIncomingMessage) => void>();
-    const lastRequestKey: { current: string | undefined } = { current: undefined };
+  function node(nodeUrl: string, busyExecutors = 1) {
+    return {
+      nodeUrl,
+      isOffline: false,
+      isTemporarilyOffline: false,
+      busyExecutors,
+      totalExecutors: 2
+    };
+  }
 
-    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, 0, [nodeB, nodeA, nodeA]);
-    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, 0, [nodeA, nodeB]);
+  it("requests each node once, deduplicated and sorted", () => {
+    const requested = new Map<string, string>();
 
-    assert.deepEqual(postMessage.mock.calls, [
-      [
-        {
-          type: "loadNodeCapacityExecutors",
-          snapshotGeneration: 0,
-          nodeUrls: [nodeA, nodeB]
-        }
-      ]
+    assert.deepEqual(
+      planExecutorLoads([node(nodeB), node(nodeA), node(nodeA)], requested, 0, "t1"),
+      [nodeA, nodeB]
+    );
+    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB)], requested, 0, "t1"), []);
+  });
+
+  it("does not re-request unchanged idle nodes on periodic snapshots", () => {
+    const requested = new Map<string, string>();
+    planExecutorLoads([node(nodeA, 0), node(nodeB, 0)], requested, 0, "t1");
+
+    // A new capacity snapshot rebuilds node objects with the same counts.
+    assert.deepEqual(
+      planExecutorLoads([{ ...node(nodeA, 0) }, { ...node(nodeB, 0) }], requested, 0, "t2"),
+      []
+    );
+  });
+
+  it("re-requests busy nodes on each new snapshot, since builds turn over at constant counts", () => {
+    const requested = new Map<string, string>();
+    planExecutorLoads([node(nodeA), node(nodeB, 0)], requested, 0, "t1");
+
+    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB, 0)], requested, 0, "t2"), [nodeA]);
+    // Re-planning within the same snapshot (e.g. a pool toggle) does not re-request.
+    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB, 0)], requested, 0, "t2"), []);
+  });
+
+  it("re-requests a node whose executor counts changed", () => {
+    const requested = new Map<string, string>();
+    planExecutorLoads([node(nodeA), node(nodeB)], requested, 0, "t1");
+
+    assert.deepEqual(planExecutorLoads([node(nodeA, 2), node(nodeB)], requested, 0, "t1"), [nodeA]);
+  });
+
+  it("re-requests every expanded node after a manual refresh", () => {
+    const requested = new Map<string, string>();
+    planExecutorLoads([node(nodeA), node(nodeB)], requested, 0, "t1");
+
+    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB)], requested, 1, "t1"), [
+      nodeA,
+      nodeB
     ]);
+  });
 
-    postLoadExecutorsIfChanged(postMessage, lastRequestKey, updatedAt, 1, [nodeA, nodeB]);
-
-    assert.deepEqual(postMessage.mock.calls[1], [
-      { type: "loadNodeCapacityExecutors", snapshotGeneration: 1, nodeUrls: [nodeA, nodeB] }
-    ]);
+  it("skips nodes without a URL", () => {
+    assert.deepEqual(
+      planExecutorLoads([{ ...node(nodeA), nodeUrl: undefined }], new Map(), 0, "t1"),
+      []
+    );
   });
 });

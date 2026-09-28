@@ -14,10 +14,13 @@ import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/Buil
 
 type CoverageGlanceCardProps = {
   coverageState: BuildDetailsCoverageStateViewModel;
+  /** Coverage is only fetched once the build completes. */
+  isRunning?: boolean;
   onShowTests?: () => void;
 };
 export function CoverageGlanceCard({
   coverageState,
+  isRunning = false,
   onShowTests
 }: CoverageGlanceCardProps): React.JSX.Element | null {
   if (coverageState.status === "disabled") {
@@ -39,16 +42,16 @@ export function CoverageGlanceCard({
         ) : null}
       </CardHeader>
       <CardContent className="pb-4">
-        {renderCoverageContent(coverageState)}
+        {renderCoverageContent(coverageState, isRunning)}
         {onShowTests ? (
           <Button
             variant="link"
             size="sm"
             className="mt-3 text-xs"
             onClick={onShowTests}
-            aria-label="Open the Tests tab for full coverage details"
+            title="Opens the Tests tab"
           >
-            View full coverage
+            View coverage details
           </Button>
         ) : null}
       </CardContent>
@@ -56,10 +59,21 @@ export function CoverageGlanceCard({
   );
 }
 
+const COVERAGE_AFTER_COMPLETION_MESSAGE = "Coverage is available after the build completes.";
+
 function renderCoverageContent(
-  coverageState: BuildDetailsCoverageStateViewModel
+  coverageState: BuildDetailsCoverageStateViewModel,
+  isRunning: boolean
 ): React.JSX.Element {
-  if (coverageState.status === "loading" || coverageState.status === "idle") {
+  const pending = coverageState.status === "loading" || coverageState.status === "idle";
+  if (pending && isRunning) {
+    return (
+      <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
+        {COVERAGE_AFTER_COMPLETION_MESSAGE}
+      </div>
+    );
+  }
+  if (pending) {
     return (
       <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
         Loading coverage results for this build.

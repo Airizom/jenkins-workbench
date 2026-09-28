@@ -8,18 +8,26 @@ import {
 } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
+import { formatCount } from "../pipelineStages/pipelineStagesUtils";
 import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipelineGraphTypes";
-import { clampZoomScale, createFittedViewport, type ViewportState } from "./pipelineGraphViewport";
+import {
+  clampZoomScale,
+  createFittedViewport,
+  revealRectInViewport,
+  type ViewportState
+} from "./pipelineGraphViewport";
 
 const { memo, useCallback, useEffect, useMemo, useRef, useState } = React;
 
 const KEYBOARD_PAN_STEP = 40;
 
+// The foreignObject clips anything drawn outside the node, so the focus
+// outline sits inside the border; the selection ring (styles.css) hugs it.
 const STAGE_NODE_BUTTON_BASE_CLASS =
-  "flex h-full w-full flex-col overflow-hidden rounded-xl bg-card text-left " +
+  "flex h-full w-full flex-col overflow-hidden rounded-xl border bg-card text-left " +
   "transition duration-150 motion-reduce:transition-none " +
   "hover:-translate-y-0.5 hover:shadow-lg motion-reduce:hover:translate-y-0 " +
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "focus-visible:outline-2 focus-visible:-outline-offset-5 focus-visible:outline-ring";
 
 const IS_MAC_PLATFORM = /Mac|iPhone|iPad/i.test(
   typeof navigator === "undefined" ? "" : navigator.platform
@@ -47,6 +55,15 @@ export function PipelineGraphCanvas({
   const onSelectStageRef = useRef(onSelectStage);
   const handleNodeSelect = useCallback((stageKey: string) => {
     onSelectStageRef.current(stageKey);
+  }, []);
+
+  // Keyboard focus on a node outside the visible canvas pans it into view.
+  const handleNodeFocus = useCallback((node: PipelineGraphLayoutNode) => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+    setViewport((current) => revealRectInViewport(current, node, container));
   }, []);
 
   useEffect(() => {
@@ -295,6 +312,7 @@ export function PipelineGraphCanvas({
                 node={node}
                 selected={selectedStageKey === node.id}
                 onSelect={handleNodeSelect}
+                onKeyboardFocus={handleNodeFocus}
               />
             ))}
           </g>
@@ -307,11 +325,13 @@ export function PipelineGraphCanvas({
 const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
   node,
   selected,
-  onSelect
+  onSelect,
+  onKeyboardFocus
 }: {
   node: PipelineGraphLayoutNode;
   selected: boolean;
   onSelect: (stageKey: string) => void;
+  onKeyboardFocus: (node: PipelineGraphLayoutNode) => void;
 }) {
   const statusClass = getResultBadgeClass(node.stage.statusClass);
   const statusIcon = getStageIcon(node.stage.statusClass);
@@ -332,15 +352,21 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
       <div className="h-full w-full" data-stage-node="true">
         <button
           type="button"
+          aria-pressed={selected}
           className={cn(
             STAGE_NODE_BUTTON_BASE_CLASS,
-            selected ? "border-2 shadow-lg" : "border shadow-sm hover:border-2"
+            selected ? "pipeline-graph-node--selected" : "shadow-sm"
           )}
           style={{
             borderColor,
             background
           }}
           onClick={() => onSelect(node.id)}
+          onFocus={(event) => {
+            if (event.currentTarget.matches(":focus-visible")) {
+              onKeyboardFocus(node);
+            }
+          }}
         >
           <div
             className="h-1 rounded-full bg-linear-to-r from-primary to-primary/40"
@@ -349,7 +375,10 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
           <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="truncate text-xs font-semibold text-foreground">
+                <div
+                  className="truncate text-xs font-semibold text-foreground"
+                  title={node.stage.name || undefined}
+                >
                   {node.stage.name || "Stage"}
                 </div>
                 <div className="truncate text-[11px] text-muted-foreground">
@@ -357,6 +386,7 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
                 </div>
               </div>
               <div
+                aria-hidden="true"
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${statusClass}`}
               >
                 {statusIcon}
@@ -369,7 +399,9 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
                 {node.stage.statusLabel || "Unknown"}
               </span>
               <span className="truncate text-muted-foreground">
-                {branchCount > 0 ? `${branchCount} branches` : `${stepCount} steps`}
+                {branchCount > 0
+                  ? formatCount(branchCount, "branch", "branches")
+                  : formatCount(stepCount, "step")}
               </span>
             </div>
           </div>

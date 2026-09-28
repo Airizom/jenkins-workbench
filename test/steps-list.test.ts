@@ -4,9 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
 import type {
   PipelineLogTargetViewModel,
-  PipelineStageStepViewModel
+  PipelineStageStepViewModel,
+  PipelineStageViewModel
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import { BranchCard } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/BranchCard";
 import { StepsList } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StepsList";
+import { StepsVisibilityToggle } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StepsVisibilityToggle";
+import { formatCount } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils";
 import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 
 function makeStep(overrides: Partial<PipelineStageStepViewModel> = {}): PipelineStageStepViewModel {
@@ -69,5 +73,81 @@ describe("StepsList", () => {
     assert.match(html, />—</);
     assert.match(html, /aria-label="Open log for step"/);
     assert.match(html, /px-2 py-1/);
+  });
+});
+
+function renderSteps(steps: PipelineStageStepViewModel[]): string {
+  return renderToStaticMarkup(
+    createElement(TooltipProvider, null, createElement(StepsList, { steps }))
+  );
+}
+
+describe("StepsList status", () => {
+  it("states each step status in text, not only by color", () => {
+    const html = renderSteps([
+      makeStep({ key: "a", statusLabel: "Failed", statusClass: "failure" }),
+      makeStep({ key: "b", statusLabel: "", statusClass: "neutral" })
+    ]);
+
+    assert.match(html, /<span class="sr-only">, Failed<\/span>/);
+    assert.match(html, /<span class="sr-only">, Status unknown<\/span>/);
+  });
+
+  it("renders a glyph for neutral steps and titles truncated names", () => {
+    const html = renderSteps([makeStep({ name: "A very long step name", statusClass: "neutral" })]);
+
+    assert.match(html, /<svg/);
+    assert.match(html, /title="A very long step name"/);
+  });
+});
+
+describe("BranchCard status", () => {
+  it("states the branch status in text and titles the name", () => {
+    const branch: PipelineStageViewModel = {
+      key: "branch-1",
+      name: "Linux",
+      statusLabel: "Unstable",
+      statusClass: "unstable",
+      durationLabel: "5s",
+      canRestartFromStage: false,
+      hasSteps: false,
+      stepsFailedOnly: [],
+      stepsAll: [],
+      parallelBranches: [],
+      canOpenLog: false
+    };
+    const html = renderToStaticMarkup(
+      createElement(TooltipProvider, null, createElement(BranchCard, { branch, showAll: false }))
+    );
+
+    assert.match(html, /<span class="sr-only">, Unstable<\/span>/);
+    assert.match(html, /title="Linux"/);
+  });
+});
+
+describe("StepsVisibilityToggle", () => {
+  it("keeps a fixed label and reports the failed-only state through aria-pressed", () => {
+    const failedOnly = renderToStaticMarkup(
+      createElement(StepsVisibilityToggle, { showAll: false, onShowAllChange: () => undefined })
+    );
+    const allSteps = renderToStaticMarkup(
+      createElement(StepsVisibilityToggle, { showAll: true, onShowAllChange: () => undefined })
+    );
+
+    for (const html of [failedOnly, allSteps]) {
+      assert.match(html, /aria-label="Failed steps only"/);
+      assert.match(html, />Failed only</);
+    }
+    assert.match(failedOnly, /aria-pressed="true"/);
+    assert.match(allSteps, /aria-pressed="false"/);
+  });
+});
+
+describe("formatCount", () => {
+  it("uses the singular noun only for exactly one", () => {
+    assert.equal(formatCount(1, "branch", "branches"), "1 branch");
+    assert.equal(formatCount(2, "branch", "branches"), "2 branches");
+    assert.equal(formatCount(0, "direct step"), "0 direct steps");
+    assert.equal(formatCount(1, "direct step"), "1 direct step");
   });
 });

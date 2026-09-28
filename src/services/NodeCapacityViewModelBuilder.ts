@@ -12,7 +12,6 @@ import type { JenkinsNodeDetails } from "../jenkins/types";
 import type {
   NodeCapacityExecutorViewModel,
   NodeCapacityNodeViewModel,
-  NodeCapacityOfflineImpactViewModel,
   NodeCapacityPoolViewModel,
   NodeCapacitySeverity,
   NodeCapacitySummaryViewModel,
@@ -30,7 +29,7 @@ import { evaluateLabelExpression, parseCompoundLabelExpression } from "./NodeLab
 import { buildNodeQueuedWorkViewModel, buildQueueWorkItems } from "./QueueWorkViewModel";
 
 const ANY_POOL_ID = "pool:any";
-const ANY_POOL_LABEL = "Any executor";
+const ANY_POOL_LABEL = "Any node";
 
 interface ClassifiedNode {
   node: JenkinsNodeInfo;
@@ -161,7 +160,6 @@ function buildPool(input: {
     ...input,
     severity,
     statusLabel: formatPoolStatus(severity, queueTotals.queuedCount, nodeTotals.idleExecutors),
-    offlineImpact: buildOfflineImpact(input.nodes),
     ...nodeTotals,
     ...queueTotals
   };
@@ -175,7 +173,7 @@ function buildSummary(
   return {
     ...aggregateNodeCapacity(nodes, { includeOfflineExecutorsInTotals: false }),
     ...aggregateQueueItems(queueItems),
-    bottleneckCount: pools.filter((pool) => pool.severity !== "normal").length
+    saturatedPoolCount: pools.filter((pool) => pool.severity === "critical").length
   };
 }
 
@@ -247,23 +245,6 @@ function aggregateQueueItems(
     blockedCount,
     buildableCount
   };
-}
-
-function buildOfflineImpact(
-  nodes: NodeCapacityNodeViewModel[]
-): NodeCapacityOfflineImpactViewModel[] {
-  const offlineImpact: NodeCapacityOfflineImpactViewModel[] = [];
-  for (const node of nodes) {
-    if (node.isOffline && node.offlineExecutors > 0) {
-      offlineImpact.push({
-        nodeName: node.displayName,
-        nodeUrl: node.nodeUrl,
-        executors: node.offlineExecutors,
-        reason: node.offlineReason
-      });
-    }
-  }
-  return offlineImpact;
 }
 
 function buildHiddenLabelKeySet(nodes: ClassifiedNode[]): Set<string> {
@@ -389,7 +370,8 @@ function formatPoolStatus(
   idleExecutors: number
 ): string {
   if (severity === "critical") {
-    return queuedCount > 0 && idleExecutors === 0 ? "Blocked capacity" : "Stuck queue";
+    // Avoid "blocked": Jenkins uses it for queue items waiting on another build.
+    return queuedCount > 0 && idleExecutors === 0 ? "No idle executors" : "Stuck queue";
   }
   if (queuedCount > 0) {
     return "Queue pressure";

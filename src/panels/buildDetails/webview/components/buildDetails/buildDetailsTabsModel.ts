@@ -23,3 +23,14 @@ export function resolveBuildDetailsSelectedTab(
   }
   return selectedTab;
 }
+
+/**
+ * New pending inputs pull focus to the Inputs tab only while the user has not picked a
+ * tab themselves; otherwise the hero banner is the (non-disruptive) signal.
+ */
+export function hasNewPendingInputs(
+  previousInputIds: ReadonlySet<string>,
+  nextInputIds: readonly string[]
+): boolean {
+  return nextInputIds.some((id) => !previousInputIds.has(id));
+}

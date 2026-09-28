@@ -1,47 +1,52 @@
 import type * as React from "react";
-import { Alert, AlertDescription } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { CpuIcon, GaugeIcon, StatusIcon, TagIcon } from "../../../../shared/webview/icons";
 import { NODE_DETAILS_TABS, type NodeDetailsTab } from "../../nodeDetailsTabValues";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorSlotGrid } from "./ExecutorSlotGrid";
-import { summarizeExecutorUtilization } from "./executorUtilization";
+import { formatExecutorCounts, summarizeExecutorUtilization } from "./executorUtilization";
 import { LabelChips } from "./LabelChips";
 import { formatMonitorLabel } from "./monitorLabels";
-import type { OverviewRow } from "./nodeDetailsUtils";
+import { buildConnectionRows, buildStatusRows } from "./nodeDetailsUtils";
 import { OverviewCard } from "./OverviewCard";
 import { QueuePreviewCard } from "./QueuePreviewCard";
 
 type NodeDetailsOverviewSectionProps = {
   state: NodeDetailsState;
-  overviewRows: OverviewRow[];
   onOpenExternal: (url: string) => void;
   onShowTab: (tab: NodeDetailsTab) => void;
 };
+/**
+ * The offline reason is intentionally not repeated here: the hero banner
+ * already shows it and stays visible across tabs.
+ */
 export function NodeDetailsOverviewSection({
   state,
-  overviewRows,
   onOpenExternal,
   onShowTab
 }: NodeDetailsOverviewSectionProps): React.JSX.Element {
-  const utilization = summarizeExecutorUtilization(state.executors, state.oneOffExecutors);
+  const utilization = summarizeExecutorUtilization(
+    state.executors,
+    state.oneOffExecutors,
+    state.isOffline
+  );
   const executorSummary = formatExecutorSummary(utilization);
+  const statusRows = buildStatusRows(state);
+  const connectionRows = buildConnectionRows(state);
 
   return (
     <div className="space-y-3">
       <div className="grid gap-3 md:grid-cols-2 md:items-start">
         <div className="space-y-3">
           <OverviewCard icon={<StatusIcon className="h-4 w-4" />} title="Status">
-            <dl className="grid gap-x-4 gap-y-2.5 sm:grid-cols-2">
-              {overviewRows.map((row) => (
-                <div key={row.label} className="flex items-center gap-2.5">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+            <dl className="m-0 grid gap-x-4 gap-y-2.5 sm:grid-cols-3">
+              {statusRows.map((row) => (
+                <div key={row.label} className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
                     {row.icon}
                   </div>
                   <div className="min-w-0">
-                    <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {row.label}
-                    </dt>
+                    <dt className="text-[11px] text-muted-foreground">{row.label}</dt>
                     <dd className="m-0 truncate text-xs font-semibold" title={row.value}>
                       {row.value}
                     </dd>
@@ -49,6 +54,24 @@ export function NodeDetailsOverviewSection({
                 </div>
               ))}
             </dl>
+            {connectionRows.length > 0 ? (
+              <div className="mt-3 border-t border-border pt-2.5">
+                <h3 className="m-0 mb-1.5 text-[11px] font-medium text-muted-foreground">
+                  Connection
+                </h3>
+                <dl className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                  {connectionRows.map((row) => (
+                    <div key={row.label} className="flex items-center gap-1.5">
+                      <span aria-hidden="true" className="text-muted-foreground">
+                        {row.icon}
+                      </span>
+                      <dt className="text-muted-foreground">{row.label}:</dt>
+                      <dd className="m-0 font-medium">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
           </OverviewCard>
 
           <OverviewCard
@@ -70,6 +93,7 @@ export function NodeDetailsOverviewSection({
               <ExecutorSlotGrid
                 executors={state.executors}
                 oneOffExecutors={state.oneOffExecutors}
+                isOffline={state.isOffline}
                 onOpenExternal={onOpenExternal}
                 onViewAll={() => onShowTab(NODE_DETAILS_TABS.EXECUTORS)}
               />
@@ -105,15 +129,6 @@ export function NodeDetailsOverviewSection({
           />
         </div>
       </div>
-
-      {state.offlineReason ? (
-        <Alert variant="warning" className="py-2">
-          <AlertDescription className="text-xs">
-            <span className="font-semibold">Offline reason: </span>
-            {state.offlineReason}
-          </AlertDescription>
-        </Alert>
-      ) : null}
     </div>
   );
 }
@@ -125,7 +140,7 @@ function formatExecutorSummary(
     return undefined;
   }
 
-  let summary = `${utilization.busy} busy · ${utilization.idle} idle`;
+  let summary = formatExecutorCounts(utilization);
   if (utilization.oneOffTotal > 0) {
     summary += ` · ${utilization.oneOffTotal} one-off`;
   }

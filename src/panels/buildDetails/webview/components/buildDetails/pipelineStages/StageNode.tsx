@@ -55,7 +55,9 @@ export function StageNode({
   return (
     <div className="relative flex" data-stage-key={stage.key}>
       <div className="flex flex-col items-center mr-3">
-        <div className={nodeStyle}>{stageIcon}</div>
+        <div className={nodeStyle} aria-hidden="true">
+          {stageIcon}
+        </div>
         {!isLast ? (
           <div
             className="stage-connector"
@@ -72,9 +74,10 @@ export function StageNode({
                 <div className="flex min-w-0 flex-col items-start gap-0.5">
                   <div
                     className={cn(
-                      "truncate text-xs font-medium",
+                      "max-w-full truncate text-xs font-medium",
                       didNotRun && "text-muted-foreground"
                     )}
+                    title={stage.name || undefined}
                   >
                     {stage.name || "Stage"}
                   </div>

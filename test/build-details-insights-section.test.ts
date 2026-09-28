@@ -17,9 +17,14 @@ const INSIGHTS: BuildFailureInsightsViewModel = {
   artifactsOverflow: 0
 };
 
-function render(insights: BuildFailureInsightsViewModel, showTestsSummary: boolean): string {
+function render(
+  insights: BuildFailureInsightsViewModel,
+  showTestsSummary: boolean,
+  resultClass?: string
+): string {
   return renderToStaticMarkup(
     createElement(BuildFailureInsightsSection, {
+      resultClass,
       insights,
       diagnostics: EMPTY_BUILD_DIAGNOSTICS,
       showTestsSummary,
@@ -43,5 +48,35 @@ describe("BuildFailureInsightsSection", () => {
   it("keeps the tests card when it carries a hint", () => {
     const html = render({ ...INSIGHTS, testResultsHint: "Test report is still loading." }, false);
     assert.match(html, /Test report is still loading\./);
+  });
+
+  it("keeps the changelog under a stable build summary heading", () => {
+    const insights: BuildFailureInsightsViewModel = {
+      ...INSIGHTS,
+      hasFailedTests: false,
+      testSummaryLabel: "",
+      changelogItems: [{ message: "Fix login", author: "Jane", commitId: "abcdef123" }]
+    };
+
+    const failed = render(insights, false, "failure");
+    assert.match(failed, />Failure analysis</);
+    assert.match(failed, />Build summary</);
+    assert.ok(failed.indexOf("Diagnostics") < failed.indexOf("Build summary"));
+    assert.ok(failed.indexOf("Fix login") > failed.indexOf("Build summary"));
+
+    const running = render(insights, false, "running");
+    assert.doesNotMatch(running, /Failure analysis/);
+    assert.doesNotMatch(running, /Diagnostics/);
+    assert.match(running, />Build summary</);
+    assert.match(running, /Fix login/);
+  });
+
+  it("renders nothing for a clean build without insights", () => {
+    const html = render(
+      { ...INSIGHTS, hasFailedTests: false, testSummaryLabel: "" },
+      false,
+      "success"
+    );
+    assert.equal(html, "");
   });
 });

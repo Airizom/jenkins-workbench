@@ -13,7 +13,7 @@ describe("NodeCapacityPanelMessages", () => {
       { type: "loadNodeCapacityExecutors" },
       { type: "loadNodeCapacityExecutors", nodeUrls: "https://jenkins.example/node/a" },
       { type: "loadNodeCapacityExecutors", nodeUrls: ["https://jenkins.example/node/a", 1] },
-      { type: "loadNodeCapacityExecutors", nodeUrls: [], snapshotGeneration: -1 },
+      { type: "loadNodeCapacityExecutors", nodeUrls: [], requestId: -1 },
       { type: "other", nodeUrls: ["https://jenkins.example/node/a"] }
     ];
 
@@ -26,7 +26,7 @@ describe("NodeCapacityPanelMessages", () => {
     assert.equal(
       isLoadNodeCapacityExecutorsMessage({
         type: "loadNodeCapacityExecutors",
-        snapshotGeneration: 0,
+        requestId: 0,
         nodeUrls: ["https://jenkins.example/node/a", "https://jenkins.example/node/b"]
       }),
       true

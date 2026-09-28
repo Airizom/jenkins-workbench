@@ -2,10 +2,10 @@ import { expect, it } from "vitest";
 import { formatAvailableTestReportCountsSummary } from "../src/panels/shared/TestReportFormatters";
 it("derives Jenkins totals when only component counts are returned", () => {
   expect(formatAvailableTestReportCountsSummary({ passCount: 2, failCount: 0, skipCount: 0 })).toBe(
-    "Failed 0 / 2 • Skipped 0"
+    "Failed 0 / 2 · Skipped 0"
   );
   expect(formatAvailableTestReportCountsSummary({ passCount: 2, failCount: 1, skipCount: 3 })).toBe(
-    "Failed 1 / 6 • Skipped 3"
+    "Failed 1 / 6 · Skipped 3"
   );
   expect(
     formatAvailableTestReportCountsSummary({ totalCount: 10, passCount: 2, failCount: 1 })
@@ -27,5 +27,5 @@ it("requests passing counts from Jenkins for reports without a totalCount field"
     })
   );
   const report = await api.getTestReport("https://jenkins.example/job/demo/1/");
-  expect(formatAvailableTestReportCountsSummary(report)).toBe("Failed 0 / 2 • Skipped 0");
+  expect(formatAvailableTestReportCountsSummary(report)).toBe("Failed 0 / 2 · Skipped 0");
 });

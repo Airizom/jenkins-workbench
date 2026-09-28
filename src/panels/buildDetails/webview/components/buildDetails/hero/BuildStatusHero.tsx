@@ -15,6 +15,9 @@ import {
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
+import { AwaitingInputBanner, type AwaitingInputSummary } from "./AwaitingInputBanner";
+
+const AWAITING_INPUT_LABEL = "Waiting for input";
 
 const { useEffect, useRef } = React;
 
@@ -60,6 +63,122 @@ function describeTestsPill(
   };
 }
 
+function HeroStatusGlyph({
+  resultClass,
+  isRunning
+}: {
+  resultClass: string;
+  isRunning: boolean;
+}): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs",
+        resolveResultBadgeClass(resultClass),
+        isRunning && "hero-status-glyph--running"
+      )}
+    >
+      <BuildResultStatusIcon
+        status={resultClass}
+        className={cn("h-6 w-6", resolveResultIconTextClass(resultClass))}
+      />
+    </div>
+  );
+}
+
+type HeroMetaProps = {
+  durationLabel: string;
+  timestampLabel: string;
+  culpritsLabel: string;
+};
+
+function HeroIdentity({
+  displayName,
+  badgeLabel,
+  badgeStatus,
+  resultClass,
+  isRunning,
+  meta
+}: {
+  displayName: string;
+  badgeLabel: string;
+  badgeStatus: string;
+  resultClass: string;
+  isRunning: boolean;
+  meta: HeroMetaProps;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-1 items-center gap-3 min-w-0">
+      <HeroStatusGlyph resultClass={resultClass} isRunning={isRunning} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-x-2.5 gap-y-1 min-w-0">
+          <h1
+            className="min-w-0 text-base sm:text-lg font-semibold leading-tight line-clamp-2 wrap-break-word"
+            id="detail-title"
+            title={displayName}
+          >
+            {displayName}
+          </h1>
+          <ResultBadge
+            id="detail-result"
+            label={badgeLabel}
+            status={badgeStatus}
+            className="shrink-0"
+          />
+        </div>
+        <BuildDetailsMetaFields
+          {...meta}
+          className="hidden sm:flex items-center gap-2 mt-1 text-xs text-muted-foreground"
+        />
+      </div>
+    </div>
+  );
+}
+
+function HeroActions({
+  testsSummary,
+  stageCount,
+  buildUrl,
+  onOpenBuild
+}: {
+  testsSummary: BuildTestsSummaryViewModel;
+  stageCount: number;
+  buildUrl?: string;
+  onOpenBuild: () => void;
+}): React.JSX.Element {
+  const testsPill = describeTestsPill(testsSummary);
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      {testsPill ? (
+        <Badge
+          variant="outline"
+          className={cn("hidden sm:inline-flex text-[11px] font-medium", testsPill.className)}
+        >
+          {testsPill.label}
+        </Badge>
+      ) : null}
+      {stageCount > 0 ? (
+        <Badge
+          variant="outline"
+          className="hidden sm:inline-flex text-[11px] font-medium border-border bg-muted-strong text-muted-foreground"
+        >
+          {stageCount === 1 ? "1 stage" : `${stageCount} stages`}
+        </Badge>
+      ) : null}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onOpenBuild}
+        disabled={!buildUrl}
+        aria-label="Open in Jenkins"
+      >
+        <ExternalLinkIcon className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Open in Jenkins</span>
+      </Button>
+    </div>
+  );
+}
+
 type BuildStatusHeroProps = {
   displayName: string;
   resultLabel: string;
@@ -72,25 +191,67 @@ type BuildStatusHeroProps = {
   buildUrl?: string;
   testsSummary: BuildTestsSummaryViewModel;
   stageCount: number;
+  /** Set while a running build is paused on one or more input steps. */
+  awaitingInput?: AwaitingInputSummary;
+  /** Omitted when the Inputs tab is already showing. */
+  onReviewInputs?: () => void;
   onOpenBuild: () => void;
   children?: React.ReactNode;
 };
-export function BuildStatusHero({
-  displayName,
-  resultLabel,
-  resultClass,
-  durationLabel,
-  timestampLabel,
-  culpritsLabel,
-  loading,
-  isRunning,
-  buildUrl,
-  testsSummary,
-  stageCount,
-  onOpenBuild,
-  children
-}: BuildStatusHeroProps): React.JSX.Element {
-  const testsPill = describeTestsPill(testsSummary);
+function resolveHeroBadge(
+  awaitingInput: AwaitingInputSummary | undefined,
+  resultLabel: string,
+  resultClass: string
+): { label: string; status: string } {
+  return awaitingInput
+    ? { label: AWAITING_INPUT_LABEL, status: "unstable" }
+    : { label: resultLabel, status: resultClass };
+}
+
+type HeroContentProps = Omit<BuildStatusHeroProps, "loading" | "children">;
+
+function HeroContent(props: HeroContentProps): React.JSX.Element {
+  const { resultClass, isRunning, awaitingInput } = props;
+  const badge = resolveHeroBadge(awaitingInput, props.resultLabel, resultClass);
+  const meta: HeroMetaProps = {
+    durationLabel: props.durationLabel,
+    timestampLabel: props.timestampLabel,
+    culpritsLabel: props.culpritsLabel
+  };
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <HeroIdentity
+          displayName={props.displayName}
+          badgeLabel={badge.label}
+          badgeStatus={badge.status}
+          resultClass={resultClass}
+          isRunning={isRunning}
+          meta={meta}
+        />
+        <HeroActions
+          testsSummary={props.testsSummary}
+          stageCount={props.stageCount}
+          buildUrl={props.buildUrl}
+          onOpenBuild={props.onOpenBuild}
+        />
+      </div>
+      <BuildDetailsMetaFields
+        idSuffix="-sm"
+        {...meta}
+        className="sm:hidden flex items-center gap-2 mt-2 text-xs text-muted-foreground"
+      />
+      {awaitingInput ? (
+        <AwaitingInputBanner summary={awaitingInput} onReview={props.onReviewInputs} />
+      ) : null}
+    </div>
+  );
+}
+
+export function BuildStatusHero(props: BuildStatusHeroProps): React.JSX.Element {
+  const { loading, children, ...contentProps } = props;
+  const { resultClass, isRunning } = contentProps;
   const heroRef = useStickyHeroOffset();
 
   return (
@@ -102,79 +263,7 @@ export function BuildStatusHero({
           borderBottom: `1px solid ${resolveBuildResultBorderColor(resultClass)}`
         }}
       >
-        <div className="mx-auto max-w-6xl px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs",
-                  resolveResultBadgeClass(resultClass),
-                  isRunning && "hero-status-glyph--running"
-                )}
-              >
-                <BuildResultStatusIcon
-                  status={resultClass}
-                  className={cn("h-6 w-6", resolveResultIconTextClass(resultClass))}
-                />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <h1
-                    className="text-base sm:text-lg font-semibold leading-tight truncate"
-                    id="detail-title"
-                  >
-                    {displayName}
-                  </h1>
-                  <ResultBadge id="detail-result" label={resultLabel} status={resultClass} />
-                </div>
-                <BuildDetailsMetaFields
-                  durationLabel={durationLabel}
-                  timestampLabel={timestampLabel}
-                  culpritsLabel={culpritsLabel}
-                  className="hidden sm:flex items-center gap-2 mt-1 text-xs text-muted-foreground"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {testsPill ? (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "hidden sm:inline-flex text-[11px] font-medium",
-                    testsPill.className
-                  )}
-                >
-                  {testsPill.label}
-                </Badge>
-              ) : null}
-              {stageCount > 0 ? (
-                <Badge
-                  variant="outline"
-                  className="hidden sm:inline-flex text-[11px] font-medium border-border bg-muted-strong text-muted-foreground"
-                >
-                  {stageCount === 1 ? "1 stage" : `${stageCount} stages`}
-                </Badge>
-              ) : null}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onOpenBuild}
-                disabled={!buildUrl}
-                aria-label="Open in Jenkins"
-              >
-                <ExternalLinkIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Open in Jenkins</span>
-              </Button>
-            </div>
-          </div>
-          <BuildDetailsMetaFields
-            idSuffix="-sm"
-            durationLabel={durationLabel}
-            timestampLabel={timestampLabel}
-            culpritsLabel={culpritsLabel}
-            className="sm:hidden flex items-center gap-2 mt-2 text-xs text-muted-foreground"
-          />
-        </div>
+        <HeroContent {...contentProps} />
         {children}
       </div>
       <div className={cn("h-0.5", resolveStatusAccentClass(resultClass))} />

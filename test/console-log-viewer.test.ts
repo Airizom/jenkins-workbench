@@ -30,15 +30,20 @@ function useMemo<T>(factory: () => T, dependencies: readonly unknown[]): T {
 }
 
 vi.doMock("react", () => ({
+  useCallback: <T>(callback: T): T => callback,
   useEffect: () => undefined,
-  useMemo
+  useMemo,
+  useRef: <T>(current: T) => ({ current }),
+  useState: <T>(initial: T) => [initial, () => undefined]
 }));
 vi.doMock("../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleSegments", () => ({
   buildConsoleSegments: buildConsoleSegmentsMock
 }));
 vi.doMock("../src/panels/buildDetails/webview/hooks/useConsoleOutputScroll", () => ({
+  prefersReducedMotion: () => false,
   useConsoleOutputScroll: () => ({
     showScrollToTop: false,
+    isAtBottom: true,
     scrollConsoleToBottom: () => undefined,
     scrollConsoleToTop: () => undefined
   })
@@ -67,6 +72,7 @@ describe("ConsoleLogViewer", () => {
       truncated: false,
       maxChars: 100,
       followLog: false,
+      canFollow: false,
       isActive: true,
       onOpenExternal: () => undefined
     };

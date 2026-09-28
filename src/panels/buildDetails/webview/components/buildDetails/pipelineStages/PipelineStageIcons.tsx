@@ -1,6 +1,7 @@
 import {
   AlertTriangleIcon,
   CheckIcon,
+  MinusIcon,
   PlayIcon,
   StopSquareIcon,
   XIcon
@@ -18,6 +19,8 @@ export function getStageIcon(statusClass?: string) {
     case "aborted":
       return <StopSquareIcon className="h-3 w-3 text-current" />;
     default:
-      return null;
+      // Neutral, skipped, and unknown statuses still get a glyph so status is
+      // never conveyed by color alone.
+      return <MinusIcon className="h-3 w-3 text-current" />;
   }
 }

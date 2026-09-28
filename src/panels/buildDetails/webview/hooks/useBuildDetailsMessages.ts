@@ -70,6 +70,9 @@ function reduceBuildDetailsMessage(
         diagnostics: message.diagnostics
       });
       break;
+    case "pendingInputActionComplete":
+      dispatch({ type: "pendingInputActionComplete", inputId: message.inputId });
+      break;
     case "setLoading":
       dispatch({ type: "setLoading", value: message.value });
       break;

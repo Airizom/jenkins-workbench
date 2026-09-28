@@ -22,7 +22,12 @@ export interface CompareSectionBaseViewModel {
 
 export interface BuildCompareBuildViewModel extends BuildHeaderViewModel {
   roleLabel: string;
+  /** Jenkins full display name, e.g. "web-app » main #1482". */
   displayName: string;
+  /** Always "#<number>" so the build stays identifiable when names truncate. */
+  buildNumberLabel: string;
+  /** Job path without the build suffix, e.g. "web-app » main". */
+  jobDisplayName?: string;
   buildUrl: string;
 }
 
@@ -37,6 +42,23 @@ export interface BuildCompareTestDiffItem {
   targetStatusTone?: StatusVisualTone;
   baselineDurationLabel?: string;
   targetDurationLabel?: string;
+  /** True when the test only exists in the target build (listed under new failures when failing). */
+  addedInTarget?: boolean;
+}
+
+/**
+ * A suite/class/name identity that occurs more than once in at least one build.
+ * Such tests cannot be paired reliably, so they are never counted as passing,
+ * failing, added, or removed. An empty label list means the identity is absent
+ * from that build.
+ */
+export interface BuildCompareAmbiguousTestItem {
+  key: string;
+  name: string;
+  className?: string;
+  suiteName?: string;
+  baselineStatusLabels: string[];
+  targetStatusLabels: string[];
 }
 
 export interface BuildCompareTestsSectionViewModel extends CompareSectionBaseViewModel {
@@ -47,7 +69,9 @@ export interface BuildCompareTestsSectionViewModel extends CompareSectionBaseVie
   newPasses: BuildCompareTestDiffItem[];
   addedTests: BuildCompareTestDiffItem[];
   removedTests: BuildCompareTestDiffItem[];
-  otherChangesCount: number;
+  /** Status changes that are neither failures nor newly passing, e.g. failed → skipped. */
+  otherChanges: BuildCompareTestDiffItem[];
+  ambiguousTests: BuildCompareAmbiguousTestItem[];
   unchangedCount: number;
 }
 
@@ -82,6 +106,8 @@ export interface BuildCompareStageDiffItem {
   targetDurationLabel?: string;
   deltaLabel?: string;
   deltaDirection?: BuildCompareStageDeltaDirection;
+  /** True when the timing delta crosses the stage regression/improvement threshold. */
+  deltaSignificant?: boolean;
 }
 
 export type BuildCompareStageDeltaDirection = "slower" | "faster";

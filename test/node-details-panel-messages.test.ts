@@ -10,6 +10,7 @@ function createNodeDetailsViewModel(
   overrides: Partial<Record<keyof NodeDetailsViewModel, unknown>> = {}
 ): Record<string, unknown> {
   return {
+    detailsAvailable: true,
     displayName: "agent-1",
     name: "agent-1",
     description: "Linux agent",
@@ -23,8 +24,8 @@ function createNodeDetailsViewModel(
     canBringOnline: false,
     canLaunchAgent: false,
     canOpenAgentInstructions: false,
-    idleLabel: "Idle",
-    executorsLabel: "2 executors",
+    activityLabel: "Idle",
+    executorsLabel: "0 of 2 busy",
     labels: ["linux"],
     executors: [{ id: "0", statusLabel: "Idle", isIdle: true }],
     oneOffExecutors: [],
@@ -74,7 +75,8 @@ describe("NodeDetailsPanelMessages", () => {
       createNodeDetailsViewModel({ isOffline: "false" }),
       createNodeDetailsViewModel({ canTakeOffline: undefined }),
       createNodeDetailsViewModel({ advancedLoaded: 1 }),
-      createNodeDetailsViewModel({ idleLabel: undefined }),
+      createNodeDetailsViewModel({ activityLabel: undefined }),
+      createNodeDetailsViewModel({ detailsAvailable: undefined }),
       createNodeDetailsViewModel({ executorsLabel: undefined }),
       createNodeDetailsViewModel({ rawJson: undefined }),
       createNodeDetailsViewModel({ labels: "linux" }),

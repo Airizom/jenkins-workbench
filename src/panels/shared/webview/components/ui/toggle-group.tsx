@@ -1,6 +1,7 @@
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
 import * as React from "react";
 
+import { focusRingInsetClassName } from "../../lib/focus";
 import { cn } from "../../lib/utils";
 
 type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root>;
@@ -29,9 +30,9 @@ export const ToggleGroupItem = React.forwardRef<
     className={cn(
       "inline-flex h-7 items-center justify-center rounded-md px-2.5 text-xs font-medium transition-colors",
       "hover:bg-accent-soft hover:text-accent-foreground",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      focusRingInsetClassName,
       "disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=on]:bg-list-active data-[state=on]:text-list-activeForeground",
+      "data-[state=on]:bg-list-active data-[state=on]:text-list-activeForeground data-[state=on]:hc-active-ring",
       className
     )}
     {...props}

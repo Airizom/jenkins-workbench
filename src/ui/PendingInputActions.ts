@@ -31,39 +31,15 @@ export async function handlePendingInputAction(
       return false;
     }
 
-    if (options.action === "approve") {
-      let params: URLSearchParams | undefined;
-      if (action.parameters.length > 0) {
-        params = await promptForParameters(action.parameters);
-        if (!params) {
-          return false;
-        }
-      }
-      await options.dataService.approveInput(options.environment, options.buildUrl, action.id, {
-        params,
-        proceedText: action.proceedText,
-        proceedUrl: action.proceedUrl
-      });
-      void vscode.window.showInformationMessage(`Approved input for ${label}.`);
-    } else {
-      await options.dataService.rejectInput(
-        options.environment,
-        options.buildUrl,
-        action.id,
-        action.abortUrl
-      );
-      void vscode.window.showInformationMessage(`Rejected input for ${label}.`);
+    const submitted =
+      options.action === "approve"
+        ? await approvePendingInput(options, action, label)
+        : await rejectPendingInput(options, action, label);
+    if (!submitted) {
+      return false;
     }
 
-    if (options.onRefresh) {
-      try {
-        await options.onRefresh();
-      } catch (error) {
-        void vscode.window.showWarningMessage(
-          `Input action for ${label} succeeded, but refresh failed: ${formatActionError(error)}`
-        );
-      }
-    }
+    await refreshAfterInputAction(options.onRefresh, label);
     return true;
   } catch (error) {
     const verb = options.action === "approve" ? "approve" : "reject";
@@ -72,6 +48,83 @@ export async function handlePendingInputAction(
     );
     return false;
   }
+}
+
+async function approvePendingInput(
+  options: PendingInputActionOptions,
+  action: PendingInputAction,
+  label: string
+): Promise<boolean> {
+  let params: URLSearchParams | undefined;
+  if (action.parameters.length > 0) {
+    params = await promptForParameters(action.parameters);
+    if (!params) {
+      return false;
+    }
+  }
+  await options.dataService.approveInput(options.environment, options.buildUrl, action.id, {
+    params,
+    proceedText: action.proceedText,
+    proceedUrl: action.proceedUrl
+  });
+  void vscode.window.showInformationMessage(`Approved input for ${label}.`);
+  return true;
+}
+
+async function rejectPendingInput(
+  options: PendingInputActionOptions,
+  action: PendingInputAction,
+  label: string
+): Promise<boolean> {
+  if (!(await confirmRejectInput(action, label))) {
+    return false;
+  }
+  await options.dataService.rejectInput(
+    options.environment,
+    options.buildUrl,
+    action.id,
+    action.abortUrl
+  );
+  void vscode.window.showInformationMessage(`Rejected input for ${label}.`);
+  return true;
+}
+
+// A refresh failure must not report the already-submitted input action as failed.
+async function refreshAfterInputAction(
+  onRefresh: PendingInputActionOptions["onRefresh"],
+  label: string
+): Promise<void> {
+  if (!onRefresh) {
+    return;
+  }
+  try {
+    await onRefresh();
+  } catch (error) {
+    void vscode.window.showWarningMessage(
+      `Input action for ${label} succeeded, but refresh failed: ${formatActionError(error)}`
+    );
+  }
+}
+
+const REJECT_CONFIRM_LABEL = "Reject";
+const MAX_CONFIRM_MESSAGE_CHARS = 120;
+
+// Rejecting an input aborts the build, so it always needs an explicit confirmation.
+async function confirmRejectInput(action: PendingInputAction, label: string): Promise<boolean> {
+  const inputMessage = truncateForConfirmation(action.message.trim() || `Input ${action.id}`);
+  const choice = await vscode.window.showWarningMessage(
+    `Reject input “${inputMessage}” for ${label}? The build will be aborted.`,
+    { modal: true },
+    REJECT_CONFIRM_LABEL
+  );
+  return choice === REJECT_CONFIRM_LABEL;
+}
+
+function truncateForConfirmation(value: string): string {
+  if (value.length <= MAX_CONFIRM_MESSAGE_CHARS) {
+    return value;
+  }
+  return `${value.slice(0, MAX_CONFIRM_MESSAGE_CHARS - 1).trimEnd()}…`;
 }
 
 async function resolvePendingInputAction(

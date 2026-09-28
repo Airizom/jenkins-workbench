@@ -5,7 +5,10 @@ import type {
   PipelineStageStepViewModel,
   PipelineStageViewModel
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
-import { hasPipelineLogTarget } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineLogTargets";
+import {
+  findPipelineLogTargetStatus,
+  hasPipelineLogTarget
+} from "../src/panels/buildDetails/webview/components/buildDetails/pipelineLogTargets";
 
 describe("pipeline log targets", () => {
   it("rejects a restored target that is absent from the current stages", () => {
@@ -83,3 +86,28 @@ function buildStep(
     canOpenLog: Boolean(logTarget)
   };
 }
+
+describe("findPipelineLogTargetStatus", () => {
+  it("returns the status of the stage, branch, or step that owns the target", () => {
+    const stageTarget = buildTarget("stage:build", "stage");
+    const branchTarget = buildTarget("stage:branch", "stage");
+    const stepTarget = buildTarget("step:archive", "step");
+    const stages = [
+      buildStage("build", stageTarget, {
+        statusClass: "failure",
+        parallelBranches: [
+          buildStage("branch", branchTarget, {
+            statusClass: "running",
+            stepsAll: [{ ...buildStep("archive", stepTarget), statusClass: "aborted" }]
+          })
+        ]
+      })
+    ];
+
+    assert.equal(findPipelineLogTargetStatus(stages, stageTarget), "failure");
+    assert.equal(findPipelineLogTargetStatus(stages, branchTarget), "running");
+    assert.equal(findPipelineLogTargetStatus(stages, stepTarget), "aborted");
+    assert.equal(findPipelineLogTargetStatus(stages, buildTarget("missing", "stage")), undefined);
+    assert.equal(findPipelineLogTargetStatus(stages, undefined), undefined);
+  });
+});

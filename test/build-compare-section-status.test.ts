@@ -8,7 +8,7 @@ describe("resolveSectionStatusBadge", () => {
     const expected: Record<CompareSectionStatus, { label: string; tone: string }> = {
       loading: { label: "Loading…", tone: "neutral" },
       available: { label: "Ready", tone: "neutral" },
-      empty: { label: "No differences", tone: "neutral" },
+      empty: { label: "No changes", tone: "neutral" },
       unavailable: { label: "No data", tone: "neutral" },
       error: { label: "Error", tone: "failed" },
       tooLarge: { label: "Too large to compare", tone: "skipped" },

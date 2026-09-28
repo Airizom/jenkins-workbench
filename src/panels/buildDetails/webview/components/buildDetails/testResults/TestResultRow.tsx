@@ -15,7 +15,7 @@ import {
 import { ChevronDownIcon, ClockIcon, FileIcon } from "../../../../../shared/webview/icons";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestCaseViewModel } from "../../../../shared/BuildDetailsContracts";
-import { hasTestDetails } from "./testResultsUtils";
+import { hasTestDetails, resolveFailureBlocks } from "./testResultsUtils";
 
 const { memo, useEffect, useState } = React;
 
@@ -44,8 +44,13 @@ function TestResultRowHeaderContent({
     <>
       <TestStatusIcon status={status} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">{name}</div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="truncate text-sm font-medium text-foreground" title={name}>
+          {name}
+        </div>
+        <div
+          className="truncate text-xs text-muted-foreground"
+          title={formatTestCaseSubtitle(className, suiteName) || undefined}
+        >
           {formatTestCaseSubtitle(className, suiteName)}
           {failureHistoryLabel && <span> · {failureHistoryLabel}</span>}
         </div>
@@ -83,6 +88,7 @@ export function TestResultRow({
   const [open, setOpen] = useState(initialOpen ?? false);
   const hasDetails = hasTestDetails(item);
   const borderClass = resolveStatusBorderClass(testStatusToVisualTone(item.status));
+  const failureBlocks = resolveFailureBlocks(item.errorDetails, item.errorStackTrace);
 
   useEffect(() => {
     if (!initialOpen) {
@@ -142,12 +148,14 @@ export function TestResultRow({
       </div>
       <CollapsibleContent className="border-t border-border bg-muted-soft px-3 py-3">
         <div className="space-y-2">
-          {item.errorDetails ? (
-            <TestDetailBlock label="Failure" value={item.errorDetails} tone="failed" />
-          ) : null}
-          {item.errorStackTrace ? (
-            <TestDetailBlock label="Stack Trace" value={item.errorStackTrace} tone="failed" />
-          ) : null}
+          {failureBlocks.map((block) => (
+            <TestDetailBlock
+              key={block.label}
+              label={block.label}
+              value={block.value}
+              tone="failed"
+            />
+          ))}
           {item.stdout ? <TestDetailBlock label="Stdout" value={item.stdout} /> : null}
           {item.stderr ? (
             <TestDetailBlock label="Stderr" value={item.stderr} tone="skipped" />

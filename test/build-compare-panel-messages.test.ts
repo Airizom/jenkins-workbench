@@ -6,6 +6,55 @@ import {
   parseBuildCompareOutgoingMessage
 } from "../src/panels/buildCompare/shared/BuildComparePanelMessages";
 
+const PANEL_STATE = {
+  environmentId: "env-1",
+  scope: "global",
+  baselineBuildUrl: "https://jenkins.example/job/a/1/",
+  targetBuildUrl: "https://jenkins.example/job/a/2/",
+  compareUi: { collapsedSections: ["console"] }
+};
+
+function createBuild(number: number): Record<string, unknown> {
+  return {
+    roleLabel: number === 1 ? "Baseline" : "Target",
+    displayName: `a #${number}`,
+    buildNumberLabel: `#${number}`,
+    jobDisplayName: "a",
+    buildUrl: `https://jenkins.example/job/a/${number}/`,
+    resultLabel: "Success",
+    resultClass: "success",
+    durationLabel: "1m",
+    timestampLabel: "now"
+  };
+}
+
+function createModel() {
+  return {
+    title: "Build Compare",
+    baseline: createBuild(1),
+    target: createBuild(2),
+    tests: {
+      status: "empty",
+      summaryLabel: "No high-signal test differences",
+      baselineSummaryLabel: "1 passed",
+      targetSummaryLabel: "1 passed",
+      newFailures: [],
+      stillFailing: [],
+      newPasses: [],
+      addedTests: [],
+      removedTests: [],
+      otherChanges: [],
+      ambiguousTests: [],
+      unchangedCount: 1
+    },
+    parameters: { status: "empty", summaryLabel: "None", items: [], unchangedCount: 0 },
+    changesets: { status: "empty", summaryLabel: "None", baselineItems: [], targetItems: [] },
+    stages: { status: "unavailable", summaryLabel: "n/a", items: [] },
+    console: createConsoleSection({ status: "loading" }),
+    errors: []
+  };
+}
+
 function createConsoleSection(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     status: "available",
@@ -100,6 +149,63 @@ describe("BuildComparePanelMessages", () => {
     };
 
     assert.deepEqual(parseBuildCompareOutgoingMessage(message), message);
+  });
+
+  it("accepts whole-comparison updates with a valid panel state", () => {
+    const message = {
+      type: "updateBuildCompare",
+      model: createModel(),
+      panelState: PANEL_STATE
+    };
+
+    assert.deepEqual(parseBuildCompareOutgoingMessage(message), message);
+  });
+
+  it("rejects whole-comparison updates with malformed models or panel state", () => {
+    const invalid: unknown[] = [
+      { type: "updateBuildCompare", model: createModel() },
+      { type: "updateBuildCompare", model: createModel(), panelState: { environmentId: "" } },
+      {
+        type: "updateBuildCompare",
+        model: { ...createModel(), errors: [1] },
+        panelState: PANEL_STATE
+      },
+      {
+        type: "updateBuildCompare",
+        model: { ...createModel(), target: { displayName: "#2", buildUrl: "u" } },
+        panelState: PANEL_STATE
+      },
+      {
+        type: "updateBuildCompare",
+        model: { ...createModel(), tests: { ...createModel().tests, ambiguousTests: undefined } },
+        panelState: PANEL_STATE
+      },
+      {
+        type: "updateBuildCompare",
+        model: { ...createModel(), stages: { status: "bogus", summaryLabel: "x", items: [] } },
+        panelState: PANEL_STATE
+      },
+      {
+        type: "updateBuildCompare",
+        model: { ...createModel(), console: { status: "loading" } },
+        panelState: PANEL_STATE
+      }
+    ];
+
+    for (const message of invalid) {
+      assert.equal(parseBuildCompareOutgoingMessage(message), undefined);
+    }
+  });
+
+  it("parses refresh failures only with a string message", () => {
+    assert.deepEqual(
+      parseBuildCompareOutgoingMessage({ type: "buildCompareRefreshFailed", message: "HTTP 503" }),
+      { type: "buildCompareRefreshFailed", message: "HTTP 503" }
+    );
+    assert.equal(
+      parseBuildCompareOutgoingMessage({ type: "buildCompareRefreshFailed", message: 503 }),
+      undefined
+    );
   });
 
   it("recognizes refresh messages and rejects other shapes", () => {

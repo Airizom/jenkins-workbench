@@ -1,5 +1,4 @@
 import type * as React from "react";
-import { isAnalysisBuildResult } from "../../../../../shared/webview/lib/statusStyles";
 import type {
   ArtifactAction,
   BuildDetailsCoverageStateViewModel,
@@ -40,7 +39,6 @@ export function OverviewTab({
   onConfigureBuildDiagnostics
 }: OverviewTabProps): React.JSX.Element {
   const showTestsCard = hasTests && testsSummary.hasAnyResults;
-  const insightsTitle = isAnalysisBuildResult(resultClass) ? "Failure Analysis" : "Build Summary";
 
   return (
     <div className="space-y-3">
@@ -50,23 +48,20 @@ export function OverviewTab({
         ) : null}
         <CoverageGlanceCard
           coverageState={coverageState}
+          isRunning={resultClass === "running"}
           onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
         />
       </div>
-      <section aria-label={insightsTitle} className="space-y-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {insightsTitle}
-        </h2>
-        <BuildFailureInsightsSection
-          insights={insights}
-          diagnostics={diagnostics}
-          showTestsSummary={!showTestsCard}
-          onArtifactAction={onArtifactAction}
-          onOpenDiagnosticSource={onOpenDiagnosticSource}
-          onShowDiagnosticProblems={onShowDiagnosticProblems}
-          onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
-        />
-      </section>
+      <BuildFailureInsightsSection
+        resultClass={resultClass}
+        insights={insights}
+        diagnostics={diagnostics}
+        showTestsSummary={!showTestsCard}
+        onArtifactAction={onArtifactAction}
+        onOpenDiagnosticSource={onOpenDiagnosticSource}
+        onShowDiagnosticProblems={onShowDiagnosticProblems}
+        onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
+      />
     </div>
   );
 }

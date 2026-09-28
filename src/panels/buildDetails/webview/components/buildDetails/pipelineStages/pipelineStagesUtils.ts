@@ -20,3 +20,14 @@ export function pruneStageFlags(
   }
   return next;
 }
+
+/** "1 branch", "2 branches": count followed by the correctly numbered noun. */
+export function formatCount(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
+}
+
+/** Screen-reader status text; the visual status is an icon plus color. */
+export function formatStatusText(statusLabel: string | undefined): string {
+  const label = statusLabel?.trim();
+  return label ? label : "Status unknown";
+}

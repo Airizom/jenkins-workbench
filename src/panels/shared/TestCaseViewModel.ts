@@ -22,7 +22,7 @@ export function formatTestCaseSubtitle(
   suiteName?: string,
   fallback = "Unnamed suite"
 ): string {
-  return [className, suiteName].filter(Boolean).join(" • ") || fallback;
+  return [className, suiteName].filter(Boolean).join(" · ") || fallback;
 }
 
 export function buildTestCaseKey(

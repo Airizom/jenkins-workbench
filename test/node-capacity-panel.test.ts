@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { NodeCapacityPanel } from "../src/panels/NodeCapacityPanel";
+import { NodeCapacityService } from "../src/services/NodeCapacityService";
 import { PanelLoadTracker } from "../src/panels/shared/PanelRuntimeHelpers";
 import type { NodeCapacityOutgoingMessage } from "../src/panels/nodeCapacity/shared/NodeCapacityPanelMessages";
 import { createEmptyNodeCapacitySummary } from "../src/shared/nodeCapacity/NodeCapacityDefaults";
@@ -53,7 +54,7 @@ describe("NodeCapacityPanel", () => {
     const loadExecutors = Reflect.get(panel, "loadNodeExecutors") as (
       this: NodeCapacityPanel,
       nodeUrls: string[],
-      snapshotGeneration: number
+      requestId: number
     ) => Promise<void>;
     const refreshCapacity = Reflect.get(panel, "refreshCapacity") as (
       this: NodeCapacityPanel
@@ -66,7 +67,31 @@ describe("NodeCapacityPanel", () => {
 
     assert.deepEqual(
       messages.filter((message) => message.type === "updateNodeCapacityNodeExecutors"),
-      [{ type: "updateNodeCapacityNodeExecutors", snapshotGeneration: 1, payload: entries }]
+      [{ type: "updateNodeCapacityNodeExecutors", requestId: 1, payload: entries }]
     );
+  });
+
+  it("reports a failing node inline without failing the rest of the batch", async () => {
+    const environment = {
+      environmentId: "jenkins",
+      scope: "global" as const,
+      url: "https://jenkins.example/"
+    };
+    const goodNode = "https://jenkins.example/computer/good/";
+    const badNode = "https://jenkins.example/computer/bad/";
+    const service = new NodeCapacityService({
+      getNodeDetails: async (_environment: unknown, nodeUrl: string) => {
+        if (nodeUrl === badNode) {
+          throw new Error("connection reset");
+        }
+        return { displayName: "good", executors: [], oneOffExecutors: [] };
+      }
+    } as never);
+
+    const results = await service.hydrateNodeExecutors(environment, [goodNode, badNode]);
+
+    assert.deepEqual(results[0], { nodeUrl: goodNode, executors: [] });
+    assert.equal(results[1]?.nodeUrl, badNode);
+    assert.match(results[1]?.error ?? "", /connection reset/);
   });
 });

@@ -93,11 +93,11 @@ export function resolveMetricDotClass(tone: Exclude<StatusVisualTone, "neutral">
 export function resolveMetricToneClass(tone: StatusVisualTone): string {
   switch (tone) {
     case "failed":
-      return "text-failure";
+      return "text-failure-foreground";
     case "skipped":
-      return "text-warning";
+      return "text-warning-foreground";
     case "passed":
-      return "text-success";
+      return "text-success-foreground";
     default:
       return "text-foreground";
   }

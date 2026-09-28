@@ -6,6 +6,7 @@ import type {
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import {
   derivePipelineSectionView,
+  findDefaultPipelineStage,
   findStageByKey,
   findStageLogTarget,
   isPipelinePresentation,
@@ -274,5 +275,27 @@ describe("findStageLogTarget", () => {
 
   it("returns undefined when the stage key is unknown", () => {
     assert.equal(findStageLogTarget([makeStage({ key: "a" })], "missing"), undefined);
+  });
+});
+
+describe("findDefaultPipelineStage", () => {
+  const stages = [
+    makeStage({ key: "checkout", statusClass: "success" }),
+    makeStage({ key: "unstable", statusClass: "unstable" }),
+    makeStage({ key: "tests", statusClass: "failure" }),
+    makeStage({ key: "deploy", statusClass: "running" })
+  ];
+
+  it("prefers the first failed stage of a completed build", () => {
+    assert.equal(findDefaultPipelineStage(stages, false)?.key, "tests");
+  });
+
+  it("prefers the running stage of a running build", () => {
+    assert.equal(findDefaultPipelineStage(stages, true)?.key, "deploy");
+  });
+
+  it("falls back to unstable stages and has no default for clean runs", () => {
+    assert.equal(findDefaultPipelineStage(stages.slice(0, 2), false)?.key, "unstable");
+    assert.equal(findDefaultPipelineStage(stages.slice(0, 1), false), undefined);
   });
 });

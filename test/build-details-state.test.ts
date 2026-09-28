@@ -37,4 +37,58 @@ describe("buildInitialState", () => {
     assert.equal(updated.diagnostics, diagnostics);
     assert.equal(updated.resultLabel, state.resultLabel);
   });
+
+  it("tracks pending-input actions until the extension reports completion", () => {
+    const state = buildInitialState({} as BuildDetailsViewModel);
+    assert.deepEqual(state.processingInputActions, {});
+
+    const started = buildDetailsReducer(state, {
+      type: "startPendingInputAction",
+      inputId: "deploy",
+      action: "reject"
+    });
+    assert.deepEqual(started.processingInputActions, { deploy: "reject" });
+
+    const repeated = buildDetailsReducer(started, {
+      type: "startPendingInputAction",
+      inputId: "deploy",
+      action: "approve"
+    });
+    assert.equal(repeated, started);
+
+    const completed = buildDetailsReducer(started, {
+      type: "pendingInputActionComplete",
+      inputId: "deploy"
+    });
+    assert.deepEqual(completed.processingInputActions, {});
+  });
+
+  it("drops busy state for inputs that are no longer pending", () => {
+    const state = buildDetailsReducer(buildInitialState({} as BuildDetailsViewModel), {
+      type: "startPendingInputAction",
+      inputId: "deploy",
+      action: "approve"
+    });
+
+    const updated = buildDetailsReducer(state, {
+      type: "updateDetails",
+      payload: {
+        type: "updateDetails",
+        resultLabel: "Running",
+        resultClass: "running",
+        durationLabel: "1m",
+        timestampLabel: "today",
+        culpritsLabel: "None",
+        pipelineStagesLoading: false,
+        testState: state.testState,
+        coverageState: state.coverageState,
+        insights: state.insights,
+        pipelineStages: [],
+        pipelineNodeLog: state.pipelineNodeLog,
+        pendingInputs: []
+      }
+    });
+
+    assert.deepEqual(updated.processingInputActions, {});
+  });
 });

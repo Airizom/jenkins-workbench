@@ -6,6 +6,7 @@ import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
+import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsPanelLoadOptions {
   label?: string;
@@ -41,4 +42,5 @@ export interface BuildDetailsPanelControllerAccess {
   refreshPendingInputs(): Promise<void>;
   beginLoading(): number;
   endLoading(request: number): void;
+  postMessage(message: BuildDetailsOutgoingMessage): void;
 }

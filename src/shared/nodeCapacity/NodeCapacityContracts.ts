@@ -7,13 +7,6 @@ export type NodeCapacitySeverity = "critical" | "warning" | "normal";
 
 export type NodeCapacityPoolKind = "label" | "any";
 
-export interface NodeCapacityOfflineImpactViewModel {
-  nodeName: string;
-  nodeUrl?: string;
-  executors: number;
-  reason?: string;
-}
-
 export interface NodeCapacityExecutorViewModel {
   id: string;
   statusLabel: string;
@@ -40,6 +33,13 @@ export interface NodeCapacityNodeViewModel extends NodeQueuedWorkViewModel {
   executorSummary: string;
   executorsLoaded: boolean;
   executors: NodeCapacityExecutorViewModel[];
+  /**
+   * Webview-only hydration status for `executors`. The host always sends
+   * nodes without it; the webview sets it while a request is in flight or
+   * after the node's executor request failed.
+   */
+  executorsLoadState?: "loading" | "error";
+  executorsError?: string;
 }
 
 export interface NodeCapacityPoolViewModel {
@@ -50,7 +50,6 @@ export interface NodeCapacityPoolViewModel {
   statusLabel: string;
   nodes: NodeCapacityNodeViewModel[];
   queueItems: QueueWorkItemViewModel[];
-  offlineImpact: NodeCapacityOfflineImpactViewModel[];
   totalNodes: number;
   onlineNodes: number;
   offlineNodes: number;
@@ -76,7 +75,8 @@ export interface NodeCapacitySummaryViewModel {
   stuckCount: number;
   blockedCount: number;
   buildableCount: number;
-  bottleneckCount: number;
+  /** Pools with stuck work or queued work and no idle executors (critical severity). */
+  saturatedPoolCount: number;
 }
 
 export interface NodeCapacityViewModel {
@@ -94,11 +94,14 @@ export interface NodeCapacityUpdateMessage {
   payload: NodeCapacityViewModel;
 }
 
+/** One node's executor hydration outcome; a failed node never fails its batch. */
+export type NodeCapacityNodeExecutorsResult =
+  | { nodeUrl: string; executors: NodeCapacityExecutorViewModel[]; error?: undefined }
+  | { nodeUrl: string; executors?: undefined; error: string };
+
 export interface NodeCapacityNodeExecutorsUpdateMessage {
   type: "updateNodeCapacityNodeExecutors";
-  snapshotGeneration: number;
-  payload: Array<{
-    nodeUrl: string;
-    executors: NodeCapacityExecutorViewModel[];
-  }>;
+  /** Echoes the `requestId` of the webview's `loadNodeCapacityExecutors` message. */
+  requestId: number;
+  payload: NodeCapacityNodeExecutorsResult[];
 }

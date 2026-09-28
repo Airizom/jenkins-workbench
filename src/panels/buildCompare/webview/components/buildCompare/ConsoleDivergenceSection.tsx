@@ -6,7 +6,7 @@ import type { BuildCompareConsoleSectionViewModel } from "../../../shared/BuildC
 import { ConsoleComparison } from "./console/ConsoleComparison";
 import { scrollConsoleSnippetsToDivergence } from "./console/consoleDivergenceScroll";
 import { CompareEmptyState } from "./shared/CompareEmptyState";
-import { SectionCard } from "./shared/SectionCard";
+import { SectionCard, type SectionCardDisclosureProps } from "./shared/SectionCard";
 
 const { useEffect } = React;
 
@@ -50,10 +50,11 @@ function DivergenceIndicator({ label, canJump }: { label?: string; canJump: bool
 }
 
 export function ConsoleDivergenceSection({
-  section
+  section,
+  ...disclosure
 }: {
   section: BuildCompareConsoleSectionViewModel;
-}) {
+} & SectionCardDisclosureProps) {
   const hasSnippets = section.status === "available";
 
   // Center both snippets on the divergence line once the console data arrives.
@@ -68,10 +69,11 @@ export function ConsoleDivergenceSection({
 
   return (
     <SectionCard
-      title="Console Divergence"
+      title="Console"
       summary={section.summaryLabel}
       detail={section.detail}
       status={section.status}
+      {...disclosure}
     >
       <DivergenceIndicator label={section.divergenceLineLabel} canJump={hasSnippets} />
       {hasSnippets ? (

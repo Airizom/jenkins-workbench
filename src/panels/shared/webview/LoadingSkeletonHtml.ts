@@ -30,9 +30,13 @@ function headerShell(content: string): string {
     </header>`;
 }
 
+// Mirrors `PanelLoadingShell` in loading-skeleton.tsx: a polite status region
+// whose only readable content is the visually hidden label; the placeholder
+// blocks are empty.
 function pageShell(header: string, content: string): string {
   return `
-  <div class="min-h-screen flex flex-col bg-background text-foreground">
+  <div role="status" aria-live="polite" aria-label="Loading" class="min-h-screen flex flex-col bg-background text-foreground">
+    <span class="sr-only">Loading…</span>
     ${header}
 
     <main class="flex-1 mx-auto w-full max-w-6xl px-4 py-3">

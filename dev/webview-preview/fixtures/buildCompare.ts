@@ -4,7 +4,9 @@ const regression: BuildCompareViewModel = {
   title: "Compare web-app » main #1481 with #1482",
   baseline: {
     roleLabel: "Baseline",
-    displayName: "#1481",
+    displayName: "web-app » main #1481",
+    buildNumberLabel: "#1481",
+    jobDisplayName: "web-app » main",
     buildUrl: "https://jenkins.example.com/job/web-app/job/main/1481/",
     resultLabel: "Success",
     resultClass: "success",
@@ -13,7 +15,9 @@ const regression: BuildCompareViewModel = {
   },
   target: {
     roleLabel: "Target",
-    displayName: "#1482",
+    displayName: "web-app » main #1482",
+    buildNumberLabel: "#1482",
+    jobDisplayName: "web-app » main",
     buildUrl: "https://jenkins.example.com/job/web-app/job/main/1482/",
     resultLabel: "Failed",
     resultClass: "failure",
@@ -22,9 +26,9 @@ const regression: BuildCompareViewModel = {
   },
   tests: {
     status: "available",
-    summaryLabel: "2 new failures, 1 new pass",
+    summaryLabel: "New failures 3 · Still failing 0 · Newly passing 1 · 1 ambiguous",
     baselineSummaryLabel: "920 passed, 6 skipped",
-    targetSummaryLabel: "2 failed, 918 passed, 6 skipped",
+    targetSummaryLabel: "3 failed, 918 passed, 6 skipped",
     newFailures: [
       {
         key: "a",
@@ -47,6 +51,17 @@ const regression: BuildCompareViewModel = {
         targetStatusTone: "failed",
         baselineDurationLabel: "3ms",
         targetDurationLabel: "4ms"
+      },
+      {
+        key: "d",
+        name: "rounds split tenders to the nearest cent when currency has no minor unit",
+        className: "checkout.payment.SplitTenderRoundingTest",
+        suiteName: "checkout-integration",
+        baselineStatusLabel: "-",
+        targetStatusLabel: "Failed",
+        targetStatusTone: "failed",
+        targetDurationLabel: "31ms",
+        addedInTarget: true
       }
     ],
     stillFailing: [],
@@ -63,12 +78,32 @@ const regression: BuildCompareViewModel = {
     ],
     addedTests: [],
     removedTests: [],
-    otherChangesCount: 0,
+    otherChanges: [
+      {
+        key: "e",
+        name: "renders the legacy receipt template",
+        className: "receipts.LegacyTemplateTest",
+        baselineStatusLabel: "Failed",
+        targetStatusLabel: "Skipped",
+        baselineStatusTone: "failed",
+        targetStatusTone: "skipped"
+      }
+    ],
+    ambiguousTests: [
+      {
+        key: "f",
+        name: "handles concurrent cart updates",
+        className: "cart.CartConcurrencyTest",
+        baselineStatusLabels: ["Failed", "Passed"],
+        targetStatusLabels: ["Passed"]
+      }
+    ],
     unchangedCount: 917
   },
   parameters: {
     status: "available",
-    summaryLabel: "2 changed",
+    summaryLabel: "2 changed parameters",
+    detail: "4 parameters matched across both builds.",
     items: [
       { name: "NODE_VERSION", changeType: "changed", baselineValue: "22", targetValue: "24" },
       { name: "SKIP_E2E", changeType: "added", targetValue: "true" }
@@ -77,7 +112,9 @@ const regression: BuildCompareViewModel = {
   },
   changesets: {
     status: "available",
-    summaryLabel: "2 commits in target",
+    summaryLabel: "Baseline 0 · Target 2",
+    detail:
+      "Jenkins changesets are per-build, not the full SCM delta between arbitrary build numbers.",
     baselineItems: [],
     targetItems: [
       {
@@ -90,7 +127,7 @@ const regression: BuildCompareViewModel = {
   },
   stages: {
     status: "available",
-    summaryLabel: "1 regression, 2 skipped",
+    summaryLabel: "5 stage paths compared · 1 slower",
     items: [
       {
         key: "checkout",
@@ -103,7 +140,8 @@ const regression: BuildCompareViewModel = {
         baselineDurationLabel: "5s",
         targetDurationLabel: "4s",
         deltaLabel: "-1s",
-        deltaDirection: "faster"
+        deltaDirection: "faster",
+        deltaSignificant: false
       },
       {
         key: "build",
@@ -116,7 +154,8 @@ const regression: BuildCompareViewModel = {
         baselineDurationLabel: "41s",
         targetDurationLabel: "48s",
         deltaLabel: "+7s",
-        deltaDirection: "slower"
+        deltaDirection: "slower",
+        deltaSignificant: false
       },
       {
         key: "tests",
@@ -129,7 +168,8 @@ const regression: BuildCompareViewModel = {
         baselineDurationLabel: "2m 10s",
         targetDurationLabel: "2m 34s",
         deltaLabel: "+24s",
-        deltaDirection: "slower"
+        deltaDirection: "slower",
+        deltaSignificant: true
       },
       {
         key: "smoke",
@@ -150,8 +190,9 @@ const regression: BuildCompareViewModel = {
   },
   console: {
     status: "available",
-    summaryLabel: "Diverges at line 19",
-    divergenceLineLabel: "Line 19",
+    summaryLabel: "First console divergence found",
+    detail: "Compared up to 5,242,880 bytes and 20,000 lines per build.",
+    divergenceLineLabel: "First difference at line 19",
     baselineLines: [
       { lineNumber: 17, text: "[Unit tests] + npm run test:unit", highlight: false },
       {
@@ -193,41 +234,60 @@ const identical: BuildCompareViewModel = {
   target: { ...regression.target, resultLabel: "Success", resultClass: "success" },
   tests: {
     ...regression.tests,
-    status: "identical",
-    summaryLabel: "No test changes",
+    status: "empty",
+    summaryLabel: "No high-signal test differences",
+    targetSummaryLabel: "920 passed, 6 skipped",
     newFailures: [],
     newPasses: [],
+    otherChanges: [],
+    ambiguousTests: [],
     unchangedCount: 926
   },
   parameters: {
     ...regression.parameters,
-    status: "identical",
-    summaryLabel: "Identical",
+    status: "empty",
+    summaryLabel: "No parameter differences",
+    detail: "6 parameters matched across both builds.",
     items: []
   },
   changesets: {
     ...regression.changesets,
     status: "empty",
-    summaryLabel: "No commits",
+    summaryLabel: "No Jenkins changesets recorded for either build",
+    detail: undefined,
     targetItems: []
   },
   stages: {
     ...regression.stages,
     status: "unavailable",
-    summaryLabel: "Not a pipeline",
+    summaryLabel: "Pipeline timing unavailable",
+    detail: "Neither build exposed wfapi pipeline data.",
     items: []
   },
   console: {
     ...regression.console,
     status: "tooLarge",
-    summaryLabel: "Console too large to compare",
-    detail: "Both console logs exceed the 5 MB comparison limit.",
+    summaryLabel: "Logs too large for comparison",
+    detail: "Comparison stops after 5,242,880 bytes or 20,000 lines per build.",
+    divergenceLineLabel: undefined,
     baselineLines: [],
     targetLines: []
   }
 };
 
+const crossJob: BuildCompareViewModel = {
+  ...regression,
+  baseline: {
+    ...regression.baseline,
+    displayName: "web-app » release/2026.09 #312",
+    buildNumberLabel: "#312",
+    jobDisplayName: "web-app » release/2026.09",
+    buildUrl: "https://jenkins.example.com/job/web-app/job/release%2F2026.09/312/"
+  }
+};
+
 export const buildCompareScenarios: Record<string, BuildCompareViewModel> = {
   regression,
-  identical
+  identical,
+  crossJob
 };

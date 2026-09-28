@@ -3,8 +3,12 @@ import { PanelErrorList } from "../../../../shared/webview/components/PanelError
 
 type NodeDetailsAlertsProps = {
   errors: string[];
+  onRetry: () => void;
 };
-export function NodeDetailsAlerts({ errors }: NodeDetailsAlertsProps): React.JSX.Element | null {
+export function NodeDetailsAlerts({
+  errors,
+  onRetry
+}: NodeDetailsAlertsProps): React.JSX.Element | null {
   if (errors.length === 0) {
     return null;
   }
@@ -13,7 +17,8 @@ export function NodeDetailsAlerts({ errors }: NodeDetailsAlertsProps): React.JSX
     <PanelErrorList
       errors={errors}
       title="Unable to load full node details"
-      className="mb-3 py-2"
+      className="mb-3 flex flex-col gap-1 py-2"
+      onRetry={onRetry}
     />
   );
 }

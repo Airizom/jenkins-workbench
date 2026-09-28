@@ -1,6 +1,5 @@
 import { isFiniteNumber, toNonNegativeInteger } from "../shared/numbers";
 import { firstNonEmpty } from "../shared/stringValues";
-import { formatExecutorStatusLabel } from "./NodeExecutorFormatters";
 import type { JenkinsNodeExecutor } from "./types";
 
 export interface JenkinsNodeOfflineCauseFields {
@@ -126,20 +125,4 @@ export function resolveBusyExecutors(
         executor.idle === false
     ).length
   );
-}
-
-export function formatNodeIdleLabel(
-  node?: { idle?: boolean } | null,
-  unknownLabel = "Unknown"
-): string {
-  if (!node) {
-    return unknownLabel;
-  }
-  if (node.idle === true) {
-    return formatExecutorStatusLabel(true);
-  }
-  if (node.idle === false) {
-    return formatExecutorStatusLabel(false);
-  }
-  return unknownLabel;
 }

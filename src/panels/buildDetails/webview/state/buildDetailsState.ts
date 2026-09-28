@@ -15,16 +15,21 @@ import type { BuildDetailsStateMessage } from "../../shared/BuildDetailsPanelMes
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
 import { parseConsoleHtml, trimConsoleHtmlModelToTail } from "../lib/consoleHtml";
 
+export type PendingInputProcessingAction = "approve" | "reject";
+
 export type BuildDetailsState = Omit<BuildDetailsViewModel, "diagnostics"> & {
   diagnostics: BuildDiagnosticsViewModel;
   consoleHtmlModel?: ConsoleHtmlModel;
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   hasLoaded: boolean;
+  /** Webview-only: approve/reject requests awaiting `pendingInputActionComplete`. */
+  processingInputActions: Record<string, PendingInputProcessingAction>;
 };
 
 export type BuildDetailsAction =
   | BuildDetailsStateMessage
   | { type: "setFollowLog"; value: boolean }
+  | { type: "startPendingInputAction"; inputId: string; action: PendingInputProcessingAction }
   | { type: "updateDetails"; payload: BuildDetailsUpdateMessage };
 export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
@@ -92,7 +97,8 @@ const FALLBACK_STATE: BuildDetailsState = {
   errors: [],
   followLog: true,
   loading: true,
-  hasLoaded: false
+  hasLoaded: false,
+  processingInputActions: {}
 };
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
   const mergedDefaults = mergeBuildDetailsDefaults(initialState);
@@ -105,7 +111,8 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
       ? parseConsoleHtml(pipelineNodeLog.html)
       : undefined,
     consoleHtmlModel: undefined,
-    hasLoaded: !(initialState.loading ?? false)
+    hasLoaded: !(initialState.loading ?? false),
+    processingInputActions: {}
   };
   if (merged.consoleHtml) {
     return {
@@ -238,6 +245,24 @@ export function buildDetailsReducer(
     case "setLoading": {
       return { ...state, loading: action.value };
     }
+    case "startPendingInputAction": {
+      if (state.processingInputActions[action.inputId]) {
+        return state;
+      }
+      return {
+        ...state,
+        processingInputActions: {
+          ...state.processingInputActions,
+          [action.inputId]: action.action
+        }
+      };
+    }
+    case "pendingInputActionComplete": {
+      return {
+        ...state,
+        processingInputActions: omitKey(state.processingInputActions, action.inputId)
+      };
+    }
     case "updateDetails": {
       const payload = action.payload;
       return {
@@ -259,6 +284,10 @@ export function buildDetailsReducer(
             ? state.pipelineNodeLogHtmlModel
             : undefined,
         pendingInputs: payload.pendingInputs ?? [],
+        processingInputActions: prunePendingInputActions(
+          state.processingInputActions,
+          payload.pendingInputs ?? []
+        ),
         hasLoaded: true
       };
     }
@@ -296,6 +325,36 @@ function appendConsoleHtmlModel(
     nodes: [...current.nodes, ...parsed.nodes],
     text: current.text + parsed.text
   };
+}
+
+function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  if (!(key in record)) {
+    return record;
+  }
+  const { [key]: _omitted, ...rest } = record;
+  return rest;
+}
+
+// Inputs that are no longer pending cannot be acted on again, so drop their busy state.
+function prunePendingInputActions(
+  current: Record<string, PendingInputProcessingAction>,
+  pendingInputs: ReadonlyArray<{ id: string }>
+): Record<string, PendingInputProcessingAction> {
+  const ids = Object.keys(current);
+  if (ids.length === 0) {
+    return current;
+  }
+  const activeIds = new Set(pendingInputs.map((input) => input.id));
+  if (ids.every((id) => activeIds.has(id))) {
+    return current;
+  }
+  const next: Record<string, PendingInputProcessingAction> = {};
+  for (const id of ids) {
+    if (activeIds.has(id)) {
+      next[id] = current[id];
+    }
+  }
+  return next;
 }
 
 function matchesPipelineLogTarget(state: BuildDetailsState, targetKey?: string): boolean {

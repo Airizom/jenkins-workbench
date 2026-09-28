@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   clampZoomScale,
-  createFittedViewport
+  createFittedViewport,
+  revealRectInViewport
 } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/pipelineGraphViewport";
 
 describe("createFittedViewport", () => {
@@ -49,5 +50,43 @@ describe("clampZoomScale", () => {
   it("lets zoom in from a fitted scale below the minimum without jumping", () => {
     assert.ok(Math.abs(clampZoomScale(0.2, 0.22) - 0.22) < 1e-9);
     assert.equal(clampZoomScale(0.2, 0.18), 0.2);
+  });
+});
+
+describe("revealRectInViewport", () => {
+  const container = { clientWidth: 400, clientHeight: 300 };
+
+  it("keeps the same viewport when the rect is already visible", () => {
+    const viewport = { scale: 1, x: 0, y: 0 };
+
+    assert.equal(
+      revealRectInViewport(viewport, { x: 50, y: 50, width: 100, height: 60 }, container),
+      viewport
+    );
+  });
+
+  it("pans a rect beyond the right and bottom edges into view without zooming", () => {
+    const viewport = { scale: 0.5, x: 0, y: 0 };
+
+    const next = revealRectInViewport(
+      viewport,
+      { x: 1000, y: 700, width: 200, height: 100 },
+      container
+    );
+
+    assert.equal(next.scale, 0.5);
+    assert.equal(next.x + (1000 + 200) * 0.5, container.clientWidth - 24);
+    assert.equal(next.y + (700 + 100) * 0.5, container.clientHeight - 24);
+  });
+
+  it("aligns the start edge of a rect left of or above the viewport", () => {
+    const next = revealRectInViewport(
+      { scale: 1, x: -500, y: -200 },
+      { x: 100, y: 50, width: 80, height: 40 },
+      container
+    );
+
+    assert.equal(next.x + 100, 24);
+    assert.equal(next.y + 50, 24);
   });
 });

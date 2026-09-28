@@ -2,6 +2,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
+import { focusRingOutsetClassName } from "../../lib/focus";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
@@ -53,7 +54,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Component
         ref={ref}
         className={cn(
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+          focusRingOutsetClassName,
           "disabled:pointer-events-none disabled:opacity-50",
           buttonVariants({ variant, size: resolvedSize }),
           className

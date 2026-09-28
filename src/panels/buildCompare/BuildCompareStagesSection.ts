@@ -84,19 +84,39 @@ function buildAvailableStagesSection(
         baselineDurationLabel: baseline.durationLabel,
         targetDurationLabel: target.durationLabel,
         deltaLabel: delta?.label,
-        deltaDirection: delta?.direction
+        deltaDirection: delta?.direction,
+        deltaSignificant: delta?.significant
       });
     }
   });
 
   return {
     status: items.length > 0 ? "available" : "empty",
-    summaryLabel:
-      items.length > 0
-        ? `${formatNumber(items.length)} stage path${items.length === 1 ? "" : "s"} compared`
-        : "No comparable pipeline stages",
+    summaryLabel: items.length > 0 ? formatStagesSummary(items) : "No comparable pipeline stages",
     items
   };
+}
+
+function formatStagesSummary(items: BuildCompareStageDiffItem[]): string {
+  const parts = [
+    `${formatNumber(items.length)} stage path${items.length === 1 ? "" : "s"} compared`
+  ];
+  const slowerCount = countSignificantDeltas(items, "slower");
+  const fasterCount = countSignificantDeltas(items, "faster");
+  if (slowerCount > 0) {
+    parts.push(`${formatNumber(slowerCount)} slower`);
+  }
+  if (fasterCount > 0) {
+    parts.push(`${formatNumber(fasterCount)} faster`);
+  }
+  return parts.join(" · ");
+}
+
+function countSignificantDeltas(
+  items: BuildCompareStageDiffItem[],
+  direction: BuildCompareStageDeltaDirection
+): number {
+  return items.filter((item) => item.deltaSignificant && item.deltaDirection === direction).length;
 }
 
 function buildStageMap(run: PipelineRun | undefined): Map<string, StageEntry> {
@@ -136,10 +156,27 @@ function collectStageEntries(
   }
 }
 
+/**
+ * A timing delta only counts as a slowdown/speedup when it is large in both
+ * absolute and relative terms; smaller swings are ordinary run-to-run noise.
+ */
+const STAGE_DELTA_MIN_MS = 15_000;
+const STAGE_DELTA_MIN_RATIO = 0.1;
+
+function isSignificantStageDelta(baselineDuration: number, deltaMs: number): boolean {
+  const magnitude = Math.abs(deltaMs);
+  if (magnitude < STAGE_DELTA_MIN_MS) {
+    return false;
+  }
+  return baselineDuration <= 0 || magnitude / baselineDuration >= STAGE_DELTA_MIN_RATIO;
+}
+
 function formatDurationDelta(
   baselineDuration?: number,
   targetDuration?: number
-): { label: string; direction?: BuildCompareStageDeltaDirection } | undefined {
+):
+  | { label: string; direction?: BuildCompareStageDeltaDirection; significant?: boolean }
+  | undefined {
   if (
     typeof baselineDuration !== "number" ||
     !Number.isFinite(baselineDuration) ||
@@ -155,6 +192,7 @@ function formatDurationDelta(
   const prefix = delta > 0 ? "+" : "-";
   return {
     label: `${prefix}${formatDurationMs(Math.abs(delta))}`,
-    direction: delta > 0 ? "slower" : "faster"
+    direction: delta > 0 ? "slower" : "faster",
+    significant: isSignificantStageDelta(baselineDuration, delta)
   };
 }

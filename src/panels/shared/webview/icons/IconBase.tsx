@@ -15,7 +15,7 @@ const WIDTH_TOKEN = /^w-/;
 const SIZE_TOKEN = /^(?:h-|w-|size-)/;
 const BOTH_DIMENSIONS_TOKEN = /^size-/;
 const COLOR_TOKEN =
-  /^text-(?:aborted|accent|background|badge|border|card|checkbox|current|description|destructive|editor-widget|failure|focus|foreground|header|input(?:ErrorFg|InfoFg|WarningFg)?|link|list|muted|panel-border|popover|primary|progress|ring|secondary|selection|success|terminal|toolbar|warning)(?:$|[-/])/;
+  /^text-(?:aborted|accent|background|badge|border|card|checkbox|current|description|destructive|editor-widget|failure|focus|foreground|header|info|input(?:ErrorFg|InfoFg|WarningFg)?|link|list|muted|panel-border|popover|primary|progress|ring|secondary|selection|success|terminal|toolbar|warning)(?:$|[-/])/;
 
 export function resolveIconClassName(defaultClassName: string, className?: string): string {
   if (!className) {

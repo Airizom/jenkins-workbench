@@ -1,24 +1,23 @@
 import type * as React from "react";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
-import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeExecutorViewModel } from "../../../shared/NodeDetailsContracts";
-import { summarizeExecutorUtilization, utilizationLevel } from "./executorUtilization";
+import { type ExecutorUtilization, summarizeExecutorUtilization } from "./executorUtilization";
 
 type ExecutorUtilizationSummaryProps = {
   executors: NodeExecutorViewModel[];
   oneOffExecutors: NodeExecutorViewModel[];
   executorsLabel: string;
-  idleLabel: string;
+  activityLabel: string;
   isOffline: boolean;
 };
 export function ExecutorUtilizationSummary({
   executors,
   oneOffExecutors,
   executorsLabel,
-  idleLabel,
+  activityLabel,
   isOffline
 }: ExecutorUtilizationSummaryProps): React.JSX.Element {
-  const utilization = summarizeExecutorUtilization(executors, oneOffExecutors);
+  const utilization = summarizeExecutorUtilization(executors, oneOffExecutors, isOffline);
 
   if (utilization.total === 0) {
     return (
@@ -27,39 +26,52 @@ export function ExecutorUtilizationSummary({
           Executors: <span className="font-medium text-foreground">{executorsLabel}</span>
         </span>
         <span>
-          Activity: <span className="font-medium text-foreground">{idleLabel}</span>
+          Activity: <span className="font-medium text-foreground">{activityLabel}</span>
         </span>
         <OneOffExecutorBadge utilization={utilization} />
       </div>
     );
   }
 
-  const ratio = utilization.ratio ?? 0;
-  const percent = Math.round(ratio * 100);
+  const percent = Math.round((utilization.ratio ?? 0) * 100);
+  const counts: Array<{ label: string; value: number; muted: boolean }> = isOffline
+    ? [
+        ...(utilization.busy > 0 ? [{ label: "busy", value: utilization.busy, muted: false }] : []),
+        { label: "offline", value: utilization.offline, muted: false }
+      ]
+    : [
+        { label: "busy", value: utilization.busy, muted: false },
+        { label: "idle", value: utilization.idle, muted: true }
+      ];
 
-  // No role="img" wrapper: the busy/idle counts and percent are readable text.
+  // No role="img" wrapper: the counts and the bar caption are readable text.
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-1.5", isOffline && "opacity-60")}>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
       <div className="flex items-baseline gap-2 text-xs">
-        <span className="text-base font-semibold tabular-nums">{utilization.busy}</span>
-        <span className="text-muted-foreground">busy</span>
-        <span className="text-base font-semibold tabular-nums text-muted-foreground">
-          {utilization.idle}
-        </span>
-        <span className="text-muted-foreground">idle</span>
+        {counts.map((count) => (
+          <span key={count.label} className="inline-flex items-baseline gap-1">
+            <span
+              className={
+                count.muted
+                  ? "text-base font-semibold tabular-nums text-muted-foreground"
+                  : "text-base font-semibold tabular-nums"
+              }
+            >
+              {count.value}
+            </span>
+            <span className="text-muted-foreground">{count.label}</span>
+          </span>
+        ))}
       </div>
       <div className="flex min-w-[140px] max-w-[280px] flex-1 items-center gap-2">
-        <div className="monitor-gauge monitor-gauge--lg">
-          <div
-            className="monitor-gauge-fill"
-            data-level={utilizationLevel(ratio)}
-            style={{ width: `${percent}%` }}
-          />
+        <div className="monitor-gauge monitor-gauge--lg" data-offline={isOffline || undefined}>
+          <div className="monitor-gauge-fill" style={{ width: `${percent}%` }} />
         </div>
-        <span className="text-[11px] tabular-nums text-muted-foreground">{percent}%</span>
+        <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
+          {isOffline ? "Offline" : `${percent}% busy`}
+        </span>
       </div>
       <OneOffExecutorBadge utilization={utilization} />
-      {isOffline ? <span className="text-[11px] text-muted-foreground">Offline</span> : null}
     </div>
   );
 }
@@ -67,7 +79,7 @@ export function ExecutorUtilizationSummary({
 function OneOffExecutorBadge({
   utilization
 }: {
-  utilization: ReturnType<typeof summarizeExecutorUtilization>;
+  utilization: ExecutorUtilization;
 }): React.JSX.Element | null {
   if (utilization.oneOffTotal === 0) {
     return null;

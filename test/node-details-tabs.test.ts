@@ -59,8 +59,8 @@ describe("NodeDetailsTabs", () => {
     renderToStaticMarkup(
       React.createElement(NodeDetailsTabs, {
         state,
-        overviewRows: [],
         onDiagnosticsToggle: (value) => values.push(value),
+        onRetryDiagnostics: () => undefined,
         onCopyJson: () => undefined,
         onOpenExternal: () => undefined
       })

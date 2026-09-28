@@ -3,8 +3,95 @@
  * "components" first and demote Tailwind's base/preflight below utilities. */
 @layer theme, base, components, utilities;
 
+@layer base {
+  /* Diff colors follow VS Code's SCM decorations so "Removed" reads as a diff
+   * change rather than a test/build failure. */
+  :root {
+    --bc-diff-added: var(
+      --vscode-gitDecoration-addedResourceForeground,
+      var(--vscode-charts-green, #81b88b)
+    );
+    --bc-diff-removed: var(
+      --vscode-gitDecoration-deletedResourceForeground,
+      var(--vscode-charts-red, #c74e39)
+    );
+    --bc-diff-modified: var(
+      --vscode-gitDecoration-modifiedResourceForeground,
+      var(--vscode-charts-yellow, #e2c08d)
+    );
+  }
+}
+
 @layer components {
   .console-line + .console-line {
     border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  }
+
+  .bc-diff-badge {
+    --bc-diff-color: var(--bc-diff-modified);
+    color: color-mix(in srgb, var(--bc-diff-color) 65%, var(--foreground));
+    border-color: color-mix(in srgb, var(--bc-diff-color) 55%, transparent);
+    background-color: color-mix(in srgb, var(--bc-diff-color) 12%, transparent);
+  }
+
+  .bc-diff-badge[data-change="added"] {
+    --bc-diff-color: var(--bc-diff-added);
+  }
+
+  .bc-diff-badge[data-change="removed"] {
+    --bc-diff-color: var(--bc-diff-removed);
+  }
+}
+
+/* Narrow panels: comparison tables collapse into one stacked card per row with
+ * inline column labels, so Target and Change never scroll out of view. Kept
+ * unlayered so it overrides the cells' Tailwind padding/alignment utilities. */
+@media (max-width: 639.98px) {
+  .bc-stack-table table,
+  .bc-stack-table tbody,
+  .bc-stack-table tr,
+  .bc-stack-table th[scope="row"],
+  .bc-stack-table td {
+    display: block;
+    width: auto;
+  }
+
+  .bc-stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .bc-stack-table tr {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .bc-stack-table th[scope="row"] {
+    padding: 0 0 0.25rem;
+  }
+
+  .bc-stack-table td {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.125rem 0;
+    text-align: left;
+  }
+
+  .bc-stack-table td::before {
+    content: attr(data-label);
+    color: var(--muted-foreground);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+  }
+
+  .bc-stack-table td > * {
+    justify-self: start;
   }
 }

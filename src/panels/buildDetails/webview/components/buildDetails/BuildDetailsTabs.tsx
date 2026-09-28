@@ -30,6 +30,7 @@ import type {
 } from "../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
+import type { PendingInputProcessingAction } from "../../state/buildDetailsState";
 import { resolveBuildDetailsSelectedTab } from "./buildDetailsTabsModel";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { OverviewTab } from "./overview/OverviewTab";
@@ -45,12 +46,50 @@ function PipelineTabStatus({
   loading: boolean;
 }): React.JSX.Element | null {
   if (failedCount > 0) {
-    return <TabCountBadge count={failedCount} tone="failure" />;
+    return (
+      <TabStatusCount
+        count={failedCount}
+        tone="failure"
+        description={pluralize(failedCount, "failed stage", "failed stages")}
+      />
+    );
   }
   if (loading) {
-    return <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />;
+    return (
+      <span className="inline-flex items-center">
+        <span
+          aria-hidden="true"
+          className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+        />
+        <span className="sr-only">(Loading)</span>
+      </span>
+    );
   }
   return null;
+}
+
+/** Visible count badge with a screen-reader phrase so "Tests 2" reads as "2 failed tests". */
+function TabStatusCount({
+  count,
+  tone,
+  description
+}: {
+  count: number;
+  tone: "warning" | "failure";
+  description: string;
+}): React.JSX.Element {
+  return (
+    <>
+      <span aria-hidden="true" className="inline-flex">
+        <TabCountBadge count={count} tone={tone} />
+      </span>
+      <span className="sr-only">({description})</span>
+    </>
+  );
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function TestsTabStatus({
@@ -59,10 +98,21 @@ function TestsTabStatus({
   summary: BuildTestsSummaryViewModel;
 }): React.JSX.Element | null {
   if (summary.failedCount > 0) {
-    return <TabCountBadge count={summary.failedCount} tone="failure" />;
+    return (
+      <TabStatusCount
+        count={summary.failedCount}
+        tone="failure"
+        description={pluralize(summary.failedCount, "failed test", "failed tests")}
+      />
+    );
   }
   if (summary.hasAnyResults) {
-    return <CheckCircleIcon className="h-3 w-3 text-success" />;
+    return (
+      <>
+        <CheckCircleIcon className="h-3 w-3 text-success" />
+        <span className="sr-only">(all passed)</span>
+      </>
+    );
   }
   return null;
 }
@@ -74,6 +124,7 @@ type BuildDetailsTabsProps = {
   hasPipelineStages: boolean;
   hasTests: boolean;
   pendingInputs: PendingInputViewModel[];
+  processingInputActions?: Record<string, PendingInputProcessingAction>;
   pipelineStages: PipelineStageViewModel[];
   pipelineNodeLog: PipelineNodeLogViewModel;
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
@@ -115,6 +166,7 @@ export function BuildDetailsTabs({
   hasPipelineStages,
   hasTests,
   pendingInputs,
+  processingInputActions,
   pipelineStages,
   pipelineNodeLog,
   pipelineNodeLogHtmlModel,
@@ -173,7 +225,11 @@ export function BuildDetailsTabs({
             <TabsTrigger value="inputs" className="text-xs">
               <AlertCircleIcon className="h-3.5 w-3.5" />
               Inputs
-              <TabCountBadge count={pendingInputs.length} tone="warning" />
+              <TabStatusCount
+                count={pendingInputs.length}
+                tone="warning"
+                description={pluralize(pendingInputs.length, "pending input", "pending inputs")}
+              />
             </TabsTrigger>
           ) : null}
           {hasPipelineStages ? (
@@ -217,6 +273,7 @@ export function BuildDetailsTabs({
         <TabsContent value="inputs" className="space-y-2">
           <PendingInputsSection
             pendingInputs={pendingInputs}
+            processingActions={processingInputActions}
             onApprove={onApproveInput}
             onReject={onRejectInput}
           />
@@ -235,6 +292,7 @@ export function BuildDetailsTabs({
             onClearPipelineLog={onClearPipelineLog}
             onExportPipelineLog={onExportPipelineLog}
             onOpenExternal={onOpenExternal}
+            isRunning={resultClass === "running"}
             isActive={activeTab === "pipeline"}
           />
         </TabsContent>
@@ -248,6 +306,7 @@ export function BuildDetailsTabs({
           consoleMaxChars={consoleMaxChars}
           consoleError={consoleError}
           followLog={followLog}
+          isRunning={resultClass === "running"}
           isActive={activeTab === "console"}
           onToggleFollowLog={onToggleFollowLog}
           onExportLogs={onExportLogs}

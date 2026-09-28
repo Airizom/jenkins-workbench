@@ -1,5 +1,6 @@
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatBuildHeaderLabels } from "../../shared/build/BuildHeaderLabels";
+import { trimToUndefined } from "../../shared/stringValues";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
 import { evaluateOptionalPair } from "./BuildCompareLoadState";
 import type { BuildCompareBuildViewModel } from "./shared/BuildCompareContracts";
@@ -9,12 +10,63 @@ export function buildBuildViewModel(
   details: JenkinsBuildDetails
 ): BuildCompareBuildViewModel {
   const headerLabels = formatBuildHeaderLabels(details);
+  const buildNumberLabel = `#${details.number}`;
   return {
     roleLabel,
     displayName: details.fullDisplayName ?? details.displayName ?? roleLabel,
+    buildNumberLabel,
+    jobDisplayName: resolveJobDisplayName(details, buildNumberLabel),
     buildUrl: details.url,
     ...headerLabels
   };
+}
+
+/**
+ * Jenkins full display names are "<job path> <build display name>", so strip
+ * the build suffix; fall back to the /job/ segments of the build URL.
+ */
+function resolveJobDisplayName(
+  details: JenkinsBuildDetails,
+  buildNumberLabel: string
+): string | undefined {
+  const fullDisplayName = trimToUndefined(details.fullDisplayName);
+  if (fullDisplayName) {
+    for (const suffix of [trimToUndefined(details.displayName), buildNumberLabel]) {
+      if (suffix && fullDisplayName.endsWith(` ${suffix}`)) {
+        const jobName = trimToUndefined(fullDisplayName.slice(0, -(suffix.length + 1)));
+        if (jobName) {
+          return jobName;
+        }
+      }
+    }
+  }
+  return resolveJobNameFromUrl(details.url);
+}
+
+function resolveJobNameFromUrl(buildUrl: string): string | undefined {
+  let pathname: string;
+  try {
+    pathname = new URL(buildUrl).pathname;
+  } catch {
+    return undefined;
+  }
+  const segments = pathname.split("/").filter((segment) => segment.length > 0);
+  const jobNames: string[] = [];
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (segments[index] === "job") {
+      jobNames.push(safeDecodeUriComponent(segments[index + 1] ?? ""));
+      index += 1;
+    }
+  }
+  return jobNames.length > 0 ? jobNames.join(" » ") : undefined;
+}
+
+function safeDecodeUriComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 export { buildOccurrenceKey } from "../shared/TestCaseViewModel";

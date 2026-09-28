@@ -5,21 +5,25 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
-import { ArrowUpIcon } from "../../../../../shared/webview/icons";
+import { ArrowDownIcon, ArrowUpIcon } from "../../../../../shared/webview/icons";
 
 type ConsoleOutputViewportProps = {
   consoleOutputRef: RefObject<HTMLPreElement | null>;
   showScrollToTop: boolean;
-  followLog: boolean;
+  showJumpToLatest: boolean;
+  label?: string;
   onScrollToTop: () => void;
+  onJumpToLatest: () => void;
   segments: ReactNode[];
 };
 
 export function ConsoleOutputViewport({
   consoleOutputRef,
   showScrollToTop,
-  followLog,
+  showJumpToLatest,
+  label = "Console output",
   onScrollToTop,
+  onJumpToLatest,
   segments
 }: ConsoleOutputViewportProps): JSX.Element {
   return (
@@ -28,13 +32,28 @@ export function ConsoleOutputViewport({
         id="console-output"
         ref={consoleOutputRef}
         role="log"
-        // Only announce streamed output while following; static logs stay quiet.
-        aria-live={followLog ? "polite" : "off"}
-        className="console-output m-0 rounded border border-border bg-terminal px-3 py-2 font-mono text-terminal-foreground text-vscode-editor leading-relaxed shadow-inner whitespace-pre overflow-x-auto overflow-y-auto"
+        aria-label={label}
+        // Streamed lines stay silent; ConsoleLogViewer announces meaningful
+        // changes (build finished, output truncated) through a status region.
+        aria-live="off"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the log scrolls independently, so keyboard users need to focus it to scroll
+        tabIndex={0}
+        className="console-output m-0 rounded border border-border bg-terminal px-3 py-2 font-mono text-terminal-foreground text-vscode-editor leading-relaxed shadow-inner whitespace-pre overflow-x-auto overflow-y-auto focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-ring"
       >
         {segments}
       </pre>
-      {showScrollToTop && !followLog ? (
+      {showJumpToLatest ? (
+        <Button
+          className="absolute bottom-2 left-1/2 z-10 h-7 -translate-x-1/2 gap-1.5 rounded-full px-3 text-xs shadow-widget"
+          onClick={onJumpToLatest}
+          size="sm"
+          variant="default"
+        >
+          <ArrowDownIcon className="h-3.5 w-3.5" />
+          Jump to latest
+        </Button>
+      ) : null}
+      {showScrollToTop ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

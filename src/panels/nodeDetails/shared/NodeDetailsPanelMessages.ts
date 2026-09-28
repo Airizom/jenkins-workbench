@@ -72,7 +72,7 @@ const REQUIRED_STRING_FIELDS = [
   "name",
   "updatedAt",
   "statusLabel",
-  "idleLabel",
+  "activityLabel",
   "executorsLabel",
   "rawJson"
 ] as const;
@@ -87,6 +87,7 @@ const OPTIONAL_STRING_FIELDS = [
 ] as const;
 
 const REQUIRED_BOOLEAN_FIELDS = [
+  "detailsAvailable",
   "isOffline",
   "isTemporarilyOffline",
   "canTakeOffline",

@@ -14,6 +14,8 @@ import type {
   BuildCompareConsoleSectionViewModel,
   BuildCompareViewModel
 } from "./shared/BuildCompareContracts";
+import type { BuildCompareOutgoingMessage } from "./shared/BuildComparePanelMessages";
+import type { BuildComparePanelSerializedState } from "./shared/BuildComparePanelWebviewState";
 
 export interface BuildComparePanelLoadOptions {
   label?: string;
@@ -22,10 +24,16 @@ export interface BuildComparePanelLoadOptions {
 
 export type BuildComparePanelLoadResult = { status: "ok" } | { status: "missingAssets" };
 
+export interface BuildComparePanelRefreshOptions {
+  label?: string;
+  panelState: BuildComparePanelSerializedState;
+}
+
 export class BuildComparePanelController {
   private readonly view: BuildComparePanelView;
   private readonly loadTokenTracker = new LoadTokenTracker();
   private loadedConsoleSection?: BuildCompareConsoleSectionViewModel;
+  private hasRenderedComparison = false;
 
   constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.view = new BuildComparePanelView(panel, extensionUri);
@@ -35,6 +43,12 @@ export class BuildComparePanelController {
   dispose(): void {
     this.loadTokenTracker.next();
     this.loadedConsoleSection = undefined;
+    this.hasRenderedComparison = false;
+  }
+
+  /** True once the React app shows a comparison that refresh/swap can update in place. */
+  get canUpdateInPlace(): boolean {
+    return this.hasRenderedComparison;
   }
 
   /**
@@ -62,6 +76,7 @@ export class BuildComparePanelController {
   ): Promise<BuildComparePanelLoadResult> {
     const token = this.loadTokenTracker.next();
     this.loadedConsoleSection = undefined;
+    this.hasRenderedComparison = false;
     const nonce = createNonce();
     const assets = this.view.resolveAssetsAndRenderLoading({
       nonce,
@@ -101,6 +116,7 @@ export class BuildComparePanelController {
       nonce,
       panelState: options?.panelState
     });
+    this.hasRenderedComparison = true;
     void this.loadConsoleSection(
       token,
       backend,
@@ -110,6 +126,65 @@ export class BuildComparePanelController {
       targetBuildUrl
     );
     return { status: "ok" };
+  }
+
+  /**
+   * Reloads the comparison and posts it to the already-rendered webview. On
+   * failure the webview keeps its last good content and shows the error inline.
+   * Resolves to false when a newer load superseded this one.
+   */
+  async refresh(
+    backend: BuildCompareBackend,
+    compareOptions: BuildCompareOptions,
+    environment: JenkinsEnvironmentRef,
+    baselineBuildUrl: string,
+    targetBuildUrl: string,
+    options: BuildComparePanelRefreshOptions
+  ): Promise<boolean> {
+    const token = this.loadTokenTracker.next();
+    const previousConsoleSection = this.loadedConsoleSection;
+    this.loadedConsoleSection = undefined;
+
+    let model: BuildCompareViewModel;
+    try {
+      model = await loadBuildCompareViewModel(backend, {
+        compareOptions,
+        environment,
+        baselineBuildUrl,
+        targetBuildUrl
+      });
+    } catch (error) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
+        return false;
+      }
+      this.loadedConsoleSection = previousConsoleSection;
+      await this.view.postMessage({
+        type: "buildCompareRefreshFailed",
+        message: `Build comparison could not be refreshed. ${formatError(error)}`
+      } satisfies BuildCompareOutgoingMessage);
+      throw error;
+    }
+    if (!this.loadTokenTracker.isCurrent(token)) {
+      return false;
+    }
+
+    this.view.setTitle(
+      options.label ?? `${model.baseline.displayName} vs ${model.target.displayName}`
+    );
+    await this.view.postMessage({
+      type: "updateBuildCompare",
+      model,
+      panelState: options.panelState
+    } satisfies BuildCompareOutgoingMessage);
+    void this.loadConsoleSection(
+      token,
+      backend,
+      compareOptions,
+      environment,
+      baselineBuildUrl,
+      targetBuildUrl
+    );
+    return true;
   }
 
   private async loadConsoleSection(
@@ -133,6 +208,6 @@ export class BuildComparePanelController {
     await this.view.postMessage({
       type: "updateConsoleSection",
       console
-    });
+    } satisfies BuildCompareOutgoingMessage);
   }
 }

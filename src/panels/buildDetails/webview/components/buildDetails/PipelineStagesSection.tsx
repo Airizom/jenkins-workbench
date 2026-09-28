@@ -10,10 +10,13 @@ import { StageNode } from "./pipelineStages/StageNode";
 const { useEffect, useMemo, useState } = React;
 export function PipelineStagesSection({
   stages,
+  expandedStageKey,
   onRestartStage,
   onSelectPipelineLog
 }: {
   stages: PipelineStageViewModel[];
+  /** Stage to open when it changes (for example the default failed stage). */
+  expandedStageKey?: string;
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
 }) {
@@ -27,6 +30,15 @@ export function PipelineStagesSection({
     setOpenStages((prev) => prev.filter((id) => stageIdSet.has(id)));
     setShowAllStages((prev) => pruneStageFlags(prev, stageIdSet));
   }, [stageIdSet]);
+
+  const expandedStageId =
+    expandedStageKey && stageIdSet.has(expandedStageKey) ? expandedStageKey : undefined;
+  useEffect(() => {
+    if (!expandedStageId) {
+      return;
+    }
+    setOpenStages((prev) => (prev.includes(expandedStageId) ? prev : [...prev, expandedStageId]));
+  }, [expandedStageId]);
 
   return (
     <Accordion type="multiple" value={openStages} onValueChange={setOpenStages}>

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { CompareSectionStatus } from "../../../../shared/BuildCompareContracts";
 import { CompareEmptyState } from "./CompareEmptyState";
-import { SectionCard } from "./SectionCard";
+import { SectionCard, type SectionCardDisclosureProps } from "./SectionCard";
 
 function resolveEmptyLabel(status: CompareSectionStatus, emptyLabel: string): string | undefined {
   switch (status) {
@@ -26,7 +26,7 @@ type CompareItemsSectionProps<TItem> = {
   items: TItem[];
   emptyLabel: string;
   renderItems: (items: TItem[]) => ReactNode;
-};
+} & SectionCardDisclosureProps;
 export function CompareItemsSection<TItem>({
   title,
   summary,
@@ -34,12 +34,13 @@ export function CompareItemsSection<TItem>({
   status,
   items,
   emptyLabel,
-  renderItems
+  renderItems,
+  ...disclosure
 }: CompareItemsSectionProps<TItem>): React.JSX.Element {
   const emptyStateLabel = resolveEmptyLabel(status, emptyLabel);
 
   return (
-    <SectionCard title={title} summary={summary} detail={detail} status={status}>
+    <SectionCard title={title} summary={summary} detail={detail} status={status} {...disclosure}>
       {items.length > 0 ? (
         renderItems(items)
       ) : emptyStateLabel ? (

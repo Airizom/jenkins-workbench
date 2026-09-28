@@ -1,10 +1,14 @@
 import * as React from "react";
+import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
+import { PanelHeader } from "../../shared/webview/components/PanelHeader";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
+import { Button } from "../../shared/webview/components/ui/button";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
+import { ExternalLinkIcon, ServerIcon } from "../../shared/webview/icons";
 import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
@@ -12,7 +16,6 @@ import type { NodeAction } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsHero } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
 import {
-  buildOverviewRows,
   formatRelativeTime,
   isStaleUpdatedAt,
   parseDate
@@ -30,7 +33,6 @@ export function NodeDetailsApp(): React.JSX.Element {
 
   useNodeDetailsMessages(dispatch);
 
-  const overviewRows = useMemo(() => buildOverviewRows(state), [state]);
   const updatedAtDate = useMemo(() => parseDate(state.updatedAt), [state.updatedAt]);
   const updatedAtLabel = useMemo(
     () => formatRelativeTime(updatedAtDate, now),
@@ -104,6 +106,45 @@ export function NodeDetailsApp(): React.JSX.Element {
     });
   };
 
+  const handleRetryDiagnostics = () => {
+    postMessage({ type: "loadAdvancedNodeDetails" });
+  };
+
+  // Nothing loaded yet and the load failed: show one failure view instead of
+  // an "Unknown" node with empty labels, executors, and queue.
+  if (!state.detailsAvailable && state.errors.length > 0) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        {state.loading ? (
+          <div className="fixed inset-x-0 top-0 z-50">
+            <Progress indeterminate className="h-px rounded-none" />
+          </div>
+        ) : null}
+        <PanelHeader
+          eyebrowIcon={<ServerIcon className="h-3.5 w-3.5" />}
+          eyebrow="Node Details"
+          title="Node details unavailable"
+          actions={
+            state.url ? (
+              <Button variant="secondary" size="sm" onClick={handleOpen}>
+                <ExternalLinkIcon className="h-3.5 w-3.5" />
+                Open in Jenkins
+              </Button>
+            ) : undefined
+          }
+        />
+        <main className="mx-auto w-full max-w-6xl px-4 py-4" aria-busy={state.loading}>
+          <PanelErrorList
+            errors={state.errors}
+            title="Couldn't load node details"
+            className="flex flex-col gap-1"
+            onRetry={state.loading ? undefined : handleRefresh}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -128,23 +169,24 @@ export function NodeDetailsApp(): React.JSX.Element {
           canOpenAgentInstructions={state.canOpenAgentInstructions}
           hasUrl={Boolean(state.url)}
           showOfflineBanner={showOfflineBanner}
+          isOffline={state.isOffline}
           offlineReason={state.offlineReason}
           executors={state.executors}
           oneOffExecutors={state.oneOffExecutors}
           executorsLabel={state.executorsLabel}
-          idleLabel={state.idleLabel}
+          activityLabel={state.activityLabel}
           onRefresh={handleRefresh}
           onNodeAction={handleNodeAction}
           onLaunchAgent={handleLaunchAgent}
           onOpen={handleOpen}
         />
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
-          <NodeDetailsAlerts errors={state.errors} />
+          <NodeDetailsAlerts errors={state.errors} onRetry={handleRefresh} />
 
           <NodeDetailsTabs
             state={state}
-            overviewRows={overviewRows}
             onDiagnosticsToggle={handleDiagnosticsToggle}
+            onRetryDiagnostics={handleRetryDiagnostics}
             onCopyJson={handleCopyJson}
             onOpenExternal={handleOpenExternal}
           />

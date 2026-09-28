@@ -37,6 +37,7 @@ import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
+import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export type {
   BuildDetailsPanelControllerAccess,
@@ -376,5 +377,9 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
   endLoading(request: number): void {
     this.loadTracker.endLoading(request);
+  }
+
+  postMessage(message: BuildDetailsOutgoingMessage): void {
+    this.view.postMessage(message);
   }
 }

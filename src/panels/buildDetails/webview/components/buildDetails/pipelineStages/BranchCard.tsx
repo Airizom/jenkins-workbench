@@ -14,6 +14,7 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getStageIcon } from "./PipelineStageIcons";
+import { formatStatusText } from "./pipelineStagesUtils";
 import { StepsList } from "./StepsList";
 
 const { useState } = React;
@@ -31,11 +32,12 @@ export function BranchCard({
   const branchIcon = getStageIcon(branch.statusClass);
   const statusClass = getResultBadgeClass(branch.statusClass);
   const branchTarget = branch.logTarget;
+  const branchName = branch.name || "Branch";
   const branchLogLabel = `Open log for ${branch.name.trim() || "branch"}`;
 
   return (
-    <Collapsible open={expanded} onOpenChange={setExpanded} className="group">
-      <div className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors group-data-[state=open]:border-border group-data-[state=open]:bg-muted-strong">
+    <Collapsible open={expanded} onOpenChange={setExpanded} className="group/branch">
+      <div className="overflow-hidden rounded border border-mutedBorder bg-muted-soft transition-colors group-data-[state=open]/branch:border-border group-data-[state=open]/branch:bg-muted-strong">
         <div className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-accent-soft">
           <CollapsibleTrigger asChild>
             <button
@@ -44,6 +46,7 @@ export function BranchCard({
             >
               <div className="flex min-w-0 items-center gap-1.5">
                 <div
+                  aria-hidden="true"
                   className={cn(
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[9px]",
                     statusClass
@@ -51,14 +54,17 @@ export function BranchCard({
                 >
                   {branchIcon}
                 </div>
-                <span className="truncate text-[11px] font-medium">{branch.name || "Branch"}</span>
+                <span className="truncate text-[11px] font-medium" title={branchName}>
+                  {branchName}
+                </span>
+                <span className="sr-only">, {formatStatusText(branch.statusLabel)}</span>
               </div>
               <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
                 <span>{branch.durationLabel}</span>
                 <ChevronDownIcon
                   className={cn(
                     "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-                    "group-data-[state=open]:rotate-180 group-data-[state=open]:text-foreground"
+                    "group-data-[state=open]/branch:rotate-180 group-data-[state=open]/branch:text-foreground"
                   )}
                 />
               </div>

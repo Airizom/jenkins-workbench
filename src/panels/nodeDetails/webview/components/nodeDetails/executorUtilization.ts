@@ -3,17 +3,18 @@ import type { NodeExecutorViewModel } from "../../../shared/NodeDetailsContracts
 export interface ExecutorUtilization {
   total: number;
   busy: number;
+  /** Always 0 for an offline node: its free executors are unavailable, not idle. */
   idle: number;
+  offline: number;
   oneOffTotal: number;
   oneOffBusy: number;
   ratio: number | undefined;
 }
 
-export type UtilizationLevel = "low" | "medium" | "saturated";
-
 export function summarizeExecutorUtilization(
   executors: NodeExecutorViewModel[],
-  oneOffExecutors: NodeExecutorViewModel[]
+  oneOffExecutors: NodeExecutorViewModel[],
+  isOffline = false
 ): ExecutorUtilization {
   const total = executors.length;
   const busy = executors.filter((executor) => !executor.isIdle).length;
@@ -22,24 +23,25 @@ export function summarizeExecutorUtilization(
   return {
     total,
     busy,
-    idle: total - busy,
+    idle: isOffline ? 0 : total - busy,
+    offline: isOffline ? total - busy : 0,
     oneOffTotal,
     oneOffBusy,
     ratio: total > 0 ? busy / total : undefined
   };
 }
 
-/**
- * A fully busy node is often healthy, so the top band renders as a warning
- * (saturated) rather than a failure; red is reserved for genuine faults such
- * as offline or stuck states.
- */
-export function utilizationLevel(ratio: number): UtilizationLevel {
-  if (ratio < 0.5) {
-    return "low";
+/** "3 busy · 1 idle" for online nodes, "4 offline" (plus any draining builds) for offline ones. */
+export function formatExecutorCounts(utilization: ExecutorUtilization): string {
+  if (utilization.offline > 0) {
+    return utilization.busy > 0
+      ? `${utilization.busy} busy · ${utilization.offline} offline`
+      : `${utilization.offline} offline`;
   }
-  if (ratio < 0.9) {
-    return "medium";
-  }
-  return "saturated";
+  return `${utilization.busy} busy · ${utilization.idle} idle`;
+}
+
+/** Executor ids are "#0" when Jenkins reports a number, else a label like "Executor 1". */
+export function formatExecutorName(id: string): string {
+  return /^#?\d+$/.test(id) ? `Executor #${id.replace(/^#/, "")}` : id;
 }

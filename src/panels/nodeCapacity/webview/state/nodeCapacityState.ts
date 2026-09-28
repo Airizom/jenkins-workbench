@@ -1,5 +1,4 @@
 import type {
-  NodeCapacityExecutorViewModel,
   NodeCapacityNodeExecutorsUpdateMessage,
   NodeCapacityNodeViewModel,
   NodeCapacityPoolViewModel,
@@ -14,10 +13,23 @@ import type { NodeCapacityOutgoingMessage } from "../../shared/NodeCapacityPanel
 
 export type NodeCapacityState = NodeCapacityViewModel & {
   hasLoaded: boolean;
-  snapshotGeneration: number;
+  /**
+   * True once a snapshot with real capacity data arrived. A later failed
+   * refresh keeps that data (marked stale) instead of replacing it with zeros.
+   */
+  hasData: boolean;
+  /** Latest executor request id per node URL; older responses are ignored. */
+  executorRequestIds: Readonly<Record<string, number>>;
 };
 
-export type NodeCapacityAction = NodeCapacityOutgoingMessage;
+/** Local action dispatched when the webview posts `loadNodeCapacityExecutors`. */
+export interface NodeCapacityExecutorsRequestedAction {
+  type: "executorsRequested";
+  requestId: number;
+  nodeUrls: string[];
+}
+
+export type NodeCapacityAction = NodeCapacityOutgoingMessage | NodeCapacityExecutorsRequestedAction;
 
 const FALLBACK_STATE: NodeCapacityState = {
   environmentLabel: "Jenkins",
@@ -28,8 +40,14 @@ const FALLBACK_STATE: NodeCapacityState = {
   errors: [],
   loading: true,
   hasLoaded: false,
-  snapshotGeneration: 0
+  hasData: false,
+  executorRequestIds: {}
 };
+
+/** The host's error view model: errors with no capacity data at all. */
+function isFailedSnapshot(model: NodeCapacityViewModel): boolean {
+  return (model.errors?.length ?? 0) > 0 && (model.pools?.length ?? 0) === 0;
+}
 
 export function buildInitialState(initialState: NodeCapacityViewModel): NodeCapacityState {
   return {
@@ -41,7 +59,8 @@ export function buildInitialState(initialState: NodeCapacityViewModel): NodeCapa
     errors: initialState.errors ?? [],
     loading: false,
     hasLoaded: true,
-    snapshotGeneration: 0
+    hasData: !isFailedSnapshot(initialState),
+    executorRequestIds: {}
   };
 }
 
@@ -58,22 +77,25 @@ export function nodeCapacityReducer(
     case "setLoading":
       return panelStateHelpers.handleSetLoading(state, action.value);
     case "updateNodeCapacity": {
+      if (state.hasData && isFailedSnapshot(action.payload)) {
+        return {
+          ...state,
+          errors: action.payload.errors,
+          hasLoaded: true
+        };
+      }
       const next = panelStateHelpers.handleFullUpdate(state, action.payload);
       return {
         ...next,
-        snapshotGeneration: state.snapshotGeneration + 1,
+        hasData: state.hasData || !isFailedSnapshot(action.payload),
+        executorRequestIds: state.executorRequestIds,
         pools: carryOverLoadedExecutors(state.pools, next.pools)
       };
     }
-    case "updateNodeCapacityNodeExecutors": {
-      if (action.snapshotGeneration !== state.snapshotGeneration) {
-        return state;
-      }
-      return {
-        ...state,
-        pools: applyExecutorUpdates(state.pools, action.payload)
-      };
-    }
+    case "executorsRequested":
+      return markExecutorsRequested(state, action);
+    case "updateNodeCapacityNodeExecutors":
+      return applyExecutorUpdates(state, action);
     default:
       return state;
   }
@@ -100,52 +122,96 @@ export function isStaleCapacityTimestamp(updatedAt: string | undefined, now: num
   return now - timestamp > NODE_CAPACITY_STALE_AFTER_MS;
 }
 
+function markExecutorsRequested(
+  state: NodeCapacityState,
+  action: NodeCapacityExecutorsRequestedAction
+): NodeCapacityState {
+  if (action.nodeUrls.length === 0) {
+    return state;
+  }
+  const requested = new Set(action.nodeUrls);
+  const executorRequestIds = { ...state.executorRequestIds };
+  for (const nodeUrl of requested) {
+    executorRequestIds[nodeUrl] = action.requestId;
+  }
+  return {
+    ...state,
+    executorRequestIds,
+    pools: mapNodesInPools(state.pools, (node) =>
+      node.nodeUrl && requested.has(node.nodeUrl)
+        ? { ...node, executorsLoadState: "loading", executorsError: undefined }
+        : node
+    )
+  };
+}
+
 function applyExecutorUpdates(
-  pools: NodeCapacityPoolViewModel[],
-  updates: NodeCapacityNodeExecutorsUpdateMessage["payload"]
-): NodeCapacityPoolViewModel[] {
-  const executorsByNodeUrl = new Map(updates.map((entry) => [entry.nodeUrl, entry.executors]));
-  return mapNodesInPools(pools, (node) => {
-    if (!node.nodeUrl || !executorsByNodeUrl.has(node.nodeUrl)) {
-      return node;
-    }
-    return {
-      ...node,
-      executorsLoaded: true,
-      executors: executorsByNodeUrl.get(node.nodeUrl) ?? []
-    };
-  });
+  state: NodeCapacityState,
+  action: NodeCapacityNodeExecutorsUpdateMessage
+): NodeCapacityState {
+  const current = action.payload.filter(
+    (entry) => state.executorRequestIds[entry.nodeUrl] === action.requestId
+  );
+  if (current.length === 0) {
+    return state;
+  }
+  const resultsByNodeUrl = new Map(current.map((entry) => [entry.nodeUrl, entry]));
+  return {
+    ...state,
+    pools: mapNodesInPools(state.pools, (node) => {
+      const result = node.nodeUrl ? resultsByNodeUrl.get(node.nodeUrl) : undefined;
+      if (!result) {
+        return node;
+      }
+      if (result.error !== undefined) {
+        return { ...node, executorsLoadState: "error", executorsError: result.error };
+      }
+      return {
+        ...node,
+        executorsLoaded: true,
+        executors: result.executors,
+        executorsLoadState: undefined,
+        executorsError: undefined
+      };
+    })
+  };
 }
 
 /**
- * Full updates rebuild every node with `executorsLoaded: false`; keep previously
- * hydrated executor lists so expanded pools do not flash empty between the
- * update and the follow-up executor fetch.
+ * Full updates rebuild every node with `executorsLoaded: false` and no load
+ * state; keep previously hydrated executor lists and in-flight/error status so
+ * expanded pools do not flash empty or lose their inline error between the
+ * update and the next executor response.
  */
 function carryOverLoadedExecutors(
   previousPools: NodeCapacityPoolViewModel[],
   nextPools: NodeCapacityPoolViewModel[]
 ): NodeCapacityPoolViewModel[] {
-  const loadedExecutorsByNodeUrl = new Map<string, NodeCapacityExecutorViewModel[]>();
+  const previousByNodeUrl = new Map<string, NodeCapacityNodeViewModel>();
   for (const pool of previousPools) {
     for (const node of pool.nodes) {
-      if (node.nodeUrl && node.executorsLoaded) {
-        loadedExecutorsByNodeUrl.set(node.nodeUrl, node.executors);
+      if (node.nodeUrl && (node.executorsLoaded || node.executorsLoadState)) {
+        previousByNodeUrl.set(node.nodeUrl, node);
       }
     }
   }
-  if (loadedExecutorsByNodeUrl.size === 0) {
+  if (previousByNodeUrl.size === 0) {
     return nextPools;
   }
   return mapNodesInPools(nextPools, (node) => {
-    if (node.executorsLoaded || !node.nodeUrl) {
+    const previous = node.nodeUrl ? previousByNodeUrl.get(node.nodeUrl) : undefined;
+    if (!previous) {
       return node;
     }
-    const executors = loadedExecutorsByNodeUrl.get(node.nodeUrl);
-    if (!executors) {
-      return node;
+    const carried: NodeCapacityNodeViewModel = {
+      ...node,
+      executorsLoadState: previous.executorsLoadState,
+      executorsError: previous.executorsError
+    };
+    if (node.executorsLoaded || !previous.executorsLoaded) {
+      return carried;
     }
-    return { ...node, executorsLoaded: true, executors };
+    return { ...carried, executorsLoaded: true, executors: previous.executors };
   });
 }
 

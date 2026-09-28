@@ -54,7 +54,7 @@ export function formatTestReportCountsSummary(input: TestReportCountSummaryInput
   if (typeof input.failed === "number" && typeof input.total === "number") {
     let label = `Failed ${formatNumber(input.failed)} / ${formatNumber(input.total)}`;
     if (typeof input.skipped === "number") {
-      label += ` • Skipped ${formatNumber(input.skipped)}`;
+      label += ` · Skipped ${formatNumber(input.skipped)}`;
     }
     return label;
   }

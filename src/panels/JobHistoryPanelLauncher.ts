@@ -4,10 +4,11 @@ import { ensureTrailingSlash, parseJobUrl } from "../jenkins/urls";
 import { isPlainRecord } from "../shared/runtimeGuards";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { HistoryController, type HistoryDependencies } from "./jobHistory/HistoryController";
-import { normalizeHistoryUi } from "./jobHistory/shared/HistoryContracts";
+import { historyJobDisplayName, normalizeHistoryUi } from "./jobHistory/shared/HistoryContracts";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
 import {
   assignWebviewPanelManifestErrorHtml,
+  createMissingPanelAssetsMessages,
   createTypedPanelRenderer
 } from "./shared/webview/WebviewHtml";
 import { createNonce } from "./shared/webview/WebviewNonce";
@@ -16,6 +17,10 @@ import {
   isSerializedEnvironmentState,
   resolveEnvironmentRef
 } from "./shared/webview/WebviewPanelState";
+
+function jobHistoryPanelTitle(jobUrl: string): string {
+  return `History: ${historyJobDisplayName(jobUrl)}`;
+}
 
 export class JobHistoryPanelLauncher {
   private panels = new Map<string, vscode.WebviewPanel>();
@@ -37,7 +42,7 @@ export class JobHistoryPanelLauncher {
     }
     const panel = vscode.window.createWebviewPanel(
       "jenkinsWorkbench.jobHistory",
-      "Job History",
+      jobHistoryPanelTitle(jobUrl),
       vscode.ViewColumn.Active,
       {
         enableScripts: true,
@@ -76,6 +81,7 @@ export class JobHistoryPanelLauncher {
       ensureTrailingSlash(jobUrl)
     ]);
     this.panels.set(key, panel);
+    panel.title = jobHistoryPanelTitle(jobUrl);
     const controller = new HistoryController(panel, this.dependencies);
     panel.onDidDispose(() => {
       controller.dispose();
@@ -97,11 +103,12 @@ export class JobHistoryPanelLauncher {
         }
       );
     } catch {
-      assignWebviewPanelManifestErrorHtml(panel, this.extensionUri, "jobHistory", {
-        title: "Job History",
-        message: "Job History assets are missing. Run npm run compile.",
-        hint: "Reopen Job History after compiling."
-      });
+      assignWebviewPanelManifestErrorHtml(
+        panel,
+        this.extensionUri,
+        "jobHistory",
+        createMissingPanelAssetsMessages({ title: "Job History", panelLabel: "Job History" })
+      );
       return;
     }
     controller.restore(historyUi);

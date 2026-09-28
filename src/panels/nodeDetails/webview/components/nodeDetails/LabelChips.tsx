@@ -31,7 +31,11 @@ export function LabelChips({ labels }: LabelChipsProps): React.JSX.Element {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {visible.map((label) => (
-        <Badge key={label} variant="secondary" className="text-xs px-2 py-0.5 break-all">
+        <Badge
+          key={label}
+          variant="secondary"
+          className="text-xs px-2 py-0.5 whitespace-normal break-all"
+        >
           {label}
         </Badge>
       ))}

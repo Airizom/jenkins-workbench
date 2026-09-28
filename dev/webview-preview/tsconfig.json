@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node", "react", "react-dom", "vite/client"]
   },
-  "include": ["*.ts", "fixtures/*.ts"]
+  "include": ["*.ts", "*.tsx", "fixtures/*.ts"]
 }

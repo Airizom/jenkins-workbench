@@ -56,10 +56,20 @@
   }
 
   /* Extra specificity so this wins over the shared .sticky-header rule
-   * regardless of layer source order. */
+   * regardless of layer source order. Docks under the tab bar (whose height
+   * useTabsBarHeightVariable publishes) and stacks below it. */
   .sticky-header.sticky-header--below-hero {
-    top: var(--sticky-hero-offset, 0px);
-    z-index: 5;
+    top: calc(var(--sticky-hero-offset, 0px) + var(--build-details-tabs-bar-height, 0px));
+    z-index: 4;
+  }
+
+  /* Keeps a revealed log pane clear of the docked hero and tab bar. */
+  .pipeline-log-pane {
+    scroll-margin-top: calc(
+      var(--sticky-hero-offset, 0px) +
+      var(--build-details-tabs-bar-height, 0px) +
+      0.5rem
+    );
   }
 
   .console-output {
@@ -107,6 +117,22 @@
   .donut-segment {
     transition: stroke-dashoffset 600ms ease;
   }
+}
+
+/* Unlayered so hover shadow utilities cannot hide it. Distinct from hover
+ * (shadow only): an inset focus-colored ring inside the status border, plus
+ * the high-contrast active border when the theme defines one. */
+.pipeline-graph-node--selected {
+  box-shadow:
+    inset 0 0 0 2px var(--vscode-focusBorder, var(--ring)),
+    0 10px 20px -10px color-mix(in srgb, var(--foreground) 35%, transparent);
+  outline: 1px dashed var(--vscode-contrastActiveBorder, transparent);
+  outline-offset: -4px;
+}
+
+.pipeline-graph-node--selected:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder, var(--ring));
+  outline-offset: -5px;
 }
 
 @keyframes stage-strip-pulse {

@@ -92,12 +92,6 @@ function pool(
     statusLabel,
     nodes,
     queueItems,
-    offlineImpact: offlineNodes.map((item) => ({
-      nodeName: item.displayName,
-      nodeUrl: item.nodeUrl,
-      executors: item.totalExecutors,
-      reason: item.offlineReason
-    })),
     totalNodes: nodes.length,
     onlineNodes: nodes.length - offlineNodes.length,
     offlineNodes: offlineNodes.length,
@@ -117,7 +111,7 @@ const pools: NodeCapacityPoolViewModel[] = [
     "linux",
     "linux",
     "critical",
-    "Saturated",
+    "Stuck queue",
     [
       node("build-agent-01", ["linux", "docker"], 4, 4),
       node("build-agent-02", ["linux", "docker"], 4, 4),
@@ -133,11 +127,11 @@ const pools: NodeCapacityPoolViewModel[] = [
     "macos",
     "macos",
     "warning",
-    "Busy",
+    "Queue pressure",
     [node("mac-mini-01", ["macos", "xcode"], 2, 2), node("mac-mini-02", ["macos", "xcode"], 2, 1)],
     [queueItem(4, "ios-app", "macos", 3)]
   ),
-  pool("windows", "windows", "normal", "Healthy", [node("win-agent-01", ["windows"], 2, 0)], [])
+  pool("windows", "windows", "normal", "Available", [node("win-agent-01", ["windows"], 2, 0)], [])
 ];
 
 const busy: NodeCapacityViewModel = {
@@ -155,7 +149,7 @@ const busy: NodeCapacityViewModel = {
     stuckCount: 1,
     blockedCount: 0,
     buildableCount: 5,
-    bottleneckCount: 2
+    saturatedPoolCount: 1
   },
   pools,
   hiddenLabelQueueItems: [queueItem(5, "docs-site", "hugo", 1)],
@@ -177,10 +171,20 @@ const empty: NodeCapacityViewModel = {
     queuedCount: 0,
     stuckCount: 0,
     buildableCount: 0,
-    bottleneckCount: 0
+    saturatedPoolCount: 0
   },
   pools: [],
   hiddenLabelQueueItems: []
 };
 
-export const nodeCapacityScenarios: Record<string, NodeCapacityViewModel> = { busy, empty };
+const error: NodeCapacityViewModel = {
+  ...empty,
+  environmentLabel: "jenkins.example.com",
+  errors: ["Request failed with status 503 (Service Unavailable)."]
+};
+
+export const nodeCapacityScenarios: Record<string, NodeCapacityViewModel> = {
+  busy,
+  empty,
+  error
+};

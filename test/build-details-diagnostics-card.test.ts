@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
-import { EMPTY_BUILD_DIAGNOSTICS } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
-import { describeBuildDiagnostics } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureDiagnosticsCard";
+import {
+  type BuildDiagnosticsViewModel,
+  EMPTY_BUILD_DIAGNOSTICS
+} from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import {
+  BuildFailureDiagnosticsCard,
+  describeBuildDiagnostics
+} from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureDiagnosticsCard";
+
+function renderCard(diagnostics: BuildDiagnosticsViewModel): string {
+  return renderToStaticMarkup(
+    createElement(BuildFailureDiagnosticsCard, {
+      diagnostics,
+      onOpenSource: () => undefined,
+      onShowProblems: () => undefined,
+      onConfigure: () => undefined
+    })
+  );
+}
 
 describe("Build Details diagnostics card", () => {
   it("describes scan states and source-resolution limits", () => {
@@ -34,5 +53,29 @@ describe("Build Details diagnostics card", () => {
     });
 
     assert.equal(summary.emptyMessage, "Choose the checkout for team/service.");
+  });
+
+  it("names diagnostic rows by severity and message rather than position", () => {
+    const html = renderCard({
+      ...EMPTY_BUILD_DIAGNOSTICS,
+      status: "available",
+      errorCount: 1,
+      resolvedCount: 1,
+      items: [{ severity: "error", message: "Cannot find symbol Foo", targetId: "t-1" }]
+    });
+
+    assert.doesNotMatch(html, /Open diagnostic 1/);
+    assert.match(html, /<span class="sr-only">Error: <\/span>Cannot find symbol Foo/);
+    assert.match(html, /title="Cannot find symbol Foo"/);
+    assert.match(html, /aria-describedby="build-diagnostics-opens-in-editor"/);
+    assert.match(html, /Opens in editor/);
+    assert.match(html, /Configure diagnostics…/);
+  });
+
+  it("explains why Show Problems is disabled while the scan is pending", () => {
+    const html = renderCard({ ...EMPTY_BUILD_DIAGNOSTICS, status: "scanning" });
+
+    assert.match(html, /disabled=""[^>]*title="Available after the diagnostic scan finishes\."/);
+    assert.match(html, /aria-describedby="build-diagnostics-show-problems-hint"/);
   });
 });

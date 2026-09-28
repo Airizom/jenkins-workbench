@@ -29,7 +29,8 @@ export interface OpenNodeDetailsMessage {
 
 export interface LoadNodeCapacityExecutorsMessage {
   type: "loadNodeCapacityExecutors";
-  snapshotGeneration: number;
+  /** Webview-assigned id echoed in the response so superseded responses can be ignored. */
+  requestId: number;
   nodeUrls: string[];
 }
 
@@ -87,9 +88,9 @@ export function isLoadNodeCapacityExecutorsMessage(
   }
   const nodeUrls = message.nodeUrls;
   return (
-    typeof message.snapshotGeneration === "number" &&
-    Number.isSafeInteger(message.snapshotGeneration) &&
-    message.snapshotGeneration >= 0 &&
+    typeof message.requestId === "number" &&
+    Number.isSafeInteger(message.requestId) &&
+    message.requestId >= 0 &&
     Array.isArray(nodeUrls) &&
     nodeUrls.every((nodeUrl) => typeof nodeUrl === "string")
   );

@@ -56,7 +56,6 @@ function buildPool(
     statusLabel: "Available",
     nodes,
     queueItems: [],
-    offlineImpact: [],
     totalNodes: nodes.length,
     onlineNodes: nodes.length,
     offlineNodes: 0,
@@ -105,14 +104,25 @@ describe("nodeCapacityReducer", () => {
       )
     );
 
-    const hydrated = nodeCapacityReducer(initial, {
+    const requested = nodeCapacityReducer(initial, {
+      type: "executorsRequested",
+      requestId: 1,
+      nodeUrls: ["https://jenkins.example/computer/a/"]
+    });
+    assert.equal(
+      findNode(requested, "pool:label:linux", "https://jenkins.example/computer/a/")
+        ?.executorsLoadState,
+      "loading"
+    );
+    const hydrated = nodeCapacityReducer(requested, {
       type: "updateNodeCapacityNodeExecutors",
-      snapshotGeneration: initial.snapshotGeneration,
+      requestId: 1,
       payload: [{ nodeUrl: "https://jenkins.example/computer/a/", executors: EXECUTORS }]
     });
 
     const node = findNode(hydrated, "pool:label:linux", "https://jenkins.example/computer/a/");
     assert.equal(node?.executorsLoaded, true);
+    assert.equal(node?.executorsLoadState, undefined);
     assert.deepEqual(node?.executors, EXECUTORS);
   });
 
@@ -186,9 +196,14 @@ describe("nodeCapacityReducer", () => {
     const freshExecutors: NodeCapacityExecutorViewModel[] = [
       { id: "0", statusLabel: "Idle", isIdle: true }
     ];
-    const rehydrated = nodeCapacityReducer(refreshed, {
+    const requested = nodeCapacityReducer(refreshed, {
+      type: "executorsRequested",
+      requestId: 3,
+      nodeUrls: ["https://jenkins.example/computer/a/"]
+    });
+    const rehydrated = nodeCapacityReducer(requested, {
       type: "updateNodeCapacityNodeExecutors",
-      snapshotGeneration: refreshed.snapshotGeneration,
+      requestId: 3,
       payload: [{ nodeUrl: "https://jenkins.example/computer/a/", executors: freshExecutors }]
     });
 
@@ -234,32 +249,35 @@ describe("nodeCapacityReducer", () => {
     assert.deepEqual(node?.executors, freshExecutors);
   });
 
-  it("ignores an executor response from an older capacity snapshot", () => {
+  it("ignores an executor response superseded by a newer request", () => {
     const nodeUrl = "https://jenkins.example/computer/a/";
-    const first = buildInitialState(
+    const initial = buildInitialState(
       buildViewModel(
         [buildPool("pool:label:linux", [buildNode(nodeUrl)])],
         "2026-06-11T00:00:00.000Z"
       )
     );
+    const first = nodeCapacityReducer(initial, {
+      type: "executorsRequested",
+      requestId: 1,
+      nodeUrls: [nodeUrl]
+    });
     const second = nodeCapacityReducer(first, {
-      type: "updateNodeCapacity",
-      payload: buildViewModel(
-        [buildPool("pool:label:linux", [buildNode(nodeUrl)])],
-        "2026-06-11T00:00:10.000Z"
-      )
+      type: "executorsRequested",
+      requestId: 2,
+      nodeUrls: [nodeUrl]
     });
     const freshExecutors: NodeCapacityExecutorViewModel[] = [
       { id: "0", statusLabel: "Building newer #2", isIdle: false }
     ];
     const hydrated = nodeCapacityReducer(second, {
       type: "updateNodeCapacityNodeExecutors",
-      snapshotGeneration: second.snapshotGeneration,
+      requestId: 2,
       payload: [{ nodeUrl, executors: freshExecutors }]
     });
     const afterLateResponse = nodeCapacityReducer(hydrated, {
       type: "updateNodeCapacityNodeExecutors",
-      snapshotGeneration: first.snapshotGeneration,
+      requestId: 1,
       payload: [{ nodeUrl, executors: EXECUTORS }]
     });
 
@@ -268,6 +286,77 @@ describe("nodeCapacityReducer", () => {
       findNode(afterLateResponse, "pool:label:linux", nodeUrl)?.executors,
       freshExecutors
     );
+  });
+
+  it("marks only the failing node with an inline error and keeps it across refreshes", () => {
+    const goodUrl = "https://jenkins.example/computer/good/";
+    const badUrl = "https://jenkins.example/computer/bad/";
+    const initial = buildInitialState(
+      buildViewModel(
+        [buildPool("pool:label:linux", [buildNode(goodUrl), buildNode(badUrl)])],
+        "2026-06-11T00:00:00.000Z"
+      )
+    );
+    const requested = nodeCapacityReducer(initial, {
+      type: "executorsRequested",
+      requestId: 1,
+      nodeUrls: [goodUrl, badUrl]
+    });
+    const settled = nodeCapacityReducer(requested, {
+      type: "updateNodeCapacityNodeExecutors",
+      requestId: 1,
+      payload: [
+        { nodeUrl: goodUrl, executors: EXECUTORS },
+        { nodeUrl: badUrl, error: "connection reset" }
+      ]
+    });
+
+    const good = findNode(settled, "pool:label:linux", goodUrl);
+    assert.equal(good?.executorsLoaded, true);
+    assert.equal(good?.executorsLoadState, undefined);
+    const bad = findNode(settled, "pool:label:linux", badUrl);
+    assert.equal(bad?.executorsLoaded, false);
+    assert.equal(bad?.executorsLoadState, "error");
+    assert.equal(bad?.executorsError, "connection reset");
+
+    const refreshed = nodeCapacityReducer(settled, {
+      type: "updateNodeCapacity",
+      payload: buildViewModel(
+        [buildPool("pool:label:linux", [buildNode(goodUrl), buildNode(badUrl)])],
+        "2026-06-11T00:00:10.000Z"
+      )
+    });
+    assert.equal(findNode(refreshed, "pool:label:linux", badUrl)?.executorsLoadState, "error");
+    assert.equal(findNode(refreshed, "pool:label:linux", goodUrl)?.executorsLoaded, true);
+  });
+
+  it("keeps the last loaded capacity when a later refresh fails", () => {
+    const initial = buildInitialState(
+      buildViewModel(
+        [buildPool("pool:label:linux", [buildNode("https://jenkins.example/computer/a/")])],
+        "2026-06-11T00:00:00.000Z"
+      )
+    );
+    assert.equal(initial.hasData, true);
+
+    const failed = nodeCapacityReducer(initial, {
+      type: "updateNodeCapacity",
+      payload: { ...buildViewModel([], "2026-06-11T00:00:10.000Z"), errors: ["HTTP 503"] }
+    });
+
+    assert.deepEqual(failed.errors, ["HTTP 503"]);
+    assert.equal(failed.pools, initial.pools);
+    assert.equal(failed.updatedAt, "2026-06-11T00:00:00.000Z");
+    assert.equal(failed.hasData, true);
+  });
+
+  it("does not report data when the first load fails", () => {
+    const failed = buildInitialState({
+      ...buildViewModel([], "2026-06-11T00:00:00.000Z"),
+      errors: ["HTTP 503"]
+    });
+
+    assert.equal(failed.hasData, false);
   });
 });
 

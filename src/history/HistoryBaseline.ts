@@ -16,7 +16,13 @@ export interface BaselineEvidence {
   report?: HistoryReport;
   message?: string;
   truncated?: boolean;
+  /** The baseline job was chosen by the user (reset can clear it). */
+  custom?: boolean;
+  /** The baseline job is the multibranch `main`/`master` default. */
+  automatic?: boolean;
 }
+type BaselineOrigin = Pick<BaselineEvidence, "custom" | "automatic" | "jobUrl">;
+
 const KEY = "jenkinsWorkbench.historyBaselines";
 
 export class HistoryBaselineStore {
@@ -70,66 +76,111 @@ export class HistoryBaselineResolver {
 
   async resolve(input: HistoryRequest, target: JenkinsBuild): Promise<BaselineEvidence> {
     const request = this.history.guard(input);
+    const origin: BaselineOrigin = {};
     try {
       if (!request.active()) return { status: "unavailable" };
-      const project = await this.project(request.environment, request.jobUrl, request);
-      let jobUrl = this.store.get(request.environment, project.url);
-      if (!jobUrl && project.multibranch && request.active()) {
-        const jobs = await this.history.run(request, () =>
-          this.data.getJobsForFolder(request.environment, project.url)
-        );
-        jobUrl =
-          jobs.find((job) => decodeJenkinsJobName(job.name) === "main")?.url ??
-          jobs.find((job) => decodeJenkinsJobName(job.name) === "master")?.url;
-      }
+      const jobUrl = await this.baselineJobUrl(request, origin);
       if (!jobUrl) return { status: "unavailable", message: "Select a baseline job." };
+      origin.jobUrl = jobUrl;
       if (ensureTrailingSlash(jobUrl) === ensureTrailingSlash(request.jobUrl))
-        return { status: "self", jobUrl, message: "This job is the baseline." };
+        return { status: "self", jobUrl, message: "This job is the baseline.", ...origin };
       if (!request.active()) return { status: "unavailable" };
-      const selectedJobUrl = jobUrl;
-      const job = await this.history.run(request, () =>
-        this.data.getJob(request.environment, selectedJobUrl)
-      );
-      const label = decodeJenkinsJobName(job.name);
-      if (!Number.isFinite(target.timestamp))
-        return { status: "unavailable", jobUrl, label, message: "Build start time unavailable." };
-      const baselineRequest = { ...request, jobUrl, anchor: undefined };
-      const window = await this.history.summaries(baselineRequest, true);
-      const build = window.builds
-        .filter(
-          (build) =>
-            completionTime(build) !== undefined &&
-            (completionTime(build) ?? Infinity) <= (target.timestamp ?? -1)
-        )
-        .sort(
-          (a, b) => (completionTime(b) ?? 0) - (completionTime(a) ?? 0) || b.number - a.number
-        )[0];
-      if (!build)
-        return {
-          status: "unavailable",
-          jobUrl,
-          label,
-          truncated: window.truncated,
-          message: window.truncated
-            ? "Baseline outside lookup range."
-            : "No baseline build completed before this build started."
-        };
-      if (!request.active()) return { status: "unavailable" };
-      const report = await this.history.report(baselineRequest, build);
-      return {
-        status: report.status,
-        jobUrl,
-        label,
-        build,
-        report,
-        truncated: window.truncated,
-        message: report.message
-      };
+      return await this.compare(request, jobUrl, target, origin);
     } catch (error) {
       return {
         status: "error",
-        message: error instanceof Error ? error.message : "Baseline request failed"
+        message: error instanceof Error ? error.message : "Baseline request failed",
+        ...origin
       };
     }
   }
+
+  /** The user's chosen baseline job, else the multibranch `main`/`master` default. */
+  private async baselineJobUrl(
+    request: HistoryRequest,
+    origin: BaselineOrigin
+  ): Promise<string | undefined> {
+    const project = await this.project(request.environment, request.jobUrl, request);
+    const custom = this.store.get(request.environment, project.url);
+    if (custom) {
+      origin.custom = true;
+      return custom;
+    }
+    if (!project.multibranch || !request.active()) return undefined;
+    const jobs = await this.history.run(request, () =>
+      this.data.getJobsForFolder(request.environment, project.url)
+    );
+    const automatic = defaultBranchJobUrl(jobs);
+    if (automatic) origin.automatic = true;
+    return automatic;
+  }
+
+  private async compare(
+    request: HistoryRequest,
+    jobUrl: string,
+    target: JenkinsBuild,
+    origin: BaselineOrigin
+  ): Promise<BaselineEvidence> {
+    const job = await this.history.run(request, () =>
+      this.data.getJob(request.environment, jobUrl)
+    );
+    const label = decodeJenkinsJobName(job.name);
+    const timestamp = target.timestamp;
+    if (timestamp === undefined || !Number.isFinite(timestamp))
+      return {
+        status: "unavailable",
+        jobUrl,
+        label,
+        message: "Build start time unavailable.",
+        ...origin
+      };
+    const baselineRequest = { ...request, jobUrl, anchor: undefined };
+    const window = await this.history.summaries(baselineRequest, true);
+    const build = latestCompletedBefore(window.builds, timestamp);
+    if (!build)
+      return {
+        status: "unavailable",
+        jobUrl,
+        label,
+        truncated: window.truncated,
+        message: window.truncated
+          ? "Baseline outside lookup range."
+          : "No baseline build completed before this build started.",
+        ...origin
+      };
+    if (!request.active()) return { status: "unavailable" };
+    const report = await this.history.report(baselineRequest, build);
+    return {
+      status: report.status,
+      jobUrl,
+      label,
+      build,
+      report,
+      truncated: window.truncated,
+      message: report.message,
+      ...origin
+    };
+  }
+}
+
+function defaultBranchJobUrl(jobs: Array<{ name: string; url: string }>): string | undefined {
+  return (
+    jobs.find((job) => decodeJenkinsJobName(job.name) === "main")?.url ??
+    jobs.find((job) => decodeJenkinsJobName(job.name) === "master")?.url
+  );
+}
+
+function completedBy(build: JenkinsBuild, timestamp: number): boolean {
+  const completed = completionTime(build);
+  return completed !== undefined && completed <= timestamp;
+}
+
+/** Latest completion at or before `timestamp`; build number breaks ties. */
+function latestCompletedBefore(
+  builds: JenkinsBuild[],
+  timestamp: number
+): JenkinsBuild | undefined {
+  return builds
+    .filter((build) => completedBy(build, timestamp))
+    .sort((a, b) => (completionTime(b) ?? 0) - (completionTime(a) ?? 0) || b.number - a.number)[0];
 }

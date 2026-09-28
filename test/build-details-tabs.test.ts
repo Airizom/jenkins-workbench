@@ -6,7 +6,10 @@ import {
   isBuildDetailsPanelState,
   normalizeBuildDetailsPanelUiState
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
-import { resolveBuildDetailsSelectedTab } from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsTabsModel";
+import {
+  hasNewPendingInputs,
+  resolveBuildDetailsSelectedTab
+} from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsTabsModel";
 
 describe("BuildDetailsTabs", () => {
   it("falls back when a selected conditional tab is no longer available", () => {
@@ -56,5 +59,12 @@ describe("BuildDetailsTabs", () => {
 
     assert.equal(isBuildDetailsPanelState({ ...state, buildDetailsUi: {} }), true);
     assert.equal(isBuildDetailsPanelState({ ...state, buildDetailsUi: [] }), false);
+  });
+
+  it("detects pending inputs that were not seen before", () => {
+    assert.equal(hasNewPendingInputs(new Set(), ["a"]), true);
+    assert.equal(hasNewPendingInputs(new Set(["a"]), ["a"]), false);
+    assert.equal(hasNewPendingInputs(new Set(["a"]), ["a", "b"]), true);
+    assert.equal(hasNewPendingInputs(new Set(["a"]), []), false);
   });
 });

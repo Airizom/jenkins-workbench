@@ -160,4 +160,37 @@ describe("history panel coordination", () => {
     expect(h.load).not.toHaveBeenCalled();
     h.controller.dispose();
   });
+  it("surfaces a paused state when hidden mid-load and resumes on visibility", async () => {
+    const h = harness();
+    let resolve!: (value: typeof window) => void;
+    h.load.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done;
+      })
+    );
+    h.controller.setContext(environment, "https://jenkins.test/job/a/");
+    expect(h.latest().status).toBe("loading");
+    h.panel.visible = false;
+    h.visibility.fire();
+    expect(h.latest()).toMatchObject({ status: "paused", pausedReason: "hidden" });
+    resolve(window);
+    await Promise.resolve();
+    expect(h.latest().status).toBe("paused");
+    h.panel.visible = true;
+    h.visibility.fire();
+    await vi.waitFor(() => expect(h.latest().status).toBe("available"));
+    expect(h.latest().pausedReason).toBeUndefined();
+    h.controller.dispose();
+  });
+  it("marks history for a running anchor build as paused until it completes", () => {
+    const h = harness();
+    h.controller.setContext(environment, "https://jenkins.test/job/a/", {
+      number: 4,
+      url: "https://jenkins.test/job/a/4/",
+      building: true
+    });
+    expect(h.load).not.toHaveBeenCalled();
+    expect(h.latest()).toMatchObject({ status: "paused", pausedReason: "building" });
+    h.controller.dispose();
+  });
 });

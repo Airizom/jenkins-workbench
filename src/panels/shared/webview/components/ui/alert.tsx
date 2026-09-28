@@ -22,9 +22,25 @@ const alertVariants = cva(
 );
 
 type AlertProps = React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>;
+
+/**
+ * Destructive alerts interrupt screen readers (`role="alert"`). Other variants
+ * are polite live regions (`role="status"`), so static notices are not
+ * re-announced as urgent every time a panel re-renders them. Pass `role` to
+ * override either default.
+ */
+function resolveAlertRole(variant: AlertProps["variant"]): "alert" | "status" {
+  return variant === "destructive" ? "alert" : "status";
+}
+
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant, ...props }, ref) => (
-    <div ref={ref} role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
+  ({ className, variant, role, ...props }, ref) => (
+    <div
+      ref={ref}
+      role={role ?? resolveAlertRole(variant)}
+      className={cn(alertVariants({ variant }), className)}
+      {...props}
+    />
   )
 );
 Alert.displayName = "Alert";

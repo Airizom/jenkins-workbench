@@ -2,6 +2,7 @@ import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import * as React from "react";
 
 import { CheckIcon, MinusIcon } from "../../icons";
+import { focusRingInsetClassName } from "../../lib/focus";
 import { cn } from "../../lib/utils";
 
 type CheckboxProps = React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>;
@@ -14,7 +15,7 @@ export const Checkbox = React.forwardRef<
     className={cn(
       "peer h-4 w-4 shrink-0 rounded-md border border-checkbox-border bg-checkbox",
       "text-checkbox-checkedForeground",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+      focusRingInsetClassName,
       "disabled:cursor-not-allowed disabled:opacity-50",
       "data-[state=checked]:bg-checkbox-checked",
       "data-[state=indeterminate]:bg-checkbox-checked",

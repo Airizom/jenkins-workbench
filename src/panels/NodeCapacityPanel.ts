@@ -4,6 +4,7 @@ import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { ensureTrailingSlash } from "../jenkins/urls";
 import { NodeCapacityService } from "../services/NodeCapacityService";
+import type { NodeCapacityNodeExecutorsResult } from "../shared/nodeCapacity/NodeCapacityContracts";
 import { buildNodeCapacityErrorViewModel } from "../shared/nodeCapacity/NodeCapacityDefaults";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
@@ -164,7 +165,7 @@ export class NodeCapacityPanel {
           return;
         }
         if (isLoadNodeCapacityExecutorsMessage(message)) {
-          void this.loadNodeExecutors(message.nodeUrls, message.snapshotGeneration);
+          void this.loadNodeExecutors(message.nodeUrls, message.requestId);
         }
       },
       null,
@@ -230,8 +231,7 @@ export class NodeCapacityPanel {
         panelState,
         errorOptions: createMissingPanelAssetsMessages({
           title: "Node Capacity",
-          panelLabel: "Node capacity",
-          reopenHint: "Open node capacity again from Jenkins Workbench to continue."
+          panelLabel: "Node capacity"
         }),
         renderLoadingHtml
       });
@@ -353,7 +353,7 @@ export class NodeCapacityPanel {
     });
   }
 
-  private async loadNodeExecutors(nodeUrls: string[], snapshotGeneration: number): Promise<void> {
+  private async loadNodeExecutors(nodeUrls: string[], requestId: number): Promise<void> {
     if (!this.capacityService || !this.environment) {
       return;
     }
@@ -371,32 +371,23 @@ export class NodeCapacityPanel {
     if (uniqueNodeUrls.length === 0) {
       return;
     }
+    // Per-node failures come back as inline error entries; the webview shows them
+    // on the affected rows, so there is no toast that would repeat every poll.
+    let payload: NodeCapacityNodeExecutorsResult[];
     try {
-      const entries = await capacityService.hydrateNodeExecutors(environment, uniqueNodeUrls);
-      if (
-        this.disposed ||
-        this.executorLoadGeneration !== generation ||
-        this.environment?.environmentId !== environmentId
-      ) {
-        return;
-      }
-      this.postMessage({
-        type: "updateNodeCapacityNodeExecutors",
-        snapshotGeneration,
-        payload: entries
-      });
+      payload = await capacityService.hydrateNodeExecutors(environment, uniqueNodeUrls);
     } catch (error) {
-      if (
-        this.disposed ||
-        this.executorLoadGeneration !== generation ||
-        this.environment?.environmentId !== environmentId
-      ) {
-        return;
-      }
-      void vscode.window.showErrorMessage(
-        `Failed to load node executor details: ${formatActionError(error)}`
-      );
+      const message = formatActionError(error);
+      payload = uniqueNodeUrls.map((nodeUrl) => ({ nodeUrl, error: message }));
     }
+    if (
+      this.disposed ||
+      this.executorLoadGeneration !== generation ||
+      this.environment?.environmentId !== environmentId
+    ) {
+      return;
+    }
+    this.postMessage({ type: "updateNodeCapacityNodeExecutors", requestId, payload });
   }
 
   private setRefreshHost(refreshHost?: NodeCapacityRefreshHost): void {

@@ -14,6 +14,7 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import { BranchCard } from "../pipelineStages/BranchCard";
 import { EmptyStepsMessage } from "../pipelineStages/EmptyStepsMessage";
+import { formatCount } from "../pipelineStages/pipelineStagesUtils";
 import { StepsList } from "../pipelineStages/StepsList";
 import { StepsVisibilityToggle } from "../pipelineStages/StepsVisibilityToggle";
 
@@ -62,17 +63,17 @@ export function PipelineGraphInspector({
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Stage Inspector
             </div>
-            <CardTitle className="text-base">{stage.name || "Stage"}</CardTitle>
+            <CardTitle className="text-base break-words">{stage.name || "Stage"}</CardTitle>
             <div className="text-xs text-muted-foreground">{stage.durationLabel || "Unknown"}</div>
           </div>
           <ResultBadge label={stage.statusLabel || "Unknown"} status={stage.statusClass} />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
-            {stage.parallelBranches.length} branches
+            {formatCount(stage.parallelBranches.length, "branch", "branches")}
           </span>
           <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
-            {stage.stepsAll.length} direct steps
+            {formatCount(stage.stepsAll.length, "direct step")}
           </span>
           {canRestartStage ? (
             <Button

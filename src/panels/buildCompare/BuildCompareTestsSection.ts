@@ -9,8 +9,9 @@ import { formatAvailableTestReportCountsSummary } from "../shared/TestReportForm
 import { testStatusToVisualTone } from "../shared/TestStatusFormatters";
 import { forEachKeyedDiff } from "./BuildCompareDiff";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
-import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
+import { evaluateStandardCompareSection } from "./BuildCompareSectionShared";
 import type {
+  BuildCompareAmbiguousTestItem,
   BuildCompareTestDiffItem,
   BuildCompareTestsSectionViewModel
 } from "./shared/BuildCompareContracts";
@@ -24,7 +25,8 @@ type TestCompareEmptyFields = Pick<
   | "newPasses"
   | "addedTests"
   | "removedTests"
-  | "otherChangesCount"
+  | "otherChanges"
+  | "ambiguousTests"
   | "unchangedCount"
   | "baselineSummaryLabel"
   | "targetSummaryLabel"
@@ -37,7 +39,8 @@ const EMPTY_TEST_DIFF_LISTS: Pick<
   | "newPasses"
   | "addedTests"
   | "removedTests"
-  | "otherChangesCount"
+  | "otherChanges"
+  | "ambiguousTests"
   | "unchangedCount"
 > = {
   newFailures: [],
@@ -45,7 +48,8 @@ const EMPTY_TEST_DIFF_LISTS: Pick<
   newPasses: [],
   addedTests: [],
   removedTests: [],
-  otherChangesCount: 0,
+  otherChanges: [],
+  ambiguousTests: [],
   unchangedCount: 0
 };
 
@@ -89,24 +93,64 @@ function buildAvailableTestsSection(
   baselineValue: JenkinsTestReport,
   targetValue: JenkinsTestReport
 ): BuildCompareTestsSectionViewModel {
-  const baselineCases = buildTestCaseMap(baselineValue);
-  const targetCases = buildTestCaseMap(targetValue);
+  const baselineGroups = groupTestCases(baselineValue);
+  const targetGroups = groupTestCases(targetValue);
   const newFailures: BuildCompareTestDiffItem[] = [];
   const stillFailing: BuildCompareTestDiffItem[] = [];
   const newPasses: BuildCompareTestDiffItem[] = [];
   const addedTests: BuildCompareTestDiffItem[] = [];
   const removedTests: BuildCompareTestDiffItem[] = [];
-  let otherChangesCount = 0;
+  const otherChanges: BuildCompareTestDiffItem[] = [];
+  const ambiguousTests: BuildCompareAmbiguousTestItem[] = [];
   let unchangedCount = 0;
 
-  forEachKeyedDiff(baselineCases, targetCases, {
-    onAdded: (_key, target) => {
-      addedTests.push(buildSingleSideTestDiffItem(target, "added"));
+  const collectAmbiguous = (
+    key: string,
+    baseline: NormalizedTestCase[],
+    target: NormalizedTestCase[]
+  ): boolean => {
+    if (baseline.length <= 1 && target.length <= 1) {
+      return false;
+    }
+    ambiguousTests.push(buildAmbiguousTestItem(key, baseline, target));
+    return true;
+  };
+
+  forEachKeyedDiff(baselineGroups, targetGroups, {
+    onAdded: (key, targetCases) => {
+      if (collectAmbiguous(key, [], targetCases)) {
+        return;
+      }
+      const [target] = targetCases;
+      if (!target) {
+        return;
+      }
+      const item = buildSingleSideTestDiffItem(target, "added");
+      // A test that first appears already failing is a regression in the target build.
+      if (target.status === "failed") {
+        newFailures.push({ ...item, addedInTarget: true });
+      } else {
+        addedTests.push(item);
+      }
     },
-    onRemoved: (_key, baseline) => {
-      removedTests.push(buildSingleSideTestDiffItem(baseline, "removed"));
+    onRemoved: (key, baselineCases) => {
+      if (collectAmbiguous(key, baselineCases, [])) {
+        return;
+      }
+      const [baseline] = baselineCases;
+      if (baseline) {
+        removedTests.push(buildSingleSideTestDiffItem(baseline, "removed"));
+      }
     },
-    onBoth: (_key, baseline, target) => {
+    onBoth: (key, baselineCases, targetCases) => {
+      if (collectAmbiguous(key, baselineCases, targetCases)) {
+        return;
+      }
+      const [baseline] = baselineCases;
+      const [target] = targetCases;
+      if (!baseline || !target) {
+        return;
+      }
       const item = buildTestDiffItem(baseline, target);
       if (target.status === "failed" && baseline.status !== "failed") {
         newFailures.push(item);
@@ -117,7 +161,7 @@ function buildAvailableTestsSection(
       } else if (baseline.status === target.status) {
         unchangedCount += 1;
       } else {
-        otherChangesCount += 1;
+        otherChanges.push(item);
       }
     }
   });
@@ -128,17 +172,19 @@ function buildAvailableTestsSection(
     newPasses.length > 0 ||
     addedTests.length > 0 ||
     removedTests.length > 0 ||
-    otherChangesCount > 0;
+    otherChanges.length > 0 ||
+    ambiguousTests.length > 0;
 
   return {
     status: hasDiffs ? "available" : "empty",
     summaryLabel: hasDiffs
-      ? `New failures ${formatNumber(newFailures.length)} • Still failing ${formatNumber(stillFailing.length)} • Newly passing ${formatNumber(newPasses.length)}`
+      ? formatTestDiffSummary(
+          newFailures.length,
+          stillFailing.length,
+          newPasses.length,
+          ambiguousTests.length
+        )
       : "No high-signal test differences",
-    detail:
-      otherChangesCount > 0
-        ? `${formatNumber(otherChangesCount)} additional test changes were not classified as failures or newly passing results.`
-        : undefined,
     baselineSummaryLabel: formatAvailableTestReportCountsSummary(baselineValue),
     targetSummaryLabel: formatAvailableTestReportCountsSummary(targetValue),
     newFailures,
@@ -146,9 +192,27 @@ function buildAvailableTestsSection(
     newPasses,
     addedTests,
     removedTests,
-    otherChangesCount,
+    otherChanges,
+    ambiguousTests,
     unchangedCount
   };
+}
+
+function formatTestDiffSummary(
+  newFailureCount: number,
+  stillFailingCount: number,
+  newPassCount: number,
+  ambiguousCount: number
+): string {
+  const parts = [
+    `New failures ${formatNumber(newFailureCount)}`,
+    `Still failing ${formatNumber(stillFailingCount)}`,
+    `Newly passing ${formatNumber(newPassCount)}`
+  ];
+  if (ambiguousCount > 0) {
+    parts.push(`${formatNumber(ambiguousCount)} ambiguous`);
+  }
+  return parts.join(" · ");
 }
 
 function buildTestSummaryLabel(result: BuildCompareOptionalResult<JenkinsTestReport>): string {
@@ -161,23 +225,42 @@ function buildTestSummaryLabel(result: BuildCompareOptionalResult<JenkinsTestRep
   return formatAvailableTestReportCountsSummary(result.value);
 }
 
-function buildTestCaseMap(report: JenkinsTestReport): Map<string, NormalizedTestCase> {
-  const items = new Map<string, NormalizedTestCase>();
-  const duplicateCounts = new Map<string, number>();
+/**
+ * Groups test cases by suite/class/name identity. Identities with more than one
+ * case on either side are reported as ambiguous instead of being paired by
+ * position, which could otherwise fabricate passes, failures, or removals.
+ */
+function groupTestCases(report: JenkinsTestReport): Map<string, NormalizedTestCase[]> {
+  const groups = new Map<string, NormalizedTestCase[]>();
   forEachNormalizedTestCase(report, (testCase, { suiteName }) => {
     const normalized = normalizeTestCaseBase(testCase, suiteName);
     if (!normalized) {
       return;
     }
-    const occurrence = duplicateCounts.get(normalized.key) ?? 0;
-    duplicateCounts.set(normalized.key, occurrence + 1);
-    const occurrenceKey = buildOccurrenceKey(normalized.key, occurrence);
-    items.set(occurrenceKey, {
-      ...normalized,
-      key: occurrenceKey
-    });
+    const group = groups.get(normalized.key);
+    if (group) {
+      group.push(normalized);
+    } else {
+      groups.set(normalized.key, [normalized]);
+    }
   });
-  return items;
+  return groups;
+}
+
+function buildAmbiguousTestItem(
+  key: string,
+  baseline: NormalizedTestCase[],
+  target: NormalizedTestCase[]
+): BuildCompareAmbiguousTestItem {
+  const representative = target[0] ?? baseline[0];
+  return {
+    key,
+    name: representative?.name ?? "Unnamed test",
+    className: representative?.className,
+    suiteName: representative?.suiteName,
+    baselineStatusLabels: baseline.map((testCase) => testCase.statusLabel),
+    targetStatusLabels: target.map((testCase) => testCase.statusLabel)
+  };
 }
 
 function buildTestDiffItem(

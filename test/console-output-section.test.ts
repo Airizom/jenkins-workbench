@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
 
 const stripAnsiMock = vi.fn((value: string): string => `stripped:${value}`);
+const postVsCodeMessageMock = vi.fn();
 
 vi.doMock("react", () => ({
   useMemo: <T>(factory: () => T): T => factory()
 }));
 vi.doMock("../src/buildDiagnostics/BuildDiagnosticConsoleText", () => ({
   stripConsoleControlSequences: stripAnsiMock
+}));
+vi.doMock("../src/panels/shared/webview/lib/vscodeApi", () => ({
+  postVsCodeMessage: postVsCodeMessageMock
 }));
 vi.doMock("../src/panels/buildDetails/webview/components/buildDetails/ConsoleLogViewer", () => ({
   ConsoleLogViewer: () => null
@@ -25,6 +29,7 @@ const baseProps = {
   consoleTruncated: false,
   consoleMaxChars: 100,
   followLog: true,
+  isRunning: true,
   isActive: true,
   onToggleFollowLog: () => undefined,
   onExportLogs: () => undefined,
@@ -33,6 +38,7 @@ const baseProps = {
 
 beforeEach(() => {
   stripAnsiMock.mockClear();
+  postVsCodeMessageMock.mockClear();
 });
 
 describe("ConsoleOutputSection", () => {
@@ -74,5 +80,42 @@ describe("ConsoleOutputSection", () => {
 
     assert.deepEqual(onToggleFollowLog.mock.calls, [[true]]);
     assert.equal(scrollToBottom.mock.calls.length, 0);
+  });
+
+  it("only offers Follow while the build is running", () => {
+    const renderHeader = (isRunning: boolean) =>
+      ConsoleOutputSection({ ...baseProps, isRunning }).props.renderHeader({
+        hasOutput: true,
+        lineCount: 1,
+        openSearchToolbar: () => undefined
+      });
+
+    const running = ConsoleOutputSection({ ...baseProps, isRunning: true });
+    const completed = ConsoleOutputSection({ ...baseProps, isRunning: false });
+
+    assert.equal(running.props.canFollow, true);
+    assert.equal(completed.props.canFollow, false);
+    assert.equal(renderHeader(true).props.canFollow, true);
+    assert.equal(renderHeader(false).props.canFollow, false);
+  });
+
+  it("passes the diagnostic jump action to the header", () => {
+    const jumpToFirstDiagnostic = vi.fn();
+    const header = ConsoleOutputSection(baseProps).props.renderHeader({
+      hasOutput: true,
+      lineCount: 1,
+      openSearchToolbar: () => undefined,
+      jumpToFirstDiagnostic
+    });
+
+    assert.equal(header.props.onJumpToFirstDiagnostic, jumpToFirstDiagnostic);
+  });
+
+  it("retries a failed console load by refreshing build details", () => {
+    const viewer = ConsoleOutputSection({ ...baseProps, consoleError: "Timed out" });
+
+    viewer.props.onRetry();
+
+    assert.deepEqual(postVsCodeMessageMock.mock.calls, [[{ type: "refreshBuildDetails" }]]);
   });
 });

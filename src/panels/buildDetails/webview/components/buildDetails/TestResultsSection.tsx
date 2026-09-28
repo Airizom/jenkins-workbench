@@ -5,6 +5,7 @@ import type {
   BuildTestResultsViewModel,
   BuildTestsSummaryViewModel
 } from "../../../shared/BuildDetailsContracts";
+import { useTabsBarHeightVariable } from "../../hooks/useTabsBarHeightVariable";
 import {
   CoverageSection,
   TestResultsEmptyState,
@@ -28,7 +29,12 @@ export function TestResultsSection({
   onReloadWithLogs: () => void;
   onOpenSource: (testCase: BuildTestCaseViewModel) => void;
 }) {
-  const testResultsView = useTestResultsView({ buildUrl, results });
+  const testResultsView = useTestResultsView({
+    buildUrl,
+    results,
+    failedCount: summary.failedCount
+  });
+  useTabsBarHeightVariable();
   const emptyState = renderTestResultsEmptyState(
     results,
     summary,
@@ -48,6 +54,16 @@ export function TestResultsSection({
         onQueryChange={testResultsView.setQuery}
         onReloadWithLogs={onReloadWithLogs}
       />
+
+      {results.loading && !emptyState ? (
+        <div role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            aria-hidden="true"
+            className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+          />
+          Loading test output…
+        </div>
+      ) : null}
 
       {emptyState ?? (
         <TestResultsList
@@ -71,7 +87,9 @@ function renderTestResultsEmptyState(
   summary: BuildTestsSummaryViewModel,
   filteredItemCount: number
 ): React.JSX.Element | undefined {
-  if (results.loading) {
+  // Keep showing existing results while a reload (for example loading test
+  // output) is in flight; the placeholder is only for the first load.
+  if (results.loading && results.items.length === 0) {
     return (
       <TestResultsEmptyState
         icon="loading"

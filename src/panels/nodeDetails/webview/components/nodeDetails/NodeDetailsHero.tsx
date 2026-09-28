@@ -2,11 +2,7 @@ import type * as React from "react";
 import { ToneBadge } from "../../../../shared/webview/components/ToneBadge";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from "../../../../shared/webview/components/ui/tooltip";
+import { AccessibleTooltip } from "../../../../shared/webview/components/ui/tooltip";
 import {
   AlertTriangleIcon,
   ClockIcon,
@@ -46,11 +42,12 @@ type NodeDetailsHeroProps = {
   canOpenAgentInstructions: boolean;
   hasUrl: boolean;
   showOfflineBanner: boolean;
+  isOffline: boolean;
   offlineReason?: string;
   executors: NodeExecutorViewModel[];
   oneOffExecutors: NodeExecutorViewModel[];
   executorsLabel: string;
-  idleLabel: string;
+  activityLabel: string;
   onRefresh: () => void;
   onNodeAction: () => void;
   onLaunchAgent: () => void;
@@ -72,17 +69,20 @@ export function NodeDetailsHero({
   canOpenAgentInstructions,
   hasUrl,
   showOfflineBanner,
+  isOffline,
   offlineReason,
   executors,
   oneOffExecutors,
   executorsLabel,
-  idleLabel,
+  activityLabel,
   onRefresh,
   onNodeAction,
   onLaunchAgent,
   onOpen
 }: NodeDetailsHeroProps): React.JSX.Element {
   const statusIconClass = resolveNodeStatusIconClass(statusClass);
+  // The subtitle repeats the node name only when it differs from the title.
+  const showName = name.trim().length > 0 && name !== displayName;
 
   return (
     <header className="node-hero" data-status={statusClass}>
@@ -99,47 +99,44 @@ export function NodeDetailsHero({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <h1 className="text-lg font-semibold leading-tight truncate">{displayName}</h1>
+                <h1
+                  className="min-w-0 max-w-full truncate text-lg font-semibold leading-tight"
+                  title={displayName}
+                >
+                  {displayName}
+                </h1>
                 <ToneBadge
                   label={statusLabel}
                   className={resolveNodeStatusBadgeClass(statusClass)}
                 />
                 {isStale ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge variant="warning" size="sm">
-                        <AlertTriangleIcon className="h-3 w-3" aria-hidden="true" />
-                        Stale
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      This snapshot has not refreshed recently. Refresh for current node state.
-                    </TooltipContent>
-                  </Tooltip>
+                  <AccessibleTooltip
+                    focusable
+                    content="This snapshot has not refreshed recently. Refresh for current node state."
+                  >
+                    <Badge variant="warning" size="sm">
+                      <AlertTriangleIcon className="h-3 w-3" aria-hidden="true" />
+                      Stale
+                    </Badge>
+                  </AccessibleTooltip>
                 ) : null}
               </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                <span>{name}</span>
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                {showName ? <MetaItem>{name}</MetaItem> : null}
                 {description ? (
-                  <>
-                    <span aria-hidden="true" className="opacity-30">
-                      ·
+                  <MetaItem separated={showName}>
+                    <span className="min-w-0 truncate" title={description}>
+                      {description}
                     </span>
-                    <span className="truncate">{description}</span>
-                  </>
+                  </MetaItem>
                 ) : null}
-                <span aria-hidden="true" className="opacity-30">
-                  ·
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center gap-1">
-                      <ClockIcon className="h-3 w-3" />
-                      {updatedAtLabel}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{updatedAtTitle}</TooltipContent>
-                </Tooltip>
+                <MetaItem separated={showName || Boolean(description)}>
+                  <span className="inline-flex items-center gap-1" title={updatedAtTitle}>
+                    <ClockIcon className="h-3 w-3" aria-hidden="true" />
+                    {updatedAtLabel}
+                    <span className="sr-only"> ({updatedAtTitle})</span>
+                  </span>
+                </MetaItem>
               </div>
             </div>
           </div>
@@ -162,7 +159,7 @@ export function NodeDetailsHero({
             {canLaunchAgent ? (
               <Button variant="outline" size="sm" onClick={onLaunchAgent} disabled={loading}>
                 <LaunchIcon className="h-3.5 w-3.5" />
-                Launch
+                Launch agent
               </Button>
             ) : null}
             <Button
@@ -170,19 +167,27 @@ export function NodeDetailsHero({
               size="sm"
               onClick={onOpen}
               disabled={!hasUrl}
-              aria-label={canOpenAgentInstructions ? "Open agent instructions" : "Open in Jenkins"}
+              aria-label={
+                canOpenAgentInstructions ? "Launch instructions in Jenkins" : "Open in Jenkins"
+              }
             >
               <ExternalLinkIcon className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">
-                {canOpenAgentInstructions ? "Instructions" : "Jenkins"}
+                {canOpenAgentInstructions ? "Launch instructions" : "Open in Jenkins"}
               </span>
             </Button>
           </div>
         </div>
 
         {showOfflineBanner ? (
-          <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 shadow-xs">
-            <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+          <div
+            role="status"
+            className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 shadow-xs"
+          >
+            <AlertTriangleIcon
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning"
+              aria-hidden="true"
+            />
             <div className="min-w-0 text-xs">
               <span className="font-semibold">{statusLabel}.</span>{" "}
               <span className="text-muted-foreground">
@@ -196,11 +201,30 @@ export function NodeDetailsHero({
           executors={executors}
           oneOffExecutors={oneOffExecutors}
           executorsLabel={executorsLabel}
-          idleLabel={idleLabel}
-          isOffline={statusClass === "offline"}
+          activityLabel={activityLabel}
+          isOffline={isOffline}
         />
       </div>
       <div className={cn("h-0.5", statusAccent)} />
     </header>
+  );
+}
+
+function MetaItem({
+  separated = false,
+  children
+}: {
+  separated?: boolean;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {separated ? (
+        <span aria-hidden="true" className="opacity-30">
+          ·
+        </span>
+      ) : null}
+      {children}
+    </span>
   );
 }

@@ -13,7 +13,7 @@ describe("disclosure helpers", () => {
     assert.equal(
       disclosureTriggerClassName("w-full", "custom-trigger"),
       "group flex items-center justify-between text-left transition-colors cursor-pointer " +
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring " +
+        "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring " +
         "disabled:pointer-events-none disabled:opacity-50 w-full custom-trigger"
     );
     assert.equal(

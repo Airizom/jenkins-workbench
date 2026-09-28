@@ -14,7 +14,7 @@ export function resolveSectionStatusBadge(status: CompareSectionStatus): Section
     case "available":
       return { label: "Ready", tone: "neutral" };
     case "empty":
-      return { label: "No differences", tone: "neutral" };
+      return { label: "No changes", tone: "neutral" };
     case "unavailable":
       return { label: "No data", tone: "neutral" };
     case "error":

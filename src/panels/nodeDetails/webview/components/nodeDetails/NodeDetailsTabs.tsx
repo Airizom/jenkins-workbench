@@ -18,21 +18,20 @@ import { NodeDetailsAdvancedSection } from "./NodeDetailsAdvancedSection";
 import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
 import { NodeDetailsQueuedWorkSection } from "./NodeDetailsQueuedWorkSection";
-import type { OverviewRow } from "./nodeDetailsUtils";
 
 const { useState } = React;
 
 type NodeDetailsTabsProps = {
   state: NodeDetailsState;
-  overviewRows: OverviewRow[];
   onDiagnosticsToggle: (value: NodeDetailsTab) => void;
+  onRetryDiagnostics: () => void;
   onCopyJson: () => void;
   onOpenExternal: (url: string) => void;
 };
 export function NodeDetailsTabs({
   state,
-  overviewRows,
   onDiagnosticsToggle,
+  onRetryDiagnostics,
   onCopyJson,
   onOpenExternal
 }: NodeDetailsTabsProps): React.JSX.Element {
@@ -78,7 +77,6 @@ export function NodeDetailsTabs({
       <TabsContent value={NODE_DETAILS_TABS.OVERVIEW} className="space-y-3">
         <NodeDetailsOverviewSection
           state={state}
-          overviewRows={overviewRows}
           onOpenExternal={onOpenExternal}
           onShowTab={handleValueChange}
         />
@@ -88,6 +86,7 @@ export function NodeDetailsTabs({
         <NodeDetailsExecutorsSection
           executors={state.executors}
           oneOffExecutors={state.oneOffExecutors}
+          isOffline={state.isOffline}
           onOpenExternal={onOpenExternal}
         />
       </TabsContent>
@@ -107,6 +106,7 @@ export function NodeDetailsTabs({
           loadStatistics={state.loadStatistics}
           rawJson={state.rawJson}
           onCopyJson={onCopyJson}
+          onRetry={onRetryDiagnostics}
         />
       </TabsContent>
     </Tabs>

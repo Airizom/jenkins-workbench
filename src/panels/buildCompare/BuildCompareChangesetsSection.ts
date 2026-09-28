@@ -13,7 +13,7 @@ export function buildChangesetsSection(
   return {
     status: hasItems ? "available" : "empty",
     summaryLabel: hasItems
-      ? `Baseline ${formatNumber(baselineItems.length)} • Target ${formatNumber(targetItems.length)}`
+      ? `Baseline ${formatNumber(baselineItems.length)} · Target ${formatNumber(targetItems.length)}`
       : "No Jenkins changesets recorded for either build",
     detail: hasItems
       ? "Jenkins changesets are per-build, not the full SCM delta between arbitrary build numbers."

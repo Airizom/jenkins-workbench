@@ -35,8 +35,8 @@ export function NodeDetailsQueuedWorkSection({
         onOpenExternal={onOpenExternal}
       />
       <QueueGroup
-        title="Any executor"
-        description="Queue items without an explicit assigned label."
+        title="Any node"
+        description="Queue items without a label requirement, which can run on any node."
         items={queuedWork.anyQueueItems}
         onOpenExternal={onOpenExternal}
       />

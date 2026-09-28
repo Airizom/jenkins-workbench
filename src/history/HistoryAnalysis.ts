@@ -132,7 +132,7 @@ export function failureEvidence(
       source: "jenkins",
       label: fresh
         ? "New failure"
-        : `${failedSince ? `Failing since #${failedSince}` : "Continuing failure"}${age ? ` · Jenkins age ${age}` : ""}`
+        : `${failedSince ? `Failing since #${failedSince}` : "Still failing"}${age ? ` · Jenkins age ${age}` : ""}`
     };
   }
   return {
@@ -142,7 +142,7 @@ export function failureEvidence(
       previous === "passed"
         ? "New failure"
         : previous === "failed"
-          ? "Continuing failure"
+          ? "Still failing"
           : "First observed failure"
   };
 }
