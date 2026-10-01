@@ -100,7 +100,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("dataService"),
         container.get("environmentStore"),
         container.get("statusRefreshService"),
-        container.get("buildDetailsPanelLauncher")
+        container.lazy("buildDetailsPanelLauncher")
       ),
     currentBranchLinkResolver: (container) =>
       new CurrentBranchLinkResolver(
@@ -131,8 +131,12 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("repositoryLinkStore")
       ),
     currentBranchCommandMapper: (_container) => new CurrentBranchCommandMapper(),
-    coverageDecorationService: (container) =>
-      new CoverageDecorationService(container.get("repositoryLinkStore")),
+    coverageDecorationService: (container) => {
+      // Built with the first Build Details panel; it owns editor decorations until deactivation.
+      const service = new CoverageDecorationService(container.get("repositoryLinkStore"));
+      options.context.subscriptions.push(service);
+      return service;
+    },
     buildDiagnosticsCoordinator: (container) =>
       new BuildDiagnosticsCoordinator(
         container.get("dataService"),
@@ -160,7 +164,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
     buildComparePanelLauncher: (container) =>
       new BuildComparePanelLauncher({
         backend: new BuildInspectionBackendAdapter(container.get("dataService")),
-        buildDetailsPanelLauncher: container.get("buildDetailsPanelLauncher"),
+        buildDetailsPanelLauncher: container.lazy("buildDetailsPanelLauncher"),
         getCompareOptions: options.buildCompareOptionsProvider,
         environmentStore: container.get("environmentStore"),
         extensionUri: options.extensionUri
@@ -170,7 +174,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("dataService"),
         container.get("presetStore"),
         container.get("queuedBuildWaiter"),
-        container.get("buildDetailsPanelLauncher"),
+        container.lazy("buildDetailsPanelLauncher"),
         container.get("refreshHost")
       ),
     currentBranchService: (container) =>
@@ -223,7 +227,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("queuePoller")
       ),
     buildDeepLinkHandler: (container) =>
-      new JenkinsWorkbenchDeepLinkBuildHandler(container.get("buildDetailsPanelLauncher")),
+      new JenkinsWorkbenchDeepLinkBuildHandler(container.lazy("buildDetailsPanelLauncher")),
     jobDeepLinkHandler: (container) =>
       new JenkinsWorkbenchDeepLinkJobHandler(container.get("treeNavigator")),
     uriHandler: (container) =>

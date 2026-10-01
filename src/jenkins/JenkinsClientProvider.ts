@@ -24,6 +24,11 @@ interface JenkinsClientCacheEntry {
   username?: string;
 }
 
+interface PendingAuthMaterial {
+  authConfigRevision: number;
+  promise: Promise<JenkinsAuthMaterial>;
+}
+
 interface JenkinsClientCacheResolution {
   cacheKey: string;
   entry: JenkinsClientCacheEntry;
@@ -31,6 +36,7 @@ interface JenkinsClientCacheResolution {
 
 export class JenkinsClientProvider {
   private readonly clientCache = new Map<string, JenkinsClientCacheEntry>();
+  private readonly pendingAuthMaterial = new Map<string, PendingAuthMaterial>();
   private requestTimeoutMs?: number;
   private readonly browserSsoAuthenticator?: BrowserSsoAuthenticator;
 
@@ -79,6 +85,11 @@ export class JenkinsClientProvider {
   invalidateClient(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
     const cacheKey = `${scope}:${environmentId}`;
     this.clientCache.delete(cacheKey);
+    for (const pendingKey of this.pendingAuthMaterial.keys()) {
+      if (pendingKey.startsWith(`${cacheKey}:`)) {
+        this.pendingAuthMaterial.delete(pendingKey);
+      }
+    }
   }
 
   private async refreshBrowserSsoAuthConfig(
@@ -128,6 +139,30 @@ export class JenkinsClientProvider {
     return { authConfig, authSignature, token };
   }
 
+  /**
+   * Shares one secret-storage read per environment and auth revision, so callers racing on a
+   * cold cache (pollers, tree, panels at startup) do not each hit the OS keychain.
+   */
+  private loadAuthMaterial(
+    cacheKey: string,
+    environment: JenkinsEnvironmentRef,
+    authConfigRevision: number
+  ): Promise<JenkinsAuthMaterial> {
+    const pendingKey = `${cacheKey}:${environment.url}:${environment.username ?? ""}`;
+    const pending = this.pendingAuthMaterial.get(pendingKey);
+    if (pending?.authConfigRevision === authConfigRevision) {
+      return pending.promise;
+    }
+
+    const promise = this.resolveAuthMaterial(environment).finally(() => {
+      if (this.pendingAuthMaterial.get(pendingKey)?.promise === promise) {
+        this.pendingAuthMaterial.delete(pendingKey);
+      }
+    });
+    this.pendingAuthMaterial.set(pendingKey, { authConfigRevision, promise });
+    return promise;
+  }
+
   private async resolveClientCache(
     environment: JenkinsEnvironmentRef
   ): Promise<JenkinsClientCacheResolution> {
@@ -142,7 +177,7 @@ export class JenkinsClientProvider {
         return { cacheKey, entry: cached };
       }
 
-      const authMaterial = await this.resolveAuthMaterial(environment);
+      const authMaterial = await this.loadAuthMaterial(cacheKey, environment, authConfigRevision);
       // Credentials changed while this read was pending; resolve again rather than
       // publishing material for a revision that is already stale.
       if (

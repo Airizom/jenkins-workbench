@@ -144,9 +144,11 @@ for (const commandId of declaredCommandIds) {
   }
 }
 
-// Extension-host code is compiled by tsc, not bundled, so its bare imports are
-// resolved from the packaged node_modules at runtime. Only webview code is
-// bundled by Vite and may import development dependencies. Every file outside
+// Extension-host code is bundled by esbuild with package.json dependencies kept
+// external (scripts/build-extension.mjs), so those bare imports are resolved from
+// the packaged node_modules at runtime; host code must not pull development
+// dependencies into the bundle. Webview code is bundled by Vite and may import
+// development dependencies. Every file outside
 // a webview directory is host code; host code also reaches webview directories
 // (for example panels/shared/webview/WebviewAssets.ts) through relative imports.
 const runtimeDependencies = new Set(Object.keys(packageJson.dependencies ?? {}));

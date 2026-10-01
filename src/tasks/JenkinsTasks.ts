@@ -8,8 +8,8 @@ export function registerJenkinsTasks(
   container: ExtensionContainer
 ): void {
   const environmentStore = container.get("environmentStore");
-  const dataService = container.get("dataService");
-  const refreshHost = container.get("refreshHost");
+  const dataService = container.lazy("dataService");
+  const refreshHost = container.lazy("refreshHost");
   const provider = new JenkinsTaskProvider(environmentStore, dataService, refreshHost);
   context.subscriptions.push(vscode.tasks.registerTaskProvider(JENKINS_TASK_TYPE, provider));
 }

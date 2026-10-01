@@ -667,7 +667,7 @@ docker compose -f dev/jenkins/compose.yaml up --detach --build --wait
 # Install dependencies
 npm install
 
-# Compile the webview bundle, typecheck it, then compile the extension
+# Build the webview bundle, typecheck everything, then bundle the extension host
 npm run compile
 
 # Watch mode for development
@@ -692,7 +692,7 @@ npm test
 # Press F5 in VS Code
 ```
 
-`npm run compile` is the canonical sync point for the project. It rebuilds the webview bundle, typechecks the webview code, and then runs the extension TypeScript compile so the runtime webview manifest stays aligned with the backend.
+`npm run compile` is the canonical sync point for the project. It rebuilds the webview bundle, typechecks the webview and extension code, and then bundles the extension host with esbuild (`scripts/build-extension.mjs`) so the runtime webview manifest stays aligned with the backend.
 
 Fallow runs in CI as a changed-code audit using the committed files in `fallow-baselines/`. Shrink those baselines as existing dead code, duplication, and complexity findings are cleaned up.
 

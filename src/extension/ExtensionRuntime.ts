@@ -7,21 +7,18 @@ import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import type { TreeViewSummary } from "../tree/TreeDataProvider";
 import { formatJobFilterDescription, formatTreeViewSummary } from "../tree/TreeViewPresentation";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
-import { JenkinsfileQuickFixProvider } from "../validation/editor/JenkinsfileQuickFixProvider";
 import { createExtensionContainer } from "./container/ExtensionContainer";
 import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 import { registerExtensionCommands } from "./ExtensionCommands";
 import type { ExtensionRuntimeOptions } from "./ExtensionServices";
 import { registerExtensionProviders } from "./ExtensionServices";
 import { registerExtensionSubscriptions } from "./ExtensionSubscriptions";
+import { registerJenkinsfileLanguageFeatures } from "./JenkinsfileLanguageFeatures";
 
-const JENKINSFILE_DOCUMENT_SELECTORS = [
-  { scheme: "file" },
-  { scheme: "untitled" },
-  { scheme: REPLAY_DRAFT_SCHEME }
-] as const;
-
-const JENKINSFILE_SIGNATURE_TRIGGER_CHARACTERS = ["(", ",", " ", ":", "'", '"'] as const;
+// Background Jenkins polls wait until the window has settled; staggered so they do not
+// contend with each other or with restored panels for the same servers.
+const WATCH_POLL_STARTUP_DELAY_MS = 5_000;
+const COMMIT_WATCH_POLL_STARTUP_DELAY_MS = 8_000;
 
 export async function activateRuntime(
   context: vscode.ExtensionContext,
@@ -65,9 +62,6 @@ export async function activateRuntime(
   const currentBranchStatusBar = container.get("currentBranchStatusBar");
   const replayDraftManager = container.get("replayDraftManager");
   const replayDraftFilesystem = container.get("replayDraftFilesystem");
-  const buildComparePanelLauncher = container.get("buildComparePanelLauncher");
-  const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
-  const coverageDecorationService = container.get("coverageDecorationService");
   const buildDiagnosticsCoordinator = container.get("buildDiagnosticsCoordinator");
 
   await syncNoEnvironmentsContext(environmentStore);
@@ -90,7 +84,8 @@ export async function activateRuntime(
   const buildDetailsSerializer = vscode.window.registerWebviewPanelSerializer(
     "jenkinsWorkbench.buildDetails",
     {
-      deserializeWebviewPanel: (panel, state) => buildDetailsPanelLauncher.revive(panel, state)
+      deserializeWebviewPanel: (panel, state) =>
+        container.get("buildDetailsPanelLauncher").revive(panel, state)
     }
   );
   context.subscriptions.push(
@@ -131,7 +126,8 @@ export async function activateRuntime(
   const buildCompareSerializer = vscode.window.registerWebviewPanelSerializer(
     "jenkinsWorkbench.buildCompare",
     {
-      deserializeWebviewPanel: (panel, state) => buildComparePanelLauncher.revive(panel, state)
+      deserializeWebviewPanel: (panel, state) =>
+        container.get("buildComparePanelLauncher").revive(panel, state)
     }
   );
 
@@ -148,17 +144,13 @@ export async function activateRuntime(
     console.warn("Failed to initialize current-branch state.", error);
   });
   buildDiagnosticsCoordinator.start();
-  commitWatchService.start();
-  poller.start();
+  commitWatchService.start({ initialDelayMs: COMMIT_WATCH_POLL_STARTUP_DELAY_MS });
+  poller.start({ initialDelayMs: WATCH_POLL_STARTUP_DELAY_MS });
   statusRefreshService.start();
   void viewStateStore.syncFilterContext();
   jenkinsfileValidationCoordinator.start();
 
-  const jenkinsfileQuickFixProvider = container.get("jenkinsfileQuickFixProvider");
-  const jenkinsfileHoverProvider = container.get("jenkinsfileHoverProvider");
   const jenkinsfileCodeLensProvider = container.get("jenkinsfileCodeLensProvider");
-  const jenkinsfileCompletionProvider = container.get("jenkinsfileCompletionProvider");
-  const jenkinsfileSignatureHelpProvider = container.get("jenkinsfileSignatureHelpProvider");
 
   context.subscriptions.push(
     treeView,
@@ -167,7 +159,6 @@ export async function activateRuntime(
     pendingInputCoordinator,
     jobConfigDraftManager,
     replayDraftManager,
-    coverageDecorationService,
     buildDiagnosticsCoordinator,
     treeSummarySubscription,
     jobFilterDescriptionSubscription,
@@ -207,28 +198,14 @@ export async function activateRuntime(
     currentBranchStatusBar,
     jenkinsfileValidationCoordinator,
     container.get("jenkinsfileValidationStatusBar"),
-    vscode.languages.registerCodeActionsProvider(
-      JENKINSFILE_DOCUMENT_SELECTORS,
-      jenkinsfileQuickFixProvider,
-      { providedCodeActionKinds: JenkinsfileQuickFixProvider.providedCodeActionKinds }
-    ),
-    vscode.languages.registerHoverProvider(
-      JENKINSFILE_DOCUMENT_SELECTORS,
-      jenkinsfileHoverProvider
-    ),
-    vscode.languages.registerCompletionItemProvider(
-      JENKINSFILE_DOCUMENT_SELECTORS,
-      jenkinsfileCompletionProvider
-    ),
-    vscode.languages.registerSignatureHelpProvider(
-      JENKINSFILE_DOCUMENT_SELECTORS,
-      jenkinsfileSignatureHelpProvider,
-      ...JENKINSFILE_SIGNATURE_TRIGGER_CHARACTERS
-    ),
-    vscode.languages.registerCodeLensProvider(
-      JENKINSFILE_DOCUMENT_SELECTORS,
-      jenkinsfileCodeLensProvider
-    )
+    registerJenkinsfileLanguageFeatures(jenkinsfileMatcher, {
+      quickFix: container.get("jenkinsfileQuickFixProvider"),
+      hover: container.get("jenkinsfileHoverProvider"),
+      completion: container.get("jenkinsfileCompletionProvider"),
+      signatureHelp: container.get("jenkinsfileSignatureHelpProvider"),
+      codeLens: jenkinsfileCodeLensProvider
+    }),
+    jenkinsfileMatcher
   );
 
   registerExtensionSubscriptions(context, container);

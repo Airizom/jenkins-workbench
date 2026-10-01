@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { areStringArraysEqual } from "../shared/arrays";
+import { createLazyOutputChannel } from "../shared/LazyOutputChannel";
 import type { JenkinsfileEnvironmentResolver } from "./JenkinsfileEnvironmentResolver";
 import type { JenkinsfileMatcher } from "./JenkinsfileMatcher";
 import type {
@@ -28,7 +29,7 @@ export class JenkinsfileValidationCoordinator
   implements vscode.Disposable, JenkinsfileValidationStatusProvider
 {
   private readonly diagnostics = vscode.languages.createDiagnosticCollection("Jenkinsfile");
-  private readonly outputChannel = vscode.window.createOutputChannel("Jenkinsfile Validation");
+  private readonly outputChannel = createLazyOutputChannel("Jenkinsfile Validation");
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly statusEmitter = new vscode.EventEmitter<vscode.Uri>();
   private readonly logger = new JenkinsfileValidationOutputLogger(this.outputChannel);

@@ -27,6 +27,31 @@ describe("ExtensionContainer", () => {
     );
   });
 
+  it("defers lazy references until first use and then shares the singleton", () => {
+    class Launcher {
+      shown: string[] = [];
+      show(target: string): void {
+        this.shown.push(target);
+      }
+    }
+    const factory = vi.fn(() => tokenValue("buildDetailsPanelLauncher", new Launcher()));
+    const container = createExtensionContainer((registry) => {
+      registry.register("buildDetailsPanelLauncher", factory);
+    });
+
+    const lazy = container.lazy("buildDetailsPanelLauncher") as unknown as Launcher;
+    assert.equal(factory.mock.calls.length, 0);
+
+    const { show } = lazy;
+    show("build/1");
+    assert.equal(factory.mock.calls.length, 1);
+    const instance = container.get("buildDetailsPanelLauncher") as unknown as Launcher;
+    assert.deepEqual(instance.shown, ["build/1"]);
+    assert.ok(lazy instanceof Launcher);
+    assert.equal(container.lazy("buildDetailsPanelLauncher"), instance);
+    assert.throws(() => container.lazy("clientProvider"), /Missing provider.*clientProvider/);
+  });
+
   it("rejects duplicate registration and missing providers", () => {
     const container = new ExtensionContainer();
     container.register("environmentStore", () => tokenValue("environmentStore", {}));

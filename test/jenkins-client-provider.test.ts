@@ -75,6 +75,41 @@ describe("JenkinsClientProvider client caching", () => {
     assert.equal(tokenReads, 4);
   });
 
+  it("shares one secret read between concurrent cold-cache callers", async () => {
+    let authConfigReads = 0;
+    let releaseRead: (() => void) | undefined;
+    const store = {
+      getAuthConfigRevision: () => 0,
+      getAuthConfig: async () => {
+        authConfigReads += 1;
+        await new Promise<void>((resolve) => {
+          releaseRead = resolve;
+        });
+        return { type: "bearer", token: "secret" } satisfies JenkinsAuthConfig;
+      },
+      getToken: async () => undefined
+    } as unknown as JenkinsEnvironmentStore;
+    const provider = new JenkinsClientProvider(store);
+    const environment: JenkinsEnvironmentRef = {
+      environmentId: "environment-1",
+      scope: "global",
+      url: "https://jenkins.example.com/"
+    };
+
+    const pending = Promise.all([
+      provider.getClient(environment),
+      provider.getAuthSignature(environment),
+      provider.getClient(environment)
+    ]);
+    await Promise.resolve();
+    releaseRead?.();
+    const [firstClient, , secondClient] = await pending;
+
+    assert.equal(authConfigReads, 1);
+    assert.ok(firstClient);
+    assert.ok(secondClient);
+  });
+
   it("does not publish a stale resolution after credentials change mid-read", async () => {
     let authConfigRevision = 0;
     let token = "old-token";

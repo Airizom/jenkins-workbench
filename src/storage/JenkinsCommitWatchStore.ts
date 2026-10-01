@@ -53,7 +53,9 @@ export class JenkinsCommitWatchStore {
   }
 
   update(watch: CommitWatch): Promise<boolean> {
-    return this.mutate(watch.id, (existing) => (existing ? watch : undefined));
+    return this.mutate(watch.id, (existing) => (existing ? watch : undefined), {
+      skipIfUnchanged: true
+    });
   }
 
   remove(id: string): Promise<boolean> {
@@ -62,13 +64,16 @@ export class JenkinsCommitWatchStore {
 
   private mutate(
     id: string,
-    change: (existing: CommitWatch | undefined) => CommitWatch | undefined
+    change: (existing: CommitWatch | undefined) => CommitWatch | undefined,
+    options: { skipIfUnchanged?: boolean } = {}
   ): Promise<boolean> {
     const operation = this.queue.then(async () => {
       const watches = this.list();
       const existing = watches.find((watch) => watch.id === id);
       const next = change(existing);
       if (!existing && !next) return false;
+      // Polls re-save every pending watch; avoid a memento write when nothing moved.
+      if (options.skipIfUnchanged && existing && next && isSameWatch(existing, next)) return true;
       await this.state.update(KEY, [
         ...watches.filter((watch) => watch.id !== id),
         ...(next ? [next] : [])
@@ -78,4 +83,8 @@ export class JenkinsCommitWatchStore {
     this.queue = operation.catch(() => undefined);
     return operation;
   }
+}
+
+function isSameWatch(left: CommitWatch, right: CommitWatch): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

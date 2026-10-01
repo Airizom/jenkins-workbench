@@ -19,7 +19,12 @@ const DEFAULT_MAX_CONSECUTIVE_ERRORS = 3;
 interface JenkinsStatusPollerRuntimeSurface {
   readonly onDidChangeWatchErrorCount: vscode.Event<number>;
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
-  start(): void;
+  start(options?: StatusPollerStartOptions): void;
+}
+
+export interface StatusPollerStartOptions {
+  /** Delay before the first poll; later polls follow the shared status tick. */
+  initialDelayMs?: number;
 }
 
 interface WatchRuntimeState {
@@ -29,6 +34,7 @@ interface WatchRuntimeState {
 
 export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPollerRuntimeSurface {
   private tickSubscription: vscode.Disposable | undefined;
+  private initialPollHandle: ReturnType<typeof setTimeout> | undefined;
   private isPolling = false;
   private hasPendingPoll = false;
   private readonly _onDidChangeWatchErrorCount = new vscode.EventEmitter<number>();
@@ -67,15 +73,31 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     this.synchronizeWatchErrorCount();
   }
 
-  start(): void {
+  start(options: StatusPollerStartOptions = {}): void {
     if (this.tickSubscription) {
       return;
     }
 
     this.tickSubscription = this.statusRefreshService.onDidTick(() => {
+      this.clearInitialPoll();
       void this.poll();
     });
-    void this.poll();
+    const initialDelayMs = options.initialDelayMs ?? 0;
+    if (initialDelayMs <= 0) {
+      void this.poll();
+      return;
+    }
+    this.initialPollHandle = setTimeout(() => {
+      this.initialPollHandle = undefined;
+      void this.poll();
+    }, initialDelayMs);
+  }
+
+  private clearInitialPoll(): void {
+    if (this.initialPollHandle) {
+      clearTimeout(this.initialPollHandle);
+      this.initialPollHandle = undefined;
+    }
   }
 
   private normalizeMaxConsecutiveErrors(maxConsecutiveErrors: number): number {
@@ -85,6 +107,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
   }
 
   dispose(): void {
+    this.clearInitialPoll();
     if (this.tickSubscription) {
       this.tickSubscription.dispose();
       this.tickSubscription = undefined;
@@ -131,8 +154,8 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     );
 
     const staleByScope = new Map<EnvironmentScope, Set<string>>();
-    let didChange = false;
     const activeWatchKeys = new Set<string>();
+    const watchesByEnvironment = new Map<JenkinsEnvironmentRef, WatchedJobEntry[]>();
 
     for (const entry of watched) {
       activeWatchKeys.add(this.buildWatchKey(entry));
@@ -141,12 +164,25 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
         this.trackStaleEnvironment(staleByScope, entry);
         continue;
       }
-
-      const changed = await this.checkWatchedJob(environment, entry);
-      if (changed) {
-        didChange = true;
-      }
+      const entries = watchesByEnvironment.get(environment) ?? [];
+      entries.push(entry);
+      watchesByEnvironment.set(environment, entries);
     }
+
+    // Environments are independent servers, so one slow Jenkins must not delay the others.
+    // Jobs within an environment stay sequential to keep per-server load flat.
+    const results = await Promise.all(
+      Array.from(watchesByEnvironment, async ([environment, entries]) => {
+        let changed = false;
+        for (const entry of entries) {
+          if (await this.checkWatchedJob(environment, entry)) {
+            changed = true;
+          }
+        }
+        return changed;
+      })
+    );
+    let didChange = results.includes(true);
 
     this.pruneInactiveWatchStates(activeWatchKeys);
 

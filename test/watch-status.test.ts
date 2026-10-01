@@ -12,7 +12,8 @@ interface PollerConstructor {
 }
 interface PollerHarness {
   poll(): Promise<void>;
-  start(): void;
+  start(options?: { initialDelayMs?: number }): void;
+  dispose(): void;
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
   watchStates: Map<string, { pendingInput: { buildUrl: string; signature: string } | undefined }>;
@@ -266,6 +267,75 @@ describe("JenkinsStatusPoller", () => {
     } finally {
       warning.mockRestore();
     }
+  });
+
+  it("waits for the startup delay before the first poll unless a tick arrives first", async () => {
+    vi.useFakeTimers();
+    try {
+      const getJob = vi.fn(async () => ({
+        name: "demo",
+        url: "job/demo/",
+        color: "blue",
+        lastCompletedBuild: { number: 1, result: "SUCCESS" }
+      }));
+      const delayed = createPollerFixture({ getJob });
+      delayed.poller.start({ initialDelayMs: 5_000 });
+      await vi.advanceTimersByTimeAsync(4_999);
+      assert.equal(getJob.mock.calls.length, 0);
+      await vi.advanceTimersByTimeAsync(1);
+      assert.equal(getJob.mock.calls.length, 1);
+
+      const ticked = createPollerFixture({ getJob });
+      ticked.poller.start({ initialDelayMs: 5_000 });
+      ticked.fireTick();
+      await vi.advanceTimersByTimeAsync(10_000);
+      assert.equal(getJob.mock.calls.length, 2);
+
+      const disposed = createPollerFixture({ getJob });
+      disposed.poller.start({ initialDelayMs: 5_000 });
+      disposed.poller.dispose();
+      await vi.advanceTimersByTimeAsync(10_000);
+      assert.equal(getJob.mock.calls.length, 2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("polls environments concurrently and each environment's jobs in order", async () => {
+    const releases = new Map<string, () => void>();
+    const started: string[] = [];
+    const fixture = createPollerFixture({
+      environments: [
+        { id: "env-1", scope: "workspace", url: "https://slow.example" },
+        { id: "env-2", scope: "workspace", url: "https://fast.example" }
+      ],
+      watched: [
+        watchedEntry({ environmentId: "env-1", jobUrl: "job/a/" }),
+        watchedEntry({ environmentId: "env-1", jobUrl: "job/b/" }),
+        watchedEntry({ environmentId: "env-2", jobUrl: "job/c/" })
+      ],
+      getJob: (_environment, jobUrl) => {
+        started.push(jobUrl);
+        return new Promise((resolve) => {
+          releases.set(jobUrl, () =>
+            resolve({
+              name: "demo",
+              url: jobUrl,
+              color: "blue",
+              lastCompletedBuild: { number: 1, result: "SUCCESS" }
+            })
+          );
+        });
+      }
+    });
+
+    const poll = fixture.poller.poll();
+    await vi.waitFor(() => assert.deepEqual(started, ["job/a/", "job/c/"]));
+    releases.get("job/c/")?.();
+    releases.get("job/a/")?.();
+    await vi.waitFor(() => assert.deepEqual(started, ["job/a/", "job/c/", "job/b/"]));
+    releases.get("job/b/")?.();
+    await poll;
   });
 
   it("sends a failure notification only after the watch update succeeds", async () => {

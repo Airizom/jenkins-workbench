@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { LogOutputChannel } from "../shared/LazyOutputChannel";
 import type { ValidationReason } from "./JenkinsfileValidationCoordinatorTypes";
 
 export class JenkinsfileValidationOutputLogger {
-  constructor(private readonly outputChannel: vscode.OutputChannel) {}
+  constructor(private readonly outputChannel: LogOutputChannel) {}
 
   logNoEnvironment(document: vscode.TextDocument, reason: ValidationReason): void {
     this.appendLogHeader(document, reason);

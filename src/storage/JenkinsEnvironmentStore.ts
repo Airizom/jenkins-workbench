@@ -212,9 +212,13 @@ export class JenkinsEnvironmentStore {
     await Promise.all(
       next.map(async (environment) => {
         const username = environment.username?.trim() ?? "";
+        // Only legacy entries still carry a username; skip the keychain read for the rest.
+        if (username.length === 0) {
+          return;
+        }
         const existing = await this.getAuthConfig(scope, environment.id);
 
-        if (!existing && username.length > 0) {
+        if (!existing) {
           const token = await this.getToken(scope, environment.id);
           const trimmedToken = token?.trim() ?? "";
           if (trimmedToken.length > 0) {
@@ -231,7 +235,7 @@ export class JenkinsEnvironmentStore {
           }
         }
 
-        if (existing?.type === "basic" && username.length > 0) {
+        if (existing?.type === "basic") {
           environment.username = undefined;
           didUpdate = true;
         }

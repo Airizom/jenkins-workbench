@@ -37,12 +37,13 @@ const watch: CommitWatch = {
 
 function setup() {
   const values = new Map<string, unknown>();
+  const update = vi.fn(async (key: string, value: unknown) => {
+    values.set(key, value);
+  });
   const memento = {
     keys: () => [...values.keys()],
     get: (key: string, fallback?: unknown) => values.get(key) ?? fallback,
-    update: async (key: string, value: unknown) => {
-      values.set(key, value);
-    }
+    update
   } as vscode.Memento;
   const store = new JenkinsCommitWatchStore(memento);
   let history: CommitHistory = { job: { name: "main", url: watch.jobUrl }, builds: [] };
@@ -54,17 +55,18 @@ function setup() {
     ])
   };
   const launcher = { show: vi.fn(async () => undefined) };
-  const service = () =>
+  const service = (ticks = {} as JenkinsStatusRefreshService) =>
     new CurrentBranchCommitWatchService(
       store,
       { load } as unknown as CurrentBranchCommitHistory,
       data as unknown as JenkinsDataService,
       envs as unknown as JenkinsEnvironmentStore,
-      {} as JenkinsStatusRefreshService,
+      ticks,
       launcher as unknown as BuildDetailsPanelLauncher
     );
   return {
     store,
+    update,
     service,
     envs,
     data,
@@ -197,6 +199,50 @@ describe("persistent commit watches", () => {
       h.store.update({ ...watch, blockedReason: "stale" })
     ]);
     expect(h.store.list().map((entry) => entry.id)).toEqual(["second"]);
+  });
+
+  it("does not rewrite pending watches whose state did not change", async () => {
+    const h = setup();
+    await h.store.add(watch);
+    const service = h.service();
+    await service.poll();
+    const writesAfterFirstPoll = h.update.mock.calls.length;
+    await service.poll();
+    await service.poll();
+    expect(h.update).toHaveBeenCalledTimes(writesAfterFirstPoll);
+    expect(h.store.list()).toHaveLength(1);
+  });
+
+  it("delays the first poll at startup until the delay or a status tick", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = setup();
+      await h.store.add(watch);
+      let tick: (() => void) | undefined;
+      const ticks = {
+        onDidTick: (listener: () => void) => {
+          tick = listener;
+          return { dispose: () => undefined };
+        }
+      } as unknown as JenkinsStatusRefreshService;
+
+      const delayed = h.service(ticks);
+      delayed.start({ initialDelayMs: 8_000 });
+      await vi.advanceTimersByTimeAsync(7_999);
+      expect(h.load).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(h.load).toHaveBeenCalledTimes(1);
+      delayed.dispose();
+
+      const ticked = h.service(ticks);
+      ticked.start({ initialDelayMs: 8_000 });
+      tick?.();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(h.load).toHaveBeenCalledTimes(2);
+      ticked.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("fetches history once per job for multiple pending commit watches", async () => {

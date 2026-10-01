@@ -12,6 +12,7 @@ import {
   EMPTY_BUILD_DIAGNOSTICS
 } from "../panels/buildDetails/shared/BuildDetailsContracts";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
+import { createLazyOutputChannel } from "../shared/LazyOutputChannel";
 import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
@@ -45,7 +46,7 @@ export class BuildDiagnosticsCoordinator
   private readonly collection = vscode.languages.createDiagnosticCollection(
     "jenkins-build-diagnostics"
   );
-  private readonly output = vscode.window.createOutputChannel("Jenkins Build Diagnostics");
+  private readonly output = createLazyOutputChannel("Jenkins Build Diagnostics");
   private readonly emitter = new vscode.EventEmitter<BuildDiagnosticsSnapshotEvent>();
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly configuration: BuildDiagnosticsConfiguration;

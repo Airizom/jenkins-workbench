@@ -66,7 +66,9 @@ export class CoverageDecorationService implements vscode.Disposable {
         void this.applyDecorationsToVisibleEditors(this.resolveGeneration);
       })
     );
-    void this.initializeGitRepositoryListeners();
+    void this.initializeGitRepositoryListeners().catch((error: unknown) => {
+      console.warn("Failed to observe Git repositories for coverage decorations.", error);
+    });
   }
 
   dispose(): void {

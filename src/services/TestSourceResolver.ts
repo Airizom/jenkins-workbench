@@ -40,10 +40,14 @@ export class TestSourceResolver {
     private readonly repositoryLinkStore: JenkinsRepositoryLinkStore,
     private readonly fileMatchStrategy: TestSourceFileMatchStrategy
   ) {
-    this.gitApiPromise = getGitApi().then((gitApi) => {
-      this.gitApi = gitApi;
-      return gitApi;
-    });
+    // A Git activation failure means "no Git repositories", never an unhandled rejection.
+    this.gitApiPromise = getGitApi().then(
+      (gitApi) => {
+        this.gitApi = gitApi;
+        return gitApi;
+      },
+      () => undefined
+    );
   }
 
   /**

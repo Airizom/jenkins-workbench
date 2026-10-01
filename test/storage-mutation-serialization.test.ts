@@ -36,6 +36,7 @@ interface EnvironmentStoreHarness {
     id: string,
     authConfig: { type: "bearer"; token: string }
   ): Promise<void>;
+  migrateLegacyAuthConfigs(): Promise<void>;
 }
 
 interface RepositoryLinkStoreConstructor {
@@ -192,6 +193,60 @@ describe("JenkinsEnvironmentStore mutation serialization", () => {
     assert.equal(await staleRead, undefined);
     assert.deepEqual(await store.getAuthConfig("workspace", "env-1"), validConfig);
     assert.equal(secrets.get(key), JSON.stringify(validConfig));
+  });
+});
+
+describe("JenkinsEnvironmentStore legacy auth migration", () => {
+  it("reads secrets only for environments that still carry a legacy username", async () => {
+    const secrets = new Map([["jenkinsWorkbench.envToken.workspace.legacy", "legacy-token"]]);
+    const reads: string[] = [];
+    const { context, workspaceState } = createContext();
+    const migrationContext = {
+      ...context,
+      secrets: {
+        get: async (key: string) => {
+          reads.push(key);
+          return secrets.get(key);
+        },
+        store: async (key: string, value: string) => {
+          secrets.set(key, value);
+        },
+        delete: async (key: string) => {
+          secrets.delete(key);
+        }
+      }
+    } as unknown as vscode.ExtensionContext;
+    await workspaceState.update("jenkinsWorkbench.environments", [
+      { id: "migrated-1", url: "https://a.example" },
+      { id: "migrated-2", url: "https://b.example" },
+      { id: "legacy", url: "https://c.example", username: "developer" }
+    ]);
+    const store = new JenkinsEnvironmentStore(migrationContext);
+
+    await store.migrateLegacyAuthConfigs();
+
+    assert.ok(reads.every((key) => key.endsWith(".legacy")));
+    assert.deepEqual(
+      JSON.parse(secrets.get("jenkinsWorkbench.envAuthConfig.workspace.legacy") ?? ""),
+      {
+        type: "basic",
+        username: "developer",
+        token: "legacy-token"
+      }
+    );
+    assert.equal(secrets.has("jenkinsWorkbench.envToken.workspace.legacy"), false);
+    const environments = (await store.getEnvironments("workspace")) as Array<{
+      id: string;
+      username?: string;
+    }>;
+    assert.equal(
+      environments.find((environment) => environment.id === "legacy")?.username,
+      undefined
+    );
+
+    reads.length = 0;
+    await store.migrateLegacyAuthConfigs();
+    assert.deepEqual(reads, []);
   });
 });
 

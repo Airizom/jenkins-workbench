@@ -4,13 +4,15 @@ This file is intentionally non-generic. It records only details that are easy to
 
 ## 1) The Real Runtime Shape (Do Not Assume Typical VS Code Extension Layout)
 
-- The extension backend is TypeScript (`src/**`), and the five panel UIs are entries in one Vite build under `src/panels/**`.
+- The extension backend is TypeScript (`src/**`) bundled by esbuild (`scripts/build-extension.mjs`) into `out/extension.js`, plus `out/BuildDiagnosticCustomMatcherWorker.js`, which `BuildDiagnosticCustomMatcherWorkerClient` loads by path. `tsc` only typechecks the host. The five panel UIs are entries in one Vite build under `src/panels/**`.
+- `package.json` `dependencies` (for example `redos-detector`) stay external to the bundle and load from the VSIX `node_modules`; everything else is inlined.
 - Webview assets are resolved from `out/webview/manifest.json` at runtime (`src/panels/shared/webview/WebviewAssets.ts`).
 - If the manifest or entry names drift, panels fail with missing assets.
 - `npm run compile` is the command that keeps everything in sync:
   - `build:webview`
   - `typecheck:webview`
-  - extension `tsc`
+  - `typecheck:extension` (`tsc --noEmit`)
+  - `build:extension` (esbuild; clears stale non-webview output in `out/`)
   - See `package.json` scripts.
 
 ## 2) High-Risk Coupling Map
@@ -62,6 +64,7 @@ If you change one side, update the others in the same pass.
 - Pending input refreshes are queued/throttled with concurrency limits in `PendingInputRefreshCoordinator`; this protects Jenkins from burst traffic.
 - Build Details uses load tokens and panel-visibility-aware polling. If you alter refresh timing, preserve token checks to avoid stale postMessage updates.
 - Task cancellation closes the local task immediately, never cancels the Jenkins queue item, and only stops a running build when `JenkinsTaskRunner` verifies that it has a single trigger. Shared or unverifiable work is left active (`src/tasks/JenkinsTaskTerminal.ts`, `src/tasks/JenkinsTaskRunner.ts`).
+- Activation is kept cheap on purpose: command handlers, task providers, and panel-launcher dependencies hold `container.lazy(...)` references, so Build Details/Compare launchers (and the Git-backed coverage/test-source services behind them) are built on first use. The watch and commit-watch pollers start after a short delay (`ExtensionRuntime.ts`). Jenkinsfile language providers register with `JenkinsfileMatcher.documentSelector` and re-register when the file patterns change; do not widen them back to whole schemes.
 - Artifact downloads require a workspace folder, but previews do not (`README.md` settings/troubleshooting sections).
 - Environment auth migration exists (`migrateLegacyAuthConfigs`) and moves old token/username style auth into secret-backed auth config (`src/storage/JenkinsEnvironmentStore.ts`).
 
@@ -140,6 +143,6 @@ Release procedure is documented and strict in `docs/release-process.md`:
 - version/tag alignment (`package.json.version` == `vX.Y.Z` tag without `v`)
 - local prepublish compile before tagging
 - push with tags and confirm clean/ahead-free status
-- package with `node scripts/release.mjs package`, never `vsce package --no-dependencies`: the extension host is `tsc` output (not bundled) and loads `dependencies` such as `redos-detector` from the VSIX `node_modules`. 1.54.0 shipped without them and failed to activate.
+- package with `node scripts/release.mjs package`, never `vsce package --no-dependencies`: the esbuild bundle keeps `dependencies` such as `redos-detector` external and loads them from the VSIX `node_modules`. 1.54.0 shipped without them and failed to activate.
 
 If a release fails in CI, first suspect tag/version mismatch or missing publish secrets (`VSCE_PAT`, `OVSX_PAT`).

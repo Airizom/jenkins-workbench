@@ -71,6 +71,36 @@ export class ExtensionContainer {
       this.resolvingStack.pop();
     }
   }
+
+  /**
+   * Returns a stand-in that constructs the service on first property access. Use it for
+   * dependencies that are only needed once a user acts (commands, panel launchers) so
+   * activation does not build them, or the graphs behind them, up front.
+   */
+  lazy<K extends ExtensionToken>(token: K): ExtensionTokenMap[K] {
+    if (!this.providers.has(token)) {
+      throw new Error(`Missing provider for token '${token}'.`);
+    }
+    const existing = this.instances[token];
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const resolve = (): object => this.get(token) as object;
+    return new Proxy(
+      {},
+      {
+        get: (_target, property) => {
+          const instance = resolve();
+          const value: unknown = Reflect.get(instance, property, instance);
+          return typeof value === "function" ? value.bind(instance) : value;
+        },
+        set: (_target, property, value) => Reflect.set(resolve(), property, value),
+        has: (_target, property) => Reflect.has(resolve(), property),
+        getPrototypeOf: () => Reflect.getPrototypeOf(resolve())
+      }
+    ) as ExtensionTokenMap[K];
+  }
 }
 
 export function createExtensionContainer(

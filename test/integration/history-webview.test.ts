@@ -7,7 +7,9 @@ describe("Job History webview", () => {
     const extension = vscode.extensions.getExtension("airizom.jenkins-workbench");
     assert.ok(extension);
     const load = (relative: string) =>
-      import(vscode.Uri.joinPath(extension.extensionUri, "out", relative).fsPath);
+      // The shipped extension is one esbuild bundle; tests load the per-module tsc
+      // build of the host sources from out-test/host instead.
+      import(vscode.Uri.joinPath(extension.extensionUri, "out-test", "host", relative).fsPath);
     const [
       { HistoryController },
       { HistoryService },

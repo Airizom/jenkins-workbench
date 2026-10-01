@@ -19,34 +19,35 @@ export function registerExtensionCommands(
   context: vscode.ExtensionContext,
   container: ExtensionContainer
 ): void {
-  const environmentStore = container.get("environmentStore");
-  const browserSsoAuthenticator = container.get("browserSsoAuthenticator");
-  const presetStore = container.get("presetStore");
-  const watchStore = container.get("watchStore");
-  const pinStore = container.get("pinStore");
-  const clientProvider = container.get("clientProvider");
-  const dataService = container.get("dataService");
-  const artifactActionHandler = container.get("artifactActionHandler");
-  const buildLogPreviewer = container.get("buildLogPreviewer");
-  const buildComparePanelLauncher = container.get("buildComparePanelLauncher");
-  const buildDetailsPanelLauncher = container.get("buildDetailsPanelLauncher");
-  const queuedBuildWaiter = container.get("queuedBuildWaiter");
-  const replayBuildWorkflow = container.get("replayBuildWorkflow");
-  const viewStateStore = container.get("viewStateStore");
-  const treeNavigator = container.get("treeNavigator");
-  const treeDataProvider = container.get("treeDataProvider");
-  const treeExpansionState = container.get("treeExpansionState");
-  const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
-  const jenkinsfileEnvironmentResolver = container.get("jenkinsfileEnvironmentResolver");
-  const jenkinsfileStepCatalogService = container.get("jenkinsfileStepCatalogService");
-  const jobConfigPreviewer = container.get("jobConfigPreviewer");
-  const workspacePreviewer = container.get("workspacePreviewer");
-  const jobConfigDraftManager = container.get("jobConfigDraftManager");
-  const jobConfigUpdateWorkflow = container.get("jobConfigUpdateWorkflow");
-  const refreshHost = container.get("refreshHost");
-  const currentBranchWorkflowService = container.get("currentBranchWorkflowService");
-  const diagnosticBindingStore = container.get("diagnosticBindingStore");
-  const buildDiagnosticsCoordinator = container.get("buildDiagnosticsCoordinator");
+  // Command handlers capture lazy references; services are built when a command first runs.
+  const environmentStore = container.lazy("environmentStore");
+  const browserSsoAuthenticator = container.lazy("browserSsoAuthenticator");
+  const presetStore = container.lazy("presetStore");
+  const watchStore = container.lazy("watchStore");
+  const pinStore = container.lazy("pinStore");
+  const clientProvider = container.lazy("clientProvider");
+  const dataService = container.lazy("dataService");
+  const artifactActionHandler = container.lazy("artifactActionHandler");
+  const buildLogPreviewer = container.lazy("buildLogPreviewer");
+  const buildComparePanelLauncher = container.lazy("buildComparePanelLauncher");
+  const buildDetailsPanelLauncher = container.lazy("buildDetailsPanelLauncher");
+  const queuedBuildWaiter = container.lazy("queuedBuildWaiter");
+  const replayBuildWorkflow = container.lazy("replayBuildWorkflow");
+  const viewStateStore = container.lazy("viewStateStore");
+  const treeNavigator = container.lazy("treeNavigator");
+  const treeDataProvider = container.lazy("treeDataProvider");
+  const treeExpansionState = container.lazy("treeExpansionState");
+  const jenkinsfileValidationCoordinator = container.lazy("jenkinsfileValidationCoordinator");
+  const jenkinsfileEnvironmentResolver = container.lazy("jenkinsfileEnvironmentResolver");
+  const jenkinsfileStepCatalogService = container.lazy("jenkinsfileStepCatalogService");
+  const jobConfigPreviewer = container.lazy("jobConfigPreviewer");
+  const workspacePreviewer = container.lazy("workspacePreviewer");
+  const jobConfigDraftManager = container.lazy("jobConfigDraftManager");
+  const jobConfigUpdateWorkflow = container.lazy("jobConfigUpdateWorkflow");
+  const refreshHost = container.lazy("refreshHost");
+  const currentBranchWorkflowService = container.lazy("currentBranchWorkflowService");
+  const diagnosticBindingStore = container.lazy("diagnosticBindingStore");
+  const buildDiagnosticsCoordinator = container.lazy("buildDiagnosticsCoordinator");
 
   registerEnvironmentCommands(
     context,
@@ -78,7 +79,7 @@ export function registerExtensionCommands(
     context,
     dataService,
     environmentStore,
-    container.get("jobHistoryPanelLauncher")
+    container.lazy("jobHistoryPanelLauncher")
   );
 
   registerJobCommands(

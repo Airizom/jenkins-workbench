@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { isSafePattern } from "redos-detector";
+import type * as RedosDetector from "redos-detector";
 import {
   addIssue,
   isRecord,
@@ -11,6 +11,14 @@ import type {
   DiagnosticProfileValidationIssue,
   NormalizedDiagnosticPathMapping
 } from "./BuildDiagnosticTypes";
+
+let redosDetector: typeof RedosDetector | undefined;
+
+// Loaded on the first regex path mapping rather than at activation; most profiles never use one.
+function isSafePattern(...args: Parameters<typeof RedosDetector.isSafePattern>) {
+  redosDetector ??= require("redos-detector") as typeof RedosDetector;
+  return redosDetector.isSafePattern(...args);
+}
 
 const PREFIX_MAPPING_PROPERTIES = new Set(["type", "remote", "local"]);
 const REGEX_MAPPING_PROPERTIES = new Set(["type", "remote", "replace", "local"]);

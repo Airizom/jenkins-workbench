@@ -17,6 +17,7 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
   private subscription?: vscode.Disposable;
   private disposed = false;
   private polling?: Promise<void>;
+  private initialPollHandle?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly store: JenkinsCommitWatchStore,
@@ -28,14 +29,23 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
   ) {}
 
   // fallow-ignore-next-line unused-class-member -- started by the extension runtime via the service container
-  start(): void {
+  start(options: { initialDelayMs?: number } = {}): void {
     if (this.subscription || this.disposed) return;
     this.subscription = this.ticks.onDidTick(() => this.schedulePoll());
-    this.schedulePoll();
+    const initialDelayMs = options.initialDelayMs ?? 0;
+    if (initialDelayMs <= 0) {
+      this.schedulePoll();
+      return;
+    }
+    this.initialPollHandle = setTimeout(() => {
+      this.initialPollHandle = undefined;
+      this.schedulePoll();
+    }, initialDelayMs);
   }
 
   dispose(): void {
     this.disposed = true;
+    clearTimeout(this.initialPollHandle);
     this.subscription?.dispose();
   }
 
@@ -115,6 +125,8 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
   }
 
   private schedulePoll(): void {
+    clearTimeout(this.initialPollHandle);
+    this.initialPollHandle = undefined;
     void this.poll().catch((error: unknown) =>
       console.warn("Unable to persist commit watch status.", error)
     );
