@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.55.1] - 2026-10-01
+
+### Changed
+
+- perf(src): bundle the extension host with esbuild into `out/extension.js`; `package.json` dependencies stay external and ship in the VSIX `node_modules`.
+- perf(src): activation does less up front. Command, task, and panel-launcher services resolve on first use, the first watch and commit-watch polls are delayed, and output channels are created on first write.
+- perf(src): Jenkinsfile language providers only register for configured Jenkinsfile patterns instead of whole schemes. Cold-cache secret reads are shared, and commit-watch state skips writes when nothing changed.
+
 ## [1.55.0] - 2026-09-27
 
 ### Changed
