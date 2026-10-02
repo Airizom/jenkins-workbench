@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.56.0] - 2026-10-01
+
+### Changed
+
+- feat(panels): Build Compare collapses sections with no differences, adds search and paging to the test diff, and offers buttons to open each build when console logs are too large to diff or fail to load.
+- feat(panels): Build Details shows a build summary card on the Overview tab when a build reports no tests, coverage, changes, or artifacts, with shortcuts to the console and pipeline. Long changelog messages expand with Show more, and the full commit id can be copied.
+- feat(panels): Build Details console search returns focus to the search button when it closes, keeps focus in the search field after Clear, and no longer jumps back to the active match while the log streams. Focus moves to the new tab when the active tab disappears, for example after approving the last input.
+- feat(panels): Job History tests can be sorted by relevance, failure rate, transitions, or name, and job names use Jenkins' ` » ` separator. Compare always uses the older build as the baseline, and history paused by hiding the panel resumes when it becomes visible again.
+- feat(panels): Node Details keeps the last data, marked stale, when a refresh fails, and always refreshes after node actions. Node panels share the same Updated labels.
+- feat(panels): Node Capacity opens pools that report problems once and leaves them open after they recover, so polling no longer collapses a pool you are reading.
+- feat(nodes): the take-offline prompt explains that running builds continue and shows how many executors are busy.
+- ci(.github): pin runners to `ubuntu-24.04` and bump the release workflow actions.
+
 ## [1.55.1] - 2026-10-01
 
 ### Changed
