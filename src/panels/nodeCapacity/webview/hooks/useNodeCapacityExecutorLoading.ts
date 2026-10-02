@@ -13,11 +13,43 @@ type ExecutorLoadCandidate = Pick<
   "nodeUrl" | "isOffline" | "isTemporarilyOffline" | "busyExecutors" | "totalExecutors"
 >;
 
+/** Effective open state per pool id; pools missing from the map are closed. */
 export type PoolOpenStates = ReadonlyMap<string, boolean>;
 
-/** Pools default to open when they signal a problem, until the user toggles them. */
 export function isPoolOpen(pool: NodeCapacityPoolViewModel, poolOpenStates: PoolOpenStates) {
-  return poolOpenStates.get(pool.id) ?? pool.severity !== "normal";
+  return poolOpenStates.get(pool.id) ?? false;
+}
+
+/**
+ * Adds pools that signal a problem to the auto-opened set. Pools are only ever
+ * added: a pool that recovers stays open, and one that degrades opens once, so
+ * 10s polling never collapses a pool the user is reading. Returns `previous`
+ * unchanged when nothing new opened.
+ */
+export function collectAutoOpenedPoolIds(
+  pools: readonly Pick<NodeCapacityPoolViewModel, "id" | "severity">[],
+  previous: ReadonlySet<string>
+): ReadonlySet<string> {
+  const added = pools.filter((pool) => pool.severity !== "normal" && !previous.has(pool.id));
+  if (added.length === 0) {
+    return previous;
+  }
+  return new Set([...previous, ...added.map((pool) => pool.id)]);
+}
+
+/** User toggles always win over the automatic decision. */
+export function resolvePoolOpenStates(
+  autoOpenedPoolIds: ReadonlySet<string>,
+  userOpenStates: PoolOpenStates
+): PoolOpenStates {
+  const resolved = new Map<string, boolean>();
+  for (const poolId of autoOpenedPoolIds) {
+    resolved.set(poolId, true);
+  }
+  for (const [poolId, open] of userOpenStates) {
+    resolved.set(poolId, open);
+  }
+  return resolved;
 }
 
 /**
@@ -55,13 +87,23 @@ export function planExecutorLoads(
   return [...nodeUrls].sort();
 }
 
-export function usePoolOpenStates(): {
+export function usePoolOpenStates(pools: readonly NodeCapacityPoolViewModel[]): {
   poolOpenStates: PoolOpenStates;
   handlePoolToggle: (poolId: string, open: boolean) => void;
 } {
-  const [poolOpenStates, setPoolOpenStates] = useState<PoolOpenStates>(() => new Map());
+  const [userOpenStates, setUserOpenStates] = useState<PoolOpenStates>(() => new Map());
+  const autoOpenedRef = useRef<ReadonlySet<string>>(new Set());
+  // Idempotent for the same `pools`, so a repeated render cannot double-apply.
+  const autoOpenedPoolIds = useMemo(() => {
+    autoOpenedRef.current = collectAutoOpenedPoolIds(pools, autoOpenedRef.current);
+    return autoOpenedRef.current;
+  }, [pools]);
+  const poolOpenStates = useMemo(
+    () => resolvePoolOpenStates(autoOpenedPoolIds, userOpenStates),
+    [autoOpenedPoolIds, userOpenStates]
+  );
   const handlePoolToggle = useCallback((poolId: string, open: boolean) => {
-    setPoolOpenStates((current) => {
+    setUserOpenStates((current) => {
       if (current.get(poolId) === open) {
         return current;
       }

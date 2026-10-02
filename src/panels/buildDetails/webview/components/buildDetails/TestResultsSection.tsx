@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { Button } from "../../../../shared/webview/components/ui/button";
 import type {
   BuildDetailsCoverageStateViewModel,
   BuildTestCaseViewModel,
@@ -38,7 +39,8 @@ export function TestResultsSection({
   const emptyState = renderTestResultsEmptyState(
     results,
     summary,
-    testResultsView.filteredItems.length
+    testResultsView.filteredItems.length,
+    testResultsView.clearFilters
   );
 
   return (
@@ -85,7 +87,8 @@ export function TestResultsSection({
 function renderTestResultsEmptyState(
   results: BuildTestResultsViewModel,
   summary: BuildTestsSummaryViewModel,
-  filteredItemCount: number
+  filteredItemCount: number,
+  onClearFilters: () => void
 ): React.JSX.Element | undefined {
   // Keep showing existing results while a reload (for example loading test
   // output) is in flight; the placeholder is only for the first load.
@@ -125,6 +128,11 @@ function renderTestResultsEmptyState(
         icon="search"
         title="No matching tests"
         message="Adjust the status filter or search query to see more results."
+        action={
+          <Button variant="secondary" size="sm" onClick={onClearFilters}>
+            Clear filters
+          </Button>
+        }
       />
     );
   }

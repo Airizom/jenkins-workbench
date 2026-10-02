@@ -32,7 +32,7 @@ export function CompareTable({
                 key={column.label}
                 scope="col"
                 className={cn(
-                  "px-3 py-1.5 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground",
+                  "px-3 py-1.5 text-left text-caption font-medium uppercase tracking-wide text-muted-foreground",
                   column.className
                 )}
               >

@@ -40,7 +40,9 @@ export function StageStripSegmentButton({
           className={cn(
             "flex min-w-0 flex-col justify-end gap-1 rounded-sm px-1 py-1",
             "hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            dense ? "w-5 flex-none" : "flex-1 min-w-[56px] max-w-[150px]"
+            // Labelled segments keep a readable minimum width; the strip
+            // scrolls horizontally instead of truncating names to a glyph.
+            dense ? "w-5 flex-none" : "min-w-24 max-w-[160px] flex-1 shrink-0"
           )}
         >
           {dense ? <DenseStatusGlyph segment={segment} /> : <SegmentLabel segment={segment} />}
@@ -48,7 +50,8 @@ export function StageStripSegmentButton({
             className={cn(
               "h-1.5 w-full rounded-full",
               resolveStatusAccentClass(segment.statusClass),
-              segment.statusClass === "running" && "stage-strip-bar--running"
+              segment.statusClass === "running" && "stage-strip-bar--running",
+              segment.statusClass === "neutral" && "stage-strip-bar--not-run"
             )}
           />
         </button>
@@ -84,7 +87,7 @@ function SegmentLabel({ segment }: { segment: StageStripSegment }): React.JSX.El
   const branches = describeSegmentBranches(segment);
   const glyph = getStageIcon(segment.statusClass);
   return (
-    <span className="flex w-full items-center gap-1 text-[11px] leading-tight text-muted-foreground">
+    <span className="flex w-full items-center gap-1 text-caption leading-tight text-muted-foreground">
       {glyph ? (
         <span
           aria-hidden="true"
@@ -98,7 +101,7 @@ function SegmentLabel({ segment }: { segment: StageStripSegment }): React.JSX.El
       ) : null}
       <span className="truncate">{segment.name}</span>
       {branches ? (
-        <span className="shrink-0 opacity-70" title={branches}>
+        <span className="shrink-0 opacity-70" aria-hidden="true">
           ×{segment.branchCount}
         </span>
       ) : null}

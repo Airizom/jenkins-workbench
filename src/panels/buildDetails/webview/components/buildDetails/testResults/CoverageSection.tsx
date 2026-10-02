@@ -53,10 +53,10 @@ export function CoverageSection({
         metrics={
           <>
             <ToneMetricCard label="Project" value={projectCoverage} tone="neutral" />
-            <ToneMetricCard label="Modified Files" value={modifiedFilesCoverage} tone="neutral" />
-            <ToneMetricCard label="Modified Lines" value={modifiedLinesCoverage} tone="neutral" />
+            <ToneMetricCard label="Modified files" value={modifiedFilesCoverage} tone="neutral" />
+            <ToneMetricCard label="Modified lines" value={modifiedLinesCoverage} tone="neutral" />
             <ToneMetricCard
-              label="Quality Gates"
+              label="Quality gates"
               value={hasQualityGates ? String(qualityGateCount) : undefined}
               tone={coverageStatusClassToVisualTone(
                 resolveCoverageStatusClass(overallQualityGateStatusClass)
@@ -126,7 +126,7 @@ function renderCoverageFooter(coverageState: BuildDetailsCoverageStateViewModel)
       {modifiedFiles.length > 0 ? (
         <div className="rounded border border-border bg-background">
           <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Modified Files
+            Modified files
           </div>
           <div className="divide-y divide-border">
             {modifiedFiles.map((file) => (

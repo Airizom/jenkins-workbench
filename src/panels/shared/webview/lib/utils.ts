@@ -10,12 +10,13 @@ export type ClassValue =
   | Record<string, boolean>;
 
 // Teach tailwind-merge the non-default scales declared in base.css `@theme` so
-// `text-vscode` is treated as a font size (not a text color) and `shadow-widget`
-// as a box shadow (not a shadow color).
+// `text-vscode`/`text-caption` are treated as font sizes (not text colors, which
+// would drop a real color class such as `text-badge-foreground`) and
+// `shadow-widget` as a box shadow (not a shadow color).
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      text: ["vscode", "vscode-editor"],
+      text: ["vscode", "vscode-editor", "micro", "caption"],
       shadow: ["widget"]
     }
   }

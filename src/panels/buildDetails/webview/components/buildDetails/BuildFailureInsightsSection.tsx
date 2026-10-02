@@ -70,6 +70,22 @@ function resolveInsightsVisibility(
   return { hasChangelog, hasTests, hasArtifacts, testsCardInAnalysis, showAnalysis, showSummary };
 }
 
+/** Whether the section renders anything; the overview uses it to avoid going blank. */
+export function hasVisibleInsights(
+  resultClass: string,
+  insights: BuildFailureInsightsViewModel,
+  diagnostics: BuildDiagnosticsViewModel,
+  showTestsSummary: boolean
+): boolean {
+  const visibility = resolveInsightsVisibility(
+    resultClass,
+    insights,
+    diagnostics,
+    showTestsSummary
+  );
+  return visibility.showAnalysis || visibility.showSummary;
+}
+
 function BuildSummaryGroup({
   insights,
   visibility,
@@ -107,6 +123,10 @@ type BuildFailureInsightsSectionProps = {
   diagnostics: BuildDiagnosticsViewModel;
   /** False when the overview already renders a test summary card above. */
   showTestsSummary: boolean;
+  /** Whether a Tests tab exists for the tests card to point at. */
+  hasTestsTab?: boolean;
+  /** Jenkins reported counts but the case-level test report could not be loaded. */
+  testReportUnavailable?: boolean;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
   onOpenDiagnosticSource: (targetId: string) => void;
   onShowDiagnosticProblems: () => void;
@@ -123,6 +143,8 @@ export function BuildFailureInsightsSection({
   insights,
   diagnostics,
   showTestsSummary,
+  hasTestsTab = true,
+  testReportUnavailable = false,
   onArtifactAction,
   onOpenDiagnosticSource,
   onShowDiagnosticProblems,
@@ -144,6 +166,8 @@ export function BuildFailureInsightsSection({
       summaryLabel={insights.testSummaryLabel}
       hasFailedTests={insights.hasFailedTests}
       hint={insights.testResultsHint}
+      hasTestsTab={hasTestsTab}
+      reportUnavailable={testReportUnavailable}
     />
   ) : null;
 

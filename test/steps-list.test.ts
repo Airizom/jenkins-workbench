@@ -10,7 +10,10 @@ import type {
 import { BranchCard } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/BranchCard";
 import { StepsList } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StepsList";
 import { StepsVisibilityToggle } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StepsVisibilityToggle";
-import { formatCount } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils";
+import {
+  defaultShowAllSteps,
+  formatCount
+} from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils";
 import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 
 function makeStep(overrides: Partial<PipelineStageStepViewModel> = {}): PipelineStageStepViewModel {
@@ -135,11 +138,54 @@ describe("StepsVisibilityToggle", () => {
     );
 
     for (const html of [failedOnly, allSteps]) {
-      assert.match(html, /aria-label="Failed steps only"/);
-      assert.match(html, />Failed only</);
+      assert.match(html, />Failed steps only</);
+      assert.doesNotMatch(html, /aria-label=/);
     }
     assert.match(failedOnly, /aria-pressed="true"/);
     assert.match(allSteps, /aria-pressed="false"/);
+  });
+});
+
+describe("defaultShowAllSteps", () => {
+  const stage = (overrides: Partial<PipelineStageViewModel> = {}): PipelineStageViewModel => ({
+    key: "stage",
+    name: "Tests",
+    statusLabel: "Success",
+    statusClass: "success",
+    durationLabel: "1s",
+    canRestartFromStage: false,
+    hasSteps: true,
+    stepsFailedOnly: [],
+    stepsAll: [makeStep()],
+    parallelBranches: [],
+    canOpenLog: false,
+    ...overrides
+  });
+  const failedStep = makeStep({ key: "f", statusClass: "failure", statusLabel: "Failed" });
+
+  it("lists every step for stages that did not fail", () => {
+    assert.equal(defaultShowAllSteps(stage()), true);
+    assert.equal(defaultShowAllSteps(stage({ statusClass: "neutral" })), true);
+  });
+
+  it("filters to failures for failed or unstable stages with failed steps", () => {
+    assert.equal(
+      defaultShowAllSteps(stage({ statusClass: "failure", stepsFailedOnly: [failedStep] })),
+      false
+    );
+    assert.equal(
+      defaultShowAllSteps(
+        stage({
+          statusClass: "unstable",
+          parallelBranches: [stage({ key: "branch", stepsFailedOnly: [failedStep] })]
+        })
+      ),
+      false
+    );
+  });
+
+  it("keeps all steps for a failed stage with no failed step to show", () => {
+    assert.equal(defaultShowAllSteps(stage({ statusClass: "failure" })), true);
   });
 });
 

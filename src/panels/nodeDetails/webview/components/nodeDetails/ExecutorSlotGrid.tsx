@@ -63,14 +63,14 @@ export function ExecutorSlotGrid({
           {onViewAll ? (
             <button
               type="button"
-              className="focus-ring rounded-sm text-[11px] text-link hover:text-link-hover hover:underline"
+              className="focus-ring rounded-sm text-caption text-link hover:text-link-hover hover:underline"
               aria-label={`View all executors (${overflow} more)`}
               onClick={onViewAll}
             >
               +{overflow}
             </button>
           ) : (
-            <span className="text-[11px] text-muted-foreground">+{overflow}</span>
+            <span className="text-caption text-muted-foreground">+{overflow}</span>
           )}
         </li>
       ) : null}

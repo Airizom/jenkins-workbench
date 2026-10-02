@@ -42,10 +42,15 @@ export interface HistoryViewModel {
   truncated?: boolean;
   message?: string;
 }
+export const HISTORY_SORTS = ["relevance", "failureRate", "transitions", "name"] as const;
+export type HistorySort = (typeof HISTORY_SORTS)[number];
 export interface HistoryUiState {
   count: 10 | 20 | 50;
   search: string;
   filter: "all" | "intermittent" | "failed" | "new" | "continuing" | "baseline";
+  sort: HistorySort;
+  /** Whether the embedded "Failure history" disclosure is expanded. */
+  open: boolean;
   selectedTest?: string;
   selectedBuild?: number;
 }
@@ -62,6 +67,10 @@ export function normalizeHistoryUi(value: unknown): HistoryUiState {
       state.filter === "baseline"
         ? state.filter
         : "all",
+    sort: (HISTORY_SORTS as readonly unknown[]).includes(state.sort)
+      ? (state.sort as HistorySort)
+      : "relevance",
+    open: state.open === true,
     selectedTest: typeof state.selectedTest === "string" ? state.selectedTest : undefined,
     selectedBuild:
       typeof state.selectedBuild === "number" &&
@@ -119,8 +128,8 @@ export const emptyHistory = (): HistoryViewModel => ({
   evidence: {}
 });
 
-/** Human job name from its URL: folder segments joined with " / ", branch names decoded. */
+/** Human job name from its URL: folder segments joined with " » " (as Jenkins does), branch names decoded. */
 export function historyJobDisplayName(jobUrl: string): string {
   const segments = parseJobUrl(jobUrl)?.fullPath;
-  return segments?.length ? segments.map(decodeJenkinsJobName).join(" / ") : jobUrl;
+  return segments?.length ? segments.map(decodeJenkinsJobName).join(" » ") : jobUrl;
 }

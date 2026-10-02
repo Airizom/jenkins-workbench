@@ -39,19 +39,21 @@ export function StepsList({
               <div
                 aria-hidden="true"
                 className={cn(
-                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border text-micro",
                   getResultBadgeClass(step.statusClass)
                 )}
               >
                 {getStageIcon(step.statusClass)}
               </div>
-              <span className="text-[11px] truncate" title={stepName}>
+              <span className="text-caption truncate" title={stepName}>
                 {stepName}
               </span>
               <span className="sr-only">, {formatStatusText(step.statusLabel)}</span>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <span className="text-[11px] text-muted-foreground">{step.durationLabel || "—"}</span>
+              <span className="text-caption text-muted-foreground">
+                {step.durationLabel || "—"}
+              </span>
               {logTarget && onSelectPipelineLog ? (
                 <Tooltip>
                   <TooltipTrigger asChild>

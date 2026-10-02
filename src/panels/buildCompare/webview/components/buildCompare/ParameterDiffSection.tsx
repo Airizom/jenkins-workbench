@@ -23,7 +23,6 @@ export function ParameterDiffSection({
       detail={section.detail}
       status={section.status}
       items={section.items}
-      emptyLabel="No changed parameters."
       {...disclosure}
       renderItems={(items) => (
         <CompareTable caption="Changed build parameters" columns={PARAMETER_COLUMNS}>

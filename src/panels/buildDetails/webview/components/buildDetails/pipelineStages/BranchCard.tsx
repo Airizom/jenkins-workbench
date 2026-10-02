@@ -54,17 +54,17 @@ export function BranchCard({
                 >
                   {branchIcon}
                 </div>
-                <span className="truncate text-[11px] font-medium" title={branchName}>
+                <span className="truncate text-caption font-medium" title={branchName}>
                   {branchName}
                 </span>
                 <span className="sr-only">, {formatStatusText(branch.statusLabel)}</span>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+              <div className="flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground">
                 <span>{branch.durationLabel}</span>
                 <ChevronDownIcon
                   className={cn(
-                    "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-                    "group-data-[state=open]/branch:rotate-180 group-data-[state=open]/branch:text-foreground"
+                    "h-3.5 w-3.5 -rotate-90 text-muted-foreground transition-transform duration-200",
+                    "group-data-[state=open]/branch:rotate-0 group-data-[state=open]/branch:text-foreground"
                   )}
                 />
               </div>

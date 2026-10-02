@@ -85,11 +85,14 @@ export function describeSegmentBranches(segment: StageStripSegment): string | un
   return `${segment.branchCount} parallel ${segment.branchCount === 1 ? "branch" : "branches"}`;
 }
 
-/** Stage name plus its parallel fan-out, e.g. "Tests · 3 parallel". */
+/**
+ * Stage name plus its parallel fan-out, e.g. "Tests · 3 parallel branches". The
+ * strip only shows "×3" next to the name, so the tooltip and accessible name
+ * spell the count out.
+ */
 export function describeSegmentTitle(segment: StageStripSegment): string {
-  return segment.branchCount > 0
-    ? `${segment.name} · ${segment.branchCount} parallel`
-    : segment.name;
+  const branches = describeSegmentBranches(segment);
+  return branches ? `${segment.name} · ${branches}` : segment.name;
 }
 
 export function describeSegmentAria(segment: StageStripSegment): string {

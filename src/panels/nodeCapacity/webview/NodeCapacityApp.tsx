@@ -33,10 +33,13 @@ import {
 
 const { useCallback, useReducer } = React;
 
+/**
+ * The header Refresh button is the single refresh action: error banners and
+ * the empty state do not repeat it.
+ */
 function NodeCapacityContent({
   state,
   poolOpenStates,
-  onRefresh,
   onOpenExternal,
   onOpenNodeDetails,
   onRetryExecutors,
@@ -44,7 +47,6 @@ function NodeCapacityContent({
 }: {
   state: NodeCapacityState;
   poolOpenStates: PoolOpenStates;
-  onRefresh: () => void;
   onOpenExternal: OpenExternalHandler;
   onOpenNodeDetails: OpenNodeDetailsHandler;
   onRetryExecutors: RetryExecutorsHandler;
@@ -55,9 +57,9 @@ function NodeCapacityContent({
       <PanelErrorList
         errors={state.errors}
         title="Refresh failed. Showing the last loaded capacity."
-        onRetry={onRefresh}
       />
-      <NodeCapacitySummary state={state} />
+      {/* Six zero counts add nothing above the empty state. */}
+      {state.pools.length > 0 ? <NodeCapacitySummary state={state} /> : null}
       {state.hiddenLabelQueueItems.length > 0 ? (
         <HiddenLabelQueue items={state.hiddenLabelQueueItems} onOpenExternal={onOpenExternal} />
       ) : null}
@@ -65,7 +67,6 @@ function NodeCapacityContent({
       <NodeCapacityPoolList
         pools={state.pools}
         poolOpenStates={poolOpenStates}
-        onRefresh={onRefresh}
         onOpenExternal={onOpenExternal}
         onOpenNodeDetails={onOpenNodeDetails}
         onRetryExecutors={onRetryExecutors}
@@ -82,7 +83,7 @@ export function NodeCapacityApp(): React.JSX.Element {
   useNodeCapacityMessages(dispatch);
 
   const timestamp = useCapacityTimestamp(state.updatedAt, state.hasLoaded);
-  const { poolOpenStates, handlePoolToggle } = usePoolOpenStates();
+  const { poolOpenStates, handlePoolToggle } = usePoolOpenStates(state.pools);
   const { handleRetryExecutors, reloadAllExecutors } = useNodeCapacityExecutorLoading(
     state.pools,
     state.updatedAt,
@@ -106,7 +107,11 @@ export function NodeCapacityApp(): React.JSX.Element {
 
   if (state.loading && !state.hasLoaded) {
     return (
-      <PanelInitialLoadingGate loading={state.loading} hasLoaded={state.hasLoaded} variant="node" />
+      <PanelInitialLoadingGate
+        loading={state.loading}
+        hasLoaded={state.hasLoaded}
+        variant="capacity"
+      />
     );
   }
 
@@ -134,13 +139,11 @@ export function NodeCapacityApp(): React.JSX.Element {
               errors={state.errors}
               title="Couldn't load node capacity"
               className="flex flex-col gap-1"
-              onRetry={handleRefresh}
             />
           ) : (
             <NodeCapacityContent
               state={state}
               poolOpenStates={poolOpenStates}
-              onRefresh={handleRefresh}
               onOpenExternal={handleOpenExternal}
               onOpenNodeDetails={handleOpenNodeDetails}
               onRetryExecutors={handleRetryExecutors}

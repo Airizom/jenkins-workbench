@@ -2,21 +2,24 @@ import * as React from "react";
 
 const { useCallback, useEffect, useState } = React;
 
-const BOTTOM_THRESHOLD_PX = 32;
+// Show the button once the reader has scrolled half a screen (and at least
+// this far) down the page, not only at the very bottom.
+const MIN_SCROLL_DISTANCE_PX = 400;
 
 const getScrollElement = (): HTMLElement => {
   const element = document.scrollingElement ?? document.documentElement;
   return element as HTMLElement;
 };
 
-const readScrollState = () => {
-  const element = getScrollElement();
-  const { scrollTop, clientHeight, scrollHeight } = element;
-  const isScrollable = scrollHeight - clientHeight > 1;
-  const isAtBottom = isScrollable && scrollTop + clientHeight >= scrollHeight - BOTTOM_THRESHOLD_PX;
-
-  return { isScrollable, isAtBottom };
-};
+export function shouldShowScrollToTop({
+  scrollTop,
+  clientHeight
+}: {
+  scrollTop: number;
+  clientHeight: number;
+}): boolean {
+  return scrollTop > Math.max(MIN_SCROLL_DISTANCE_PX, clientHeight / 2);
+}
 
 const prefersReducedMotion = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -29,9 +32,7 @@ export function useScrollToTopButton(): ScrollToTopButtonState {
   const [showButton, setShowButton] = useState(false);
 
   const updateVisibility = useCallback(() => {
-    const { isScrollable, isAtBottom } = readScrollState();
-    const nextShow = isScrollable && isAtBottom;
-    setShowButton(nextShow);
+    setShowButton(shouldShowScrollToTop(getScrollElement()));
   }, []);
 
   useEffect(() => {

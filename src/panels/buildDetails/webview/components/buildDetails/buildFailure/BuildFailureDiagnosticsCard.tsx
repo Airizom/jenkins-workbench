@@ -24,6 +24,8 @@ export function BuildFailureDiagnosticsCard({
   onConfigure: () => void;
 }) {
   const summary = describeBuildDiagnostics(diagnostics);
+  const visibleItems = diagnostics.items.slice(0, MAX_VISIBLE_DIAGNOSTICS);
+  const hiddenCount = countHiddenDiagnostics(diagnostics, visibleItems.length);
   const showProblemsDisabled = diagnostics.resolvedCount === 0;
   const showProblemsHint = showProblemsDisabled
     ? describeShowProblemsUnavailable(diagnostics.status)
@@ -34,7 +36,7 @@ export function BuildFailureDiagnosticsCard({
       title="Diagnostics"
       headerExtra={
         summary.countLabel ? (
-          <span className="text-[11px] text-muted-foreground">{summary.countLabel}</span>
+          <span className="text-caption text-muted-foreground">{summary.countLabel}</span>
         ) : undefined
       }
     >
@@ -43,9 +45,9 @@ export function BuildFailureDiagnosticsCard({
           Opens in editor
         </span>
       ) : null}
-      {diagnostics.items.length > 0 ? (
+      {visibleItems.length > 0 ? (
         <ul className="space-y-1.5" aria-label="Build diagnostics">
-          {diagnostics.items.slice(0, 5).map((item) => (
+          {visibleItems.map((item) => (
             <DiagnosticInsightRow
               item={item}
               key={diagnosticItemKey(item)}
@@ -57,8 +59,30 @@ export function BuildFailureDiagnosticsCard({
         <BuildFailureInsightEmpty>{summary.emptyMessage}</BuildFailureInsightEmpty>
       )}
 
+      {hiddenCount > 0 ? (
+        <p className="m-0 flex flex-wrap items-center gap-x-1.5 text-caption text-muted-foreground">
+          <span>+{hiddenCount.toLocaleString()} more not shown here</span>
+          {showProblemsDisabled ? null : (
+            <>
+              <span aria-hidden="true">·</span>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-caption"
+                onClick={onShowProblems}
+              >
+                Show problems
+              </Button>
+            </>
+          )}
+        </p>
+      ) : null}
+
       {summary.notices.length > 0 ? (
-        <ul className="space-y-1 text-[11px] text-muted-foreground" aria-label="Diagnostic notices">
+        <ul
+          className="space-y-1 text-caption text-muted-foreground"
+          aria-label="Diagnostic notices"
+        >
           {summary.notices.map((notice) => (
             <li key={notice} className="flex items-start gap-1.5">
               <InfoIcon className="mt-0.5 h-3 w-3 shrink-0" />
@@ -78,9 +102,9 @@ export function BuildFailureDiagnosticsCard({
           title={showProblemsHint}
           onClick={onShowProblems}
         >
-          Show Problems
+          Show problems
         </Button>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onConfigure}>
+        <Button variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={onConfigure}>
           Configure diagnostics…
         </Button>
         {showProblemsHint ? (
@@ -94,6 +118,18 @@ export function BuildFailureDiagnosticsCard({
 }
 
 const SHOW_PROBLEMS_HINT_ID = "build-diagnostics-show-problems-hint";
+// The extension already sends at most five; the cap keeps the card compact
+// if that ever changes.
+const MAX_VISIBLE_DIAGNOSTICS = 5;
+
+/** Diagnostics counted in the header but not listed in the card. */
+export function countHiddenDiagnostics(
+  diagnostics: BuildDiagnosticsViewModel,
+  visibleCount: number
+): number {
+  const total = diagnostics.errorCount + diagnostics.warningCount + diagnostics.informationCount;
+  return Math.max(0, total - visibleCount);
+}
 const OPENS_IN_EDITOR_HINT_ID = "build-diagnostics-opens-in-editor";
 
 function describeShowProblemsUnavailable(status: BuildDiagnosticsViewModel["status"]): string {
@@ -128,14 +164,12 @@ function DiagnosticInsightRow({
   const locationLine = [item.locationLabel, item.source, item.code].filter(Boolean).join(" · ");
   const content = (
     <span className="min-w-0 flex-1">
-      <span className="block truncate text-xs text-foreground" title={item.message}>
+      <span className="block text-xs text-foreground wrap-break-word">
         <span className="sr-only">{SEVERITY_PREFIXES[item.severity]} </span>
         {item.message}
       </span>
       {locationLine ? (
-        <span className="block truncate text-[11px] text-muted-foreground" title={locationLine}>
-          {locationLine}
-        </span>
+        <span className="block text-caption text-muted-foreground break-all">{locationLine}</span>
       ) : null}
     </span>
   );

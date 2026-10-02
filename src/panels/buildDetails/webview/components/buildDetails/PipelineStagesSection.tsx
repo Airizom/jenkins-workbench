@@ -4,19 +4,24 @@ import type {
   PipelineLogTargetViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
-import { getStageId, pruneStageFlags } from "./pipelineStages/pipelineStagesUtils";
+import type { PipelineStageRequest } from "./pipelineSectionState";
+import {
+  defaultShowAllSteps,
+  getStageId,
+  pruneStageFlags
+} from "./pipelineStages/pipelineStagesUtils";
 import { StageNode } from "./pipelineStages/StageNode";
 
 const { useEffect, useMemo, useState } = React;
 export function PipelineStagesSection({
   stages,
-  expandedStageKey,
+  expandRequest,
   onRestartStage,
   onSelectPipelineLog
 }: {
   stages: PipelineStageViewModel[];
-  /** Stage to open when it changes (for example the default failed stage). */
-  expandedStageKey?: string;
+  /** Stage to open on each new request (the default failed stage, a strip click). */
+  expandRequest?: PipelineStageRequest;
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
 }) {
@@ -32,19 +37,20 @@ export function PipelineStagesSection({
   }, [stageIdSet]);
 
   const expandedStageId =
-    expandedStageKey && stageIdSet.has(expandedStageKey) ? expandedStageKey : undefined;
+    expandRequest && stageIdSet.has(expandRequest.stageKey) ? expandRequest.stageKey : undefined;
+  const expandRequestId = expandRequest?.id;
   useEffect(() => {
-    if (!expandedStageId) {
+    if (!expandedStageId || expandRequestId === undefined) {
       return;
     }
     setOpenStages((prev) => (prev.includes(expandedStageId) ? prev : [...prev, expandedStageId]));
-  }, [expandedStageId]);
+  }, [expandedStageId, expandRequestId]);
 
   return (
     <Accordion type="multiple" value={openStages} onValueChange={setOpenStages}>
       {stages.map((stage, index) => {
         const stageId = stageIds[index];
-        const showAll = showAllStages[stageId] ?? false;
+        const showAll = showAllStages[stageId] ?? defaultShowAllSteps(stage);
         const isLast = index === stages.length - 1;
         return (
           <StageNode

@@ -26,7 +26,7 @@ function renderSummaryCard(overrides: Partial<BuildTestsSummaryViewModel>): stri
 }
 
 describe("TestResultsSummaryCard", () => {
-  it("uses the test distribution percentage for the badge and meter", () => {
+  it("uses the executed-test pass rate for the badge and meter", () => {
     const html = renderSummaryCard({
       totalCount: 4,
       failedCount: 1,
@@ -35,7 +35,7 @@ describe("TestResultsSummaryCard", () => {
     });
 
     assert.match(html, />75% passed</);
-    assert.match(html, /aria-label="75% tests passed"/);
+    assert.match(html, /aria-label="Tests 75% passed"/);
     assert.match(html, /aria-valuenow="75"/);
   });
 
@@ -48,10 +48,9 @@ describe("TestResultsSummaryCard", () => {
     });
 
     assert.doesNotMatch(html, /100% passed/);
-    assert.doesNotMatch(html, /100% tests passed/);
-    assert.match(html, />99% passed</);
-    assert.match(html, /aria-label="99% tests passed"/);
-    assert.match(html, /aria-valuenow="99"/);
+    assert.match(html, />99\.5% passed</);
+    assert.match(html, /aria-label="Tests 99\.5% passed"/);
+    assert.match(html, /aria-valuenow="99\.5"/);
   });
 
   it("reports 100% passed only when every test passed", () => {
@@ -65,6 +64,19 @@ describe("TestResultsSummaryCard", () => {
     assert.match(html, /aria-valuenow="100"/);
   });
 
+  it("does not count skipped tests against a run without failures", () => {
+    const html = renderSummaryCard({
+      totalCount: 926,
+      skippedCount: 6,
+      passedCount: 920,
+      summaryLabel: "920 passed, 6 skipped"
+    });
+
+    assert.match(html, />100% passed</);
+    assert.doesNotMatch(html, /99%/);
+    assert.match(html, /border-success-border/);
+  });
+
   it("does not report 0% passed when at least one test passed", () => {
     const html = renderSummaryCard({
       totalCount: 1000,
@@ -74,7 +86,7 @@ describe("TestResultsSummaryCard", () => {
     });
 
     assert.doesNotMatch(html, /\b0% passed/);
-    assert.match(html, />1% passed</);
-    assert.match(html, /aria-valuenow="1"/);
+    assert.match(html, />&lt;1% passed</);
+    assert.match(html, /aria-valuenow="0\.1"/);
   });
 });

@@ -16,13 +16,36 @@ import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
 import { PipelineStagesSection } from "./PipelineStagesSection";
 import type { PipelineSectionBodyKind } from "./pipelineSectionModel";
-import { canFollowPipelineNodeLog } from "./pipelineSectionState";
+import { canFollowPipelineNodeLog, type PipelineStageRequest } from "./pipelineSectionState";
 import { LoadingBanner } from "./pipelineStages/LoadingBanner";
 import { PipelineStagesPlaceholder } from "./pipelineStages/PipelineStagesPlaceholder";
 import { usePipelineLogPaneReveal } from "./usePipelineLogPaneReveal";
 import { usePipelineSectionState } from "./usePipelineSectionState";
 
-const { Suspense, lazy } = React;
+const { Suspense, lazy, useCallback } = React;
+
+const PRESENTATION_HINTS: Record<PipelinePresentation, string> = {
+  list: "Expand a stage to see its steps, then open a stage or step log.",
+  graph: "Select a stage to inspect it and open its log."
+};
+
+/** Brings a requested stage on screen: its list row, else the graph canvas. */
+function scrollPipelineStageIntoView(stageKey: string): void {
+  // Wait a frame so the pipeline tab content is visible before scrolling.
+  requestAnimationFrame(() => {
+    const element =
+      document.querySelector(`#pipeline-section [data-stage-key="${CSS.escape(stageKey)}"]`) ??
+      document.querySelector("#pipeline-section .pipeline-graph-canvas") ??
+      document.getElementById("pipeline-section");
+    if (!element) {
+      return;
+    }
+    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth";
+    element.scrollIntoView({ behavior, block: "center" });
+  });
+}
 
 const LazyPipelineGraphSection = lazy(async () => {
   const module = await import("./pipelineGraph/PipelineGraphSection");
@@ -43,7 +66,7 @@ function PipelineSectionHeader({
         <div>
           <div className="text-sm font-semibold">Pipeline</div>
           <div className="text-xs text-muted-foreground">
-            Stages and steps for this run. Select a stage to inspect its log.
+            Stages and steps for this run. {PRESENTATION_HINTS[presentation]}
           </div>
         </div>
       </div>
@@ -76,6 +99,8 @@ type PipelineSectionProps = {
   onOpenExternal: (url: string) => void;
   isRunning: boolean;
   isActive: boolean;
+  /** Stage to open, from the hero stage strip. */
+  stageRequest?: PipelineStageRequest;
 };
 
 function PipelineFallbackNotice({ notice }: { notice: string }): React.JSX.Element {
@@ -120,19 +145,33 @@ function PipelineSectionLogPane({
 
 export function PipelineSection(props: PipelineSectionProps) {
   const { stages, pipelineNodeLog, loading, onSelectPipelineLog, isRunning, isActive } = props;
+  const { paneRef, headingRef, requestReveal } = usePipelineLogPaneReveal(
+    pipelineNodeLog.target?.key
+  );
+  // A stacked log pane is revealed once its log loads; otherwise (or without a
+  // log) the requested stage itself is scrolled into view.
+  const revealRequestedStage = useCallback(
+    (stage: PipelineStageViewModel) => {
+      const target = stage.logTarget;
+      if (target && requestReveal(target.key)) {
+        return;
+      }
+      scrollPipelineStageIntoView(stage.key);
+    },
+    [requestReveal]
+  );
   const state = usePipelineSectionState({
     stages,
     currentTarget: pipelineNodeLog.target,
     loading,
     isActive,
     isRunning,
-    onSelectPipelineLog
+    stageRequest: props.stageRequest,
+    onSelectPipelineLog,
+    onStageRequestOpened: revealRequestedStage
   });
 
   useTabsBarHeightVariable();
-  const { paneRef, headingRef, requestReveal } = usePipelineLogPaneReveal(
-    pipelineNodeLog.target?.key
-  );
 
   const handleUserSelectPipelineLog = (target: PipelineLogTargetViewModel) => {
     state.markUserSelection();
@@ -160,7 +199,7 @@ export function PipelineSection(props: PipelineSectionProps) {
             body={state.view.body}
             stages={stages}
             selectedStageKey={state.selectedStageKey}
-            expandedStageKey={state.expandedStageKey}
+            expandRequest={state.expandRequest}
             onSelectStage={state.selectGraphStage}
             onSyncSelectedStage={state.syncGraphStage}
             onRestartStage={props.onRestartStage}
@@ -178,7 +217,7 @@ function PipelineSectionBody({
   body,
   stages,
   selectedStageKey,
-  expandedStageKey,
+  expandRequest,
   onSelectStage,
   onSyncSelectedStage,
   onRestartStage,
@@ -188,7 +227,7 @@ function PipelineSectionBody({
   body: PipelineSectionBodyKind;
   stages: PipelineStageViewModel[];
   selectedStageKey?: string;
-  expandedStageKey?: string;
+  expandRequest?: PipelineStageRequest;
   onSelectStage: (stageKey: string | undefined) => void;
   onSyncSelectedStage: (stageKey: string | undefined) => void;
   onRestartStage: (stageName: string) => void;
@@ -222,7 +261,7 @@ function PipelineSectionBody({
   return (
     <PipelineStagesSection
       stages={stages}
-      expandedStageKey={expandedStageKey}
+      expandRequest={expandRequest}
       onRestartStage={onRestartStage}
       onSelectPipelineLog={onSelectPipelineLog}
     />

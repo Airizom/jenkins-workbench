@@ -13,16 +13,18 @@ import {
 } from "../../shared/webview/components/ui/table";
 import { cn } from "../../shared/webview/lib/utils";
 import type { HistoryViewModel } from "../shared/HistoryContracts";
-import { BuildResultLabel, type HistorySend, ThisBuildBadge } from "./HistoryOutcomes";
+import { BuildResultLabel, type HistorySend, SelectedBuildBadge } from "./HistoryOutcomes";
+import { compareBuildsLabel } from "./historyPresentation";
 
 const COMPLETED_RESULTS = ["SUCCESS", "UNSTABLE", "FAILURE"];
 const LOADING_TITLE = "Wait for history to finish loading";
+const SELECT_HELP_ID = "history-builds-select-help";
 
 function metricsLine(model: HistoryViewModel): string {
   const metrics = historyMetrics(model.builds.map((item) => item.build));
   const parts = [
     metrics.denominator
-      ? `Success rate ${Math.round((100 * metrics.successful) / metrics.denominator)}% (${metrics.successful} of ${metrics.denominator} SUCCESS, UNSTABLE or FAILURE builds)`
+      ? `Success rate ${Math.round((100 * metrics.successful) / metrics.denominator)}% · ${metrics.successful} of ${metrics.denominator} completed ${metrics.denominator === 1 ? "build" : "builds"} passed`
       : "Success rate unavailable",
     `Median duration ${metrics.medianDuration === undefined ? "unavailable" : formatDurationMs(metrics.medianDuration)}`,
     metrics.aborted ? `${metrics.aborted} aborted` : "",
@@ -37,25 +39,30 @@ type HistoryBuildItem = HistoryViewModel["builds"][number];
 function reportBadge(report: HistoryBuildItem["report"]) {
   if (report.status === "available")
     return report.truncated ? (
-      <Badge variant="warning" size="sm" title="Only part of this test report was sampled">
+      <Badge variant="warning" size="sm" title={PARTIAL_REASON}>
         Partial
+        <span className="sr-only">. {PARTIAL_REASON}</span>
       </Badge>
     ) : (
       <Badge variant="muted" size="sm">
         Available
       </Badge>
     );
+  const reason = report.message ?? "No test report for this build";
   return (
     <Badge
       variant="outline"
       size="sm"
       className="border-dashed border-muted-foreground-border text-muted-foreground"
-      title={report.message ?? "No test report for this build"}
+      title={reason}
     >
       {report.status === "error" ? "Error" : "Unavailable"}
+      <span className="sr-only">. {reason}</span>
     </Badge>
   );
 }
+
+const PARTIAL_REASON = "Only part of this test report was sampled";
 
 function DurationBar({
   build,
@@ -99,6 +106,7 @@ function CompareButton({
       variant="ghost"
       size="xs"
       className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+      aria-label={compareBuildsLabel(buildNumber, model.selectedBuild)}
       aria-disabled={loading || undefined}
       title={loading ? LOADING_TITLE : undefined}
       onClick={() => {
@@ -131,10 +139,11 @@ function HistoryBuildRow({
       <TableCell className="whitespace-nowrap">
         <span className="flex items-center gap-2">
           <Button
-            variant={selected ? "secondary" : "ghost"}
+            variant={selected ? "secondary" : "outline"}
             size="xs"
             className="tabular-nums aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             aria-pressed={selected}
+            aria-describedby={SELECT_HELP_ID}
             aria-disabled={loading || undefined}
             title={loading ? LOADING_TITLE : `Analyze failures in build #${build.number}`}
             onClick={() => {
@@ -143,18 +152,23 @@ function HistoryBuildRow({
           >
             #{build.number}
           </Button>
-          {selected ? <ThisBuildBadge /> : null}
+          {selected ? <SelectedBuildBadge label="Selected" /> : null}
         </span>
       </TableCell>
-      <TableCell>
+      <TableCell data-label="Result">
         <BuildResultLabel result={build.result} building={build.building} />
       </TableCell>
-      <TableCell>
+      <TableCell data-label="Duration">
         <DurationBar build={build} maxDuration={maxDuration} />
       </TableCell>
-      <TableCell>{reportBadge(report)}</TableCell>
-      <TableCell className="whitespace-nowrap text-right">
-        <Button variant="ghost" size="xs" onClick={() => send("openBuild", build.number)}>
+      <TableCell data-label="Test report">{reportBadge(report)}</TableCell>
+      <TableCell className="whitespace-nowrap text-right max-sm:whitespace-normal">
+        <Button
+          variant="ghost"
+          size="xs"
+          aria-label={`Open build #${build.number} details`}
+          onClick={() => send("openBuild", build.number)}
+        >
           Build details
         </Button>
         <CompareButton model={model} buildNumber={build.number} loading={loading} send={send} />
@@ -181,8 +195,11 @@ export function HistoryBuildsTable({
         title={<span id="history-builds-heading">Builds · newest first</span>}
         count={model.builds.length}
       />
-      <p className="mb-2 text-xs text-muted-foreground">{metricsLine(model)}</p>
-      <div className="relative overflow-x-auto rounded-lg border border-border">
+      <p className="mb-1 text-xs text-muted-foreground">{metricsLine(model)}</p>
+      <p id={SELECT_HELP_ID} className="mb-2 text-xs text-muted-foreground">
+        Select a build number to analyze its test failures; other rows then compare against it.
+      </p>
+      <div className="history-stack-table relative overflow-x-auto rounded-lg border border-border">
         <Table className="min-w-[36rem] text-xs">
           <TableHeader>
             <TableRow className="hover:bg-transparent">

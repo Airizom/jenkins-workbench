@@ -181,9 +181,9 @@ describe("stageStripModel", () => {
     assert.ok(plain && parallel);
     assert.equal(describeSegmentAria(plain), "Checkout: Success");
     assert.equal(describeSegmentDetail(plain), "Success · 12s");
-    assert.equal(describeSegmentAria(parallel), "Test · 1 parallel: Failed");
+    assert.equal(describeSegmentAria(parallel), "Test · 1 parallel branch: Failed");
     assert.equal(describeSegmentDetail(parallel), "Failed");
-    assert.equal(describeSegmentTitle(parallel), "Test · 1 parallel");
+    assert.equal(describeSegmentTitle(parallel), "Test · 1 parallel branch");
     assert.equal(describeSegmentTitle(plain), "Checkout");
     assert.equal(describeSegmentBranches(parallel), "1 parallel branch");
   });

@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { useId } from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Switch } from "../../../../../shared/webview/components/ui/switch";
 import {
@@ -15,6 +16,7 @@ type ConsoleOutputHeaderProps = {
   /** Follow only applies while the build is running; hidden otherwise. */
   canFollow: boolean;
   onSearch: () => void;
+  searchButtonRef?: React.Ref<HTMLButtonElement>;
   onExport: () => void;
   onFollowLogChange: (checked: boolean) => void;
   onJumpToFirstDiagnostic?: () => void;
@@ -26,10 +28,12 @@ export function ConsoleOutputHeader({
   followLog,
   canFollow,
   onSearch,
+  searchButtonRef,
   onExport,
   onFollowLogChange,
   onJumpToFirstDiagnostic
 }: ConsoleOutputHeaderProps): React.JSX.Element {
+  const followId = useId();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex items-center gap-2">
@@ -53,6 +57,7 @@ export function ConsoleOutputHeader({
           </Button>
         ) : null}
         <Button
+          ref={searchButtonRef}
           aria-label="Search console output"
           onClick={onSearch}
           size="sm"
@@ -74,9 +79,9 @@ export function ConsoleOutputHeader({
         </Button>
         {canFollow ? (
           <div className="flex items-center gap-1.5 ml-0.5 pl-1.5 border-l border-border">
-            <Switch id="follow-log" checked={followLog} onCheckedChange={onFollowLogChange} />
+            <Switch id={followId} checked={followLog} onCheckedChange={onFollowLogChange} />
             <label
-              htmlFor="follow-log"
+              htmlFor={followId}
               className="text-xs text-muted-foreground select-none whitespace-nowrap"
               title="Keep the newest output in view. Scrolling up pauses Follow."
             >

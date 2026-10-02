@@ -6,6 +6,16 @@ type PanelHeaderProps = {
   eyebrow?: React.ReactNode;
   eyebrowIcon?: React.ReactNode;
   title: React.ReactNode;
+  /**
+   * Native tooltip with the full title. Defaults to `title` when it is a
+   * string; pass it when `title` is a node so a truncated title stays readable.
+   */
+  titleTooltip?: string;
+  /**
+   * Let a long title wrap (breaking anywhere, e.g. long job paths) instead of
+   * truncating to one line with an ellipsis.
+   */
+  wrapTitle?: boolean;
   /** Badges rendered inline after the title. */
   titleAdornment?: React.ReactNode;
   meta?: React.ReactNode;
@@ -19,6 +29,8 @@ export function PanelHeader({
   eyebrow,
   eyebrowIcon,
   title,
+  titleTooltip,
+  wrapTitle = false,
   titleAdornment,
   meta,
   actions,
@@ -35,13 +47,21 @@ export function PanelHeader({
       >
         <div className="min-w-0 flex-1">
           {eyebrow ? (
-            <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-caption font-medium uppercase tracking-wider text-muted-foreground">
               {eyebrowIcon}
-              <span className="truncate">{eyebrow}</span>
+              <span className="truncate" title={typeof eyebrow === "string" ? eyebrow : undefined}>
+                {eyebrow}
+              </span>
             </div>
           ) : null}
           <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="min-w-0 truncate text-base font-semibold leading-tight sm:text-lg">
+            <h1
+              className={cn(
+                "min-w-0 text-base font-semibold leading-tight sm:text-lg",
+                wrapTitle ? "[overflow-wrap:anywhere]" : "truncate"
+              )}
+              title={titleTooltip ?? (typeof title === "string" ? title : undefined)}
+            >
               {title}
             </h1>
             {titleAdornment}

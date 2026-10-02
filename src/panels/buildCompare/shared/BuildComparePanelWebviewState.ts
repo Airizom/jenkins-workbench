@@ -17,9 +17,14 @@ const BUILD_COMPARE_SECTION_IDS = [
 
 export type BuildCompareSectionId = (typeof BUILD_COMPARE_SECTION_IDS)[number];
 
-/** Webview-owned UI state persisted alongside the build pair. */
+/**
+ * Webview-owned UI state persisted alongside the build pair. Sections the user
+ * toggled away from their default (open, or collapsed when nothing changed) are
+ * recorded explicitly.
+ */
 export interface BuildComparePanelUiState {
   collapsedSections?: BuildCompareSectionId[];
+  expandedSections?: BuildCompareSectionId[];
 }
 
 export interface BuildComparePanelSerializedState extends SerializedEnvironmentState {
@@ -71,10 +76,21 @@ function isBuildCompareSectionId(value: unknown): value is BuildCompareSectionId
   return BUILD_COMPARE_SECTION_IDS.includes(value as BuildCompareSectionId);
 }
 
+function normalizeSectionIds(value: unknown): BuildCompareSectionId[] {
+  return Array.isArray(value) ? [...new Set(value.filter(isBuildCompareSectionId))] : [];
+}
+
 export function normalizeBuildComparePanelUiState(value: unknown): BuildComparePanelUiState {
-  if (!isPlainRecord(value) || !Array.isArray(value.collapsedSections)) {
+  if (!isPlainRecord(value)) {
     return {};
   }
-  const collapsedSections = [...new Set(value.collapsedSections.filter(isBuildCompareSectionId))];
-  return collapsedSections.length > 0 ? { collapsedSections } : {};
+  const collapsedSections = normalizeSectionIds(value.collapsedSections);
+  // A section is either explicitly collapsed or explicitly expanded, never both.
+  const expandedSections = normalizeSectionIds(value.expandedSections).filter(
+    (id) => !collapsedSections.includes(id)
+  );
+  return {
+    ...(collapsedSections.length > 0 ? { collapsedSections } : {}),
+    ...(expandedSections.length > 0 ? { expandedSections } : {})
+  };
 }

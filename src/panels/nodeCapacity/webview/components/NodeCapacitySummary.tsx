@@ -61,7 +61,7 @@ export function NodeCapacitySummary({ state }: { state: NodeCapacityState }): Re
             key={metric.label}
             className="flex flex-col rounded-lg border border-border bg-card px-3 py-2.5 shadow-xs"
           >
-            <dt className="order-2 mt-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <dt className="order-2 mt-0.5 text-caption font-medium uppercase tracking-wider text-muted-foreground">
               {metric.label}
             </dt>
             <dd
@@ -72,7 +72,7 @@ export function NodeCapacitySummary({ state }: { state: NodeCapacityState }): Re
             >
               {metric.value}
             </dd>
-            <dd className="order-3 m-0 mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            <dd className="order-3 m-0 mt-0.5 text-caption leading-snug text-muted-foreground">
               {metric.description}
             </dd>
           </div>

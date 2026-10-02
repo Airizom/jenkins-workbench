@@ -9,6 +9,9 @@ import { ArrowDownIcon, ArrowUpIcon } from "../../../../../shared/webview/icons"
 
 type ConsoleOutputViewportProps = {
   consoleOutputRef: RefObject<HTMLPreElement | null>;
+  id?: string;
+  /** Ids of notices (truncation, load errors) that qualify the output. */
+  describedBy?: string;
   showScrollToTop: boolean;
   showJumpToLatest: boolean;
   label?: string;
@@ -19,6 +22,8 @@ type ConsoleOutputViewportProps = {
 
 export function ConsoleOutputViewport({
   consoleOutputRef,
+  id,
+  describedBy,
   showScrollToTop,
   showJumpToLatest,
   label = "Console output",
@@ -29,10 +34,11 @@ export function ConsoleOutputViewport({
   return (
     <div className="relative">
       <pre
-        id="console-output"
+        id={id}
         ref={consoleOutputRef}
         role="log"
         aria-label={label}
+        aria-describedby={describedBy}
         // Streamed lines stay silent; ConsoleLogViewer announces meaningful
         // changes (build finished, output truncated) through a status region.
         aria-live="off"

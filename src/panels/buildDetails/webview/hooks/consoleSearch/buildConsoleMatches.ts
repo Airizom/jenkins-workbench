@@ -21,7 +21,8 @@ export function buildConsoleMatches(
   if (useRegex) {
     let regex: RegExp;
     try {
-      regex = new RegExp(query, "g");
+      // Case-insensitive, like plain-text search.
+      regex = new RegExp(query, "gi");
     } catch (error) {
       return {
         matches: [],

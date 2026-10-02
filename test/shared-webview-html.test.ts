@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import { renderLoadingSkeletonHtml } from "../src/panels/shared/webview/LoadingSkeletonHtml";
 import * as vscodeStub from "./helpers/vscodeStub";
 
 const executedCommands: string[] = [];
@@ -162,7 +163,7 @@ describe("panel load-error view", () => {
 });
 
 describe("server-rendered loading skeleton", () => {
-  it.each(["build", "node"] as const)(
+  it.each(["build", "node", "capacity", "compare"] as const)(
     "exposes a polite loading status for %s panels",
     (variant) => {
       const html = renderPanelLoadingHtml(
@@ -174,4 +175,33 @@ describe("server-rendered loading skeleton", () => {
       assert.match(html, /<span class="sr-only">Loading…<\/span>/);
     }
   );
+});
+
+describe("loading skeleton layouts", () => {
+  const render = (variant: Parameters<typeof renderLoadingSkeletonHtml>[0]) =>
+    renderLoadingSkeletonHtml(variant);
+
+  it("gives Node Capacity its own header, six summary cards, and pool cards", () => {
+    const html = render("capacity");
+    assert.notEqual(html, render("node"));
+    assert.match(html, /class="panel-header"/);
+    assert.equal(html.match(/rounded-lg border border-border bg-card px-3 py-2\.5/g)?.length, 6);
+    assert.equal(html.match(/rounded-lg border border-border bg-card px-4 py-3/g)?.length, 3);
+    assert.doesNotMatch(html, /border-b border-border">\s*<div class="flex w-full flex-nowrap/);
+  });
+
+  it("matches the Node Details hero: not sticky, 40px icon, utilization row", () => {
+    const html = render("node");
+    assert.doesNotMatch(html, /sticky-header/);
+    assert.match(html, /h-10 w-10/);
+    assert.match(html, /max-w-\[280px\]/);
+    assert.match(html, /md:grid-cols-2/);
+  });
+
+  it("matches the Build Details hero and stage strip", () => {
+    const html = render("build");
+    assert.match(html, /sticky-header/);
+    assert.match(html, /h-10 w-10 shrink-0 rounded-xl/);
+    assert.equal(html.match(/h-6 flex-1 max-w-\[150px\]/g)?.length, 5);
+  });
 });

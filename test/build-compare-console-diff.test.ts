@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { BuildInspectionBackend as BuildCompareBackend } from "../src/panels/shared/backend/BuildInspectionBackend";
-import { buildConsoleComparisonSection } from "../src/panels/buildCompare/BuildCompareConsoleDiff";
+import {
+  buildConsoleComparisonSection,
+  formatByteSize
+} from "../src/panels/buildCompare/BuildCompareConsoleDiff";
 
 const ENVIRONMENT: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -308,4 +311,14 @@ it("ignores differing serialized notes even when notes span multiple chunks", as
     TARGET_URL
   );
   assert.equal(result.status, "identical");
+});
+
+describe("formatByteSize", () => {
+  it("formats comparison limits in readable binary units", () => {
+    assert.equal(formatByteSize(5_242_880), "5 MB");
+    assert.equal(formatByteSize(1_536), "1.5 KB");
+    assert.equal(formatByteSize(1_073_741_824), "1 GB");
+    assert.equal(formatByteSize(512), "512 bytes");
+    assert.equal(formatByteSize(Number.NaN), "0 bytes");
+  });
 });

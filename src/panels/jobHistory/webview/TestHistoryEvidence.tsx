@@ -6,6 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from "../../shared/webview/components/ui/collapsible";
+import { DisclosureChevron } from "../../shared/webview/components/ui/disclosure-chevron";
 import { HistoryContext } from "./HistoryContext";
 import { TestOutcomeTimeline, useHistoryAction } from "./HistoryOutcomes";
 
@@ -30,21 +31,27 @@ export function TestHistoryEvidence({
   const usable = test.passed + test.failed;
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-t border-border text-xs">
-      <CollapsibleTrigger className="gap-2 px-3 py-1.5 text-muted-foreground hover:text-foreground">
-        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="font-medium text-foreground">History</span>
-          <span className="truncate">{evidence?.label ?? "Observed outcomes"}</span>
-          {test.intermittent ? (
-            <Badge variant="warning" size="sm">
-              Intermittent
-            </Badge>
-          ) : null}
-          {alsoFailingInBaseline ? (
-            <Badge variant="failure" size="sm">
-              Also failing in baseline
-            </Badge>
-          ) : null}
-        </span>
+      <CollapsibleTrigger
+        asChild
+        className="justify-start gap-1.5 px-3 py-1.5 text-muted-foreground hover:text-foreground"
+      >
+        <button type="button">
+          <DisclosureChevron className="mr-0 h-3.5 w-3.5" />
+          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="font-medium text-foreground">History</span>
+            <span className="truncate">{evidence?.label ?? "Observed outcomes"}</span>
+            {test.intermittent ? (
+              <Badge variant="warning" size="sm">
+                Intermittent
+              </Badge>
+            ) : null}
+            {alsoFailingInBaseline ? (
+              <Badge variant="failure" size="sm">
+                Also failing in baseline
+              </Badge>
+            ) : null}
+          </span>
+        </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="px-3 pb-3">
         <p className="mb-2 text-muted-foreground">

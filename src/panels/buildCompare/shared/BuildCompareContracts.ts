@@ -36,8 +36,9 @@ export interface BuildCompareTestDiffItem {
   name: string;
   className?: string;
   suiteName?: string;
-  baselineStatusLabel: string;
-  targetStatusLabel: string;
+  /** Undefined when the test is absent from that build (added or removed tests). */
+  baselineStatusLabel?: string;
+  targetStatusLabel?: string;
   baselineStatusTone?: StatusVisualTone;
   targetStatusTone?: StatusVisualTone;
   baselineDurationLabel?: string;

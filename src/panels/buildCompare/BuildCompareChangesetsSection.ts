@@ -13,12 +13,16 @@ export function buildChangesetsSection(
   return {
     status: hasItems ? "available" : "empty",
     summaryLabel: hasItems
-      ? `Baseline ${formatNumber(baselineItems.length)} · Target ${formatNumber(targetItems.length)}`
-      : "No Jenkins changesets recorded for either build",
+      ? `${formatCommitCount(baselineItems.length)} in baseline · ${formatCommitCount(targetItems.length)} in target`
+      : "No commits recorded for either build",
     detail: hasItems
-      ? "Jenkins changesets are per-build, not the full SCM delta between arbitrary build numbers."
+      ? "Jenkins records each build's commits since the build before it, not the full difference between these two builds."
       : undefined,
     baselineItems,
     targetItems
   };
+}
+
+function formatCommitCount(count: number): string {
+  return `${formatNumber(count)} ${count === 1 ? "commit" : "commits"}`;
 }

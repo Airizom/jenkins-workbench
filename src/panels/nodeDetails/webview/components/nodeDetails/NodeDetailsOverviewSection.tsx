@@ -17,8 +17,8 @@ type NodeDetailsOverviewSectionProps = {
   onShowTab: (tab: NodeDetailsTab) => void;
 };
 /**
- * The offline reason is intentionally not repeated here: the hero banner
- * already shows it and stays visible across tabs.
+ * The status and offline reason are intentionally not repeated here: the hero
+ * badge and banner already show them and stay visible across tabs.
  */
 export function NodeDetailsOverviewSection({
   state,
@@ -39,15 +39,20 @@ export function NodeDetailsOverviewSection({
       <div className="grid gap-3 md:grid-cols-2 md:items-start">
         <div className="space-y-3">
           <OverviewCard icon={<StatusIcon className="h-4 w-4" />} title="Status">
-            <dl className="m-0 grid gap-x-4 gap-y-2.5 sm:grid-cols-3">
+            {/* auto-fit sizes columns to the card, which is half the page from `md`
+                up, so values like "1 busy · 3 offline" are not squeezed. */}
+            <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-x-4 gap-y-2.5">
               {statusRows.map((row) => (
                 <div key={row.label} className="flex min-w-0 items-center gap-2.5">
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
                     {row.icon}
                   </div>
                   <div className="min-w-0">
-                    <dt className="text-[11px] text-muted-foreground">{row.label}</dt>
-                    <dd className="m-0 truncate text-xs font-semibold" title={row.value}>
+                    <dt className="text-caption text-muted-foreground">{row.label}</dt>
+                    <dd
+                      className="m-0 truncate text-xs font-semibold"
+                      title={row.title ?? row.value}
+                    >
                       {row.value}
                     </dd>
                   </div>
@@ -56,10 +61,10 @@ export function NodeDetailsOverviewSection({
             </dl>
             {connectionRows.length > 0 ? (
               <div className="mt-3 border-t border-border pt-2.5">
-                <h3 className="m-0 mb-1.5 text-[11px] font-medium text-muted-foreground">
+                <h3 className="m-0 mb-1.5 text-caption font-medium text-muted-foreground">
                   Connection
                 </h3>
-                <dl className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                <dl className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-caption">
                   {connectionRows.map((row) => (
                     <div key={row.label} className="flex items-center gap-1.5">
                       <span aria-hidden="true" className="text-muted-foreground">
@@ -177,7 +182,7 @@ function MonitorsTeaser({
               key={monitor.key}
               className="rounded border border-mutedBorder bg-muted-soft px-3 py-2"
             >
-              <div className="truncate text-[11px] text-muted-foreground" title={monitor.key}>
+              <div className="truncate text-caption text-muted-foreground" title={monitor.key}>
                 {formatMonitorLabel(monitor.key)}
               </div>
               <div className="truncate text-xs font-semibold" title={monitor.summary}>
@@ -201,7 +206,7 @@ function MonitorsTeaser({
       <Button
         variant="secondary"
         size="sm"
-        className="h-6 px-2 text-[11px]"
+        className="h-6 px-2 text-caption"
         onClick={onShowDiagnostics}
       >
         Open diagnostics

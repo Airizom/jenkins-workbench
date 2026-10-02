@@ -103,6 +103,13 @@ export function PlayIcon(props: IconProps) {
     </IconBase>
   );
 }
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <polyline points="9 6 15 12 9 18" />
+    </IconBase>
+  );
+}
 export function ChevronDownIcon(props: IconProps) {
   return (
     <IconBase {...props}>

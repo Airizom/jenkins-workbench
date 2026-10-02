@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { EmptyState } from "../../../../../shared/webview/components/EmptyState";
 import { AlertCircleIcon, SearchIcon, TestTubeIcon } from "../../../../../shared/webview/icons";
 import type { EmptyStateIcon } from "./testResultsTypes";
@@ -5,11 +6,13 @@ import type { EmptyStateIcon } from "./testResultsTypes";
 export function TestResultsEmptyState({
   icon,
   title,
-  message
+  message,
+  action
 }: {
   icon?: EmptyStateIcon;
   title: string;
   message: string;
+  action?: React.ReactNode;
 }) {
   return (
     <EmptyState
@@ -17,6 +20,7 @@ export function TestResultsEmptyState({
       description={message}
       tone={icon === "info" ? "warning" : "neutral"}
       icon={icon ? <EmptyStateGlyph icon={icon} /> : undefined}
+      action={action}
     />
   );
 }

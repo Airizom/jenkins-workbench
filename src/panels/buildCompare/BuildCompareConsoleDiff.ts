@@ -346,7 +346,7 @@ function buildConsoleDivergenceResult(
   return {
     status: "available",
     summaryLabel: "First console divergence found",
-    detail: `Compared up to ${options.maxBytes.toLocaleString()} bytes and ${options.maxLines.toLocaleString()} lines per build.`,
+    detail: `Compared up to ${formatByteSize(options.maxBytes)} and ${options.maxLines.toLocaleString()} lines per build.`,
     divergenceLineLabel: `First difference at line ${divergenceLine.toLocaleString()}`,
     baselineLines: toSnippetLines(baselineSnippet, startLineNumber, divergenceLine),
     targetLines: toSnippetLines(targetSnippet, startLineNumber, divergenceLine)
@@ -357,10 +357,29 @@ function buildConsoleTooLargeResult(options: BuildCompareConsoleOptions): Consol
   return {
     status: "tooLarge",
     summaryLabel: "Logs too large for comparison",
-    detail: `Comparison stops after ${options.maxBytes.toLocaleString()} bytes or ${options.maxLines.toLocaleString()} lines per build.`,
+    detail: `Comparison stops after ${formatByteSize(options.maxBytes)} or ${options.maxLines.toLocaleString()} lines per build.`,
     baselineLines: [],
     targetLines: []
   };
+}
+
+const BYTE_UNITS = ["KB", "MB", "GB"] as const;
+
+/** Human-readable size in binary units, e.g. 5242880 → "5 MB", 1536 → "1.5 KB". */
+export function formatByteSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 1024) {
+    return `${Math.max(0, Math.round(Number.isFinite(bytes) ? bytes : 0)).toLocaleString()} bytes`;
+  }
+  let value = bytes;
+  let unit: (typeof BYTE_UNITS)[number] = BYTE_UNITS[0];
+  for (const candidate of BYTE_UNITS) {
+    value /= 1024;
+    unit = candidate;
+    if (value < 1024) {
+      break;
+    }
+  }
+  return `${Number(value.toFixed(1)).toLocaleString()} ${unit}`;
 }
 
 function getCommonPrefixLength(left: string, right: string): number {

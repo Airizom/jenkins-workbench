@@ -27,7 +27,7 @@ export function OverviewCard({
           {icon}
           <h2 className="m-0 truncate text-xs font-semibold">{title}</h2>
         </div>
-        {meta ? <div className="shrink-0 text-[11px] text-muted-foreground">{meta}</div> : null}
+        {meta ? <div className="shrink-0 text-caption text-muted-foreground">{meta}</div> : null}
       </div>
       <div className="p-3">{children}</div>
     </section>

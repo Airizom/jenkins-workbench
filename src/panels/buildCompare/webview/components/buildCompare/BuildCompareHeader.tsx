@@ -15,12 +15,14 @@ function BuildReference({
 }) {
   const jobName = showJob ? build.jobDisplayName : undefined;
   return (
-    // Only a visible job name may shrink; the "#N" part must never be clipped.
+    // Only a visible job name may shrink (wrapping on narrow panels); "#N" is never clipped.
     <span
       className={cn("flex items-baseline gap-1", jobName ? "min-w-0" : "shrink-0")}
       title={build.displayName}
     >
-      {jobName ? <span className="min-w-0 truncate font-normal">{jobName}</span> : null}
+      {jobName ? (
+        <span className="min-w-0 font-normal [overflow-wrap:anywhere]">{jobName}</span>
+      ) : null}
       <span className="shrink-0 tabular-nums">{build.buildNumberLabel}</span>
     </span>
   );
@@ -36,7 +38,7 @@ export function BuildCompareHeader({
 }: {
   baseline: BuildCompareBuildViewModel;
   target: BuildCompareBuildViewModel;
-  /** Any load in flight (initial sections, console, refresh, or swap). */
+  /** A refresh, swap, or section load that blocks both actions; the console scan does not. */
   busy: boolean;
   busyAction?: BuildCompareBusyAction;
   onRefresh: () => void;
@@ -49,21 +51,21 @@ export function BuildCompareHeader({
     <PanelHeader
       maxWidthClassName="max-w-7xl"
       eyebrow="Build Compare"
+      // Long job paths wrap instead of being clipped on narrow panels.
+      wrapTitle
+      titleTooltip={`${baseline.displayName} vs ${target.displayName}`}
       title={
         <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
           {sharedJobName ? (
             // Narrow panels put the job on its own line so it wraps instead of truncating away.
-            <span
-              className="min-w-0 basis-full wrap-break-word sm:basis-auto sm:truncate"
-              title={sharedJobName}
-            >
+            <span className="min-w-0 basis-full [overflow-wrap:anywhere] sm:basis-auto">
               {sharedJobName}
             </span>
           ) : null}
           <BuildReference build={baseline} showJob={!sharedJobName} />
           <span
             aria-hidden="true"
-            className="shrink-0 self-center rounded-full border border-border bg-muted-strong px-1.5 text-[11px] font-normal text-muted-foreground"
+            className="shrink-0 self-center rounded-full border border-border bg-muted-strong px-1.5 text-caption font-normal text-muted-foreground"
           >
             vs
           </span>
@@ -80,9 +82,7 @@ export function BuildCompareHeader({
             disabled={busy}
             aria-label={refreshing ? "Refreshing comparison" : "Refresh comparison"}
           >
-            <RefreshIcon
-              className={cn("h-3.5 w-3.5", (refreshing || (busy && !swapping)) && "animate-spin")}
-            />
+            <RefreshIcon className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
             <span className="hidden sm:inline">{refreshing ? "Refreshing…" : "Refresh"}</span>
           </Button>
           <Button variant="secondary" size="sm" onClick={onSwap} disabled={busy}>

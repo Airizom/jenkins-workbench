@@ -239,7 +239,22 @@ export const jobHistoryScenarios: Record<string, HistoryViewModel> = {
     revision: 4,
     status: "error",
     jobUrl,
-    message: "Error: Jenkins responded with 503 Service Unavailable"
+    message: "Jenkins responded with 503 Service Unavailable"
+  },
+  /** Selected build has no test report: the summary must not claim "No failing tests". */
+  selectedReportUnavailable: {
+    ...loaded,
+    selectedBuild: 46,
+    evidence: {},
+    baseline: undefined,
+    baselineOutcomes: undefined
+  },
+  /** Selected build's report was sampled: counts are labelled partial. */
+  partialReport: {
+    ...loaded,
+    builds: loaded.builds.map((item, index) =>
+      index === 0 ? { ...item, report: { ...item.report, truncated: true } } : item
+    )
   },
   notLoaded: { ...emptyHistory(), revision: 1, status: "idle", jobUrl }
 };

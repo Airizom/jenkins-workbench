@@ -29,7 +29,7 @@ function UpdatedAtMeta({
 }): React.JSX.Element {
   return (
     <span title={updatedAtAbsolute}>
-      Updated {updatedAtLabel}
+      {updatedAtLabel}
       <span className="sr-only"> ({updatedAtAbsolute})</span>
     </span>
   );

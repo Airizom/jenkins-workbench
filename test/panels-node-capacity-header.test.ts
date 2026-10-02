@@ -5,7 +5,11 @@ import { describe, it } from "vitest";
 import type { NodeCapacityPoolViewModel } from "../src/shared/nodeCapacity/NodeCapacityContracts";
 import { NodeCapacityHeader } from "../src/panels/nodeCapacity/webview/components/NodeCapacityHeader";
 import { NodeCapacityPoolList } from "../src/panels/nodeCapacity/webview/components/NodeCapacityPoolList";
-import { isPoolOpen } from "../src/panels/nodeCapacity/webview/hooks/useNodeCapacityExecutorLoading";
+import {
+  collectAutoOpenedPoolIds,
+  isPoolOpen,
+  resolvePoolOpenStates
+} from "../src/panels/nodeCapacity/webview/hooks/useNodeCapacityExecutorLoading";
 import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 
 function renderHeader(overrides: Partial<Parameters<typeof NodeCapacityHeader>[0]> = {}): string {
@@ -18,7 +22,7 @@ function renderHeader(overrides: Partial<Parameters<typeof NodeCapacityHeader>[0
         loading: false,
         loadFailed: false,
         isStale: false,
-        updatedAtLabel: "2 minutes ago",
+        updatedAtLabel: "Updated 2m ago",
         updatedAtAbsolute: "9/27/2026, 10:00:00 AM",
         onRefresh: () => undefined,
         ...overrides
@@ -61,7 +65,6 @@ function renderPools(pools: NodeCapacityPoolViewModel[]): string {
       createElement(NodeCapacityPoolList, {
         pools,
         poolOpenStates: new Map(),
-        onRefresh: () => undefined,
         onOpenExternal: () => undefined,
         onOpenNodeDetails: () => undefined,
         onRetryExecutors: () => undefined,
@@ -77,7 +80,7 @@ describe("NodeCapacityHeader", () => {
 
     assert.match(html, /Production/);
     assert.match(html, /Node Capacity/);
-    assert.match(html, /Updated 2 minutes ago/);
+    assert.match(html, /Updated 2m ago/);
     assert.match(html, /<span class="sr-only"> \(9\/27\/2026, 10:00:00 AM\)<\/span>/);
     assert.doesNotMatch(html, /Stale/);
     assert.doesNotMatch(html, /animate-spin/);
@@ -103,11 +106,12 @@ describe("NodeCapacityHeader", () => {
 });
 
 describe("NodeCapacityPoolList", () => {
-  it("offers a refresh when Jenkins returned no pools", () => {
+  it("shows the empty state without repeating the header Refresh action", () => {
     const html = renderPools([]);
 
     assert.match(html, /No node capacity data/);
     assert.match(html, /aria-label="Label pools"/);
+    assert.doesNotMatch(html, /<button/);
   });
 
   it("renders a panel per pool", () => {
@@ -119,11 +123,44 @@ describe("NodeCapacityPoolList", () => {
   });
 });
 
-describe("isPoolOpen", () => {
-  it("expands abnormal pools until the user toggles them", () => {
-    assert.equal(isPoolOpen(pool("a", "normal"), new Map()), false);
-    assert.equal(isPoolOpen(pool("a", "warning"), new Map()), true);
-    assert.equal(isPoolOpen(pool("a", "warning"), new Map([["a", false]])), false);
+describe("pool open state", () => {
+  it("treats pools without an open state as closed", () => {
+    assert.equal(isPoolOpen(pool("a", "warning"), new Map()), false);
     assert.equal(isPoolOpen(pool("a", "normal"), new Map([["a", true]])), true);
+  });
+
+  it("auto-opens abnormal pools once and never auto-closes them while polling", () => {
+    let autoOpened = collectAutoOpenedPoolIds(
+      [pool("a", "normal"), pool("b", "warning")],
+      new Set()
+    );
+    assert.deepEqual([...autoOpened], ["b"]);
+
+    // Next poll: b recovers, a degrades. b stays open; a opens.
+    autoOpened = collectAutoOpenedPoolIds([pool("a", "critical"), pool("b", "normal")], autoOpened);
+    assert.deepEqual([...autoOpened].sort(), ["a", "b"]);
+
+    const states = resolvePoolOpenStates(autoOpened, new Map());
+    assert.equal(isPoolOpen(pool("b", "normal"), states), true);
+  });
+
+  it("keeps the same set when a poll opens nothing new, so renders stay memoized", () => {
+    const previous = collectAutoOpenedPoolIds([pool("a", "warning")], new Set());
+    assert.equal(
+      collectAutoOpenedPoolIds([pool("a", "warning"), pool("c", "normal")], previous),
+      previous
+    );
+  });
+
+  it("lets user toggles override the automatic decision", () => {
+    const states = resolvePoolOpenStates(
+      new Set(["a"]),
+      new Map([
+        ["a", false],
+        ["c", true]
+      ])
+    );
+    assert.equal(isPoolOpen(pool("a", "critical"), states), false);
+    assert.equal(isPoolOpen(pool("c", "normal"), states), true);
   });
 });

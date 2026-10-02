@@ -32,7 +32,7 @@ export function TestResultsList({
         </span>
         <div className="flex items-center gap-2">
           {summary.logsIncluded ? (
-            <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
+            <Badge variant="secondary" className="text-caption px-1.5 py-0">
               Case logs loaded
             </Badge>
           ) : null}
@@ -54,7 +54,7 @@ export function TestResultsList({
             {(filteredItems.length - visibleItems.length).toLocaleString()} more tests
           </span>
           <Button variant="outline" size="sm" onClick={onShowMore}>
-            Show More
+            Show more
           </Button>
         </div>
       ) : null}

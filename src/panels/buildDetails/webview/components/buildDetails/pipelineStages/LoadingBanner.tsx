@@ -3,7 +3,7 @@ export function LoadingBanner(): React.JSX.Element {
   return (
     <div
       role="status"
-      className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+      className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-caption font-medium text-muted-foreground"
     >
       <span
         aria-hidden

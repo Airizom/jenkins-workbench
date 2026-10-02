@@ -64,6 +64,16 @@
     );
   }
 
+  /* High contrast: the status tint gradients are decorative and lower
+   * contrast; the badge, banner, and accent line carry the status. */
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) .node-hero[data-status] {
+    background: var(--background);
+  }
+
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) .monitor-gauge {
+    box-shadow: inset 0 0 0 1px var(--vscode-contrastBorder);
+  }
+
   .node-hero-icon {
     background: color-mix(in srgb, currentColor 12%, transparent);
     border: 1px solid color-mix(in srgb, currentColor 30%, transparent);

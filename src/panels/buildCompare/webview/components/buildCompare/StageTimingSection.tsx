@@ -22,7 +22,6 @@ export function StageTimingSection({
       detail={section.detail}
       status={section.status}
       items={section.items}
-      emptyLabel="No pipeline stage data to compare."
       {...disclosure}
       renderItems={(items) => (
         <CompareTable caption="Stage timing by build" columns={STAGE_COLUMNS}>

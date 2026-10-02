@@ -4,36 +4,35 @@
 @layer theme, base, components, utilities;
 
 @layer components {
-  .capacity-pool summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .capacity-pool summary {
+  /* Stretch the disclosure button over the whole pool header so the counts
+   * and bar stay clickable while the button's accessible name stays short. */
+  .capacity-pool-toggle {
     outline: none;
   }
 
-  .capacity-pool summary:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: -2px;
+  /* Matches the header's `rounded-lg` so the focus ring follows the card. */
+  .capacity-pool-toggle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
   }
 
-  .capacity-pool[open] > summary .capacity-pool-chevron {
-    transform: rotate(180deg);
+  /* VS Code disclosure convention: chevron-right collapsed, down when open. */
+  .capacity-pool[data-open] .capacity-pool-chevron {
+    transform: rotate(90deg);
     color: var(--foreground);
   }
 
-  /* Square off the summary's bottom corners once content sits beneath it so the
-   * hover highlight does not leave gaps against the card edge. */
-  .capacity-pool[open] > summary {
+  /* Match the header, whose bottom corners square off once content sits
+   * beneath it (`group-data-[open]/pool:rounded-b-none`). */
+  .capacity-pool[data-open] .capacity-pool-toggle::after {
     border-end-start-radius: 0;
     border-end-end-radius: 0;
   }
-}
 
-@layer utilities {
-  @media (prefers-reduced-motion: reduce) {
-    .capacity-pool-chevron {
-      transition: none;
-    }
+  .capacity-pool-toggle:focus-visible::after {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
   }
 }

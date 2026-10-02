@@ -10,21 +10,12 @@ import {
 } from "../../../../../shared/webview/components/ui/card";
 import { TestTubeIcon } from "../../../../../shared/webview/icons";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
-import { getTestDistribution } from "../testResults/testResultsUtils";
-
-/**
- * Formats the pass rate without ever rounding up to 100% while any test failed:
- * failures floor the value (one decimal above 99%, capped at 99.9).
- */
-export function formatPassRate(passedPct: number, failedCount: number): string {
-  if (failedCount === 0) {
-    return String(Math.round(passedPct));
-  }
-  if (passedPct >= 99) {
-    return Math.min(Math.floor(passedPct * 10) / 10, 99.9).toFixed(1);
-  }
-  return String(Math.floor(passedPct));
-}
+import {
+  describeTestOutcome,
+  formatPassRate,
+  getTestDistribution,
+  type TestOutcomeSummary
+} from "../testResults/testResultsUtils";
 
 type TestPassDonutCardProps = {
   summary: BuildTestsSummaryViewModel;
@@ -35,9 +26,8 @@ export function TestPassDonutCard({
   onShowTests
 }: TestPassDonutCardProps): React.JSX.Element {
   const distribution = getTestDistribution(summary);
-  const passRate = formatPassRate(distribution.passedPct, summary.failedCount);
+  const outcome = describeTestOutcome(summary);
   const hasFailures = summary.failedCount > 0;
-  const badgeTone = summary.passedCount === 0 && summary.skippedCount > 0 ? "skipped" : "passed";
 
   return (
     <Card>
@@ -47,13 +37,13 @@ export function TestPassDonutCard({
           <CardTitle>Tests</CardTitle>
         </div>
         {summary.hasAnyResults && !hasFailures ? (
-          <ToneBadge label={`${passRate}% passed`} tone={badgeTone} />
+          <ToneBadge label={outcome.passRateLabel} tone={outcome.tone} />
         ) : null}
       </CardHeader>
       <CardContent className="pb-4">
         {summary.totalCount > 0 ? (
           <div className="flex flex-wrap items-center gap-4">
-            <TestPassDonut summary={summary} passRate={passRate} distribution={distribution} />
+            <TestPassDonut summary={summary} outcome={outcome} distribution={distribution} />
             <div className="flex min-w-[240px] flex-1 flex-col gap-3">
               {hasFailures ? (
                 <p className="m-0 flex flex-wrap items-baseline gap-x-2">
@@ -61,7 +51,7 @@ export function TestPassDonutCard({
                     {summary.failedCount.toLocaleString()} failed
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    of {summary.totalCount.toLocaleString()} · {passRate}% passed
+                    of {summary.totalCount.toLocaleString()} · {outcome.passRateLabel}
                   </span>
                 </p>
               ) : null}
@@ -96,25 +86,52 @@ export function TestPassDonutCard({
   );
 }
 
+/** Big number plus caption in the donut hole: failures first, then the pass rate. */
+function describeDonutCenter(
+  summary: BuildTestsSummaryViewModel,
+  outcome: TestOutcomeSummary
+): { value: string; caption: string; className: string } {
+  if (summary.failedCount > 0) {
+    return {
+      value: summary.failedCount.toLocaleString(),
+      caption: "failed",
+      className: "fill-failure"
+    };
+  }
+  if (outcome.passRate === undefined) {
+    return {
+      value: summary.skippedCount.toLocaleString(),
+      caption: "skipped",
+      className: "fill-foreground"
+    };
+  }
+  return {
+    value: `${formatPassRate(outcome.passRate, 0)}%`,
+    caption: "passed",
+    className: "fill-foreground"
+  };
+}
+
 function TestPassDonut({
   summary,
-  passRate,
+  outcome,
   distribution
 }: {
   summary: BuildTestsSummaryViewModel;
-  passRate: string;
+  outcome: TestOutcomeSummary;
   distribution: ReturnType<typeof getTestDistribution>;
 }): React.JSX.Element {
   const { failedPct, skippedPct, passedPct } = distribution;
-  const hasFailures = summary.failedCount > 0;
   const segments = [
     { pct: passedPct, start: 0, className: "text-success" },
     { pct: failedPct, start: passedPct, className: "text-failure" },
     { pct: skippedPct, start: passedPct + failedPct, className: "text-warning" }
   ];
-  const label = hasFailures
-    ? `${summary.failedCount} of ${summary.totalCount} tests failed: ${passRate}% passed, ${summary.skippedCount} skipped`
-    : `${passRate}% tests passed: ${summary.passedCount} passed, ${summary.failedCount} failed, ${summary.skippedCount} skipped`;
+  const center = describeDonutCenter(summary, outcome);
+  const label =
+    summary.failedCount > 0
+      ? `${summary.failedCount} of ${summary.totalCount} tests failed: ${outcome.passRateLabel}, ${summary.skippedCount} skipped`
+      : `Tests ${outcome.passRateLabel.toLowerCase()}: ${summary.passedCount} passed, ${summary.skippedCount} skipped`;
 
   return (
     <svg viewBox="0 0 40 40" className="h-28 w-28 shrink-0" role="img" aria-label={label}>
@@ -145,41 +162,26 @@ function TestPassDonut({
           />
         ) : null
       )}
-      {hasFailures ? (
-        <>
-          <text
-            x="20"
-            y="18.5"
-            textAnchor="middle"
-            dominantBaseline="central"
-            className="fill-failure font-semibold"
-            style={{ fontSize: "9px" }}
-          >
-            {summary.failedCount.toLocaleString()}
-          </text>
-          <text
-            x="20"
-            y="25.5"
-            textAnchor="middle"
-            dominantBaseline="central"
-            className="fill-muted-foreground"
-            style={{ fontSize: "4px" }}
-          >
-            failed
-          </text>
-        </>
-      ) : (
-        <text
-          x="20"
-          y="20"
-          textAnchor="middle"
-          dominantBaseline="central"
-          className="fill-foreground font-semibold"
-          style={{ fontSize: "9px" }}
-        >
-          {passRate}%
-        </text>
-      )}
+      <text
+        x="20"
+        y="18.5"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className={`${center.className} font-semibold`}
+        style={{ fontSize: "9px" }}
+      >
+        {center.value}
+      </text>
+      <text
+        x="20"
+        y="25.5"
+        textAnchor="middle"
+        dominantBaseline="central"
+        className="fill-muted-foreground"
+        style={{ fontSize: "4px" }}
+      >
+        {center.caption}
+      </text>
     </svg>
   );
 }

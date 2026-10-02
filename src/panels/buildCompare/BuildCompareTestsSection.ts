@@ -184,7 +184,7 @@ function buildAvailableTestsSection(
           newPasses.length,
           ambiguousTests.length
         )
-      : "No high-signal test differences",
+      : "No test changes",
     baselineSummaryLabel: formatAvailableTestReportCountsSummary(baselineValue),
     targetSummaryLabel: formatAvailableTestReportCountsSummary(targetValue),
     newFailures,
@@ -290,8 +290,8 @@ function buildSingleSideTestDiffItem(
     name: testCase.name,
     className: testCase.className,
     suiteName: testCase.suiteName,
-    baselineStatusLabel: side === "removed" ? testCase.statusLabel : "-",
-    targetStatusLabel: side === "added" ? testCase.statusLabel : "-",
+    baselineStatusLabel: side === "removed" ? testCase.statusLabel : undefined,
+    targetStatusLabel: side === "added" ? testCase.statusLabel : undefined,
     baselineStatusTone: side === "removed" ? testStatusToVisualTone(testCase.status) : undefined,
     targetStatusTone: side === "added" ? testStatusToVisualTone(testCase.status) : undefined,
     baselineDurationLabel: side === "removed" ? testCase.durationLabel : undefined,

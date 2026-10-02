@@ -10,14 +10,14 @@ export function StepsVisibilityToggle({
 }): React.JSX.Element {
   return (
     // Fixed label; aria-pressed carries the state (pressed = failed steps only).
+    // Applies to the stage's direct steps and the steps inside its branches.
     <Toggle
       pressed={!showAll}
       onPressedChange={(failedOnly) => onShowAllChange(!failedOnly)}
       size="sm"
-      aria-label="Failed steps only"
       title="Show only failed steps"
     >
-      Failed only
+      Failed steps only
     </Toggle>
   );
 }

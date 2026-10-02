@@ -48,7 +48,10 @@ export function StageNode({
   const stageName = stage.name;
   const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
   const stageLogTarget = stage.logTarget;
-  const hasStageActions = Boolean(stageLogTarget) || canRestartStage;
+  // One "failed steps only" filter per stage covers its direct and branch
+  // steps, so it sits in the stage toolbar rather than on either list.
+  const hasAnySteps = hasDirectSteps || hasBranchSteps;
+  const hasStageToolbar = Boolean(stageLogTarget) || canRestartStage || hasAnySteps;
   const didNotRun = isStageNotRun(stage);
   const stageMeta = describeStageMeta(stage);
 
@@ -81,18 +84,18 @@ export function StageNode({
                   >
                     {stage.name || "Stage"}
                   </div>
-                  <div className="text-[11px] text-muted-foreground tabular-nums">{stageMeta}</div>
+                  <div className="text-caption text-muted-foreground tabular-nums">{stageMeta}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <ResultBadge
                     label={stage.statusLabel || "Unknown"}
                     status={stage.statusClass}
-                    className="text-[11px]"
+                    className="text-caption"
                   />
                   <ChevronDownIcon
                     className={cn(
-                      "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
-                      "group-data-[state=open]:rotate-180 group-data-[state=open]:text-foreground"
+                      "h-3.5 w-3.5 -rotate-90 text-muted-foreground transition-transform duration-200",
+                      "group-data-[state=open]:rotate-0 group-data-[state=open]:text-foreground"
                     )}
                   />
                 </div>
@@ -101,13 +104,21 @@ export function StageNode({
 
             <AccordionContent>
               <div className="border-t border-border px-3 py-2.5 space-y-2.5">
-                {hasStageActions ? (
-                  <div className="flex items-center justify-end gap-2">
+                {hasStageToolbar ? (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {hasAnySteps ? (
+                      <div className="mr-auto">
+                        <StepsVisibilityToggle
+                          showAll={showAll}
+                          onShowAllChange={onShowAllChange}
+                        />
+                      </div>
+                    ) : null}
                     {stageLogTarget ? (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-6 px-2 text-[11px]"
+                        className="h-6 px-2 text-caption"
                         onClick={(event) => {
                           event.stopPropagation();
                           onSelectPipelineLog(stageLogTarget);
@@ -121,7 +132,7 @@ export function StageNode({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-6 px-2 text-[11px]"
+                        className="h-6 px-2 text-caption"
                         onClick={(event) => {
                           event.stopPropagation();
                           onRestartStage(stageName);
@@ -134,16 +145,8 @@ export function StageNode({
                 ) : null}
                 {hasBranches ? (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Parallel Branches
-                      </div>
-                      {hasBranchSteps ? (
-                        <StepsVisibilityToggle
-                          showAll={showAll}
-                          onShowAllChange={onShowAllChange}
-                        />
-                      ) : null}
+                    <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
+                      Parallel branches
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {stage.parallelBranches.map((branch) => (
@@ -160,11 +163,8 @@ export function StageNode({
 
                 {hasDirectSteps ? (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        Steps
-                      </div>
-                      <StepsVisibilityToggle showAll={showAll} onShowAllChange={onShowAllChange} />
+                    <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
+                      {showAll ? "Steps" : "Failed steps"}
                     </div>
                     {steps.length > 0 ? (
                       <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />

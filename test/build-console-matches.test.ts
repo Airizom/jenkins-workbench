@@ -41,6 +41,20 @@ describe("buildConsoleMatches", () => {
     ]);
   });
 
+  it("matches regexes case-insensitively, like plain-text search", () => {
+    const text = "Error one\nERROR two\nerror three";
+
+    assert.deepEqual(buildConsoleMatches(text, "error \\w+", true).matches, [
+      { start: 0, end: 9 },
+      { start: 10, end: 19 },
+      { start: 20, end: 31 }
+    ]);
+    assert.deepEqual(
+      buildConsoleMatches(text, "ERROR", true).matches,
+      buildConsoleMatches(text, "ERROR", false).matches
+    );
+  });
+
   it("handles regex syntax and backreferences through the shared analyzer", () => {
     const invalid = buildConsoleMatches("ERROR", "[", true);
     assert.match(invalid.error ?? "", /Invalid regular expression/);

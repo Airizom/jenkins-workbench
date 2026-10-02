@@ -93,6 +93,16 @@ describe("normalizeBuildComparePanelUiState", () => {
     assert.deepEqual(normalizeBuildComparePanelUiState({ collapsedSections: "tests" }), {});
   });
 
+  it("keeps explicit expansions, letting an explicit collapse win on conflict", () => {
+    assert.deepEqual(
+      normalizeBuildComparePanelUiState({
+        collapsedSections: ["tests"],
+        expandedSections: ["console", "tests", "bogus", "console"]
+      }),
+      { collapsedSections: ["tests"], expandedSections: ["console"] }
+    );
+  });
+
   it("accepts persisted state with or without UI state", () => {
     const base = {
       environmentId: "env-1",
@@ -157,6 +167,45 @@ describe("resolveCompareSectionNavChip", () => {
     });
     assert.deepEqual(resolveCompareSectionNavChip("tests", passing), {
       text: "1 newly passing",
+      tone: "neutral"
+    });
+  });
+
+  it("states what parameter and commit counts mean", () => {
+    const model = createModel({
+      parameters: {
+        status: "available",
+        summaryLabel: "",
+        items: [
+          { name: "A", changeType: "changed", baselineValue: "1", targetValue: "2" },
+          { name: "B", changeType: "added", targetValue: "x" }
+        ],
+        unchangedCount: 0
+      },
+      changesets: {
+        status: "available",
+        summaryLabel: "",
+        baselineItems: [{ message: "m", author: "a" }],
+        targetItems: [
+          { message: "n", author: "b" },
+          { message: "o", author: "c" }
+        ]
+      }
+    });
+    assert.deepEqual(resolveCompareSectionNavChip("parameters", model), {
+      text: "2 changed",
+      tone: "neutral"
+    });
+    // Per-build commit lists are reported per side, never summed.
+    assert.deepEqual(resolveCompareSectionNavChip("changesets", model), {
+      text: "1 in baseline, 2 in target",
+      tone: "neutral"
+    });
+    const empty = createModel({
+      changesets: { status: "empty", summaryLabel: "", baselineItems: [], targetItems: [] }
+    });
+    assert.deepEqual(resolveCompareSectionNavChip("changesets", empty), {
+      text: "none",
       tone: "neutral"
     });
   });

@@ -31,14 +31,17 @@ export const TabsList = React.forwardRef<
     },
     [forwardedRef]
   );
-  // The scrollbar is hidden, so edge fades signal clipped tabs and the active
-  // tab is scrolled into view when selection changes.
+  // Narrow panels scroll the strip: a thin scrollbar and edge fades signal
+  // clipped tabs, and the active tab is scrolled into view when selection
+  // changes (including arrow-key navigation, which changes the active tab).
   useHorizontalOverflow(listRef, ACTIVE_TAB_SELECTOR);
   return (
     <TabsPrimitive.List
       ref={setRefs}
       className={cn(
-        "no-scrollbar overflow-fade-x flex w-full flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-visible border-b border-border",
+        // `overflow-y-hidden` stops the active indicator's 1px overhang from
+        // adding a vertical scrollbar; it is clipped by the scroll box either way.
+        "scrollbar-thin overflow-fade-x flex w-full flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-hidden border-b border-border",
         className
       )}
       {...props}

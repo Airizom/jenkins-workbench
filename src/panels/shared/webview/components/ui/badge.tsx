@@ -28,7 +28,7 @@ const badgeVariants = cva(
         // `leading-4` follows the font size: tailwind-merge drops a line height
         // that precedes a font-size class.
         default: "px-2.5 py-0.5 text-xs leading-4",
-        sm: "px-1.5 py-0 text-[11px] leading-4"
+        sm: "px-1.5 py-0 text-caption leading-4"
       }
     },
     defaultVariants: {

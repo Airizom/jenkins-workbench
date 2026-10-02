@@ -16,7 +16,7 @@ export interface CompareSectionNavChip {
 export const COMPARE_SECTION_TITLES: Record<BuildCompareSectionId, string> = {
   tests: "Tests",
   parameters: "Parameters",
-  changesets: "Changes",
+  changesets: "Commits",
   stages: "Stages",
   console: "Console"
 };
@@ -69,12 +69,35 @@ function resolveStagesChip(stages: BuildCompareViewModel["stages"]): CompareSect
     : { text: "no changes", tone: "neutral" };
 }
 
+/**
+ * Jenkins records each build's own commits (since the build before it), so the
+ * two sides are listed separately rather than summed into one misleading total.
+ */
+function resolveChangesetsChip(
+  changesets: BuildCompareViewModel["changesets"]
+): CompareSectionNavChip {
+  const sides = [
+    [changesets.baselineItems.length, "baseline"],
+    [changesets.targetItems.length, "target"]
+  ] as const;
+  return {
+    text: sides
+      .filter(([count]) => count > 0)
+      .map(([count, side]) => `${count} in ${side}`)
+      .join(", "),
+    tone: "neutral"
+  };
+}
+
 /** Visible per-section status for the jump nav; color only reinforces the text. */
 export function resolveCompareSectionNavChip(
   id: BuildCompareSectionId,
   model: BuildCompareViewModel
 ): CompareSectionNavChip {
   const section = model[id];
+  if (id === "changesets" && section.status === "empty") {
+    return { text: "none", tone: "neutral" };
+  }
   if (section.status !== "available") {
     return STATUS_CHIPS[section.status] ?? { text: "n/a", tone: "muted" };
   }
@@ -82,12 +105,9 @@ export function resolveCompareSectionNavChip(
     case "tests":
       return resolveTestsChip(model.tests);
     case "parameters":
-      return { text: String(model.parameters.items.length), tone: "neutral" };
+      return { text: `${model.parameters.items.length} changed`, tone: "neutral" };
     case "changesets":
-      return {
-        text: String(model.changesets.baselineItems.length + model.changesets.targetItems.length),
-        tone: "neutral"
-      };
+      return resolveChangesetsChip(model.changesets);
     case "stages":
       return resolveStagesChip(model.stages);
     case "console":

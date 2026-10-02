@@ -16,9 +16,17 @@ describe("display formatters", () => {
 
   it("preserves locale and relative formatting for finite timestamps", () => {
     const timestamp = Date.now();
-    const absolute = new Date(timestamp).toLocaleString();
+    const absolute = new Date(timestamp).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
 
     assert.equal(formatLocaleTimestampWithRelative(timestamp, false), absolute);
     assert.equal(formatLocaleTimestampWithRelative(timestamp, true), `${absolute} (just now)`);
+  });
+
+  it("omits seconds from absolute timestamps", () => {
+    const timestamp = new Date(2026, 8, 26, 9, 14, 37).getTime();
+    assert.doesNotMatch(formatOptionalLocaleTimestamp(timestamp), /:37/);
   });
 });

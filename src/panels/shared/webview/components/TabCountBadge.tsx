@@ -22,7 +22,7 @@ export function TabCountBadge({
     <span
       className={cn(
         "inline-flex h-4 min-w-[16px] items-center justify-center rounded-full border px-1",
-        "text-[10px] font-semibold tabular-nums",
+        "text-micro font-semibold tabular-nums",
         TONE_CLASSES[tone],
         className
       )}

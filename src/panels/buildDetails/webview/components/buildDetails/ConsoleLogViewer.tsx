@@ -15,6 +15,8 @@ export type ConsoleLogViewerHeaderState = {
   hasOutput: boolean;
   lineCount: number;
   openSearchToolbar: () => void;
+  /** Attach to the button that opens search so closing search can refocus it. */
+  searchToggleRef: React.RefObject<HTMLButtonElement | null>;
   /** Defined when the console links at least one diagnostic source location. */
   jumpToFirstDiagnostic?: () => void;
 };
@@ -25,6 +27,9 @@ export function ConsoleLogViewer({
   truncated,
   maxChars,
   error,
+  loading,
+  emptyTitle,
+  emptyDescription,
   followLog,
   canFollow,
   onFollowLogChange,
@@ -46,6 +51,10 @@ export function ConsoleLogViewer({
   /** Character window applied to the output; omit or pass 0 when unknown. */
   maxChars?: number;
   error?: string;
+  /** True while the first chunk of output is being fetched. */
+  loading?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
   followLog: boolean;
   /** True while the output can still grow (running build or node). */
   canFollow: boolean;
@@ -183,9 +192,8 @@ export function ConsoleLogViewer({
   );
   const hasOutput = sourceText.length > 0;
   const lineCount = useMemo(() => countConsoleLines(sourceText), [sourceText]);
-  const showOutput = hasOutput && !error;
   const hasDiagnosticLinks =
-    showOutput && sourceReferences.length > 0 && Boolean(onOpenDiagnosticSource);
+    hasOutput && sourceReferences.length > 0 && Boolean(onOpenDiagnosticSource);
 
   const jumpToFirstDiagnostic = useCallback(() => {
     const output = consoleOutputRef.current;
@@ -225,6 +233,7 @@ export function ConsoleLogViewer({
         hasOutput,
         lineCount,
         openSearchToolbar: consoleSearch.openSearchToolbar,
+        searchToggleRef: consoleSearch.searchToggleRef,
         jumpToFirstDiagnostic: hasDiagnosticLinks ? jumpToFirstDiagnostic : undefined
       })}
       <ConsoleLogSearchBody
@@ -233,9 +242,12 @@ export function ConsoleLogViewer({
         note={note}
         error={error}
         hasOutput={hasOutput}
+        loading={loading}
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
         outputLabel={outputLabel}
         showScrollToTop={showScrollToTop && (!canFollow || !followLog)}
-        showJumpToLatest={canFollow && !followLog && !isAtBottom && showOutput}
+        showJumpToLatest={canFollow && !followLog && !isAtBottom && hasOutput}
         onScrollToTop={scrollConsoleToTop}
         onJumpToLatest={handleJumpToLatest}
         onRetry={onRetry}

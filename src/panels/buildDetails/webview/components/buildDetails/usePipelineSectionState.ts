@@ -20,7 +20,9 @@ import {
   isSamePersistedPipelineUiState,
   normalizeInitialPipelineState,
   type PersistedPipelineUiState,
-  pickDefaultStageToOpen
+  type PipelineStageRequest,
+  pickDefaultStageToOpen,
+  planStageRequest
 } from "./pipelineSectionState";
 
 const { useCallback, useEffect, useRef, useState } = React;
@@ -193,11 +195,13 @@ function usePipelineStageSelection(
   // default selection never overrides (or repeats after) an explicit choice.
   const doneRef = useRef(false);
   const [selectedStageKey, setSelectedStageKey] = useState(initialStageKey);
-  const [expandedStageKey, setExpandedStageKey] = useState<string | undefined>();
+  // The id lets the list re-expand a stage the user collapsed since the last
+  // request for the same key.
+  const [expandRequest, setExpandRequest] = useState<PipelineStageRequest | undefined>();
   const openStage = useCallback(
     (stage: PipelineStageViewModel) => {
       setSelectedStageKey(stage.key);
-      setExpandedStageKey(stage.key);
+      setExpandRequest((previous) => ({ stageKey: stage.key, id: (previous?.id ?? 0) + 1 }));
       if (stage.logTarget) {
         onSelectPipelineLog(stage.logTarget);
       }
@@ -209,7 +213,7 @@ function usePipelineStageSelection(
     doneRef,
     openStage,
     selectedStageKey,
-    expandedStageKey,
+    expandRequest,
     selectGraphStage: (stageKey: string | undefined) => {
       doneRef.current = true;
       setSelectedStageKey(stageKey);
@@ -227,6 +231,40 @@ function usePipelineStageSelection(
   };
 }
 
+/**
+ * Opens stages requested from outside the tab (the hero stage strip) through
+ * the same path as a user selection. Declared before the default-selection
+ * effect so a request that also activates the tab wins over the default pick.
+ */
+function useExternalStageRequest(
+  stageRequest: PipelineStageRequest | undefined,
+  stages: PipelineStageViewModel[],
+  { doneRef, openStage }: Pick<PipelineStageSelection, "doneRef" | "openStage">,
+  onStageRequestOpened: ((stage: PipelineStageViewModel) => void) | undefined
+): void {
+  // Requests made before this mount are stale (the strip only exists once the
+  // stages, and so this section, do), so they are never replayed.
+  const lastHandledIdRef = useRef<number | undefined>(stageRequest?.id);
+
+  useEffect(() => {
+    const plan = planStageRequest({
+      request: stageRequest,
+      lastHandledId: lastHandledIdRef.current,
+      stages
+    });
+    if (!plan.consume) {
+      return;
+    }
+    lastHandledIdRef.current = stageRequest?.id;
+    if (!plan.stage) {
+      return;
+    }
+    doneRef.current = true;
+    openStage(plan.stage);
+    onStageRequestOpened?.(plan.stage);
+  }, [stageRequest, stages, doneRef, openStage, onStageRequestOpened]);
+}
+
 type PipelineStageSelection = ReturnType<typeof usePipelineStageSelection>;
 
 /**
@@ -239,14 +277,19 @@ export function usePipelineSectionState({
   loading,
   isActive,
   isRunning,
-  onSelectPipelineLog
+  stageRequest,
+  onSelectPipelineLog,
+  onStageRequestOpened
 }: {
   stages: PipelineStageViewModel[];
   currentTarget?: PipelineLogTargetViewModel;
   loading: boolean;
   isActive: boolean;
   isRunning: boolean;
+  stageRequest?: PipelineStageRequest;
   onSelectPipelineLog: SelectPipelineLog;
+  /** Called after a stage request opened its stage, to reveal it on screen. */
+  onStageRequestOpened?: (stage: PipelineStageViewModel) => void;
 }) {
   // Single vscode-state read per mount, validated and normalized once.
   const [initial] = useState(readInitialPipelineState);
@@ -256,6 +299,7 @@ export function usePipelineSectionState({
     stages,
     onSelectPipelineLog
   );
+  useExternalStageRequest(stageRequest, stages, { doneRef, openStage }, onStageRequestOpened);
   const view = derivePipelineSectionView(loading, stages.length, presentationState.presentation);
   const logContext: PipelineLogContext = {
     restoredLogTarget: initial.restoredLogTarget,

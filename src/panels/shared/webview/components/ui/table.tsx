@@ -39,7 +39,7 @@ export function TableHead({ className, ...props }: TableHeadProps) {
   return (
     <th
       className={cn(
-        "px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground",
+        "px-3 py-2 text-left text-caption font-semibold uppercase tracking-wider text-muted-foreground",
         className
       )}
       {...props}

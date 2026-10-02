@@ -66,7 +66,7 @@ function TestResultRowHeaderContent({
         <ChevronDownIcon
           className={cn(
             "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-            open ? "rotate-180" : ""
+            open ? "rotate-0" : "-rotate-90"
           )}
         />
       ) : null}

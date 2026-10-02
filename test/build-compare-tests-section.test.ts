@@ -5,6 +5,11 @@ import { describe, it } from "vitest";
 import type { JenkinsTestReport } from "../src/jenkins/types";
 import { buildTestsSection } from "../src/panels/buildCompare/BuildCompareTestsSection";
 import { TestDiffSection } from "../src/panels/buildCompare/webview/components/buildCompare/TestDiffSection";
+import {
+  filterTestDiffItems,
+  showMoreTestsLabel,
+  TEST_DIFF_PAGE_SIZE
+} from "../src/panels/buildCompare/webview/components/buildCompare/testDiff/testDiffModel";
 
 function availableReport(value: JenkinsTestReport) {
   return { status: "available" as const, value };
@@ -244,7 +249,73 @@ describe("buildTestsSection", () => {
 
     const html = renderToStaticMarkup(createElement(TestDiffSection, { section }));
 
-    assert.match(html, /Baseline test report: request failed/);
+    // The detail is shown once, in the section heading.
+    assert.equal(html.split("Baseline test report: request failed").length - 1, 1);
     assert.doesNotMatch(html, /No test changes between these builds\./);
+  });
+
+  it("describes identical test reports in plain words", () => {
+    const tests = report([{ name: "a", status: "PASSED" }]);
+    const section = buildTestsSection(availableReport(tests), availableReport(tests));
+
+    assert.equal(section.status, "empty");
+    assert.equal(section.summaryLabel, "No test changes");
+  });
+
+  it("leaves the absent side of added and removed tests empty instead of a literal dash", () => {
+    const baseline = report([{ name: "removed", status: "PASSED" }]);
+    const target = report([{ name: "added", status: "SKIPPED" }]);
+
+    const section = buildTestsSection(availableReport(baseline), availableReport(target));
+
+    assert.equal(section.addedTests[0]?.baselineStatusLabel, undefined);
+    assert.equal(section.removedTests[0]?.targetStatusLabel, undefined);
+    const html = renderToStaticMarkup(createElement(TestDiffSection, { section }));
+    assert.match(
+      html,
+      /<span aria-hidden="true">—<\/span><span class="sr-only">Not present<\/span>/
+    );
+    assert.doesNotMatch(html, />-</);
+  });
+});
+
+describe("test diff paging and search", () => {
+  const failures = (count: number) =>
+    report(Array.from({ length: count }, (_, index) => ({ name: `t${index}`, status: "FAILED" })));
+  const passes = (count: number) =>
+    report(Array.from({ length: count }, (_, index) => ({ name: `t${index}`, status: "PASSED" })));
+
+  it("renders one page per group with a Show more control and a search box", () => {
+    const section = buildTestsSection(availableReport(passes(120)), availableReport(failures(120)));
+    const html = renderToStaticMarkup(createElement(TestDiffSection, { section }));
+
+    assert.equal(section.newFailures.length, 120);
+    // Long names wrap instead of truncating behind a tooltip.
+    assert.match(html, /class="min-w-0 text-sm font-medium \[overflow-wrap:anywhere\]">t0</);
+    assert.equal((html.match(/>t\d+<\/p>/g) ?? []).length, TEST_DIFF_PAGE_SIZE);
+    assert.match(html, /Show 50 more \(70 remaining\)/);
+    assert.match(html, /aria-label="Search changed tests by suite, class, or name"/);
+    assert.match(html, /120 changed tests/);
+  });
+
+  it("omits the search box for a handful of changes", () => {
+    const section = buildTestsSection(availableReport(passes(3)), availableReport(failures(3)));
+    const html = renderToStaticMarkup(createElement(TestDiffSection, { section }));
+
+    assert.doesNotMatch(html, /Search changed tests/);
+    assert.doesNotMatch(html, /Show \d+ more/);
+  });
+
+  it("filters by suite, class, or name and labels the remaining pages", () => {
+    const items = [
+      { name: "applies discount", className: "checkout.Payment", suiteName: "unit" },
+      { name: "renders", className: "ui.Cart", suiteName: "integration" }
+    ];
+    assert.deepEqual(filterTestDiffItems(items, "  PAYMENT "), [items[0]]);
+    assert.deepEqual(filterTestDiffItems(items, "integration"), [items[1]]);
+    assert.deepEqual(filterTestDiffItems(items, ""), items);
+    assert.deepEqual(filterTestDiffItems(items, "nothing"), []);
+    assert.equal(showMoreTestsLabel(20), "Show 20 more");
+    assert.equal(showMoreTestsLabel(1_070), "Show 50 more (1,070 remaining)");
   });
 });

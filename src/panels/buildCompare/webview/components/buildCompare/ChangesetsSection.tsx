@@ -13,7 +13,7 @@ export function ChangesetsSection({
   const hasItems = section.baselineItems.length > 0 || section.targetItems.length > 0;
   return (
     <SectionCard
-      title="Changes"
+      title="Commits"
       summary={section.summaryLabel}
       detail={section.detail}
       status={section.status}

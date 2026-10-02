@@ -66,13 +66,20 @@ export function ConsoleOutputSection({
       onRetry={requestConsoleReload}
       sourceReferences={sourceReferences}
       onOpenDiagnosticSource={onOpenDiagnosticSource}
-      renderHeader={({ hasOutput, lineCount, openSearchToolbar, jumpToFirstDiagnostic }) => (
+      renderHeader={({
+        hasOutput,
+        lineCount,
+        openSearchToolbar,
+        searchToggleRef,
+        jumpToFirstDiagnostic
+      }) => (
         <ConsoleOutputHeader
           hasConsoleOutput={hasOutput}
           lineCount={lineCount}
           followLog={followLog}
           canFollow={isRunning}
           onSearch={openSearchToolbar}
+          searchButtonRef={searchToggleRef}
           onExport={onExportLogs}
           onFollowLogChange={onToggleFollowLog}
           onJumpToFirstDiagnostic={jumpToFirstDiagnostic}

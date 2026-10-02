@@ -36,7 +36,9 @@ import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { OverviewTab } from "./overview/OverviewTab";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineSection } from "./PipelineSection";
+import type { PipelineStageRequest } from "./pipelineSectionState";
 import { TestResultsSection } from "./TestResultsSection";
+import { describeTestOutcome } from "./testResults/testResultsUtils";
 
 function PipelineTabStatus({
   failedCount,
@@ -110,7 +112,9 @@ function TestsTabStatus({
     return (
       <>
         <CheckCircleIcon className="h-3 w-3 text-success" />
-        <span className="sr-only">(all passed)</span>
+        <span className="sr-only">
+          ({describeTestOutcome(summary).tone === "skipped" ? "all skipped" : "no failures"})
+        </span>
       </>
     );
   }
@@ -130,8 +134,13 @@ type BuildDetailsTabsProps = {
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   pipelineStagesLoading: boolean;
   stripFailedCount: number;
+  /** Stage to open in the Pipeline tab, from the hero stage strip. */
+  stageRequest?: PipelineStageRequest;
   buildUrl?: string;
+  resultLabel: string;
   resultClass: string;
+  durationLabel: string;
+  timestampLabel: string;
   testsSummary: BuildTestsSummaryViewModel;
   testResults: BuildTestResultsViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
@@ -172,8 +181,12 @@ export function BuildDetailsTabs({
   pipelineNodeLogHtmlModel,
   pipelineStagesLoading,
   stripFailedCount,
+  stageRequest,
   buildUrl,
+  resultLabel,
   resultClass,
+  durationLabel,
+  timestampLabel,
   testsSummary,
   testResults,
   coverageState,
@@ -217,12 +230,12 @@ export function BuildDetailsTabs({
        * long console log or test list. */}
       <div className="build-details-tabs-bar">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="overview" className="text-xs">
+          <TabsTrigger value="overview" data-tab-value="overview" className="text-xs">
             <GaugeIcon className="h-3.5 w-3.5" />
             Overview
           </TabsTrigger>
           {hasPendingInputs ? (
-            <TabsTrigger value="inputs" className="text-xs">
+            <TabsTrigger value="inputs" data-tab-value="inputs" className="text-xs">
               <AlertCircleIcon className="h-3.5 w-3.5" />
               Inputs
               <TabStatusCount
@@ -233,18 +246,18 @@ export function BuildDetailsTabs({
             </TabsTrigger>
           ) : null}
           {hasPipelineStages ? (
-            <TabsTrigger value="pipeline" className="text-xs">
+            <TabsTrigger value="pipeline" data-tab-value="pipeline" className="text-xs">
               <WorkflowIcon className="h-3.5 w-3.5" />
               Pipeline
               <PipelineTabStatus failedCount={stripFailedCount} loading={pipelineStagesLoading} />
             </TabsTrigger>
           ) : null}
-          <TabsTrigger value="console" className="text-xs">
+          <TabsTrigger value="console" data-tab-value="console" className="text-xs">
             <TerminalIcon className="h-3.5 w-3.5" />
             Console
           </TabsTrigger>
           {hasTests ? (
-            <TabsTrigger value="tests" className="text-xs">
+            <TabsTrigger value="tests" data-tab-value="tests" className="text-xs">
               <TestTubeIcon className="h-3.5 w-3.5" />
               Tests
               <TestsTabStatus summary={testsSummary} />
@@ -255,7 +268,11 @@ export function BuildDetailsTabs({
 
       <TabsContent value="overview" className="space-y-3">
         <OverviewTab
+          resultLabel={resultLabel}
           resultClass={resultClass}
+          durationLabel={durationLabel}
+          timestampLabel={timestampLabel}
+          hasPipelineStages={hasPipelineStages}
           testsSummary={testsSummary}
           coverageState={coverageState}
           insights={insights}
@@ -294,6 +311,7 @@ export function BuildDetailsTabs({
             onOpenExternal={onOpenExternal}
             isRunning={resultClass === "running"}
             isActive={activeTab === "pipeline"}
+            stageRequest={stageRequest}
           />
         </TabsContent>
       ) : null}

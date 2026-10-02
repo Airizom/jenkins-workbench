@@ -20,13 +20,29 @@ import type { NodeExecutorViewModel, NodeStatusClass } from "../../../shared/Nod
 import { ExecutorUtilizationSummary } from "./ExecutorUtilizationSummary";
 
 export type NodeAction =
-  | { type: "takeNodeOffline"; label: "Take Offline..." }
+  | { type: "takeNodeOffline"; label: "Take offline…" }
   | {
       type: "bringNodeOnline";
-      label: "Bring Online";
+      label: "Bring online";
     };
 
+/**
+ * Disconnected nodes are a fault (error tone); nodes someone took temporarily
+ * offline are intentional (warning tone). Matches the hero badge and accent.
+ */
+const OFFLINE_BANNER_TONES = {
+  offline: {
+    container: "border-failure-border bg-failure-soft",
+    icon: "text-failure"
+  },
+  temporary: {
+    container: "border-warning-border bg-warning-soft",
+    icon: "text-warning"
+  }
+} as const;
+
 type NodeDetailsHeroProps = {
+  environmentLabel: string;
   displayName: string;
   name: string;
   description?: string;
@@ -54,6 +70,7 @@ type NodeDetailsHeroProps = {
   onOpen: () => void;
 };
 export function NodeDetailsHero({
+  environmentLabel,
   displayName,
   name,
   description,
@@ -83,6 +100,13 @@ export function NodeDetailsHero({
   const statusIconClass = resolveNodeStatusIconClass(statusClass);
   // The subtitle repeats the node name only when it differs from the title.
   const showName = name.trim().length > 0 && name !== displayName;
+  const bannerTone =
+    statusClass === "offline" || statusClass === "temporary"
+      ? OFFLINE_BANNER_TONES[statusClass]
+      : OFFLINE_BANNER_TONES.offline;
+  // One filled button at most: the action that resolves the current state.
+  // Taking a healthy node offline and opening Jenkins stay secondary.
+  const nodeActionIsPrimary = nodeAction?.type === "bringNodeOnline";
 
   return (
     <header className="node-hero" data-status={statusClass}>
@@ -98,6 +122,12 @@ export function NodeDetailsHero({
               <ServerIcon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
+              <div
+                className="truncate text-caption font-medium uppercase tracking-wider text-muted-foreground"
+                title={environmentLabel}
+              >
+                {environmentLabel}
+              </div>
               <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <h1
                   className="min-w-0 max-w-full truncate text-lg font-semibold leading-tight"
@@ -121,7 +151,7 @@ export function NodeDetailsHero({
                   </AccessibleTooltip>
                 ) : null}
               </div>
-              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+              <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-caption text-muted-foreground">
                 {showName ? <MetaItem>{name}</MetaItem> : null}
                 {description ? (
                   <MetaItem separated={showName}>
@@ -140,7 +170,7 @@ export function NodeDetailsHero({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
             <Button
               variant="outline"
               size="sm"
@@ -151,19 +181,9 @@ export function NodeDetailsHero({
               <RefreshIcon className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
               Refresh
             </Button>
-            {nodeAction ? (
-              <Button variant="outline" size="sm" onClick={onNodeAction} disabled={loading}>
-                {nodeAction.label}
-              </Button>
-            ) : null}
-            {canLaunchAgent ? (
-              <Button variant="outline" size="sm" onClick={onLaunchAgent} disabled={loading}>
-                <LaunchIcon className="h-3.5 w-3.5" />
-                Launch agent
-              </Button>
-            ) : null}
+            {/* Instructions replace Open in Jenkins: both open the node page. */}
             <Button
-              variant="secondary"
+              variant={canOpenAgentInstructions ? "default" : "outline"}
               size="sm"
               onClick={onOpen}
               disabled={!hasUrl}
@@ -176,19 +196,38 @@ export function NodeDetailsHero({
                 {canOpenAgentInstructions ? "Launch instructions" : "Open in Jenkins"}
               </span>
             </Button>
+            {nodeAction ? (
+              <Button
+                variant={nodeActionIsPrimary ? "default" : "outline"}
+                size="sm"
+                onClick={onNodeAction}
+                disabled={loading}
+              >
+                {nodeAction.label}
+              </Button>
+            ) : null}
+            {canLaunchAgent ? (
+              <Button variant="default" size="sm" onClick={onLaunchAgent} disabled={loading}>
+                <LaunchIcon className="h-3.5 w-3.5" />
+                Launch agent
+              </Button>
+            ) : null}
           </div>
         </div>
 
         {showOfflineBanner ? (
           <div
             role="status"
-            className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 shadow-xs"
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2 shadow-xs",
+              bannerTone.container
+            )}
           >
             <AlertTriangleIcon
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning"
+              className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", bannerTone.icon)}
               aria-hidden="true"
             />
-            <div className="min-w-0 text-xs">
+            <div className="min-w-0 text-xs [overflow-wrap:anywhere]">
               <span className="font-semibold">{statusLabel}.</span>{" "}
               <span className="text-muted-foreground">
                 {offlineReason ?? "Jenkins reported this node as offline."}

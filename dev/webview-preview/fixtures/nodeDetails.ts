@@ -1,9 +1,23 @@
+import {
+  buildNodeActionCapabilities,
+  type NodeActionEligibilityInput
+} from "../../../src/jenkins/nodeActionCapabilities";
 import type { NodeDetailsViewModel } from "../../../src/panels/nodeDetails/shared/NodeDetailsContracts";
 
 const now = Date.now();
 
+/**
+ * Action flags come from the same eligibility logic the host uses, so each
+ * scenario shows only button combinations a real node can produce.
+ */
+function capabilitiesFor(input: NodeActionEligibilityInput) {
+  return buildNodeActionCapabilities(input);
+}
+
 const online: NodeDetailsViewModel = {
   detailsAvailable: true,
+  refreshFailed: false,
+  environmentLabel: "jenkins.example.com",
   displayName: "build-agent-01",
   name: "build-agent-01",
   description: "Ubuntu 24.04 · 16 vCPU · Docker 27",
@@ -11,12 +25,7 @@ const online: NodeDetailsViewModel = {
   updatedAt: new Date(now - 15_000).toISOString(),
   statusLabel: "Online",
   statusClass: "online",
-  isOffline: false,
-  isTemporarilyOffline: false,
-  canTakeOffline: true,
-  canBringOnline: false,
-  canLaunchAgent: false,
-  canOpenAgentInstructions: false,
+  ...capabilitiesFor({ offline: false, temporarilyOffline: false, launchSupported: true }),
   activityLabel: "Running builds",
   executorsLabel: "3 of 4 busy",
   labels: ["linux", "docker", "x86_64", "build-agent-01"],
@@ -102,18 +111,16 @@ const online: NodeDetailsViewModel = {
   advancedLoaded: true
 };
 
+/** Disconnected agent that Jenkins can launch: Launch agent is the primary action. */
 const offline: NodeDetailsViewModel = {
   ...online,
   displayName: "build-agent-03",
   name: "build-agent-03",
   statusLabel: "Offline",
   statusClass: "offline",
-  isOffline: true,
-  canTakeOffline: false,
-  canBringOnline: true,
-  canLaunchAgent: true,
-  canOpenAgentInstructions: true,
+  ...capabilitiesFor({ offline: true, temporarilyOffline: false, launchSupported: true }),
   offlineReason: "Disconnected: java.nio.channels.ClosedChannelException",
+  offlineSinceMs: now - 3 * 60 * 60_000,
   activityLabel: "Offline",
   executorsLabel: "4 offline",
   executors: online.executors.map((executor) => ({
@@ -125,17 +132,34 @@ const offline: NodeDetailsViewModel = {
   updatedAt: new Date(now - 20 * 60_000).toISOString()
 };
 
+/** Inbound agent that must be started on the machine: Launch instructions is primary. */
+const inbound: NodeDetailsViewModel = {
+  ...offline,
+  displayName: "mac-mini-04",
+  name: "mac-mini-04",
+  jnlpAgentLabel: "Yes",
+  launchSupportedLabel: "No",
+  manualLaunchLabel: "Yes",
+  ...capabilitiesFor({
+    offline: true,
+    temporarilyOffline: false,
+    launchSupported: false,
+    manualLaunchAllowed: true,
+    jnlpAgent: true
+  }),
+  offlineReason: undefined,
+  offlineSinceMs: undefined
+};
+
 const temporary: NodeDetailsViewModel = {
   ...online,
   displayName: "build-agent-02",
   name: "build-agent-02",
   statusLabel: "Temporarily offline",
   statusClass: "temporary",
-  isOffline: true,
-  isTemporarilyOffline: true,
-  canTakeOffline: false,
-  canBringOnline: true,
+  ...capabilitiesFor({ offline: true, temporarilyOffline: true, launchSupported: true }),
   offlineReason: "Draining for kernel upgrade (mia)",
+  offlineSinceMs: now - 25 * 60_000,
   executorsLabel: "1 busy · 3 offline",
   executors: online.executors.map((executor, index) =>
     index === 0 ? executor : { id: executor.id, statusLabel: "Idle", isIdle: true }
@@ -167,7 +191,7 @@ const error: NodeDetailsViewModel = {
   description: undefined,
   statusLabel: "Unknown",
   statusClass: "unknown",
-  canTakeOffline: false,
+  ...capabilitiesFor({}),
   activityLabel: "Not available",
   executorsLabel: "Not available",
   labels: [],
@@ -182,10 +206,20 @@ const error: NodeDetailsViewModel = {
   errors: ["Request failed with status 404 (Not Found)."]
 };
 
+/** A refresh failed after a successful load: last details stay, marked stale. */
+const refreshFailed: NodeDetailsViewModel = {
+  ...online,
+  refreshFailed: true,
+  updatedAt: new Date(now - 12 * 60_000).toISOString(),
+  errors: ["Request failed with status 502 (Bad Gateway)."]
+};
+
 export const nodeDetailsScenarios: Record<string, NodeDetailsViewModel> = {
   online,
   offline,
+  inbound,
   temporary,
   idle,
+  refreshFailed,
   error
 };

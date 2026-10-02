@@ -20,7 +20,8 @@ const INSIGHTS: BuildFailureInsightsViewModel = {
 function render(
   insights: BuildFailureInsightsViewModel,
   showTestsSummary: boolean,
-  resultClass?: string
+  resultClass?: string,
+  testsState: { hasTestsTab?: boolean; testReportUnavailable?: boolean } = {}
 ): string {
   return renderToStaticMarkup(
     createElement(BuildFailureInsightsSection, {
@@ -28,6 +29,7 @@ function render(
       insights,
       diagnostics: EMPTY_BUILD_DIAGNOSTICS,
       showTestsSummary,
+      ...testsState,
       onArtifactAction: () => undefined,
       onOpenDiagnosticSource: () => undefined,
       onShowDiagnosticProblems: () => undefined,
@@ -48,6 +50,25 @@ describe("BuildFailureInsightsSection", () => {
   it("keeps the tests card when it carries a hint", () => {
     const html = render({ ...INSIGHTS, testResultsHint: "Test report is still loading." }, false);
     assert.match(html, /Test report is still loading\./);
+  });
+
+  it("points at the Tests tab by its real name only when the tab exists", () => {
+    assert.match(render(INSIGHTS, true), /available in the Tests tab\./);
+
+    const noTab = render(INSIGHTS, true, "failure", { hasTestsTab: false });
+    assert.doesNotMatch(noTab, /Tests tab|Test Results tab/);
+    assert.match(noTab, /Individual test results are not available for this build\./);
+  });
+
+  it("says the test report failed to load instead of promising results", () => {
+    const html = render(
+      { ...INSIGHTS, testResultsHint: "Browse detailed results in the Tests tab." },
+      true,
+      "failure",
+      { testReportUnavailable: true }
+    );
+    assert.match(html, /The test report could not be loaded/);
+    assert.doesNotMatch(html, /Tests tab/);
   });
 
   it("keeps the changelog under a stable build summary heading", () => {

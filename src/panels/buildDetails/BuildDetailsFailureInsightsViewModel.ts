@@ -26,7 +26,7 @@ export function buildBuildFailureInsights(
     testSummaryLabel: testsSummary?.summaryLabel ?? EMPTY_TEST_RESULTS_LABEL,
     hasFailedTests: (testsSummary?.failedCount ?? 0) > 0,
     testResultsHint: testsSummary?.hasDetailedResults
-      ? "Browse detailed results in the Test Results tab."
+      ? "Browse detailed results in the Tests tab."
       : undefined,
     artifacts: cappedArtifacts.items,
     artifactsOverflow: cappedArtifacts.overflow

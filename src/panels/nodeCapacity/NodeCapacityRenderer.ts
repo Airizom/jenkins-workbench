@@ -7,5 +7,5 @@ export const nodeCapacityWebviewEntryName = "nodeCapacity" satisfies WebviewEntr
 export const { renderLoadingHtml, renderPanelHtml: renderNodeCapacityHtml } =
   createTypedPanelRenderer<NodeCapacityViewModel>({
     entryName: nodeCapacityWebviewEntryName,
-    skeletonVariant: "node"
+    skeletonVariant: "capacity"
   });

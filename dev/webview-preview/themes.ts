@@ -116,6 +116,7 @@ const highContrast: Record<string, string> = {
   "--vscode-foreground": "#ffffff",
   "--vscode-descriptionForeground": "#ffffffb3",
   "--vscode-contrastBorder": "#6fc3df",
+  "--vscode-contrastActiveBorder": "#f38518",
   "--vscode-focusBorder": "#f38518",
   "--vscode-editorWidget-background": "#0c141f",
   "--vscode-sideBar-background": "#000000",

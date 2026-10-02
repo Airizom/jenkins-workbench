@@ -11,7 +11,8 @@ import {
   isSamePersistedPipelineUiState,
   normalizeInitialPipelineState,
   type PersistedPipelineUiState,
-  pickDefaultStageToOpen
+  pickDefaultStageToOpen,
+  planStageRequest
 } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineSectionState";
 
 function makeTarget(
@@ -197,6 +198,47 @@ describe("pickDefaultStageToOpen", () => {
     };
     assert.equal(pickDefaultStageToOpen({ ...options, hasCurrentTarget: true }), undefined);
     assert.equal(pickDefaultStageToOpen({ ...options, restoredLogSelected: true }), undefined);
+  });
+});
+
+describe("planStageRequest", () => {
+  const stages = [
+    makeStage({ key: "a" }),
+    makeStage({ key: "b", parallelBranches: [makeStage({ key: "b1" })] })
+  ];
+
+  it("ignores a missing or already handled request", () => {
+    assert.deepEqual(planStageRequest({ request: undefined, lastHandledId: undefined, stages }), {
+      consume: false
+    });
+    assert.deepEqual(
+      planStageRequest({ request: { stageKey: "a", id: 2 }, lastHandledId: 2, stages }),
+      { consume: false }
+    );
+  });
+
+  it("opens the requested stage once per request id, including repeat clicks", () => {
+    const first = planStageRequest({
+      request: { stageKey: "b", id: 1 },
+      lastHandledId: undefined,
+      stages
+    });
+    assert.equal(first.consume, true);
+    assert.equal(first.stage?.key, "b");
+
+    const repeat = planStageRequest({
+      request: { stageKey: "b", id: 2 },
+      lastHandledId: 1,
+      stages
+    });
+    assert.equal(repeat.stage?.key, "b");
+  });
+
+  it("consumes a request whose stage no longer exists without opening anything", () => {
+    assert.deepEqual(
+      planStageRequest({ request: { stageKey: "gone", id: 3 }, lastHandledId: 2, stages }),
+      { consume: true, stage: undefined }
+    );
   });
 });
 

@@ -12,8 +12,13 @@ import {
   resolveBuildDetailsErrorMode
 } from "../src/panels/buildDetails/webview/components/buildDetails/BuildDetailsErrors";
 import { describeAwaitingInput } from "../src/panels/buildDetails/webview/components/buildDetails/hero/AwaitingInputBanner";
-import { BuildStatusHero } from "../src/panels/buildDetails/webview/components/buildDetails/hero/BuildStatusHero";
+import { BuildDetailsMetaFields } from "../src/panels/buildDetails/webview/components/buildDetails/BuildDetailsMetaFields";
+import {
+  BuildStatusHero,
+  describeTestsPill
+} from "../src/panels/buildDetails/webview/components/buildDetails/hero/BuildStatusHero";
 import { CoverageGlanceCard } from "../src/panels/buildDetails/webview/components/buildDetails/overview/CoverageGlanceCard";
+import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 
 const EMPTY_TESTS: BuildTestsSummaryViewModel = {
   totalCount: 0,
@@ -30,20 +35,24 @@ const EMPTY_TESTS: BuildTestsSummaryViewModel = {
 
 function renderHero(overrides: Partial<Parameters<typeof BuildStatusHero>[0]> = {}): string {
   return renderToStaticMarkup(
-    createElement(BuildStatusHero, {
-      displayName: "web-app » release #212",
-      resultLabel: "Running",
-      resultClass: "running",
-      durationLabel: "1m",
-      timestampLabel: "today",
-      culpritsLabel: "None",
-      loading: false,
-      isRunning: true,
-      testsSummary: EMPTY_TESTS,
-      stageCount: 0,
-      onOpenBuild: () => undefined,
-      ...overrides
-    })
+    createElement(
+      TooltipProvider,
+      null,
+      createElement(BuildStatusHero, {
+        displayName: "web-app » release #212",
+        resultLabel: "Running",
+        resultClass: "running",
+        durationLabel: "1m",
+        timestampLabel: "today",
+        culpritsLabel: "None",
+        loading: false,
+        isRunning: true,
+        testsSummary: EMPTY_TESTS,
+        stageCount: 0,
+        onOpenBuild: () => undefined,
+        ...overrides
+      })
+    )
   );
 }
 
@@ -77,6 +86,51 @@ describe("BuildStatusHero", () => {
       describeAwaitingInput({ count: 2, message: "Deploy?" }),
       "2 inputs are waiting for a response."
     );
+  });
+});
+
+describe("BuildStatusHero accessibility and meta", () => {
+  it("names the progress bar while the build runs", () => {
+    assert.match(
+      renderHero(),
+      /role="progressbar"[^>]*aria-label="Build in progress"|aria-label="Build in progress"[^>]*role="progressbar"/
+    );
+  });
+
+  it("omits empty culprits along with their separator", () => {
+    for (const culpritsLabel of ["", "None", "—"]) {
+      const html = renderToStaticMarkup(
+        createElement(BuildDetailsMetaFields, {
+          durationLabel: "1m",
+          timestampLabel: "today",
+          culpritsLabel
+        })
+      );
+      assert.doesNotMatch(html, /detail-culprits/);
+      assert.equal(html.match(/>·</g)?.length, 1);
+    }
+
+    const withCulprits = renderToStaticMarkup(
+      createElement(BuildDetailsMetaFields, {
+        durationLabel: "1m",
+        timestampLabel: "today",
+        culpritsLabel: "Jane Doe"
+      })
+    );
+    assert.match(withCulprits, /id="detail-culprits"[^>]*>.*Jane Doe/);
+    assert.equal(withCulprits.match(/>·</g)?.length, 2);
+  });
+
+  it("reports skipped tests without implying failures in the tests pill", () => {
+    const pill = describeTestsPill({
+      ...EMPTY_TESTS,
+      totalCount: 926,
+      skippedCount: 6,
+      passedCount: 920,
+      hasAnyResults: true
+    });
+    assert.equal(pill?.label, "920 passed · 6 skipped");
+    assert.match(pill?.className ?? "", /text-success/);
   });
 });
 

@@ -29,6 +29,42 @@ describe("NodeDetailsViewModel", () => {
     assert.deepEqual(viewModel.errors, ["load failed"]);
     assert.equal(viewModel.advancedLoaded, false);
     assert.equal(viewModel.rawJson, "");
+    assert.equal(viewModel.refreshFailed, false);
+    assert.equal(viewModel.environmentLabel, "Jenkins");
+  });
+
+  it("carries the environment label, refresh failure, and offline-since time", () => {
+    const viewModel = buildNodeDetailsViewModel({
+      details: {
+        displayName: "agent-2",
+        offline: true,
+        temporarilyOffline: true,
+        offlineCause: { description: "Draining", timestamp: 1_700_000_000_000 }
+      },
+      errors: ["HTTP 502"],
+      refreshFailed: true,
+      environmentLabel: "jenkins.example",
+      updatedAt: "2026-05-30T18:00:00.000Z"
+    });
+
+    assert.equal(viewModel.environmentLabel, "jenkins.example");
+    assert.equal(viewModel.refreshFailed, true);
+    assert.equal(viewModel.offlineSinceMs, 1_700_000_000_000);
+    assert.equal(viewModel.updatedAt, "2026-05-30T18:00:00.000Z");
+  });
+
+  it("ignores offline cause timestamps for online nodes", () => {
+    const viewModel = buildNodeDetailsViewModel({
+      details: {
+        displayName: "agent-3",
+        offline: false,
+        temporarilyOffline: false,
+        offlineCause: { timestamp: 1_700_000_000_000 }
+      },
+      errors: []
+    });
+
+    assert.equal(viewModel.offlineSinceMs, undefined);
   });
 
   it("formats executor progress, work labels, and duration fallbacks", () => {

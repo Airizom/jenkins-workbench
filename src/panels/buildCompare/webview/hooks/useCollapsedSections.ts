@@ -4,27 +4,50 @@ import { readBuildCompareUiState, writeBuildCompareUiState } from "../lib/buildC
 
 const { useCallback, useState } = React;
 
-/** Tracks collapsed comparison sections and persists them in the webview state. */
+interface SectionOverrides {
+  collapsed: ReadonlySet<BuildCompareSectionId>;
+  expanded: ReadonlySet<BuildCompareSectionId>;
+}
+
+/**
+ * Tracks which comparison sections are expanded. Each section has a default
+ * (sections without differences start collapsed); only the user's explicit
+ * toggles are persisted in the webview state.
+ */
 export function useCollapsedSections(): {
-  isOpen: (id: BuildCompareSectionId) => boolean;
+  isOpen: (id: BuildCompareSectionId, defaultOpen?: boolean) => boolean;
   setOpen: (id: BuildCompareSectionId, open: boolean) => void;
 } {
-  const [collapsed, setCollapsed] = useState<ReadonlySet<BuildCompareSectionId>>(
-    () => new Set(readBuildCompareUiState().collapsedSections ?? [])
+  const [overrides, setOverrides] = useState<SectionOverrides>(() => {
+    const saved = readBuildCompareUiState();
+    return {
+      collapsed: new Set(saved.collapsedSections ?? []),
+      expanded: new Set(saved.expandedSections ?? [])
+    };
+  });
+
+  const isOpen = useCallback(
+    (id: BuildCompareSectionId, defaultOpen = true) =>
+      overrides.collapsed.has(id) ? false : overrides.expanded.has(id) ? true : defaultOpen,
+    [overrides]
   );
 
-  const isOpen = useCallback((id: BuildCompareSectionId) => !collapsed.has(id), [collapsed]);
-
   const setOpen = useCallback((id: BuildCompareSectionId, open: boolean) => {
-    setCollapsed((current) => {
-      const next = new Set(current);
+    setOverrides((current) => {
+      const collapsed = new Set(current.collapsed);
+      const expanded = new Set(current.expanded);
       if (open) {
-        next.delete(id);
+        collapsed.delete(id);
+        expanded.add(id);
       } else {
-        next.add(id);
+        expanded.delete(id);
+        collapsed.add(id);
       }
-      writeBuildCompareUiState({ collapsedSections: [...next] });
-      return next;
+      writeBuildCompareUiState({
+        collapsedSections: [...collapsed],
+        expandedSections: [...expanded]
+      });
+      return { collapsed, expanded };
     });
   }, []);
 

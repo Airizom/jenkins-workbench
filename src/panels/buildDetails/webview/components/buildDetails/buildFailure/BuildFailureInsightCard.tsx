@@ -15,7 +15,7 @@ export function BuildFailureInsightCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {icon}
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
             {title}
           </span>
         </div>

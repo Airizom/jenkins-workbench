@@ -4,73 +4,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
 import type {
   NodeCapacityNodeViewModel,
-  NodeCapacityPoolViewModel,
-  NodeCapacitySeverity
+  NodeCapacityPoolViewModel
 } from "../src/shared/nodeCapacity/NodeCapacityContracts";
-import {
-  isUserInitiatedPoolToggle,
-  NodeCapacityPoolPanel
-} from "../src/panels/nodeCapacity/webview/components/NodeCapacityPoolPanel";
+import { NodeCapacityPoolPanel } from "../src/panels/nodeCapacity/webview/components/NodeCapacityPoolPanel";
 import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
-
-/**
- * Mirrors how `isPoolOpen` resolves a pool's open state: an explicit user
- * override wins, otherwise abnormal severity expands the pool.
- */
-function resolveOpen(override: boolean | undefined, severity: NodeCapacitySeverity): boolean {
-  return override ?? severity !== "normal";
-}
-
-describe("isUserInitiatedPoolToggle", () => {
-  it("ignores toggle events caused by the controlled open prop changing", () => {
-    // React already re-rendered with the new prop by the time `toggle` fires.
-    assert.equal(isUserInitiatedPoolToggle(true, true), false);
-    assert.equal(isUserInitiatedPoolToggle(false, false), false);
-  });
-
-  it("records toggles where the DOM diverges from the controlled prop", () => {
-    assert.equal(isUserInitiatedPoolToggle(true, false), true);
-    assert.equal(isUserInitiatedPoolToggle(false, true), true);
-  });
-
-  it("does not turn automatic severity expansion into a persistent override", () => {
-    let override: boolean | undefined;
-    const applyToggle = (domOpen: boolean, controlledOpen: boolean) => {
-      if (isUserInitiatedPoolToggle(domOpen, controlledOpen)) {
-        override = domOpen;
-      }
-    };
-
-    // Untouched normal pool: closed.
-    assert.equal(resolveOpen(override, "normal"), false);
-
-    // Refresh into warning: React sets open=true, then the browser fires
-    // `toggle` with the DOM matching the already-updated prop.
-    const warningOpen = resolveOpen(override, "warning");
-    assert.equal(warningOpen, true);
-    applyToggle(true, warningOpen);
-    assert.equal(override, undefined);
-
-    // Refresh back to normal: same sequence with open=false.
-    const normalOpen = resolveOpen(override, "normal");
-    applyToggle(false, normalOpen);
-    assert.equal(override, undefined);
-    assert.equal(normalOpen, false);
-  });
-
-  it("still lets a user collapse an automatically expanded pool", () => {
-    let override: boolean | undefined;
-    const controlledOpen = resolveOpen(override, "critical");
-    assert.equal(controlledOpen, true);
-
-    // User clicks the summary: the browser flips the DOM before React sees it.
-    if (isUserInitiatedPoolToggle(false, controlledOpen)) {
-      override = false;
-    }
-    assert.equal(override, false);
-    assert.equal(resolveOpen(override, "critical"), false);
-  });
-});
 
 function drainingNode(): NodeCapacityNodeViewModel {
   return {
@@ -107,7 +44,8 @@ function drainingNode(): NodeCapacityNodeViewModel {
 
 function renderPool(
   nodes: NodeCapacityNodeViewModel[],
-  totals: Partial<NodeCapacityPoolViewModel>
+  totals: Partial<NodeCapacityPoolViewModel>,
+  isOpen = true
 ) {
   const pool: NodeCapacityPoolViewModel = {
     id: "linux",
@@ -136,7 +74,7 @@ function renderPool(
       null,
       createElement(NodeCapacityPoolPanel, {
         pool,
-        isOpen: true,
+        isOpen,
         onOpenExternal: () => undefined,
         onOpenNodeDetails: () => undefined,
         onRetryExecutors: () => undefined,
@@ -228,5 +166,41 @@ describe("NodeCapacityPoolPanel", () => {
     );
     assert.match(failed, /Couldn(&#x27;|')t load running work/);
     assert.match(failed, /aria-label="Retry loading running work on agent-2"/);
+  });
+
+  it("names the disclosure button with only the pool label and status", () => {
+    const html = renderPool([drainingNode()], { totalExecutors: 2, offlineExecutors: 2 });
+    const button = html.match(/<button[^>]*aria-expanded="true"[^>]*>(.*?)<\/button>/);
+    assert.ok(button, "expected a disclosure button");
+    assert.match(button[0], /aria-controls="capacity-pool-/);
+    assert.equal(button[1], 'linux<span class="sr-only">, Busy</span>');
+    assert.doesNotMatch(html, /<summary/);
+  });
+
+  it("hides pool content when collapsed and points the chevron right", () => {
+    const html = renderPool([drainingNode()], { totalExecutors: 2 }, false);
+    assert.match(html, /aria-expanded="false"/);
+    assert.match(html, /<div id="capacity-pool-[^"]*" hidden=""/);
+    assert.doesNotMatch(html, /agent-2/);
+    assert.match(html, /<polyline points="9 6 15 12 9 18"/);
+  });
+
+  it("uses warning for temporarily offline nodes and failure for disconnected ones", () => {
+    const temporary = renderPool([drainingNode()], { totalExecutors: 2 });
+    assert.match(temporary, /border-warning-border bg-warning-soft/);
+    assert.doesNotMatch(temporary, /bg-failure-soft/);
+
+    const disconnected = renderPool(
+      [{ ...drainingNode(), isTemporarilyOffline: false, statusLabel: "Offline" }],
+      { totalExecutors: 2 }
+    );
+    assert.match(disconnected, /border-failure-border bg-failure-soft/);
+    assert.match(disconnected, /text-failure-foreground[^"]*">Offline<\/span>/);
+  });
+
+  it("keeps the full offline reason reachable", () => {
+    const reason = "Disconnected: the agent process exited after the controller restarted.";
+    const html = renderPool([{ ...drainingNode(), offlineReason: reason }], { totalExecutors: 2 });
+    assert.match(html, new RegExp(`title="${reason}"`));
   });
 });

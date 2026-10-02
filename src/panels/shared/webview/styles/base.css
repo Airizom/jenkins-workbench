@@ -117,6 +117,10 @@
 
   --text-vscode: var(--vscode-font-size);
   --text-vscode-editor: var(--vscode-editor-font-size, 13px);
+  /* Small text scales with the user's VS Code font size (13px default) and never drops below a
+   * legible floor; use `text-micro`/`text-caption` instead of fixed `text-[10px]`/`text-[11px]`. */
+  --text-micro: max(10px, calc(var(--vscode-font-size, 13px) * 0.77));
+  --text-caption: max(11px, calc(var(--vscode-font-size, 13px) * 0.85));
 
   /* Kept as an alias of the mid elevation step so the many existing
    * `shadow-widget` call sites pick up the refined scale. */
@@ -195,6 +199,28 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* Thin, theme-colored scrollbar for horizontal strips (tabs). Unlike
+ * `no-scrollbar`, it keeps a visible cue that the strip scrolls; pair it with
+ * `overflow-fade-x`. Chromium ignores the ::-webkit rules once the standard
+ * properties are set, so both are declared. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* Contrast outline for fills that carry meaning without a border (progress
+ * and capacity segments, legend swatches). `--hc-border` is transparent outside
+ * high-contrast themes, so it can be applied unconditionally. */
+@utility hc-outline {
+  outline: 1px solid var(--hc-border);
+  outline-offset: -1px;
 }
 
 /* Selected/on marker for high-contrast themes. An inset shadow rather than an
@@ -517,6 +543,25 @@
     --terminal-foreground: var(--vscode-terminal-foreground, var(--foreground));
   }
 
+  /* High-contrast themes: soft status tints and 50% borders wash out against
+   * the mandated contrast borders, so status borders use the full status color
+   * and the translucent header becomes opaque. VS Code sets these body classes. */
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) {
+    --success-border: var(--success);
+    --warning-border: var(--warning);
+    --failure-border: var(--failure);
+    --failure-border-subtle: var(--failure);
+    --aborted-border: var(--aborted);
+    --info-border: var(--info);
+  }
+
+  /* Keyboard focus is always visible in --vscode-focusBorder. `:where` keeps
+   * zero specificity so explicit focus rings on primitives still win. */
+  :where(.vscode-high-contrast, .vscode-high-contrast-light) :where(:focus-visible) {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: 1px;
+  }
+
   body {
     margin: 0;
     padding: 0;
@@ -658,6 +703,28 @@
   .focus-ring-inset:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: -2px;
+  }
+
+  /* High contrast: no translucency or blur behind the sticky header, and
+   * progress tracks get a contrast boundary (their fills are not bordered). */
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) .panel-header {
+    background-color: var(--background);
+    backdrop-filter: none;
+  }
+
+  /* Windows forced colors drops background fills. `hc-outline` segments stay
+   * visible because forced colors repaints their transparent outline; progress
+   * tracks get an explicit one. */
+  @media (forced-colors: active) {
+    [role="progressbar"] {
+      outline: 1px solid CanvasText;
+      outline-offset: -1px;
+    }
+  }
+
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) [role="progressbar"] {
+    outline: 1px solid var(--vscode-contrastBorder);
+    outline-offset: -1px;
   }
 
   /* Edge fades for horizontally scrolling strips. `useHorizontalOverflow` sets

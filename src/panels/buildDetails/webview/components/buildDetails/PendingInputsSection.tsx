@@ -20,8 +20,8 @@ const ACTION_LABELS: Record<ProcessingAction, string> = {
   reject: "Reject"
 };
 const PROCESSING_LABELS: Record<ProcessingAction, string> = {
-  approve: "Approving...",
-  reject: "Rejecting..."
+  approve: "Approving…",
+  reject: "Rejecting…"
 };
 const ACTION_TITLES: Record<ProcessingAction, string> = {
   approve: "Approve this input and let the build continue",
@@ -74,7 +74,7 @@ export function PendingInputsSection({
                 <div className="min-w-0 space-y-0.5">
                   <div className="text-sm font-medium wrap-break-word">{input.message}</div>
                   {input.submitterLabel ? (
-                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-1 text-caption text-muted-foreground">
                       <UserIcon className="h-3 w-3" />
                       <span className="truncate">{input.submitterLabel}</span>
                     </div>
@@ -96,7 +96,7 @@ export function PendingInputsSection({
             </div>
 
             {input.parameters.length > 0 ? (
-              <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-warning-border bg-card px-3 py-2.5 text-[11px]">
+              <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-warning-border bg-card px-3 py-2.5 text-caption">
                 {input.parameters.map((param) => (
                   <React.Fragment key={`${input.id}-${param.name}`}>
                     <dt className="flex items-center gap-1.5">

@@ -26,7 +26,10 @@ export type { NodeDetailsViewModel } from "./shared/NodeDetailsContracts";
 export interface NodeDetailsViewModelInput {
   details?: JenkinsNodeDetails;
   errors: string[];
+  /** Pass the previous successful load time when rebuilding after a failed refresh. */
   updatedAt?: string;
+  refreshFailed?: boolean;
+  environmentLabel?: string;
   fallbackUrl?: string;
   advancedLoaded?: boolean;
   nowMs?: number;
@@ -34,6 +37,7 @@ export interface NodeDetailsViewModelInput {
 }
 
 const UNKNOWN_LABEL = "Not available";
+const FALLBACK_ENVIRONMENT_LABEL = "Jenkins";
 const MONITOR_STRING_KEYS = ["message", "status", "state", "description", "name"] as const;
 const MONITOR_NUMBER_KEYS = ["size", "count", "total"] as const;
 
@@ -58,6 +62,7 @@ type NodeStatusFields = Pick<
   | "canLaunchAgent"
   | "canOpenAgentInstructions"
   | "offlineReason"
+  | "offlineSinceMs"
 >;
 
 type NodeOverviewFields = Pick<
@@ -81,6 +86,8 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
   const nowMs = resolveNowMs(input.nowMs, updatedAt);
 
   return {
+    refreshFailed: Boolean(input.refreshFailed),
+    environmentLabel: trimToUndefined(input.environmentLabel) ?? FALLBACK_ENVIRONMENT_LABEL,
     ...buildNodeIdentity(details, input.fallbackUrl, updatedAt),
     ...buildNodeStatus(details),
     ...buildNodeOverview(details),
@@ -122,8 +129,16 @@ function buildNodeStatus(details?: JenkinsNodeDetails): NodeStatusFields {
     statusLabel: status.label,
     statusClass: status.className,
     ...capabilities,
-    offlineReason: formatNodeOfflineReason(details)
+    offlineReason: formatNodeOfflineReason(details),
+    offlineSinceMs: resolveOfflineSinceMs(details)
   };
+}
+
+function resolveOfflineSinceMs(details?: JenkinsNodeDetails): number | undefined {
+  const timestamp = details?.offlineCause?.timestamp;
+  return details?.offline === true && isFiniteNumber(timestamp) && timestamp > 0
+    ? timestamp
+    : undefined;
 }
 
 function buildNodeOverview(details?: JenkinsNodeDetails): NodeOverviewFields {

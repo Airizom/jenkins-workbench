@@ -63,7 +63,7 @@ function ExecutorWorkCell({
           {buildLabel}
         </span>
         {showStatus ? (
-          <span className="text-[11px] text-muted-foreground">{entry.statusLabel}</span>
+          <span className="text-caption text-muted-foreground">{entry.statusLabel}</span>
         ) : null}
       </div>
     </TableCell>
@@ -83,7 +83,7 @@ function ExecutorProgressCell({ entry }: { entry: ExecutorEntry }): React.JSX.El
     <TableCell className="py-1.5 px-3">
       <div className="flex items-center gap-1.5">
         <Progress value={progressPercent} className="h-1.5 w-28" />
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-caption text-muted-foreground">
           {entry.progressLabel ?? `${progressPercent}%`}
         </span>
       </div>
@@ -110,7 +110,7 @@ function ExecutorOpenCell({
     <TableCell className="py-1.5 px-3">
       <button
         type="button"
-        className="focus-ring inline-flex items-center gap-0.5 rounded-sm text-[11px] text-link hover:text-link-hover hover:underline"
+        className="focus-ring inline-flex items-center gap-0.5 rounded-sm text-caption text-link hover:text-link-hover hover:underline"
         aria-label={`Open ${entry.workLabel ?? `${formatExecutorName(entry.id)} build`} in Jenkins`}
         onClick={() => onOpenExternal(workUrl)}
       >
@@ -132,7 +132,7 @@ export function ExecutorTableRow({
   return (
     <TableRow>
       <ExecutorStatusCell busy={busy} freeLabel={freeLabel} />
-      <TableCell className="font-mono text-[11px] text-muted-foreground py-1.5 px-3">
+      <TableCell className="font-mono text-caption text-muted-foreground py-1.5 px-3">
         {entry.id}
       </TableCell>
       <ExecutorWorkCell entry={entry} busy={busy} buildLabel={buildLabel} />

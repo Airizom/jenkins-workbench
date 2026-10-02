@@ -419,10 +419,24 @@ const freestyle: BuildDetailsViewModel = {
   errors: ["Unable to load test report: HTTP 404 Not Found"]
 };
 
+// A clean freestyle build that reports nothing beyond its result, so the
+// Overview tab shows its fallback summary card.
+const minimal: BuildDetailsViewModel = {
+  ...freestyle,
+  displayName: "nightly-cleanup #89",
+  resultLabel: "Success",
+  resultClass: "success",
+  insights: { ...running.insights, changelogItems: [] },
+  coverageState: { ...running.coverageState, status: "disabled" },
+  consoleText: "Started by timer\nCleaning old workspaces\nFinished: SUCCESS",
+  errors: []
+};
+
 export const buildDetailsScenarios: Record<string, BuildDetailsViewModel> = {
   failed,
   running,
   awaitingInput,
   success,
-  freestyle
+  freestyle,
+  minimal
 };

@@ -51,12 +51,74 @@ export function getTestDistribution(summary: BuildTestsSummaryViewModel): {
     passedPct: (summary.passedCount / total) * 100
   };
 }
+/**
+ * Formats the pass rate without ever rounding up to 100% while any test failed:
+ * failures floor the value (one decimal above 99%, capped at 99.9), and a
+ * non-zero rate below 1% reads "<1" rather than "0".
+ */
+export function formatPassRate(passedPct: number, failedCount: number): string {
+  if (failedCount === 0) {
+    return String(Math.round(passedPct));
+  }
+  if (passedPct >= 99) {
+    return Math.min(Math.floor(passedPct * 10) / 10, 99.9).toFixed(1);
+  }
+  if (passedPct > 0 && passedPct < 1) {
+    return "<1";
+  }
+  return String(Math.floor(passedPct));
+}
+
+export type TestOutcomeTone = "passed" | "failed" | "skipped";
+
+export interface TestOutcomeSummary {
+  /** Passed share of executed (passed + failed) tests; undefined when nothing ran. */
+  passRate?: number;
+  /** "99.7% passed", or "All skipped" when every test was skipped. */
+  passRateLabel: string;
+  /** Count phrasing for compact badges, e.g. "920 passed · 6 skipped". */
+  countsLabel: string;
+  /** Driven by failures only; skipped tests never make a run look failed. */
+  tone: TestOutcomeTone;
+}
+
+/**
+ * One shared reading of a test summary for the hero badge, the overview donut,
+ * and the Tests tab header. Skipped tests are left out of the pass rate so a
+ * clean run with skips reports 100% rather than an alarming 99%.
+ */
+export function describeTestOutcome(summary: BuildTestsSummaryViewModel): TestOutcomeSummary {
+  const { passedCount, failedCount, skippedCount } = summary;
+  const executed = passedCount + failedCount;
+  const passRate = executed > 0 ? (passedCount / executed) * 100 : undefined;
+  const passRateLabel =
+    passRate === undefined ? "All skipped" : `${formatPassRate(passRate, failedCount)}% passed`;
+  const tone: TestOutcomeTone =
+    failedCount > 0 ? "failed" : passRate === undefined && skippedCount > 0 ? "skipped" : "passed";
+  return { passRate, passRateLabel, countsLabel: formatTestCountsLabel(summary), tone };
+}
+
+function formatTestCountsLabel(summary: BuildTestsSummaryViewModel): string {
+  const { passedCount, failedCount, skippedCount, totalCount } = summary;
+  if (failedCount > 0) {
+    return `${failedCount.toLocaleString()} failed of ${totalCount.toLocaleString()} tests`;
+  }
+  const parts: string[] = [];
+  if (passedCount > 0 || skippedCount === 0) {
+    parts.push(`${passedCount.toLocaleString()} passed`);
+  }
+  if (skippedCount > 0) {
+    parts.push(`${skippedCount.toLocaleString()} skipped`);
+  }
+  return parts.join(" · ");
+}
+
 export function hasTestDetails(item: BuildTestCaseViewModel): boolean {
   return Boolean(item.errorDetails || item.errorStackTrace || item.stdout || item.stderr);
 }
 
 export interface TestFailureBlock {
-  label: "Failure" | "Stack Trace";
+  label: "Failure" | "Stack trace";
   value: string;
 }
 
@@ -79,7 +141,7 @@ export function resolveFailureBlocks(
     blocks.push({ label: "Failure", value: details });
   }
   if (stackTrace) {
-    blocks.push({ label: "Stack Trace", value: stackTrace });
+    blocks.push({ label: "Stack trace", value: stackTrace });
   }
   return blocks;
 }

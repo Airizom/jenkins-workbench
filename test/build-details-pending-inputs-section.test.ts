@@ -89,7 +89,7 @@ describe("PendingInputsSection", () => {
     );
 
     assert.equal(html.match(/<button[^>]*disabled=""/g)?.length, 2);
-    assert.match(html, /Rejecting\.\.\./);
+    assert.match(html, /Rejecting…/);
     assert.match(html, /aria-busy="true"/);
   });
 });

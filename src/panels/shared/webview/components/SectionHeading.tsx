@@ -20,11 +20,11 @@ export function SectionHeading({
 }: SectionHeadingProps): React.JSX.Element {
   return (
     <div className={cn("mb-2 flex items-center justify-between gap-2", className)}>
-      <Heading className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <Heading className="flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wider text-muted-foreground">
         {icon}
         <span>{title}</span>
         {count !== undefined ? (
-          <span className="rounded-full bg-muted-strong px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+          <span className="rounded-full bg-muted-strong px-1.5 text-micro font-medium tabular-nums text-muted-foreground">
             {count}
           </span>
         ) : null}

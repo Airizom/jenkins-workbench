@@ -8,6 +8,7 @@ import type {
 } from "../../../../shared/BuildCompareContracts";
 import { CompareDiffRowShell } from "../shared/CompareDiffRowShell";
 import { CompareSideGrid } from "../shared/CompareSideGrid";
+import { CompareTableEmptyValue } from "../shared/CompareTable";
 
 const META_SEPARATOR = " · ";
 
@@ -22,14 +23,17 @@ function TestStatusCell({
   duration
 }: {
   label: string;
-  status: string;
+  /** Undefined when the test is absent from this build. */
+  status?: string;
   tone?: StatusVisualTone;
   duration?: string;
 }) {
   return (
     <div>
       <p className="text-muted-foreground">{label}</p>
-      <p className={tone !== undefined ? resolveMetricToneClass(tone) : undefined}>{status}</p>
+      <p className={tone !== undefined ? resolveMetricToneClass(tone) : undefined}>
+        {status ?? <CompareTableEmptyValue />}
+      </p>
       {duration ? <p className="text-muted-foreground">{duration}</p> : null}
     </div>
   );
@@ -40,7 +44,6 @@ export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
     <CompareDiffRowShell
       title={item.name}
       subtitle={formatTestSubtitle(item.className, item.suiteName)}
-      titleClassName="truncate"
       align="center"
       changeType={item.addedInTarget ? "added" : undefined}
       changeLabel={item.addedInTarget ? "New test" : undefined}
@@ -63,9 +66,9 @@ export function TestDiffRow({ item }: { item: BuildCompareTestDiffItem }) {
   );
 }
 
-function formatOccurrences(labels: string[]): { status: string; count?: string } {
+function formatOccurrences(labels: string[]): { status?: string; count?: string } {
   if (labels.length === 0) {
-    return { status: "Not present" };
+    return { status: undefined };
   }
   return {
     status: labels.join(", "),
@@ -81,7 +84,6 @@ export function AmbiguousTestRow({ item }: { item: BuildCompareAmbiguousTestItem
     <CompareDiffRowShell
       title={item.name}
       subtitle={formatTestSubtitle(item.className, item.suiteName)}
-      titleClassName="truncate"
       align="center"
     >
       <CompareSideGrid className="text-right">

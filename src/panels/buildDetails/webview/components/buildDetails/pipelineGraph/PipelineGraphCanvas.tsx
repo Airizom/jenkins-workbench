@@ -92,6 +92,19 @@ export function PipelineGraphCanvas({
     return () => observer.disconnect();
   }, []);
 
+  // Pans a newly selected stage into view, for example one picked from the
+  // hero stage strip while it sits outside the visible canvas.
+  useEffect(() => {
+    const container = containerRef.current;
+    const node = selectedStageKey
+      ? layoutRef.current.nodes.find((candidate) => candidate.id === selectedStageKey)
+      : undefined;
+    if (!container || !node) {
+      return;
+    }
+    setViewport((current) => revealRectInViewport(current, node, container));
+  }, [selectedStageKey]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
@@ -240,15 +253,15 @@ export function PipelineGraphCanvas({
     <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Pipeline Graph
+          <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+            Pipeline graph
           </div>
           <div className="text-xs text-muted-foreground">
             Drag or use arrow keys to pan. Selection syncs the inspector.
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <span className="mr-1 hidden text-[11px] text-muted-foreground sm:inline">
+          <span className="mr-1 hidden text-caption text-muted-foreground sm:inline">
             {ZOOM_HINT}
           </span>
           <Button variant="outline" size="sm" aria-label="Zoom out" onClick={() => zoomBy(0.9)}>
@@ -381,7 +394,7 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
                 >
                   {node.stage.name || "Stage"}
                 </div>
-                <div className="truncate text-[11px] text-muted-foreground">
+                <div className="truncate text-caption text-muted-foreground">
                   {node.stage.durationLabel || "Unknown"}
                 </div>
               </div>
@@ -392,7 +405,7 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
                 {statusIcon}
               </div>
             </div>
-            <div className="mt-auto flex items-center justify-between gap-2 text-[11px]">
+            <div className="mt-auto flex items-center justify-between gap-2 text-caption">
               <span
                 className={`inline-flex rounded-full border px-2 py-0.5 font-semibold ${statusClass}`}
               >

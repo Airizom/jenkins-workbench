@@ -40,9 +40,10 @@ export function BuildCard({
             <Button
               variant="outline"
               size="sm"
+              aria-label={`Open build details for ${side} build ${build.buildNumberLabel}`}
               onClick={() => postVsCodeMessage({ type: "openBuildDetails", side })}
             >
-              Open Build Details
+              Open build details
             </Button>
           </div>
         </div>
@@ -50,7 +51,7 @@ export function BuildCard({
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-2">
           <SummaryStat label="Duration" value={build.durationLabel} />
-          <SummaryStat label="Completed" value={build.timestampLabel} />
+          <SummaryStat label="Started" value={build.timestampLabel} />
         </div>
       </CardContent>
     </Card>

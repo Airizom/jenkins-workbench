@@ -38,6 +38,7 @@ function harness() {
   };
   const load = vi.fn().mockResolvedValue(window);
   const openBuild = vi.fn();
+  const compare = vi.fn();
   const dependencies = {
     history: { guard: (request: unknown) => request, load },
     baseline: { resolve: vi.fn().mockResolvedValue({ status: "unavailable" }) },
@@ -45,7 +46,8 @@ function harness() {
       onDidChange: environmentChange.event,
       getEnvironments: async () => [{ id: "e", url: environment.url }]
     },
-    openBuild
+    openBuild,
+    compare
   } as unknown as HistoryDependencies;
   const controller = new HistoryController(panel as unknown as vscode.WebviewPanel, dependencies);
   return {
@@ -56,6 +58,7 @@ function harness() {
     panel,
     load,
     openBuild,
+    compare,
     posted,
     latest: () => posted[posted.length - 1]
   };
@@ -180,6 +183,45 @@ describe("history panel coordination", () => {
     h.visibility.fire();
     await vi.waitFor(() => expect(h.latest().status).toBe("available"));
     expect(h.latest().pausedReason).toBeUndefined();
+    h.controller.dispose();
+  });
+  it("always compares the older build as baseline, whichever row is clicked", async () => {
+    const h = harness();
+    const builds = [5, 4, 3].map((number) => ({
+      build: { number, url: `https://jenkins.test/job/a/${number}/`, result: "FAILURE" },
+      report: { status: "available", cases: [] }
+    }));
+    h.load.mockResolvedValue({ builds, truncated: false });
+    h.controller.setContext(environment, "https://jenkins.test/job/a/");
+    await vi.waitFor(() => expect(h.latest().selectedBuild).toBe(5));
+    await vi.waitFor(() => expect(h.latest().baseline).toBeDefined());
+    const send = (action: string, value: number) =>
+      h.messages.fire({ type: "historyAction", revision: h.latest().revision, action, value });
+    send("compare", 3);
+    await vi.waitFor(() => expect(h.compare).toHaveBeenCalledTimes(1));
+    expect(h.compare).toHaveBeenLastCalledWith(
+      environment,
+      "https://jenkins.test/job/a/3/",
+      "https://jenkins.test/job/a/5/"
+    );
+    send("selectBuild", 3);
+    await vi.waitFor(() => expect(h.latest().selectedBuild).toBe(3));
+    await vi.waitFor(() => expect(h.latest().baseline).toBeDefined());
+    send("compare", 4);
+    await vi.waitFor(() => expect(h.compare).toHaveBeenCalledTimes(2));
+    expect(h.compare).toHaveBeenLastCalledWith(
+      environment,
+      "https://jenkins.test/job/a/3/",
+      "https://jenkins.test/job/a/4/"
+    );
+    h.controller.dispose();
+  });
+  it("reports load failures without a doubled error prefix", async () => {
+    const h = harness();
+    h.load.mockRejectedValue(new Error("Jenkins responded with 503"));
+    h.controller.setContext(environment, "https://jenkins.test/job/a/");
+    await vi.waitFor(() => expect(h.latest().status).toBe("error"));
+    expect(h.latest().message).toBe("Jenkins responded with 503");
     h.controller.dispose();
   });
   it("marks history for a running anchor build as paused until it completes", () => {

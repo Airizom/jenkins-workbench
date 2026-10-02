@@ -101,6 +101,7 @@ export function NodeDetailsTabs({
       <TabsContent value={NODE_DETAILS_TABS.DIAGNOSTICS} className="space-y-3">
         <NodeDetailsAdvancedSection
           advancedLoaded={state.advancedLoaded}
+          advancedRequested={state.advancedRequested}
           loading={state.loading}
           monitorData={state.monitorData}
           loadStatistics={state.loadStatistics}

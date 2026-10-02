@@ -8,14 +8,23 @@ import type { NodeDetailsUpdateMessage } from "../../shared/NodeDetailsPanelMess
 export type NodeDetailsState = NodeDetailsViewModel & {
   loading: boolean;
   hasLoaded: boolean;
+  /**
+   * Webview-only: diagnostics were requested and no update has answered yet.
+   * Set optimistically on request so the Diagnostics tab shows its loading
+   * state before the host's `setLoading` message arrives.
+   */
+  advancedRequested: boolean;
 };
 
 export type NodeDetailsAction =
   | { type: "setLoading"; value: boolean }
+  | { type: "advancedRequested" }
   | { type: "updateNodeDetails"; payload: NodeDetailsUpdateMessage };
 
 const FALLBACK_STATE: NodeDetailsState = {
   detailsAvailable: false,
+  refreshFailed: false,
+  environmentLabel: "Jenkins",
   displayName: "Node Details",
   name: "Unknown",
   description: undefined,
@@ -30,6 +39,7 @@ const FALLBACK_STATE: NodeDetailsState = {
   canLaunchAgent: false,
   canOpenAgentInstructions: false,
   offlineReason: undefined,
+  offlineSinceMs: undefined,
   activityLabel: "Not available",
   executorsLabel: "Not available",
   labels: [],
@@ -49,7 +59,8 @@ const FALLBACK_STATE: NodeDetailsState = {
   errors: [],
   advancedLoaded: false,
   loading: true,
-  hasLoaded: false
+  hasLoaded: false,
+  advancedRequested: false
 };
 
 function buildInitialState(initialState: NodeDetailsViewModel): NodeDetailsState {
@@ -65,7 +76,8 @@ function buildInitialState(initialState: NodeDetailsViewModel): NodeDetailsState
     errors: initialState.errors ?? [],
     advancedLoaded: initialState.advancedLoaded ?? false,
     loading: false,
-    hasLoaded: true
+    hasLoaded: true,
+    advancedRequested: false
   };
 }
 
@@ -80,7 +92,13 @@ export function nodeDetailsReducer(
   switch (action.type) {
     case "setLoading":
       return panelStateHelpers.handleSetLoading(state, action.value);
+    case "advancedRequested":
+      return state.advancedLoaded || state.advancedRequested
+        ? state
+        : { ...state, advancedRequested: true };
     case "updateNodeDetails":
+      // Full updates rebuild from the view model, which clears
+      // `advancedRequested`: the host has answered, loaded or failed.
       return panelStateHelpers.handleFullUpdate(state, action.payload.payload);
     default:
       return state;

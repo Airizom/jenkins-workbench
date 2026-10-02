@@ -44,7 +44,7 @@ export function MonitorCard({ title, entries }: MonitorCardProps): React.JSX.Ele
                 orientation="both"
                 className="max-h-48 rounded border border-border bg-muted-strong"
               >
-                <pre className="m-0 px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground whitespace-pre">
+                <pre className="m-0 px-2.5 py-1.5 text-caption font-mono text-muted-foreground whitespace-pre">
                   {formatJson(entry.raw)}
                 </pre>
               </ScrollArea>

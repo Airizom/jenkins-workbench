@@ -18,7 +18,7 @@ import type { PipelineNodeLogViewModel } from "../../../shared/BuildDetailsContr
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { ConsoleLogViewer } from "./ConsoleLogViewer";
 
-const { useEffect, useState } = React;
+const { useEffect, useId, useRef, useState } = React;
 export function PipelineNodeLogPane({
   log,
   htmlModel,
@@ -45,6 +45,9 @@ export function PipelineNodeLogPane({
 }) {
   const targetKey = log.target?.key;
   const [followLog, setFollowLog] = useState(true);
+  const followId = useId();
+  const emptyStateRef = useRef<HTMLDivElement>(null);
+  const closeRequestedRef = useRef(false);
   const consoleUrl = log.consoleUrl;
 
   // Each newly selected node starts out following its latest output.
@@ -54,20 +57,45 @@ export function PipelineNodeLogPane({
     }
   }, [targetKey]);
 
+  // Closing unmounts the Close button; once the host clears the target, move
+  // focus to the empty state unless the user already focused something else.
+  useEffect(() => {
+    if (!closeRequestedRef.current) {
+      return;
+    }
+    closeRequestedRef.current = false;
+    const active = document.activeElement;
+    if (!targetKey && (!active || active === document.body)) {
+      emptyStateRef.current?.focus();
+    }
+  }, [targetKey]);
+
+  const handleClose = () => {
+    closeRequestedRef.current = true;
+    onClear();
+  };
+
   if (!log.target) {
     return (
       <aside ref={paneRef} className="pipeline-log-pane" aria-label="Pipeline log">
-        <EmptyState
-          icon={<TerminalIcon className="h-4 w-4" />}
-          title="No log selected"
-          description="Choose a stage or step in the pipeline to stream its log here."
-          className="py-6"
-        />
+        <div
+          ref={emptyStateRef}
+          tabIndex={-1}
+          className="rounded-lg focus:outline-none focus-visible:outline-1 focus-visible:outline-ring"
+        >
+          <EmptyState
+            icon={<TerminalIcon className="h-4 w-4" />}
+            title="No log selected"
+            description="Choose a stage or step in the pipeline to stream its log here."
+            className="py-6"
+          />
+        </div>
       </aside>
     );
   }
   const target = log.target;
   const kindLabel = target.kind === "stage" ? "Stage" : "Step";
+  const kindNoun = target.kind === "stage" ? "stage" : "step";
   const targetName = target.name;
 
   return (
@@ -81,6 +109,13 @@ export function PipelineNodeLogPane({
         htmlModel={htmlModel}
         truncated={log.truncated}
         error={log.error}
+        loading={log.loading}
+        emptyTitle="No log output"
+        emptyDescription={
+          canFollow
+            ? `This ${kindNoun} has not produced any log output yet.`
+            : `This ${kindNoun} produced no log output.`
+        }
         followLog={followLog}
         canFollow={canFollow}
         onFollowLogChange={setFollowLog}
@@ -91,11 +126,11 @@ export function PipelineNodeLogPane({
         finishedAnnouncement={`${kindLabel} finished. Log is complete.`}
         onOpenExternal={onOpenExternal}
         onRetry={onRetry}
-        renderHeader={({ hasOutput, lineCount, openSearchToolbar }) => (
+        renderHeader={({ hasOutput, lineCount, openSearchToolbar, searchToggleRef }) => (
           <div className="flex flex-col gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {kindLabel} Log
+              <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+                {kindLabel} log
               </div>
               <h3
                 ref={headingRef}
@@ -105,17 +140,18 @@ export function PipelineNodeLogPane({
               >
                 {targetName}
               </h3>
-              <div className="text-[11px] text-muted-foreground">
-                {log.loading ? "Loading" : `${lineCount.toLocaleString()} lines`}
+              <div className="text-caption text-muted-foreground">
+                {log.loading ? "Loading…" : `${lineCount.toLocaleString()} lines`}
               </div>
             </div>
             <div className="flex items-center gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    ref={searchToggleRef}
                     variant="ghost"
                     size="icon"
-                    aria-label={`Search ${kindLabel.toLowerCase()} log`}
+                    aria-label={`Search ${kindNoun} log`}
                     onClick={openSearchToolbar}
                   >
                     <SearchIcon className="h-3.5 w-3.5" />
@@ -143,7 +179,7 @@ export function PipelineNodeLogPane({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={`Export ${kindLabel.toLowerCase()} log`}
+                    aria-label={`Export ${kindNoun} log`}
                     disabled={!hasOutput}
                     onClick={onExport}
                   >
@@ -155,14 +191,10 @@ export function PipelineNodeLogPane({
               {canFollow ? (
                 <>
                   <div className="mx-1 h-5 w-px bg-border" />
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Switch
-                      id="pipeline-node-log-follow"
-                      checked={followLog}
-                      onCheckedChange={setFollowLog}
-                    />
+                  <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
+                    <Switch id={followId} checked={followLog} onCheckedChange={setFollowLog} />
                     <label
-                      htmlFor="pipeline-node-log-follow"
+                      htmlFor={followId}
                       className="select-none"
                       title="Keep the newest output in view. Scrolling up pauses Follow."
                     >
@@ -173,7 +205,7 @@ export function PipelineNodeLogPane({
               ) : null}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Close log" onClick={onClear}>
+                  <Button variant="ghost" size="icon" aria-label="Close log" onClick={handleClose}>
                     <XIcon className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>

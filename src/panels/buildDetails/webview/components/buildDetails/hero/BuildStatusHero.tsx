@@ -4,6 +4,11 @@ import { ResultBadge } from "../../../../../shared/webview/components/ResultBadg
 import { Badge } from "../../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { Progress } from "../../../../../shared/webview/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "../../../../../shared/webview/components/ui/tooltip";
 import { ExternalLinkIcon } from "../../../../../shared/webview/icons";
 import {
   resolveBuildResultBorderColor,
@@ -15,6 +20,7 @@ import {
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
+import { describeTestOutcome } from "../testResults/testResultsUtils";
 import { AwaitingInputBanner, type AwaitingInputSummary } from "./AwaitingInputBanner";
 
 const AWAITING_INPUT_LABEL = "Waiting for input";
@@ -45,22 +51,20 @@ function useStickyHeroOffset(): React.RefObject<HTMLElement | null> {
   return heroRef;
 }
 
-function describeTestsPill(
+const TESTS_PILL_TONE_CLASSES = {
+  failed: "border-failure-border bg-failure-soft text-failure",
+  passed: "border-success-border bg-success-soft text-success",
+  skipped: "border-warning-border bg-warning-soft text-warning"
+} as const;
+
+export function describeTestsPill(
   summary: BuildTestsSummaryViewModel
 ): { label: string; className: string } | undefined {
   if (!summary.hasAnyResults || summary.totalCount === 0) {
     return undefined;
   }
-  if (summary.failedCount > 0) {
-    return {
-      label: `${summary.failedCount} failed of ${summary.totalCount} tests`,
-      className: "border-failure-border bg-failure-soft text-failure"
-    };
-  }
-  return {
-    label: `${summary.passedCount}/${summary.totalCount} tests`,
-    className: "border-success-border bg-success-soft text-success"
-  };
+  const outcome = describeTestOutcome(summary);
+  return { label: outcome.countsLabel, className: TESTS_PILL_TONE_CLASSES[outcome.tone] };
 }
 
 function HeroStatusGlyph({
@@ -152,7 +156,7 @@ function HeroActions({
       {testsPill ? (
         <Badge
           variant="outline"
-          className={cn("hidden sm:inline-flex text-[11px] font-medium", testsPill.className)}
+          className={cn("hidden sm:inline-flex text-caption font-medium", testsPill.className)}
         >
           {testsPill.label}
         </Badge>
@@ -160,21 +164,27 @@ function HeroActions({
       {stageCount > 0 ? (
         <Badge
           variant="outline"
-          className="hidden sm:inline-flex text-[11px] font-medium border-border bg-muted-strong text-muted-foreground"
+          className="hidden sm:inline-flex text-caption font-medium border-border bg-muted-strong text-muted-foreground"
         >
           {stageCount === 1 ? "1 stage" : `${stageCount} stages`}
         </Badge>
       ) : null}
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={onOpenBuild}
-        disabled={!buildUrl}
-        aria-label="Open in Jenkins"
-      >
-        <ExternalLinkIcon className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Open in Jenkins</span>
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onOpenBuild}
+            disabled={!buildUrl}
+            aria-label="Open in Jenkins"
+          >
+            <ExternalLinkIcon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Open in Jenkins</span>
+          </Button>
+        </TooltipTrigger>
+        {/* Only needed while the button is icon-only. */}
+        <TooltipContent className="sm:hidden">Open in Jenkins</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -255,8 +265,14 @@ export function BuildStatusHero(props: BuildStatusHeroProps): React.JSX.Element 
   const heroRef = useStickyHeroOffset();
 
   return (
-    <header ref={heroRef} className="sticky-header">
-      {isRunning || loading ? <Progress indeterminate className="h-px rounded-none" /> : null}
+    <header ref={heroRef} className="sticky-header build-details-hero">
+      {isRunning || loading ? (
+        <Progress
+          indeterminate
+          aria-label={isRunning ? "Build in progress" : "Loading build details"}
+          className="h-px rounded-none"
+        />
+      ) : null}
       <div
         style={{
           background: resolveBuildResultGraphBackground(resultClass),

@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { type ComponentProps, createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
+import { PanelErrorList } from "../src/panels/shared/webview/components/PanelErrorList";
+import { PanelHeader } from "../src/panels/shared/webview/components/PanelHeader";
 import { Alert } from "../src/panels/shared/webview/components/ui/alert";
 import { Badge } from "../src/panels/shared/webview/components/ui/badge";
 import { Checkbox } from "../src/panels/shared/webview/components/ui/checkbox";
+import { ClampedText } from "../src/panels/shared/webview/components/ui/clamped-text";
+import { DisclosureChevron } from "../src/panels/shared/webview/components/ui/disclosure-chevron";
+import { LoadingSkeleton } from "../src/panels/shared/webview/components/ui/loading-skeleton";
 import { Select, SelectTrigger } from "../src/panels/shared/webview/components/ui/select";
 import { Switch } from "../src/panels/shared/webview/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "../src/panels/shared/webview/components/ui/tabs";
@@ -22,6 +27,7 @@ import {
   resolveHorizontalOverflow,
   resolveRevealScrollLeft
 } from "../src/panels/shared/webview/hooks/useHorizontalOverflow";
+import { renderLoadingSkeletonHtml } from "../src/panels/shared/webview/LoadingSkeletonHtml";
 import { focusRingInsetClassName } from "../src/panels/shared/webview/lib/focus";
 
 const INSET_FOCUS = focusRingInsetClassName;
@@ -133,7 +139,15 @@ describe("Badge", () => {
     assert.match(renderToStaticMarkup(createElement(Badge, null, "3")), /text-xs leading-4/);
     assert.match(
       renderToStaticMarkup(createElement(Badge, { size: "sm" }, "3")),
-      /text-\[11px\] leading-4/
+      /text-caption leading-4/
+    );
+  });
+
+  it("keeps its text color alongside the caption font size", () => {
+    // tailwind-merge must treat text-caption as a font size, not a color.
+    assert.match(
+      renderToStaticMarkup(createElement(Badge, { size: "sm" }, "3")),
+      /text-badge-foreground/
     );
   });
 
@@ -152,6 +166,10 @@ describe("TabsList overflow affordance", () => {
       )
     );
     assert.match(html, /overflow-fade-x/);
+    // A visible (thin) scrollbar, not a hidden one, signals clipped tabs.
+    assert.match(html, /scrollbar-thin/);
+    assert.doesNotMatch(html, /no-scrollbar/);
+    assert.match(html, /overflow-x-auto/);
   });
 
   it("reports which edges hide content", () => {
@@ -239,4 +257,66 @@ describe("TruncatedText", () => {
     );
     assert.match(html, /title="folder\/job"/);
   });
+});
+
+describe("PanelHeader", () => {
+  it("truncates by default and exposes the full title as a tooltip", () => {
+    const html = renderToStaticMarkup(
+      createElement(PanelHeader, { title: "folder/very-long-job-name", eyebrow: "Production" })
+    );
+    assert.match(html, /<h1 class="[^"]*truncate[^"]*" title="folder\/very-long-job-name">/);
+    assert.match(html, /<span class="truncate" title="Production">Production<\/span>/);
+  });
+
+  it("wraps long titles anywhere when wrapTitle is set", () => {
+    const html = renderToStaticMarkup(
+      createElement(PanelHeader, {
+        title: createElement("span", null, "a/b"),
+        titleTooltip: "a/b",
+        wrapTitle: true
+      })
+    );
+    assert.match(html, /<h1 class="[^"]*\[overflow-wrap:anywhere\][^"]*" title="a\/b">/);
+    assert.doesNotMatch(html, /<h1 class="[^"]*truncate/);
+  });
+});
+
+describe("ClampedText", () => {
+  it("clamps the text and keeps the full value in a title", () => {
+    const html = renderToStaticMarkup(
+      createElement(ClampedText, { text: "A long offline reason", textClassName: "text-xs" })
+    );
+    assert.match(html, /class="[^"]*line-clamp-2[^"]*text-xs" title="A long offline reason"/);
+  });
+});
+
+describe("DisclosureChevron", () => {
+  it("points right when collapsed and rotates down when open", () => {
+    const html = renderToStaticMarkup(createElement(DisclosureChevron));
+    assert.match(html, /<polyline points="9 6 15 12 9 18"/);
+    assert.match(html, /group-data-\[state=open\]:rotate-90/);
+  });
+});
+
+describe("PanelErrorList retry", () => {
+  it("can keep Retry visible but disabled", () => {
+    const html = renderToStaticMarkup(
+      createElement(PanelErrorList, {
+        errors: ["HTTP 502"],
+        onRetry: () => undefined,
+        retryDisabled: true
+      })
+    );
+    assert.match(html, /<button[^>]*disabled=""[^>]*>.*Retry<\/button>/);
+  });
+});
+
+describe("LoadingSkeleton", () => {
+  it.each(["build", "node", "capacity", "compare"] as const)(
+    "renders the same markup as the host skeleton for %s panels",
+    (variant) => {
+      const html = renderToStaticMarkup(createElement(LoadingSkeleton, { variant }));
+      assert.ok(html.includes(renderLoadingSkeletonHtml(variant)));
+    }
+  );
 });

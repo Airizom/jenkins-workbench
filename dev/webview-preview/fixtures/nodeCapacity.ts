@@ -36,7 +36,7 @@ function node(
   labels: string[],
   total: number,
   busy: number,
-  offline = false,
+  offline: false | "offline" | "temporary" = false,
   offlineReason?: string
 ): NodeCapacityNodeViewModel {
   const idle = offline ? 0 : total - busy;
@@ -44,9 +44,16 @@ function node(
     displayName: name,
     name,
     nodeUrl: `https://jenkins.example.com/computer/${name}/`,
-    statusLabel: offline ? "Offline" : busy > 0 ? "Online" : "Idle",
-    isOffline: offline,
-    isTemporarilyOffline: false,
+    statusLabel:
+      offline === "temporary"
+        ? "Temporarily offline"
+        : offline
+          ? "Offline"
+          : busy > 0
+            ? "Online"
+            : "Idle",
+    isOffline: offline !== false,
+    isTemporarilyOffline: offline === "temporary",
     offlineReason,
     labels,
     poolLabels: labels,
@@ -60,7 +67,7 @@ function node(
     executors: Array.from({ length: total }, (_, index) => ({
       id: `#${index}`,
       statusLabel: offline ? "Offline" : index < busy ? "Busy" : "Idle",
-      isIdle: offline || index >= busy,
+      isIdle: offline !== false || index >= busy,
       workLabel: !offline && index < busy ? `web-app » main #${1480 + index}` : undefined,
       workUrl:
         !offline && index < busy
@@ -115,7 +122,15 @@ const pools: NodeCapacityPoolViewModel[] = [
     [
       node("build-agent-01", ["linux", "docker"], 4, 4),
       node("build-agent-02", ["linux", "docker"], 4, 4),
-      node("build-agent-03", ["linux"], 4, 0, true, "Disconnected: ChannelClosedException")
+      node(
+        "build-agent-03",
+        ["linux"],
+        4,
+        0,
+        "offline",
+        "Disconnected: java.nio.channels.ClosedChannelException. The agent process exited after the controller restarted; check the agent log on the machine for the full stack trace."
+      ),
+      node("build-agent-04", ["linux"], 2, 0, "temporary", "Draining for kernel upgrade (mia)")
     ],
     [
       queueItem(1, "web-app-pr-842", "linux", 14, true),
@@ -138,13 +153,13 @@ const busy: NodeCapacityViewModel = {
   environmentLabel: "jenkins.example.com",
   updatedAt: new Date(now - 20_000).toISOString(),
   summary: {
-    totalNodes: 6,
+    totalNodes: 7,
     onlineNodes: 5,
-    offlineNodes: 1,
-    totalExecutors: 18,
+    offlineNodes: 2,
+    totalExecutors: 20,
     busyExecutors: 11,
     idleExecutors: 3,
-    offlineExecutors: 4,
+    offlineExecutors: 6,
     queuedCount: 5,
     stuckCount: 1,
     blockedCount: 0,

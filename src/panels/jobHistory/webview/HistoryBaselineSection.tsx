@@ -4,6 +4,8 @@ import { type HistoryViewModel, historyJobDisplayName } from "../shared/HistoryC
 import type { HistorySend } from "./HistoryOutcomes";
 import { formatHistoryTimestamp } from "./historyPresentation";
 
+const AUTOMATIC_BASELINE = "Automatic default: the multibranch main or master branch";
+
 function baselineJobName(baseline: NonNullable<HistoryViewModel["baseline"]>): string {
   if (baseline.status === "self") return "This job";
   if (baseline.label) return baseline.label;
@@ -17,7 +19,7 @@ function baselineDetail(model: HistoryViewModel): string {
   if (baseline.build) {
     parts.push(
       `Build #${baseline.build.number}`,
-      formatHistoryTimestamp(baseline.build.timestamp),
+      `started ${formatHistoryTimestamp(baseline.build.timestamp)}`,
       "latest to complete before the selected build started"
     );
   }
@@ -45,11 +47,9 @@ export function HistoryBaselineSection({
           <span className="text-muted-foreground">Baseline job:</span>
           <span className="font-medium">{baseline ? baselineJobName(baseline) : "…"}</span>
           {baseline?.automatic ? (
-            <span
-              className="text-xs text-muted-foreground"
-              title="Automatic default: the multibranch main or master branch"
-            >
-              (auto)
+            <span className="text-xs text-muted-foreground" title={AUTOMATIC_BASELINE}>
+              <span aria-hidden="true">(auto)</span>
+              <span className="sr-only">({AUTOMATIC_BASELINE})</span>
             </span>
           ) : null}
           {baseline?.status === "error" ? (
@@ -62,11 +62,7 @@ export function HistoryBaselineSection({
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {baseline?.build && model.selectedBuild !== undefined ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => send("compare", model.selectedBuild)}
-          >
+          <Button size="sm" onClick={() => send("compare", model.selectedBuild)}>
             Compare with baseline
           </Button>
         ) : null}

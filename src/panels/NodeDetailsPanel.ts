@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
+import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
@@ -43,6 +44,7 @@ import { createNonce } from "./shared/webview/WebviewNonce";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 
 type NodeDetailsRefreshHost = EnvironmentPanelRefreshHost;
+type NodeQueuedWork = Awaited<ReturnType<NodeQueuedWorkService["getQueuedWorkForNode"]>>;
 
 interface NodeDetailsPanelShowOptions {
   dataService: JenkinsDataService;
@@ -73,6 +75,9 @@ export class NodeDetailsPanel {
   private environment?: JenkinsEnvironmentRef;
   private nodeUrl?: string;
   private lastDetails?: JenkinsNodeDetails;
+  /** Time and queued work of the last successful load, reused when a refresh fails. */
+  private lastUpdatedAt?: string;
+  private lastQueuedWork?: NodeQueuedWork;
   private readonly loadTracker: PanelLoadTracker;
   private hasRendered = false;
   private disposed = false;
@@ -217,6 +222,8 @@ export class NodeDetailsPanel {
     this.hasRendered = false;
     this.nonce = createNonce();
     this.lastDetails = undefined;
+    this.lastUpdatedAt = undefined;
+    this.lastQueuedWork = undefined;
     this.advancedLoaded = false;
     this.advancedRequested = false;
     this.loadTracker.resetLoadingRequests();
@@ -300,37 +307,45 @@ export class NodeDetailsPanel {
       return;
     }
     const label = this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node";
-    const target = { environment: this.environment, nodeUrl: this.nodeUrl, label };
+    const target = {
+      environment: this.environment,
+      nodeUrl: this.nodeUrl,
+      label,
+      busyExecutors: this.lastDetails?.busyExecutors
+    };
     const { nodeActionService, refreshHost } = this;
     // Collect the offline reason before showing progress: a spinner and disabled
     // buttons while the input box is open would suggest work already started,
     // and cancelling must leave the panel untouched.
     let offlineReason: { reason?: string } | undefined;
     if (action === "takeNodeOffline") {
-      offlineReason = await nodeActionService.promptOfflineReason(label);
+      offlineReason = await nodeActionService.promptOfflineReason(label, target.busyExecutors);
       if (!offlineReason || this.disposed) {
         return;
       }
     }
     const loadingRequest = this.loadTracker.beginLoading();
     try {
-      let didToggle: boolean;
-      switch (action) {
-        case "takeNodeOffline":
-          didToggle = await nodeActionService.takeNodeOffline(target, refreshHost, offlineReason);
-          break;
-        case "bringNodeOnline":
-          didToggle = await nodeActionService.bringNodeOnline(target, refreshHost);
-          break;
-        case "launchNodeAgent":
-          didToggle = await nodeActionService.launchNodeAgent(target, refreshHost);
-          break;
+      try {
+        switch (action) {
+          case "takeNodeOffline":
+            await nodeActionService.takeNodeOffline(target, refreshHost, offlineReason);
+            break;
+          case "bringNodeOnline":
+            await nodeActionService.bringNodeOnline(target, refreshHost);
+            break;
+          case "launchNodeAgent":
+            await nodeActionService.launchNodeAgent(target, refreshHost);
+            break;
+        }
+      } catch (error) {
+        void vscode.window.showErrorMessage(formatActionError(error));
       }
-      if (didToggle) {
+      // Refresh even when the action was a no-op ("already online", "not
+      // launchable"): those results mean the panel was showing stale state.
+      if (!this.disposed) {
         await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });
       }
-    } catch (error) {
-      void vscode.window.showErrorMessage(formatActionError(error));
     } finally {
       this.loadTracker.endLoading(loadingRequest);
     }
@@ -353,9 +368,7 @@ export class NodeDetailsPanel {
       }
       const advancedLoaded = this.advancedLoaded || detailLevel === "advanced";
       const errors: string[] = [];
-      let queuedWork:
-        | Awaited<ReturnType<NodeQueuedWorkService["getQueuedWorkForNode"]>>
-        | undefined;
+      let queuedWork: NodeQueuedWork | undefined;
       if (this.nodeQueuedWorkService) {
         try {
           queuedWork = await this.nodeQueuedWorkService.getQueuedWorkForNode(
@@ -369,12 +382,16 @@ export class NodeDetailsPanel {
       if (!this.loadTracker.isCurrent(token)) {
         return undefined;
       }
+      const updatedAt = new Date().toISOString();
       this.lastDetails = details;
+      this.lastUpdatedAt = updatedAt;
+      this.lastQueuedWork = queuedWork;
       this.advancedLoaded = advancedLoaded;
       return buildNodeDetailsViewModel({
         details,
         errors,
-        updatedAt: new Date().toISOString(),
+        updatedAt,
+        environmentLabel: this.environmentLabel,
         fallbackUrl: this.nodeUrl,
         advancedLoaded,
         queuedWork,
@@ -385,12 +402,18 @@ export class NodeDetailsPanel {
         return undefined;
       }
       const message = formatActionError(error);
+      // Keep the last successful load time and queue so the Stale badge and
+      // relative time stay truthful instead of presenting old data as fresh.
+      const hasLastDetails = this.lastDetails !== undefined;
       return buildNodeDetailsViewModel({
         details: this.lastDetails,
         errors: [message],
-        updatedAt: new Date().toISOString(),
+        updatedAt: (hasLastDetails ? this.lastUpdatedAt : undefined) ?? new Date().toISOString(),
+        refreshFailed: hasLastDetails,
+        environmentLabel: this.environmentLabel,
         fallbackUrl: this.nodeUrl,
         advancedLoaded: this.advancedLoaded,
+        queuedWork: hasLastDetails ? this.lastQueuedWork : undefined,
         nowMs: Date.now()
       });
     }
@@ -417,6 +440,10 @@ export class NodeDetailsPanel {
         `Failed to copy node details: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
+  }
+
+  private get environmentLabel(): string | undefined {
+    return this.environment ? formatEnvironmentLabel(this.environment.url) : undefined;
   }
 
   private get currentDetailLevel(): "basic" | "advanced" {

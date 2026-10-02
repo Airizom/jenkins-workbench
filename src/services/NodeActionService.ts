@@ -10,6 +10,8 @@ export type NodeActionTarget = {
   environment: JenkinsEnvironmentRef;
   nodeUrl: string;
   label: string;
+  /** Busy executor count when known, so the offline prompt can mention running builds. */
+  busyExecutors?: number;
 };
 
 export interface NodeActionRefreshHost extends EnvironmentScopedRefreshHost {}
@@ -18,13 +20,19 @@ export class NodeActionService {
   constructor(private readonly dataService: JenkinsDataService) {}
 
   /**
-   * Asks for the optional offline reason. Resolves `undefined` when the user
-   * cancels, so callers can show progress only after the user confirms.
+   * Confirms taking the node offline and asks for the optional reason. The
+   * prompt states the consequence (and running builds, when `busyExecutors` is
+   * known). Resolves `undefined` when the user cancels, so callers can show
+   * progress only after the user confirms.
    */
-  async promptOfflineReason(label: string): Promise<{ reason?: string } | undefined> {
+  async promptOfflineReason(
+    label: string,
+    busyExecutors?: number
+  ): Promise<{ reason?: string } | undefined> {
     const reasonInput = await vscode.window.showInputBox({
-      prompt: `Offline reason for ${label} (optional)`,
-      placeHolder: "Why are you taking this node offline?",
+      title: `Take ${label} offline`,
+      prompt: formatTakeOfflinePrompt(label, busyExecutors),
+      placeHolder: "Offline reason (optional)",
       ignoreFocusOut: true
     });
     if (reasonInput === undefined) {
@@ -44,7 +52,7 @@ export class NodeActionService {
     refreshHost?: NodeActionRefreshHost,
     confirmed?: { reason?: string }
   ): Promise<boolean> {
-    const input = confirmed ?? (await this.promptOfflineReason(target.label));
+    const input = confirmed ?? (await this.promptOfflineReason(target.label, target.busyExecutors));
     if (!input) {
       return false;
     }
@@ -187,4 +195,13 @@ export class NodeActionService {
     const reasonLabel = offlineReason ? ` Reason: ${offlineReason}` : "";
     return `${actionLabel} for ${target.label}, but it is still offline.${reasonLabel}`;
   }
+}
+
+export function formatTakeOfflinePrompt(label: string, busyExecutors?: number): string {
+  const parts = [`New builds won't be scheduled on ${label}; running builds continue.`];
+  if (busyExecutors !== undefined && Number.isFinite(busyExecutors) && busyExecutors > 0) {
+    parts.push(`${busyExecutors} executor${busyExecutors === 1 ? " is" : "s are"} busy right now.`);
+  }
+  parts.push("Press Enter to confirm. The reason is optional.");
+  return parts.join(" ");
 }

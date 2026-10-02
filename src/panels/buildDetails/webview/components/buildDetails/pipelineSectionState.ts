@@ -8,7 +8,11 @@ import type {
   PipelinePresentation
 } from "../../../shared/BuildDetailsPanelWebviewState";
 import { findPipelineLogTargetStatus } from "./pipelineLogTargets";
-import { findDefaultPipelineStage, isPipelinePresentation } from "./pipelineSectionModel";
+import {
+  findDefaultPipelineStage,
+  findStageByKey,
+  isPipelinePresentation
+} from "./pipelineSectionModel";
 
 const DEFAULT_PRESENTATION: PipelinePresentation = "list";
 
@@ -125,6 +129,35 @@ export function pickDefaultStageToOpen({
     return undefined;
   }
   return findDefaultPipelineStage(stages, isRunning);
+}
+
+/**
+ * A request from outside the Pipeline tab (the hero stage strip) to open a
+ * stage. `id` increases per request so clicking the same stage again still
+ * re-expands and re-reveals it.
+ */
+export interface PipelineStageRequest {
+  stageKey: string;
+  id: number;
+}
+
+/**
+ * Each request is consumed once. A consumed request opens its stage when the
+ * stage still exists, exactly like a user selection in the list or graph.
+ */
+export function planStageRequest({
+  request,
+  lastHandledId,
+  stages
+}: {
+  request: PipelineStageRequest | undefined;
+  lastHandledId: number | undefined;
+  stages: PipelineStageViewModel[];
+}): { consume: boolean; stage?: PipelineStageViewModel } {
+  if (!request || request.id === lastHandledId) {
+    return { consume: false };
+  }
+  return { consume: true, stage: findStageByKey(stages, request.stageKey) };
 }
 
 export function canFollowPipelineNodeLog(

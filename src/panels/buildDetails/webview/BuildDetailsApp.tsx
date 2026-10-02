@@ -6,7 +6,6 @@ import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
-import { toast } from "../../shared/webview/hooks/useToast";
 import type {
   BuildDetailsViewModel,
   PipelineLogTargetViewModel
@@ -24,6 +23,7 @@ import {
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
 import { BuildStatusHero } from "./components/buildDetails/hero/BuildStatusHero";
+import type { PipelineStageRequest } from "./components/buildDetails/pipelineSectionState";
 import { PipelineStageStrip } from "./components/buildDetails/stageStrip/PipelineStageStrip";
 import type { StageStripSegment } from "./components/buildDetails/stageStrip/stageStripModel";
 import {
@@ -41,21 +41,8 @@ import {
   DEFAULT_INSIGHTS
 } from "./state/buildDetailsState";
 
-const { useCallback, useMemo, useReducer } = React;
+const { useCallback, useMemo, useReducer, useState } = React;
 
-function scrollStageIntoView(stageKey: string): void {
-  // Wait a frame so the pipeline tab content is visible before scrolling.
-  requestAnimationFrame(() => {
-    const stageElement = document.querySelector(`[data-stage-key="${CSS.escape(stageKey)}"]`);
-    if (!stageElement) {
-      return;
-    }
-    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-      ? "auto"
-      : "smooth";
-    stageElement.scrollIntoView({ behavior, block: "center" });
-  });
-}
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
   const postMessage = usePanelPostMessage<BuildDetailsIncomingMessage>();
@@ -105,9 +92,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     postMessage({ type: "toggleFollowLog", value });
   };
 
+  // The extension host reports export, download, and reload outcomes itself,
+  // so these handlers only post the request.
   const handleExportConsole = () => {
     postMessage({ type: "exportConsole" });
-    toast({ title: "Console export requested" });
   };
 
   const handleRetry = () => {
@@ -128,15 +116,16 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   );
   const stripFailedCount = useMemo(() => countFailedSegments(stripSegments), [stripSegments]);
 
+  // Strip clicks go through the Pipeline tab's own selection path (expand or
+  // select the stage, open its log, reveal it) rather than posting a log
+  // request here, so the tab's default stage pick cannot override them.
+  const [stageRequest, setStageRequest] = useState<PipelineStageRequest | undefined>();
   const handleStripStageSelect = useCallback(
     (segment: StageStripSegment) => {
       setSelectedTab("pipeline");
-      if (segment.logTarget) {
-        handleSelectPipelineLog(segment.logTarget);
-      }
-      scrollStageIntoView(segment.key);
+      setStageRequest((previous) => ({ stageKey: segment.key, id: (previous?.id ?? 0) + 1 }));
     },
-    [setSelectedTab, handleSelectPipelineLog]
+    [setSelectedTab]
   );
 
   if (state.loading && !state.hasLoaded) {
@@ -176,13 +165,19 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             />
           </BuildStatusHero>
 
-          <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
-            <HistoryView embedded buildRunning={isRunning} />
+          {/* Bottom padding keeps the floating scroll-to-top button clear of the
+           * last row's controls (for example an artifact's download button). */}
+          <main
+            className="flex-1 mx-auto w-full max-w-6xl px-4 pt-3 pb-16"
+            aria-busy={state.loading}
+          >
             <BuildDetailsErrors
               errors={state.errors}
               buildLoaded={hasLoadedBuildHeader(state)}
               onRetry={handleRetry}
             />
+            {/* Failure history only analyzes finished builds. */}
+            {isRunning ? null : <HistoryView embedded />}
             <BuildDetailsTabs
               selectedTab={selectedTab}
               onTabChange={setSelectedTab}
@@ -196,8 +191,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               pipelineNodeLogHtmlModel={state.pipelineNodeLogHtmlModel}
               pipelineStagesLoading={state.pipelineStagesLoading}
               stripFailedCount={stripFailedCount}
+              stageRequest={stageRequest}
               buildUrl={buildUrl}
+              resultLabel={state.resultLabel}
               resultClass={state.resultClass}
+              durationLabel={state.durationLabel}
+              timestampLabel={state.timestampLabel}
               testsSummary={state.testState.summary}
               testResults={state.testState.results}
               coverageState={coverageState}
@@ -216,23 +215,14 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               }
               onSelectPipelineLog={handleSelectPipelineLog}
               onClearPipelineLog={() => postMessage({ type: "clearPipelineLogNode" })}
-              onExportPipelineLog={() => {
-                postMessage({ type: "exportPipelineNodeLog" });
-                toast({ title: "Log export requested" });
-              }}
+              onExportPipelineLog={() => postMessage({ type: "exportPipelineNodeLog" })}
               onToggleFollowLog={handleToggleFollowLog}
               onExportLogs={handleExportConsole}
               onOpenExternal={handleOpenExternal}
-              onArtifactAction={(action, artifact) => {
-                postMessage(buildArtifactActionMessage(action, artifact));
-                if (action === "download") {
-                  toast({ title: "Download requested", description: artifact.name });
-                }
-              }}
-              onReloadTestResults={() => {
-                postMessage(buildReloadTestReportMessage());
-                toast({ title: "Reloading test report" });
-              }}
+              onArtifactAction={(action, artifact) =>
+                postMessage(buildArtifactActionMessage(action, artifact))
+              }
+              onReloadTestResults={() => postMessage(buildReloadTestReportMessage())}
               onOpenTestSource={(testCase) => postMessage(buildOpenTestSourceMessage(testCase))}
               onOpenDiagnosticSource={(targetId) =>
                 postMessage({ type: "openDiagnosticSource", targetId })
@@ -242,8 +232,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             />
           </main>
 
+          {/* Hidden only while a running build follows the log (the page keeps
+           * jumping to the newest output); finished builds always get it. */}
           <BuildDetailsScrollToTopButton
-            show={showButton && !state.followLog}
+            show={showButton && !(isRunning && state.followLog)}
             onScrollToTop={scrollToTop}
           />
 

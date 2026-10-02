@@ -60,6 +60,8 @@ export function ExecutorsTableCard({
   }
 
   const busyCount = entries.filter((entry) => !entry.isIdle).length;
+  // Free executors on an offline node are unavailable, not idle.
+  const freeLabel = isOffline ? "Offline" : "Idle";
 
   return (
     <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
@@ -67,7 +69,7 @@ export function ExecutorsTableCard({
         <div className="flex items-center gap-1.5">
           <CpuIcon className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">{title}</span>
-          <span className="text-[11px] text-muted-foreground">({filteredEntries.length})</span>
+          <span className="text-caption text-muted-foreground">({filteredEntries.length})</span>
           {/* Busy executors are normal work: progress tone, never warning. */}
           {busyCount > 0 ? (
             <Badge variant="info" size="sm">
@@ -94,18 +96,18 @@ export function ExecutorsTableCard({
             >
               <ToggleGroupItem value="all">All</ToggleGroupItem>
               <ToggleGroupItem value="busy">Busy</ToggleGroupItem>
-              <ToggleGroupItem value="idle">Idle</ToggleGroupItem>
+              <ToggleGroupItem value="idle">{freeLabel}</ToggleGroupItem>
             </ToggleGroup>
           </div>
           <div className="sm:hidden w-[120px]">
             <Select value={filter} onValueChange={(value) => setFilter(value as ExecutorFilter)}>
-              <SelectTrigger className="h-7 text-xs">
+              <SelectTrigger className="h-7 text-xs" aria-label="Executor filter">
                 <SelectValue placeholder="Filter" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="busy">Busy</SelectItem>
-                <SelectItem value="idle">Idle</SelectItem>
+                <SelectItem value="idle">{freeLabel}</SelectItem>
               </SelectContent>
             </Select>
           </div>

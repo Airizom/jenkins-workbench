@@ -22,18 +22,21 @@ import {
 import { ChevronDownIcon } from "../../shared/webview/icons";
 import { cn } from "../../shared/webview/lib/utils";
 import {
+  type HistorySort,
   type HistoryUiState,
   type HistoryViewModel,
   normalizeHistoryUi
 } from "../shared/HistoryContracts";
 import { type HistorySend, OutcomeBadge, TestOutcomeTimeline } from "./HistoryOutcomes";
 import {
+  failureRate,
   filterTests,
   HISTORY_FILTER_LABELS,
   HISTORY_PAGE_SIZE,
+  HISTORY_SORT_LABELS,
   observationGaps,
   selectedBuildIndex,
-  testIdentityLabel
+  unavailableReportBuilds
 } from "./historyPresentation";
 
 const BASELINE_LABELS: Record<string, string> = {
@@ -54,13 +57,14 @@ function baselineLabel(model: HistoryViewModel, test: TestHistory): string {
   return BASELINE_LABELS[model.baselineOutcomes?.[test.key] ?? "missing"] ?? "Unavailable";
 }
 
-function FailureRate({ test }: { test: TestHistory }) {
+function FailureRate({ model, test }: { model: HistoryViewModel; test: TestHistory }) {
   const usable = test.failed + test.passed;
-  const gaps = observationGaps(test);
+  const rate = failureRate(test);
+  const gaps = observationGaps(test, model);
   return (
     <div className="space-y-1">
       <div className="tabular-nums">
-        {usable ? `${Math.round((100 * test.failed) / usable)}%` : "—"}
+        {rate === undefined ? "—" : `${Math.round(100 * rate)}%`}
         <span className="text-muted-foreground">
           {" "}
           · {test.failed}/{usable} failed
@@ -78,14 +82,16 @@ function FailureRate({ test }: { test: TestHistory }) {
                 title={gap.tooltip}
               >
                 {gap.label}
+                {gap.tooltip ? <span className="sr-only">. {gap.tooltip}</span> : null}
               </Badge>
             ) : (
               <span
                 key={gap.label}
-                className="text-[11px] text-muted-foreground"
+                className="text-caption text-muted-foreground"
                 title={gap.tooltip}
               >
                 {gap.label}
+                {gap.tooltip ? <span className="sr-only">. {gap.tooltip}</span> : null}
               </span>
             )
           )}
@@ -113,7 +119,6 @@ function TestNameButton({
       className="focus-ring group flex w-full min-w-0 items-start gap-1.5 rounded-sm text-left"
       aria-expanded={expanded}
       aria-controls={expanded ? detailsId : undefined}
-      title={testIdentityLabel(test)}
       onClick={() => onToggle(test.key)}
     >
       <ChevronDownIcon
@@ -124,11 +129,13 @@ function TestNameButton({
         )}
       />
       <span className="min-w-0">
-        <span className="block truncate font-medium text-foreground group-hover:underline">
+        <span className="block font-medium text-foreground [overflow-wrap:anywhere] group-hover:underline">
           {test.name}
         </span>
         {context ? (
-          <span className="block truncate text-[11px] text-muted-foreground">{context}</span>
+          <span className="block text-caption text-muted-foreground [overflow-wrap:anywhere]">
+            {context}
+          </span>
         ) : null}
       </span>
     </button>
@@ -150,16 +157,17 @@ function SelectedBuildOutcome({
     <div className="space-y-1">
       <OutcomeBadge outcome={outcome} />
       {evidence ? (
-        <div
-          title={
-            evidence.source === "jenkins" ? "From Jenkins test age" : "From the sampled builds"
-          }
-        >
+        <div>
           {evidence.label}
+          <span className="sr-only">
+            {evidence.source === "jenkins"
+              ? " (from Jenkins test age)"
+              : " (from the sampled builds)"}
+          </span>
         </div>
       ) : null}
       {outcome === "failed" ? (
-        <div className="text-[11px] text-muted-foreground">
+        <div className="text-caption text-muted-foreground">
           Baseline: {baselineLabel(model, test)}
         </div>
       ) : null}
@@ -172,14 +180,17 @@ function TestDetailsRow({
   test,
   detailsId,
   headingRef,
+  selectedLabel,
   send
 }: {
   model: HistoryViewModel;
   test: TestHistory;
   detailsId: string;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
+  selectedLabel: string;
   send: HistorySend;
 }) {
+  const context = [test.suiteName, test.className].filter(Boolean).join(" · ");
   return (
     <TableRow className="hover:bg-transparent">
       <TableCell colSpan={4} className="bg-muted-soft px-3 pb-3 pt-2">
@@ -188,11 +199,13 @@ function TestDetailsRow({
             id={`${detailsId}-heading`}
             ref={headingRef}
             tabIndex={-1}
-            className="focus-ring mb-1 truncate rounded-sm text-sm font-semibold"
-            title={testIdentityLabel(test)}
+            className="focus-ring mb-1 rounded-sm text-sm font-semibold [overflow-wrap:anywhere]"
           >
             {test.name}
           </h3>
+          {context ? (
+            <p className="mb-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">{context}</p>
+          ) : null}
           <p className="mb-2 text-xs text-muted-foreground">
             Outcomes by build, newest first. Ambiguous or unavailable results break transition
             sequences and never count as passes.
@@ -200,6 +213,7 @@ function TestDetailsRow({
           <TestOutcomeTimeline
             model={model}
             test={test}
+            selectedLabel={selectedLabel}
             onOpenBuild={(buildNumber) => send("openBuild", buildNumber)}
             onCompare={(buildNumber) => send("compare", buildNumber)}
           />
@@ -215,6 +229,8 @@ function HistoryTestRow({
   index,
   expanded,
   headingRef,
+  selectedLabel,
+  outcomeLabel,
   onToggle,
   send
 }: {
@@ -223,6 +239,8 @@ function HistoryTestRow({
   index: number;
   expanded: boolean;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
+  selectedLabel: string;
+  outcomeLabel: string;
   onToggle: (key: string) => void;
   send: HistorySend;
 }) {
@@ -238,10 +256,10 @@ function HistoryTestRow({
             onToggle={onToggle}
           />
         </TableCell>
-        <TableCell className="align-top">
-          <FailureRate test={test} />
+        <TableCell className="align-top" data-label="Failure rate">
+          <FailureRate model={model} test={test} />
         </TableCell>
-        <TableCell className="align-top">
+        <TableCell className="align-top" data-label="Transitions">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="tabular-nums">{test.transitions}</span>
             {test.intermittent ? (
@@ -251,7 +269,7 @@ function HistoryTestRow({
             ) : null}
           </div>
         </TableCell>
-        <TableCell className="align-top">
+        <TableCell className="align-top" data-label={outcomeLabel}>
           <SelectedBuildOutcome model={model} test={test} index={index} />
         </TableCell>
       </TableRow>
@@ -261,6 +279,7 @@ function HistoryTestRow({
           test={test}
           detailsId={detailsId}
           headingRef={headingRef}
+          selectedLabel={selectedLabel}
           send={send}
         />
       ) : null}
@@ -268,16 +287,41 @@ function HistoryTestRow({
   );
 }
 
+/** aria-sort for a column header; only the active non-default sort is announced. */
+function ariaSort(ui: HistoryUiState, column: HistorySort): "ascending" | "descending" | undefined {
+  if (ui.sort !== column) return undefined;
+  return column === "name" ? "ascending" : "descending";
+}
+
+function UnavailableReportsNote({ model }: { model: HistoryViewModel }) {
+  const builds = unavailableReportBuilds(model);
+  if (!builds.length) return null;
+  const shown = builds.slice(0, 5).map((number) => `#${number}`);
+  const list =
+    builds.length > shown.length
+      ? `${shown.join(", ")} and ${builds.length - shown.length} more`
+      : shown.join(", ");
+  return (
+    <p className="text-xs text-muted-foreground">
+      No test report for {builds.length === 1 ? "build" : "builds"} {list}. Those builds are left
+      out of failure rates and transitions; they are not counted as passes.
+    </p>
+  );
+}
+
 export function HistoryTestsSection({
   model,
   ui,
   setUi,
-  send
+  send,
+  embedded = false
 }: {
   model: HistoryViewModel;
   ui: HistoryUiState;
   setUi: (ui: HistoryUiState) => void;
   send: HistorySend;
+  /** Inside Build Details the selected build is the panel's own build. */
+  embedded?: boolean;
 }) {
   const [page, setPage] = React.useState(0);
   const focusDetails = React.useRef(false);
@@ -285,7 +329,7 @@ export function HistoryTestsSection({
   // biome-ignore lint/correctness/useExhaustiveDependencies: These changes reset pagination even though their values are not read by the effect.
   React.useEffect(() => {
     setPage(0);
-  }, [ui.search, ui.filter, model.jobUrl]);
+  }, [ui.search, ui.filter, ui.sort, model.jobUrl]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Focus follows the user's expansion, not re-renders.
   React.useEffect(() => {
     if (!focusDetails.current) return;
@@ -305,6 +349,9 @@ export function HistoryTestsSection({
     focusDetails.current = expanding;
     setUi({ ...ui, selectedTest: expanding ? key : undefined });
   };
+  const outcomeLabel =
+    model.selectedBuild === undefined ? "Selected build" : `Build #${model.selectedBuild}`;
+  const selectedLabel = embedded ? "This build" : "Selected";
   return (
     <section aria-labelledby="history-tests-heading" className="space-y-2">
       <SectionHeading
@@ -340,9 +387,25 @@ export function HistoryTestsSection({
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={ui.sort}
+          onValueChange={(sort) => setUi(normalizeHistoryUi({ ...ui, sort }))}
+        >
+          <SelectTrigger aria-label="Sort test history" className="w-60 max-w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(HISTORY_SORT_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
+      <UnavailableReportsNote model={model} />
       {tests.length ? (
-        <div className="relative overflow-x-auto rounded-lg border border-border">
+        <div className="history-stack-table relative overflow-x-auto rounded-lg border border-border">
           <Table className="min-w-[48rem] table-fixed text-xs">
             <colgroup>
               <col />
@@ -352,14 +415,10 @@ export function HistoryTestsSection({
             </colgroup>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Test</TableHead>
-                <TableHead>Failure rate</TableHead>
-                <TableHead>Transitions</TableHead>
-                <TableHead>
-                  {model.selectedBuild === undefined
-                    ? "Selected build"
-                    : `Build #${model.selectedBuild}`}
-                </TableHead>
+                <TableHead aria-sort={ariaSort(ui, "name")}>Test</TableHead>
+                <TableHead aria-sort={ariaSort(ui, "failureRate")}>Failure rate</TableHead>
+                <TableHead aria-sort={ariaSort(ui, "transitions")}>Transitions</TableHead>
+                <TableHead>{outcomeLabel}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -371,6 +430,8 @@ export function HistoryTestsSection({
                   index={index}
                   expanded={ui.selectedTest === test.key}
                   headingRef={detailsHeading}
+                  selectedLabel={selectedLabel}
+                  outcomeLabel={outcomeLabel}
                   onToggle={toggle}
                   send={send}
                 />

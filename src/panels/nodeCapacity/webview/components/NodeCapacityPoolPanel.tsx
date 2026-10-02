@@ -9,6 +9,7 @@ import { SectionHeading } from "../../../shared/webview/components/SectionHeadin
 import { ToneBadge } from "../../../shared/webview/components/ToneBadge";
 import { Badge } from "../../../shared/webview/components/ui/badge";
 import { Button } from "../../../shared/webview/components/ui/button";
+import { ClampedText } from "../../../shared/webview/components/ui/clamped-text";
 import {
   Tooltip,
   TooltipContent,
@@ -17,11 +18,14 @@ import {
 import { TruncatedText } from "../../../shared/webview/components/ui/truncated-text";
 import {
   AlertTriangleIcon,
-  ChevronDownIcon,
+  ChevronRightIcon,
   ExternalLinkIcon,
   ServerIcon
 } from "../../../shared/webview/icons";
-import { resolveSeverityBadgeClass } from "../../../shared/webview/lib/statusStyles";
+import {
+  resolveNodeStatusBadgeClass,
+  resolveSeverityBadgeClass
+} from "../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../shared/webview/lib/utils";
 import { NodeCapacityQueueList } from "./NodeCapacityQueue";
 import type {
@@ -37,20 +41,14 @@ const POOL_SEVERITY_BORDER_CLASSES: Record<NodeCapacitySeverity, string> = {
 };
 
 /**
- * `<details>` fires `toggle` for every change to its `open` attribute,
- * including the ones React applies when the controlled `isOpen` prop changes
- * (for example a pool auto-expanding on abnormal severity). Only a user
- * interaction leaves the DOM state out of sync with the prop, so only that
- * case should be recorded as an explicit override.
- */
-export function isUserInitiatedPoolToggle(domOpen: boolean, controlledOpen: boolean): boolean {
-  return domOpen !== controlledOpen;
-}
-
-/**
  * Memoized so collapsed/untouched pools skip their whole subtree when the app
  * re-renders on clock ticks, unrelated pool toggles, or header-only updates;
  * pool/node view models keep stable identities between those renders.
+ *
+ * The header is a heading plus a disclosure button whose accessible name is
+ * only the pool label and status. The button's `::after` covers the whole
+ * header (see styles.css), so the counts and bar stay clickable without
+ * becoming part of the button's name.
  */
 export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
   pool,
@@ -67,44 +65,46 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
   onRetryExecutors: RetryExecutorsHandler;
   onToggleExpanded: (poolId: string, open: boolean) => void;
 }): React.JSX.Element {
-  const handleToggle = (event: React.SyntheticEvent<HTMLDetailsElement>) => {
-    const domOpen = event.currentTarget.open;
-    if (!isUserInitiatedPoolToggle(domOpen, isOpen)) {
-      return;
-    }
-    onToggleExpanded(pool.id, domOpen);
-  };
+  const contentId = `capacity-pool-${React.useId()}`;
   const counts = buildPoolCounts(pool);
 
   return (
-    <details
+    <section
       className={cn(
-        "capacity-pool rounded-lg border bg-card shadow-sm",
+        "capacity-pool group/pool rounded-lg border bg-card shadow-sm",
         POOL_SEVERITY_BORDER_CLASSES[pool.severity]
       )}
-      open={isOpen}
-      onToggle={handleToggle}
+      data-open={isOpen || undefined}
     >
-      <summary className="cursor-pointer list-none rounded-lg px-4 py-3 transition-colors hover:bg-accent-soft">
+      {/* Bottom corners square off when open so the hover highlight meets the content edge. */}
+      <div className="capacity-pool-header relative rounded-lg px-4 py-3 transition-colors hover:bg-accent-soft group-data-[open]/pool:rounded-b-none">
         <div className="grid gap-3 lg:grid-cols-6 lg:items-center">
           <div className="flex min-w-0 items-start gap-2 lg:col-span-2">
-            <ChevronDownIcon
+            <ChevronRightIcon
               aria-hidden="true"
-              className="capacity-pool-chevron mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200"
+              className="capacity-pool-chevron mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none"
             />
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h2
-                  className="min-w-0 max-w-full truncate text-sm font-semibold"
+              <h2 className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold">
+                <button
+                  type="button"
+                  className="capacity-pool-toggle min-w-0 max-w-full cursor-pointer truncate text-left"
+                  aria-expanded={isOpen}
+                  aria-controls={contentId}
                   title={pool.label}
+                  onClick={() => onToggleExpanded(pool.id, !isOpen)}
                 >
                   {pool.label}
-                </h2>
-                <ToneBadge
-                  label={pool.statusLabel}
-                  className={resolveSeverityBadgeClass(pool.severity)}
-                />
-              </div>
+                  <span className="sr-only">, {pool.statusLabel}</span>
+                </button>
+                {/* Announced through the button name above. */}
+                <span aria-hidden="true" className="inline-flex">
+                  <ToneBadge
+                    label={pool.statusLabel}
+                    className={resolveSeverityBadgeClass(pool.severity)}
+                  />
+                </span>
+              </h2>
               <div className="mt-0.5 text-xs text-muted-foreground">
                 {formatPoolAvailability(pool)}
               </div>
@@ -122,18 +122,26 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
             ))}
           </div>
         </div>
-      </summary>
-
-      <div className="grid gap-4 border-t border-border p-4 lg:grid-cols-2">
-        <NodeList
-          nodes={pool.nodes}
-          onOpenNodeDetails={onOpenNodeDetails}
-          onOpenExternal={onOpenExternal}
-          onRetryExecutors={onRetryExecutors}
-        />
-        <NodeCapacityQueueList items={pool.queueItems} onOpenExternal={onOpenExternal} />
       </div>
-    </details>
+
+      <div
+        id={contentId}
+        hidden={!isOpen}
+        className="grid gap-4 border-t border-border p-4 lg:grid-cols-2"
+      >
+        {isOpen ? (
+          <>
+            <NodeList
+              nodes={pool.nodes}
+              onOpenNodeDetails={onOpenNodeDetails}
+              onOpenExternal={onOpenExternal}
+              onRetryExecutors={onRetryExecutors}
+            />
+            <NodeCapacityQueueList items={pool.queueItems} onOpenExternal={onOpenExternal} />
+          </>
+        ) : null}
+      </div>
+    </section>
   );
 });
 
@@ -198,9 +206,12 @@ function PoolInlineCounts({ counts }: { counts: PoolCount[] }): React.JSX.Elemen
   );
 }
 
+// Idle uses a foreground tint well above the `bg-muted` track so free capacity
+// reads as a segment rather than empty track. `hc-outline` gives every segment
+// a contrast border in high-contrast themes.
 const CAPACITY_SEGMENTS = [
   { key: "busy", label: "busy", className: "bg-progress" },
-  { key: "idle", label: "idle", className: "bg-muted-strong" },
+  { key: "idle", label: "idle", className: "bg-muted-foreground/45" },
   { key: "offline", label: "offline", className: "bg-warning" }
 ] as const;
 
@@ -237,7 +248,7 @@ function ExecutorCapacityBar({
           counts[segment.key] > 0 ? (
             <span
               key={segment.key}
-              className={segment.className}
+              className={cn("hc-outline", segment.className)}
               style={{ width: `${(counts[segment.key] / total) * 100}%` }}
             />
           ) : null
@@ -246,11 +257,13 @@ function ExecutorCapacityBar({
       {/* The bar's accessible name already lists the counts; the legend is visual only. */}
       <ul
         aria-hidden="true"
-        className="m-0 flex list-none gap-2.5 p-0 text-[10px] leading-none text-muted-foreground"
+        className="m-0 flex list-none gap-2.5 p-0 text-micro leading-none text-muted-foreground"
       >
         {CAPACITY_SEGMENTS.map((segment) => (
           <li key={segment.key} className="flex items-center gap-1">
-            <span className={cn("inline-block h-1.5 w-2.5 rounded-full", segment.className)} />
+            <span
+              className={cn("hc-outline inline-block h-1.5 w-2.5 rounded-full", segment.className)}
+            />
             {segment.label}
           </li>
         ))}
@@ -270,7 +283,7 @@ function PoolMetric({ count }: { count: PoolCount }): React.JSX.Element {
       >
         {count.value}
       </div>
-      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
         {count.label}
       </div>
     </div>
@@ -315,57 +328,84 @@ const NodeList = React.memo(function NodeList({
         count={nodes.length}
       />
       <div className="space-y-2">
-        {nodes.map((node) => (
-          <div
-            key={node.nodeUrl ?? node.name}
-            className={cn(
-              "rounded-md border p-3",
-              node.isOffline
-                ? "border-warning-border bg-warning-soft"
-                : "border-border bg-surface-sunken"
-            )}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <NodeName node={node} onOpenNodeDetails={onOpenNodeDetails} />
-                  <Badge variant={node.isOffline ? "secondary" : "muted"}>{node.statusLabel}</Badge>
+        {nodes.map((node) => {
+          const offlineTone = resolveNodeOfflineTone(node);
+          return (
+            <div
+              key={node.nodeUrl ?? node.name}
+              className={cn(
+                "rounded-md border p-3",
+                offlineTone
+                  ? NODE_OFFLINE_ROW_CLASSES[offlineTone]
+                  : "border-border bg-surface-sunken"
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <NodeName node={node} onOpenNodeDetails={onOpenNodeDetails} />
+                    {offlineTone ? (
+                      <ToneBadge
+                        label={node.statusLabel}
+                        className={resolveNodeStatusBadgeClass(offlineTone)}
+                      />
+                    ) : (
+                      <Badge variant="muted">{node.statusLabel}</Badge>
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{node.executorSummary}</div>
+                  {node.offlineReason ? (
+                    <ClampedText
+                      text={node.offlineReason}
+                      className="mt-1"
+                      textClassName="text-xs text-muted-foreground"
+                    />
+                  ) : null}
+                  <NodeRunningWork
+                    node={node}
+                    onOpenExternal={onOpenExternal}
+                    onRetryExecutors={onRetryExecutors}
+                  />
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">{node.executorSummary}</div>
-                {node.offlineReason ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                    {node.offlineReason}
-                  </p>
+                {node.nodeUrl ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={`Open ${node.displayName} in Jenkins`}
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => node.nodeUrl && onOpenExternal(node.nodeUrl)}
+                      >
+                        <ExternalLinkIcon className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open in Jenkins</TooltipContent>
+                  </Tooltip>
                 ) : null}
-                <NodeRunningWork
-                  node={node}
-                  onOpenExternal={onOpenExternal}
-                  onRetryExecutors={onRetryExecutors}
-                />
               </div>
-              {node.nodeUrl ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      aria-label={`Open ${node.displayName} in Jenkins`}
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={() => node.nodeUrl && onOpenExternal(node.nodeUrl)}
-                    >
-                      <ExternalLinkIcon className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Open in Jenkins</TooltipContent>
-                </Tooltip>
-              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
 });
+
+type NodeOfflineTone = "offline" | "temporary";
+
+/** Same tones as Node Details: disconnected is a fault, temporarily offline is intentional. */
+const NODE_OFFLINE_ROW_CLASSES: Record<NodeOfflineTone, string> = {
+  offline: "border-failure-border bg-failure-soft",
+  temporary: "border-warning-border bg-warning-soft"
+};
+
+function resolveNodeOfflineTone(node: NodeCapacityNodeViewModel): NodeOfflineTone | undefined {
+  if (!node.isOffline) {
+    return undefined;
+  }
+  return node.isTemporarilyOffline ? "temporary" : "offline";
+}
 
 /** The node name doubles as the Node Details link, so each row keeps one icon action. */
 function NodeName({
@@ -457,7 +497,7 @@ function ExecutorWorkList({
         const workUrl = executor.workUrl;
         return (
           <li key={executor.id} className="flex min-w-0 items-center gap-2 text-xs">
-            <span className="w-6 shrink-0 text-[11px] tabular-nums text-muted-foreground">
+            <span className="w-6 shrink-0 text-caption tabular-nums text-muted-foreground">
               {executor.id}
             </span>
             {workUrl ? (

@@ -102,12 +102,12 @@ function renderCoverageContent(
     <div className="grid grid-cols-3 gap-2">
       <ToneMetricCard label="Project" value={coverageState.projectCoverage} tone="neutral" />
       <ToneMetricCard
-        label="Modified Files"
+        label="Modified files"
         value={coverageState.modifiedFilesCoverage}
         tone="neutral"
       />
       <ToneMetricCard
-        label="Modified Lines"
+        label="Modified lines"
         value={coverageState.modifiedLinesCoverage}
         tone="neutral"
       />

@@ -8,6 +8,23 @@ export function getStageId(stage: PipelineStageViewModel, index: number): string
   }
   return `stage-${index}`;
 }
+const FAILED_ONLY_STATUSES = new Set(["failure", "unstable"]);
+
+function hasFailedSteps(stage: PipelineStageViewModel): boolean {
+  return (
+    stage.stepsFailedOnly.length > 0 ||
+    stage.parallelBranches.some((branch) => hasFailedSteps(branch))
+  );
+}
+
+/**
+ * Steps start filtered to failures only for a failed or unstable stage that
+ * has failed steps to show; every other stage lists all of its steps.
+ */
+export function defaultShowAllSteps(stage: PipelineStageViewModel): boolean {
+  return !(FAILED_ONLY_STATUSES.has(stage.statusClass) && hasFailedSteps(stage));
+}
+
 export function pruneStageFlags(
   prev: Record<string, boolean>,
   validKeys: Set<string>

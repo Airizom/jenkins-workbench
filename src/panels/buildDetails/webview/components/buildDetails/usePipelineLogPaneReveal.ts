@@ -43,18 +43,20 @@ export function usePipelineLogPaneReveal(activeTargetKey: string | undefined) {
     reveal();
   }, [activeTargetKey, reveal]);
 
+  // Returns whether the pane will be revealed (only when it is stacked).
   const requestReveal = useCallback(
-    (targetKey: string) => {
+    (targetKey: string): boolean => {
       if (!isLogPaneStacked()) {
         pendingKeyRef.current = undefined;
-        return;
+        return false;
       }
       if (targetKey === activeTargetKey) {
         pendingKeyRef.current = undefined;
         reveal();
-        return;
+        return true;
       }
       pendingKeyRef.current = targetKey;
+      return true;
     },
     [activeTargetKey, reveal]
   );

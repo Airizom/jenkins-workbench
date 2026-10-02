@@ -1,3 +1,64 @@
 /* Job History renders with the shared Tailwind components and tokens from base.css.
  * This file stays because Build Details imports it for the embedded history view;
  * add rules here only inside `@layer components` and only when no utility fits. */
+
+/* Narrow panels: the builds and tests tables collapse into one stacked card per
+ * row (as Build Compare's `bc-stack-table` does), with each cell labelled from
+ * `data-label`, so outcomes and actions never scroll out of view. Kept unlayered
+ * so it overrides the table's min-width and the cells' Tailwind utilities. */
+@media (max-width: 639.98px) {
+  .history-stack-table table,
+  .history-stack-table tbody,
+  .history-stack-table tr,
+  .history-stack-table td {
+    display: block;
+    width: auto;
+    min-width: 0;
+  }
+
+  .history-stack-table table {
+    table-layout: auto;
+  }
+
+  .history-stack-table colgroup {
+    display: none;
+  }
+
+  .history-stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .history-stack-table tr {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .history-stack-table td {
+    padding: 0.125rem 0;
+    text-align: left;
+  }
+
+  .history-stack-table td[data-label] {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .history-stack-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted-foreground);
+    font-size: var(--text-caption);
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+  }
+
+  .history-stack-table td[data-label] > * {
+    justify-self: start;
+  }
+}

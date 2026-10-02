@@ -14,7 +14,7 @@ import { resolveResultIconTextClass } from "../../shared/webview/lib/statusStyle
 import { cn } from "../../shared/webview/lib/utils";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { HistoryAction, HistoryViewModel } from "../shared/HistoryContracts";
-import { outcomePresentation } from "./historyPresentation";
+import { compareBuildsLabel, outcomePresentation } from "./historyPresentation";
 
 function OutcomeIcon({ outcome }: { outcome: HistoryOutcome | undefined }) {
   switch (outcome) {
@@ -58,10 +58,11 @@ export function OutcomeBadge({
   );
 }
 
-export function ThisBuildBadge() {
+/** Marks the analyzed build: "This build" inside Build Details, "Selected" in Job History. */
+export function SelectedBuildBadge({ label = "This build" }: { label?: string }) {
   return (
     <Badge variant="muted" size="sm">
-      This build
+      {label}
     </Badge>
   );
 }
@@ -89,12 +90,14 @@ export function TestOutcomeTimeline({
   model,
   test,
   onOpenBuild,
-  onCompare
+  onCompare,
+  selectedLabel
 }: {
   model: HistoryViewModel;
   test: TestHistory;
   onOpenBuild: (buildNumber: number) => void;
   onCompare?: (buildNumber: number) => void;
+  selectedLabel?: string;
 }) {
   return (
     <ol className="flex flex-col divide-y divide-border rounded-md border border-border bg-surface">
@@ -111,18 +114,19 @@ export function TestOutcomeTimeline({
             <Button
               variant="link"
               className="min-w-10 justify-start text-xs tabular-nums"
-              aria-label={`Open build #${build.number}`}
+              aria-label={`Open build #${build.number} details`}
               onClick={() => onOpenBuild(build.number)}
             >
               #{build.number}
             </Button>
             <OutcomeBadge outcome={test.outcomes[index]} />
-            {isSelected ? <ThisBuildBadge /> : null}
+            {isSelected ? <SelectedBuildBadge label={selectedLabel} /> : null}
             {onCompare && !isSelected && model.selectedBuild !== undefined ? (
               <Button
                 variant="ghost"
                 size="xs"
                 className="ml-auto"
+                aria-label={compareBuildsLabel(build.number, model.selectedBuild)}
                 onClick={() => onCompare(build.number)}
               >
                 Compare with #{model.selectedBuild}

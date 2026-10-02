@@ -21,7 +21,8 @@ export type SectionCardDisclosureProps = {
 /**
  * Collapsible comparison section. The heading wraps only the disclosure
  * button (keeping heading navigation intact); the summary and detail sit
- * outside it and describe the button through aria-describedby.
+ * outside it and describe the button through aria-describedby. A section
+ * with nothing to expand renders a compact, non-interactive heading.
  */
 export function SectionCard({
   title,
@@ -56,19 +57,24 @@ export function SectionCard({
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-semibold leading-tight">
-                {/* Pass classes to the trigger (not the child) so tailwind-merge
-                    overrides the shared full-width, space-between layout. */}
-                <CollapsibleTrigger
-                  asChild
-                  className="-mx-1 w-auto max-w-full justify-start rounded-md px-1 py-0.5 hover:bg-accent-soft"
-                >
-                  <button type="button" aria-describedby={describedBy}>
-                    <DisclosureChevron className="h-4 w-4" />
-                    <span className="min-w-0 truncate" title={title}>
-                      {title}
-                    </span>
-                  </button>
-                </CollapsibleTrigger>
+                {hasContent ? (
+                  // Pass classes to the trigger (not the child) so tailwind-merge
+                  // overrides the shared full-width, space-between layout.
+                  <CollapsibleTrigger
+                    asChild
+                    className="-mx-1 w-auto max-w-full justify-start rounded-md px-1 py-0.5 hover:bg-accent-soft"
+                  >
+                    <button type="button" aria-describedby={describedBy}>
+                      <DisclosureChevron className="h-4 w-4" />
+                      <span className="min-w-0 truncate" title={title}>
+                        {title}
+                      </span>
+                    </button>
+                  </CollapsibleTrigger>
+                ) : (
+                  // Keeps the title aligned with the summary below (chevron width + gap).
+                  <span className="block pl-6">{title}</span>
+                )}
               </h3>
               <p id={summaryId} className="mt-1 pl-6 text-xs leading-relaxed text-muted-foreground">
                 {summary}

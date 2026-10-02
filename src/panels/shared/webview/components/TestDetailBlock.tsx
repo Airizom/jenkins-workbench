@@ -16,10 +16,10 @@ export function TestDetailBlock({
         resolveStatusBorderClass(tone ?? "neutral")
       )}
     >
-      <div className="border-b border-border px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="border-b border-border px-2.5 py-1.5 text-caption font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
-      <pre className="m-0 max-h-52 overflow-auto px-2.5 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap wrap-break-word">
+      <pre className="m-0 max-h-52 overflow-auto px-2.5 py-2 font-mono text-caption leading-relaxed whitespace-pre-wrap wrap-break-word">
         {value}
       </pre>
     </div>

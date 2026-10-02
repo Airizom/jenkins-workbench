@@ -57,7 +57,6 @@ const regression: BuildCompareViewModel = {
         name: "rounds split tenders to the nearest cent when currency has no minor unit",
         className: "checkout.payment.SplitTenderRoundingTest",
         suiteName: "checkout-integration",
-        baselineStatusLabel: "-",
         targetStatusLabel: "Failed",
         targetStatusTone: "failed",
         targetDurationLabel: "31ms",
@@ -112,9 +111,9 @@ const regression: BuildCompareViewModel = {
   },
   changesets: {
     status: "available",
-    summaryLabel: "Baseline 0 · Target 2",
+    summaryLabel: "0 commits in baseline · 2 commits in target",
     detail:
-      "Jenkins changesets are per-build, not the full SCM delta between arbitrary build numbers.",
+      "Jenkins records each build's commits since the build before it, not the full difference between these two builds.",
     baselineItems: [],
     targetItems: [
       {
@@ -191,7 +190,7 @@ const regression: BuildCompareViewModel = {
   console: {
     status: "available",
     summaryLabel: "First console divergence found",
-    detail: "Compared up to 5,242,880 bytes and 20,000 lines per build.",
+    detail: "Compared up to 5 MB and 20,000 lines per build.",
     divergenceLineLabel: "First difference at line 19",
     baselineLines: [
       { lineNumber: 17, text: "[Unit tests] + npm run test:unit", highlight: false },
@@ -235,7 +234,7 @@ const identical: BuildCompareViewModel = {
   tests: {
     ...regression.tests,
     status: "empty",
-    summaryLabel: "No high-signal test differences",
+    summaryLabel: "No test changes",
     targetSummaryLabel: "920 passed, 6 skipped",
     newFailures: [],
     newPasses: [],
@@ -253,7 +252,7 @@ const identical: BuildCompareViewModel = {
   changesets: {
     ...regression.changesets,
     status: "empty",
-    summaryLabel: "No Jenkins changesets recorded for either build",
+    summaryLabel: "No commits recorded for either build",
     detail: undefined,
     targetItems: []
   },
@@ -261,14 +260,85 @@ const identical: BuildCompareViewModel = {
     ...regression.stages,
     status: "unavailable",
     summaryLabel: "Pipeline timing unavailable",
-    detail: "Neither build exposed wfapi pipeline data.",
+    detail: "Neither build has pipeline stage data.",
     items: []
   },
   console: {
     ...regression.console,
+    status: "identical",
+    summaryLabel: "Console output is identical",
+    detail: "Compared in full.",
+    divergenceLineLabel: undefined,
+    baselineLines: [],
+    targetLines: []
+  }
+};
+
+/** Console past the scan limits: offers to open either build instead of a snippet. */
+const consoleTooLarge: BuildCompareViewModel = {
+  ...regression,
+  console: {
+    ...regression.console,
     status: "tooLarge",
     summaryLabel: "Logs too large for comparison",
-    detail: "Comparison stops after 5,242,880 bytes or 20,000 lines per build.",
+    detail: "Comparison stops after 5 MB or 20,000 lines per build.",
+    divergenceLineLabel: undefined,
+    baselineLines: [],
+    targetLines: []
+  }
+};
+
+/** Hundreds of changed tests: exercises the search box and "Show more" paging. */
+const manyTestChanges: BuildCompareViewModel = {
+  ...regression,
+  tests: {
+    ...regression.tests,
+    summaryLabel: "New failures 140 · Still failing 12 · Newly passing 1 · 1 ambiguous",
+    targetSummaryLabel: "152 failed, 768 passed, 6 skipped",
+    newFailures: Array.from({ length: 140 }, (_, index) => ({
+      key: `generated-${index}`,
+      name: `handles order variant ${index + 1}`,
+      className: `checkout.variants.Variant${Math.floor(index / 20) + 1}Test`,
+      suiteName: "checkout-variants",
+      baselineStatusLabel: "Passed",
+      targetStatusLabel: "Failed",
+      baselineStatusTone: "passed" as const,
+      targetStatusTone: "failed" as const
+    })),
+    stillFailing: Array.from({ length: 12 }, (_, index) => ({
+      key: `still-${index}`,
+      name: `syncs inventory shard ${index + 1}`,
+      className: "inventory.ShardSyncTest",
+      baselineStatusLabel: "Failed",
+      targetStatusLabel: "Failed",
+      baselineStatusTone: "failed" as const,
+      targetStatusTone: "failed" as const
+    }))
+  }
+};
+
+/** A failed section: the detail shows once in the section, the top list only names it. */
+const sectionError: BuildCompareViewModel = {
+  ...regression,
+  tests: {
+    ...regression.tests,
+    status: "error",
+    summaryLabel: "Test comparison unavailable",
+    detail: "Target test report: Request failed with status 500.",
+    baselineSummaryLabel: "920 passed, 6 skipped",
+    targetSummaryLabel: "Error",
+    newFailures: [],
+    stillFailing: [],
+    newPasses: [],
+    otherChanges: [],
+    ambiguousTests: [],
+    unchangedCount: 0
+  },
+  console: {
+    ...regression.console,
+    status: "error",
+    summaryLabel: "Console comparison unavailable",
+    detail: "Request failed with status 503.",
     divergenceLineLabel: undefined,
     baselineLines: [],
     targetLines: []
@@ -289,5 +359,8 @@ const crossJob: BuildCompareViewModel = {
 export const buildCompareScenarios: Record<string, BuildCompareViewModel> = {
   regression,
   identical,
-  crossJob
+  crossJob,
+  consoleTooLarge,
+  manyTestChanges,
+  sectionError
 };

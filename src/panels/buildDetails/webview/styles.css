@@ -117,6 +117,24 @@
   .donut-segment {
     transition: stroke-dashoffset 600ms ease;
   }
+
+  /* Below the `sm` breakpoint the hero, tab bar, and toolbars would together
+   * cover most of the viewport, so only the tab bar stays docked. */
+  @media (width < 40rem) {
+    .sticky-header.build-details-hero,
+    .sticky-header.sticky-header--below-hero {
+      position: relative;
+      top: auto;
+    }
+
+    .build-details-tabs-bar {
+      top: 0;
+    }
+
+    .pipeline-log-pane {
+      scroll-margin-top: calc(var(--build-details-tabs-bar-height, 0px) + 0.5rem);
+    }
+  }
 }
 
 /* Unlayered so hover shadow utilities cannot hide it. Distinct from hover
@@ -156,6 +174,15 @@
 }
 
 @layer utilities {
+  /* High-contrast themes map the neutral fill to the contrast border color,
+   * which reads as a progress bar. Show stages that did not run as an empty,
+   * dashed outline instead. Lives in the utilities layer so it outranks the
+   * segment's `bg-*` fill utility. */
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) .stage-strip-bar--not-run {
+    background: transparent;
+    border: 1px dashed var(--vscode-contrastBorder, currentColor);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .stage-strip-bar--running,
     .hero-status-glyph--running {

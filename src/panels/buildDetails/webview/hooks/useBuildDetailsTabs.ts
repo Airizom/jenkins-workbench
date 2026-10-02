@@ -26,6 +26,23 @@ type UseBuildDetailsTabsResult = {
 };
 const NO_INPUT_IDS: readonly string[] = [];
 
+/**
+ * When the active tab disappears (for example Inputs after the last input is
+ * approved) its focused control unmounts and focus falls back to the body.
+ * Move it to the newly active tab trigger, unless the user already moved on.
+ */
+function focusTabTriggerIfFocusLost(tab: BuildDetailsTab): void {
+  requestAnimationFrame(() => {
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) {
+      return;
+    }
+    document
+      .querySelector<HTMLElement>(`[role="tab"][data-tab-value="${tab}"]`)
+      ?.focus({ preventScroll: true });
+  });
+}
+
 export function useBuildDetailsTabs({
   hasPendingInputs,
   pendingInputIds = NO_INPUT_IDS,
@@ -84,6 +101,7 @@ export function useBuildDetailsTabs({
       selectedTabWasAvailable.current = true;
     } else if (selectedTabWasAvailable.current) {
       applySelectedTab(defaultTab);
+      focusTabTriggerIfFocusLost(defaultTab);
     }
   }, [availableTabs, defaultTab, selectedTab, applySelectedTab]);
 

@@ -68,6 +68,7 @@ const NODE_STATUS_CLASSES: ReadonlySet<string> = new Set<NodeStatusClass>([
 ]);
 
 const REQUIRED_STRING_FIELDS = [
+  "environmentLabel",
   "displayName",
   "name",
   "updatedAt",
@@ -88,6 +89,7 @@ const OPTIONAL_STRING_FIELDS = [
 
 const REQUIRED_BOOLEAN_FIELDS = [
   "detailsAvailable",
+  "refreshFailed",
   "isOffline",
   "isTemporarilyOffline",
   "canTakeOffline",
@@ -146,6 +148,12 @@ export function isNodeDetailsViewModel(value: unknown): value is NodeDetailsView
     return false;
   }
   if (!REQUIRED_BOOLEAN_FIELDS.every((field) => typeof value[field] === "boolean")) {
+    return false;
+  }
+  if (
+    value.offlineSinceMs !== undefined &&
+    (typeof value.offlineSinceMs !== "number" || !Number.isFinite(value.offlineSinceMs))
+  ) {
     return false;
   }
   if (typeof value.statusClass !== "string" || !NODE_STATUS_CLASSES.has(value.statusClass)) {

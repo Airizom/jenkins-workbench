@@ -61,6 +61,12 @@ export function useTestResultsView({
     setStatusFilterState(value);
   }, []);
 
+  const clearFilters = useCallback(() => {
+    filterSettledRef.current = true;
+    setStatusFilterState("all");
+    setQuery("");
+  }, []);
+
   const visibleItems = filteredItems.slice(0, renderCount);
   const hasMore = filteredItems.length > visibleItems.length;
 
@@ -73,6 +79,7 @@ export function useTestResultsView({
     hasMore,
     setStatusFilter,
     setQuery,
+    clearFilters,
     showMore: () => setRenderCount((current) => current + RENDER_BATCH_SIZE)
   };
 }

@@ -3,33 +3,20 @@ import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { TestTubeIcon } from "../../../../../shared/webview/icons";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
-import { getTestDistribution } from "./testResultsUtils";
-
-function getPassedPercent(summary: BuildTestsSummaryViewModel, passedPct: number): number {
-  const rounded = Math.round(passedPct);
-  if (rounded >= 100 && summary.passedCount < summary.totalCount) {
-    return 99;
-  }
-  if (rounded <= 0 && summary.passedCount > 0) {
-    return 1;
-  }
-  return rounded;
-}
+import { describeTestOutcome, getTestDistribution } from "./testResultsUtils";
 
 export function TestResultsSummaryCard({ summary }: { summary: BuildTestsSummaryViewModel }) {
   const { failedPct, skippedPct, passedPct } = getTestDistribution(summary);
-  const passedPercent = getPassedPercent(summary, passedPct);
+  const outcome = describeTestOutcome(summary);
+  const meterValue = Math.floor((outcome.passRate ?? 0) * 10) / 10;
 
   return (
     <MetricsSummarySection
       icon={<TestTubeIcon className="h-4 w-4" />}
-      title="Test Results"
+      title="Test results"
       badge={
         summary.hasAnyResults ? (
-          <ToneBadge
-            label={`${passedPercent}% passed`}
-            tone={summary.failedCount > 0 ? "failed" : "passed"}
-          />
+          <ToneBadge label={outcome.passRateLabel} tone={outcome.tone} />
         ) : undefined
       }
       description={summary.summaryLabel}
@@ -45,14 +32,14 @@ export function TestResultsSummaryCard({ summary }: { summary: BuildTestsSummary
         summary.hasAnyResults ? (
           <>
             <meter
-              aria-label={`${passedPercent}% tests passed`}
-              aria-valuenow={passedPercent}
+              aria-label={`Tests ${outcome.passRateLabel.toLowerCase()}`}
+              aria-valuenow={meterValue}
               className="sr-only"
               min={0}
               max={100}
-              value={passedPercent}
+              value={meterValue}
             >
-              {passedPercent}% tests passed
+              {outcome.passRateLabel}
             </meter>
             <div
               aria-hidden="true"

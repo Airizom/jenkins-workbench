@@ -4,7 +4,7 @@ import { Progress } from "../../shared/webview/components/ui/progress";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { toast } from "../../shared/webview/hooks/useToast";
-import type { BuildCompareViewModel } from "../shared/BuildCompareContracts";
+import type { BuildCompareViewModel, CompareSectionStatus } from "../shared/BuildCompareContracts";
 import type { BuildCompareIncomingMessage } from "../shared/BuildComparePanelMessages";
 import type { BuildCompareSectionId } from "../shared/BuildComparePanelWebviewState";
 import { BuildCompareBuildPair } from "./components/buildCompare/BuildCompareBuildPair";
@@ -54,6 +54,13 @@ const ACTION_MESSAGES: Record<
   }
 };
 
+/** Sections with nothing to show start collapsed; their summary line says why. */
+const QUIET_STATUSES: ReadonlySet<CompareSectionStatus> = new Set([
+  "empty",
+  "unavailable",
+  "identical"
+]);
+
 function sectionAnchorId(id: BuildCompareSectionId): string {
   return `compare-section-${id}`;
 }
@@ -83,7 +90,7 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
   };
 
   const disclosure = (id: BuildCompareSectionId) => ({
-    open: isOpen(id),
+    open: isOpen(id, !QUIET_STATUSES.has(model[id].status)),
     onOpenChange: (open: boolean) => setOpen(id, open)
   });
 
@@ -92,14 +99,29 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
     parameters: <ParameterDiffSection section={model.parameters} {...disclosure("parameters")} />,
     changesets: <ChangesetsSection section={model.changesets} {...disclosure("changesets")} />,
     stages: <StageTimingSection section={model.stages} {...disclosure("stages")} />,
-    console: <ConsoleDivergenceSection section={model.console} {...disclosure("console")} />
+    console: (
+      <ConsoleDivergenceSection
+        section={model.console}
+        baseline={model.baseline}
+        target={model.target}
+        {...disclosure("console")}
+      />
+    )
   };
 
+  // Each failed section explains itself in place; this list only names them.
   const sectionErrors = SECTION_ORDER.flatMap((id) => {
     const section = model[id];
-    return section.status === "error" ? [section.detail ?? section.summaryLabel] : [];
+    return section.status === "error"
+      ? [`${COMPARE_SECTION_TITLES[id]}: ${section.summaryLabel}`]
+      : [];
   });
   const isLoading = SECTION_ORDER.some((id) => model[id].status === "loading");
+  // The console scan runs after the rest of the comparison and can take a while;
+  // it must not lock Refresh or Swap (both restart it anyway).
+  const actionsBusy =
+    busyAction !== undefined ||
+    SECTION_ORDER.some((id) => id !== "console" && model[id].status === "loading");
   const busy = isLoading || busyAction !== undefined;
 
   const navItems: CompareSectionNavItem[] = SECTION_ORDER.map((id) => ({
@@ -118,7 +140,7 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
       <BuildCompareHeader
         baseline={model.baseline}
         target={model.target}
-        busy={busy}
+        busy={actionsBusy}
         busyAction={busyAction}
         onRefresh={() => runAction("refresh")}
         onSwap={() => runAction("swap")}
@@ -130,14 +152,14 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
             errors={[actionError.message]}
             title={`${ACTION_MESSAGES[actionError.action].failureTitle}. Showing the previous comparison.`}
             className="flex flex-col gap-1"
-            onRetry={busy ? undefined : () => runAction(actionError.action)}
+            onRetry={actionsBusy ? undefined : () => runAction(actionError.action)}
           />
         ) : null}
         <PanelErrorList
           errors={[...model.errors, ...sectionErrors]}
           title="Comparison errors"
           className="flex flex-col gap-1"
-          onRetry={busy ? undefined : () => runAction("refresh")}
+          onRetry={actionsBusy ? undefined : () => runAction("refresh")}
         />
         <BuildCompareBuildPair baseline={model.baseline} target={model.target} />
         <CompareSectionNav items={navItems} />

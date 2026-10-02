@@ -33,9 +33,8 @@ export function buildStagesSection(
     dataLabel: "Pipeline data",
     errorSummaryLabel: "Pipeline timing unavailable",
     unavailableSummaryLabel: "Pipeline timing unavailable",
-    bothUnavailableDetail: "Neither build exposed wfapi pipeline data.",
-    partialUnavailableDetail:
-      "Both builds need wfapi pipeline data for stage-by-stage timing comparison.",
+    bothUnavailableDetail: "Neither build has pipeline stage data.",
+    partialUnavailableDetail: "Both builds need pipeline stage data to compare stage timing.",
     emptyFields: { items: [] },
     onAvailable: (baselineValue, targetValue) =>
       buildAvailableStagesSection(baselineValue, targetValue)

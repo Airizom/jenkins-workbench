@@ -13,7 +13,7 @@ export type BuildComparePanelRenderOptions = EnvironmentPanelRenderOptions;
 
 export class BuildComparePanelView extends EnvironmentPanelView<BuildCompareViewModel> {
   constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-    super(panel, extensionUri, "buildCompare", "build", "Build Compare", renderBuildCompareHtml);
+    super(panel, extensionUri, "buildCompare", "compare", "Build Compare", renderBuildCompareHtml);
   }
 
   renderBuildCompare(

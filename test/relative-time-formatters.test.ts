@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import {
-  formatRelativeDate,
-  formatRelativeIsoTimestamp,
-  formatRelativeTimestampMs
+  formatRelativeTimestampMs,
+  formatUpdatedAtLabel
 } from "../src/formatters/RelativeTimeFormatters";
 
 const MINUTE_MS = 60_000;
@@ -34,43 +33,39 @@ describe("relative time formatters", () => {
       assert.equal(formatRelativeTimestampMs(NOW - ageMs), expected);
     }
   });
+});
 
-  it("preserves Date formatting at elapsed-time boundaries", () => {
+describe("formatUpdatedAtLabel", () => {
+  it("uses one Updated pattern for Date and ISO inputs", () => {
     const cases: Array<[number, string]> = [
-      [MINUTE_MS, "1m ago"],
-      [HOUR_MS, "1h ago"],
-      [DAY_MS, "24h ago"],
-      [2 * DAY_MS, "2d ago"],
-      [7 * DAY_MS, "7d ago"]
+      [15_000, "Updated just now"],
+      [59_999, "Updated just now"],
+      [MINUTE_MS, "Updated 1m ago"],
+      [59 * MINUTE_MS, "Updated 59m ago"],
+      [HOUR_MS, "Updated 1h ago"],
+      [23 * HOUR_MS, "Updated 23h ago"]
     ];
 
     for (const [ageMs, expected] of cases) {
-      assert.equal(formatRelativeDate(new Date(NOW - ageMs), NOW), expected);
+      assert.equal(formatUpdatedAtLabel(new Date(NOW - ageMs), NOW), expected);
+      assert.equal(formatUpdatedAtLabel(new Date(NOW - ageMs).toISOString(), NOW), expected);
     }
   });
 
-  it("preserves ISO formatting at elapsed-time boundaries", () => {
-    const ages = [MINUTE_MS, HOUR_MS, DAY_MS, 2 * DAY_MS, 7 * DAY_MS];
+  it("includes the date once the snapshot is a day old", () => {
+    const timestamp = NOW - 2 * DAY_MS;
+    const expected = new Date(timestamp).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
 
-    for (const ageMs of ages) {
-      const timestamp = NOW - ageMs;
-      const expected = ageMs < HOUR_MS ? "1m ago" : new Date(timestamp).toLocaleTimeString();
-      assert.equal(formatRelativeIsoTimestamp(new Date(timestamp).toISOString()), expected);
-    }
-  });
-});
-
-describe("formatRelativeDate", () => {
-  it("keeps sub-minute ages as Just now", () => {
-    const now = Date.UTC(2026, 0, 1, 12, 0, 0);
-
-    assert.equal(formatRelativeDate(new Date(now - 15_000), now), "Just now");
-    assert.equal(formatRelativeDate(new Date(now - 59_999), now), "Just now");
+    assert.equal(formatUpdatedAtLabel(new Date(timestamp), NOW), `Updated ${expected}`);
+    assert.equal(formatUpdatedAtLabel(new Date(NOW - DAY_MS), NOW).startsWith("Updated "), true);
+    assert.notEqual(formatUpdatedAtLabel(new Date(NOW - DAY_MS), NOW), "Updated 24h ago");
   });
 
-  it("formats one minute old timestamps as minutes", () => {
-    const now = Date.UTC(2026, 0, 1, 12, 0, 0);
-
-    assert.equal(formatRelativeDate(new Date(now - 60_000), now), "1m ago");
+  it("reports unknown times without a misleading relative label", () => {
+    assert.equal(formatUpdatedAtLabel(undefined, NOW), "Update time unknown");
+    assert.equal(formatUpdatedAtLabel("not a date", NOW), "Update time unknown");
   });
 });

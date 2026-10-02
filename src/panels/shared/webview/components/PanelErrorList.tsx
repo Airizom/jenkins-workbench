@@ -12,11 +12,27 @@ type PanelErrorListProps = {
   className?: string;
   onRetry?: () => void;
   retryLabel?: string;
+  /** Keeps the Retry button in place but disabled, e.g. while a retry is already running. */
+  retryDisabled?: boolean;
 };
 
-function RetryButton({ onRetry, retryLabel }: { onRetry: () => void; retryLabel: string }) {
+function RetryButton({
+  onRetry,
+  retryLabel,
+  disabled
+}: {
+  onRetry: () => void;
+  retryLabel: string;
+  disabled?: boolean;
+}) {
   return (
-    <Button variant="outline" size="sm" className="mt-2 self-start" onClick={onRetry}>
+    <Button
+      variant="outline"
+      size="sm"
+      className="mt-2 self-start"
+      onClick={onRetry}
+      disabled={disabled}
+    >
       <RefreshIcon className="h-3.5 w-3.5" />
       {retryLabel}
     </Button>
@@ -30,7 +46,8 @@ export function PanelErrorList({
   id,
   className,
   onRetry,
-  retryLabel = "Retry"
+  retryLabel = "Retry",
+  retryDisabled
 }: PanelErrorListProps): React.JSX.Element | null {
   if (errors.length === 0) {
     return null;
@@ -42,7 +59,9 @@ export function PanelErrorList({
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           <CardDescription>{errors.join(" ")}</CardDescription>
-          {onRetry ? <RetryButton onRetry={onRetry} retryLabel={retryLabel} /> : null}
+          {onRetry ? (
+            <RetryButton onRetry={onRetry} retryLabel={retryLabel} disabled={retryDisabled} />
+          ) : null}
         </CardHeader>
       </Card>
     );
@@ -66,7 +85,9 @@ export function PanelErrorList({
           {error}
         </AlertDescription>
       ))}
-      {onRetry ? <RetryButton onRetry={onRetry} retryLabel={retryLabel} /> : null}
+      {onRetry ? (
+        <RetryButton onRetry={onRetry} retryLabel={retryLabel} disabled={retryDisabled} />
+      ) : null}
     </Alert>
   );
 }

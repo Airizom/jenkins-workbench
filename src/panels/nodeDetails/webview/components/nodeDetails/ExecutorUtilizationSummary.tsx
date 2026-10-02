@@ -25,9 +25,12 @@ export function ExecutorUtilizationSummary({
         <span>
           Executors: <span className="font-medium text-foreground">{executorsLabel}</span>
         </span>
-        <span>
-          Activity: <span className="font-medium text-foreground">{activityLabel}</span>
-        </span>
+        {/* Offline is already stated by the badge and banner above. */}
+        {isOffline ? null : (
+          <span>
+            Activity: <span className="font-medium text-foreground">{activityLabel}</span>
+          </span>
+        )}
         <OneOffExecutorBadge utilization={utilization} />
       </div>
     );
@@ -67,9 +70,13 @@ export function ExecutorUtilizationSummary({
         <div className="monitor-gauge monitor-gauge--lg" data-offline={isOffline || undefined}>
           <div className="monitor-gauge-fill" style={{ width: `${percent}%` }} />
         </div>
-        <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground">
-          {isOffline ? "Offline" : `${percent}% busy`}
-        </span>
+        {/* Offline is already stated by the badge, banner, and counts; the hatched
+            bar carries it visually. */}
+        {isOffline ? null : (
+          <span className="shrink-0 whitespace-nowrap text-caption tabular-nums text-muted-foreground">
+            {percent}% busy
+          </span>
+        )}
       </div>
       <OneOffExecutorBadge utilization={utilization} />
     </div>
@@ -88,7 +95,7 @@ function OneOffExecutorBadge({
   return (
     <Badge
       variant="outline"
-      className="text-[10px] px-1.5 py-0 border-border bg-muted-soft text-muted-foreground"
+      className="text-micro px-1.5 py-0 border-border bg-muted-soft text-muted-foreground"
     >
       +{utilization.oneOffBusy}/{utilization.oneOffTotal} one-off
     </Badge>

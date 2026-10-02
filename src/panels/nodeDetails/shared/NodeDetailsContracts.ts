@@ -20,10 +20,18 @@ export interface NodeMonitorViewModel {
 export interface NodeDetailsViewModel {
   /** False when Jenkins returned no node data yet (for example, the first load failed). */
   detailsAvailable: boolean;
+  /**
+   * True when the latest refresh failed and the view still shows the last
+   * successfully loaded details (with that load's `updatedAt`).
+   */
+  refreshFailed: boolean;
+  /** Jenkins environment the node belongs to, shown as the hero eyebrow. */
+  environmentLabel: string;
   displayName: string;
   name: string;
   description?: string;
   url?: string;
+  /** Time of the last successful load; a failed refresh keeps the previous value. */
   updatedAt: string;
   statusLabel: string;
   statusClass: NodeStatusClass;
@@ -34,6 +42,8 @@ export interface NodeDetailsViewModel {
   canLaunchAgent: boolean;
   canOpenAgentInstructions: boolean;
   offlineReason?: string;
+  /** Epoch ms when Jenkins recorded the offline cause, when reported. */
+  offlineSinceMs?: number;
   /** "Running builds", "Idle", "Offline", or "Not available". */
   activityLabel: string;
   /** "3 of 4 busy", "4 offline", "4 total", or "Not available". */

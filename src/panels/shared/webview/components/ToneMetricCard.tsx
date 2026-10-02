@@ -31,7 +31,7 @@ export function ToneMetricCard({
             className={cn("inline-block h-1.5 w-1.5 rounded-full", resolveMetricDotClass(tone))}
           />
         ) : null}
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        <span className="text-caption uppercase tracking-wide text-muted-foreground">{label}</span>
       </div>
       <div className={cn("text-lg font-semibold tabular-nums", resolveMetricToneClass(tone))}>
         {displayValue}

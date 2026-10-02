@@ -13,5 +13,7 @@ export interface TestResultsView {
   hasMore: boolean;
   setStatusFilter: (value: TestStatusFilter) => void;
   setQuery: (value: string) => void;
+  /** Resets the status filter to "all" and clears the search query. */
+  clearFilters: () => void;
   showMore: () => void;
 }

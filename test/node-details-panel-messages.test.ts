@@ -11,6 +11,8 @@ function createNodeDetailsViewModel(
 ): Record<string, unknown> {
   return {
     detailsAvailable: true,
+    refreshFailed: false,
+    environmentLabel: "jenkins.example.com",
     displayName: "agent-1",
     name: "agent-1",
     description: "Linux agent",
@@ -77,6 +79,10 @@ describe("NodeDetailsPanelMessages", () => {
       createNodeDetailsViewModel({ advancedLoaded: 1 }),
       createNodeDetailsViewModel({ activityLabel: undefined }),
       createNodeDetailsViewModel({ detailsAvailable: undefined }),
+      createNodeDetailsViewModel({ refreshFailed: undefined }),
+      createNodeDetailsViewModel({ environmentLabel: undefined }),
+      createNodeDetailsViewModel({ offlineSinceMs: "yesterday" }),
+      createNodeDetailsViewModel({ offlineSinceMs: Number.NaN }),
       createNodeDetailsViewModel({ executorsLabel: undefined }),
       createNodeDetailsViewModel({ rawJson: undefined }),
       createNodeDetailsViewModel({ labels: "linux" }),
@@ -110,10 +116,12 @@ describe("NodeDetailsPanelMessages", () => {
       offlineReason: undefined,
       jnlpAgentLabel: undefined,
       launchSupportedLabel: undefined,
-      manualLaunchLabel: undefined
+      manualLaunchLabel: undefined,
+      offlineSinceMs: undefined
     });
 
     assert.equal(isNodeDetailsViewModel(payload), true);
+    assert.equal(isNodeDetailsViewModel(createNodeDetailsViewModel({ offlineSinceMs: 1 })), true);
   });
 
   it("parses copy result messages only with a boolean success flag", () => {

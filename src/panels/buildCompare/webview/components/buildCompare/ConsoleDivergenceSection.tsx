@@ -1,41 +1,66 @@
 import * as React from "react";
-import { Badge } from "../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { ArrowDownIcon } from "../../../../shared/webview/icons";
-import type { BuildCompareConsoleSectionViewModel } from "../../../shared/BuildCompareContracts";
+import { postVsCodeMessage } from "../../../../shared/webview/lib/vscodeApi";
+import type {
+  BuildCompareBuildViewModel,
+  BuildCompareConsoleSectionViewModel
+} from "../../../shared/BuildCompareContracts";
 import { ConsoleComparison } from "./console/ConsoleComparison";
 import { scrollConsoleSnippetsToDivergence } from "./console/consoleDivergenceScroll";
-import { CompareEmptyState } from "./shared/CompareEmptyState";
 import { SectionCard, type SectionCardDisclosureProps } from "./shared/SectionCard";
 
 const { useEffect } = React;
 
-function resolveConsoleEmptyLabel(status: BuildCompareConsoleSectionViewModel["status"]): string {
+/**
+ * Guidance for states that have no snippet but still need the full logs. Other
+ * states (loading, identical, unavailable) are fully described by the heading.
+ */
+function resolveConsoleFallback(
+  status: BuildCompareConsoleSectionViewModel["status"]
+): string | undefined {
   switch (status) {
-    case "loading":
-      return "Console comparison is still loading.";
     case "tooLarge":
-      return "Open the underlying build details to inspect the full logs.";
-    case "identical":
-      return "Both console logs matched within the configured comparison limits.";
+      return "These logs are past the comparison limits. Open a build to read its full console output.";
+    case "error":
+      return "Refresh to try the comparison again, or open a build to read its full console output.";
     default:
-      return "Console comparison did not produce a snippet.";
+      return undefined;
   }
 }
 
-function DivergenceIndicator({ label, canJump }: { label?: string; canJump: boolean }) {
+function OpenBuildButtons({
+  baseline,
+  target
+}: {
+  baseline: BuildCompareBuildViewModel;
+  target: BuildCompareBuildViewModel;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {(
+        [
+          ["baseline", baseline],
+          ["target", target]
+        ] as const
+      ).map(([side, build]) => (
+        <Button
+          key={side}
+          variant="outline"
+          size="sm"
+          onClick={() => postVsCodeMessage({ type: "openBuildDetails", side })}
+        >
+          Open {side} build {build.buildNumberLabel}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+function DivergenceIndicator({ label }: { label?: string }) {
   if (!label) {
     return null;
   }
-
-  if (!canJump) {
-    return (
-      <Badge variant="outline" className="mb-3">
-        {label}
-      </Badge>
-    );
-  }
-
   return (
     <Button
       variant="outline"
@@ -51,11 +76,16 @@ function DivergenceIndicator({ label, canJump }: { label?: string; canJump: bool
 
 export function ConsoleDivergenceSection({
   section,
+  baseline,
+  target,
   ...disclosure
 }: {
   section: BuildCompareConsoleSectionViewModel;
+  baseline: BuildCompareBuildViewModel;
+  target: BuildCompareBuildViewModel;
 } & SectionCardDisclosureProps) {
   const hasSnippets = section.status === "available";
+  const fallback = hasSnippets ? undefined : resolveConsoleFallback(section.status);
 
   // Center both snippets on the divergence line once the console data arrives.
   useEffect(() => {
@@ -75,12 +105,18 @@ export function ConsoleDivergenceSection({
       status={section.status}
       {...disclosure}
     >
-      <DivergenceIndicator label={section.divergenceLineLabel} canJump={hasSnippets} />
       {hasSnippets ? (
-        <ConsoleComparison section={section} />
-      ) : (
-        <CompareEmptyState label={resolveConsoleEmptyLabel(section.status)} />
-      )}
+        <>
+          <DivergenceIndicator label={section.divergenceLineLabel} />
+          <ConsoleComparison section={section} />
+        </>
+      ) : null}
+      {fallback ? (
+        <>
+          <p className="text-xs text-muted-foreground">{fallback}</p>
+          <OpenBuildButtons baseline={baseline} target={target} />
+        </>
+      ) : null}
     </SectionCard>
   );
 }

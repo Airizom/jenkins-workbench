@@ -3,6 +3,7 @@ import type { QueueWorkItemViewModel } from "../../../../../shared/queueWork/Que
 import { ExternalLinkIcon } from "../../icons";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { ClampedText } from "../ui/clamped-text";
 import { TruncatedText } from "../ui/truncated-text";
 
 export type QueueWorkItemRowProps = {
@@ -58,7 +59,11 @@ export function QueueWorkItemRow({
           {item.queuedDurationLabel ? ` · ${item.queuedDurationLabel}` : ""}
         </div>
         {item.reason ? (
-          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.reason}</p>
+          <ClampedText
+            text={item.reason}
+            className="mt-1"
+            textClassName="text-xs text-muted-foreground"
+          />
         ) : null}
       </div>
       {item.taskUrl ? renderTaskAction(item.taskUrl) : null}

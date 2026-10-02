@@ -5,31 +5,34 @@ import { describe, it } from "vitest";
 import type { CompareSectionStatus } from "../src/panels/buildCompare/shared/BuildCompareContracts";
 import { CompareItemsSection } from "../src/panels/buildCompare/webview/components/buildCompare/shared/CompareItemsSection";
 
-function renderEmptySection(status: CompareSectionStatus): string {
+function renderSection(status: CompareSectionStatus, items: string[] = []): string {
   return renderToStaticMarkup(
     createElement(CompareItemsSection<string>, {
       title: "Parameter Diff",
       summary: "Comparison summary",
+      detail: "Why it looks this way",
       status,
-      items: [],
-      emptyLabel: "No differences",
-      renderItems: (items) => items.join(", ")
+      items,
+      renderItems: (visible) => visible.join(", ")
     })
   );
 }
 
 describe("CompareItemsSection", () => {
-  it("shows the result empty label only for a completed empty comparison", () => {
-    assert.match(renderEmptySection("empty"), /No differences/);
-
-    for (const status of ["loading", "error", "unavailable"] as const) {
-      assert.doesNotMatch(renderEmptySection(status), /No differences/);
+  it("renders an empty section as a compact heading with its summary, not an empty-state box", () => {
+    for (const status of ["empty", "loading", "error", "unavailable"] as const) {
+      const html = renderSection(status);
+      assert.match(html, /Comparison summary/);
+      assert.match(html, /Why it looks this way/);
+      // Nothing to expand: no disclosure button and no placeholder copy.
+      assert.doesNotMatch(html, /<button/);
+      assert.doesNotMatch(html, /Comparison (is loading|failed|data is unavailable)\./);
     }
   });
 
-  it("shows a message matching the pending or failed status", () => {
-    assert.match(renderEmptySection("loading"), /Comparison is loading\./);
-    assert.match(renderEmptySection("error"), /Comparison failed\./);
-    assert.match(renderEmptySection("unavailable"), /Comparison data is unavailable\./);
+  it("renders the items behind a disclosure when there are any", () => {
+    const html = renderSection("available", ["alpha", "beta"]);
+    assert.match(html, /alpha, beta/);
+    assert.match(html, /<h3[^>]*><button[^>]*aria-expanded="true"/);
   });
 });

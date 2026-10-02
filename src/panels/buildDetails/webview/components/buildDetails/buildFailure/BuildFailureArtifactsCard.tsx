@@ -51,23 +51,23 @@ function ArtifactsList({
           relativePath && relativePath !== displayName
             ? `${displayName} (${relativePath})`
             : displayName;
-        const artifactTooltip = relativePath || displayName;
+        // The directory is visible secondary text (not a hover-only tooltip),
+        // so the full path is readable and selectable without a pointer.
+        const showPath = Boolean(relativePath) && relativePath !== displayName;
         return (
           <li
             className="flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-muted-soft px-2 py-1.5"
             key={keys[index]}
           >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <FileIcon className="h-4 w-4 shrink-0" />
-                  <span className="text-xs truncate">{displayName}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-sm wrap-break-word">
-                {artifactTooltip}
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex min-w-0 items-start gap-1.5">
+              <FileIcon className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs wrap-break-word">{displayName}</div>
+                {showPath ? (
+                  <div className="text-caption text-muted-foreground break-all">{relativePath}</div>
+                ) : null}
+              </div>
+            </div>
             <div className="flex items-center gap-0.5 shrink-0">
               <ArtifactActionButton
                 action="preview"

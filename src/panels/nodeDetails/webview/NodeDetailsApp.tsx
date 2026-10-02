@@ -16,7 +16,7 @@ import type { NodeAction } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsHero } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
 import {
-  formatRelativeTime,
+  formatUpdatedAtLabel,
   isStaleUpdatedAt,
   parseDate
 } from "./components/nodeDetails/nodeDetailsUtils";
@@ -35,7 +35,7 @@ export function NodeDetailsApp(): React.JSX.Element {
 
   const updatedAtDate = useMemo(() => parseDate(state.updatedAt), [state.updatedAt]);
   const updatedAtLabel = useMemo(
-    () => formatRelativeTime(updatedAtDate, now),
+    () => formatUpdatedAtLabel(updatedAtDate, now),
     [updatedAtDate, now]
   );
   const updatedAtTitle = useMemo(
@@ -47,10 +47,10 @@ export function NodeDetailsApp(): React.JSX.Element {
   const statusAccent = resolveNodeStatusAccentClass(state.statusClass);
   const nodeAction = useMemo<NodeAction | undefined>(() => {
     if (state.canTakeOffline) {
-      return { type: "takeNodeOffline", label: "Take Offline..." };
+      return { type: "takeNodeOffline", label: "Take offline…" };
     }
     if (state.canBringOnline) {
-      return { type: "bringNodeOnline", label: "Bring Online" };
+      return { type: "bringNodeOnline", label: "Bring online" };
     }
     return undefined;
   }, [state.canTakeOffline, state.canBringOnline]);
@@ -100,14 +100,13 @@ export function NodeDetailsApp(): React.JSX.Element {
     postMessage({ type: "copyNodeJson", content: state.rawJson });
   };
 
-  const handleDiagnosticsToggle = (value: NodeDetailsTab) => {
-    loadAdvancedNodeDetailsForTab(value, state.advancedLoaded, () => {
-      postMessage({ type: "loadAdvancedNodeDetails" });
-    });
+  const requestAdvancedDetails = () => {
+    dispatch({ type: "advancedRequested" });
+    postMessage({ type: "loadAdvancedNodeDetails" });
   };
 
-  const handleRetryDiagnostics = () => {
-    postMessage({ type: "loadAdvancedNodeDetails" });
+  const handleDiagnosticsToggle = (value: NodeDetailsTab) => {
+    loadAdvancedNodeDetailsForTab(value, state.advancedLoaded, requestAdvancedDetails);
   };
 
   // Nothing loaded yet and the load failed: show one failure view instead of
@@ -122,7 +121,7 @@ export function NodeDetailsApp(): React.JSX.Element {
         ) : null}
         <PanelHeader
           eyebrowIcon={<ServerIcon className="h-3.5 w-3.5" />}
-          eyebrow="Node Details"
+          eyebrow={state.environmentLabel}
           title="Node details unavailable"
           actions={
             state.url ? (
@@ -138,7 +137,8 @@ export function NodeDetailsApp(): React.JSX.Element {
             errors={state.errors}
             title="Couldn't load node details"
             className="flex flex-col gap-1"
-            onRetry={state.loading ? undefined : handleRefresh}
+            onRetry={handleRefresh}
+            retryDisabled={state.loading}
           />
         </main>
       </div>
@@ -154,6 +154,7 @@ export function NodeDetailsApp(): React.JSX.Element {
           </div>
         ) : null}
         <NodeDetailsHero
+          environmentLabel={state.environmentLabel}
           displayName={state.displayName}
           name={state.name}
           description={state.description}
@@ -181,12 +182,17 @@ export function NodeDetailsApp(): React.JSX.Element {
           onOpen={handleOpen}
         />
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-3" aria-busy={state.loading}>
-          <NodeDetailsAlerts errors={state.errors} onRetry={handleRefresh} />
+          <NodeDetailsAlerts
+            errors={state.errors}
+            refreshFailed={state.refreshFailed}
+            loading={state.loading}
+            onRetry={handleRefresh}
+          />
 
           <NodeDetailsTabs
             state={state}
             onDiagnosticsToggle={handleDiagnosticsToggle}
-            onRetryDiagnostics={handleRetryDiagnostics}
+            onRetryDiagnostics={requestAdvancedDetails}
             onCopyJson={handleCopyJson}
             onOpenExternal={handleOpenExternal}
           />

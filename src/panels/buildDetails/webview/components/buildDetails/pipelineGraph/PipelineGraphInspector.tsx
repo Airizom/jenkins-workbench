@@ -38,7 +38,7 @@ export function PipelineGraphInspector({
     return (
       <Card className="h-full">
         <CardHeader className="pb-3">
-          <CardTitle>Stage Inspector</CardTitle>
+          <CardTitle>Stage inspector</CardTitle>
         </CardHeader>
         <CardContent className="pt-0 text-sm text-muted-foreground">
           Select a stage in the graph to inspect its status, duration, branches, and steps.
@@ -60,15 +60,15 @@ export function PipelineGraphInspector({
       <CardHeader className="gap-3 border-b border-border pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Stage Inspector
+            <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+              Stage inspector
             </div>
             <CardTitle className="text-base break-words">{stage.name || "Stage"}</CardTitle>
             <div className="text-xs text-muted-foreground">{stage.durationLabel || "Unknown"}</div>
           </div>
           <ResultBadge label={stage.statusLabel || "Unknown"} status={stage.statusClass} />
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
           <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
             {formatCount(stage.parallelBranches.length, "branch", "branches")}
           </span>
@@ -98,7 +98,7 @@ export function PipelineGraphInspector({
         {hasParallelBranches ? (
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
                 Parallel Branches
               </div>
               {hasBranchSteps ? (
@@ -121,7 +121,7 @@ export function PipelineGraphInspector({
         {hasDirectSteps ? (
           <section className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
                 Steps
               </div>
               <StepsVisibilityToggle showAll={showAllSteps} onShowAllChange={setShowAllSteps} />

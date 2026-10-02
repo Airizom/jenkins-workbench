@@ -8,6 +8,7 @@ import {
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import {
   BuildFailureDiagnosticsCard,
+  countHiddenDiagnostics,
   describeBuildDiagnostics
 } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureDiagnosticsCard";
 
@@ -66,10 +67,28 @@ describe("Build Details diagnostics card", () => {
 
     assert.doesNotMatch(html, /Open diagnostic 1/);
     assert.match(html, /<span class="sr-only">Error: <\/span>Cannot find symbol Foo/);
-    assert.match(html, /title="Cannot find symbol Foo"/);
+    // Messages wrap in full rather than truncating behind a hover-only title.
+    assert.doesNotMatch(html, /title="Cannot find symbol Foo"/);
+    assert.doesNotMatch(html, /\btruncate\b/);
     assert.match(html, /aria-describedby="build-diagnostics-opens-in-editor"/);
     assert.match(html, /Opens in editor/);
     assert.match(html, /Configure diagnostics…/);
+  });
+
+  it("says how many diagnostics the card does not list and links to Problems", () => {
+    const item = { severity: "error" as const, message: "Boom", targetId: "t" };
+    const html = renderCard({
+      ...EMPTY_BUILD_DIAGNOSTICS,
+      status: "available",
+      errorCount: 7,
+      warningCount: 1,
+      resolvedCount: 8,
+      items: [1, 2, 3, 4, 5].map((index) => ({ ...item, message: `Boom ${index}` }))
+    });
+
+    assert.match(html, /\+3 more not shown here/);
+    assert.equal(html.match(/>Show problems</g)?.length, 2);
+    assert.equal(countHiddenDiagnostics({ ...EMPTY_BUILD_DIAGNOSTICS, errorCount: 2 }, 2), 0);
   });
 
   it("explains why Show Problems is disabled while the scan is pending", () => {

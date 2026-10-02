@@ -1,5 +1,5 @@
 import * as React from "react";
-import { formatRelativeIsoTimestamp } from "../../../../formatters/RelativeTimeFormatters";
+import { formatUpdatedAtLabel } from "../../../../formatters/RelativeTimeFormatters";
 import {
   isStaleCapacityTimestamp,
   NODE_CAPACITY_REFRESH_INTERVAL_MS
@@ -8,6 +8,7 @@ import {
 const { useEffect, useMemo, useState } = React;
 
 interface CapacityTimestampLabels {
+  /** "Updated 5m ago"; same wording as the Node Details header. */
   updatedAtLabel: string;
   updatedAtAbsolute: string;
   isStale: boolean;
@@ -31,7 +32,7 @@ export function useCapacityTimestamp(
     return () => clearInterval(intervalId);
   }, []);
 
-  const updatedAtLabel = useMemo(() => formatRelativeIsoTimestamp(updatedAt), [updatedAt, now]);
+  const updatedAtLabel = useMemo(() => formatUpdatedAtLabel(updatedAt, now), [updatedAt, now]);
   const updatedAtAbsolute = useMemo(() => formatAbsoluteTimestamp(updatedAt), [updatedAt]);
   const isStale = useMemo(
     () => hasLoaded && isStaleCapacityTimestamp(updatedAt, now),

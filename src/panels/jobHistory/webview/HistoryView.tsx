@@ -9,6 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from "../../shared/webview/components/ui/collapsible";
+import { DisclosureChevron } from "../../shared/webview/components/ui/disclosure-chevron";
 import {
   Select,
   SelectContent,
@@ -85,6 +86,7 @@ function HistoryToolbar({
         </Select>
       </span>
       <Button
+        variant="outline"
         size="sm"
         aria-disabled={loading || undefined}
         className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
@@ -151,10 +153,10 @@ function PausedState({ send }: { send: HistorySend }) {
   return (
     <EmptyState
       title="Paused while hidden"
-      description="History loading stopped when the panel was hidden. It resumes when the panel is visible."
+      description="History loading stopped when the panel was hidden."
       action={
         <Button size="sm" onClick={() => send("refresh")}>
-          Resume now
+          Resume
         </Button>
       }
     />
@@ -216,7 +218,7 @@ function HistoryResults({ model, embedded, ui, setUi, send }: HistoryBodyProps) 
           }}
         />
       ) : null}
-      <HistoryTestsSection model={model} ui={ui} setUi={setUi} send={send} />
+      <HistoryTestsSection model={model} ui={ui} setUi={setUi} send={send} embedded={embedded} />
     </div>
   );
 }
@@ -248,15 +250,18 @@ export function HistoryView({
   const [ui, setUi] = React.useState(() =>
     normalizeHistoryUi(getVsCodeState<{ historyUi?: unknown }>()?.historyUi)
   );
-  const [open, setOpen] = React.useState(false);
   React.useEffect(() => {
     const saved = getVsCodeState();
     setVsCodeState({ ...(isPlainRecord(saved) ? saved : {}), historyUi: ui });
     postVsCodeMessage({ type: "persistHistoryUi", uiState: ui });
   }, [ui]);
-  const announcement = buildRunning
-    ? "History is available after the build completes"
-    : historyAnnouncement(model);
+  // A collapsed embedded disclosure stays quiet; its summary line already shows the state.
+  const announcement =
+    embedded && !ui.open
+      ? ""
+      : buildRunning
+        ? "History is available after the build completes"
+        : historyAnnouncement(model);
   const liveRegion = (
     <p role="status" aria-live="polite" className="sr-only">
       {announcement}
@@ -281,14 +286,20 @@ export function HistoryView({
         className="mb-3 rounded-lg border border-border bg-surface"
       >
         {liveRegion}
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <CollapsibleTrigger className="gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent-soft">
-            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-sm font-semibold">Failure history</span>
-              <span className="text-xs text-muted-foreground">
-                {failureHistorySummary(model, buildRunning)}
+        <Collapsible open={ui.open} onOpenChange={(open) => setUi({ ...ui, open })}>
+          <CollapsibleTrigger
+            asChild
+            className="justify-start gap-2 rounded-lg px-3 py-2 text-left hover:bg-accent-soft"
+          >
+            <button type="button">
+              <DisclosureChevron className="mr-0 h-4 w-4" />
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <span className="text-sm font-semibold">Failure history</span>
+                <span className="text-xs text-muted-foreground">
+                  {failureHistorySummary(model, buildRunning)}
+                </span>
               </span>
-            </span>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="border-t border-border px-3 py-3">
             {body}
@@ -297,12 +308,13 @@ export function HistoryView({
       </section>
     );
   }
-  const jobName = model.jobUrl ? historyJobDisplayName(model.jobUrl) : "Job history";
+  const jobName = model.jobUrl ? historyJobDisplayName(model.jobUrl) : "Job History";
   return (
     <div className="flex min-h-screen flex-col">
       <PanelHeader
-        eyebrow="Job history"
-        title={<span title={jobName}>{jobName}</span>}
+        eyebrow="Job History"
+        title={jobName}
+        wrapTitle
         actions={
           <Button
             variant="secondary"

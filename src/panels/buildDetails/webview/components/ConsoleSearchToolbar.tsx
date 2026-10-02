@@ -1,4 +1,5 @@
 import type * as React from "react";
+import { useId } from "react";
 import { Button } from "../../../shared/webview/components/ui/button";
 import { Checkbox } from "../../../shared/webview/components/ui/checkbox";
 import { Input } from "../../../shared/webview/components/ui/input";
@@ -15,6 +16,9 @@ export interface ConsoleSearchToolbarProps {
   error?: string;
   tooManyMatchesLabel?: string;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  containerRef?: React.Ref<HTMLDivElement>;
+  /** Id of the output the search navigates. */
+  controlsId?: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
   onToggleRegex: () => void;
@@ -32,6 +36,8 @@ export function ConsoleSearchToolbar({
   error,
   tooManyMatchesLabel,
   inputRef,
+  containerRef,
+  controlsId,
   onChange,
   onKeyDown,
   onToggleRegex,
@@ -43,35 +49,33 @@ export function ConsoleSearchToolbar({
     "flex-1 min-w-[160px] h-7 text-xs",
     error ? "border-inputErrorBorder" : "border-input"
   );
+  const regexId = useId();
+  const errorId = useId();
 
   return (
-    <div className="flex flex-col gap-1" hidden={!visible}>
+    <div ref={containerRef} className="flex flex-col gap-1" hidden={!visible}>
       <div className="flex flex-wrap items-center gap-1.5">
         <Input
           ref={inputRef}
           aria-label="Search console output"
+          aria-controls={controlsId}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={error ? true : undefined}
           className={searchInputClassName}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          placeholder="Search..."
+          placeholder="Search…"
           spellCheck={false}
           type="text"
           value={query}
         />
         <div className="flex items-center gap-1">
-          <Checkbox
-            id="console-search-regex"
-            checked={useRegex}
-            onCheckedChange={() => onToggleRegex()}
-          />
-          <label
-            htmlFor="console-search-regex"
-            className="text-[11px] text-muted-foreground select-none"
-          >
+          <Checkbox id={regexId} checked={useRegex} onCheckedChange={() => onToggleRegex()} />
+          <label htmlFor={regexId} className="text-caption text-muted-foreground select-none">
             Regex
           </label>
         </div>
-        <span aria-hidden="true" className="text-[11px] text-muted-foreground">
+        <span aria-hidden="true" className="text-caption text-muted-foreground">
           {matchCountLabel}
         </span>
         <span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
@@ -82,7 +86,7 @@ export function ConsoleSearchToolbar({
           onClick={onPrev}
           size="sm"
           variant="ghost"
-          className="h-6 gap-1 px-1.5 text-[11px]"
+          className="h-6 gap-1 px-1.5 text-caption"
           title="Previous match (Shift+Enter)"
         >
           <ChevronUpIcon className="h-3.5 w-3.5" />
@@ -93,7 +97,7 @@ export function ConsoleSearchToolbar({
           onClick={onNext}
           size="sm"
           variant="ghost"
-          className="h-6 gap-1 px-1.5 text-[11px]"
+          className="h-6 gap-1 px-1.5 text-caption"
           title="Next match (Enter)"
         >
           <ChevronDownIcon className="h-3.5 w-3.5" />
@@ -104,16 +108,20 @@ export function ConsoleSearchToolbar({
           onClick={onClear}
           size="sm"
           variant="ghost"
-          className="h-6 gap-1 px-1.5 text-[11px]"
+          className="h-6 gap-1 px-1.5 text-caption"
           title="Clear search"
         >
           <XIcon className="h-3.5 w-3.5" />
           Clear
         </Button>
       </div>
-      {error ? <div className="text-[11px] text-inputErrorFg">{error}</div> : null}
+      {error ? (
+        <div id={errorId} className="text-caption text-inputErrorFg">
+          {error}
+        </div>
+      ) : null}
       {tooManyMatchesLabel ? (
-        <div className="text-[11px] text-muted-foreground">{tooManyMatchesLabel}</div>
+        <div className="text-caption text-muted-foreground">{tooManyMatchesLabel}</div>
       ) : null}
     </div>
   );

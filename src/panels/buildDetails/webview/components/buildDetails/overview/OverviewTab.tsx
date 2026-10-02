@@ -8,12 +8,17 @@ import type {
   BuildTestsSummaryViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../../hooks/useBuildDetailsTabs";
-import { BuildFailureInsightsSection } from "../BuildFailureInsightsSection";
+import { BuildFailureInsightsSection, hasVisibleInsights } from "../BuildFailureInsightsSection";
 import { CoverageGlanceCard } from "./CoverageGlanceCard";
+import { OverviewSummaryCard } from "./OverviewSummaryCard";
 import { TestPassDonutCard } from "./TestPassDonutCard";
 
 type OverviewTabProps = {
+  resultLabel: string;
   resultClass: string;
+  durationLabel: string;
+  timestampLabel: string;
+  hasPipelineStages: boolean;
   testsSummary: BuildTestsSummaryViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
@@ -26,7 +31,11 @@ type OverviewTabProps = {
   onConfigureBuildDiagnostics: () => void;
 };
 export function OverviewTab({
+  resultLabel,
   resultClass,
+  durationLabel,
+  timestampLabel,
+  hasPipelineStages,
   testsSummary,
   coverageState,
   insights,
@@ -39,29 +48,47 @@ export function OverviewTab({
   onConfigureBuildDiagnostics
 }: OverviewTabProps): React.JSX.Element {
   const showTestsCard = hasTests && testsSummary.hasAnyResults;
+  const showCoverageCard = coverageState.status !== "disabled";
+  const showInsights = hasVisibleInsights(resultClass, insights, diagnostics, !showTestsCard);
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 lg:grid-cols-2">
-        {showTestsCard ? (
-          <TestPassDonutCard summary={testsSummary} onShowTests={() => onNavigateTab("tests")} />
-        ) : null}
-        <CoverageGlanceCard
-          coverageState={coverageState}
-          isRunning={resultClass === "running"}
-          onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
+      {showTestsCard || showCoverageCard ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {showTestsCard ? (
+            <TestPassDonutCard summary={testsSummary} onShowTests={() => onNavigateTab("tests")} />
+          ) : null}
+          <CoverageGlanceCard
+            coverageState={coverageState}
+            isRunning={resultClass === "running"}
+            onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
+          />
+        </div>
+      ) : null}
+      {showInsights ? (
+        <BuildFailureInsightsSection
+          resultClass={resultClass}
+          insights={insights}
+          diagnostics={diagnostics}
+          showTestsSummary={!showTestsCard}
+          hasTestsTab={hasTests}
+          testReportUnavailable={testsSummary.detailsUnavailable}
+          onArtifactAction={onArtifactAction}
+          onOpenDiagnosticSource={onOpenDiagnosticSource}
+          onShowDiagnosticProblems={onShowDiagnosticProblems}
+          onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
         />
-      </div>
-      <BuildFailureInsightsSection
-        resultClass={resultClass}
-        insights={insights}
-        diagnostics={diagnostics}
-        showTestsSummary={!showTestsCard}
-        onArtifactAction={onArtifactAction}
-        onOpenDiagnosticSource={onOpenDiagnosticSource}
-        onShowDiagnosticProblems={onShowDiagnosticProblems}
-        onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
-      />
+      ) : null}
+      {!showTestsCard && !showCoverageCard && !showInsights ? (
+        <OverviewSummaryCard
+          resultLabel={resultLabel}
+          resultClass={resultClass}
+          durationLabel={durationLabel}
+          timestampLabel={timestampLabel}
+          hasPipelineStages={hasPipelineStages}
+          onNavigateTab={onNavigateTab}
+        />
+      ) : null}
     </div>
   );
 }

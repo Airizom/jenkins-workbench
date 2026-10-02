@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatError } from "../../formatters/ErrorFormatters";
 import { analyzeTests, failureEvidence, type HistoryBuild } from "../../history/HistoryAnalysis";
 import type { HistoryBaselineResolver } from "../../history/HistoryBaseline";
 import type { HistoryRequest, HistoryService } from "../../history/HistoryService";
@@ -51,7 +52,7 @@ export class HistoryController {
       panel.webview.onDidReceiveMessage((message) => {
         void this.handle(message).catch((error) => {
           if (!this.disposed)
-            void vscode.window.showErrorMessage(`History action failed: ${String(error)}`);
+            void vscode.window.showErrorMessage(`History action failed: ${formatError(error)}`);
         });
       }),
       panel.onDidChangeViewState(() => {
@@ -59,7 +60,9 @@ export class HistoryController {
         wasVisible = panel.visible;
         this.generation++;
         if (!panel.visible) this.pauseWhileHidden();
-        else if (this.context && this.automatic) void this.load();
+        // Work that hiding interrupted resumes on its own, so "paused" never sticks.
+        else if (this.context && (this.automatic || this.model.pausedReason === "hidden"))
+          void this.load();
       })
     );
   }
@@ -195,7 +198,7 @@ export class HistoryController {
       await this.select(request);
     } catch (error) {
       if (request.active()) {
-        this.model = { ...this.model, status: "error", message: String(error) };
+        this.model = { ...this.model, status: "error", message: formatError(error) };
         this.post();
       }
     }
@@ -287,13 +290,16 @@ export class HistoryController {
     } else if (message.action === "openBuild")
       await this.dependencies.openBuild(environment, build.url);
     else if (message.action === "compare") {
-      const target = this.model.builds.find(
+      const selected = this.model.builds.find(
         (item) => item.build.number === this.model.selectedBuild
       )?.build;
-      if (target && target.url !== build.url)
-        await this.dependencies.compare(environment, build.url, target.url);
-      else if (target && this.model.baseline?.build)
-        await this.dependencies.compare(environment, this.model.baseline.build.url, target.url);
+      // Within one job the older build is always the baseline, whichever row was clicked.
+      if (selected && selected.url !== build.url) {
+        const [older, newer] =
+          build.number < selected.number ? [build, selected] : [selected, build];
+        await this.dependencies.compare(environment, older.url, newer.url);
+      } else if (selected && this.model.baseline?.build)
+        await this.dependencies.compare(environment, this.model.baseline.build.url, selected.url);
     }
   }
 }

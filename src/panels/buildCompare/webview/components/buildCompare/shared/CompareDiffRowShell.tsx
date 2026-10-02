@@ -29,7 +29,7 @@ export function CompareChangeBadge({
   return (
     <span
       data-change={changeType}
-      className="bc-diff-badge inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-4 whitespace-nowrap"
+      className="bc-diff-badge inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 text-caption font-medium leading-4 whitespace-nowrap"
     >
       <span aria-hidden="true">{badge.glyph}</span>
       {label ?? badge.label}
@@ -42,7 +42,6 @@ export function CompareDiffRowShell({
   changeType,
   changeLabel,
   subtitle,
-  titleClassName,
   align = "start",
   children
 }: {
@@ -50,7 +49,6 @@ export function CompareDiffRowShell({
   changeType?: CompareDiffChangeType;
   changeLabel?: string;
   subtitle?: string;
-  titleClassName?: string;
   align?: "start" | "center";
   children?: ReactNode;
 }) {
@@ -62,12 +60,11 @@ export function CompareDiffRowShell({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <CompareChangeBadge changeType={changeType} label={changeLabel} />
-            <p className={cn("min-w-0 text-sm font-medium", titleClassName)} title={title}>
-              {title}
-            </p>
+            {/* Long test names wrap rather than truncate, so nothing hides behind a tooltip. */}
+            <p className={"min-w-0 text-sm font-medium [overflow-wrap:anywhere]"}>{title}</p>
           </div>
           {subtitle ? (
-            <p className="mt-1 truncate text-xs text-muted-foreground" title={subtitle}>
+            <p className="mt-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
               {subtitle}
             </p>
           ) : null}

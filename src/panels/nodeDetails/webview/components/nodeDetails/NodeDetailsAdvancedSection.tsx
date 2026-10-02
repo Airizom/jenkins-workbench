@@ -9,6 +9,8 @@ import { RawJsonCard } from "./RawJsonCard";
 
 type NodeDetailsAdvancedSectionProps = {
   advancedLoaded: boolean;
+  /** Diagnostics were requested and the host has not answered yet. */
+  advancedRequested: boolean;
   loading: boolean;
   monitorData: NodeMonitorViewModel[];
   loadStatistics: NodeMonitorViewModel[];
@@ -18,6 +20,7 @@ type NodeDetailsAdvancedSectionProps = {
 };
 export function NodeDetailsAdvancedSection({
   advancedLoaded,
+  advancedRequested,
   loading,
   monitorData,
   loadStatistics,
@@ -31,17 +34,17 @@ export function NodeDetailsAdvancedSection({
     diagnosticsContent = (
       <div className="space-y-3">
         <MonitorCard title="Monitors" entries={monitorData} />
-        <MonitorCard title="Load Statistics" entries={loadStatistics} />
+        <MonitorCard title="Load statistics" entries={loadStatistics} />
       </div>
     );
-  } else if (loading) {
+  } else if (loading || advancedRequested) {
     diagnosticsContent = (
       <div
         className="space-y-2 rounded-lg border border-card-border bg-card p-4 shadow-sm"
         aria-label="Loading diagnostics"
         role="status"
       >
-        <div className="text-xs text-muted-foreground">Loading diagnostics...</div>
+        <div className="text-xs text-muted-foreground">Loading diagnostics…</div>
         <Skeleton className="h-6 w-full" />
         <Skeleton className="h-6 w-3/4" />
         <Skeleton className="h-6 w-5/6" />
