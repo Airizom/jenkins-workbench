@@ -36,6 +36,21 @@ export function createFittedViewport(
   return { scale, x, y };
 }
 
+// Keeps the user's zoom and the layout point at the centre of the canvas when
+// the container is resized.
+export function recenterViewportOnResize(
+  viewport: ViewportState,
+  previous: ViewportContainerSize,
+  next: ViewportContainerSize
+): ViewportState {
+  const deltaX = (next.clientWidth - previous.clientWidth) / 2;
+  const deltaY = (next.clientHeight - previous.clientHeight) / 2;
+  if (deltaX === 0 && deltaY === 0) {
+    return viewport;
+  }
+  return { ...viewport, x: viewport.x + deltaX, y: viewport.y + deltaY };
+}
+
 // Manual zoom respects MIN_SCALE, but never pushes a fitted scale that is
 // already below it back up or further down.
 export function clampZoomScale(currentScale: number, nextScale: number): number {

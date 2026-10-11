@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
+import { JenkinsTaskBuildFollower } from "../src/tasks/JenkinsTaskBuildFollower";
+import { ConsoleLineWriter } from "../src/tasks/JenkinsTaskConsoleFollower";
 import {
   JENKINS_TASK_EXIT_CODES,
   JenkinsTaskRunner,
@@ -12,6 +14,7 @@ import {
   type JenkinsTaskRunnerBackend,
   mapJenkinsBuildResult
 } from "../src/tasks/JenkinsTaskRunner";
+import { resolveRunnerOptions } from "../src/tasks/JenkinsTaskRunnerSupport";
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -180,6 +183,10 @@ function outputCollector(): {
   };
 }
 
+function pendingCancellationWaits(runner: JenkinsTaskRunner): number {
+  return (runner as unknown as { cancelWaiters: ReadonlySet<() => void> }).cancelWaiters.size;
+}
+
 function immediateRunner(
   backend: JenkinsTaskRunnerBackend,
   overrides?: {
@@ -219,6 +226,59 @@ describe("JenkinsTaskRunner result mapping", () => {
 });
 
 describe("JenkinsTaskRunner lifecycle", () => {
+  it("removes cancellation subscriptions between thousands of polling waits", async () => {
+    const backend = new FakeBackend();
+    backend.queueItems = [
+      ...Array.from({ length: 2000 }, () => ({ id: 41 })),
+      { id: 41, executable: { number: 7 } }
+    ];
+    let waits = 0;
+    const runner = new JenkinsTaskRunner(backend, {
+      delay: async () => {
+        waits++;
+        assert.equal(pendingCancellationWaits(runner), 1);
+      }
+    });
+
+    const result = await runner.run(baseRequest, outputCollector().output);
+
+    assert.equal(result.exitCode, JENKINS_TASK_EXIT_CODES.success);
+    assert.equal(waits, 2000);
+    assert.equal(pendingCancellationWaits(runner), 0);
+  });
+
+  it("removes the cancellation subscription when a polling delay rejects", async () => {
+    const backend = new FakeBackend();
+    backend.queueItems = [{ id: 41 }];
+    const runner = new JenkinsTaskRunner(backend, {
+      delay: async () => {
+        throw new Error("Delay failed");
+      }
+    });
+
+    const result = await runner.run(baseRequest, outputCollector().output);
+
+    assert.equal(result.exitCode, JENKINS_TASK_EXIT_CODES.error);
+    assert.equal(result.error, "Delay failed");
+    assert.equal(pendingCancellationWaits(runner), 0);
+  });
+
+  it("interrupts an active polling wait and removes its cancellation subscription", async () => {
+    const backend = new FakeBackend();
+    backend.queueItems = [{ id: 41 }];
+    const runner = new JenkinsTaskRunner(backend, {
+      delay: () => new Promise<void>(() => undefined)
+    });
+    const runPromise = runner.run(baseRequest, outputCollector().output);
+    await waitUntil(() => pendingCancellationWaits(runner) === 1);
+
+    runner.cancel();
+
+    assert.equal((await runPromise).exitCode, JENKINS_TASK_EXIT_CODES.canceled);
+    await runner.waitForCleanup();
+    assert.equal(pendingCancellationWaits(runner), 0);
+  });
+
   it("waits for the final result when a running build reports a provisional result", async () => {
     const backend = new FakeBackend();
     backend.buildDetails = [
@@ -750,6 +810,60 @@ describe("JenkinsTaskRunner lifecycle", () => {
 });
 
 describe("JenkinsTaskRunner input steps and cancellation", () => {
+  it.each([
+    { inputStepPolicy: "abort" as const },
+    { inputStepPolicy: "wait" as const, inputTimeoutSeconds: 5 }
+  ])("limits consecutive input-policy stop failures for %j", async (inputOptions) => {
+    const backend = new FakeBackend();
+    const collected = outputCollector();
+    let now = 0;
+    backend.buildDetails = [
+      { number: 7, url: "https://jenkins.example/job/example/7/", building: true }
+    ];
+    backend.inputSummaries = [
+      { awaitingInput: true, count: 1, signature: "approval", fetchedAt: 0 }
+    ];
+    backend.stopBuild = async (_environment, buildUrl) => {
+      backend.stoppedBuilds.push(buildUrl);
+      throw new Error("stop API unavailable");
+    };
+    const follower = new JenkinsTaskBuildFollower(
+      backend,
+      resolveRunnerOptions({ maxConsecutiveErrors: 3, now: () => now }),
+      collected.output,
+      {
+        isCanceled: () => false,
+        throwIfCanceled: () => {},
+        waitForNextPoll: async () => {
+          now += 5000;
+          assert.ok(now <= 20_000, "Stop retries must be bounded.");
+        },
+        getQueueOwnership: () => "exclusive",
+        updateQueueOwnership: () => "exclusive",
+        setState: () => {}
+      }
+    );
+
+    await assert.rejects(
+      follower.follow(
+        { ...baseRequest, ...inputOptions },
+        "https://jenkins.example/job/example/7/",
+        41,
+        new ConsoleLineWriter(collected.output.writeConsole)
+      ),
+      /Unable to check Jenkins input steps after 3 consecutive errors: stop API unavailable/
+    );
+    assert.equal(backend.stoppedBuilds.length, 3);
+    assert.equal(backend.inputCalls, inputOptions.inputStepPolicy === "abort" ? 3 : 4);
+    assert.deepEqual(
+      collected.statuses.filter((status) => status.startsWith("Input-step status unavailable")),
+      [
+        "Input-step status unavailable; retrying (1/3).",
+        "Input-step status unavailable; retrying (2/3)."
+      ]
+    );
+  });
+
   it("starts each input timeout when the input response is observed", async () => {
     const backend = new FakeBackend();
     const clock = { value: 0 };

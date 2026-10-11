@@ -100,7 +100,7 @@ export async function readTextPrefixFromStream(
       const remaining = maxBytes - collector.bytesReceived;
       if (remaining <= 0) {
         truncated = true;
-        abortStreamResponse(response);
+        response.abort();
         return;
       }
       const slice = buffer.length > remaining ? buffer.subarray(0, remaining) : buffer;
@@ -110,7 +110,7 @@ export async function readTextPrefixFromStream(
         shouldTruncateAfterChunk(collector.bytesReceived, maxBytes, sliceWasTrimmed, contentLength)
       ) {
         truncated = true;
-        abortStreamResponse(response);
+        response.abort();
       }
     };
 
@@ -212,10 +212,6 @@ function createPrefixBuffer(
     return undefined;
   }
   return Buffer.allocUnsafe(Math.min(contentLength, maxBytes));
-}
-
-function abortStreamResponse(response: JenkinsStreamResponse): void {
-  response.abort();
 }
 
 // Progressive console resume offsets are byte-based, so drop any partial UTF-8

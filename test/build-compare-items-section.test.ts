@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
 import type { CompareSectionStatus } from "../src/panels/buildCompare/shared/BuildCompareContracts";
 import { CompareItemsSection } from "../src/panels/buildCompare/webview/components/buildCompare/shared/CompareItemsSection";
+import type { SectionCardDisclosureProps } from "../src/panels/buildCompare/webview/components/buildCompare/shared/SectionCard";
 
 function renderSection(status: CompareSectionStatus, items: string[] = []): string {
   return renderToStaticMarkup(
@@ -34,5 +35,25 @@ describe("CompareItemsSection", () => {
     const html = renderSection("available", ["alpha", "beta"]);
     assert.match(html, /alpha, beta/);
     assert.match(html, /<h3[^>]*><button[^>]*aria-expanded="true"/);
+  });
+
+  it("requires onOpenChange whenever open is controlled", () => {
+    const controlled: SectionCardDisclosureProps = { open: false, onOpenChange: () => {} };
+    const uncontrolled: SectionCardDisclosureProps = { onOpenChange: () => {} };
+    // @ts-expect-error A controlled `open` without `onOpenChange` would ignore toggles.
+    const halfControlled: SectionCardDisclosureProps = { open: true };
+    assert.ok(controlled && uncontrolled && halfControlled);
+
+    const html = renderToStaticMarkup(
+      createElement(CompareItemsSection<string>, {
+        title: "Parameter Diff",
+        summary: "Comparison summary",
+        status: "available",
+        items: ["alpha"],
+        renderItems: (visible) => visible.join(", "),
+        ...controlled
+      })
+    );
+    assert.match(html, /<h3[^>]*><button[^>]*aria-expanded="false"/);
   });
 });

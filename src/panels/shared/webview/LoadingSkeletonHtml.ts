@@ -281,5 +281,5 @@ const LOADING_SKELETONS: Record<LoadingSkeletonVariant, string> = {
 };
 
 export function renderLoadingSkeletonHtml(variant: LoadingSkeletonVariant): string {
-  return LOADING_SKELETONS[variant] ?? BUILD_LOADING_SKELETON;
+  return LOADING_SKELETONS[variant];
 }

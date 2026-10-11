@@ -39,7 +39,6 @@ const JOB_CLASSIFIER_TOKENS: Array<{ readonly token: string; readonly kind: Jenk
   { token: "workflowjob", kind: "pipeline" },
   { token: "job", kind: "job" }
 ];
-const JOB_CLASSIFIER_TOKEN_COUNT = JOB_CLASSIFIER_TOKENS.length;
 
 export class JenkinsJobsApi {
   constructor(private readonly context: JenkinsClientContext) {}
@@ -60,7 +59,7 @@ export class JenkinsJobsApi {
   }
 
   async getFolderJobsInView(folderUrl: string, viewUrl: string): Promise<JenkinsJob[]> {
-    return this.getFolderJobs(buildViewScopedJobUrl(viewUrl, folderUrl));
+    return this.getFolderJobs(buildViewScopedJobUrl(viewUrl, folderUrl, this.context.baseUrl));
   }
 
   async getViewJobs(viewUrl: string): Promise<JenkinsJob[]> {
@@ -80,11 +79,9 @@ export class JenkinsJobsApi {
     }
 
     const normalized = className.toLowerCase();
-    for (let index = 0; index < JOB_CLASSIFIER_TOKEN_COUNT; index++) {
-      const classifier = JOB_CLASSIFIER_TOKENS[index];
-      if (normalized.includes(classifier.token)) {
-        return classifier.kind;
-      }
+    const kind = JOB_CLASSIFIER_TOKENS.find((c) => normalized.includes(c.token))?.kind;
+    if (kind) {
+      return kind;
     }
 
     // Jenkins exposes many concrete job subclasses that are still job-like
@@ -135,7 +132,7 @@ export class JenkinsJobsApi {
       return { newUrl: response.location };
     }
 
-    const parsed = parseJobUrl(jobUrl);
+    const parsed = parseJobUrl(jobUrl, this.context.baseUrl);
     if (parsed) {
       return { newUrl: buildJobUrl(parsed.parentUrl, newName) };
     }

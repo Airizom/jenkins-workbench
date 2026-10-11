@@ -39,5 +39,6 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: fallow-results.sarif
+      # The Compile step above already built the extension and webview.
       - name: Integration tests
-        run: xvfb-run -a npm run test:integration
+        run: xvfb-run -a npm run test:integration:ci

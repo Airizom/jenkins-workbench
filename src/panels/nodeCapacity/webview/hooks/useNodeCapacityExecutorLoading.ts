@@ -57,7 +57,11 @@ export function resolvePoolOpenStates(
  * busy executors are reloaded on every capacity snapshot (`snapshotId`), since
  * builds can turn over without the counts changing. Idle nodes are requested
  * again only when their executor counts or connectivity change, or after a
- * manual refresh bumps `refreshGeneration`.
+ * manual refresh bumps `refreshGeneration`. Busy nodes ignore the generation:
+ * the refresh's new snapshot reloads them, so the bump must not request them
+ * a second time against the old snapshot. Keys for nodes no longer expanded
+ * are dropped, so a node that leaves and returns (a snapshot that omitted it,
+ * or a collapsed pool) is requested again instead of rendering unhydrated.
  */
 export function planExecutorLoads(
   nodes: readonly ExecutorLoadCandidate[],
@@ -65,18 +69,23 @@ export function planExecutorLoads(
   refreshGeneration: number,
   snapshotId: string
 ): string[] {
+  const currentNodeUrls = new Set(nodes.map((node) => node.nodeUrl));
+  for (const nodeUrl of requestedKeys.keys()) {
+    if (!currentNodeUrls.has(nodeUrl)) {
+      requestedKeys.delete(nodeUrl);
+    }
+  }
   const nodeUrls = new Set<string>();
   for (const node of nodes) {
     if (!node.nodeUrl || nodeUrls.has(node.nodeUrl)) {
       continue;
     }
     const key = [
-      refreshGeneration,
       node.isOffline,
       node.isTemporarilyOffline,
       node.busyExecutors,
       node.totalExecutors,
-      node.busyExecutors > 0 ? snapshotId : ""
+      node.busyExecutors > 0 ? snapshotId : refreshGeneration
     ].join(":");
     if (requestedKeys.get(node.nodeUrl) === key) {
       continue;

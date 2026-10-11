@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as vscode from "vscode";
+import { MAX_DIAGNOSTICS_MAX_PROBLEMS } from "../extension/ExtensionConfigDefinitions";
 import type {
   BuildDiagnosticInsightItem,
   BuildDiagnosticsViewModel
@@ -11,7 +12,6 @@ import type { BuildDiagnosticPathResolver } from "./BuildDiagnosticPathResolver"
 import type { NormalizedDiagnosticProfile, RawBuildDiagnostic } from "./BuildDiagnosticTypes";
 
 const RESOLUTION_CONCURRENCY = 8;
-const MAX_PUBLISHED_PROBLEMS = 500;
 const RESOLUTION_CANDIDATE_MULTIPLIER = 4;
 
 export interface BuildDiagnosticSourceTarget {
@@ -80,44 +80,46 @@ export async function aggregateAndPublishBuildDiagnostics(
   while (considered < candidates.length && seen.size < candidateLimit) {
     const batch = candidates.slice(considered, considered + RESOLUTION_CONCURRENCY);
     considered += batch.length;
-    await forEachConcurrent(batch, RESOLUTION_CONCURRENCY, async (raw) => {
-      let resolution: Awaited<ReturnType<BuildDiagnosticPathResolver["resolve"]>>;
-      try {
-        resolution = await options.pathResolver.resolve(
-          options.repositoryUri,
-          options.profile,
-          raw
-        );
-      } catch {
-        resolutionFailures += 1;
-        seen.add(diagnosticKey(raw.rawPath, raw));
-        unresolved.push(raw);
-        return;
-      }
-      if (resolution.status !== "resolved") {
-        const key = diagnosticKey(raw.rawPath, raw);
+    await Promise.all(
+      batch.map(async (raw) => {
+        let resolution: Awaited<ReturnType<BuildDiagnosticPathResolver["resolve"]>>;
+        try {
+          resolution = await options.pathResolver.resolve(
+            options.repositoryUri,
+            options.profile,
+            raw
+          );
+        } catch {
+          resolutionFailures += 1;
+          seen.add(diagnosticKey(raw.rawPath, raw));
+          unresolved.push(raw);
+          return;
+        }
+        if (resolution.status !== "resolved") {
+          const key = diagnosticKey(raw.rawPath, raw);
+          seen.add(key);
+          unresolved.push(raw);
+          return;
+        }
+        const range = toRange(raw);
+        const key = diagnosticKey(resolution.uri.toString(), raw, range);
         seen.add(key);
-        unresolved.push(raw);
-        return;
-      }
-      const range = toRange(raw);
-      const key = diagnosticKey(resolution.uri.toString(), raw, range);
-      seen.add(key);
-      resolved.push({
-        raw,
-        uri: resolution.uri,
-        range,
-        target: {
-          id: randomUUID(),
+        resolved.push({
+          raw,
           uri: resolution.uri,
           range,
-          generation: options.generation,
-          buildUrl: options.buildUrl,
-          rawPath: raw.rawPath,
-          logLine: raw.logLine
-        }
-      });
-    });
+          target: {
+            id: randomUUID(),
+            uri: resolution.uri,
+            range,
+            generation: options.generation,
+            buildUrl: options.buildUrl,
+            rawPath: raw.rawPath,
+            logLine: raw.logLine
+          }
+        });
+      })
+    );
   }
   const candidateOmittedCount = candidates.length - considered;
   resolved.sort(compareResolved);
@@ -195,7 +197,7 @@ export function getBuildDiagnosticCandidateLimit(maxProblems: number): number {
 }
 
 function getPublishedProblemLimit(maxProblems: number): number {
-  return Math.min(MAX_PUBLISHED_PROBLEMS, Math.max(1, Math.floor(maxProblems)));
+  return Math.min(MAX_DIAGNOSTICS_MAX_PROBLEMS, Math.max(1, Math.floor(maxProblems)));
 }
 
 function selectResolutionCandidates(
@@ -277,7 +279,9 @@ function aggregateStackTraceGroups<T>(
     group.sort(
       (left, right) => (getRaw(left).stackFrameIndex ?? 0) - (getRaw(right).stackFrameIndex ?? 0)
     );
-    const primaryIndex = getRaw(group[0]).parserId === "python-traceback" ? group.length - 1 : 0;
+    const first = getRaw(group[0]);
+    const primaryIndex =
+      (first.baseParserId ?? first.parserId) === "python-traceback" ? group.length - 1 : 0;
     aggregated.push({
       primary: group[primaryIndex],
       related: group.filter((_diagnostic, index) => index !== primaryIndex)
@@ -292,16 +296,7 @@ function deduplicateUnresolvedDiagnostics(
   const result: RawBuildDiagnostic[] = [];
   const seen = new Set<string>();
   for (const raw of diagnostics) {
-    const key = [
-      raw.rawPath,
-      raw.line,
-      raw.column ?? "",
-      raw.endLine ?? "",
-      raw.endColumn ?? "",
-      raw.severity,
-      raw.code ?? "",
-      raw.message
-    ].join("\0");
+    const key = diagnosticKey(raw.rawPath, raw);
     if (!seen.has(key)) {
       seen.add(key);
       result.push(raw);
@@ -427,22 +422,6 @@ function compareRawLogOrder(
 
 function severityRank(severity: BuildDiagnosticSeverity): number {
   return severity === "error" ? 0 : severity === "warning" ? 1 : 2;
-}
-
-async function forEachConcurrent<T>(
-  items: readonly T[],
-  concurrency: number,
-  callback: (item: T) => Promise<void>
-): Promise<void> {
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      await callback(items[index]);
-    }
-  });
-  await Promise.all(workers);
 }
 
 export {

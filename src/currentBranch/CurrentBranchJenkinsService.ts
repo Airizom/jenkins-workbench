@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import { captureCheckout } from "./CurrentBranchCheckout";
+import { captureCheckout, isCheckoutCurrent } from "./CurrentBranchCheckout";
 import type { CurrentBranchLinkResolver } from "./CurrentBranchLinkResolver";
 import type { CurrentBranchRefreshCoordinator } from "./CurrentBranchRefreshCoordinator";
 import type { CurrentBranchRepositoryResolver } from "./CurrentBranchRepositoryResolver";
@@ -10,6 +10,7 @@ import type { CurrentBranchStatusResolver } from "./CurrentBranchStatusResolver"
 import type {
   CurrentBranchLinkedContext,
   CurrentBranchRefreshOptions,
+  CurrentBranchRepositoryContext,
   CurrentBranchRepositoryInfo,
   CurrentBranchState
 } from "./CurrentBranchTypes";
@@ -51,21 +52,20 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
           this.currentState.kind === "matched" &&
           active &&
           active.repositoryUriString === this.currentState.repository.repositoryUriString &&
-          JSON.stringify(captureCheckout(active.repository)) ===
-            JSON.stringify(this.currentState.checkout)
+          isCheckoutCurrent(this.currentState.checkout, active.repository)
         ) {
           return;
         }
         this.refreshSequence++;
-        if (this.currentState.kind === "matched") {
-          this.updateState({ ...this.currentState, commit: undefined, checkout: undefined });
-        }
+        this.invalidateStaleTarget(active);
         this.scheduleRefresh();
       }),
       environmentStore.onDidChange(() => {
+        this.refreshSequence++;
         this.scheduleRefresh({ force: true });
       }),
       this.linkResolver.onDidChange(() => {
+        this.refreshSequence++;
         this.scheduleRefresh();
       }),
       statusRefreshService.onDidTick(() => {
@@ -96,6 +96,25 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
     this.emitter.dispose();
   }
 
+  // A job target only stays actionable while the same repository and branch are checked out.
+  private invalidateStaleTarget(active: CurrentBranchRepositoryContext | undefined): void {
+    const state = this.currentState;
+    const hasTarget =
+      state.kind === "matched" || (state.kind === "requestFailed" && !!state.selectedTarget);
+    if (!hasTarget) {
+      return;
+    }
+    const sameBranch =
+      !!active &&
+      active.repositoryUriString === state.repository.repositoryUriString &&
+      captureCheckout(active.repository).branch === state.branchName;
+    if (!sameBranch) {
+      this.updateState({ kind: "resolving" });
+    } else if (state.kind === "matched") {
+      this.updateState({ ...state, commit: undefined, checkout: undefined });
+    }
+  }
+
   getState(): CurrentBranchState {
     return this.currentState;
   }
@@ -112,8 +131,8 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
     await this.refresh({ force: false });
   }
 
-  async refresh(options: CurrentBranchRefreshOptions = {}): Promise<CurrentBranchState> {
-    this.refreshCoordinator.beginRefresh();
+  async refresh(requestedOptions: CurrentBranchRefreshOptions = {}): Promise<CurrentBranchState> {
+    const options = this.refreshCoordinator.beginRefresh(requestedOptions);
     if (this.isDisposed) {
       return this.currentState;
     }
@@ -157,8 +176,7 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
     const nextState = await this.statusResolver.resolve(localState, options);
     if (
       localState.checkout &&
-      JSON.stringify(localState.checkout) !==
-        JSON.stringify(captureCheckout(localState.repository.repository))
+      !isCheckoutCurrent(localState.checkout, localState.repository.repository)
     ) {
       this.scheduleRefresh();
       return this.currentState;
@@ -170,7 +188,7 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
   }
 
   private queuePendingRefresh(options: CurrentBranchRefreshOptions): Promise<CurrentBranchState> {
-    this.refreshSequence += 1;
+    // Coalescing a refresh does not invalidate an active result for the same context.
     if (!this.pendingRefresh) {
       this.pendingRefresh = createPendingRefresh(options);
       return this.pendingRefresh.promise;
@@ -220,8 +238,7 @@ export class CurrentBranchJenkinsService implements vscode.Disposable {
       const state = await this.statusResolver.resolve(localState, options);
       if (
         !localState.checkout ||
-        JSON.stringify(localState.checkout) ===
-          JSON.stringify(captureCheckout(repositoryContext.repository))
+        isCheckoutCurrent(localState.checkout, repositoryContext.repository)
       )
         return state;
     }

@@ -39,12 +39,13 @@ function harness() {
   const load = vi.fn().mockResolvedValue(window);
   const openBuild = vi.fn();
   const compare = vi.fn();
+  const getEnvironments = vi.fn().mockResolvedValue([{ id: "e", url: environment.url }]);
   const dependencies = {
     history: { guard: (request: unknown) => request, load },
     baseline: { resolve: vi.fn().mockResolvedValue({ status: "unavailable" }) },
     environments: {
       onDidChange: environmentChange.event,
-      getEnvironments: async () => [{ id: "e", url: environment.url }]
+      getEnvironments
     },
     openBuild,
     compare
@@ -55,6 +56,7 @@ function harness() {
     messages,
     visibility,
     environmentChange,
+    getEnvironments,
     panel,
     load,
     openBuild,
@@ -151,6 +153,81 @@ describe("history panel coordination", () => {
     h.environmentChange.fire();
     await vi.waitFor(() => expect(h.load).toHaveBeenCalledTimes(2));
     expect(h.latest().jobUrl).toBe("https://jenkins.test/job/a/");
+    h.controller.dispose();
+  });
+  it.each([false, true])(
+    "preserves a pending environment update across hiding (show before resolution: %s)",
+    async (showBeforeResolution) => {
+      const h = harness();
+      h.controller.setContext(environment, "https://jenkins.test/job/a/");
+      await vi.waitFor(() => expect(h.latest().status).toBe("available"));
+      const updated = { id: "e", url: environment.url, username: "updated" };
+      let resolve!: (value: (typeof updated)[]) => void;
+      h.getEnvironments.mockReturnValueOnce(new Promise((done) => (resolve = done)));
+      h.environmentChange.fire();
+      h.panel.visible = false;
+      h.visibility.fire();
+      if (showBeforeResolution) {
+        h.panel.visible = true;
+        h.visibility.fire();
+      }
+      expect(h.load).toHaveBeenCalledTimes(1);
+      resolve([updated]);
+      if (!showBeforeResolution) {
+        await vi.waitFor(() => expect(h.latest().status).toBe("idle"));
+        expect(h.load).toHaveBeenCalledTimes(1);
+        h.panel.visible = true;
+        h.visibility.fire();
+      }
+      await vi.waitFor(() => expect(h.load).toHaveBeenCalledTimes(2));
+      expect(h.load).toHaveBeenLastCalledWith(
+        expect.objectContaining({ environment: { ...environment, username: "updated" } })
+      );
+      h.controller.dispose();
+    }
+  );
+  it.each([false, true])(
+    "clears a removed environment across hiding (show before resolution: %s)",
+    async (showBeforeResolution) => {
+      const h = harness();
+      h.controller.setContext(environment, "https://jenkins.test/job/a/");
+      await vi.waitFor(() => expect(h.latest().status).toBe("available"));
+      let resolve!: (value: []) => void;
+      h.getEnvironments.mockReturnValueOnce(new Promise((done) => (resolve = done)));
+      h.environmentChange.fire();
+      h.panel.visible = false;
+      h.visibility.fire();
+      if (showBeforeResolution) {
+        h.panel.visible = true;
+        h.visibility.fire();
+      }
+      expect(h.load).toHaveBeenCalledTimes(1);
+      resolve([]);
+      await vi.waitFor(() => expect(h.latest().jobUrl).toBe(""));
+      if (!showBeforeResolution) {
+        h.panel.visible = true;
+        h.visibility.fire();
+      }
+      expect(h.latest().status).toBe("idle");
+      expect(h.load).toHaveBeenCalledTimes(1);
+      h.controller.dispose();
+    }
+  );
+  it("resumes loading with the current binding when an environment lookup fails", async () => {
+    const h = harness();
+    h.controller.setContext(environment, "https://jenkins.test/job/a/");
+    await vi.waitFor(() => expect(h.latest().status).toBe("available"));
+    let reject!: (error: Error) => void;
+    h.getEnvironments.mockReturnValueOnce(new Promise((_, fail) => (reject = fail)));
+    h.environmentChange.fire();
+    h.panel.visible = false;
+    h.visibility.fire();
+    h.panel.visible = true;
+    h.visibility.fire();
+    expect(h.load).toHaveBeenCalledTimes(1);
+    reject(new Error("storage unavailable"));
+    await vi.waitFor(() => expect(h.load).toHaveBeenCalledTimes(2));
+    expect(h.load).toHaveBeenLastCalledWith(expect.objectContaining({ environment }));
     h.controller.dispose();
   });
   it("does not schedule automatic history for hidden panels or non-failing builds", () => {

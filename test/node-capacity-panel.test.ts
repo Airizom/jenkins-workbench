@@ -1,13 +1,96 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import { NodeCapacityPanel } from "../src/panels/NodeCapacityPanel";
 import { NodeCapacityService } from "../src/services/NodeCapacityService";
-import { PanelLoadTracker } from "../src/panels/shared/PanelRuntimeHelpers";
+import { LoadTokenTracker, PanelLoadTracker } from "../src/panels/shared/PanelRuntimeHelpers";
 import type { NodeCapacityOutgoingMessage } from "../src/panels/nodeCapacity/shared/NodeCapacityPanelMessages";
 import { createEmptyNodeCapacitySummary } from "../src/shared/nodeCapacity/NodeCapacityDefaults";
 import type { NodeCapacityNodeExecutorsUpdateMessage } from "../src/shared/nodeCapacity/NodeCapacityContracts";
 
 describe("NodeCapacityPanel", () => {
+  it("resumes polling after being revealed during an active refresh", async () => {
+    vi.useFakeTimers();
+    try {
+      const model = {
+        environmentLabel: "Jenkins",
+        updatedAt: "2026-09-22T00:00:00.000Z",
+        summary: createEmptyNodeCapacitySummary(),
+        pools: [],
+        hiddenLabelQueueItems: [],
+        errors: [],
+        loading: false
+      };
+      let resolveCapacity!: (value: typeof model) => void;
+      const getNodeCapacity = vi
+        .fn()
+        .mockResolvedValue(model)
+        .mockImplementationOnce(
+          () =>
+            new Promise<typeof model>((resolve) => {
+              resolveCapacity = resolve;
+            })
+        );
+      const viewStateListeners: (() => void)[] = [];
+      const webviewPanel = {
+        visible: true,
+        onDidDispose: vi.fn(),
+        onDidChangeViewState: (listener: () => void) => {
+          viewStateListeners.push(listener);
+          return { dispose() {} };
+        },
+        webview: { postMessage: vi.fn().mockResolvedValue(true) }
+      };
+      const panel = Object.create(NodeCapacityPanel.prototype) as NodeCapacityPanel;
+      Object.assign(panel, {
+        capacityService: { getNodeCapacity },
+        environment: {
+          environmentId: "jenkins",
+          scope: "global",
+          url: "https://jenkins.example/"
+        },
+        capacityRequestCount: 0,
+        hasRendered: true,
+        disposed: false,
+        disposables: [],
+        loadTokenTracker: new LoadTokenTracker(),
+        loadTracker: new PanelLoadTracker(() => {}),
+        panel: webviewPanel
+      });
+      const attachLifecycle = Reflect.get(panel, "attachLifecycle") as (
+        this: NodeCapacityPanel
+      ) => void;
+      attachLifecycle.call(panel);
+      const setVisible = (visible: boolean) => {
+        webviewPanel.visible = visible;
+        for (const listener of viewStateListeners) {
+          listener();
+        }
+      };
+
+      setVisible(true);
+      assert.equal(getNodeCapacity.mock.calls.length, 1);
+      setVisible(false);
+      setVisible(true);
+      await vi.advanceTimersByTimeAsync(10_000);
+      assert.equal(getNodeCapacity.mock.calls.length, 1);
+
+      resolveCapacity(model);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(9_999);
+      assert.equal(getNodeCapacity.mock.calls.length, 1);
+      await vi.advanceTimersByTimeAsync(1);
+      assert.equal(getNodeCapacity.mock.calls.length, 2);
+      await vi.advanceTimersByTimeAsync(10_000);
+      assert.equal(getNodeCapacity.mock.calls.length, 3);
+      setVisible(false);
+      await vi.advanceTimersByTimeAsync(10_000);
+      assert.equal(getNodeCapacity.mock.calls.length, 3);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it("delivers executor hydration when a capacity refresh completes first", async () => {
     const environment = {
       environmentId: "jenkins",
@@ -40,6 +123,7 @@ describe("NodeCapacityPanel", () => {
       capacityRequestCount: 0,
       hasRendered: true,
       disposed: false,
+      loadTokenTracker: new LoadTokenTracker(),
       loadTracker: new PanelLoadTracker(() => {}),
       panel: {
         webview: {

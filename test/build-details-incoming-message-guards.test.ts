@@ -5,9 +5,11 @@ import {
   isPersistUiStateMessage,
   isSelectPipelineLogNodeMessage
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelMessages";
+import type { PipelineLogTargetViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import {
   isBuildDetailsPanelState,
-  normalizeBuildDetailsPanelUiState
+  normalizeBuildDetailsPanelUiState,
+  withBuildDetailsPanelUiState
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 
 const validTarget = { key: "stage-1", kind: "stage", name: "Build", nodeId: "12" };
@@ -56,6 +58,31 @@ describe("build details incoming message guards", () => {
       }),
       false
     );
+  });
+
+  it("accepts persistUiState messages that only clear fields so the clear is persisted", () => {
+    const message = {
+      type: "persistUiState",
+      uiState: { selectedGraphStageKey: undefined, selectedPipelineLogTarget: undefined }
+    };
+    assert.equal(isPersistUiStateMessage(message), true);
+    assert.equal(isPersistUiStateMessage({ type: "persistUiState", uiState: {} }), true);
+    assert.equal(isPersistUiStateMessage({ type: "persistUiState" }), false);
+
+    const state = withBuildDetailsPanelUiState(
+      {
+        environmentId: "env",
+        scope: "workspace",
+        buildUrl: "https://jenkins.example/job/a/1/"
+      },
+      { selectedPipelineLogTarget: validTarget as PipelineLogTargetViewModel }
+    );
+    assert.equal(
+      normalizeBuildDetailsPanelUiState(state.buildDetailsUi)?.selectedPipelineLogTarget?.key,
+      "stage-1"
+    );
+    const cleared = withBuildDetailsPanelUiState(state, message.uiState);
+    assert.equal(cleared.buildDetailsUi, undefined);
   });
 
   it("restores serialized panel state and drops stale UI state fields when read", () => {

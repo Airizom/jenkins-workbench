@@ -44,7 +44,7 @@ export function resolveMultiDefaultValue(
 }
 
 function splitMultiValue(value: string, delimiter?: string): string[] {
-  const separator = delimiter?.trim() || ",";
+  const separator = delimiter || ",";
   return value
     .split(separator)
     .map((entry) => entry.trim())

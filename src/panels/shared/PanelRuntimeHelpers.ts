@@ -128,23 +128,10 @@ export class LoadTokenTracker {
 }
 
 export class PanelLoadTracker {
-  private readonly loadTokenTracker = new LoadTokenTracker();
   private readonly loadingRequests = new Set<number>();
   private nextLoadingRequest = 0;
 
   constructor(private readonly postLoading: (value: boolean) => void) {}
-
-  nextToken(): number {
-    return this.loadTokenTracker.next();
-  }
-
-  get currentToken(): number {
-    return this.loadTokenTracker.current;
-  }
-
-  isCurrent(token: number): boolean {
-    return this.loadTokenTracker.isCurrent(token);
-  }
 
   resetLoadingRequests(): void {
     if (this.loadingRequests.size === 0) {

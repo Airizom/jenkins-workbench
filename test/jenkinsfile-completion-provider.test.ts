@@ -138,4 +138,73 @@ describe("JenkinsfileCompletionProvider", () => {
       "parallel(${branchName}: { ${value} })"
     );
   });
+
+  it("builds call snippets for named, positional, closure, and argument-free steps", async () => {
+    const step = (
+      name: string,
+      signature?: {
+        parameters: { name: string; type?: string; isBody?: boolean }[];
+        usesNamedArgs: boolean;
+        takesClosure: boolean;
+      }
+    ) => [
+      name,
+      {
+        name,
+        displayName: name,
+        requiresNodeContext: false,
+        isAdvanced: false,
+        signatures: signature ? [{ label: name, ...signature }] : []
+      }
+    ];
+    const steps = new Map([
+      step("named", {
+        parameters: [{ name: "url", type: "String" }],
+        usesNamedArgs: true,
+        takesClosure: false
+      }),
+      step("echo", {
+        parameters: [{ name: "message", type: "String" }],
+        usesNamedArgs: false,
+        takesClosure: false
+      }),
+      step("dir", {
+        parameters: [
+          { name: "path", type: "String" },
+          { name: "body", type: "Closure", isBody: true }
+        ],
+        usesNamedArgs: false,
+        takesClosure: true
+      }),
+      step("node", { parameters: [], usesNamedArgs: false, takesClosure: true }),
+      step("bare")
+    ] as never);
+    const provider = new JenkinsfileCompletionProvider(
+      { isEnabled: () => true } as never,
+      { matches: () => true } as never,
+      { getCatalogForDocument: async () => ({ catalog: { steps } }) } as never
+    );
+    const position = { line: 0, character: 0 };
+
+    const result = await provider.provideCompletionItems(
+      { positionAt: () => position } as never,
+      position as never
+    );
+
+    const snippets = Object.fromEntries(
+      (result?.items ?? []).map((item) => [
+        item.label,
+        (item.insertText as TestSnippetString | undefined)?.value
+      ])
+    );
+    // biome-ignore-start lint/suspicious/noTemplateCurlyInString: VS Code snippet placeholder syntax.
+    assert.deepEqual(snippets, {
+      bare: "bare()",
+      dir: "dir(${value}) {\n\t$0\n}",
+      echo: "echo(${message})",
+      named: "named(${url}: ${value})",
+      node: "node() {\n\t$0\n}"
+    });
+    // biome-ignore-end lint/suspicious/noTemplateCurlyInString: VS Code snippet placeholder syntax.
+  });
 });

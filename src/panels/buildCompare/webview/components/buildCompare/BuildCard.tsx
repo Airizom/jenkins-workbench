@@ -36,7 +36,7 @@ export function BuildCard({
             </CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <ResultBadge resultClass={build.resultClass} label={build.resultLabel} />
+            <ResultBadge status={build.resultClass} label={build.resultLabel} />
             <Button
               variant="outline"
               size="sm"

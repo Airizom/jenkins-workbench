@@ -35,7 +35,7 @@ export async function compareWithBuild(
 
   await withActionErrorMessage("Unable to open build comparison", async () => {
     const selectedLabel = getTreeItemLabel(selected);
-    const parsed = parseBuildUrl(selected.buildUrl);
+    const parsed = parseBuildUrl(selected.buildUrl, selected.environment.url);
     if (!parsed) {
       void vscode.window.showInformationMessage(
         "The selected build URL could not be resolved to its Jenkins job."

@@ -58,6 +58,7 @@ export class BuildDetailsPanelRuntime {
   }
 
   dispose(): void {
+    this.visibilityGeneration += 1;
     this.testReportRefreshGeneration += 1;
     this.stopCompletionPolling();
     this.coverageCoordinator.dispose();
@@ -73,15 +74,15 @@ export class BuildDetailsPanelRuntime {
   }
 
   /**
-   * Returns false when the panel was hidden (or a newer visibility transition started) while
-   * this handler was awaiting, in which case no visible-only work was started.
+   * Returns false when the panel was hidden, reloaded, or a newer visibility transition
+   * started while this handler was awaiting, so it cannot start further visible-only work.
    */
   async handlePanelVisible(token: number): Promise<boolean> {
     const generation = ++this.visibilityGeneration;
     this.coverageCoordinator.handlePanelVisible();
     this.stopCompletionPolling();
     await this.refreshBuildStatus(token);
-    if (!this.isVisibilityCurrent(generation)) {
+    if (!this.isVisibilityCurrent(token, generation)) {
       return false;
     }
     if (this.options.state.lastDetailsBuilding) {
@@ -95,15 +96,19 @@ export class BuildDetailsPanelRuntime {
       this.refreshWorkflowRun(),
       this.options.getPollingController()?.refreshPendingInputs()
     ]);
-    if (!this.isVisibilityCurrent(generation)) {
+    if (!this.isVisibilityCurrent(token, generation)) {
       return false;
     }
     void this.refreshRestartFromStageInfo(token, { postUpdate: true });
     return true;
   }
 
-  private isVisibilityCurrent(generation: number): boolean {
-    return generation === this.visibilityGeneration && this.options.view.isVisible();
+  private isVisibilityCurrent(token: number, generation: number): boolean {
+    return (
+      this.options.isTokenCurrent(token) &&
+      generation === this.visibilityGeneration &&
+      this.options.view.isVisible()
+    );
   }
 
   async refreshPendingInputs(): Promise<void> {
@@ -163,6 +168,9 @@ export class BuildDetailsPanelRuntime {
     token: number,
     options?: { includeCaseLogs?: boolean; showLoading?: boolean }
   ): Promise<void> {
+    if (!this.options.isTokenCurrent(token)) {
+      return;
+    }
     const pollingController = this.options.getPollingController();
     if (
       !pollingController ||

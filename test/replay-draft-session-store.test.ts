@@ -86,6 +86,35 @@ describe("ReplayDraftSessionStore", () => {
     assert.equal(store.hasDraft(filesystem.createdUris[0]), false);
   });
 
+  it("keeps loaded-script drafts under the session directory despite dot segments", () => {
+    const filesystem = new ReplayDraftFilesystem();
+    const store = new ReplayDraftSessionStore(filesystem);
+    const session = store.createSession(
+      environment,
+      "https://jenkins.example/job/demo/1/",
+      "demo #1",
+      {
+        ...definition,
+        loadedScripts: [
+          { displayName: "../../x.groovy", postField: "loadedScript0", script: "return 1" },
+          { displayName: "./vars/../helper.groovy", postField: "loadedScript1", script: "" },
+          { displayName: "..", postField: "loadedScript2", script: "" }
+        ]
+      }
+    );
+
+    const paths = session.scripts.map((script) => script.uri.path);
+    assert.deepEqual(paths.slice(1), [
+      `/${session.sessionId}/x.groovy`,
+      `/${session.sessionId}/vars/helper.groovy`,
+      `/${session.sessionId}/LoadedScript.groovy`
+    ]);
+    for (const path of paths) {
+      assert.ok(path.startsWith(`/${session.sessionId}/`));
+      assert.ok(!path.split("/").some((segment) => segment === "." || segment === ".."));
+    }
+  });
+
   it("removes all session drafts when disposed", () => {
     const filesystem = new ReplayDraftFilesystem();
     const store = new ReplayDraftSessionStore(filesystem);

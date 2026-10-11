@@ -12,12 +12,14 @@ import type {
 
 const MAX_AGGREGATED_NODE_COUNT = 25;
 const MAX_AGGREGATED_NODE_FETCHES_PER_POLL = 6;
+const MAX_FAILED_NODE_FETCH_RETRIES = 3;
 
 interface AggregatedNodeLogSnapshot {
   html: string;
   text: string;
   hasMore: boolean;
   active: boolean;
+  failedFetchCount?: number;
   consoleUrl?: string;
 }
 
@@ -61,22 +63,44 @@ export class PipelineStageLogAggregator {
     const omittedNodeCount = Math.max(0, nodeIds.length - selectedNodeIds.length);
     const refreshCandidates = selectedNodeIds.filter((nodeId) => {
       const cached = this.nodeCache.get(nodeId);
-      return initial ? !cached : !cached || cached.hasMore || cached.active;
+      // `hasMore` only marks a truncated snapshot; a finished node returns the
+      // same truncated text on every fetch, so only active nodes are refreshed.
+      // Failed placeholders get bounded retries; reselecting renews the budget.
+      return (
+        !cached ||
+        (initial && Boolean(cached.failedFetchCount)) ||
+        this.canRetryFailedNode(cached) ||
+        (!initial && cached.active)
+      );
     });
     const nodesToFetch = this.takeRefreshBatch(refreshCandidates);
 
-    const fetchedNodes = await Promise.all(
-      nodesToFetch.map(async (nodeId) => ({
-        nodeId,
-        snapshot: await this.options.backend.getFlowNodeLog(
-          this.options.environment,
-          this.options.buildUrl,
-          nodeId
-        )
-      }))
+    const fetchedNodes = await Promise.allSettled(
+      nodesToFetch.map((nodeId) =>
+        this.options.backend.getFlowNodeLog(this.options.environment, this.options.buildUrl, nodeId)
+      )
     );
 
-    for (const { nodeId, snapshot } of fetchedNodes) {
+    let failure: { reason: unknown } | undefined;
+    fetchedNodes.forEach((result, index) => {
+      const nodeId = nodesToFetch[index];
+      if (result.status === "rejected") {
+        failure ??= { reason: result.reason };
+        const cached = this.nodeCache.get(nodeId);
+        // Keep a previously loaded snapshot; only uncached nodes get a placeholder.
+        if (!cached || cached.failedFetchCount) {
+          const text = `Failed to load node log: ${formatFetchError(result.reason)}`;
+          this.nodeCache.set(nodeId, {
+            html: escapeHtml(text),
+            text,
+            hasMore: false,
+            active: false,
+            failedFetchCount: initial ? 1 : (cached?.failedFetchCount ?? 0) + 1
+          });
+        }
+        return;
+      }
+      const snapshot = result.value;
       if (!snapshot) {
         this.nodeCache.set(nodeId, {
           html: "",
@@ -84,7 +108,7 @@ export class PipelineStageLogAggregator {
           hasMore: false,
           active: false
         });
-        continue;
+        return;
       }
       const text = htmlToText(snapshot.text ?? "");
       this.nodeCache.set(nodeId, {
@@ -94,9 +118,26 @@ export class PipelineStageLogAggregator {
         active: isWorkflowNodeActive(snapshot.nodeStatus),
         consoleUrl: snapshot.consoleUrl
       });
+    });
+
+    if (failure && !selectedNodeIds.some((nodeId) => this.hasLoadedSnapshot(nodeId))) {
+      // Nothing usable was loaded, so let the caller's error and retry handling run.
+      throw failure.reason;
     }
 
     return this.buildLog(target, selectedNodeIds, omittedNodeCount);
+  }
+
+  private hasLoadedSnapshot(nodeId: string): boolean {
+    const cached = this.nodeCache.get(nodeId);
+    return Boolean(cached && !cached.failedFetchCount);
+  }
+
+  private canRetryFailedNode(snapshot: AggregatedNodeLogSnapshot): boolean {
+    return (
+      snapshot.failedFetchCount !== undefined &&
+      snapshot.failedFetchCount <= MAX_FAILED_NODE_FETCH_RETRIES
+    );
   }
 
   private buildLog(
@@ -109,8 +150,8 @@ export class PipelineStageLogAggregator {
     let truncated = false;
     let consoleUrl: string | undefined;
     let pendingNodeCount = 0;
-    let hasMoreNodeData = false;
     let hasActiveNode = false;
+    let hasRetryableFailure = false;
 
     for (const nodeId of selectedNodeIds) {
       const snapshot = this.nodeCache.get(nodeId);
@@ -123,8 +164,8 @@ export class PipelineStageLogAggregator {
       parts.push(snapshot.html);
       textParts.push(`===== ${header} =====\n${snapshot.text}`);
       truncated = truncated || Boolean(snapshot.hasMore);
-      hasMoreNodeData = hasMoreNodeData || Boolean(snapshot.hasMore);
       hasActiveNode = hasActiveNode || snapshot.active;
+      hasRetryableFailure = hasRetryableFailure || this.canRetryFailedNode(snapshot);
       consoleUrl = consoleUrl ?? snapshot.consoleUrl;
     }
 
@@ -149,8 +190,8 @@ export class PipelineStageLogAggregator {
       loading: pendingNodeCount > 0,
       polling:
         pendingNodeCount > 0 ||
-        hasMoreNodeData ||
         hasActiveNode ||
+        hasRetryableFailure ||
         this.isStageChildDiscoveryIncomplete(target),
       consoleUrl
     };
@@ -215,6 +256,10 @@ export class PipelineStageLogAggregator {
     this.fetchCursor = (start + batch.length) % candidates.length;
     return batch;
   }
+}
+
+function formatFetchError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function renderLogDivider(text: string): string {

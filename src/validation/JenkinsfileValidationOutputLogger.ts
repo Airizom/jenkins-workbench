@@ -14,14 +14,16 @@ export class JenkinsfileValidationOutputLogger {
 
   logValidation(
     document: vscode.TextDocument,
-    environment: JenkinsEnvironmentRef,
+    environment: JenkinsEnvironmentRef | undefined,
     output: string,
     reason: ValidationReason
   ): void {
     this.appendLogHeader(document, reason);
-    this.outputChannel.appendLine(
-      `Environment: ${environment.url} (${environment.scope}, ${environment.environmentId})`
-    );
+    if (environment) {
+      this.outputChannel.appendLine(
+        `Environment: ${environment.url} (${environment.scope}, ${environment.environmentId})`
+      );
+    }
     this.outputChannel.appendLine(output.trim() || "<no output>");
     this.outputChannel.appendLine("");
   }

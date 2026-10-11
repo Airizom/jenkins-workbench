@@ -118,8 +118,8 @@ export class JenkinsEnvironmentStore {
   // fallow-ignore-next-line unused-class-member
   async migrateLegacyAuthConfigs(): Promise<void> {
     await Promise.all([
-      this.migrateLegacyAuthConfigsForScope("workspace"),
-      this.migrateLegacyAuthConfigsForScope("global")
+      this.mutationQueue(() => this.migrateLegacyAuthConfigsForScope("workspace")),
+      this.mutationQueue(() => this.migrateLegacyAuthConfigsForScope("global"))
     ]);
   }
 
@@ -216,6 +216,7 @@ export class JenkinsEnvironmentStore {
         if (username.length === 0) {
           return;
         }
+        const revision = this.getAuthConfigRevision(scope, environment.id);
         const existing = await this.getAuthConfig(scope, environment.id);
 
         if (!existing) {
@@ -227,7 +228,15 @@ export class JenkinsEnvironmentStore {
               username,
               token: trimmedToken
             };
-            await this.setAuthConfig(scope, environment.id, authConfig);
+            const saved = await this.setAuthConfigIfRevision(
+              scope,
+              environment.id,
+              authConfig,
+              revision
+            );
+            if (!saved) {
+              return;
+            }
             await this.deleteToken(scope, environment.id);
             environment.username = undefined;
             didUpdate = true;

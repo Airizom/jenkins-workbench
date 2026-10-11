@@ -1,9 +1,13 @@
 import * as vscode from "vscode";
+import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
+import { CancellationError } from "../jenkins/errors";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JobHistoryPanelLauncher } from "../panels/JobHistoryPanelLauncher";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsFolderTreeItem, JobTreeItem } from "../tree/TreeItems";
 import { toJenkinsEnvironmentRef, withActionErrorMessage } from "./CommandUtils";
+
+const JOB_HISTORY_PICKER_MAX_RESULTS = 2000;
 
 export function registerHistoryCommands(
   context: vscode.ExtensionContext,
@@ -31,12 +35,37 @@ export function registerHistoryCommands(
         }
         const entries = await environments.listEnvironmentsWithScope();
         const chosen = await vscode.window.showQuickPick(
-          entries.map((entry) => ({ label: entry.url, entry })),
-          { title: "Choose Jenkins environment" }
+          entries.map((entry) => ({
+            label: formatEnvironmentLabel(entry.url),
+            description: entry.username ? `${entry.scope} · ${entry.username}` : entry.scope,
+            entry
+          })),
+          { title: "Choose Jenkins environment", matchOnDescription: true }
         );
         if (!chosen) return;
         const environment = toJenkinsEnvironmentRef(chosen.entry);
-        const jobs = await data.getAllJobsForEnvironment(environment);
+        const jobs = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Loading Jenkins jobs for Job History",
+            cancellable: true
+          },
+          (_progress, token) =>
+            data
+              .getAllJobsForEnvironment(environment, {
+                cancellation: token,
+                concurrency: 1,
+                maxResults: JOB_HISTORY_PICKER_MAX_RESULTS
+              })
+              .catch((error: unknown) => {
+                // Cancelling the progress notification is a normal close, not a failure.
+                if (token.isCancellationRequested || error instanceof CancellationError) {
+                  return undefined;
+                }
+                throw error;
+              })
+        );
+        if (!jobs) return;
         const selected = await vscode.window.showQuickPick(
           jobs.map((job) => ({ label: job.fullName, url: job.url })),
           { title: "Choose job for history", matchOnDescription: true }

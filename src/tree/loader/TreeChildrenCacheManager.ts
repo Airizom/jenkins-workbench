@@ -8,6 +8,7 @@ import {
   isEnvironmentScopedChildKey,
   type TreeChildrenKeyBuilder
 } from "./TreeCacheKeys";
+import { LOADED_CHILDREN_KEYS_MAX_ENTRIES } from "./TreeChildrenConfig";
 import {
   buildWorkspaceDirectoryChildrenKey,
   buildWorkspaceDirectoryChildrenPrefix,
@@ -42,7 +43,20 @@ export class TreeChildrenCacheManager {
 
   setChildren<T>(key: string, items: T[]): void {
     this.childrenCache.set(key, items);
+    this.recordLoadedKey(key);
+  }
+
+  private recordLoadedKey(key: string): void {
+    // Keep recent expansion history across ordinary refreshes, without retaining
+    // every build or workspace directory visited for the manager's lifetime.
+    this.loadedKeys.delete(key);
     this.loadedKeys.add(key);
+    if (this.loadedKeys.size > LOADED_CHILDREN_KEYS_MAX_ENTRIES) {
+      const oldestKey = this.loadedKeys.values().next().value;
+      if (oldestKey !== undefined) {
+        this.loadedKeys.delete(oldestKey);
+      }
+    }
   }
 
   getCachedArtifacts<T>(key: string): T | undefined {
@@ -235,6 +249,7 @@ export class TreeChildrenCacheManager {
   ): Promise<WorkbenchTreeElement[]> {
     const cached = this.childrenCache.get<WorkbenchTreeElement[]>(key);
     if (cached) {
+      this.recordLoadedKey(key);
       return Promise.resolve(cached);
     }
 
@@ -253,16 +268,14 @@ export class TreeChildrenCacheManager {
         if (!this.isCurrentLoadToken(key, token)) {
           return;
         }
-        this.childrenCache.set(key, items);
-        this.loadedKeys.add(key);
+        this.setChildren(key, items);
       })
       .catch((error) => {
         if (!this.isCurrentLoadToken(key, token)) {
           return;
         }
         const items = [this.createErrorPlaceholder("Unable to load data.", error)];
-        this.childrenCache.set(key, items);
-        this.loadedKeys.add(key);
+        this.setChildren(key, items);
       })
       .finally(() => {
         if (this.pendingLoads.get(key) === pending) {

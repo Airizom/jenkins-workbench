@@ -1,10 +1,14 @@
 import { parentPort, workerData } from "node:worker_threads";
+import { isPlainRecord } from "../shared/runtimeGuards";
 import {
   CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
+  type CustomMatcherWorkerReadyMessage,
   type CustomMatcherWorkerResponse,
+  isWorkerRequestId,
   MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH,
   parseCustomMatcherWorkerData,
-  parseCustomMatcherWorkerRequest
+  parseCustomMatcherWorkerRequest,
+  safeErrorMessage
 } from "./BuildDiagnosticCustomMatcherProtocol";
 import { BuildDiagnosticLogParser } from "./BuildDiagnosticLogParser";
 import type { RawBuildDiagnostic } from "./BuildDiagnosticTypes";
@@ -32,6 +36,11 @@ try {
 }
 
 port.on("message", handleMessage);
+const ready: CustomMatcherWorkerReadyMessage = {
+  protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
+  type: "ready"
+};
+port.postMessage(ready);
 
 function handleMessage(value: unknown): void {
   const requestId = readRequestId(value);
@@ -112,19 +121,6 @@ function postDiagnostics(
 }
 
 function readRequestId(value: unknown): number {
-  const candidate = isObjectWithId(value) ? value.id : undefined;
-  return isPositiveRequestId(candidate) ? candidate : 1;
-}
-
-function isObjectWithId(value: unknown): value is { id: unknown } {
-  return typeof value === "object" && value !== null && "id" in value;
-}
-
-function isPositiveRequestId(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-}
-
-function safeErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 512) || "Custom matcher worker failed.";
+  const candidate = isPlainRecord(value) ? value.id : undefined;
+  return isWorkerRequestId(candidate) ? candidate : 1;
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { RawBuildDiagnostic } from "../src/buildDiagnostics/BuildDiagnosticTypes";
+import { MAX_DIAGNOSTICS_MAX_PROBLEMS } from "../src/extension/ExtensionConfigDefinitions";
 import * as vscodeStub from "./helpers/vscodeStub";
 
 vi.doMock("vscode", () => vscodeStub);
@@ -158,9 +159,10 @@ describe("build diagnostic aggregation", () => {
     assert.ok(published.every((diagnostic) => diagnostic.source?.includes("Jenkins app #12")));
   });
 
-  it("enforces the hard 500-Problem publication ceiling", async () => {
+  it("enforces the configured maxProblems ceiling for publication", async () => {
     const collection = new DiagnosticCollection();
-    const diagnostics = Array.from({ length: 501 }, (_unused, index) =>
+    const length = MAX_DIAGNOSTICS_MAX_PROBLEMS + 1;
+    const diagnostics = Array.from({ length }, (_unused, index) =>
       raw({
         line: index + 1,
         message: `failure ${index + 1}`,
@@ -175,16 +177,16 @@ describe("build diagnostic aggregation", () => {
       repositoryUri: vscodeStub.Uri.file("/repo") as never,
       profile: AUTOMATIC_DIAGNOSTIC_PROFILE,
       diagnostics,
-      maxProblems: 1_000,
+      maxProblems: MAX_DIAGNOSTICS_MAX_PROBLEMS * 2,
       generation: 1,
       buildUrl: "https://jenkins.example/job/app/12/",
       buildIdentity: "Jenkins app #12",
       truncated: false
     });
 
-    assert.equal(snapshot.viewModel.resolvedCount, 501);
+    assert.equal(snapshot.viewModel.resolvedCount, length);
     assert.equal(snapshot.viewModel.omittedCount, 1);
-    assert.equal([...collection.entries.values()].flat().length, 500);
+    assert.equal([...collection.entries.values()].flat().length, MAX_DIAGNOSTICS_MAX_PROBLEMS);
   });
 
   it("bounds path resolution work and counts candidates omitted before resolution", async () => {
@@ -401,6 +403,48 @@ describe("build diagnostic aggregation", () => {
     );
   });
 
+  it("keeps the innermost Python frame primary when a base matcher restyles tracebacks", async () => {
+    const { parseBuildLog } = await import("../src/buildDiagnostics/BuildDiagnosticLogParser");
+    const collection = new DiagnosticCollection();
+    const diagnostics = parseBuildLog(
+      "Traceback (most recent call last):\n" +
+        '  File "src/main.py", line 3, in <module>\n' +
+        '  File "src/service.py", line 7, in run\n' +
+        '  File "src/failure.py", line 11, in execute\n' +
+        "ValueError: bad\n",
+      {
+        builtIns: [],
+        customMatchers: [{ id: "py", base: "python-traceback", severity: "warning", patterns: [] }]
+      }
+    );
+    assert.equal(diagnostics.length, 3);
+    assert.ok(diagnostics.every((item) => item.parserId === "custom:py"));
+    const paths = Object.fromEntries(
+      diagnostics.map((item) => [item.rawPath, vscodeStub.Uri.file(`/repo/${item.rawPath}`)])
+    );
+
+    await aggregateAndPublishBuildDiagnostics({
+      collection: collection as never,
+      pathResolver: resolver(paths) as never,
+      repositoryUri: vscodeStub.Uri.file("/repo") as never,
+      profile: AUTOMATIC_DIAGNOSTIC_PROFILE,
+      diagnostics,
+      maxProblems: 10,
+      generation: 1,
+      buildUrl: "https://jenkins.example/job/app/14/",
+      buildIdentity: "Jenkins app #14",
+      truncated: false
+    });
+
+    assert.deepEqual([...collection.entries.keys()], ["file:///repo/src/failure.py"]);
+    const published = collection.entries.get("file:///repo/src/failure.py")?.[0];
+    assert.equal(published?.range.start.line, 10);
+    assert.deepEqual(
+      published?.relatedInformation?.map((related) => related.location.uri.toString()),
+      ["file:///repo/src/main.py", "file:///repo/src/service.py"]
+    );
+  });
+
   it("keeps unresolved findings visible but non-clickable and never publishes stale scans", async () => {
     const collection = new DiagnosticCollection();
     const unresolved = raw({ rawPath: "/agent/src/missing.ts", message: "missing source" });
@@ -438,6 +482,27 @@ describe("build diagnostic aggregation", () => {
     });
     assert.equal(staleCollection.clearCount, 0);
     assert.equal(staleCollection.entries.size, 0);
+  });
+
+  it("deduplicates unresolved findings by their normalized range", async () => {
+    const snapshot = await aggregateAndPublishBuildDiagnostics({
+      collection: new DiagnosticCollection() as never,
+      pathResolver: resolver({}) as never,
+      repositoryUri: vscodeStub.Uri.file("/repo") as never,
+      profile: AUTOMATIC_DIAGNOSTIC_PROFILE,
+      diagnostics: [
+        raw({ rawPath: "/agent/src/missing.ts", line: 3, column: undefined, logLine: 1 }),
+        raw({ rawPath: "/agent/src/missing.ts", line: 3, column: 1, logLine: 2, sequence: 2 })
+      ],
+      maxProblems: 10,
+      generation: 1,
+      buildUrl: "https://jenkins.example/job/app/16/",
+      buildIdentity: "Jenkins app #16",
+      truncated: false
+    });
+
+    assert.equal(snapshot.viewModel.unresolvedCount, 1);
+    assert.equal(snapshot.viewModel.errorCount, 1);
   });
 });
 
@@ -489,6 +554,57 @@ describe("buildConsoleReferences", () => {
     assert.deepEqual(
       references.map((reference) => consoleText.slice(reference.startOffset, reference.endOffset)),
       ["src/a.ts", "src/a.ts"]
+    );
+  });
+
+  it("skips duplicate line-scoped references instead of linking an unrelated occurrence", () => {
+    const line = "src/a.ts:1: error: first";
+    const consoleText = `${line}\nsrc/a.ts:99: unrelated\n`;
+    const references = buildConsoleReferences(consoleText, [
+      { targetId: "first", rawPath: "src/a.ts", rawText: line, logLine: 1 },
+      { targetId: "duplicate", rawPath: "src/a.ts", rawText: line, logLine: 1 }
+    ]);
+
+    assert.deepEqual(references, [
+      { targetId: "first", startOffset: 0, endOffset: "src/a.ts".length }
+    ]);
+  });
+
+  it("links every reference that shares one console line", () => {
+    const consoleText = "a.ts:1:1 error x\n";
+    const references = buildConsoleReferences(consoleText, [
+      { targetId: "path", rawPath: "a.ts", rawText: "a.ts:1:1 error x", logLine: 1 },
+      { targetId: "path-line", rawPath: "a.ts:1", rawText: "a.ts:1:1 error x", logLine: 1 }
+    ]);
+
+    assert.deepEqual(
+      references.map((reference) => [reference.targetId, reference.startOffset]).sort(),
+      [
+        ["path", 0],
+        ["path-line", 0]
+      ]
+    );
+  });
+
+  it("keeps same-line references on their own occurrence of repeated line text", () => {
+    const line = "src/a.ts:1:1: error: x uses src/b.ts";
+    const consoleText = `${line}\nsummary\n${line}\n`;
+    const secondLineStart = consoleText.lastIndexOf(line);
+    const references = buildConsoleReferences(consoleText, [
+      { targetId: "first-a", rawPath: "src/a.ts", rawText: line, logLine: 1 },
+      { targetId: "first-b", rawPath: "src/b.ts", rawText: line, logLine: 1 },
+      { targetId: "second-a", rawPath: "src/a.ts", rawText: line, logLine: 3 },
+      { targetId: "second-b", rawPath: "src/b.ts", rawText: line, logLine: 3 }
+    ]);
+
+    assert.deepEqual(
+      references.map((reference) => [reference.targetId, reference.startOffset]),
+      [
+        ["first-a", 0],
+        ["first-b", line.indexOf("src/b.ts")],
+        ["second-a", secondLineStart],
+        ["second-b", secondLineStart + line.indexOf("src/b.ts")]
+      ]
     );
   });
 });

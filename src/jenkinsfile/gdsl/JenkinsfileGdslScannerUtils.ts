@@ -1,3 +1,12 @@
+const STRING_ESCAPES: Readonly<Record<string, string>> = {
+  b: "\b",
+  f: "\f",
+  n: "\n",
+  r: "\r",
+  s: " ",
+  t: "\t"
+};
+
 export function findCallStart(text: string, name: string, start: number): number | undefined {
   let index = start;
   while (index < text.length) {
@@ -106,7 +115,14 @@ export function readGdslString(
 
   while (index < text.length) {
     if (!triple && text[index] === "\\") {
-      value += text[index + 1] ?? "";
+      const escaped = text[index + 1] ?? "";
+      const unicodeDigits = text.slice(index + 2, index + 6);
+      if (escaped === "u" && /^[0-9a-fA-F]{4}$/.test(unicodeDigits)) {
+        value += String.fromCharCode(Number.parseInt(unicodeDigits, 16));
+        index += 6;
+        continue;
+      }
+      value += STRING_ESCAPES[escaped] ?? escaped;
       index += 2;
       continue;
     }
@@ -151,10 +167,34 @@ function skipBlockComment(text: string, start: number): number {
   return Math.min(text.length, index + 2);
 }
 
-export function findPreviousMeaningfulIndex(text: string, index: number): number | undefined {
+/** Marks comment characters, so backward scans can skip them without misreading strings. */
+export function buildGdslCommentMask(text: string): Uint8Array {
+  const mask = new Uint8Array(text.length);
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] === "'" || text[index] === '"') {
+      index = skipString(text, index);
+      continue;
+    }
+    const commentEnd = skipGdslComment(text, index);
+    if (commentEnd !== undefined) {
+      mask.fill(1, index, commentEnd);
+      index = commentEnd;
+      continue;
+    }
+    index += 1;
+  }
+  return mask;
+}
+
+export function findPreviousMeaningfulIndex(
+  text: string,
+  index: number,
+  commentMask?: Uint8Array
+): number | undefined {
   let current = index;
   while (current >= 0) {
-    if (!/\s/.test(text[current])) {
+    if (!/\s/.test(text[current]) && !commentMask?.[current]) {
       return current;
     }
     current -= 1;

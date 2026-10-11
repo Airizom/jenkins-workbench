@@ -25,6 +25,15 @@ export class BuildDiagnosticStackTraceParser {
   private pythonTailLines = 0;
   private dotnetStack: StackState | undefined;
 
+  /** Ends active traces without reusing previously emitted stack IDs. */
+  reset(): void {
+    this.jvmStack = undefined;
+    this.javascriptStack = undefined;
+    this.pythonStack = undefined;
+    this.pythonTailLines = 0;
+    this.dotnetStack = undefined;
+  }
+
   parseJvmStack(text: string): DiagnosticDraft | undefined {
     if (
       /^(?:Exception in thread\s+"[^"]+"\s+)?(?:Caused by:\s*)?[\w.$]+(?:Exception|Error)(?::\s*.*)?$/.test(

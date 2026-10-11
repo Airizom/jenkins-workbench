@@ -49,7 +49,7 @@ import {
 } from "./shared/webview/WebviewHtml";
 import { configureWebviewPanel } from "./shared/webview/WebviewPanelChrome";
 
-interface BuildDetailsPanelShowOptions {
+export interface BuildDetailsPanelServices {
   historyDependencies?: HistoryDependencies;
   backend: BuildDetailsBackend;
   artifactActionHandler: ArtifactActionHandler;
@@ -59,27 +59,20 @@ interface BuildDetailsPanelShowOptions {
   pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
   testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
+  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
+}
+
+interface BuildDetailsPanelShowOptions extends BuildDetailsPanelServices {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   extensionUri: vscode.Uri;
   label?: string;
   pipelineNodeSelection?: PipelineNodeSelection;
-  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
 }
 
-interface BuildDetailsPanelReviveOptions {
-  historyDependencies?: HistoryDependencies;
-  backend: BuildDetailsBackend;
-  artifactActionHandler: ArtifactActionHandler;
-  consoleExporter: BuildConsoleExporter;
-  coverageDecorationService: CoverageDecorationService;
-  refreshHost: EnvironmentScopedRefreshHost | undefined;
-  pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
-  testSourceResolver?: TestSourceResolver;
-  testSourceNavigationUiService?: TestSourceNavigationUiService;
+interface BuildDetailsPanelReviveOptions extends BuildDetailsPanelServices {
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
-  buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
 }
 
 interface BuildDetailsPanelMutableServices {
@@ -425,7 +418,9 @@ export class BuildDetailsPanel {
   private updateHistory(): void {
     const details = this.controller.getCurrentDetails();
     const buildUrl = this.controller.getBuildUrl();
-    const jobUrl = buildUrl ? parseBuildUrl(buildUrl)?.jobUrl : undefined;
+    const jobUrl = buildUrl
+      ? parseBuildUrl(buildUrl, this.historyEnvironment?.url)?.jobUrl
+      : undefined;
     const hasFailures = this.controller.hasFailedTests();
     const historyKey = `${buildUrl}:${hasFailures}`;
     if (

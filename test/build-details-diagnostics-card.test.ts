@@ -91,10 +91,49 @@ describe("Build Details diagnostics card", () => {
     assert.equal(countHiddenDiagnostics({ ...EMPTY_BUILD_DIAGNOSTICS, errorCount: 2 }, 2), 0);
   });
 
+  it("renders identical diagnostics without duplicate React keys", () => {
+    const item = { severity: "error" as const, message: "Unresolved failure" };
+    const errors: unknown[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    let html: string;
+    try {
+      html = renderCard({
+        ...EMPTY_BUILD_DIAGNOSTICS,
+        status: "available",
+        errorCount: 2,
+        items: [item, { ...item }]
+      });
+    } finally {
+      console.error = originalError;
+    }
+
+    assert.equal(html.match(/Unresolved failure/g)?.length, 2);
+    assert.equal(
+      errors.some((args) => String(args).includes("same key")),
+      false
+    );
+  });
+
   it("explains why Show Problems is disabled while the scan is pending", () => {
     const html = renderCard({ ...EMPTY_BUILD_DIAGNOSTICS, status: "scanning" });
 
     assert.match(html, /disabled=""[^>]*title="Available after the diagnostic scan finishes\."/);
     assert.match(html, /aria-describedby="build-diagnostics-show-problems-hint"/);
+  });
+
+  it("uses the empty-state message as the Show Problems hint for blocking statuses", () => {
+    for (const status of ["disabled", "error", "needsRepository"] as const) {
+      const diagnostics = { ...EMPTY_BUILD_DIAGNOSTICS, status };
+      const { emptyMessage } = describeBuildDiagnostics(diagnostics);
+      const html = renderCard(diagnostics);
+
+      assert.ok(
+        html.includes(`title="${emptyMessage}"`),
+        `${status} hint should match "${emptyMessage}"`
+      );
+    }
   });
 });

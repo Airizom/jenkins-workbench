@@ -1,3 +1,4 @@
+import { createUniqueListKeys } from "../../../../shared/webview/lib/uniqueListKeys";
 import type { BuildCompareChangesetItem } from "../../../shared/BuildCompareContracts";
 import { CompareMutedCard } from "./shared/CompareMutedCard";
 import { CompareSectionFrame } from "./shared/CompareSectionFrame";
@@ -17,10 +18,15 @@ export function ChangesetColumn({
       </div>
     );
   }
+  // Commit ids and author/message pairs can repeat, so repeats get an occurrence suffix.
+  const keys = createUniqueListKeys(
+    items,
+    (item) => item.commitId ?? `${item.author}:${item.message}`
+  );
   return (
     <CompareSectionFrame title={title} count={items.length}>
-      {items.map((item) => (
-        <CompareMutedCard key={item.commitId ?? `${item.author}:${item.message}`}>
+      {items.map((item, index) => (
+        <CompareMutedCard key={keys[index]}>
           <p className="text-sm [overflow-wrap:anywhere]">{item.message}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {item.author}

@@ -4,7 +4,7 @@ import {
   ConsoleOutputEmptyState,
   ConsoleOutputErrorNotice,
   ConsoleOutputLoadingState,
-  ConsoleOutputNotice,
+  ConsoleOutputTruncationNotice,
   ConsoleOutputViewport
 } from "./buildDetails/consoleOutput";
 import { ConsoleSearchToolbar } from "./ConsoleSearchToolbar";
@@ -73,7 +73,7 @@ export function ConsoleLogSearchBody({
         onNext={() => consoleSearch.handleSearchStep("next")}
         onClear={consoleSearch.handleClearSearch}
       />
-      <ConsoleOutputNotice id={noteId} note={note ?? ""} />
+      <ConsoleOutputTruncationNotice id={noteId} note={note ?? ""} />
       {/* A failed refresh keeps the output already loaded, with its scroll and search state. */}
       <ConsoleOutputErrorNotice id={errorId} error={error} onRetry={onRetry} />
       {hasOutput ? (

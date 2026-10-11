@@ -34,8 +34,7 @@ export class JenkinsPendingInputClient {
     options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
   ): Promise<void> {
     const params = options?.params;
-    const hasParams = params !== undefined && params.size > 0;
-    if (hasParams && params) {
+    if (params && params.size > 0) {
       const url = new URL(buildActionUrl(buildUrl, "wfapi/inputSubmit"));
       url.searchParams.set("inputId", inputId);
       const body = this.buildInputSubmitBody(inputId, params, options?.proceedText);

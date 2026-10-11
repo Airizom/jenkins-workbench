@@ -68,7 +68,7 @@ export class TreeBuildChildrenLoader {
       );
       const items: ArtifactTreeItem[] = [];
       for (const artifact of artifacts) {
-        const relativePath = (artifact.relativePath ?? "").trim();
+        const relativePath = artifact.relativePath ?? "";
         if (!relativePath) {
           continue;
         }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type * as vscode from "vscode";
 import { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
+import { createFakeSecretStorage } from "./helpers/storageMocks";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 vi.doMock("vscode", () => createEventEmitterVscodeMock());
@@ -26,7 +27,10 @@ interface EnvironmentStoreHarness {
     environment: { id: string; url: string },
     token?: string
   ): Promise<void>;
-  getEnvironments(scope: "workspace" | "global"): Promise<Array<{ id: string; url: string }>>;
+  getEnvironments(
+    scope: "workspace" | "global"
+  ): Promise<Array<{ id: string; url: string; username?: string }>>;
+  removeEnvironment(scope: "workspace" | "global", id: string): Promise<boolean>;
   getAuthConfig(
     scope: "workspace" | "global",
     id: string
@@ -197,6 +201,79 @@ describe("JenkinsEnvironmentStore mutation serialization", () => {
 });
 
 describe("JenkinsEnvironmentStore legacy auth migration", () => {
+  async function pauseMigration(
+    scope: "workspace" | "global",
+    pauseAt: "envToken" | "envAuthConfig" = "envToken"
+  ) {
+    const { context } = createContext();
+    const secrets = createFakeSecretStorage();
+    secrets.values.set(`jenkinsWorkbench.envToken.${scope}.legacy`, "legacy-token");
+    const state = scope === "workspace" ? context.workspaceState : context.globalState;
+    await state.update("jenkinsWorkbench.environments", [
+      { id: "legacy", url: "https://a.example", username: "developer" }
+    ]);
+    let releaseRead!: () => void;
+    const readHeld = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    let signalRead!: () => void;
+    const readStarted = new Promise<void>((resolve) => {
+      signalRead = resolve;
+    });
+    vi.spyOn(secrets, "get").mockImplementation(async (key) => {
+      const value = secrets.values.get(key);
+      if (key === `jenkinsWorkbench.${pauseAt}.${scope}.legacy`) {
+        signalRead();
+        await readHeld;
+      }
+      return value;
+    });
+    const store = new JenkinsEnvironmentStore({ ...context, secrets });
+    const migration = store.migrateLegacyAuthConfigs();
+    await readStarted;
+    return { store, secrets, migration, releaseRead };
+  }
+
+  for (const scope of ["workspace", "global"] as const) {
+    it.each(["add", "remove"] as const)(
+      `preserves an environment %s requested during ${scope} migration`,
+      async (operation) => {
+        const { store, migration, releaseRead } = await pauseMigration(scope);
+        const mutation =
+          operation === "add"
+            ? store.addEnvironment(scope, { id: "added", url: "https://b.example" })
+            : store.removeEnvironment(scope, "legacy");
+        // Give an unqueued mutation time to persist before migration resumes.
+        await new Promise((resolve) => setImmediate(resolve));
+        releaseRead();
+        await Promise.all([migration, mutation]);
+
+        assert.deepEqual(
+          (await store.getEnvironments(scope)).map((environment) => environment.id),
+          operation === "add" ? ["legacy", "added"] : []
+        );
+      }
+    );
+  }
+
+  it.each(["envToken", "envAuthConfig"] as const)(
+    "keeps newer auth saved during a migration %s read",
+    async (pauseAt) => {
+      const { store, secrets, migration, releaseRead } = await pauseMigration("workspace", pauseAt);
+      const authConfig = { type: "bearer" as const, token: "new-token" };
+      await store.setAuthConfig("workspace", "legacy", authConfig);
+      releaseRead();
+      await migration;
+
+      assert.deepEqual(await store.getAuthConfig("workspace", "legacy"), authConfig);
+      assert.equal(
+        secrets.values.get("jenkinsWorkbench.envToken.workspace.legacy"),
+        "legacy-token"
+      );
+      assert.equal((await store.getEnvironments("workspace"))[0].username, "developer");
+    }
+  );
+
   it("reads secrets only for environments that still carry a legacy username", async () => {
     const secrets = new Map([["jenkinsWorkbench.envToken.workspace.legacy", "legacy-token"]]);
     const reads: string[] = [];

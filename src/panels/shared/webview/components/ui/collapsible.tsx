@@ -9,11 +9,7 @@ import {
 
 export const Collapsible = CollapsiblePrimitive.Root;
 
-type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<
-  typeof CollapsiblePrimitive.Trigger
-> & {
-  asChild?: boolean;
-};
+type CollapsibleTriggerProps = React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Trigger>;
 export const CollapsibleTrigger = React.forwardRef<
   React.ElementRef<typeof CollapsiblePrimitive.Trigger>,
   CollapsibleTriggerProps

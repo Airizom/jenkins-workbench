@@ -308,7 +308,9 @@ export function HistoryView({
       </section>
     );
   }
-  const jobName = model.jobUrl ? historyJobDisplayName(model.jobUrl) : "Job History";
+  const jobName = model.jobUrl
+    ? historyJobDisplayName(model.jobUrl, model.environmentUrl)
+    : "Job History";
   return (
     <div className="flex min-h-screen flex-col">
       <PanelHeader

@@ -1,4 +1,5 @@
 import {
+  buildGdslCommentMask,
   findCallStart,
   findMatchingDelimiter,
   findMatchingDelimiterBackward,
@@ -59,6 +60,7 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
   const calls: ScannedMethodCall[] = [];
   const guardStack: string[][] = [];
   const aliasScopes: Array<Map<string, string[]>> = [new Map()];
+  const commentMask = buildGdslCommentMask(body);
   let index = 0;
 
   while (index < body.length) {
@@ -74,12 +76,23 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
     }
     const aliasAssignment = findGuardAliasAssignment(body, index, aliasScopes);
     if (aliasAssignment) {
-      aliasScopes[aliasScopes.length - 1].set(aliasAssignment.name, aliasAssignment.guardNames);
+      // A declaration binds in the current scope; a reassignment updates the
+      // nearest scope that already declares the alias.
+      let scopeIndex = aliasScopes.length - 1;
+      if (!aliasAssignment.declared) {
+        for (let candidate = scopeIndex; candidate >= 0; candidate -= 1) {
+          if (aliasScopes[candidate].has(aliasAssignment.name)) {
+            scopeIndex = candidate;
+            break;
+          }
+        }
+      }
+      aliasScopes[scopeIndex].set(aliasAssignment.name, aliasAssignment.guardNames);
       index = aliasAssignment.end;
       continue;
     }
     if (character === "{") {
-      guardStack.push(resolveGuardNames(body, index, aliasScopes));
+      guardStack.push(resolveGuardNames(body, index, aliasScopes, commentMask));
       aliasScopes.push(new Map());
       index += 1;
       continue;
@@ -118,15 +131,16 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
 function resolveGuardNames(
   text: string,
   openBrace: number,
-  aliasScopes: ReadonlyArray<ReadonlyMap<string, string[]>>
+  aliasScopes: ReadonlyArray<ReadonlyMap<string, string[]>>,
+  commentMask: Uint8Array
 ): string[] {
-  const previous = findPreviousMeaningfulIndex(text, openBrace - 1);
+  const previous = findPreviousMeaningfulIndex(text, openBrace - 1, commentMask);
   if (previous === undefined || text[previous] !== ")") {
     return [];
   }
 
   const openParen = findMatchingDelimiterBackward(text, previous, "(", ")");
-  const keywordEnd = findPreviousMeaningfulIndex(text, openParen - 1);
+  const keywordEnd = findPreviousMeaningfulIndex(text, openParen - 1, commentMask);
   if (keywordEnd === undefined) {
     return [];
   }
@@ -148,11 +162,12 @@ function findGuardAliasAssignment(
   text: string,
   index: number,
   aliasScopes: ReadonlyArray<ReadonlyMap<string, string[]>>
-): { name: string; guardNames: string[]; end: number } | undefined {
+): { name: string; guardNames: string[]; end: number; declared: boolean } | undefined {
   IDENTIFIER_PATTERN.lastIndex = index;
   let match = IDENTIFIER_PATTERN.exec(text);
+  const declared = match?.[0] === "def";
 
-  if (match?.[0] === "def") {
+  if (declared) {
     const nextIdentifierIndex = skipWhitespace(text, IDENTIFIER_PATTERN.lastIndex);
     IDENTIFIER_PATTERN.lastIndex = nextIdentifierIndex;
     match = IDENTIFIER_PATTERN.exec(text);
@@ -163,23 +178,26 @@ function findGuardAliasAssignment(
   }
 
   const assignmentName = match[0];
-  const equalsIndex = skipWhitespace(text, IDENTIFIER_PATTERN.lastIndex);
-  if (text[equalsIndex] !== "=") {
-    return undefined;
+  const nameEnd = IDENTIFIER_PATTERN.lastIndex;
+  const equalsIndex = skipWhitespace(text, nameEnd);
+  if (text[equalsIndex] !== "=" || /[=~]/.test(text[equalsIndex + 1] ?? "")) {
+    // An uninitialized local declaration still shadows outer aliases; `def name(` is a method.
+    return declared && text[equalsIndex] !== "("
+      ? { name: assignmentName, guardNames: [], declared, end: nameEnd }
+      : undefined;
   }
 
   const valueStart = skipWhitespace(text, equalsIndex + 1);
   const lineEnd = findAssignmentEnd(text, valueStart);
   const valueText = text.slice(valueStart, lineEnd);
   const guardNames = extractGuardNames(valueText, aliasScopes);
-  if (guardNames.length === 0) {
-    return undefined;
-  }
 
   return {
     name: assignmentName,
     guardNames,
-    end: lineEnd
+    declared,
+    // Keep scanning other values: they may still contain method declarations.
+    end: guardNames.length > 0 ? lineEnd : valueStart
   };
 }
 

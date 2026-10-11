@@ -9,7 +9,7 @@ export class JenkinsWorkbenchDeepLinkJobHandler {
   constructor(private readonly treeNavigator: DefaultJenkinsTreeNavigator) {}
 
   async revealJob(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const parsed = parseJobUrl(jobUrl);
+    const parsed = parseJobUrl(jobUrl, environment.url);
     if (!parsed) {
       void vscode.window.showErrorMessage("Unable to parse the job URL from the deep link.");
       return;

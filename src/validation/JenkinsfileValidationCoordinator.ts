@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { areStringArraysEqual } from "../shared/arrays";
@@ -62,13 +63,17 @@ export class JenkinsfileValidationCoordinator
           return;
         }
         this.cancelChangeValidation(document);
-        void this.validateDocument(document, { reason: "save" });
+        void this.validateDocument(document, { reason: "save" }).catch((error) => {
+          this.handleUnexpectedValidationError(document, error);
+        });
       }),
       vscode.workspace.onDidOpenTextDocument((document) => {
         if (!this.shouldValidateAutomatically(document)) {
           return;
         }
-        void this.validateDocument(document, { reason: "open" });
+        void this.validateDocument(document, { reason: "open" }).catch((error) => {
+          this.handleUnexpectedValidationError(document, error);
+        });
       }),
       vscode.workspace.onDidChangeTextDocument((event) => {
         if (!this.config.enabled) {
@@ -114,7 +119,9 @@ export class JenkinsfileValidationCoordinator
       return;
     }
     this.cancelChangeValidation(document);
-    void this.validateDocument(document, { reason, force: true });
+    void this.validateDocument(document, { reason, force: true }).catch((error) => {
+      this.handleUnexpectedValidationError(document, error);
+    });
   }
 
   handleMatcherUpdate(): void {
@@ -368,9 +375,18 @@ export class JenkinsfileValidationCoordinator
     void this.validateDocument(document, {
       reason: "change",
       cancellationToken: tokenSource.token
-    }).finally(() => {
-      this.stateStore.completeChangeValidation(key, tokenSource);
-    });
+    })
+      .finally(() => {
+        this.stateStore.completeChangeValidation(key, tokenSource);
+      })
+      .catch((error) => {
+        this.handleUnexpectedValidationError(document, error);
+      });
+  }
+
+  private handleUnexpectedValidationError(document: vscode.TextDocument, error: unknown): void {
+    this.restoreStatusBar(document);
+    this.outputChannel.appendLine(`Jenkinsfile validation failed: ${formatError(error)}`);
   }
 
   private cancelChangeValidation(document: vscode.TextDocument): void {

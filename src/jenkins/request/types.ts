@@ -11,6 +11,8 @@ export interface JenkinsRequestOptions {
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
+  /** Jenkins environment URL; its path is the context path, not a route marker. */
+  contextUrl?: string;
   maxBytes?: number;
 }
 
@@ -37,6 +39,8 @@ export interface JenkinsVoidRequestOptions {
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
+  /** Jenkins environment URL; its path is the context path, not a route marker. */
+  contextUrl?: string;
 }
 
 export interface JenkinsTextRequestOptions {
@@ -46,6 +50,8 @@ export interface JenkinsTextRequestOptions {
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
+  /** Jenkins environment URL; its path is the context path, not a route marker. */
+  contextUrl?: string;
   maxBytes?: number;
 }
 
@@ -53,6 +59,8 @@ export interface JenkinsSimpleRequestOptions {
   authHeader?: string;
   headers?: Record<string, string>;
   timeoutMs?: number;
+  /** Jenkins environment URL; its path is the context path, not a route marker. */
+  contextUrl?: string;
   maxBytes?: number;
 }
 
@@ -67,6 +75,8 @@ export interface JenkinsStreamRequestOptions {
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
+  /** Jenkins environment URL; its path is the context path, not a route marker. */
+  contextUrl?: string;
   maxBytes?: number;
 }
 

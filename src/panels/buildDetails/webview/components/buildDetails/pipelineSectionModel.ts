@@ -30,7 +30,9 @@ export function derivePipelineSectionView(
   return {
     hidden: !loading && !hasStages,
     hasStages,
-    canValidateLogTarget: hasStages || !loading,
+    // An empty stage list (loading or not) cannot prove a persisted log target
+    // is gone, so keep it until stages arrive instead of consuming it.
+    canValidateLogTarget: hasStages,
     showLoadingBanner: loading && hasStages,
     body
   };

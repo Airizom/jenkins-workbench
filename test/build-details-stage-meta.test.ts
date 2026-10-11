@@ -5,6 +5,7 @@ import {
   describeStageMeta,
   isStageNotRun
 } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode";
+import { formatCount } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils";
 
 function stage(overrides: Partial<PipelineStageViewModel> = {}): PipelineStageViewModel {
   return {
@@ -51,6 +52,14 @@ describe("pipeline stage meta", () => {
     assert.equal(
       describeStageMeta(stage({ parallelBranches: [stage({ key: "a" }), stage({ key: "b" })] })),
       "48s · 2 parallel branches"
+    );
+  });
+
+  it("formats large branch counts like the pipeline graph", () => {
+    const parallelBranches = Array.from({ length: 1000 }, (_, i) => stage({ key: `b${i}` }));
+    assert.equal(
+      describeStageMeta(stage({ parallelBranches })),
+      `48s · ${formatCount(1000, "parallel branch", "parallel branches")}`
     );
   });
 });

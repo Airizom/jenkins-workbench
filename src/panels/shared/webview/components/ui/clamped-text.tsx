@@ -33,10 +33,10 @@ export function ClampedText({
   const textRef = React.useRef<HTMLParagraphElement | null>(null);
   const textId = React.useId();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-measure when the text changes even though the effect reads it from the DOM.
   React.useLayoutEffect(() => {
     const element = textRef.current;
-    // Re-measure when the text changes; an empty string never overflows.
-    if (!element || expanded || text.length === 0) {
+    if (!element || expanded) {
       return;
     }
     const measure = (): void => {

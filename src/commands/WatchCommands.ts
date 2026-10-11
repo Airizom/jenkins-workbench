@@ -20,5 +20,3 @@ export function registerWatchCommands(
     )
   );
 }
-
-export type { EnvironmentScopedRefreshHost };

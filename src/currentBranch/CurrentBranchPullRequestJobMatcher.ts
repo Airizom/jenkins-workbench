@@ -8,10 +8,9 @@ export interface CurrentBranchPullRequestJobRef {
   color?: string;
 }
 
-export interface CurrentBranchPullRequestJobMatch {
-  job: CurrentBranchPullRequestJobRef;
+export type CurrentBranchPullRequestJobMatch = {
   pullRequest: Extract<CurrentBranchPullRequestResolution, { kind: "pullRequest" }>;
-}
+} & ({ kind: "matched"; job: CurrentBranchPullRequestJobRef } | { kind: "ambiguous" });
 
 export interface CurrentBranchPullRequestJobMatcher {
   findMatch(
@@ -52,8 +51,13 @@ export class CurrentBranchPullRequestJobNameMatcher implements CurrentBranchPull
       return undefined;
     }
 
-    const match = jobs.find((job) => expectedNames.has(normalizeJobName(job.name)));
-    return match ? { job: match, pullRequest: pullRequestContext } : undefined;
+    const matches = jobs.filter((job) => expectedNames.has(normalizeJobName(job.name)));
+    if (new Set(matches.map((job) => job.url)).size > 1) {
+      return { kind: "ambiguous", pullRequest: pullRequestContext };
+    }
+
+    const match = matches[0];
+    return match ? { kind: "matched", job: match, pullRequest: pullRequestContext } : undefined;
   }
 }
 

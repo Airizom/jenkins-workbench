@@ -124,6 +124,22 @@ describe("Jenkinsfile pipeline parser", () => {
       });
     });
 
+    it.each(["", "$/$$\n$$$/\n$/$\n"])(
+      "targets the real pipeline after a dollar-slashy literal with escapes %j",
+      (escapes) => {
+        const literal = `def template = $/\n${escapes}pipeline {\n}\n/$\n`;
+        const { document, context } = parsePipeline(`${literal}pipeline {\n  stages {}\n}`);
+        const openLine = literal.split("\n").length - 1;
+        assert.equal(context.openLine, openLine);
+        assert.equal(context.closeLine, openLine + 2);
+        assert.deepEqual(resolveInsertLocation(document, context, "agent"), {
+          line: openLine + 1,
+          character: 0
+        });
+        assert.equal(findPipelineBlock(createDocument(literal)), undefined);
+      }
+    );
+
     it("ignores pipeline headers and closing braces in comments and strings", () => {
       const document = createDocument(
         '"""\npipeline {\n}\n"""\npipeline {\n  /*\n}\n  */\n  echo "}"\n}'
@@ -209,9 +225,15 @@ describe("Jenkinsfile pipeline parser", () => {
       assert.equal(findPipelineBlock(createDocument("pipeline")), undefined);
     });
 
-    it("returns undefined when the block is never closed at the pipeline indent", () => {
+    it("returns undefined when the block is never closed", () => {
       assert.equal(findPipelineBlock(createDocument("pipeline {\n  agent any\n")), undefined);
-      assert.equal(findPipelineBlock(createDocument("pipeline {\n  agent any\n  }")), undefined);
+      assert.equal(findPipelineBlock(createDocument("pipeline {\nagent {\n}\n")), undefined);
+    });
+
+    it("accepts a closing brace at a different indentation from the pipeline", () => {
+      const { context } = parsePipeline("pipeline {\n  agent any\n  }");
+      assert.equal(context.closeLine, 2);
+      assert.equal(context.closeChar, 2);
     });
 
     it("resolves the inline closing brace across nested blocks", () => {
@@ -233,7 +255,90 @@ describe("Jenkinsfile pipeline parser", () => {
     });
   });
 
+  describe("resolveInsertLocation", () => {
+    it("keeps stages inside the pipeline when a header agent shares its closing line", () => {
+      const { document, context } = parsePipeline("pipeline { agent {\nlabel 'linux'\n}}");
+      assert.deepEqual(resolveInsertLocation(document, context, "stages"), {
+        line: context.openLine,
+        character: context.openChar + 1
+      });
+    });
+
+    it("inserts at the start of an indented closing-brace line in an empty pipeline", () => {
+      const { document, context } = parsePipeline("pipeline {\n  }");
+      assert.deepEqual(resolveInsertLocation(document, context, "agent"), {
+        line: context.closeLine,
+        character: 0
+      });
+    });
+
+    it("falls back to the pipeline closing brace after multiline comments", () => {
+      const { document, context } = parsePipeline("pipeline { /* note\nend */ }");
+      assert.deepEqual(resolveInsertLocation(document, context, "agent"), {
+        line: context.closeLine,
+        character: context.closeChar
+      });
+    });
+
+    it.each([
+      ["pipeline { agent {\nlabel 'linux'\n}\n}", 3],
+      ["pipeline {\nagent {\nlabel 'linux'\n}\n}", 4],
+      ["pipeline {\n  agent {\n  docker {\n  image 'node'\n  }\n  }\n}", 6],
+      ["pipeline {\nagent\n{\nlabel 'linux'\n}\n}", 5],
+      ["pipeline {\nagent { label 'linux' }\noptions {}\n}", 2],
+      ['pipeline {\nagent {\n/*\n}\n*/\nlabel """\n}\n"""\n}\noptions {}\n}', 9]
+    ])("places stages after the complete agent block in %j", (text, line) => {
+      const { document, context } = parsePipeline(text);
+      assert.equal(context.closeLine, text.split("\n").length - 1);
+      assert.deepEqual(resolveInsertLocation(document, context, "stages"), {
+        line,
+        character: 0
+      });
+    });
+  });
+
+  it("ignores braces in strings, comments, and dollar-slashy literals across parser queries", () => {
+    const text = [
+      "/* pipeline {",
+      "} */",
+      "pipeline {",
+      "  options { /* } */ }",
+      '  environment { URL = "https://x/{y}" }',
+      "  agent {",
+      "    label $/{ /$",
+      "    // }",
+      "  }",
+      "  post { always { echo '}' } }",
+      "}"
+    ].join("\n");
+    const { document, context } = parsePipeline(text);
+
+    assert.equal(context.openLine, 2);
+    assert.equal(context.closeLine, 10);
+    assert.equal(hasTopLevelSection(document, context, "agent"), true);
+    assert.equal(hasTopLevelSection(document, context, "post"), true);
+    assert.equal(hasTopLevelSection(document, context, "stages"), false);
+    assert.equal(hasTopLevelSection(document, context, "label"), false);
+    assert.deepEqual(resolveInsertLocation(document, context, "stages"), {
+      line: 9,
+      character: 0
+    });
+    assert.deepEqual(resolveInsertLocation(document, context, "agent"), {
+      line: 3,
+      character: 0
+    });
+  });
+
   describe("hasTopLevelSection", () => {
+    it("finds a multiline section opened on the pipeline header", () => {
+      const { document, context } = parsePipeline(
+        "pipeline { stages {\n    stage('Build') {\n      agent any\n    }\n  }\n}"
+      );
+
+      assert.equal(hasTopLevelSection(document, context, "stages"), true);
+      assert.equal(hasTopLevelSection(document, context, "agent"), false);
+    });
+
     it("finds sections in multi-line pipeline blocks", () => {
       const { document, context } = parsePipeline(
         'pipeline {\n  agent any\n  stages {\n    stage("x") {\n    }\n  }\n}'

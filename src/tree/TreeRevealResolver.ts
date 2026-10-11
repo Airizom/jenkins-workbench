@@ -79,7 +79,6 @@ export class JenkinsTreeRevealResolver {
       onDidChangeTreeData: this.onDidChangeTreeData,
       shouldRetry: (result) => result.some(isLoadingPlaceholder),
       getPendingElement: () => element,
-      getPendingElementBeforeOperation: () => element,
       retryAfterTimeout: true
     });
     return children.some(isLoadingPlaceholder) ? [] : children;

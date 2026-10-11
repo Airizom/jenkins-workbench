@@ -104,6 +104,20 @@ export class JenkinsClientProvider {
       environment.scope,
       environment.environmentId
     );
+    const storedAuthConfig = await this.store.getAuthConfig(
+      environment.scope,
+      environment.environmentId
+    );
+    // Existing clients retain their refresh callbacks after cache invalidation. Only
+    // reauthenticate material that still matches a revision-consistent store read.
+    if (
+      this.store.getAuthConfigRevision(environment.scope, environment.environmentId) !==
+        authConfigRevision ||
+      buildAuthSignature(storedAuthConfig) !== buildAuthSignature(currentAuthConfig)
+    ) {
+      return undefined;
+    }
+
     const refreshed = await this.browserSsoAuthenticator.authenticate({
       environmentUrl: environment.url,
       loginUrl: currentAuthConfig.loginUrl,

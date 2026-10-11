@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 60;
 const MIN_REFRESH_INTERVAL_SECONDS = 5;
 const DEFAULT_REFRESH_INTERVAL_MS = DEFAULT_REFRESH_INTERVAL_SECONDS * 1000;
+const MAX_REFRESH_INTERVAL_MS = 2_147_483_647;
 
 export class JenkinsStatusRefreshService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
@@ -60,6 +61,6 @@ export class JenkinsStatusRefreshService implements vscode.Disposable {
     }
 
     const clampedSeconds = Math.max(MIN_REFRESH_INTERVAL_SECONDS, refreshIntervalSeconds);
-    return clampedSeconds * 1000;
+    return Math.min(clampedSeconds * 1000, MAX_REFRESH_INTERVAL_MS);
   }
 }

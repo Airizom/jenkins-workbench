@@ -15,7 +15,9 @@ vi.doMock("vscode", () => ({
   }
 }));
 const { NodeDetailsPanel } = await import("../src/panels/NodeDetailsPanel");
-const { createPanelLoadingTracker } = await import("../src/panels/shared/PanelRuntimeHelpers");
+const { createPanelLoadingTracker, LoadTokenTracker } = await import(
+  "../src/panels/shared/PanelRuntimeHelpers"
+);
 
 it("keeps advanced details requested when an environment refresh interrupts the first request", async () => {
   const details: JenkinsNodeDetails = {
@@ -41,6 +43,7 @@ it("keeps advanced details requested when an environment refresh interrupts the 
     advancedRequested: false,
     disposed: false,
     panel: { visible: true, webview: { postMessage } },
+    loadTokenTracker: new LoadTokenTracker(),
     loadTracker: createPanelLoadingTracker(() => {})
   }) as NodeDetailsPanelType;
 
@@ -75,6 +78,7 @@ function createPanel(overrides: Record<string, unknown> = {}) {
     advancedRequested: false,
     disposed: false,
     panel: { visible: true, webview: { postMessage } },
+    loadTokenTracker: new LoadTokenTracker(),
     loadTracker: createPanelLoadingTracker((message) => postMessage(message)),
     ...overrides
   }) as NodeDetailsPanelType;

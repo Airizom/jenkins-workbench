@@ -31,6 +31,8 @@ export function formatCurrentBranchTooltip(
   >
 ): string {
   switch (state.kind) {
+    case "resolving":
+      return "Resolving Jenkins status for the current repository and checkout.";
     case "matched":
       return formatMatchedTooltip(state);
     case "branchMissing":
@@ -64,18 +66,15 @@ export function isCurrentBranchBuilding(
 }
 
 function formatMatchedTooltip(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
+  const pullRequestSummary = formatPullRequestSummary(state.pullRequest);
   const lines = [
     ...currentCommitTooltip(state),
     `Linked multibranch: ${state.link.multibranchLabel}`,
     `Repository: ${state.repository.repositoryLabel}`,
     `Branch: ${state.branchName}`,
+    ...(pullRequestSummary ? [pullRequestSummary] : []),
     `Job: ${state.jobName}`
   ];
-
-  const pullRequestSummary = formatPullRequestSummary(state.pullRequest);
-  if (pullRequestSummary) {
-    lines.splice(3, 0, pullRequestSummary);
-  }
 
   const statusLabel = formatJobColor(state.jobColor);
   if (statusLabel) {

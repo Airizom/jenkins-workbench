@@ -47,6 +47,13 @@ export class BuildDiagnosticBuiltInParser {
     this.parsers = ordered.filter(([id]) => enabled.has(id)).map(([, parser]) => parser);
   }
 
+  /** Discards multiline context that cannot safely span skipped input. */
+  reset(): void {
+    this.eslintPath = undefined;
+    this.rustHeader = undefined;
+    this.stacks.reset();
+  }
+
   /** Closes stack traces that the given line cannot continue. */
   endTerminatedStacks(text: string): void {
     this.stacks.endTerminatedStacks(text);

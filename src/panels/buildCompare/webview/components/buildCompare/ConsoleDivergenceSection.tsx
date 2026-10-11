@@ -87,15 +87,18 @@ export function ConsoleDivergenceSection({
   const hasSnippets = section.status === "available";
   const fallback = hasSnippets ? undefined : resolveConsoleFallback(section.status);
 
-  // Center both snippets on the divergence line once the console data arrives.
+  // Center both snippets on the divergence line whenever new console data arrives,
+  // and when the section is reopened (collapsing unmounts the snippets).
+  const { baselineLines, targetLines } = section;
+  const isOpen = disclosure.open ?? true;
   useEffect(() => {
-    if (!hasSnippets) {
+    if (!hasSnippets || !isOpen || !baselineLines || !targetLines) {
       return;
     }
     // Wait a frame so the snippets are laid out before measuring offsets.
     const frame = requestAnimationFrame(() => scrollConsoleSnippetsToDivergence());
     return () => cancelAnimationFrame(frame);
-  }, [hasSnippets]);
+  }, [hasSnippets, isOpen, baselineLines, targetLines]);
 
   return (
     <SectionCard

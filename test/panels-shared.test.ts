@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { PanelLoadTracker, bindEnvironmentRefresh } from "../src/panels/shared/PanelRuntimeHelpers";
+import {
+  LoadTokenTracker,
+  PanelLoadTracker,
+  bindEnvironmentRefresh
+} from "../src/panels/shared/PanelRuntimeHelpers";
 import {
   buildOccurrenceKey,
   buildTestCaseId,
@@ -49,6 +53,19 @@ describe("TestReportFormatters", () => {
   });
 });
 
+describe("LoadTokenTracker", () => {
+  it("tracks the current load token", () => {
+    const tracker = new LoadTokenTracker();
+
+    const first = tracker.next();
+    const second = tracker.next();
+
+    assert.equal(tracker.current, second);
+    assert.equal(tracker.isCurrent(first), false);
+    assert.equal(tracker.isCurrent(second), true);
+  });
+});
+
 describe("PanelLoadTracker", () => {
   it("posts loading changes only at lifecycle boundaries", () => {
     const posted: boolean[] = [];
@@ -78,16 +95,9 @@ describe("PanelLoadTracker", () => {
     assert.deepEqual(posted, [true, false, true, false]);
   });
 
-  it("resets outstanding loads and tracks current load tokens", () => {
+  it("resets outstanding loads", () => {
     const posted: boolean[] = [];
     const tracker = new PanelLoadTracker((value) => posted.push(value));
-
-    const first = tracker.nextToken();
-    const second = tracker.nextToken();
-
-    assert.equal(tracker.currentToken, second);
-    assert.equal(tracker.isCurrent(first), false);
-    assert.equal(tracker.isCurrent(second), true);
 
     tracker.resetLoadingRequests();
     tracker.beginLoading();

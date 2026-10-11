@@ -98,7 +98,7 @@ const FALLBACK_STATE: BuildDetailsState = {
   followLog: true,
   loading: true,
   hasLoaded: false,
-  processingInputActions: {}
+  processingInputActions: Object.create(null)
 };
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
   const mergedDefaults = mergeBuildDetailsDefaults(initialState);
@@ -112,7 +112,7 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
       : undefined,
     consoleHtmlModel: undefined,
     hasLoaded: !(initialState.loading ?? false),
-    processingInputActions: {}
+    processingInputActions: Object.create(null)
   };
   if (merged.consoleHtml) {
     return {
@@ -246,15 +246,14 @@ export function buildDetailsReducer(
       return { ...state, loading: action.value };
     }
     case "startPendingInputAction": {
-      if (state.processingInputActions[action.inputId]) {
+      if (Object.hasOwn(state.processingInputActions, action.inputId)) {
         return state;
       }
       return {
         ...state,
-        processingInputActions: {
-          ...state.processingInputActions,
+        processingInputActions: Object.assign(Object.create(null), state.processingInputActions, {
           [action.inputId]: action.action
-        }
+        })
       };
     }
     case "pendingInputActionComplete": {
@@ -328,10 +327,11 @@ function appendConsoleHtmlModel(
 }
 
 function omitKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-  if (!(key in record)) {
+  if (!Object.hasOwn(record, key)) {
     return record;
   }
-  const { [key]: _omitted, ...rest } = record;
+  const rest: Record<string, T> = Object.assign(Object.create(null), record);
+  delete rest[key];
   return rest;
 }
 
@@ -348,7 +348,7 @@ function prunePendingInputActions(
   if (ids.every((id) => activeIds.has(id))) {
     return current;
   }
-  const next: Record<string, PendingInputProcessingAction> = {};
+  const next: Record<string, PendingInputProcessingAction> = Object.create(null);
   for (const id of ids) {
     if (activeIds.has(id)) {
       next[id] = current[id];

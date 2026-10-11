@@ -156,8 +156,9 @@ function scanTokenOccurrences(
     return;
   }
 
-  const lowerLine = lineText.toLowerCase();
-  const lowerToken = token.toLowerCase();
+  // Fold only ASCII step-token letters so Unicode text cannot shift source offsets.
+  const lowerLine = lineText.replace(/[A-Z]/g, (char) => char.toLowerCase());
+  const lowerToken = token.replace(/[A-Z]/g, (char) => char.toLowerCase());
   let index = lowerLine.indexOf(lowerToken);
   while (index !== -1) {
     const beforeIndex = index - 1;

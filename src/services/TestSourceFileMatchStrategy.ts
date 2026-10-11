@@ -84,7 +84,7 @@ function scoreCandidate(
   const expectedSuffix = `${expectedPath}.${getExtension(uri)}`;
   let score = normalizedPath.endsWith(expectedSuffix) ? 100 : 0;
   for (const preference of preferredPathScores) {
-    if (normalizedPath.includes(preference.fragment)) {
+    if (normalizedPath.includes(preference.fragment.toLowerCase())) {
       score += preference.score;
     }
   }

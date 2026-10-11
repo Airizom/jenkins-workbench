@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
-import { describe, it } from "vitest";
+import { text } from "node:stream/consumers";
+import { describe, it, vi } from "vitest";
 import { requestText } from "../src/jenkins/request";
-import { isCrossOriginRedirect } from "../src/jenkins/request/redirects";
+import { decideRedirect, isCrossOriginRedirect } from "../src/jenkins/request/redirects";
+import { request } from "../src/jenkins/request/standardRequest";
+import { requestJenkinsStream } from "../src/jenkins/request/streamRequest";
 
 describe("isCrossOriginRedirect", () => {
   it("treats the same origin as same-origin", () => {
@@ -51,6 +54,27 @@ describe("isCrossOriginRedirect", () => {
   });
 });
 
+describe("decideRedirect login detection", () => {
+  const redirect = (location: string, contextUrl?: string) =>
+    decideRedirect({
+      statusCode: 302,
+      method: "GET",
+      location,
+      currentUrl: "https://ci.example/job/job/demo/api/json",
+      contextUrl,
+      redirectCount: 0
+    }).type;
+
+  it("recognizes login below a context path named like a route marker", () => {
+    assert.equal(redirect("/job/login", "https://ci.example/job/"), "reject");
+    assert.equal(redirect("/job/job/login/", "https://ci.example/job/"), "follow");
+  });
+
+  it("treats /job/login as a job route without an environment context", () => {
+    assert.equal(redirect("/job/login"), "follow");
+  });
+});
+
 interface TestServer {
   url: string;
   close(): Promise<void>;
@@ -60,14 +84,18 @@ async function startServer(
   handler: (req: http.IncomingMessage, res: http.ServerResponse) => void
 ): Promise<TestServer> {
   const server = http.createServer(handler);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
   const { port } = server.address() as AddressInfo;
   return {
     url: `http://127.0.0.1:${port}`,
     close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve()))
-      )
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeAllConnections();
+      })
   };
 }
 
@@ -180,4 +208,58 @@ describe("standard request redirect handling", () => {
       await server.close();
     }
   });
+});
+
+describe.each(["standard", "streaming"])("discarded %s responses", (mode) => {
+  it.each(["follow", "reject", "cannotFollow"])(
+    "closes a trickling redirect body for %s decisions",
+    async (decision) => {
+      let sourceClosed = false;
+      let finalRequested = false;
+      const server = await startServer((req, res) => {
+        if (req.url === "/final") {
+          finalRequested = true;
+          res.end("target-ok");
+          return;
+        }
+        res.writeHead(302, { Location: decision === "reject" ? "/login" : "/final" });
+        res.write("discarded");
+        const interval = setInterval(() => res.write("discarded"), 10);
+        res.on("close", () => {
+          clearInterval(interval);
+          sourceClosed = true;
+        });
+      });
+
+      try {
+        const options = {
+          method: decision === "cannotFollow" ? ("POST" as const) : ("GET" as const),
+          timeoutMs: 200
+        };
+        const result =
+          mode === "standard"
+            ? request(`${server.url}/start`, {
+                ...options,
+                parseJson: false,
+                returnText: decision === "follow"
+              })
+            : requestJenkinsStream(`${server.url}/start`, options).then(({ stream }) =>
+                text(stream)
+              );
+
+        if (decision === "reject") {
+          await assert.rejects(result, /redirected to login/i);
+        } else if (decision === "cannotFollow" && mode === "streaming") {
+          await assert.rejects(result, /redirect that cannot be followed/i);
+        } else {
+          assert.equal(await result, decision === "follow" ? "target-ok" : undefined);
+        }
+
+        await vi.waitFor(() => assert.equal(sourceClosed, true), { timeout: 1000 });
+        assert.equal(finalRequested, decision === "follow");
+      } finally {
+        await server.close();
+      }
+    }
+  );
 });

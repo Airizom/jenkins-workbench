@@ -30,7 +30,7 @@ export type ValidationOutcome =
   | {
       status: "completed";
       kind: "request-failed";
-      environment: JenkinsEnvironmentRef;
+      environment?: JenkinsEnvironmentRef;
       message: string;
     }
   | { status: "completed"; kind: "no-environment" };

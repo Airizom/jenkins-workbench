@@ -8,6 +8,7 @@ import {
   resolveDiagnosticProfile
 } from "../src/buildDiagnostics/BuildDiagnosticProfiles";
 import { validateDiagnosticRegexp } from "../src/buildDiagnostics/BuildDiagnosticRegexSafety";
+import { serializePathMappings } from "../src/buildDiagnostics/BuildDiagnosticTypes";
 
 const packageJson = JSON.parse(readFileSync(`${process.cwd()}/package.json`, "utf8")) as {
   contributes: {
@@ -139,6 +140,34 @@ describe("diagnostic profile normalization", () => {
     assert.equal(normalized.profiles.get("unsafe")?.valid, false);
     assert.equal(normalized.profiles.get("unsafe")?.pathMappings.length, 0);
     assert.equal(normalized.issues.length, 3);
+  });
+
+  it("treats './' and '.\\' local values as the repository root", () => {
+    const normalized = normalizeDiagnosticProfiles({
+      rooted: {
+        pathMappings: [
+          { type: "prefix", remote: "/ws", local: "./" },
+          { type: "prefix", remote: "/ws2", local: ".\\" }
+        ]
+      }
+    });
+    const profile = normalized.profiles.get("rooted");
+
+    assert.equal(profile?.valid, true);
+    assert.deepEqual(normalized.issues, []);
+    assert.deepEqual(
+      profile?.pathMappings.map((mapping) => mapping.localRoot),
+      ["", ""]
+    );
+    assert.equal(resolveDiagnosticProfile(normalized, "rooted").profile, profile);
+  });
+
+  it("still rejects a bare slash local value", () => {
+    const normalized = normalizeDiagnosticProfiles({
+      slash: { pathMappings: [{ type: "prefix", remote: "/ws", local: "/" }] }
+    });
+
+    assert.equal(normalized.profiles.get("slash")?.valid, false);
   });
 
   it("rejects adjacent repetitions in synchronous regex path mappings", () => {
@@ -392,5 +421,35 @@ describe("diagnostic regular expression safety", () => {
     }
     assert.equal(validateDiagnosticRegexp("^a+(?:(?=a))a+$").safe, false);
     assert.equal(validateDiagnosticRegexp("^a+(?=b)b$").safe, true);
+  });
+
+  it("serializes path mappings without RegExp instances and reflects every field", () => {
+    const profileWith = (local: string) =>
+      normalizeDiagnosticProfiles({
+        regex: {
+          pathMappings: [
+            { type: "prefix", remote: "/workspace/", local: "." },
+            { type: "regex", remote: "^/agent/[^/]+/(.*)$", replace: "$1", local }
+          ]
+        }
+      }).profiles.get("regex");
+    const original = profileWith("packages/a");
+    const changed = profileWith("packages/b");
+    assert.ok(original && changed);
+
+    const serialized = serializePathMappings(original.pathMappings);
+    assert.deepEqual(serialized, [
+      { type: "prefix", remotePrefix: "/workspace/", localRoot: "" },
+      {
+        type: "regex",
+        pattern: "^/agent/[^/]+/(.*)$",
+        replacement: "$1",
+        localRoot: "packages/a"
+      }
+    ]);
+    assert.notEqual(
+      JSON.stringify(serializePathMappings(changed.pathMappings)),
+      JSON.stringify(serialized)
+    );
   });
 });

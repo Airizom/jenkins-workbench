@@ -8,7 +8,8 @@ import {
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 import {
   hasNewPendingInputs,
-  resolveBuildDetailsSelectedTab
+  resolveBuildDetailsSelectedTab,
+  shouldFallBackFromSelectedTab
 } from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsTabsModel";
 
 describe("BuildDetailsTabs", () => {
@@ -66,5 +67,43 @@ describe("BuildDetailsTabs", () => {
     assert.equal(hasNewPendingInputs(new Set(["a"]), ["a"]), false);
     assert.equal(hasNewPendingInputs(new Set(["a"]), ["a", "b"]), true);
     assert.equal(hasNewPendingInputs(new Set(["a"]), []), false);
+  });
+
+  it("replaces a restored tab that is still unavailable once details have loaded", () => {
+    // Before details arrive, a restored tab waits for its availability.
+    assert.equal(
+      shouldFallBackFromSelectedTab({
+        isAvailable: false,
+        wasAvailable: false,
+        detailsLoaded: false
+      }),
+      false
+    );
+    // Details loaded without the restored tab (its input was approved elsewhere).
+    assert.equal(
+      shouldFallBackFromSelectedTab({
+        isAvailable: false,
+        wasAvailable: false,
+        detailsLoaded: true
+      }),
+      true
+    );
+    // A tab that disappears after being shown still falls back.
+    assert.equal(
+      shouldFallBackFromSelectedTab({
+        isAvailable: false,
+        wasAvailable: true,
+        detailsLoaded: false
+      }),
+      true
+    );
+    assert.equal(
+      shouldFallBackFromSelectedTab({
+        isAvailable: true,
+        wasAvailable: false,
+        detailsLoaded: true
+      }),
+      false
+    );
   });
 });

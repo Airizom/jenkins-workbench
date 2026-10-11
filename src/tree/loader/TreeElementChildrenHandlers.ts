@@ -90,9 +90,8 @@ export function createTreeElementChildrenHandlers({
         );
       },
       invalidate: (group) => {
-        cacheManager.clearChildrenCache(
-          activityLoader.buildActivityGroupChildrenKey(group.environment, group.group)
-        );
+        // Root and sibling loads also populate this group's children.
+        activityLoader.clearActivityData(group.environment);
       }
     }),
     createTreeElementChildrenHandler(PinnedJobsFolderTreeItem, {

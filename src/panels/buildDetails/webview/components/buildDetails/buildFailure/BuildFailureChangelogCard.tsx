@@ -1,11 +1,11 @@
 import * as React from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { GitCommitIcon, UserIcon } from "../../../../../shared/webview/icons";
+import { createUniqueListKeys } from "../../../../../shared/webview/lib/uniqueListKeys";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildFailureChangelogItem } from "../../../../shared/BuildDetailsContracts";
 import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 import { OverflowText } from "./BuildFailureOverflowText";
-import { createUniqueListKeys } from "./buildFailureListKeys";
 
 const { useState } = React;
 export function BuildFailureChangelogCard({
@@ -60,7 +60,7 @@ function ChangelogEntry({ item }: { item: BuildFailureChangelogItem }) {
       <div
         className={cn(
           "text-xs text-foreground wrap-break-word whitespace-pre-line",
-          !expanded && "line-clamp-2"
+          canExpand && !expanded && "line-clamp-2"
         )}
       >
         {item.message}

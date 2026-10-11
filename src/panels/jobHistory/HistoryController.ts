@@ -34,6 +34,7 @@ export interface HistoryDependencies {
 /** Shared visible-panel coordinator; webview actions resolve only server-held builds. */
 export class HistoryController {
   private generation = 0;
+  private pendingEnvironmentRebind?: symbol;
   private disposed = false;
   private automatic = true;
   private context?: { environment: JenkinsEnvironmentRef; jobUrl: string; anchor?: JenkinsBuild };
@@ -81,12 +82,23 @@ export class HistoryController {
     const context = this.context;
     if (!context) return;
     this.generation++;
-    const generation = this.generation;
-    const environment = await resolveEnvironmentRef(
-      this.dependencies.environments,
-      context.environment
-    );
-    if (this.disposed || generation !== this.generation) return;
+    // Visibility cancels history work, but must not discard an environment update.
+    const token = Symbol();
+    this.pendingEnvironmentRebind = token;
+    let environment: JenkinsEnvironmentRef | undefined;
+    try {
+      environment = await resolveEnvironmentRef(
+        this.dependencies.environments,
+        context.environment
+      );
+    } catch {
+      // A failed lookup keeps the current binding instead of blocking loads indefinitely.
+      if (this.disposed || token !== this.pendingEnvironmentRebind) return;
+      this.pendingEnvironmentRebind = undefined;
+      if (this.automatic) void this.load();
+      return;
+    }
+    if (this.disposed || token !== this.pendingEnvironmentRebind) return;
     if (!environment) {
       this.clear();
       return;
@@ -109,12 +121,14 @@ export class HistoryController {
     automatic = true
   ): void {
     this.generation++;
+    this.pendingEnvironmentRebind = undefined;
     this.context = { environment, jobUrl, anchor };
     this.observations = [];
     this.automatic = automatic;
     this.model = {
       ...emptyHistory(),
       jobUrl,
+      environmentUrl: environment.url,
       revision: this.generation,
       count: this.model.count,
       selectedBuild: this.model.selectedBuild,
@@ -124,6 +138,7 @@ export class HistoryController {
     if (automatic && this.panel.visible && !anchor?.building) void this.load();
   }
   clear(): void {
+    this.pendingEnvironmentRebind = undefined;
     this.observations = [];
     this.generation++;
     this.context = undefined;
@@ -144,7 +159,13 @@ export class HistoryController {
     });
   }
   async load(refresh = false): Promise<void> {
-    if (!this.context || !this.panel.visible || this.context.anchor?.building) return;
+    if (
+      !this.context ||
+      this.pendingEnvironmentRebind ||
+      !this.panel.visible ||
+      this.context.anchor?.building
+    )
+      return;
     this.automatic = true;
     this.generation++;
     const request = this.request(refresh);

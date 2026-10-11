@@ -1,7 +1,7 @@
 import { TestStatusIcon } from "../../../../../shared/webview/components/TestStatusIcon";
 import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { TestTubeIcon } from "../../../../../shared/webview/icons";
-import { BuildFailureInsightCard } from "./BuildFailureInsightCard";
+import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 
 const TESTS_TAB_HINT = "Detailed case results are available in the Tests tab.";
 const REPORT_UNAVAILABLE_MESSAGE =
@@ -51,7 +51,7 @@ export function BuildFailureTestsSummaryCard({
       title="Tests"
       headerExtra={<ToneBadge label={summaryLabel} tone={hasFailedTests ? "failed" : undefined} />}
     >
-      <div className="rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 flex items-start gap-2 text-xs text-muted-foreground">
+      <BuildFailureInsightEmpty className="items-start justify-start gap-2">
         {showStatusIcon ? (
           <TestStatusIcon
             status={hasFailedTests ? "failed" : "passed"}
@@ -60,7 +60,7 @@ export function BuildFailureTestsSummaryCard({
           />
         ) : null}
         <span>{message}</span>
-      </div>
+      </BuildFailureInsightEmpty>
     </BuildFailureInsightCard>
   );
 }

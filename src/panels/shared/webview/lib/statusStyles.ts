@@ -2,7 +2,7 @@ import type { NodeStatusClass } from "../../../nodeDetails/shared/NodeDetailsCon
 import { cn } from "./utils";
 
 type BuildResultClassKey = "success" | "failure" | "unstable" | "aborted" | "running" | "neutral";
-type BuildResultStyle = {
+export type BuildResultStyle = {
   badge: string;
   text: string;
   iconText: string;
@@ -12,7 +12,7 @@ type BuildResultStyle = {
   graphBackground: string;
   borderColor: string;
 };
-type NodeStatusStyle = { badge: string; icon: string; accent: string };
+export type NodeStatusStyle = { badge: string; icon: string; accent: string };
 
 function normalizeBuildResultClass(resultClass?: string): BuildResultClassKey {
   switch (resultClass) {
@@ -127,44 +127,17 @@ const NODE_STATUS_STYLES: Record<NodeStatusClass, NodeStatusStyle> = {
     accent: "bg-border"
   }
 };
-export function resolveResultBadgeClass(resultClass: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].badge;
+export function resolveBuildResultStyle(resultClass?: string): BuildResultStyle {
+  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)];
 }
-export function resolveResultTextClass(resultClass?: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].text;
-}
-export function resolveStatusAccentClass(resultClass: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].accent;
-}
-export function resolveResultIconTextClass(resultClass?: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].iconText;
+export function resolveNodeStatusStyle(statusClass: NodeStatusClass): NodeStatusStyle {
+  return NODE_STATUS_STYLES[statusClass];
 }
 
 const STAGE_NODE_BASE_CLASS =
   "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors";
 export function resolveBuildResultStageNodeClass(resultClass?: string): string {
-  return cn(
-    STAGE_NODE_BASE_CLASS,
-    BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].stageNode
-  );
-}
-export function resolveBuildResultConnectorColor(resultClass?: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].connectorColor;
-}
-export function resolveBuildResultGraphBackground(resultClass?: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].graphBackground;
-}
-export function resolveBuildResultBorderColor(resultClass?: string): string {
-  return BUILD_RESULT_STYLES[normalizeBuildResultClass(resultClass)].borderColor;
-}
-export function resolveNodeStatusBadgeClass(statusClass: NodeStatusClass): string {
-  return NODE_STATUS_STYLES[statusClass].badge;
-}
-export function resolveNodeStatusIconClass(statusClass: NodeStatusClass): string {
-  return NODE_STATUS_STYLES[statusClass].icon;
-}
-export function resolveNodeStatusAccentClass(statusClass: NodeStatusClass): string {
-  return NODE_STATUS_STYLES[statusClass].accent;
+  return cn(STAGE_NODE_BASE_CLASS, resolveBuildResultStyle(resultClass).stageNode);
 }
 export function isAnalysisBuildResult(resultClass: string): boolean {
   return resultClass === "failure" || resultClass === "unstable";
@@ -172,10 +145,10 @@ export function isAnalysisBuildResult(resultClass: string): boolean {
 export function resolveSeverityBadgeClass(severity: "critical" | "warning" | "normal"): string {
   switch (severity) {
     case "critical":
-      return resolveResultBadgeClass("failure");
+      return resolveBuildResultStyle("failure").badge;
     case "warning":
-      return resolveResultBadgeClass("unstable");
+      return resolveBuildResultStyle("unstable").badge;
     default:
-      return resolveResultBadgeClass("neutral");
+      return resolveBuildResultStyle("neutral").badge;
   }
 }

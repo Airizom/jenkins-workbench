@@ -1,11 +1,13 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { renormalizeRepositoryIdentity } from "../jenkins/JenkinsRevisionEvidence";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { CommitWatch, JenkinsCommitWatchStore } from "../storage/JenkinsCommitWatchStore";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import {
   assessCommit,
+  COMMIT_HISTORY_LIMIT,
   type CurrentBranchCommitHistory,
   type VerifiedCommitBuild
 } from "./CurrentBranchCommitHistory";
@@ -107,7 +109,7 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
           watch.blockedReason ??
           (watch.observedBuild
             ? `Following build #${watch.observedBuild.number}`
-            : "Waiting for a verified build in the newest 50 builds"),
+            : `Waiting for a verified build in the newest ${COMMIT_HISTORY_LIMIT} builds`),
         watch
       })),
       { placeHolder: "Select a commit watch to cancel", matchOnDetail: true }
@@ -162,7 +164,11 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
         }
         const history = await request;
         if (history.error) throw new Error(history.error);
-        const checkout = { head: watch.head, repositories: watch.repositories, dirty: false };
+        const checkout = {
+          head: watch.head,
+          repositories: watch.repositories.map(renormalizeRepositoryIdentity),
+          dirty: false
+        };
         let assessment = assessCommit(history, checkout);
         if (
           watch.observedBuild &&

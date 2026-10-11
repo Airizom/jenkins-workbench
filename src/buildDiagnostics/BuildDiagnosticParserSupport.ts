@@ -9,6 +9,7 @@ import type {
 
 export interface DiagnosticDraft {
   parserId: string;
+  baseParserId?: string;
   source: string;
   severity: BuildDiagnosticSeverity;
   message: string;
@@ -53,7 +54,7 @@ export function normalizeBuildLogLine(rawLine: string): NormalizedLogLine {
   let previous = "";
   while (previous !== text) {
     previous = text;
-    text = text.replace(/^\s*\[(?:\d{4}-\d{2}-\d{2}[T ][^\]]+|Pipeline(?:\s+[^\]]*)?)\]\s*/i, "");
+    text = text.replace(/^\s*\[(?:\d{4}-\d{2}-\d{2}[T ][^\]]+|Pipeline(?:\s[^\]]*)?)\]\s*/i, "");
     text = text.replace(/^\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\s+/, "");
     const severityPrefix = text.match(/^\s*\[(ERROR|WARN(?:ING)?|INFO)\]\s*/i);
     if (severityPrefix) {

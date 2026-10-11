@@ -32,6 +32,7 @@ export interface BuildComparePanelRefreshOptions {
 export class BuildComparePanelController {
   private readonly view: BuildComparePanelView;
   private readonly loadTokenTracker = new LoadTokenTracker();
+  private consoleLoadToken?: number;
   private loadedConsoleSection?: BuildCompareConsoleSectionViewModel;
   private hasRenderedComparison = false;
 
@@ -42,6 +43,7 @@ export class BuildComparePanelController {
   /** Invalidates in-flight loads so they stop posting to a disposed webview. */
   dispose(): void {
     this.loadTokenTracker.next();
+    this.consoleLoadToken = undefined;
     this.loadedConsoleSection = undefined;
     this.hasRenderedComparison = false;
   }
@@ -75,6 +77,7 @@ export class BuildComparePanelController {
     options?: BuildComparePanelLoadOptions
   ): Promise<BuildComparePanelLoadResult> {
     const token = this.loadTokenTracker.next();
+    this.consoleLoadToken = undefined;
     this.loadedConsoleSection = undefined;
     this.hasRenderedComparison = false;
     const nonce = createNonce();
@@ -117,6 +120,7 @@ export class BuildComparePanelController {
       panelState: options?.panelState
     });
     this.hasRenderedComparison = true;
+    this.consoleLoadToken = token;
     void this.loadConsoleSection(
       token,
       backend,
@@ -142,8 +146,6 @@ export class BuildComparePanelController {
     options: BuildComparePanelRefreshOptions
   ): Promise<boolean> {
     const token = this.loadTokenTracker.next();
-    const previousConsoleSection = this.loadedConsoleSection;
-    this.loadedConsoleSection = undefined;
 
     let model: BuildCompareViewModel;
     try {
@@ -157,7 +159,6 @@ export class BuildComparePanelController {
       if (!this.loadTokenTracker.isCurrent(token)) {
         return false;
       }
-      this.loadedConsoleSection = previousConsoleSection;
       await this.view.postMessage({
         type: "buildCompareRefreshFailed",
         message: `Build comparison could not be refreshed. ${formatError(error)}`
@@ -168,6 +169,9 @@ export class BuildComparePanelController {
       return false;
     }
 
+    // Keep the displayed comparison's console load until its replacement succeeds.
+    this.consoleLoadToken = token;
+    this.loadedConsoleSection = undefined;
     this.view.setTitle(
       options.label ?? `${model.baseline.displayName} vs ${model.target.displayName}`
     );
@@ -201,7 +205,7 @@ export class BuildComparePanelController {
       baselineBuildUrl,
       targetBuildUrl
     });
-    if (!this.loadTokenTracker.isCurrent(token)) {
+    if (this.consoleLoadToken !== token) {
       return;
     }
     this.loadedConsoleSection = console;

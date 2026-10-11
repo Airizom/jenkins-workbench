@@ -111,7 +111,6 @@ export class JenkinsTaskBuildFollower {
           this.control.throwIfCanceled();
           const inputObservedAt = this.options.now();
           nextInputPollAt = inputObservedAt + this.options.inputPollIntervalMs;
-          inputErrors = 0;
           if (summary.availability === "unsupported" && isInputEnforcementRequested(request)) {
             throw new RunnerFailure(
               "Jenkins does not expose pending input actions, so the configured input-step enforcement cannot be guaranteed."
@@ -172,6 +171,7 @@ export class JenkinsTaskBuildFollower {
               this.control.setState("running");
             }
           }
+          inputErrors = 0;
         } catch (error) {
           if (error instanceof TaskCanceledError || this.control.isCanceled()) {
             throw new TaskCanceledError();

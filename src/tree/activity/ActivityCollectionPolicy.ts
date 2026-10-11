@@ -32,14 +32,13 @@ function backfillRunningEntries(
   excludedJobUrls: ReadonlySet<string>,
   maxItems: number
 ): void {
-  const current = groups.get("running");
-  if (!current) {
+  if (!groups.has("running")) {
     return;
   }
 
   const backfilled: JobSearchEntry[] = [];
   const includedJobUrls = new Set<string>();
-  for (const entry of [...runningCandidates, ...current]) {
+  for (const entry of runningCandidates) {
     if (
       backfilled.length >= maxItems ||
       excludedJobUrls.has(entry.url) ||
@@ -76,7 +75,7 @@ function removeAwaitingInputEntriesFromOtherGroups(
   groups: ActivityGroups,
   awaitingInputJobUrls: ReadonlySet<string>
 ): void {
-  for (const group of ["failing", "unstable", "running"] as const) {
+  for (const group of ["failing", "unstable"] as const) {
     const current = groups.get(group);
     if (!current) {
       continue;

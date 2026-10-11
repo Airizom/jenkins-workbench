@@ -6,6 +6,7 @@ export interface ExecutorUtilization {
   /** Always 0 for an offline node: its free executors are unavailable, not idle. */
   idle: number;
   offline: number;
+  isOffline: boolean;
   oneOffTotal: number;
   oneOffBusy: number;
   ratio: number | undefined;
@@ -25,6 +26,7 @@ export function summarizeExecutorUtilization(
     busy,
     idle: isOffline ? 0 : total - busy,
     offline: isOffline ? total - busy : 0,
+    isOffline,
     oneOffTotal,
     oneOffBusy,
     ratio: total > 0 ? busy / total : undefined
@@ -33,10 +35,13 @@ export function summarizeExecutorUtilization(
 
 /** "3 busy · 1 idle" for online nodes, "4 offline" (plus any draining builds) for offline ones. */
 export function formatExecutorCounts(utilization: ExecutorUtilization): string {
-  if (utilization.offline > 0) {
-    return utilization.busy > 0
+  if (utilization.isOffline) {
+    if (utilization.busy === 0) {
+      return `${utilization.offline} offline`;
+    }
+    return utilization.offline > 0
       ? `${utilization.busy} busy · ${utilization.offline} offline`
-      : `${utilization.offline} offline`;
+      : `${utilization.busy} busy · offline`;
   }
   return `${utilization.busy} busy · ${utilization.idle} idle`;
 }

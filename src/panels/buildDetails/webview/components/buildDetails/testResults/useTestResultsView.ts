@@ -54,7 +54,7 @@ export function useTestResultsView({
     }
     filterSettledRef.current = true;
     setStatusFilterState("failed");
-  }, [failedCount]);
+  }, [buildUrl, failedCount]);
 
   const setStatusFilter = useCallback((value: TestStatusFilter) => {
     filterSettledRef.current = true;

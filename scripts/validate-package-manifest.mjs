@@ -94,55 +94,60 @@ const readSourceFiles = async (dir) => {
   return files;
 };
 
-const commandSourceFiles = await readSourceFiles(path.join(rootDir, "src", "commands"));
+const commandSourceFiles = new Set(await readSourceFiles(path.join(rootDir, "src", "commands")));
 const registeredCommandIds = new Set();
 
-for (const sourceFile of commandSourceFiles) {
-  const source = await readFile(sourceFile, "utf8");
-  const syntaxTree = parse(source, { sourceType: "unambiguous", plugins: ["typescript"] });
-  const collectRegistrations = (node) => {
-    if (!node || typeof node !== "object") {
+const walk = (node, visit) => {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+
+  visit(node);
+
+  for (const child of Object.values(node)) {
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        walk(item, visit);
+      }
+    } else {
+      walk(child, visit);
+    }
+  }
+};
+
+// A string literal, or a template literal without expressions; undefined for anything dynamic.
+const staticString = (node) => {
+  if (node?.type === "StringLiteral") {
+    return node.value;
+  }
+
+  if (node?.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return node.quasis[0].value.cooked;
+  }
+
+  return undefined;
+};
+
+const collectCommandRegistrations = (syntaxTree) => {
+  walk(syntaxTree, (node) => {
+    if (node.type !== "CallExpression") {
       return;
     }
 
-    if (node.type === "CallExpression") {
-      const callee = node.callee;
-      const isRegistration =
-        (callee?.type === "Identifier" && callee.name === "registerCommand") ||
-        (callee?.type === "MemberExpression" &&
-          callee.computed === false &&
-          callee.property.type === "Identifier" &&
-          callee.property.name === "registerCommand");
-      const commandId = node.arguments[0];
+    const callee = node.callee;
+    const isRegistration =
+      (callee?.type === "Identifier" && callee.name === "registerCommand") ||
+      (callee?.type === "MemberExpression" &&
+        callee.computed === false &&
+        callee.property.type === "Identifier" &&
+        callee.property.name === "registerCommand");
+    const commandId = isRegistration ? staticString(node.arguments[0]) : undefined;
 
-      if (isRegistration && commandId?.type === "StringLiteral") {
-        registeredCommandIds.add(commandId.value);
-      } else if (
-        isRegistration &&
-        commandId?.type === "TemplateLiteral" &&
-        commandId.expressions.length === 0
-      ) {
-        registeredCommandIds.add(commandId.quasis[0].value.cooked);
-      }
+    if (commandId !== undefined) {
+      registeredCommandIds.add(commandId);
     }
-
-    for (const child of Object.values(node)) {
-      if (Array.isArray(child)) {
-        child.forEach(collectRegistrations);
-      } else if (child && typeof child === "object") {
-        collectRegistrations(child);
-      }
-    }
-  };
-
-  collectRegistrations(syntaxTree);
-}
-
-for (const commandId of declaredCommandIds) {
-  if (!registeredCommandIds.has(commandId)) {
-    fail(`${commandId} is contributed but not registered in src/commands`);
-  }
-}
+  });
+};
 
 // Extension-host code is bundled by esbuild with package.json dependencies kept
 // external (scripts/build-extension.mjs), so those bare imports are resolved from
@@ -185,6 +190,52 @@ const resolveRelativeImport = async (fromFile, specifier) => {
   return undefined;
 };
 
+// esbuild also bundles dynamic import() and require() calls with literal specifiers, so walk the
+// whole tree rather than only top-level declarations.
+const collectImportSpecifiers = (syntaxTree) => {
+  const specifiers = [];
+
+  walk(syntaxTree.program, (node) => {
+    let specifierNode;
+
+    if (
+      node.type === "ImportDeclaration" ||
+      node.type === "ExportNamedDeclaration" ||
+      node.type === "ExportAllDeclaration"
+    ) {
+      specifierNode = isTypeOnlyImport(node) ? undefined : node.source;
+    } else if (node.type === "ImportExpression") {
+      specifierNode = node.source;
+    } else if (
+      node.type === "CallExpression" &&
+      (node.callee?.type === "Import" ||
+        (node.callee?.type === "Identifier" && node.callee.name === "require"))
+    ) {
+      specifierNode = node.arguments[0];
+    } else if (
+      node.type === "TSImportEqualsDeclaration" &&
+      node.importKind !== "type" &&
+      node.moduleReference?.type === "TSExternalModuleReference"
+    ) {
+      specifierNode = node.moduleReference.expression;
+    }
+
+    const specifier = staticString(specifierNode);
+
+    if (specifier !== undefined) {
+      specifiers.push(specifier);
+    }
+  });
+
+  return specifiers;
+};
+
+const parseSourceFile = async (sourceFile) => {
+  const source = await readFile(sourceFile, "utf8");
+  const plugins = sourceFile.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"];
+  return parse(source, { sourceType: "unambiguous", plugins });
+};
+
 const pendingHostFiles = (await readSourceFiles(path.join(rootDir, "src"))).filter(
   (file) => !path.relative(rootDir, file).split(path.sep).includes("webview")
 );
@@ -198,17 +249,13 @@ while (pendingHostFiles.length > 0) {
   }
 
   visitedHostFiles.add(sourceFile);
-  const source = await readFile(sourceFile, "utf8");
-  const plugins = sourceFile.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"];
-  const syntaxTree = parse(source, { sourceType: "unambiguous", plugins });
+  const syntaxTree = await parseSourceFile(sourceFile);
 
-  for (const node of syntaxTree.program.body) {
-    const specifier = node.source?.value;
+  if (commandSourceFiles.has(sourceFile)) {
+    collectCommandRegistrations(syntaxTree);
+  }
 
-    if (typeof specifier !== "string" || isTypeOnlyImport(node)) {
-      continue;
-    }
-
+  for (const specifier of collectImportSpecifiers(syntaxTree)) {
     if (specifier.startsWith(".")) {
       const resolved = await resolveRelativeImport(sourceFile, specifier);
 
@@ -220,6 +267,19 @@ while (pendingHostFiles.length > 0) {
         `${path.relative(rootDir, sourceFile)} imports ${specifier}, which is not a package.json dependency and will not be packaged`
       );
     }
+  }
+}
+
+// Command files in unreferenced webview directories still count as registrations.
+for (const sourceFile of commandSourceFiles) {
+  if (!visitedHostFiles.has(sourceFile)) {
+    collectCommandRegistrations(await parseSourceFile(sourceFile));
+  }
+}
+
+for (const commandId of declaredCommandIds) {
+  if (!registeredCommandIds.has(commandId)) {
+    fail(`${commandId} is contributed but not registered in src/commands`);
   }
 }
 

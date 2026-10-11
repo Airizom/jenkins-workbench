@@ -39,22 +39,26 @@ export class JenkinsfileValidationRunner {
     const { key, token } = this.stateStore.nextToken(document);
 
     callbacks.onValidationStart();
-    const cancellationSubscription = options.cancellationToken?.onCancellationRequested(() => {
-      if (this.stateStore.isActiveToken(key, token)) {
-        callbacks.onRestoreStatus();
-      }
+    let cancellationSubscription: vscode.Disposable | undefined;
+    const cancellation = new Promise<never>((_resolve, reject) => {
+      cancellationSubscription = options.cancellationToken?.onCancellationRequested(() => {
+        reject(new Error("Validation canceled"));
+      });
     });
 
+    let environment: JenkinsEnvironmentRef | undefined;
     try {
       const canceledBeforeLookup = this.getCancellationOutcome(options, callbacks);
       if (canceledBeforeLookup) {
         return canceledBeforeLookup;
       }
 
-      const environment =
+      environment = await Promise.race([
         options.reason === "command"
-          ? await this.environmentResolver.resolveForDocument(document)
-          : await this.environmentResolver.resolveForDocumentSilently(document);
+          ? this.environmentResolver.resolveForDocument(document)
+          : this.environmentResolver.resolveForDocumentSilently(document),
+        cancellation
+      ]);
       const activeAfterLookup = this.getActiveOutcome(
         document,
         version,
@@ -84,31 +88,22 @@ export class JenkinsfileValidationRunner {
         return canceledAfterStatus;
       }
 
-      let output = "";
-      try {
-        const client = await this.clientProvider.getClient(environment);
-        output = await client.validateDeclarativeJenkinsfile(text);
-      } catch (error) {
-        const message = `Validation request failed: ${formatError(error)}`;
-        this.logger.logValidation(document, environment, message, options.reason);
-        const activeAfterFailure = this.getActiveOutcome(
-          document,
-          version,
-          options,
-          key,
-          token,
-          callbacks
-        );
-        if (activeAfterFailure) {
-          return activeAfterFailure;
-        }
-        return {
-          status: "completed",
-          kind: "request-failed",
-          environment,
-          message
-        };
+      const client = await Promise.race([this.clientProvider.getClient(environment), cancellation]);
+      const activeAfterClient = this.getActiveOutcome(
+        document,
+        version,
+        options,
+        key,
+        token,
+        callbacks
+      );
+      if (activeAfterClient) {
+        return activeAfterClient;
       }
+      const output = await Promise.race([
+        client.validateDeclarativeJenkinsfile(text),
+        cancellation
+      ]);
 
       const activeAfterRequest = this.getActiveOutcome(
         document,
@@ -138,6 +133,23 @@ export class JenkinsfileValidationRunner {
         hash,
         environmentKey
       };
+    } catch (error) {
+      const activeAfterFailure = this.getActiveOutcome(
+        document,
+        version,
+        options,
+        key,
+        token,
+        callbacks
+      );
+      if (activeAfterFailure) {
+        return activeAfterFailure;
+      }
+      callbacks.onRestoreStatus();
+      const context = environment ? "Validation request failed" : "Environment resolution failed";
+      const message = `${context}: ${formatError(error)}`;
+      this.logger.logValidation(document, environment, message, options.reason);
+      return { status: "completed", kind: "request-failed", environment, message };
     } finally {
       cancellationSubscription?.dispose();
     }

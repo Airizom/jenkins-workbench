@@ -10,13 +10,7 @@ import {
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
 import { ExternalLinkIcon } from "../../../../../shared/webview/icons";
-import {
-  resolveBuildResultBorderColor,
-  resolveBuildResultGraphBackground,
-  resolveResultBadgeClass,
-  resolveResultIconTextClass,
-  resolveStatusAccentClass
-} from "../../../../../shared/webview/lib/statusStyles";
+import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
@@ -74,18 +68,16 @@ function HeroStatusGlyph({
   resultClass: string;
   isRunning: boolean;
 }): React.JSX.Element {
+  const resultStyle = resolveBuildResultStyle(resultClass);
   return (
     <div
       className={cn(
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs",
-        resolveResultBadgeClass(resultClass),
+        resultStyle.badge,
         isRunning && "hero-status-glyph--running"
       )}
     >
-      <BuildResultStatusIcon
-        status={resultClass}
-        className={cn("h-6 w-6", resolveResultIconTextClass(resultClass))}
-      />
+      <BuildResultStatusIcon status={resultClass} className={cn("h-6 w-6", resultStyle.iconText)} />
     </div>
   );
 }
@@ -263,6 +255,7 @@ export function BuildStatusHero(props: BuildStatusHeroProps): React.JSX.Element 
   const { loading, children, ...contentProps } = props;
   const { resultClass, isRunning } = contentProps;
   const heroRef = useStickyHeroOffset();
+  const resultStyle = resolveBuildResultStyle(resultClass);
 
   return (
     <header ref={heroRef} className="sticky-header build-details-hero">
@@ -275,14 +268,14 @@ export function BuildStatusHero(props: BuildStatusHeroProps): React.JSX.Element 
       ) : null}
       <div
         style={{
-          background: resolveBuildResultGraphBackground(resultClass),
-          borderBottom: `1px solid ${resolveBuildResultBorderColor(resultClass)}`
+          background: resultStyle.graphBackground,
+          borderBottom: `1px solid ${resultStyle.borderColor}`
         }}
       >
         <HeroContent {...contentProps} />
         {children}
       </div>
-      <div className={cn("h-0.5", resolveStatusAccentClass(resultClass))} />
+      <div className={cn("h-0.5", resultStyle.accent)} />
     </header>
   );
 }

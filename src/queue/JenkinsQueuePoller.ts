@@ -12,7 +12,6 @@ const DEFAULT_POLL_INTERVAL_MS = DEFAULT_POLL_INTERVAL_SECONDS * 1000;
 
 export class JenkinsQueuePoller implements vscode.Disposable {
   private intervalId: NodeJS.Timeout | undefined;
-  private isPolling = false;
   private pollIntervalMs: number;
   private readonly expandedEnvironments = new Map<string, JenkinsEnvironmentRef>();
 
@@ -78,9 +77,9 @@ export class JenkinsQueuePoller implements vscode.Disposable {
     }
     const interval = this.pollIntervalMs;
     this.intervalId = setInterval(() => {
-      void this.poll();
+      this.poll();
     }, interval);
-    void this.poll();
+    this.poll();
   }
 
   private stop(): void {
@@ -91,20 +90,15 @@ export class JenkinsQueuePoller implements vscode.Disposable {
   }
 
   private poll(): void {
-    if (this.isPolling || this.expandedEnvironments.size === 0) {
+    if (this.expandedEnvironments.size === 0) {
       return;
     }
-    this.isPolling = true;
-    try {
-      for (const environment of this.expandedEnvironments.values()) {
-        try {
-          this.host.refreshQueueOnly(environment);
-        } catch (error) {
-          console.warn("Failed to refresh Jenkins queue.", error);
-        }
+    for (const environment of this.expandedEnvironments.values()) {
+      try {
+        this.host.refreshQueueOnly(environment);
+      } catch (error) {
+        console.warn("Failed to refresh Jenkins queue.", error);
       }
-    } finally {
-      this.isPolling = false;
     }
   }
 

@@ -9,26 +9,15 @@ export interface BuildDetailsCompletionPollerOptions {
 }
 
 export class BuildDetailsCompletionPoller {
-  private readonly getRefreshIntervalMs: () => number;
-  private readonly fetchBuildDetails: (token: number) => Promise<JenkinsBuildDetails | undefined>;
-  private readonly isTokenCurrent: (token: number) => boolean;
-  private readonly shouldPoll: () => boolean;
-  private readonly onDetailsUpdate: (details: JenkinsBuildDetails) => void;
   private pollTimer: NodeJS.Timeout | undefined;
   private pollInFlight = false;
   private pollingActive = false;
   private pollGeneration = 0;
 
-  constructor(options: BuildDetailsCompletionPollerOptions) {
-    this.getRefreshIntervalMs = options.getRefreshIntervalMs;
-    this.fetchBuildDetails = options.fetchBuildDetails;
-    this.isTokenCurrent = options.isTokenCurrent;
-    this.shouldPoll = options.shouldPoll;
-    this.onDetailsUpdate = options.onDetailsUpdate;
-  }
+  constructor(private readonly options: BuildDetailsCompletionPollerOptions) {}
 
   start(token: number): void {
-    if (!this.shouldPoll() || this.pollingActive || !this.isTokenCurrent(token)) {
+    if (!this.options.shouldPoll() || this.pollingActive || !this.options.isTokenCurrent(token)) {
       return;
     }
     this.pollingActive = true;
@@ -49,12 +38,12 @@ export class BuildDetailsCompletionPoller {
     if (
       !this.pollingActive ||
       this.pollTimer ||
-      !this.shouldPoll() ||
-      !this.isTokenCurrent(token)
+      !this.options.shouldPoll() ||
+      !this.options.isTokenCurrent(token)
     ) {
       return;
     }
-    const delay = this.getRefreshIntervalMs();
+    const delay = this.options.getRefreshIntervalMs();
     this.pollTimer = setTimeout(() => {
       this.pollTimer = undefined;
       void this.poll(token);
@@ -65,18 +54,18 @@ export class BuildDetailsCompletionPoller {
     if (this.pollInFlight || !this.pollingActive) {
       return;
     }
-    if (!this.shouldPoll() || !this.isTokenCurrent(token)) {
+    if (!this.options.shouldPoll() || !this.options.isTokenCurrent(token)) {
       this.pollingActive = false;
       return;
     }
     this.pollInFlight = true;
     const pollGeneration = this.pollGeneration;
     try {
-      const details = await this.fetchBuildDetails(token).catch(() => undefined);
+      const details = await this.options.fetchBuildDetails(token).catch(() => undefined);
       if (pollGeneration !== this.pollGeneration) {
         return;
       }
-      if (!this.shouldPoll() || !this.isTokenCurrent(token)) {
+      if (!this.options.shouldPoll() || !this.options.isTokenCurrent(token)) {
         this.stop();
         return;
       }
@@ -84,8 +73,15 @@ export class BuildDetailsCompletionPoller {
         this.scheduleNextPoll(token);
         return;
       }
-      this.onDetailsUpdate(details);
-      if (!this.shouldPoll()) {
+      try {
+        this.options.onDetailsUpdate(details);
+      } catch {
+        // Keep polling so a failing update handler cannot strand the poller as active.
+      }
+      if (pollGeneration !== this.pollGeneration) {
+        return;
+      }
+      if (!this.options.shouldPoll()) {
         this.stop();
         return;
       }

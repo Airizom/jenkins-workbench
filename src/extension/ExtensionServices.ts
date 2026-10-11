@@ -9,11 +9,7 @@ import type { ArtifactActionOptionsProvider } from "../ui/ArtifactActionHandler"
 import type { ArtifactPreviewOptionsProvider } from "../ui/ArtifactPreviewer";
 import type { ArtifactPreviewProviderOptions } from "../ui/ArtifactPreviewProvider";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
-import {
-  composeProviderCatalog,
-  type ExtensionContainer,
-  registerProviderCatalog
-} from "./container/ExtensionContainer";
+import { type ExtensionContainer, registerProviderCatalogs } from "./container/ExtensionContainer";
 import { createCoreProviderCatalog } from "./providers/CoreProviders";
 import { createRuntimeProviderCatalog } from "./providers/RuntimeProviders";
 import { createTreeProviderCatalog } from "./providers/TreeProviders";
@@ -81,11 +77,10 @@ export function registerExtensionProviders(
     queuePollIntervalSeconds: options.queuePollIntervalSeconds
   });
 
-  const composedCatalog = composeProviderCatalog([
+  registerProviderCatalogs(container, [
     coreCatalog,
     treeCatalog,
     validationCatalog,
     runtimeCatalog
   ]);
-  registerProviderCatalog(container, composedCatalog);
 }

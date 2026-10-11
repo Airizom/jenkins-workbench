@@ -1,11 +1,30 @@
 import assert from "node:assert/strict";
-import { createElement } from "react";
+import { Children, createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
 import {
   describePendingInputParameter,
   PendingInputsSection
 } from "../src/panels/buildDetails/webview/components/buildDetails/PendingInputsSection";
+import type { PendingInputProcessingAction } from "../src/panels/buildDetails/webview/state/buildDetailsState";
+
+function invokeInputActions(node: ReactNode): void {
+  for (const child of Children.toArray(node)) {
+    if (
+      !isValidElement<{
+        children?: ReactNode;
+        action?: PendingInputProcessingAction;
+        onAction?: (action: PendingInputProcessingAction) => void;
+      }>(child)
+    ) {
+      continue;
+    }
+    if (child.props.action) {
+      child.props.onAction?.(child.props.action);
+    }
+    invokeInputActions(child.props.children);
+  }
+}
 
 describe("PendingInputsSection", () => {
   it("describes parameter descriptions, choices, and defaults", () => {
@@ -92,4 +111,46 @@ describe("PendingInputsSection", () => {
     assert.match(html, /Rejecting…/);
     assert.match(html, /aria-busy="true"/);
   });
+
+  for (const id of ["constructor", "toString", "__proto__"]) {
+    it(`ignores inherited processing entries for ${id}`, () => {
+      const approved: string[] = [];
+      const rejected: string[] = [];
+      const section = PendingInputsSection({
+        pendingInputs: [
+          { id, message: "Continue?", submitterLabel: "", parametersLabel: "", parameters: [] }
+        ],
+        processingActions: {},
+        onApprove: (inputId) => approved.push(inputId),
+        onReject: (inputId) => rejected.push(inputId)
+      });
+      const html = renderToStaticMarkup(section);
+
+      assert.equal(html.match(/<button/g)?.length, 2);
+      assert.doesNotMatch(html, /disabled=""/);
+      assert.match(html, /aria-busy="false"/);
+      invokeInputActions(section);
+      assert.deepEqual(approved, [id]);
+      assert.deepEqual(rejected, [id]);
+    });
+
+    for (const action of ["approve", "reject"] as const) {
+      it(`blocks both actions for an own ${action} entry for ${id}`, () => {
+        const section = PendingInputsSection({
+          pendingInputs: [
+            { id, message: "Continue?", submitterLabel: "", parametersLabel: "", parameters: [] }
+          ],
+          processingActions: { [id]: action },
+          onApprove: () => assert.fail("Approve must be blocked while processing"),
+          onReject: () => assert.fail("Reject must be blocked while processing")
+        });
+        const html = renderToStaticMarkup(section);
+
+        assert.equal(html.match(/<button[^>]*disabled=""/g)?.length, 2);
+        assert.match(html, /aria-busy="true"/);
+        assert.ok(html.includes(action === "approve" ? "Approving…" : "Rejecting…"));
+        invokeInputActions(section);
+      });
+    }
+  }
 });

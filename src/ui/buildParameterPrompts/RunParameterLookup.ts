@@ -6,99 +6,85 @@ import type { BuildParameterPromptOptions } from "./BuildParameterPromptTypes";
 export async function fetchRunBuildChoices(
   options: BuildParameterPromptOptions,
   parameter: JobParameter
-): Promise<Array<{ number: number; description?: string; detail?: string }>> {
-  const candidates = resolveRunJobCandidates(options.environment, options.jobUrl, parameter);
-
-  for (const candidate of candidates) {
-    try {
-      const builds = await options.dataService.getBuildsForJob(options.environment, candidate, 20);
-      const mapped = builds
-        .filter((build) => typeof build.number === "number")
-        .map((build) => ({
-          number: build.number,
-          description:
-            typeof build.result === "string" && build.result.trim().length > 0
-              ? build.result
-              : undefined,
-          detail:
-            typeof build.timestamp === "number" && Number.isFinite(build.timestamp)
-              ? new Date(build.timestamp).toLocaleString()
-              : undefined
-        }));
-      if (mapped.length > 0) {
-        return mapped;
-      }
-    } catch {
-      // Fall back to manual input if lookups fail.
-    }
+): Promise<Array<{ number: number; runId: string; description?: string; detail?: string }>> {
+  const jobUrl = resolveRunJobUrl(options.environment, options.jobUrl, parameter);
+  const job = jobUrl ? parseJobUrl(jobUrl, options.environment.url) : undefined;
+  if (!jobUrl || !job) {
+    return [];
   }
 
-  return [];
+  try {
+    const builds = await options.dataService.getBuildsForJob(options.environment, jobUrl, 20);
+    return builds
+      .filter((build) => typeof build.number === "number")
+      .map((build) => ({
+        number: build.number,
+        runId: `${job.fullPath.join("/")}#${build.number}`,
+        description:
+          typeof build.result === "string" && build.result.trim().length > 0
+            ? build.result
+            : undefined,
+        detail:
+          typeof build.timestamp === "number" && Number.isFinite(build.timestamp)
+            ? new Date(build.timestamp).toLocaleString()
+            : undefined
+      }));
+  } catch {
+    // Fall back to manual input if the lookup fails.
+    return [];
+  }
 }
 
-function resolveRunJobCandidates(
+function resolveRunJobUrl(
   environment: JenkinsEnvironmentRef,
   currentJobUrl: string,
   parameter: JobParameter
-): string[] {
-  const values: string[] = [];
+): string | undefined {
   const environmentOrigin = resolveOrigin(environment.url);
-  const addCandidate = (candidate: string): void => {
-    if (!isSameOrigin(candidate, environmentOrigin)) {
-      return;
-    }
-    if (values.includes(candidate)) {
-      return;
-    }
-    values.push(candidate);
-  };
 
   const raw = parameter.runProjectName?.trim();
-  if (raw && raw.length > 0) {
-    let absolute: URL | undefined;
-    try {
-      absolute = new URL(raw);
-    } catch {
-      // Not an absolute URL.
-    }
-
-    if (absolute) {
-      const candidate = ensureTrailingSlash(absolute.toString());
-      if (parseJobUrl(candidate)) {
-        addCandidate(candidate);
-      }
-    } else {
-      try {
-        const relative = ensureTrailingSlash(
-          new URL(raw, ensureTrailingSlash(environment.url)).toString()
-        );
-        if (parseJobUrl(relative)) {
-          addCandidate(relative);
-        } else {
-          const segments = raw
-            .split("/")
-            .map((segment) => segment.trim())
-            .filter((segment) => segment.length > 0);
-          if (segments.length > 0) {
-            addCandidate(
-              segments.reduce(
-                (parentUrl, segment) => buildJobUrl(parentUrl, segment),
-                ensureTrailingSlash(environment.url)
-              )
-            );
-          }
-        }
-      } catch {
-        // Ignore invalid relative URL or job name.
-      }
-    }
-  }
-
   if (!raw) {
-    addCandidate(currentJobUrl);
+    return isSameOrigin(currentJobUrl, environmentOrigin) ? currentJobUrl : undefined;
   }
 
-  return values;
+  let candidate: string | undefined;
+  let absolute: URL | undefined;
+  try {
+    absolute = new URL(raw);
+  } catch {
+    // Not an absolute URL.
+  }
+
+  if (absolute) {
+    const absoluteUrl = ensureTrailingSlash(absolute.toString());
+    if (parseJobUrl(absoluteUrl, environment.url)) {
+      candidate = absoluteUrl;
+    }
+  } else {
+    try {
+      const relative = ensureTrailingSlash(
+        new URL(raw, ensureTrailingSlash(environment.url)).toString()
+      );
+      if (parseJobUrl(relative, environment.url)) {
+        candidate = relative;
+      } else {
+        const segments = raw
+          .split("/")
+          .map((segment) => segment.trim())
+          .filter((segment) => segment.length > 0);
+        if (segments.length > 0) {
+          candidate = segments.reduce(
+            (parentUrl, segment) => buildJobUrl(parentUrl, segment),
+            ensureTrailingSlash(environment.url)
+          );
+        }
+      }
+    } catch {
+      // Ignore invalid relative URL or job name.
+    }
+  }
+
+  return candidate && isSameOrigin(candidate, environmentOrigin) ? candidate : undefined;
 }
 
 function resolveOrigin(value: string): string | undefined {

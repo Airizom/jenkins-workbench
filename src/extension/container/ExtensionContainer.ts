@@ -12,19 +12,6 @@ export type PartialExtensionProviderCatalog = Partial<ExtensionProviderCatalog>;
 
 export type ProviderRegistry = ExtensionContainer;
 
-type UnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) extends (
-  value: infer Result
-) => void
-  ? Result
-  : never;
-
-type Simplify<T> = {
-  [K in keyof T]: T[K];
-};
-
-export type ComposedProviderCatalog<TGroups extends readonly PartialExtensionProviderCatalog[]> =
-  Simplify<UnionToIntersection<TGroups[number]>>;
-
 export class ExtensionContainer {
   private readonly providers = new Map<ExtensionToken, ProviderFactory<ExtensionToken>>();
   private readonly instances: Partial<ExtensionTokenMap> = {};
@@ -112,48 +99,17 @@ export function createExtensionContainer(
   return container;
 }
 
-export function registerProviderCatalog(
+export function registerProviderCatalogs(
   container: ExtensionContainer,
-  catalog: PartialExtensionProviderCatalog
+  catalogs: readonly PartialExtensionProviderCatalog[]
 ): void {
-  for (const token of Object.keys(catalog) as ExtensionToken[]) {
-    const factory = catalog[token];
-    if (!factory) {
-      continue;
-    }
-    container.register(token, factory as ProviderFactory<ExtensionToken>);
-  }
-}
-
-export function composeProviderCatalog<TGroups extends readonly PartialExtensionProviderCatalog[]>(
-  groups: TGroups
-): ComposedProviderCatalog<TGroups> {
-  const catalog: PartialExtensionProviderCatalog = {};
-  const seenTokens = new Set<ExtensionToken>();
-  const duplicateTokens = new Set<ExtensionToken>();
-
-  for (const group of groups) {
-    for (const token of Object.keys(group) as ExtensionToken[]) {
-      const factory = group[token];
+  for (const catalog of catalogs) {
+    for (const token of Object.keys(catalog) as ExtensionToken[]) {
+      const factory = catalog[token];
       if (!factory) {
         continue;
       }
-      if (seenTokens.has(token)) {
-        duplicateTokens.add(token);
-        continue;
-      }
-      seenTokens.add(token);
-      (catalog as Record<ExtensionToken, ProviderFactory<ExtensionToken> | undefined>)[token] =
-        factory as ProviderFactory<ExtensionToken>;
+      container.register(token, factory as ProviderFactory<ExtensionToken>);
     }
   }
-
-  if (duplicateTokens.size > 0) {
-    const duplicates = [...duplicateTokens].sort().join(", ");
-    throw new Error(
-      `Duplicate provider token registrations found while composing provider catalogs: ${duplicates}`
-    );
-  }
-
-  return catalog as ComposedProviderCatalog<TGroups>;
 }

@@ -2,8 +2,8 @@ import * as React from "react";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
-import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { toast } from "../../shared/webview/hooks/useToast";
+import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { BuildCompareViewModel, CompareSectionStatus } from "../shared/BuildCompareContracts";
 import type { BuildCompareIncomingMessage } from "../shared/BuildComparePanelMessages";
 import type { BuildCompareSectionId } from "../shared/BuildComparePanelWebviewState";
@@ -68,7 +68,7 @@ function sectionAnchorId(id: BuildCompareSectionId): string {
 export function BuildCompareApp({ initialState }: { initialState: BuildCompareViewModel }) {
   const [state, dispatch] = useReducer(buildCompareReducer, initialState, createBuildCompareState);
   const { model, busyAction, actionError, completedAction } = state;
-  const postMessage = usePanelPostMessage<BuildCompareIncomingMessage>();
+  const postMessage: (message: BuildCompareIncomingMessage) => void = postVsCodeMessage;
   const { isOpen, setOpen } = useCollapsedSections();
   useBuildCompareMessages(dispatch);
 

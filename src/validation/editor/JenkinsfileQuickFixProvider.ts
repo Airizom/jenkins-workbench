@@ -108,21 +108,29 @@ function createMissingSectionActions(
   context: PipelineBlockContext,
   section: "agent" | "stages"
 ): vscode.CodeAction[] {
+  const location = resolveInsertLocation(document, context, section);
   if (section === "agent") {
-    const location = resolveInsertLocation(document, context, section);
-    return [
-      createInsertAgentAction(document, diagnostic, context, "any", 'Insert "agent any"', location),
-      createInsertAgentAction(
+    return (["any", "none"] as const).map((agentValue) =>
+      createInsertAction(
         document,
         diagnostic,
         context,
-        "none",
-        'Insert "agent none"',
-        location
+        location,
+        buildAgentInsertText(context, agentValue),
+        `Insert "agent ${agentValue}"`
       )
-    ];
+    );
   }
-  return [createInsertStagesAction(document, diagnostic, context)];
+  return [
+    createInsertAction(
+      document,
+      diagnostic,
+      context,
+      location,
+      buildStagesInsertText(context),
+      'Insert "stages" block'
+    )
+  ];
 }
 
 function createSelectEnvironmentAction(diagnostic: vscode.Diagnostic): vscode.CodeAction {
@@ -142,47 +150,18 @@ function createInsertAction(
   document: vscode.TextDocument,
   diagnostic: vscode.Diagnostic,
   context: PipelineBlockContext,
-  section: "agent" | "stages",
+  location: PipelineTextLocation,
   insertText: string,
-  title: string,
-  location?: PipelineTextLocation
+  title: string
 ): vscode.CodeAction {
   const edit = new vscode.WorkspaceEdit();
-  const resolvedLocation = location ?? resolveInsertLocation(document, context, section);
+  const prefix = !context.inline && location.character > 0 ? "\n" : "";
   edit.insert(
     document.uri,
-    new vscode.Position(resolvedLocation.line, resolvedLocation.character),
-    insertText
+    new vscode.Position(location.line, location.character),
+    prefix + insertText
   );
   return createEditAction(title, diagnostic, edit);
-}
-
-function createInsertAgentAction(
-  document: vscode.TextDocument,
-  diagnostic: vscode.Diagnostic,
-  context: PipelineBlockContext,
-  agentValue: "any" | "none",
-  title: string,
-  location?: PipelineTextLocation
-): vscode.CodeAction {
-  const insertText = buildAgentInsertText(context, agentValue);
-  return createInsertAction(document, diagnostic, context, "agent", insertText, title, location);
-}
-
-function createInsertStagesAction(
-  document: vscode.TextDocument,
-  diagnostic: vscode.Diagnostic,
-  context: PipelineBlockContext
-): vscode.CodeAction {
-  const insertText = buildStagesInsertText(context);
-  return createInsertAction(
-    document,
-    diagnostic,
-    context,
-    "stages",
-    insertText,
-    'Insert "stages" block'
-  );
 }
 
 function createReplaceStepAction(

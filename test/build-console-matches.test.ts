@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { isValidElement } from "react";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import { buildConsoleMatches } from "../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleMatches";
 import { MAX_CONSOLE_MATCHES } from "../src/panels/buildDetails/webview/hooks/consoleSearch/constants";
 import {
@@ -29,6 +29,24 @@ describe("buildConsoleMatches", () => {
     assert.equal(result.tooManyMatches, false);
     assert.deepEqual(result.matches, [{ start: 1, end: 2 }]);
   });
+
+  it.each(["ΟΣ", "οσ", "ος"])("matches Greek sigma variants with query %s", (query) => {
+    for (const text of ["ΟΣ", "οσ", "ος"]) {
+      assert.deepEqual(buildConsoleMatches(text, query, false).matches, [{ start: 0, end: 2 }]);
+    }
+  });
+
+  it.each(["ΟΣ", "οσ", "ος"])(
+    "preserves source offsets for Greek matches with query %s",
+    (query) => {
+      assert.deepEqual(buildConsoleMatches("🙂İΟΣ ος οσ ΟΣΑ", query, false).matches, [
+        { start: 3, end: 5 },
+        { start: 6, end: 8 },
+        { start: 9, end: 11 },
+        { start: 12, end: 14 }
+      ]);
+    }
+  );
 
   it("finds ordinary regex matches", () => {
     const result = buildConsoleMatches("ERROR 1\nWARN 2\nERROR 3", "ERROR \\d", true);
@@ -75,6 +93,30 @@ describe("buildConsoleMatches", () => {
       assert.match(result.error ?? "", /too slow/);
       assert.deepEqual(result.matches, []);
       assert.equal(result.tooManyMatches, false);
+    }
+  });
+
+  it("rejects case-insensitive overlapping alternatives before execution", () => {
+    const pattern = "^(a|A)+$";
+    const originalExec = RegExp.prototype.exec;
+    const exec = vi.spyOn(RegExp.prototype, "exec").mockImplementation(function (
+      this: RegExp,
+      text
+    ) {
+      if (this.source === pattern && this.flags === "gi") {
+        assert.fail("Unsafe regex must be rejected before execution");
+      }
+      return originalExec.call(this, text);
+    });
+
+    try {
+      const result = buildConsoleMatches(`${"a".repeat(30)}!`, pattern, true);
+
+      assert.match(result.error ?? "", /too slow/);
+      assert.deepEqual(result.matches, []);
+      assert.equal(result.tooManyMatches, false);
+    } finally {
+      exec.mockRestore();
     }
   });
 

@@ -29,11 +29,7 @@ export function isSerializedEnvironmentState(value: unknown): value is Serialize
     return false;
   }
   const record = value as Record<string, unknown>;
-  return (
-    typeof record.environmentId === "string" &&
-    record.environmentId.length > 0 &&
-    isEnvironmentScope(record.scope)
-  );
+  return isNonEmptyString(record.environmentId) && isEnvironmentScope(record.scope);
 }
 
 export function isNonEmptyString(value: unknown): value is string {
@@ -54,10 +50,8 @@ export function validateEnvironmentScopedPanelState(
   value: unknown,
   validateExtraFields: (record: Record<string, unknown>) => boolean
 ): value is SerializedEnvironmentState {
-  if (!isSerializedEnvironmentState(value)) {
-    return false;
-  }
-  return validateExtraFields(value as unknown as Record<string, unknown>);
+  const record = value as Record<string, unknown>;
+  return isSerializedEnvironmentState(record) && validateExtraFields(record);
 }
 
 export async function resolveEnvironmentRef(

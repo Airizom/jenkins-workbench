@@ -6,6 +6,7 @@ import {
   FileIcon,
   InfoIcon
 } from "../../../../../shared/webview/icons";
+import { createUniqueListKeys } from "../../../../../shared/webview/lib/uniqueListKeys";
 import type {
   BuildDiagnosticInsightItem,
   BuildDiagnosticsViewModel
@@ -25,6 +26,7 @@ export function BuildFailureDiagnosticsCard({
 }) {
   const summary = describeBuildDiagnostics(diagnostics);
   const visibleItems = diagnostics.items.slice(0, MAX_VISIBLE_DIAGNOSTICS);
+  const visibleItemKeys = createUniqueListKeys(visibleItems, diagnosticItemKey);
   const hiddenCount = countHiddenDiagnostics(diagnostics, visibleItems.length);
   const showProblemsDisabled = diagnostics.resolvedCount === 0;
   const showProblemsHint = showProblemsDisabled
@@ -47,10 +49,10 @@ export function BuildFailureDiagnosticsCard({
       ) : null}
       {visibleItems.length > 0 ? (
         <ul className="space-y-1.5" aria-label="Build diagnostics">
-          {visibleItems.map((item) => (
+          {visibleItems.map((item, index) => (
             <DiagnosticInsightRow
               item={item}
-              key={diagnosticItemKey(item)}
+              key={visibleItemKeys[index]}
               onOpenSource={onOpenSource}
             />
           ))}
@@ -133,19 +135,16 @@ export function countHiddenDiagnostics(
 const OPENS_IN_EDITOR_HINT_ID = "build-diagnostics-opens-in-editor";
 
 function describeShowProblemsUnavailable(status: BuildDiagnosticsViewModel["status"]): string {
-  if (status === "idle" || status === "scanning") {
-    return "Available after the diagnostic scan finishes.";
+  switch (status) {
+    case "idle":
+    case "scanning":
+      return "Available after the diagnostic scan finishes.";
+    case "available":
+    case "truncated":
+      return "No diagnostics were resolved to local source files.";
+    default:
+      return STATUS_MESSAGES[status];
   }
-  if (status === "disabled") {
-    return "Build diagnostics are disabled for this job.";
-  }
-  if (status === "needsRepository") {
-    return "Choose a local repository to resolve source paths first.";
-  }
-  if (status === "error") {
-    return "Build diagnostics could not be loaded.";
-  }
-  return "No diagnostics were resolved to local source files.";
 }
 
 const SEVERITY_PREFIXES: Record<BuildDiagnosticInsightItem["severity"], string> = {
@@ -254,7 +253,7 @@ export function describeBuildDiagnostics(diagnostics: BuildDiagnosticsViewModel)
 
   return {
     countLabel: countParts.length > 0 ? countParts.join(" · ") : undefined,
-    emptyMessage: diagnostics.message ?? defaultStatusMessage(diagnostics.status),
+    emptyMessage: diagnostics.message ?? STATUS_MESSAGES[diagnostics.status],
     notices: [...new Set(notices)]
   };
 }
@@ -270,23 +269,17 @@ function diagnosticItemKey(item: BuildDiagnosticInsightItem): string {
   ].join("\u0000");
 }
 
-function defaultStatusMessage(status: BuildDiagnosticsViewModel["status"]): string {
-  switch (status) {
-    case "scanning":
-      return "Scanning the Jenkins console for source diagnostics…";
-    case "disabled":
-      return "Build diagnostics are disabled for this job.";
-    case "needsRepository":
-      return "Choose a local repository to resolve Jenkins source paths.";
-    case "error":
-      return "Build diagnostics could not be loaded.";
-    case "available":
-    case "truncated":
-      return "No local source diagnostics were found.";
-    default:
-      return "Waiting for a build diagnostic scan.";
-  }
-}
+// Shared by the empty state and the disabled Show problems hint so the two
+// never describe the same status differently.
+const STATUS_MESSAGES: Record<BuildDiagnosticsViewModel["status"], string> = {
+  idle: "Waiting for a build diagnostic scan.",
+  scanning: "Scanning the Jenkins console for source diagnostics…",
+  disabled: "Build diagnostics are disabled for this job.",
+  needsRepository: "Choose a local repository to resolve Jenkins source paths.",
+  error: "Build diagnostics could not be loaded.",
+  available: "No local source diagnostics were found.",
+  truncated: "No local source diagnostics were found."
+};
 
 function pluralize(word: string, count: number): string {
   return count === 1 ? word : `${word}s`;

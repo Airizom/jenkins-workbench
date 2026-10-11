@@ -23,7 +23,7 @@ import {
   ServerIcon
 } from "../../../shared/webview/icons";
 import {
-  resolveNodeStatusBadgeClass,
+  resolveNodeStatusStyle,
   resolveSeverityBadgeClass
 } from "../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../shared/webview/lib/utils";
@@ -347,7 +347,7 @@ const NodeList = React.memo(function NodeList({
                     {offlineTone ? (
                       <ToneBadge
                         label={node.statusLabel}
-                        className={resolveNodeStatusBadgeClass(offlineTone)}
+                        className={resolveNodeStatusStyle(offlineTone).badge}
                       />
                     ) : (
                       <Badge variant="muted">{node.statusLabel}</Badge>
@@ -443,8 +443,9 @@ function NodeRunningWork({
 }): React.JSX.Element | null {
   const hasLoadedBusyWork =
     node.executorsLoaded && node.executors.some((executor) => !executor.isIdle);
-  // Offline nodes only list work when a draining build is still running.
-  if (node.isOffline && !hasLoadedBusyWork) {
+  // Offline nodes only list work while a draining build is still running; keep
+  // request status visible while that work is loading, failed, or stale.
+  if (node.isOffline && !hasLoadedBusyWork && node.busyExecutors === 0) {
     return null;
   }
   const nodeUrl = node.nodeUrl;

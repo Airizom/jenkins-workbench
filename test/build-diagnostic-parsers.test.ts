@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import * as path from "node:path";
+import { buildSync } from "esbuild";
 import { describe, it } from "vitest";
 import {
   BuildDiagnosticLogParser,
@@ -264,6 +267,46 @@ describe("built-in build diagnostic parsers", () => {
     assert.deepEqual([second[0].sequence, final[0].sequence], [1, 2]);
   });
 
+  it.each(["[Pipeline]", "[Pipeline ]", "[Pipeline    stage]", "[pipeline\t\tstage]"])(
+    "normalizes the valid prefix %s",
+    (prefix) => {
+      assert.deepEqual(normalizeBuildLogLine(`${prefix} [WARN] message`), {
+        text: "message",
+        prefixSeverity: "warning"
+      });
+    }
+  );
+
+  it("bounds normalization time for unterminated whitespace-heavy Pipeline prefixes", () => {
+    const bundle = buildSync({
+      entryPoints: [
+        path.resolve(__dirname, "../src/buildDiagnostics/BuildDiagnosticParserSupport.ts")
+      ],
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      write: false
+    });
+    // Isolate synchronous regex execution so a regression cannot hang the test runner.
+    const result = spawnSync(process.execPath, ["--input-type=module"], {
+      input: `
+        import assert from "node:assert/strict";
+        ${bundle.outputFiles[0].text}
+        for (const whitespace of [" ", "\\t"]) {
+          const line = "[Pipeline " + whitespace.repeat(300_000) + "x";
+          assert.deepEqual(normalizeBuildLogLine(line), {
+            text: line,
+            prefixSeverity: undefined
+          });
+        }
+      `,
+      encoding: "utf8",
+      timeout: 2000
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+  });
+
   it("bounds incomplete lines and resumes parsing after the next newline", () => {
     const parser = new BuildDiagnosticLogParser({
       maxLineChars: 12
@@ -278,6 +321,32 @@ describe("built-in build diagnostic parsers", () => {
     assert.equal(findings.length, 1);
     assert.equal(findings[0].parserId, "go");
     assert.equal(findings[0].logLine, 2);
+  });
+
+  it.each([
+    ["ESLint", "src/a.ts", "  7:1 error wrong"],
+    ["Rust", "error: stale", "  --> src/a.rs:7:1"]
+  ])("clears %s headers when discarding an oversized line", (_name, header, finding) => {
+    assert.deepEqual(
+      parseBuildLog(`${header}\n${"x".repeat(65)}\n${finding}\n`, { maxLineChars: 64 }),
+      []
+    );
+  });
+
+  it.each([
+    ["JVM", "java.lang.Error: stale", "  at A.run(A.java:7)"],
+    ["JavaScript", "TypeError: stale", "  at run (src/a.ts:7:1)"],
+    ["Python", "Traceback (most recent call last):", '  File "a.py", line 7'],
+    [".NET", "System.Exception: stale", "  at A.Run() in A.cs:line 7"]
+  ])("starts a new %s stack after an oversized line", (_name, header, frame) => {
+    const findings = parseBuildLog(`${header}\n${frame}\n${"x".repeat(65)}\n${frame}\n`, {
+      maxLineChars: 64
+    });
+
+    assert.equal(findings.length, 2);
+    assert.notEqual(findings[0].stackTraceId, findings[1].stackTraceId);
+    assert.equal(findings[1].stackFrameIndex, 0);
+    assert.doesNotMatch(findings[1].message, /stale/);
   });
 
   it("honors parser selection and emits deterministic deduplication keys", () => {

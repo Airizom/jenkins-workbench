@@ -68,6 +68,9 @@ vi.doMock("vscode", () => ({
     onDidChangeConfiguration: configurationEmitter.event,
     fs: {
       stat: async (uri: vscodeStub.Uri) => {
+        if (uri.path === "/workspace/repo/src") {
+          return { type: vscodeStub.FileType.Directory };
+        }
         if (uri.path.startsWith("/workspace/repo/src/")) {
           return { type: vscodeStub.FileType.File };
         }
@@ -85,6 +88,7 @@ vi.doMock("vscode", () => ({
 const { BuildDiagnosticsCoordinator } = await import(
   "../src/buildDiagnostics/BuildDiagnosticsCoordinator"
 );
+const diagnosticProfiles = await import("../src/buildDiagnostics/BuildDiagnosticProfiles");
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -331,6 +335,53 @@ describe("BuildDiagnosticsCoordinator ownership", () => {
     assert.equal(collection.entries.size, 0);
     assert.equal(harness.coordinator.getDiagnostics().status, "idle");
     harness.coordinator.dispose();
+  });
+
+  it("reuses normalized profiles until diagnostic settings change", async () => {
+    const currentBuild = "https://jenkins.example/job/project/job/main/1/";
+    const profiles = {
+      mapped: {
+        pathMappings: [{ type: "regex", remote: "^/agent/", replace: "" }]
+      }
+    };
+    configurationValues.set("diagnostics.profiles", profiles);
+    const normalize = vi.spyOn(diagnosticProfiles, "normalizeDiagnosticProfiles");
+    const harness = createHarness(matchedState("FAILURE", currentBuild));
+    try {
+      harness.coordinator.start();
+      await waitForScans(harness.coordinator);
+      assert.equal(normalize.mock.calls.length, 1);
+
+      harness.currentBranch.update(matchedState("FAILURE", currentBuild));
+      await waitForScans(harness.coordinator);
+      assert.equal(normalize.mock.calls.length, 1);
+      assert.deepEqual(harness.progressiveCalls, [currentBuild]);
+
+      await harness.coordinator.refresh();
+      assert.equal(normalize.mock.calls.length, 1);
+      assert.deepEqual(harness.progressiveCalls, [currentBuild, currentBuild]);
+
+      configurationEmitter.fire({ affectsConfiguration: () => false });
+      harness.currentBranch.update(matchedState("FAILURE", currentBuild));
+      await waitForScans(harness.coordinator);
+      assert.equal(normalize.mock.calls.length, 1);
+
+      const updatedProfiles = { mapped: { ...profiles.mapped, builtIns: [] } };
+      configurationValues.set("diagnostics.profiles", updatedProfiles);
+      configurationEmitter.fire({
+        affectsConfiguration: (section) => section === "jenkinsWorkbench.diagnostics"
+      });
+      await waitForScans(harness.coordinator);
+      assert.equal(normalize.mock.calls.length, 2);
+      assert.deepEqual(normalize.mock.calls[1], [updatedProfiles]);
+
+      harness.currentBranch.update(matchedState("FAILURE", currentBuild));
+      await waitForScans(harness.coordinator);
+      assert.equal(normalize.mock.calls.length, 2);
+    } finally {
+      harness.coordinator.dispose();
+      normalize.mockRestore();
+    }
   });
 
   it("does not reuse a completed scan after the console byte limit changes", async () => {

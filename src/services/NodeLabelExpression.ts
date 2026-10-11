@@ -20,9 +20,9 @@ const BINARY_OPERATORS: Array<{ op: string; kind: "and" | "or" | "implies" | "if
 ];
 
 /**
- * Parses a Jenkins label expression and returns it only when it combines labels with
- * operators. Plain labels and unparseable input return undefined so callers can keep
- * treating them as literal label names.
+ * Parses a Jenkins label expression with operators or parentheses. Plain labels and
+ * unparseable input return undefined so callers can keep treating them as literal
+ * label names.
  */
 export function parseCompoundLabelExpression(value: string): LabelExpression | undefined {
   const tokens = tokenize(value);
@@ -31,7 +31,7 @@ export function parseCompoundLabelExpression(value: string): LabelExpression | u
   }
   const parser = new Parser(tokens);
   const expression = parser.parse();
-  if (!expression || expression.kind === "atom") {
+  if (!expression || (expression.kind === "atom" && tokens.length === 1)) {
     return undefined;
   }
   return expression;

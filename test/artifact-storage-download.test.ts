@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { PassThrough, Readable } from "node:stream";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import { createFileArtifactFilesystem } from "../src/services/ArtifactFilesystem";
 import {
@@ -36,6 +36,77 @@ function createRequest(workspaceRoot: string): ArtifactDownloadRequest {
 }
 
 describe("ArtifactStorageService downloads", () => {
+  it("destroys the response stream when directory preparation fails", async () => {
+    const stream = new PassThrough();
+    const error = new Error("directory creation failed");
+    const abort = vi.fn(() => {
+      stream.destroy();
+    });
+    const service = new ArtifactStorageService(
+      { getArtifactStream: async () => ({ stream, headers: {}, abort }) },
+      {
+        ...createFileArtifactFilesystem(),
+        createDirectory: async () => {
+          throw error;
+        }
+      }
+    );
+
+    await assert.rejects(service.downloadArtifact(createRequest(os.tmpdir())), error);
+
+    assert.equal(stream.destroyed, true);
+    assert.equal(abort.mock.calls.length, 1);
+  });
+
+  it("destroys the response stream when sink creation throws synchronously", async () => {
+    const stream = new PassThrough();
+    const error = new Error("sink creation failed");
+    const abort = vi.fn(() => {
+      stream.destroy();
+    });
+    const deleteTemporaryFile = vi.fn(async () => {});
+    const createWriteStream = vi.fn(() => {
+      throw error;
+    });
+    const service = new ArtifactStorageService(
+      { getArtifactStream: async () => ({ stream, headers: {}, abort }) },
+      {
+        ...createFileArtifactFilesystem(),
+        createDirectory: async () => {},
+        createWriteStream,
+        delete: deleteTemporaryFile
+      }
+    );
+
+    await assert.rejects(service.downloadArtifact(createRequest(os.tmpdir())), error);
+
+    assert.equal(stream.destroyed, true);
+    assert.equal(abort.mock.calls.length, 1);
+    assert.deepEqual(deleteTemporaryFile.mock.calls, createWriteStream.mock.calls);
+  });
+
+  it.each([
+    ["report:a.txt", "report_a.txt"],
+    ["report:a.txt", "report%3Aa.txt"],
+    ["run:1/report.txt", "run_1/report.txt"],
+    ["run:1/report.txt", "run%3A1/report.txt"]
+  ])("preserves distinct downloads for %s and %s", async (firstPath, secondPath) => {
+    const workspaceRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "artifact-download-"));
+    try {
+      const service = createService([Readable.from(["first"]), Readable.from(["second"])]);
+      const request = createRequest(workspaceRoot);
+
+      const first = await service.downloadArtifact({ ...request, relativePath: firstPath });
+      const second = await service.downloadArtifact({ ...request, relativePath: secondPath });
+
+      assert.notEqual(first.targetPath, second.targetPath);
+      assert.equal(await fs.promises.readFile(first.targetPath, "utf8"), "first");
+      assert.equal(await fs.promises.readFile(second.targetPath, "utf8"), "second");
+    } finally {
+      await fs.promises.rm(workspaceRoot, { recursive: true, force: true });
+    }
+  });
+
   it("preserves an existing download when its replacement stream fails", async () => {
     const workspaceRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "artifact-download-"));
     try {

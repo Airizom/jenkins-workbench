@@ -66,8 +66,8 @@ export class HistoryBaselineResolver {
     jobUrl: string,
     request: HistoryRequest = { environment, jobUrl, count: 20, active: () => true }
   ): Promise<{ url: string; multibranch: boolean }> {
-    const parent = parseJobUrl(jobUrl)?.parentUrl;
-    if (parent && parseJobUrl(parent)) {
+    const parent = parseJobUrl(jobUrl, environment.url)?.parentUrl;
+    if (parent && parseJobUrl(parent, environment.url)) {
       const info = await this.history.run(request, () => this.data.getJobInfo(environment, parent));
       if (info.kind === "multibranch") return { url: parent, multibranch: true };
     }
@@ -87,6 +87,8 @@ export class HistoryBaselineResolver {
       if (!request.active()) return { status: "unavailable" };
       return await this.compare(request, jobUrl, target, origin);
     } catch (error) {
+      // Cancellation mid-request is not a baseline failure.
+      if (!request.active()) return { status: "unavailable" };
       return {
         status: "error",
         message: error instanceof Error ? error.message : "Baseline request failed",
@@ -170,17 +172,16 @@ function defaultBranchJobUrl(jobs: Array<{ name: string; url: string }>): string
   );
 }
 
-function completedBy(build: JenkinsBuild, timestamp: number): boolean {
-  const completed = completionTime(build);
-  return completed !== undefined && completed <= timestamp;
-}
-
 /** Latest completion at or before `timestamp`; build number breaks ties. */
 function latestCompletedBefore(
   builds: JenkinsBuild[],
   timestamp: number
 ): JenkinsBuild | undefined {
   return builds
-    .filter((build) => completedBy(build, timestamp))
-    .sort((a, b) => (completionTime(b) ?? 0) - (completionTime(a) ?? 0) || b.number - a.number)[0];
+    .map((build) => ({ build, completed: completionTime(build) }))
+    .filter(
+      (entry): entry is { build: JenkinsBuild; completed: number } =>
+        entry.completed !== undefined && entry.completed <= timestamp
+    )
+    .sort((a, b) => b.completed - a.completed || b.build.number - a.build.number)[0]?.build;
 }

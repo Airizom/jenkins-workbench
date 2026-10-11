@@ -19,6 +19,22 @@ export class DraftEditorService {
     );
   }
 
+  /**
+   * Runs `onClosed` only if the document stays closed. VS Code also fires
+   * `onDidCloseTextDocument` when a document's language changes, then reopens
+   * it right away; that is not the user closing the draft.
+   */
+  whenDocumentStaysClosed(uri: vscode.Uri, onClosed: () => void): vscode.Disposable {
+    const key = uri.toString();
+    const timer = setTimeout(() => {
+      if (vscode.workspace.textDocuments.some((document) => document.uri.toString() === key)) {
+        return;
+      }
+      onClosed();
+    }, 0);
+    return { dispose: () => clearTimeout(timer) };
+  }
+
   async openDocuments(uris: vscode.Uri[], options?: { focusUri?: vscode.Uri }): Promise<void> {
     if (uris.length === 0) {
       return;

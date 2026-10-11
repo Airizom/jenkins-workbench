@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it, vi } from "vitest";
 import type * as vscode from "vscode";
-import { JENKINS_TASK_TYPE, normalizeTaskDefinition } from "../src/tasks/JenkinsTaskTypes";
+import {
+  JENKINS_TASK_TYPE,
+  normalizeJobUrl,
+  normalizeTaskDefinition
+} from "../src/tasks/JenkinsTaskTypes";
 
 vi.doMock("vscode", () => ({ workspace: { getConfiguration: () => undefined } }));
 const { getJenkinsTaskRunnerOptions } = await import("../src/extension/ExtensionConfig");
@@ -137,5 +141,15 @@ describe("Jenkins task-runner manifest contract", () => {
     assert.equal(properties["jenkinsWorkbench.taskRunner.pollIntervalSeconds"]?.minimum, 1);
     assert.equal(properties["jenkinsWorkbench.taskRunner.maxConsecutiveErrors"]?.default, 5);
     assert.equal(properties["jenkinsWorkbench.taskRunner.maxConsecutiveErrors"]?.minimum, 1);
+  });
+});
+
+describe("normalizeJobUrl context paths", () => {
+  it("does not treat a context path named job as a job route", () => {
+    const environmentUrl = "https://ci.example/job/";
+    assert.ok("error" in normalizeJobUrl(environmentUrl, "https://ci.example/job/login"));
+    assert.deepEqual(normalizeJobUrl(environmentUrl, "job/demo"), {
+      jobUrl: "https://ci.example/job/job/demo/"
+    });
   });
 });

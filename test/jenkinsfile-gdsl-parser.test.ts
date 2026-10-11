@@ -110,6 +110,161 @@ if (enclosingCall('node')) { method(name: 'insideNode') }
     );
   });
 
+  it.each([
+    "/* explanation */",
+    "// explanation\n",
+    "/* multiline\n explanation */",
+    "/* first */ // second\n /* third */",
+    "/* documentation mentions /* syntax */",
+    "// see 'quoted' /* text\n",
+    "/* a // b */"
+  ])("preserves guard constraints across comments: %s", (comment) => {
+    for (const guardName of ["node", "options"]) {
+      const condition = `(enclosingCall('${guardName}'))`;
+      const body = "{ method(name: 'sh', type: 'Object') }";
+      const expected = scanMethodCalls(`if ${condition} ${body}`);
+      assert.equal(expected.length, guardName === "node" ? 1 : 0);
+      if (guardName === "node") {
+        assert.equal(expected[0].requiresNodeContext, true);
+      }
+
+      for (const [beforeCondition, beforeBody] of [
+        [comment, ""],
+        ["", comment],
+        [comment, comment]
+      ]) {
+        assert.deepEqual(
+          scanMethodCalls(`if ${beforeCondition} ${condition} ${beforeBody} ${body}`),
+          expected
+        );
+      }
+    }
+  });
+
+  it.each(["'// marker'", '"/* marker"', "'''line\n/* marker'''", String.raw`'\'// marker'`])(
+    "respects string boundaries when skipping guard comments: %s",
+    (literal) => {
+      const guard = "if /* keyword */ (enclosingCall('node')) /* body */";
+      const body = "{ method(name: 'sh') }";
+      const calls = scanMethodCalls(`${literal}\n${guard} ${body}`);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].requiresNodeContext, true);
+
+      const interrupted = scanMethodCalls(`${guard} ${literal} ${body}`);
+      assert.equal(interrupted.length, 1);
+      assert.equal(interrupted[0].requiresNodeContext, false);
+    }
+  );
+
+  it.each(["options", "node"])("clears reassigned %s guard aliases", (guardName) => {
+    for (const value of ["true", "isEnabled()"]) {
+      const calls = scanMethodCalls(`
+def guarded = enclosingCall('${guardName}')
+guarded = ${value}
+if (guarded) { method(name: 'echo', type: 'Object') }
+`);
+
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].call.args[0]?.value, "echo");
+      assert.equal(calls[0].requiresNodeContext, false);
+    }
+  });
+
+  it.each(["options", "node"])(
+    "shadows outer %s aliases with unconstrained locals",
+    (guardName) => {
+      const calls = scanMethodCalls(`
+def guarded = enclosingCall('${guardName}')
+{
+  def guarded = true
+  if (guarded) { method(name: 'inner') }
+}
+if (guarded) { method(name: 'outer') }
+`);
+
+      assert.deepEqual(
+        calls.map(({ call, requiresNodeContext }) => ({
+          name: call.args[0]?.value,
+          requiresNodeContext
+        })),
+        [
+          { name: "inner", requiresNodeContext: false },
+          ...(guardName === "node" ? [{ name: "outer", requiresNodeContext: true }] : [])
+        ]
+      );
+    }
+  );
+
+  it.each(["options", "node"])(
+    "clears %s guard aliases reassigned in a nested block",
+    (guardName) => {
+      const calls = scanMethodCalls(`
+def guarded = enclosingCall('${guardName}')
+if (true) { guarded = true }
+if (guarded) { method(name: 'echo', type: 'Object') }
+`);
+
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].requiresNodeContext, false);
+    }
+  );
+
+  it.each(["options", "node"])(
+    "shadows outer %s aliases with uninitialized local declarations",
+    (guardName) => {
+      const calls = scanMethodCalls(`
+def guarded = enclosingCall('${guardName}')
+if (true) {
+  def guarded
+  guarded = true
+  if (guarded) { method(name: 'inner') }
+}
+if (guarded) { method(name: 'outer') }
+`);
+
+      assert.deepEqual(
+        calls.map(({ call, requiresNodeContext }) => ({
+          name: call.args[0]?.value,
+          requiresNodeContext
+        })),
+        [
+          { name: "inner", requiresNodeContext: false },
+          ...(guardName === "node" ? [{ name: "outer", requiresNodeContext: true }] : [])
+        ]
+      );
+    }
+  );
+
+  it("still scans methods declared in unconstrained assignment values", () => {
+    const calls = scanMethodCalls(`
+def declared = method(name: 'assigned', type: 'Object')
+`);
+
+    assert.deepEqual(
+      calls.map(({ call }) => call.args[0]?.value),
+      ["assigned"]
+    );
+  });
+
+  it("does not clear guard aliases when comparing their values", () => {
+    const calls = scanMethodCalls(`
+def guarded = enclosingCall('node')
+if (guarded == true) { method(name: 'comparison') }
+if (guarded) { method(name: 'nodeOnly') }
+`);
+
+    assert.deepEqual(
+      calls.map(({ call, requiresNodeContext }) => ({
+        name: call.args[0]?.value,
+        requiresNodeContext
+      })),
+      [
+        { name: "comparison", requiresNodeContext: false },
+        { name: "nodeOnly", requiresNodeContext: true }
+      ]
+    );
+  });
+
   it("infers only guards required by boolean conditions", () => {
     const calls = scanMethodCalls(`
 if (enclosingCall('stage') || enclosingCall('node')) { method(name: 'either') }
@@ -180,6 +335,39 @@ if (enclosingCall('node') && check(/* ) */ true)) { method(name: 'commented') }
       end: tripleQuoted.indexOf(" trailing"),
       terminated: true
     });
+  });
+
+  it.each([
+    [String.raw`first\nsecond`, "first\nsecond"],
+    [String.raw`left\tright`, "left\tright"],
+    [String.raw`\b\f\r\s`, "\b\f\r "],
+    [String.raw`\u0041\u00e9\uD83D\uDE80`, "Aé🚀"],
+    [String.raw`\'\"\\\$`, "'\"\\$"],
+    [String.raw`\\n`, String.raw`\n`]
+  ])("decodes ordinary string escapes in %s", (source, expected) => {
+    for (const quote of ["'", '"']) {
+      const text = `${quote}${source}${quote}`;
+      assert.deepEqual(readGdslString(text, 0), {
+        value: expected,
+        end: text.length,
+        terminated: true
+      });
+      assert.deepEqual(new GdslTokenizer(text).next(), { type: "string", value: expected });
+    }
+  });
+
+  it("preserves decoded documentation and display names in step definitions", () => {
+    const catalog = parseJenkinsfileGdsl(String.raw`
+contributor(context(type: 'org.jenkinsci.plugins.workflow.cps.CpsScript')) {
+  method(name: 'echo', doc: 'first\nsecond\t\u0041 \'quoted\' \\path')
+}
+`);
+    const expected = "first\nsecond\tA 'quoted' \\path";
+    const step = catalog.steps.get("echo");
+
+    assert.ok(step);
+    assert.equal(step.documentation, expected);
+    assert.equal(step.displayName, expected);
   });
 
   it("preserves caller-specific behavior for unterminated strings", () => {

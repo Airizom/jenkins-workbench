@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import type * as vscode from "vscode";
-import { describe, it } from "vitest";
+import { afterEach, describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../src/jenkins/types";
 import type { BuildCompareOptions } from "../src/panels/buildCompare/BuildCompareOptions";
 import { BuildComparePanelController } from "../src/panels/buildCompare/BuildComparePanelController";
-import { renderBuildCompareLoadErrorHtml } from "../src/panels/buildCompare/BuildComparePanelView";
+import {
+  BuildComparePanelView,
+  renderBuildCompareLoadErrorHtml
+} from "../src/panels/buildCompare/BuildComparePanelView";
+import type { BuildCompareOutgoingMessage } from "../src/panels/buildCompare/shared/BuildComparePanelMessages";
 import { createBuildComparePanelState } from "../src/panels/buildCompare/shared/BuildComparePanelWebviewState";
 import type { BuildInspectionBackend } from "../src/panels/shared/backend/BuildInspectionBackend";
 
@@ -74,7 +78,107 @@ function createBackend(failDetails: () => boolean): BuildInspectionBackend {
 
 const panelState = createBuildComparePanelState(ENVIRONMENT, BASELINE_URL, TARGET_URL);
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function loadWithPendingConsole() {
+  const { panel, posted } = createPanel();
+  const controller = new BuildComparePanelController(panel, {} as vscode.Uri);
+  const backend = createBackend(() => false);
+  const consoleRequest =
+    createDeferred<
+      Awaited<ReturnType<BuildInspectionBackend["console"]["getConsoleTextProgressive"]>>
+    >();
+  vi.spyOn(backend.console, "getConsoleTextProgressive").mockReturnValueOnce(
+    consoleRequest.promise
+  );
+  vi.spyOn(BuildComparePanelView.prototype, "resolveAssetsAndRenderLoading").mockReturnValue({
+    scriptUri: "",
+    styleUris: []
+  });
+  vi.spyOn(BuildComparePanelView.prototype, "renderBuildCompare").mockImplementation(() => {});
+  assert.deepEqual(await controller.load(backend, OPTIONS, ENVIRONMENT, BASELINE_URL, TARGET_URL), {
+    status: "ok"
+  });
+  assert.equal(controller.canUpdateInPlace, true);
+  assert.equal(posted.length, 0);
+  const completeConsole = async () => {
+    consoleRequest.resolve({
+      text: "baseline only\n",
+      textSize: 14,
+      bytesRead: 14,
+      moreData: false
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  };
+  return { controller, backend, posted, completeConsole };
+}
+
 describe("BuildComparePanelController.refresh", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(["before", "after"])(
+    "keeps the initial console result when it finishes %s refresh failure",
+    async (completionOrder) => {
+      const { controller, backend, posted, completeConsole } = await loadWithPendingConsole();
+      const refreshDetails = createDeferred<JenkinsBuildDetails>();
+      vi.spyOn(backend.status, "getBuildDetails").mockReturnValue(refreshDetails.promise);
+      const refresh = controller.refresh(backend, OPTIONS, ENVIRONMENT, BASELINE_URL, TARGET_URL, {
+        panelState
+      });
+      const failure = assert.rejects(refresh, /HTTP 503/);
+
+      if (completionOrder === "before") {
+        await completeConsole();
+      }
+      refreshDetails.reject(new Error("HTTP 503"));
+      await failure;
+      if (completionOrder === "after") {
+        await completeConsole();
+      }
+
+      const messages = posted as BuildCompareOutgoingMessage[];
+      assert.equal(messages.filter((message) => message.type === "updateBuildCompare").length, 0);
+      assert.equal(
+        messages.filter((message) => message.type === "buildCompareRefreshFailed").length,
+        1
+      );
+      const updates = messages.filter((message) => message.type === "updateConsoleSection");
+      assert.equal(updates.length, 1);
+      assert.equal(updates[0].console.status, "available");
+      await controller.handleWebviewReady();
+      assert.deepEqual(posted.at(-1), updates[0]);
+    }
+  );
+
+  it("discards the initial console result after a successful replacement", async () => {
+    const { controller, backend, posted, completeConsole } = await loadWithPendingConsole();
+    assert.equal(
+      await controller.refresh(backend, OPTIONS, ENVIRONMENT, BASELINE_URL, TARGET_URL, {
+        panelState
+      }),
+      true
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const messages = posted as BuildCompareOutgoingMessage[];
+    const updates = messages.filter((message) => message.type === "updateConsoleSection");
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].console.status, "identical");
+
+    const messageCount = posted.length;
+    await completeConsole();
+    assert.equal(posted.length, messageCount);
+    await controller.handleWebviewReady();
+    assert.deepEqual(posted.at(-1), updates[0]);
+  });
+
   it("posts the new comparison instead of reloading the webview", async () => {
     const { panel, posted, getHtml } = createPanel();
     const controller = new BuildComparePanelController(panel, {} as vscode.Uri);

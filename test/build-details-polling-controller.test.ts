@@ -21,7 +21,8 @@ function deferredDetails(): {
 function createController(
   getBuildDetails: () => Promise<JenkinsBuildDetails>,
   getWorkflowRun: () => Promise<JenkinsWorkflowRun | undefined> = async () => undefined,
-  onErrors: (errors: string[]) => void = () => {}
+  onErrors: (errors: string[]) => void = () => {},
+  onComplete: (details: JenkinsBuildDetails) => void = () => {}
 ): BuildDetailsPollingController {
   return new BuildDetailsPollingController({
     statusBackend: { getBuildDetails, getWorkflowRun },
@@ -53,7 +54,7 @@ function createController(
       onConsoleHtmlAppend: () => {},
       onConsoleHtmlSet: () => {},
       onErrors,
-      onComplete: () => {}
+      onComplete
     }
   });
 }
@@ -138,6 +139,46 @@ describe("BuildDetailsPollingController concurrent fetches", () => {
       controller.dispose();
       fetchNext.mockRestore();
       process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("still reports completion when stopped during the completing poll's workflow fetch", async () => {
+    let building = true;
+    let workflowCalls = 0;
+    let resolveWorkflow!: (value: JenkinsWorkflowRun | undefined) => void;
+    let signalWorkflowStarted!: () => void;
+    const workflowStarted = new Promise<void>((resolve) => {
+      signalWorkflowStarted = resolve;
+    });
+    const completed: JenkinsBuildDetails[] = [];
+    const controller = createController(
+      async () => ({ ...details, building }),
+      () => {
+        workflowCalls += 1;
+        if (workflowCalls === 1) {
+          return Promise.resolve(undefined);
+        }
+        signalWorkflowStarted();
+        return new Promise<JenkinsWorkflowRun | undefined>((resolve) => {
+          resolveWorkflow = resolve;
+        });
+      },
+      undefined,
+      (value) => completed.push(value)
+    );
+
+    try {
+      await controller.loadInitial();
+      building = false;
+      controller.start();
+      await workflowStarted;
+      controller.stop();
+      resolveWorkflow(undefined);
+      await nextTurn();
+      assert.equal(completed.length, 1);
+      assert.equal(completed[0]?.building, false);
+    } finally {
+      controller.dispose();
     }
   });
 });

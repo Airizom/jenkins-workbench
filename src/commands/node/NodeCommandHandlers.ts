@@ -14,29 +14,18 @@ export async function showNodeDetails(
   extensionUri: vscode.Uri,
   item?: NodeTreeItem
 ): Promise<void> {
-  const selected = requireSelection(item, "Select a node to view details.");
-  if (!selected) {
+  const target = resolveNodeActionTarget(item, "view details");
+  if (!target) {
     return;
   }
-  if (!(selected instanceof NodeTreeItem)) {
-    void vscode.window.showInformationMessage("Select a node to view details.");
-    return;
-  }
-  if (!selected.nodeUrl) {
-    void vscode.window.showInformationMessage(
-      "That node does not expose a stable URL in the Jenkins API."
-    );
-    return;
-  }
-  const nodeUrl = selected.nodeUrl;
 
   await withActionErrorMessage("Unable to open node details", async () => {
     await NodeDetailsPanel.show({
       dataService,
-      environment: selected.environment,
-      nodeUrl,
+      environment: target.environment,
+      nodeUrl: target.nodeUrl,
       extensionUri,
-      label: getTreeItemLabel(selected),
+      label: target.label,
       refreshHost
     });
   });

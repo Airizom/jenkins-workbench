@@ -1,4 +1,4 @@
-import { isFailedStatusToken, normalizeStatusToken } from "./StatusTokenUtils";
+import { normalizeStatusToken } from "./StatusTokenUtils";
 
 export type BuildResultClass =
   | "success"
@@ -95,7 +95,7 @@ export function normalizePipelineStatus(status?: string): {
     return {
       label: resolveBuildResultLabel(normalized),
       className,
-      isFailed: isFailedStatusToken(normalized)
+      isFailed: resolveBuildResultCompletionSeverity(className) === "warning"
     };
   }
 

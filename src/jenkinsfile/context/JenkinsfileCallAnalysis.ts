@@ -1,6 +1,7 @@
 import { BARE_CALL_PREFIX_KEYWORDS } from "./JenkinsfileContextConstants";
 import {
   findNextMeaningfulIndex,
+  findPreviousMeaningfulIndex,
   isValidStepStart,
   readIdentifier
 } from "./JenkinsfileContextNavigation";
@@ -36,7 +37,7 @@ export function analyzeActiveCallArguments(
   const depth = createGroupingDepth();
   let commaCount = 0;
   let currentSegmentStart = 0;
-  const namedArgs: string[] = [];
+  let hasNamedArgs = false;
 
   for (let index = 0; index < segment.length; index += 1) {
     const character = segment[index];
@@ -44,10 +45,9 @@ export function analyzeActiveCallArguments(
       continue;
     }
     if (character === "," && isTopLevel(depth)) {
-      const segmentText = segment.slice(currentSegmentStart, index);
-      const namedArg = extractLeadingNamedArgName(segmentText);
-      if (namedArg) {
-        namedArgs.push(namedArg);
+      if (!hasNamedArgs) {
+        const segmentText = segment.slice(currentSegmentStart, index);
+        hasNamedArgs = Boolean(extractLeadingNamedArgName(segmentText));
       }
       commaCount += 1;
       currentSegmentStart = index + 1;
@@ -60,7 +60,7 @@ export function analyzeActiveCallArguments(
   return {
     activeIndex: commaCount,
     activeName,
-    usesNamedArgs: namedArgs.length > 0 || Boolean(activeName)
+    usesNamedArgs: hasNamedArgs || Boolean(activeName)
   };
 }
 
@@ -175,9 +175,21 @@ function resolveBareCallStart(
 }
 
 function findBareCallStatementStart(maskedText: string, offset: number): number {
+  const groupClosers: string[] = [];
   let current = Math.max(0, offset - 1);
   while (current >= 0) {
     const character = maskedText[current];
+    if (character === ")" || character === "]") {
+      groupClosers.push(character);
+    }
+    if (groupClosers.length > 0) {
+      const closer = groupClosers[groupClosers.length - 1];
+      if ((character === "(" && closer === ")") || (character === "[" && closer === "]")) {
+        groupClosers.pop();
+      }
+      current -= 1;
+      continue;
+    }
     if (character === "}") {
       const interpolationStart = findInterpolationStart(maskedText, current);
       if (interpolationStart !== undefined) {
@@ -186,15 +198,18 @@ function findBareCallStatementStart(maskedText: string, offset: number): number 
       }
       return current + 1;
     }
-    if (
-      character === "\n" &&
-      maskedText
-        .slice(current + 1, offset)
-        .trimStart()
-        .startsWith(",")
-    ) {
-      current -= 1;
-      continue;
+    if (character === "\n") {
+      const previous = findPreviousMeaningfulIndex(maskedText, current - 1);
+      if (
+        (previous !== undefined && maskedText[previous] === ",") ||
+        maskedText
+          .slice(current + 1, offset)
+          .trimStart()
+          .startsWith(",")
+      ) {
+        current -= 1;
+        continue;
+      }
     }
     if (character === "\n" || character === ";" || character === "{") {
       return current + 1;

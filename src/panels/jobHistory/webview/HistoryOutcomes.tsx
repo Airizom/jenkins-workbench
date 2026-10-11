@@ -10,7 +10,7 @@ import { TestStatusIcon } from "../../shared/webview/components/TestStatusIcon";
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
 import { AlertCircleIcon, MinusIcon } from "../../shared/webview/icons";
-import { resolveResultIconTextClass } from "../../shared/webview/lib/statusStyles";
+import { resolveBuildResultStyle } from "../../shared/webview/lib/statusStyles";
 import { cn } from "../../shared/webview/lib/utils";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { HistoryAction, HistoryViewModel } from "../shared/HistoryContracts";
@@ -72,7 +72,7 @@ export function BuildResultLabel({ result, building }: { result?: string; buildi
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <span
-        className={cn("inline-flex", resolveResultIconTextClass(resultClass))}
+        className={cn("inline-flex", resolveBuildResultStyle(resultClass).iconText)}
         aria-hidden="true"
       >
         <BuildResultStatusIcon status={resultClass} className="h-3.5 w-3.5" />

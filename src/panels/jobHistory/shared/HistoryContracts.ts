@@ -28,6 +28,8 @@ export interface HistoryViewModel {
   status: HistoryStatus;
   pausedReason?: HistoryPausedReason;
   jobUrl: string;
+  /** Environment URL whose path is the Jenkins context path, used to name jobs. */
+  environmentUrl?: string;
   count: 10 | 20 | 50;
   builds: Array<{
     build: HistoryBuild["build"];
@@ -80,20 +82,22 @@ export function normalizeHistoryUi(value: unknown): HistoryUiState {
         : undefined
   };
 }
+const HISTORY_ACTIONS = [
+  "ready",
+  "refresh",
+  "window",
+  "selectBuild",
+  "openBuild",
+  "compare",
+  "baseline",
+  "resetBaseline",
+  "openJob",
+  "openJobInJenkins"
+] as const;
 export type HistoryAction = {
   type: "historyAction";
   revision: number;
-  action:
-    | "ready"
-    | "refresh"
-    | "window"
-    | "selectBuild"
-    | "openBuild"
-    | "compare"
-    | "baseline"
-    | "resetBaseline"
-    | "openJob"
-    | "openJobInJenkins";
+  action: (typeof HISTORY_ACTIONS)[number];
   value?: number;
 };
 export function isHistoryAction(value: unknown): value is HistoryAction {
@@ -101,18 +105,7 @@ export function isHistoryAction(value: unknown): value is HistoryAction {
     isPlainRecord(value) &&
     value.type === "historyAction" &&
     Number.isSafeInteger(value.revision) &&
-    [
-      "ready",
-      "refresh",
-      "window",
-      "selectBuild",
-      "openBuild",
-      "compare",
-      "baseline",
-      "resetBaseline",
-      "openJob",
-      "openJobInJenkins"
-    ].includes(String(value.action)) &&
+    (HISTORY_ACTIONS as readonly string[]).includes(String(value.action)) &&
     (value.value === undefined ||
       (typeof value.value === "number" && Number.isSafeInteger(value.value)))
   );
@@ -129,7 +122,7 @@ export const emptyHistory = (): HistoryViewModel => ({
 });
 
 /** Human job name from its URL: folder segments joined with " » " (as Jenkins does), branch names decoded. */
-export function historyJobDisplayName(jobUrl: string): string {
-  const segments = parseJobUrl(jobUrl)?.fullPath;
+export function historyJobDisplayName(jobUrl: string, environmentUrl?: string): string {
+  const segments = parseJobUrl(jobUrl, environmentUrl)?.fullPath;
   return segments?.length ? segments.map(decodeJenkinsJobName).join(" » ") : jobUrl;
 }

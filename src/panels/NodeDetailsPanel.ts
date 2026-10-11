@@ -30,6 +30,7 @@ import {
   bindEnvironmentRefresh,
   createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
+  LoadTokenTracker,
   type PanelLoadTracker,
   shouldRefreshVisibleEnvironmentPanel
 } from "./shared/PanelRuntimeHelpers";
@@ -78,6 +79,7 @@ export class NodeDetailsPanel {
   /** Time and queued work of the last successful load, reused when a refresh fails. */
   private lastUpdatedAt?: string;
   private lastQueuedWork?: NodeQueuedWork;
+  private readonly loadTokenTracker = new LoadTokenTracker();
   private readonly loadTracker: PanelLoadTracker;
   private hasRendered = false;
   private disposed = false;
@@ -218,7 +220,7 @@ export class NodeDetailsPanel {
   }
 
   private async load(): Promise<void> {
-    const token = this.loadTracker.nextToken();
+    const token = this.loadTokenTracker.next();
     this.hasRendered = false;
     this.nonce = createNonce();
     this.lastDetails = undefined;
@@ -250,7 +252,7 @@ export class NodeDetailsPanel {
     const { scriptUri, styleUris } = assets;
 
     const model = await this.fetchNodeDetails(token, "basic");
-    if (!model || !this.loadTracker.isCurrent(token)) {
+    if (!model || !this.loadTokenTracker.isCurrent(token)) {
       return;
     }
 
@@ -284,12 +286,12 @@ export class NodeDetailsPanel {
     detailLevel: "basic" | "advanced",
     options?: { skipLoading?: boolean }
   ): Promise<void> {
-    const token = this.loadTracker.nextToken();
+    const token = this.loadTokenTracker.next();
     const shouldToggleLoading = !options?.skipLoading;
     const loadingRequest = shouldToggleLoading ? this.loadTracker.beginLoading() : undefined;
     try {
       const model = await this.fetchNodeDetails(token, detailLevel);
-      if (!model || !this.loadTracker.isCurrent(token)) {
+      if (!model || !this.loadTokenTracker.isCurrent(token)) {
         return;
       }
       this.postMessage({ type: "updateNodeDetails", payload: model });
@@ -363,7 +365,7 @@ export class NodeDetailsPanel {
         mode: "refresh",
         detailLevel
       });
-      if (!this.loadTracker.isCurrent(token)) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
         return undefined;
       }
       const advancedLoaded = this.advancedLoaded || detailLevel === "advanced";
@@ -379,7 +381,7 @@ export class NodeDetailsPanel {
           errors.push(`Unable to load queued work: ${formatActionError(error)}`);
         }
       }
-      if (!this.loadTracker.isCurrent(token)) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
         return undefined;
       }
       const updatedAt = new Date().toISOString();
@@ -398,7 +400,7 @@ export class NodeDetailsPanel {
         nowMs: Date.now()
       });
     } catch (error) {
-      if (!this.loadTracker.isCurrent(token)) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
         return undefined;
       }
       const message = formatActionError(error);

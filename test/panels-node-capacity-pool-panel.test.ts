@@ -148,24 +148,43 @@ describe("NodeCapacityPoolPanel", () => {
     assert.doesNotMatch(html, /Open node details for/);
   });
 
-  it("shows inline loading and failure states for running work", () => {
-    const online: NodeCapacityNodeViewModel = {
+  it.each([false, true])("shows initial loading and failure states (offline: %s)", (isOffline) => {
+    const node: NodeCapacityNodeViewModel = {
       ...drainingNode(),
-      isOffline: false,
-      isTemporarilyOffline: false,
-      statusLabel: "Online",
+      isOffline,
+      isTemporarilyOffline: isOffline,
+      statusLabel: isOffline ? "Temporarily offline" : "Online",
       executorsLoaded: false,
       executors: []
     };
-    const loading = renderPool([{ ...online, executorsLoadState: "loading" }], {});
+    const loading = renderPool([{ ...node, executorsLoadState: "loading" }], {});
     assert.match(loading, /Loading running work…/);
 
     const failed = renderPool(
-      [{ ...online, executorsLoadState: "error", executorsError: "HTTP 500" }],
+      [{ ...node, executorsLoadState: "error", executorsError: "HTTP 500" }],
       {}
     );
     assert.match(failed, /Couldn(&#x27;|')t load running work/);
+    assert.match(failed, /HTTP 500/);
     assert.match(failed, /aria-label="Retry loading running work on agent-2"/);
+    assert.match(failed, />Retry<\/button>/);
+  });
+
+  it("shows a reload failure for a busy offline node with a stale idle list", () => {
+    const node = drainingNode();
+    const html = renderPool(
+      [
+        {
+          ...node,
+          executors: node.executors.map((executor) => ({ ...executor, isIdle: true })),
+          executorsLoadState: "error",
+          executorsError: "HTTP 500"
+        }
+      ],
+      {}
+    );
+    assert.match(html, /Couldn(&#x27;|')t load running work/);
+    assert.match(html, /aria-label="Retry loading running work on agent-2"/);
   });
 
   it("names the disclosure button with only the pool label and status", () => {

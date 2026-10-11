@@ -35,5 +35,6 @@ export function classifyNodeLabels(node: NodeLabelInput): NodeLabelClassificatio
 }
 
 export function normalizeLabelKey(value: unknown): string {
-  return typeof value === "string" ? value.trim().toLocaleLowerCase() : "";
+  // Jenkins scheduling labels are case-sensitive.
+  return typeof value === "string" ? value.trim() : "";
 }

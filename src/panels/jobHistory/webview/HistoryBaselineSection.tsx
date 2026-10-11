@@ -6,10 +6,13 @@ import { formatHistoryTimestamp } from "./historyPresentation";
 
 const AUTOMATIC_BASELINE = "Automatic default: the multibranch main or master branch";
 
-function baselineJobName(baseline: NonNullable<HistoryViewModel["baseline"]>): string {
+function baselineJobName(
+  baseline: NonNullable<HistoryViewModel["baseline"]>,
+  environmentUrl?: string
+): string {
   if (baseline.status === "self") return "This job";
   if (baseline.label) return baseline.label;
-  return baseline.jobUrl ? historyJobDisplayName(baseline.jobUrl) : "None selected";
+  return baseline.jobUrl ? historyJobDisplayName(baseline.jobUrl, environmentUrl) : "None selected";
 }
 
 function baselineDetail(model: HistoryViewModel): string {
@@ -45,7 +48,9 @@ export function HistoryBaselineSection({
       <div className="min-w-0 flex-1 text-sm">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-muted-foreground">Baseline job:</span>
-          <span className="font-medium">{baseline ? baselineJobName(baseline) : "…"}</span>
+          <span className="font-medium">
+            {baseline ? baselineJobName(baseline, model.environmentUrl) : "…"}
+          </span>
           {baseline?.automatic ? (
             <span className="text-xs text-muted-foreground" title={AUTOMATIC_BASELINE}>
               <span aria-hidden="true">(auto)</span>

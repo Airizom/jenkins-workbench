@@ -1,4 +1,5 @@
 import type { BuildDiagnosticSeverity } from "../shared/BuildDiagnosticContracts";
+import { isPlainRecord } from "../shared/runtimeGuards";
 import {
   CUSTOM_MATCHER_CAPTURE_PROPERTIES,
   createNormalizedCustomDiagnosticPattern,
@@ -9,40 +10,31 @@ import {
   MAX_CUSTOM_MATCHER_CAPTURE_INDEX,
   MAX_CUSTOM_MATCHER_METADATA_LENGTH,
   MAX_CUSTOM_MATCHER_PATTERNS,
-  MAX_CUSTOM_MATCHERS,
-  validateCustomMatcherPatternRegexp
+  MAX_CUSTOM_MATCHERS
 } from "./BuildDiagnosticCustomMatcherProtocol";
 import {
   addIssue,
-  isRecord,
   readOptionalBoundedString,
   readRequiredBoundedString,
   readRequiredString,
   reportUnknownProperties
 } from "./BuildDiagnosticProfileValidation";
+import { validateDiagnosticRegexp } from "./BuildDiagnosticRegexSafety";
 import {
-  BUILT_IN_DIAGNOSTIC_PARSER_IDS,
   type BuiltInDiagnosticParserId,
   type CustomDiagnosticMatcherDefinition,
   type DiagnosticProfileValidationIssue,
+  isBuiltInParserId,
   type NormalizedCustomDiagnosticMatcher,
   type NormalizedCustomDiagnosticPattern
 } from "./BuildDiagnosticTypes";
 
 const MATCHER_PROPERTIES = new Set(["name", "base", "source", "severity", "pattern"]);
-const PATTERN_PROPERTIES = new Set([
+const PATTERN_PROPERTIES = new Set<string>([
   "regexp",
   "kind",
-  "file",
-  "location",
-  "line",
-  "column",
-  "endLine",
-  "endColumn",
-  "severity",
-  "code",
-  "message",
-  "loop"
+  "loop",
+  ...CUSTOM_MATCHER_CAPTURE_PROPERTIES
 ]);
 
 export function normalizeMatchers(
@@ -78,7 +70,7 @@ function normalizeMatcher(
   ids: Set<string>,
   issues: DiagnosticProfileValidationIssue[]
 ): NormalizedCustomDiagnosticMatcher | undefined {
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     addIssue(issues, matcherPath, "Matcher must be an object.");
     return undefined;
   }
@@ -209,7 +201,7 @@ function normalizePattern(
   patternPath: string,
   issues: DiagnosticProfileValidationIssue[]
 ): NormalizedCustomDiagnosticPattern | undefined {
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     addIssue(issues, patternPath, "Pattern must be an object.");
     return undefined;
   }
@@ -242,7 +234,7 @@ function normalizePatternRegexp(
   if (!regexpSource) {
     return undefined;
   }
-  const validation = validateCustomMatcherPatternRegexp(regexpSource);
+  const validation = validateDiagnosticRegexp(regexpSource);
   if (!validation.safe || !validation.regexp) {
     addIssue(issues, `${patternPath}.regexp`, validation.reason ?? "Unsafe regular expression.");
     return undefined;
@@ -318,11 +310,4 @@ function normalizePatternKind(
   }
   addIssue(issues, issuePath, "kind must be 'file' or 'location'.");
   return "location";
-}
-
-function isBuiltInParserId(value: unknown): value is BuiltInDiagnosticParserId {
-  return (
-    typeof value === "string" &&
-    (BUILT_IN_DIAGNOSTIC_PARSER_IDS as readonly string[]).includes(value)
-  );
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { JobSearchEntry } from "../src/jenkins/JenkinsDataService";
 import { JenkinsRequestError } from "../src/jenkins/errors";
+import type { TreeRefreshWaiter } from "../src/tree/TreeDataProviderRefreshCoordinator";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
 class TestTreeItem {
@@ -82,6 +83,8 @@ interface ProviderHarness {
   onDidChangeSummary(listener: (summary: TreeViewSummaryStub) => void): { dispose(): void };
   getChildren(element?: unknown): Promise<unknown[]>;
   getParent(element: unknown): unknown;
+  createRefreshWaiter(): TreeRefreshWaiter;
+  refresh(refreshToken?: number): boolean;
   refreshViewOnly(): void;
   refreshQueueOnly(environment: EnvironmentRef): void;
   refreshActivity(environment: EnvironmentRef): void;
@@ -93,6 +96,7 @@ interface ProviderHarness {
   fullEnvironmentRefresh(request?: {
     environmentId?: string;
     trigger?: "manual" | "system";
+    refreshToken?: number;
   }): boolean;
   resolveJobElement(environment: EnvironmentRef, entry: JobSearchEntry): Promise<unknown>;
   dispose(): void;
@@ -444,6 +448,34 @@ describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
     );
     assert.equal(fixture.cacheClearsForEnvironment, 2);
     fixture.provider.dispose();
+  });
+
+  it("does not resolve a later scheduled refresh waiter from an earlier notification", async () => {
+    vi.useFakeTimers();
+    const fixture = createProviderFixture();
+    const resolved: string[] = [];
+
+    try {
+      const first = fixture.provider.createRefreshWaiter();
+      void first.promise.then(() => resolved.push("first"));
+      assert.equal(fixture.provider.refresh(first.token), true);
+
+      const second = fixture.provider.createRefreshWaiter();
+      void second.promise.then(() => resolved.push("second"));
+      fixture.provider.fullEnvironmentRefresh({ refreshToken: second.token });
+
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.deepEqual(resolved, ["first"]);
+      assert.equal(fixture.events.length, 1);
+
+      await vi.advanceTimersByTimeAsync(150);
+      assert.deepEqual(resolved, ["first", "second"]);
+      assert.equal(fixture.events.length, 2);
+    } finally {
+      fixture.provider.dispose();
+      vi.useRealTimers();
+    }
   });
 
   it("re-triggers a queue load after a refresh clears an in-flight load", async () => {

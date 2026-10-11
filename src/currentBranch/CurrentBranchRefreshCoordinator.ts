@@ -11,9 +11,12 @@ export class CurrentBranchRefreshCoordinator implements vscode.Disposable {
     this.clearScheduledRefresh();
   }
 
-  beginRefresh(): void {
+  // Cancels any debounced refresh and folds its pending force request into the starting refresh.
+  beginRefresh(options: CurrentBranchRefreshOptions): CurrentBranchRefreshOptions {
     this.clearScheduledRefresh();
+    const force = options.force === true || this.pendingScheduledForceRefresh;
     this.pendingScheduledForceRefresh = false;
+    return force === (options.force === true) ? options : { ...options, force };
   }
 
   scheduleRefresh(

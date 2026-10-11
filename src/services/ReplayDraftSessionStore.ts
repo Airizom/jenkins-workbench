@@ -222,7 +222,7 @@ function buildReadablePath(displayName: string, isMainScript: boolean): string {
   const segments = displayName
     .split(/[\\/]+/)
     .map((segment) => sanitizeSegment(segment))
-    .filter((segment) => segment.length > 0);
+    .filter((segment) => segment.length > 0 && segment !== "." && segment !== "..");
   if (segments.length === 0) {
     return "LoadedScript.groovy";
   }

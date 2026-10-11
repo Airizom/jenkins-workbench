@@ -172,10 +172,9 @@ function resolveParameterSummary(
   const visible: string[] = [];
   let total = 0;
   visitMatchingBuildParameters(build.actions, options, (name, parameter, isMasked) => {
-    const formatted = formatParameterSummary(name, parameter.value, isMasked, options);
     total += 1;
     if (visible.length < maxParameterCount) {
-      visible.push(formatted);
+      visible.push(formatParameterSummary(name, parameter.value, isMasked, options));
     }
   });
 

@@ -138,6 +138,18 @@ describe("BuildFailureChangelogCard", () => {
     );
     assert.match(html, /<code[^>]*select-all[^>]*>4f2c9a1b7e3d<\/code>/);
     assert.match(html, /aria-expanded="false"[^>]*>Show more</);
+    assert.match(html, /line-clamp-2/);
+  });
+
+  it("never clamps short messages that have no expand toggle", () => {
+    const html = renderToStaticMarkup(
+      createElement(BuildFailureChangelogCard, {
+        items: [{ message: "x".repeat(100), author: "Jane", commitId: "4f2c9a1b7e3d" }],
+        overflowCount: 0
+      })
+    );
+    assert.doesNotMatch(html, /Show more/);
+    assert.doesNotMatch(html, /line-clamp-2/);
   });
 });
 

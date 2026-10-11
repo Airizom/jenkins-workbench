@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import {
-  composeProviderCatalog,
   createExtensionContainer,
-  ExtensionContainer
+  ExtensionContainer,
+  registerProviderCatalogs
 } from "../src/extension/container/ExtensionContainer";
 import type {
   ExtensionToken,
@@ -104,20 +104,30 @@ describe("ExtensionContainer", () => {
   });
 });
 
-describe("composeProviderCatalog", () => {
-  it("rejects duplicate tokens deterministically regardless of group order", () => {
-    const first = {
-      environmentStore: () => tokenValue("environmentStore", {}),
-      clientProvider: () => tokenValue("clientProvider", {})
-    };
-    const second = {
-      clientProvider: () => tokenValue("clientProvider", {}),
-      environmentStore: () => tokenValue("environmentStore", {})
-    };
-    const expected = /Duplicate provider token registrations.*clientProvider, environmentStore/;
+describe("registerProviderCatalogs", () => {
+  it("registers every catalog and skips undefined factories", () => {
+    const container = new ExtensionContainer();
+    const store = tokenValue("environmentStore", {});
+    const client = tokenValue("clientProvider", {});
 
-    assert.throws(() => composeProviderCatalog([first, second]), expected);
-    assert.throws(() => composeProviderCatalog([second, first]), expected);
+    registerProviderCatalogs(container, [
+      { environmentStore: () => store, dataService: undefined },
+      { clientProvider: () => client }
+    ]);
+
+    assert.equal(container.get("environmentStore"), store);
+    assert.equal(container.get("clientProvider"), client);
+    assert.throws(() => container.get("dataService"), /Missing provider.*dataService/);
+  });
+
+  it("rejects a token shared by two catalogs", () => {
+    const first = { environmentStore: () => tokenValue("environmentStore", {}) };
+    const second = { environmentStore: () => tokenValue("environmentStore", {}) };
+
+    assert.throws(
+      () => registerProviderCatalogs(new ExtensionContainer(), [first, second]),
+      /Provider already registered.*environmentStore/
+    );
   });
 });
 

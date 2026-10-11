@@ -120,6 +120,35 @@ describe("historical baseline", () => {
       jobUrl: "https://jenkins.test/job/gone/"
     });
   });
+  it("reports a request invalidated mid-flight as unavailable, not an error", async () => {
+    const store = new HistoryBaselineStore({
+      workspaceState: state(),
+      globalState: state()
+    } as unknown as vscode.ExtensionContext);
+    await store.set(environment, "https://jenkins.test/job/a/", "https://jenkins.test/job/main/");
+    let release: (value: { name: string }) => void = () => undefined;
+    let started: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const data = {
+      getJob: () =>
+        new Promise((resolve) => {
+          release = resolve;
+          started();
+        })
+    } as unknown as JenkinsDataService;
+    const history = new HistoryService(data);
+    const resolver = new HistoryBaselineResolver(data, history, store);
+    const result = resolver.resolve(
+      { environment, jobUrl: "https://jenkins.test/job/a/", count: 20, active: () => true },
+      { number: 5, url: "https://jenkins.test/job/a/5/", timestamp: 1000 }
+    );
+    await pending;
+    history.invalidate();
+    release({ name: "main" });
+    expect(await result).toEqual({ status: "unavailable" });
+  });
   describe("resolver outcomes", () => {
     const jobUrl = "https://jenkins.test/job/a/";
     const target = { number: 5, url: "https://jenkins.test/job/a/5/", timestamp: 1000 };

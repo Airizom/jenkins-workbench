@@ -34,19 +34,38 @@ export function buildRawContentHeaders(
 export function buildHeadersWithCrumb(
   contentHeaders: Record<string, string>,
   crumbHeader: JenkinsCrumbHeader | undefined,
-  baseHeadersHaveCookie: boolean
+  baseHeaders?: Record<string, string>
 ): Record<string, string> {
+  const headers = { ...baseHeaders, ...contentHeaders };
   if (!crumbHeader) {
-    return contentHeaders;
+    return headers;
   }
 
-  const headers = {
-    ...contentHeaders,
-    [crumbHeader.field]: crumbHeader.value
-  };
+  headers[crumbHeader.field] = crumbHeader.value;
 
-  if (crumbHeader.cookie && !baseHeadersHaveCookie && !getHeaderFlags(contentHeaders).hasCookie) {
-    headers.Cookie = crumbHeader.cookie;
+  if (crumbHeader.cookie) {
+    const cookieHeaders: string[] = [];
+    for (const source of [baseHeaders, contentHeaders]) {
+      for (const [name, value] of Object.entries(source ?? {})) {
+        if (name.toLowerCase() === "cookie") {
+          cookieHeaders.push(value);
+          delete headers[name];
+        }
+      }
+    }
+    // The crumb response owns the session cookie, including after a refresh.
+    cookieHeaders.push(crumbHeader.cookie);
+    const cookies = new Map<string, string>();
+    for (const value of cookieHeaders) {
+      for (const part of value.split(";")) {
+        const cookie = part.trim();
+        const separator = cookie.indexOf("=");
+        if (separator > 0) {
+          cookies.set(cookie.slice(0, separator).trim(), cookie);
+        }
+      }
+    }
+    headers.Cookie = [...cookies.values()].join("; ");
   }
 
   return headers;

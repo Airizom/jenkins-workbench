@@ -138,8 +138,11 @@ export function formatJobDescription(options: {
   return parts.length > 0 ? parts.join(" • ") : undefined;
 }
 
-export function formatPinnedJobPathContext(jobUrl: string): string | undefined {
-  const parsed = parseJobUrl(jobUrl);
+export function formatPinnedJobPathContext(
+  jobUrl: string,
+  environmentUrl?: string
+): string | undefined {
+  const parsed = parseJobUrl(jobUrl, environmentUrl);
   if (!parsed || parsed.fullPath.length <= 1) {
     return undefined;
   }
@@ -147,8 +150,13 @@ export function formatPinnedJobPathContext(jobUrl: string): string | undefined {
   return parsed.fullPath.slice(0, -1).join(" / ");
 }
 
-export function formatPinnedJobTooltip(label: string, jobUrl: string, details?: string): string {
-  const parsed = parseJobUrl(jobUrl);
+export function formatPinnedJobTooltip(
+  label: string,
+  jobUrl: string,
+  details?: string,
+  environmentUrl?: string
+): string {
+  const parsed = parseJobUrl(jobUrl, environmentUrl);
   const fullPath = parsed?.fullPath.join(" / ");
   const lines = [label];
 

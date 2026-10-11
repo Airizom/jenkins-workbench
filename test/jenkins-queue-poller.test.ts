@@ -3,10 +3,6 @@ import { afterEach, describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import { JenkinsQueuePoller } from "../src/queue/JenkinsQueuePoller";
 
-interface PollerInternals {
-  poll(): void;
-}
-
 function environment(overrides: Partial<JenkinsEnvironmentRef> = {}): JenkinsEnvironmentRef {
   return {
     scope: "workspace",
@@ -190,18 +186,15 @@ describe("JenkinsQueuePoller", () => {
     poller.dispose();
   });
 
-  it("suppresses reentrant polls while a refresh is in progress", () => {
+  it("does not start a nested poll when a refresh re-expands an environment", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"], now: 0 });
     const refreshes: JenkinsEnvironmentRef[] = [];
-    let reentered = false;
     const env = environment();
 
     const poller = new JenkinsQueuePoller({
       refreshQueueOnly: (environmentRef) => {
         refreshes.push(environmentRef);
-        if (!reentered) {
-          reentered = true;
-          (poller as unknown as PollerInternals).poll();
-        }
+        poller.trackExpanded(environmentRef);
       }
     });
 

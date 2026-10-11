@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import { Writable } from "node:stream";
-import { describe, it } from "vitest";
+import { afterEach, beforeEach, describe, it } from "vitest";
 import { BuildActionError } from "../src/jenkins/errors";
 import type { JenkinsConsoleTextClient } from "../src/jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import {
   type BuildConsoleFilesystem,
-  BuildConsoleExporter
+  BuildConsoleExporter,
+  createNodeBuildConsoleFilesystem
 } from "../src/services/BuildConsoleExporter";
 
 const ENVIRONMENT: JenkinsEnvironmentRef = {
@@ -52,7 +56,9 @@ describe("BuildConsoleExporter", () => {
     };
     const filesystem: BuildConsoleFilesystem = {
       createWriteStream: () => stream,
-      writeFile: async () => {}
+      writeFile: async () => {},
+      rename: async () => {},
+      delete: async () => {}
     };
     const exporter = new BuildConsoleExporter(client, filesystem, {
       maxConsoleChars: 100,
@@ -100,7 +106,9 @@ describe("BuildConsoleExporter", () => {
     };
     const filesystem: BuildConsoleFilesystem = {
       createWriteStream: () => stream,
-      writeFile: async () => {}
+      writeFile: async () => {},
+      rename: async () => {},
+      delete: async () => {}
     };
     const exporter = new BuildConsoleExporter(client, filesystem, { maxConsoleChars: 100 });
 
@@ -139,7 +147,9 @@ describe("BuildConsoleExporter", () => {
     };
     const filesystem: BuildConsoleFilesystem = {
       createWriteStream: () => stream,
-      writeFile: async () => {}
+      writeFile: async () => {},
+      rename: async () => {},
+      delete: async () => {}
     };
     const exporter = new BuildConsoleExporter(client, filesystem, { maxConsoleChars: 100 });
 
@@ -179,7 +189,9 @@ describe("BuildConsoleExporter", () => {
       createWriteStream: () => new MemoryWriteStream(),
       writeFile: async (targetPath, data, encoding) => {
         writes.push({ targetPath, data, encoding });
-      }
+      },
+      rename: async () => {},
+      delete: async () => {}
     };
     const exporter = new BuildConsoleExporter(client, filesystem, { maxConsoleChars: 100 });
 
@@ -191,7 +203,10 @@ describe("BuildConsoleExporter", () => {
 
     assert.deepEqual(result, { mode: "tail", truncated: true });
     assert.equal(tailCalls, 1);
-    assert.deepEqual(writes, [{ targetPath: "/tmp/console.log", data: "tail", encoding: "utf8" }]);
+    assert.equal(writes.length, 1);
+    assert.match(writes[0].targetPath, /^\/tmp\/\.console\.log\.[\w-]+\.tmp$/);
+    assert.equal(writes[0].data, "tail");
+    assert.equal(writes[0].encoding, "utf8");
   });
 
   it("surfaces a snapshot write failure without requesting the tail", async () => {
@@ -223,7 +238,9 @@ describe("BuildConsoleExporter", () => {
       writeFile: async () => {
         writeCalls += 1;
         throw writeError;
-      }
+      },
+      rename: async () => {},
+      delete: async () => {}
     };
     const exporter = new BuildConsoleExporter(client, filesystem, { maxConsoleChars: 100 });
 
@@ -239,4 +256,131 @@ describe("BuildConsoleExporter", () => {
     assert.equal(tailCalls, 0);
     assert.equal(writeCalls, 1);
   });
+});
+
+describe("BuildConsoleExporter filesystem lifecycle", () => {
+  let directory: string;
+  let targetPath: string;
+  const original = "Existing console output that must survive a failed export.\n";
+
+  beforeEach(async () => {
+    directory = await fs.mkdtemp(path.join(os.tmpdir(), "console-export-"));
+    targetPath = path.join(directory, "console.log");
+    await fs.writeFile(targetPath, original);
+  });
+
+  afterEach(async () => {
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  function createClient(): JenkinsConsoleTextClient {
+    return {
+      getConsoleTextProgressive: async () => ({
+        text: "progressive",
+        textSize: 11,
+        moreData: false,
+        bytesRead: 11
+      }),
+      getConsoleText: async () => ({ text: "full", truncated: false, bytesRead: 4 }),
+      getConsoleTextTail: async () => ({
+        text: "tail",
+        truncated: true,
+        bytesRead: 4,
+        nextStart: 0,
+        progressiveSupported: false
+      })
+    };
+  }
+
+  function exportFile(
+    client: JenkinsConsoleTextClient,
+    filesystem = createNodeBuildConsoleFilesystem()
+  ) {
+    return new BuildConsoleExporter(client, filesystem, { maxConsoleChars: 100 }).exportToFile({
+      environment: ENVIRONMENT,
+      buildUrl: "https://jenkins.example/job/demo/1/",
+      targetPath
+    });
+  }
+
+  it.each(["initial", "midstream", "snapshot"])(
+    "preserves the destination and removes temporary files after a %s request failure",
+    async (failure) => {
+      const client = createClient();
+      const requestError = new Error("Network failure");
+      client.getConsoleTextProgressive = async (_environment, _buildUrl, start) => {
+        if (failure !== "initial" && start === 0) {
+          return { text: "partial", textSize: 7, moreData: true, bytesRead: 7 };
+        }
+        if (failure === "snapshot") {
+          throw new BuildActionError("Progressive output unavailable", "not_found");
+        }
+        throw requestError;
+      };
+      client.getConsoleText = async () => {
+        throw requestError;
+      };
+      client.getConsoleTextTail = async () => {
+        throw requestError;
+      };
+
+      await assert.rejects(exportFile(client), (error) => error === requestError);
+
+      assert.equal(await fs.readFile(targetPath, "utf8"), original);
+      assert.deepEqual(await fs.readdir(directory), ["console.log"]);
+    }
+  );
+
+  it.each(["write", "rename"])(
+    "preserves the destination and removes temporary files after a %s failure",
+    async (failure) => {
+      const client = createClient();
+      client.getConsoleTextProgressive = async () => {
+        throw new BuildActionError("Progressive output unavailable", "not_found");
+      };
+      const filesystem = createNodeBuildConsoleFilesystem();
+      const filesystemError = new Error("Filesystem failure");
+      if (failure === "write") {
+        filesystem.writeFile = async (filePath) => {
+          await fs.writeFile(filePath, "partial snapshot");
+          throw filesystemError;
+        };
+      } else {
+        filesystem.rename = async () => {
+          throw filesystemError;
+        };
+      }
+
+      await assert.rejects(exportFile(client, filesystem), (error) => error === filesystemError);
+
+      assert.equal(await fs.readFile(targetPath, "utf8"), original);
+      assert.deepEqual(await fs.readdir(directory), ["console.log"]);
+    }
+  );
+
+  it.each(["progressive", "full", "tail"] as const)(
+    "replaces the destination with the completed %s export and leaves no temporary files",
+    async (mode) => {
+      const client = createClient();
+      if (mode !== "progressive") {
+        client.getConsoleTextProgressive = async (_environment, _buildUrl, start) => {
+          if (start === 0) {
+            return { text: "partial", textSize: 7, moreData: true, bytesRead: 7 };
+          }
+          throw new BuildActionError("Progressive output unavailable", "not_found");
+        };
+      }
+      if (mode === "tail") {
+        client.getConsoleText = async () => {
+          throw new Error("Full output unavailable");
+        };
+      }
+
+      const result = await exportFile(client);
+
+      assert.deepEqual(result, { mode, truncated: mode === "tail" });
+      assert.equal(await fs.readFile(targetPath, "utf8"), mode);
+      assert.deepEqual(await fs.readdir(directory), ["console.log"]);
+    }
+  );
 });

@@ -51,6 +51,7 @@ export type CurrentBranchBuildAction = "triggerBuild" | "openLatestBuild" | "ope
 const GIT_UNAVAILABLE_MESSAGE = "Git integration is unavailable.";
 const NO_ACTIVE_REPOSITORY_MESSAGE = "No Git repository is active in this window.";
 const DETACHED_HEAD_MESSAGE = "Check out a branch to use current-branch Jenkins actions.";
+const RESOLVING_MESSAGE = "Resolving Jenkins status for the current repository and checkout.";
 
 export class CurrentBranchCommandMapper {
   getCurrentCommitBuildTarget(
@@ -70,6 +71,11 @@ export class CurrentBranchCommandMapper {
     repositories?: CurrentBranchRepositoryInfo[]
   ): CurrentBranchResolutionResult {
     switch (state.kind) {
+      case "resolving":
+        return {
+          kind: "message",
+          ...createInfoMessage(RESOLVING_MESSAGE)
+        };
       case "ambiguousRepository":
         return {
           kind: "ambiguousRepository",
@@ -154,6 +160,8 @@ export class CurrentBranchCommandMapper {
     action: CurrentBranchBuildAction
   ): CurrentBranchUserMessage | undefined {
     switch (state.kind) {
+      case "resolving":
+        return createInfoMessage(RESOLVING_MESSAGE);
       case "matched":
         // Only the latest-build action can lack a target for matched states.
         if (action !== "openLatestBuild" || state.lastBuild?.url) {

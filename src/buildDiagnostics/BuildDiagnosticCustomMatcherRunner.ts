@@ -20,10 +20,11 @@ interface CustomMatcherState {
 export class BuildDiagnosticCustomMatcherRunner {
   private readonly states = new Map<string, CustomMatcherState>();
 
-  constructor(private readonly matchers: readonly NormalizedCustomDiagnosticMatcher[]) {
-    for (const matcher of matchers) {
-      this.states.set(matcher.id, { patternIndex: 0, captures: {} });
-    }
+  constructor(private readonly matchers: readonly NormalizedCustomDiagnosticMatcher[]) {}
+
+  /** Discards captures that cannot safely span skipped input. */
+  reset(): void {
+    this.states.clear();
   }
 
   /** Returns drafts from every matcher that completed on this line, in matcher order. */
@@ -48,6 +49,7 @@ export class BuildDiagnosticCustomMatcherRunner {
     return {
       ...draft,
       parserId: `custom:${matcher.id}`,
+      baseParserId: draft.parserId,
       source: matcher.source ?? draft.source,
       severity: matcher.severity ?? draft.severity
     };

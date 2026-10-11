@@ -63,6 +63,41 @@ describe("BuildDetailsCompletionPoller", () => {
     }
   });
 
+  it("keeps polling when the details update handler throws", async () => {
+    vi.useFakeTimers();
+    let fetchCalls = 0;
+    let updateCalls = 0;
+    const poller = new BuildDetailsCompletionPoller({
+      getRefreshIntervalMs: () => 1,
+      fetchBuildDetails: async () => {
+        fetchCalls += 1;
+        return buildDetails();
+      },
+      isTokenCurrent: () => true,
+      shouldPoll: () => true,
+      onDetailsUpdate: () => {
+        updateCalls += 1;
+        if (updateCalls === 1) {
+          throw new Error("update failure");
+        }
+      }
+    });
+
+    try {
+      poller.start(1);
+      await vi.advanceTimersByTimeAsync(1);
+      assert.equal(fetchCalls, 1);
+      assert.equal(updateCalls, 1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      assert.equal(fetchCalls, 2);
+      assert.equal(updateCalls, 2);
+    } finally {
+      poller.stop();
+      vi.useRealTimers();
+    }
+  });
+
   it("can restart after a scheduled poll is skipped while polling is disabled", async () => {
     let shouldPoll = true;
     let fetchCalls = 0;

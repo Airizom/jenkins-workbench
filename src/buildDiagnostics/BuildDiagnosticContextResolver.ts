@@ -10,10 +10,12 @@ import {
   normalizeDiagnosticJobScopeUrl
 } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
+import { serializeCustomDiagnosticMatchers } from "./BuildDiagnosticCustomMatcherProtocol";
 import { resolveDiagnosticProfile } from "./BuildDiagnosticProfiles";
-import type {
-  NormalizedDiagnosticProfile,
-  NormalizedDiagnosticProfiles
+import {
+  type NormalizedDiagnosticProfile,
+  type NormalizedDiagnosticProfiles,
+  serializePathMappings
 } from "./BuildDiagnosticTypes";
 
 export type BuildDiagnosticContextResolution =
@@ -247,28 +249,9 @@ function fingerprintProfile(profile: NormalizedDiagnosticProfile): string {
   const serializable = {
     id: profile.id,
     builtIns: profile.builtIns,
-    pathMappings: profile.pathMappings.map((mapping) =>
-      mapping.type === "regex"
-        ? {
-            type: mapping.type,
-            pattern: mapping.pattern,
-            replacement: mapping.replacement,
-            localRoot: mapping.localRoot
-          }
-        : mapping
-    ),
+    pathMappings: serializePathMappings(profile.pathMappings),
     searchExcludeGlob: profile.searchExcludeGlob,
-    matchers: profile.matchers.map((matcher) => ({
-      id: matcher.id,
-      source: matcher.source,
-      severity: matcher.severity,
-      base: matcher.base,
-      patterns: matcher.patterns.map((pattern) => ({
-        ...pattern,
-        regexp: undefined,
-        regexpSource: pattern.regexpSource
-      }))
-    }))
+    matchers: serializeCustomDiagnosticMatchers(profile.matchers)
   };
   return createHash("sha256").update(JSON.stringify(serializable)).digest("hex");
 }

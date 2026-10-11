@@ -5,6 +5,8 @@ export { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 
 const DEFAULT_REFRESH_INTERVAL_SECONDS = 5;
 const MIN_REFRESH_INTERVAL_SECONDS = 2;
+// setTimeout clamps delays above 2^31-1 ms to 1 ms, so cap the interval below that.
+const MAX_REFRESH_INTERVAL_MS = 2_147_483_647;
 const DEFAULT_TEST_REPORT_INCLUDE_CASE_LOGS = false;
 const DEFAULT_COVERAGE_ENABLED = true;
 const DEFAULT_COVERAGE_DECORATIONS_ENABLED = true;
@@ -24,7 +26,7 @@ export function getBuildDetailsRefreshIntervalMs(
     MIN_REFRESH_INTERVAL_SECONDS,
     Number.isFinite(seconds) ? seconds : DEFAULT_REFRESH_INTERVAL_SECONDS
   );
-  return safeSeconds * 1000;
+  return Math.min(MAX_REFRESH_INTERVAL_MS, safeSeconds * 1000);
 }
 
 export function getTestReportIncludeCaseLogs(

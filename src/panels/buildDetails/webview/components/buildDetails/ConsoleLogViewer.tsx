@@ -98,6 +98,7 @@ export function ConsoleLogViewer({
     );
   }, [
     htmlModel,
+    sourceText,
     consoleSearch.matches,
     consoleSearch.activeMatchIndex,
     consoleSearch.isSearchActive,
@@ -176,6 +177,7 @@ export function ConsoleLogViewer({
     canFollow,
     logKey,
     scrollKey,
+    sourceText,
     consoleSearch.isSearchActive,
     scrollConsoleToBottom
   ]);

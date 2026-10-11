@@ -12,69 +12,21 @@ function reduceBuildDetailsMessage(
 ): void {
   switch (message.type) {
     case "appendConsole":
-      dispatch({ type: "appendConsole", text: message.text });
-      break;
     case "appendConsoleHtml":
-      dispatch({ type: "appendConsoleHtml", html: message.html });
-      break;
     case "setConsole":
-      dispatch({
-        type: "setConsole",
-        text: message.text,
-        truncated: message.truncated
-      });
-      break;
     case "setConsoleHtml":
-      dispatch({
-        type: "setConsoleHtml",
-        html: message.html,
-        truncated: message.truncated
-      });
-      break;
     case "setPipelineNodeLog":
-      dispatch({ type: "setPipelineNodeLog", log: message.log });
-      break;
     case "appendPipelineNodeLogHtml":
-      dispatch({
-        type: "appendPipelineNodeLogHtml",
-        targetKey: message.targetKey,
-        html: message.html
-      });
-      break;
     case "setPipelineNodeLogLoading":
-      dispatch({
-        type: "setPipelineNodeLogLoading",
-        targetKey: message.targetKey,
-        loading: message.loading
-      });
-      break;
     case "setPipelineNodeLogError":
-      dispatch({
-        type: "setPipelineNodeLogError",
-        targetKey: message.targetKey,
-        error: message.error
-      });
+    case "setErrors":
+    case "setBuildDiagnostics":
+    case "pendingInputActionComplete":
+    case "setLoading":
+      dispatch(message);
       break;
     case "updateDetails":
       dispatch({ type: "updateDetails", payload: message });
-      break;
-    case "setErrors":
-      dispatch({
-        type: "setErrors",
-        errors: message.errors
-      });
-      break;
-    case "setBuildDiagnostics":
-      dispatch({
-        type: "setBuildDiagnostics",
-        diagnostics: message.diagnostics
-      });
-      break;
-    case "pendingInputActionComplete":
-      dispatch({ type: "pendingInputActionComplete", inputId: message.inputId });
-      break;
-    case "setLoading":
-      dispatch({ type: "setLoading", value: message.value });
       break;
     default:
       break;

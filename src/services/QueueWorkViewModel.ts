@@ -18,6 +18,11 @@ interface QueueWorkBuildContext {
   labelsByNodeName?: Map<string, string[]>;
 }
 
+export type QueueLabelExpressions = ReadonlyMap<
+  string,
+  ReturnType<typeof parseCompoundLabelExpression>
+>;
+
 function buildQueueWorkItemViewModel(
   item: JenkinsQueueItemInfo,
   context: QueueWorkBuildContext
@@ -48,9 +53,25 @@ export function buildQueueWorkItems(
   return items.map((item) => buildQueueWorkItemViewModel(item, context));
 }
 
+export function prepareQueueLabelExpressions(
+  queueItems: QueueWorkItemViewModel[]
+): QueueLabelExpressions {
+  const expressions = new Map<string, ReturnType<typeof parseCompoundLabelExpression>>();
+  for (const item of queueItems) {
+    for (const label of item.queuedForLabels) {
+      // Keep undefined results too, so plain and invalid labels are parsed only once.
+      if (!expressions.has(label)) {
+        expressions.set(label, parseCompoundLabelExpression(label));
+      }
+    }
+  }
+  return expressions;
+}
+
 export function buildNodeQueuedWorkViewModel(
   queueItems: QueueWorkItemViewModel[],
-  labels: NodeLabelClassification
+  labels: NodeLabelClassification,
+  expressions: QueueLabelExpressions = prepareQueueLabelExpressions(queueItems)
 ): NodeQueuedWorkViewModel {
   const matchingQueueItems: QueueWorkItemViewModel[] = [];
   const anyQueueItems: QueueWorkItemViewModel[] = [];
@@ -58,7 +79,7 @@ export function buildNodeQueuedWorkViewModel(
   for (const item of queueItems) {
     if (
       hasMatchingLabel(item, labels.poolLabelSet) ||
-      hasMatchingLabelExpression(item, labels.allLabels)
+      hasMatchingLabelExpression(item, labels.allLabels, expressions)
     ) {
       matchingQueueItems.push(item);
     }
@@ -95,9 +116,13 @@ function hasMatchingLabel(item: QueueWorkItemViewModel, labelKeys: Set<string>):
   return item.queuedForLabels.some((label) => labelKeys.has(normalizeLabelKey(label)));
 }
 
-function hasMatchingLabelExpression(item: QueueWorkItemViewModel, nodeLabels: string[]): boolean {
+function hasMatchingLabelExpression(
+  item: QueueWorkItemViewModel,
+  nodeLabels: string[],
+  expressions: QueueLabelExpressions
+): boolean {
   return item.queuedForLabels.some((label) => {
-    const expression = parseCompoundLabelExpression(label);
+    const expression = expressions.get(label);
     return expression !== undefined && evaluateLabelExpression(expression, nodeLabels);
   });
 }
@@ -128,7 +153,7 @@ function inferQueuedLabelsFromBlockedNodeReason(
   const seenLabelKeys = new Set<string>();
   let match = nodeNamePattern.exec(reason);
   while (match !== null) {
-    for (const label of labelsByNodeName.get(normalizeLabelKey(match[1])) ?? []) {
+    for (const label of labelsByNodeName.get(normalizeNodeNameKey(match[1])) ?? []) {
       const key = normalizeLabelKey(label);
       if (!seenLabelKeys.has(key)) {
         seenLabelKeys.add(key);
@@ -148,11 +173,15 @@ function buildPoolLabelsByNodeName(nodes: NodeLabelInput[]): Map<string, string[
       continue;
     }
     for (const name of [node.name, node.displayName]) {
-      const key = normalizeLabelKey(name);
+      const key = normalizeNodeNameKey(name);
       if (key) {
         labelsByNodeName.set(key, labels);
       }
     }
   }
   return labelsByNodeName;
+}
+
+function normalizeNodeNameKey(value: unknown): string {
+  return normalizeLabelKey(value).toLocaleLowerCase();
 }

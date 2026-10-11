@@ -9,7 +9,7 @@ import type {
   JenkinsViewInfo,
   JobParameter
 } from "./JenkinsDataTypes";
-import { mapJenkinsJobs } from "./JenkinsJobMapping";
+import { mapJenkinsJob, mapJenkinsJobs } from "./JenkinsJobMapping";
 import { mapJobParameter } from "./JenkinsParameterMapping";
 
 export class JenkinsJobDataOperations {
@@ -40,12 +40,7 @@ export class JenkinsJobDataOperations {
       async () => {
         const client = await this.context.getClient(environment);
         const job = await client.getJob(jobUrl);
-        return {
-          name: job.name,
-          url: job.url,
-          color: job.color,
-          kind: client.classifyJob(job)
-        };
+        return mapJenkinsJob(client, job);
       },
       this.context.getCacheTtlMs()
     );
@@ -58,22 +53,29 @@ export class JenkinsJobDataOperations {
   ): Promise<JenkinsJobInfo[]> {
     const cacheKey = await this.context.buildCacheKey(environment, "folder", folderUrl);
     if (options?.mode === "refresh") {
-      const client = await this.context.getClient(environment);
-      const jobs = await client.getFolderJobs(folderUrl);
-      const mappedJobs = mapJenkinsJobs(client, jobs);
-      this.context.getCache().set(cacheKey, mappedJobs, this.context.getCacheTtlMs());
-      return mappedJobs;
+      return this.context.getCache().withWriteGuard([cacheKey], async (cache) => {
+        const mappedJobs = await this.loadFolderJobs(environment, folderUrl);
+        cache.set(cacheKey, mappedJobs, this.context.getCacheTtlMs());
+        return mappedJobs;
+      });
     }
 
-    return this.context.getCache().getOrLoad(
-      cacheKey,
-      async () => {
-        const client = await this.context.getClient(environment);
-        const jobs = await client.getFolderJobs(folderUrl);
-        return mapJenkinsJobs(client, jobs);
-      },
-      this.context.getCacheTtlMs()
-    );
+    return this.context
+      .getCache()
+      .getOrLoad(
+        cacheKey,
+        () => this.loadFolderJobs(environment, folderUrl),
+        this.context.getCacheTtlMs()
+      );
+  }
+
+  private async loadFolderJobs(
+    environment: JenkinsEnvironmentRef,
+    folderUrl: string
+  ): Promise<JenkinsJobInfo[]> {
+    const client = await this.context.getClient(environment);
+    const jobs = await client.getFolderJobs(folderUrl);
+    return mapJenkinsJobs(client, jobs);
   }
 
   async getJobCollection(

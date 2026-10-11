@@ -62,7 +62,7 @@ function addParameterToPayload(
     return;
   }
 
-  const delimiter = parameter.multiSelectDelimiter?.trim();
+  const delimiter = parameter.multiSelectDelimiter;
   if (delimiter) {
     payload.fields.push({
       name: parameter.name,
@@ -119,46 +119,26 @@ async function promptParameterValue(
     return picks.map((pick) => pick.label);
   }
 
-  if (isSensitiveParameter(parameter)) {
-    return promptForSensitiveParameter(parameter, presetValue);
+  // Sensitive values always use a masked input box, even for run, file, or text kinds.
+  const sensitive = isSensitiveParameter(parameter);
+  if (!sensitive) {
+    if (parameter.kind === "run") {
+      return promptForRunParameter(options, parameter, presetValue);
+    }
+    if (parameter.kind === "file") {
+      return promptForFileParameter(parameter, presetValue);
+    }
+    if (parameter.kind === "text") {
+      return promptForTextParameter(parameter, presetValue);
+    }
   }
 
-  if (parameter.kind === "run") {
-    return promptForRunParameter(options, parameter, presetValue);
-  }
-
-  if (parameter.kind === "file") {
-    return promptForFileParameter(parameter, presetValue);
-  }
-
-  if (parameter.kind === "text") {
-    return promptForTextParameter(parameter, presetValue);
-  }
-
-  const input = await vscode.window.showInputBox({
+  return vscode.window.showInputBox({
     prompt,
     placeHolder: description,
+    password: sensitive,
     value: resolveSingleDefaultValue(presetValue, parameter.defaultValue),
     ignoreFocusOut: true
-  });
-
-  if (input === undefined) {
-    return undefined;
-  }
-
-  return input;
-}
-
-async function promptForSensitiveParameter(
-  parameter: JobParameter,
-  presetValue?: ParameterValue
-): Promise<string | undefined> {
-  return vscode.window.showInputBox({
-    prompt: `Parameter: ${parameter.name}`,
-    placeHolder: parameter.description,
-    password: true,
-    ignoreFocusOut: true,
-    value: resolveSingleDefaultValue(presetValue, parameter.defaultValue)
   });
 }
 
@@ -187,7 +167,7 @@ async function promptForRunParameter(
       label: `#${candidate.number}`,
       description: candidate.description,
       detail: candidate.detail,
-      value: String(candidate.number),
+      value: candidate.runId,
       mode: "existing"
     }));
 

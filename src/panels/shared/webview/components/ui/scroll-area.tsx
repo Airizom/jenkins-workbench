@@ -25,24 +25,18 @@ export const ScrollArea = React.forwardRef<
 ));
 ScrollArea.displayName = "ScrollArea";
 
-type ScrollBarProps = React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Scrollbar>;
-
-const ScrollBar = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.Scrollbar>,
-  ScrollBarProps
->(({ className, orientation = "vertical", ...props }, ref) => (
-  <ScrollAreaPrimitive.Scrollbar
-    ref={ref}
-    orientation={orientation}
-    className={cn(
-      "flex touch-none select-none transition-colors",
-      orientation === "vertical" && "h-full w-2.5 border-l border-transparent p-0.5",
-      orientation === "horizontal" && "h-2.5 w-full border-t border-transparent p-0.5",
-      className
-    )}
-    {...props}
-  >
-    <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-muted-foreground opacity-50 hover:opacity-70" />
-  </ScrollAreaPrimitive.Scrollbar>
-));
-ScrollBar.displayName = "ScrollBar";
+function ScrollBar({ orientation }: { orientation: "vertical" | "horizontal" }) {
+  return (
+    <ScrollAreaPrimitive.Scrollbar
+      orientation={orientation}
+      className={cn(
+        "flex touch-none select-none transition-colors",
+        orientation === "vertical"
+          ? "h-full w-2.5 border-l border-transparent p-0.5"
+          : "h-2.5 w-full flex-col border-t border-transparent p-0.5"
+      )}
+    >
+      <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-muted-foreground opacity-50 hover:opacity-70" />
+    </ScrollAreaPrimitive.Scrollbar>
+  );
+}

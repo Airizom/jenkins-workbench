@@ -26,7 +26,12 @@ import {
   normalizeLabelKey
 } from "./NodeLabelClassification";
 import { evaluateLabelExpression, parseCompoundLabelExpression } from "./NodeLabelExpression";
-import { buildNodeQueuedWorkViewModel, buildQueueWorkItems } from "./QueueWorkViewModel";
+import {
+  buildNodeQueuedWorkViewModel,
+  buildQueueWorkItems,
+  prepareQueueLabelExpressions,
+  type QueueLabelExpressions
+} from "./QueueWorkViewModel";
 
 const ANY_POOL_ID = "pool:any";
 const ANY_POOL_LABEL = "Any node";
@@ -43,12 +48,13 @@ export function buildNodeCapacityViewModel(
   updatedAt: string
 ): NodeCapacityViewModel {
   const queueViewModels = buildQueueWorkItems(queueItems, { nodes });
+  const queueLabelExpressions = prepareQueueLabelExpressions(queueViewModels);
   const anyQueueItems = queueViewModels.filter((item) => item.queuedForLabels.length === 0);
   const classifiedNodes = nodes.map((node) => ({ node, labels: classifyNodeLabels(node) }));
   const hiddenLabelKeys = buildHiddenLabelKeySet(classifiedNodes);
   const poolLabels = collectPoolLabels(classifiedNodes, queueViewModels, hiddenLabelKeys);
   const nodeViewModels = classifiedNodes.map(({ node, labels }) =>
-    buildNodeViewModel(node, labels, queueViewModels)
+    buildNodeViewModel(node, labels, queueViewModels, queueLabelExpressions)
   );
   const nodeViewModelsByLabel = buildNodeViewModelsByLabel(nodeViewModels);
   const queueItemsByLabel = groupQueueItemsByLabel(queueViewModels, hiddenLabelKeys);
@@ -63,7 +69,9 @@ export function buildNodeCapacityViewModel(
     }),
     ...poolLabels.map((label) => {
       const key = normalizeLabelKey(label);
-      const expression = parseCompoundLabelExpression(label);
+      const expression = queueLabelExpressions.has(label)
+        ? queueLabelExpressions.get(label)
+        : parseCompoundLabelExpression(label);
       return buildPool({
         id: `pool:label:${label}`,
         label,
@@ -101,7 +109,8 @@ export function buildNodeCapacityExecutorViewModels(
 function buildNodeViewModel(
   node: JenkinsNodeInfo,
   labels: NodeLabelClassification,
-  queueItems: QueueWorkItemViewModel[]
+  queueItems: QueueWorkItemViewModel[],
+  queueLabelExpressions: QueueLabelExpressions
 ): NodeCapacityNodeViewModel {
   const totalExecutors = toNonNegativeInteger(node.numExecutors);
   const busyExecutors = resolveBusyExecutors(node, totalExecutors);
@@ -134,7 +143,7 @@ function buildNodeViewModel(
         ) ?? "Online"),
     executorsLoaded: false,
     executors: [],
-    ...buildNodeQueuedWorkViewModel(queueItems, labels)
+    ...buildNodeQueuedWorkViewModel(queueItems, labels, queueLabelExpressions)
   };
 }
 

@@ -39,9 +39,59 @@ const { JenkinsfileValidationCodeLensProvider } = await import(
   "../src/validation/editor/JenkinsfileValidationCodeLensProvider"
 );
 
-describe("Jenkinsfile providers with a commented-out pipeline", () => {
-  it("places the missing-agent edit and CodeLens on the real pipeline", () => {
-    const lines = ["/*", "pipeline {", "}", "*/", "pipeline {", "  stages {}", "}"];
+describe("Jenkinsfile providers with non-code pipelines", () => {
+  it.each(["  }\n}", "  }}"])(
+    "inserts both agent choices outside stages opened on the pipeline header (%j)",
+    (closing) => {
+      const lines = [
+        "pipeline { stages {",
+        "    stage('Build') {",
+        "      steps { echo 'ok' }",
+        "    }",
+        closing
+      ]
+        .join("\n")
+        .split("\n");
+      const document = {
+        uri: vscodeStub.Uri.file("/Jenkinsfile"),
+        lineCount: lines.length,
+        lineAt: (line: number) => ({ text: lines[line] })
+      } as unknown as TextDocument;
+      const matcher = { matches: () => true } as unknown as ConstructorParameters<
+        typeof JenkinsfileQuickFixProvider
+      >[0];
+      const diagnostic = new vscodeStub.Diagnostic(
+        new vscodeStub.Range(0, 0, 0, 8),
+        "Missing agent"
+      );
+      diagnostic.source = "jenkins";
+      diagnostic.code = "missing-agent";
+      const actions = new JenkinsfileQuickFixProvider(matcher).provideCodeActions(
+        document,
+        diagnostic.range as unknown as Range,
+        { diagnostics: [diagnostic] } as unknown as CodeActionContext
+      );
+
+      assert.equal(actions.length, 2);
+      for (const [index, value] of ["any", "none"].entries()) {
+        const insertion = (actions[index].edit as unknown as TestWorkspaceEdit).insertions[0];
+        const result = [...lines];
+        const { line, character } = insertion.position;
+        result[line] =
+          result[line].slice(0, character) + insertion.text + result[line].slice(character);
+        assert.match(
+          result.join("\n"),
+          new RegExp(`^pipeline \\{\\s*agent ${value}\\s+stages \\{`)
+        );
+      }
+    }
+  );
+
+  it.each([
+    ["block comment", "/*", "*/"],
+    ["dollar-slashy literal", "def template = $/", "/$"]
+  ])("places the missing-agent edit and CodeLens after a %s", (_name, open, close) => {
+    const lines = [open, "pipeline {", "}", close, "pipeline {", "  stages {}", "}"];
     const document = {
       uri: vscodeStub.Uri.file("/Jenkinsfile"),
       lineCount: lines.length,
@@ -105,5 +155,72 @@ describe("Jenkinsfile providers with a commented-out pipeline", () => {
       );
       assert.equal(actions.length, 0, code);
     }
+  });
+
+  it.each([
+    ["missing-agent", "pipeline {}", ['Insert "agent any"', 'Insert "agent none"']],
+    ["missing-stages", "pipeline { agent any }", ['Insert "stages" block']]
+  ])("inserts %s before the closing brace of an inline pipeline", (code, text, titles) => {
+    const lines = [text];
+    const document = {
+      uri: vscodeStub.Uri.file("/Jenkinsfile"),
+      lineCount: lines.length,
+      lineAt: (line: number) => ({ text: lines[line] })
+    } as unknown as TextDocument;
+    const matcher = { matches: () => true } as unknown as ConstructorParameters<
+      typeof JenkinsfileQuickFixProvider
+    >[0];
+    const diagnostic = new vscodeStub.Diagnostic(new vscodeStub.Range(0, 0, 0, 8), code);
+    diagnostic.source = "jenkins";
+    diagnostic.code = code;
+
+    const actions = new JenkinsfileQuickFixProvider(matcher).provideCodeActions(
+      document,
+      diagnostic.range as unknown as Range,
+      { diagnostics: [diagnostic] } as unknown as CodeActionContext
+    );
+    assert.deepEqual(
+      actions.map((action) => action.title),
+      titles
+    );
+    for (const action of actions) {
+      const insertion = (action.edit as unknown as TestWorkspaceEdit).insertions[0];
+      assert.equal(insertion.position.line, 0);
+      assert.equal(insertion.position.character, text.length - 1);
+      assert.ok(insertion.text.startsWith("\n  "));
+      assert.ok(insertion.text.endsWith("\n"));
+    }
+  });
+
+  it("inserts missing stages after an agent with equally indented closing braces", () => {
+    const lines = ["pipeline {", "agent {", "label 'linux'", "}", "}"];
+    const document = {
+      uri: vscodeStub.Uri.file("/Jenkinsfile"),
+      lineCount: lines.length,
+      lineAt: (line: number) => ({ text: lines[line] })
+    } as unknown as TextDocument;
+    const matcher = { matches: () => true } as unknown as ConstructorParameters<
+      typeof JenkinsfileQuickFixProvider
+    >[0];
+    const diagnostic = new vscodeStub.Diagnostic(
+      new vscodeStub.Range(0, 0, 0, 8),
+      "Missing stages"
+    );
+    diagnostic.source = "jenkins";
+    diagnostic.code = "missing-stages";
+
+    const actions = new JenkinsfileQuickFixProvider(matcher).provideCodeActions(
+      document,
+      diagnostic.range as unknown as Range,
+      { diagnostics: [diagnostic] } as unknown as CodeActionContext
+    );
+    assert.equal(actions.length, 1);
+    const insertion = (actions[0].edit as unknown as TestWorkspaceEdit).insertions[0];
+    assert.equal(insertion.position.line, 4);
+    assert.equal(insertion.position.character, 0);
+    const result = [...lines];
+    result[insertion.position.line] = insertion.text + result[insertion.position.line];
+    assert.ok(result.join("\n").startsWith("pipeline {\nagent {\nlabel 'linux'\n}\n  stages {"));
+    assert.ok(result.join("\n").endsWith("  }\n}"));
   });
 });

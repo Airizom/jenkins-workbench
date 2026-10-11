@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { describe, it, vi } from "vitest";
+import { beforeEach, describe, it, vi } from "vitest";
 
 const buildConsoleSegmentsMock = vi.fn(() => []);
+const scrollConsoleToBottomMock = vi.fn();
 const matches: never[] = [];
 const memoizedValues: Array<{ dependencies: readonly unknown[]; value: unknown }> = [];
 let memoIndex = 0;
@@ -31,20 +32,22 @@ function useMemo<T>(factory: () => T, dependencies: readonly unknown[]): T {
 
 vi.doMock("react", () => ({
   useCallback: <T>(callback: T): T => callback,
-  useEffect: () => undefined,
+  useEffect: (effect: () => void, dependencies: readonly unknown[]) =>
+    useMemo(effect, dependencies),
   useMemo,
   useRef: <T>(current: T) => ({ current }),
   useState: <T>(initial: T) => [initial, () => undefined]
 }));
 vi.doMock("../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleSegments", () => ({
-  buildConsoleSegments: buildConsoleSegmentsMock
+  buildConsoleSegments: buildConsoleSegmentsMock,
+  normalizeConsoleSourceReferences: () => []
 }));
 vi.doMock("../src/panels/buildDetails/webview/hooks/useConsoleOutputScroll", () => ({
   prefersReducedMotion: () => false,
   useConsoleOutputScroll: () => ({
     showScrollToTop: false,
     isAtBottom: true,
-    scrollConsoleToBottom: () => undefined,
+    scrollConsoleToBottom: scrollConsoleToBottomMock,
     scrollConsoleToTop: () => undefined
   })
 }));
@@ -65,7 +68,42 @@ const { ConsoleLogViewer } = await import(
   "../src/panels/buildDetails/webview/components/buildDetails/ConsoleLogViewer"
 );
 
+beforeEach(() => {
+  memoizedValues.length = 0;
+  buildConsoleSegmentsMock.mockClear();
+  scrollConsoleToBottomMock.mockClear();
+});
+
 describe("ConsoleLogViewer", () => {
+  it.each([false, true])("follows equal-length output changes (HTML: %s)", (useHtmlModel) => {
+    const initialText = "long line\n".repeat(100);
+    const replacementText = "a\n".repeat(500);
+    assert.equal(initialText.length, replacementText.length);
+    const props = {
+      text: initialText,
+      truncated: true,
+      followLog: true,
+      canFollow: true,
+      isActive: true,
+      onOpenExternal: () => undefined
+    };
+    const render = (text: string) => {
+      beginRender();
+      ConsoleLogViewer({
+        ...props,
+        text: useHtmlModel ? "fallback" : text,
+        htmlModel: useHtmlModel ? { nodes: [], text } : undefined
+      });
+    };
+
+    render(initialText);
+    assert.equal(scrollConsoleToBottomMock.mock.calls.length, 1);
+    render(initialText);
+    assert.equal(scrollConsoleToBottomMock.mock.calls.length, 1);
+    render(replacementText);
+    assert.equal(scrollConsoleToBottomMock.mock.calls.length, 2);
+  });
+
   it("reuses rendered segments when source references are omitted", () => {
     const props = {
       text: "console output",

@@ -11,10 +11,7 @@ import {
   RefreshIcon,
   ServerIcon
 } from "../../../../shared/webview/icons";
-import {
-  resolveNodeStatusBadgeClass,
-  resolveNodeStatusIconClass
-} from "../../../../shared/webview/lib/statusStyles";
+import { resolveNodeStatusStyle } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeExecutorViewModel, NodeStatusClass } from "../../../shared/NodeDetailsContracts";
 import { ExecutorUtilizationSummary } from "./ExecutorUtilizationSummary";
@@ -97,7 +94,7 @@ export function NodeDetailsHero({
   onLaunchAgent,
   onOpen
 }: NodeDetailsHeroProps): React.JSX.Element {
-  const statusIconClass = resolveNodeStatusIconClass(statusClass);
+  const statusStyle = resolveNodeStatusStyle(statusClass);
   // The subtitle repeats the node name only when it differs from the title.
   const showName = name.trim().length > 0 && name !== displayName;
   const bannerTone =
@@ -116,7 +113,7 @@ export function NodeDetailsHero({
             <div
               className={cn(
                 "node-hero-icon flex h-10 w-10 shrink-0 items-center justify-center",
-                statusIconClass
+                statusStyle.icon
               )}
             >
               <ServerIcon className="h-5 w-5" />
@@ -135,10 +132,7 @@ export function NodeDetailsHero({
                 >
                   {displayName}
                 </h1>
-                <ToneBadge
-                  label={statusLabel}
-                  className={resolveNodeStatusBadgeClass(statusClass)}
-                />
+                <ToneBadge label={statusLabel} className={statusStyle.badge} />
                 {isStale ? (
                   <AccessibleTooltip
                     focusable

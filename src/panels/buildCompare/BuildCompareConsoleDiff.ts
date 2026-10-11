@@ -239,30 +239,12 @@ async function compareConsoleReaders(
       const leadingContext = trimToLastLines(sharedTail + beforeDiff, LEADING_CONTEXT_LINES);
       baselineReader.consume(commonLength);
       targetReader.consume(commonLength);
-      await baselineReader.appendUntilLineCountWithLimit(
-        TRAILING_CONTEXT_LINES,
-        baselineReader.getRemainingByteBudget()
-      );
-      await targetReader.appendUntilLineCountWithLimit(
-        TRAILING_CONTEXT_LINES,
-        targetReader.getRemainingByteBudget()
-      );
-
-      const baselineSnippet = takeFirstLines(
-        leadingContext + baselineReader.buffer,
-        LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
-      );
-      const targetSnippet = takeFirstLines(
-        leadingContext + targetReader.buffer,
-        LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
-      );
-      const startLineNumber = Math.max(1, divergenceLine - countLineBreaks(leadingContext));
-      return buildConsoleDivergenceResult(
-        options,
+      return finalizeConsoleDivergence(
+        baselineReader,
+        targetReader,
+        leadingContext,
         divergenceLine,
-        baselineSnippet,
-        targetSnippet,
-        startLineNumber
+        options
       );
     }
 
@@ -305,35 +287,58 @@ async function compareConsoleReaders(
     }
 
     if (baselineReader.buffer.length === 0 || targetReader.buffer.length === 0) {
+      // A truncated fallback ending is a scan limit, not a genuine EOF.
+      if (
+        (baselineReader.buffer.length === 0 && baselineReader.truncatedByLimit) ||
+        (targetReader.buffer.length === 0 && targetReader.truncatedByLimit)
+      ) {
+        return buildConsoleTooLargeResult(options);
+      }
       const divergenceLine = comparedLineBreaks + 1;
-      await baselineReader.appendUntilLineCountWithLimit(
-        TRAILING_CONTEXT_LINES,
-        baselineReader.getRemainingByteBudget()
-      );
-      await targetReader.appendUntilLineCountWithLimit(
-        TRAILING_CONTEXT_LINES,
-        targetReader.getRemainingByteBudget()
-      );
-      const baselineSnippet = takeFirstLines(
-        sharedTail + baselineReader.buffer,
-        LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
-      );
-      const targetSnippet = takeFirstLines(
-        sharedTail + targetReader.buffer,
-        LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
-      );
-      const startLineNumber = Math.max(1, divergenceLine - countLineBreaks(sharedTail));
-      return buildConsoleDivergenceResult(
-        options,
+      return finalizeConsoleDivergence(
+        baselineReader,
+        targetReader,
+        sharedTail,
         divergenceLine,
-        baselineSnippet,
-        targetSnippet,
-        startLineNumber
+        options
       );
     }
 
     return buildConsoleTooLargeResult(options);
   }
+}
+
+async function finalizeConsoleDivergence(
+  baselineReader: ConsoleComparisonReader,
+  targetReader: ConsoleComparisonReader,
+  leadingContext: string,
+  divergenceLine: number,
+  options: BuildCompareConsoleOptions
+): Promise<ConsoleComparisonResult> {
+  await baselineReader.appendUntilLineCountWithLimit(
+    TRAILING_CONTEXT_LINES,
+    baselineReader.getRemainingByteBudget()
+  );
+  await targetReader.appendUntilLineCountWithLimit(
+    TRAILING_CONTEXT_LINES,
+    targetReader.getRemainingByteBudget()
+  );
+  const baselineSnippet = takeFirstLines(
+    leadingContext + baselineReader.buffer,
+    LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
+  );
+  const targetSnippet = takeFirstLines(
+    leadingContext + targetReader.buffer,
+    LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES
+  );
+  const startLineNumber = Math.max(1, divergenceLine - countLineBreaks(leadingContext));
+  return buildConsoleDivergenceResult(
+    options,
+    divergenceLine,
+    baselineSnippet,
+    targetSnippet,
+    startLineNumber
+  );
 }
 
 function buildConsoleDivergenceResult(

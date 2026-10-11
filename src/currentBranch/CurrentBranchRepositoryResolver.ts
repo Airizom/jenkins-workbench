@@ -8,7 +8,7 @@ import type {
 } from "./CurrentBranchTypes";
 
 interface RepositoryRegistration {
-  headName: string | undefined;
+  checkoutFingerprint: string | undefined;
   stateSubscription: vscode.Disposable;
   uiSubscription?: vscode.Disposable;
 }
@@ -139,13 +139,13 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
       let registration = this.repositoryRegistrations.get(key);
       if (!registration) {
         const createdRegistration: RepositoryRegistration = {
-          headName: getHeadName(repository),
+          checkoutFingerprint: checkoutFingerprint(repository),
           stateSubscription: repository.state.onDidChange(() => {
-            const nextHeadName = getHeadName(repository);
-            if (nextHeadName === createdRegistration.headName) {
+            const nextFingerprint = checkoutFingerprint(repository);
+            if (nextFingerprint === createdRegistration.checkoutFingerprint) {
               return;
             }
-            createdRegistration.headName = nextHeadName;
+            createdRegistration.checkoutFingerprint = nextFingerprint;
             this.emitter.fire();
           })
         };
@@ -173,8 +173,4 @@ export class CurrentBranchRepositoryResolver implements vscode.Disposable {
 function disposeRepositoryRegistration(registration: RepositoryRegistration): void {
   registration.stateSubscription.dispose();
   registration.uiSubscription?.dispose();
-}
-
-function getHeadName(repository: CurrentBranchRepositoryContext["repository"]): string | undefined {
-  return checkoutFingerprint(repository);
 }

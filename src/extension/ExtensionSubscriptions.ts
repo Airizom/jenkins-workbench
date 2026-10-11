@@ -54,25 +54,9 @@ const ACTIVITY_CONFIG_KEYS = [
 
 type ConfigReactionKey = ConfigKey;
 
-interface ConfigReactionContext {
-  config: vscode.WorkspaceConfiguration;
-  dataService: ExtensionTokenMap["dataService"];
-  refreshHost: ExtensionTokenMap["refreshHost"];
-  treeDataProvider: ExtensionTokenMap["treeDataProvider"];
-  statusRefreshService: ExtensionTokenMap["statusRefreshService"];
-  activityRefreshService: ExtensionTokenMap["activityRefreshService"];
-  poller: ExtensionTokenMap["poller"];
-  queuePoller: ExtensionTokenMap["queuePoller"];
-  currentBranchPullRequestJobMatcher: ExtensionTokenMap["currentBranchPullRequestJobMatcher"];
-  currentBranchService: ExtensionTokenMap["currentBranchService"];
-  jenkinsfileIntelligenceConfigState: ExtensionTokenMap["jenkinsfileIntelligenceConfigState"];
-  jenkinsfileValidationCoordinator: ExtensionTokenMap["jenkinsfileValidationCoordinator"];
-  jenkinsfileMatcher: ExtensionTokenMap["jenkinsfileMatcher"];
-}
-
 interface ConfigReaction {
   keys: readonly ConfigReactionKey[];
-  run: (context: ConfigReactionContext, changedKeys: ReadonlySet<ConfigReactionKey>) => void;
+  run: (config: vscode.WorkspaceConfiguration, changedKeys: ReadonlySet<ConfigReactionKey>) => void;
 }
 
 interface ConfigReactionMatch {
@@ -126,94 +110,78 @@ export function registerExtensionSubscriptions(
   const configReactions: ConfigReaction[] = [
     {
       keys: [CONFIG_KEYS.cacheTtlSeconds],
-      run: (reactionContext) => {
-        reactionContext.dataService.updateCacheTtlMs(getCacheTtlMs(reactionContext.config));
-        reactionContext.refreshHost.fullEnvironmentRefresh({ trigger: "system" });
+      run: (config) => {
+        dataService.updateCacheTtlMs(getCacheTtlMs(config));
+        refreshHost.fullEnvironmentRefresh({ trigger: "system" });
       }
     },
     {
       keys: [CONFIG_KEYS.statusRefreshIntervalSeconds],
-      run: (reactionContext) => {
-        reactionContext.statusRefreshService.updateRefreshIntervalSeconds(
-          getStatusRefreshIntervalSeconds(reactionContext.config)
-        );
+      run: (config) => {
+        statusRefreshService.updateRefreshIntervalSeconds(getStatusRefreshIntervalSeconds(config));
       }
     },
     {
       keys: [CONFIG_KEYS.watchErrorThreshold],
-      run: (reactionContext) => {
-        reactionContext.poller.updateMaxConsecutiveErrors(
-          getWatchErrorThreshold(reactionContext.config)
-        );
+      run: (config) => {
+        poller.updateMaxConsecutiveErrors(getWatchErrorThreshold(config));
       }
     },
     {
       keys: [CONFIG_KEYS.queuePollIntervalSeconds],
-      run: (reactionContext) => {
-        reactionContext.queuePoller.updatePollIntervalSeconds(
-          getQueuePollIntervalSeconds(reactionContext.config)
-        );
+      run: (config) => {
+        queuePoller.updatePollIntervalSeconds(getQueuePollIntervalSeconds(config));
       }
     },
     {
       keys: [CONFIG_KEYS.currentBranchPullRequestJobNamePatterns],
-      run: (reactionContext) => {
-        reactionContext.currentBranchPullRequestJobMatcher.updatePatterns(
-          getCurrentBranchPullRequestJobNamePatterns(reactionContext.config)
+      run: (config) => {
+        currentBranchPullRequestJobMatcher.updatePatterns(
+          getCurrentBranchPullRequestJobNamePatterns(config)
         );
-        void reactionContext.currentBranchService.refresh({ force: true });
+        void currentBranchService.refresh({ force: true });
       }
     },
     {
       keys: BUILD_TOOLTIP_CONFIG_KEYS,
-      run: (reactionContext, changedKeys) => {
-        reactionContext.treeDataProvider.updateBuildTooltipOptions(
-          getBuildTooltipOptions(reactionContext.config)
-        );
-        reactionContext.treeDataProvider.updateBuildListFetchOptions(
-          getBuildListFetchOptions(reactionContext.config)
-        );
+      run: (config, changedKeys) => {
+        treeDataProvider.updateBuildTooltipOptions(getBuildTooltipOptions(config));
+        treeDataProvider.updateBuildListFetchOptions(getBuildListFetchOptions(config));
         const shouldClearDataCache =
           changedKeys.has(CONFIG_KEYS.buildTooltipDetails) ||
           changedKeys.has(CONFIG_KEYS.buildTooltipParametersEnabled);
-        reactionContext.refreshHost.refreshViewOnly({
+        refreshHost.refreshViewOnly({
           clearDataCache: shouldClearDataCache
         });
       }
     },
     {
       keys: [CONFIG_KEYS.treeViewsExcludedNames],
-      run: (reactionContext) => {
-        reactionContext.treeDataProvider.updateViewCurationOptions(
-          getTreeViewCurationOptions(reactionContext.config)
-        );
-        reactionContext.refreshHost.refreshViewOnly();
+      run: (config) => {
+        treeDataProvider.updateViewCurationOptions(getTreeViewCurationOptions(config));
+        refreshHost.refreshViewOnly();
       }
     },
     {
       keys: ACTIVITY_CONFIG_KEYS,
-      run: (reactionContext) => {
-        const activityOptions = getTreeActivityOptions(reactionContext.config);
-        reactionContext.treeDataProvider.updateActivityOptions(activityOptions);
-        reactionContext.activityRefreshService.updateOptions(activityOptions);
-        reactionContext.refreshHost.refreshViewOnly();
+      run: (config) => {
+        const activityOptions = getTreeActivityOptions(config);
+        treeDataProvider.updateActivityOptions(activityOptions);
+        activityRefreshService.updateOptions(activityOptions);
+        refreshHost.refreshViewOnly();
       }
     },
     {
       keys: [CONFIG_KEYS.jenkinsfileIntelligenceEnabled],
-      run: (reactionContext) => {
-        reactionContext.jenkinsfileIntelligenceConfigState.updateConfig(
-          getJenkinsfileIntelligenceConfig(reactionContext.config)
-        );
+      run: (config) => {
+        jenkinsfileIntelligenceConfigState.updateConfig(getJenkinsfileIntelligenceConfig(config));
       }
     },
     {
       keys: JENKINSFILE_VALIDATION_CONFIG_KEYS,
-      run: (reactionContext) => {
-        reactionContext.jenkinsfileValidationCoordinator.updateConfig(
-          getJenkinsfileValidationConfig(reactionContext.config)
-        );
-        void syncJenkinsfileContext(reactionContext.jenkinsfileMatcher);
+      run: (config) => {
+        jenkinsfileValidationCoordinator.updateConfig(getJenkinsfileValidationConfig(config));
+        void syncJenkinsfileContext(jenkinsfileMatcher);
       }
     }
   ];
@@ -233,24 +201,9 @@ export function registerExtensionSubscriptions(
       return;
     }
 
-    const reactionContext: ConfigReactionContext = {
-      config: getExtensionConfiguration(),
-      dataService,
-      refreshHost,
-      statusRefreshService,
-      activityRefreshService,
-      treeDataProvider,
-      poller,
-      queuePoller,
-      currentBranchPullRequestJobMatcher,
-      currentBranchService,
-      jenkinsfileIntelligenceConfigState,
-      jenkinsfileValidationCoordinator,
-      jenkinsfileMatcher
-    };
-
+    const config = getExtensionConfiguration();
     for (const match of matches) {
-      match.reaction.run(reactionContext, match.changedKeys);
+      match.reaction.run(config, match.changedKeys);
     }
   });
 

@@ -127,7 +127,7 @@ export class JenkinsTaskTerminal implements vscode.Pseudoterminal {
         return;
       }
       const jobUrl = normalized.definition.jobUrl;
-      const parsedJob = parseJobUrl(jobUrl);
+      const parsedJob = parseJobUrl(jobUrl, environment.url);
       const jobLabel = parsedJob ? parsedJob.fullPath.join(" / ") : jobUrl;
 
       const parametersResult = parseTaskParameters(normalized.definition.parameters);

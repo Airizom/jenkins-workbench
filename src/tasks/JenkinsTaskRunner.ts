@@ -49,6 +49,7 @@ export class JenkinsTaskRunner {
   private cancelRequested = false;
   private cancelResolver: ((result: JenkinsTaskRunResult) => void) | undefined;
   private readonly cancelResult: Promise<JenkinsTaskRunResult>;
+  private readonly cancelWaiters = new Set<() => void>();
   private executionCompletion: Promise<void> = Promise.resolve();
   private runStarted = false;
   private request: JenkinsTaskRunRequest | undefined;
@@ -107,6 +108,10 @@ export class JenkinsTaskRunner {
     this.cancelRequested = true;
     this.stateValue = "canceled";
     this.cancelResolver?.(this.canceledResult());
+    for (const cancelWait of this.cancelWaiters) {
+      cancelWait();
+    }
+    this.cancelWaiters.clear();
     if (this.runStarted) {
       void this.ensureCleanup();
     }
@@ -194,6 +199,7 @@ export class JenkinsTaskRunner {
       }
 
       const message = errorMessage(error);
+      // The build follower flushes before its completion status; do the same before the error status.
       consoleWriter.flush();
       output.writeStatus(`Error: ${message}`);
       if (this.submitted) {
@@ -201,8 +207,6 @@ export class JenkinsTaskRunner {
       }
       this.stateValue = "failed";
       return this.errorResult(message);
-    } finally {
-      consoleWriter.flush();
     }
   }
 
@@ -273,15 +277,22 @@ export class JenkinsTaskRunner {
   }
 
   private async waitForNextPoll(consecutiveErrors = 0): Promise<void> {
+    this.throwIfCanceled();
     const multiplier = consecutiveErrors > 0 ? 2 ** Math.min(consecutiveErrors - 1, 10) : 1;
     const delayMs = Math.min(this.options.pollIntervalMs * multiplier, MAX_RETRY_DELAY_MS);
-    await Promise.race([
-      this.options.delay(delayMs),
-      this.cancelResult.then(() => {
-        throw new TaskCanceledError();
-      })
-    ]);
-    this.throwIfCanceled();
+    let cancelWait: (() => void) | undefined;
+    const canceled = new Promise<void>((resolve) => {
+      cancelWait = resolve;
+      this.cancelWaiters.add(resolve);
+    });
+    try {
+      await Promise.race([this.options.delay(delayMs), canceled]);
+      this.throwIfCanceled();
+    } finally {
+      if (cancelWait) {
+        this.cancelWaiters.delete(cancelWait);
+      }
+    }
   }
 
   private throwIfCanceled(): void {

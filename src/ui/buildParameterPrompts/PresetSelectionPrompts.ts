@@ -21,10 +21,8 @@ export async function choosePreset(
     );
 
     const picks: Array<
-      vscode.QuickPickItem & {
-        action: "manual" | "preset" | "manage";
-        presetId?: string;
-      }
+      vscode.QuickPickItem &
+        ({ action: "manual" } | { action: "manage" } | { action: "preset"; presetId: string })
     > = [
       {
         label: "Manual entry",
@@ -69,10 +67,6 @@ export async function choosePreset(
       continue;
     }
 
-    if (!pick.presetId) {
-      continue;
-    }
-
     const preset = await options.presetStore.getPreset(
       options.environment.scope,
       options.environment.environmentId,
@@ -92,10 +86,6 @@ async function managePresets(
   options: BuildParameterPromptOptions,
   presets: ParameterPresetSummary[]
 ): Promise<void> {
-  if (presets.length === 0) {
-    return;
-  }
-
   const action = await vscode.window.showQuickPick(
     [
       { label: "Rename preset", action: "rename" as const },

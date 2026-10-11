@@ -8,7 +8,7 @@ import type {
   JenkinsfileStepSignature
 } from "../JenkinsfileIntelligenceTypes";
 import type { JenkinsfileStepCatalogService } from "../JenkinsfileStepCatalogService";
-import { canProvideJenkinsfileIntelligence } from "./JenkinsfileEditorSupport";
+import { canProvideJenkinsfileIntelligence, getCallParameters } from "./JenkinsfileEditorSupport";
 
 export class JenkinsfileSignatureHelpProvider implements vscode.SignatureHelpProvider {
   constructor(
@@ -45,7 +45,7 @@ export class JenkinsfileSignatureHelpProvider implements vscode.SignatureHelpPro
     help.signatures = signatures;
     help.activeSignature = resolveActiveSignature(step, analysis.argumentContext.usesNamedArgs);
     help.activeParameter = resolveActiveParameter(
-      step.signatures[help.activeSignature] ?? step.signatures[0],
+      step.signatures[help.activeSignature],
       analysis.argumentContext
     );
     return help;
@@ -54,12 +54,10 @@ export class JenkinsfileSignatureHelpProvider implements vscode.SignatureHelpPro
 
 function toSignatureInformation(signature: JenkinsfileStepSignature): vscode.SignatureInformation {
   const info = new vscode.SignatureInformation(signature.label);
-  info.parameters = signature.parameters
-    .filter((parameter) => !parameter.isBody)
-    .map(
-      (parameter) =>
-        new vscode.ParameterInformation(buildParameterLabel(parameter), parameter.description)
-    );
+  info.parameters = getCallParameters(signature).map(
+    (parameter) =>
+      new vscode.ParameterInformation(buildParameterLabel(parameter), parameter.description)
+  );
   return info;
 }
 
@@ -76,7 +74,7 @@ function resolveActiveParameter(
   signature: JenkinsfileStepSignature,
   context: { activeIndex: number; activeName?: string }
 ): number {
-  const parameters = signature.parameters.filter((parameter) => !parameter.isBody);
+  const parameters = getCallParameters(signature);
   if (parameters.length === 0) {
     return 0;
   }

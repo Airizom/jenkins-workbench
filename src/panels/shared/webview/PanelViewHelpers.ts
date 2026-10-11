@@ -12,8 +12,6 @@ import {
   renderPanelLoadingHtml
 } from "./WebviewHtml";
 
-export type PanelViewAssets = ResolvedWebviewAssets;
-
 export interface EnvironmentPanelRenderOptions {
   nonce: string;
   panelState?: unknown;
@@ -39,13 +37,13 @@ export class EnvironmentPanelView<TModel> {
     private readonly renderPanelHtml: (model: TModel, options: PanelDetailsRenderOptions) => string
   ) {}
 
-  resolveAssets(): PanelViewAssets | undefined {
+  resolveAssets(): ResolvedWebviewAssets | undefined {
     return resolvePanelAssets(this.panel, this.extensionUri, this.entryName);
   }
 
   resolveAssetsAndRenderLoading(
     options: EnvironmentPanelRenderOptions
-  ): PanelViewAssets | undefined {
+  ): ResolvedWebviewAssets | undefined {
     return resolvePanelAssetsAndRenderLoading({
       panel: this.panel,
       extensionUri: this.extensionUri,
@@ -59,7 +57,7 @@ export class EnvironmentPanelView<TModel> {
 
   renderModel(
     model: TModel,
-    assets: PanelViewAssets,
+    assets: ResolvedWebviewAssets,
     options: EnvironmentPanelRenderOptions
   ): void {
     this.panel.webview.html = this.renderPanelHtml(model, {
@@ -81,7 +79,7 @@ function resolvePanelAssets(
   extensionUri: vscode.Uri,
   entryName: WebviewEntryName,
   errorOptions?: PanelManifestErrorOptions
-): PanelViewAssets | undefined {
+): ResolvedWebviewAssets | undefined {
   try {
     return resolveWebviewAssets(panel.webview, extensionUri, entryName);
   } catch {
@@ -94,7 +92,7 @@ function resolvePanelAssets(
 
 export function resolvePanelAssetsAndRenderLoading(
   options: PanelLoadingShellOptions
-): PanelViewAssets | undefined {
+): ResolvedWebviewAssets | undefined {
   const assets = resolvePanelAssets(
     options.panel,
     options.extensionUri,
@@ -110,21 +108,11 @@ export function resolvePanelAssetsAndRenderLoading(
     return undefined;
   }
 
-  assignPanelLoadingHtml(options.panel, options.renderLoadingHtml, {
+  options.panel.webview.html = options.renderLoadingHtml({
+    cspSource: options.panel.webview.cspSource,
     nonce: options.nonce,
     styleUris: assets.styleUris,
     panelState: options.panelState
   });
   return assets;
-}
-
-function assignPanelLoadingHtml(
-  panel: vscode.WebviewPanel,
-  renderLoadingHtml: (options: PanelDetailsRenderOptions) => string,
-  options: Omit<PanelDetailsRenderOptions, "cspSource" | "scriptUri">
-): void {
-  panel.webview.html = renderLoadingHtml({
-    ...options,
-    cspSource: panel.webview.cspSource
-  });
 }

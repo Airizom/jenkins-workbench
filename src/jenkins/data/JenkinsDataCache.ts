@@ -80,26 +80,66 @@ export class JenkinsDataCache {
       return Promise.resolve(entry.value);
     }
 
-    const existingLoad = this.pendingLoads.get(key)?.promise;
+    const existing = this.pendingLoads.get(key);
+    const existingLoad = existing?.isValid ? existing.promise : undefined;
     if (existingLoad) {
       return existingLoad as Promise<T>;
     }
 
     const pendingLoad: PendingLoad = { isValid: true };
-    const promise = (async () => {
-      const result = await loader();
-      if (pendingLoad.isValid) {
-        this.setEntry(key, result, ttlMs);
-      }
-      return result;
-    })();
-    pendingLoad.promise = promise;
-    this.pendingLoads.set(key, pendingLoad);
-    void promise.then(
-      () => this.unregisterPendingLoad(key, pendingLoad),
-      () => this.unregisterPendingLoad(key, pendingLoad)
+    const promise = this.runWithWriteGuard(
+      [key],
+      async (cache) => {
+        const result = await loader();
+        cache.set(key, result, ttlMs);
+        return result;
+      },
+      pendingLoad
     );
+    pendingLoad.promise = promise;
     return promise;
+  }
+
+  // Keep asynchronous writes scoped to the load that started them, including refreshes
+  // and loads that write several related entries.
+  withWriteGuard<T>(
+    keys: string[],
+    operation: (cache: Pick<JenkinsDataCache, "set" | "delete">) => Promise<T>
+  ): Promise<T> {
+    return this.runWithWriteGuard(keys, operation);
+  }
+
+  private runWithWriteGuard<T>(
+    keys: string[],
+    operation: (cache: Pick<JenkinsDataCache, "set" | "delete">) => Promise<T>,
+    pendingLoad: PendingLoad = { isValid: true }
+  ): Promise<T> {
+    for (const key of keys) {
+      this.invalidatePendingLoad(key);
+      this.pendingLoads.set(key, pendingLoad);
+    }
+    const canWrite = (key: string): boolean =>
+      pendingLoad.isValid && this.pendingLoads.get(key) === pendingLoad;
+    return (async () => {
+      try {
+        return await operation({
+          set: (key, value, ttlMs) => {
+            if (canWrite(key)) {
+              this.setEntry(key, value, ttlMs);
+            }
+          },
+          delete: (key) => {
+            if (canWrite(key)) {
+              this.cache.delete(key);
+            }
+          }
+        });
+      } finally {
+        for (const key of keys) {
+          this.unregisterPendingLoad(key, pendingLoad);
+        }
+      }
+    })();
   }
 
   buildKey(

@@ -81,12 +81,7 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
     this.scope = environment.scope;
     this.url = environment.url;
     this.username = environment.username;
-    this.id = InstanceTreeItem.buildId({
-      environmentId: environment.id,
-      scope: environment.scope,
-      url: environment.url,
-      username: environment.username
-    });
+    this.id = InstanceTreeItem.buildId(this);
     this.contextValue = "environment";
     const identity = [formatScopeLabel(environment.scope), environment.username].filter(Boolean);
     this.description = (

@@ -34,11 +34,11 @@ export interface SetLoadingOutgoingMessage {
 export function parseSetLoadingOutgoingMessage(
   record: Record<string, unknown>
 ): SetLoadingOutgoingMessage | undefined {
-  if (record.type !== "setLoading") {
+  if (record.type !== "setLoading" || typeof record.value !== "boolean") {
     return undefined;
   }
   return {
     type: "setLoading",
-    value: typeof record.value === "boolean" ? record.value : Boolean(record.value)
+    value: record.value
   };
 }

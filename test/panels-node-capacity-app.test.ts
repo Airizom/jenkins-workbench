@@ -53,13 +53,32 @@ describe("planExecutorLoads", () => {
     assert.deepEqual(planExecutorLoads([node(nodeA, 2), node(nodeB)], requested, 0, "t1"), [nodeA]);
   });
 
-  it("re-requests every expanded node after a manual refresh", () => {
+  it("re-requests idle nodes immediately after a manual refresh", () => {
     const requested = new Map<string, string>();
-    planExecutorLoads([node(nodeA), node(nodeB)], requested, 0, "t1");
+    planExecutorLoads([node(nodeA, 0), node(nodeB, 0)], requested, 0, "t1");
 
-    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB)], requested, 1, "t1"), [
+    assert.deepEqual(planExecutorLoads([node(nodeA, 0), node(nodeB, 0)], requested, 1, "t1"), [
       nodeA,
       nodeB
+    ]);
+  });
+
+  it("requests busy nodes once per manual refresh, when the refreshed snapshot arrives", () => {
+    const requested = new Map<string, string>();
+    planExecutorLoads([node(nodeA), node(nodeB, 0)], requested, 0, "t1");
+
+    // The refresh bumps the generation before the new snapshot arrives.
+    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB, 0)], requested, 1, "t1"), [nodeB]);
+    assert.deepEqual(planExecutorLoads([node(nodeA), node(nodeB, 0)], requested, 1, "t2"), [nodeA]);
+  });
+
+  it("re-requests an idle node that drops out of a snapshot and returns unchanged", () => {
+    const requested = new Map<string, string>();
+    planExecutorLoads([node(nodeA, 0), node(nodeB, 0)], requested, 0, "t1");
+
+    assert.deepEqual(planExecutorLoads([node(nodeB, 0)], requested, 0, "t2"), []);
+    assert.deepEqual(planExecutorLoads([node(nodeA, 0), node(nodeB, 0)], requested, 0, "t3"), [
+      nodeA
     ]);
   });
 

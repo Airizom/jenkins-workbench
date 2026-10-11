@@ -44,23 +44,26 @@ export class JenkinsParameterPresetStore {
       .map(toPresetSummary);
   }
 
-  async getPreset(
+  getPreset(
     scope: EnvironmentScope,
     environmentId: string,
     jobUrl: string,
     presetId: string
   ): Promise<ParameterPreset | undefined> {
-    const preset = this.state
-      .findJob(scope, environmentId, jobUrl)
-      ?.presets.find((candidate) => candidate.id === presetId);
-    if (!preset) {
-      return undefined;
-    }
+    // Keep metadata and secret reads together so mutations cannot delete their keys mid-read.
+    return this.mutationQueue(async () => {
+      const preset = this.state
+        .findJob(scope, environmentId, jobUrl)
+        ?.presets.find((candidate) => candidate.id === presetId);
+      if (!preset) {
+        return undefined;
+      }
 
-    return {
-      ...toPresetSummary(preset),
-      values: await this.secrets.resolveValues(preset.values, preset.secretKeys)
-    };
+      return {
+        ...toPresetSummary(preset),
+        values: await this.secrets.resolveValues(preset.values, preset.secretKeys)
+      };
+    });
   }
 
   savePreset(
@@ -259,9 +262,10 @@ export class JenkinsParameterPresetStore {
       jobs[sourceIndex] = { ...source, jobUrl: newJobUrl };
     } else {
       const target = jobs[targetIndex];
-      const sortedPresets = [...target.presets, ...source.presets].sort(
-        (a, b) => b.updatedAt - a.updatedAt
-      );
+      const sortedPresets = [
+        ...target.presets,
+        ...withUniqueNamesAndIds(source.presets, target.presets)
+      ].sort((a, b) => b.updatedAt - a.updatedAt);
       jobs[targetIndex] = {
         ...target,
         presets: sortedPresets
@@ -311,6 +315,34 @@ function assertUniqueName(presets: StoredParameterPreset[], presetId: string, na
   if (duplicate) {
     throw new Error(`A preset named "${name}" already exists for this job.`);
   }
+}
+
+// Merged presets are kept rather than dropped (they may own secrets the user
+// still needs), so incoming presets receive unique names and IDs on collision.
+function withUniqueNamesAndIds(
+  incoming: StoredParameterPreset[],
+  existing: StoredParameterPreset[]
+): StoredParameterPreset[] {
+  const usedNames = new Set(existing.map((preset) => normalizePresetName(preset.name)));
+  const usedIds = new Set(existing.map((preset) => preset.id));
+  return incoming.map((preset) => {
+    let id = preset.id;
+    while (usedIds.has(id)) {
+      id = crypto.randomUUID();
+    }
+    usedIds.add(id);
+    const baseName = preset.name.trim();
+    let name = baseName;
+    for (let suffix = 2; usedNames.has(normalizePresetName(name)); suffix++) {
+      name = `${baseName} (${suffix})`;
+    }
+    usedNames.add(normalizePresetName(name));
+    return name === preset.name && id === preset.id ? preset : { ...preset, id, name };
+  });
+}
+
+function normalizePresetName(name: string): string {
+  return name.trim().toLocaleLowerCase();
 }
 
 function toPresetSummary(preset: StoredParameterPreset): ParameterPresetSummary {

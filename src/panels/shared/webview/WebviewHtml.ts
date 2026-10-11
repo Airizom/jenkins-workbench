@@ -238,7 +238,7 @@ export function renderPanelRestoreErrorHtml(
         ${reloadAction}
         ${details}
       </main>
-      ${renderErrorPageScript(options.panelState, nonce, showReloadAction === true)}
+      ${renderWebviewBootstrapScript(options.panelState, nonce, showReloadAction === true)}
       <style>
         .jenkins-workbench-panel-message {
           color: var(--vscode-foreground);
@@ -295,7 +295,7 @@ export function renderPanelRestoreErrorHtml(
 
 // Acquires the webview API once (a second `acquireVsCodeApi()` call throws),
 // restores panel state, and wires the optional reload button.
-function renderErrorPageScript(state: unknown, nonce: string, withReload: boolean): string {
+function renderWebviewBootstrapScript(state: unknown, nonce: string, withReload: boolean): string {
   if (state === undefined && !withReload) {
     return "";
   }
@@ -325,30 +325,21 @@ function renderErrorPageScript(state: unknown, nonce: string, withReload: boolea
 
 export type PanelDetailsRenderOptions = WebviewRenderOptions & { panelState?: unknown };
 
-export interface TypedPanelRendererOptions {
-  entryName: WebviewEntryName;
-  skeletonVariant: LoadingSkeletonVariant;
-}
-
 export function renderPanelLoadingHtml(
   options: PanelDetailsRenderOptions,
   skeletonVariant: LoadingSkeletonVariant
 ): string {
-  const stateScript = renderWebviewStateScript(options.panelState, options.nonce);
+  const stateScript = renderWebviewBootstrapScript(options.panelState, options.nonce, false);
   return renderWebviewShell(`${stateScript}${renderLoadingSkeletonHtml(skeletonVariant)}`, options);
 }
 
-export function createTypedPanelRenderer<TModel>(
-  options: LoadingSkeletonVariant | TypedPanelRendererOptions
-) {
-  const entryName = typeof options === "string" ? undefined : options.entryName;
-  const skeletonVariant = typeof options === "string" ? options : options.skeletonVariant;
+export function createTypedPanelRenderer<TModel>(skeletonVariant: LoadingSkeletonVariant): {
+  renderLoadingHtml: (options: PanelDetailsRenderOptions) => string;
+  renderPanelHtml: (model: TModel, options: PanelDetailsRenderOptions) => string;
+} {
   return {
-    entryName,
-    renderLoadingHtml: (options: PanelDetailsRenderOptions): string =>
-      renderPanelLoadingHtml(options, skeletonVariant),
-    renderPanelHtml: (model: TModel, options: PanelDetailsRenderOptions): string =>
-      renderPanelAppHtml(model, options)
+    renderLoadingHtml: (options) => renderPanelLoadingHtml(options, skeletonVariant),
+    renderPanelHtml: renderPanelAppHtml
   };
 }
 
@@ -367,21 +358,6 @@ function renderPanelAppHtml(initialModel: unknown, options: PanelDetailsRenderOp
     `,
     options
   );
-}
-
-function renderWebviewStateScript(state: unknown, nonce: string): string {
-  if (state === undefined) {
-    return "";
-  }
-  const serialized = serializeForScript(state);
-  return `
-    <script nonce="${nonce}">
-      const vscodeApi = typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : undefined;
-      if (vscodeApi && typeof vscodeApi.setState === "function") {
-        vscodeApi.setState(${serialized});
-      }
-    </script>
-  `;
 }
 
 function renderInjectedWebviewStateScript(state: unknown, nonce: string): string {

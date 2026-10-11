@@ -1,6 +1,6 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
-import { type CachedValue, getFreshCachedValue, setCachedValue } from "./CurrentBranchCache";
+import { type CachedValue, resolveCachedLatest } from "./CurrentBranchCache";
 import type {
   CurrentBranchGitHubPullRequestAdapter,
   CurrentBranchPullRequestResolution
@@ -73,27 +73,15 @@ export class CurrentBranchTargetResolver {
     const requestId = ++this.requestId;
     const pullRequestContext = await this.resolvePullRequestContext(localState, options, requestId);
     const cacheKey = buildTargetResolutionCacheKey(localState, pullRequestContext);
-    if (!options.force) {
-      const cachedResolution = getFreshCachedValue(this.targetResolutionCache, cacheKey);
-      if (cachedResolution) {
-        return cachedResolution;
-      }
-    }
-
-    this.latestTargetRequest.set(
+    return resolveCachedLatest(
+      this.targetResolutionCache,
+      this.latestTargetRequest,
       cacheKey,
-      Math.max(requestId, this.latestTargetRequest.get(cacheKey) ?? 0)
+      requestId,
+      TARGET_RESOLUTION_CACHE_TTL_MS,
+      options.force,
+      () => this.fetchTargetResolution(localState, pullRequestContext, cacheKey)
     );
-    const resolution = await this.fetchTargetResolution(localState, pullRequestContext, cacheKey);
-    if (this.latestTargetRequest.get(cacheKey) === requestId) {
-      setCachedValue(
-        this.targetResolutionCache,
-        cacheKey,
-        resolution,
-        TARGET_RESOLUTION_CACHE_TTL_MS
-      );
-    }
-    return resolution;
   }
 
   private async resolvePullRequestContext(
@@ -101,25 +89,15 @@ export class CurrentBranchTargetResolver {
     options: CurrentBranchRefreshOptions,
     requestId: number
   ): Promise<CurrentBranchPullRequestResolution> {
-    const cacheKey = buildPullRequestContextCacheKey(localState);
-    if (!options.force) {
-      const cachedContext = getFreshCachedValue(this.pullRequestContextCache, cacheKey);
-      if (cachedContext) {
-        return cachedContext;
-      }
-    }
-
-    this.latestPullRequestRequest.set(cacheKey, requestId);
-    const context = await this.pullRequestAdapter.lookup(localState.repository);
-    if (this.latestPullRequestRequest.get(cacheKey) === requestId) {
-      setCachedValue(
-        this.pullRequestContextCache,
-        cacheKey,
-        context,
-        PULL_REQUEST_CONTEXT_CACHE_TTL_MS
-      );
-    }
-    return context;
+    return resolveCachedLatest(
+      this.pullRequestContextCache,
+      this.latestPullRequestRequest,
+      buildPullRequestContextCacheKey(localState),
+      requestId,
+      PULL_REQUEST_CONTEXT_CACHE_TTL_MS,
+      options.force,
+      () => this.pullRequestAdapter.lookup(localState.repository)
+    );
   }
 
   private async fetchTargetResolution(
@@ -169,6 +147,11 @@ export class CurrentBranchTargetResolver {
     const pullRequestMatch = this.pullRequestJobMatcher.findMatch(jobs, pullRequestContext);
     if (!pullRequestMatch) {
       return undefined;
+    }
+    if (pullRequestMatch.kind === "ambiguous") {
+      throw new Error(
+        `Multiple Jenkins jobs match PR #${pullRequestMatch.pullRequest.number}; unable to select a target.`
+      );
     }
 
     return {

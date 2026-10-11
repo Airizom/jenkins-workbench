@@ -28,6 +28,8 @@ export function BranchCard({
   onSelectPipelineLog?: (target: PipelineLogTargetViewModel) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const hasBranches = branch.parallelBranches.length > 0;
+  const hasDirectSteps = branch.stepsAll.length > 0;
   const steps = showAll ? branch.stepsAll : branch.stepsFailedOnly;
   const branchIcon = getStageIcon(branch.statusClass);
   const statusClass = getResultBadgeClass(branch.statusClass);
@@ -82,13 +84,27 @@ export function BranchCard({
             </Button>
           ) : null}
         </div>
-        {branch.hasSteps ? (
-          <CollapsibleContent className="border-t border-border px-2.5 pb-2 pt-1.5">
-            {steps.length > 0 ? (
-              <StepsList steps={steps} compact onSelectPipelineLog={onSelectPipelineLog} />
-            ) : (
-              <EmptyStepsMessage showAll={showAll} />
-            )}
+        {hasDirectSteps || hasBranches ? (
+          <CollapsibleContent className="space-y-2 border-t border-border px-2.5 pb-2 pt-1.5">
+            {hasBranches ? (
+              <div className="space-y-2">
+                {branch.parallelBranches.map((nestedBranch) => (
+                  <BranchCard
+                    key={nestedBranch.key}
+                    branch={nestedBranch}
+                    showAll={showAll}
+                    onSelectPipelineLog={onSelectPipelineLog}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {hasDirectSteps ? (
+              steps.length > 0 ? (
+                <StepsList steps={steps} compact onSelectPipelineLog={onSelectPipelineLog} />
+              ) : (
+                <EmptyStepsMessage showAll={showAll} />
+              )
+            ) : null}
           </CollapsibleContent>
         ) : null}
       </div>

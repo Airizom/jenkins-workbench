@@ -4,7 +4,7 @@ import { analyzeJenkinsfileContext } from "../JenkinsfileContextAnalyzer";
 import type { JenkinsfileIntelligenceConfigState } from "../JenkinsfileIntelligenceConfigState";
 import type { JenkinsfileStepSignature } from "../JenkinsfileIntelligenceTypes";
 import type { JenkinsfileStepCatalogService } from "../JenkinsfileStepCatalogService";
-import { canProvideJenkinsfileIntelligence } from "./JenkinsfileEditorSupport";
+import { canProvideJenkinsfileIntelligence, getCallParameters } from "./JenkinsfileEditorSupport";
 
 export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
   constructor(
@@ -95,8 +95,8 @@ function appendStepSignatures(
   markdown.appendMarkdown("**Signatures**\n");
   for (const signature of signatures) {
     markdown.appendMarkdown(`- ${codeSpan(signature.label)}\n`);
-    const describedParameters = signature.parameters.filter(
-      (parameter) => !parameter.isBody && parameter.description
+    const describedParameters = getCallParameters(signature).filter(
+      (parameter) => parameter.description
     );
     for (const parameter of describedParameters) {
       markdown.appendMarkdown(

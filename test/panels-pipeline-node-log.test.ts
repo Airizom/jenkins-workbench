@@ -187,6 +187,34 @@ describe("PipelineNodeLogFetcher", () => {
     assert.ok(appendResult.cachedLog?.text.endsWith("b".repeat(10)));
     assert.equal(appendResult.cachedLog?.truncated, true);
   });
+
+  it("windows an oversized initial progressive node log and flags it as truncated", async () => {
+    const fake = createFakeBackend();
+    const fetcher = createFetcher(fake.backend);
+    const html = `${"a".repeat(MAX_CONSOLE_CHARS)}<b>tail</b>`;
+
+    const initialFetch = fetcher.fetch(buildTarget("11"), true, undefined);
+    fake.resolveNext(buildChunk({ html, textSize: html.length, moreData: false }));
+    const result = await initialFetch;
+
+    assert.equal(result.log?.text.length, MAX_CONSOLE_CHARS);
+    assert.ok(result.log?.text.endsWith("tail"));
+    assert.equal(result.log?.truncated, true);
+    assert.equal(result.log?.html, result.log?.text);
+  });
+
+  it("keeps a small initial progressive node log intact", async () => {
+    const fake = createFakeBackend();
+    const fetcher = createFetcher(fake.backend);
+
+    const initialFetch = fetcher.fetch(buildTarget("11"), true, undefined);
+    fake.resolveNext(buildChunk({ html: "<b>ok</b><br>", textSize: 3, moreData: false }));
+    const result = await initialFetch;
+
+    assert.equal(result.log?.html, "<b>ok</b><br>");
+    assert.equal(result.log?.text, "ok\n");
+    assert.equal(result.log?.truncated, false);
+  });
 });
 
 describe("PipelineStageLogAggregator", () => {
@@ -264,6 +292,40 @@ describe("PipelineStageLogAggregator", () => {
     assert.equal(logCallCount, 2);
   });
 
+  it("stops refreshing a completed child node whose snapshot is truncated", async () => {
+    let logCallCount = 0;
+    const backend = {
+      getFlowNodeDetails: async () => ({
+        id: "stage-1",
+        status: "SUCCESS",
+        stageFlowNodes: [{ id: "child-1" }]
+      }),
+      getFlowNodeLog: async (_environment: unknown, _buildUrl: string, nodeId: string) => {
+        logCallCount += 1;
+        return { nodeId, text: "partial", hasMore: true, nodeStatus: "SUCCESS" };
+      }
+    } as unknown as BuildDetailsConsoleBackend;
+    const aggregator = new PipelineStageLogAggregator({
+      backend,
+      environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl: "https://jenkins.example/job/example/1/"
+    });
+    const target: PipelineLogTargetViewModel = {
+      key: "stage:stage-1",
+      kind: "stage",
+      name: "Stage 1",
+      nodeId: "stage-1"
+    };
+
+    const firstResult = await aggregator.fetch(target, true);
+    const secondResult = await aggregator.fetch(target, false);
+
+    assert.equal(firstResult.truncated, true);
+    assert.equal(firstResult.polling, false);
+    assert.equal(secondResult.polling, false);
+    assert.equal(logCallCount, 1);
+  });
+
   it("starts every request in the capped stage-log batch before awaiting results", async () => {
     const nodeIds = ["1", "2", "3", "4", "5", "6"];
     const calls: string[] = [];
@@ -297,9 +359,205 @@ describe("PipelineStageLogAggregator", () => {
       nodeIds.map((nodeId) => `===== Node ${nodeId} =====\nlog ${nodeId}`).join("\n\n")
     );
   });
+
+  it("keeps the other node logs when one child node fetch fails", async () => {
+    const calls: string[] = [];
+    const backend = {
+      getFlowNodeLog: async (_environment: unknown, _buildUrl: string, nodeId: string) => {
+        calls.push(nodeId);
+        if (nodeId === "2") {
+          throw new Error("boom");
+        }
+        return { nodeId, text: `log ${nodeId}`, hasMore: false, nodeStatus: "SUCCESS" };
+      }
+    } as unknown as BuildDetailsConsoleBackend;
+    const aggregator = new PipelineStageLogAggregator({
+      backend,
+      environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl: "https://jenkins.example/job/example/1/"
+    });
+    const target: PipelineLogTargetViewModel = {
+      key: "stage:1",
+      kind: "stage",
+      name: "Stage 1",
+      childNodeIds: ["1", "2", "3"]
+    };
+
+    const result = await aggregator.fetch(target, true);
+    assert.ok(result.text.includes("===== Node 1 =====\nlog 1"));
+    assert.ok(result.text.includes("===== Node 2 =====\nFailed to load node log: boom"));
+    assert.ok(result.text.includes("===== Node 3 =====\nlog 3"));
+    assert.equal(result.loading, false);
+    assert.equal(result.polling, true);
+
+    calls.length = 0;
+    await aggregator.fetch(target, true);
+    assert.deepEqual(calls, ["2"]);
+  });
+
+  it("rethrows when every child node fetch fails", async () => {
+    const backend = {
+      getFlowNodeLog: async () => {
+        throw new Error("down");
+      }
+    } as unknown as BuildDetailsConsoleBackend;
+    const aggregator = new PipelineStageLogAggregator({
+      backend,
+      environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl: "https://jenkins.example/job/example/1/"
+    });
+
+    await assert.rejects(
+      aggregator.fetch(
+        { key: "stage:1", kind: "stage", name: "Stage 1", childNodeIds: ["1", "2"] },
+        true
+      ),
+      /down/
+    );
+  });
 });
 
 describe("PipelineNodeLogManager", () => {
+  it.each(["transient", "persistent"])(
+    "schedules bounded retries for a %s partial stage-log failure",
+    async (failure) => {
+      vi.useFakeTimers();
+      try {
+        const calls: string[] = [];
+        let failedNodeCalls = 0;
+        const backend = {
+          getFlowNodeDetails: async () => ({
+            id: "stage-1",
+            status: "SUCCESS",
+            stageFlowNodes: [{ id: "1" }, { id: "2" }]
+          }),
+          getFlowNodeLog: async (_environment: unknown, _buildUrl: string, nodeId: string) => {
+            calls.push(nodeId);
+            if (nodeId === "2") {
+              failedNodeCalls += 1;
+              if (failure === "persistent" || failedNodeCalls === 1) {
+                throw new Error("outage");
+              }
+            }
+            return { text: `log ${nodeId}`, hasMore: false, nodeStatus: "SUCCESS" };
+          }
+        } as unknown as BuildDetailsConsoleBackend;
+        const manager = new PipelineNodeLogManager({
+          backend,
+          environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+          buildUrl: "https://jenkins.example/job/example/1/",
+          getRefreshIntervalMs: () => 1000,
+          formatError: String,
+          callbacks: {
+            onSetLog: () => undefined,
+            onAppendHtml: () => undefined,
+            onLoading: () => undefined,
+            onError: () => assert.fail("partial failures should retain the aggregate")
+          }
+        });
+        const target: PipelineLogTargetViewModel = {
+          key: "stage:stage-1",
+          kind: "stage",
+          name: "Stage 1",
+          nodeId: "stage-1"
+        };
+
+        manager.selectTarget(target);
+        await vi.advanceTimersByTimeAsync(0);
+        assert.deepEqual(calls, ["1", "2"]);
+        assert.match(manager.getActiveLog()?.text ?? "", /Failed to load node log: outage/);
+        assert.equal(manager.getActiveLog()?.loading, false);
+        assert.equal(manager.getActiveLog()?.polling, true);
+        assert.equal(vi.getTimerCount(), 1);
+
+        await vi.advanceTimersByTimeAsync(1000);
+        assert.deepEqual(calls, ["1", "2", "2"]);
+        if (failure === "transient") {
+          assert.equal(
+            manager.getActiveLog()?.text,
+            "===== Node 1 =====\nlog 1\n\n===== Node 2 =====\nlog 2"
+          );
+        }
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        assert.equal(failedNodeCalls, failure === "transient" ? 2 : 4);
+        assert.equal(manager.getActiveLog()?.polling, false);
+        assert.equal(vi.getTimerCount(), 0);
+
+        if (failure === "persistent") {
+          manager.selectTarget(target);
+          await vi.advanceTimersByTimeAsync(10_000);
+          assert.equal(failedNodeCalls, 8, "reselecting renews the failed node's retry budget");
+          assert.equal(calls.filter((nodeId) => nodeId === "1").length, 1);
+          assert.equal(vi.getTimerCount(), 0);
+        }
+        manager.dispose();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it.each(["reselect", "resume"])(
+    "stops retries with a cached active log until %s",
+    async (recovery) => {
+      vi.useFakeTimers();
+      try {
+        let snapshotCalls = 0;
+        const backend = {
+          getFlowNodeLogHtmlProgressive: async () => undefined,
+          getFlowNodeLog: async (): Promise<JenkinsFlowNodeLog> => {
+            snapshotCalls += 1;
+            if (snapshotCalls === 1) {
+              return { text: "active log", hasMore: false, nodeStatus: "IN_PROGRESS" };
+            }
+            throw new Error("persistent outage");
+          }
+        } as unknown as BuildDetailsConsoleBackend;
+        const errors: string[] = [];
+        const manager = new PipelineNodeLogManager({
+          backend,
+          environment: { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+          buildUrl: "https://jenkins.example/job/example/1/",
+          getRefreshIntervalMs: () => 1000,
+          formatError: (error) => (error instanceof Error ? error.message : String(error)),
+          callbacks: {
+            onSetLog: () => undefined,
+            onAppendHtml: () => undefined,
+            onLoading: () => undefined,
+            onError: (_targetKey, error) => errors.push(error)
+          }
+        });
+
+        manager.selectTarget(buildTarget("7"));
+        await vi.advanceTimersByTimeAsync(0);
+        assert.equal(manager.getActiveLog()?.polling, true);
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        assert.equal(snapshotCalls, 5, "one success followed by a failure and three retries");
+        assert.equal(errors.length, 4);
+        assert.equal(manager.getActiveLog()?.text, "active log");
+        assert.equal(vi.getTimerCount(), 0);
+
+        if (recovery === "reselect") {
+          manager.selectTarget(buildTarget("7"));
+        } else {
+          manager.resume();
+        }
+        await vi.advanceTimersByTimeAsync(0);
+        assert.equal(snapshotCalls, 6);
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        assert.equal(snapshotCalls, 9, "recovery resets the retry budget");
+        assert.equal(errors.length, 8);
+        assert.equal(vi.getTimerCount(), 0);
+        manager.dispose();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
   it("retries an uncached target after its initial fetch fails", async () => {
     vi.useFakeTimers();
     try {

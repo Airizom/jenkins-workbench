@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { createUniqueListKeys } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/buildFailureListKeys";
+import { createUniqueListKeys } from "../src/panels/shared/webview/lib/uniqueListKeys";
 
 describe("build failure list keys", () => {
   it("creates unique keys for repeated or missing identities", () => {

@@ -115,6 +115,7 @@ export class BuildDiagnosticsCoordinator
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration("jenkinsWorkbench.diagnostics")) {
+          this.scanRunner.invalidateProfiles();
           this.resetAndEvaluate("diagnostic settings changed");
         }
       })

@@ -14,6 +14,10 @@ import type { NormalizedDiagnosticProfile, RawBuildDiagnostic } from "./BuildDia
 const DEFAULT_CHUNK_BYTES = 256 * 1024;
 const MAX_DRAIN_REQUESTS = 256;
 const DEFAULT_MAX_DIAGNOSTICS = 2_000;
+// Allow alias deduplication some headroom without resolving every path in the log.
+const RETENTION_RESOLUTION_MULTIPLIER = 4;
+// Fallback scans re-read the console head, so running builds refresh them sparingly.
+const DEFAULT_FALLBACK_REFRESH_INTERVAL_MS = 30_000;
 
 export interface BuildDiagnosticScanSnapshot {
   diagnostics: readonly RawBuildDiagnostic[];
@@ -47,11 +51,14 @@ export interface BuildDiagnosticScanSessionOptions {
   customMatcherRunnerFactory?: (
     onDisabled: (reason: CustomMatcherWorkerDisableReason) => void
   ) => BuildDiagnosticCustomMatcherRunner;
+  fallbackRefreshIntervalMs?: number;
+  now?: () => number;
 }
 
 interface ProgressiveDrainState {
   serverHasMore: boolean;
   requestCount: number;
+  requestBudget: number;
 }
 
 /**
@@ -72,6 +79,10 @@ export class BuildDiagnosticScanSession {
   private readonly retainedSignatures = new Set<string>();
   private signatureByDiagnostic = new WeakMap<RawBuildDiagnostic, string>();
   private readonly resolveDiagnostic?: BuildDiagnosticScanSessionOptions["resolveDiagnostic"];
+  // Retention only needs a stable identity per raw path, so each path is resolved once per
+  // session. Attempts (and so cached identities) are bounded by a per-session budget.
+  private readonly retentionPathByRawPath = new Map<string, Promise<string | undefined>>();
+  private pathResolutionAttempts = 0;
   private retainedDiagnosticCount = 0;
   private omittedCount = 0;
   private nextOffset = 0;
@@ -85,6 +96,9 @@ export class BuildDiagnosticScanSession {
   private lineTruncationWarning: string | undefined;
   private disposed = false;
   private readonly customMatcherRunnerFactory: BuildDiagnosticScanSessionOptions["customMatcherRunnerFactory"];
+  private readonly fallbackRefreshIntervalMs: number;
+  private readonly now: () => number;
+  private lastFallbackScanAt: number | undefined;
 
   constructor(options: BuildDiagnosticScanSessionOptions) {
     this.dataService = options.dataService;
@@ -99,6 +113,11 @@ export class BuildDiagnosticScanSession {
     this.resolveDiagnostic = options.resolveDiagnostic;
     this.chunkBytes = Math.max(1024, Math.floor(options.chunkBytes ?? DEFAULT_CHUNK_BYTES));
     this.customMatcherRunnerFactory = options.customMatcherRunnerFactory;
+    this.fallbackRefreshIntervalMs = Math.max(
+      0,
+      options.fallbackRefreshIntervalMs ?? DEFAULT_FALLBACK_REFRESH_INTERVAL_MS
+    );
+    this.now = options.now ?? Date.now;
     this.parser = options.parser ?? createBuiltInParser(options.profile);
     this.customMatcherRunner =
       options.customMatcherRunner ?? this.createCustomMatcherRunner(options.profile);
@@ -112,6 +131,9 @@ export class BuildDiagnosticScanSession {
       return this.snapshot();
     }
     if (this.progressiveState === "unsupported") {
+      if (building && this.isFallbackRefreshThrottled()) {
+        return this.snapshot();
+      }
       await this.scanFallback(building);
       return this.snapshot();
     }
@@ -140,11 +162,16 @@ export class BuildDiagnosticScanSession {
       return;
     }
     this.disposed = true;
+    this.retentionPathByRawPath.clear();
     this.customMatcherRunner.dispose();
   }
 
   private async drainProgressive(building: boolean): Promise<void> {
-    const state: ProgressiveDrainState = { serverHasMore: true, requestCount: 0 };
+    const state: ProgressiveDrainState = {
+      serverHasMore: true,
+      requestCount: 0,
+      requestBudget: this.getDrainRequestBudget(building)
+    };
     while (this.canDrainProgressive(state)) {
       const shouldStop = await this.drainNextProgressiveChunk(state, building);
       if (shouldStop) {
@@ -161,11 +188,22 @@ export class BuildDiagnosticScanSession {
     }
   }
 
+  /**
+   * A finished build is drained in one pass, so its request budget must cover
+   * maxLogBytes at the configured chunk size, with room for short responses.
+   */
+  private getDrainRequestBudget(building: boolean): number {
+    if (building) {
+      return MAX_DRAIN_REQUESTS;
+    }
+    return Math.max(MAX_DRAIN_REQUESTS, 2 * Math.ceil(this.maxLogBytes / this.chunkBytes));
+  }
+
   private canDrainProgressive(state: ProgressiveDrainState): boolean {
     return (
       state.serverHasMore &&
       this.bytesRead < this.maxLogBytes &&
-      state.requestCount < MAX_DRAIN_REQUESTS &&
+      state.requestCount < state.requestBudget &&
       !this.disposed
     );
   }
@@ -217,7 +255,7 @@ export class BuildDiagnosticScanSession {
   private finishProgressiveDrain(state: ProgressiveDrainState, building: boolean): void {
     if (
       (this.bytesRead >= this.maxLogBytes ||
-        (!building && state.requestCount >= MAX_DRAIN_REQUESTS)) &&
+        (!building && state.requestCount >= state.requestBudget)) &&
       (state.serverHasMore || building)
     ) {
       this.truncated = true;
@@ -227,7 +265,15 @@ export class BuildDiagnosticScanSession {
     }
   }
 
+  private isFallbackRefreshThrottled(): boolean {
+    return (
+      typeof this.lastFallbackScanAt === "number" &&
+      this.now() - this.lastFallbackScanAt < this.fallbackRefreshIntervalMs
+    );
+  }
+
   private async scanFallback(building: boolean): Promise<void> {
+    this.lastFallbackScanAt = this.now();
     const result = await this.dataService.getConsoleTextHead(
       this.environment,
       this.buildUrl,
@@ -272,13 +318,17 @@ export class BuildDiagnosticScanSession {
       return;
     }
     this.finishApplied = true;
-    const builtIns = this.parser.finish();
-    if (this.parser.didTruncateLine) {
-      this.recordLineTruncation();
+    try {
+      const builtIns = this.parser.finish();
+      if (this.parser.didTruncateLine) {
+        this.recordLineTruncation();
+      }
+      const custom = await this.customMatcherRunner.finish();
+      await this.retainDiagnostics(builtIns);
+      await this.retainDiagnostics(custom);
+    } finally {
+      this.retentionPathByRawPath.clear();
     }
-    const custom = await this.customMatcherRunner.finish();
-    await this.retainDiagnostics(builtIns);
-    await this.retainDiagnostics(custom);
   }
 
   private async retainDiagnostics(next: readonly RawBuildDiagnostic[]): Promise<void> {
@@ -286,11 +336,7 @@ export class BuildDiagnosticScanSession {
       if (this.disposed) {
         return;
       }
-      // Keep a failed path for aggregation, which reports it as unresolved and
-      // continues publishing diagnostics whose paths remain accessible.
-      const resolvedPath = this.resolveDiagnostic
-        ? await this.resolveDiagnostic(diagnostic).catch(() => undefined)
-        : undefined;
+      const resolvedPath = await this.resolveRetentionPath(diagnostic);
       if (this.disposed) {
         return;
       }
@@ -319,21 +365,42 @@ export class BuildDiagnosticScanSession {
     }
   }
 
+  private resolveRetentionPath(diagnostic: RawBuildDiagnostic): Promise<string | undefined> {
+    if (!this.resolveDiagnostic) {
+      return Promise.resolve(undefined);
+    }
+    const rawPath = diagnostic.rawPath;
+    const cached = this.retentionPathByRawPath.get(rawPath);
+    if (cached) {
+      return cached;
+    }
+    // Past the budget, retention falls back to the raw path as its identity.
+    // Publishing still resolves the retained diagnostics, which maxDiagnostics bounds.
+    if (this.pathResolutionAttempts >= this.maxDiagnostics * RETENTION_RESOLUTION_MULTIPLIER) {
+      return Promise.resolve(undefined);
+    }
+    this.pathResolutionAttempts += 1;
+    // Keep a failed path for aggregation, which reports it as unresolved and
+    // continues publishing diagnostics whose paths remain accessible. A failure
+    // is not cached, so a later occurrence of the path can retry.
+    const pending: Promise<string | undefined> = this.resolveDiagnostic(diagnostic).catch(() => {
+      if (this.retentionPathByRawPath.get(rawPath) === pending) {
+        this.retentionPathByRawPath.delete(rawPath);
+      }
+      return undefined;
+    });
+    this.retentionPathByRawPath.set(rawPath, pending);
+    return pending;
+  }
+
   private displaceDiagnostic(
     severity: RawBuildDiagnostic["severity"]
   ): RawBuildDiagnostic | undefined {
     if (severity === "error") {
-      if (this.maxDiagnostics <= 2) {
-        return (
-          this.diagnosticsBySeverity.information.pop() ??
-          this.diagnosticsBySeverity.warning.pop() ??
-          this.diagnosticsBySeverity.error.shift()
-        );
-      }
       return (
-        this.diagnosticsBySeverity.error.shift() ??
         this.diagnosticsBySeverity.information.pop() ??
-        this.diagnosticsBySeverity.warning.pop()
+        this.diagnosticsBySeverity.warning.pop() ??
+        this.diagnosticsBySeverity.error.shift()
       );
     }
     if (severity === "warning") {

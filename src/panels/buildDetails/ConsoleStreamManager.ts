@@ -115,6 +115,10 @@ export class ConsoleStreamManager {
       consoleError = error;
     }
     this.textConsoleStream.seedFromTail(consoleTextResult);
+    if (!consoleTextResult) {
+      // Without a tail there is no bounded HTML start; let a later probe initialize HTML.
+      return { consoleTextResult, consoleError };
+    }
     let consoleHtmlResult: { html: string; truncated: boolean } | undefined;
     try {
       consoleHtmlResult = await this.htmlConsoleStream.tryInitialize(consoleTextResult);

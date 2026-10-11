@@ -1,7 +1,4 @@
 export { ConsoleOutputEmptyState, ConsoleOutputLoadingState } from "./ConsoleOutputEmptyState";
 export { ConsoleOutputHeader } from "./ConsoleOutputHeader";
-export {
-  ConsoleOutputErrorNotice,
-  ConsoleOutputTruncationNotice as ConsoleOutputNotice
-} from "./ConsoleOutputNotice";
+export { ConsoleOutputErrorNotice, ConsoleOutputTruncationNotice } from "./ConsoleOutputNotice";
 export { ConsoleOutputViewport } from "./ConsoleOutputViewport";

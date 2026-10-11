@@ -1,16 +1,17 @@
 import * as vscode from "vscode";
+import type { CurrentBranchRepositoryInfo } from "../../currentBranch/CurrentBranchTypes";
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import { resolveTreeItemLabel } from "../../tree/TreeItemLabels";
 import type { JenkinsFolderTreeItem } from "../../tree/TreeItems";
 import { pickMultibranchTarget, pickRepository } from "./CurrentBranchPrompts";
 
 export async function linkCurrentRepository(
-  workflowService: CurrentBranchWorkflowService
+  workflowService: CurrentBranchWorkflowService,
+  selectedRepository?: CurrentBranchRepositoryInfo
 ): Promise<void> {
-  const repository = await pickRepository(
-    workflowService,
-    "Select the Git repository to link to Jenkins"
-  );
+  const repository =
+    selectedRepository ??
+    (await pickRepository(workflowService, "Select the Git repository to link to Jenkins"));
   if (!repository) {
     return;
   }
@@ -57,12 +58,12 @@ export async function linkRepositoryHere(
 }
 
 export async function unlinkCurrentRepository(
-  workflowService: CurrentBranchWorkflowService
+  workflowService: CurrentBranchWorkflowService,
+  selectedRepository?: CurrentBranchRepositoryInfo
 ): Promise<void> {
-  const repository = await pickRepository(
-    workflowService,
-    "Select the Git repository to unlink from Jenkins"
-  );
+  const repository =
+    selectedRepository ??
+    (await pickRepository(workflowService, "Select the Git repository to unlink from Jenkins"));
   if (!repository) {
     return;
   }

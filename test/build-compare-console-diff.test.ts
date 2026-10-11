@@ -63,6 +63,46 @@ function createFakeBackend(
 }
 
 describe("buildConsoleComparisonSection", () => {
+  it.each([
+    { scenario: "characters differ", baselineSuffix: "baseline\n" },
+    { scenario: "one log ends after a shared prefix", baselineSuffix: "" }
+  ])("preserves snippet context and highlighting when $scenario", async ({ baselineSuffix }) => {
+    const sharedLines = Array.from({ length: 45 }, (_, index) => `shared ${index + 1}`);
+    const trailingLines = Array.from({ length: 90 }, (_, index) => `trailing ${index + 1}`);
+    const sharedChunks = [
+      `${sharedLines.slice(0, 20).join("\n")}\n`,
+      `${sharedLines.slice(20).join("\n")}\nshared `
+    ];
+    const trailingChunk = `${trailingLines.join("\n")}\n`;
+    const backend = createFakeBackend({
+      [BASELINE_URL]: [
+        sharedChunks[0],
+        sharedChunks[1] + baselineSuffix,
+        ...(baselineSuffix ? [trailingChunk] : [])
+      ],
+      [TARGET_URL]: [sharedChunks[0], `${sharedChunks[1]}target\n`, trailingChunk]
+    });
+
+    const section = await buildConsoleComparisonSection(
+      backend,
+      { maxBytes: 10_000, maxLines: 1000 },
+      ENVIRONMENT,
+      BASELINE_URL,
+      TARGET_URL
+    );
+
+    const expectedLines = (suffix: string) =>
+      [
+        ...sharedLines.slice(6),
+        `shared ${suffix}`,
+        ...(suffix ? trailingLines.slice(0, 80) : [])
+      ].map((text, index) => ({ lineNumber: index + 7, text, highlight: index === 39 }));
+    assert.equal(section.status, "available");
+    assert.equal(section.divergenceLineLabel, "First difference at line 46");
+    assert.deepEqual(section.baselineLines, expectedLines(baselineSuffix.trim()));
+    assert.deepEqual(section.targetLines, expectedLines("target"));
+  });
+
   it("terminates with tooLarge when multibyte logs are byte-identical past the budget", {
     timeout: 5000
   }, async () => {
@@ -296,6 +336,64 @@ describe("buildConsoleComparisonSection", () => {
     assert.deepEqual(progressiveCalls, [BASELINE_URL, TARGET_URL]);
     assert.deepEqual(headCalls, [BASELINE_URL, TARGET_URL]);
   });
+
+  it.each(
+    [BASELINE_URL, TARGET_URL].flatMap((truncatedBuildUrl) => [
+      {
+        truncatedBuildUrl,
+        scenario: "matching continuation",
+        otherText: "shared\nprefix continuation\n",
+        expectedStatus: "tooLarge"
+      },
+      {
+        truncatedBuildUrl,
+        scenario: "mismatch before cutoff",
+        otherText: "shared\nprXfix continuation\n",
+        expectedStatus: "available"
+      }
+    ])
+  )(
+    "handles $scenario with a truncated fallback for $truncatedBuildUrl",
+    async ({ truncatedBuildUrl, otherText, expectedStatus }) => {
+      const fallbackText = `\u001b[8mha:${"x".repeat(32)}\u001b[0mshared\nprefix`;
+      const maxBytes = Buffer.byteLength(fallbackText, "utf8");
+      const backend = {
+        console: {
+          getConsoleTextProgressive: async (
+            _environment: JenkinsEnvironmentRef,
+            buildUrl: string
+          ) => {
+            if (buildUrl === truncatedBuildUrl) {
+              throw new Error("Progressive console output is unavailable");
+            }
+            const bytesRead = Buffer.byteLength(otherText, "utf8");
+            return { text: otherText, textSize: bytesRead, moreData: false, bytesRead };
+          },
+          getConsoleTextHead: async () => ({
+            text: fallbackText,
+            bytesRead: maxBytes,
+            truncated: true
+          })
+        }
+      } as unknown as BuildCompareBackend;
+
+      const section = await buildConsoleComparisonSection(
+        backend,
+        { maxBytes, maxLines: 100 },
+        ENVIRONMENT,
+        BASELINE_URL,
+        TARGET_URL
+      );
+
+      assert.equal(section.status, expectedStatus);
+      if (expectedStatus === "available") {
+        assert.equal(section.divergenceLineLabel, "First difference at line 2");
+      } else {
+        assert.deepEqual(section.baselineLines, []);
+        assert.deepEqual(section.targetLines, []);
+      }
+    }
+  );
 });
 
 it("ignores differing serialized notes even when notes span multiple chunks", async () => {

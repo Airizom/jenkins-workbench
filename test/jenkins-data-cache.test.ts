@@ -3,6 +3,44 @@ import { describe, it } from "vitest";
 import { JenkinsDataCache } from "../src/jenkins/data/JenkinsDataCache";
 
 describe("JenkinsDataCache", () => {
+  it.each(["clear", "environment", "delete", "set", "load"])(
+    "invalidates all guarded writes on %s without affecting another environment",
+    async (invalidation) => {
+      const cache = new JenkinsDataCache();
+      const key = "env-1:jobs";
+      cache.set("env-1:summary", "new summary");
+      let release!: () => void;
+      const response = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const oldRequest = cache.withWriteGuard([key, "env-1:summary"], async (writer) => {
+        await response;
+        writer.set(key, "old");
+        writer.delete("env-1:summary");
+      });
+      const otherRequest = cache.withWriteGuard(["env-2:jobs"], async (writer) => {
+        await response;
+        writer.set("env-2:jobs", "unrelated");
+      });
+      if (invalidation === "clear") cache.clear();
+      if (invalidation === "environment") cache.clearForEnvironment("env-1");
+      if (invalidation === "delete") cache.delete(key);
+      if (invalidation === "set") cache.set(key, "new");
+      if (invalidation === "load") {
+        await cache.withWriteGuard([key], async (writer) => writer.set(key, "new"));
+      }
+      release();
+      await Promise.all([oldRequest, otherRequest]);
+
+      assert.equal(cache.get(key), ["set", "load"].includes(invalidation) ? "new" : undefined);
+      assert.equal(
+        cache.get("env-1:summary"),
+        ["clear", "environment"].includes(invalidation) ? undefined : "new summary"
+      );
+      assert.equal(cache.get("env-2:jobs"), invalidation === "clear" ? undefined : "unrelated");
+    }
+  );
+
   it("shares a loader across concurrent misses for the same key", async () => {
     const cache = new JenkinsDataCache();
     let loaderCalls = 0;

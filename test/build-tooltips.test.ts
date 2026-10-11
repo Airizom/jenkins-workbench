@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import type { JenkinsBuild } from "../src/jenkins/JenkinsClient";
 import { buildBuildTooltip } from "../src/tree/BuildTooltips";
 
@@ -132,6 +132,30 @@ describe("buildBuildTooltip cause summaries", () => {
 });
 
 describe("buildBuildTooltip parameter limits", () => {
+  it.each([0, 1])("only formats visible values with a limit of %i", (maxParameterCount) => {
+    const serializeBranch = vi.fn(() => "main");
+    const serializeMode = vi.fn(() => "fast");
+    const build = createBuild({
+      actions: [
+        {
+          parameters: [
+            { name: "BRANCH", value: { toJSON: serializeBranch } },
+            { name: "MODE", value: { toJSON: serializeMode } }
+          ]
+        }
+      ]
+    });
+
+    const tooltip = buildBuildTooltip(build, { includeParameters: true, maxParameterCount });
+
+    assert.equal(
+      tooltip.value,
+      maxParameterCount === 0 ? "**Parameters:** +2 more" : '**Parameters:** BRANCH="main" +1 more'
+    );
+    assert.equal(serializeBranch.mock.calls.length, maxParameterCount);
+    assert.equal(serializeMode.mock.calls.length, 0);
+  });
+
   it("supports limits of zero and one", () => {
     assert.equal(parameterTooltipValue(0), "**Parameters:** +3 more");
     assert.equal(parameterTooltipValue(1), "**Parameters:** BRANCH=main +2 more");

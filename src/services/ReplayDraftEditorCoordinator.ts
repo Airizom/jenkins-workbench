@@ -6,6 +6,7 @@ export class ReplayDraftEditorCoordinator implements vscode.Disposable {
   private readonly closingSessions = new Set<string>();
   private readonly promptingSessions = new Set<string>();
   private readonly subscriptions: vscode.Disposable[] = [];
+  private readonly pendingCloses = new Set<vscode.Disposable>();
 
   constructor(
     private readonly store: ReplayDraftSessionStore,
@@ -18,9 +19,13 @@ export class ReplayDraftEditorCoordinator implements vscode.Disposable {
         if (!this.store.hasDraft(document.uri)) {
           return;
         }
-        void this.handleDraftClosed(document.uri).catch((error) => {
-          console.warn("Failed to process replay draft close.", error);
+        const pending = this.editorService.whenDocumentStaysClosed(document.uri, () => {
+          this.pendingCloses.delete(pending);
+          void this.handleDraftClosed(document.uri).catch((error) => {
+            console.warn("Failed to process replay draft close.", error);
+          });
         });
+        this.pendingCloses.add(pending);
       })
     );
   }
@@ -30,6 +35,10 @@ export class ReplayDraftEditorCoordinator implements vscode.Disposable {
       subscription.dispose();
     }
     this.subscriptions.length = 0;
+    for (const pending of this.pendingCloses) {
+      pending.dispose();
+    }
+    this.pendingCloses.clear();
     this.closingSessions.clear();
     this.promptingSessions.clear();
   }

@@ -125,7 +125,11 @@ function isNodeExecutorViewModel(value: unknown): boolean {
     isPlainRecord(value) &&
     typeof value.id === "string" &&
     typeof value.statusLabel === "string" &&
-    typeof value.isIdle === "boolean"
+    typeof value.isIdle === "boolean" &&
+    (value.progressPercent === undefined || typeof value.progressPercent === "number") &&
+    (value.progressLabel === undefined || typeof value.progressLabel === "string") &&
+    (value.workDurationLabel === undefined || typeof value.workDurationLabel === "string") &&
+    (value.workDurationMs === undefined || typeof value.workDurationMs === "number")
   );
 }
 

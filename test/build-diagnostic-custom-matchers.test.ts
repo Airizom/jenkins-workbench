@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { parseBuildLog } from "../src/buildDiagnostics/BuildDiagnosticLogParser";
+import {
+  BuildDiagnosticLogParser,
+  parseBuildLog
+} from "../src/buildDiagnostics/BuildDiagnosticLogParser";
 import { normalizeDiagnosticProfiles } from "../src/buildDiagnostics/BuildDiagnosticProfiles";
 
 function getMatchers(profileDefinition: unknown) {
@@ -157,6 +160,43 @@ describe("custom diagnostic matchers", () => {
     assert.equal(findings.length, 1);
     assert.equal(findings[0].rawPath, "fresh.ts");
     assert.equal(findings[0].line, 9);
+  });
+
+  it.each([
+    ["complete line", [`${"x".repeat(33)}\n`]],
+    ["split line", ["x".repeat(16), `${"x".repeat(17)}\n`]],
+    ["discarded across chunks", ["x".repeat(33), "more", "\n"]]
+  ])("resets multiline captures after an oversized %s", (_name, chunks) => {
+    const matchers = getMatchers({
+      matchers: [
+        {
+          name: "pair",
+          pattern: [
+            { regexp: "^FILE (.+)$", file: 1 },
+            { regexp: "^LINE (\\d+): (.*)$", line: 1, message: 2 }
+          ]
+        }
+      ]
+    });
+    const parser = new BuildDiagnosticLogParser({
+      builtIns: [],
+      customMatchers: matchers,
+      maxLineChars: 32
+    });
+
+    assert.deepEqual(parser.acceptChunk("FILE src/a.ts\n"), []);
+    for (const chunk of chunks) {
+      assert.deepEqual(parser.acceptChunk(chunk), []);
+    }
+    assert.deepEqual(parser.acceptChunk("LINE 7: wrong\n"), []);
+    assert.equal(parser.didTruncateLine, true);
+
+    const findings = parser.acceptChunk("FILE src/b.ts\nLINE 8: right\n");
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rawPath, "src/b.ts");
+    assert.equal(findings[0].logLine, 5);
+    assert.equal(findings[0].sequence, 1);
+    assert.deepEqual(parser.finish(), []);
   });
 
   it("activates a built-in parser through base even when builtIns is empty", () => {

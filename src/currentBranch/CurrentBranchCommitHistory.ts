@@ -8,7 +8,7 @@ import {
 import type { JenkinsBuild, JenkinsJob } from "../jenkins/types";
 import type { CurrentBranchCheckout } from "./CurrentBranchCheckout";
 
-const COMMIT_HISTORY_LIMIT = 50;
+export const COMMIT_HISTORY_LIMIT = 50;
 
 export interface CommitHistory {
   job: JenkinsJob;

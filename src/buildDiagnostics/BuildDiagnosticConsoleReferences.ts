@@ -12,6 +12,7 @@ interface ConsoleReferenceSearchState {
   occupied: Set<string>;
   nextSearchOffsetByPath: Map<string, number>;
   nextSearchOffsetByLine: Map<string, number>;
+  lineStartByLogLine: Map<string, number>;
 }
 
 export function buildConsoleReferences(
@@ -25,7 +26,8 @@ export function buildConsoleReferences(
   const state: ConsoleReferenceSearchState = {
     occupied: new Set(),
     nextSearchOffsetByPath: new Map(),
-    nextSearchOffsetByLine: new Map()
+    nextSearchOffsetByLine: new Map(),
+    lineStartByLogLine: new Map()
   };
   const orderedReferences = [...references].sort(
     (left, right) => left.logLine - right.logLine || left.rawPath.localeCompare(right.rawPath)
@@ -62,14 +64,23 @@ function findLineScopedPathStart(
   if (!normalizedLine || pathOffsetInLine < 0) {
     return undefined;
   }
-  const lineStart = consoleText.indexOf(
-    normalizedLine,
-    state.nextSearchOffsetByLine.get(normalizedLine) ?? 0
-  );
+  // References sharing a log line reuse that line's located offset instead of
+  // advancing past it, so each one stays on the same console occurrence.
+  const logLineKey = `${reference.logLine}\0${normalizedLine}`;
+  let lineStart = state.lineStartByLogLine.get(logLineKey);
+  if (lineStart === undefined) {
+    lineStart = consoleText.indexOf(
+      normalizedLine,
+      state.nextSearchOffsetByLine.get(normalizedLine) ?? 0
+    );
+    state.lineStartByLogLine.set(logLineKey, lineStart);
+    if (lineStart >= 0) {
+      state.nextSearchOffsetByLine.set(normalizedLine, lineStart + normalizedLine.length);
+    }
+  }
   if (lineStart < 0) {
     return null;
   }
-  state.nextSearchOffsetByLine.set(normalizedLine, lineStart + normalizedLine.length);
   return lineStart + pathOffsetInLine;
 }
 
@@ -79,8 +90,8 @@ function findAvailablePathStart(
   lineStart: number | undefined,
   state: ConsoleReferenceSearchState
 ): number {
-  const lineKey = typeof lineStart === "number" ? rangeKey(lineStart, rawPath.length) : undefined;
-  if (typeof lineStart === "number" && lineKey && !state.occupied.has(lineKey)) {
+  if (typeof lineStart === "number") {
+    // Claiming skips occupied ranges; never move a line-scoped reference elsewhere.
     return lineStart;
   }
   const next = findUnoccupiedOccurrence(

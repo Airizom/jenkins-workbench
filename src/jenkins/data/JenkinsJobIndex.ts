@@ -72,17 +72,11 @@ export class JenkinsJobIndex {
     return this.getCachedOrCollectEntries(environment, options, MULTIBRANCH_JOB_SEARCH_STRATEGY);
   }
 
-  async *iterateJobsForEnvironment(
+  iterateJobsForEnvironment(
     environment: JenkinsEnvironmentRef,
     options?: JobSearchOptions
   ): AsyncIterable<JobSearchEntry[]> {
-    for await (const batch of this.iterateSearchEntriesForEnvironment(
-      environment,
-      options,
-      FULL_JOB_SEARCH_STRATEGY
-    )) {
-      yield batch;
-    }
+    return this.iterateSearchEntriesForEnvironment(environment, options, FULL_JOB_SEARCH_STRATEGY);
   }
 
   private async getCachedOrCollectEntries(
@@ -143,12 +137,12 @@ export class JenkinsJobIndex {
       maxRetries
     } = normalizeJobSearchOptions(options);
 
-    const client = await this.clientProvider.getClient(environment);
     const output = new AsyncQueue<JobSearchEntry[]>();
     let disposed = false;
     let workQueue: AsyncQueue<JobQueueItem> | undefined;
 
-    void (async () => {
+    const traversal = this.cache.withWriteGuard([cacheKey], async (cache) => {
+      const client = await this.clientProvider.getClient(environment);
       const throwIfStopped = (): void => {
         if (disposed) {
           throw new CancellationError();
@@ -258,18 +252,7 @@ export class JenkinsJobIndex {
       }
 
       if (pendingJobs === 0) {
-        await flushBatch();
-        throwIfStopped();
-        this.cache.set(
-          cacheKey,
-          {
-            entries: results,
-            complete: !limitReached
-          },
-          cacheTtlMs
-        );
-        output.close();
-        return;
+        queue.close();
       }
 
       const worker = async (): Promise<void> => {
@@ -336,7 +319,7 @@ export class JenkinsJobIndex {
 
       await flushBatch();
       throwIfStopped();
-      this.cache.set(
+      cache.set(
         cacheKey,
         {
           entries: results,
@@ -345,7 +328,8 @@ export class JenkinsJobIndex {
         cacheTtlMs
       );
       output.close();
-    })().catch((error) => {
+    });
+    void traversal.catch((error) => {
       output.fail(error);
     });
 

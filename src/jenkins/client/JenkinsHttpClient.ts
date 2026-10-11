@@ -33,10 +33,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   private readonly requestTimeoutMs?: number;
   private readonly refreshAuthConfig?: JenkinsAuthConfigRefresh;
   private currentAuthConfig?: JenkinsAuthConfig;
-  private authHeader?: string;
   private baseHeaders?: Record<string, string>;
-  private hasBaseHeaders = false;
-  private baseHeadersHaveCookie = false;
   private requestOptions!: JenkinsSimpleRequestOptions;
   private ssoLoginUrlText?: string;
   private ssoLoginPath?: string;
@@ -150,15 +147,14 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       username: this.username,
       token: this.token
     });
-    this.authHeader = authHeaders.authHeader;
-    const headerFlags = getHeaderFlags(authHeaders.headers);
-    this.hasBaseHeaders = headerFlags.hasHeaders;
-    this.baseHeadersHaveCookie = headerFlags.hasCookie;
-    this.baseHeaders = this.hasBaseHeaders ? authHeaders.headers : undefined;
+    this.baseHeaders = getHeaderFlags(authHeaders.headers).hasHeaders
+      ? authHeaders.headers
+      : undefined;
     this.requestOptions = {
-      authHeader: this.authHeader,
+      authHeader: authHeaders.authHeader,
       headers: this.baseHeaders,
-      timeoutMs: this.requestTimeoutMs
+      timeoutMs: this.requestTimeoutMs,
+      contextUrl: this.baseUrl
     };
     this.clearSsoLoginMatchers();
   }
@@ -189,53 +185,20 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     }
   }
 
-  private async requestVoidWithLocation(
-    url: string,
-    options: {
-      method: "POST" | "GET";
-      headers?: Record<string, string>;
-      body?: string | Uint8Array;
-      redirectCount?: number;
-    }
-  ): Promise<JenkinsPostResponse> {
-    return requestVoidWithLocationInternal(url, {
-      method: options.method,
-      headers: this.mergeHeaders(options.headers),
-      body: options.body,
-      redirectCount: options.redirectCount,
-      authHeader: this.authHeader,
-      timeoutMs: this.requestTimeoutMs
-    });
-  }
-
-  private async requestTextWithOptions(
-    url: string,
-    options: {
-      method: "POST" | "GET" | "HEAD";
-      headers?: Record<string, string>;
-      body?: string | Uint8Array;
-      redirectCount?: number;
-    }
-  ): Promise<string> {
-    return requestTextInternal(url, {
-      method: options.method,
-      headers: this.mergeHeaders(options.headers),
-      body: options.body,
-      redirectCount: options.redirectCount,
-      authHeader: this.authHeader,
-      timeoutMs: this.requestTimeoutMs
-    });
-  }
-
   private async requestPostWithCrumbInternal(
     url: string,
     body: string | Uint8Array | undefined,
     contentHeaders: Record<string, string>
   ): Promise<JenkinsPostResponse> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = buildHeadersWithCrumb(contentHeaders, crumbHeader, this.baseHeadersHaveCookie);
+    const headers = buildHeadersWithCrumb(contentHeaders, crumbHeader, this.baseHeaders);
     return this.requestPostWithCrumbRetry(contentHeaders, headers, (requestHeaders) =>
-      this.requestVoidWithLocation(url, { method: "POST", headers: requestHeaders, body })
+      requestVoidWithLocationInternal(url, {
+        ...this.requestOptions,
+        method: "POST",
+        headers: requestHeaders,
+        body
+      })
     );
   }
 
@@ -246,10 +209,15 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     options?: { acceptErrorStatuses?: number[] }
   ): Promise<string> {
     const crumbHeader = await this.crumbService.getCrumbHeader();
-    const headers = buildHeadersWithCrumb(contentHeaders, crumbHeader, this.baseHeadersHaveCookie);
+    const headers = buildHeadersWithCrumb(contentHeaders, crumbHeader, this.baseHeaders);
     try {
       return await this.requestPostWithCrumbRetry(contentHeaders, headers, (requestHeaders) =>
-        this.requestTextWithOptions(url, { method: "POST", headers: requestHeaders, body })
+        requestTextInternal(url, {
+          ...this.requestOptions,
+          method: "POST",
+          headers: requestHeaders,
+          body
+        })
       );
     } catch (error) {
       // Callers that sniff endpoint availability (e.g. 404 HTML pages) opt in
@@ -275,7 +243,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       return await request(headers);
     } catch (error) {
       return this.retryAfterCrumbError(error, (refreshed) =>
-        request(buildHeadersWithCrumb(contentHeaders, refreshed, this.baseHeadersHaveCookie))
+        request(buildHeadersWithCrumb(contentHeaders, refreshed, this.baseHeaders))
       );
     }
   }
@@ -289,9 +257,8 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     }
 
     const requestOptions: JenkinsSimpleRequestOptions = {
-      authHeader: this.authHeader,
-      headers: this.mergeHeaders(headers),
-      timeoutMs: this.requestTimeoutMs
+      ...this.requestOptions,
+      headers: this.mergeHeaders(headers)
     };
     if (maxBytes !== undefined) {
       requestOptions.maxBytes = maxBytes;
@@ -300,10 +267,10 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   }
 
   private mergeHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
-    if (!this.hasBaseHeaders) {
+    const baseHeaders = this.baseHeaders;
+    if (!baseHeaders) {
       return headers;
     }
-    const baseHeaders = this.baseHeaders;
     if (!headers || !getHeaderFlags(headers).hasHeaders) {
       return baseHeaders;
     }

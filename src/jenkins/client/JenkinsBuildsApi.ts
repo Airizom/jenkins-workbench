@@ -33,7 +33,6 @@ import {
   buildTestReportTree
 } from "./JenkinsBuildTreeBuilders";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
-import { buildProgressiveConsoleHtmlResult } from "./JenkinsConsoleStream";
 import { JenkinsPendingInputClient } from "./JenkinsPendingInputClient";
 import { JenkinsReplayClient } from "./JenkinsReplayClient";
 import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
@@ -202,17 +201,11 @@ export class JenkinsBuildsApi {
     start: number,
     annotator?: string
   ): Promise<JenkinsProgressiveConsoleHtml> {
-    const consoleUrl = await this.resolveFlowNodeLogConsoleUrl(buildUrl, nodeId);
+    const { consoleUrl } = await this.getFlowNodeLog(buildUrl, nodeId);
     if (!consoleUrl) {
       throw new JenkinsRequestError("Flow node console URL is unavailable.", 404);
     }
-    const safeStart = Math.max(0, Math.floor(start));
-    const url = new URL("logText/progressiveHtml", ensureTrailingSlash(consoleUrl));
-    url.searchParams.set("start", safeStart.toString());
-    const response = await this.context.requestTextWithHeaders(url.toString(), {
-      headers: annotator ? { "X-ConsoleAnnotator": annotator } : undefined
-    });
-    return buildProgressiveConsoleHtmlResult(response, safeStart);
+    return this.consoleClient.getConsoleHtmlProgressive(consoleUrl, start, annotator);
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
@@ -322,15 +315,6 @@ export class JenkinsBuildsApi {
       buildUrl,
       `execution/node/${encodeURIComponent(nodeId.trim())}/wfapi/describe`
     );
-  }
-
-  private async resolveFlowNodeLogConsoleUrl(
-    buildUrl: string,
-    nodeId: string
-  ): Promise<string | undefined> {
-    const url = this.buildFlowNodeLogUrl(buildUrl, nodeId);
-    const snapshot = await this.context.requestJson<Pick<JenkinsFlowNodeLog, "consoleUrl">>(url);
-    return this.resolveTrustedFlowNodeConsoleUrl(buildUrl, snapshot.consoleUrl);
   }
 
   private resolveTrustedFlowNodeConsoleUrl(

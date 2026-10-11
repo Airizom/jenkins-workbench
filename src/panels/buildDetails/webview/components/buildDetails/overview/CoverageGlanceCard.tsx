@@ -59,41 +59,46 @@ export function CoverageGlanceCard({
   );
 }
 
-const COVERAGE_AFTER_COMPLETION_MESSAGE = "Coverage is available after the build completes.";
+/** Message for each non-data coverage state; undefined once metrics are ready. */
+function describeCoverageNotice(
+  coverageState: BuildDetailsCoverageStateViewModel,
+  isRunning: boolean
+): { message: string; isError: boolean } | undefined {
+  const pending = coverageState.status === "loading" || coverageState.status === "idle";
+  if (pending) {
+    return {
+      message: isRunning
+        ? "Coverage is available after the build completes."
+        : "Loading coverage results for this build.",
+      isError: false
+    };
+  }
+  if (coverageState.status === "error") {
+    return {
+      message: coverageState.errorMessage
+        ? `Coverage data could not be loaded for this build. ${coverageState.errorMessage}`
+        : "Coverage data could not be loaded for this build.",
+      isError: true
+    };
+  }
+  if (coverageState.status === "unavailable") {
+    return { message: "Coverage data is unavailable for this build.", isError: false };
+  }
+  return undefined;
+}
 
 function renderCoverageContent(
   coverageState: BuildDetailsCoverageStateViewModel,
   isRunning: boolean
 ): React.JSX.Element {
-  const pending = coverageState.status === "loading" || coverageState.status === "idle";
-  if (pending && isRunning) {
+  const notice = describeCoverageNotice(coverageState, isRunning);
+  if (notice) {
+    const borderClass = notice.isError ? "border-failure-border-subtle" : "border-border";
     return (
-      <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-        {COVERAGE_AFTER_COMPLETION_MESSAGE}
-      </div>
-    );
-  }
-  if (pending) {
-    return (
-      <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-        Loading coverage results for this build.
-      </div>
-    );
-  }
-
-  if (coverageState.status === "error") {
-    return (
-      <div className="rounded border border-failure-border-subtle bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-        Coverage data could not be loaded for this build.
-        {coverageState.errorMessage ? ` ${coverageState.errorMessage}` : ""}
-      </div>
-    );
-  }
-
-  if (coverageState.status === "unavailable") {
-    return (
-      <div className="rounded border border-border bg-muted-soft px-3 py-2 text-xs text-muted-foreground">
-        Coverage data is unavailable for this build.
+      <div
+        className={`rounded border ${borderClass} bg-muted-soft px-3 py-2 text-xs text-muted-foreground`}
+      >
+        {notice.message}
       </div>
     );
   }

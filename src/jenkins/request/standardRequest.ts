@@ -13,27 +13,11 @@ export async function request<T>(url: string, options: JenkinsRequestOptions): P
         headers: requestOptions.headers,
         authHeader: requestOptions.authHeader
       }),
-    resolveRedirectAction: ({ redirectDecision }) => {
-      if (redirectDecision.type === "reject") {
-        return {
-          type: "abort",
-          error: redirectDecision.error
-        };
-      }
-      if (redirectDecision.type === "follow") {
-        return {
-          type: "follow",
-          nextUrl: redirectDecision.nextUrl,
-          redirectCount: redirectDecision.redirectCount
-        };
-      }
-      return { type: "continue" } as const;
-    },
     onResponse: ({ response, statusCode, options: requestOptions, redirectDecision }) => {
       const responsePlan = buildRequestResponsePlan(requestOptions, redirectDecision);
       if (responsePlan.type === "resolveImmediately") {
-        // Drain the discarded response so the socket is released.
-        response.resume();
+        // Stop discarded bodies immediately, even if the server keeps sending.
+        response.destroy();
         return Promise.resolve(undefined as T);
       }
       return decodeAndMaterializeResponse<T>(

@@ -210,6 +210,40 @@ describe("resolveCompareSectionNavChip", () => {
     });
   });
 
+  it.each<{ name: string; item: Partial<BuildCompareStageDiffItem>; text: string }>([
+    {
+      name: "a recovered stage",
+      item: { baselineStatusClass: "failure", deltaSignificant: false },
+      text: "1 change"
+    },
+    {
+      name: "a significant speedup",
+      item: { deltaDirection: "faster", deltaSignificant: true },
+      text: "1 change"
+    },
+    {
+      name: "a recovered and faster stage only once",
+      item: { baselineStatusClass: "failure", deltaDirection: "faster", deltaSignificant: true },
+      text: "1 change"
+    },
+    {
+      name: "a changed outcome with equal severity",
+      item: { baselineStatusClass: "aborted", targetStatusClass: "unstable" },
+      text: "1 change"
+    },
+    { name: "an unchanged stage", item: {}, text: "no changes" },
+    {
+      name: "an insignificant speedup as unchanged",
+      item: { deltaDirection: "faster", deltaSignificant: false },
+      text: "no changes"
+    }
+  ])("reports $name", ({ item, text }) => {
+    const model = createModel({
+      stages: { status: "available", summaryLabel: "", items: [stage(item)] }
+    });
+    assert.deepEqual(resolveCompareSectionNavChip("stages", model), { text, tone: "neutral" });
+  });
+
   it("counts only significant slowdowns for stages", () => {
     const model = createModel({
       stages: {
@@ -223,6 +257,23 @@ describe("resolveCompareSectionNavChip", () => {
     });
     assert.deepEqual(resolveCompareSectionNavChip("stages", model), {
       text: "1 slower",
+      tone: "failure"
+    });
+  });
+
+  it("treats a stage that goes from success to aborted as a regression", () => {
+    const model = createModel({
+      stages: {
+        status: "available",
+        summaryLabel: "",
+        items: [
+          stage({ key: "a", targetStatusClass: "aborted" }),
+          stage({ key: "b", deltaDirection: "slower", deltaSignificant: true })
+        ]
+      }
+    });
+    assert.deepEqual(resolveCompareSectionNavChip("stages", model), {
+      text: "1 regressed",
       tone: "failure"
     });
   });

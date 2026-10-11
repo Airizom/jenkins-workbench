@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { fullGitRevision } from "../jenkins/JenkinsRevisionEvidence";
+import { createSerialTaskQueue } from "./SerialTaskQueue";
 
 export interface CommitWatch {
   id: string;
@@ -19,7 +20,7 @@ export interface CommitWatch {
 const KEY = "jenkinsWorkbench.commitWatches.v1";
 
 export class JenkinsCommitWatchStore {
-  private queue: Promise<unknown> = Promise.resolve();
+  private readonly mutationQueue = createSerialTaskQueue();
 
   constructor(private readonly state: vscode.Memento) {}
 
@@ -67,7 +68,7 @@ export class JenkinsCommitWatchStore {
     change: (existing: CommitWatch | undefined) => CommitWatch | undefined,
     options: { skipIfUnchanged?: boolean } = {}
   ): Promise<boolean> {
-    const operation = this.queue.then(async () => {
+    return this.mutationQueue(async () => {
       const watches = this.list();
       const existing = watches.find((watch) => watch.id === id);
       const next = change(existing);
@@ -80,8 +81,6 @@ export class JenkinsCommitWatchStore {
       ]);
       return true;
     });
-    this.queue = operation.catch(() => undefined);
-    return operation;
   }
 }
 

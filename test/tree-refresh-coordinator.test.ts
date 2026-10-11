@@ -5,33 +5,22 @@ import type { WorkbenchTreeElement } from "../src/tree/items/WorkbenchTreeElemen
 
 const DEBOUNCE_MS = 5;
 
-function createElement(): WorkbenchTreeElement {
-  return {} as unknown as WorkbenchTreeElement;
-}
-
 function createCoordinator(): {
   coordinator: TreeDataProviderRefreshCoordinator;
   notified: Array<WorkbenchTreeElement | undefined>;
-  invalidated: WorkbenchTreeElement[];
-  schedule: (element?: WorkbenchTreeElement) => void;
 } {
   const notified: Array<WorkbenchTreeElement | undefined> = [];
-  const invalidated: WorkbenchTreeElement[] = [];
   const coordinator = new TreeDataProviderRefreshCoordinator(
-    (element) => notified.push(element),
+    (element) => {
+      notified.push(element);
+      for (const token of coordinator.takePendingRefreshWaiters()) {
+        coordinator.resolveRefreshWaiter(token);
+      }
+    },
     () => undefined
   );
 
-  return {
-    coordinator,
-    notified,
-    invalidated,
-    schedule: (element) => {
-      coordinator.scheduleRefresh(element, undefined, DEBOUNCE_MS, (invalidatedElement) => {
-        invalidated.push(invalidatedElement);
-      });
-    }
-  };
+  return { coordinator, notified };
 }
 
 function waitForDebounce(): Promise<void> {
@@ -39,74 +28,40 @@ function waitForDebounce(): Promise<void> {
 }
 
 describe("TreeDataProviderRefreshCoordinator", () => {
-  it("fires an element-scoped refresh for a single pending element", async () => {
-    const { coordinator, notified, invalidated, schedule } = createCoordinator();
-    const element = createElement();
+  it("debounces repeated scheduled refreshes into one full-tree notification", async () => {
+    const { coordinator, notified } = createCoordinator();
 
-    schedule(element);
-    await waitForDebounce();
-
-    assert.deepEqual(notified, [element]);
-    assert.deepEqual(invalidated, [element]);
-    coordinator.dispose();
-  });
-
-  it("coalesces repeated refreshes of the same element into one element-scoped refresh", async () => {
-    const { coordinator, notified, schedule } = createCoordinator();
-    const element = createElement();
-
-    schedule(element);
-    schedule(element);
-    await waitForDebounce();
-
-    assert.deepEqual(notified, [element]);
-    coordinator.dispose();
-  });
-
-  it("escalates distinct pending elements to a full refresh", async () => {
-    const { coordinator, notified, schedule } = createCoordinator();
-
-    schedule(createElement());
-    schedule(createElement());
+    coordinator.scheduleRefresh(undefined, DEBOUNCE_MS);
+    coordinator.scheduleRefresh(undefined, DEBOUNCE_MS);
+    coordinator.scheduleRefresh(undefined, DEBOUNCE_MS);
     await waitForDebounce();
 
     assert.deepEqual(notified, [undefined]);
     coordinator.dispose();
   });
 
-  it("keeps a pending full refresh full when an element-scoped refresh arrives", async () => {
-    const { coordinator, notified, schedule } = createCoordinator();
+  it("resolves every refresh token registered before the debounced notification", async () => {
+    const { coordinator, notified } = createCoordinator();
+    const first = coordinator.createRefreshWaiter();
+    const second = coordinator.createRefreshWaiter();
 
-    schedule(undefined);
-    schedule(createElement());
-    await waitForDebounce();
-
-    assert.deepEqual(notified, [undefined]);
-    coordinator.dispose();
-  });
-
-  it("escalates a pending element-scoped refresh when a full refresh arrives", async () => {
-    const { coordinator, notified, schedule } = createCoordinator();
-
-    schedule(createElement());
-    schedule(undefined);
-    await waitForDebounce();
+    coordinator.scheduleRefresh(first.token, DEBOUNCE_MS);
+    coordinator.scheduleRefresh(second.token, DEBOUNCE_MS);
+    await Promise.all([first.promise, second.promise]);
 
     assert.deepEqual(notified, [undefined]);
     coordinator.dispose();
   });
 
-  it("resets pending state after firing so later element refreshes stay element-scoped", async () => {
-    const { coordinator, notified, schedule } = createCoordinator();
-    const first = createElement();
-    const second = createElement();
+  it("fires a separate full-tree notification for refreshes scheduled after the debounce", async () => {
+    const { coordinator, notified } = createCoordinator();
 
-    schedule(first);
+    coordinator.scheduleRefresh(undefined, DEBOUNCE_MS);
     await waitForDebounce();
-    schedule(second);
+    coordinator.scheduleRefresh(undefined, DEBOUNCE_MS);
     await waitForDebounce();
 
-    assert.deepEqual(notified, [first, second]);
+    assert.deepEqual(notified, [undefined, undefined]);
     coordinator.dispose();
   });
 });

@@ -24,6 +24,7 @@ class FakeConsoleDataService implements ConsoleStreamDataService {
   htmlProgressiveCalls = 0;
   textSnapshotCalls = 0;
   failNextHtmlProgressive = false;
+  failNextTextTail = false;
 
   async getConsoleText(
     _environment: JenkinsEnvironmentRef,
@@ -43,6 +44,10 @@ class FakeConsoleDataService implements ConsoleStreamDataService {
     _buildUrl: string,
     _maxChars: number
   ): Promise<JenkinsConsoleTextTail> {
+    if (this.failNextTextTail) {
+      this.failNextTextTail = false;
+      throw new Error("tail endpoint failed");
+    }
     return {
       text: "seed",
       truncated: false,
@@ -118,5 +123,23 @@ describe("ConsoleStreamManager", () => {
     });
     assert.equal(dataService.htmlProgressiveCalls, 2);
     assert.equal(dataService.textSnapshotCalls, 1);
+  });
+
+  it("skips unbounded HTML initialization when the console tail fetch fails", async () => {
+    const dataService = new FakeConsoleDataService();
+    dataService.failNextTextTail = true;
+    const manager = createManager(dataService);
+
+    const result = await manager.loadInitialConsole();
+
+    assert.equal(result.consoleTextResult, undefined);
+    assert.equal(result.consoleHtmlResult, undefined);
+    assert.ok(result.consoleError instanceof Error);
+    assert.equal(dataService.htmlProgressiveCalls, 0);
+
+    const next = await manager.fetchNext();
+
+    assert.equal(next.mode, "html");
+    assert.equal(dataService.htmlProgressiveCalls, 2);
   });
 });

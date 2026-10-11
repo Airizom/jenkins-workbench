@@ -42,7 +42,7 @@ export const SelectContent = React.forwardRef<
       position={position}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 max-h-60 min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-widget outline-none",
+        "z-50 max-h-[min(15rem,var(--radix-select-content-available-height,15rem))] min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-widget outline-none",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
         className
       )}

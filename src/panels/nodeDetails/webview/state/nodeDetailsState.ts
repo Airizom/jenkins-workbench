@@ -67,14 +67,6 @@ function buildInitialState(initialState: NodeDetailsViewModel): NodeDetailsState
   return {
     ...FALLBACK_STATE,
     ...initialState,
-    labels: initialState.labels ?? [],
-    executors: initialState.executors ?? [],
-    oneOffExecutors: initialState.oneOffExecutors ?? [],
-    queuedWork: initialState.queuedWork ?? FALLBACK_STATE.queuedWork,
-    monitorData: initialState.monitorData ?? [],
-    loadStatistics: initialState.loadStatistics ?? [],
-    errors: initialState.errors ?? [],
-    advancedLoaded: initialState.advancedLoaded ?? false,
     loading: false,
     hasLoaded: true,
     advancedRequested: false

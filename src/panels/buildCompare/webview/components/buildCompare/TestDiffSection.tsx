@@ -114,7 +114,7 @@ export function TestDiffSection({
         <SummaryStat label="Baseline" value={section.baselineSummaryLabel} />
         <SummaryStat label="Target" value={section.targetSummaryLabel} />
       </div>
-      {totalCount >= TEST_DIFF_SEARCH_MIN_ITEMS ? (
+      {totalCount >= TEST_DIFF_SEARCH_MIN_ITEMS || listKey.length > 0 ? (
         <TestSearch
           query={query}
           matchCount={matchCount}

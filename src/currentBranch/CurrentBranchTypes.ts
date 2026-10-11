@@ -47,6 +47,7 @@ type CurrentBranchBaseState = {
 };
 
 export type CurrentBranchState =
+  | (CurrentBranchBaseState & { kind: "resolving" })
   | (CurrentBranchBaseState & {
       kind: "noGit" | "noRepository" | "ambiguousRepository" | "unlinked";
     })

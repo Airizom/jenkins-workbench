@@ -43,4 +43,17 @@ describe("JenkinsfileValidationUtils token lookup", () => {
     assert.equal(findTokenOccurrence("agent any", ""), undefined);
     assert.deepEqual(findTokenOccurrences("agent any", ""), []);
   });
+
+  it("preserves source offsets after Unicode characters that expand when lowercased", () => {
+    assert.equal(findTokenOccurrence("İ sh()", "sh"), 2);
+    assert.deepEqual(findTokenOccurrences("İ sh()", "sh"), [2]);
+    assert.equal(findTokenOccurrence("İ SH(); İ sh()", "Sh"), 2);
+    assert.deepEqual(findTokenOccurrences("İ SH(); İ sh()", "Sh"), [2, 10]);
+  });
+
+  it("checks token boundaries at the original source offsets", () => {
+    const line = "İ shSuffix(); prefixSh(); sh()";
+    assert.equal(findTokenOccurrence(line, "sh"), 26);
+    assert.deepEqual(findTokenOccurrences(line, "sh"), [26]);
+  });
 });

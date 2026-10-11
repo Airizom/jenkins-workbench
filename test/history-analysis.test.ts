@@ -5,7 +5,8 @@ import {
   historyMetrics,
   limitHistoryReport,
   normalizeHistoryReport,
-  type HistoryBuild
+  type HistoryBuild,
+  type HistoryOutcome
 } from "../src/history/HistoryAnalysis";
 import { buildTestReportTree } from "../src/jenkins/client/JenkinsBuildTreeBuilders";
 
@@ -64,6 +65,31 @@ describe("history evidence", () => {
     expect(analyzeTests(builds, 5)).toHaveLength(5);
     expect(normalizeHistoryReport({ totalCount: 100 }).status).toBe("unavailable");
   });
+  it.each([
+    { totalCount: 2, omittedOutcome: "unavailable" },
+    { totalCount: 1, omittedOutcome: "missing" }
+  ])(
+    "classifies omitted tests as $omittedOutcome when totalCount is $totalCount",
+    ({ totalCount, omittedOutcome }) => {
+      const testA = { name: "A", status: "PASSED" };
+      const report = normalizeHistoryReport({
+        totalCount,
+        suites: [{ name: "suite", cases: [testA] }]
+      });
+      expect(report.status).toBe("available");
+      expect(Boolean(report.truncated)).toBe(totalCount > 1);
+      const complete = normalizeHistoryReport({
+        totalCount: 2,
+        suites: [{ name: "suite", cases: [testA, { name: "B", status: "PASSED" }] }]
+      });
+      const tests = analyzeTests([
+        { build: { number: 2, url: "https://example.test/2" }, report },
+        { build: { number: 1, url: "https://example.test/1" }, report: complete }
+      ]);
+      expect(tests.find((test) => test.name === "A")?.outcomes).toEqual(["passed", "passed"]);
+      expect(tests.find((test) => test.name === "B")?.outcomes).toEqual([omittedOutcome, "passed"]);
+    }
+  );
   it("requires repeated transitions and breaks sequences at gaps", () => {
     expect(analyzeTests([observation("FAILED", 3), observation("PASSED", 2)])[0].intermittent).toBe(
       false
@@ -84,13 +110,57 @@ describe("history evidence", () => {
       ])[0].intermittent
     ).toBe(false);
   });
+  it("preserves all outcome counts and transitions in a mixed history", () => {
+    const outcomes: HistoryOutcome[] = [
+      "passed",
+      "failed",
+      "passed",
+      "skipped",
+      "unknown",
+      "ambiguous",
+      "unavailable",
+      "missing",
+      "error",
+      "failed",
+      "passed"
+    ];
+    const builds: HistoryBuild[] = outcomes.map((outcome, number) => ({
+      build: { number, url: `https://example.com/job/a/${number}/` },
+      report:
+        outcome === "unavailable" || outcome === "error"
+          ? { status: outcome, cases: [] }
+          : {
+              status: "available",
+              cases: outcome === "missing" ? [] : [{ key: "test", name: "test", outcome }]
+            }
+    }));
+    expect(analyzeTests(builds)).toEqual([
+      {
+        key: "test",
+        name: "test",
+        outcomes,
+        passed: 3,
+        failed: 2,
+        skipped: 1,
+        unknown: 1,
+        ambiguous: 1,
+        unavailable: 1,
+        missing: 1,
+        errors: 1,
+        transitions: 3,
+        intermittent: true
+      }
+    ]);
+  });
   it("does not match duplicate identities by occurrence", () => {
     const test = { name: "test", className: "Class", status: "FAILED" };
     const report = normalizeHistoryReport({
+      totalCount: 2,
       suites: [{ name: "suite", cases: [test, { ...test, status: "PASSED" }] }]
     });
     expect(report.cases).toHaveLength(1);
     expect(report.cases[0].outcome).toBe("ambiguous");
+    expect(report.truncated).not.toBe(true);
   });
   it("rejects contradictory and invalid onset metadata", () => {
     const test = observation("FAILED", 10).report.cases[0];

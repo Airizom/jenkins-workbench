@@ -14,6 +14,7 @@ interface InputBoxOptions {
 interface QuickPickItem {
   readonly label: string;
   readonly action?: string;
+  readonly mode?: string;
   readonly picked?: boolean;
 }
 
@@ -38,7 +39,7 @@ const vscodeMock = {
         return multiChoicePicks;
       }
       const selectedAction = quickPickActions.shift();
-      return items.find((item) => item.action === selectedAction);
+      return items.find((item) => (item.action ?? item.mode) === selectedAction);
     },
     showOpenDialog: async () => undefined
   },
@@ -85,6 +86,64 @@ beforeEach(() => {
 });
 
 describe("promptParameterValues multi-choice parameters", () => {
+  describe.each([
+    { delimiter: " ", serializedValue: "red blue" },
+    { delimiter: " | ", serializedValue: "red | blue" }
+  ])("with delimiter '$delimiter'", ({ delimiter, serializedValue }) => {
+    it.each([false, true])(
+      "preserves the delimiter in defaults and payloads (use preset: %s)",
+      async (usePreset) => {
+        multiChoicePicks = [{ label: "red" }, { label: "blue" }];
+        const prompted = await promptParameterValues(
+          createOptions([
+            {
+              name: "COLORS",
+              kind: "multiChoice",
+              choices: ["red", "blue", "green"],
+              defaultValue: usePreset ? "green" : serializedValue,
+              multiSelectDelimiter: delimiter
+            }
+          ]),
+          usePreset ? { COLORS: serializedValue } : undefined
+        );
+
+        assert.deepEqual(quickPickCalls[0], [
+          { label: "red", picked: true },
+          { label: "blue", picked: true },
+          { label: "green", picked: false }
+        ]);
+        assert.deepEqual(prompted?.payload.fields, [{ name: "COLORS", value: serializedValue }]);
+      }
+    );
+  });
+
+  it.each([undefined, ""])(
+    "uses comma-separated defaults and repeated fields for an absent delimiter (%s)",
+    async (multiSelectDelimiter) => {
+      multiChoicePicks = [{ label: "red" }, { label: "blue" }];
+      const prompted = await promptParameterValues(
+        createOptions([
+          {
+            name: "COLORS",
+            kind: "multiChoice",
+            choices: ["red", "blue"],
+            defaultValue: "red,blue",
+            multiSelectDelimiter
+          }
+        ])
+      );
+
+      assert.deepEqual(
+        quickPickCalls[0].map((item) => item.picked),
+        [true, true]
+      );
+      assert.deepEqual(prompted?.payload.fields, [
+        { name: "COLORS", value: "red" },
+        { name: "COLORS", value: "blue" }
+      ]);
+    }
+  );
+
   it.each([undefined, ","])(
     "sends an explicit empty value after clearing a default selection (delimiter: %s)",
     async (multiSelectDelimiter) => {
@@ -190,6 +249,32 @@ describe("promptParameterValues sensitive parameters", () => {
     assert.deepEqual(prompted?.payload.fields, [{ name: "TOKEN", value: "typed-secret" }]);
   });
 
+  it.each(["password", "credentials"] as const)(
+    "masks %s parameters and prefills the preset value",
+    async (kind) => {
+      await promptParameterValues(
+        createOptions([{ name: "SECRET", kind, defaultValue: "default-secret" }]),
+        { SECRET: "preset-secret" }
+      );
+
+      assert.equal(inputBoxCalls.length, 1);
+      assert.equal(inputBoxCalls[0].password, true);
+      assert.equal(inputBoxCalls[0].value, "preset-secret");
+    }
+  );
+
+  it("does not mask plain string parameters and prefills the default value", async () => {
+    inputBoxValue = "typed-value";
+    const prompted = await promptParameterValues(
+      createOptions([{ name: "BRANCH", kind: "string", defaultValue: "main" }])
+    );
+
+    assert.equal(inputBoxCalls.length, 1);
+    assert.equal(inputBoxCalls[0].password, false);
+    assert.equal(inputBoxCalls[0].value, "main");
+    assert.deepEqual(prompted?.payload.fields, [{ name: "BRANCH", value: "typed-value" }]);
+  });
+
   it("does not open sensitive text parameters in a plaintext editor", async () => {
     await promptParameterValues(
       createOptions([
@@ -209,14 +294,40 @@ describe("promptParameterValues sensitive parameters", () => {
   });
 });
 
+describe("promptParameterValues run parameters", () => {
+  it.each([
+    "folder/upstream",
+    "job/folder/job/upstream/",
+    "https://jenkins.example/job/folder/job/upstream/"
+  ])("submits the externalizable run ID for %s", async (runProjectName) => {
+    const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName }]);
+    options.dataService = {
+      getBuildsForJob: async () => [{ number: 42 }]
+    } as unknown as BuildParameterPromptOptions["dataService"];
+    quickPickActions = ["existing"];
+
+    const prompted = await promptParameterValues(options);
+
+    assert.deepEqual(prompted?.payload.fields, [
+      { name: "RUN_BUILD", value: "folder/upstream#42" }
+    ]);
+    assert.equal(prompted?.values.RUN_BUILD, "folder/upstream#42");
+  });
+});
+
 describe("fetchRunBuildChoices run parameter lookup", () => {
-  it("queries the canonical Jenkins job URL first for a simple project name", async () => {
+  it.each([
+    ["foo", "https://jenkins.example/job/foo/"],
+    ["folder/foo", "https://jenkins.example/job/folder/job/foo/"],
+    ["job/folder/job/foo", "https://jenkins.example/job/folder/job/foo/"],
+    ["https://jenkins.example/job/foo", "https://jenkins.example/job/foo/"]
+  ])("queries one Jenkins job URL for %s", async (runProjectName, expectedJobUrl) => {
     const requestedJobUrls: string[] = [];
     const options = createOptions([
       {
         name: "RUN_BUILD",
         kind: "run",
-        runProjectName: "foo"
+        runProjectName
       }
     ]);
     options.dataService = {
@@ -231,32 +342,35 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
 
     await fetchRunBuildChoices(options, options.parameters[0]);
 
-    assert.deepEqual(requestedJobUrls, ["https://jenkins.example/job/foo/"]);
+    assert.deepEqual(requestedJobUrls, [expectedJobUrl]);
   });
 
-  it("does not request external absolute runProjectName URLs", async () => {
-    const requestedJobUrls: string[] = [];
-    const options = createOptions([
-      {
-        name: "RUN_BUILD",
-        kind: "run",
-        runProjectName: "https://example.invalid/job/x/"
-      }
-    ]);
-    options.dataService = {
-      getBuildsForJob: async (
-        _environment: BuildParameterPromptOptions["environment"],
-        jobUrl: string
-      ) => {
-        requestedJobUrls.push(jobUrl);
-        return [];
-      }
-    } as unknown as BuildParameterPromptOptions["dataService"];
+  it.each(["https://example.invalid/job/x/", "//example.invalid/job/x/"])(
+    "does not request external runProjectName URL %s",
+    async (runProjectName) => {
+      const requestedJobUrls: string[] = [];
+      const options = createOptions([
+        {
+          name: "RUN_BUILD",
+          kind: "run",
+          runProjectName
+        }
+      ]);
+      options.dataService = {
+        getBuildsForJob: async (
+          _environment: BuildParameterPromptOptions["environment"],
+          jobUrl: string
+        ) => {
+          requestedJobUrls.push(jobUrl);
+          return [];
+        }
+      } as unknown as BuildParameterPromptOptions["dataService"];
 
-    await fetchRunBuildChoices(options, options.parameters[0]);
+      await fetchRunBuildChoices(options, options.parameters[0]);
 
-    assert.deepEqual(requestedJobUrls, []);
-  });
+      assert.deepEqual(requestedJobUrls, []);
+    }
+  );
 
   it("does not offer current-job builds when an explicit target has no builds", async () => {
     const requestedJobUrls: string[] = [];
@@ -293,6 +407,23 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
     const choices = await fetchRunBuildChoices(options, options.parameters[0]);
 
     assert.equal(choices[0]?.number, 42);
+    assert.equal(choices[0]?.runId, "demo#42");
     assert.deepEqual(requestedJobUrls, [options.jobUrl]);
+  });
+
+  it("returns no choices after one failed lookup", async () => {
+    const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName: "foo" }]);
+    const getBuildsForJob = vi.fn().mockRejectedValue(new Error("Lookup failed"));
+    options.dataService = {
+      getBuildsForJob
+    } as unknown as BuildParameterPromptOptions["dataService"];
+
+    assert.deepEqual(await fetchRunBuildChoices(options, options.parameters[0]), []);
+    assert.equal(getBuildsForJob.mock.calls.length, 1);
+    assert.deepEqual(getBuildsForJob.mock.calls[0], [
+      options.environment,
+      "https://jenkins.example/job/foo/",
+      20
+    ]);
   });
 });

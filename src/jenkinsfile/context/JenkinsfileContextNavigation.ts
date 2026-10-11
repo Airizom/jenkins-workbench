@@ -75,7 +75,7 @@ export function resolveBraceLabel(
   return undefined;
 }
 
-function findPreviousMeaningfulIndex(text: string, index: number): number | undefined {
+export function findPreviousMeaningfulIndex(text: string, index: number): number | undefined {
   let current = index;
   while (current >= 0) {
     if (!text[current].trim()) {

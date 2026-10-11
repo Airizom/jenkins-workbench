@@ -32,6 +32,23 @@ describe("nodeDetailsReducer advanced request", () => {
     });
     assert.equal(answered.advancedRequested, false);
   });
+
+  it("rebuilds state from a full view model update", () => {
+    vi.stubGlobal("window", {});
+    const initial = getInitialState();
+    vi.unstubAllGlobals();
+    const updated = nodeDetailsReducer(initial, {
+      type: "updateNodeDetails",
+      payload: { type: "updateNodeDetails", payload: nodeDetailsScenarios.online }
+    });
+    assert.deepEqual(updated, {
+      ...initial,
+      ...nodeDetailsScenarios.online,
+      loading: initial.loading,
+      hasLoaded: true,
+      advancedRequested: false
+    });
+  });
 });
 
 describe("NodeDetailsAdvancedSection", () => {

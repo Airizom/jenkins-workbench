@@ -8,11 +8,6 @@ type ResolvePathOutcome = {
   wasPending: boolean;
 };
 
-type ExpansionOperation = {
-  operationVersion: number;
-  path?: TreeExpansionPath;
-};
-
 type CollapsedPathOperation = {
   operationVersion: number;
   path: TreeExpansionPath;
@@ -26,6 +21,7 @@ export class TreeExpansionState implements vscode.Disposable {
   private readonly pendingCollapsedElements = new Map<WorkbenchTreeElement, number>();
   private readonly elementOperationVersions = new WeakMap<WorkbenchTreeElement, number>();
   private readonly activeProgrammaticReveals = new WeakMap<WorkbenchTreeElement, number>();
+  private readonly inFlightOperationVersions = new Set<number>();
   private readonly disposables: vscode.Disposable[] = [];
   private nextOperationVersion = 0;
 
@@ -48,6 +44,9 @@ export class TreeExpansionState implements vscode.Disposable {
       disposable.dispose();
     }
     this.disposables.length = 0;
+    this.collapsedPathOperations.clear();
+    this.pendingCollapsedElements.clear();
+    this.inFlightOperationVersions.clear();
   }
 
   snapshot(): TreeExpansionPath[] {
@@ -61,6 +60,18 @@ export class TreeExpansionState implements vscode.Disposable {
 
     const sortedPaths = [...paths].sort((left, right) => left.length - right.length);
     const operationVersion = ++this.nextOperationVersion;
+    this.inFlightOperationVersions.add(operationVersion);
+    try {
+      await this.restoreSortedPaths(sortedPaths, operationVersion);
+    } finally {
+      this.endOperation(operationVersion);
+    }
+  }
+
+  private async restoreSortedPaths(
+    sortedPaths: TreeExpansionPath[],
+    operationVersion: number
+  ): Promise<void> {
     for (const path of sortedPaths) {
       const key = this.buildKey(path);
       const currentVersion = this.expandedPathVersions.get(key) ?? 0;
@@ -81,7 +92,7 @@ export class TreeExpansionState implements vscode.Disposable {
       }
       if (
         this.expandedPathVersions.get(key) !== operationVersion ||
-        this.hasNewerCollapse(path, operationVersion, outcome.element)
+        this.findNewerCollapsedElement(path, operationVersion, outcome.element) !== undefined
       ) {
         this.clearRestoredPath(key, operationVersion);
         continue;
@@ -108,16 +119,19 @@ export class TreeExpansionState implements vscode.Disposable {
     if (this.activeProgrammaticReveals.has(element)) {
       return;
     }
-    const operation = await this.startExpansionOperation(element);
-    if (
-      !operation?.path ||
-      this.hasNewerCollapsedPrefix(operation.path, operation.operationVersion)
-    ) {
-      return;
+    const operationVersion = this.startElementOperation(element);
+    this.inFlightOperationVersions.add(operationVersion);
+    try {
+      const path = await this.buildCurrentExpansionPath(element, operationVersion);
+      if (!path || this.hasNewerCollapsedPrefix(path, operationVersion)) {
+        return;
+      }
+      const key = this.buildKey(path);
+      this.expandedPaths.set(key, path);
+      this.expandedPathVersions.set(key, operationVersion);
+    } finally {
+      this.endOperation(operationVersion);
     }
-    const key = this.buildKey(operation.path);
-    this.expandedPaths.set(key, operation.path);
-    this.expandedPathVersions.set(key, operation.operationVersion);
   }
 
   private async trackCollapsed(element: WorkbenchTreeElement): Promise<void> {
@@ -152,6 +166,29 @@ export class TreeExpansionState implements vscode.Disposable {
       if (this.pendingCollapsedElements.get(element) === operationVersion) {
         this.pendingCollapsedElements.delete(element);
       }
+      this.pruneCollapsedPathOperations();
+    }
+  }
+
+  private endOperation(operationVersion: number): void {
+    this.inFlightOperationVersions.delete(operationVersion);
+    this.pruneCollapsedPathOperations();
+  }
+
+  // A collapse only affects expand/restore operations that started before it. Discard it
+  // when a newer expansion supersedes it or none of those earlier operations is still in flight.
+  private pruneCollapsedPathOperations(): void {
+    let oldestInFlightVersion = Number.POSITIVE_INFINITY;
+    for (const version of this.inFlightOperationVersions) {
+      oldestInFlightVersion = Math.min(oldestInFlightVersion, version);
+    }
+    for (const [key, collapsed] of this.collapsedPathOperations) {
+      if (
+        collapsed.operationVersion <= oldestInFlightVersion ||
+        (this.expandedPathVersions.get(key) ?? 0) > collapsed.operationVersion
+      ) {
+        this.collapsedPathOperations.delete(key);
+      }
     }
   }
 
@@ -159,16 +196,6 @@ export class TreeExpansionState implements vscode.Disposable {
     const operationVersion = ++this.nextOperationVersion;
     this.elementOperationVersions.set(element, operationVersion);
     return operationVersion;
-  }
-
-  private async startExpansionOperation(
-    element: WorkbenchTreeElement
-  ): Promise<ExpansionOperation> {
-    const operationVersion = this.startElementOperation(element);
-    return {
-      operationVersion,
-      path: await this.buildCurrentExpansionPath(element, operationVersion)
-    };
   }
 
   private async revealForRestore(element: WorkbenchTreeElement): Promise<void> {
@@ -228,14 +255,6 @@ export class TreeExpansionState implements vscode.Disposable {
       }
     }
     return false;
-  }
-
-  private hasNewerCollapse(
-    path: TreeExpansionPath,
-    operationVersion: number,
-    element: WorkbenchTreeElement
-  ): boolean {
-    return this.findNewerCollapsedElement(path, operationVersion, element) !== undefined;
   }
 
   private findNewerCollapsedElement(

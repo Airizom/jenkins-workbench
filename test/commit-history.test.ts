@@ -113,4 +113,19 @@ describe("commit presentation", () => {
     value.commit = undefined;
     expect(currentCommitLabel(value)).toBe("Checking current commit");
   });
+
+  it("lists the not-found reason once when no build verifies the current commit", () => {
+    const value = state();
+    const other = {
+      ...build,
+      actions: [
+        { lastBuiltRevision: { SHA1: "b".repeat(40) }, remoteUrls: ["git@github.com:team/app.git"] }
+      ]
+    };
+    const history = { job: { name: "app", url: value.jobUrl }, builds: [other] };
+    value.commit = assessCommit(history, checkout);
+    expect(value.commit.kind).toBe("notFound");
+    const notFoundLine = "No verified build for current commit in the newest 50 builds";
+    expect(currentCommitTooltip(value).filter((line) => line === notFoundLine)).toHaveLength(1);
+  });
 });

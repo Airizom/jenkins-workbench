@@ -5,7 +5,7 @@ import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelIn
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
-import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
+import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type {
   BuildDetailsViewModel,
   PipelineLogTargetViewModel
@@ -45,7 +45,7 @@ const { useCallback, useMemo, useReducer, useState } = React;
 
 export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsViewModel }) {
   const [state, dispatch] = useReducer(buildDetailsReducer, initialState, buildInitialState);
-  const postMessage = usePanelPostMessage<BuildDetailsIncomingMessage>();
+  const postMessage: (message: BuildDetailsIncomingMessage) => void = postVsCodeMessage;
   const handleOpenExternal = useOpenExternalMessage(postMessage);
   useBuildDetailsMessages(dispatch);
   const { showButton, scrollToTop } = useScrollToTopButton();
@@ -65,7 +65,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     hasPendingInputs,
     pendingInputIds,
     hasPipelineStages,
-    hasTests
+    hasTests,
+    detailsLoaded: state.hasLoaded
   });
   const startPendingInputAction = usePendingInputActions(
     dispatch,

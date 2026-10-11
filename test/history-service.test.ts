@@ -69,6 +69,50 @@ describe("bounded history service", () => {
     await service.report(request({ refresh: true }), build(1));
     expect(getTestReport).toHaveBeenCalledTimes(2);
   });
+  it("fetches for an active subscriber joining an immediately cancelled report", async () => {
+    const getTestReport = vi.fn().mockResolvedValue({ suites: [] });
+    const service = new HistoryService(dataService({ getTestReport }));
+    const cancelled = service.report(request({ active: () => false }), build(1));
+    const active = service.report(request(), build(1));
+
+    expect(await cancelled).toEqual({ status: "unavailable", cases: [] });
+    expect(await active).toEqual({ status: "available", cases: [] });
+    expect(await service.report(request(), build(1))).toEqual({
+      status: "available",
+      cases: []
+    });
+    expect(getTestReport).toHaveBeenCalledTimes(1);
+  });
+  it("retries for an active subscriber joining after queued cancellation", async () => {
+    const gate = deferred<void>();
+    const cancelledAtDispatch = deferred<void>();
+    const getTestReport = vi.fn().mockResolvedValue({ suites: [] });
+    const service = new HistoryService(dataService({ getTestReport }));
+    const blockers = Array.from({ length: 3 }, () => service.run(request(), () => gate.promise));
+    let active = true;
+    const cancelled = service.report(
+      request({
+        active: () => {
+          if (!active) cancelledAtDispatch.resolve();
+          return active;
+        }
+      }),
+      build(1)
+    );
+    active = false;
+    gate.resolve();
+    await cancelledAtDispatch.promise;
+    const joined = service.report(request(), build(1));
+
+    expect(await cancelled).toEqual({ status: "unavailable", cases: [] });
+    expect(await joined).toEqual({ status: "available", cases: [] });
+    await Promise.all(blockers);
+    expect(await service.report(request(), build(1))).toEqual({
+      status: "available",
+      cases: []
+    });
+    expect(getTestReport).toHaveBeenCalledTimes(1);
+  });
   it("caps requests at three and skips queued requests whose subscribers closed", async () => {
     const gate = deferred<undefined>();
     const getTestReport = vi.fn(() => gate.promise);
@@ -89,6 +133,18 @@ describe("bounded history service", () => {
     service.invalidate();
     gate.resolve([build(1)]);
     await expect(pending).rejects.toThrow("cancelled");
+  });
+  it("stops fetching reports for a load invalidated in flight", async () => {
+    const gate = deferred<undefined>();
+    const getBuildsForJob = vi.fn(async () => [1, 2, 3, 4, 5].map(build));
+    const getTestReport = vi.fn(() => gate.promise);
+    const service = new HistoryService(dataService({ getBuildsForJob, getTestReport }));
+    const pending = service.load(request({ count: 10 }));
+    await vi.waitFor(() => expect(getTestReport).toHaveBeenCalledTimes(3));
+    service.invalidate();
+    gate.resolve(undefined);
+    await pending;
+    expect(getTestReport).toHaveBeenCalledTimes(3);
   });
   it("does not cache errors and expires successful report entries", async () => {
     vi.useFakeTimers();

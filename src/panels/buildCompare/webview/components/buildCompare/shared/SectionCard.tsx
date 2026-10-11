@@ -12,11 +12,13 @@ import { resolveSectionStatusBadge } from "./sectionStatusBadge";
 
 const { useId, useState } = React;
 
-/** Lets the app control (and persist) whether a section is expanded. */
-export type SectionCardDisclosureProps = {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-};
+/**
+ * Lets the app control (and persist) whether a section is expanded. A
+ * controlled `open` requires `onOpenChange`; otherwise toggles would be lost.
+ */
+export type SectionCardDisclosureProps =
+  | { open: boolean; onOpenChange: (open: boolean) => void }
+  | { open?: undefined; onOpenChange?: (open: boolean) => void };
 
 /**
  * Collapsible comparison section. The heading wraps only the disclosure
@@ -42,7 +44,12 @@ export function SectionCard({
 >) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(true);
   const open = controlledOpen ?? uncontrolledOpen;
-  const handleOpenChange = onOpenChange ?? setUncontrolledOpen;
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (controlledOpen === undefined) {
+      setUncontrolledOpen(nextOpen);
+    }
+    onOpenChange?.(nextOpen);
+  };
   const statusBadge = resolveSectionStatusBadge(status);
   const idBase = useId();
   const summaryId = `${idBase}-summary`;
@@ -85,11 +92,7 @@ export function SectionCard({
                 </p>
               ) : null}
             </div>
-            {/* A populated section speaks for itself; only call out the
-                states that explain missing or partial content. */}
-            {status === "available" ? null : (
-              <ToneBadge label={statusBadge.label} tone={statusBadge.tone} />
-            )}
+            {statusBadge ? <ToneBadge label={statusBadge.label} tone={statusBadge.tone} /> : null}
           </div>
         </CardHeader>
         {hasContent ? (

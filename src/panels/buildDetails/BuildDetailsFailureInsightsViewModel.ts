@@ -39,7 +39,7 @@ function buildArtifacts(details?: JenkinsBuildDetails): BuildFailureArtifact[] {
   }
   const items: BuildFailureArtifact[] = [];
   for (const artifact of details.artifacts) {
-    const relativePath = (artifact.relativePath ?? "").trim();
+    const relativePath = artifact.relativePath ?? "";
     if (!relativePath) {
       continue;
     }

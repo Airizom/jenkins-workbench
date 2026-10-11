@@ -5,7 +5,7 @@ import { DraftEditorService } from "../../services/DraftEditorService";
 import type { JobConfigDraft, JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
-import { formatActionError, getTreeItemLabel } from "../CommandUtils";
+import { formatActionError, getTreeItemLabel, requireSelection } from "../CommandUtils";
 
 type DraftMetadata = Parameters<JobConfigDraftManager["createDraft"]>[2];
 
@@ -19,9 +19,9 @@ export class JobConfigUpdateWorkflow {
     private readonly editorService: DraftEditorService = new DraftEditorService()
   ) {}
 
-  async startUpdate(item?: JobTreeItem | PipelineTreeItem): Promise<void> {
+  async startUpdate(selection?: JobTreeItem | PipelineTreeItem): Promise<void> {
+    const item = requireSelection(selection, "Select a job or pipeline to update its config.");
     if (!item) {
-      void vscode.window.showInformationMessage("Select a job or pipeline to update its config.");
       return;
     }
 
@@ -102,8 +102,9 @@ export class JobConfigUpdateWorkflow {
     targetUri: vscode.Uri
   ): Promise<void> {
     const document = await vscode.workspace.openTextDocument(targetUri);
+    const baselineXml = draft.lastSubmittedXml ?? draft.originalXml;
     let editedXml = document.getText();
-    if (editedXml === draft.originalXml) {
+    if (editedXml === baselineXml) {
       void vscode.window.showInformationMessage(
         `No changes detected for ${draft.label}. Update canceled.`
       );
@@ -125,7 +126,7 @@ export class JobConfigUpdateWorkflow {
         },
         () => this.dataService.getJobConfigXml(draft.environment, draft.jobUrl)
       );
-      if (currentXml !== draft.originalXml) {
+      if (currentXml !== baselineXml) {
         const overwrite = await this.showRemoteConflictConfirmation(draft.label);
         if (!overwrite) {
           return;
@@ -134,7 +135,7 @@ export class JobConfigUpdateWorkflow {
 
       let uploadXml = document.getText();
       while (uploadXml !== editedXml) {
-        if (uploadXml === draft.originalXml) {
+        if (uploadXml === baselineXml) {
           void vscode.window.showInformationMessage(
             `No changes detected for ${draft.label}. Update canceled.`
           );
@@ -160,6 +161,7 @@ export class JobConfigUpdateWorkflow {
         },
         () => submission
       );
+      draft.lastSubmittedXml = uploadXml;
       refreshHost.fullEnvironmentRefresh({ environmentId: draft.environment.environmentId });
       if (document.getText() !== uploadXml) {
         void vscode.window.showInformationMessage(
@@ -168,7 +170,7 @@ export class JobConfigUpdateWorkflow {
         return;
       }
       void vscode.window.showInformationMessage(`Updated config.xml for ${draft.label}.`);
-      const closed = await this.closeDraftEditor(targetUri);
+      const closed = await this.editorService.closeUris([targetUri]);
       if (closed) {
         this.draftManager.discardDraft(targetUri);
       }
@@ -177,10 +179,6 @@ export class JobConfigUpdateWorkflow {
         `Failed to update config.xml for ${draft.label}: ${formatActionError(error)}`
       );
     }
-  }
-
-  private async closeDraftEditor(uri: vscode.Uri): Promise<boolean> {
-    return await this.editorService.closeUris([uri]);
   }
 
   private async showSubmitConfirmation(label: string, errorCount: number): Promise<boolean> {

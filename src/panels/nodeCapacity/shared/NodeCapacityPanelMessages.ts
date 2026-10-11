@@ -58,14 +58,38 @@ export function parseNodeCapacityOutgoingMessage(
   }
   switch (message.type) {
     case "updateNodeCapacity":
-      return message as unknown as NodeCapacityUpdateMessage;
+      return isNodeCapacityViewModelShape(message.payload)
+        ? (message as unknown as NodeCapacityUpdateMessage)
+        : undefined;
     case "updateNodeCapacityNodeExecutors":
-      return message as unknown as NodeCapacityNodeExecutorsUpdateMessage;
+      return typeof message.requestId === "number" &&
+        Array.isArray(message.payload) &&
+        message.payload.every(isNodeExecutorsResultShape)
+        ? (message as unknown as NodeCapacityNodeExecutorsUpdateMessage)
+        : undefined;
     case "setLoading":
       return parseSetLoadingOutgoingMessage(message);
     default:
       return undefined;
   }
+}
+
+function isNodeCapacityViewModelShape(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isRecord(value.summary) &&
+    Array.isArray(value.pools) &&
+    Array.isArray(value.hiddenLabelQueueItems) &&
+    Array.isArray(value.errors)
+  );
+}
+
+function isNodeExecutorsResultShape(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.nodeUrl === "string" &&
+    (Array.isArray(value.executors) || typeof value.error === "string")
+  );
 }
 
 export function isRefreshNodeCapacityMessage(
@@ -77,7 +101,11 @@ export function isRefreshNodeCapacityMessage(
 export { isOpenExternalMessage };
 
 export function isOpenNodeDetailsMessage(message: unknown): message is OpenNodeDetailsMessage {
-  return hasMessageType(message, "openNodeDetails") && typeof message.nodeUrl === "string";
+  return (
+    hasMessageType(message, "openNodeDetails") &&
+    typeof message.nodeUrl === "string" &&
+    (message.label === undefined || typeof message.label === "string")
+  );
 }
 
 export function isLoadNodeCapacityExecutorsMessage(

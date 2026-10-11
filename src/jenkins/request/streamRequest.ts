@@ -23,29 +23,14 @@ export function requestJenkinsStream(
         headers: requestOptions.headers,
         authHeader: requestOptions.authHeader
       }),
-    resolveRedirectAction: ({ redirectDecision }) => {
+    onResponse: ({ response, statusCode, redirectDecision }) => {
       if (redirectDecision.type === "cannotFollow") {
-        return {
-          type: "abort",
-          error: new JenkinsRequestError("Jenkins returned a redirect that cannot be followed.")
-        };
+        // Stop discarded bodies immediately, even if the server keeps sending.
+        response.destroy();
+        return Promise.reject(
+          new JenkinsRequestError("Jenkins returned a redirect that cannot be followed.")
+        );
       }
-      if (redirectDecision.type === "reject") {
-        return {
-          type: "abort",
-          error: redirectDecision.error
-        };
-      }
-      if (redirectDecision.type === "follow") {
-        return {
-          type: "follow",
-          nextUrl: redirectDecision.nextUrl,
-          redirectCount: redirectDecision.redirectCount
-        };
-      }
-      return { type: "continue" } as const;
-    },
-    onResponse: ({ response, statusCode }) => {
       if (statusCode < 200 || statusCode >= 300) {
         return collectBoundedResponseText(
           response,

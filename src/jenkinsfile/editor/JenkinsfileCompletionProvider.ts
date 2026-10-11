@@ -4,7 +4,7 @@ import { analyzeJenkinsfileContext } from "../JenkinsfileContextAnalyzer";
 import type { JenkinsfileIntelligenceConfigState } from "../JenkinsfileIntelligenceConfigState";
 import type { JenkinsfileStepDefinition } from "../JenkinsfileIntelligenceTypes";
 import type { JenkinsfileStepCatalogService } from "../JenkinsfileStepCatalogService";
-import { canProvideJenkinsfileIntelligence } from "./JenkinsfileEditorSupport";
+import { canProvideJenkinsfileIntelligence, getCallParameters } from "./JenkinsfileEditorSupport";
 
 export class JenkinsfileCompletionProvider implements vscode.CompletionItemProvider {
   constructor(
@@ -61,60 +61,32 @@ function createCompletionItem(
 }
 
 function buildStepSnippet(step: JenkinsfileStepDefinition): vscode.SnippetString {
-  const signature =
-    step.signatures.find((entry) => entry.usesNamedArgs) ??
-    step.signatures.find((entry) => !entry.usesNamedArgs) ??
-    step.signatures[0];
+  const signature = step.signatures.find((entry) => entry.usesNamedArgs) ?? step.signatures[0];
 
   if (!signature) {
     return new vscode.SnippetString(`${step.name}()`);
   }
 
-  const parameters = signature.parameters.filter((parameter) => !parameter.isBody);
+  const parameters = getCallParameters(signature);
+
+  const snippet = new vscode.SnippetString();
+  snippet.appendText(`${step.name}(`);
 
   if (signature.usesNamedArgs && parameters.length > 0) {
-    const snippet = createCallSnippet(step.name);
-    appendNamedArgument(snippet, parameters[0].name, "value", parameters[0].type === "Closure");
-    appendBody(snippet, signature.takesClosure);
-    return snippet;
-  }
-
-  if (!signature.usesNamedArgs && parameters.length === 1) {
-    const snippet = createCallSnippet(step.name);
+    const isClosure = parameters[0].type === "Closure";
+    snippet.appendPlaceholder(parameters[0].name);
+    snippet.appendText(isClosure ? ": { " : ": ");
+    snippet.appendPlaceholder("value");
+    if (isClosure) {
+      snippet.appendText(" }");
+    }
+  } else if (!signature.usesNamedArgs && parameters.length === 1) {
     snippet.appendPlaceholder(parameters[0].name === "message" ? "message" : "value");
-    closeCallSnippet(snippet);
-    appendBody(snippet, signature.takesClosure);
-    return snippet;
   }
 
-  const snippet = new vscode.SnippetString(`${step.name}()`);
+  snippet.appendText(")");
   appendBody(snippet, signature.takesClosure);
   return snippet;
-}
-
-function createCallSnippet(stepName: string): vscode.SnippetString {
-  const snippet = new vscode.SnippetString();
-  snippet.appendText(`${stepName}(`);
-  return snippet;
-}
-
-function appendNamedArgument(
-  snippet: vscode.SnippetString,
-  namePlaceholder: string,
-  valuePlaceholder: string,
-  isClosure: boolean
-): void {
-  snippet.appendPlaceholder(namePlaceholder);
-  snippet.appendText(isClosure ? ": { " : ": ");
-  snippet.appendPlaceholder(valuePlaceholder);
-  if (isClosure) {
-    snippet.appendText(" }");
-  }
-  closeCallSnippet(snippet);
-}
-
-function closeCallSnippet(snippet: vscode.SnippetString): void {
-  snippet.appendText(")");
 }
 
 function appendBody(snippet: vscode.SnippetString, takesClosure: boolean): void {

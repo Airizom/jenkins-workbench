@@ -59,6 +59,133 @@ describe("BuildDiagnosticScanSession", () => {
     );
   });
 
+  it("resolves each raw path once per session and retries failed resolutions", async () => {
+    const lines = Array.from(
+      { length: 10_000 },
+      (_unused, index) => `src/missing.ts:${index + 1}:1: error: repeated`
+    );
+    lines.push("src/flaky.ts:1:1: error: first", "src/flaky.ts:2:1: error: second");
+    const log = `${lines.join("\n")}\n`;
+    let flakyFailed = false;
+    const resolveDiagnostic = vi.fn(async (diagnostic: RawBuildDiagnostic) => {
+      if (diagnostic.rawPath === "src/flaky.ts" && !flakyFailed) {
+        flakyFailed = true;
+        throw new Error("Unavailable");
+      }
+      return undefined;
+    });
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => ({
+          text: log,
+          textSize: log.length,
+          moreData: false,
+          bytesRead: log.length
+        }),
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/6/",
+      profile: profile(),
+      maxLogBytes: log.length,
+      resolveDiagnostic
+    });
+
+    await session.scan(false);
+    const calls = resolveDiagnostic.mock.calls.map(([diagnostic]) => diagnostic.rawPath);
+    assert.equal(calls.filter((rawPath) => rawPath === "src/missing.ts").length, 1);
+    assert.equal(calls.filter((rawPath) => rawPath === "src/flaky.ts").length, 2);
+  });
+
+  it.each(["progressive", "fallback"])(
+    "bounds the %s path cache while scanning and releases it on completion",
+    async (mode) => {
+      const log = Array.from(
+        { length: 10_000 },
+        (_unused, index) => `src/${index}.ts:1:1: warning: omitted\n`
+      ).join("");
+      const tail = "src/final.ts:1:1: error: final unterminated line";
+      let finished = false;
+      const resolveDiagnostic = vi.fn(async () => undefined);
+      const session = new BuildDiagnosticScanSession({
+        dataService: {
+          getConsoleTextProgressive: async () => {
+            if (mode === "fallback") {
+              throw new JenkinsRequestError("Unsupported", 404);
+            }
+            const text = finished ? tail : log;
+            return {
+              text,
+              textSize: finished ? log.length + tail.length : log.length,
+              moreData: false,
+              bytesRead: text.length
+            };
+          },
+          getConsoleTextHead: async () => {
+            const text = finished ? log + tail : log;
+            return { text, bytesRead: text.length, truncated: false };
+          }
+        } as never,
+        environment,
+        buildUrl: "https://jenkins.example/job/app/6/",
+        profile: profile(),
+        maxLogBytes: log.length + tail.length + 1,
+        maxDiagnostics: 2,
+        fallbackRefreshIntervalMs: 0,
+        resolveDiagnostic
+      });
+      const cache = Reflect.get(session, "retentionPathByRawPath") as Map<string, unknown>;
+
+      const running = await session.scan(true);
+      assert.equal(running.complete, false);
+      assert.equal(running.diagnostics.length, 2);
+      assert.equal(cache.size, 8);
+      assert.equal(resolveDiagnostic.mock.calls.length, 8);
+
+      finished = true;
+      const completed = await session.scan(false);
+      assert.equal(completed.complete, true);
+      assert.equal(completed.diagnostics.length, 2);
+      assert.equal(completed.diagnostics[0].message, "final unterminated line");
+      assert.equal(cache.size, 0);
+      assert.equal(resolveDiagnostic.mock.calls.length, 8);
+      assert.deepEqual(await session.scan(false), completed);
+      assert.equal(cache.size, 0);
+      session.dispose();
+    }
+  );
+
+  it("counts failed resolutions against the budget across fallback refreshes", async () => {
+    const resolveDiagnostic = vi.fn(async () => {
+      throw new Error("Unavailable");
+    });
+    const log = "src/flaky.ts:1:1: error: failure\n".repeat(1_000);
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => {
+          throw new JenkinsRequestError("Unsupported", 404);
+        },
+        getConsoleTextHead: async () => ({ text: log, bytesRead: log.length, truncated: false })
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/6/",
+      profile: profile(),
+      maxLogBytes: log.length,
+      maxDiagnostics: 2,
+      fallbackRefreshIntervalMs: 0,
+      resolveDiagnostic
+    });
+
+    await session.scan(true);
+    const refreshed = await session.scan(true);
+    assert.equal(resolveDiagnostic.mock.calls.length, 8);
+    assert.equal(refreshed.diagnostics.length, 1);
+    assert.equal((Reflect.get(session, "retentionPathByRawPath") as Map<string, unknown>).size, 0);
+    session.dispose();
+  });
+
   it("stops draining when disposed during a progressive request", async () => {
     let resolveRequest:
       | ((value: { text: string; textSize: number; moreData: boolean; bytesRead: number }) => void)
@@ -188,6 +315,53 @@ describe("BuildDiagnosticScanSession", () => {
     assert.deepEqual(head.mock.calls[0].slice(1), ["https://jenkins.example/job/app/8/", 23]);
   });
 
+  it("throttles fallback rescans while the build is running", async () => {
+    const head = vi.fn(async () => ({
+      text: "src/a.go:4:2: broken\n",
+      bytesRead: 23,
+      truncated: false
+    }));
+    const factory = vi.fn(() => ({
+      acceptChunk: async () => [],
+      finish: async () => [],
+      dispose: () => undefined
+    }));
+    let now = 1_000;
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => {
+          throw new JenkinsRequestError("unsupported", 404);
+        },
+        getConsoleTextHead: head
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/8/",
+      profile: profile(),
+      maxLogBytes: 1024,
+      customMatcherRunnerFactory: factory,
+      fallbackRefreshIntervalMs: 30_000,
+      now: () => now
+    });
+
+    await session.scan(true);
+    now += 5_000;
+    await session.scan(true);
+    now += 5_000;
+    const throttled = await session.scan(true);
+    assert.equal(head.mock.calls.length, 1);
+    assert.equal(factory.mock.calls.length, 2);
+    assert.equal(throttled.complete, false);
+    assert.equal(throttled.diagnostics.length, 1);
+
+    now += 30_000;
+    await session.scan(true);
+    assert.equal(head.mock.calls.length, 2);
+
+    const completed = await session.scan(false);
+    assert.equal(head.mock.calls.length, 3);
+    assert.equal(completed.complete, true);
+  });
+
   it("marks a running scan complete and incomplete when the byte cap is reached", async () => {
     const session = new BuildDiagnosticScanSession({
       dataService: {
@@ -276,6 +450,47 @@ describe("BuildDiagnosticScanSession", () => {
     const repeated = await session.scan(false);
     assert.equal(calls, 256);
     assert.deepEqual(repeated, firstPass);
+  });
+
+  it("scales the completed-build request budget with maxLogBytes", async () => {
+    const chunkBytes = 1024;
+    const totalChunks = 300;
+    const progressive = vi.fn(
+      async (
+        _environment: JenkinsEnvironmentRef,
+        _buildUrl: string,
+        start: number,
+        requestedBytes: number
+      ) => {
+        const size = Math.min(requestedBytes, totalChunks * chunkBytes - start);
+        return {
+          text: "x".repeat(size),
+          textSize: start + size,
+          moreData: start + size < totalChunks * chunkBytes,
+          bytesRead: size
+        };
+      }
+    );
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: progressive,
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/10/",
+      profile: profile(),
+      maxLogBytes: 512 * chunkBytes,
+      chunkBytes
+    });
+
+    const result = await session.scan(false);
+
+    assert.equal(progressive.mock.calls.length, totalChunks);
+    assert.equal(result.complete, true);
+    assert.equal(result.truncated, false);
+    assert.equal(result.bytesRead, totalChunks * chunkBytes);
   });
 
   it("resumes a running scan after more than 256 empty polls", async () => {
@@ -495,6 +710,62 @@ describe("BuildDiagnosticScanSession", () => {
       ]
     );
     assert.equal(result.omittedCount, 4);
+  });
+
+  it("keeps every later error when warnings fill a large retention buffer", async () => {
+    const diagnostic = (
+      sequence: number,
+      severity: RawBuildDiagnostic["severity"]
+    ): RawBuildDiagnostic => ({
+      parserId: "custom",
+      source: "custom",
+      severity,
+      message: `finding ${sequence}`,
+      rawPath: `src/${sequence}.ts`,
+      line: sequence,
+      kind: "problem",
+      priority: 1,
+      logLine: sequence,
+      rawText: `src/${sequence}.ts:${sequence}: finding`,
+      sequence
+    });
+    const session = new BuildDiagnosticScanSession({
+      dataService: {
+        getConsoleTextProgressive: async () => ({
+          text: "dense output",
+          textSize: 12,
+          moreData: false,
+          bytesRead: 12
+        }),
+        getConsoleTextHead: async () => {
+          throw new Error("fallback should not run");
+        }
+      } as never,
+      environment,
+      buildUrl: "https://jenkins.example/job/app/12/",
+      profile: profile({ builtIns: [] }),
+      maxLogBytes: 1024,
+      maxDiagnostics: 10,
+      customMatcherRunner: {
+        acceptChunk: async () => [
+          ...Array.from({ length: 10 }, (_unused, index) => diagnostic(index + 1, "warning")),
+          ...Array.from({ length: 5 }, (_unused, index) => diagnostic(index + 11, "error"))
+        ],
+        finish: async () => [],
+        dispose: () => undefined
+      }
+    });
+
+    const result = await session.scan(false);
+
+    const errors = result.diagnostics.filter((item) => item.severity === "error");
+    const warnings = result.diagnostics.filter((item) => item.severity === "warning");
+    assert.deepEqual(
+      errors.map((item) => item.sequence),
+      [11, 12, 13, 14, 15]
+    );
+    assert.equal(warnings.length, 5);
+    assert.equal(result.omittedCount, 5);
   });
 
   it("keeps later unique findings when alias errors fill the scanner", async () => {

@@ -10,7 +10,6 @@ export type TreeChangeRetryOptions<Result> = {
   onDidChangeTreeData: vscode.Event<WorkbenchTreeElement | undefined>;
   shouldRetry: (result: Result) => boolean;
   getPendingElement: (result: Result) => WorkbenchTreeElement | undefined;
-  getPendingElementBeforeOperation?: () => WorkbenchTreeElement | undefined;
   retryAfterTimeout?: boolean;
   waitAfterRetryExhausted?: boolean;
   retryLimit?: number;
@@ -66,8 +65,9 @@ async function runTreeChangeAttempt<Result>(
     if (!acceptingChanges) {
       return;
     }
-    // Record every change so the resolved pending element can be checked after the
-    // operation, even when an early wait targets a different provisional element.
+    // Record every change during the operation so the resolved pending element can be
+    // checked afterwards. The timeout only starts once the operation finishes, so a slow
+    // operation cannot use up the wait before the pending element is known.
     observedChanges.push(changedElement);
     if (waiting && doesTreeChangeMatch(changedElement, pendingElement)) {
       finishWaiting(true);
@@ -82,12 +82,6 @@ async function runTreeChangeAttempt<Result>(
         options.timeoutMs ?? TREE_CHANGE_RETRY_TIMEOUT_MS
       );
     });
-  const earlyWait = options.getPendingElementBeforeOperation
-    ? (() => {
-        pendingElement = options.getPendingElementBeforeOperation?.();
-        return startWaiting();
-      })()
-    : undefined;
 
   try {
     const result = await options.operation();
@@ -102,9 +96,6 @@ async function runTreeChangeAttempt<Result>(
     }
     if (!shouldWait) {
       return { result, didChange: false };
-    }
-    if (earlyWait) {
-      return { result, didChange: await earlyWait };
     }
 
     const didChange = await startWaiting();

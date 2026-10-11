@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
-import { captureCheckout } from "../src/currentBranch/CurrentBranchCheckout";
+import { captureCheckout, isCheckoutCurrent } from "../src/currentBranch/CurrentBranchCheckout";
 import type { CurrentBranchPullRequestResolution } from "../src/currentBranch/CurrentBranchGitHubPullRequestAdapter";
-import type {
-  CurrentBranchPullRequestJobMatcher,
-  CurrentBranchPullRequestJobRef
+import {
+  type CurrentBranchPullRequestJobMatcher,
+  CurrentBranchPullRequestJobNameMatcher,
+  type CurrentBranchPullRequestJobRef
 } from "../src/currentBranch/CurrentBranchPullRequestJobMatcher";
 import type {
   CurrentBranchLinkedContext,
@@ -14,7 +15,11 @@ import type {
 import type { GitApi, GitRepository } from "../src/git/GitExtensionApi";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-import { createCurrentBranchVscodeMock, TestUri } from "./helpers/vscodeMocks";
+import {
+  createCurrentBranchVscodeMock,
+  createThemeVscodeMock,
+  TestUri
+} from "./helpers/vscodeMocks";
 
 let githubPullRequestExtension:
   | { isActive: boolean; exports: unknown; activate: () => Promise<unknown> }
@@ -24,7 +29,7 @@ const vscodeMock = createCurrentBranchVscodeMock({
   githubPullRequestExtension: () => githubPullRequestExtension
 });
 
-vi.doMock("vscode", () => vscodeMock);
+vi.doMock("vscode", () => ({ ...vscodeMock, ...createThemeVscodeMock() }));
 const { CurrentBranchRepositoryResolver } = await import(
   "../src/currentBranch/CurrentBranchRepositoryResolver"
 );
@@ -40,6 +45,9 @@ const { CurrentBranchRefreshCoordinator } = await import(
 const { CurrentBranchJenkinsService } = await import(
   "../src/currentBranch/CurrentBranchJenkinsService"
 );
+const { CurrentBranchCommandMapper } = await import(
+  "../src/currentBranch/CurrentBranchCommandMapper"
+);
 const { CurrentBranchLinkResolver } = await import(
   "../src/currentBranch/CurrentBranchLinkResolver"
 );
@@ -54,6 +62,19 @@ const noopEvent = (() => ({
 beforeEach(() => {
   vscodeMock.window.activeTextEditor = undefined;
   githubPullRequestExtension = undefined;
+});
+
+describe("isCheckoutCurrent", () => {
+  it("compares a captured checkout against the repository's current fingerprint", () => {
+    const repository = createGitRepository("/workspace/app");
+    const checkout = captureCheckout(repository);
+
+    assert.equal(isCheckoutCurrent(checkout, repository), true);
+    assert.equal(isCheckoutCurrent(undefined, repository), false);
+
+    repository.state.HEAD = { name: "feature/other", type: 0 };
+    assert.equal(isCheckoutCurrent(checkout, repository), false);
+  });
 });
 
 describe("CurrentBranchRepositoryResolver", () => {
@@ -102,6 +123,38 @@ describe("CurrentBranchRepositoryResolver", () => {
   });
 });
 
+describe("CurrentBranchPullRequestJobNameMatcher", () => {
+  it("accepts duplicate matching entries for the same job URL", () => {
+    const matcher = new CurrentBranchPullRequestJobNameMatcher();
+    const pullRequest = { kind: "pullRequest" as const, number: 42 };
+    const job = { name: "PR%2D42", url: "job/main/job/PR-42/" };
+
+    assert.deepEqual(matcher.findMatch([job, { ...job, name: "PR-42" }], pullRequest), {
+      kind: "matched",
+      job,
+      pullRequest
+    });
+    assert.equal(matcher.findMatch([job], { kind: "none" }), undefined);
+    assert.equal(matcher.findMatch([], pullRequest), undefined);
+  });
+
+  it("rejects distinct matching jobs across configured patterns", () => {
+    const matcher = new CurrentBranchPullRequestJobNameMatcher(["pr-{number}", "change-{number}"]);
+    const pullRequest = { kind: "pullRequest" as const, number: 42 };
+
+    assert.deepEqual(
+      matcher.findMatch(
+        [
+          { name: "PR-42", url: "job/main/job/PR-42/" },
+          { name: "change-42", url: "job/main/job/change-42/" }
+        ],
+        pullRequest
+      ),
+      { kind: "ambiguous", pullRequest }
+    );
+  });
+});
+
 describe("CurrentBranchTargetResolver", () => {
   it("selects a matching pull request job before branch fallback", async () => {
     const fixture = createTargetFixture({
@@ -116,10 +169,8 @@ describe("CurrentBranchTargetResolver", () => {
         { name: "feature%2Fdeploy", url: "job/main/job/feature%2Fdeploy/", color: "blue" },
         { name: "PR-42", url: "job/main/job/PR-42/", color: "yellow" }
       ],
-      matcher: (jobs, pullRequestContext) =>
-        pullRequestContext.kind === "pullRequest"
-          ? { job: jobs[1], pullRequest: pullRequestContext }
-          : undefined
+      matcher: (jobs, context) =>
+        new CurrentBranchPullRequestJobNameMatcher().findMatch(jobs, context)
     });
 
     const resolution = await fixture.resolver.resolve(fixture.localState, {});
@@ -134,6 +185,38 @@ describe("CurrentBranchTargetResolver", () => {
       headBranch: "feature/deploy"
     });
   });
+
+  it.each([false, true])(
+    "reports ambiguous case-insensitive PR jobs without branch fallback (reversed: %s)",
+    async (reversed) => {
+      const jobs = [
+        { name: "pr-42", url: "job/main/job/pr-42/" },
+        { name: "PR-42", url: "job/main/job/PR-42/" },
+        { name: "feature%2Fdeploy", url: "job/main/job/feature%2Fdeploy/" }
+      ];
+      const fixture = createTargetFixture({
+        pullRequestResolution: { kind: "pullRequest", number: 42, headBranch: "feature/deploy" },
+        jobs: reversed ? jobs.reverse() : jobs,
+        matcher: (candidates, context) =>
+          new CurrentBranchPullRequestJobNameMatcher().findMatch(candidates, context)
+      });
+      const message = "Multiple Jenkins jobs match PR #42; unable to select a target.";
+
+      await assert.rejects(fixture.resolver.resolve(fixture.localState, {}), { message });
+
+      const getJob = vi.fn();
+      const statusResolver = new CurrentBranchStatusResolver(
+        { getJob } as unknown as JenkinsDataService,
+        fixture.resolver
+      );
+      const state = await statusResolver.resolve(fixture.localState, {});
+
+      assert.equal(state.kind, "requestFailed");
+      assert.equal(state.message, message);
+      assert.equal(state.selectedTarget, undefined);
+      assert.equal(getJob.mock.calls.length, 0);
+    }
+  );
 
   it("falls back to the pull request head branch job when no pull request job matches", async () => {
     const fixture = createTargetFixture({
@@ -469,8 +552,78 @@ describe("CurrentBranchStatusResolver", () => {
   });
 });
 
+describe("CurrentBranchRefreshCoordinator", () => {
+  it("folds a pending scheduled force refresh into a non-forced refresh that starts first", () => {
+    vi.useFakeTimers();
+    const coordinator = new CurrentBranchRefreshCoordinator();
+    try {
+      const runRefresh = vi.fn();
+      coordinator.scheduleRefresh({ force: true }, runRefresh);
+
+      assert.deepEqual(coordinator.beginRefresh({ force: false }), { force: true });
+      vi.advanceTimersByTime(1_000);
+      assert.equal(runRefresh.mock.calls.length, 0);
+      assert.deepEqual(coordinator.beginRefresh({ force: false }), { force: false });
+    } finally {
+      coordinator.dispose();
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("CurrentBranchJenkinsService", () => {
-  it("preserves verification during editor navigation but clears it immediately for a new HEAD", async () => {
+  it.each(["branch", "repository"] as const)(
+    "clears action targets immediately on a %s change until resolution completes",
+    async (change) => {
+      const fixture = createCurrentBranchServiceFixture();
+      const mapper = new CurrentBranchCommandMapper();
+      try {
+        const firstRefresh = fixture.service.refresh();
+        await fixture.waitForResolveCallCount(1);
+        const previous = createMatchedState(fixture.localState, 1);
+        fixture.resolveCalls[0].deferred.resolve(previous);
+        await firstRefresh;
+        assert.equal(mapper.getBuildTarget(fixture.service.getState())?.jobUrl, previous.jobUrl);
+        assert.equal(
+          mapper.getLatestBuildTarget(fixture.service.getState())?.buildUrl,
+          previous.lastBuild?.url
+        );
+
+        if (change === "repository") {
+          fixture.localState.repository = createRepositoryContext("/workspace/other");
+        } else {
+          fixture.localState.repository.repository.state.HEAD = { name: "feature/next" };
+        }
+        fixture.localState.branchName = "feature/next";
+        fixture.repositoryChanged();
+
+        const assertUnavailable = () => {
+          const state = fixture.service.getState();
+          assert.equal(mapper.getBuildTarget(state), undefined);
+          assert.equal(mapper.getLatestBuildTarget(state), undefined);
+          assert.equal(mapper.getOpenBranchRequest(state), undefined);
+          assert.equal(mapper.getCurrentCommitBuildTarget(state), undefined);
+        };
+        assertUnavailable();
+        const nextRefresh = fixture.service.refresh();
+        await fixture.waitForResolveCallCount(2);
+        assertUnavailable();
+
+        const next = createMatchedState(fixture.localState, 2);
+        fixture.resolveCalls[1].deferred.resolve(next);
+        await nextRefresh;
+        assert.equal(mapper.getBuildTarget(fixture.service.getState())?.jobUrl, next.jobUrl);
+        assert.equal(
+          mapper.getLatestBuildTarget(fixture.service.getState())?.buildUrl,
+          next.lastBuild?.url
+        );
+      } finally {
+        fixture.service.dispose();
+      }
+    }
+  );
+
+  it("preserves verification during editor navigation but invalidates it immediately for a new HEAD", async () => {
     const fixture = createCurrentBranchServiceFixture();
     try {
       const refresh = fixture.service.refresh();
@@ -489,8 +642,32 @@ describe("CurrentBranchJenkinsService", () => {
       };
       fixture.repositoryChanged();
       const invalidated = fixture.service.getState();
-      assert.equal(invalidated.kind, "matched");
-      assert.equal(invalidated.commit, undefined);
+      assert.deepEqual(invalidated, { kind: "resolving" });
+    } finally {
+      fixture.service.dispose();
+    }
+  });
+
+  it("keeps the job target when only the commit on the same branch changes", async () => {
+    const fixture = createCurrentBranchServiceFixture();
+    try {
+      const refresh = fixture.service.refresh();
+      await fixture.waitForResolveCallCount(1);
+      const state = createMatchedState(fixture.localState, 1);
+      assert.equal(state.kind, "matched");
+      state.checkout = captureCheckout(fixture.localState.repository.repository);
+      state.commit = { kind: "notFound", reason: "No build" };
+      fixture.resolveCalls[0].deferred.resolve(state);
+      await refresh;
+      fixture.localState.repository.repository.state.HEAD = {
+        name: state.branchName,
+        commit: "c".repeat(40)
+      };
+      fixture.repositoryChanged();
+      const current = fixture.service.getState();
+      assert.equal(current.kind, "matched");
+      assert.equal(current.kind === "matched" && current.jobUrl, state.jobUrl);
+      assert.equal(current.kind === "matched" ? current.commit : "unexpected", undefined);
     } finally {
       fixture.service.dispose();
     }
@@ -526,7 +703,7 @@ describe("CurrentBranchJenkinsService", () => {
       linkResolver,
       { dispose: () => undefined } as never,
       {
-        beginRefresh: () => undefined,
+        beginRefresh: (options: { force?: boolean }) => options,
         dispose: () => undefined,
         scheduleRefresh: (
           options: { force?: boolean },
@@ -568,7 +745,8 @@ describe("CurrentBranchJenkinsService", () => {
       const firstState = await firstRefresh;
       await fixture.waitForResolveCallCount(2);
 
-      assert.equal(firstState.kind, "noGit");
+      assert.equal(firstState.kind, "matched");
+      assert.equal(firstState.lastBuild?.number, 1);
       assert.equal(fixture.resolveCalls.length, 2);
       assert.deepEqual(fixture.resolveCalls[1].options, { force: true });
 
@@ -584,6 +762,89 @@ describe("CurrentBranchJenkinsService", () => {
       fixture.service.dispose();
     }
   });
+
+  it("publishes status during sustained polling overlap and queues only one follow-up", async () => {
+    vi.useFakeTimers();
+    const fixture = createCurrentBranchServiceFixture();
+    const changes: CurrentBranchState[] = [];
+    fixture.service.onDidChange((state) => changes.push(state));
+    try {
+      const initialRefresh = fixture.service.refresh();
+      await fixture.waitForResolveCallCount(1);
+      fixture.resolveCalls[0].deferred.resolve(createMatchedState(fixture.localState, 1));
+      await initialRefresh;
+
+      fixture.statusTick();
+      await vi.advanceTimersByTimeAsync(300);
+      for (let buildNumber = 2; buildNumber <= 4; buildNumber++) {
+        for (let tick = 0; tick < 3; tick++) {
+          fixture.statusTick();
+          await vi.advanceTimersByTimeAsync(300);
+          assert.equal(fixture.resolveCalls.length, buildNumber);
+        }
+        fixture.resolveCalls[buildNumber - 1].deferred.resolve(
+          createMatchedState(fixture.localState, buildNumber)
+        );
+        await vi.advanceTimersByTimeAsync(0);
+        assert.equal(changes.length, buildNumber);
+        assert.equal(fixture.service.getState(), changes[buildNumber - 1]);
+        assert.equal(fixture.resolveCalls.length, buildNumber + 1);
+        assert.deepEqual(fixture.resolveCalls[buildNumber].options, { force: true });
+      }
+
+      fixture.resolveCalls[4].deferred.resolve(createMatchedState(fixture.localState, 5));
+      await vi.advanceTimersByTimeAsync(1_000);
+      assert.deepEqual(
+        changes.map((state) => (state.kind === "matched" ? state.lastBuild?.number : undefined)),
+        [1, 2, 3, 4, 5]
+      );
+      assert.equal(fixture.resolveCalls.length, 5);
+    } finally {
+      fixture.service.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["repository", "checkout", "link", "environment"] as const)(
+    "discards an active result immediately after a %s change",
+    async (change) => {
+      vi.useFakeTimers();
+      const fixture = createCurrentBranchServiceFixture();
+      const changes: CurrentBranchState[] = [];
+      fixture.service.onDidChange((state) => changes.push(state));
+      try {
+        const refresh = fixture.service.refresh();
+        await fixture.waitForResolveCallCount(1);
+        const staleState = createMatchedState(fixture.localState, 1);
+        if (change === "repository") {
+          fixture.localState.repository = createRepositoryContext("/workspace/other");
+          fixture.repositoryChanged();
+        } else if (change === "checkout") {
+          fixture.localState.repository.repository.state.HEAD = { name: "feature/next" };
+          fixture.repositoryChanged();
+        } else if (change === "link") {
+          fixture.linkChanged();
+        } else {
+          fixture.environmentChanged();
+        }
+
+        // Complete before the debounced follow-up starts.
+        fixture.resolveCalls[0].deferred.resolve(staleState);
+        await refresh;
+        assert.equal(changes.length, 0);
+
+        await vi.advanceTimersByTimeAsync(300);
+        assert.equal(fixture.resolveCalls.length, 2);
+        const nextState = createMatchedState(fixture.localState, 2);
+        fixture.resolveCalls[1].deferred.resolve(nextState);
+        await vi.advanceTimersByTimeAsync(0);
+        assert.deepEqual(changes, [nextState]);
+      } finally {
+        fixture.service.dispose();
+        vi.useRealTimers();
+      }
+    }
+  );
 });
 
 function createRepositoryResolver(
@@ -724,6 +985,9 @@ function createCurrentBranchServiceFixture(): {
   }>;
   waitForResolveCallCount: (count: number) => Promise<void>;
   repositoryChanged: () => void;
+  linkChanged: () => void;
+  environmentChanged: () => void;
+  statusTick: () => void;
 } {
   const localState = createLinkedContext();
   const resolveCalls: Array<{
@@ -732,6 +996,9 @@ function createCurrentBranchServiceFixture(): {
   }> = [];
   let notifyResolveCall: () => void = () => undefined;
   let repositoryChanged = () => {};
+  let linkChanged = () => {};
+  let environmentChanged = () => {};
+  let statusTick = () => {};
   const repositoryResolver = {
     dispose: () => undefined,
     initialize: async () => undefined,
@@ -743,7 +1010,10 @@ function createCurrentBranchServiceFixture(): {
     resolveActiveRepository: () => localState.repository
   };
   const linkResolver = {
-    onDidChange: noopEvent,
+    onDidChange: (listener: () => void) => {
+      linkChanged = listener;
+      return { dispose() {} };
+    },
     resolve: async () => localState
   };
   const statusResolver = {
@@ -756,8 +1026,14 @@ function createCurrentBranchServiceFixture(): {
     }
   };
   const eventSource = {
-    onDidChange: noopEvent,
-    onDidTick: noopEvent
+    onDidChange: (listener: () => void) => {
+      environmentChanged = listener;
+      return { dispose() {} };
+    },
+    onDidTick: (listener: () => void) => {
+      statusTick = listener;
+      return { dispose() {} };
+    }
   };
   const service = new CurrentBranchJenkinsService(
     repositoryResolver as never,
@@ -771,6 +1047,9 @@ function createCurrentBranchServiceFixture(): {
   return {
     service,
     repositoryChanged: () => repositoryChanged(),
+    linkChanged: () => linkChanged(),
+    environmentChanged: () => environmentChanged(),
+    statusTick: () => statusTick(),
     localState,
     resolveCalls,
     waitForResolveCallCount: async (count: number) => {
@@ -805,7 +1084,8 @@ function createCurrentBranchServiceFixture(): {
 function createMatchedState(
   localState: CurrentBranchLinkedContext,
   buildNumber: number
-): CurrentBranchState {
+): Extract<CurrentBranchState, { kind: "matched" }> {
+  const jobUrl = `job/main/job/${encodeURIComponent(localState.branchName)}/`;
   return {
     kind: "matched",
     repository: {
@@ -818,8 +1098,9 @@ function createMatchedState(
     environment: localState.environment,
     resolvedTargetKind: "branch",
     jobName: localState.branchName,
-    jobUrl: "job/main/job/feature%2Fdeploy/",
-    lastBuild: { number: buildNumber }
+    jobUrl,
+    checkout: captureCheckout(localState.repository.repository),
+    lastBuild: { number: buildNumber, url: `${jobUrl}${buildNumber}/` }
   };
 }
 

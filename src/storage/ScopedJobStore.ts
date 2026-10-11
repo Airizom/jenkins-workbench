@@ -54,9 +54,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     jobUrl: string
   ): Promise<boolean> {
     const entries = await this.readEntries(scope);
-    return entries.some(
-      (entry) => entry.environmentId === environmentId && entry.jobUrl === jobUrl
-    );
+    return entries.some((entry) => this.isSameJob(entry, { environmentId, jobUrl }));
   }
 
   protected addOrUpdate(
@@ -138,10 +136,14 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     }
 
     return this.mutationQueue(() =>
-      this.removeMatchingEntries(
-        scope,
-        (entry) => entry.environmentId === environmentId && jobUrls.has(entry.jobUrl)
-      )
+      this.removeMatchingEntries(scope, (entry) => {
+        for (const jobUrl of jobUrls) {
+          if (this.isSameJob(entry, { environmentId, jobUrl })) {
+            return true;
+          }
+        }
+        return false;
+      })
     );
   }
 

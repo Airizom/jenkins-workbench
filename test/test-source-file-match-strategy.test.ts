@@ -68,4 +68,32 @@ describe("DefaultTestSourceFileMatchStrategy", () => {
       ]
     );
   });
+
+  it("matches preferred path fragments case-insensitively", async () => {
+    findFiles.mockImplementationOnce(async () => [
+      vscodeStub.Uri.file("/workspace/one/src/acceptance/com/example/BuildTest.java"),
+      vscodeStub.Uri.file("/workspace/one/src/integrationTest/com/example/BuildTest.java")
+    ]);
+    const strategy = new DefaultTestSourceFileMatchStrategy({
+      getOptions: () => ({
+        fileExtensions: ["java"],
+        excludeGlob: "",
+        maxResultsPerPattern: 10,
+        preferredPathScores: [{ fragment: "src/integrationTest/", score: 50 }]
+      })
+    });
+
+    const matches = await strategy.findMatches(
+      [vscodeStub.Uri.file("/workspace/one")] as never,
+      "com.example.BuildTest"
+    );
+
+    assert.deepEqual(
+      matches.map((uri) => uri.fsPath),
+      [
+        "/workspace/one/src/integrationTest/com/example/BuildTest.java",
+        "/workspace/one/src/acceptance/com/example/BuildTest.java"
+      ]
+    );
+  });
 });

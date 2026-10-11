@@ -167,7 +167,7 @@ export function normalizeJobUrl(
     return { error: "jobUrl must resolve within environmentUrl." };
   }
 
-  if (!parseJobUrl(normalized)) {
+  if (!parseJobUrl(normalized, base)) {
     return { error: "jobUrl must point to a Jenkins job (missing /job/ segment)." };
   }
 

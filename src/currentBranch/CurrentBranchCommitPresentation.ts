@@ -1,4 +1,5 @@
 import type { JenkinsBuild } from "../jenkins/types";
+import { COMMIT_HISTORY_LIMIT } from "./CurrentBranchCommitHistory";
 import type { CurrentBranchState } from "./CurrentBranchTypes";
 
 type Matched = Extract<CurrentBranchState, { kind: "matched" }>;
@@ -40,9 +41,9 @@ export function currentCommitTooltip(state: Matched): string[] {
   const { checkout, commit, history } = state;
   if (!checkout || !commit) return ["Checking current commit; previous verification cleared"];
   const lines = [currentCommitLabel(state), `HEAD: ${checkout.head ?? "unknown"}`, commit.reason];
-  if (commit.kind !== "verified")
-    lines.push("No verified build for current commit in the newest 50 builds");
-  lines.push("Search scope: newest 50 builds of the selected Jenkins job");
+  if (commit.kind === "unverified")
+    lines.push(`No verified build for current commit in the newest ${COMMIT_HISTORY_LIMIT} builds`);
+  lines.push(`Search scope: newest ${COMMIT_HISTORY_LIMIT} builds of the selected Jenkins job`);
   if (commit.current) {
     const evidence = commit.current.evidence;
     lines.push(`Evidence: ${evidence.source}`, `Repository identity: ${evidence.repository}`);

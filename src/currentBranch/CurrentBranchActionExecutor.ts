@@ -1,4 +1,3 @@
-import type * as vscode from "vscode";
 import {
   openLastFailedBuildForTarget,
   type TriggerBuildForTargetOptions,
@@ -38,10 +37,7 @@ export class CurrentBranchActionExecutor {
     );
   }
 
-  async openLatestBuild(
-    target: CurrentBranchBuildDetailsTarget,
-    _extensionUri: vscode.Uri
-  ): Promise<void> {
+  async openLatestBuild(target: CurrentBranchBuildDetailsTarget): Promise<void> {
     await withActionErrorMessage("Unable to open the latest build details", async () => {
       await this.buildDetailsPanelLauncher.show({
         environment: target.environment,
@@ -51,10 +47,7 @@ export class CurrentBranchActionExecutor {
     });
   }
 
-  openLastFailedBuild(
-    target: CurrentBranchJobActionTarget,
-    _extensionUri: vscode.Uri
-  ): Promise<void> {
+  openLastFailedBuild(target: CurrentBranchJobActionTarget): Promise<void> {
     return openLastFailedBuildForTarget(this.dataService, this.buildDetailsPanelLauncher, target);
   }
 

@@ -4,20 +4,6 @@ import { createRequestTarget, createTimeoutError } from "./transport";
 
 type RequestMethod = "GET" | "POST" | "HEAD";
 
-export type RequestLifecycleAction =
-  | {
-      type: "abort";
-      error: Error;
-    }
-  | {
-      type: "follow";
-      nextUrl: string;
-      redirectCount: number;
-    }
-  | {
-      type: "continue";
-    };
-
 export interface RedirectableRequestOptions {
   method?: RequestMethod;
   headers?: Record<string, string>;
@@ -25,19 +11,13 @@ export interface RedirectableRequestOptions {
   body?: string | Uint8Array;
   timeoutMs?: number;
   redirectCount?: number;
+  contextUrl?: string;
 }
 
 export interface RequestLifecycleOptions<TOptions extends RedirectableRequestOptions, TResponse> {
   url: string;
   options: TOptions;
   buildHeaders: (options: TOptions) => Record<string, string>;
-  resolveRedirectAction: (input: {
-    requestUrl: string;
-    options: TOptions;
-    method: RequestMethod;
-    statusCode: number;
-    redirectDecision: RedirectDecision;
-  }) => RequestLifecycleAction;
   onResponse: (input: {
     response: IncomingMessage;
     statusCode: number;
@@ -56,7 +36,6 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
   url,
   options,
   buildHeaders,
-  resolveRedirectAction,
   onResponse
 }: RequestLifecycleOptions<TOptions, TResponse>): Promise<TResponse> {
   const headers = buildHeaders(options);
@@ -95,7 +74,7 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
     const req = client.request(
       {
         method,
-        hostname: parsed.hostname,
+        hostname: parsed.hostname.startsWith("[") ? parsed.hostname.slice(1, -1) : parsed.hostname,
         port: parsed.port,
         path: `${parsed.pathname}${parsed.search}`,
         headers,
@@ -108,41 +87,33 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
           method,
           location: response.headers.location,
           currentUrl: url,
+          contextUrl: options.contextUrl,
           redirectCount: options.redirectCount ?? 0
         });
 
-        const redirectAction = resolveRedirectAction({
-          requestUrl: url,
-          options,
-          method,
-          statusCode,
-          redirectDecision
-        });
-
-        if (redirectAction.type === "abort") {
-          // Drain the discarded response so the socket is released.
-          response.resume();
-          safeReject(redirectAction.error);
+        if (redirectDecision.type === "reject") {
+          // Stop discarded bodies immediately, even if the server keeps sending.
+          response.destroy();
+          safeReject(redirectDecision.error);
           return;
         }
 
-        if (redirectAction.type === "follow") {
+        if (redirectDecision.type === "follow") {
           clearTimer();
-          response.resume();
+          response.destroy();
           // Never forward credentials to another origin.
-          const nextOptions: TOptions = isCrossOriginRedirect(url, redirectAction.nextUrl)
+          const nextOptions: TOptions = isCrossOriginRedirect(url, redirectDecision.nextUrl)
             ? {
                 ...options,
-                redirectCount: redirectAction.redirectCount,
+                redirectCount: redirectDecision.redirectCount,
                 authHeader: undefined,
                 headers: undefined
               }
-            : { ...options, redirectCount: redirectAction.redirectCount };
+            : { ...options, redirectCount: redirectDecision.redirectCount };
           executeRequestLifecycle<TOptions, TResponse>({
-            url: redirectAction.nextUrl,
+            url: redirectDecision.nextUrl,
             options: nextOptions,
             buildHeaders,
-            resolveRedirectAction,
             onResponse
           })
             .then(safeResolve)

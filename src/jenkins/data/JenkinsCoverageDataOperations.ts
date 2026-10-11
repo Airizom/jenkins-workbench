@@ -4,11 +4,11 @@ import type {
 } from "../coverage/JenkinsCoverageTypes";
 import type { JenkinsClient } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
+import type { JenkinsDataCache } from "./JenkinsDataCache";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 
 const DEFAULT_COVERAGE_ACTION_PATH = "coverage";
-const FORWARD_SLASH_CHAR_CODE = 47;
 
 export interface JenkinsCoverageRequestOptions {
   buildCompleted?: boolean;
@@ -80,14 +80,16 @@ export class JenkinsCoverageDataOperations {
       return cached;
     }
 
-    const client = await this.runtimeContext.getClient(environment);
-    try {
-      const value = await operation(client);
-      this.updateCompletedBuildCache(cacheKey, value, completed);
-      return value;
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    return this.runtimeContext.getCache().withWriteGuard([cacheKey], async (cache) => {
+      const client = await this.runtimeContext.getClient(environment);
+      try {
+        const value = await operation(client);
+        this.updateCompletedBuildCache(cache, cacheKey, value, completed);
+        return value;
+      } catch (error) {
+        throw toBuildActionError(error);
+      }
+    });
   }
 
   private getCompletedBuildCacheEntry<T>(cacheKey: string, buildCompleted: boolean): T | undefined {
@@ -104,6 +106,7 @@ export class JenkinsCoverageDataOperations {
   }
 
   private updateCompletedBuildCache<T>(
+    cache: Pick<JenkinsDataCache, "set" | "delete">,
     cacheKey: string,
     value: T | undefined,
     buildCompleted: boolean
@@ -112,7 +115,6 @@ export class JenkinsCoverageDataOperations {
       return;
     }
 
-    const cache = this.runtimeContext.getCache();
     if (value !== undefined) {
       cache.set(cacheKey, value, this.runtimeContext.getCacheTtlMs());
     } else {
@@ -131,22 +133,6 @@ export class JenkinsCoverageDataOperations {
 }
 
 function normalizeCoverageActionPath(actionPath?: string): string {
-  const trimmed = actionPath?.trim();
-  if (!trimmed) {
-    return DEFAULT_COVERAGE_ACTION_PATH;
-  }
-
-  let start = 0;
-  let end = trimmed.length;
-  while (start < end && trimmed.charCodeAt(start) === FORWARD_SLASH_CHAR_CODE) {
-    start += 1;
-  }
-  while (end > start && trimmed.charCodeAt(end - 1) === FORWARD_SLASH_CHAR_CODE) {
-    end -= 1;
-  }
-
-  if (start === end) {
-    return DEFAULT_COVERAGE_ACTION_PATH;
-  }
-  return start === 0 && end === trimmed.length ? trimmed : trimmed.slice(start, end);
+  const normalized = actionPath?.trim().replace(/^\/+|\/+$/g, "");
+  return normalized || DEFAULT_COVERAGE_ACTION_PATH;
 }

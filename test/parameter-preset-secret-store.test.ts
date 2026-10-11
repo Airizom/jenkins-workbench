@@ -50,7 +50,7 @@ describe("ParameterPresetSecretStore.prepare", () => {
     });
 
     assert.deepEqual(prepared.values, { BRANCH: "main" });
-    assert.deepEqual(prepared.secretKeys, { TOKEN: "old-key" });
+    assert.deepEqual({ ...prepared.secretKeys }, { TOKEN: "old-key" });
     assert.deepEqual(prepared.newlyStoredKeys, []);
     assert.equal(secrets.values.size, 0);
   });
@@ -66,7 +66,7 @@ describe("ParameterPresetSecretStore.prepare", () => {
     });
 
     assert.deepEqual(prepared.values, {});
-    assert.deepEqual(prepared.secretKeys, {});
+    assert.deepEqual({ ...prepared.secretKeys }, {});
     assert.deepEqual(prepared.newlyStoredKeys, []);
     assert.equal(secrets.values.size, 0);
   });
@@ -81,7 +81,7 @@ describe("ParameterPresetSecretStore.prepare", () => {
       previousSecretKeys: { TOKEN: "token-key", OTHER: "other-key" }
     });
 
-    assert.deepEqual(prepared.secretKeys, { TOKEN: "token-key" });
+    assert.deepEqual({ ...prepared.secretKeys }, { TOKEN: "token-key" });
   });
 
   it("prefers freshly stored secrets over carried-over previous keys", async () => {

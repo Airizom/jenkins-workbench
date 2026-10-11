@@ -2,10 +2,7 @@ import * as React from "react";
 import { getResultBadgeClass } from "../../../../../shared/webview/components/ResultBadge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { MinusIcon, PlusIcon } from "../../../../../shared/webview/icons";
-import {
-  resolveBuildResultBorderColor,
-  resolveBuildResultGraphBackground
-} from "../../../../../shared/webview/lib/statusStyles";
+import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import { formatCount } from "../pipelineStages/pipelineStagesUtils";
@@ -13,7 +10,9 @@ import type { PipelineGraphLayoutNode, PipelineGraphLayoutResult } from "./pipel
 import {
   clampZoomScale,
   createFittedViewport,
+  recenterViewportOnResize,
   revealRectInViewport,
+  type ViewportContainerSize,
   type ViewportState
 } from "./pipelineGraphViewport";
 
@@ -46,7 +45,16 @@ export function PipelineGraphCanvas({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef(layout);
   const hasAutoFittedRef = useRef(false);
+  // Once the user zooms, pans, or fits explicitly, resizes keep their viewport.
+  const userAdjustedViewportRef = useRef(false);
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, x: 0, y: 0 });
+  const adjustViewport = useCallback(
+    (next: ViewportState | ((current: ViewportState) => ViewportState)) => {
+      userAdjustedViewportRef.current = true;
+      setViewport(next);
+    },
+    []
+  );
   const [isPanning, setIsPanning] = useState(false);
   const panStateRef = useRef<{ pointerId: number; x: number; y: number } | undefined>(undefined);
 
@@ -80,8 +88,20 @@ export function PipelineGraphCanvas({
       return;
     }
 
+    const readSize = (): ViewportContainerSize => ({
+      clientWidth: container.clientWidth,
+      clientHeight: container.clientHeight
+    });
+    let containerSize = readSize();
     const observer = new ResizeObserver(() => {
-      setViewport(createFittedViewport(layoutRef.current, container));
+      const previousSize = containerSize;
+      const nextSize = readSize();
+      containerSize = nextSize;
+      if (!userAdjustedViewportRef.current) {
+        setViewport(createFittedViewport(layoutRef.current, nextSize));
+        return;
+      }
+      setViewport((current) => recenterViewportOnResize(current, previousSize, nextSize));
     });
     observer.observe(container);
     if (!hasAutoFittedRef.current) {
@@ -92,18 +112,26 @@ export function PipelineGraphCanvas({
     return () => observer.disconnect();
   }, []);
 
-  // Pans a newly selected stage into view, for example one picked from the
-  // hero stage strip while it sits outside the visible canvas.
+  const { x, y, width, height } =
+    (selectedStageKey
+      ? layout.nodes.find((candidate) => candidate.id === selectedStageKey)
+      : undefined) ?? {};
+
+  // Reveal selection when it changes or its geometry arrives from a relayout.
+  // Status-only updates should preserve the user's pan.
   useEffect(() => {
     const container = containerRef.current;
-    const node = selectedStageKey
-      ? layoutRef.current.nodes.find((candidate) => candidate.id === selectedStageKey)
-      : undefined;
-    if (!container || !node) {
+    if (
+      !container ||
+      x === undefined ||
+      y === undefined ||
+      width === undefined ||
+      height === undefined
+    ) {
       return;
     }
-    setViewport((current) => revealRectInViewport(current, node, container));
-  }, [selectedStageKey]);
+    setViewport((current) => revealRectInViewport(current, { x, y, width, height }, container));
+  }, [selectedStageKey, x, y, width, height]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -122,7 +150,7 @@ export function PipelineGraphCanvas({
       const rect = container.getBoundingClientRect();
       const pointerX = event.clientX - rect.left;
       const pointerY = event.clientY - rect.top;
-      setViewport((current) => {
+      adjustViewport((current) => {
         const nextScale = clampZoomScale(
           current.scale,
           current.scale * (event.deltaY < 0 ? 1.1 : 0.92)
@@ -137,10 +165,10 @@ export function PipelineGraphCanvas({
     };
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, []);
+  }, [adjustViewport]);
 
   const zoomBy = (factor: number) => {
-    setViewport((current) => ({
+    adjustViewport((current) => ({
       ...current,
       scale: clampZoomScale(current.scale, current.scale * factor)
     }));
@@ -151,7 +179,7 @@ export function PipelineGraphCanvas({
       return;
     }
     const pan = (deltaX: number, deltaY: number) => {
-      setViewport((current) => ({
+      adjustViewport((current) => ({
         ...current,
         x: current.x + deltaX,
         y: current.y + deltaY
@@ -215,7 +243,7 @@ export function PipelineGraphCanvas({
       x: event.clientX,
       y: event.clientY
     };
-    setViewport((current) => ({
+    adjustViewport((current) => ({
       ...current,
       x: current.x + deltaX,
       y: current.y + deltaY
@@ -278,7 +306,7 @@ export function PipelineGraphCanvas({
               if (!container) {
                 return;
               }
-              setViewport(createFittedViewport(layout, container, { allowBelowMinimum: true }));
+              adjustViewport(createFittedViewport(layout, container, { allowBelowMinimum: true }));
             }}
           >
             Fit
@@ -351,8 +379,9 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
   const branchCount = node.stage.parallelBranches.length;
   const stepCount = node.stage.stepsAll.length;
   const accentWidth = Math.round(28 + node.durationRatio * 72);
-  const borderColor = resolveBuildResultBorderColor(node.stage.statusClass);
-  const background = resolveBuildResultGraphBackground(node.stage.statusClass);
+  const { borderColor, graphBackground: background } = resolveBuildResultStyle(
+    node.stage.statusClass
+  );
 
   return (
     <foreignObject

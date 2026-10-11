@@ -3,6 +3,7 @@ import { describe, it } from "vitest";
 import {
   clampZoomScale,
   createFittedViewport,
+  recenterViewportOnResize,
   revealRectInViewport
 } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/pipelineGraphViewport";
 
@@ -88,5 +89,28 @@ describe("revealRectInViewport", () => {
 
     assert.equal(next.x + 100, 24);
     assert.equal(next.y + 50, 24);
+  });
+});
+
+describe("recenterViewportOnResize", () => {
+  it("keeps the user's zoom and the centred layout point when the canvas grows", () => {
+    const viewport = { scale: 1.5, x: -120, y: 30 };
+    const previous = { clientWidth: 600, clientHeight: 360 };
+    const next = { clientWidth: 900, clientHeight: 440 };
+
+    const resized = recenterViewportOnResize(viewport, previous, next);
+
+    assert.equal(resized.scale, 1.5);
+    const centreBefore = (previous.clientWidth / 2 - viewport.x) / viewport.scale;
+    const centreAfter = (next.clientWidth / 2 - resized.x) / resized.scale;
+    assert.equal(centreAfter, centreBefore);
+    assert.equal(resized.y, 70);
+  });
+
+  it("returns the same viewport when the size is unchanged", () => {
+    const viewport = { scale: 0.3, x: 10, y: 20 };
+    const size = { clientWidth: 500, clientHeight: 300 };
+
+    assert.equal(recenterViewportOnResize(viewport, size, { ...size }), viewport);
   });
 });

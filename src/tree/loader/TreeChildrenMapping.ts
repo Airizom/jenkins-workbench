@@ -233,21 +233,9 @@ function createJobTreeItem(
     case "folder":
     case "multibranch":
       return createFolderTreeItem(environment, job, treeFilter, jobScope);
-    case "pipeline":
-      return new JobTreeItem({
-        presentation: "pipeline",
-        variant: "default",
-        environment,
-        label: job.name,
-        jobUrl: job.url,
-        jobScope,
-        color: job.color,
-        isWatched,
-        isPinned
-      });
     default:
       return new JobTreeItem({
-        presentation: "job",
+        presentation: job.kind === "pipeline" ? "pipeline" : "job",
         variant: "default",
         environment,
         label: job.name,

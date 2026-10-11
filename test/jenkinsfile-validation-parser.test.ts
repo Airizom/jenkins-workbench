@@ -145,3 +145,22 @@ it("unpacks Jenkins array-valued validation messages", () => {
   assert.equal(findings[0].line, 2);
   assert.equal(findings[1].column, 3);
 });
+
+it("reads embedded locations from array Message and scalar Error fields alike", () => {
+  const findings = parseDeclarativeValidationOutput(
+    JSON.stringify({
+      errors: [
+        { Message: ["Expected a step @ line 4, column 7"] },
+        { Error: "Expected a stage @ line 6, column 2" }
+      ]
+    })
+  );
+
+  assert.deepEqual(
+    findings.map(({ message, line, column }) => ({ message, line, column })),
+    [
+      { message: "Expected a step", line: 4, column: 7 },
+      { message: "Expected a stage", line: 6, column: 2 }
+    ]
+  );
+});

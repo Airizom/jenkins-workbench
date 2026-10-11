@@ -48,8 +48,18 @@ describe("derivePipelineSectionView", () => {
     const view = derivePipelineSectionView(false, 0, "list");
     assert.equal(view.hidden, true);
     assert.equal(view.hasStages, false);
-    assert.equal(view.canValidateLogTarget, true);
+    assert.equal(view.canValidateLogTarget, false);
     assert.equal(view.showLoadingBanner, false);
+  });
+
+  it("keeps a restored log target while not loading with no stages yet", () => {
+    const restoredTarget = makeTarget();
+    const { canValidateLogTarget } = derivePipelineSectionView(false, 0, "list");
+    const context = { restoredTarget, canValidateLogTarget, currentTarget: undefined, stages: [] };
+    assert.deepEqual(planRestoredLogTarget({ ...context, alreadyConsumed: false }), {
+      consume: false
+    });
+    assert.equal(resolvePersistedPipelineLogTarget(context), restoredTarget);
   });
 
   it("shows the placeholder body while loading without stages", () => {

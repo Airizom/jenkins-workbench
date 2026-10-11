@@ -77,7 +77,9 @@ export function normalizeHistoryReport(report: JenkinsTestReport | undefined): H
     return { status: "unavailable", cases: [], message: "Detailed test cases unavailable." };
   }
   const cases = new Map<string, HistoryCase>();
+  let suppliedCaseCount = 0;
   for (const suite of report.suites ?? []) {
+    suppliedCaseCount += suite.cases?.length ?? 0;
     for (const test of suite.cases ?? []) {
       const name = test.name?.trim();
       if (!name) continue;
@@ -102,7 +104,11 @@ export function normalizeHistoryReport(report: JenkinsTestReport | undefined): H
       });
     }
   }
-  return { status: "available", cases: [...cases.values()] };
+  return {
+    status: "available",
+    cases: [...cases.values()],
+    ...((report.totalCount ?? 0) > suppliedCaseCount ? { truncated: true } : {})
+  };
 }
 
 export function failureEvidence(
@@ -171,11 +177,22 @@ export function analyzeTests(builds: HistoryBuild[], maxTests = 5000): TestHisto
             ? report.status
             : (maps[index].get(test.key)?.outcome ?? (report.truncated ? "unavailable" : "missing"))
       );
+      const counts: Record<HistoryOutcome, number> = {
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        unknown: 0,
+        missing: 0,
+        ambiguous: 0,
+        unavailable: 0,
+        error: 0
+      };
       let previous: HistoryOutcome | undefined;
       let transitions = 0;
       let segmentTransitions = 0;
       let intermittent = false;
       for (const outcome of outcomes) {
+        counts[outcome]++;
         if (outcome !== "passed" && outcome !== "failed") {
           previous = undefined;
           segmentTransitions = 0;
@@ -194,14 +211,14 @@ export function analyzeTests(builds: HistoryBuild[], maxTests = 5000): TestHisto
         className: test.className,
         suiteName: test.suiteName,
         outcomes,
-        passed: outcomes.filter((value) => value === "passed").length,
-        failed: outcomes.filter((value) => value === "failed").length,
-        skipped: outcomes.filter((value) => value === "skipped").length,
-        unavailable: outcomes.filter((value) => value === "unavailable").length,
-        missing: outcomes.filter((value) => value === "missing").length,
-        unknown: outcomes.filter((value) => value === "unknown").length,
-        ambiguous: outcomes.filter((value) => value === "ambiguous").length,
-        errors: outcomes.filter((value) => value === "error").length,
+        passed: counts.passed,
+        failed: counts.failed,
+        skipped: counts.skipped,
+        unavailable: counts.unavailable,
+        missing: counts.missing,
+        unknown: counts.unknown,
+        ambiguous: counts.ambiguous,
+        errors: counts.error,
         transitions,
         intermittent
       };
@@ -216,16 +233,19 @@ export function analyzeTests(builds: HistoryBuild[], maxTests = 5000): TestHisto
 }
 
 export function completionTime(build: JenkinsBuild): number | undefined {
+  const { timestamp, duration } = build;
   if (
     build.building ||
     !build.result ||
-    !Number.isFinite(build.timestamp) ||
-    !Number.isFinite(build.duration) ||
-    (build.timestamp ?? -1) < 0 ||
-    (build.duration ?? -1) < 0
+    timestamp === undefined ||
+    duration === undefined ||
+    !Number.isFinite(timestamp) ||
+    !Number.isFinite(duration) ||
+    timestamp < 0 ||
+    duration < 0
   )
     return undefined;
-  return (build.timestamp ?? 0) + (build.duration ?? 0);
+  return timestamp + duration;
 }
 
 export function historyMetrics(builds: JenkinsBuild[]) {

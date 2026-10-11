@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import type { ClientRequest, IncomingMessage } from "node:http";
 import * as realHttp from "node:http";
 import { PassThrough } from "node:stream";
+import { text } from "node:stream/consumers";
 import { describe, it, vi } from "vitest";
 import { JenkinsMaxBytesError, JenkinsRequestError } from "../src/jenkins/errors";
 
@@ -12,6 +13,7 @@ import { JenkinsMaxBytesError, JenkinsRequestError } from "../src/jenkins/errors
 const http = { ...realHttp };
 vi.doMock("node:http", () => http);
 const { requestJenkinsStream } = await import("../src/jenkins/request/streamRequest");
+const { request } = await import("../src/jenkins/request/standardRequest");
 
 type TestResponse = IncomingMessage & PassThrough;
 
@@ -40,13 +42,18 @@ function createRequest(onEnd: () => void): ClientRequest {
   return request;
 }
 
-function mockHttpRequest(response: IncomingMessage): () => void {
+function mockHttpRequest(
+  response: IncomingMessage,
+  ...redirectResponses: IncomingMessage[]
+): () => void {
   const originalRequest = http.request;
+  const responses = [response, ...redirectResponses];
   const fakeRequest = ((...args: unknown[]) => {
     const callback = args.find(
       (arg): arg is (incoming: IncomingMessage) => void => typeof arg === "function"
     );
-    return createRequest(() => callback?.(response));
+    const currentResponse = responses.shift() ?? response;
+    return createRequest(() => callback?.(currentResponse));
   }) as typeof http.request;
 
   Object.defineProperty(http, "request", { value: fakeRequest });
@@ -78,6 +85,26 @@ function waitForStreamError(stream: NodeJS.ReadableStream): Promise<Error> {
 }
 
 describe("requestJenkinsStream", () => {
+  it("rejects and destroys POST redirects that cannot be followed", async () => {
+    const response = createResponse();
+    response.statusCode = 302;
+    response.headers.location = "/final";
+    const restoreHttpRequest = mockHttpRequest(response);
+
+    try {
+      await assert.rejects(
+        requestJenkinsStream("http://jenkins.example/start", { method: "POST" }),
+        (error) =>
+          error instanceof JenkinsRequestError &&
+          error.message === "Jenkins returned a redirect that cannot be followed."
+      );
+      assert.equal(response.destroyed, true);
+    } finally {
+      restoreHttpRequest();
+      response.destroy();
+    }
+  });
+
   it("times out when the response body stalls after successful headers", async () => {
     const response = createResponse();
     const restoreHttpRequest = mockHttpRequest(response);
@@ -250,4 +277,47 @@ describe("requestJenkinsStream", () => {
       response.destroy();
     }
   });
+});
+
+describe.each(["standard", "streaming"])("discarded %s response disposal", (mode) => {
+  it.each(["follow", "reject", "cannotFollow"])(
+    "destroys the discarded response for %s decisions",
+    async (decision) => {
+      const response = createResponse();
+      response.statusCode = 302;
+      response.headers.location = decision === "reject" ? "/login" : "/final";
+      const finalResponse = createResponse();
+      finalResponse.end("target-ok");
+      const restoreHttpRequest = mockHttpRequest(response, finalResponse);
+
+      try {
+        const options = {
+          method: decision === "cannotFollow" ? ("POST" as const) : ("GET" as const)
+        };
+        const result =
+          mode === "standard"
+            ? request("http://jenkins.example/start", {
+                ...options,
+                parseJson: false,
+                returnText: decision === "follow"
+              })
+            : requestJenkinsStream("http://jenkins.example/start", options).then(({ stream }) =>
+                text(stream)
+              );
+
+        if (decision === "reject") {
+          await assert.rejects(result, /redirected to login/i);
+        } else if (decision === "cannotFollow" && mode === "streaming") {
+          await assert.rejects(result, /redirect that cannot be followed/i);
+        } else {
+          assert.equal(await result, decision === "follow" ? "target-ok" : undefined);
+        }
+        assert.equal(response.destroyed, true);
+      } finally {
+        restoreHttpRequest();
+        response.destroy();
+        finalResponse.destroy();
+      }
+    }
+  );
 });

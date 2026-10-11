@@ -20,7 +20,7 @@ export function registerCurrentBranchCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand("jenkinsWorkbench.openCurrentCommitBuild", async () => {
       const state = await resolveCurrentBranchState(workflowService);
-      if (state) await workflowService.openCurrentCommitBuild(state, context.extensionUri);
+      if (state) await workflowService.openCurrentCommitBuild(state);
     }),
     vscode.commands.registerCommand("jenkinsWorkbench.watchCurrentCommit", async () => {
       const state = await resolveCurrentBranchState(workflowService);
@@ -40,7 +40,7 @@ export function registerCurrentBranchCommands(
       unlinkCurrentRepository(workflowService)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.currentBranchActions", () =>
-      showCurrentBranchActions(workflowService, context.extensionUri)
+      showCurrentBranchActions(workflowService)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.openCurrentBranchInJenkins", () =>
       openCurrentBranchInJenkins(workflowService)

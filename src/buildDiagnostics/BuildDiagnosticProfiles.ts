@@ -1,8 +1,8 @@
+import { isPlainRecord } from "../shared/runtimeGuards";
 import { normalizeMatchers } from "./BuildDiagnosticMatcherNormalizer";
 import { normalizePathMappings } from "./BuildDiagnosticPathMappingNormalizer";
 import {
   addIssue,
-  isRecord,
   readOptionalString,
   reportUnknownProperties
 } from "./BuildDiagnosticProfileValidation";
@@ -10,6 +10,7 @@ import {
   BUILT_IN_DIAGNOSTIC_PARSER_IDS,
   type BuiltInDiagnosticParserId,
   type DiagnosticProfileValidationIssue,
+  isBuiltInParserId,
   type NormalizedDiagnosticProfile,
   type NormalizedDiagnosticProfiles,
   type ResolvedDiagnosticProfile
@@ -40,7 +41,7 @@ export function normalizeDiagnosticProfiles(value: unknown): NormalizedDiagnosti
   const issues: DiagnosticProfileValidationIssue[] = [];
   const profiles = new Map<string, NormalizedDiagnosticProfile>();
   const profileIds = new Set<string>();
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     if (typeof value !== "undefined") {
       addIssue(issues, "profiles", "Profiles must be an object keyed by profile ID.");
     }
@@ -68,7 +69,7 @@ export function normalizeDiagnosticProfiles(value: unknown): NormalizedDiagnosti
       continue;
     }
     profileIds.add(id);
-    if (!isRecord(definition)) {
+    if (!isPlainRecord(definition)) {
       addIssue(issues, profilePath, "Profile definition must be an object.");
       continue;
     }
@@ -157,13 +158,6 @@ function normalizeBuiltIns(
     }
   }
   return result;
-}
-
-function isBuiltInParserId(value: unknown): value is BuiltInDiagnosticParserId {
-  return (
-    typeof value === "string" &&
-    (BUILT_IN_DIAGNOSTIC_PARSER_IDS as readonly string[]).includes(value)
-  );
 }
 
 function freezeProfile(profile: NormalizedDiagnosticProfile): NormalizedDiagnosticProfile {

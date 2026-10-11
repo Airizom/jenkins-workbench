@@ -16,6 +16,13 @@ export const BUILT_IN_DIAGNOSTIC_PARSER_IDS = [
 
 export type BuiltInDiagnosticParserId = (typeof BUILT_IN_DIAGNOSTIC_PARSER_IDS)[number];
 
+export function isBuiltInParserId(value: unknown): value is BuiltInDiagnosticParserId {
+  return (
+    typeof value === "string" &&
+    (BUILT_IN_DIAGNOSTIC_PARSER_IDS as readonly string[]).includes(value)
+  );
+}
+
 export type BuildDiagnosticKind = "problem" | "stack-frame";
 
 /**
@@ -24,6 +31,8 @@ export type BuildDiagnosticKind = "problem" | "stack-frame";
  */
 export interface RawBuildDiagnostic {
   parserId: string;
+  /** Built-in parser that produced this result before a base matcher restyled it. */
+  baseParserId?: string;
   source: string;
   severity: BuildDiagnosticSeverity;
   message: string;
@@ -59,6 +68,22 @@ export interface NormalizedRegexPathMapping {
 export type NormalizedDiagnosticPathMapping =
   | NormalizedPrefixPathMapping
   | NormalizedRegexPathMapping;
+
+/**
+ * JSON-safe copy of path mappings. Shared by the scan-cache fingerprint and
+ * the path-resolution cache key so both change together when a mapping does.
+ */
+export function serializePathMappings(
+  mappings: readonly NormalizedDiagnosticPathMapping[]
+): Array<NormalizedPrefixPathMapping | Omit<NormalizedRegexPathMapping, "regexp">> {
+  return mappings.map((mapping) => {
+    if (mapping.type === "prefix") {
+      return mapping;
+    }
+    const { regexp: _regexp, ...serializable } = mapping;
+    return serializable;
+  });
+}
 
 export type CustomDiagnosticPatternKind = "file" | "location";
 

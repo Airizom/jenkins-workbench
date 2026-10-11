@@ -64,7 +64,7 @@ export class ParameterPresetSecretStore {
   private async storeSecretValues(
     secretValues: ParameterPresetValues
   ): Promise<{ secretKeys: Record<string, string>; newlyStoredKeys: string[] }> {
-    const secretKeys: Record<string, string> = {};
+    const secretKeys: Record<string, string> = Object.create(null);
     const newlyStoredKeys: string[] = [];
     try {
       for (const [name, value] of Object.entries(secretValues)) {
@@ -150,7 +150,7 @@ function carryOverRetainedSecretKeys(
   options: { preserveExistingSecrets: boolean; keepSecretNames: ReadonlySet<string> }
 ): void {
   for (const [name, secretKey] of Object.entries(previousSecretKeys)) {
-    if (secretKeys[name]) {
+    if (Object.hasOwn(secretKeys, name)) {
       continue;
     }
     if (options.preserveExistingSecrets || options.keepSecretNames.has(name)) {

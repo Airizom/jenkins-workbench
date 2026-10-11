@@ -118,14 +118,14 @@ describe("retryOnTreeChange", () => {
     assert.equal(vi.getTimerCount(), 0);
   });
 
-  it("can start the timeout before the operation completes", async () => {
+  it("starts the timeout after a slow operation completes", async () => {
     vi.useFakeTimers();
     const changes = new TestTreeChanges();
     const pendingElement = createElement("jobs");
     let operationCount = 0;
     let resolveFirst: ((result: AttemptResult) => void) | undefined;
-    const resolution = retryOnTreeChange({
-      ...createOptions(changes, async () => {
+    const resolution = retryOnTreeChange(
+      createOptions(changes, async () => {
         operationCount += 1;
         if (operationCount === 1) {
           return await new Promise<AttemptResult>((resolve) => {
@@ -133,15 +133,15 @@ describe("retryOnTreeChange", () => {
           });
         }
         return { pending: false, value: "loaded" };
-      }),
-      getPendingElementBeforeOperation: () => pendingElement,
-      retryAfterTimeout: true
-    });
+      })
+    );
 
-    await vi.advanceTimersByTimeAsync(50);
-    assert.equal(changes.listenerCount, 0);
+    await vi.advanceTimersByTimeAsync(100);
+    assert.equal(changes.listenerCount, 1);
     assert.equal(vi.getTimerCount(), 0);
     resolveFirst?.({ pending: true, pendingElement });
+    await vi.advanceTimersByTimeAsync(10);
+    changes.fire(createElement("jobs"));
 
     assert.equal((await resolution).value, "loaded");
     assert.equal(operationCount, 2);
@@ -149,26 +149,22 @@ describe("retryOnTreeChange", () => {
     assert.equal(vi.getTimerCount(), 0);
   });
 
-  it("retries when the resolved pending element changed during an early wait", async () => {
+  it("does not count a change for a different element seen during the operation", async () => {
     vi.useFakeTimers();
     const changes = new TestTreeChanges();
     let operationCount = 0;
-    const resolution = retryOnTreeChange({
-      ...createOptions(changes, async () => {
+    const resolution = retryOnTreeChange(
+      createOptions(changes, async () => {
         operationCount += 1;
-        if (operationCount === 1) {
-          changes.fire(createElement("nodes"));
-          return { pending: true, pendingElement: createElement("nodes") };
-        }
-        return { pending: false, value: "loaded" };
-      }),
-      getPendingElementBeforeOperation: () => createElement("jobs")
-    });
+        changes.fire(createElement("jobs"));
+        return { pending: true, pendingElement: createElement("nodes") };
+      })
+    );
 
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(50);
 
-    assert.equal((await resolution).value, "loaded");
-    assert.equal(operationCount, 2);
+    assert.equal((await resolution).pending, true);
+    assert.equal(operationCount, 1);
     assert.equal(changes.listenerCount, 0);
     assert.equal(vi.getTimerCount(), 0);
   });

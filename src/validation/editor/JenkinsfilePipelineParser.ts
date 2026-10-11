@@ -29,26 +29,6 @@ interface PipelineTextSource {
 
 const INDENT_FALLBACK = "  ";
 
-export function findPipelineBlock(document: TextDocument): PipelineBlockContext | undefined {
-  return findPipelineBlockFromSource(createDocumentSource(document));
-}
-
-export function hasTopLevelSection(
-  document: TextDocument,
-  context: PipelineBlockContext,
-  token: string
-): boolean {
-  return hasTopLevelSectionInSource(createDocumentSource(document), context, token);
-}
-
-export function resolveInsertLocation(
-  document: TextDocument,
-  context: PipelineBlockContext,
-  section: "agent" | "stages"
-): PipelineTextLocation {
-  return resolveInsertLocationFromSource(createDocumentSource(document), context, section);
-}
-
 export function buildAgentInsertText(
   context: PipelineBlockContext,
   agentValue: "any" | "none"
@@ -80,23 +60,21 @@ export function buildStagesInsertText(context: PipelineBlockContext): string {
   return `${lines.join("\n")}\n`;
 }
 
-function createDocumentSource(document: TextDocument): PipelineTextSource {
+// Masks comments and strings across the whole document in a single pass.
+function createCodeSource(document: TextDocument): PipelineTextSource {
+  const state: CodeMaskState = { inBlockComment: false };
+  const codeLines = Array.from({ length: document.lineCount }, (_, line) =>
+    maskNonCode(document.lineAt(line).text, state)
+  );
   return {
-    lineCount: document.lineCount,
-    lineAt: (line: number) => document.lineAt(line).text
+    lineCount: codeLines.length,
+    lineAt: (line) => codeLines[line]
   };
 }
 
-function findPipelineBlockFromSource(source: PipelineTextSource): PipelineBlockContext | undefined {
-  const state: CodeMaskState = { inBlockComment: false };
-  const codeLines = Array.from({ length: source.lineCount }, (_, line) =>
-    maskNonCode(source.lineAt(line), state)
-  );
-  const codeSource: PipelineTextSource = {
-    lineCount: source.lineCount,
-    lineAt: (line) => codeLines[line]
-  };
-  for (let lineIndex = 0; lineIndex < source.lineCount; lineIndex += 1) {
+export function findPipelineBlock(document: TextDocument): PipelineBlockContext | undefined {
+  const codeSource = createCodeSource(document);
+  for (let lineIndex = 0; lineIndex < codeSource.lineCount; lineIndex += 1) {
     const context = parsePipelineBlockAtLine(codeSource, lineIndex);
     if (context) {
       return context;
@@ -129,7 +107,7 @@ function parsePipelineBlockAtLine(
   if (!open) {
     return undefined;
   }
-  const close = resolveCloseBrace(source, lineText, open, header.pipelineIndent.length);
+  const close = resolveCloseBrace(source, open);
   if (!close) {
     return undefined;
   }
@@ -157,11 +135,10 @@ function matchPipelineHeader(lineText: string): PipelineHeaderMatch | undefined 
   if (!hasInlineBrace && !isBarePipeline) {
     return undefined;
   }
-  const pipelineIndex = pipelineMatch.index ?? signature.indexOf(pipelineMatch[0]);
   return {
     pipelineIndent: getIndent(lineText),
     isBarePipeline,
-    braceSearchStart: pipelineIndex + pipelineMatch[0].length
+    braceSearchStart: pipelineMatch[0].length
   };
 }
 
@@ -197,38 +174,31 @@ function findOpeningBraceOnFollowingLine(
 }
 
 function resolveCloseBrace(
-  source: PipelineTextSource,
-  openLineText: string,
-  open: BracePosition,
-  pipelineIndentLength: number
+  codeSource: PipelineTextSource,
+  open: BracePosition
 ): BracePosition | undefined {
-  const inlineCloseChar = scanLineCode(
-    openLineText,
-    open.character + 1,
-    openLineText.length,
-    (index, depth) => depth === 0 && openLineText[index] === "}"
-  ).matchedIndex;
-  if (inlineCloseChar !== undefined) {
-    return { line: open.line, character: inlineCloseChar };
+  let depth = 0;
+  for (let line = open.line; line < codeSource.lineCount; line += 1) {
+    const start = line === open.line ? open.character : 0;
+    const scan = scanBraceDepth(codeSource.lineAt(line), start, depth);
+    if (scan.closeIndex !== undefined) {
+      return { line, character: scan.closeIndex };
+    }
+    depth = scan.depth;
   }
-  const closingLine = findClosingBraceLine(source, open.line + 1, pipelineIndentLength);
-  if (closingLine === undefined) {
-    return undefined;
-  }
-  const closeChar = source.lineAt(closingLine).indexOf("}");
-  return { line: closingLine, character: closeChar };
+  return undefined;
 }
 
-function hasTopLevelSectionInSource(
-  source: PipelineTextSource,
+export function hasTopLevelSection(
+  document: TextDocument,
   context: PipelineBlockContext,
   token: string
 ): boolean {
   if (context.inline) {
-    const lineText = source.lineAt(context.openLine);
+    const lineText = document.lineAt(context.openLine).text;
     return hasInlineTopLevelSection(lineText, context.openChar + 1, context.closeChar, token);
   }
-  return findTopLevelSectionLine(source, context, token) !== undefined;
+  return findTopLevelSectionLine(createCodeSource(document), context, token) !== undefined;
 }
 
 function hasInlineTopLevelSection(
@@ -247,30 +217,39 @@ function hasInlineTopLevelSection(
   );
 }
 
-function resolveInsertLocationFromSource(
-  source: PipelineTextSource,
+export function resolveInsertLocation(
+  document: TextDocument,
   context: PipelineBlockContext,
   section: "agent" | "stages"
 ): PipelineTextLocation {
   if (context.inline) {
     return { line: context.closeLine, character: context.closeChar };
   }
+  const source = createCodeSource(document);
 
   if (section === "stages") {
     const agentLine = findTopLevelSectionLine(source, context, "agent");
     if (agentLine !== undefined) {
       const agentEndLine = findSectionEndLine(source, context, agentLine, "agent");
-      const line = Math.min(agentEndLine + 1, context.closeLine);
-      return { line, character: 0 };
+      if (agentEndLine < context.closeLine) {
+        return { line: agentEndLine + 1, character: 0 };
+      }
     }
   }
 
   const firstTopLevel = findFirstTopLevelLine(source, context);
-  const targetLine =
-    firstTopLevel !== undefined
-      ? firstTopLevel
-      : Math.min(context.openLine + 1, source.lineCount - 1);
-  return { line: targetLine, character: 0 };
+  if (firstTopLevel === context.openLine) {
+    return { line: context.openLine, character: context.openChar + 1 };
+  }
+  if (firstTopLevel !== undefined) {
+    return { line: firstTopLevel, character: 0 };
+  }
+  // Insert before the closing brace; start its line when only indentation precedes it.
+  const closeLineText = document.lineAt(context.closeLine).text;
+  const closeOnOwnLine =
+    context.closeLine > context.openLine &&
+    closeLineText.slice(0, context.closeChar).trim().length === 0;
+  return { line: context.closeLine, character: closeOnOwnLine ? 0 : context.closeChar };
 }
 
 function resolveIndentation(
@@ -310,15 +289,10 @@ function findTopLevelSectionLine(
   context: PipelineBlockContext,
   token: string
 ): number | undefined {
-  let tokenPattern: RegExp | undefined;
-  return findMatchingTopLevelLine(source, context, (lineText, indent) => {
-    const trimmed = lineText.slice(indent.length);
-    tokenPattern ??= new RegExp(`^${token}\\b`);
-    if (tokenPattern.test(trimmed)) {
-      return true;
-    }
-    return false;
-  });
+  const tokenPattern = new RegExp(`^${token}\\b`);
+  return findMatchingTopLevelLine(source, context, (lineText, indent) =>
+    tokenPattern.test(lineText.slice(indent.length))
+  );
 }
 
 function findFirstTopLevelLine(
@@ -329,15 +303,14 @@ function findFirstTopLevelLine(
 }
 
 function findMatchingTopLevelLine(
-  source: PipelineTextSource,
+  codeSource: PipelineTextSource,
   context: PipelineBlockContext,
   predicate: (lineText: string, indent: string) => boolean
 ): number | undefined {
-  const state: CodeMaskState = { inBlockComment: false };
-  const openingLine = maskNonCode(source.lineAt(context.openLine), state);
-  let depth = braceDepth(openingLine, context.openChar + 1, 0);
-  for (let lineIndex = context.openLine + 1; lineIndex < context.closeLine; lineIndex += 1) {
-    const lineText = maskNonCode(source.lineAt(lineIndex), state);
+  let depth = 0;
+  for (let lineIndex = context.openLine; lineIndex < context.closeLine; lineIndex += 1) {
+    const code = codeSource.lineAt(lineIndex);
+    const lineText = lineIndex === context.openLine ? code.slice(context.openChar + 1) : code;
     if (lineText.trim().length === 0) {
       continue;
     }
@@ -345,23 +318,36 @@ function findMatchingTopLevelLine(
     if (depth === 0 && predicate(lineText, indent)) {
       return lineIndex;
     }
-    depth = braceDepth(lineText, 0, depth);
+    depth = scanBraceDepth(lineText, 0, depth).depth;
   }
   return undefined;
 }
 
-function braceDepth(lineText: string, startIndex: number, depth: number): number {
+/**
+ * Tracks brace depth across masked code, clamping at zero. `closeIndex` is the first closing
+ * brace that returns an open nesting level to zero.
+ */
+function scanBraceDepth(
+  code: string,
+  startIndex: number,
+  depth: number
+): { depth: number; closeIndex?: number } {
   let currentDepth = depth;
-  for (let index = startIndex; index < lineText.length; index += 1) {
-    if (lineText[index] === "{") {
+  let closeIndex: number | undefined;
+  for (let index = startIndex; index < code.length; index += 1) {
+    if (code[index] === "{") {
       currentDepth += 1;
-    } else if (lineText[index] === "}") {
-      currentDepth = Math.max(0, currentDepth - 1);
+    } else if (code[index] === "}" && currentDepth > 0) {
+      currentDepth -= 1;
+      if (currentDepth === 0) {
+        closeIndex ??= index;
+      }
     }
   }
-  return currentDepth;
+  return { depth: currentDepth, closeIndex };
 }
 
+// Expects masked code lines so braces inside comments and strings are ignored.
 function findSectionEndLine(
   source: PipelineTextSource,
   context: PipelineBlockContext,
@@ -372,7 +358,6 @@ function findSectionEndLine(
   const tokenIndex = lineText.toLowerCase().indexOf(token.toLowerCase());
   let openLine = sectionLine;
   let openChar = tokenIndex >= 0 ? lineText.indexOf("{", tokenIndex + token.length) : -1;
-  const sectionIndentLength = getIndent(lineText).length;
 
   if (openChar === -1) {
     const nextLine = findNextNonEmptyLine(source, sectionLine + 1, context.closeLine);
@@ -388,30 +373,11 @@ function findSectionEndLine(
     openLine = nextLine;
   }
 
-  const closingLine = findClosingBraceLine(source, openLine + 1, sectionIndentLength);
-  if (closingLine === undefined || closingLine > context.closeLine) {
+  const close = resolveCloseBrace(source, { line: openLine, character: openChar });
+  if (close === undefined || close.line > context.closeLine) {
     return sectionLine;
   }
-  return closingLine;
-}
-
-function findClosingBraceLine(
-  source: PipelineTextSource,
-  startLine: number,
-  indentLength: number
-): number | undefined {
-  for (let lineIndex = startLine; lineIndex < source.lineCount; lineIndex += 1) {
-    const lineText = source.lineAt(lineIndex);
-    const signature = codeBeforeLineComment(lineText).trim();
-    if (signature !== "}") {
-      continue;
-    }
-    const indent = getIndent(lineText);
-    if (indent.length === indentLength) {
-      return lineIndex;
-    }
-  }
-  return undefined;
+  return close.line;
 }
 
 function findNextNonEmptyLine(

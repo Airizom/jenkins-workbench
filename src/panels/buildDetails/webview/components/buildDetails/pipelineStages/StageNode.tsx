@@ -8,8 +8,8 @@ import {
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { ChevronDownIcon, TerminalIcon } from "../../../../../shared/webview/icons";
 import {
-  resolveBuildResultConnectorColor,
-  resolveBuildResultStageNodeClass
+  resolveBuildResultStageNodeClass,
+  resolveBuildResultStyle
 } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type {
@@ -19,6 +19,7 @@ import type {
 import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getStageIcon } from "./PipelineStageIcons";
+import { formatCount } from "./pipelineStagesUtils";
 import { StepsList } from "./StepsList";
 import { StepsVisibilityToggle } from "./StepsVisibilityToggle";
 export function StageNode({
@@ -44,7 +45,7 @@ export function StageNode({
   const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
   const stageIcon = getStageIcon(stage.statusClass);
   const nodeStyle = resolveBuildResultStageNodeClass(stage.statusClass);
-  const connectorColor = resolveBuildResultConnectorColor(stage.statusClass);
+  const connectorColor = resolveBuildResultStyle(stage.statusClass).connectorColor;
   const stageName = stage.name;
   const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
   const stageLogTarget = stage.logTarget;
@@ -196,7 +197,7 @@ export function describeStageMeta(stage: PipelineStageViewModel): string {
   const parts = [isStageNotRun(stage) ? "Did not run" : stage.durationLabel || "Unknown"];
   const branchCount = stage.parallelBranches.length;
   if (branchCount > 0) {
-    parts.push(`${branchCount} parallel ${branchCount === 1 ? "branch" : "branches"}`);
+    parts.push(formatCount(branchCount, "parallel branch", "parallel branches"));
   }
   return parts.join(" · ");
 }

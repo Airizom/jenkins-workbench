@@ -59,14 +59,11 @@ export async function promptBooleanParameterValue(
   defaultInput?: string | number | boolean | string[]
 ): Promise<string | undefined> {
   const defaultValue = normalizeBoolean(defaultInput);
-  const pick = await vscode.window.showQuickPick(
-    [
-      { label: "true", picked: defaultValue === true },
-      { label: "false", picked: defaultValue === false }
-    ],
-    { placeHolder: prompt, ignoreFocusOut: true }
+  return promptChoiceParameterValue(
+    prompt,
+    ["true", "false"],
+    defaultValue === undefined ? undefined : String(defaultValue)
   );
-  return pick?.label;
 }
 
 export async function promptChoiceParameterValue(
@@ -74,14 +71,28 @@ export async function promptChoiceParameterValue(
   choices: string[],
   defaultValue?: string
 ): Promise<string | undefined> {
-  const pick = await vscode.window.showQuickPick(
-    choices.map((choice) => ({
-      label: choice,
-      picked: choice === defaultValue
-    })),
-    { placeHolder: prompt, ignoreFocusOut: true }
-  );
-  return pick?.label;
+  const quickPick = vscode.window.createQuickPick();
+  quickPick.items = choices.map((label) => ({ label }));
+  quickPick.placeholder = prompt;
+  quickPick.ignoreFocusOut = true;
+  const defaultItem = quickPick.items.find((item) => item.label === defaultValue);
+  if (defaultItem) {
+    quickPick.activeItems = [defaultItem];
+  }
+
+  return new Promise((resolve) => {
+    const accept = quickPick.onDidAccept(() => {
+      resolve(quickPick.selectedItems[0]?.label);
+      quickPick.hide();
+    });
+    const hide = quickPick.onDidHide(() => {
+      resolve(undefined);
+      accept.dispose();
+      hide.dispose();
+      quickPick.dispose();
+    });
+    quickPick.show();
+  });
 }
 
 function normalizeBoolean(value?: string | number | boolean | string[]): boolean | undefined {

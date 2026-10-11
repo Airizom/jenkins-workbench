@@ -1,3 +1,4 @@
+import { JenkinsActionError, JenkinsRequestError } from "../jenkins/errors";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { parseQueueItemId } from "../jenkins/urls";
@@ -5,6 +6,7 @@ import { parseQueueItemId } from "../jenkins/urls";
 const DEFAULT_POLL_INTERVAL_MS = 2000;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_FALLBACK_DELAY_MS = 4000;
+const MAX_CONSECUTIVE_ERRORS = 3;
 
 export class QueuedBuildWaiter {
   private readonly pollIntervalMs: number;
@@ -33,6 +35,7 @@ export class QueuedBuildWaiter {
     }
 
     const deadline = Date.now() + this.timeoutMs;
+    let consecutiveErrors = 0;
     while (Date.now() < deadline) {
       try {
         const item = await this.dataService.getQueueItem(environment, queueId);
@@ -42,12 +45,25 @@ export class QueuedBuildWaiter {
         if (item.executable) {
           return;
         }
-      } catch {
-        return;
+        consecutiveErrors = 0;
+      } catch (error) {
+        // A client error (item gone, auth) will not recover; retry others a few times.
+        consecutiveErrors += 1;
+        if (isClientError(error) || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          return;
+        }
       }
       await delay(this.pollIntervalMs);
     }
   }
+}
+
+function isClientError(error: unknown): boolean {
+  if (!(error instanceof JenkinsRequestError || error instanceof JenkinsActionError)) {
+    return false;
+  }
+  const statusCode = error.statusCode ?? 0;
+  return statusCode >= 400 && statusCode < 500;
 }
 
 function delay(ms: number): Promise<void> {

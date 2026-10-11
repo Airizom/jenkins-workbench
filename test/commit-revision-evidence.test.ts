@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assessBuildRevision,
-  normalizeRepositoryUrl
+  normalizeRepositoryUrl,
+  renormalizeRepositoryIdentity
 } from "../src/jenkins/JenkinsRevisionEvidence";
 import { assessCommit } from "../src/currentBranch/CurrentBranchCommitHistory";
 import type { JenkinsBuild } from "../src/jenkins/types";
@@ -24,6 +25,34 @@ describe("repository-aware commit evidence", () => {
     expect(normalizeRepositoryUrl("ssh://git@github.com/team/app.git")).toBe(repositories[0]);
     expect(normalizeRepositoryUrl("git@alias:team/App.git")).toBe("alias/team/App");
     expect(normalizeRepositoryUrl("/local/repo")).toBeUndefined();
+  });
+
+  it("re-normalizes repository identities stored by earlier versions", () => {
+    expect(renormalizeRepositoryIdentity("github.com/Team/App")).toBe(repositories[0]);
+    expect(renormalizeRepositoryIdentity("github.com:22/team/app")).toBe(repositories[0]);
+    expect(renormalizeRepositoryIdentity("git.example:2222/Team/App")).toBe(
+      "git.example:2222/Team/App"
+    );
+  });
+
+  it("ignores default SSH ports and path case on case-insensitive hosts", () => {
+    expect(normalizeRepositoryUrl("ssh://git@github.com:22/team/app.git")).toBe(repositories[0]);
+    expect(normalizeRepositoryUrl("git://github.com:9418/team/app.git")).toBe(repositories[0]);
+    expect(normalizeRepositoryUrl("ssh://git@git.example:2222/team/app.git")).toBe(
+      "git.example:2222/team/app"
+    );
+    expect(normalizeRepositoryUrl("https://github.com/Team/App.git")).toBe(repositories[0]);
+    expect(
+      assessBuildRevision(
+        {
+          ...build(1),
+          actions: [
+            { lastBuiltRevision: { SHA1: head }, remoteUrls: ["https://github.com/Team/App.git"] }
+          ]
+        },
+        [normalizeRepositoryUrl("git@github.com:team/app.git") as string]
+      ).kind
+    ).toBe("verified");
   });
 
   it("requires full SHA and repository evidence", () => {

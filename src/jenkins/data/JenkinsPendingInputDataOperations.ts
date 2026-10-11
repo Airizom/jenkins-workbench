@@ -1,5 +1,6 @@
 import { JenkinsRequestError } from "../errors";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
+import type { JenkinsDataCache } from "./JenkinsDataCache";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 import type {
@@ -25,8 +26,6 @@ interface PendingInputFetchResult {
 }
 
 export class JenkinsPendingInputDataOperations {
-  private readonly cacheGenerations = new Map<string, number>();
-
   constructor(private readonly context: JenkinsDataRuntimeContext) {}
 
   async getPendingInputActions(
@@ -45,10 +44,11 @@ export class JenkinsPendingInputDataOperations {
     if (cached && options?.mode !== "refresh") {
       return cached;
     }
-    const generation = this.getCacheGeneration(keys);
-    const result = await this.fetchPendingInputActions(environment, buildUrl, keys, generation);
-    this.cachePendingInputActions(keys, result.actions, result.availability, generation);
-    return result.actions;
+    return this.context.getCache().withWriteGuard(Object.values(keys), async (cache) => {
+      const result = await this.fetchPendingInputActions(environment, buildUrl, keys, cache);
+      this.cachePendingInputActions(keys, result.actions, result.availability, cache);
+      return result.actions;
+    });
   }
 
   async getPendingInputSummary(
@@ -119,7 +119,7 @@ export class JenkinsPendingInputDataOperations {
     buildUrl: string
   ): Promise<void> {
     const keys = await this.buildPendingInputCacheKeys(environment, buildUrl);
-    this.cacheGenerations.set(keys.cacheKey, this.getCacheGeneration(keys) + 1);
+    // Deleting these keys invalidates all outstanding guarded writes for this build.
     this.context.getCache().delete(keys.cacheKey);
     this.context.getCache().delete(keys.summaryKey);
     this.context.getCache().delete(keys.unsupportedKey);
@@ -129,7 +129,7 @@ export class JenkinsPendingInputDataOperations {
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     keys: PendingInputCacheKeys,
-    generation: number
+    cache: Pick<JenkinsDataCache, "set" | "delete">
   ): Promise<PendingInputFetchResult> {
     const client = await this.context.getClient(environment);
     try {
@@ -138,16 +138,11 @@ export class JenkinsPendingInputDataOperations {
       return { actions: mapped, availability: "supported" };
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        if (this.getCacheGeneration(keys) !== generation) {
-          return { actions: [], availability: "unsupported" };
-        }
-        this.context
-          .getCache()
-          .set(
-            keys.unsupportedKey,
-            true,
-            this.context.getCacheTtlMs() ?? PENDING_INPUT_UNSUPPORTED_TTL_MS
-          );
+        cache.set(
+          keys.unsupportedKey,
+          true,
+          this.context.getCacheTtlMs() ?? PENDING_INPUT_UNSUPPORTED_TTL_MS
+        );
         return { actions: [], availability: "unsupported" };
       }
       throw toBuildActionError(error);
@@ -161,14 +156,12 @@ export class JenkinsPendingInputDataOperations {
   ): Promise<PendingInputSummary> {
     if (this.context.getCache().has(keys.unsupportedKey)) {
       const cached = this.context.getCache().get<PendingInputSummary>(keys.summaryKey);
-      return (
-        cached ??
-        this.cachePendingInputActions(keys, [], "unsupported", this.getCacheGeneration(keys))
-      );
+      return cached ?? this.cachePendingInputActions(keys, [], "unsupported");
     }
-    const generation = this.getCacheGeneration(keys);
-    const result = await this.fetchPendingInputActions(environment, buildUrl, keys, generation);
-    return this.cachePendingInputActions(keys, result.actions, result.availability, generation);
+    return this.context.getCache().withWriteGuard(Object.values(keys), async (cache) => {
+      const result = await this.fetchPendingInputActions(environment, buildUrl, keys, cache);
+      return this.cachePendingInputActions(keys, result.actions, result.availability, cache);
+    });
   }
 
   private async buildPendingInputCacheKeys(
@@ -193,20 +186,12 @@ export class JenkinsPendingInputDataOperations {
     keys: PendingInputCacheKeys,
     actions: PendingInputAction[],
     availability: "supported" | "unsupported",
-    generation: number
+    cache: Pick<JenkinsDataCache, "set" | "delete"> = this.context.getCache()
   ): PendingInputSummary {
-    const cache = this.context.getCache();
     const summary = this.buildPendingInputSummary(actions, Date.now(), availability);
-    if (this.getCacheGeneration(keys) !== generation) {
-      return summary;
-    }
     cache.set(keys.cacheKey, actions, PENDING_INPUT_ACTIONS_TTL_MS);
     cache.set(keys.summaryKey, summary, PENDING_INPUT_SUMMARY_TTL_MS);
     return summary;
-  }
-
-  private getCacheGeneration(keys: PendingInputCacheKeys): number {
-    return this.cacheGenerations.get(keys.cacheKey) ?? 0;
   }
 
   private buildPendingInputSummary(

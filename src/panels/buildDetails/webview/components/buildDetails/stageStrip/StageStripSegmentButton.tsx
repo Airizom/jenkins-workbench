@@ -4,10 +4,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
-import {
-  resolveResultIconTextClass,
-  resolveStatusAccentClass
-} from "../../../../../shared/webview/lib/statusStyles";
+import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { StageStripSegment } from "./stageStripModel";
@@ -49,7 +46,7 @@ export function StageStripSegmentButton({
           <span
             className={cn(
               "h-1.5 w-full rounded-full",
-              resolveStatusAccentClass(segment.statusClass),
+              resolveBuildResultStyle(segment.statusClass).accent,
               segment.statusClass === "running" && "stage-strip-bar--running",
               segment.statusClass === "neutral" && "stage-strip-bar--not-run"
             )}
@@ -75,7 +72,7 @@ function DenseStatusGlyph({ segment }: { segment: StageStripSegment }): React.JS
       aria-hidden="true"
       className={cn(
         "flex w-full items-center justify-center",
-        resolveResultIconTextClass(segment.statusClass)
+        resolveBuildResultStyle(segment.statusClass).iconText
       )}
     >
       {getStageIcon(segment.statusClass)}
@@ -93,7 +90,7 @@ function SegmentLabel({ segment }: { segment: StageStripSegment }): React.JSX.El
           aria-hidden="true"
           className={cn(
             "flex h-3 w-3 shrink-0 items-center justify-center",
-            resolveResultIconTextClass(segment.statusClass)
+            resolveBuildResultStyle(segment.statusClass).iconText
           )}
         >
           {glyph}

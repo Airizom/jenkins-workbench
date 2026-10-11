@@ -10,12 +10,14 @@ export type JobConfigDraft = {
   label: string;
   originalUri: vscode.Uri;
   originalXml: string;
+  lastSubmittedXml?: string;
 };
 
 export class JobConfigDraftManager implements vscode.Disposable {
   private readonly drafts = new Map<string, JobConfigDraft>();
   private readonly manualSaveQueue = new Set<string>();
   private readonly subscriptions: vscode.Disposable[] = [];
+  private readonly pendingCloses = new Set<vscode.Disposable>();
   private readonly submitEmitter = new vscode.EventEmitter<vscode.Uri>();
   readonly onDidRequestSubmit = this.submitEmitter.event;
 
@@ -48,7 +50,11 @@ export class JobConfigDraftManager implements vscode.Disposable {
         if (!this.isDraftDocument(document)) {
           return;
         }
-        this.discardDraft(document.uri);
+        const pending = this.editorService.whenDocumentStaysClosed(document.uri, () => {
+          this.pendingCloses.delete(pending);
+          this.discardDraft(document.uri);
+        });
+        this.pendingCloses.add(pending);
       }),
       this.submitEmitter
     );
@@ -59,6 +65,10 @@ export class JobConfigDraftManager implements vscode.Disposable {
       subscription.dispose();
     }
     this.subscriptions.length = 0;
+    for (const pending of this.pendingCloses) {
+      pending.dispose();
+    }
+    this.pendingCloses.clear();
     this.drafts.clear();
     this.manualSaveQueue.clear();
   }

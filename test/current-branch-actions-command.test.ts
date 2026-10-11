@@ -55,8 +55,6 @@ vi.doMock("../src/ui/OpenExternalUrl", () => ({
 
 const { registerCurrentBranchCommands } = await import("../src/commands/CurrentBranchCommands");
 
-const extensionUri = vscodeStub.Uri.file("/extensions/jenkins-workbench");
-
 const repository = {
   repositoryUriString: "file:///workspace/app",
   repositoryLabel: "app",
@@ -118,11 +116,11 @@ function createWorkflowService(options?: {
     triggerCurrentBranchBuild: async (state: CurrentBranchState) => {
       record("triggerCurrentBranchBuild", state);
     },
-    openLatestBuild: async (state: CurrentBranchState, uri: unknown) => {
-      record("openLatestBuild", state, uri);
+    openLatestBuild: async (state: CurrentBranchState) => {
+      record("openLatestBuild", state);
     },
-    openLastFailedBuild: async (state: CurrentBranchState, uri: unknown) => {
-      record("openLastFailedBuild", state, uri);
+    openLastFailedBuild: async (state: CurrentBranchState) => {
+      record("openLastFailedBuild", state);
     },
     scanLinkedMultibranch: async (state: CurrentBranchState) => {
       record("scanLinkedMultibranch", state);
@@ -159,7 +157,7 @@ async function runActionsCommand(
   lastQuickPickItems = [];
   quickPickSelection = selection;
 
-  registerCurrentBranchCommands({ subscriptions: [], extensionUri } as never, stub.service);
+  registerCurrentBranchCommands({ subscriptions: [] } as never, stub.service);
   const command = registeredCommands.get("jenkinsWorkbench.currentBranchActions");
   assert.ok(command, "expected the currentBranchActions command to be registered");
   await command();
@@ -227,7 +225,7 @@ describe("showCurrentBranchActions", () => {
         "unlink"
       ]
     );
-    assert.deepEqual(methodCalls(stub, "openLatestBuild")[0]?.args, [state, extensionUri]);
+    assert.deepEqual(methodCalls(stub, "openLatestBuild")[0]?.args, [state]);
   });
 
   it("triggers a build and opens the last failed build for the matched state", async () => {
@@ -238,7 +236,7 @@ describe("showCurrentBranchActions", () => {
     assert.deepEqual(methodCalls(stub, "triggerCurrentBranchBuild")[0]?.args, [state]);
 
     await runActionsCommand(stub, "Open Last Failed Build");
-    assert.deepEqual(methodCalls(stub, "openLastFailedBuild")[0]?.args, [state, extensionUri]);
+    assert.deepEqual(methodCalls(stub, "openLastFailedBuild")[0]?.args, [state]);
   });
 
   it("re-resolves the branch before triggering a build from the picker", async () => {
@@ -360,6 +358,28 @@ describe("showCurrentBranchActions", () => {
     ]);
   });
 
+  it("reports an unlinked repository refreshed from an ambiguous workspace", async () => {
+    const otherRepository = {
+      repositoryUriString: "file:///workspace/api",
+      repositoryLabel: "api",
+      repositoryPath: "/workspace/api"
+    };
+    const stub = createWorkflowService({
+      resolution: { kind: "ambiguousRepository", repositories: [] } as never,
+      repositoryResolution: {
+        kind: "resolved",
+        state: { kind: "unlinked", repository: otherRepository } as CurrentBranchState
+      },
+      repositories: [repository, otherRepository]
+    });
+
+    queuedRepositorySelection = "api";
+    await runActionsCommand(stub, "Refresh Current Branch Status");
+
+    assert.equal(methodCalls(stub, "refreshCurrentBranchStatus").length, 0);
+    assert.deepEqual(infoMessages, ["api is not linked to Jenkins."]);
+  });
+
   it("routes relink and unlink through the repository workflows", async () => {
     const stub = createWorkflowService();
 
@@ -370,6 +390,34 @@ describe("showCurrentBranchActions", () => {
     await runActionsCommand(stub, "Unlink Repository");
     assert.equal(methodCalls(stub, "unlinkRepository").length, 1);
     assert.deepEqual(infoMessages, ["Removed the Jenkins link for app."]);
+  });
+
+  it("unlinks the repository selected for an ambiguous workspace without prompting again", async () => {
+    const otherRepository = {
+      repositoryUriString: "file:///workspace/api",
+      repositoryLabel: "api",
+      repositoryPath: "/workspace/api"
+    };
+    const stub = createWorkflowService({
+      resolution: { kind: "ambiguousRepository", repositories: [] } as never,
+      repositoryResolution: {
+        kind: "resolved",
+        state: {
+          kind: "branchMissing",
+          repository: otherRepository,
+          branchName: "feature/api",
+          link: { multibranchLabel: "API" }
+        } as unknown as CurrentBranchState
+      },
+      repositories: [repository, otherRepository]
+    });
+
+    queuedRepositorySelection = "api";
+    await runActionsCommand(stub, "Unlink Repository");
+
+    assert.equal(quickPickCalls, 2);
+    assert.deepEqual(methodCalls(stub, "unlinkRepository")[0]?.args, [otherRepository]);
+    assert.deepEqual(infoMessages, ["Removed the Jenkins link for api."]);
   });
 
   it("shows the resolution message instead of the picker when no state resolves", async () => {

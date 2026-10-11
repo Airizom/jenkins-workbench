@@ -6,16 +6,68 @@ import * as vscodeStub from "./helpers/vscodeStub";
 const willSaves = new vscodeStub.EventEmitter<vscode.TextDocumentWillSaveEvent>();
 const saves = new vscodeStub.EventEmitter<vscode.TextDocument>();
 const closes = new vscodeStub.EventEmitter<vscode.TextDocument>();
+const textDocuments: vscode.TextDocument[] = [];
 
 vi.doMock("vscode", () => ({
   ...vscodeStub,
   TextDocumentSaveReason: { Manual: 1, AfterDelay: 2 },
   workspace: {
+    textDocuments,
     onWillSaveTextDocument: willSaves.event,
     onDidSaveTextDocument: saves.event,
     onDidCloseTextDocument: closes.event
   }
 }));
+
+function createFilesystem() {
+  const files = new Set<string>();
+  return {
+    createDraft: (label: string) => {
+      const uri = vscodeStub.Uri.parse(`jenkins-config:/${label}`);
+      files.add(uri.toString());
+      return uri;
+    },
+    hasDraft: (uri: vscode.Uri) => files.has(uri.toString()),
+    removeDraft: (uri: vscode.Uri) => files.delete(uri.toString())
+  };
+}
+
+const draftInfo = {
+  environment: {},
+  jobUrl: "https://jenkins/job/a/",
+  label: "a",
+  originalXml: "<project/>"
+} as never;
+
+it("keeps the draft when VS Code reopens it after a language change", async () => {
+  const filesystem = createFilesystem();
+  const manager = new JobConfigDraftManager(filesystem as never);
+  const uri = manager.createDraft("job.xml", "<project/>", draftInfo);
+  const document = { uri } as vscode.TextDocument;
+
+  // A language change fires close, then reopens the same document.
+  closes.fire(document);
+  textDocuments.push(document);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(manager.hasDraft(uri), true);
+  assert.equal(filesystem.hasDraft(uri), true);
+  textDocuments.length = 0;
+  manager.dispose();
+});
+
+it("discards the draft when the document stays closed", async () => {
+  const filesystem = createFilesystem();
+  const manager = new JobConfigDraftManager(filesystem as never);
+  const uri = manager.createDraft("job.xml", "<project/>", draftInfo);
+
+  closes.fire({ uri } as vscode.TextDocument);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(manager.hasDraft(uri), false);
+  assert.equal(filesystem.hasDraft(uri), false);
+  manager.dispose();
+});
 
 const { JobConfigDraftManager } = await import("../src/services/JobConfigDraftManager");
 

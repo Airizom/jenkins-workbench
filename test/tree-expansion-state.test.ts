@@ -260,6 +260,56 @@ describe("TreeExpansionState", () => {
     state.dispose();
   });
 
+  it.each(["same", "replacement"])(
+    "preserves an ancestor reopened with the %s element during a pending descendant reveal",
+    async (elementKind) => {
+      const treeView = new TestTreeView();
+      const resolver = new ControlledExpansionResolver();
+      const state = new TreeExpansionState(
+        treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+        resolver
+      );
+      const ancestor = createElement("ancestor");
+      const descendant = createElement("descendant");
+      const ancestorPath = ["env", "jobs", "ancestor"];
+      const path = [...ancestorPath, "descendant"];
+      let finishReveal: (() => void) | undefined;
+      let revealCount = 0;
+      treeView.onReveal = () => {
+        revealCount += 1;
+        if (revealCount === 1) {
+          return new Promise<void>((resolve) => {
+            finishReveal = resolve;
+          });
+        }
+        return undefined;
+      };
+      collapseCommands.length = 0;
+
+      const restore = state.restore([path]);
+      resolver.pendingResolves[0].resolve({ element: descendant, pending: false });
+      await flushPromises();
+      assert.ok(finishReveal);
+
+      treeView.fireCollapse(ancestor);
+      resolver.pendingBuilds[0].resolve(ancestorPath);
+      await flushPromises();
+      assert.deepEqual(state.snapshot(), []);
+
+      treeView.fireExpand(elementKind === "same" ? ancestor : createElement("ancestor"));
+      resolver.pendingBuilds[1].resolve(ancestorPath);
+      await flushPromises();
+      assert.deepEqual(state.snapshot(), [ancestorPath]);
+
+      finishReveal();
+      await restore;
+      assert.deepEqual(collapseCommands, []);
+      assert.equal(revealCount, 1);
+      assert.deepEqual(state.snapshot(), [ancestorPath]);
+      state.dispose();
+    }
+  );
+
   it("does not restore an expansion when a later collapse resolves first", async () => {
     const treeView = new TestTreeView();
     const resolver = new ControlledExpansionResolver();
@@ -398,6 +448,51 @@ describe("TreeExpansionState", () => {
 
     await restore;
     assert.deepEqual(state.snapshot(), [path]);
+    state.dispose();
+  });
+
+  it("drops collapse records once no earlier operation is in flight", async () => {
+    const treeView = new TestTreeView();
+    const resolver = new ControlledExpansionResolver();
+    const state = new TreeExpansionState(
+      treeView as unknown as ConstructorParameters<typeof TreeExpansionState>[0],
+      resolver
+    );
+    const collapsedPathOperations = (
+      state as unknown as { collapsedPathOperations: Map<string, unknown> }
+    ).collapsedPathOperations;
+    const element = createElement("folder");
+    const path = ["env", "jobs", "folder"];
+
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      treeView.fireCollapse(element);
+      resolver.pendingBuilds.shift()?.resolve(path);
+      await flushPromises();
+      assert.equal(collapsedPathOperations.size, 0);
+
+      treeView.fireExpand(element);
+      resolver.pendingBuilds.shift()?.resolve(path);
+      await flushPromises();
+      assert.equal(collapsedPathOperations.size, 0);
+      assert.deepEqual(state.snapshot(), [path]);
+    }
+
+    const restore = state.restore([path]);
+    treeView.fireCollapse(element);
+    resolver.pendingBuilds.shift()?.resolve(path);
+    await flushPromises();
+    assert.equal(collapsedPathOperations.size, 1);
+
+    let revealCount = 0;
+    treeView.onReveal = () => {
+      revealCount += 1;
+    };
+    resolver.pendingResolves[0].resolve({ element, pending: false });
+    await restore;
+    assert.equal(revealCount, 0);
+    assert.deepEqual(state.snapshot(), []);
+    assert.equal(collapsedPathOperations.size, 0);
+
     state.dispose();
   });
 

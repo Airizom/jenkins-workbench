@@ -4,7 +4,7 @@ import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelIn
 import { Progress } from "../../shared/webview/components/ui/progress";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
-import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
+import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type {
   NodeCapacityIncomingMessage,
   OpenNodeDetailsMessage
@@ -78,7 +78,7 @@ function NodeCapacityContent({
 
 export function NodeCapacityApp(): React.JSX.Element {
   const [state, dispatch] = useReducer(nodeCapacityReducer, undefined, getInitialState);
-  const postMessage = usePanelPostMessage<NodeCapacityIncomingMessage>();
+  const postMessage: (message: NodeCapacityIncomingMessage) => void = postVsCodeMessage;
   const handleOpenExternal = useOpenExternalMessage(postMessage);
   useNodeCapacityMessages(dispatch);
 

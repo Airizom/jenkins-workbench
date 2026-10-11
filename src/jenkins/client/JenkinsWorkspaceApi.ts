@@ -23,7 +23,7 @@ export class JenkinsWorkspaceApi {
     relativePath: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse> {
-    const workspacePath = normalizeWorkspaceFilePath(relativePath);
+    const workspacePath = normalizeWorkspaceRequestPath(relativePath);
     const url = buildWorkspaceFileUrl(jobUrl, workspacePath);
     return this.context.requestBufferWithHeaders(url, options);
   }
@@ -36,10 +36,6 @@ function normalizeWorkspaceDirectoryPath(value?: string): string | undefined {
   return normalizeWorkspaceRequestPath(value);
 }
 
-function normalizeWorkspaceFilePath(value: string): string {
-  return normalizeWorkspaceRequestPath(value);
-}
-
 function normalizeWorkspaceRequestPath(value: string): string {
   const normalized = normalizePosixRelativePath(value);
   if (!normalized) {
@@ -48,11 +44,7 @@ function normalizeWorkspaceRequestPath(value: string): string {
   return normalized;
 }
 
-function parseWorkspaceEntries(
-  listing: string,
-  parentRelativePath?: string
-): JenkinsWorkspaceEntry[] {
-  const parentPath = normalizePosixRelativePath(parentRelativePath ?? "");
+function parseWorkspaceEntries(listing: string, parentPath?: string): JenkinsWorkspaceEntry[] {
   const entries: JenkinsWorkspaceEntry[] = [];
 
   for (const line of listing.split(/\r?\n/)) {
@@ -76,7 +68,9 @@ function normalizeWorkspaceEntryLine(
     return undefined;
   }
 
-  const relativePath = joinWorkspaceRelativePath(parentRelativePath, entry.name);
+  const relativePath = normalizePosixRelativePath(
+    parentRelativePath ? `${parentRelativePath}/${entry.name}` : entry.name
+  );
   if (!relativePath) {
     return undefined;
   }
@@ -104,16 +98,6 @@ function normalizeWorkspaceEntryName(
   }
 
   return { name, isDirectory };
-}
-
-function joinWorkspaceRelativePath(
-  parentPath: string | undefined,
-  childPath: string
-): string | undefined {
-  if (!parentPath) {
-    return normalizePosixRelativePath(childPath);
-  }
-  return normalizePosixRelativePath(`${parentPath}/${childPath}`);
 }
 
 function compareWorkspaceEntries(

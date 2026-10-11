@@ -40,6 +40,8 @@ export interface RedirectDecisionInput {
   method: "GET" | "POST" | "HEAD";
   location: string | string[] | undefined;
   currentUrl: string;
+  /** Environment URL used to recognize login routes below its context path. */
+  contextUrl?: string;
   redirectCount: number;
 }
 
@@ -58,6 +60,7 @@ export function decideRedirect({
   method,
   location,
   currentUrl,
+  contextUrl,
   redirectCount
 }: RedirectDecisionInput): RedirectDecision {
   if (statusCode < 300 || statusCode >= 400) {
@@ -89,7 +92,7 @@ export function decideRedirect({
     };
   }
 
-  if (isAuthRedirect(nextUrl, currentUrl)) {
+  if (isAuthRedirect(nextUrl, contextUrl ?? currentUrl)) {
     return {
       type: "reject",
       error: new JenkinsRequestError(

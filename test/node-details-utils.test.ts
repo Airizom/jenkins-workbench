@@ -89,6 +89,22 @@ describe("offline executor utilization", () => {
     assert.equal(formatExecutorCounts(utilization), "1 busy · 1 offline");
   });
 
+  it("keeps a fully busy offline node marked offline instead of idle", () => {
+    const utilization = summarizeExecutorUtilization(
+      [makeExecutor({ id: "0", isIdle: false }), makeExecutor({ id: "1", isIdle: false })],
+      [],
+      true
+    );
+
+    assert.equal(formatExecutorCounts(utilization), "2 busy · offline");
+  });
+
+  it("does not report idle executors for an offline node without executors", () => {
+    const utilization = summarizeExecutorUtilization([], [], true);
+
+    assert.equal(formatExecutorCounts(utilization), "0 offline");
+  });
+
   it("formats online nodes as busy and idle counts", () => {
     const utilization = summarizeExecutorUtilization(
       [makeExecutor({ id: "0", isIdle: false }), makeExecutor({ id: "1" })],

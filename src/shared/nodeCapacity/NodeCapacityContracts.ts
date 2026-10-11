@@ -42,14 +42,8 @@ export interface NodeCapacityNodeViewModel extends NodeQueuedWorkViewModel {
   executorsError?: string;
 }
 
-export interface NodeCapacityPoolViewModel {
-  id: string;
-  label: string;
-  kind: NodeCapacityPoolKind;
-  severity: NodeCapacitySeverity;
-  statusLabel: string;
-  nodes: NodeCapacityNodeViewModel[];
-  queueItems: QueueWorkItemViewModel[];
+/** Node, executor, and queue counters shared by each pool and the overall summary. */
+export interface NodeCapacityCounts {
   totalNodes: number;
   onlineNodes: number;
   offlineNodes: number;
@@ -63,18 +57,17 @@ export interface NodeCapacityPoolViewModel {
   buildableCount: number;
 }
 
-export interface NodeCapacitySummaryViewModel {
-  totalNodes: number;
-  onlineNodes: number;
-  offlineNodes: number;
-  totalExecutors: number;
-  busyExecutors: number;
-  idleExecutors: number;
-  offlineExecutors: number;
-  queuedCount: number;
-  stuckCount: number;
-  blockedCount: number;
-  buildableCount: number;
+export interface NodeCapacityPoolViewModel extends NodeCapacityCounts {
+  id: string;
+  label: string;
+  kind: NodeCapacityPoolKind;
+  severity: NodeCapacitySeverity;
+  statusLabel: string;
+  nodes: NodeCapacityNodeViewModel[];
+  queueItems: QueueWorkItemViewModel[];
+}
+
+export interface NodeCapacitySummaryViewModel extends NodeCapacityCounts {
   /** Pools with stuck work or queued work and no idle executors (critical severity). */
   saturatedPoolCount: number;
 }

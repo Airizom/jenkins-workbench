@@ -12,7 +12,6 @@ export type RefreshCooldownHandler = (durationMs: number) => void;
 
 export class TreeDataProviderRefreshCoordinator {
   private debounceTimer: NodeJS.Timeout | undefined;
-  private pendingRefreshElement: WorkbenchTreeElement | undefined | null = null;
   private lastManualRefreshAt = 0;
   private refreshWaiterToken = 0;
   private readonly refreshWaiters = new Map<number, () => void>();
@@ -79,25 +78,7 @@ export class TreeDataProviderRefreshCoordinator {
     return true;
   }
 
-  scheduleRefresh(
-    element: WorkbenchTreeElement | undefined,
-    refreshToken: number | undefined,
-    debounceMs: number,
-    invalidateForElement: (element: WorkbenchTreeElement) => void
-  ): void {
-    if (element !== undefined) {
-      invalidateForElement(element);
-    }
-
-    // pendingRefreshElement: null = nothing pending, undefined = full refresh pending.
-    if (element === undefined) {
-      this.pendingRefreshElement = undefined;
-    } else if (this.pendingRefreshElement === null) {
-      this.pendingRefreshElement = element;
-    } else if (this.pendingRefreshElement !== element) {
-      this.pendingRefreshElement = undefined;
-    }
-
+  scheduleRefresh(refreshToken: number | undefined, debounceMs: number): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
@@ -106,9 +87,7 @@ export class TreeDataProviderRefreshCoordinator {
 
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
-      const elementToRefresh = this.pendingRefreshElement;
-      this.pendingRefreshElement = null;
-      this.notifyTreeChange(elementToRefresh === null ? undefined : elementToRefresh);
+      this.notifyTreeChange(undefined);
     }, debounceMs);
   }
 
@@ -127,17 +106,10 @@ export class TreeDataProviderRefreshCoordinator {
     waiter();
   }
 
-  resolvePendingRefreshWaiters(): void {
-    if (this.pendingRefreshWaiters.size === 0) {
-      return;
-    }
-
+  takePendingRefreshWaiters(): number[] {
     const tokens = Array.from(this.pendingRefreshWaiters);
     this.pendingRefreshWaiters.clear();
-
-    for (const token of tokens) {
-      this.resolveRefreshWaiter(token);
-    }
+    return tokens;
   }
 
   private registerPendingRefreshWaiter(refreshToken: number | undefined): void {

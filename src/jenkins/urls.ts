@@ -15,6 +15,14 @@ export interface ParsedBuildUrl {
 const BUILD_NUMBER_PATTERN = /^\d+$/;
 const QUEUE_ITEM_ID_PATTERN = /^\d+$/;
 const RELATIVE_URL_BASE = "https://jenkins.invalid/";
+const AUTH_PATH_SEGMENTS: ReadonlySet<string> = new Set([
+  "login",
+  "loginentry",
+  "loginerror",
+  "securityrealm",
+  "j_acegi_security_check",
+  "j_security_check"
+]);
 
 export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
@@ -66,12 +74,27 @@ export function parseQueueItemId(queueLocation?: string): number | undefined {
   return Number.isSafeInteger(queueItemId) && queueItemId > 0 ? queueItemId : undefined;
 }
 
+function getContextPathLength(pathParts: readonly string[], environmentUrl?: string): number {
+  if (!environmentUrl) {
+    return 0;
+  }
+  try {
+    const contextParts = new URL(environmentUrl).pathname
+      .split("/")
+      .filter((part) => part.length > 0);
+    return contextParts.every((part, index) => pathParts[index] === part) ? contextParts.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function parseJobPathParts(
   pathParts: readonly string[],
-  endExclusive = pathParts.length
+  endExclusive = pathParts.length,
+  startIndex = 0
 ): { firstJobIndex: number; segments: string[] } | undefined {
   let firstJobIndex = -1;
-  for (let index = 0; index < endExclusive; index++) {
+  for (let index = startIndex; index < endExclusive; index++) {
     if (pathParts[index] === "job") {
       firstJobIndex = index;
       break;
@@ -105,7 +128,7 @@ function appendJobPathSegments(baseUrl: string, segments: readonly string[]): st
   return url;
 }
 
-export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
+export function parseJobUrl(jobUrl: string, environmentUrl?: string): ParsedJobUrl | undefined {
   let url: URL;
   try {
     url = new URL(jobUrl);
@@ -113,7 +136,11 @@ export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
     return undefined;
   }
   const pathParts = url.pathname.split("/").filter((p) => p.length > 0);
-  const parsedJobPath = parseJobPathParts(pathParts);
+  const parsedJobPath = parseJobPathParts(
+    pathParts,
+    pathParts.length,
+    getContextPathLength(pathParts, environmentUrl)
+  );
   if (!parsedJobPath) {
     return undefined;
   }
@@ -124,12 +151,7 @@ export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
   const parentSegments = segments.slice(0, -1);
 
   const basePath = baseParts.length > 0 ? `/${baseParts.join("/")}` : "";
-  let parentPath = basePath;
-  for (const segment of parentSegments) {
-    parentPath += `/job/${encodeURIComponent(segment)}`;
-  }
-
-  const parentUrl = `${url.origin}${parentPath}/`;
+  const parentUrl = appendJobPathSegments(`${url.origin}${basePath}/`, parentSegments);
 
   return {
     parentUrl,
@@ -139,12 +161,15 @@ export function parseJobUrl(jobUrl: string): ParsedJobUrl | undefined {
 }
 
 export function buildJobUrl(parentUrl: string, jobName: string): string {
-  const base = ensureTrailingSlash(parentUrl);
-  return `${base}job/${encodeURIComponent(jobName)}/`;
+  return appendJobPathSegments(parentUrl, [jobName]);
 }
 
-export function buildViewScopedJobUrl(viewUrl: string, jobUrl: string): string {
-  const parsed = parseJobUrl(jobUrl);
+export function buildViewScopedJobUrl(
+  viewUrl: string,
+  jobUrl: string,
+  environmentUrl?: string
+): string {
+  const parsed = parseJobUrl(jobUrl, environmentUrl);
   if (!parsed) {
     return jobUrl;
   }
@@ -156,7 +181,7 @@ export function canonicalizeJobUrlForEnvironment(
   environmentUrl: string,
   jobUrl: string
 ): string | undefined {
-  const parsed = parseJobUrl(jobUrl);
+  const parsed = parseJobUrl(jobUrl, environmentUrl);
   if (!parsed) {
     return undefined;
   }
@@ -164,7 +189,10 @@ export function canonicalizeJobUrlForEnvironment(
   return appendJobPathSegments(environmentUrl, parsed.fullPath);
 }
 
-export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
+export function parseBuildUrl(
+  buildUrl: string,
+  environmentUrl?: string
+): ParsedBuildUrl | undefined {
   let url: URL;
   try {
     url = new URL(buildUrl);
@@ -184,7 +212,14 @@ export function parseBuildUrl(buildUrl: string): ParsedBuildUrl | undefined {
   }
 
   const jobPathPartCount = pathParts.length - 1;
-  const parsedJobPath = parseJobPathParts(pathParts, jobPathPartCount);
+  if (pathParts[jobPathPartCount - 2] !== "job") {
+    return undefined;
+  }
+  const parsedJobPath = parseJobPathParts(
+    pathParts,
+    jobPathPartCount,
+    getContextPathLength(pathParts, environmentUrl)
+  );
   if (url.origin === "null" || !parsedJobPath) {
     return undefined;
   }
@@ -203,7 +238,7 @@ export function canonicalizeBuildUrlForEnvironment(
   environmentUrl: string,
   buildUrl: string
 ): string | undefined {
-  const parsed = parseBuildUrl(buildUrl);
+  const parsed = parseBuildUrl(buildUrl, environmentUrl);
   if (!parsed) {
     return undefined;
   }
@@ -226,12 +261,7 @@ export function buildApiUrlFromBase(baseUrl: string, path: string, tree?: string
 }
 
 export function buildApiUrlFromItem(itemUrl: string, tree?: string): string {
-  const base = ensureTrailingSlash(itemUrl);
-  const url = new URL("api/json", base);
-  if (tree) {
-    url.searchParams.set("tree", tree);
-  }
-  return url.toString();
+  return buildApiUrlFromBase(itemUrl, "api/json", tree);
 }
 
 export function buildActionUrl(itemUrl: string, action: string): string {
@@ -269,9 +299,8 @@ export function buildArtifactDownloadUrl(buildUrl: string, relativePath: string)
 
 export function buildWorkspaceDirectoryListingUrl(jobUrl: string, relativePath?: string): string {
   const base = ensureTrailingSlash(jobUrl);
-  const workspacePath = relativePath
-    ? `ws/${encodePathSegments(relativePath)}/*plain*/`
-    : "ws/*plain*/";
+  const encodedPath = relativePath ? encodePathSegments(relativePath) : "";
+  const workspacePath = encodedPath ? `ws/${encodedPath}/*plain*/` : "ws/*plain*/";
   return new URL(workspacePath, base).toString();
 }
 
@@ -328,12 +357,16 @@ export function isAuthRedirect(location: string, baseUrl: string): boolean {
   } catch {
     return false;
   }
-  const path = target.pathname.toLowerCase();
+  const pathParts = target.pathname.split("/").filter((part) => part.length > 0);
 
-  return (
-    path.includes("/login") ||
-    path.includes("/securityrealm") ||
-    path.includes("/j_acegi_security_check") ||
-    path.includes("/j_security_check")
-  );
+  for (const part of pathParts.slice(getContextPathLength(pathParts, baseUrl))) {
+    if (part === "job") {
+      // Everything after the first job marker belongs to item names and item actions.
+      return false;
+    }
+    if (AUTH_PATH_SEGMENTS.has(part.toLowerCase())) {
+      return true;
+    }
+  }
+  return false;
 }

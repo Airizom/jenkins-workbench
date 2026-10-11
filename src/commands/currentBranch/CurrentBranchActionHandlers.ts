@@ -20,15 +20,14 @@ interface CurrentBranchActionContext {
   workflowService: CurrentBranchWorkflowService;
   state: CurrentBranchState;
   selectedRepository?: CurrentBranchRepositoryInfo;
-  extensionUri: vscode.Uri;
 }
 
 const CURRENT_BRANCH_ACTION_RUNNERS: Record<
   CurrentBranchAction,
   (context: CurrentBranchActionContext) => Promise<void>
 > = {
-  openCurrentCommitBuild: ({ workflowService, state, extensionUri }) =>
-    workflowService.openCurrentCommitBuild(state, extensionUri),
+  openCurrentCommitBuild: ({ workflowService, state }) =>
+    workflowService.openCurrentCommitBuild(state),
   watchCurrentCommit: ({ workflowService, state }) => workflowService.watchCurrentCommit(state),
   manageCommitWatches: ({ workflowService }) => workflowService.manageCommitWatches(),
   openBranch: ({ workflowService, state }) =>
@@ -36,10 +35,8 @@ const CURRENT_BRANCH_ACTION_RUNNERS: Record<
   openMultibranch: ({ workflowService, state }) =>
     openRequest(workflowService.getOpenMultibranchRequest(state)),
   triggerBuild: ({ workflowService, state }) => triggerBuildForLatestState(workflowService, state),
-  openLatestBuild: ({ workflowService, state, extensionUri }) =>
-    workflowService.openLatestBuild(state, extensionUri),
-  openLastFailed: ({ workflowService, state, extensionUri }) =>
-    workflowService.openLastFailedBuild(state, extensionUri),
+  openLatestBuild: ({ workflowService, state }) => workflowService.openLatestBuild(state),
+  openLastFailed: ({ workflowService, state }) => workflowService.openLastFailedBuild(state),
   scanMultibranch: ({ workflowService, state }) => scanLinkedMultibranch(workflowService, state),
   refresh: async ({ workflowService, selectedRepository }) => {
     if (selectedRepository) {
@@ -48,13 +45,14 @@ const CURRENT_BRANCH_ACTION_RUNNERS: Record<
     }
     await workflowService.refreshCurrentBranchStatus(FORCE_REFRESH_OPTIONS);
   },
-  relink: ({ workflowService }) => linkCurrentRepository(workflowService),
-  unlink: ({ workflowService }) => unlinkCurrentRepository(workflowService)
+  relink: ({ workflowService, state, selectedRepository }) =>
+    linkCurrentRepository(workflowService, selectedRepository ?? state.repository),
+  unlink: ({ workflowService, state, selectedRepository }) =>
+    unlinkCurrentRepository(workflowService, selectedRepository ?? state.repository)
 };
 
 export async function showCurrentBranchActions(
-  workflowService: CurrentBranchWorkflowService,
-  extensionUri: vscode.Uri
+  workflowService: CurrentBranchWorkflowService
 ): Promise<void> {
   const resolved = await resolveCurrentBranchSelection(workflowService);
   if (!resolved) {
@@ -73,8 +71,7 @@ export async function showCurrentBranchActions(
   await CURRENT_BRANCH_ACTION_RUNNERS[pick.action]({
     workflowService,
     state,
-    selectedRepository,
-    extensionUri
+    selectedRepository
   });
 }
 
@@ -131,15 +128,35 @@ async function refreshSelectedRepositoryStatus(
   workflowService: CurrentBranchWorkflowService,
   repository: CurrentBranchRepositoryInfo
 ): Promise<void> {
-  const state = unwrapResolvedState(
-    await workflowService.resolveCurrentBranchStateForRepository(repository, FORCE_REFRESH_OPTIONS)
+  const result = await workflowService.resolveCurrentBranchStateForRepository(
+    repository,
+    FORCE_REFRESH_OPTIONS
   );
-  if (state?.kind !== "matched" && state?.kind !== "branchMissing") {
+  const state = unwrapResolvedState(result);
+  if (!state) {
     return;
   }
-  void vscode.window.showInformationMessage(
-    formatCurrentBranchTooltip(state).split("\n").join(" • ")
-  );
+  const reportedResolutionMessage = result.kind === "resolved" && Boolean(result.message);
+  if (state.kind !== "matched" && state.kind !== "branchMissing" && reportedResolutionMessage) {
+    return;
+  }
+  void vscode.window.showInformationMessage(formatRefreshedStatus(state, repository));
+}
+
+function formatRefreshedStatus(
+  state: CurrentBranchState,
+  repository: CurrentBranchRepositoryInfo
+): string {
+  switch (state.kind) {
+    case "noGit":
+    case "noRepository":
+    case "ambiguousRepository":
+      return `Refreshed Jenkins status for ${repository.repositoryLabel}.`;
+    case "unlinked":
+      return `${repository.repositoryLabel} is not linked to Jenkins.`;
+    default:
+      return formatCurrentBranchTooltip(state).split("\n").join(" • ");
+  }
 }
 
 async function scanLinkedMultibranch(

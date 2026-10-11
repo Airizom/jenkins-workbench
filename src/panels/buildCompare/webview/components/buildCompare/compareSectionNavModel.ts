@@ -63,7 +63,12 @@ function resolveStagesChip(stages: BuildCompareViewModel["stages"]): CompareSect
   if (slower > 0) {
     return { text: `${slower} slower`, tone: "failure" };
   }
-  const changed = stages.items.filter((item) => item.changeType !== "matched").length;
+  const changed = stages.items.filter(
+    (item) =>
+      item.changeType !== "matched" ||
+      item.baselineStatusClass !== item.targetStatusClass ||
+      (item.deltaSignificant && item.deltaDirection === "faster")
+  ).length;
   return changed > 0
     ? { text: plural(changed, "change"), tone: "neutral" }
     : { text: "no changes", tone: "neutral" };

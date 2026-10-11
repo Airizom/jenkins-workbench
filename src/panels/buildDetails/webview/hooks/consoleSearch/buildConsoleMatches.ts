@@ -62,7 +62,7 @@ export function buildConsoleMatches(
 
   const matches: ConsoleMatch[] = [];
   const { normalizedText, sourceStarts, sourceEnds } = buildPlainTextSearchIndex(text);
-  const normalizedQuery = query.toLowerCase();
+  const normalizedQuery = normalizePlainText(query);
   let startIndex = 0;
   let tooManyMatches = false;
 
@@ -85,6 +85,11 @@ export function buildConsoleMatches(
   return { matches, tooManyMatches };
 }
 
+function normalizePlainText(text: string): string {
+  // Fold final sigma too, so casing context does not affect literal matches.
+  return text.toLowerCase().replace(/ς/g, "σ");
+}
+
 function buildPlainTextSearchIndex(text: string): {
   normalizedText: string;
   sourceStarts: number[];
@@ -96,7 +101,8 @@ function buildPlainTextSearchIndex(text: string): {
   let sourceIndex = 0;
 
   for (const char of text) {
-    const folded = char.toLowerCase();
+    // Same fold as normalizePlainText, without a regex pass per character.
+    const folded = char === "ς" ? "σ" : char.toLowerCase();
     const start = sourceIndex;
     const end = start + char.length;
     normalizedText += folded;
@@ -128,6 +134,7 @@ function getRegexSafetyError(text: string, query: string): string | undefined {
 function isConsoleRegexSafe(query: string): boolean {
   try {
     return isSafePattern(query, {
+      caseInsensitive: true,
       maxScore: MAX_REGEX_ANALYSIS_SCORE,
       maxSteps: MAX_REGEX_ANALYSIS_STEPS
     }).safe;

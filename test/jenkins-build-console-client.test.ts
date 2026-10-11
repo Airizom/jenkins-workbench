@@ -49,6 +49,25 @@ describe("JenkinsBuildConsoleClient", () => {
     }
   );
 
+  it("reports a head read as truncated when Content-Length exceeds the byte budget", async () => {
+    const client = new JenkinsBuildConsoleClient(
+      createJenkinsClientContext({
+        requestStream: async () => {
+          const stream = Readable.from([Buffer.from("abcdef")]);
+          return {
+            stream,
+            headers: { "content-length": "100" },
+            abort: () => stream.destroy()
+          };
+        }
+      })
+    );
+
+    const result = await client.getConsoleTextHead("https://jenkins.example.com/job/test/1/", 10);
+
+    assert.deepEqual(result, { text: "abcdef", truncated: true, bytesRead: 6 });
+  });
+
   it.each([undefined, 0, -1])(
     "gets the complete console text once for limit %s",
     async (maxChars) => {

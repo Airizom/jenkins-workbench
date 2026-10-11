@@ -28,10 +28,10 @@ export function buildBuildsTree(options?: {
 
   const includeCauses = Boolean(options?.includeDetails);
   const includeParameters = Boolean(options?.includeParameters);
-  if (options?.includeRevisions) {
-    parts.push(`,actions[${REVISION_FIELDS}]`);
-  } else if (includeCauses || includeParameters) {
-    parts.push(`,actions[${buildActionFields({ includeCauses, includeParameters }).join(",")}]`);
+  const includeRevisions = Boolean(options?.includeRevisions);
+  if (includeRevisions || includeCauses || includeParameters) {
+    const actionFields = buildActionFields({ includeCauses, includeParameters, includeRevisions });
+    parts.push(`,actions[${actionFields.join(",")}]`);
   }
 
   parts.push("]{limit}");
@@ -80,8 +80,12 @@ function buildActionFields(options?: {
   extraFields?: string[];
   includeCauses?: boolean;
   includeParameters?: boolean;
+  includeRevisions?: boolean;
 }): string[] {
-  const fields = [...BUILD_ACTION_BASE_FIELDS, ...(options?.extraFields ?? [])];
+  const fields = [
+    ...(options?.includeRevisions ? [REVISION_FIELDS] : BUILD_ACTION_BASE_FIELDS),
+    ...(options?.extraFields ?? [])
+  ];
   if (options?.includeCauses) {
     fields.push(BUILD_ACTION_CAUSE_FIELD);
   }

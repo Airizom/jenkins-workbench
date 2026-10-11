@@ -82,7 +82,3 @@ export function addIssue(
 ): void {
   issues.push({ path: issuePath, message, severity: "error" });
 }
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}

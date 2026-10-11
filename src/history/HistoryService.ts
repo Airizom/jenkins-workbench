@@ -33,7 +33,7 @@ export class HistoryService implements vscode.Disposable {
   private cache = new Map<string, CachedReport>();
   private pending = new Map<
     string,
-    { promise: Promise<HistoryReport>; subscribers: (() => boolean)[] }
+    { promise: Promise<HistoryReport | undefined>; subscribers: (() => boolean)[] }
   >();
   private queues = new Map<string, { running: number; waiting: (() => void)[] }>();
   private generation = 0;
@@ -91,32 +91,35 @@ export class HistoryService implements vscode.Disposable {
   }
 
   async summaries(
-    request: HistoryRequest,
+    input: HistoryRequest,
     all = false
   ): Promise<{ builds: JenkinsBuild[]; truncated: boolean }> {
-    const generation = this.generation;
+    const request = this.guard(input);
     const found = new Map<number, JenkinsBuild>();
     for (let offset = 0; offset < 500; offset += 100) {
-      if (!request.active() || generation !== this.generation) break;
+      if (!request.active()) break;
       const page = await this.schedule(request.environment, async () => {
-        if (!request.active() || generation !== this.generation) return [];
+        if (!request.active()) return [];
         return this.data.getBuildsForJob(request.environment, request.jobUrl, 100, {
           offset,
           bypassCache: request.refresh
         });
       });
-      if (!request.active() || generation !== this.generation)
-        throw new Error("History request cancelled");
+      if (!request.active()) throw new Error("History request cancelled");
       for (const build of page) {
         if (build.building || !build.result) continue;
-        if (
-          request.anchor &&
-          (build.number >= request.anchor.number ||
-            completionTime(build) === undefined ||
-            !Number.isFinite(request.anchor.timestamp) ||
-            (completionTime(build) ?? Infinity) > (request.anchor.timestamp ?? -1))
-        )
-          continue;
+        if (request.anchor) {
+          const completed = completionTime(build);
+          const anchorTime = request.anchor.timestamp;
+          if (
+            build.number >= request.anchor.number ||
+            completed === undefined ||
+            anchorTime === undefined ||
+            !Number.isFinite(anchorTime) ||
+            completed > anchorTime
+          )
+            continue;
+        }
         found.set(build.number, build);
       }
       if (page.length < 100 || (!all && found.size >= request.count))
@@ -132,17 +135,24 @@ export class HistoryService implements vscode.Disposable {
     const key = `${this.environmentKey(request.environment)}:${ensureTrailingSlash(build.url)}:history`;
     const cached = this.cache.get(key);
     if (!request.refresh && cached && cached.expires > Date.now()) return cached.report;
+    const generation = this.generation;
     const pending = this.pending.get(key);
     if (pending) {
       pending.subscribers.push(request.active);
-      return pending.promise;
+      const report = await pending.promise;
+      return (
+        report ??
+        (generation === this.generation && request.active()
+          ? this.report(request, build)
+          : { status: "unavailable", cases: [] })
+      );
     }
-    const generation = this.generation;
     const subscribers = [request.active];
-    const operation = this.schedule(request.environment, async (): Promise<HistoryReport> => {
+    const operation = this.schedule<HistoryReport | undefined>(request.environment, async () => {
       // Once shared, a request belongs to every subscriber, not the first panel.
+      // Cancellation is not a fetched unavailable report and must not be cached.
       if (generation !== this.generation || !subscribers.some((active) => active()))
-        return { status: "unavailable", cases: [] };
+        return undefined;
       try {
         return normalizeHistoryReport(
           await this.data.getTestReport(request.environment, build.url, { projection: "history" })
@@ -156,9 +166,11 @@ export class HistoryService implements vscode.Disposable {
       }
     });
     this.pending.set(key, { promise: operation, subscribers });
+    let report: HistoryReport | undefined;
     try {
-      const report = await operation;
+      report = await operation;
       if (
+        report &&
         generation === this.generation &&
         subscribers.some((active) => active()) &&
         report.status !== "error" &&
@@ -179,14 +191,19 @@ export class HistoryService implements vscode.Disposable {
           this.cache.delete(oldKey);
         }
       }
-      return report;
     } finally {
       if (this.pending.get(key)?.promise === operation) this.pending.delete(key);
     }
+    return (
+      report ??
+      (generation === this.generation && request.active()
+        ? this.report(request, build)
+        : { status: "unavailable", cases: [] })
+    );
   }
 
-  async load(request: HistoryRequest): Promise<HistoryWindow> {
-    const generation = this.generation;
+  async load(input: HistoryRequest): Promise<HistoryWindow> {
+    const request = this.guard(input);
     const window = await this.summaries(request);
     const selected = (request.anchor ? [request.anchor, ...window.builds] : window.builds).slice(
       0,
@@ -197,7 +214,7 @@ export class HistoryService implements vscode.Disposable {
     let cursor = 0;
     await Promise.all(
       Array.from({ length: 3 }, async () => {
-        while (cursor < selected.length && request.active() && generation === this.generation) {
+        while (cursor < selected.length && request.active()) {
           const index = cursor++;
           const build = selected[index];
           const report = await this.report(request, build);

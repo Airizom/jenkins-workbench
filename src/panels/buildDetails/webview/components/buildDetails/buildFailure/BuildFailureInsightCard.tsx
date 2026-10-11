@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "../../../../../shared/webview/lib/utils";
 export function BuildFailureInsightCard({
   icon,
   title,
@@ -25,9 +26,20 @@ export function BuildFailureInsightCard({
     </div>
   );
 }
-export function BuildFailureInsightEmpty({ children }: { children: ReactNode }) {
+export function BuildFailureInsightEmpty({
+  className,
+  children
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 text-xs text-muted-foreground">
+    <div
+      className={cn(
+        "flex items-center justify-center rounded border border-dashed border-border bg-muted-soft px-2.5 py-3 text-xs text-muted-foreground",
+        className
+      )}
+    >
       {children}
     </div>
   );

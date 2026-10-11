@@ -9,6 +9,20 @@ const { CurrentBranchCommandMapper } = await import(
 );
 
 describe("CurrentBranchCommandMapper.getActionUnavailableMessage", () => {
+  it("explains that actions are unavailable while the current context is resolving", () => {
+    const mapper = new CurrentBranchCommandMapper();
+    const state: CurrentBranchState = { kind: "resolving" };
+    const message = {
+      severity: "info",
+      message: "Resolving Jenkins status for the current repository and checkout."
+    };
+
+    assert.deepEqual(mapper.mapStateToResolution(state), { kind: "message", ...message });
+    for (const action of ["triggerBuild", "openLatestBuild", "openLastFailedBuild"] as const) {
+      assert.deepEqual(mapper.getActionUnavailableMessage(state, action), message);
+    }
+  });
+
   it("explains a missing branch job instead of silently doing nothing", () => {
     const mapper = new CurrentBranchCommandMapper();
 

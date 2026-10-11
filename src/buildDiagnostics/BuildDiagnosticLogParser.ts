@@ -79,6 +79,8 @@ export class BuildDiagnosticLogParser {
       if (this.remainderLength + segment.length > this.maxLineChars) {
         this.clearRemainder();
         this.lineTruncated = true;
+        this.customMatchers.reset();
+        this.builtIns.reset();
         if (newline < 0) {
           this.discardingOversizedLine = true;
           return diagnostics;

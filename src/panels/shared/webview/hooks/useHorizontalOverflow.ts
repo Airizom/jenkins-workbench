@@ -86,11 +86,15 @@ export function useHorizontalOverflow<T extends HTMLElement>(
     }
 
     const update = (): void => syncOverflowAttributes(element);
-    const revealActive = (behavior: ScrollBehavior): void => {
+    let revealed: HTMLElement | null = null;
+    const revealActive = (behavior: ScrollBehavior, onlyIfNew = false): void => {
       const active = activeSelector ? element.querySelector<HTMLElement>(activeSelector) : null;
-      if (active) {
+      // Child-list churn (e.g. tab badges) must not undo a manual scroll, so
+      // it reveals only an active item that has not been revealed yet.
+      if (active && !(onlyIfNew && active === revealed)) {
         revealItem(element, active, behavior);
       }
+      revealed = active;
     };
 
     update();
@@ -105,8 +109,11 @@ export function useHorizontalOverflow<T extends HTMLElement>(
         ? undefined
         : new MutationObserver((records) => {
             update();
+            const behavior = prefersReducedMotion() ? "auto" : "smooth";
             if (records.some((record) => record.type === "attributes")) {
-              revealActive(prefersReducedMotion() ? "auto" : "smooth");
+              revealActive(behavior);
+            } else if (records.some((record) => record.type === "childList")) {
+              revealActive(behavior, true);
             }
           });
     mutationObserver?.observe(element, {

@@ -1,26 +1,21 @@
-import { resolveResultBadgeClass } from "../lib/statusStyles";
+import { resolveBuildResultStyle } from "../lib/statusStyles";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
 export function getResultBadgeClass(status?: string): string {
-  if (!status) {
-    return resolveResultBadgeClass("neutral");
-  }
-  return resolveResultBadgeClass(status);
+  return resolveBuildResultStyle(status).badge;
 }
 export function ResultBadge({
   label,
-  resultClass,
   status,
   className,
   id
 }: {
   label: string;
-  resultClass?: string;
   status?: string;
   className?: string;
   id?: string;
 }) {
-  const badgeClass = getResultBadgeClass(resultClass ?? status);
+  const badgeClass = getResultBadgeClass(status);
   return (
     <Badge id={id} variant="outline" className={cn("font-semibold", badgeClass, className)}>
       {label}

@@ -147,14 +147,7 @@ export class BuildDetailsCoverageCoordinator {
       this.showCoverageLoading();
     }
 
-    const result = await loadCoverage({
-      coverageBackend: request.coverageBackend,
-      environment: request.environment,
-      buildUrl: request.buildUrl,
-      actionPath,
-      coverageEnabled: request.coverageEnabled,
-      decorationsEnabled: request.decorationsEnabled
-    });
+    const result = await loadCoverage(request, actionPath);
     if (this.isStale(token, refreshGeneration)) {
       return;
     }
@@ -164,8 +157,8 @@ export class BuildDetailsCoverageCoordinator {
 
   private showCoverageLoading(): void {
     const changed = this.options.state.setCoverageLoading(true);
-    if (changed && this.options.isViewVisible()) {
-      this.options.postStateUpdate();
+    if (changed) {
+      this.postStateUpdateIfVisible();
     }
   }
 
@@ -173,11 +166,15 @@ export class BuildDetailsCoverageCoordinator {
     request: CoverageRefreshRequest,
     result: BuildDetailsCoverageLoadResult
   ): void {
-    const { coverageOverview, modifiedCoverageFiles } = result;
-    this.options.state.setCoverage(
-      request.coverageEnabled ? coverageOverview : undefined,
-      request.coverageEnabled ? modifiedCoverageFiles : undefined
-    );
+    const { coverageOverview, modifiedCoverageFiles, overviewError } = result;
+    if (overviewError !== undefined) {
+      this.options.state.setCoverageError(overviewError);
+    } else {
+      this.options.state.setCoverage(
+        request.coverageEnabled ? coverageOverview : undefined,
+        request.coverageEnabled ? modifiedCoverageFiles : undefined
+      );
+    }
     this.options.state.setCoverageLoading(false);
     this.options.decorationsAdapter.apply({
       environment: request.environment,
@@ -187,8 +184,8 @@ export class BuildDetailsCoverageCoordinator {
     });
     if (this.options.isViewVisible()) {
       this.options.decorationsAdapter.activate();
-      this.options.postStateUpdate();
     }
+    this.postStateUpdateIfVisible();
   }
 
   private handleRefreshError(token: number, refreshGeneration: number, error: unknown): void {
@@ -225,31 +222,26 @@ export class BuildDetailsCoverageCoordinator {
 interface BuildDetailsCoverageLoadResult {
   coverageOverview: JenkinsCoverageOverview | undefined;
   modifiedCoverageFiles: JenkinsModifiedCoverageFile[] | undefined;
+  overviewError?: string;
 }
 
-interface BuildDetailsCoverageLoadRequest {
-  coverageBackend: BuildDetailsCoverageBackend;
-  environment: JenkinsEnvironmentRef;
-  buildUrl: string;
-  actionPath: string;
-  coverageEnabled: boolean;
-  decorationsEnabled: boolean;
-}
-
-async function loadCoverage({
-  coverageBackend,
-  environment,
-  buildUrl,
-  actionPath,
-  coverageEnabled,
-  decorationsEnabled
-}: BuildDetailsCoverageLoadRequest): Promise<BuildDetailsCoverageLoadResult> {
-  const coverageOverview = coverageEnabled
-    ? await coverageBackend.getCoverageOverview(environment, buildUrl, {
+async function loadCoverage(
+  request: CoverageRefreshRequest,
+  actionPath: string
+): Promise<BuildDetailsCoverageLoadResult> {
+  const { coverageBackend, environment, buildUrl, coverageEnabled, decorationsEnabled } = request;
+  let coverageOverview: JenkinsCoverageOverview | undefined;
+  let overviewError: string | undefined;
+  if (coverageEnabled) {
+    try {
+      coverageOverview = await coverageBackend.getCoverageOverview(environment, buildUrl, {
         buildCompleted: true,
         actionPath
-      })
-    : undefined;
+      });
+    } catch (error) {
+      overviewError = formatError(error);
+    }
+  }
 
   let modifiedCoverageFiles: JenkinsModifiedCoverageFile[] | undefined;
   if (coverageEnabled || decorationsEnabled) {
@@ -263,7 +255,7 @@ async function loadCoverage({
         }
       );
     } catch (error) {
-      if (!coverageOverview) {
+      if (!coverageOverview && overviewError === undefined) {
         throw error;
       }
     }
@@ -271,6 +263,7 @@ async function loadCoverage({
 
   return {
     coverageOverview,
-    modifiedCoverageFiles
+    modifiedCoverageFiles,
+    overviewError
   };
 }

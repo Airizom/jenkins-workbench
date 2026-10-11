@@ -11,6 +11,7 @@ import type {
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
 import type { PipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
+import { prefersReducedMotion } from "../../hooks/useConsoleOutputScroll";
 import { useTabsBarHeightVariable } from "../../hooks/useTabsBarHeightVariable";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
@@ -40,9 +41,7 @@ function scrollPipelineStageIntoView(stageKey: string): void {
     if (!element) {
       return;
     }
-    const behavior = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-      ? "auto"
-      : "smooth";
+    const behavior = prefersReducedMotion() ? "auto" : "smooth";
     element.scrollIntoView({ behavior, block: "center" });
   });
 }

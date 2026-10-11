@@ -41,8 +41,10 @@ export function PendingInputsSection({
   onApprove: (inputId: string) => void;
   onReject: (inputId: string) => void;
 }) {
+  const getProcessingAction = (inputId: string) =>
+    Object.hasOwn(processingActions, inputId) ? processingActions[inputId] : undefined;
   const handleInputAction = (inputId: string, action: ProcessingAction) => {
-    if (processingActions[inputId]) {
+    if (getProcessingAction(inputId)) {
       return;
     }
     if (action === "approve") {
@@ -59,7 +61,7 @@ export function PendingInputsSection({
   return (
     <div className="space-y-2">
       {pendingInputs.map((input) => {
-        const processingAction = processingActions[input.id];
+        const processingAction = getProcessingAction(input.id);
         const handleAction = (action: ProcessingAction) => handleInputAction(input.id, action);
 
         return (

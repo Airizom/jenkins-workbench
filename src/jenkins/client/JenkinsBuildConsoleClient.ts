@@ -1,5 +1,4 @@
 import { JenkinsRequestError } from "../errors";
-import { parseContentLength } from "../request/responses";
 import type {
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
@@ -37,11 +36,10 @@ export class JenkinsBuildConsoleClient {
 
     const url = buildActionUrl(buildUrl, "consoleText");
     const response = await this.context.requestStream(url);
-    const contentLength = parseContentLength(response.headers["content-length"]);
     const prefix = await readTextPrefixFromStream(response, maxBytes);
     return {
       text: prefix.text,
-      truncated: prefix.truncated || (contentLength !== undefined && contentLength > maxBytes),
+      truncated: prefix.truncated,
       bytesRead: prefix.bytesRead
     };
   }

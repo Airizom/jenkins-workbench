@@ -1,8 +1,5 @@
 import { ArrowDownIcon, ArrowUpIcon } from "../../../../shared/webview/icons";
-import {
-  resolveResultTextClass,
-  resolveStatusAccentClass
-} from "../../../../shared/webview/lib/statusStyles";
+import { resolveBuildResultStyle } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type {
   BuildCompareStageDeltaDirection,
@@ -35,17 +32,15 @@ function StageSideCell({
       </td>
     );
   }
+  const statusStyle = resolveBuildResultStyle(statusClass);
   return (
     <td className="px-3 py-2" data-label={label}>
       <span className="inline-flex max-w-full items-center gap-1.5">
         <span
           aria-hidden="true"
-          className={cn(
-            "h-1.5 w-1.5 shrink-0 rounded-full",
-            resolveStatusAccentClass(statusClass ?? "")
-          )}
+          className={cn("h-1.5 w-1.5 shrink-0 rounded-full", statusStyle.accent)}
         />
-        <span className={resolveResultTextClass(statusClass)}>{status}</span>
+        <span className={statusStyle.text}>{status}</span>
         {duration ? (
           <span className="truncate text-muted-foreground tabular-nums" title={duration}>
             {duration}

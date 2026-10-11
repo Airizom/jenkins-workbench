@@ -6,13 +6,13 @@ import {
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
 import { DownloadIcon, EyeIcon, FileIcon } from "../../../../../shared/webview/icons";
+import { createUniqueListKeys } from "../../../../../shared/webview/lib/uniqueListKeys";
 import type {
   ArtifactAction,
   BuildFailureArtifact
 } from "../../../../shared/BuildDetailsContracts";
 import { BuildFailureInsightCard, BuildFailureInsightEmpty } from "./BuildFailureInsightCard";
 import { OverflowText } from "./BuildFailureOverflowText";
-import { createUniqueListKeys } from "./buildFailureListKeys";
 export function BuildFailureArtifactsCard({
   items,
   overflowCount,
@@ -47,13 +47,10 @@ function ArtifactsList({
       {items.map((item, index) => {
         const displayName = item.name ?? "Artifact";
         const relativePath = item.relativePath ?? displayName;
-        const artifactLabel =
-          relativePath && relativePath !== displayName
-            ? `${displayName} (${relativePath})`
-            : displayName;
         // The directory is visible secondary text (not a hover-only tooltip),
         // so the full path is readable and selectable without a pointer.
         const showPath = Boolean(relativePath) && relativePath !== displayName;
+        const artifactLabel = showPath ? `${displayName} (${relativePath})` : displayName;
         return (
           <li
             className="flex items-center justify-between gap-1.5 rounded border border-mutedBorder bg-muted-soft px-2 py-1.5"

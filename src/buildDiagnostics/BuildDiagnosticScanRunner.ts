@@ -53,6 +53,7 @@ export class BuildDiagnosticScanRunner {
   private readonly pathResolver = new BuildDiagnosticPathResolver();
   private readonly completedCache = new Map<string, BuildDiagnosticScanSnapshot>();
   private activeScan?: ActiveScan;
+  private normalizedProfiles?: ReturnType<typeof normalizeDiagnosticProfiles>;
 
   constructor(
     private readonly dataService: JenkinsDataService,
@@ -80,7 +81,8 @@ export class BuildDiagnosticScanRunner {
       };
     }
 
-    const profiles = normalizeDiagnosticProfiles(config.profiles);
+    this.normalizedProfiles ??= normalizeDiagnosticProfiles(config.profiles);
+    const profiles = this.normalizedProfiles;
     for (const issue of profiles.issues) {
       this.log(`Profile ${issue.severity}: ${issue.path}: ${issue.message}`);
     }
@@ -128,8 +130,13 @@ export class BuildDiagnosticScanRunner {
     this.pathResolver.clear();
   }
 
+  invalidateProfiles(): void {
+    this.normalizedProfiles = undefined;
+  }
+
   dispose(): void {
     this.reset();
+    this.invalidateProfiles();
     this.completedCache.clear();
   }
 

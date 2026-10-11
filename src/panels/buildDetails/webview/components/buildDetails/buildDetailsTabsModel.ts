@@ -34,3 +34,20 @@ export function hasNewPendingInputs(
 ): boolean {
   return nextInputIds.some((id) => !previousInputIds.has(id));
 }
+
+/**
+ * An unavailable selected tab falls back to the default once it was shown and then
+ * disappeared, or once build details have loaded without it (a restored tab the
+ * current build no longer offers).
+ */
+export function shouldFallBackFromSelectedTab({
+  isAvailable,
+  wasAvailable,
+  detailsLoaded
+}: {
+  isAvailable: boolean;
+  wasAvailable: boolean;
+  detailsLoaded: boolean;
+}): boolean {
+  return !isAvailable && (wasAvailable || detailsLoaded);
+}

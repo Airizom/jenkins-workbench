@@ -156,7 +156,7 @@ export class PipelineNodeLogManager {
           void this.fetchActive(this.generation, queuedInitial);
         } else if (
           generation === this.generation &&
-          (retryAfterFailure || this.shouldPollActiveLog())
+          (retryAfterFailure || (this.consecutiveFetchFailures === 0 && this.shouldPollActiveLog()))
         ) {
           this.scheduleNext(generation);
         }

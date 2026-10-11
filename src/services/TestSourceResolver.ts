@@ -28,7 +28,7 @@ export function buildTestSourceNavigationContext(
 ): TestSourceNavigationContext {
   return {
     environment,
-    multibranchFolderUrl: resolveMultibranchFolderUrl(buildUrl)
+    multibranchFolderUrl: resolveMultibranchFolderUrl(buildUrl, environment.url)
   };
 }
 
@@ -57,11 +57,7 @@ export class TestSourceResolver {
    * repositories that are not workspace folders look unavailable until an unrelated refresh.
    */
   async whenReady(): Promise<void> {
-    try {
-      await this.gitApiPromise;
-    } catch {
-      // The Git API is unavailable; availability falls back to workspace folders only.
-    }
+    await this.gitApiPromise;
   }
 
   canResolve(context: TestSourceNavigationContext, className?: string): boolean {
@@ -144,17 +140,20 @@ function addIfLinkedRoot(
   }
 }
 
-function resolveMultibranchFolderUrl(buildUrl?: string): string | undefined {
+function resolveMultibranchFolderUrl(
+  buildUrl: string | undefined,
+  environmentUrl: string
+): string | undefined {
   if (!buildUrl) {
     return undefined;
   }
 
-  const parsedBuild = parseBuildUrl(buildUrl);
+  const parsedBuild = parseBuildUrl(buildUrl, environmentUrl);
   if (!parsedBuild) {
     return undefined;
   }
 
-  const parsedJob = parseJobUrl(parsedBuild.jobUrl);
+  const parsedJob = parseJobUrl(parsedBuild.jobUrl, environmentUrl);
   if (!parsedJob || parsedJob.fullPath.length < 2) {
     return undefined;
   }

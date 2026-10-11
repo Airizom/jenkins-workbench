@@ -1,8 +1,8 @@
 import * as path from "node:path";
 import type * as RedosDetector from "redos-detector";
+import { isPlainRecord } from "../shared/runtimeGuards";
 import {
   addIssue,
-  isRecord,
   readRequiredString,
   reportUnknownProperties
 } from "./BuildDiagnosticProfileValidation";
@@ -51,7 +51,7 @@ function normalizePathMapping(
   mappingPath: string,
   issues: DiagnosticProfileValidationIssue[]
 ): NormalizedDiagnosticPathMapping | undefined {
-  if (!isRecord(value)) {
+  if (!isPlainRecord(value)) {
     addIssue(issues, mappingPath, "Path mapping must be an object.");
     return undefined;
   }
@@ -130,16 +130,18 @@ function normalizeRepositoryRelativeRoot(
     addIssue(issues, issuePath, "local must be a repository-relative path.");
     return undefined;
   }
-  const normalized = value.trim().replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "");
+  const slashed = value.trim().replace(/\\/g, "/");
+  const normalized = slashed.replace(/^\.\//, "").replace(/\/$/, "");
   const segments = normalized.split("/");
   if (
-    !normalized ||
-    path.posix.isAbsolute(normalized) ||
+    !slashed ||
+    path.posix.isAbsolute(slashed) ||
     path.win32.isAbsolute(value) ||
     segments.includes("..")
   ) {
     addIssue(issues, issuePath, "local must stay within the bound repository.");
     return undefined;
   }
-  return normalized;
+  // "./" and ".\" name the repository root, like "." and "".
+  return normalized === "." ? "" : normalized;
 }

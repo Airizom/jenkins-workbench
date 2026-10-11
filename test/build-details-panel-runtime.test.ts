@@ -202,6 +202,131 @@ describe("BuildDetailsPanelRuntime", () => {
     }
   });
 
+  it("does not let an old visibility handler interfere with a reloaded panel's report", async () => {
+    const environment = {
+      environmentId: "env-1",
+      scope: "global" as const,
+      url: "https://jenkins.example/"
+    };
+    const buildUrl = `${environment.url}job/example/1/`;
+    const state = new BuildDetailsPanelState();
+    state.resetForLoad(environment, buildUrl, "nonce-1");
+    state.updateDetails({ number: 1, url: buildUrl, building: true });
+
+    let resolveDetails: (details: JenkinsBuildDetails) => void = () => undefined;
+    let resolveReport: (value: { report: { totalCount: number } }) => void = () => undefined;
+    const backend = {
+      status: {
+        getBuildDetails: () =>
+          new Promise<JenkinsBuildDetails>((resolve) => {
+            resolveDetails = resolve;
+          })
+      }
+    };
+    const oldPollingController = { start: vi.fn() };
+    const newPollingController = {
+      start: vi.fn(),
+      fetchTestReport: vi.fn().mockResolvedValue({ report: { totalCount: 99 } }),
+      refreshConsoleSnapshot: vi.fn().mockResolvedValue({}),
+      fetchWorkflowRunWithCallbacks: vi.fn().mockResolvedValue(undefined),
+      refreshPendingInputs: vi.fn().mockResolvedValue(undefined)
+    };
+    newPollingController.fetchTestReport.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveReport = resolve;
+        })
+    );
+    let pollingController = oldPollingController;
+    let currentToken = 1;
+    const runtime = new BuildDetailsPanelRuntime({
+      state,
+      view: { isVisible: () => true, postStateUpdate: vi.fn() } as never,
+      coverageDecorationService: {
+        activateOwner: vi.fn(),
+        deactivateOwner: vi.fn(),
+        clearCoverageContext: vi.fn()
+      } as never,
+      getBackend: () => backend as never,
+      getPollingController: () => pollingController as never,
+      getCurrentToken: () => currentToken,
+      isTokenCurrent: (token) => token === currentToken
+    });
+
+    try {
+      const visibilityRefresh = runtime.handlePanelVisible(currentToken);
+      currentToken += 1;
+      runtime.dispose();
+      const nextBuildUrl = `${environment.url}job/example/2/`;
+      state.resetForLoad(environment, nextBuildUrl, "nonce-2");
+      state.updateDetails({ number: 2, url: nextBuildUrl, building: false });
+      pollingController = newPollingController;
+      const reportRefresh = runtime.refreshTestReport(currentToken, { showLoading: true });
+      assert.equal(state.testResultsLoading, true);
+
+      resolveDetails({ number: 1, url: buildUrl, building: true });
+      const stillVisible = await visibilityRefresh;
+      resolveReport({ report: { totalCount: 2 } });
+      await reportRefresh;
+
+      assert.equal(stillVisible, false);
+      assert.equal(newPollingController.start.mock.calls.length, 0);
+      assert.equal(newPollingController.fetchTestReport.mock.calls.length, 1);
+      assert.equal(newPollingController.refreshConsoleSnapshot.mock.calls.length, 0);
+      assert.equal(newPollingController.fetchWorkflowRunWithCallbacks.mock.calls.length, 0);
+      assert.equal(newPollingController.refreshPendingInputs.mock.calls.length, 0);
+      assert.equal(state.currentTestReport?.totalCount, 2);
+      assert.equal(state.testResultsLoading, false);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
+  it("rejects stale report refreshes without superseding the current request", async () => {
+    const buildUrl = "https://jenkins.example/job/example/2/";
+    const state = new BuildDetailsPanelState();
+    state.resetForLoad(
+      { environmentId: "env-1", scope: "global", url: "https://jenkins.example/" },
+      buildUrl,
+      "nonce"
+    );
+    state.updateDetails({ number: 2, url: buildUrl, building: false });
+
+    let resolveReport: (value: { report: { totalCount: number } }) => void = () => undefined;
+    const fetchTestReport = vi.fn().mockResolvedValue({ report: { totalCount: 99 } });
+    fetchTestReport.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveReport = resolve;
+        })
+    );
+    const runtime = new BuildDetailsPanelRuntime({
+      state,
+      view: { isVisible: () => true, postStateUpdate: vi.fn() } as never,
+      coverageDecorationService: {
+        deactivateOwner: vi.fn(),
+        clearCoverageContext: vi.fn()
+      } as never,
+      getBackend: () => undefined,
+      getPollingController: () => ({ fetchTestReport }) as never,
+      getCurrentToken: () => 2,
+      isTokenCurrent: (token) => token === 2
+    });
+
+    try {
+      const currentRefresh = runtime.refreshTestReport(2, { showLoading: true });
+      await runtime.refreshTestReport(1, { showLoading: true });
+      resolveReport({ report: { totalCount: 2 } });
+      await currentRefresh;
+
+      assert.equal(fetchTestReport.mock.calls.length, 1);
+      assert.equal(state.currentTestReport?.totalCount, 2);
+      assert.equal(state.testResultsLoading, false);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
   it("starts visible polling when the panel stays visible through the status refresh", async () => {
     const buildUrl = "https://jenkins.example/job/example/1/";
     const state = new BuildDetailsPanelState();

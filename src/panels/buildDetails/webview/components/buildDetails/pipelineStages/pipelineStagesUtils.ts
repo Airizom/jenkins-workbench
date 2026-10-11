@@ -1,9 +1,9 @@
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 export function getStageId(stage: PipelineStageViewModel, index: number): string {
-  if (typeof stage.key === "string" && stage.key.length > 0) {
+  if (stage.key) {
     return stage.key;
   }
-  if (typeof stage.name === "string" && stage.name.length > 0) {
+  if (stage.name) {
     return `${stage.name}-${index}`;
   }
   return `stage-${index}`;

@@ -7,12 +7,25 @@ type GroovyMaskMode =
   | { type: "dollar-slashy" }
   | { type: "interpolation"; depth: number };
 
+/** Previous significant code token, which Groovy's lexer uses to tell a slashy literal from division. */
+type PreviousToken =
+  | { kind: "start" | "newline" | "literal" }
+  | { kind: "symbol"; value: string; end: number }
+  // `member` marks a property name after `.`, which is never a keyword there.
+  | { kind: "word"; value: string; end: number; member: boolean };
+
+const LITERAL_TOKEN: PreviousToken = { kind: "literal" };
+
 export function maskGroovyText(text: string): string {
   const chars = text.split("");
   let index = 0;
   const modeStack: GroovyMaskMode[] = [];
   let inLineComment = false;
   let inBlockComment = false;
+  // Open code brackets; newlines inside parentheses or lists do not end statements.
+  const brackets: string[] = [];
+  // Comments never change it, so they cannot make division look like a slashy literal.
+  let previousToken: PreviousToken = { kind: "start" };
 
   while (index < chars.length) {
     const currentMode = modeStack[modeStack.length - 1];
@@ -59,7 +72,7 @@ export function maskGroovyText(text: string): string {
         continue;
       }
 
-      const nextIndex = enterStringMode(text, chars, index, modeStack);
+      const nextIndex = enterStringMode(text, chars, index, modeStack, previousToken);
       if (nextIndex !== undefined) {
         index = nextIndex;
         continue;
@@ -76,11 +89,14 @@ export function maskGroovyText(text: string): string {
       }
       if (quote === '"' && character === "$" && next === "{") {
         index = enterInterpolation(chars, index, modeStack);
+        brackets.push("{");
+        previousToken = { kind: "symbol", value: "{", end: index - 1 };
         continue;
       }
       if (currentMode.type === "single" || currentMode.type === "double") {
         if (character === quote) {
           modeStack.pop();
+          previousToken = LITERAL_TOKEN;
         }
         index += 1;
         continue;
@@ -89,6 +105,7 @@ export function maskGroovyText(text: string): string {
         chars[index + 1] = " ";
         chars[index + 2] = " ";
         modeStack.pop();
+        previousToken = LITERAL_TOKEN;
         index += 3;
         continue;
       }
@@ -113,13 +130,17 @@ export function maskGroovyText(text: string): string {
       }
       if (character === "$" && next === "{") {
         index = enterInterpolation(chars, index, modeStack);
+        brackets.push("{");
+        previousToken = { kind: "symbol", value: "{", end: index - 1 };
         continue;
       }
       if (currentMode.type === "slashy" && character === "/") {
         modeStack.pop();
+        previousToken = LITERAL_TOKEN;
       } else if (currentMode.type === "dollar-slashy" && character === "/" && next === "$") {
         chars[index + 1] = " ";
         modeStack.pop();
+        previousToken = LITERAL_TOKEN;
         index += 2;
         continue;
       }
@@ -127,6 +148,13 @@ export function maskGroovyText(text: string): string {
       continue;
     }
 
+    // A backslash-newline continues the statement on the next line.
+    if (character === "\\" && (next === "\n" || (next === "\r" && nextTwo === "\n"))) {
+      index += next === "\n" ? 2 : 3;
+      continue;
+    }
+    previousToken = nextPreviousToken(previousToken, character, index, brackets);
+    trackBracket(brackets, character);
     if (currentMode?.type === "interpolation") {
       if (character === "{") {
         currentMode.depth += 1;
@@ -136,14 +164,48 @@ export function maskGroovyText(text: string): string {
           modeStack.pop();
         }
       }
-      index += 1;
-      continue;
     }
-
     index += 1;
   }
 
   return chars.join("");
+}
+
+function nextPreviousToken(
+  previous: PreviousToken,
+  character: string,
+  index: number,
+  brackets: readonly string[]
+): PreviousToken {
+  if (/\s/.test(character)) {
+    // Inside parentheses or lists Groovy ignores newlines.
+    const newlineEndsStatement = brackets.length === 0 || brackets[brackets.length - 1] === "{";
+    return character === "\n" && newlineEndsStatement ? { kind: "newline" } : previous;
+  }
+  // Java identifier parts also include currency symbols, connector punctuation,
+  // and ignorable format characters; surrogate halves cover supplementary planes.
+  if (/[\p{ID_Continue}\p{Sc}\p{Pc}\p{Cf}\uD800-\uDFFF]/u.test(character)) {
+    if (previous.kind === "word" && previous.end === index - 1) {
+      return { ...previous, value: previous.value + character, end: index };
+    }
+    const member = previous.kind === "symbol" && previous.value === ".";
+    return { kind: "word", value: character, end: index, member };
+  }
+  // `++` and `--` end an operand (`count++ / total`), like Groovy's INC/DEC tokens.
+  const repeated =
+    "+-".includes(character) &&
+    previous.kind === "symbol" &&
+    previous.value === character &&
+    previous.end === index - 1;
+  return { kind: "symbol", value: repeated ? character + character : character, end: index };
+}
+
+function trackBracket(brackets: string[], character: string): void {
+  if ("([{".includes(character)) {
+    brackets.push(character);
+  } else if (")]}".includes(character)) {
+    brackets.pop();
+  }
 }
 
 type QuotedMaskMode = Extract<
@@ -182,7 +244,8 @@ function enterStringMode(
   text: string,
   chars: string[],
   index: number,
-  modeStack: GroovyMaskMode[]
+  modeStack: GroovyMaskMode[],
+  previousToken: PreviousToken
 ): number | undefined {
   const character = text[index];
   const next = text[index + 1];
@@ -223,7 +286,7 @@ function enterStringMode(
     return index + 2;
   }
 
-  if (character === "/" && canStartSlashyString(text, index)) {
+  if (character === "/" && canStartSlashyString(previousToken)) {
     modeStack.push({ type: "slashy" });
     chars[index] = " ";
     return index + 1;
@@ -232,40 +295,34 @@ function enterStringMode(
   return undefined;
 }
 
-function canStartSlashyString(text: string, index: number): boolean {
-  let previous = index - 1;
-  while (previous >= 0 && /[\t\r ]/.test(text[previous])) {
-    previous -= 1;
-  }
-  if (previous < 0 || "\n([{=,:?~!;+-*%&|^<>".includes(text[previous])) {
-    return true;
-  }
+// Keywords after which Groovy's lexer still allows a slashy literal.
+const SLASHY_KEYWORDS = new Set([
+  "as",
+  "assert",
+  "case",
+  "else",
+  "in",
+  "instanceof",
+  "return",
+  "throw",
+  "yield"
+]);
 
-  // Groovy also permits a slashy literal as the first argument of a bare call.
-  // Only use that interpretation after an identifier when the closing slash
-  // ends the argument, so ordinary division stays visible to the parser.
-  if (previous === index - 1 || !/[\w$]/.test(text[previous])) {
-    return false;
+/**
+ * Like Groovy's lexer, read a slash after an identifier, literal, or closing
+ * bracket as division; only keywords such as `return` or `in` can precede a
+ * slashy literal. (A bare call such as `sh /re/` does not compile in Groovy.)
+ */
+function canStartSlashyString(previous: PreviousToken): boolean {
+  switch (previous.kind) {
+    case "start":
+    case "newline":
+      return true;
+    case "literal":
+      return false;
+    case "word":
+      return !previous.member && SLASHY_KEYWORDS.has(previous.value);
+    case "symbol":
+      return previous.value.length === 1 && "([{=,:?~!;+-*%&|^<>".includes(previous.value);
   }
-  for (let end = index + 1; end < text.length; end += 1) {
-    if (text[end] === "\\") {
-      end += 1;
-      continue;
-    }
-    if (text[end] !== "/") {
-      continue;
-    }
-    let after = end + 1;
-    while (/[\t\r ]/.test(text[after] ?? "")) {
-      after += 1;
-    }
-    // Commas and grouping punctuation cannot belong to a simple division
-    // operand, even when a cast or another operator follows the literal.
-    return (
-      after === text.length ||
-      !/[\w$]/.test(text[after]) ||
-      /[,(){}[\]:]/.test(text.slice(index + 1, end))
-    );
-  }
-  return false;
 }

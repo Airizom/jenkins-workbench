@@ -148,8 +148,19 @@ async function goToJob(
         });
       }
       if (picks.length > previousCount) {
+        const active = quickPick.activeItems[0];
         picks.sort((a, b) => a.label.localeCompare(b.label));
         quickPick.items = [...picks];
+        if (active) {
+          const restored = picks.find(
+            (pick) =>
+              pick.entry.url === active.entry.url &&
+              pick.environment.environmentId === active.environment.environmentId
+          );
+          if (restored) {
+            quickPick.activeItems = [restored];
+          }
+        }
       }
     };
     void (async () => {

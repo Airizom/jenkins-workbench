@@ -65,6 +65,57 @@ describe("NodeDetailsPanelMessages", () => {
     assert.equal(parseNodeDetailsOutgoingMessage({ type: "updateNodeDetails" }), undefined);
   });
 
+  for (const collection of ["executors", "oneOffExecutors"] as const) {
+    it(`rejects malformed optional executor fields in ${collection}`, () => {
+      for (const invalidFields of [
+        { progressPercent: "50" },
+        { progressLabel: {} },
+        { workDurationLabel: 42 },
+        { workDurationMs: "1000" },
+        { progressPercent: null },
+        { progressLabel: null },
+        { workDurationLabel: null },
+        { workDurationMs: null }
+      ]) {
+        const payload = createNodeDetailsViewModel({
+          [collection]: [{ id: "0", statusLabel: "Running", isIdle: false, ...invalidFields }]
+        });
+
+        assert.equal(
+          parseNodeDetailsOutgoingMessage({ type: "updateNodeDetails", payload }),
+          undefined
+        );
+      }
+    });
+
+    it(`accepts valid or omitted optional executor fields in ${collection}`, () => {
+      for (const optionalFields of [
+        {},
+        {
+          progressPercent: 50,
+          progressLabel: "50%",
+          workDurationLabel: "1 second",
+          workDurationMs: 1000
+        },
+        {
+          progressPercent: undefined,
+          progressLabel: undefined,
+          workDurationLabel: undefined,
+          workDurationMs: undefined
+        }
+      ]) {
+        const payload = createNodeDetailsViewModel({
+          [collection]: [{ id: "0", statusLabel: "Running", isIdle: false, ...optionalFields }]
+        });
+
+        assert.deepEqual(parseNodeDetailsOutgoingMessage({ type: "updateNodeDetails", payload }), {
+          type: "updateNodeDetails",
+          payload
+        });
+      }
+    });
+  }
+
   it("rejects each malformed payload field independently", () => {
     const invalidPayloads: Record<string, unknown>[] = [
       createNodeDetailsViewModel({ displayName: undefined }),

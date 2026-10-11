@@ -137,6 +137,69 @@ describe("CoverageDecorationService owner activation", () => {
     service.dispose();
   });
 
+  it("preserves the active owner's decorations when a stale file resolution finishes", async () => {
+    const lookupStarted = deferred<void>();
+    const oldLookup = deferred<{ type: number }>();
+    let lookupCount = 0;
+    statImpl = async () => {
+      if (lookupCount++ === 0) {
+        lookupStarted.resolve();
+        return oldLookup.promise;
+      }
+      return { type: 1 };
+    };
+    const setDecorations = vi.fn();
+    visibleTextEditors.push({
+      document: { uri: fileUri("/repo-a/src/Feature.ts") },
+      setDecorations
+    });
+    const service = new CoverageDecorationService({
+      onDidChange: () => disposable,
+      findLinksForMultibranch: () => [{ repositoryUri: "file:///repo-a" }]
+    } as unknown as JenkinsRepositoryLinkStore);
+    const applyDecorations = vi.spyOn(
+      service as unknown as {
+        applyDecorationsToVisibleEditors(generation: number): Promise<void>;
+      },
+      "applyDecorationsToVisibleEditors"
+    );
+    try {
+      for (const [ownerId, line] of [
+        ["a", 1],
+        ["b", 2]
+      ] as const) {
+        service.setCoverageContext(ownerId, {
+          environment,
+          buildUrl: "https://jenkins.example/job/app/job/main/1/",
+          modifiedFiles: [
+            {
+              path: "src/Feature.ts",
+              blocks: [{ startLine: line, endLine: line, type: "covered" }]
+            }
+          ]
+        });
+      }
+      service.activateOwner("a");
+      const stalePass = applyDecorations.mock.results[0].value;
+      await lookupStarted.promise;
+      service.activateOwner("b");
+      await applyDecorations.mock.results[1].value;
+      assert.deepEqual(
+        setDecorations.mock.calls.slice(-3).map((call) => call[1]),
+        [[new MockRange(1, 0, 1, 0)], [], []]
+      );
+      setDecorations.mockClear();
+
+      oldLookup.resolve({ type: 1 });
+      await stalePass;
+
+      assert.equal(setDecorations.mock.calls.length, 0);
+    } finally {
+      service.dispose();
+      visibleTextEditors.length = 0;
+    }
+  });
+
   it.each(["direct", "suffix"] as const)(
     "does not cache a stale %s match after switching owners",
     async (matchKind) => {

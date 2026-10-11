@@ -18,6 +18,11 @@ export function fullGitRevision(value: unknown): string | undefined {
     : undefined;
 }
 
+// Non-special URL schemes keep default ports, so drop them explicitly.
+const DEFAULT_PORTS: Record<string, string> = { "ssh:": "22", "git:": "9418" };
+// Hosted providers resolve owner/repository paths case-insensitively.
+const CASE_INSENSITIVE_HOSTS = new Set(["github.com", "gitlab.com", "bitbucket.org"]);
+
 export function normalizeRepositoryUrl(value: string): string | undefined {
   try {
     const scp = /^(?:[^@/]+@)?([^:/]+):(.+)$/.exec(value);
@@ -25,14 +30,27 @@ export function normalizeRepositoryUrl(value: string): string | undefined {
     if (!["https:", "http:", "ssh:", "git:"].includes(url.protocol)) {
       return undefined;
     }
-    const path = url.pathname.replace(/\/+$/, "").replace(/\.git$/, "");
+    let path = url.pathname.replace(/\/+$/, "").replace(/\.git$/, "");
     if (!url.hostname || !path || path === "/" || url.search || url.hash) {
       return undefined;
     }
-    return `${url.host.toLowerCase()}${path}`;
+    const hostname = url.hostname.toLowerCase();
+    const port = url.port && url.port !== DEFAULT_PORTS[url.protocol] ? `:${url.port}` : "";
+    if (CASE_INSENSITIVE_HOSTS.has(hostname)) {
+      path = path.toLowerCase();
+    }
+    return `${hostname}${port}${path}`;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Re-applies the current normalization to a stored `host/path` identity, so
+ * identities persisted by older versions keep matching.
+ */
+export function renormalizeRepositoryIdentity(identity: string): string {
+  return normalizeRepositoryUrl(`ssh://${identity}`) ?? identity;
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -97,7 +115,7 @@ export function assessBuildRevision(
       typeof repo === "string" &&
       /^[^/]+$/.test(owner) &&
       /^[^/]+$/.test(repo)
-        ? `${[...hosts][0]}/${owner}/${repo}`
+        ? normalizeRepositoryUrl(`ssh://${[...hosts][0]}/${owner}/${repo}`)
         : undefined;
     if (!sourceUrl || !repositories.includes(sourceUrl)) continue;
     const pull = fullGitRevision(scm.pullHash);

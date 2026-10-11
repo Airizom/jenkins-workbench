@@ -5,6 +5,9 @@ import type {
   JenkinsProgressiveConsoleText
 } from "../../jenkins/types";
 
+const MAX_CONSECUTIVE_PROGRESSIVE_ERRORS = 3;
+const PROGRESSIVE_RETRY_COOLDOWN_MS = 30000;
+
 export interface TextConsoleStreamCallbacks {
   onConsoleAppend(text: string): void;
   onConsoleSet(payload: { text: string; truncated: boolean }): void;
@@ -16,6 +19,11 @@ export interface TextConsoleStreamDataService {
     buildUrl: string,
     maxChars?: number
   ): Promise<JenkinsConsoleText>;
+  getConsoleTextTail(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    maxChars: number
+  ): Promise<JenkinsConsoleTextTail>;
   getConsoleTextProgressive(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
@@ -42,6 +50,8 @@ export class TextConsoleStream {
   private consoleTruncated = false;
   private progressiveSupported = false;
   private forceSnapshot = false;
+  private progressiveErrorCount = 0;
+  private progressiveRetryAt: number | undefined;
 
   constructor(options: TextConsoleStreamOptions) {
     this.dataService = options.dataService;
@@ -60,6 +70,8 @@ export class TextConsoleStream {
     this.consoleTruncated = result.truncated;
     this.consoleOffset = result.nextStart;
     this.progressiveSupported = result.progressiveSupported;
+    this.progressiveErrorCount = 0;
+    this.progressiveRetryAt = undefined;
   }
 
   reset(): void {
@@ -68,17 +80,16 @@ export class TextConsoleStream {
     this.consoleOffset = 0;
     this.progressiveSupported = false;
     this.forceSnapshot = false;
+    this.progressiveErrorCount = 0;
+    this.progressiveRetryAt = undefined;
   }
 
   resetForFallback(): void {
-    this.consoleBuffer = "";
-    this.consoleTruncated = false;
-    this.consoleOffset = 0;
-    this.progressiveSupported = false;
+    this.reset();
     this.forceSnapshot = true;
   }
 
-  fetchNext(): Promise<JenkinsProgressiveConsoleText | JenkinsConsoleText> {
+  fetchNext(now = Date.now()): Promise<JenkinsProgressiveConsoleText | JenkinsConsoleText> {
     if (this.forceSnapshot) {
       this.forceSnapshot = false;
       return this.dataService.getConsoleText(this.environment, this.buildUrl, this.maxConsoleChars);
@@ -90,18 +101,42 @@ export class TextConsoleStream {
         this.consoleOffset
       );
     }
+    if (this.progressiveRetryAt !== undefined && now >= this.progressiveRetryAt) {
+      // Re-seed from the tail so the byte offset comes from the server, not the string length.
+      this.progressiveRetryAt = now + PROGRESSIVE_RETRY_COOLDOWN_MS;
+      return this.dataService.getConsoleTextTail(
+        this.environment,
+        this.buildUrl,
+        this.maxConsoleChars
+      );
+    }
     return this.dataService.getConsoleText(this.environment, this.buildUrl, this.maxConsoleChars);
   }
 
-  handleError(): void {
-    if (this.progressiveSupported) {
-      this.progressiveSupported = false;
+  handleError(now = Date.now()): void {
+    if (!this.progressiveSupported) {
+      return;
     }
+    // A failed progressive request does not advance the offset, so transient errors retry in place.
+    this.progressiveErrorCount += 1;
+    if (this.progressiveErrorCount < MAX_CONSECUTIVE_PROGRESSIVE_ERRORS) {
+      return;
+    }
+    this.progressiveSupported = false;
+    this.progressiveErrorCount = 0;
+    this.progressiveRetryAt = now + PROGRESSIVE_RETRY_COOLDOWN_MS;
   }
 
   applyResult(value: JenkinsProgressiveConsoleText | JenkinsConsoleText): void {
     if (this.isProgressive(value)) {
+      this.progressiveErrorCount = 0;
       this.handleProgressiveChunk(value);
+    } else if (this.isTail(value)) {
+      this.seedFromTail(value);
+      this.callbacks.onConsoleSet({
+        text: this.consoleBuffer,
+        truncated: this.consoleTruncated
+      });
     } else {
       this.consoleBuffer = value.text;
       this.consoleTruncated = value.truncated;
@@ -117,6 +152,12 @@ export class TextConsoleStream {
     value: JenkinsProgressiveConsoleText | JenkinsConsoleText
   ): value is JenkinsProgressiveConsoleText {
     return "textSize" in value;
+  }
+
+  private isTail(
+    value: JenkinsProgressiveConsoleText | JenkinsConsoleText
+  ): value is JenkinsConsoleTextTail {
+    return "nextStart" in value;
   }
 
   private handleProgressiveChunk(chunk: JenkinsProgressiveConsoleText): void {

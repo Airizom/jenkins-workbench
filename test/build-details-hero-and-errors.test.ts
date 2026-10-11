@@ -197,4 +197,22 @@ describe("CoverageGlanceCard", () => {
     assert.match(html, />View coverage details</);
     assert.doesNotMatch(html, /aria-label="Open the Tests tab/);
   });
+
+  it("shows the error message with a failure border", () => {
+    const html = renderToStaticMarkup(
+      createElement(CoverageGlanceCard, {
+        coverageState: { ...idle, status: "error", errorMessage: "HTTP 500" }
+      })
+    );
+    assert.match(html, /Coverage data could not be loaded for this build\. HTTP 500/);
+    assert.match(html, /border-failure-border-subtle/);
+  });
+
+  it("explains when coverage is unavailable", () => {
+    const html = renderToStaticMarkup(
+      createElement(CoverageGlanceCard, { coverageState: { ...idle, status: "unavailable" } })
+    );
+    assert.match(html, /Coverage data is unavailable for this build\./);
+    assert.doesNotMatch(html, /border-failure-border-subtle/);
+  });
 });

@@ -74,11 +74,11 @@ describe("Jenkinsfile Groovy context parsing", () => {
   it("ignores slashy string punctuation when finding the active argument", () => {
     for (const source of [
       "sh(/a,b}\\/c/, timeout: /*cursor*/2)",
-      "sh /a,b/, timeout: /*cursor*/2",
-      "sh /a,b/.trim(), timeout: /*cursor*/2",
-      "sh /a,b/ as String, timeout: /*cursor*/2",
+      "sh(/a,b/.trim(), timeout: /*cursor*/2)",
+      "sh(/a,b/ as String, timeout: /*cursor*/2)",
       "sh(foo + /a,b/, timeout: /*cursor*/2)",
-      "sh /a,\nb/, timeout: /*cursor*/2",
+      "sh foo + /a,b/, timeout: /*cursor*/2",
+      "sh(/a,\nb/, timeout: /*cursor*/2)",
       "sh($/a,b}/*c*/$/, timeout: /*cursor*/2)",
       "sh($/a$$b$/c,} /$, timeout: /*cursor*/2)"
     ]) {
@@ -102,6 +102,83 @@ describe("Jenkinsfile Groovy context parsing", () => {
 
   it("does not treat division as a slashy string", () => {
     assert.equal(maskGroovyText("value / amount, next"), "value / amount, next");
+  });
+
+  it("preserves method calls and grouped operands in chained division", () => {
+    for (const text of [
+      "def value = count++ / helper() / total",
+      "def value = count-- / helper() / total",
+      "def value = numerator \\\n  / helper() / denominator",
+      "def value = numerator \\\r\n  / helper() / denominator",
+      "def value = πreturn / helper() / denominator",
+      "def value = éin / helper() / denominator",
+      "def value = obj.return / helper() / denominator",
+      "def value = obj?.in / helper() / denominator",
+      "def value = 𝒙return / helper() / denominator",
+      "def value = £return / helper() / denominator",
+      "def value = a\u200breturn / helper() / denominator"
+    ]) {
+      assert.equal(maskGroovyText(text), text);
+    }
+    for (const operand of [
+      "helper()",
+      "helper(first, second)",
+      "(helper())",
+      "values[index]",
+      'helper("a/,b")'
+    ]) {
+      for (const denominator of [
+        "denominator",
+        "(denominator)",
+        "-denominator",
+        "- /* divisor */ denominator"
+      ]) {
+        for (const lead of [
+          "def value = ",
+          "return ",
+          "println ",
+          "call(first, ",
+          "def value = (\n  ",
+          "def values = [\n  ",
+          "def value =\n  ",
+          "def value = // note\n  ",
+          "def value = (\n  numerator\n  / helper() / denominator) + ",
+          "def ratio = { ",
+          "def ratio = {\n  ",
+          "def value = (numerator // +\n  / 2) + (",
+          ""
+        ]) {
+          // Strings and comments are masked; the division operands stay visible.
+          const division = `numerator / ${operand.replace('"a/,b"', " ".repeat(6))} / `;
+          const text = `${lead}numerator / ${operand} / ${denominator}`;
+          assert.ok(maskGroovyText(text).includes(division), text);
+        }
+      }
+    }
+
+    const interpolated = `echo "\${(numerator\n  / helper() / denominator)}"`;
+    assert.ok(maskGroovyText(interpolated).includes("/ helper() /"));
+
+    const context = analyzeMarkedText(
+      "def value = numerator / helper(first, sec/*cursor*/ond) / denominator"
+    );
+    assert.equal(context.identifier?.name, "second");
+    assert.equal(context.activeCall?.name, "helper");
+    assert.equal(context.argumentContext?.activeIndex, 1);
+  });
+
+  it("masks slashy literals after keywords but reads a slash after an identifier as division", () => {
+    const literal = "/a(b),c/";
+    for (const keyword of ["return", "assert", "case", "throw", "value in", "value as"]) {
+      assert.equal(
+        maskGroovyText(`${keyword} ${literal}`),
+        `${keyword} ${" ".repeat(literal.length)}`
+      );
+    }
+    // Groovy's lexer reads these as division, so a bare call cannot take a slashy argument.
+    for (const text of ["sh /a(b),c/ as String", "returned /a(b),c/"]) {
+      assert.equal(maskGroovyText(text), text);
+    }
   });
 
   it("reports named argument context for parenthesized calls with Elvis and ternary arguments", () => {
@@ -168,6 +245,49 @@ describe("Jenkinsfile Groovy context parsing", () => {
       syntax: "bare",
       callStart: guarded.text.indexOf("sh")
     });
+  });
+
+  it("keeps multiline comma continuations in the enclosing bare call", () => {
+    for (const source of [
+      "sh script: 'echo ok',\n  returnStdout: true",
+      "sh script: 'echo ok'\n  , returnStdout: true",
+      "sh script: 'echo ok', /* comment */\r\n  returnStdout: true",
+      "sh script: 'echo ok', // comment\n\n  returnStdout: true",
+      "sh script: format(\n  'echo ok',\n  value\n),\n  returnStdout: true",
+      "sh script: ['echo ok',\n  'echo done'\n].join(';'),\n  returnStdout: true"
+    ]) {
+      const maskedText = maskGroovyText(source);
+      const activeCall = findBareActiveCall(maskedText, source.length);
+
+      assert.deepEqual(activeCall, { name: "sh", syntax: "bare", callStart: 0 }, source);
+      assert.deepEqual(analyzeActiveCallArguments(maskedText, activeCall, source.length), {
+        activeIndex: 1,
+        activeName: "returnStdout",
+        usesNamedArgs: true
+      });
+    }
+  });
+
+  it("starts bare calls after a leading newline with nothing before it", () => {
+    const source = "\nsh script: 'echo ok', returnStdout: true";
+    const maskedText = maskGroovyText(source);
+
+    assert.deepEqual(findBareActiveCall(maskedText, source.length), {
+      name: "sh",
+      syntax: "bare",
+      callStart: 1
+    });
+  });
+
+  it("ends bare calls at newlines after completed grouped arguments", () => {
+    for (const previous of ["echo format('one', 'two')", "echo ['one', 'two']"]) {
+      const source = `${previous}\nsh script: 'echo ok'`;
+      assert.deepEqual(findBareActiveCall(maskGroovyText(source), source.length), {
+        name: "sh",
+        syntax: "bare",
+        callStart: source.indexOf("sh")
+      });
+    }
   });
 
   it("tracks declarative block paths and step-allowed rules", () => {

@@ -22,3 +22,29 @@ export function setCachedValue<Value>(
     value
   });
 }
+
+// Serves fresh cached values unless forced; otherwise fetches and caches the result only when
+// no newer request for the same key started while the fetch was pending.
+export async function resolveCachedLatest<Value>(
+  cache: Map<string, CachedValue<Value>>,
+  latestRequests: Map<string, number>,
+  key: string,
+  requestId: number,
+  timeToLiveMs: number,
+  force: boolean | undefined,
+  fetch: () => Promise<Value>
+): Promise<Value> {
+  if (!force) {
+    const cached = getFreshCachedValue(cache, key);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  latestRequests.set(key, Math.max(requestId, latestRequests.get(key) ?? 0));
+  const value = await fetch();
+  if (latestRequests.get(key) === requestId) {
+    setCachedValue(cache, key, value, timeToLiveMs);
+  }
+  return value;
+}

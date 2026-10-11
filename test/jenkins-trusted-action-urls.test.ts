@@ -91,10 +91,10 @@ describe("server-provided Jenkins action URLs", () => {
     assert.deepEqual(textRequests, []);
   });
 
-  it("resolves a same-origin relative flow-node console URL", async () => {
+  it("throws 404 when the flow-node log omits its console URL", async () => {
     const textRequests: string[] = [];
     const context = createJenkinsClientContext({
-      requestJson: async <T>(): Promise<T> => ({ consoleUrl: "console/" }) as T,
+      requestJson: async <T>(): Promise<T> => ({ nodeId: "node-1" }) as T,
       requestTextWithHeaders: async (url) => {
         textRequests.push(url);
         return { text: "", headers: {} };
@@ -102,10 +102,39 @@ describe("server-provided Jenkins action URLs", () => {
     });
     const api = new JenkinsBuildsApi(context);
 
-    await api.getFlowNodeLogHtmlProgressive(BUILD_URL, "node-1", 4);
+    await assert.rejects(
+      api.getFlowNodeLogHtmlProgressive(BUILD_URL, "node-1", 0),
+      (error: unknown) => error instanceof JenkinsRequestError && error.statusCode === 404
+    );
+    assert.deepEqual(textRequests, []);
+  });
+
+  it("resolves a relative flow-node console URL and preserves progressive HTML state", async () => {
+    const textRequests: string[] = [];
+    const context = createJenkinsClientContext({
+      requestJson: async <T>(): Promise<T> => ({ consoleUrl: "console/" }) as T,
+      requestTextWithHeaders: async (url, options) => {
+        textRequests.push(url);
+        assert.deepEqual(options?.headers, { "X-ConsoleAnnotator": "previous" });
+        return {
+          text: "<span>log</span>",
+          headers: { "x-text-size": "12", "x-more-data": "true", "x-console-annotator": "next" }
+        };
+      }
+    });
+    const api = new JenkinsBuildsApi(context);
+
+    const result = await api.getFlowNodeLogHtmlProgressive(BUILD_URL, "node-1", 4.9, "previous");
 
     assert.deepEqual(textRequests, [
       "https://jenkins.example.com/job/demo/15/console/logText/progressiveHtml?start=4"
     ]);
+    assert.deepEqual(result, {
+      html: "<span>log</span>",
+      textSize: 12,
+      textSizeKnown: true,
+      moreData: true,
+      annotator: "next"
+    });
   });
 });

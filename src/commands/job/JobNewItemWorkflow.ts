@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsItemCreateKind } from "../../jenkins/types";
-import { formatActionError } from "../CommandUtils";
+import { confirmModalAction, withActionErrorMessage } from "../CommandUtils";
 import { getJobNameValidationError } from "./JobNameValidation";
 
 interface NewItemKindDefinition {
@@ -60,31 +60,29 @@ export class JobNewItemWorkflow {
       return;
     }
 
-    const confirm = await vscode.window.showWarningMessage(
+    const confirmed = await confirmModalAction(
       `Create ${kindDefinition.promptLabel} "${newName}" in ${target.locationLabel}?`,
-      { modal: true },
       "Create"
     );
-    if (confirm !== "Create") {
+    if (!confirmed) {
       return;
     }
 
-    try {
-      const { newUrl } = await this.deps.dataService.createItem(
-        kindDefinition.itemType,
-        target.environment,
-        target.parentUrl,
-        newName
-      );
-      void vscode.window.showInformationMessage(
-        `Created ${kindDefinition.promptLabel} "${newName}".${newUrl ? ` New job URL: ${newUrl}` : ""}`
-      );
-      this.deps.onEnvironmentChanged(target.environment.environmentId);
-    } catch (error) {
-      void vscode.window.showErrorMessage(
-        `Failed to create ${kindDefinition.promptLabel} "${newName}": ${formatActionError(error)}`
-      );
-    }
+    await withActionErrorMessage(
+      `Failed to create ${kindDefinition.promptLabel} "${newName}"`,
+      async () => {
+        const { newUrl } = await this.deps.dataService.createItem(
+          kindDefinition.itemType,
+          target.environment,
+          target.parentUrl,
+          newName
+        );
+        void vscode.window.showInformationMessage(
+          `Created ${kindDefinition.promptLabel} "${newName}".${newUrl ? ` New job URL: ${newUrl}` : ""}`
+        );
+        this.deps.onEnvironmentChanged(target.environment.environmentId);
+      }
+    );
   }
 }
 

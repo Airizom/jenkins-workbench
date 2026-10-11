@@ -69,7 +69,7 @@ export function parseBuildDetailsOutgoingMessage(
       };
     }
     case "setPipelineNodeLog": {
-      const log = parsePipelineNodeLogPayload(record.log);
+      const log = parsePipelineNodeLogPayload(record.log, { rejectInvalidTarget: true });
       return log ? { type: "setPipelineNodeLog", log } : undefined;
     }
     case "appendPipelineNodeLogHtml": {
@@ -96,7 +96,13 @@ export function parseBuildDetailsOutgoingMessage(
       };
     }
     case "updateDetails": {
-      return isBuildDetailsUpdateMessage(record) ? record : undefined;
+      if (!isBuildDetailsUpdateMessage(record)) {
+        return undefined;
+      }
+      const pipelineNodeLog = parsePipelineNodeLogPayload(record.pipelineNodeLog, {
+        rejectInvalidTarget: true
+      });
+      return pipelineNodeLog ? { ...record, pipelineNodeLog } : undefined;
     }
     case "setErrors": {
       if (
@@ -135,24 +141,83 @@ function isBuildDetailsUpdateMessage(
     "timestampLabel",
     "culpritsLabel"
   ] as const;
-  const recordFields = ["testState", "coverageState", "insights", "pipelineNodeLog"] as const;
   return (
     record.type === "updateDetails" &&
     stringFields.every((field) => typeof record[field] === "string") &&
     typeof record.pipelineStagesLoading === "boolean" &&
-    recordFields.every((field) => asRecord(record[field]) !== undefined) &&
+    isTestStatePayload(record.testState) &&
+    isCoverageStatePayload(record.coverageState) &&
+    isInsightsPayload(record.insights) &&
+    asRecord(record.pipelineNodeLog) !== undefined &&
     Array.isArray(record.pipelineStages) &&
+    record.pipelineStages.every(isPipelineStagePayload) &&
     Array.isArray(record.pendingInputs)
   );
 }
 
-function parsePipelineNodeLogPayload(value: unknown): PipelineNodeLogViewModel | undefined {
+function isTestStatePayload(value: unknown): boolean {
+  const record = asRecord(value);
+  const summary = asRecord(record?.summary);
+  const results = asRecord(record?.results);
+  const countFields = ["totalCount", "failedCount", "skippedCount", "passedCount"] as const;
+  return (
+    summary !== undefined &&
+    countFields.every((field) => typeof summary[field] === "number") &&
+    typeof summary.summaryLabel === "string" &&
+    results !== undefined &&
+    Array.isArray(results.items) &&
+    typeof results.loading === "boolean"
+  );
+}
+
+function isCoverageStatePayload(value: unknown): boolean {
+  const record = asRecord(value);
+  return (
+    record !== undefined &&
+    typeof record.status === "string" &&
+    Array.isArray(record.qualityGates) &&
+    Array.isArray(record.modifiedFiles)
+  );
+}
+
+function isInsightsPayload(value: unknown): boolean {
+  const record = asRecord(value);
+  return (
+    record !== undefined &&
+    Array.isArray(record.changelogItems) &&
+    Array.isArray(record.artifacts) &&
+    typeof record.testSummaryLabel === "string"
+  );
+}
+
+function isPipelineStagePayload(value: unknown): boolean {
+  const record = asRecord(value);
+  return (
+    record !== undefined &&
+    typeof record.key === "string" &&
+    typeof record.name === "string" &&
+    Array.isArray(record.stepsFailedOnly) &&
+    Array.isArray(record.stepsAll) &&
+    Array.isArray(record.parallelBranches) &&
+    record.parallelBranches.every(isPipelineStagePayload)
+  );
+}
+
+function parsePipelineNodeLogPayload(
+  value: unknown,
+  options: { rejectInvalidTarget?: boolean } = {}
+): PipelineNodeLogViewModel | undefined {
   const record = asRecord(value);
   if (!record) {
     return undefined;
   }
   const target =
     typeof record.target === "undefined" ? undefined : normalizePipelineLogTarget(record.target);
+  // A target that was sent but failed validation must not be treated as "no target",
+  // or the log would be applied to the wrong (or no) pipeline node.
+  if (options.rejectInvalidTarget && typeof record.target !== "undefined" && !target) {
+    return undefined;
+  }
   const html = typeof record.html === "string" ? record.html : undefined;
   return {
     target,

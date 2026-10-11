@@ -1,13 +1,15 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
-import type {
-  NormalizedDiagnosticPathMapping,
-  NormalizedDiagnosticProfile,
-  RawBuildDiagnostic
+import {
+  type NormalizedDiagnosticPathMapping,
+  type NormalizedDiagnosticProfile,
+  type RawBuildDiagnostic,
+  serializePathMappings
 } from "./BuildDiagnosticTypes";
 
 const DEFAULT_SUFFIX_SEARCH_LIMIT = 200;
 const DEFAULT_CACHE_TTL_MS = 5_000;
+const MAX_CACHE_ENTRIES = 2_000;
 
 export type DiagnosticPathResolutionReason = "unsafe" | "missing" | "ambiguous" | "notFile";
 
@@ -21,17 +23,19 @@ export interface BuildDiagnosticPathResolverOptions {
   now?: () => number;
 }
 
-interface DiagnosticPathCacheEntry {
-  pending: Promise<DiagnosticPathResolution>;
+interface DiagnosticPathCacheEntry<T> {
+  pending: Promise<T>;
   expiresAt: number;
 }
 
 /** Resolves remote build paths without ever allowing a result outside the bound repository. */
 export class BuildDiagnosticPathResolver {
-  private readonly cache = new Map<string, DiagnosticPathCacheEntry>();
+  private readonly cache = new Map<string, DiagnosticPathCacheEntry<DiagnosticPathResolution>>();
+  private readonly suffixCache = new Map<string, DiagnosticPathCacheEntry<readonly vscode.Uri[]>>();
   private readonly suffixSearchLimit: number;
   private readonly cacheTtlMs: number;
   private readonly now: () => number;
+  private nextPruneAt = 0;
 
   constructor(options: BuildDiagnosticPathResolverOptions = {}) {
     this.suffixSearchLimit = Math.max(1, options.suffixSearchLimit ?? DEFAULT_SUFFIX_SEARCH_LIMIT);
@@ -41,6 +45,8 @@ export class BuildDiagnosticPathResolver {
 
   clear(): void {
     this.cache.clear();
+    this.suffixCache.clear();
+    this.nextPruneAt = 0;
   }
 
   resolve(
@@ -49,23 +55,55 @@ export class BuildDiagnosticPathResolver {
     diagnostic: Pick<RawBuildDiagnostic, "rawPath">
   ): Promise<DiagnosticPathResolution> {
     const key = `${repositoryUri.toString()}\0${profileResolutionKey(profile)}\0${diagnostic.rawPath}`;
-    const cached = this.cache.get(key);
+    return this.resolveCached(this.cache, key, () =>
+      this.resolveUncached(repositoryUri, profile, diagnostic.rawPath)
+    );
+  }
+
+  private resolveCached<T>(
+    cache: Map<string, DiagnosticPathCacheEntry<T>>,
+    key: string,
+    resolve: () => Promise<T>
+  ): Promise<T> {
+    const cached = cache.get(key);
     if (cached && cached.expiresAt > this.now()) {
       return cached.pending;
     }
 
-    const pending = this.resolveUncached(repositoryUri, profile, diagnostic.rawPath);
-    const entry: DiagnosticPathCacheEntry = {
+    const now = this.now();
+    this.pruneExpired(now);
+    const pending = resolve();
+    const entry: DiagnosticPathCacheEntry<T> = {
       pending,
-      expiresAt: this.now() + this.cacheTtlMs
+      expiresAt: now + this.cacheTtlMs
     };
-    this.cache.set(key, entry);
+    cache.delete(key);
+    if (cache.size >= MAX_CACHE_ENTRIES) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(key, entry);
     void pending.catch(() => {
-      if (this.cache.get(key) === entry) {
-        this.cache.delete(key);
+      if (cache.get(key) === entry) {
+        cache.delete(key);
       }
     });
     return pending;
+  }
+
+  /** Sweeps at most once per TTL so inserts stay amortized constant time. */
+  private pruneExpired(now: number): void {
+    if (now < this.nextPruneAt) {
+      return;
+    }
+    this.nextPruneAt = now + this.cacheTtlMs;
+    for (const cache of [this.cache, this.suffixCache]) {
+      for (const [key, entry] of cache) {
+        if (entry.expiresAt <= now) {
+          cache.delete(key);
+        }
+      }
+    }
   }
 
   private async resolveUncached(
@@ -83,16 +121,27 @@ export class BuildDiagnosticPathResolver {
       normalizedRemotePath,
       profile.pathMappings
     );
-    if (mapped) {
+    if (mapped?.status === "resolved") {
       return mapped;
     }
 
     const direct = await this.resolveDirect(repositoryUri, normalizedRemotePath);
-    if (direct) {
+    if (direct?.status === "resolved") {
       return direct;
     }
 
-    return this.resolveUniqueSuffix(repositoryUri, normalizedRemotePath, profile.searchExcludeGlob);
+    // An unsafe mapped or direct candidate, such as `../src/foo.c` from an
+    // out-of-tree build, only means "not matched". The suffix search stays
+    // inside the repository, so it may still find the file.
+    const suffix = await this.resolveUniqueSuffix(
+      repositoryUri,
+      normalizedRemotePath,
+      profile.searchExcludeGlob
+    );
+    if (suffix.status === "unresolved" && suffix.reason === "missing" && (mapped || direct)) {
+      return { status: "unresolved", reason: "unsafe" };
+    }
+    return suffix;
   }
 
   private async resolveFromMappings(
@@ -100,6 +149,7 @@ export class BuildDiagnosticPathResolver {
     normalizedRemotePath: string,
     mappings: readonly NormalizedDiagnosticPathMapping[]
   ): Promise<DiagnosticPathResolution | undefined> {
+    let unsafe: DiagnosticPathResolution | undefined;
     for (const mapping of mappings) {
       const rewritten = rewriteMappedPath(mapping, normalizedRemotePath);
       if (typeof rewritten === "undefined") {
@@ -111,10 +161,10 @@ export class BuildDiagnosticPathResolver {
         return { ...mapped, strategy: "mapping" };
       }
       if (mapped.reason === "unsafe") {
-        return mapped;
+        unsafe ??= mapped;
       }
     }
-    return undefined;
+    return unsafe;
   }
 
   private async resolveDirect(
@@ -140,13 +190,10 @@ export class BuildDiagnosticPathResolver {
       return { status: "unresolved", reason: "unsafe" };
     }
     const candidate = vscode.Uri.joinPath(repositoryUri, ...safeSegments);
-    if (!isUriInsideRepository(repositoryUri, candidate)) {
-      return { status: "unresolved", reason: "unsafe" };
-    }
     try {
-      const stat = await vscode.workspace.fs.stat(candidate);
-      if ((stat.type & vscode.FileType.File) === 0) {
-        return { status: "unresolved", reason: "notFile" };
+      const reason = await inspectRepositoryFile(repositoryUri, candidate);
+      if (reason) {
+        return { status: "unresolved", reason };
       }
       return { status: "resolved", uri: candidate, strategy: "direct" };
     } catch (error) {
@@ -167,12 +214,22 @@ export class BuildDiagnosticPathResolver {
     if (!basename) {
       return { status: "unresolved", reason: "unsafe" };
     }
-    const include = new vscode.RelativePattern(repositoryUri, `**/${escapeGlobSegment(basename)}`);
-    const matches = await vscode.workspace.findFiles(
-      include,
-      searchExcludeGlob || undefined,
-      this.suffixSearchLimit + 1
-    );
+    const key = JSON.stringify([repositoryUri.toString(), searchExcludeGlob, basename]);
+    const matches = await this.resolveCached(this.suffixCache, key, async () => {
+      const include = new vscode.RelativePattern(
+        repositoryUri,
+        `**/${escapeGlobSegment(basename)}`
+      );
+      const found = await vscode.workspace.findFiles(
+        include,
+        searchExcludeGlob || undefined,
+        this.suffixSearchLimit + 1
+      );
+      // Preserve overflow before filtering so a partial search never implies uniqueness.
+      return found.length > this.suffixSearchLimit
+        ? found
+        : collectSuffixFiles(repositoryUri, found);
+    });
     if (matches.length > this.suffixSearchLimit) {
       return {
         status: "unresolved",
@@ -180,8 +237,14 @@ export class BuildDiagnosticPathResolver {
         candidates: matches.length
       };
     }
-    const files = await collectSuffixFiles(repositoryUri, matches, remoteSegments);
-    return selectUniqueSuffix(files);
+    return selectUniqueSuffix(
+      matches
+        .map((uri) => ({
+          uri,
+          suffixDepth: matchingSuffixDepth(relativeUriPath(repositoryUri, uri), remoteSegments)
+        }))
+        .filter((file) => file.suffixDepth > 0)
+    );
   }
 }
 
@@ -210,12 +273,11 @@ function getSafeBasename(remoteSegments: readonly string[]): string | undefined 
 
 async function collectSuffixFiles(
   repositoryUri: vscode.Uri,
-  matches: readonly vscode.Uri[],
-  remoteSegments: readonly string[]
-): Promise<Array<{ uri: vscode.Uri; suffixDepth: number }>> {
-  const files: Array<{ uri: vscode.Uri; suffixDepth: number }> = [];
+  matches: readonly vscode.Uri[]
+): Promise<vscode.Uri[]> {
+  const files: vscode.Uri[] = [];
   for (const candidate of matches) {
-    const file = await inspectSuffixCandidate(repositoryUri, candidate, remoteSegments);
+    const file = await inspectSuffixCandidate(repositoryUri, candidate);
     if (file) {
       files.push(file);
     }
@@ -225,24 +287,40 @@ async function collectSuffixFiles(
 
 async function inspectSuffixCandidate(
   repositoryUri: vscode.Uri,
-  candidate: vscode.Uri,
-  remoteSegments: readonly string[]
-): Promise<{ uri: vscode.Uri; suffixDepth: number } | undefined> {
-  if (!isUriInsideRepository(repositoryUri, candidate)) {
-    return undefined;
-  }
-  const relative = relativeUriPath(repositoryUri, candidate);
-  const suffixDepth = matchingSuffixDepth(relative, remoteSegments);
-  if (suffixDepth === 0) {
-    return undefined;
-  }
+  candidate: vscode.Uri
+): Promise<vscode.Uri | undefined> {
   try {
-    const stat = await vscode.workspace.fs.stat(candidate);
-    return (stat.type & vscode.FileType.File) !== 0 ? { uri: candidate, suffixDepth } : undefined;
+    return (await inspectRepositoryFile(repositoryUri, candidate)) ? undefined : candidate;
   } catch {
     // A workspace search can race a deletion. Treat it as absent.
     return undefined;
   }
+}
+
+async function inspectRepositoryFile(
+  repositoryUri: vscode.Uri,
+  candidate: vscode.Uri
+): Promise<DiagnosticPathResolutionReason | undefined> {
+  if (!isUriInsideRepository(repositoryUri, candidate)) {
+    return "unsafe";
+  }
+  const stat = await vscode.workspace.fs.stat(candidate);
+  if ((stat.type & vscode.FileType.SymbolicLink) !== 0) {
+    return "unsafe";
+  }
+  if ((stat.type & vscode.FileType.File) === 0) {
+    return "notFile";
+  }
+  // The workspace filesystem API has no realpath operation. Reject links below
+  // the bound root, including ancestors whose children stat as ordinary files.
+  const segments = relativeUriPath(repositoryUri, candidate).split("/").filter(Boolean);
+  for (let depth = segments.length - 1; depth > 0; depth -= 1) {
+    const ancestor = vscode.Uri.joinPath(repositoryUri, ...segments.slice(0, depth));
+    if (((await vscode.workspace.fs.stat(ancestor)).type & vscode.FileType.SymbolicLink) !== 0) {
+      return "unsafe";
+    }
+  }
+  return undefined;
 }
 
 function selectUniqueSuffix(
@@ -337,15 +415,6 @@ function profileResolutionKey(profile: NormalizedDiagnosticProfile): string {
   return JSON.stringify({
     id: profile.id,
     searchExcludeGlob: profile.searchExcludeGlob,
-    pathMappings: profile.pathMappings.map((mapping) =>
-      mapping.type === "prefix"
-        ? mapping
-        : {
-            type: mapping.type,
-            pattern: mapping.pattern,
-            replacement: mapping.replacement,
-            localRoot: mapping.localRoot
-          }
-    )
+    pathMappings: serializePathMappings(profile.pathMappings)
   });
 }

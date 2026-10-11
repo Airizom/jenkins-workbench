@@ -59,14 +59,14 @@ export function mergeStepCatalogs(
       }))
     };
 
-    const mergedStep = mergeStepDefinitions(fallbackStep, enrichedLiveStep);
+    const signatures =
+      enrichedLiveStep.signatures.length > 0
+        ? enrichedLiveStep.signatures
+        : mergeSignatures(fallbackStep.signatures, []);
+    const mergedStep = mergeStepDefinitions(fallbackStep, enrichedLiveStep, signatures);
     merged.set(name, {
       ...mergedStep,
-      requiresNodeContext: liveStep.requiresNodeContext,
-      signatures:
-        enrichedLiveStep.signatures.length > 0
-          ? enrichedLiveStep.signatures.map(normalizeSignature)
-          : mergedStep.signatures
+      requiresNodeContext: liveStep.requiresNodeContext
     });
   }
 
@@ -75,7 +75,8 @@ export function mergeStepCatalogs(
 
 function mergeStepDefinitions(
   baseStep: JenkinsfileStepDefinition,
-  nextStep: JenkinsfileStepDefinition
+  nextStep: JenkinsfileStepDefinition,
+  signatures = mergeSignatures(baseStep.signatures, nextStep.signatures)
 ): JenkinsfileStepDefinition {
   return {
     ...baseStep,
@@ -84,7 +85,7 @@ function mergeStepDefinitions(
     documentation: nextStep.documentation ?? baseStep.documentation,
     requiresNodeContext: baseStep.requiresNodeContext || nextStep.requiresNodeContext,
     isAdvanced: baseStep.isAdvanced && nextStep.isAdvanced,
-    signatures: mergeSignatures(baseStep.signatures, nextStep.signatures)
+    signatures
   };
 }
 

@@ -8,6 +8,7 @@ import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import type { JenkinsFolderTreeItem, JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import {
+  confirmModalAction,
   formatActionError,
   getTreeItemLabel,
   requireSelection,
@@ -63,11 +64,6 @@ function getJobSelectionContext(
     label: getTreeItemLabel(selected),
     environmentId: selected.environment.environmentId
   };
-}
-
-async function confirmModalAction(prompt: string, actionLabel: string): Promise<boolean> {
-  const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, actionLabel);
-  return choice === actionLabel;
 }
 
 function showMetadataFailureWarning(
@@ -305,7 +301,7 @@ export async function copyJob(
     return;
   }
 
-  const parsed = parseJobUrl(context.selected.jobUrl);
+  const parsed = parseJobUrl(context.selected.jobUrl, context.selected.environment.url);
 
   if (!parsed) {
     void vscode.window.showErrorMessage(`Unable to parse job URL for "${context.label}".`);

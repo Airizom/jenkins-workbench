@@ -13,6 +13,9 @@ export function pickFiniteNumber(primary?: number, fallback?: number): number | 
 }
 
 export function clampPercent(value: number): number {
+  if (Number.isNaN(value)) {
+    return 0;
+  }
   return Math.max(0, Math.min(100, Math.floor(value)));
 }
 

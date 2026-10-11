@@ -70,9 +70,7 @@ export class RestartFromStageResponseParser {
     if (this.isHtmlDocument(responseText)) {
       return this.failureResult(RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE);
     }
-    return this.failureResult(
-      message ?? RestartFromStageResponseParser.UNEXPECTED_RESPONSE_MESSAGE
-    );
+    return this.failureResult(responseText);
   }
 
   private unwrapJenkinsResponse(value: unknown): RestartFromStagePayload {
@@ -155,16 +153,11 @@ export class RestartFromStageResponseParser {
   }
 
   private isMissingRestartEndpointResponse(responseText: string): boolean {
-    if (!responseText || !responseText.includes("404")) {
+    if (!RestartFromStageResponseParser.MISSING_ENDPOINT_STATUS_PATTERN.test(responseText)) {
       return false;
     }
 
-    const normalized = responseText.toLowerCase();
-    if (!RestartFromStageResponseParser.MISSING_ENDPOINT_STATUS_PATTERN.test(normalized)) {
-      return false;
-    }
-
-    return this.isHtmlDocument(normalized) || normalized.includes("http error");
+    return this.isHtmlDocument(responseText) || responseText.toLowerCase().includes("http error");
   }
 
   private isHtmlDocument(value: string): boolean {

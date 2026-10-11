@@ -24,6 +24,48 @@ const job = (name: string, url: string, kind: JenkinsJobKind): TestJob => ({
 });
 
 describe("JenkinsJobIndex", () => {
+  it.each([true, false])(
+    "does not cache an invalidated traversal with empty=%s results",
+    async (empty) => {
+      const cache = new JenkinsDataCache();
+      let release!: (jobs: JenkinsJob[]) => void;
+      let started!: () => void;
+      const response = new Promise<JenkinsJob[]>((resolve) => {
+        release = resolve;
+      });
+      const requestStarted = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const newJobs = [job("new", `${environment.url}job/new/`, "job")];
+      const getRootJobs = vi
+        .fn(async (): Promise<JenkinsJob[]> => newJobs)
+        .mockImplementationOnce(() => {
+          started();
+          return response;
+        });
+      const client = {
+        getRootJobs,
+        classifyJob: (jenkinsJob: JenkinsJob): JenkinsJobKind => (jenkinsJob as TestJob).kind
+      } as unknown as JenkinsClient;
+      const provider = {
+        getClient: async () => client,
+        getAuthSignature: async () => "auth"
+      } as unknown as JenkinsClientProvider;
+      const index = new JenkinsJobIndex(cache, provider);
+      const options = { backoffBaseMs: 0, backoffMaxMs: 0 };
+
+      const oldRequest = index.getAllJobsForEnvironment(environment, options);
+      await requestStarted;
+      cache.clearForEnvironment(environment.environmentId);
+      const newEntries = await index.getAllJobsForEnvironment(environment, options);
+      release(empty ? [] : [job("old", `${environment.url}job/old/`, "job")]);
+      await oldRequest;
+
+      assert.deepEqual(await index.getAllJobsForEnvironment(environment, options), newEntries);
+      assert.equal(getRootJobs.mock.calls.length, 2);
+    }
+  );
+
   it("uses the configured TTL and reloads jobs when caching is disabled", async () => {
     let now = 1_000;
     let rootJobs: JenkinsJob[] = [job("first", "https://jenkins.example.com/job/first/", "job")];
@@ -106,6 +148,33 @@ describe("JenkinsJobIndex", () => {
       assert.deepEqual(batches, []);
     }
   );
+
+  it("caches a complete empty index when no root jobs can be traversed", async () => {
+    const cache = new JenkinsDataCache();
+    const client = {
+      getRootJobs: async (): Promise<JenkinsJob[]> => [],
+      classifyJob: (jenkinsJob: JenkinsJob): JenkinsJobKind => (jenkinsJob as TestJob).kind
+    } as unknown as JenkinsClient;
+    const clientProvider = {
+      getClient: async (): Promise<JenkinsClient> => client,
+      getAuthSignature: async (): Promise<string> => "auth"
+    } as unknown as JenkinsClientProvider;
+    const index = new JenkinsJobIndex(cache, clientProvider);
+    const batches: unknown[] = [];
+
+    for await (const batch of index.iterateJobsForEnvironment(environment, {
+      backoffBaseMs: 0,
+      backoffMaxMs: 0
+    })) {
+      batches.push(batch);
+    }
+
+    assert.deepEqual(batches, []);
+    assert.deepEqual(cache.get(cache.buildKey(environment, "job-index", undefined, "auth")), {
+      entries: [],
+      complete: true
+    });
+  });
 
   it("stops queued folder traversal when a streaming consumer returns early", async () => {
     const rootFolderUrl = "https://jenkins.example.com/job/root/";

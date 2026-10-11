@@ -1,5 +1,5 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import { type CachedValue, getFreshCachedValue, setCachedValue } from "./CurrentBranchCache";
+import { type CachedValue, resolveCachedLatest } from "./CurrentBranchCache";
 import { captureCheckout } from "./CurrentBranchCheckout";
 import { assessCommit, CurrentBranchCommitHistory } from "./CurrentBranchCommitHistory";
 import { toRepositoryInfo } from "./CurrentBranchRepositoryUtils";
@@ -49,30 +49,23 @@ export class CurrentBranchStatusResolver {
     };
     try {
       const targetResolution = await this.targetResolver.resolve(localState, options);
-      const cacheKey = targetResolution.cacheKey;
-      if (!options.force) {
-        const cachedState = getFreshCachedValue(this.remoteStateCache, cacheKey);
-        if (cachedState) {
-          return this.materializeRemoteState(localState, cachedState);
-        }
-      }
-
-      this.latestRemoteRequest.set(
-        cacheKey,
-        Math.max(requestId, this.latestRemoteRequest.get(cacheKey) ?? 0)
+      const resolved = await resolveCachedLatest(
+        this.remoteStateCache,
+        this.latestRemoteRequest,
+        targetResolution.cacheKey,
+        requestId,
+        REMOTE_RESOLUTION_CACHE_TTL_MS,
+        options.force,
+        async (): Promise<CurrentBranchRemoteResolvedState> =>
+          targetResolution.kind === "selected"
+            ? this.hydrateSelectedTarget(targetResolution.target)
+            : {
+                kind: "branchMissing",
+                branchName: targetResolution.branchName,
+                link: targetResolution.link,
+                environment: targetResolution.environment
+              }
       );
-      const resolved =
-        targetResolution.kind === "selected"
-          ? await this.hydrateSelectedTarget(targetResolution.target)
-          : {
-              kind: "branchMissing" as const,
-              branchName: targetResolution.branchName,
-              link: targetResolution.link,
-              environment: targetResolution.environment
-            };
-      if (this.latestRemoteRequest.get(cacheKey) === requestId) {
-        setCachedValue(this.remoteStateCache, cacheKey, resolved, REMOTE_RESOLUTION_CACHE_TTL_MS);
-      }
       return this.materializeRemoteState(localState, resolved);
     } catch (error) {
       return this.materializeRemoteState(localState, {
@@ -137,25 +130,13 @@ export class CurrentBranchStatusResolver {
 }
 
 function toLastBuildInfo(
-  lastBuild:
-    | {
-        url?: string;
-        number?: number;
-        result?: string;
-        building?: boolean;
-        timestamp?: number;
-      }
-    | undefined
+  lastBuild: CurrentBranchBuildInfo | undefined
 ): CurrentBranchBuildInfo | undefined {
-  return lastBuild
-    ? {
-        url: lastBuild.url,
-        number: lastBuild.number,
-        result: lastBuild.result,
-        building: lastBuild.building,
-        timestamp: lastBuild.timestamp
-      }
-    : undefined;
+  if (!lastBuild) {
+    return undefined;
+  }
+  const { url, number, result, building, timestamp } = lastBuild;
+  return { url, number, result, building, timestamp };
 }
 
 function toResolutionErrorMessage(error: unknown): string {

@@ -107,9 +107,6 @@ export function resolveBusyExecutors(
   node: NodeExecutorCountFields,
   totalExecutors: number
 ): number {
-  if (node.offline === true) {
-    return 0;
-  }
   if (typeof node.busyExecutors === "number" && Number.isFinite(node.busyExecutors)) {
     return Math.min(totalExecutors, toNonNegativeInteger(node.busyExecutors));
   }

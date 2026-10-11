@@ -4,10 +4,10 @@ import type { CompareSectionStatus } from "../src/panels/buildCompare/shared/Bui
 import { resolveSectionStatusBadge } from "../src/panels/buildCompare/webview/components/buildCompare/shared/sectionStatusBadge";
 
 describe("resolveSectionStatusBadge", () => {
-  it("maps every section status to a human label and semantic tone", () => {
-    const expected: Record<CompareSectionStatus, { label: string; tone: string }> = {
+  it("maps every non-available section status to a human label and semantic tone", () => {
+    const expected: Record<CompareSectionStatus, { label: string; tone: string } | null> = {
       loading: { label: "Loading…", tone: "neutral" },
-      available: { label: "Ready", tone: "neutral" },
+      available: null,
       empty: { label: "No changes", tone: "neutral" },
       unavailable: { label: "No data", tone: "neutral" },
       error: { label: "Error", tone: "failed" },

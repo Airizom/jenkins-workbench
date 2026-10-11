@@ -15,6 +15,7 @@ interface PollerHarness {
   start(options?: { initialDelayMs?: number }): void;
   dispose(): void;
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
+  synchronizeWatchErrorCount(): void;
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
   watchStates: Map<string, { pendingInput: { buildUrl: string; signature: string } | undefined }>;
 }
@@ -78,7 +79,6 @@ describe("JenkinsJobStatusEvaluator", () => {
     assert.equal(result.shouldUpdateStatus, true);
     assert.equal(result.shouldUpdateCompletion, true);
     assert.equal(result.shouldUpdateBuilding, true);
-    assert.equal(result.shouldRefresh, true);
     assert.equal(result.notification, undefined);
   });
 
@@ -233,12 +233,113 @@ describe("JenkinsJobStatusEvaluator", () => {
 
     assert.equal(result.nextStatus, "unknown");
     assert.equal(result.shouldUpdateStatus, false);
-    assert.equal(result.shouldRefresh, false);
+    assert.equal(result.shouldUpdateCompletion, false);
+    assert.equal(result.shouldUpdateBuilding, false);
     assert.equal(result.notification, undefined);
   });
 });
 
 describe("JenkinsStatusPoller", () => {
+  it.each(["success", "missing", "error"] as const)(
+    "discards a late %s response and queued ticks after disposal",
+    async (outcome) => {
+      const response = deferred<JenkinsJob>();
+      const watched = [
+        watchedEntry({ lastStatus: "success" }),
+        watchedEntry({ jobUrl: "job/other/" }),
+        watchedEntry({ environmentId: "removed-environment" })
+      ];
+      const listWatchedJobs = vi.fn(async () => watched);
+      const getJob = vi.fn(() => response.promise);
+      const updateWatchStatus = vi.fn(async () => undefined);
+      const getPendingInputSummary = vi.fn(async () => ({
+        awaitingInput: true,
+        count: 1,
+        signature: "input-a",
+        fetchedAt: 1
+      }));
+      const fixture = createPollerFixture({
+        listWatchedJobs,
+        getJob,
+        updateWatchStatus,
+        getPendingInputSummary,
+        maxConsecutiveErrors: 1
+      });
+      fixture.poller.start({ initialDelayMs: 60_000 });
+      const poll = fixture.poller.poll();
+      await vi.waitFor(() => assert.equal(getJob.mock.calls.length, 1));
+      const removedEnvironments = [...fixture.watchStore.removedEnvironments];
+      const hostRefreshes = fixture.hostRefreshes;
+      fixture.fireTick();
+      const listCallsBeforeDisposal = listWatchedJobs.mock.calls.length;
+      fixture.poller.dispose();
+
+      if (outcome === "success") {
+        response.resolve({ ...runningJob(), color: "red" });
+      } else {
+        response.reject(
+          outcome === "missing" ? new JenkinsRequestError("missing", 404) : new Error("network")
+        );
+      }
+      await poll;
+      // Even a retained tick callback or another start must not restart a disposed poller.
+      fixture.fireTick();
+      fixture.poller.start();
+      await fixture.poller.poll();
+
+      assert.equal(getJob.mock.calls.length, 1);
+      assert.equal(listWatchedJobs.mock.calls.length, listCallsBeforeDisposal);
+      assert.equal(getPendingInputSummary.mock.calls.length, 0);
+      assert.equal(updateWatchStatus.mock.calls.length, 0);
+      assert.deepEqual(fixture.watchStore.removedWatches, []);
+      assert.deepEqual(fixture.watchStore.removedEnvironments, removedEnvironments);
+      assert.equal(fixture.poller.watchStates.size, 0);
+      assert.ok(Object.values(fixture.notifier.calls).every((calls) => calls.length === 0));
+      assert.equal(fixture.hostRefreshes, hostRefreshes);
+    }
+  );
+
+  it.each(["pending input", "watch update"] as const)(
+    "stops after an in-flight %s completes following disposal",
+    async (stage) => {
+      const pending = deferred<void>();
+      const updateWatchStatus = vi.fn(async () => {
+        if (stage === "watch update") {
+          await pending.promise;
+        }
+      });
+      const getPendingInputSummary = vi.fn(async () => {
+        if (stage === "pending input") {
+          await pending.promise;
+        }
+        return { awaitingInput: stage === "pending input", count: 1, signature: "a", fetchedAt: 1 };
+      });
+      const getJob = vi.fn(async () => ({ ...runningJob(), color: "red" }));
+      const fixture = createPollerFixture({
+        watched: [watchedEntry({ lastStatus: "success" }), watchedEntry({ jobUrl: "job/other/" })],
+        getJob,
+        getPendingInputSummary,
+        updateWatchStatus
+      });
+      const poll = fixture.poller.poll();
+      await vi.waitFor(() =>
+        assert.equal(
+          (stage === "pending input" ? getPendingInputSummary : updateWatchStatus).mock.calls
+            .length,
+          1
+        )
+      );
+      fixture.poller.dispose();
+      pending.resolve();
+      await poll;
+
+      assert.equal(getJob.mock.calls.length, 1);
+      assert.equal(updateWatchStatus.mock.calls.length, stage === "watch update" ? 1 : 0);
+      assert.ok(Object.values(fixture.notifier.calls).every((calls) => calls.length === 0));
+      assert.equal(fixture.hostRefreshes, 0);
+    }
+  );
+
   it("handles a watch-store failure on a tick and polls again on the next tick", async () => {
     let listAttempts = 0;
     const failure = new Error("watch store unavailable");
@@ -338,6 +439,116 @@ describe("JenkinsStatusPoller", () => {
     await poll;
   });
 
+  it("keeps polling and refreshing a healthy environment while another is stalled", async () => {
+    const slowResponse = deferred<JenkinsJob>();
+    const healthy = watchedEntry({
+      scope: "global",
+      jobUrl: "job/healthy/",
+      lastStatus: "success",
+      lastCompletedBuildNumber: 7,
+      lastIsBuilding: false
+    });
+    const slow = watchedEntry({
+      lastStatus: "success",
+      lastCompletedBuildNumber: 7,
+      lastIsBuilding: false
+    });
+    let healthyColor = "blue";
+    const job = (jobUrl: string, color = "blue"): JenkinsJob => ({
+      name: "demo",
+      url: jobUrl,
+      color,
+      lastCompletedBuild: { number: 7, result: "SUCCESS" }
+    });
+    const getJob = vi.fn((_environment: unknown, jobUrl: string) =>
+      jobUrl === slow.jobUrl ? slowResponse.promise : Promise.resolve(job(jobUrl, healthyColor))
+    );
+    const fixture = createPollerFixture({
+      environments: [
+        { id: "env-1", scope: "workspace", url: "https://slow.example" },
+        { id: "env-1", scope: "global", url: "https://healthy.example" }
+      ],
+      listWatchedJobs: async () => [{ ...slow }, { ...healthy }],
+      getJob,
+      updateWatchStatus: async () => {
+        healthy.lastStatus = healthyColor === "red" ? "failure" : "success";
+      }
+    });
+    const callsFor = (jobUrl: string) =>
+      getJob.mock.calls.filter(([, requestedUrl]) => requestedUrl === jobUrl).length;
+
+    try {
+      fixture.poller.start();
+      await vi.waitFor(() => assert.equal(callsFor(healthy.jobUrl), 1));
+      assert.equal(fixture.hostRefreshes, 0);
+
+      healthyColor = "red";
+      fixture.fireTick();
+      await vi.waitFor(() => assert.equal(fixture.hostRefreshes, 1));
+      // Only the environment whose watched job changed is refreshed.
+      assert.deepEqual(fixture.refreshedEnvironmentIds, ["env-1"]);
+      assert.equal(callsFor(healthy.jobUrl), 2);
+      assert.equal(callsFor(slow.jobUrl), 1);
+      assert.equal(fixture.notifier.calls.failures.length, 1);
+
+      fixture.fireTick();
+      await vi.waitFor(() => assert.equal(callsFor(healthy.jobUrl), 3));
+      assert.equal(callsFor(slow.jobUrl), 1);
+
+      slowResponse.resolve(job(slow.jobUrl));
+      await vi.waitFor(() => assert.equal(callsFor(slow.jobUrl), 2));
+      await fixture.poller.poll();
+      assert.equal(fixture.hostRefreshes, 1);
+      assert.equal(fixture.notifier.calls.failures.length, 1);
+    } finally {
+      fixture.poller.dispose();
+      slowResponse.resolve(job(slow.jobUrl));
+    }
+  });
+
+  it("coalesces queued ticks and reloads persisted status before polling again", async () => {
+    const response = deferred<JenkinsJob>();
+    const entry = watchedEntry({
+      lastStatus: "success",
+      lastCompletedBuildNumber: 7,
+      lastIsBuilding: false
+    });
+    const getJob = vi.fn(() => response.promise);
+    const listWatchedJobs = vi.fn(async () => [{ ...entry }]);
+    const fixture = createPollerFixture({
+      listWatchedJobs,
+      getJob,
+      updateWatchStatus: async () => {
+        entry.lastStatus = "failure";
+      }
+    });
+
+    try {
+      fixture.poller.start({ initialDelayMs: 60_000 });
+      const poll = fixture.poller.poll();
+      await vi.waitFor(() => assert.equal(getJob.mock.calls.length, 1));
+      const queuedPoll = fixture.poller.poll();
+      await vi.waitFor(() => assert.equal(listWatchedJobs.mock.calls.length, 2));
+      const nextPoll = fixture.poller.poll();
+      await vi.waitFor(() => assert.equal(listWatchedJobs.mock.calls.length, 3));
+      assert.equal(getJob.mock.calls.length, 1);
+
+      response.resolve({
+        name: "demo",
+        url: entry.jobUrl,
+        color: "red",
+        lastCompletedBuild: { number: 7, result: "FAILURE" }
+      });
+      await Promise.all([poll, queuedPoll, nextPoll]);
+
+      assert.equal(getJob.mock.calls.length, 2);
+      assert.equal(fixture.notifier.calls.failures.length, 1);
+      assert.equal(fixture.hostRefreshes, 1);
+    } finally {
+      fixture.poller.dispose();
+    }
+  });
+
   it("sends a failure notification only after the watch update succeeds", async () => {
     const entry = watchedEntry({
       lastStatus: "success",
@@ -375,6 +586,27 @@ describe("JenkinsStatusPoller", () => {
       "Job demo failed in https://jenkins.example."
     ]);
     assert.deepEqual(fixture.notifier.calls.completions, []);
+  });
+
+  it("persists and refreshes when only the job name changes", async () => {
+    const updateWatchStatus = vi.fn(async () => undefined);
+    const fixture = createPollerFixture({
+      watched: [
+        watchedEntry({ lastStatus: "success", lastCompletedBuildNumber: 1, lastIsBuilding: false })
+      ],
+      getJob: async () => ({
+        name: "renamed",
+        url: "job/demo/",
+        color: "blue",
+        lastCompletedBuild: { number: 1, result: "SUCCESS" }
+      }),
+      updateWatchStatus
+    });
+
+    await fixture.poller.poll();
+
+    assert.equal(updateWatchStatus.mock.calls.length, 1);
+    assert.deepEqual(fixture.refreshedEnvironmentIds, ["env-1"]);
   });
 
   it("removes watches for stale environments and triggers a refresh", async () => {
@@ -435,6 +667,39 @@ describe("JenkinsStatusPoller", () => {
 
     assert.deepEqual(errorCounts, [1, 0]);
   });
+
+  it.each([0, 1, 2, 3])(
+    "skips redundant error-count synchronization after recovering from %i failures",
+    async (failures) => {
+      const fixture = createPollerFixture({
+        maxConsecutiveErrors: 2,
+        getJob: async () => {
+          throw new Error("network");
+        }
+      });
+      const errorCounts: number[] = [];
+      fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+      for (let attempt = 0; attempt < failures; attempt += 1) {
+        await fixture.poller.poll();
+      }
+
+      fixture.getJob = async () => ({ name: "demo", url: "job/demo/", color: "blue" });
+      const synchronize = vi.spyOn(fixture.poller, "synchronizeWatchErrorCount");
+      try {
+        await fixture.poller.poll();
+        // Pruning synchronizes once per poll; recovery only needs another scan at the threshold.
+        assert.equal(synchronize.mock.calls.length, failures >= 2 ? 2 : 1);
+        assert.deepEqual(errorCounts, failures >= 2 ? [1, 0] : []);
+
+        synchronize.mockClear();
+        await fixture.poller.poll();
+        await fixture.poller.poll();
+        assert.equal(synchronize.mock.calls.length, 2);
+      } finally {
+        synchronize.mockRestore();
+      }
+    }
+  );
 
   it("updates the derived error count once when watches are pruned or cleared", async () => {
     const watched = [watchedEntry(), watchedEntry({ jobUrl: "job/other/", jobName: "other" })];
@@ -646,6 +911,20 @@ describe("JenkinsStatusPoller", () => {
   });
 });
 
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function runningJob(jobUrl = "job/demo/"): JenkinsJob {
   const name = jobUrl.includes("other") ? "other" : "demo";
   return {
@@ -701,6 +980,7 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
     fetchedAt: number;
   }>;
   hostRefreshes: number;
+  refreshedEnvironmentIds: Array<string | undefined>;
 } {
   const notifier = createNotifier();
   let tick: (() => void) | undefined;
@@ -742,7 +1022,8 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
         count: 0,
         fetchedAt: 1
       })),
-    hostRefreshes: 0
+    hostRefreshes: 0,
+    refreshedEnvironmentIds: [] as Array<string | undefined>
   };
   const store = {
     listEnvironmentsWithScope: async () =>
@@ -765,8 +1046,9 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
       fixture.getPendingInputSummary(environment, buildUrl)
   };
   const host = {
-    fullEnvironmentRefresh: () => {
+    fullEnvironmentRefresh: (environmentId?: string) => {
       fixture.hostRefreshes += 1;
+      fixture.refreshedEnvironmentIds.push(environmentId);
     }
   };
 

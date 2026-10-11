@@ -204,6 +204,10 @@ export class CoverageDecorationService implements vscode.Disposable {
       editorDecorations.set(targetUri.toString(), ranges);
     }
 
+    if (generation !== this.resolveGeneration) {
+      return;
+    }
+
     for (const editor of editors) {
       const ranges = editorDecorations.get(editor.document.uri.toString());
       editor.setDecorations(this.coveredDecorationType, ranges?.covered ?? []);

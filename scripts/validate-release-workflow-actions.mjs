@@ -8,6 +8,15 @@ const fullShaPattern = /^[a-f0-9]{40}$/i;
 const errors = [];
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+// Local ./ references are versioned with the repository; everything else must pin a commit SHA.
+const isPinned = (uses) => {
+  if (uses.startsWith("./")) {
+    return true;
+  }
+
+  const atIndex = uses.lastIndexOf("@");
+  return atIndex !== -1 && fullShaPattern.test(uses.slice(atIndex + 1));
+};
 const stripQuotes = (token) => token.replace(/^(["'])(.*)\1$/, "$2");
 const normalizeScriptPath = (token) => stripQuotes(token).replace(/^\.\//, "");
 const isVsixUpload = (step) =>
@@ -57,15 +66,10 @@ for (const [jobName, job] of Object.entries(jobs)) {
     continue;
   }
 
-  if (typeof job.uses === "string" && !job.uses.startsWith("./")) {
-    const atIndex = job.uses.lastIndexOf("@");
-    const ref = atIndex === -1 ? "" : job.uses.slice(atIndex + 1);
-
-    if (!fullShaPattern.test(ref)) {
-      errors.push(
-        `${workflowPath} job ${jobName} ${job.uses} must use a full 40-character commit SHA`
-      );
-    }
+  if (typeof job.uses === "string" && !isPinned(job.uses)) {
+    errors.push(
+      `${workflowPath} job ${jobName} ${job.uses} must use a full 40-character commit SHA`
+    );
   }
 
   if (!Array.isArray(job.steps)) {
@@ -103,14 +107,7 @@ for (const [jobName, job] of Object.entries(jobs)) {
   }
 
   for (const [stepIndex, step] of job.steps.entries()) {
-    if (!isRecord(step) || typeof step.uses !== "string" || step.uses.startsWith("./")) {
-      continue;
-    }
-
-    const atIndex = step.uses.lastIndexOf("@");
-    const ref = atIndex === -1 ? "" : step.uses.slice(atIndex + 1);
-
-    if (!fullShaPattern.test(ref)) {
+    if (isRecord(step) && typeof step.uses === "string" && !isPinned(step.uses)) {
       errors.push(
         `${workflowPath} job ${jobName} step ${stepIndex + 1} ${step.uses} must use a full 40-character commit SHA`
       );

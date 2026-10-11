@@ -8,13 +8,7 @@ export async function openResourcePreview(
   await withPreviewLease(
     previewProvider,
     uri,
-    (release) =>
-      vscode.window.tabGroups.onDidChangeTabs((event) => {
-        if (!event.closed.some((tab) => tabReferencesUri(tab, uri))) {
-          return;
-        }
-        release();
-      }),
+    (release) => onPreviewTabsClosed(uri, release),
     async (release) => {
       await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
       if (!isUriOpenInTabs(uri)) {
@@ -32,19 +26,14 @@ export async function openTextPreview(
   return withPreviewLease(
     previewProvider,
     uri,
-    (release) =>
-      // Register before any await so a document closed mid-open still triggers release;
-      // otherwise the entry's inUseCount would stay above zero forever.
-      vscode.workspace.onDidCloseTextDocument((document) => {
-        if (document.uri.toString() !== uri.toString()) {
-          return;
-        }
-        release();
-      }),
-    async () => {
+    (release) => onPreviewTabsClosed(uri, release),
+    async (release) => {
       const editor = await vscode.window.showTextDocument(uri, { preview: true });
       if (options?.languageId && editor.document.languageId !== options.languageId) {
         await vscode.languages.setTextDocumentLanguage(editor.document, options.languageId);
+      }
+      if (!isUriOpenInTabs(uri)) {
+        release();
       }
       return editor;
     }
@@ -76,6 +65,15 @@ async function withPreviewLease<T>(
     release();
     throw error;
   }
+}
+
+function onPreviewTabsClosed(uri: vscode.Uri, release: () => void): vscode.Disposable {
+  // Register before opening; document close events also fire on language changes.
+  return vscode.window.tabGroups.onDidChangeTabs((event) => {
+    if (event.closed.some((tab) => tabReferencesUri(tab, uri)) && !isUriOpenInTabs(uri)) {
+      release();
+    }
+  });
 }
 
 function isUriOpenInTabs(uri: vscode.Uri): boolean {

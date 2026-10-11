@@ -93,15 +93,7 @@ export function toast(options: ToastOptions): { id: string; dismiss: () => void 
   return { id, dismiss: () => dismissToast(id) };
 }
 
-function dismissToast(id?: string): void {
-  if (!id) {
-    currentToasts = currentToasts.map((toastState) => ({ ...toastState, open: false }));
-    for (const toastState of currentToasts) {
-      scheduleRemove(toastState.id);
-    }
-    emit();
-    return;
-  }
+function dismissToast(id: string): void {
   currentToasts = currentToasts.map((toastState) =>
     toastState.id === id ? { ...toastState, open: false } : toastState
   );
@@ -118,9 +110,8 @@ export function useToast(): {
   toasts: ToastState[];
   toast: typeof toast;
   dismissToast: typeof dismissToast;
-  removeToast: typeof removeToast;
 } {
   const toasts = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  return { toasts, toast, dismissToast, removeToast };
+  return { toasts, toast, dismissToast };
 }

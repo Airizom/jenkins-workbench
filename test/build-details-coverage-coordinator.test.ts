@@ -469,14 +469,50 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
     ]);
   });
 
-  it("reports overview errors without posting when the view is hidden", async () => {
+  it.each([true, false])(
+    "preserves decorations and reports overview errors when panel visibility is %s",
+    async (visible) => {
+      setCoverageConfig();
+      const { coordinator, calls, applyOptions } = createHarness({
+        details: createDetailsWithCoverageAction(),
+        isViewVisible: () => visible,
+        backend: {
+          getCoverageOverview: async () => {
+            throw new Error("overview failed");
+          }
+        }
+      });
+
+      await coordinator.refresh(1, { showLoading: true });
+
+      assert.ok(calls.includes("backend.modifiedFiles"));
+      assert.deepEqual(applyOptions, [
+        {
+          environment: createEnvironment(),
+          buildUrl: "https://jenkins.example/job/app/12/",
+          modifiedCoverageFiles: createModifiedFiles(),
+          decorationsEnabled: true
+        }
+      ]);
+      assert.ok(!calls.includes("adapter.clear"));
+      assert.ok(calls.includes("state.setCoverageError:overview failed"));
+      assert.ok(!calls.includes("state.setCoverage"));
+      assert.ok(calls.includes("state.setCoverageLoading:false"));
+      assert.equal(calls.includes("adapter.activate"), visible);
+      assert.equal(calls.at(-1) === "postStateUpdate", visible);
+    }
+  );
+
+  it("reports the overview error when both coverage endpoints fail", async () => {
     setCoverageConfig();
     const { coordinator, calls } = createHarness({
       details: createDetailsWithCoverageAction(),
-      isViewVisible: () => false,
       backend: {
         getCoverageOverview: async () => {
           throw new Error("overview failed");
+        },
+        getModifiedCoverageFiles: async () => {
+          throw new Error("modified files failed");
         }
       }
     });
@@ -484,7 +520,7 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
     await coordinator.refresh(1);
 
     assert.ok(calls.includes("state.setCoverageError:overview failed"));
-    assert.ok(!calls.includes("postStateUpdate"));
+    assert.ok(!calls.includes("state.setCoverageError:modified files failed"));
   });
 
   it("suppresses error handling when the token became stale before the failure", async () => {

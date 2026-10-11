@@ -41,3 +41,10 @@ export function captureCheckout(repository: GitRepository): CurrentBranchCheckou
 export function checkoutFingerprint(repository: GitRepository): string {
   return JSON.stringify(captureCheckout(repository));
 }
+
+export function isCheckoutCurrent(
+  checkout: CurrentBranchCheckout | undefined,
+  repository: GitRepository
+): boolean {
+  return JSON.stringify(checkout) === checkoutFingerprint(repository);
+}

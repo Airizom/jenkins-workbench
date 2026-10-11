@@ -107,6 +107,32 @@ describe("Jenkins build tree builders", () => {
     );
   });
 
+  it.each([
+    { includeDetails: true, includeParameters: false },
+    { includeDetails: false, includeParameters: true },
+    { includeDetails: true, includeParameters: true }
+  ])("combines revision fields with requested action fields: %o", async (options) => {
+    const { context, requestedUrls } = createContextHarness();
+    await new JenkinsBuildsApi(context).getBuilds("https://jenkins.example.com/job/demo/", 20, {
+      ...options,
+      includeRevisions: true
+    });
+
+    const tree = getTreeParameter(requestedUrls[0]);
+    const actionFields = [
+      "_class,lastBuiltRevision[SHA1],remoteUrls",
+      "revision[_class,pullHash,mergeHash,head[sourceOwner,sourceRepo,checkoutStrategy]]"
+    ];
+    if (options.includeDetails) {
+      actionFields.push("causes[shortDescription,userId,userName]");
+    }
+    if (options.includeParameters) {
+      actionFields.push("parameters[name,value]");
+    }
+    assert.ok(tree.endsWith(`,actions[${actionFields.join(",")}]]{0,20}`));
+    assert.equal(tree.split("actions[").length - 1, 1);
+  });
+
   it("requests only status fields for lightweight build polling", async () => {
     const { context, requestedUrls } = createContextHarness();
     const api = new JenkinsBuildsApi(context);

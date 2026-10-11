@@ -67,7 +67,6 @@ export class JenkinsWorkbenchTreeDataProvider
   private readonly hierarchyState: TreeDataProviderHierarchyState;
   private readonly expansionResolver: TreeDataProviderExpansionResolver;
   private readonly summaryState: TreeDataProviderSummaryState;
-  private readonly invalidateForElement: (element: WorkbenchTreeElement) => void;
   private pendingInputUnsubscribe: (() => void) | undefined;
 
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -108,7 +107,6 @@ export class JenkinsWorkbenchTreeDataProvider
       this.notifyElement.bind(this),
       this.notifyEnvironment.bind(this)
     );
-    this.invalidateForElement = this.childrenLoader.invalidateForElement.bind(this.childrenLoader);
     this.pendingInputUnsubscribe = pendingInputCoordinator.onSummaryChange((change) => {
       this.childrenLoader.clearPendingInputDependentCaches(change.environment);
       this.notifyElement(undefined);
@@ -172,12 +170,7 @@ export class JenkinsWorkbenchTreeDataProvider
 
   refreshView(): void {
     this.childrenLoader.clearViewCache();
-    this.refreshCoordinator.scheduleRefresh(
-      undefined,
-      undefined,
-      REFRESH_DEBOUNCE_MS,
-      this.invalidateForElement
-    );
+    this.refreshCoordinator.scheduleRefresh(undefined, REFRESH_DEBOUNCE_MS);
     this.emitSummary();
   }
 
@@ -229,12 +222,7 @@ export class JenkinsWorkbenchTreeDataProvider
       request.jobScope
     );
     if (request.refreshTree ?? true) {
-      this.refreshCoordinator.scheduleRefresh(
-        undefined,
-        undefined,
-        REFRESH_DEBOUNCE_MS,
-        this.invalidateForElement
-      );
+      this.refreshCoordinator.scheduleRefresh(undefined, REFRESH_DEBOUNCE_MS);
     }
     this.emitSummary();
   }
@@ -267,12 +255,7 @@ export class JenkinsWorkbenchTreeDataProvider
     this.clearEnvironmentCaches(environmentId);
     this.hierarchyState.clearEnvironment(environmentId);
 
-    this.refreshCoordinator.scheduleRefresh(
-      undefined,
-      refreshToken,
-      REFRESH_DEBOUNCE_MS,
-      this.invalidateForElement
-    );
+    this.refreshCoordinator.scheduleRefresh(refreshToken, REFRESH_DEBOUNCE_MS);
     this.emitSummary();
   }
 
@@ -346,9 +329,12 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   private notifyTreeChange(element?: WorkbenchTreeElement): void {
+    const refreshTokens = this.refreshCoordinator.takePendingRefreshWaiters();
     this._onDidChangeTreeData.fire(element);
     queueMicrotask(() => {
-      this.refreshCoordinator.resolvePendingRefreshWaiters();
+      for (const token of refreshTokens) {
+        this.refreshCoordinator.resolveRefreshWaiter(token);
+      }
     });
   }
 

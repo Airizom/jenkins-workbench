@@ -78,6 +78,31 @@ describe("parseUriQueryParams", () => {
     assert.equal(params.has("nodeKind"), false);
   });
 
+  it.each([undefined, new Set(["url"])])(
+    "preserves empty nested URL query segments with knownKeys=%j",
+    (knownKeys) => {
+      const nestedUrl = "https://jenkins.example/job/demo/?x=1&&y=2&";
+      const params = parseUriQueryParams(`url=${nestedUrl}`, knownKeys);
+
+      assert.deepEqual(Object.fromEntries(params), { url: nestedUrl });
+    }
+  );
+
+  it.each([undefined, new Set(["url", "nodeId"])])(
+    "ignores empty outer parameters with knownKeys=%j",
+    (knownKeys) => {
+      const params = parseUriQueryParams(
+        "&nodeId=7&&url=https://jenkins.example/job/demo/&",
+        knownKeys
+      );
+
+      assert.deepEqual(Object.fromEntries(params), {
+        nodeId: "7",
+        url: "https://jenkins.example/job/demo/"
+      });
+    }
+  );
+
   it("preserves the full nested URL when an old link is ambiguous", () => {
     const nestedUrl = "https://ci.example/job/app/1/?x=1&y=2";
     const decodedQuery = decodeURIComponent(`url=${encodeURIComponent(nestedUrl)}&nodeId=outer`);

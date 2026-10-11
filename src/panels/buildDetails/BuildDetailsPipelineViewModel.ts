@@ -36,10 +36,6 @@ export function buildPipelineStagesViewModel(
   return stages.map((stage) => mapPipelineStage(stage, restartState));
 }
 
-interface PipelineStepDraft extends PipelineStageStepViewModel {
-  isFailed: boolean;
-}
-
 function mapPipelineStage(
   stage: PipelineStage,
   restartState: PipelineStageRestartState
@@ -48,9 +44,15 @@ function mapPipelineStage(
   const status = normalizePipelineStatus(stage.status);
   const durationMs = normalizeDurationMillis(stage.durationMillis);
   const durationLabel = formatBuildDuration(stage.durationMillis);
-  const steps = stage.steps.map((step) => mapPipelineStep(step));
-  const stepsFailedOnly = steps.filter((step) => step.isFailed);
-  const stepsAll = steps.map((step) => stripFailure(step));
+  const stepsAll: PipelineStageStepViewModel[] = [];
+  const stepsFailedOnly: PipelineStageStepViewModel[] = [];
+  for (const step of stage.steps) {
+    const { viewModel, isFailed } = mapPipelineStep(step);
+    stepsAll.push(viewModel);
+    if (isFailed) {
+      stepsFailedOnly.push(viewModel);
+    }
+  }
   const parallelBranches = mapParallelBranches(stage, restartState);
   const hasSteps = stepsAll.length > 0 || parallelBranches.some((branch) => branch.hasSteps);
   const logTarget = buildStageLogTarget(stage);
@@ -71,7 +73,7 @@ function mapPipelineStage(
     durationMs,
     canRestartFromStage,
     hasSteps,
-    stepsFailedOnly: stepsFailedOnly.map((step) => stripFailure(step)),
+    stepsFailedOnly,
     stepsAll,
     parallelBranches,
     canOpenLog: Boolean(logTarget)
@@ -105,32 +107,24 @@ function createPipelineStageRestartState(
   return { enabled: restartableStages.size > 0, restartableStages };
 }
 
-function mapPipelineStep(step: PipelineStep): PipelineStepDraft {
+function mapPipelineStep(step: PipelineStep): {
+  viewModel: PipelineStageStepViewModel;
+  isFailed: boolean;
+} {
   const status = normalizePipelineStatus(step.status);
   const durationLabel = formatBuildDuration(step.durationMillis);
   return {
-    key: step.key,
-    nodeId: step.nodeId,
-    logTarget: buildStepLogTarget(step),
-    name: step.name,
-    statusLabel: status.label,
-    statusClass: status.className,
-    durationLabel,
-    canOpenLog: Boolean(step.nodeId),
+    viewModel: {
+      key: step.key,
+      nodeId: step.nodeId,
+      logTarget: buildStepLogTarget(step),
+      name: step.name,
+      statusLabel: status.label,
+      statusClass: status.className,
+      durationLabel,
+      canOpenLog: Boolean(step.nodeId)
+    },
     isFailed: status.isFailed
-  };
-}
-
-function stripFailure(step: PipelineStepDraft): PipelineStageStepViewModel {
-  return {
-    key: step.key,
-    nodeId: step.nodeId,
-    logTarget: step.logTarget,
-    name: step.name,
-    statusLabel: step.statusLabel,
-    statusClass: step.statusClass,
-    durationLabel: step.durationLabel,
-    canOpenLog: step.canOpenLog
   };
 }
 

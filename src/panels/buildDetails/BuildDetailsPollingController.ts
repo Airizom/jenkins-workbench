@@ -409,12 +409,14 @@ export class BuildDetailsPollingController {
         try {
           workflowRun = await this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
           if (!this.isPollCurrent(pollGeneration)) {
+            this.deliverStaleCompletion(completedNow, details);
             return;
           }
           this.callbacks.onWorkflowRun(workflowRun);
           this.workflowRetryPending = false;
         } catch (error) {
           if (!this.isPollCurrent(pollGeneration)) {
+            this.deliverStaleCompletion(completedNow, details);
             return;
           }
           workflowError = error;
@@ -446,6 +448,17 @@ export class BuildDetailsPollingController {
       }
     } finally {
       this.pollInFlight = false;
+    }
+  }
+
+  // onDetails and lastKnownBuilding already consumed the completion transition before the
+  // workflow fetch, so a stop() during that fetch must not swallow the completion callback.
+  private deliverStaleCompletion(
+    completedNow: boolean,
+    details: JenkinsBuildDetails | undefined
+  ): void {
+    if (completedNow && details && !this.disposed) {
+      this.callbacks.onComplete(details);
     }
   }
 

@@ -20,6 +20,8 @@ export interface NodeLaunchResult {
 }
 
 export class JenkinsNodeDataOperations {
+  private readonly pendingOfflineOperations = new Map<string, Promise<void>>();
+
   constructor(private readonly context: JenkinsDataRuntimeContext) {}
 
   async getNodes(
@@ -28,9 +30,11 @@ export class JenkinsNodeDataOperations {
   ): Promise<JenkinsNodeInfo[]> {
     const cacheKey = await this.context.buildCacheKey(environment, "nodes");
     if (options?.mode === "refresh") {
-      const nodes = await this.loadNodes(environment);
-      this.context.getCache().set(cacheKey, nodes, this.context.getCacheTtlMs());
-      return nodes;
+      return this.context.getCache().withWriteGuard([cacheKey], async (cache) => {
+        const nodes = await this.loadNodes(environment);
+        cache.set(cacheKey, nodes, this.context.getCacheTtlMs());
+        return nodes;
+      });
     }
     return this.context
       .getCache()
@@ -64,14 +68,16 @@ export class JenkinsNodeDataOperations {
     if (cached) {
       return cached;
     }
-    const client = await this.context.getClient(environment);
-    try {
-      const details = await client.getNodeDetails(nodeUrl, { detailLevel });
-      this.context.getCache().set(cacheKey, details, this.context.getCacheTtlMs());
-      return details;
-    } catch (error) {
-      throw toJenkinsActionError(error);
-    }
+    return this.context.getCache().withWriteGuard([cacheKey], async (cache) => {
+      const client = await this.context.getClient(environment);
+      try {
+        const details = await client.getNodeDetails(nodeUrl, { detailLevel });
+        cache.set(cacheKey, details, this.context.getCacheTtlMs());
+        return details;
+      } catch (error) {
+        throw toJenkinsActionError(error);
+      }
+    });
   }
 
   async setNodeTemporarilyOffline(
@@ -80,6 +86,16 @@ export class JenkinsNodeDataOperations {
     targetOffline: boolean,
     reason?: string
   ): Promise<NodeOfflineToggleResult> {
+    // Serialize the entire read/check/toggle sequence because toggleOffline is not idempotent.
+    const operationKey = JSON.stringify([environment.environmentId, environment.url, nodeUrl]);
+    const previous = this.pendingOfflineOperations.get(operationKey);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.pendingOfflineOperations.set(operationKey, pending);
+    await previous;
+
     try {
       const details = await this.getNodeDetails(environment, nodeUrl, {
         mode: "refresh",
@@ -92,22 +108,12 @@ export class JenkinsNodeDataOperations {
         if (isTemporarilyOffline) {
           return { status: "no_change", details };
         }
-        this.context.clearCacheForEnvironment(environment.environmentId);
-        const client = await this.context.getClient(environment);
-        await client.toggleNodeTemporarilyOffline(nodeUrl, reason);
-        const refreshed = await this.getNodeDetails(environment, nodeUrl, {
-          mode: "refresh",
-          detailLevel: "basic"
-        });
-        return { status: "toggled", details: refreshed };
-      }
-
-      if (!isTemporarilyOffline) {
+      } else if (!isTemporarilyOffline) {
         return { status: isOffline ? "not_temporarily_offline" : "no_change", details };
       }
       this.context.clearCacheForEnvironment(environment.environmentId);
       const client = await this.context.getClient(environment);
-      await client.toggleNodeTemporarilyOffline(nodeUrl);
+      await client.toggleNodeTemporarilyOffline(nodeUrl, targetOffline ? reason : undefined);
       const refreshed = await this.getNodeDetails(environment, nodeUrl, {
         mode: "refresh",
         detailLevel: "basic"
@@ -115,6 +121,11 @@ export class JenkinsNodeDataOperations {
       return { status: "toggled", details: refreshed };
     } catch (error) {
       throw toJenkinsActionError(error);
+    } finally {
+      release();
+      if (this.pendingOfflineOperations.get(operationKey) === pending) {
+        this.pendingOfflineOperations.delete(operationKey);
+      }
     }
   }
 

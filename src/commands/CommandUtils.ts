@@ -57,6 +57,11 @@ export function requireSelection<T>(
   return item;
 }
 
+export async function confirmModalAction(prompt: string, actionLabel: string): Promise<boolean> {
+  const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, actionLabel);
+  return choice === actionLabel;
+}
+
 export async function withActionErrorMessage(
   messagePrefix: string,
   action: () => Promise<void>

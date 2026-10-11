@@ -1,6 +1,9 @@
 import * as React from "react";
 import type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState";
-import { hasNewPendingInputs } from "../components/buildDetails/buildDetailsTabsModel";
+import {
+  hasNewPendingInputs,
+  shouldFallBackFromSelectedTab
+} from "../components/buildDetails/buildDetailsTabsModel";
 import {
   getBuildDetailsPanelUiState,
   setBuildDetailsPanelUiState
@@ -16,6 +19,8 @@ type UseBuildDetailsTabsParams = {
   pendingInputIds?: readonly string[];
   hasPipelineStages: boolean;
   hasTests: boolean;
+  /** True once a build details snapshot has arrived, so a restored tab can be validated. */
+  detailsLoaded?: boolean;
 };
 
 type UseBuildDetailsTabsResult = {
@@ -47,7 +52,8 @@ export function useBuildDetailsTabs({
   hasPendingInputs,
   pendingInputIds = NO_INPUT_IDS,
   hasPipelineStages,
-  hasTests
+  hasTests,
+  detailsLoaded = true
 }: UseBuildDetailsTabsParams): UseBuildDetailsTabsResult {
   const defaultTab: BuildDetailsTab = hasPendingInputs ? "inputs" : "overview";
 
@@ -97,13 +103,20 @@ export function useBuildDetailsTabs({
   }, [pendingInputIds, applySelectedTab]);
 
   useEffect(() => {
-    if (availableTabs.includes(selectedTab)) {
+    const isAvailable = availableTabs.includes(selectedTab);
+    if (isAvailable) {
       selectedTabWasAvailable.current = true;
-    } else if (selectedTabWasAvailable.current) {
+    } else if (
+      shouldFallBackFromSelectedTab({
+        isAvailable,
+        wasAvailable: selectedTabWasAvailable.current,
+        detailsLoaded
+      })
+    ) {
       applySelectedTab(defaultTab);
       focusTabTriggerIfFocusLost(defaultTab);
     }
-  }, [availableTabs, defaultTab, selectedTab, applySelectedTab]);
+  }, [availableTabs, defaultTab, selectedTab, detailsLoaded, applySelectedTab]);
 
   return {
     selectedTab,

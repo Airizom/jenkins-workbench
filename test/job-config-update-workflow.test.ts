@@ -33,7 +33,7 @@ const vscodeMock = {
       quickPickCalls += 1;
       return quickPickSelections.shift() === false ? items[1] : items[0];
     },
-    showWarningMessage: async () => warningChoice,
+    showWarningMessage: vi.fn(async () => warningChoice),
     withProgress: async (_options: unknown, task: () => Promise<unknown>) => task()
   },
   workspace: {
@@ -58,7 +58,14 @@ const vscodeMock = {
 
 const commandUtilsMock = {
   formatActionError: (error: unknown) => (error instanceof Error ? error.message : String(error)),
-  getTreeItemLabel: () => "demo"
+  getTreeItemLabel: () => "demo",
+  requireSelection: <T>(item: T | undefined, missingSelectionMessage: string) => {
+    if (!item) {
+      informationMessages.push(missingSelectionMessage);
+      return undefined;
+    }
+    return item;
+  }
 };
 
 vi.doMock("vscode", () => vscodeMock);
@@ -93,17 +100,15 @@ function createWorkflow(
     }
   };
 
+  const draft = {
+    environment,
+    jobUrl: "job/demo/",
+    label: "demo",
+    originalUri: { toString: () => "job-config-original:/demo/config.xml" },
+    originalXml: "<project><description>original</description></project>"
+  };
   const draftManager = {
-    getDraft: (uri: UriLike) =>
-      uri.toString() === targetUri.toString()
-        ? {
-            environment,
-            jobUrl: "job/demo/",
-            label: "demo",
-            originalUri: { toString: () => "job-config-original:/demo/config.xml" },
-            originalXml: "<project><description>original</description></project>"
-          }
-        : undefined,
+    getDraft: (uri: UriLike) => (uri.toString() === targetUri.toString() ? draft : undefined),
     getVisibleDrafts: () => [],
     discardDraft: (uri: UriLike) => {
       calls.discarded.push(uri.toString());
@@ -146,6 +151,18 @@ beforeEach(() => {
   quickPickCalls = 0;
   quickPickSelections = [];
   informationMessages.length = 0;
+  vscodeMock.window.showWarningMessage.mockClear();
+});
+
+describe("JobConfigUpdateWorkflow startUpdate", () => {
+  it("asks for a selection without loading config when no item is selected", async () => {
+    const { workflow, calls } = createWorkflow();
+
+    await workflow.startUpdate(undefined);
+
+    assert.deepEqual(informationMessages, ["Select a job or pipeline to update its config."]);
+    assert.equal(calls.getJobConfigXml, 0);
+  });
 });
 
 describe("JobConfigUpdateWorkflow submitDraft", () => {
@@ -261,6 +278,40 @@ describe("JobConfigUpdateWorkflow submitDraft", () => {
     assert.deepEqual(calls.closed, []);
     assert.deepEqual(calls.discarded, []);
   });
+
+  it.each([
+    ["original", true],
+    ["newer edit", true],
+    ["edited", false]
+  ] as const)(
+    "compares retained draft contents '%s' against the last successful upload",
+    async (description, shouldUpload) => {
+      const upload = deferred<void>();
+      const uploadedXml = documentText;
+      const { workflow, refreshHost, calls } = createWorkflow({
+        updateConfigXml: () => upload.promise
+      });
+      const submission = workflow.submitDraft(refreshHost, targetUri as never);
+      await vi.waitFor(() => assert.equal(calls.updateJobConfigXml.length, 1));
+
+      documentText = "<project><description>newer edit</description></project>";
+      remoteXml = uploadedXml;
+      upload.resolve();
+      await submission;
+      assert.deepEqual(calls.closed, []);
+      assert.deepEqual(calls.discarded, []);
+
+      documentText = `<project><description>${description}</description></project>`;
+      await workflow.submitDraft(refreshHost, targetUri as never);
+
+      assert.deepEqual(
+        calls.updateJobConfigXml,
+        shouldUpload ? [uploadedXml, documentText] : [uploadedXml]
+      );
+      assert.equal(calls.getJobConfigXml, shouldUpload ? 2 : 1);
+      assert.equal(vscodeMock.window.showWarningMessage.mock.calls.length, 0);
+    }
+  );
 });
 
 function deferred<T>() {

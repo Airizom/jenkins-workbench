@@ -109,5 +109,8 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
 }
 
 function escapeMultipartValue(value: string): string {
+  if (/[\r\n]/.test(value)) {
+    throw new Error("Multipart header parameters must not contain CR or LF.");
+  }
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

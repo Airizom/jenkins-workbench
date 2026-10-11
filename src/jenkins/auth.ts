@@ -16,6 +16,11 @@ function getAuthorizationHeader(username?: string, token?: string): string | und
   return `Basic ${encoded}`;
 }
 
+// RFC 7230 token characters, matching what Node's HTTP client accepts for header names.
+const HTTP_TOKEN_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+// Node accepts only horizontal tab, visible ASCII, and Latin-1 bytes in header values.
+const INVALID_HEADER_VALUE_PATTERN = /[^\t\x20-\x7e\x80-\xff]/;
+
 export function parseHeadersJson(input: string): {
   headers?: Record<string, string>;
   error?: string;
@@ -32,7 +37,7 @@ export function parseHeadersJson(input: string): {
   }
 
   const candidate = parsed as Record<string, unknown>;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = Object.create(null);
   for (const [rawKey, rawValue] of Object.entries(candidate)) {
     if (typeof rawValue !== "string") {
       return { error: `Header "${rawKey}" must be a string.` };
@@ -42,8 +47,14 @@ export function parseHeadersJson(input: string): {
     if (trimmedKey.length === 0) {
       return { error: "Header names cannot be empty." };
     }
+    if (!HTTP_TOKEN_PATTERN.test(trimmedKey)) {
+      return { error: `Header name "${trimmedKey}" contains invalid characters.` };
+    }
     if (trimmedValue.length === 0) {
       return { error: `Header "${trimmedKey}" cannot be empty.` };
+    }
+    if (INVALID_HEADER_VALUE_PATTERN.test(trimmedValue)) {
+      return { error: `Header "${trimmedKey}" contains invalid characters.` };
     }
     headers[trimmedKey] = trimmedValue;
   }
@@ -52,7 +63,7 @@ export function parseHeadersJson(input: string): {
     return { error: "Provide at least one header." };
   }
 
-  return { headers };
+  return { headers: { ...headers } };
 }
 
 export function parseAuthConfig(value: unknown): JenkinsAuthConfig | undefined {
@@ -264,7 +275,12 @@ function setNormalizedHeader(target: Record<string, string>, key: string, value:
   if (trimmedKey.length === 0 || trimmedValue.length === 0) {
     return;
   }
-  target[trimmedKey] = trimmedValue;
+  Object.defineProperty(target, trimmedKey, {
+    value: trimmedValue,
+    enumerable: true,
+    writable: true,
+    configurable: true
+  });
 }
 
 function hasOwnEntries(record: Record<string, string>): boolean {

@@ -7,9 +7,9 @@ import { Progress } from "../../shared/webview/components/ui/progress";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
-import { usePanelPostMessage } from "../../shared/webview/hooks/usePanelPostMessage";
 import { ExternalLinkIcon, ServerIcon } from "../../shared/webview/icons";
-import { resolveNodeStatusAccentClass } from "../../shared/webview/lib/statusStyles";
+import { resolveNodeStatusStyle } from "../../shared/webview/lib/statusStyles";
+import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type { NodeDetailsIncomingMessage } from "../shared/NodeDetailsPanelMessages";
 import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
 import type { NodeAction } from "./components/nodeDetails/NodeDetailsHero";
@@ -28,7 +28,7 @@ const { useEffect, useMemo, useReducer, useState } = React;
 export function NodeDetailsApp(): React.JSX.Element {
   const [state, dispatch] = useReducer(nodeDetailsReducer, undefined, getInitialState);
   const [now, setNow] = useState(() => Date.now());
-  const postMessage = usePanelPostMessage<NodeDetailsIncomingMessage>();
+  const postMessage: (message: NodeDetailsIncomingMessage) => void = postVsCodeMessage;
   const handleOpenExternal = useOpenExternalMessage(postMessage);
 
   useNodeDetailsMessages(dispatch);
@@ -44,7 +44,7 @@ export function NodeDetailsApp(): React.JSX.Element {
   );
   const isStale = useMemo(() => isStaleUpdatedAt(updatedAtDate, now), [updatedAtDate, now]);
   const showOfflineBanner = state.statusClass === "offline" || state.statusClass === "temporary";
-  const statusAccent = resolveNodeStatusAccentClass(state.statusClass);
+  const statusAccent = resolveNodeStatusStyle(state.statusClass).accent;
   const nodeAction = useMemo<NodeAction | undefined>(() => {
     if (state.canTakeOffline) {
       return { type: "takeNodeOffline", label: "Take offline…" };

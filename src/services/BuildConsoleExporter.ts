@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
-import { pipeline } from "node:stream/promises";
+import * as path from "node:path";
+import { finished, pipeline } from "node:stream/promises";
 import { BuildActionError } from "../jenkins/errors";
 import { JenkinsConsoleNoteFilter } from "../jenkins/JenkinsConsoleNotes";
 import type { JenkinsConsoleTextClient } from "../jenkins/JenkinsConsoleTextClient";
@@ -12,12 +14,17 @@ export interface BuildConsoleFilesystem {
     options?: { encoding?: BufferEncoding }
   ): NodeJS.WritableStream;
   writeFile(targetPath: string, data: string, encoding: BufferEncoding): Promise<void>;
+  rename(sourcePath: string, targetPath: string): Promise<void>;
+  delete(targetPath: string): Promise<void>;
 }
 
 export function createNodeBuildConsoleFilesystem(): BuildConsoleFilesystem {
   return {
-    createWriteStream: (targetPath, options) => fs.createWriteStream(targetPath, options),
-    writeFile: (targetPath, data, encoding) => fs.promises.writeFile(targetPath, data, encoding)
+    createWriteStream: (targetPath, options) =>
+      fs.createWriteStream(targetPath, { ...options, flags: "wx" }),
+    writeFile: (targetPath, data, encoding) => fs.promises.writeFile(targetPath, data, encoding),
+    rename: (sourcePath, targetPath) => fs.promises.rename(sourcePath, targetPath),
+    delete: (targetPath) => fs.promises.unlink(targetPath)
   };
 }
 
@@ -69,18 +76,38 @@ export class BuildConsoleExporter {
     buildUrl: string;
     targetPath: string;
   }): Promise<BuildConsoleExportResult> {
+    const temporaryPath = path.join(
+      path.dirname(options.targetPath),
+      `.${path.basename(options.targetPath)}.${randomUUID()}.tmp`
+    );
     try {
-      return await this.writeConsoleProgressive(
-        options.targetPath,
-        options.environment,
-        options.buildUrl
-      );
-    } catch (error) {
-      if (!this.shouldFallbackToSnapshot(error)) {
-        throw error;
+      let result: BuildConsoleExportResult;
+      try {
+        result = await this.writeConsoleProgressive(
+          temporaryPath,
+          options.environment,
+          options.buildUrl
+        );
+      } catch (error) {
+        if (!this.shouldFallbackToSnapshot(error)) {
+          throw error;
+        }
+        result = await this.writeConsoleSnapshot(
+          temporaryPath,
+          options.environment,
+          options.buildUrl
+        );
       }
+      await this.filesystem.rename(temporaryPath, options.targetPath);
+      return result;
+    } catch (error) {
+      try {
+        await this.filesystem.delete(temporaryPath);
+      } catch {
+        // Preserve the export error if cleanup fails.
+      }
+      throw error;
     }
-    return this.writeConsoleSnapshot(options.targetPath, options.environment, options.buildUrl);
   }
 
   private async writeConsoleProgressive(
@@ -90,7 +117,13 @@ export class BuildConsoleExporter {
   ): Promise<BuildConsoleExportResult> {
     const writeStream = this.filesystem.createWriteStream(targetPath, { encoding: "utf8" });
     const state = { truncated: false };
-    await pipeline(this.getProgressiveConsoleChunks(environment, buildUrl, state), writeStream);
+    try {
+      await pipeline(this.getProgressiveConsoleChunks(environment, buildUrl, state), writeStream);
+    } catch (error) {
+      // The pipeline can reject before the file stream finishes opening and closing.
+      await finished(writeStream, { cleanup: true }).catch(() => {});
+      throw error;
+    }
     return { mode: "progressive", truncated: state.truncated };
   }
 

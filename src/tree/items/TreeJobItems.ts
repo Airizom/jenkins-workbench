@@ -108,15 +108,6 @@ export type JobTreeItemOptions = JobTreeItemCommonOptions &
     | { variant: "activity"; group: ActivityGroupKind; pathContext?: string }
   );
 
-function buildJobTreeItemId(
-  presentation: JobTreePresentation,
-  environment: JenkinsEnvironmentRef,
-  jobUrl: string,
-  jobScope: TreeJobScope
-): string {
-  return buildEnvironmentTreeItemId(presentation, environment, jobScope, jobUrl);
-}
-
 export class JobTreeItem extends vscode.TreeItem {
   public readonly presentation: JobTreePresentation;
   public readonly environment: JenkinsEnvironmentRef;
@@ -146,11 +137,11 @@ export class JobTreeItem extends vscode.TreeItem {
     this.isWatched = isWatched;
     this.isPinned = resolvedIsPinned;
     this.isDisabled = isJobColorDisabled(color);
-    this.id = buildJobTreeItemId(
+    this.id = buildEnvironmentTreeItemId(
       options.presentation,
       options.environment,
-      options.jobUrl,
-      this.jobScope
+      this.jobScope,
+      options.jobUrl
     );
     this.contextValue = buildJobContextValue(
       contextBase,
@@ -158,21 +149,20 @@ export class JobTreeItem extends vscode.TreeItem {
       resolvedIsPinned,
       this.isDisabled
     );
-    this.description = formatJobDescription({
-      status: formatJobColor(color),
-      isWatched,
-      isPinned: resolvedIsPinned,
-      isDisabled: this.isDisabled
-    });
     this.iconPath = jobIcon(options.presentation, color);
     if (options.variant === "quickAccess") {
       this.description = buildJobDescriptionWithPathContext(
-        formatPinnedJobPathContext(options.jobUrl),
+        formatPinnedJobPathContext(options.jobUrl, options.environment.url),
         color,
         isWatched,
         false
       );
-      this.tooltip = formatPinnedJobTooltip(options.label, options.jobUrl, this.description);
+      this.tooltip = formatPinnedJobTooltip(
+        options.label,
+        options.jobUrl,
+        this.description,
+        options.environment.url
+      );
     } else if (options.variant === "activity") {
       this.description = buildJobDescriptionWithPathContext(
         options.pathContext,
@@ -186,6 +176,13 @@ export class JobTreeItem extends vscode.TreeItem {
         options.pathContext,
         this.description
       );
+    } else {
+      this.description = formatJobDescription({
+        status: formatJobColor(color),
+        isWatched,
+        isPinned: resolvedIsPinned,
+        isDisabled: this.isDisabled
+      });
     }
     this.accessibilityInformation = {
       label: buildJobAccessibilityLabel(options.label, formatJobColor(color), this.description)
@@ -223,14 +220,15 @@ export class StalePinnedJobTreeItem extends vscode.TreeItem {
     super(label, vscode.TreeItemCollapsibleState.None);
     this.id = buildEnvironmentTreeItemId("stale-pinned", environment, jobUrl);
     this.contextValue = "stalePinnedItem pinned";
-    const pathContext = formatPinnedJobPathContext(jobUrl);
+    const pathContext = formatPinnedJobPathContext(jobUrl, environment.url);
     this.description = pathContext
       ? `${pathContext} • Missing from Jenkins`
       : "Missing from Jenkins";
     this.tooltip = formatPinnedJobTooltip(
       label,
       jobUrl,
-      "Pinned entry no longer resolves in Jenkins."
+      "Pinned entry no longer resolves in Jenkins.",
+      environment.url
     );
     this.iconPath = WARNING_ICON;
   }

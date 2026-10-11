@@ -19,13 +19,13 @@ export function parseUriQueryParams(
   const params = new Map<string, string>();
   let currentKey: string | undefined;
   for (const pair of query.split("&")) {
-    if (pair.length === 0) {
+    const nestedUrlQuery = currentKey === "url" && params.get("url")?.includes("?");
+    if (pair.length === 0 && !nestedUrlQuery) {
       continue;
     }
     const separatorIndex = pair.indexOf("=");
     const key = separatorIndex === -1 ? pair : pair.slice(0, separatorIndex);
     const value = separatorIndex === -1 ? "" : pair.slice(separatorIndex + 1);
-    const nestedUrlQuery = currentKey === "url" && params.get("url")?.includes("?");
     if (currentKey !== undefined && (nestedUrlQuery || (knownKeys && !knownKeys.has(key)))) {
       params.set(currentKey, `${params.get(currentKey)}&${pair}`);
       continue;

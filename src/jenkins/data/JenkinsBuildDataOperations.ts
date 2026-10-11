@@ -45,29 +45,20 @@ export class JenkinsBuildDataOperations {
     const includeParameters = options?.includeParameters ?? false;
     const bypassCache = options?.bypassCache ?? false;
     const client = await this.context.getClient(environment);
-    if (bypassCache) {
-      return client.getBuilds(jobUrl, limit, {
+    const load = () =>
+      client.getBuilds(jobUrl, limit, {
         offset: options?.offset,
         includeDetails: detailLevel === "details",
         includeRevisions: detailLevel === "revisions",
         includeParameters
       });
+    if (bypassCache) {
+      return load();
     }
     const rangeKind = options?.offset === undefined ? "recent" : `paged-${options.offset}`;
     const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}-${limit}-${rangeKind}`;
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, jobUrl);
-    return this.context.getCache().getOrLoad(
-      cacheKey,
-      async () => {
-        return client.getBuilds(jobUrl, limit, {
-          offset: options?.offset,
-          includeDetails: detailLevel === "details",
-          includeRevisions: detailLevel === "revisions",
-          includeParameters
-        });
-      },
-      this.context.getCacheTtlMs()
-    );
+    return this.context.getCache().getOrLoad(cacheKey, load, this.context.getCacheTtlMs());
   }
 
   async getBuildDetails(
@@ -98,18 +89,20 @@ export class JenkinsBuildDataOperations {
       return cached;
     }
 
-    const client = await this.context.getClient(environment);
-    try {
-      const details = await client.getBuildDetails(buildUrl, options);
-      if (!details.building) {
-        this.context.getCache().set(cacheKey, details, this.context.getCacheTtlMs());
-      } else {
-        this.context.getCache().delete(cacheKey);
+    return this.context.getCache().withWriteGuard([cacheKey], async (cache) => {
+      const client = await this.context.getClient(environment);
+      try {
+        const details = await client.getBuildDetails(buildUrl, options);
+        if (!details.building) {
+          cache.set(cacheKey, details, this.context.getCacheTtlMs());
+        } else {
+          cache.delete(cacheKey);
+        }
+        return details;
+      } catch (error) {
+        throw toBuildActionError(error);
       }
-      return details;
-    } catch (error) {
-      throw toBuildActionError(error);
-    }
+    });
   }
 
   async getBuildArtifacts(
@@ -132,16 +125,18 @@ export class JenkinsBuildDataOperations {
     if (this.context.getCache().has(unsupportedKey)) {
       return undefined;
     }
-    const client = await this.context.getClient(environment);
-    try {
-      return await client.getWorkflowRun(buildUrl);
-    } catch (error) {
-      if (error instanceof JenkinsRequestError && error.statusCode === 404) {
-        this.context.getCache().set(unsupportedKey, true, this.context.getCacheTtlMs());
-        return undefined;
+    return this.context.getCache().withWriteGuard([unsupportedKey], async (cache) => {
+      const client = await this.context.getClient(environment);
+      try {
+        return await client.getWorkflowRun(buildUrl);
+      } catch (error) {
+        if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+          cache.set(unsupportedKey, true, this.context.getCacheTtlMs());
+          return undefined;
+        }
+        throw toBuildActionError(error);
       }
-      throw toBuildActionError(error);
-    }
+    });
   }
 
   async getArtifact(

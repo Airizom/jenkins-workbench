@@ -57,8 +57,8 @@ describe("ArtifactStorageService path sanitization", () => {
 
     const result = await service.downloadArtifact(createRequest("report.txt:payload"));
 
-    assert.equal(result.safeRelativePath, "report.txt_payload");
-    assert.equal(path.basename(result.targetPath), "report.txt_payload");
+    assert.equal(result.safeRelativePath, "report.txt%3Apayload");
+    assert.equal(path.basename(result.targetPath), "report.txt%3Apayload");
     assert.equal(writes.length, 1);
     assert.equal(path.dirname(writes[0]), path.dirname(result.targetPath));
     assert.notEqual(writes[0], result.targetPath);
@@ -69,11 +69,11 @@ describe("ArtifactStorageService path sanitization", () => {
 
     const result = await service.downloadArtifact(createRequest("logs/run:1/out:err.txt"));
 
-    assert.equal(result.safeRelativePath, "logs/run_1/out_err.txt");
-    assert.ok(result.targetPath.endsWith(path.join("logs", "run_1", "out_err.txt")));
+    assert.equal(result.safeRelativePath, "logs/run%3A1/out%3Aerr.txt");
+    assert.ok(result.targetPath.endsWith(path.join("logs", "run%3A1", "out%3Aerr.txt")));
   });
 
-  it("leaves colon-free artifact paths unchanged", async () => {
+  it("leaves artifact paths without colons or percent signs unchanged", async () => {
     const { service } = createService();
 
     const result = await service.downloadArtifact(createRequest("logs/report.txt"));

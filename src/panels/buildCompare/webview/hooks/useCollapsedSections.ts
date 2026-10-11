@@ -2,7 +2,7 @@ import * as React from "react";
 import type { BuildCompareSectionId } from "../../shared/BuildComparePanelWebviewState";
 import { readBuildCompareUiState, writeBuildCompareUiState } from "../lib/buildComparePanelState";
 
-const { useCallback, useState } = React;
+const { useCallback, useEffect, useRef, useState } = React;
 
 interface SectionOverrides {
   collapsed: ReadonlySet<BuildCompareSectionId>;
@@ -43,13 +43,23 @@ export function useCollapsedSections(): {
         expanded.delete(id);
         collapsed.add(id);
       }
-      writeBuildCompareUiState({
-        collapsedSections: [...collapsed],
-        expandedSections: [...expanded]
-      });
       return { collapsed, expanded };
     });
   }, []);
+
+  // Persist outside the updater so React can replay it without side effects;
+  // the ref skips the state that was just read from storage.
+  const persistedRef = useRef(overrides);
+  useEffect(() => {
+    if (persistedRef.current === overrides) {
+      return;
+    }
+    persistedRef.current = overrides;
+    writeBuildCompareUiState({
+      collapsedSections: [...overrides.collapsed],
+      expandedSections: [...overrides.expanded]
+    });
+  }, [overrides]);
 
   return { isOpen, setOpen };
 }

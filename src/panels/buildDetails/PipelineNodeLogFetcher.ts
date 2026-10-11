@@ -142,12 +142,17 @@ export class PipelineNodeLogFetcher {
           }
         };
       }
+      const fullText = htmlToText(chunk.html);
+      const truncatedByWindow = fullText.length > MAX_CONSOLE_CHARS;
+      // Annotated HTML cannot be cut safely, so an oversized log falls back to
+      // the escaped tail of its text.
+      const text = truncatedByWindow ? fullText.slice(-MAX_CONSOLE_CHARS) : fullText;
       return {
         log: {
           target,
-          html: chunk.html,
-          text: htmlToText(chunk.html),
-          truncated: this.progressiveOffset > 0 && initial === false,
+          html: truncatedByWindow ? escapeHtml(text) : chunk.html,
+          text,
+          truncated: truncatedByWindow || (this.progressiveOffset > 0 && initial === false),
           loading: false,
           polling: chunk.moreData
         }
@@ -182,7 +187,8 @@ export class PipelineNodeLogFetcher {
       text,
       truncated: Boolean(snapshot.hasMore),
       loading: false,
-      polling: Boolean(snapshot.hasMore) || isWorkflowNodeActive(snapshot.nodeStatus),
+      // `hasMore` marks truncation, not activity; only an active node can change.
+      polling: isWorkflowNodeActive(snapshot.nodeStatus),
       consoleUrl: snapshot.consoleUrl
     };
   }

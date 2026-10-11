@@ -205,8 +205,10 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("watchStore"),
         container.get("statusNotifier"),
         {
-          fullEnvironmentRefresh: () => {
-            container.get("refreshHost").fullEnvironmentRefresh({ trigger: "system" });
+          fullEnvironmentRefresh: (environmentId) => {
+            container
+              .get("refreshHost")
+              .fullEnvironmentRefresh({ trigger: "system", environmentId });
           }
         },
         options.watchErrorThreshold

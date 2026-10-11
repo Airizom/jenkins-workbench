@@ -4,8 +4,7 @@ import type { ArtifactAction, PipelineLogTargetViewModel } from "./BuildDetailsC
 import { isPipelineLogTargetViewModel } from "./BuildDetailsContracts";
 import {
   type BuildDetailsPanelUiState,
-  isBuildDetailsPanelUiState,
-  normalizeBuildDetailsPanelUiState
+  isBuildDetailsPanelUiState
 } from "./BuildDetailsPanelWebviewState";
 
 export interface ToggleFollowLogMessage {
@@ -235,8 +234,7 @@ export function isPersistUiStateMessage(message: unknown): message is PersistUiS
   if (!hasMessageType(message, "persistUiState")) {
     return false;
   }
-  return (
-    isBuildDetailsPanelUiState(message.uiState) &&
-    normalizeBuildDetailsPanelUiState(message.uiState) !== undefined
-  );
+  // A uiState that only clears fields normalizes to undefined but must still be accepted;
+  // withBuildDetailsPanelUiState normalizes the merged result.
+  return isBuildDetailsPanelUiState(message.uiState);
 }

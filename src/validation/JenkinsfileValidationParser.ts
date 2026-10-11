@@ -95,7 +95,7 @@ function parseJsonValidationOutput(text: string): JenkinsfileValidationFinding[]
     for (const error of errors) {
       findings.push(...parseJsonErrors(error));
     }
-    if (findings.length === 0 && errors.length > 0) {
+    if (findings.length === 0) {
       findings.push({ message: text });
     }
     return findings;
@@ -134,38 +134,26 @@ function extractJsonErrors(value: unknown): unknown[] | undefined {
 }
 
 function parseJsonErrors(error: unknown): JenkinsfileValidationFinding[] {
-  if (error && typeof error === "object") {
-    const record = error as Record<string, unknown>;
-    const messages = record.message ?? record.Message ?? record.error ?? record.Error;
-    if (Array.isArray(messages)) {
-      return messages.flatMap((message) =>
-        typeof message === "string" ? parseJsonErrors({ ...record, message }) : []
-      );
-    }
-  }
-  const finding = parseJsonError(error);
-  return finding ? [finding] : [];
-}
-
-function parseJsonError(error: unknown): JenkinsfileValidationFinding | undefined {
   if (typeof error === "string") {
-    return parseFindingLine(error) ?? buildFinding(error);
+    return [parseFindingLine(error) ?? buildFinding(error)];
   }
 
   if (!error || typeof error !== "object") {
-    return undefined;
+    return [];
   }
 
   const record = error as Record<string, unknown>;
-  const message =
-    (record.message as string | undefined) ??
-    (record.Message as string | undefined) ??
-    (record.error as string | undefined) ??
-    (record.Error as string | undefined);
-  if (typeof message !== "string" || !message) {
-    return undefined;
-  }
+  const messageField = record.message ?? record.Message ?? record.error ?? record.Error;
+  const messages = Array.isArray(messageField) ? messageField : [messageField];
+  return messages.flatMap((message) =>
+    typeof message === "string" && message ? [parseJsonErrorMessage(record, message)] : []
+  );
+}
 
+function parseJsonErrorMessage(
+  record: Record<string, unknown>,
+  message: string
+): JenkinsfileValidationFinding {
   const line = toNumber(record.line ?? record.Line);
   const column = toNumber(record.column ?? record.Column);
   const embedded =

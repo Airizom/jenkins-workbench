@@ -27,6 +27,7 @@ import {
   bindEnvironmentRefresh,
   createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
+  LoadTokenTracker,
   type PanelLoadTracker,
   shouldRefreshVisibleEnvironmentPanel
 } from "./shared/PanelRuntimeHelpers";
@@ -73,6 +74,7 @@ export class NodeCapacityPanel {
   private dataService?: JenkinsDataService;
   private capacityService?: NodeCapacityService;
   private environment?: JenkinsEnvironmentRef;
+  private readonly loadTokenTracker = new LoadTokenTracker();
   private readonly loadTracker: PanelLoadTracker;
   private executorLoadGeneration = 0;
   private capacityRequestCount = 0;
@@ -214,7 +216,7 @@ export class NodeCapacityPanel {
     this.stopVisibleRefreshTimer();
     this.beginCapacityRequest();
     this.executorLoadGeneration += 1;
-    const token = this.loadTracker.nextToken();
+    const token = this.loadTokenTracker.next();
     this.hasRendered = false;
     this.nonce = createNonce();
     this.loadTracker.resetLoadingRequests();
@@ -241,7 +243,7 @@ export class NodeCapacityPanel {
       const { scriptUri, styleUris } = assets;
 
       const model = await this.fetchCapacity(token);
-      if (!model || !this.loadTracker.isCurrent(token)) {
+      if (!model || !this.loadTokenTracker.isCurrent(token)) {
         return;
       }
 
@@ -270,11 +272,11 @@ export class NodeCapacityPanel {
       return;
     }
     this.beginCapacityRequest();
-    const token = this.loadTracker.nextToken();
+    const token = this.loadTokenTracker.next();
     const loadingRequest = options?.skipLoading ? undefined : this.loadTracker.beginLoading();
     try {
       const model = await this.fetchCapacity(token);
-      if (!model || !this.loadTracker.isCurrent(token)) {
+      if (!model || !this.loadTokenTracker.isCurrent(token)) {
         return;
       }
       this.postMessage({ type: "updateNodeCapacity", payload: model });
@@ -283,6 +285,9 @@ export class NodeCapacityPanel {
         this.loadTracker.endLoading(loadingRequest);
       }
       this.endCapacityRequest();
+      if (!this.disposed) {
+        this.startVisibleRefreshTimer();
+      }
     }
   }
 
@@ -292,12 +297,12 @@ export class NodeCapacityPanel {
     }
     try {
       const model = await this.capacityService.getNodeCapacity(this.environment);
-      if (!this.loadTracker.isCurrent(token)) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
         return undefined;
       }
       return model;
     } catch (error) {
-      if (!this.loadTracker.isCurrent(token)) {
+      if (!this.loadTokenTracker.isCurrent(token)) {
         return undefined;
       }
       return buildNodeCapacityErrorViewModel(this.environment.url, [formatActionError(error)]);

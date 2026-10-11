@@ -47,10 +47,8 @@ export class CurrentBranchWorkflowService {
     return this.currentBranchService.listRepositories();
   }
 
-  async openCurrentCommitBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
-    const latest = state.repository
-      ? await this.currentBranchService.resolveForRepository(state.repository, { force: true })
-      : state;
+  async openCurrentCommitBuild(state: CurrentBranchState): Promise<void> {
+    const latest = await this.resolveLatest(state);
     const target = this.commandMapper.getCurrentCommitBuildTarget(latest);
     if (!target) {
       void vscode.window.showInformationMessage(
@@ -60,13 +58,11 @@ export class CurrentBranchWorkflowService {
       );
       return;
     }
-    await this.actionExecutor.openLatestBuild(target, extensionUri);
+    await this.actionExecutor.openLatestBuild(target);
   }
 
   async watchCurrentCommit(state: CurrentBranchState): Promise<void> {
-    const latest = state.repository
-      ? await this.currentBranchService.resolveForRepository(state.repository, { force: true })
-      : state;
+    const latest = await this.resolveLatest(state);
     await this.commitWatches?.watch(latest);
   }
 
@@ -157,24 +153,30 @@ export class CurrentBranchWorkflowService {
     });
   }
 
-  async openLatestBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
+  async openLatestBuild(state: CurrentBranchState): Promise<void> {
     const target = this.commandMapper.getLatestBuildTarget(state);
     if (!target) {
       this.showActionUnavailableMessage(state, "openLatestBuild");
       return;
     }
 
-    await this.actionExecutor.openLatestBuild(target, extensionUri);
+    await this.actionExecutor.openLatestBuild(target);
   }
 
-  async openLastFailedBuild(state: CurrentBranchState, extensionUri: vscode.Uri): Promise<void> {
+  async openLastFailedBuild(state: CurrentBranchState): Promise<void> {
     const target = this.commandMapper.getBuildTarget(state);
     if (!target) {
       this.showActionUnavailableMessage(state, "openLastFailedBuild");
       return;
     }
 
-    await this.actionExecutor.openLastFailedBuild(target, extensionUri);
+    await this.actionExecutor.openLastFailedBuild(target);
+  }
+
+  private resolveLatest(state: CurrentBranchState): Promise<CurrentBranchState> {
+    return state.repository
+      ? this.currentBranchService.resolveForRepository(state.repository, { force: true })
+      : Promise.resolve(state);
   }
 
   private showActionUnavailableMessage(

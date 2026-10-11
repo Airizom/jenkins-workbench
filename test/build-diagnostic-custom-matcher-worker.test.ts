@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import {
+  CUSTOM_MATCHER_CAPTURE_PROPERTIES,
   CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
+  isWorkerRequestId,
   MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH,
+  MAX_CUSTOM_MATCHER_ERROR_MESSAGE_LENGTH,
   parseCustomMatcherWorkerData,
+  safeErrorMessage,
   serializeCustomDiagnosticMatchers,
   type CustomMatcherWorkerData,
   type CustomMatcherWorkerRequest,
@@ -75,6 +79,14 @@ function createInProcessWorker(data: CustomMatcherWorkerData): CustomMatcherWork
 }
 
 describe("isolated custom matcher worker", () => {
+  it("accepts only positive safe-integer request IDs", () => {
+    assert.equal(isWorkerRequestId(1), true);
+    assert.equal(isWorkerRequestId(Number.MAX_SAFE_INTEGER), true);
+    for (const value of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1, "1", undefined]) {
+      assert.equal(isWorkerRequestId(value), false, String(value));
+    }
+  });
+
   it("stops collecting parser results as soon as the per-call cap is exceeded", () => {
     const matchers = normalizeMatchers([
       {
@@ -127,6 +139,30 @@ describe("isolated custom matcher worker", () => {
     assert.deepEqual(regexValidation.calls, ["^(.+):(\\d+): (.*)$"]);
   });
 
+  it("round-trips every pattern capture property through the worker payload", () => {
+    const captures = Object.fromEntries(
+      CUSTOM_MATCHER_CAPTURE_PROPERTIES.map((property, index) => [property, index + 1])
+    );
+    const regexp = `^${"(\\w)".repeat(CUSTOM_MATCHER_CAPTURE_PROPERTIES.length)}$`;
+    const matchers = normalizeMatchers([
+      { name: "all", pattern: { regexp, kind: "file", loop: true, ...captures } }
+    ]);
+
+    const parsed = parseCustomMatcherWorkerData({
+      protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
+      matchers: serializeCustomDiagnosticMatchers(matchers),
+      maxBatchChars: 1024
+    });
+
+    const pattern = parsed.matchers[0].patterns[0];
+    for (const property of CUSTOM_MATCHER_CAPTURE_PROPERTIES) {
+      assert.equal(pattern[property], captures[property], property);
+    }
+    assert.equal(pattern.kind, "file");
+    assert.equal(pattern.loop, true);
+    assert.equal(pattern.regexpSource, regexp);
+  });
+
   it("rejects worker protocol version mismatches", () => {
     assert.throws(
       () =>
@@ -137,6 +173,13 @@ describe("isolated custom matcher worker", () => {
         }),
       /Unsupported custom matcher worker protocol version/
     );
+  });
+
+  it("bounds worker error messages and falls back when they are empty", () => {
+    const long = "x".repeat(MAX_CUSTOM_MATCHER_ERROR_MESSAGE_LENGTH + 10);
+    assert.equal(safeErrorMessage(new Error(long)).length, MAX_CUSTOM_MATCHER_ERROR_MESSAGE_LENGTH);
+    assert.equal(safeErrorMessage("plain"), "plain");
+    assert.equal(safeErrorMessage(new Error("")), "Custom matcher worker failed.");
   });
 
   it("preserves partial lines and multiline matcher state across bounded batches", async () => {
@@ -268,7 +311,12 @@ describe("isolated custom matcher worker", () => {
       postMessage(): void {
         postCount += 1;
       },
-      on() {
+      on(event: string, listener: (value: unknown) => void) {
+        if (event === "message") {
+          queueMicrotask(() =>
+            listener({ protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION, type: "ready" })
+          );
+        }
         return hangingWorker;
       },
       async terminate(): Promise<number> {
@@ -290,5 +338,90 @@ describe("isolated custom matcher worker", () => {
     assert.deepEqual(await client.acceptChunk("src/b.ts:2: bad\n"), []);
     assert.equal(postCount, 1);
     assert.equal(terminateCount, 1);
+  });
+
+  it("does not count worker startup against the first batch time limit", async () => {
+    const matchers = normalizeMatchers([
+      {
+        name: "single",
+        pattern: { regexp: "^(.+):(\\d+): (.*)$", file: 1, line: 2, message: 3 }
+      }
+    ]);
+    const disabledReasons: string[] = [];
+    const client = new BuildDiagnosticCustomMatcherWorkerClient({
+      matchers,
+      batchTimeoutMs: 10,
+      workerFactory: (data) => {
+        const inner = createInProcessWorker(data);
+        const queued: CustomMatcherWorkerRequest[] = [];
+        let started = false;
+        let messageListener: ((value: unknown) => void) | undefined;
+        const slowStartWorker = {
+          postMessage(request: CustomMatcherWorkerRequest): void {
+            if (started) {
+              inner.postMessage(request);
+            } else {
+              queued.push(request);
+            }
+          },
+          on(event: string, listener: (value: never) => void) {
+            if (event === "message") {
+              messageListener = listener as (value: unknown) => void;
+            }
+            inner.on(event as "message", listener as (value: unknown) => void);
+            return slowStartWorker;
+          },
+          terminate: () => inner.terminate()
+        };
+        setTimeout(() => {
+          started = true;
+          messageListener?.({
+            protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
+            type: "ready"
+          });
+          for (const request of queued) {
+            inner.postMessage(request);
+          }
+        }, 60);
+        return slowStartWorker as unknown as CustomMatcherWorkerHandle;
+      },
+      onDisabled: (reason) => disabledReasons.push(reason.kind)
+    });
+
+    const findings = await client.acceptChunk("src/a.ts:3: slow start\n");
+    await client.finish();
+
+    assert.deepEqual(disabledReasons, []);
+    assert.equal(client.isDisabled, false);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].rawPath, "src/a.ts");
+  });
+
+  it("disables itself when the worker never finishes starting", async () => {
+    const matchers = normalizeMatchers([
+      {
+        name: "single",
+        pattern: { regexp: "^(.+):(\\d+): (.*)$", file: 1, line: 2, message: 3 }
+      }
+    ]);
+    const silentWorker = {
+      postMessage(): void {},
+      on() {
+        return silentWorker;
+      },
+      async terminate(): Promise<number> {
+        return 0;
+      }
+    } as unknown as CustomMatcherWorkerHandle;
+    const client = new BuildDiagnosticCustomMatcherWorkerClient({
+      matchers,
+      batchTimeoutMs: 10,
+      startupTimeoutMs: 20,
+      workerFactory: () => silentWorker
+    });
+
+    assert.deepEqual(await client.acceptChunk("src/a.ts:1: bad\n"), []);
+    assert.equal(client.disabledReason?.kind, "timeout");
+    assert.match(client.disabledReason?.message ?? "", /did not start within 20ms/);
   });
 });

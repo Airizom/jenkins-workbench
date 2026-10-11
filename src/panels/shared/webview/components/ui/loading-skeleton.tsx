@@ -2,7 +2,10 @@ import type { HTMLAttributes } from "react";
 import * as React from "react";
 import { type LoadingSkeletonVariant, renderLoadingSkeletonHtml } from "../../LoadingSkeletonHtml";
 
-export interface LoadingSkeletonProps extends HTMLAttributes<HTMLDivElement> {
+// The skeleton owns the div's content, so callers cannot pass children or their
+// own inner HTML (React throws when both are set).
+export interface LoadingSkeletonProps
+  extends Omit<HTMLAttributes<HTMLDivElement>, "children" | "dangerouslySetInnerHTML"> {
   variant?: LoadingSkeletonVariant;
 }
 

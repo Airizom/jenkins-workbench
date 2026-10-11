@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,11 +12,33 @@ const toolsDir = path.join(
   process.env.RUNNER_TEMP ?? os.tmpdir(),
   "jenkins-workbench-release-tools"
 );
-const toolPath = (name) => path.join(toolsDir, "node_modules", ".bin", name);
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const toolPath = (name) => {
+  const packageDir = path.join(toolsDir, "node_modules", name === "vsce" ? "@vscode/vsce" : name);
+  const packageJson = JSON.parse(readFileSync(path.join(packageDir, "package.json"), "utf8"));
+  return path.resolve(
+    packageDir,
+    typeof packageJson.bin === "string" ? packageJson.bin : packageJson.bin[name]
+  );
+};
+const npmCommand = "npm";
+
+// Windows cannot spawn .cmd shims directly. Run the JavaScript entrypoints
+// through Node, preserving argument boundaries without a command shell.
+const spawnTool = (command, args, options) => {
+  if (command === npmCommand && process.platform !== "win32") {
+    return spawnSync(command, args, options);
+  }
+
+  const entrypoint =
+    command === npmCommand
+      ? process.env.npm_execpath ||
+        path.join(path.dirname(process.execPath), "node_modules/npm/bin/npm-cli.js")
+      : command;
+  return spawnSync(process.execPath, [entrypoint, ...args], options);
+};
 
 const run = (command, args, options = {}) => {
-  const result = spawnSync(command, args, { stdio: "inherit", ...options });
+  const result = spawnTool(command, args, { stdio: "inherit", ...options });
 
   if (result.error) {
     throw result.error;
@@ -74,7 +97,7 @@ const installTools = () => {
 };
 
 const capture = (command, args) => {
-  const result = spawnSync(command, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnTool(command, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
   if (result.error) {
     throw result.error;
@@ -112,8 +135,43 @@ const packageDirOf = (file) => {
   return match?.[1];
 };
 
-const readProductionTree = () =>
-  JSON.parse(capture(npmCommand, ["ls", "--omit=dev", "--all", "--long", "--json"]));
+const readProductionTree = (allowExtraneous = false) => {
+  const args = ["ls", "--omit=dev", "--all", "--long", "--json"];
+  const result = spawnTool(npmCommand, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  const failure = () =>
+    new Error(
+      `${npmCommand} ${args.join(" ")} exited with status ${result.status}\n${result.stderr}`
+    );
+  let tree;
+  try {
+    tree = JSON.parse(result.stdout);
+  } catch (error) {
+    throw result.status === 0 ? error : failure();
+  }
+  // Older npm versions report extraneous packages as ELSPROBLEMS. Only cleanup
+  // may recover from that result; dependency verification still requires success.
+  const recoverable =
+    allowExtraneous &&
+    result.status === 1 &&
+    tree.error?.code === "ELSPROBLEMS" &&
+    Array.isArray(tree.problems) &&
+    tree.problems.length > 0 &&
+    tree.problems.every(
+      (problem) => typeof problem === "string" && problem.startsWith("extraneous:")
+    ) &&
+    collectExtraneousPaths(tree, []).length > 0;
+
+  if (result.status !== 0 && !recoverable) {
+    throw failure();
+  }
+
+  return tree;
+};
 
 const collectExtraneousPaths = (node, paths) => {
   for (const dependency of Object.values(node.dependencies ?? {})) {
@@ -131,7 +189,7 @@ const collectExtraneousPaths = (node, paths) => {
 // wasm32 optional packages as extraneous. vsce ships anything npm lists, so
 // remove them first; by definition nothing installed depends on them.
 const removeExtraneousPackages = async () => {
-  for (const extraneousPath of collectExtraneousPaths(readProductionTree(), [])) {
+  for (const extraneousPath of collectExtraneousPaths(readProductionTree(true), [])) {
     console.log(`Removing extraneous ${path.relative(process.cwd(), extraneousPath)}`);
     await rm(extraneousPath, { recursive: true, force: true });
   }
@@ -183,19 +241,14 @@ const publish = async (artifactPath) => {
 
   const packageJson = await readPackageJson();
   const version = validateTag(packageJson);
-  const vscePat = requireSecret("VSCE_PAT");
-  const ovsxPat = requireSecret("OVSX_PAT");
-  run(toolPath("vsce"), [
-    "publish",
-    "--skip-duplicate",
-    "--pat",
-    vscePat,
-    "--packagePath",
-    artifactPath
-  ]);
+  // vsce and ovsx read VSCE_PAT/OVSX_PAT from the inherited environment; passing
+  // them as arguments would expose the tokens in the process command line.
+  requireSecret("VSCE_PAT");
+  requireSecret("OVSX_PAT");
+  run(toolPath("vsce"), ["publish", "--skip-duplicate", "--packagePath", artifactPath]);
 
   const extensionId = `${packageJson.publisher}.${packageJson.name}`;
-  const lookup = spawnSync(
+  const lookup = spawnTool(
     toolPath("ovsx"),
     ["get", extensionId, "--versionRange", version, "--metadata"],
     { stdio: "ignore" }
@@ -210,7 +263,7 @@ const publish = async (artifactPath) => {
     return;
   }
 
-  run(toolPath("ovsx"), ["publish", artifactPath, "-p", ovsxPat]);
+  run(toolPath("ovsx"), ["publish", artifactPath]);
 };
 
 try {

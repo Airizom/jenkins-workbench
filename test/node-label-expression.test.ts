@@ -16,10 +16,21 @@ describe("NodeLabelExpression", () => {
     assert.equal(parseCompoundLabelExpression("linux"), undefined);
     assert.equal(parseCompoundLabelExpression("linux-x86_64"), undefined);
     assert.equal(parseCompoundLabelExpression('"docker host"'), undefined);
+    assert.equal(parseCompoundLabelExpression('"(linux)"'), undefined);
     assert.equal(parseCompoundLabelExpression("linux &&"), undefined);
+    assert.equal(parseCompoundLabelExpression("(linux"), undefined);
+    assert.equal(parseCompoundLabelExpression("(linux))"), undefined);
     assert.equal(parseCompoundLabelExpression("(linux || windows"), undefined);
     assert.equal(parseCompoundLabelExpression('"unterminated && linux'), undefined);
   });
+
+  it.each(["(linux)", "((linux))", " ( ( linux ) ) "])(
+    "matches a parenthesized single label: %s",
+    (expression) => {
+      assert.equal(matches(expression, ["linux"]), true);
+      assert.equal(matches(expression, ["windows"]), false);
+    }
+  );
 
   it("applies Jenkins operator precedence", () => {
     assert.equal(matches("windows || linux && x86", ["windows"]), true);
@@ -37,7 +48,11 @@ describe("NodeLabelExpression", () => {
     assert.equal(matches('"docker host" && linux', ["docker host", "linux"]), true);
   });
 
-  it("compares labels case-insensitively like literal pool matching", () => {
-    assert.equal(matches("Linux && X86", ["linux", "x86"]), true);
+  it("compares labels case-sensitively like Jenkins", () => {
+    assert.equal(matches("Linux && X86", ["Linux", "X86"]), true);
+    assert.equal(matches("Linux && X86", ["linux", "x86"]), false);
+    assert.equal(matches("linux && !Linux", ["Linux"]), false);
+    assert.equal(matches("linux && !Linux", ["linux"]), true);
+    assert.equal(matches('"Linux" || windows', ["linux"]), false);
   });
 });

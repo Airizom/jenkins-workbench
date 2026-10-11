@@ -122,6 +122,22 @@ describe("promoteAwaitingInputJobs", () => {
     assert.deepEqual(groups.get("running"), [running]);
   });
 
+  it("preserves candidate order while excluding, deduplicating, and limiting running jobs", () => {
+    const groups = createActivityGroups();
+    const awaiting = createEntry("awaiting", "red_anime");
+    const first = createEntry("first", "blue_anime");
+    const duplicate = { ...first, name: "duplicate" };
+    const second = createEntry("second", "blue_anime");
+    const third = createEntry("third", "blue_anime");
+    const candidates = [awaiting, first, duplicate, second, third];
+    groups.set("running", candidates);
+
+    promoteAwaitingInputJobs(groups, candidates, new Set([awaiting.url]), 2);
+
+    assert.deepEqual(groups.get("awaitingInput"), [awaiting]);
+    assert.deepEqual(groups.get("running"), [first, second]);
+  });
+
   it("removes confirmed awaiting-input jobs when the awaiting group is already full", () => {
     const groups = createActivityGroups();
     const existing = createEntry("existing", "red_anime");

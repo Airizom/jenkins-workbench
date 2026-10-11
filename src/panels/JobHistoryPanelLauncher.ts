@@ -18,8 +18,16 @@ import {
   resolveEnvironmentRef
 } from "./shared/webview/WebviewPanelState";
 
-function jobHistoryPanelTitle(jobUrl: string): string {
-  return `History: ${historyJobDisplayName(jobUrl)}`;
+function jobHistoryPanelTitle(jobUrl: string, environmentUrl: string): string {
+  return `History: ${historyJobDisplayName(jobUrl, environmentUrl)}`;
+}
+
+function jobHistoryPanelKey(environment: JenkinsEnvironmentRef, jobUrl: string): string {
+  return JSON.stringify([
+    environment.scope,
+    environment.environmentId,
+    ensureTrailingSlash(jobUrl)
+  ]);
 }
 
 export class JobHistoryPanelLauncher {
@@ -30,19 +38,14 @@ export class JobHistoryPanelLauncher {
     private readonly environments: JenkinsEnvironmentStore
   ) {}
   async show(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
-    const key = JSON.stringify([
-      environment.scope,
-      environment.environmentId,
-      ensureTrailingSlash(jobUrl)
-    ]);
-    const existing = this.panels.get(key);
+    const existing = this.panels.get(jobHistoryPanelKey(environment, jobUrl));
     if (existing) {
       existing.reveal();
       return;
     }
     const panel = vscode.window.createWebviewPanel(
       "jenkinsWorkbench.jobHistory",
-      jobHistoryPanelTitle(jobUrl),
+      jobHistoryPanelTitle(jobUrl, environment.url),
       vscode.ViewColumn.Active,
       {
         enableScripts: true,
@@ -56,14 +59,13 @@ export class JobHistoryPanelLauncher {
     if (
       !isPlainRecord(state) ||
       !isSerializedEnvironmentState(state) ||
-      typeof state.jobUrl !== "string" ||
-      !parseJobUrl(state.jobUrl)
+      typeof state.jobUrl !== "string"
     ) {
       panel.dispose();
       return;
     }
     const environment = await resolveEnvironmentRef(this.environments, state);
-    if (!environment) {
+    if (!environment || !parseJobUrl(state.jobUrl, environment.url)) {
       panel.dispose();
       return;
     }
@@ -75,13 +77,9 @@ export class JobHistoryPanelLauncher {
     jobUrl: string,
     ui?: unknown
   ): void {
-    const key = JSON.stringify([
-      environment.scope,
-      environment.environmentId,
-      ensureTrailingSlash(jobUrl)
-    ]);
+    const key = jobHistoryPanelKey(environment, jobUrl);
     this.panels.set(key, panel);
-    panel.title = jobHistoryPanelTitle(jobUrl);
+    panel.title = jobHistoryPanelTitle(jobUrl, environment.url);
     const controller = new HistoryController(panel, this.dependencies);
     panel.onDidDispose(() => {
       controller.dispose();

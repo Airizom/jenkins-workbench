@@ -59,9 +59,15 @@ function getStatusBarPresentation(
     case "ambiguousRepository":
     case "unlinked":
       return undefined;
+    case "resolving":
+      return {
+        text: "$(sync~spin) Jenkins: Resolving current branch",
+        color: undefined,
+        tooltip: formatCurrentBranchTooltip(state)
+      };
     case "matched":
       return {
-        text: `${isCurrentBranchBuilding(state) ? "$(sync~spin)" : iconForMatchedState(state)} Jenkins: ${formatMatchedStatusLabel(state)}`,
+        text: `${isCurrentBranchBuilding(state) ? "$(sync~spin)" : iconForMatchedState(state)} Jenkins: ${currentCommitLabel(state)}`,
         color: colorForMatchedState(state),
         tooltip: formatCurrentBranchTooltip(state)
       };
@@ -98,10 +104,6 @@ function colorForMatchedState(
   return result === "FAILURE" || result === "UNSTABLE"
     ? new vscode.ThemeColor("statusBarItem.warningForeground")
     : undefined;
-}
-
-function formatMatchedStatusLabel(state: Extract<CurrentBranchState, { kind: "matched" }>): string {
-  return currentCommitLabel(state);
 }
 
 function formatFailedStatusLabel(

@@ -12,7 +12,6 @@ export interface JobStatusEvaluation {
   shouldUpdateStatus: boolean;
   shouldUpdateCompletion: boolean;
   shouldUpdateBuilding: boolean;
-  shouldRefresh: boolean;
   currentCompletedBuildNumber?: number;
   currentIsBuilding?: boolean;
   notification?:
@@ -73,14 +72,12 @@ export class JenkinsJobStatusEvaluator {
     // transition would skip its failure/recovery notification.
     const shouldUpdateStatus =
       statusChanged && !(currentStatus === "other" && isTerminalWatchStatus(previousStatus));
-    const shouldRefresh = shouldUpdateStatus || shouldUpdateCompletion || shouldUpdateBuilding;
 
     return {
       nextStatus: currentStatus,
       shouldUpdateStatus,
       shouldUpdateCompletion,
       shouldUpdateBuilding,
-      shouldRefresh,
       currentCompletedBuildNumber,
       currentIsBuilding,
       notification

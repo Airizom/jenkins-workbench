@@ -5,7 +5,4 @@ import { createTypedPanelRenderer } from "../shared/webview/WebviewHtml";
 export const nodeCapacityWebviewEntryName = "nodeCapacity" satisfies WebviewEntryName;
 
 export const { renderLoadingHtml, renderPanelHtml: renderNodeCapacityHtml } =
-  createTypedPanelRenderer<NodeCapacityViewModel>({
-    entryName: nodeCapacityWebviewEntryName,
-    skeletonVariant: "capacity"
-  });
+  createTypedPanelRenderer<NodeCapacityViewModel>("capacity");

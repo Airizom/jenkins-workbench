@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
-import { JenkinsClientProvider } from "../src/jenkins/JenkinsClientProvider";
+import { describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-import type { JenkinsAuthConfig } from "../src/jenkins/types";
+import type { JenkinsAuthConfig, JenkinsClientOptions } from "../src/jenkins/types";
 import type { JenkinsEnvironmentStore } from "../src/storage/JenkinsEnvironmentStore";
+
+vi.doMock("../src/jenkins/JenkinsClient", () => ({
+  JenkinsClient: class {
+    constructor(readonly options: JenkinsClientOptions) {}
+  }
+}));
+const { JenkinsClientProvider } = await import("../src/jenkins/JenkinsClientProvider");
 
 describe("JenkinsClientProvider client caching", () => {
   it("reuses and invalidates auth material consistently across both accessors", async () => {
@@ -157,6 +163,104 @@ describe("JenkinsClientProvider client caching", () => {
 });
 
 describe("JenkinsClientProvider SSO refresh", () => {
+  it.each([
+    { type: "bearer", token: "edited-token" },
+    { type: "sso", loginUrl: "https://jenkins.example.com/other-login" },
+    {
+      type: "sso",
+      loginUrl: "https://jenkins.example.com/login",
+      headers: { Cookie: "new-session" }
+    },
+    undefined
+  ] satisfies (JenkinsAuthConfig | undefined)[])(
+    "rejects an old client's refresh after authentication is replaced with %j",
+    async (editedConfig) => {
+      const originalConfig: JenkinsAuthConfig = {
+        type: "sso",
+        loginUrl: "https://jenkins.example.com/login"
+      };
+      let authConfigRevision = 0;
+      let storedConfig: JenkinsAuthConfig | undefined = originalConfig;
+      const save = vi.fn(async (_scope, _id, config: JenkinsAuthConfig) => {
+        storedConfig = config;
+        return true;
+      });
+      const store = {
+        getAuthConfigRevision: () => authConfigRevision,
+        getAuthConfig: async () => storedConfig,
+        setAuthConfigIfRevision: save
+      } as unknown as JenkinsEnvironmentStore;
+      const authenticate = vi.fn(async () => ({
+        ...originalConfig,
+        headers: { Cookie: "stale-session" }
+      }));
+      const provider = new JenkinsClientProvider(store, {
+        browserSsoAuthenticator: { authenticate }
+      });
+      const environment: JenkinsEnvironmentRef = {
+        environmentId: "environment-1",
+        scope: "global",
+        url: "https://jenkins.example.com/"
+      };
+      const client = (await provider.getClient(environment)) as unknown as {
+        options: JenkinsClientOptions;
+      };
+      const refresh = client.options.refreshAuthConfig;
+      assert.ok(refresh);
+
+      storedConfig = editedConfig;
+      authConfigRevision += 1;
+      provider.invalidateClient(environment.scope, environment.environmentId);
+
+      assert.equal(await refresh(originalConfig), undefined);
+      assert.deepEqual(storedConfig, editedConfig);
+      assert.equal(authenticate.mock.calls.length, 0);
+      assert.equal(save.mock.calls.length, 0);
+    }
+  );
+
+  it("rejects a refresh when authentication changes during the store read", async () => {
+    const originalConfig: JenkinsAuthConfig = {
+      type: "sso",
+      loginUrl: "https://jenkins.example.com/login"
+    };
+    let authConfigRevision = 0;
+    const store = {
+      getAuthConfigRevision: () => authConfigRevision,
+      getAuthConfig: async () => {
+        authConfigRevision += 1;
+        return originalConfig;
+      },
+      setAuthConfigIfRevision: vi.fn()
+    } as unknown as JenkinsEnvironmentStore;
+    const authenticate = vi.fn(async () => originalConfig);
+    const provider = new JenkinsClientProvider(store, {
+      browserSsoAuthenticator: { authenticate }
+    });
+    const refresh = (
+      provider as unknown as {
+        refreshBrowserSsoAuthConfig(
+          environment: JenkinsEnvironmentRef,
+          currentAuthConfig: JenkinsAuthConfig
+        ): Promise<JenkinsAuthConfig | undefined>;
+      }
+    ).refreshBrowserSsoAuthConfig.bind(provider);
+
+    assert.equal(
+      await refresh(
+        {
+          environmentId: "environment-1",
+          scope: "global",
+          url: "https://jenkins.example.com/"
+        },
+        originalConfig
+      ),
+      undefined
+    );
+    assert.equal(authenticate.mock.calls.length, 0);
+    assert.equal(vi.mocked(store.setAuthConfigIfRevision).mock.calls.length, 0);
+  });
+
   it("does not overwrite an auth config saved while SSO reauth was pending", async () => {
     const originalConfig: JenkinsAuthConfig = {
       type: "sso",
@@ -167,6 +271,7 @@ describe("JenkinsClientProvider SSO refresh", () => {
     let storedConfig: JenkinsAuthConfig | undefined = originalConfig;
     const store = {
       getAuthConfigRevision: () => authConfigRevision,
+      getAuthConfig: async () => storedConfig,
       setAuthConfigIfRevision: async (
         _scope: string,
         _id: string,

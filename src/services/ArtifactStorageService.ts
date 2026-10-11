@@ -66,16 +66,21 @@ export class ArtifactStorageService {
       { maxBytes: resolveMaxBytes(request.maxBytes) }
     );
 
-    await this.filesystem.createDirectory(path.dirname(resolved.targetPath), request.workspaceRoot);
     const temporaryPath = path.join(
       path.dirname(resolved.targetPath),
       `.${path.basename(resolved.targetPath)}.${randomUUID()}.tmp`
     );
     try {
+      await this.filesystem.createDirectory(
+        path.dirname(resolved.targetPath),
+        request.workspaceRoot
+      );
       const writeStream = this.filesystem.createWriteStream(temporaryPath);
       await pipeline(response.stream, writeStream);
       await this.filesystem.rename(temporaryPath, resolved.targetPath, request.workspaceRoot);
     } catch (error) {
+      // Setup can fail before pipeline owns the response; release its socket either way.
+      response.abort();
       await this.safeDelete(temporaryPath);
       throw error;
     }
@@ -141,12 +146,9 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
 }
 
 function sanitizeArtifactRelativePath(relativePath: string): string {
-  // On NTFS a ':' in a file name addresses an alternate data stream, so a
-  // Jenkins-controlled artifact name like "report.txt:payload" would write hidden
-  // content into the target root. Replace ':' with '_' (matching the '_' substitution
-  // used for the surrounding directory segments) on every platform so downloads land
-  // at the same path everywhere; POSIX names containing ':' are renamed accordingly.
-  return relativePath.replace(/:/g, "_");
+  // Encode NTFS alternate data stream separators on every platform. Escape literal
+  // percent signs first so encoded names cannot collide with other artifact paths.
+  return relativePath.replace(/%/g, "%25").replace(/:/g, "%3A");
 }
 
 function resolveDownloadRoot(workspaceRoot: string, downloadRoot: string): string | undefined {

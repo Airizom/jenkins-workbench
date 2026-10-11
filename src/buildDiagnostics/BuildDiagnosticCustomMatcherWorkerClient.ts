@@ -4,8 +4,10 @@ import {
   CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
   type CustomMatcherWorkerData,
   type CustomMatcherWorkerRequest,
+  isCustomMatcherWorkerReadyMessage,
   isCustomMatcherWorkerResponse,
   MAX_CUSTOM_MATCHER_BATCH_CHARS,
+  safeErrorMessage,
   serializeCustomDiagnosticMatchers
 } from "./BuildDiagnosticCustomMatcherProtocol";
 import type { NormalizedCustomDiagnosticMatcher, RawBuildDiagnostic } from "./BuildDiagnosticTypes";
@@ -15,6 +17,8 @@ const DEFAULT_CUSTOM_MATCHER_BATCH_CHARS = 128 * 1024;
 const MAX_CUSTOM_MATCHER_BATCH_TIMEOUT_MS = 5_000;
 
 const MIN_CUSTOM_MATCHER_BATCH_TIMEOUT_MS = 10;
+const DEFAULT_CUSTOM_MATCHER_STARTUP_TIMEOUT_MS = 10_000;
+const MAX_CUSTOM_MATCHER_STARTUP_TIMEOUT_MS = 60_000;
 
 export type CustomMatcherWorkerDisableReason = {
   kind: "timeout" | "workerError" | "protocolError";
@@ -32,6 +36,8 @@ export interface CustomMatcherWorkerHandle {
 export interface BuildDiagnosticCustomMatcherWorkerClientOptions {
   matchers: readonly NormalizedCustomDiagnosticMatcher[];
   batchTimeoutMs?: number;
+  /** Time allowed for the worker to boot and compile matchers before batch timers start. */
+  startupTimeoutMs?: number;
   batchChars?: number;
   onDisabled?: (reason: CustomMatcherWorkerDisableReason) => void;
   onLineTruncated?: () => void;
@@ -43,7 +49,7 @@ type ClientState = "inactive" | "active" | "disabled" | "finished" | "disposed";
 
 type PendingRequest = {
   resolve: (diagnostics: RawBuildDiagnostic[]) => void;
-  timeout: NodeJS.Timeout;
+  timeout: NodeJS.Timeout | undefined;
 };
 
 /**
@@ -53,11 +59,14 @@ type PendingRequest = {
  */
 export class BuildDiagnosticCustomMatcherWorkerClient {
   private readonly batchTimeoutMs: number;
+  private readonly startupTimeoutMs: number;
   private readonly batchChars: number;
   private readonly onDisabled: ((reason: CustomMatcherWorkerDisableReason) => void) | undefined;
   private readonly onLineTruncated: (() => void) | undefined;
   private readonly pending = new Map<number, PendingRequest>();
   private worker: CustomMatcherWorkerHandle | undefined;
+  private workerReady = false;
+  private startupTimeout: NodeJS.Timeout | undefined;
   private state: ClientState;
   private nextRequestId = 1;
   private operationTail: Promise<void> = Promise.resolve();
@@ -70,6 +79,12 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
       DEFAULT_CUSTOM_MATCHER_BATCH_TIMEOUT_MS,
       MIN_CUSTOM_MATCHER_BATCH_TIMEOUT_MS,
       MAX_CUSTOM_MATCHER_BATCH_TIMEOUT_MS
+    );
+    this.startupTimeoutMs = boundedInteger(
+      options.startupTimeoutMs,
+      DEFAULT_CUSTOM_MATCHER_STARTUP_TIMEOUT_MS,
+      MIN_CUSTOM_MATCHER_BATCH_TIMEOUT_MS,
+      MAX_CUSTOM_MATCHER_STARTUP_TIMEOUT_MS
     );
     this.batchChars = boundedInteger(
       options.batchChars,
@@ -104,6 +119,12 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
           });
         }
       });
+      this.startupTimeout = setTimeout(() => {
+        this.disable({
+          kind: "timeout",
+          message: `Custom matcher worker did not start within ${this.startupTimeoutMs}ms.`
+        });
+      }, this.startupTimeoutMs);
     } catch (error) {
       this.disable({ kind: "workerError", message: safeErrorMessage(error) });
     }
@@ -192,12 +213,9 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
         : { protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION, id, type };
 
     return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        this.disable({
-          kind: "timeout",
-          message: `Custom matcher batch exceeded the ${this.batchTimeoutMs}ms time limit.`
-        });
-      }, this.batchTimeoutMs);
+      // Requests posted before the ready handshake queue behind worker startup,
+      // so their batch timers start only once the worker can process them.
+      const timeout = this.workerReady ? this.startBatchTimer() : undefined;
       this.pending.set(id, { resolve, timeout });
       try {
         worker.postMessage(request);
@@ -207,7 +225,36 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
     });
   }
 
+  private startBatchTimer(): NodeJS.Timeout {
+    return setTimeout(() => {
+      this.disable({
+        kind: "timeout",
+        message: `Custom matcher batch exceeded the ${this.batchTimeoutMs}ms time limit.`
+      });
+    }, this.batchTimeoutMs);
+  }
+
+  private markWorkerReady(): void {
+    if (this.workerReady || this.state !== "active") {
+      return;
+    }
+    this.workerReady = true;
+    this.clearStartupTimeout();
+    for (const pending of this.pending.values()) {
+      pending.timeout ??= this.startBatchTimer();
+    }
+  }
+
+  private clearStartupTimeout(): void {
+    clearTimeout(this.startupTimeout);
+    this.startupTimeout = undefined;
+  }
+
   private handleMessage(value: unknown): void {
+    if (isCustomMatcherWorkerReadyMessage(value)) {
+      this.markWorkerReady();
+      return;
+    }
     if (!isCustomMatcherWorkerResponse(value)) {
       this.disable({
         kind: "protocolError",
@@ -221,6 +268,8 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
     }
     clearTimeout(pending.timeout);
     this.pending.delete(value.id);
+    // A response proves the worker started even if its ready message was not observed.
+    this.markWorkerReady();
     if (!value.ok) {
       pending.resolve([]);
       this.disable({ kind: "workerError", message: value.error });
@@ -228,11 +277,7 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
     }
     if (value.lineTruncated && !this.lineTruncationReported) {
       this.lineTruncationReported = true;
-      try {
-        this.onLineTruncated?.();
-      } catch {
-        // Warning reporting must not destabilize custom matching.
-      }
+      this.onLineTruncated?.();
     }
     pending.resolve(value.diagnostics);
   }
@@ -245,11 +290,7 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
     this.disableReason = reason;
     this.resolvePendingWithEmptyResults();
     this.terminateWorker();
-    try {
-      this.onDisabled?.(reason);
-    } catch {
-      // Diagnostic reporting must not let a consumer callback destabilize the host.
-    }
+    this.onDisabled?.(reason);
   }
 
   private resolvePendingWithEmptyResults(): void {
@@ -261,15 +302,10 @@ export class BuildDiagnosticCustomMatcherWorkerClient {
   }
 
   private terminateWorker(): void {
+    this.clearStartupTimeout();
     const worker = this.worker;
     this.worker = undefined;
-    if (worker) {
-      try {
-        void worker.terminate().catch(() => undefined);
-      } catch {
-        // The client is already terminal; worker shutdown failures are non-fatal.
-      }
-    }
+    void worker?.terminate().catch(() => undefined);
   }
 }
 
@@ -309,9 +345,4 @@ function isHighSurrogate(value: number): boolean {
 
 function isLowSurrogate(value: number): boolean {
   return value >= 0xdc00 && value <= 0xdfff;
-}
-
-function safeErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 512) || "Custom matcher worker failed.";
 }
