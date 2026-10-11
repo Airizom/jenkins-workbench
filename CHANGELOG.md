@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.56.1] - 2026-10-11
+
+### Fixed
+
+- fix(panels): correct refresh races, persisted state, nested pipeline rendering, console streaming, test search, coverage updates, and offline node capacity.
+- fix(jenkins): harden authentication, request headers, URL handling, revision evidence, cache invalidation, and concurrent node updates.
+- fix(diagnostics): bound log scans and path resolution, preserve console references, and reset oversized multiline parser state.
+- fix(jenkinsfile): correct Groovy lexing, GDSL scope handling, pipeline discovery, quick-fix placement, and validation cancellation.
+- fix(workflows): correct current-branch target resolution, independent environment polling, tree refresh coordination, history cancellation, and task retry cleanup.
+- fix(storage): preserve parameter defaults, preset secrets, artifact paths, export destinations, and preview leases across failures and concurrent updates.
+
+### Changed
+
+- refactor: consolidate shared guards, formatters, loaders, and webview helpers; simplify custom matcher workers and remove redundant infrastructure.
+- chore(release): harden cross-platform publishing tools, inline manifest schemas, avoid duplicate CI compilation, and expand regression coverage.
+
 ## [1.56.0] - 2026-10-01
 
 ### Changed
