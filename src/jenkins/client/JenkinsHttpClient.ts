@@ -63,9 +63,16 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     });
   }
 
-  async requestJson<T>(url: string): Promise<T> {
+  async requestJson<T>(
+    url: string,
+    options?: { beforeRequest?: () => void; signal?: AbortSignal }
+  ): Promise<T> {
     return this.requestWithSsoRetry(url, () =>
-      requestJsonInternal<T>(url, this.getRequestOptions())
+      requestJsonInternal<T>(url, {
+        ...this.getRequestOptions(),
+        beforeRequest: options?.beforeRequest,
+        signal: options?.signal
+      })
     );
   }
 
@@ -99,10 +106,13 @@ export class JenkinsHttpClient implements JenkinsClientContext {
 
   async requestStream(
     url: string,
-    options?: { maxBytes?: number }
+    options?: { maxBytes?: number; signal?: AbortSignal }
   ): Promise<JenkinsStreamResponse> {
     return this.requestWithSsoRetry(url, () =>
-      requestStreamInternal(url, this.getRequestOptions(undefined, options?.maxBytes))
+      requestStreamInternal(url, {
+        ...this.getRequestOptions(undefined, options?.maxBytes),
+        ...(options?.signal ? { signal: options.signal } : {})
+      })
     );
   }
 

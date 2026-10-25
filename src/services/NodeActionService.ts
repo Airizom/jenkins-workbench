@@ -5,6 +5,7 @@ import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { formatNodeOfflineReason } from "../jenkins/NodeFormatters";
 import type { JenkinsNodeDetails } from "../jenkins/types";
+import { NodeManagementWorkflow } from "./NodeManagementWorkflow";
 
 export type NodeActionTarget = {
   environment: JenkinsEnvironmentRef;
@@ -18,6 +19,42 @@ export interface NodeActionRefreshHost extends EnvironmentScopedRefreshHost {}
 
 export class NodeActionService {
   constructor(private readonly dataService: JenkinsDataService) {}
+
+  // fallow-ignore-next-line unused-class-member -- invoked through computed node action handlers
+  async editNodeLabels(
+    target: NodeActionTarget,
+    refreshHost?: NodeActionRefreshHost
+  ): Promise<boolean> {
+    return new NodeManagementWorkflow(this.dataService).editNodeLabels(target, refreshHost);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through computed node action handlers
+  async disconnectNodeAgent(
+    target: NodeActionTarget,
+    refreshHost?: NodeActionRefreshHost
+  ): Promise<boolean> {
+    return new NodeManagementWorkflow(this.dataService).disconnectNodeAgent(target, refreshHost);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through computed node action handlers
+  async deleteNode(
+    target: NodeActionTarget,
+    refreshHost?: NodeActionRefreshHost
+  ): Promise<boolean> {
+    return new NodeManagementWorkflow(this.dataService).deleteNode(target, refreshHost);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through computed node action handlers
+  async copyNode(target: NodeActionTarget, refreshHost?: NodeActionRefreshHost): Promise<boolean> {
+    return new NodeManagementWorkflow(this.dataService).copyNode(target, refreshHost);
+  }
+
+  async createNode(
+    environment: JenkinsEnvironmentRef,
+    refreshHost?: NodeActionRefreshHost
+  ): Promise<NodeActionTarget | undefined> {
+    return new NodeManagementWorkflow(this.dataService).createNode(environment, refreshHost);
+  }
 
   /**
    * Confirms taking the node offline and asks for the optional reason. The

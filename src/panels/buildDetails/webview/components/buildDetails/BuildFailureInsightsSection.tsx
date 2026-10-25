@@ -90,11 +90,13 @@ function BuildSummaryGroup({
   insights,
   visibility,
   testsCard,
+  onDownloadAllArtifacts,
   onArtifactAction
 }: {
   insights: BuildFailureInsightsViewModel;
   visibility: InsightsVisibility;
   testsCard: React.ReactNode;
+  onDownloadAllArtifacts: () => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }): React.JSX.Element {
   return (
@@ -110,6 +112,7 @@ function BuildSummaryGroup({
         <BuildFailureArtifactsCard
           items={insights.artifacts}
           overflowCount={insights.artifactsOverflow}
+          onDownloadAllArtifacts={onDownloadAllArtifacts}
           onArtifactAction={onArtifactAction}
         />
       ) : null}
@@ -127,6 +130,7 @@ type BuildFailureInsightsSectionProps = {
   hasTestsTab?: boolean;
   /** Jenkins reported counts but the case-level test report could not be loaded. */
   testReportUnavailable?: boolean;
+  onDownloadAllArtifacts: () => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
   onOpenDiagnosticSource: (targetId: string) => void;
   onShowDiagnosticProblems: () => void;
@@ -145,6 +149,7 @@ export function BuildFailureInsightsSection({
   showTestsSummary,
   hasTestsTab = true,
   testReportUnavailable = false,
+  onDownloadAllArtifacts,
   onArtifactAction,
   onOpenDiagnosticSource,
   onShowDiagnosticProblems,
@@ -189,6 +194,7 @@ export function BuildFailureInsightsSection({
           insights={insights}
           visibility={visibility}
           testsCard={testsCard}
+          onDownloadAllArtifacts={onDownloadAllArtifacts}
           onArtifactAction={onArtifactAction}
         />
       ) : null}

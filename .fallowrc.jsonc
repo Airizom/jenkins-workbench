@@ -105,7 +105,11 @@
     },
     {
       "implements": "JenkinsArtifactRetrievalRuntimeSurface",
-      "members": ["getArtifact", "getArtifactStream"]
+      "members": ["getArtifact", "getArtifactStream", "getArtifactArchiveStream"]
+    },
+    {
+      "implements": "JenkinsBuildRelationshipsRuntimeSurface",
+      "members": ["getDownstreamBuilds"]
     },
     {
       "implements": "JenkinsBuildInspectionRuntimeSurface",

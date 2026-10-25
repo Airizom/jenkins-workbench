@@ -67,6 +67,7 @@ function renderOverview(overrides: Partial<Parameters<typeof OverviewTab>[0]> = 
       diagnostics: EMPTY_BUILD_DIAGNOSTICS,
       hasTests: false,
       onNavigateTab: () => undefined,
+      onDownloadAllArtifacts: () => undefined,
       onArtifactAction: () => undefined,
       onOpenDiagnosticSource: () => undefined,
       onShowDiagnosticProblems: () => undefined,
@@ -136,6 +137,34 @@ describe("OverviewTab", () => {
 });
 
 describe("BuildFailureArtifactsCard", () => {
+  it("offers one build-level ZIP button even when the artifact list is truncated", () => {
+    let downloads = 0;
+    const card = BuildFailureArtifactsCard({
+      items: [{ name: "report.txt", relativePath: "report.txt" }],
+      overflowCount: 42,
+      onDownloadAllArtifacts: () => {
+        downloads++;
+      },
+      onArtifactAction: () => undefined
+    });
+    card.props.headerExtra.props.onClick();
+    assert.equal(downloads, 1);
+    const html = renderToStaticMarkup(createElement(TooltipProvider, null, card));
+    assert.match(html, /Download All Artifacts as ZIP/);
+    assert.match(html, /42 more/);
+  });
+
+  it("hides the ZIP button when there are no artifacts", () => {
+    const html = renderToStaticMarkup(
+      createElement(BuildFailureArtifactsCard, {
+        items: [],
+        overflowCount: 0,
+        onDownloadAllArtifacts: () => undefined,
+        onArtifactAction: () => undefined
+      })
+    );
+    assert.doesNotMatch(html, /Download All Artifacts as ZIP/);
+  });
   it("shows the artifact path as visible text rather than a hover-only tooltip", () => {
     const html = renderToStaticMarkup(
       createElement(
@@ -144,6 +173,7 @@ describe("BuildFailureArtifactsCard", () => {
         createElement(BuildFailureArtifactsCard, {
           items: [{ name: "junit.xml", fileName: "junit.xml", relativePath: "reports/junit.xml" }],
           overflowCount: 0,
+          onDownloadAllArtifacts: () => undefined,
           onArtifactAction: () => undefined
         })
       )

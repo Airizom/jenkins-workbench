@@ -1,9 +1,6 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { canonicalizeJobUrlForEnvironment } from "../jenkins/urls";
 import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
-import type { JobTreeItem } from "../tree/TreeItems";
 import { withActionErrorMessage } from "../ui/ActionErrorMessage";
 
 export { formatActionError, withActionErrorMessage };
@@ -14,19 +11,6 @@ interface FullEnvironmentRefreshHost {
 
 export function getTreeItemLabel(item: vscode.TreeItem): string {
   return resolveTreeItemLabel(item) ?? "item";
-}
-
-export function getCanonicalTreeJobUrl(item: JobScopedStateItem): string {
-  return canonicalizeJobUrlForEnvironment(item.environment.url, item.jobUrl) ?? item.jobUrl;
-}
-
-export function getTreeJobUrlAliases(item: JobScopedStateItem): string[] {
-  const canonicalJobUrl = getCanonicalTreeJobUrl(item);
-  return canonicalJobUrl === item.jobUrl ? [item.jobUrl] : [item.jobUrl, canonicalJobUrl];
-}
-
-export function getJobTreeItemKind(item: JobTreeItem): "job" | "pipeline" {
-  return item.presentation;
 }
 
 export function createEnvironmentRefreshCallback(
@@ -51,71 +35,4 @@ export function requireSelection<T>(
 export async function confirmModalAction(prompt: string, actionLabel: string): Promise<boolean> {
   const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, actionLabel);
   return choice === actionLabel;
-}
-
-interface JobScopedStateItem {
-  environment: JenkinsEnvironmentRef;
-  jobUrl: string;
-}
-
-interface AddJobScopedStateOptions<T extends JobScopedStateItem> {
-  item: T | undefined;
-  missingSelectionMessage: string;
-  getLabel: (item: T) => string;
-  alreadyPresentMessage: (label: string) => string;
-  addedMessage: (label: string) => string;
-  isPresent: (item: T) => Promise<boolean>;
-  add: (item: T, label: string) => Promise<void>;
-  refreshEnvironment: (environmentId: string) => void;
-}
-
-interface RemoveJobScopedStateOptions<T extends JobScopedStateItem> {
-  item: T | undefined;
-  missingSelectionMessage: string;
-  getLabel: (item: T) => string;
-  missingStateMessage: (label: string) => string;
-  removedMessage: (label: string) => string;
-  remove: (item: T) => Promise<boolean>;
-  refreshEnvironment: (environmentId: string) => void;
-}
-
-export async function addJobScopedState<T extends JobScopedStateItem>(
-  options: AddJobScopedStateOptions<T>
-): Promise<void> {
-  const item = requireSelection(options.item, options.missingSelectionMessage);
-  if (!item) {
-    return;
-  }
-
-  const label = options.getLabel(item);
-  const isPresent = await options.isPresent(item);
-
-  if (isPresent) {
-    void vscode.window.showInformationMessage(options.alreadyPresentMessage(label));
-    return;
-  }
-
-  await options.add(item, label);
-  void vscode.window.showInformationMessage(options.addedMessage(label));
-  options.refreshEnvironment(item.environment.environmentId);
-}
-
-export async function removeJobScopedState<T extends JobScopedStateItem>(
-  options: RemoveJobScopedStateOptions<T>
-): Promise<void> {
-  const item = requireSelection(options.item, options.missingSelectionMessage);
-  if (!item) {
-    return;
-  }
-
-  const label = options.getLabel(item);
-  const removed = await options.remove(item);
-
-  if (!removed) {
-    void vscode.window.showInformationMessage(options.missingStateMessage(label));
-    return;
-  }
-
-  void vscode.window.showInformationMessage(options.removedMessage(label));
-  options.refreshEnvironment(item.environment.environmentId);
 }

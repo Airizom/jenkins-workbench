@@ -342,6 +342,10 @@ export function buildArtifactDownloadUrl(buildUrl: string, relativePath: string)
   return new URL(`artifact/${encodedPath}`, base).toString();
 }
 
+export function buildArtifactArchiveDownloadUrl(buildUrl: string): string {
+  return new URL("artifact/*zip*/archive.zip", ensureTrailingSlash(buildUrl)).toString();
+}
+
 export function buildWorkspaceDirectoryListingUrl(jobUrl: string, relativePath?: string): string {
   const base = ensureTrailingSlash(jobUrl);
   const encodedPath = relativePath ? encodePathSegments(relativePath) : "";

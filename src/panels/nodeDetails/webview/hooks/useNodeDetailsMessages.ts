@@ -18,6 +18,18 @@ function reduceNodeDetailsMessage(
     case "updateNodeDetails":
       dispatch({ type: "updateNodeDetails", payload: message });
       break;
+    case "updateNodeAgentLog":
+      dispatch({ type: "updateNodeAgentLog", payload: message.payload });
+      break;
+    case "copyNodeAgentLogResult":
+      if (message.success) {
+        toast({
+          title: "Copied",
+          description: "Displayed agent log copied to clipboard.",
+          variant: "success"
+        });
+      }
+      break;
     case "copyNodeJsonResult":
       if (message.success) {
         toast({

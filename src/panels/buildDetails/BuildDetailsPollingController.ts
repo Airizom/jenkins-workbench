@@ -189,10 +189,14 @@ export class BuildDetailsPollingController {
     this.testReportOptions = options;
   }
 
-  async loadInitial(): Promise<BuildDetailsInitialState> {
+  async loadInitial(initialDetails?: JenkinsBuildDetails): Promise<BuildDetailsInitialState> {
     const [detailsResult, workflowResult, consoleResult, pendingInputsResult] =
       await Promise.allSettled([
-        this.statusBackend.getBuildDetails(this.environment, this.buildUrl),
+        initialDetails
+          ? Promise.resolve(initialDetails)
+          : this.statusBackend.getBuildDetails(this.environment, this.buildUrl, {
+              includeCauses: true
+            }),
         this.statusBackend.getWorkflowRun(this.environment, this.buildUrl),
         this.consoleStreamManager.loadInitialConsole(),
         this.pendingInputProvider.getPendingInputActions(this.environment, this.buildUrl)

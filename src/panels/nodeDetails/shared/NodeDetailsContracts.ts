@@ -44,6 +44,9 @@ export interface NodeDetailsViewModel {
   canBringOnline: boolean;
   canLaunchAgent: boolean;
   canOpenAgentInstructions: boolean;
+  /** Configuration support is verified on demand before any mutation. */
+  canManageNode?: boolean;
+  canDisconnectAgent?: boolean;
   offlineReason?: string;
   /** Epoch ms when Jenkins recorded the offline cause, when reported. */
   offlineSinceMs?: number;

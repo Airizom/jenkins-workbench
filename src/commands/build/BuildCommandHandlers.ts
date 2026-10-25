@@ -5,8 +5,7 @@ export {
   rebuildBuild,
   rejectInput,
   replayBuild,
-  runReplayDraft,
-  stopBuild
+  runReplayDraft
 } from "./BuildLifecycleHandlers";
 export {
   type OpenableTreeItem,

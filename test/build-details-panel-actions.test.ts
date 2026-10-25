@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
+import type { ArtifactActionRequest } from "../src/ui/ArtifactActionHandler";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { BuildDetailsPanelControllerAccess } from "../src/panels/buildDetails/BuildDetailsPanelControllerTypes";
 import type { BuildDetailsOutgoingMessage } from "../src/panels/buildDetails/shared/BuildDetailsPanelMessages";
@@ -43,7 +44,9 @@ function createActions(options?: {
   workflowResult?: ManagementResult;
   workflowError?: Error;
   withoutWorkflow?: boolean;
+  withoutArtifactHandler?: boolean;
 }) {
+  const artifactRequests: ArtifactActionRequest[] = [];
   const posted: BuildDetailsOutgoingMessage[] = [];
   const statusRefreshes: number[] = [];
   const workflowCalls: Array<{ method: string; target: unknown; keep?: boolean }> = [];
@@ -103,7 +106,14 @@ function createActions(options?: {
 
   const actions = new BuildDetailsPanelActions({
     controller,
-    getArtifactActionHandler: () => undefined,
+    getArtifactActionHandler: () =>
+      options?.withoutArtifactHandler
+        ? undefined
+        : {
+            handle: async (request: ArtifactActionRequest) => {
+              artifactRequests.push(request);
+            }
+          },
     getConsoleExporter: () => {
       throw new Error("unused");
     },
@@ -111,7 +121,7 @@ function createActions(options?: {
     getTestSourceNavigationUiService: () => undefined,
     getBuildManagementWorkflow: () => (options?.withoutWorkflow ? undefined : (workflow as never))
   });
-  return { actions, posted, restarts, rejects, statusRefreshes, workflowCalls };
+  return { actions, posted, restarts, rejects, statusRefreshes, workflowCalls, artifactRequests };
 }
 
 describe("BuildDetailsPanelActions", () => {
@@ -119,6 +129,28 @@ describe("BuildDetailsPanelActions", () => {
     warningPrompts.length = 0;
     errorMessages.length = 0;
     warningResponse = undefined;
+  });
+
+  it.each([false, true])("downloads the current build archive (running: %s)", async (building) => {
+    const { actions, artifactRequests } = createActions({
+      details: { number: 9, fullDisplayName: " app #9 ", building }
+    });
+    await actions.handleDownloadAllArtifacts();
+    assert.deepEqual(artifactRequests, [
+      {
+        action: "downloadAll",
+        environment,
+        buildUrl: "https://jenkins.example/job/app/9/",
+        buildNumber: 9,
+        jobNameHint: "app #9"
+      }
+    ]);
+  });
+
+  it("ignores archive requests when its handler is unavailable", async () => {
+    const { actions, artifactRequests } = createActions({ withoutArtifactHandler: true });
+    await actions.handleDownloadAllArtifacts();
+    assert.deepEqual(artifactRequests, []);
   });
 
   it("confirms before restarting from a stage and does nothing when dismissed", async () => {

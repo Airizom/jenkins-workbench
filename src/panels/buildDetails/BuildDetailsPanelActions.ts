@@ -244,11 +244,31 @@ export class BuildDetailsPanelActions {
     this.controller.clearPipelineLogTarget();
   }
 
+  async handleDownloadAllArtifacts(): Promise<void> {
+    await this.handleArtifactRequest({ action: "downloadAll" });
+  }
+
   async handleArtifactAction(message: {
     action: "preview" | "download";
     relativePath: string;
     fileName?: string;
   }): Promise<void> {
+    const fileName =
+      typeof message.fileName === "string" && message.fileName.length > 0
+        ? message.fileName
+        : undefined;
+    await this.handleArtifactRequest({
+      action: message.action,
+      relativePath: message.relativePath,
+      fileName
+    });
+  }
+
+  private async handleArtifactRequest(
+    request:
+      | { action: "downloadAll" }
+      | { action: "preview" | "download"; relativePath: string; fileName?: string }
+  ): Promise<void> {
     const artifactActionHandler = this.getArtifactActionHandler();
     const environment = this.controller.getEnvironment();
     const buildUrl = this.controller.getBuildUrl();
@@ -256,20 +276,12 @@ export class BuildDetailsPanelActions {
     if (!artifactActionHandler || !environment || !buildUrl) {
       return;
     }
-    const fileName =
-      typeof message.fileName === "string" && message.fileName.length > 0
-        ? message.fileName
-        : undefined;
-    const jobNameHint =
-      details?.fullDisplayName?.trim() || details?.displayName?.trim() || undefined;
     await artifactActionHandler.handle({
-      action: message.action,
+      ...request,
       environment,
       buildUrl,
       buildNumber: details?.number,
-      relativePath: message.relativePath,
-      fileName,
-      jobNameHint
+      jobNameHint: details?.fullDisplayName?.trim() || details?.displayName?.trim() || undefined
     });
   }
 

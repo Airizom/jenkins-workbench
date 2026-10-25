@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type {
+  ArtifactArchiveDownloadRequest,
   ArtifactDownloadRequest,
   ArtifactStorageService
 } from "../src/services/ArtifactStorageService";
@@ -18,10 +19,35 @@ const infoMessages: string[] = [];
 const errorMessages: string[] = [];
 let workspaceFolders: TestWorkspaceFolder[] | undefined;
 let workspaceFolderPickResult: TestWorkspaceFolder | undefined;
+let cancelImmediately = false;
+let cancelDownload: (() => void) | undefined;
+let progressDisposed = false;
+const progressOptions: unknown[] = [];
 
 vi.doMock("vscode", () => ({
   ...vscodeStub,
+  ProgressLocation: { Notification: 15 },
   window: {
+    withProgress: async (
+      options: unknown,
+      task: (_progress: unknown, token: unknown) => Promise<unknown>
+    ) => {
+      progressOptions.push(options);
+      return task(
+        {},
+        {
+          isCancellationRequested: cancelImmediately,
+          onCancellationRequested: (listener: () => void) => {
+            cancelDownload = listener;
+            return {
+              dispose: () => {
+                progressDisposed = true;
+              }
+            };
+          }
+        }
+      );
+    },
     showInformationMessage: async (message: string) => {
       infoMessages.push(message);
       return undefined;
@@ -57,13 +83,19 @@ function createFolder(name: string, options?: { scheme?: string }): TestWorkspac
   };
 }
 
-function createHandler(options?: { previewError?: unknown; downloadError?: unknown }): {
+function createHandler(options?: {
+  previewError?: unknown;
+  downloadError?: unknown;
+  archiveDownload?: (request: ArtifactArchiveDownloadRequest) => Promise<void>;
+}): {
   handler: InstanceType<typeof DefaultArtifactActionHandler>;
   previewRequests: unknown[];
   downloadCalls: ArtifactDownloadRequest[];
+  archiveCalls: ArtifactArchiveDownloadRequest[];
 } {
   const previewRequests: unknown[] = [];
   const downloadCalls: ArtifactDownloadRequest[] = [];
+  const archiveCalls: ArtifactArchiveDownloadRequest[] = [];
 
   const previewer = {
     preview: async (request: unknown) => {
@@ -75,6 +107,15 @@ function createHandler(options?: { previewError?: unknown; downloadError?: unkno
   } as unknown as ArtifactPreviewer;
 
   const storageService = {
+    downloadAllArtifacts: async (request: ArtifactArchiveDownloadRequest) => {
+      archiveCalls.push(request);
+      request.signal?.throwIfAborted();
+      if (options?.downloadError) {
+        throw options.downloadError;
+      }
+      await options?.archiveDownload?.(request);
+      return { label: "42.zip", targetPath: "/workspace/lib/artifacts/42.zip" };
+    },
     downloadArtifact: async (request: ArtifactDownloadRequest) => {
       if (options?.downloadError) {
         throw options.downloadError;
@@ -88,12 +129,16 @@ function createHandler(options?: { previewError?: unknown; downloadError?: unkno
     downloadRoot: `${folder.name}-artifacts`,
     maxBytes: 1024
   }));
-  return { handler, previewRequests, downloadCalls };
+  return { handler, previewRequests, downloadCalls, archiveCalls };
 }
 
 function resetMessages(): void {
   infoMessages.length = 0;
   errorMessages.length = 0;
+  progressOptions.length = 0;
+  cancelImmediately = false;
+  progressDisposed = false;
+  cancelDownload = undefined;
 }
 
 describe("DefaultArtifactActionHandler.handle", () => {
@@ -262,5 +307,83 @@ describe("DefaultArtifactActionHandler.handle", () => {
     });
 
     assert.deepEqual(errorMessages, ["Failed to download report.html: Unexpected error."]);
+  });
+});
+
+describe("DefaultArtifactActionHandler archive downloads", () => {
+  const request = {
+    action: "downloadAll" as const,
+    environment,
+    buildUrl: "https://jenkins.example/job/app/42/",
+    buildNumber: 42,
+    jobNameHint: "app"
+  };
+
+  it("downloads to the selected workspace with progress and reports the saved ZIP", async () => {
+    resetMessages();
+    workspaceFolders = [createFolder("app"), createFolder("lib")];
+    workspaceFolderPickResult = workspaceFolders[1];
+    const { handler, archiveCalls, downloadCalls } = createHandler();
+    await handler.handle(request);
+    assert.equal(downloadCalls.length, 0);
+    assert.equal(archiveCalls.length, 1);
+    assert.equal(archiveCalls[0].workspaceRoot, "/workspace/lib");
+    assert.equal(archiveCalls[0].downloadRoot, "lib-artifacts");
+    assert.equal(archiveCalls[0].maxBytes, 1024);
+    assert.equal(archiveCalls[0].signal?.aborted, false);
+    assert.deepEqual(progressOptions, [
+      { location: 15, title: "Downloading all artifacts as ZIP", cancellable: true }
+    ]);
+    assert.equal(progressDisposed, true);
+    assert.deepEqual(infoMessages, ["Downloaded 42.zip to /workspace/lib/artifacts/42.zip."]);
+  });
+
+  it.each(["missing", "non-file", "dismissed"])(
+    "does not start ZIP progress for a %s workspace",
+    async (kind) => {
+      resetMessages();
+      workspaceFolders =
+        kind === "missing"
+          ? undefined
+          : kind === "non-file"
+            ? [createFolder("remote", { scheme: "vfs" })]
+            : [createFolder("app"), createFolder("lib")];
+      workspaceFolderPickResult = undefined;
+      const { handler, archiveCalls } = createHandler();
+      await handler.handle(request);
+      assert.equal(archiveCalls.length, 0);
+      assert.equal(progressOptions.length, 0);
+      assert.deepEqual(errorMessages, []);
+    }
+  );
+
+  it.each([true, false])(
+    "silently handles cancellation (already canceled: %s)",
+    async (alreadyCanceled) => {
+      resetMessages();
+      workspaceFolders = [createFolder("app")];
+      cancelImmediately = alreadyCanceled;
+      const { handler } = createHandler({
+        archiveDownload: async (download) => {
+          cancelDownload?.();
+          download.signal?.throwIfAborted();
+        }
+      });
+      await handler.handle(request);
+      assert.deepEqual(infoMessages, []);
+      assert.deepEqual(errorMessages, []);
+      assert.equal(progressDisposed, true);
+    }
+  );
+
+  it("reports ZIP failures with size-limit guidance and disposes the cancel listener", async () => {
+    resetMessages();
+    workspaceFolders = [createFolder("app")];
+    const { handler } = createHandler({ downloadError: new JenkinsMaxBytesError(1024 * 1024) });
+    await handler.handle(request);
+    assert.equal(errorMessages.length, 1);
+    assert.match(errorMessages[0], /^Failed to download all artifacts as ZIP:/);
+    assert.match(errorMessages[0], /download size limit of 1 MB/);
+    assert.equal(progressDisposed, true);
   });
 });

@@ -9,15 +9,18 @@ import {
 } from "../services/ArtifactStorageService";
 import type { ArtifactPreviewer } from "./ArtifactPreviewer";
 
-export interface ArtifactActionRequest {
-  action: "preview" | "download";
+interface ArtifactBuildContext {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   buildNumber?: number;
-  relativePath: string;
-  fileName?: string;
   jobNameHint?: string;
 }
+
+export type ArtifactActionRequest = ArtifactBuildContext &
+  (
+    | { action: "preview" | "download"; relativePath: string; fileName?: string }
+    | { action: "downloadAll" }
+  );
 
 export interface ArtifactActionHandler {
   handle(request: ArtifactActionRequest): Promise<void>;
@@ -40,7 +43,10 @@ export class DefaultArtifactActionHandler implements ArtifactActionHandler {
   ) {}
 
   async handle(request: ArtifactActionRequest): Promise<void> {
-    const label = request.fileName || path.basename(request.relativePath) || request.relativePath;
+    const label =
+      request.action === "downloadAll"
+        ? "all artifacts as ZIP"
+        : request.fileName || path.basename(request.relativePath) || request.relativePath;
 
     try {
       if (request.action === "preview") {
@@ -65,17 +71,52 @@ export class DefaultArtifactActionHandler implements ArtifactActionHandler {
       }
 
       const options = this.optionsProvider(workspaceFolder);
-      const result = await this.storageService.downloadArtifact({
+      const context = {
         environment: request.environment,
         buildUrl: request.buildUrl,
         buildNumber: request.buildNumber,
-        relativePath: request.relativePath,
-        fileName: request.fileName,
         jobNameHint: request.jobNameHint,
         workspaceRoot: workspaceFolder.uri.fsPath,
         downloadRoot: options.downloadRoot,
         maxBytes: options.maxBytes
-      });
+      };
+      const result =
+        request.action === "downloadAll"
+          ? await vscode.window.withProgress(
+              {
+                location: vscode.ProgressLocation.Notification,
+                title: "Downloading all artifacts as ZIP",
+                cancellable: true
+              },
+              async (_progress, token) => {
+                const abortController = new AbortController();
+                const subscription = token.onCancellationRequested(() => abortController.abort());
+                if (token.isCancellationRequested) {
+                  abortController.abort();
+                }
+                try {
+                  return await this.storageService.downloadAllArtifacts({
+                    ...context,
+                    signal: abortController.signal
+                  });
+                } catch (error) {
+                  if (abortController.signal.aborted) {
+                    return undefined;
+                  }
+                  throw error;
+                } finally {
+                  subscription.dispose();
+                }
+              }
+            )
+          : await this.storageService.downloadArtifact({
+              ...context,
+              relativePath: request.relativePath,
+              fileName: request.fileName
+            });
+      if (!result) {
+        return;
+      }
 
       void vscode.window.showInformationMessage(
         `Downloaded ${result.label} to ${result.targetPath}.`

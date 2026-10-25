@@ -1,11 +1,12 @@
 import type { JenkinsBuildDataOperations } from "./data/JenkinsBuildDataOperations";
+import type { JenkinsBuildRelationships } from "./data/JenkinsBuildRelationships";
 import type { JenkinsCoverageDataOperations } from "./data/JenkinsCoverageDataOperations";
 import type { JenkinsPendingInputDataOperations } from "./data/JenkinsPendingInputDataOperations";
 import type { JenkinsQueueAndJobManagementOperations } from "./data/JenkinsQueueAndJobManagementOperations";
 
 export type JenkinsArtifactRetrievalRuntimeSurface = Pick<
   JenkinsBuildDataOperations,
-  "getArtifact" | "getArtifactStream"
+  "getArtifact" | "getArtifactStream" | "getArtifactArchiveStream"
 >;
 
 export type JenkinsBuildInspectionRuntimeSurface = Pick<
@@ -50,4 +51,9 @@ export type JenkinsPipelineRestartRuntimeSurface = Pick<
 export type JenkinsJobStateRuntimeSurface = Pick<
   JenkinsQueueAndJobManagementOperations,
   "enableJob" | "disableJob"
+>;
+
+export type JenkinsBuildRelationshipsRuntimeSurface = Pick<
+  JenkinsBuildRelationships,
+  "getDownstreamBuilds"
 >;

@@ -6,7 +6,9 @@ import {
   isPlainRecord,
   parseSetLoadingOutgoingMessage
 } from "../../../shared/runtimeGuards";
+import type { NodeAgentLogState } from "./NodeAgentLogContracts";
 import type { NodeDetailsViewModel, NodeStatusClass } from "./NodeDetailsContracts";
+import { isNodeDetailsTab, type NodeDetailsTab } from "./NodeDetailsTabs";
 
 export interface NodeDetailsUpdateMessage {
   type: "updateNodeDetails";
@@ -21,6 +23,8 @@ export interface NodeDetailsCopyJsonResultMessage {
 export type NodeDetailsOutgoingMessage =
   | NodeDetailsUpdateMessage
   | NodeDetailsCopyJsonResultMessage
+  | { type: "updateNodeAgentLog"; payload: NodeAgentLogState }
+  | { type: "copyNodeAgentLogResult"; success: boolean }
   | { type: "setLoading"; value: boolean };
 
 export interface RefreshNodeDetailsMessage {
@@ -50,7 +54,18 @@ export interface CopyNodeJsonMessage {
   content: string;
 }
 
+export type NodeManagementAction =
+  | "editNodeLabels"
+  | "disconnectNodeAgent"
+  | "copyNode"
+  | "deleteNode";
+
 export type NodeDetailsIncomingMessage =
+  | { type: NodeManagementAction }
+  | { type: "setNodeDetailsTab"; tab: NodeDetailsTab }
+  | { type: "setNodeAgentLogFollowing"; following: boolean }
+  | { type: "refreshNodeAgentLog" }
+  | { type: "copyNodeAgentLog" }
   | RefreshNodeDetailsMessage
   | LoadAdvancedNodeDetailsMessage
   | TakeNodeOfflineMessage
@@ -151,6 +166,13 @@ export function isNodeDetailsViewModel(value: unknown): value is NodeDetailsView
   ) {
     return false;
   }
+  if (
+    !["canManageNode", "canDisconnectAgent"].every(
+      (field) => value[field] === undefined || typeof value[field] === "boolean"
+    )
+  ) {
+    return false;
+  }
   if (!REQUIRED_BOOLEAN_FIELDS.every((field) => typeof value[field] === "boolean")) {
     return false;
   }
@@ -207,11 +229,19 @@ export function parseNodeDetailsOutgoingMessage(
       }
       return { type: "updateNodeDetails", payload };
     }
+    case "updateNodeAgentLog": {
+      const payload = record.payload;
+      if (!isNodeAgentLogState(payload)) {
+        return undefined;
+      }
+      return { type: "updateNodeAgentLog", payload };
+    }
+    case "copyNodeAgentLogResult":
     case "copyNodeJsonResult": {
       if (typeof record.success !== "boolean") {
         return undefined;
       }
-      return { type: "copyNodeJsonResult", success: record.success };
+      return { type: record.type, success: record.success };
     }
     default:
       return undefined;
@@ -249,4 +279,44 @@ export function isCopyNodeJsonMessage(message: unknown): message is CopyNodeJson
     return false;
   }
   return typeof message.content === "string";
+}
+
+function isNodeAgentLogState(value: unknown): value is NodeAgentLogState {
+  return (
+    isPlainRecord(value) &&
+    typeof value.text === "string" &&
+    typeof value.loading === "boolean" &&
+    typeof value.following === "boolean" &&
+    typeof value.omitted === "boolean" &&
+    (value.catchingUp === undefined || typeof value.catchingUp === "boolean") &&
+    (value.error === undefined || typeof value.error === "string")
+  );
+}
+
+export function isNodeManagementMessage(
+  message: unknown
+): message is { type: NodeManagementAction } {
+  return (
+    isPlainRecord(message) &&
+    typeof message.type === "string" &&
+    ["editNodeLabels", "disconnectNodeAgent", "copyNode", "deleteNode"].includes(message.type)
+  );
+}
+
+export function isSetNodeDetailsTabMessage(
+  message: unknown
+): message is { type: "setNodeDetailsTab"; tab: NodeDetailsTab } {
+  return (
+    hasMessageType(message, "setNodeDetailsTab") &&
+    typeof message.tab === "string" &&
+    isNodeDetailsTab(message.tab)
+  );
+}
+
+export function isSetNodeAgentLogFollowingMessage(
+  message: unknown
+): message is { type: "setNodeAgentLogFollowing"; following: boolean } {
+  return (
+    hasMessageType(message, "setNodeAgentLogFollowing") && typeof message.following === "boolean"
+  );
 }

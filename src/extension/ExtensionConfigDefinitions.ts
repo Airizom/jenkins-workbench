@@ -4,6 +4,12 @@ export const CONFIG_KEYS = {
   cacheTtlSeconds: "cacheTtlSeconds",
   statusRefreshIntervalSeconds: "pollIntervalSeconds",
   watchErrorThreshold: "watchErrorThreshold",
+  watchNotificationsEnabled: "watchNotifications.enabled",
+  watchNotificationsFailure: "watchNotifications.failure",
+  watchNotificationsRecovery: "watchNotifications.recovery",
+  watchNotificationsCompletion: "watchNotifications.completion",
+  watchNotificationsPendingInput: "watchNotifications.pendingInput",
+  watchNotificationsWatchError: "watchNotifications.watchError",
   queuePollIntervalSeconds: "queuePollIntervalSeconds",
   taskRunnerPollIntervalSeconds: "taskRunner.pollIntervalSeconds",
   taskRunnerMaxConsecutiveErrors: "taskRunner.maxConsecutiveErrors",
@@ -39,6 +45,14 @@ export const DEFAULT_CACHE_TTL_SECONDS = 300;
 export const DEFAULT_STATUS_REFRESH_INTERVAL_SECONDS = 60;
 export const MIN_STATUS_REFRESH_INTERVAL_SECONDS = 5;
 export const DEFAULT_WATCH_ERROR_THRESHOLD = 3;
+export const DEFAULT_WATCH_NOTIFICATION_OPTIONS = {
+  enabled: true,
+  failure: true,
+  recovery: true,
+  completion: true,
+  pendingInput: true,
+  watchError: true
+} as const;
 export const DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 10;
 export const MIN_QUEUE_POLL_INTERVAL_SECONDS = 2;
 export const DEFAULT_TASK_RUNNER_POLL_INTERVAL_SECONDS = 2;

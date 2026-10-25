@@ -10,12 +10,14 @@ import type {
   BuildDetailsViewModel,
   PipelineLogTargetViewModel
 } from "../shared/BuildDetailsContracts";
+import { EMPTY_BUILD_NAVIGATION, EMPTY_BUILD_RELATIONSHIPS } from "../shared/BuildDetailsContracts";
 import type {
   BuildDetailsIncomingMessage,
   BuildManagementMessage
 } from "../shared/BuildDetailsPanelMessages";
 import {
   buildArtifactActionMessage,
+  buildDownloadAllArtifactsMessage,
   buildOpenTestSourceMessage,
   buildReloadTestReportMessage
 } from "./buildDetailsWebviewMessages";
@@ -51,6 +53,11 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const postMessage: (message: BuildDetailsIncomingMessage) => void = postVsCodeMessage;
   const handleOpenExternal = useOpenExternalMessage(postMessage);
   useBuildDetailsMessages(dispatch);
+  // The new document must install its message listener before the host republishes
+  // transient navigation and relationship state after replacing the webview HTML.
+  React.useEffect(() => {
+    postVsCodeMessage({ type: "buildDetailsReady" } satisfies BuildDetailsIncomingMessage);
+  }, []);
   const { showButton, scrollToTop } = useScrollToTopButton();
 
   const coverageState = state.coverageState ?? DEFAULT_COVERAGE_STATE;
@@ -158,6 +165,8 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
       <TooltipProvider>
         <div className="min-h-screen flex flex-col">
           <BuildStatusHero
+            navigation={state.navigation ?? EMPTY_BUILD_NAVIGATION}
+            onNavigateBuild={(direction) => postMessage({ type: "navigateBuild", direction })}
             displayName={state.displayName}
             description={state.description}
             keptForever={state.keptForever}
@@ -200,6 +209,14 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             {/* Failure history only analyzes finished builds. */}
             {isRunning ? null : <HistoryView embedded />}
             <BuildDetailsTabs
+              relatedBuilds={{
+                relationships: state.relationships ?? EMPTY_BUILD_RELATIONSHIPS,
+                navigationBusy: state.navigation?.busy,
+                onExpandedChange: (expanded) =>
+                  postMessage({ type: "setRelatedBuildsExpanded", expanded }),
+                onRefresh: () => postMessage({ type: "refreshRelatedBuilds" }),
+                onOpenBuild: (targetId) => postMessage({ type: "openRelatedBuild", targetId })
+              }}
               selectedTab={selectedTab}
               onTabChange={setSelectedTab}
               hasPendingInputs={hasPendingInputs}
@@ -240,6 +257,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               onToggleFollowLog={handleToggleFollowLog}
               onExportLogs={handleExportConsole}
               onOpenExternal={handleOpenExternal}
+              onDownloadAllArtifacts={() => postMessage(buildDownloadAllArtifactsMessage())}
               onArtifactAction={(action, artifact) =>
                 postMessage(buildArtifactActionMessage(action, artifact))
               }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   buildArtifactActionMessage,
+  buildDownloadAllArtifactsMessage,
   buildOpenTestSourceMessage,
   buildReloadTestReportMessage
 } from "../src/panels/buildDetails/webview/buildDetailsWebviewMessages";
@@ -11,6 +12,10 @@ import type {
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 
 describe("BuildDetails webview messages", () => {
+  it("builds a build-level archive request without an artifact path or URL", () => {
+    assert.deepEqual(buildDownloadAllArtifactsMessage(), { type: "downloadAllArtifacts" });
+  });
+
   it("builds artifact action messages with backend payload fields", () => {
     const artifact: BuildFailureArtifact = {
       name: "Report",

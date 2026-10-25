@@ -2,6 +2,8 @@ import { asRecord, parseSetLoadingOutgoingMessage } from "../../../shared/runtim
 import type {
   BuildDetailsUpdateMessage,
   BuildDiagnosticsViewModel,
+  BuildNavigationViewModel,
+  BuildRelationshipsViewModel,
   PipelineNodeLogViewModel
 } from "./BuildDetailsContracts";
 import { normalizePipelineLogTarget } from "./BuildDetailsContracts";
@@ -10,6 +12,8 @@ import { normalizeBuildDiagnosticsViewModel } from "./BuildDetailsDiagnosticsNor
 export type { BuildDetailsUpdateMessage } from "./BuildDetailsContracts";
 
 export type BuildDetailsOutgoingMessage =
+  | { type: "setBuildRelationships"; relationships: BuildRelationshipsViewModel }
+  | { type: "setBuildNavigation"; navigation: BuildNavigationViewModel }
   | BuildDetailsUpdateMessage
   | { type: "appendConsole"; text: string }
   | { type: "appendConsoleHtml"; html: string }
@@ -43,6 +47,27 @@ export function parseBuildDetailsOutgoingMessage(
   }
 
   switch (record.type) {
+    case "setBuildRelationships": {
+      return isBuildRelationshipsPayload(record.relationships)
+        ? { type: "setBuildRelationships", relationships: record.relationships }
+        : undefined;
+    }
+    case "setBuildNavigation": {
+      const navigation = asRecord(record.navigation);
+      return navigation &&
+        typeof navigation.canGoBack === "boolean" &&
+        typeof navigation.canGoForward === "boolean" &&
+        typeof navigation.busy === "boolean"
+        ? {
+            type: "setBuildNavigation",
+            navigation: {
+              canGoBack: navigation.canGoBack,
+              canGoForward: navigation.canGoForward,
+              busy: navigation.busy
+            }
+          }
+        : undefined;
+    }
     case "appendConsole": {
       const text = record.text;
       if (typeof text === "string" && text.length > 0) {
@@ -238,4 +263,43 @@ function parsePipelineNodeLogPayload(
     error: typeof record.error === "string" ? record.error : undefined,
     consoleUrl: typeof record.consoleUrl === "string" ? record.consoleUrl : undefined
   };
+}
+
+function isBuildRelationshipsPayload(value: unknown): value is BuildRelationshipsViewModel {
+  const record = asRecord(value);
+  if (!record) return false;
+  const isEntry = (value: unknown): boolean => {
+    const entry = asRecord(value);
+    return Boolean(
+      entry &&
+        typeof entry.targetId === "string" &&
+        entry.targetId.trim() &&
+        typeof entry.jobName === "string" &&
+        entry.jobName.trim() &&
+        Number.isSafeInteger(entry.number) &&
+        (entry.number as number) > 0 &&
+        (entry.resultLabel === undefined || typeof entry.resultLabel === "string") &&
+        (entry.resultClass === undefined || typeof entry.resultClass === "string")
+    );
+  };
+  return (
+    Array.isArray(record.upstream) &&
+    record.upstream.every(isEntry) &&
+    Array.isArray(record.downstream) &&
+    record.downstream.every(isEntry) &&
+    typeof record.loading === "boolean" &&
+    typeof record.searched === "boolean" &&
+    Number.isSafeInteger(record.jobsSearched) &&
+    (record.jobsSearched as number) >= 0 &&
+    Number.isSafeInteger(record.buildsSearched) &&
+    (record.buildsSearched as number) >= 0 &&
+    Array.isArray(record.partialReasons) &&
+    record.partialReasons.every((reason) => typeof reason === "string") &&
+    (record.lastCheckedAt === undefined ||
+      (typeof record.lastCheckedAt === "number" &&
+        Number.isFinite(record.lastCheckedAt) &&
+        record.lastCheckedAt >= 0 &&
+        record.lastCheckedAt <= 8_640_000_000_000_000)) &&
+    (record.error === undefined || typeof record.error === "string")
+  );
 }

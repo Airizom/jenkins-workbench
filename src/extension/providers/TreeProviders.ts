@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { TreeBulkSelection } from "../../commands/bulk/TreeBulkSelection";
 import type { BuildListFetchOptions } from "../../jenkins/JenkinsDataService";
 import type { TreeActivityOptions } from "../../tree/ActivityTypes";
 import { ActivityRefreshService } from "../../tree/activity/ActivityRefreshService";
@@ -39,8 +40,11 @@ export function createTreeProviderCatalog(options: TreeProviderOptions) {
     treeView: (container) =>
       vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {
         treeDataProvider: container.get("treeDataProvider"),
+        canSelectMany: true,
         showCollapseAll: true
       }),
+    treeBulkSelection: (container) =>
+      new TreeBulkSelection(container.get("treeView"), container.get("treeDataProvider")),
     treeExpansionState: (container) =>
       new TreeExpansionState(container.get("treeView"), container.get("treeDataProvider")),
     treeNavigator: (container) =>

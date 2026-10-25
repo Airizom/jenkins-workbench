@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsStreamResponse } from "../jenkins/request";
 import { normalizePosixRelativePath } from "../shared/posixPaths";
 import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactPathUtils";
 
@@ -16,7 +17,12 @@ const WINDOWS_RESERVED_PATH_COMPONENT = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(
 export interface ArtifactFilesystem {
   createDirectory(path: string, workspaceRoot: string): Thenable<void>;
   createWriteStream(filePath: string): NodeJS.WritableStream;
-  rename(sourcePath: string, targetPath: string, workspaceRoot: string): Thenable<void>;
+  rename(
+    sourcePath: string,
+    targetPath: string,
+    workspaceRoot: string,
+    signal?: AbortSignal
+  ): Thenable<void>;
   delete(path: string): Thenable<void>;
 }
 
@@ -30,6 +36,11 @@ export interface ArtifactDownloadRequest {
   workspaceRoot: string;
   downloadRoot: string;
   maxBytes?: number;
+}
+
+export interface ArtifactArchiveDownloadRequest
+  extends Omit<ArtifactDownloadRequest, "relativePath" | "fileName"> {
+  signal?: AbortSignal;
 }
 
 export interface ArtifactDownloadResult {
@@ -52,7 +63,10 @@ export class ArtifactStorageError extends Error {
 
 export class ArtifactStorageService {
   constructor(
-    private readonly dataService: Pick<JenkinsDataService, "getArtifactStream">,
+    private readonly dataService: Pick<
+      JenkinsDataService,
+      "getArtifactStream" | "getArtifactArchiveStream"
+    >,
     private readonly filesystem: ArtifactFilesystem
   ) {}
 
@@ -66,18 +80,55 @@ export class ArtifactStorageService {
       { maxBytes: resolveMaxBytes(request.maxBytes) }
     );
 
+    return this.saveResponse(request, resolved, response);
+  }
+
+  async downloadAllArtifacts(
+    request: ArtifactArchiveDownloadRequest
+  ): Promise<ArtifactDownloadResult> {
+    const targetRoot = resolveArtifactBuildRoot(request);
+    const targetPath = `${targetRoot}.zip`;
+    const label = path.basename(targetPath);
+    request.signal?.throwIfAborted();
+    const response = await this.dataService.getArtifactArchiveStream(
+      request.environment,
+      request.buildUrl,
+      { maxBytes: resolveMaxBytes(request.maxBytes), signal: request.signal }
+    );
+    return this.saveResponse(
+      request,
+      { targetPath, safeRelativePath: label, label },
+      response,
+      request.signal
+    );
+  }
+
+  private async saveResponse(
+    request: Pick<ArtifactDownloadRequest, "workspaceRoot">,
+    resolved: { targetPath: string; safeRelativePath: string; label: string },
+    response: JenkinsStreamResponse,
+    signal?: AbortSignal
+  ): Promise<ArtifactDownloadResult> {
     const temporaryPath = path.join(
       path.dirname(resolved.targetPath),
       `.${path.basename(resolved.targetPath)}.${randomUUID()}.tmp`
     );
     try {
+      signal?.throwIfAborted();
       await this.filesystem.createDirectory(
         path.dirname(resolved.targetPath),
         request.workspaceRoot
       );
+      signal?.throwIfAborted();
       const writeStream = this.filesystem.createWriteStream(temporaryPath);
-      await pipeline(response.stream, writeStream);
-      await this.filesystem.rename(temporaryPath, resolved.targetPath, request.workspaceRoot);
+      await pipeline(response.stream, writeStream, { signal });
+      signal?.throwIfAborted();
+      await this.filesystem.rename(
+        temporaryPath,
+        resolved.targetPath,
+        request.workspaceRoot,
+        signal
+      );
     } catch (error) {
       // Setup can fail before pipeline owns the response; release its socket either way.
       response.abort();
@@ -120,6 +171,18 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
   }
   const safeRelativePath = sanitizeArtifactRelativePath(normalizedRelativePath);
 
+  const targetRoot = resolveArtifactBuildRoot(request);
+
+  const targetPath = path.resolve(targetRoot, ...safeRelativePath.split("/"));
+  if (!isPathInside(targetRoot, targetPath)) {
+    throw new ArtifactStorageError("invalidPath", INVALID_PATH_MESSAGE);
+  }
+
+  const label = request.fileName || path.basename(safeRelativePath) || safeRelativePath;
+  return { targetPath, safeRelativePath, label };
+}
+
+function resolveArtifactBuildRoot(request: ArtifactArchiveDownloadRequest): string {
   const resolvedRoot = resolveDownloadRoot(request.workspaceRoot, request.downloadRoot);
   if (!resolvedRoot) {
     throw new ArtifactStorageError("invalidRoot", INVALID_ROOT_MESSAGE);
@@ -136,13 +199,7 @@ function resolveArtifactTargetPath(request: ArtifactDownloadRequest): {
     throw new ArtifactStorageError("invalidRoot", INVALID_ROOT_MESSAGE);
   }
 
-  const targetPath = path.resolve(targetRoot, ...safeRelativePath.split("/"));
-  if (!isPathInside(targetRoot, targetPath)) {
-    throw new ArtifactStorageError("invalidPath", INVALID_PATH_MESSAGE);
-  }
-
-  const label = request.fileName || path.basename(safeRelativePath) || safeRelativePath;
-  return { targetPath, safeRelativePath, label };
+  return targetRoot;
 }
 
 function sanitizeArtifactRelativePath(relativePath: string): string {

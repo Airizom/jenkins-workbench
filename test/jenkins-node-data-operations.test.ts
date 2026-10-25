@@ -27,6 +27,46 @@ function createOperations(client: JenkinsClient): JenkinsNodeDataOperations {
 }
 
 describe("JenkinsNodeDataOperations", () => {
+  it.each([
+    { offline: false, temporarilyOffline: false, launchSupported: true, status: "no_change" },
+    {
+      offline: true,
+      temporarilyOffline: true,
+      launchSupported: true,
+      status: "temporarily_offline"
+    },
+    { offline: true, temporarilyOffline: false, launchSupported: false, status: "not_launchable" },
+    { offline: true, temporarilyOffline: false, launchSupported: true, status: "launched" }
+  ])("launches only eligible offline agents: $status", async ({ status, ...details }) => {
+    const nodeUrl = `${environment.url}computer/agent-one/`;
+    const launchNodeAgent = vi.fn(async () => undefined);
+    const getNodeDetails = vi.fn(async () => details);
+    const operations = createOperations({
+      getNodeDetails,
+      launchNodeAgent
+    } as unknown as JenkinsClient);
+    const result = await operations.launchNodeAgent(environment, nodeUrl);
+    assert.equal(result.status, status);
+    assert.equal(launchNodeAgent.mock.calls.length, status === "launched" ? 1 : 0);
+    assert.equal(getNodeDetails.mock.calls.length, status === "launched" ? 2 : 1);
+  });
+
+  it("reports a launch failure without attempting a refresh", async () => {
+    const launchNodeAgent = vi.fn(async () => {
+      throw new Error("Launch denied");
+    });
+    const getNodeDetails = vi.fn(async () => ({ offline: true, launchSupported: true }));
+    const operations = createOperations({
+      getNodeDetails,
+      launchNodeAgent
+    } as unknown as JenkinsClient);
+    await assert.rejects(
+      operations.launchNodeAgent(environment, `${environment.url}computer/a/`),
+      /Launch denied/
+    );
+    assert.equal(getNodeDetails.mock.calls.length, 1);
+  });
+
   it.each([true, false])("sets temporarilyOffline=%s", async (targetOffline) => {
     const nodeUrl = `${environment.url}computer/agent-one/`;
     let temporarilyOffline = !targetOffline;

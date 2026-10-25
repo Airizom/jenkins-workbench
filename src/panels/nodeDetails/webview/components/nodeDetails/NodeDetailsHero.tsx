@@ -14,7 +14,9 @@ import {
 import { resolveNodeStatusStyle } from "../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeExecutorViewModel, NodeStatusClass } from "../../../shared/NodeDetailsContracts";
+import type { NodeManagementAction } from "../../../shared/NodeDetailsPanelMessages";
 import { ExecutorUtilizationSummary } from "./ExecutorUtilizationSummary";
+import { NodeDetailsActions } from "./NodeDetailsActions";
 import { formatOfflineSince } from "./nodeDetailsUtils";
 
 export type NodeAction =
@@ -68,6 +70,9 @@ type NodeDetailsHeroProps = {
   onNodeAction: () => void;
   onLaunchAgent: () => void;
   onOpen: () => void;
+  canManageNode?: boolean;
+  canDisconnectAgent?: boolean;
+  onManagementAction?: (action: NodeManagementAction) => void;
 };
 export function NodeDetailsHero({
   environmentLabel,
@@ -96,7 +101,10 @@ export function NodeDetailsHero({
   onRefresh,
   onNodeAction,
   onLaunchAgent,
-  onOpen
+  onOpen,
+  canManageNode = false,
+  canDisconnectAgent = false,
+  onManagementAction
 }: NodeDetailsHeroProps): React.JSX.Element {
   const statusStyle = resolveNodeStatusStyle(statusClass);
   // The subtitle repeats the node name only when it differs from the title.
@@ -195,6 +203,14 @@ export function NodeDetailsHero({
                 {canOpenAgentInstructions ? "Launch instructions" : "Open in Jenkins"}
               </span>
             </Button>
+            {onManagementAction ? (
+              <NodeDetailsActions
+                disabled={loading}
+                canManageNode={canManageNode}
+                canDisconnectAgent={canDisconnectAgent}
+                onAction={onManagementAction}
+              />
+            ) : null}
             {nodeAction ? (
               <Button
                 variant={nodeActionIsPrimary ? "default" : "outline"}

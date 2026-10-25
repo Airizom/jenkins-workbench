@@ -7,7 +7,7 @@ import {
   formatNodeTreeDescription,
   resolveNodeStatusDescriptor
 } from "../../jenkins/NodeFormatters";
-import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
+import { buildNodeActionCapabilities, isBuiltInNode } from "../../jenkins/nodeActionCapabilities";
 import { STATUS_INACTIVE_THEME_COLOR } from "../formatters";
 
 const SERVER_ICON = new vscode.ThemeIcon("server");
@@ -26,6 +26,9 @@ export class NodeTreeItem extends vscode.TreeItem {
     const capabilities = buildNodeActionCapabilities(node);
     if (node.nodeUrl) {
       contextValue += " nodeOpenable";
+      if (!isBuiltInNode(node)) {
+        contextValue += " nodeAgent";
+      }
     }
     if (capabilities.canTakeOffline) {
       contextValue += " nodeOnline";

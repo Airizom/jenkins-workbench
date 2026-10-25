@@ -105,7 +105,8 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
       const dataService = container.get("dataService");
       return new ArtifactStorageService(
         {
-          getArtifactStream: (...args) => dataService.getArtifactStream(...args)
+          getArtifactStream: (...args) => dataService.getArtifactStream(...args),
+          getArtifactArchiveStream: (...args) => dataService.getArtifactArchiveStream(...args)
         },
         createFileArtifactFilesystem()
       );

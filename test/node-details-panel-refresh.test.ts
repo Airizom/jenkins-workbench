@@ -92,6 +92,19 @@ it("shares one in-flight advanced request when Diagnostics is requested repeated
   assert.equal(getNodeDetails.mock.calls.length, 1);
 });
 
+it("loads advanced data when the restored Diagnostics tab selection arrives", async () => {
+  const getNodeDetails = vi.fn(async () => ({
+    displayName: "agent-1",
+    offline: false,
+    temporarilyOffline: false
+  }));
+  const { panel } = createPanel({ dataService: { getNodeDetails } });
+  panel["selectTab"]("diagnostics");
+  await panel["loadAdvancedDetails"]();
+  assert.equal(getNodeDetails.mock.calls.length, 1);
+  assert.equal(panel["advancedLoaded"], true);
+});
+
 function createPanel(overrides: Record<string, unknown> = {}) {
   const postMessage = vi.fn();
   const panel = Object.assign(Object.create(NodeDetailsPanel.prototype), {

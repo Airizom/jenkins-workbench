@@ -30,6 +30,7 @@ function render(
       diagnostics: EMPTY_BUILD_DIAGNOSTICS,
       showTestsSummary,
       ...testsState,
+      onDownloadAllArtifacts: () => undefined,
       onArtifactAction: () => undefined,
       onOpenDiagnosticSource: () => undefined,
       onShowDiagnosticProblems: () => undefined,

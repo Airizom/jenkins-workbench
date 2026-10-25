@@ -5,6 +5,8 @@ import { createRequestTarget, createTimeoutError } from "./transport";
 type RequestMethod = "GET" | "POST" | "HEAD";
 
 export interface RedirectableRequestOptions {
+  signal?: AbortSignal;
+  beforeRequest?: () => void;
   method?: RequestMethod;
   headers?: Record<string, string>;
   authHeader?: string;
@@ -76,6 +78,8 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
       reject(error);
     };
 
+    options.signal?.throwIfAborted();
+    options.beforeRequest?.();
     const req = client.request(
       {
         method,
@@ -84,6 +88,7 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
         path: `${parsed.pathname}${parsed.search}`,
         headers,
         timeout: timeoutMs,
+        signal: options.signal,
         ...tlsOptions
       },
       (response) => {

@@ -5,9 +5,14 @@ import type {
 } from "../shared/BuildDetailsContracts";
 import type {
   ArtifactActionMessage,
+  DownloadAllArtifactsMessage,
   OpenTestSourceMessage,
   ReloadTestReportMessage
 } from "../shared/BuildDetailsPanelMessages";
+
+export function buildDownloadAllArtifactsMessage(): DownloadAllArtifactsMessage {
+  return { type: "downloadAllArtifacts" };
+}
 
 export function buildArtifactActionMessage(
   action: ArtifactAction,

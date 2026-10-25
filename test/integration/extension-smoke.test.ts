@@ -25,15 +25,31 @@ describe("extension smoke", () => {
     const registered = new Set(await vscode.commands.getCommands(true));
     const expected = [
       "jenkinsWorkbench.openJobHistory",
+      "jenkinsWorkbench.downloadAllArtifacts",
       "jenkinsWorkbench.addEnvironment",
       "jenkinsWorkbench.editEnvironment",
       "jenkinsWorkbench.removeEnvironment",
       "jenkinsWorkbench.triggerBuild",
       "jenkinsWorkbench.replayWithLocalJenkinsfile",
       "jenkinsWorkbench.abortBuild",
+      "jenkinsWorkbench.abortBuild.single",
+      "jenkinsWorkbench.cancelQueueItem",
+      "jenkinsWorkbench.cancelQueueItem.single",
+      "jenkinsWorkbench.watchJob",
+      "jenkinsWorkbench.unwatchJob",
+      "jenkinsWorkbench.pinJob",
+      "jenkinsWorkbench.pinJob.single",
+      "jenkinsWorkbench.unpinJob",
+      "jenkinsWorkbench.unpinJob.single",
       "jenkinsWorkbench.configureBuildDiagnostics",
       "jenkinsWorkbench.refreshBuildDiagnostics",
-      "jenkinsWorkbench.showBuildDiagnosticOutput"
+      "jenkinsWorkbench.showBuildDiagnosticOutput",
+      "jenkinsWorkbench.editNodeLabels",
+      "jenkinsWorkbench.disconnectNodeAgent",
+      "jenkinsWorkbench.showNodeAgentLog",
+      "jenkinsWorkbench.createNode",
+      "jenkinsWorkbench.copyNode",
+      "jenkinsWorkbench.deleteNode"
     ];
     const missing = expected.filter((command) => !registered.has(command));
     assert.deepEqual(missing, [], `commands not registered: ${missing.join(", ")}`);

@@ -1,18 +1,18 @@
 import * as vscode from "vscode";
-import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
-import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import type { QueueItemTreeItem } from "../tree/TreeItems";
-import { cancelQueueItem } from "./queue/QueueCommandHandlers";
+import { type BulkCommandDependencies, createBulkCommandHandler } from "./BulkCommand";
 
 export function registerQueueCommands(
   context: vscode.ExtensionContext,
-  dataService: JenkinsDataService,
-  refreshHost: EnvironmentScopedRefreshHost
+  bulk: BulkCommandDependencies
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.cancelQueueItem",
-      (item?: QueueItemTreeItem) => cancelQueueItem(dataService, refreshHost, item)
+      createBulkCommandHandler(bulk, "cancel")
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.cancelQueueItem.single",
+      createBulkCommandHandler(bulk, "cancel", true)
     )
   );
 }

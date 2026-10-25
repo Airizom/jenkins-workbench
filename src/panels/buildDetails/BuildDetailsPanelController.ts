@@ -1,4 +1,5 @@
 import type * as vscode from "vscode";
+import type { BuildRelationship } from "../../jenkins/BuildRelationships";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
@@ -31,12 +32,15 @@ import type {
   BuildDetailsPollingController
 } from "./BuildDetailsPollingController";
 import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
+import { BuildRelationshipsController } from "./BuildRelationshipsController";
 import type { PipelineNodeLogManager } from "./PipelineNodeLogManager";
 import type {
   BuildDiagnosticsViewModel,
+  BuildNavigationViewModel,
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
+import { EMPTY_BUILD_NAVIGATION } from "./shared/BuildDetailsContracts";
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export type {
@@ -50,6 +54,8 @@ type BuildDetailsResolvedAssets = Parameters<BuildDetailsPanelView["renderBuildD
 export class BuildDetailsPanelController implements BuildDetailsPanelControllerAccess {
   private readonly state = new BuildDetailsPanelState();
   private readonly view: BuildDetailsPanelView;
+  private readonly relationships: BuildRelationshipsController;
+  private navigation: BuildNavigationViewModel = { ...EMPTY_BUILD_NAVIGATION };
   private readonly runtime: BuildDetailsPanelRuntime;
   private readonly canOpenTestSource?: BuildDetailsCanOpenTestSource;
   private readonly loadTokenTracker = new LoadTokenTracker();
@@ -83,6 +89,10 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       onTextChanged: () => this.onDiagnosticConsoleTextChanged?.()
     });
     this.view = new BuildDetailsPanelView(panel, extensionUri);
+    this.relationships = new BuildRelationshipsController(
+      (relationships) => this.postMessage({ type: "setBuildRelationships", relationships }),
+      () => this.view.isVisible()
+    );
     this.loadTracker = new PanelLoadTracker((value) => this.view.setLoading(value));
     this.runtime = new BuildDetailsPanelRuntime({
       onTestReportChanged,
@@ -94,7 +104,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       getCurrentToken: () => this.loadTokenTracker.current,
       isTokenCurrent: (token) => this.loadTokenTracker.isCurrent(token),
       canOpenTestSource: getCanOpenTestSource,
-      onBuildDetailsChanged,
+      onBuildDetailsChanged: (details) => this.handleBuildDetailsChanged(details),
       onConsoleTextSet: (text) => this.diagnosticConsoleSync.replaceAndNotify(text)
     });
   }
@@ -137,6 +147,25 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
 
   getCurrentDetails(): JenkinsBuildDetails | undefined {
     return this.state.currentDetails;
+  }
+
+  getRelatedBuildTarget(targetId: string): BuildRelationship | undefined {
+    return this.relationships.getTarget(targetId);
+  }
+
+  republishRelationships(): void {
+    this.postMessage({
+      type: "setBuildRelationships",
+      relationships: this.relationships.getState()
+    });
+  }
+
+  setRelatedBuildsExpanded(expanded: boolean): void {
+    this.relationships.setExpanded(expanded);
+  }
+
+  async refreshRelatedBuilds(): Promise<void> {
+    await this.relationships.refresh();
   }
   hasFailedTests(): boolean {
     return (
@@ -228,7 +257,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     // Wait for test-source availability (Git API initialization) alongside the initial fetch so
     // the first render does not report linked repositories as unavailable.
     const [initialState]: [BuildDetailsInitialState, unknown] = await Promise.all([
-      this.pollingController.loadInitial(),
+      this.pollingController.loadInitial(options?.initialDetails),
       this.whenTestSourceAvailabilityReady?.() ?? Promise.resolve()
     ]);
     if (!this.loadTokenTracker.isCurrent(token)) {
@@ -255,6 +284,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   private disposeLoadScopedResources(): void {
+    this.relationships.clear();
     this.initialActivation?.dispose();
     this.initialActivation = undefined;
     this.pollingController?.dispose();
@@ -285,7 +315,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       canOpenTestSource: this.canOpenTestSource,
       isTokenCurrent: (currentToken) => this.loadTokenTracker.isCurrent(currentToken),
       publishErrors: () => this.publishErrors(),
-      onBuildDetailsChanged: (details) => this.onBuildDetailsChanged?.(details)
+      onBuildDetailsChanged: (details) => this.handleBuildDetailsChanged(details)
     });
   }
 
@@ -298,12 +328,24 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     applyBuildDetailsInitialState(this.state, initialState);
     this.diagnosticConsoleSync.setText(initialState.consoleTextResult?.text ?? "");
     const details = this.state.currentDetails;
+    if (this.state.environment && this.state.currentBuildUrl) {
+      this.relationships.initialize(
+        this.state.environment,
+        this.state.currentBuildUrl,
+        this.backend?.relationships,
+        details
+      );
+    }
     if (details) {
       this.onBuildDetailsChanged?.(details);
     }
     this.view.setTitle(resolveInitialPanelTitle(details, options?.label));
     this.view.renderBuildDetails(
-      buildInitialBuildDetailsViewModel(this.state, initialState, this.canOpenTestSource),
+      {
+        ...buildInitialBuildDetailsViewModel(this.state, initialState, this.canOpenTestSource),
+        relationships: this.relationships.getState(),
+        navigation: this.navigation
+      },
       assets,
       {
         nonce: this.state.currentNonce,
@@ -334,6 +376,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   handlePanelHidden(): void {
+    this.relationships.handleHidden();
     this.pipelineNodeLogManager?.pause();
     this.runtime.handlePanelHidden(this.loadTokenTracker.current);
   }
@@ -373,6 +416,11 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     }
   }
 
+  private handleBuildDetailsChanged(details: JenkinsBuildDetails): void {
+    this.relationships.updateUpstream(details);
+    this.onBuildDetailsChanged?.(details);
+  }
+
   beginLoading(): number {
     return this.loadTracker.beginLoading();
   }
@@ -386,6 +434,9 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
     // disposed webview throws on access.
     if (this.disposed) {
       return;
+    }
+    if (message.type === "setBuildNavigation") {
+      this.navigation = message.navigation;
     }
     this.view.postMessage(message);
   }

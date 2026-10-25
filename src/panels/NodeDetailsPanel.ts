@@ -3,19 +3,25 @@ import { formatActionError } from "../formatters/ErrorFormatters";
 import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { canonicalNodeUrl } from "../jenkins/NodeIdentity";
 import type { JenkinsNodeDetails } from "../jenkins/types";
 import { NodeActionService } from "../services/NodeActionService";
+import { NodeAgentLogController } from "../services/NodeAgentLogController";
 import { NodeQueuedWorkService } from "../services/NodeQueuedWorkService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import { routeNodeDetailsMessage } from "./nodeDetails/NodeDetailsMessageRouter";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
-import type { NodeDetailsOutgoingMessage } from "./nodeDetails/shared/NodeDetailsPanelMessages";
+import type {
+  NodeDetailsOutgoingMessage,
+  NodeManagementAction
+} from "./nodeDetails/shared/NodeDetailsPanelMessages";
 import {
   createNodeDetailsPanelState,
   isNodeDetailsPanelState
 } from "./nodeDetails/shared/NodeDetailsPanelWebviewState";
+import { NODE_DETAILS_TABS, type NodeDetailsTab } from "./nodeDetails/shared/NodeDetailsTabs";
 import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
   attachPanelLifecycle,
@@ -46,6 +52,7 @@ interface NodeDetailsPanelShowOptions {
   nodeUrl: string;
   extensionUri: vscode.Uri;
   label?: string;
+  initialTab?: NodeDetailsTab;
   refreshHost?: NodeDetailsRefreshHost;
 }
 
@@ -80,6 +87,10 @@ export class NodeDetailsPanel {
   private advancedLoaded = false;
   private advancedRequested = false;
   private advancedLoad?: Promise<void>;
+  private logController?: NodeAgentLogController;
+  private activeTab: NodeDetailsTab = NODE_DETAILS_TABS.OVERVIEW;
+  private logFollowing = true;
+  private managementPending = false;
 
   static async show(options: NodeDetailsPanelShowOptions): Promise<void> {
     const { dataService, environment, nodeUrl, extensionUri, label, refreshHost } = options;
@@ -100,6 +111,8 @@ export class NodeDetailsPanel {
     }
 
     const activePanel = NodeDetailsPanel.currentPanel;
+    activePanel.activeTab = options.initialTab ?? NODE_DETAILS_TABS.OVERVIEW;
+    activePanel.logFollowing = true;
     activePanel.dataService = dataService;
     activePanel.nodeActionService = new NodeActionService(dataService);
     activePanel.nodeQueuedWorkService = new NodeQueuedWorkService(dataService);
@@ -145,6 +158,8 @@ export class NodeDetailsPanel {
 
     revived.environment = restored.environment;
     revived.nodeUrl = restored.state.nodeUrl;
+    revived.activeTab = restored.state.activeTab ?? NODE_DETAILS_TABS.OVERVIEW;
+    revived.logFollowing = restored.state.logFollowing ?? true;
     await revived.load();
   }
 
@@ -154,17 +169,39 @@ export class NodeDetailsPanel {
     closePanelForEnvironment(current?.panel, current?.environment, scope, environmentId);
   }
 
+  static closeForNode(environment: JenkinsEnvironmentRef, nodeUrl: string): void {
+    const current = NodeDetailsPanel.currentPanel;
+    if (
+      current?.environment?.environmentId === environment.environmentId &&
+      current.environment.scope === environment.scope &&
+      current.environment.url === environment.url &&
+      current.nodeUrl !== undefined &&
+      canonicalNodeUrl(current.nodeUrl) === canonicalNodeUrl(nodeUrl)
+    ) {
+      current.panel.dispose();
+    }
+  }
+
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.loadTracker = createPanelLoadingTracker((message: NodeDetailsOutgoingMessage) =>
       this.postMessage(message)
     );
+    this.logController = new NodeAgentLogController((payload) => {
+      this.logFollowing = payload.following;
+      this.postMessage({ type: "updateNodeAgentLog", payload });
+    });
     this.attachLifecycle();
     this.panel.webview.onDidReceiveMessage(
       (message: unknown) =>
         routeNodeDetailsMessage(message, {
           refresh: () => this.refreshDetails(),
+          manageNode: (action) => this.handleManagementAction(action),
+          selectTab: (tab) => this.selectTab(tab),
+          setLogFollowing: (following) => this.logController?.setFollowing(following),
+          refreshLog: () => this.logController?.refresh(),
+          copyLog: () => this.copyLog(),
           loadAdvanced: () => this.loadAdvancedDetails(),
           performAction: (action) => this.handleNodeAction(action),
           openExternal: (url) => this.openExternalUrl(url),
@@ -176,6 +213,13 @@ export class NodeDetailsPanel {
   }
 
   private attachLifecycle(): void {
+    this.panel.onDidChangeViewState(
+      () => {
+        this.logController?.setVisible(this.panel.visible);
+      },
+      null,
+      this.disposables
+    );
     attachPanelLifecycle(this.panel, this.disposables, {
       onDispose: () => this.dispose(),
       onVisible: () => {
@@ -186,6 +230,8 @@ export class NodeDetailsPanel {
 
   private dispose(): void {
     this.disposed = true;
+    this.loadTokenTracker.next();
+    this.logController?.dispose();
     disposeEnvironmentScopedPanel({
       clearSingleton: () => {
         NodeDetailsPanel.currentPanel = undefined;
@@ -200,6 +246,16 @@ export class NodeDetailsPanel {
 
   private async load(): Promise<void> {
     const token = this.loadTokenTracker.next();
+    const dataService = this.dataService;
+    const environment = this.environment;
+    const nodeUrl = this.nodeUrl;
+    this.logController?.reset(
+      dataService && environment && nodeUrl
+        ? (options) => dataService.getNodeAgentLog(environment, nodeUrl, options)
+        : undefined,
+      this.logFollowing
+    );
+    this.logController?.setVisible(this.panel.visible);
     this.hasRendered = false;
     this.nonce = createNonce();
     this.lastDetails = undefined;
@@ -211,7 +267,10 @@ export class NodeDetailsPanel {
     this.loadTracker.resetLoadingRequests();
     const panelState =
       this.environment && this.nodeUrl
-        ? createNodeDetailsPanelState(this.environment, this.nodeUrl)
+        ? createNodeDetailsPanelState(this.environment, this.nodeUrl, {
+            activeTab: this.activeTab,
+            logFollowing: this.logFollowing
+          })
         : undefined;
 
     const assets = resolvePanelAssetsAndRenderLoading({
@@ -244,6 +303,8 @@ export class NodeDetailsPanel {
       panelState
     });
     this.hasRendered = true;
+    // The webview selects its initial tab after installing message listeners.
+    // Starting here can lose a fast initial response before those listeners exist.
   }
 
   private async refreshDetails(): Promise<void> {
@@ -306,13 +367,15 @@ export class NodeDetailsPanel {
       busyExecutors: this.lastDetails?.busyExecutors
     };
     const { nodeActionService, refreshHost } = this;
+    const isCurrentTarget = () =>
+      !this.disposed && this.environment === target.environment && this.nodeUrl === target.nodeUrl;
     // Collect the offline reason before showing progress: a spinner and disabled
     // buttons while the input box is open would suggest work already started,
     // and cancelling must leave the panel untouched.
     let offlineReason: { reason?: string } | undefined;
     if (action === "takeNodeOffline") {
       offlineReason = await nodeActionService.promptOfflineReason(label, target.busyExecutors);
-      if (!offlineReason || this.disposed) {
+      if (!offlineReason || !isCurrentTarget()) {
         return;
       }
     }
@@ -335,11 +398,69 @@ export class NodeDetailsPanel {
       }
       // Refresh even when the action was a no-op ("already online", "not
       // launchable"): those results mean the panel was showing stale state.
-      if (!this.disposed) {
+      if (isCurrentTarget()) {
         await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });
       }
     } finally {
       this.loadTracker.endLoading(loadingRequest);
+    }
+  }
+
+  private selectTab(tab: NodeDetailsTab): void {
+    if (!this.hasRendered) {
+      return;
+    }
+    this.activeTab = tab;
+    this.logController?.setActive(tab === NODE_DETAILS_TABS.AGENT_LOG);
+    if (tab === NODE_DETAILS_TABS.DIAGNOSTICS) {
+      void this.loadAdvancedDetails();
+    }
+  }
+
+  private async copyLog(): Promise<void> {
+    try {
+      await vscode.env.clipboard.writeText(this.logController?.text ?? "");
+      this.postMessage({ type: "copyNodeAgentLogResult", success: true });
+    } catch (error) {
+      this.postMessage({ type: "copyNodeAgentLogResult", success: false });
+      void vscode.window.showErrorMessage(`Failed to copy agent log: ${formatActionError(error)}`);
+    }
+  }
+
+  private async handleManagementAction(action: NodeManagementAction): Promise<void> {
+    if (
+      !this.hasRendered ||
+      this.managementPending ||
+      !this.nodeActionService ||
+      !this.environment ||
+      !this.nodeUrl
+    ) {
+      return;
+    }
+    const target = {
+      environment: this.environment,
+      nodeUrl: this.nodeUrl,
+      label: this.lastDetails?.displayName ?? this.lastDetails?.name ?? "node",
+      busyExecutors: this.lastDetails?.busyExecutors
+    };
+    this.managementPending = true;
+    try {
+      const changed = await this.nodeActionService[action](target, this.refreshHost);
+      if (action === "deleteNode" && changed) {
+        NodeDetailsPanel.closeForNode(target.environment, target.nodeUrl);
+        return;
+      }
+      if (
+        !this.disposed &&
+        this.environment === target.environment &&
+        this.nodeUrl === target.nodeUrl
+      ) {
+        await this.refreshDetailsWith(this.currentDetailLevel, { skipLoading: true });
+      }
+    } catch (error) {
+      void vscode.window.showErrorMessage(formatActionError(error));
+    } finally {
+      this.managementPending = false;
     }
   }
 

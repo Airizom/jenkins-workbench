@@ -52,6 +52,10 @@ export function registerExtensionCommands(
   const currentBranchWorkflowService = container.lazy("currentBranchWorkflowService");
   const diagnosticBindingStore = container.lazy("diagnosticBindingStore");
   const buildDiagnosticsCoordinator = container.lazy("buildDiagnosticsCoordinator");
+  const bulk = {
+    bulkActionService: container.lazy("bulkActionService"),
+    treeBulkSelection: container.lazy("treeBulkSelection")
+  };
 
   registerEnvironmentCommands(
     context,
@@ -81,7 +85,8 @@ export function registerExtensionCommands(
     {
       workflow: buildManagementWorkflow,
       descriptionDraftManager: buildDescriptionDraftManager
-    }
+    },
+    bulk
   );
 
   registerCurrentBranchCommands(context, currentBranchWorkflowService);
@@ -109,7 +114,7 @@ export function registerExtensionCommands(
 
   registerBuildDiagnosticCommands(context, buildDiagnosticsCoordinator);
 
-  registerNodeCommands(context, dataService, refreshHost);
+  registerNodeCommands(context, dataService, refreshHost, environmentStore);
   registerNodeCapacityCommands(
     context,
     dataService,
@@ -118,11 +123,11 @@ export function registerExtensionCommands(
     buildDetailsPanelLauncher
   );
 
-  registerQueueCommands(context, dataService, refreshHost);
+  registerQueueCommands(context, bulk);
 
-  registerWatchCommands(context, watchStore, refreshHost);
+  registerWatchCommands(context, bulk);
 
-  registerPinCommands(context, dataService, pinStore, refreshHost);
+  registerPinCommands(context, dataService, pinStore, refreshHost, bulk);
 
   registerSearchCommands(context, environmentStore, dataService, viewStateStore, treeNavigator);
 

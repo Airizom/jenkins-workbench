@@ -1,6 +1,9 @@
 import type { IncomingHttpHeaders } from "node:http";
 
 export interface JenkinsRequestOptions {
+  signal?: AbortSignal;
+  /** Called before every transport attempt, including redirects. Throw to stop scheduling. */
+  beforeRequest?: () => void;
   method?: "GET" | "POST" | "HEAD";
   headers?: Record<string, string>;
   body?: string | Uint8Array;
@@ -62,6 +65,9 @@ export interface JenkinsTextRequestOptions {
 }
 
 export interface JenkinsSimpleRequestOptions {
+  signal?: AbortSignal;
+  /** Called before every transport attempt, including redirects. Throw to stop scheduling. */
+  beforeRequest?: () => void;
   authHeader?: string;
   headers?: Record<string, string>;
   timeoutMs?: number;
@@ -77,6 +83,7 @@ export interface JenkinsPostResponse {
 }
 
 export interface JenkinsStreamRequestOptions {
+  signal?: AbortSignal;
   method?: "GET" | "POST" | "HEAD";
   headers?: Record<string, string>;
   body?: string | Uint8Array;

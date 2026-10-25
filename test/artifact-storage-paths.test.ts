@@ -17,7 +17,10 @@ function createService(): {
   writes: string[];
 } {
   const writes: string[] = [];
-  const dataService: Pick<JenkinsDataService, "getArtifactStream"> = {
+  const dataService: Pick<JenkinsDataService, "getArtifactStream" | "getArtifactArchiveStream"> = {
+    getArtifactArchiveStream: async () => {
+      throw new Error("Unexpected archive request");
+    },
     getArtifactStream: async () => ({
       stream: Readable.from(["artifact content"]),
       headers: {},

@@ -176,6 +176,17 @@ export class JenkinsBuildDataOperations {
     return client.getArtifactStream(buildUrl, relativePath, options);
   }
 
+  async getArtifactArchiveStream(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { maxBytes?: number; signal?: AbortSignal }
+  ): Promise<JenkinsStreamResponse> {
+    options?.signal?.throwIfAborted();
+    const client = await this.context.getClient(environment);
+    options?.signal?.throwIfAborted();
+    return client.getArtifactArchiveStream(buildUrl, options);
+  }
+
   async getConsoleText(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,

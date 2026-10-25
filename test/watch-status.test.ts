@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it, vi } from "vitest";
+import { beforeEach, describe, it, vi } from "vitest";
+import type { WatchNotificationOptions } from "../src/extension/ExtensionConfig";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsJob } from "../src/jenkins/types";
 import { JenkinsJobStatusEvaluator } from "../src/watch/JenkinsJobStatusEvaluator";
@@ -19,10 +20,23 @@ interface PollerHarness {
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
 }
 
-vi.doMock("vscode", () => createEventEmitterVscodeMock());
+const notificationMessages = {
+  information: vi.fn(async (..._args: string[]) => undefined),
+  warning: vi.fn(async (..._args: string[]) => undefined),
+  error: vi.fn(async (..._args: string[]) => undefined)
+};
+vi.doMock("vscode", () => ({
+  ...createEventEmitterVscodeMock(),
+  window: {
+    showInformationMessage: notificationMessages.information,
+    showWarningMessage: notificationMessages.warning,
+    showErrorMessage: notificationMessages.error
+  }
+}));
 const { JenkinsStatusPoller } = (await import("../src/watch/JenkinsStatusPoller")) as unknown as {
   JenkinsStatusPoller: PollerConstructor;
 };
+const { VscodeStatusNotifier } = await import("../src/extension/VscodeStatusNotifier");
 
 interface NotifierCalls {
   failures: string[];
@@ -914,6 +928,200 @@ describe("JenkinsStatusPoller", () => {
   });
 });
 
+function enabledWatchNotifications(): WatchNotificationOptions {
+  return {
+    enabled: true,
+    failure: true,
+    recovery: true,
+    completion: true,
+    pendingInput: true,
+    watchError: true
+  };
+}
+
+function persistWatchUpdate(entry: WatchedJobEntry, update: Partial<WatchedJobEntry>): void {
+  for (const [key, value] of Object.entries(update)) {
+    if (value !== undefined) {
+      Object.assign(entry, { [key]: value });
+    }
+  }
+}
+
+describe("watched job notification filtering", () => {
+  beforeEach(() => {
+    notificationMessages.information.mockClear();
+    notificationMessages.warning.mockClear();
+    notificationMessages.error.mockClear();
+  });
+
+  it("persists muted transitions and completions without replaying them when unmuted", async () => {
+    let options = { ...enabledWatchNotifications(), enabled: false };
+    const entry = watchedEntry({
+      lastStatus: "success",
+      lastCompletedBuildNumber: 7,
+      lastIsBuilding: false
+    });
+    let buildNumber = 8;
+    let color = "red";
+    const fixture = createPollerFixture({
+      watched: [entry],
+      notifier: new VscodeStatusNotifier(() => options),
+      updateWatchStatus: async (_scope, _environmentId, _jobUrl, update) => {
+        persistWatchUpdate(entry, update);
+      },
+      getJob: async () => ({
+        name: "demo",
+        url: entry.jobUrl,
+        color,
+        lastCompletedBuild: {
+          number: buildNumber,
+          result: color === "red" ? "FAILURE" : "SUCCESS"
+        }
+      })
+    });
+
+    await fixture.poller.poll();
+    buildNumber = 9;
+    await fixture.poller.poll();
+    assert.equal(entry.lastStatus, "failure");
+    assert.equal(entry.lastCompletedBuildNumber, 9);
+    assert.ok(fixture.hostRefreshes > 0);
+
+    options = { ...options, enabled: true };
+    await fixture.poller.poll();
+    assert.equal(notificationMessages.error.mock.calls.length, 0);
+    assert.equal(notificationMessages.warning.mock.calls.length, 0);
+    assert.equal(notificationMessages.information.mock.calls.length, 0);
+
+    buildNumber = 10;
+    await fixture.poller.poll();
+    assert.deepEqual(notificationMessages.warning.mock.calls, [
+      ["Job demo completed (Failed) in https://jenkins.example."]
+    ]);
+
+    buildNumber = 11;
+    color = "blue";
+    await fixture.poller.poll();
+    assert.deepEqual(notificationMessages.information.mock.calls, [
+      ["Job demo recovered in https://jenkins.example."]
+    ]);
+    assert.equal(entry.lastStatus, "success");
+    fixture.poller.dispose();
+  });
+
+  it("does not fall through to completion when a failure notification is disabled", async () => {
+    const entry = watchedEntry({
+      lastStatus: "success",
+      lastCompletedBuildNumber: 7,
+      lastIsBuilding: false
+    });
+    let buildNumber = 8;
+    const fixture = createPollerFixture({
+      watched: [entry],
+      notifier: new VscodeStatusNotifier(() => ({
+        ...enabledWatchNotifications(),
+        failure: false
+      })),
+      updateWatchStatus: async (_scope, _environmentId, _jobUrl, update) => {
+        persistWatchUpdate(entry, update);
+      },
+      getJob: async () => ({
+        name: "demo",
+        url: entry.jobUrl,
+        color: "red",
+        lastCompletedBuild: { number: buildNumber, result: "FAILURE" }
+      })
+    });
+
+    await fixture.poller.poll();
+    assert.equal(notificationMessages.error.mock.calls.length, 0);
+    assert.equal(notificationMessages.warning.mock.calls.length, 0);
+    assert.equal(notificationMessages.information.mock.calls.length, 0);
+    assert.equal(entry.lastStatus, "failure");
+
+    buildNumber = 9;
+    await fixture.poller.poll();
+    assert.equal(notificationMessages.warning.mock.calls.length, 1);
+    fixture.poller.dispose();
+  });
+
+  it("consumes muted pending-input signatures and notifies only for new inputs after unmuting", async () => {
+    let options = { ...enabledWatchNotifications(), enabled: false };
+    let signature = "input-a";
+    const fixture = createPollerFixture({
+      notifier: new VscodeStatusNotifier(() => options),
+      getJob: async () => runningJob(),
+      getPendingInputSummary: async () => ({
+        awaitingInput: true,
+        count: 1,
+        signature,
+        fetchedAt: 1
+      })
+    });
+
+    await fixture.poller.poll();
+    options = { ...options, enabled: true };
+    await fixture.poller.poll();
+    assert.equal(notificationMessages.information.mock.calls.length, 0);
+
+    signature = "input-b";
+    await fixture.poller.poll();
+    assert.deepEqual(notificationMessages.information.mock.calls, [
+      ["Job demo is awaiting input in https://jenkins.example.", "Open in Jenkins"]
+    ]);
+    fixture.poller.dispose();
+  });
+
+  it("maintains watch-error counts while muted without replaying the threshold warning", async () => {
+    let options = { ...enabledWatchNotifications(), enabled: false };
+    const fixture = createPollerFixture({
+      notifier: new VscodeStatusNotifier(() => options),
+      maxConsecutiveErrors: 1,
+      getJob: async () => {
+        throw new Error("offline");
+      }
+    });
+    const counts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => counts.push(count));
+
+    await fixture.poller.poll();
+    assert.deepEqual(counts, [1]);
+    options = { ...options, enabled: true };
+    await fixture.poller.poll();
+    assert.equal(notificationMessages.warning.mock.calls.length, 0);
+
+    fixture.getJob = async () => runningJob();
+    await fixture.poller.poll();
+    fixture.getJob = async () => {
+      throw new Error("offline again");
+    };
+    await fixture.poller.poll();
+    assert.deepEqual(counts, [1, 0, 1]);
+    assert.equal(notificationMessages.warning.mock.calls.length, 1);
+    fixture.poller.dispose();
+  });
+
+  it("still removes missing jobs while their removal warning is muted", async () => {
+    const fixture = createPollerFixture({
+      notifier: new VscodeStatusNotifier(() => ({
+        ...enabledWatchNotifications(),
+        watchError: false
+      })),
+      getJob: async () => {
+        throw new JenkinsRequestError("missing", 404);
+      }
+    });
+
+    await fixture.poller.poll();
+
+    assert.deepEqual(fixture.watchStore.removedWatches, [
+      { scope: "workspace", environmentId: "env-1", jobUrl: "job/demo/" }
+    ]);
+    assert.equal(notificationMessages.warning.mock.calls.length, 0);
+    fixture.poller.dispose();
+  });
+});
+
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -960,7 +1168,13 @@ interface PollerFixtureOptions {
     fetchedAt: number;
   }>;
   maxConsecutiveErrors?: number;
-  updateWatchStatus?: () => Promise<void>;
+  notifier?: StatusNotifier;
+  updateWatchStatus?: (
+    scope: string,
+    environmentId: string,
+    jobUrl: string,
+    update: Partial<WatchedJobEntry>
+  ) => Promise<void>;
 }
 
 function createPollerFixture(options: PollerFixtureOptions = {}): {
@@ -1061,7 +1275,7 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
     statusRefreshService,
     pendingInputCoordinator,
     watchStore,
-    notifier,
+    options.notifier ?? notifier,
     host,
     options.maxConsecutiveErrors
   ) as PollerHarness;

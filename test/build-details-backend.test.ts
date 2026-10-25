@@ -55,6 +55,7 @@ describe("BuildDetailsBackendAdapter", () => {
     assert.equal(backend.coverage, dataService);
     assert.equal(backend.pendingInputs, dataService);
     assert.equal(backend.restart, dataService);
+    assert.equal(backend.relationships, dataService);
 
     await backend.coverage.discoverCoverageActionPath(environment, buildUrl);
     await backend.coverage.getCoverageOverview(environment, buildUrl);

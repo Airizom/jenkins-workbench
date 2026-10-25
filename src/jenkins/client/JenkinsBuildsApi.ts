@@ -23,6 +23,7 @@ import type {
 import {
   buildActionUrl,
   buildApiUrlFromItem,
+  buildArtifactArchiveDownloadUrl,
   buildArtifactDownloadUrl,
   ensureTrailingSlash
 } from "../urls";
@@ -155,6 +156,14 @@ export class JenkinsBuildsApi {
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
     const url = buildArtifactDownloadUrl(buildUrl, relativePath);
+    return this.context.requestStream(url, options);
+  }
+
+  async getArtifactArchiveStream(
+    buildUrl: string,
+    options?: { maxBytes?: number; signal?: AbortSignal }
+  ): Promise<JenkinsStreamResponse> {
+    const url = buildArtifactArchiveDownloadUrl(buildUrl);
     return this.context.requestStream(url, options);
   }
 

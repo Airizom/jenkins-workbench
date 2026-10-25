@@ -124,7 +124,9 @@ describe("Jenkins build tree builders", () => {
       "revision[_class,pullHash,mergeHash,head[sourceOwner,sourceRepo,checkoutStrategy]]"
     ];
     if (options.includeDetails) {
-      actionFields.push("causes[shortDescription,userId,userName]");
+      actionFields.push(
+        "causes[shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild]"
+      );
     }
     if (options.includeParameters) {
       actionFields.push("parameters[name,value]");
@@ -149,7 +151,7 @@ describe("Jenkins build tree builders", () => {
   it("includes shared change set and action fragments for build lists with details", () => {
     assert.equal(
       buildBuildsTree({ includeDetails: true, includeParameters: true }),
-      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,causes[shortDescription,userId,userName],parameters[name,value]]]{limit}"
+      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,causes[shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild],parameters[name,value]]]{limit}"
     );
   });
 
@@ -184,7 +186,7 @@ describe("Jenkins build tree builders", () => {
   it("includes shared change set and action fragments for build details", () => {
     assert.equal(
       buildBuildDetailsTree({ includeCauses: true, includeParameters: true }),
-      "number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,fullDisplayName,description,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,failCount,skipCount,totalCount,causes[shortDescription,userId,userName],parameters[name,value]]"
+      "number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,fullDisplayName,description,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,failCount,skipCount,totalCount,causes[shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild],parameters[name,value]]"
     );
   });
 });

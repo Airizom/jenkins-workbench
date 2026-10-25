@@ -58,7 +58,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Failure Insights** — Focused diagnostics, change, test, and artifact cards that help explain failed and unstable builds
 - **Build Comparison** — Compare parameters, changes, stages, tests, and the first console divergence between two builds
 - **Coverage Insights** — View Jenkins Coverage plugin summaries and decorate modified source lines by coverage status
-- **Artifact Preview & Download** — Open images/text artifacts or download them to your workspace
+- **Artifact Preview & Download** — Open images/text artifacts, download individual files, or download all build artifacts as a ZIP to your workspace
 - **Workspace Browsing** — Browse a classic job's current Jenkins workspace and preview files without leaving VS Code
 
 ### Build Details Panel
@@ -68,9 +68,14 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Pipeline Visualization** — View stage-by-stage progress for Pipeline jobs
 - **Restart From Stage** — Restart failed/unstable Declarative runs from eligible stages
 - **Build Management** — Keep forever, edit, or delete the build from the header; shows a Kept forever badge and the build description
+- **Related Builds** — Follow direct upstream and downstream build links, with Back/Forward navigation in the same panel
 - **Stage Load Feedback** — Inline loading states while pipeline stages resolve
 - **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
+
+In the Overview tab, **Related Builds** shows upstream builds immediately. Expand **Downstream builds** to search for running or completed builds triggered by this build. **Refresh** repeats the search; results do not poll automatically. Back/Forward restores the build and its selected tab for this panel session.
+
+Downstream discovery checks configured downstream jobs first, then other accessible jobs, matching their structured upstream causes. By default it checks up to 50 jobs and 100 recent builds per job. All discovery and history requests share a 100-request budget, four concurrent requests, and a 30-second deadline. Search limits and access failures are shown alongside any matches; an empty result does not prove that no downstream builds exist. Queued work remains in the queue view. Collapsing the section, hiding the panel, or navigating away cancels discovery. Use Refresh to check for newly started builds.
 
 ### Cross-build failure history
 
@@ -107,6 +112,7 @@ The command submits the current editor text, including unsaved changes, without 
 ### Watch Jobs
 
 - **Status Notifications** — Watch jobs and receive alerts when builds succeed, fail, or change status
+- **Notification Controls** — Choose failure, recovery, completion, pending-input, and watch-error alerts, or mute all job-watch notifications in [Watch Notification settings](#watch-notifications)
 - **Configurable Polling** — Adjust poll intervals to balance responsiveness and server load
 - **Smart Recovery** — Automatic retry with backoff for transient errors
 
@@ -116,6 +122,14 @@ The command submits the current editor text, including unsaved changes, without 
 - **Job Status Filters** — Show all jobs, only failing jobs, or only running jobs
 - **Branch Filtering** — Filter branches within multibranch pipeline folders
 - **Quick Access** — Filter icons in the view title bar for one-click filtering
+
+### Bulk Tree Actions
+
+Use **Ctrl-click** (Windows/Linux) or **Cmd-click** (macOS) to select individual rows, or **Shift-click** to select a range. Right-click the selection or use the existing Command Palette commands to stop running builds, cancel queued items, watch/unwatch jobs, or pin/unpin jobs. Inline row icons always act on that row alone.
+
+Selections can include several Jenkins environments and different kinds of rows. Each action processes eligible rows, skips incompatible rows, and leaves jobs already in the requested watched/pinned state unchanged. Selecting a folder does not select its descendants. Repeated appearances of the same job, build, or queue item are processed once.
+
+Stopping builds and cancelling queued items each show one confirmation for the whole batch. Progress includes **Cancel**, which stops work that has not started; requests already sent finish normally. Individual failures do not prevent other selected items from being processed. The completion notification summarizes changes, skipped items, failures, and unattempted work; choose **Show Details** to open the **Jenkins Bulk Actions** output channel.
 
 ### Build Queue
 
@@ -310,6 +324,29 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | `jenkinsWorkbench.taskRunner.maxConsecutiveErrors` | 5 | Consecutive Jenkins API errors allowed per task-runner operation before cleanup and failure. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
 | `jenkinsWorkbench.buildDetails.testReport.includeCaseLogs` | false | Include per-test stack traces and stdout/stderr when fetching test reports. |
+| `jenkinsWorkbench.buildDetails.relatedBuilds.maxJobs` | 50 | Candidate jobs per downstream search (1–200), within the shared request/time budget. |
+| `jenkinsWorkbench.buildDetails.relatedBuilds.maxBuildsPerJob` | 100 | Recent builds inspected per candidate job (1–1,000). |
+
+### Watch Notifications
+
+These settings apply to ongoing job watches across the VS Code window. Configure them in User or Workspace settings; workspace values override user values. Changes apply to subsequent notifications immediately, without reloading. **Notify When Current Commit Finishes** notifications are controlled independently and are unaffected by these settings.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.watchNotifications.enabled` | true | Master switch for all job-watch notifications; preserves individual category preferences. |
+| `jenkinsWorkbench.watchNotifications.failure` | true | Notify when a watched job enters failure. |
+| `jenkinsWorkbench.watchNotifications.recovery` | true | Notify when a failed watched job returns to success. |
+| `jenkinsWorkbench.watchNotifications.completion` | true | Notify about other build completions, including repeated failures. |
+| `jenkinsWorkbench.watchNotifications.pendingInput` | true | Notify when a watched build needs input. |
+| `jenkinsWorkbench.watchNotifications.watchError` | true | Notify about polling errors and watches removed because Jenkins reports the job missing. |
+
+Common configurations:
+
+- **Status changes:** set `jenkinsWorkbench.watchNotifications.completion` to `false` to keep failure-entry and recovery alerts without routine completion alerts.
+- **Failure-only build alerts:** also set `jenkinsWorkbench.watchNotifications.recovery` to `false`. Repeated failed builds remain quiet while completion alerts are disabled. Pending-input and watch-error alerts have separate controls.
+- **Do not disturb:** set `jenkinsWorkbench.watchNotifications.enabled` to `false` to mute all job-watch alerts.
+
+Muting affects notification display only. Polling, saved watch status, pending-input tracking, and tree updates continue. Muted events are discarded: re-enabling notifications does not replay them or announce a pending input that has not changed. Disabling a failure or recovery alert does not replace it with a completion alert.
 
 ### Build Details & Comparison
 
@@ -425,7 +462,7 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `jenkinsWorkbench.artifactDownloadRoot` | `jenkins-artifacts` | Workspace-relative folder for downloaded artifacts. |
-| `jenkinsWorkbench.artifactMaxDownloadMb` | 100 | Maximum artifact download size in megabytes (0 disables limit). |
+| `jenkinsWorkbench.artifactMaxDownloadMb` | 100 | Maximum artifact download size in megabytes; applies to the compressed size for ZIP downloads (0 disables limit). |
 
 ### Artifact Preview Cache
 
@@ -512,6 +549,7 @@ activates there.
 |---------|-------------|
 | `Jenkins: Preview Artifact` | Open an artifact (image/text) from a build |
 | `Jenkins: Download Artifact` | Download an artifact to the workspace |
+| `Jenkins: Download All Artifacts as ZIP` | Download all artifacts from the selected build as a ZIP to the workspace |
 | `Jenkins: Preview Workspace File` | Open a file from the selected job workspace |
 
 ### Navigation & Search
@@ -560,6 +598,23 @@ Commit watches are opt-in and workspace-scoped. They retain the original reposit
 | `Jenkins: Take Node Offline...` | Mark the selected Jenkins node temporarily offline |
 | `Jenkins: Bring Node Online` | Return a temporarily offline node to service |
 | `Jenkins: Launch Node Agent` | Ask Jenkins to launch the selected node agent |
+| `Jenkins: Edit Node Labels...` | Edit configured labels on a permanent agent |
+| `Jenkins: Disconnect Node Agent...` | Disconnect an agent, with an optional reason |
+| `Jenkins: View Agent Log` | Follow recent agent output in Node Details |
+| `Jenkins: Create Node...` | Create a permanent inbound agent from the Nodes group or Command Palette |
+| `Jenkins: Copy Node...` | Copy a permanent agent, then review its configuration in Jenkins |
+| `Jenkins: Delete Node...` | Delete a permanent agent after checking that it has no running work |
+
+Node context menus and the Node Details **Actions** menu provide management actions. Capacity links to Node Details. Label editing changes only the configured label list; Jenkins' automatic node-name label and plugin-provided labels remain unchanged. Use Jenkins label-list syntax, including quoted labels where needed. An empty value clears configured labels. If configured labels change remotely while the prompt is open, reload before saving; unrelated configuration changes are preserved. Jenkins does not offer an atomic compare-and-swap for this update, so a small final read/write race remains.
+
+Creation asks for a name, remote root, executor count (default 1), labels, scheduling mode, and optional description, then shows a review before creating an inbound agent. Open the agent's Jenkins connection instructions to connect it. Copy preserves the source launcher and other plugin settings and opens the new agent's Jenkins configuration page; Jenkins holds the copy from launching until you save its configuration. A failed create or copy is checked for an existing target before another attempt is offered.
+
+Configuration changes, copying, and deletion support permanent agents; use Jenkins to manage built-in, cloud-managed, or unrecognized node types. Disconnect warns that running builds may fail. Deletion requires typing the node name and confirming, and is blocked when running work is present or activity is unknown. Activity is checked again immediately before deletion, but Jenkins does not provide an atomic "delete only if idle" operation.
+
+The **Agent Log** tab follows recent plain-text output every three seconds while it is selected and visible. **Pause**, **Refresh**, **Retry**, and **Copy** operate on the displayed output. Each update retains at most 64 KiB and the displayed buffer at most 256 KiB; indicators identify omitted older output and catch-up on paginated Jenkins logs. Jenkins can transform log text and its byte offsets refer to the source log, so each server batch must be read fully before its cursor can be reused. Network response size is therefore controlled by Jenkins, while retained memory stays bounded. Hiding the panel or leaving the tab stops fetching. Logs and configuration XML are not persisted.
+
+Jenkins permissions still apply: label changes require **Agent/Configure**; creation and copying require **Agent/Create** (copy also requires access to the source configuration); disconnect requires **Agent/Disconnect**; deletion requires **Agent/Delete**. Logs require **Agent/Connect** or **Agent/Extended Read**, depending on Jenkins configuration. Permission failures are reported without retrying mutations automatically.
+
 
 ### Filtering
 
@@ -660,7 +715,11 @@ Select **Verify certificates (recommended)** to restore verification. Changing t
 ### Artifact Downloads
 
 - Artifact downloads require a folder-backed workspace; previews do not
-- If downloads fail, check the `jenkinsWorkbench.artifactMaxDownloadMb` limit
+- Use **Download All Artifacts as ZIP** from a build's context menu or the Build Details Artifacts card to save Jenkins' complete archive, including artifacts beyond the card's displayed list
+- ZIPs are saved as `<artifactDownloadRoot>/<environment>/<job segment>/<build number>.zip`, beside the folder used for individual artifacts; multi-root workspaces prompt for the destination workspace folder
+- Running builds download the artifacts Jenkins has archived so far
+- ZIP downloads show progress with a **Cancel** button. Cancellation or failure removes the partial download and preserves any previously downloaded ZIP; successful downloads replace it
+- If downloads fail, check the `jenkinsWorkbench.artifactMaxDownloadMb` limit, which applies to the compressed size of a ZIP; set it to `0` to disable the limit
 
 ### Workspace Browsing
 
@@ -775,6 +834,7 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 31. Open a completed build with Jenkins Coverage data and verify its summary, modified-file data, and editor decorations
 32. Keep a build forever and release it from the tree and from Build Details; delete a kept build with Stop Keeping and Delete and confirm an open Build Details panel for it closes
 33. Edit a build's display name (and reset it), a single-line description, and a multi-line description in the draft editor, including a remote-change conflict
+34. Multi-select jobs, running builds, and queue items with Ctrl/Cmd-click and Shift-click, including rows from different environments and repeated jobs in different sections; exercise all six bulk actions from the context menu and Command Palette, verify mixed watched/pinned states and row-only inline icons, decline a stop/cancel confirmation, cancel in-progress work, and check partial-failure details and refreshed tree/watch/queue state
 
 ## License
 

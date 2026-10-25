@@ -4,22 +4,28 @@ import {
   type BuildManagementMessage,
   isApproveInputMessage,
   isArtifactActionMessage,
+  isBuildDetailsReadyMessage,
   isClearPipelineLogNodeMessage,
   isConfigureBuildDiagnosticsMessage,
   isDeleteBuildMessage,
+  isDownloadAllArtifactsMessage,
   isEditBuildMessage,
   isExportConsoleMessage,
   isExportPipelineNodeLogMessage,
+  isNavigateBuildMessage,
   isOpenDiagnosticSourceMessage,
   isOpenExternalMessage,
+  isOpenRelatedBuildMessage,
   isOpenTestSourceMessage,
   isPersistUiStateMessage,
   isRefreshBuildDetailsMessage,
+  isRefreshRelatedBuildsMessage,
   isRejectInputMessage,
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
   isSetKeepForeverMessage,
+  isSetRelatedBuildsExpandedMessage,
   isShowBuildDiagnosticProblemsMessage,
   isToggleFollowLogMessage,
   type OpenDiagnosticSourceMessage,
@@ -32,7 +38,13 @@ import {
 } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsMessageRouterHandlers {
+  onBuildDetailsReady?(): void;
+  onSetRelatedBuildsExpanded?(expanded: boolean): void;
+  onRefreshRelatedBuilds?(): void;
+  onOpenRelatedBuild?(targetId: string): void;
+  onNavigateBuild?(direction: "back" | "forward"): void;
   onArtifactAction(message: ArtifactActionMessage): void;
+  onDownloadAllArtifacts(): void;
   onOpenExternal(url: string): void;
   onExportConsole(): void;
   onApproveInput(message: ApproveInputMessage): void;
@@ -68,7 +80,19 @@ function createMessageRoutes(
   handlers: BuildDetailsMessageRouterHandlers
 ): Array<(message: unknown) => boolean> {
   return [
+    createMessageRoute(isBuildDetailsReadyMessage, () => handlers.onBuildDetailsReady?.()),
+    createMessageRoute(isSetRelatedBuildsExpandedMessage, (message) =>
+      handlers.onSetRelatedBuildsExpanded?.(message.expanded)
+    ),
+    createMessageRoute(isRefreshRelatedBuildsMessage, () => handlers.onRefreshRelatedBuilds?.()),
+    createMessageRoute(isOpenRelatedBuildMessage, (message) =>
+      handlers.onOpenRelatedBuild?.(message.targetId)
+    ),
+    createMessageRoute(isNavigateBuildMessage, (message) =>
+      handlers.onNavigateBuild?.(message.direction)
+    ),
     createMessageRoute(isArtifactActionMessage, (message) => handlers.onArtifactAction(message)),
+    createMessageRoute(isDownloadAllArtifactsMessage, () => handlers.onDownloadAllArtifacts()),
     createMessageRoute(isOpenExternalMessage, (message) => handlers.onOpenExternal(message.url)),
     createMessageRoute(isExportConsoleMessage, () => handlers.onExportConsole()),
     createMessageRoute(isRefreshBuildDetailsMessage, () => handlers.onRefreshBuildDetails()),

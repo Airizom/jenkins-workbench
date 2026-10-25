@@ -32,6 +32,51 @@ const { BuildDetailsPanelRuntime } = await import(
 );
 
 describe("BuildDetailsPanelRuntime", () => {
+  it("requests causes on initial recovery and keeps later status refreshes lightweight", async () => {
+    const environment = {
+      environmentId: "env-1",
+      scope: "global" as const,
+      url: "https://jenkins.example/"
+    };
+    const buildUrl = `${environment.url}job/example/1/`;
+    const state = new BuildDetailsPanelState();
+    state.resetForLoad(environment, buildUrl, "nonce");
+    const recovered = {
+      number: 1,
+      url: buildUrl,
+      building: false,
+      actions: [{ causes: [{ upstreamUrl: "job/parent/", upstreamBuild: 2 }] }]
+    };
+    const getBuildDetails = vi.fn().mockResolvedValue(recovered);
+    const changed = vi.fn();
+    const runtime = new BuildDetailsPanelRuntime({
+      state,
+      view: { isVisible: () => false } as never,
+      coverageDecorationService: {
+        deactivateOwner: vi.fn(),
+        clearCoverageContext: vi.fn()
+      } as never,
+      getBackend: () => ({ status: { getBuildDetails } }) as never,
+      getPollingController: () => undefined,
+      getCurrentToken: () => 1,
+      isTokenCurrent: () => true,
+      onBuildDetailsChanged: changed
+    });
+    try {
+      await runtime.refreshBuildStatus(1);
+      assert.deepEqual(getBuildDetails.mock.calls[0], [
+        environment,
+        buildUrl,
+        { includeCauses: true }
+      ]);
+      assert.equal(changed.mock.calls[0][0], recovered);
+      await runtime.refreshBuildStatus(1);
+      assert.equal(getBuildDetails.mock.calls[1][2], undefined);
+    } finally {
+      runtime.dispose();
+    }
+  });
+
   it("keeps the newest test report when concurrent refreshes complete out of order", async () => {
     const buildUrl = "https://jenkins.example/job/example/1/";
     const state = new BuildDetailsPanelState();

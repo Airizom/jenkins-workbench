@@ -12,10 +12,12 @@ import type { BuildDetailsTab } from "../../../hooks/useBuildDetailsTabs";
 import { BuildFailureInsightsSection, hasVisibleInsights } from "../BuildFailureInsightsSection";
 import { CoverageGlanceCard } from "./CoverageGlanceCard";
 import { OverviewSummaryCard } from "./OverviewSummaryCard";
+import { RelatedBuildsSection, type RelatedBuildsSectionProps } from "./RelatedBuildsSection";
 import { RunningProgressCard } from "./RunningProgressCard";
 import { TestPassDonutCard } from "./TestPassDonutCard";
 
 type OverviewTabProps = {
+  relatedBuilds?: RelatedBuildsSectionProps;
   resultLabel: string;
   resultClass: string;
   durationLabel: string;
@@ -29,12 +31,14 @@ type OverviewTabProps = {
   diagnostics: BuildDiagnosticsViewModel;
   hasTests: boolean;
   onNavigateTab: (tab: BuildDetailsTab) => void;
+  onDownloadAllArtifacts: () => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
   onOpenDiagnosticSource: (targetId: string) => void;
   onShowDiagnosticProblems: () => void;
   onConfigureBuildDiagnostics: () => void;
 };
 export function OverviewTab({
+  relatedBuilds,
   resultLabel,
   resultClass,
   durationLabel,
@@ -48,6 +52,7 @@ export function OverviewTab({
   diagnostics,
   hasTests,
   onNavigateTab,
+  onDownloadAllArtifacts,
   onArtifactAction,
   onOpenDiagnosticSource,
   onShowDiagnosticProblems,
@@ -62,6 +67,7 @@ export function OverviewTab({
 
   return (
     <div className="space-y-3">
+      {relatedBuilds ? <RelatedBuildsSection {...relatedBuilds} /> : null}
       {isRunning ? (
         <RunningProgressCard
           pipelineStages={pipelineStages}
@@ -91,6 +97,7 @@ export function OverviewTab({
           showTestsSummary={!showTestsCard}
           hasTestsTab={hasTests}
           testReportUnavailable={testsSummary.detailsUnavailable}
+          onDownloadAllArtifacts={onDownloadAllArtifacts}
           onArtifactAction={onArtifactAction}
           onOpenDiagnosticSource={onOpenDiagnosticSource}
           onShowDiagnosticProblems={onShowDiagnosticProblems}

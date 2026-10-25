@@ -6,6 +6,7 @@ import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
 import { JenkinsPipelineSyntaxApi } from "./client/JenkinsPipelineSyntaxApi";
 import { JenkinsPipelineValidationApi } from "./client/JenkinsPipelineValidationApi";
 import { JenkinsQueueApi } from "./client/JenkinsQueueApi";
+import { JenkinsRelationshipsApi } from "./client/JenkinsRelationshipsApi";
 import { JenkinsWorkspaceApi } from "./client/JenkinsWorkspaceApi";
 import { JenkinsCoverageApi } from "./coverage/JenkinsCoverageApi";
 import type {
@@ -13,6 +14,7 @@ import type {
   JenkinsModifiedCoverageFile
 } from "./coverage/JenkinsCoverageTypes";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
+import type { NodeAgentLogOptions, NodeAgentLogResult } from "./NodeManagement";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type {
   JenkinsArtifact,
@@ -80,6 +82,7 @@ export type {
 
 export class JenkinsClient {
   private readonly buildsApi: JenkinsBuildsApi;
+  private readonly relationshipsApi: JenkinsRelationshipsApi;
   private readonly jobsApi: JenkinsJobsApi;
   private readonly nodesApi: JenkinsNodesApi;
   private readonly queueApi: JenkinsQueueApi;
@@ -92,6 +95,7 @@ export class JenkinsClient {
     const httpClient = new JenkinsHttpClient(options);
     this.jobsApi = new JenkinsJobsApi(httpClient);
     this.buildsApi = new JenkinsBuildsApi(httpClient);
+    this.relationshipsApi = new JenkinsRelationshipsApi(httpClient);
     this.nodesApi = new JenkinsNodesApi(httpClient);
     this.queueApi = new JenkinsQueueApi(httpClient);
     this.pipelineValidationApi = new JenkinsPipelineValidationApi(httpClient);
@@ -157,6 +161,42 @@ export class JenkinsClient {
     }
   ): Promise<JenkinsBuildDetails> {
     return this.buildsApi.getBuildDetails(buildUrl, options);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async getDownstreamProjects(
+    jobUrl: string,
+    limit?: number,
+    beforeRequest?: () => void,
+    signal?: AbortSignal
+  ): Promise<JenkinsJob[]> {
+    return this.relationshipsApi.getDownstreamProjects(jobUrl, limit, beforeRequest, signal);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async getRelationshipJobs(
+    parentUrl: string,
+    limit: number,
+    beforeRequest?: () => void,
+    signal?: AbortSignal
+  ): Promise<JenkinsJob[]> {
+    return this.relationshipsApi.getRelationshipJobs(parentUrl, limit, beforeRequest, signal);
+  }
+
+  async getRelationshipBuilds(
+    jobUrl: string,
+    offset: number,
+    limit: number,
+    beforeRequest?: () => void,
+    signal?: AbortSignal
+  ): Promise<JenkinsBuild[]> {
+    return this.relationshipsApi.getRelationshipBuilds(
+      jobUrl,
+      offset,
+      limit,
+      beforeRequest,
+      signal
+    );
   }
 
   async getBuildArtifacts(buildUrl: string): Promise<JenkinsArtifact[]> {
@@ -262,6 +302,14 @@ export class JenkinsClient {
     return this.buildsApi.getArtifactStream(buildUrl, relativePath, options);
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async getArtifactArchiveStream(
+    buildUrl: string,
+    options?: { maxBytes?: number; signal?: AbortSignal }
+  ): Promise<JenkinsStreamResponse> {
+    return this.buildsApi.getArtifactArchiveStream(buildUrl, options);
+  }
+
   // fallow-ignore-next-line unused-class-member
   async getWorkspaceEntries(
     jobUrl: string,
@@ -300,6 +348,44 @@ export class JenkinsClient {
   // fallow-ignore-next-line unused-class-member
   async launchNodeAgent(nodeUrl: string): Promise<void> {
     await this.nodesApi.launchNodeAgent(nodeUrl);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async getNodeConfigXml(nodeUrl: string): Promise<string> {
+    return this.nodesApi.getNodeConfigXml(nodeUrl);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async updateNodeConfigXml(nodeUrl: string, xml: string): Promise<void> {
+    return this.nodesApi.updateNodeConfigXml(nodeUrl, xml);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async disconnectNodeAgent(nodeUrl: string, reason?: string): Promise<void> {
+    return this.nodesApi.disconnectNodeAgent(nodeUrl, reason);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async deleteNode(nodeUrl: string): Promise<void> {
+    return this.nodesApi.deleteNode(nodeUrl);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async createNode(name: string, xml: string): Promise<void> {
+    return this.nodesApi.createNode(name, xml);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async copyNode(sourceName: string, name: string): Promise<void> {
+    return this.nodesApi.copyNode(sourceName, name);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async getNodeAgentLog(
+    nodeUrl: string,
+    options?: NodeAgentLogOptions
+  ): Promise<NodeAgentLogResult> {
+    return this.nodesApi.getNodeAgentLog(nodeUrl, options);
   }
 
   async getQueue(): Promise<JenkinsQueueItem[]> {

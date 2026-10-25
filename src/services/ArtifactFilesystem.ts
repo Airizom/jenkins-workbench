@@ -8,7 +8,7 @@ export function createFileArtifactFilesystem(): ArtifactFilesystem {
     createDirectory: (directoryPath, workspaceRoot) =>
       checkDirectory(directoryPath, workspaceRoot, true),
     createWriteStream: (filePath: string) => fs.createWriteStream(filePath, { flags: "wx" }),
-    rename: async (sourcePath, targetPath, workspaceRoot) => {
+    rename: async (sourcePath, targetPath, workspaceRoot, signal) => {
       await checkDirectory(path.dirname(targetPath), workspaceRoot, false);
       try {
         if ((await fs.promises.lstat(targetPath)).isSymbolicLink()) {
@@ -19,6 +19,7 @@ export function createFileArtifactFilesystem(): ArtifactFilesystem {
           throw error;
         }
       }
+      signal?.throwIfAborted();
       await fs.promises.rename(sourcePath, targetPath);
     },
     delete: (targetPath: string) => fs.promises.unlink(targetPath)

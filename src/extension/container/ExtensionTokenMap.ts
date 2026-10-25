@@ -2,6 +2,8 @@ import type * as vscode from "vscode";
 import type { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { LocalJenkinsfileReplayWorkflow } from "../../commands/build/LocalJenkinsfileReplayWorkflow";
 import type { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
+import type { BulkActionService } from "../../commands/bulk/BulkActionService";
+import type { TreeBulkSelection } from "../../commands/bulk/TreeBulkSelection";
 import type { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import type { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import type { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
@@ -85,6 +87,8 @@ import type { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
 import type { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 
 export interface ExtensionTokenMap {
+  bulkActionService: BulkActionService;
+  treeBulkSelection: TreeBulkSelection;
   historyService: HistoryService;
   historyBaselineStore: HistoryBaselineStore;
   historyBaselineResolver: HistoryBaselineResolver;

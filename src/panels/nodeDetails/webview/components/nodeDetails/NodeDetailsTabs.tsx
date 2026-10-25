@@ -14,18 +14,20 @@ import {
   TabsTrigger
 } from "../../../../shared/webview/components/ui/tabs";
 import { ClockIcon, CpuIcon, GaugeIcon, StatusIcon } from "../../../../shared/webview/icons";
+import { emptyNodeAgentLogState } from "../../../shared/NodeAgentLogContracts";
 import {
   isNodeDetailsTab,
   NODE_DETAILS_TABS,
   type NodeDetailsTab
 } from "../../nodeDetailsTabValues";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
+import { NodeAgentLogSection } from "./NodeAgentLogSection";
 import { NodeDetailsAdvancedSection } from "./NodeDetailsAdvancedSection";
 import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
 import { NodeDetailsQueuedWorkSection } from "./NodeDetailsQueuedWorkSection";
 
-const { useRef, useState } = React;
+const { useRef } = React;
 
 /**
  * Waiting work is normal, so the Queue count stays neutral unless an item
@@ -49,15 +51,21 @@ type NodeDetailsTabsProps = {
   onRetryDiagnostics: () => void;
   onCopyJson: () => void;
   onOpenExternal: (url: string) => void;
+  onLogFollow?: () => void;
+  onLogRefresh?: () => void;
+  onLogCopy?: () => void;
 };
 export function NodeDetailsTabs({
   state,
   onDiagnosticsToggle,
   onRetryDiagnostics,
   onCopyJson,
-  onOpenExternal
+  onOpenExternal,
+  onLogFollow,
+  onLogRefresh,
+  onLogCopy
 }: NodeDetailsTabsProps): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<NodeDetailsTab>(NODE_DETAILS_TABS.OVERVIEW);
+  const activeTab = state.activeTab ?? NODE_DETAILS_TABS.OVERVIEW;
   // Radix reports one mouse click twice (focus, then mousedown) before React
   // re-renders, so compare against a ref rather than the rendered state.
   const activeTabRef = useRef<NodeDetailsTab>(activeTab);
@@ -68,14 +76,13 @@ export function NodeDetailsTabs({
       return;
     }
     activeTabRef.current = value;
-    setActiveTab(value);
     onDiagnosticsToggle(value);
   };
 
   return (
     <Tabs value={activeTab} onValueChange={handleValueChange} className="space-y-3">
-      <div className="sticky top-0 z-10 -mx-4 bg-background px-4 py-1">
-        <TabsList className="w-full justify-start">
+      <div className="sticky top-0 z-10 -mx-4 overflow-x-auto bg-background px-4 py-1">
+        <TabsList className="w-max min-w-full justify-start">
           <TabsTrigger value={NODE_DETAILS_TABS.OVERVIEW} className="text-xs">
             <StatusIcon className="h-3.5 w-3.5" />
             Overview
@@ -95,6 +102,9 @@ export function NodeDetailsTabs({
           <TabsTrigger value={NODE_DETAILS_TABS.DIAGNOSTICS} className="text-xs">
             <GaugeIcon className="h-3.5 w-3.5" />
             Diagnostics
+          </TabsTrigger>
+          <TabsTrigger value={NODE_DETAILS_TABS.AGENT_LOG} className="text-xs">
+            Agent Log
           </TabsTrigger>
         </TabsList>
       </div>
@@ -120,6 +130,15 @@ export function NodeDetailsTabs({
         <NodeDetailsQueuedWorkSection
           queuedWork={state.queuedWork}
           onOpenExternal={onOpenExternal}
+        />
+      </TabsContent>
+
+      <TabsContent value={NODE_DETAILS_TABS.AGENT_LOG} className="space-y-3">
+        <NodeAgentLogSection
+          state={state.agentLog ?? emptyNodeAgentLogState()}
+          onFollow={onLogFollow}
+          onRefresh={onLogRefresh}
+          onCopy={onLogCopy}
         />
       </TabsContent>
 

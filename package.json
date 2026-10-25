@@ -262,6 +262,42 @@
         "icon": "$(debug-start)"
       },
       {
+        "command": "jenkinsWorkbench.editNodeLabels",
+        "title": "Edit Node Labels...",
+        "category": "Jenkins",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jenkinsWorkbench.disconnectNodeAgent",
+        "title": "Disconnect Node Agent...",
+        "category": "Jenkins",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "jenkinsWorkbench.showNodeAgentLog",
+        "title": "View Agent Log",
+        "category": "Jenkins",
+        "icon": "$(output)"
+      },
+      {
+        "command": "jenkinsWorkbench.createNode",
+        "title": "Create Node...",
+        "category": "Jenkins",
+        "icon": "$(add)"
+      },
+      {
+        "command": "jenkinsWorkbench.copyNode",
+        "title": "Copy Node...",
+        "category": "Jenkins",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "jenkinsWorkbench.deleteNode",
+        "title": "Delete Node...",
+        "category": "Jenkins",
+        "icon": "$(trash)"
+      },
+      {
         "command": "jenkinsWorkbench.previewBuildLog",
         "title": "Preview Build Logs",
         "category": "Jenkins",
@@ -299,6 +335,12 @@
       {
         "command": "jenkinsWorkbench.downloadArtifact",
         "title": "Download Artifact",
+        "category": "Jenkins",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "jenkinsWorkbench.downloadAllArtifacts",
+        "title": "Download All Artifacts as ZIP",
         "category": "Jenkins",
         "icon": "$(cloud-download)"
       },
@@ -468,6 +510,30 @@
         "command": "jenkinsWorkbench.showBuildDiagnosticOutput",
         "title": "Show Build Diagnostic Output",
         "category": "Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.abortBuild.single",
+        "title": "Abort/Stop Build",
+        "category": "Jenkins",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "jenkinsWorkbench.cancelQueueItem.single",
+        "title": "Cancel Queue Item",
+        "category": "Jenkins",
+        "icon": "$(close)"
+      },
+      {
+        "command": "jenkinsWorkbench.pinJob.single",
+        "title": "Pin Job",
+        "category": "Jenkins",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "jenkinsWorkbench.unpinJob.single",
+        "title": "Unpin Job",
+        "category": "Jenkins",
+        "icon": "$(pinned)"
       }
     ],
     "taskDefinitions": [
@@ -614,6 +680,42 @@
           "default": 3,
           "minimum": 1,
           "description": "Consecutive polling errors before warning about a watched job. Watches are removed only when Jenkins reports the job missing."
+        },
+        "jenkinsWorkbench.watchNotifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Enable ongoing job-watch notifications. Turn off for do not disturb while polling and tree updates continue. Muted events are not replayed. Does not affect commit-watch notifications. Changes apply immediately."
+        },
+        "jenkinsWorkbench.watchNotifications.failure": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Notify when a watched job enters failure. Consecutive failed builds use completion notifications. Requires watchNotifications.enabled. Changes apply immediately."
+        },
+        "jenkinsWorkbench.watchNotifications.recovery": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Notify when a failed watched job returns to success. Requires watchNotifications.enabled. Changes apply immediately."
+        },
+        "jenkinsWorkbench.watchNotifications.completion": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Notify about watched build completions that are not failure-entry or recovery events, including consecutive failures. Turn off for status-change alerts only. Requires watchNotifications.enabled. Changes apply immediately."
+        },
+        "jenkinsWorkbench.watchNotifications.pendingInput": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Notify when a watched build needs input. Re-enabling does not notify again for unchanged input observed while muted. Requires watchNotifications.enabled. Changes apply immediately."
+        },
+        "jenkinsWorkbench.watchNotifications.watchError": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show polling-error and missing-job-removal warnings for watched jobs. Watch-error counts and automatic removal of missing jobs continue when disabled. Requires watchNotifications.enabled. Changes apply immediately."
         },
         "jenkinsWorkbench.buildDetailsRefreshIntervalSeconds": {
           "type": "number",
@@ -922,6 +1024,20 @@
             },
             "additionalProperties": false
           }
+        },
+        "jenkinsWorkbench.buildDetails.relatedBuilds.maxJobs": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Maximum candidate jobs inspected by an on-demand downstream build search. Searches also share a 100-request and 30-second limit."
+        },
+        "jenkinsWorkbench.buildDetails.relatedBuilds.maxBuildsPerJob": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "Maximum recent builds inspected per candidate job during downstream discovery. Search results identify incomplete coverage."
         },
         "jenkinsWorkbench.buildDetails.testReport.includeCaseLogs": {
           "type": "boolean",
@@ -1369,17 +1485,17 @@
           "group": "1_actions@2"
         },
         {
-          "command": "jenkinsWorkbench.pinJob",
+          "command": "jenkinsWorkbench.pinJob.single",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)pinned(\\s|$)/)",
           "group": "inline@2"
         },
         {
-          "command": "jenkinsWorkbench.unpinJob",
+          "command": "jenkinsWorkbench.unpinJob.single",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)pinned(\\s|$)/",
           "group": "inline@2"
         },
         {
-          "command": "jenkinsWorkbench.unpinJob",
+          "command": "jenkinsWorkbench.unpinJob.single",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)stalePinnedItem(\\s|$)/",
           "group": "inline@2"
         },
@@ -1430,12 +1546,12 @@
         },
         {
           "command": "jenkinsWorkbench.watchJob",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)watched(\\s|$)/)",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)watched(\\s|$)/))) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.watch))",
           "group": "2_watch@0"
         },
         {
           "command": "jenkinsWorkbench.unwatchJob",
-          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)watched(\\s|$)/",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)watched(\\s|$)/)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.unwatch))",
           "group": "2_watch@0"
         },
         {
@@ -1444,7 +1560,7 @@
           "group": "2_watch@1"
         },
         {
-          "command": "jenkinsWorkbench.abortBuild",
+          "command": "jenkinsWorkbench.abortBuild.single",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/",
           "group": "inline@3"
         },
@@ -1464,7 +1580,7 @@
           "group": "inline@1"
         },
         {
-          "command": "jenkinsWorkbench.cancelQueueItem",
+          "command": "jenkinsWorkbench.cancelQueueItem.single",
           "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
           "group": "inline@0"
         },
@@ -1492,6 +1608,11 @@
           "command": "jenkinsWorkbench.showBuildDetails",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "1_actions@1"
+        },
+        {
+          "command": "jenkinsWorkbench.downloadAllArtifacts",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "1_actions@3"
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
@@ -1562,6 +1683,56 @@
           "command": "jenkinsWorkbench.clearBranchFilter",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)branchFiltered(\\s|$)/",
           "group": "navigation@3"
+        },
+        {
+          "command": "jenkinsWorkbench.abortBuild",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)buildRunning(\\s|$)/)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.stop))",
+          "group": "3_destructive@0"
+        },
+        {
+          "command": "jenkinsWorkbench.cancelQueueItem",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem == queueItem)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.cancel))",
+          "group": "3_destructive@0"
+        },
+        {
+          "command": "jenkinsWorkbench.pinJob",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && !(viewItem =~ /(^|\\s)pinned(\\s|$)/))) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.pin))",
+          "group": "2_watch@2"
+        },
+        {
+          "command": "jenkinsWorkbench.unpinJob",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && ((viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/ && viewItem =~ /(^|\\s)pinned(\\s|$)/) || viewItem =~ /(^|\\s)stalePinnedItem(\\s|$)/)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.unpin))",
+          "group": "2_watch@2"
+        },
+        {
+          "command": "jenkinsWorkbench.editNodeLabels",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/ && viewItem =~ /(^|\\s)nodeAgent(\\s|$)/",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "jenkinsWorkbench.disconnectNodeAgent",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/ && viewItem =~ /(^|\\s)nodeAgent(\\s|$)/",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "jenkinsWorkbench.showNodeAgentLog",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/",
+          "group": "1_actions@3"
+        },
+        {
+          "command": "jenkinsWorkbench.createNode",
+          "when": "view == jenkinsWorkbench.tree && viewItem == nodes",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "jenkinsWorkbench.copyNode",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/ && viewItem =~ /(^|\\s)nodeAgent(\\s|$)/",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "jenkinsWorkbench.deleteNode",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)nodeOpenable(\\s|$)/ && viewItem =~ /(^|\\s)nodeAgent(\\s|$)/",
+          "group": "2_manage@9"
         }
       ],
       "editor/title": [
@@ -1672,6 +1843,22 @@
         {
           "command": "jenkinsWorkbench.replayWithLocalJenkinsfile",
           "when": "jenkinsWorkbench.workspaceJenkinsfileActive"
+        },
+        {
+          "command": "jenkinsWorkbench.abortBuild.single",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.cancelQueueItem.single",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.pinJob.single",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.unpinJob.single",
+          "when": "false"
         }
       ]
     },
@@ -1874,7 +2061,8 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "redos-detector": "^6.1.4"
+    "redos-detector": "^6.1.4",
+    "saxes": "^6.0.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

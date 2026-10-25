@@ -58,6 +58,42 @@ export function getWatchErrorThreshold(config: vscode.WorkspaceConfiguration): n
   );
 }
 
+export interface WatchNotificationOptions {
+  enabled: boolean;
+  failure: boolean;
+  recovery: boolean;
+  completion: boolean;
+  pendingInput: boolean;
+  watchError: boolean;
+}
+
+export function getWatchNotificationOptions(
+  config: vscode.WorkspaceConfiguration
+): WatchNotificationOptions {
+  const readBoolean = (key: definitions.ConfigKey, fallback: boolean): boolean => {
+    const value = config.get<unknown>(key);
+    return typeof value === "boolean" ? value : fallback;
+  };
+  const defaults = definitions.DEFAULT_WATCH_NOTIFICATION_OPTIONS;
+  return {
+    enabled: readBoolean(definitions.CONFIG_KEYS.watchNotificationsEnabled, defaults.enabled),
+    failure: readBoolean(definitions.CONFIG_KEYS.watchNotificationsFailure, defaults.failure),
+    recovery: readBoolean(definitions.CONFIG_KEYS.watchNotificationsRecovery, defaults.recovery),
+    completion: readBoolean(
+      definitions.CONFIG_KEYS.watchNotificationsCompletion,
+      defaults.completion
+    ),
+    pendingInput: readBoolean(
+      definitions.CONFIG_KEYS.watchNotificationsPendingInput,
+      defaults.pendingInput
+    ),
+    watchError: readBoolean(
+      definitions.CONFIG_KEYS.watchNotificationsWatchError,
+      defaults.watchError
+    )
+  };
+}
+
 export function getQueuePollIntervalSeconds(config: vscode.WorkspaceConfiguration): number {
   const pollIntervalSeconds = getFiniteNumberConfigValue(
     config,

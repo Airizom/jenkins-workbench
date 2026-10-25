@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { BuildDiagnosticsCoordinator } from "../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsBuildDetails } from "../jenkins/types";
 import { normalizeJenkinsUrlForComparison, parseBuildUrl } from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
@@ -24,8 +25,13 @@ import {
   getBuildDetailsCoverageEnabledConfigKey,
   getTestReportIncludeCaseLogsConfigKey
 } from "./buildDetails/BuildDetailsConfig";
+import { formatError } from "./buildDetails/BuildDetailsFormatters";
 import { createBuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageBindings";
 import type { BuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageRouter";
+import {
+  BuildDetailsNavigation,
+  type BuildDetailsNavigationTarget
+} from "./buildDetails/BuildDetailsNavigation";
 import { BuildDetailsPanelActions } from "./buildDetails/BuildDetailsPanelActions";
 import {
   BuildDetailsPanelController,
@@ -103,6 +109,11 @@ export class BuildDetailsPanel {
   private artifactActionHandler?: ArtifactActionHandler;
   private serializedState?: BuildDetailsPanelSerializedState;
   private readonly canOpenTestSource: BuildDetailsCanOpenTestSource;
+  private readonly navigation = new BuildDetailsNavigation();
+  private navigationGeneration = 0;
+  private navigationBusy = false;
+  private currentLoadComplete = false;
+  private disposed = false;
 
   static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
     const {
@@ -264,6 +275,7 @@ export class BuildDetailsPanel {
           this.controller.getBuildUrl()
         );
         this.updateHistory();
+        this.recordRecoveredNavigation();
       },
       () => this.postCurrentBuildDiagnostics(),
       () => this.mutableServices.testSourceResolver?.whenReady() ?? Promise.resolve(),
@@ -283,6 +295,23 @@ export class BuildDetailsPanel {
       controller: this.controller,
       buildDiagnosticsCoordinator: this.buildDiagnosticsCoordinator,
       getSerializedState: () => this.serializedState,
+      onBuildDetailsReady: () => {
+        this.postNavigation();
+        this.controller.republishRelationships();
+      },
+      openRelatedBuild: (targetId) => {
+        const target = this.controller.getRelatedBuildTarget(targetId);
+        if (target) {
+          void this.navigateToBuild(target.buildUrl, `${target.jobName} #${target.number}`);
+        }
+      },
+      navigateBuild: (direction) => {
+        this.recordDisplayedNavigation();
+        const target = this.navigation.target(direction);
+        if (target) {
+          void this.navigateToBuild(target.entry.buildUrl, target.entry.label, target);
+        }
+      },
       persistUiState: (message) => {
         if (this.serializedState) {
           this.serializedState = withBuildDetailsPanelUiState(
@@ -347,6 +376,8 @@ export class BuildDetailsPanel {
   }
 
   private dispose(): void {
+    this.disposed = true;
+    this.navigationGeneration++;
     this.historyController?.dispose();
     const buildUrl = this.controller.getBuildUrl();
     disposePanelResources(this.disposables);
@@ -366,14 +397,33 @@ export class BuildDetailsPanel {
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     label?: string,
-    pipelineNodeSelection?: PipelineNodeSelection
+    pipelineNodeSelection?: PipelineNodeSelection,
+    navigationLoad?: {
+      generation: number;
+      target?: BuildDetailsNavigationTarget;
+      initialDetails: JenkinsBuildDetails;
+    }
   ): Promise<void> {
+    const generation = navigationLoad?.generation ?? ++this.navigationGeneration;
+    if (this.disposed || generation !== this.navigationGeneration) {
+      return;
+    }
+    this.currentLoadComplete = false;
+    if (!navigationLoad) {
+      this.navigationBusy = false;
+    }
+    this.navigation.snapshot(this.serializedState);
+    this.navigation.setEnvironment(environment);
     this.historyController?.clear();
     this.historyEnvironment = environment;
     this.historyBuildUrl = undefined;
     this.artifactActionHandler = artifactActionHandler;
     this.buildDiagnosticsCoordinator.setPanelOwner(environment, buildUrl);
-    let panelState = mergeBuildDetailsPanelState(this.serializedState, environment, buildUrl);
+    let panelState = mergeBuildDetailsPanelState(
+      navigationLoad?.target?.entry.panelState ?? this.serializedState,
+      environment,
+      buildUrl
+    );
     const pipelineLogTarget = toPipelineLogTargetViewModel(pipelineNodeSelection);
     if (pipelineLogTarget) {
       panelState = withBuildDetailsPanelUiState(panelState, {
@@ -388,10 +438,14 @@ export class BuildDetailsPanel {
       buildUrl,
       {
         label,
-        panelState
+        panelState,
+        initialDetails: navigationLoad?.initialDetails
       }
     );
 
+    if (this.disposed || generation !== this.navigationGeneration) {
+      return;
+    }
     if (result.status === "missingAssets") {
       assignWebviewPanelManifestErrorHtml(this.panel, this.extensionUri, "buildDetails", {
         ...createMissingPanelAssetsMessages({
@@ -402,8 +456,143 @@ export class BuildDetailsPanel {
       });
       return;
     }
+    this.recordLoadedNavigation(environment, buildUrl, label, navigationLoad?.target);
+    this.currentLoadComplete = true;
+    this.postNavigation();
     this.postCurrentBuildDiagnostics();
     this.updateHistory();
+  }
+
+  private recordLoadedNavigation(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    label: string | undefined,
+    target: BuildDetailsNavigationTarget | undefined
+  ): void {
+    const details = this.controller.getCurrentDetails();
+    const currentBuildUrl = this.controller.getBuildUrl();
+    if (details && currentBuildUrl && areBuildUrlsEqual(currentBuildUrl, buildUrl)) {
+      const entry = {
+        environment,
+        buildUrl,
+        label: details.fullDisplayName ?? details.displayName ?? label,
+        panelState: this.serializedState
+      };
+      if (target) {
+        this.navigation.commit(target, entry);
+      } else {
+        this.navigation.record(entry);
+      }
+    }
+  }
+
+  private recordRecoveredNavigation(): void {
+    if (this.disposed || !this.currentLoadComplete) {
+      return;
+    }
+    this.recordDisplayedNavigation();
+  }
+
+  private recordDisplayedNavigation(): void {
+    if (this.disposed) return;
+    const details = this.controller.getCurrentDetails();
+    const environment = this.controller.getEnvironment();
+    const buildUrl = this.controller.getBuildUrl();
+    const panelState = this.serializedState;
+    if (
+      !details ||
+      !environment ||
+      !buildUrl ||
+      !areBuildUrlsEqual(details.url, buildUrl) ||
+      !panelState ||
+      panelState.environmentId !== environment.environmentId ||
+      panelState.scope !== environment.scope ||
+      !areBuildUrlsEqual(panelState.buildUrl, buildUrl)
+    ) {
+      return;
+    }
+    // Details can already be visible while test/coverage activation is still pending.
+    // Save that successful source before navigation invalidates the pending load.
+    this.navigation.record({
+      environment,
+      buildUrl,
+      label: details.fullDisplayName ?? details.displayName,
+      panelState
+    });
+    this.postNavigation();
+  }
+
+  private async navigateToBuild(
+    buildUrl: string,
+    label?: string,
+    target?: BuildDetailsNavigationTarget
+  ): Promise<void> {
+    const backend = this.controller.getBackend();
+    const environment = this.controller.getEnvironment();
+    const artifactActionHandler = this.artifactActionHandler;
+    const sourceBuildUrl = this.controller.getBuildUrl();
+    if (
+      this.disposed ||
+      this.navigationBusy ||
+      !backend ||
+      !environment ||
+      !artifactActionHandler ||
+      !sourceBuildUrl ||
+      areBuildUrlsEqual(sourceBuildUrl, buildUrl)
+    ) {
+      return;
+    }
+    this.recordDisplayedNavigation();
+    const generation = ++this.navigationGeneration;
+    const sourceToken = this.controller.getLoadToken();
+    this.navigationBusy = true;
+    this.postNavigation();
+    try {
+      // Validate access before replacing the current webview. Reuse these details
+      // in the load so an unavailable target cannot clear the source build.
+      const initialDetails = await backend.status.getBuildDetails(environment, buildUrl, {
+        includeCauses: true,
+        bypassCache: true
+      });
+      if (
+        this.disposed ||
+        generation !== this.navigationGeneration ||
+        sourceToken !== this.controller.getLoadToken()
+      ) {
+        return;
+      }
+      await this.load(backend, artifactActionHandler, environment, buildUrl, label, undefined, {
+        generation,
+        target,
+        initialDetails
+      });
+    } catch (error) {
+      if (
+        !this.disposed &&
+        generation === this.navigationGeneration &&
+        sourceToken === this.controller.getLoadToken()
+      ) {
+        void vscode.window.showErrorMessage(
+          `Unable to open ${label ?? "related build"}: ${formatError(error)}. Check that the build still exists and that you have permission to view it.`
+        );
+      }
+    } finally {
+      if (!this.disposed && generation === this.navigationGeneration) {
+        this.navigationBusy = false;
+        this.postNavigation();
+      }
+    }
+  }
+
+  private postNavigation(): void {
+    this.controller.postMessage({
+      type: "setBuildNavigation",
+      navigation: {
+        canGoBack: this.navigation.canGoBack,
+        canGoForward: this.navigation.canGoForward,
+        busy: this.navigationBusy
+      }
+    });
   }
 
   private updateHistory(): void {

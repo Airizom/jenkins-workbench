@@ -1,18 +1,29 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
+import { formatEnvironmentDisplayName } from "../../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import { toJenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { NodeDetailsPanel } from "../../panels/NodeDetailsPanel";
 import { NodeActionService, type NodeActionTarget } from "../../services/NodeActionService";
-import { NodeTreeItem } from "../../tree/TreeItems";
+import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
+import { NodesFolderTreeItem, NodeTreeItem } from "../../tree/TreeItems";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 
-type NodeActionMethod = "takeNodeOffline" | "bringNodeOnline" | "launchNodeAgent";
+type NodeActionMethod =
+  | "takeNodeOffline"
+  | "bringNodeOnline"
+  | "launchNodeAgent"
+  | "editNodeLabels"
+  | "disconnectNodeAgent"
+  | "copyNode"
+  | "deleteNode";
 
 export async function showNodeDetails(
   dataService: JenkinsDataService,
   refreshHost: EnvironmentScopedRefreshHost,
   extensionUri: vscode.Uri,
-  item?: NodeTreeItem
+  item?: NodeTreeItem,
+  initialTab?: "agentLog"
 ): Promise<void> {
   const target = resolveNodeActionTarget(item, "view details");
   if (!target) {
@@ -26,8 +37,99 @@ export async function showNodeDetails(
       nodeUrl: target.nodeUrl,
       extensionUri,
       label: target.label,
-      refreshHost
+      refreshHost,
+      initialTab
     });
+  });
+}
+
+export async function showNodeAgentLog(
+  dataService: JenkinsDataService,
+  refreshHost: EnvironmentScopedRefreshHost,
+  extensionUri: vscode.Uri,
+  item?: NodeTreeItem
+): Promise<void> {
+  await showNodeDetails(dataService, refreshHost, extensionUri, item, "agentLog");
+}
+
+export async function editNodeLabels(
+  dataService: JenkinsDataService,
+  refreshHost: EnvironmentScopedRefreshHost,
+  item?: NodeTreeItem
+): Promise<boolean> {
+  return runNodeAction(dataService, refreshHost, item, "edit labels", "editNodeLabels");
+}
+
+export async function disconnectNodeAgent(
+  dataService: JenkinsDataService,
+  refreshHost: EnvironmentScopedRefreshHost,
+  item?: NodeTreeItem
+): Promise<boolean> {
+  return runNodeAction(dataService, refreshHost, item, "disconnect", "disconnectNodeAgent");
+}
+
+export async function copyNode(
+  dataService: JenkinsDataService,
+  refreshHost: EnvironmentScopedRefreshHost,
+  item?: NodeTreeItem
+): Promise<boolean> {
+  return runNodeAction(dataService, refreshHost, item, "copy", "copyNode");
+}
+
+export async function deleteNode(
+  dataService: JenkinsDataService,
+  refreshHost: EnvironmentScopedRefreshHost,
+  item?: NodeTreeItem
+): Promise<boolean> {
+  return runNodeAction(dataService, refreshHost, item, "delete", "deleteNode");
+}
+
+export async function createNode(
+  dataService: JenkinsDataService,
+  environmentStore: JenkinsEnvironmentStore,
+  refreshHost: EnvironmentScopedRefreshHost,
+  extensionUri: vscode.Uri,
+  item?: NodesFolderTreeItem
+): Promise<void> {
+  let environment = item instanceof NodesFolderTreeItem ? item.environment : undefined;
+  if (!environment) {
+    const environments = await environmentStore.listEnvironmentsWithScope();
+    if (environments.length === 0) {
+      void vscode.window.showInformationMessage(
+        "Add a Jenkins environment before creating a node."
+      );
+      return;
+    }
+    const selected =
+      environments.length === 1
+        ? environments[0]
+        : (
+            await vscode.window.showQuickPick(
+              environments.map((candidate) => ({
+                label: formatEnvironmentDisplayName(candidate),
+                description: candidate.scope,
+                environment: candidate
+              })),
+              { title: "Create Node", placeHolder: "Select a Jenkins environment" }
+            )
+          )?.environment;
+    if (!selected) {
+      return;
+    }
+    environment = toJenkinsEnvironmentRef(selected);
+  }
+  await withActionErrorMessage("Unable to create node", async () => {
+    const target = await new NodeActionService(dataService).createNode(environment, refreshHost);
+    if (target) {
+      await NodeDetailsPanel.show({
+        dataService,
+        environment: target.environment,
+        nodeUrl: target.nodeUrl,
+        extensionUri,
+        label: target.label,
+        refreshHost
+      });
+    }
   });
 }
 
@@ -67,7 +169,11 @@ async function runNodeAction(
     return false;
   }
 
-  return new NodeActionService(dataService)[action](target, refreshHost);
+  const succeeded = await new NodeActionService(dataService)[action](target, refreshHost);
+  if (succeeded && action === "deleteNode") {
+    NodeDetailsPanel.closeForNode(target.environment, target.nodeUrl);
+  }
+  return succeeded;
 }
 
 function resolveNodeActionTarget(

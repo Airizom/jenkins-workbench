@@ -4,7 +4,9 @@ import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef
 
 const informationMessages: string[] = [];
 const actionCalls: Array<{ action: string; target: { nodeUrl: string; label: string } }> = [];
-const detailsPanelCalls: unknown[] = [];
+const detailsPanelCalls: Array<{ initialTab?: string }> = [];
+const closedPanels: unknown[] = [];
+let actionResult = true;
 
 const vscodeMock = {
   window: {
@@ -23,7 +25,30 @@ class TestNodeTreeItem {
   ) {}
 }
 
+class TestNodesFolderTreeItem {
+  constructor(public readonly environment: JenkinsEnvironmentRef) {}
+}
+
 class TestNodeActionService {
+  async editNodeLabels(target: { nodeUrl: string; label: string }): Promise<boolean> {
+    actionCalls.push({ action: "editNodeLabels", target });
+    return actionResult;
+  }
+  async disconnectNodeAgent(target: { nodeUrl: string; label: string }): Promise<boolean> {
+    actionCalls.push({ action: "disconnectNodeAgent", target });
+    return actionResult;
+  }
+  async copyNode(target: { nodeUrl: string; label: string }): Promise<boolean> {
+    actionCalls.push({ action: "copyNode", target });
+    return actionResult;
+  }
+  async deleteNode(target: { nodeUrl: string; label: string }): Promise<boolean> {
+    actionCalls.push({ action: "deleteNode", target });
+    return actionResult;
+  }
+  async createNode(environment: JenkinsEnvironmentRef) {
+    return { environment, nodeUrl: "computer/new-agent/", label: "new-agent" };
+  }
   async takeNodeOffline(target: { nodeUrl: string; label: string }): Promise<boolean> {
     actionCalls.push({ action: "takeNodeOffline", target });
     return true;
@@ -44,11 +69,15 @@ vi.doMock("vscode", () => vscodeMock);
 vi.doMock("../src/tree/TreeItems", () => ({
   BuildTreeItem: class {},
   NodeTreeItem: TestNodeTreeItem,
+  NodesFolderTreeItem: TestNodesFolderTreeItem,
   PipelineTreeItem: class {}
 }));
 vi.doMock("../src/panels/NodeDetailsPanel", () => ({
   NodeDetailsPanel: {
-    show: async (options: unknown) => {
+    closeForNode: (...args: unknown[]) => {
+      closedPanels.push(args);
+    },
+    show: async (options: { initialTab?: string }) => {
       detailsPanelCalls.push(options);
     }
   }
@@ -72,6 +101,8 @@ beforeEach(() => {
   informationMessages.length = 0;
   actionCalls.length = 0;
   detailsPanelCalls.length = 0;
+  closedPanels.length = 0;
+  actionResult = true;
 });
 
 describe("showNodeDetails", () => {
@@ -148,5 +179,70 @@ describe("node mutating command handlers", () => {
       }
     ]);
     assert.deepEqual(informationMessages, []);
+  });
+});
+
+describe("node management commands", () => {
+  it("opens agent logs on the requested tab", async () => {
+    const item = new TestNodeTreeItem(environment, "computer/agent-1/", "agent-1") as never;
+    await handlers.showNodeAgentLog({} as never, refreshHost, {} as never, item);
+    assert.equal(detailsPanelCalls[0].initialTab, "agentLog");
+  });
+
+  it.each(["editNodeLabels", "disconnectNodeAgent", "copyNode", "deleteNode"] as const)(
+    "validates the target for %s",
+    async (action) => {
+      assert.equal(
+        await handlers[action]({} as never, refreshHost, {
+          environment,
+          nodeUrl: "computer/forged/"
+        } as never),
+        false
+      );
+      assert.equal(actionCalls.length, 0);
+      assert.equal(
+        await handlers[action](
+          {} as never,
+          refreshHost,
+          new TestNodeTreeItem(environment, undefined, "missing-url") as never
+        ),
+        false
+      );
+      assert.equal(actionCalls.length, 0);
+    }
+  );
+
+  it("closes only the deleted target after success", async () => {
+    const item = new TestNodeTreeItem(environment, "computer/agent-1/", "agent-1") as never;
+    actionResult = false;
+    assert.equal(await handlers.deleteNode({} as never, refreshHost, item), false);
+    assert.deepEqual(closedPanels, []);
+    actionResult = true;
+    assert.equal(await handlers.deleteNode({} as never, refreshHost, item), true);
+    assert.deepEqual(closedPanels, [[environment, "computer/agent-1/"]]);
+  });
+
+  it("creates in the selected Nodes group and opens details", async () => {
+    const store = { listEnvironmentsWithScope: vi.fn() };
+    await handlers.createNode(
+      {} as never,
+      store as never,
+      refreshHost,
+      {} as never,
+      new TestNodesFolderTreeItem(environment) as never
+    );
+    assert.equal(store.listEnvironmentsWithScope.mock.calls.length, 0);
+    assert.equal(detailsPanelCalls.length, 1);
+  });
+
+  it("reports when creation has no configured environment", async () => {
+    await handlers.createNode(
+      {} as never,
+      { listEnvironmentsWithScope: async () => [] } as never,
+      refreshHost,
+      {} as never
+    );
+    assert.deepEqual(detailsPanelCalls, []);
+    assert.match(informationMessages[0], /Add a Jenkins environment/);
   });
 });

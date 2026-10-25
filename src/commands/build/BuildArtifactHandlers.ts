@@ -1,10 +1,10 @@
-import type { ArtifactTreeItem } from "../../tree/TreeItems";
+import type { ArtifactTreeItem, BuildTreeItem } from "../../tree/TreeItems";
 import type { ArtifactActionHandler, ArtifactActionRequest } from "../../ui/ArtifactActionHandler";
 import { requireSelection } from "../CommandUtils";
 
 function resolveArtifactRequest(
   item: ArtifactTreeItem | undefined,
-  action: ArtifactActionRequest["action"]
+  action: "preview" | "download"
 ): ArtifactActionRequest | undefined {
   const selected = requireSelection(item, `Select an artifact to ${action}.`);
   if (!selected) {
@@ -44,4 +44,22 @@ export async function downloadArtifact(
   }
 
   await artifactActionHandler.handle(request);
+}
+
+export async function downloadAllArtifacts(
+  artifactActionHandler: ArtifactActionHandler,
+  item?: BuildTreeItem
+): Promise<void> {
+  const selected = requireSelection(item, "Select a build to download all artifacts as ZIP.");
+  if (!selected) {
+    return;
+  }
+
+  await artifactActionHandler.handle({
+    action: "downloadAll",
+    environment: selected.environment,
+    buildUrl: selected.buildUrl,
+    buildNumber: selected.buildNumber,
+    jobNameHint: selected.jobNameHint
+  });
 }

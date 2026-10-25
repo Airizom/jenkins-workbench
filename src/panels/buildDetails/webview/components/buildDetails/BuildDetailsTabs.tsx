@@ -34,6 +34,7 @@ import type { PendingInputProcessingAction } from "../../state/buildDetailsState
 import { resolveBuildDetailsSelectedTab } from "./buildDetailsTabsModel";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
 import { OverviewTab } from "./overview/OverviewTab";
+import type { RelatedBuildsSectionProps } from "./overview/RelatedBuildsSection";
 import { PendingInputsSection } from "./PendingInputsSection";
 import { PipelineSection } from "./PipelineSection";
 import type { PipelineStageRequest } from "./pipelineSectionState";
@@ -133,6 +134,7 @@ function TestsTabStatus({
 }
 
 type BuildDetailsTabsProps = {
+  relatedBuilds?: RelatedBuildsSectionProps;
   selectedTab: BuildDetailsTab;
   onTabChange: (tab: BuildDetailsTab) => void;
   hasPendingInputs: boolean;
@@ -172,6 +174,7 @@ type BuildDetailsTabsProps = {
   onToggleFollowLog: (value: boolean) => void;
   onExportLogs: () => void;
   onOpenExternal: (url: string) => void;
+  onDownloadAllArtifacts: () => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
   onReloadTestResults: () => void;
   onOpenTestSource: (testCase: BuildTestCaseViewModel) => void;
@@ -180,6 +183,7 @@ type BuildDetailsTabsProps = {
   onConfigureBuildDiagnostics: () => void;
 };
 export function BuildDetailsTabs({
+  relatedBuilds,
   selectedTab,
   onTabChange,
   hasPendingInputs,
@@ -218,6 +222,7 @@ export function BuildDetailsTabs({
   onToggleFollowLog,
   onExportLogs,
   onOpenExternal,
+  onDownloadAllArtifacts,
   onArtifactAction,
   onReloadTestResults,
   onOpenTestSource,
@@ -304,6 +309,7 @@ export function BuildDetailsTabs({
 
       <TabsContent value="overview" className="space-y-3">
         <OverviewTab
+          relatedBuilds={relatedBuilds}
           resultLabel={resultLabel}
           resultClass={resultClass}
           durationLabel={durationLabel}
@@ -317,6 +323,7 @@ export function BuildDetailsTabs({
           diagnostics={diagnostics}
           hasTests={hasTests}
           onNavigateTab={onTabChange}
+          onDownloadAllArtifacts={onDownloadAllArtifacts}
           onArtifactAction={onArtifactAction}
           onOpenDiagnosticSource={onOpenDiagnosticSource}
           onShowDiagnosticProblems={onShowDiagnosticProblems}

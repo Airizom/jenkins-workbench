@@ -12,7 +12,10 @@ import {
 } from "../src/services/ArtifactStorageService";
 
 function createService(streams: Readable[]): ArtifactStorageService {
-  const dataService: Pick<JenkinsDataService, "getArtifactStream"> = {
+  const dataService: Pick<JenkinsDataService, "getArtifactStream" | "getArtifactArchiveStream"> = {
+    getArtifactArchiveStream: async () => {
+      throw new Error("Unexpected archive request");
+    },
     getArtifactStream: async () => {
       const stream = streams.shift();
       if (!stream) {
@@ -43,7 +46,12 @@ describe("ArtifactStorageService downloads", () => {
       stream.destroy();
     });
     const service = new ArtifactStorageService(
-      { getArtifactStream: async () => ({ stream, headers: {}, abort }) },
+      {
+        getArtifactArchiveStream: async () => {
+          throw new Error("Unexpected archive request");
+        },
+        getArtifactStream: async () => ({ stream, headers: {}, abort })
+      },
       {
         ...createFileArtifactFilesystem(),
         createDirectory: async () => {
@@ -69,7 +77,12 @@ describe("ArtifactStorageService downloads", () => {
       throw error;
     });
     const service = new ArtifactStorageService(
-      { getArtifactStream: async () => ({ stream, headers: {}, abort }) },
+      {
+        getArtifactArchiveStream: async () => {
+          throw new Error("Unexpected archive request");
+        },
+        getArtifactStream: async () => ({ stream, headers: {}, abort })
+      },
       {
         ...createFileArtifactFilesystem(),
         createDirectory: async () => {},

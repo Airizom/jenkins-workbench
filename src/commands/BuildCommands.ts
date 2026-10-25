@@ -14,7 +14,12 @@ import type {
 } from "../tree/TreeItems";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
 import type { BuildLogPreviewer } from "../ui/BuildLogPreviewer";
-import { downloadArtifact, previewArtifact } from "./build/BuildArtifactHandlers";
+import { type BulkCommandDependencies, createBulkCommandHandler } from "./BulkCommand";
+import {
+  downloadAllArtifacts,
+  downloadArtifact,
+  previewArtifact
+} from "./build/BuildArtifactHandlers";
 import {
   approveInput,
   compareWithBuild,
@@ -28,7 +33,6 @@ import {
   replayBuild,
   runReplayDraft,
   showBuildDetails,
-  stopBuild,
   triggerBuild
 } from "./build/BuildCommandHandlers";
 import type { BuildCommandRefreshHost } from "./build/BuildCommandTypes";
@@ -59,7 +63,8 @@ export function registerBuildCommands(
   replayBuildWorkflow: ReplayBuildWorkflow,
   localJenkinsfileReplayWorkflow: LocalJenkinsfileReplayWorkflow,
   refreshHost: BuildCommandRefreshHost,
-  buildManagement: BuildManagementCommandDependencies
+  buildManagement: BuildManagementCommandDependencies,
+  bulk: BulkCommandDependencies
 ): void {
   const { workflow: buildManagementWorkflow, descriptionDraftManager } = buildManagement;
   context.subscriptions.push(
@@ -68,8 +73,13 @@ export function registerBuildCommands(
       (item?: JobTreeItem | PipelineTreeItem) =>
         triggerBuild(dataService, presetStore, queuedBuildWaiter, refreshHost, item)
     ),
-    vscode.commands.registerCommand("jenkinsWorkbench.abortBuild", (item?: BuildTreeItem) =>
-      stopBuild(dataService, refreshHost, item)
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.abortBuild",
+      createBulkCommandHandler(bulk, "stop")
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.abortBuild.single",
+      createBulkCommandHandler(bulk, "stop", true)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.approveInput", (item?: BuildTreeItem) =>
       approveInput(dataService, refreshHost, item)
@@ -116,6 +126,10 @@ export function registerBuildCommands(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.downloadArtifact",
       (item?: ArtifactTreeItem) => downloadArtifact(artifactActionHandler, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.downloadAllArtifacts",
+      (item?: BuildTreeItem) => downloadAllArtifacts(artifactActionHandler, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.deleteBuild", (item?: BuildTreeItem) =>
       deleteBuild(buildManagementWorkflow, item)

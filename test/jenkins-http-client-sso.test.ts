@@ -16,7 +16,19 @@ let streamAttempts: RequestAttempt[] = [];
 let streamBody = "";
 let streamHeaders: Record<string, string> = {};
 
+let jsonAttempts = 0;
 const requestMock = {
+  requestJson: async (
+    _url: string,
+    options?: { headers?: Record<string, string>; beforeRequest?: () => void }
+  ) => {
+    options?.beforeRequest?.();
+    jsonAttempts++;
+    if (options?.headers?.Cookie === "session=stale") {
+      throw new JenkinsRequestError("Expired session", 403, "", { "www-authenticate": "LocalSSO" });
+    }
+    return { ok: true };
+  },
   requestTextWithHeaders: async () => {
     throw new JenkinsRequestError("Crumbs disabled", 404, "");
   },
@@ -74,6 +86,35 @@ describe("JenkinsHttpClient SSO stream retry", () => {
 
     assert.equal(result.text, "progressive-ok");
     assert.equal(result.moreData, false);
+  });
+
+  it("invokes the JSON retry budget hook before the second HTTP attempt", async () => {
+    jsonAttempts = 0;
+    const client = createSsoHttpClient("https://jenkins.example.com/", "session=stale");
+    const beforeRequest = vi.fn();
+    assert.deepEqual(
+      await client.requestJson("https://jenkins.example.com/api/json", { beforeRequest }),
+      { ok: true }
+    );
+    assert.equal(beforeRequest.mock.calls.length, 2);
+    assert.equal(jsonAttempts, 2);
+  });
+
+  it("does not send a retry if the JSON request budget hook refuses it", async () => {
+    jsonAttempts = 0;
+    const client = createSsoHttpClient("https://jenkins.example.com/", "session=stale");
+    let attempts = 0;
+    await assert.rejects(
+      client.requestJson("https://jenkins.example.com/api/json", {
+        beforeRequest: () => {
+          if (++attempts > 1) {
+            throw new Error("budget exhausted");
+          }
+        }
+      }),
+      /budget exhausted/
+    );
+    assert.equal(jsonAttempts, 1);
   });
 
   it("coalesces concurrent SSO refreshes and retries with the same credentials", async () => {

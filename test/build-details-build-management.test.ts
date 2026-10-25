@@ -55,6 +55,16 @@ describe("build management message guards", () => {
 });
 
 describe("BuildDetailsMessageRouter build management routes", () => {
+  it("routes archive downloads without accepting a build target from the webview", () => {
+    const onDownloadAllArtifacts = vi.fn();
+    const router = new BuildDetailsMessageRouter({
+      onDownloadAllArtifacts
+    } as unknown as BuildDetailsMessageRouterHandlers);
+    router.route({ type: "downloadAllArtifacts", buildUrl: "https://untrusted.example/" });
+    router.route({ type: "downloadAllArtifact" });
+    assert.deepEqual(onDownloadAllArtifacts.mock.calls, [[]]);
+  });
+
   it("routes keep, edit, and delete requests to the management handler", () => {
     const onBuildManagement = vi.fn();
     const handlers = new Proxy({ onBuildManagement } as Record<string, unknown>, {

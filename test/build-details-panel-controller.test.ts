@@ -22,7 +22,10 @@ const environment = {
 const buildUrl = "https://jenkins.example/job/example/1/";
 
 function withControllerPrototype(fields: Record<string, unknown>): BuildDetailsPanelController {
-  return Object.assign(Object.create(BuildDetailsPanelController.prototype), fields);
+  return Object.assign(Object.create(BuildDetailsPanelController.prototype), {
+    relationships: { clear: vi.fn(), handleHidden: vi.fn() },
+    ...fields
+  });
 }
 
 function createDiagnosticConsoleSync(

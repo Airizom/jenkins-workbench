@@ -24,6 +24,7 @@ export type BuildDetailsPendingInputsBackend = JenkinsPendingInputActionRuntimeS
 export type BuildDetailsRestartBackend = JenkinsPipelineRestartRuntimeSurface;
 
 export interface BuildDetailsBackend {
+  relationships?: Pick<JenkinsDataService, "getDownstreamBuilds">;
   status: BuildInspectionStatusBackend;
   tests: BuildInspectionTestsBackend;
   coverage: BuildDetailsCoverageBackend;
@@ -38,6 +39,7 @@ export type BuildDetailsPendingInputProvider = Pick<
 >;
 
 export class BuildDetailsBackendAdapter implements BuildDetailsBackend {
+  readonly relationships: Pick<JenkinsDataService, "getDownstreamBuilds">;
   readonly status: BuildInspectionStatusBackend;
   readonly tests: BuildInspectionTestsBackend;
   readonly coverage: BuildDetailsCoverageBackend;
@@ -46,6 +48,7 @@ export class BuildDetailsBackendAdapter implements BuildDetailsBackend {
   readonly restart: BuildDetailsRestartBackend;
 
   constructor(dataService: JenkinsDataService) {
+    this.relationships = dataService;
     const inspection = new BuildInspectionBackendAdapter(dataService);
     this.status = inspection.status;
     this.tests = inspection.tests;

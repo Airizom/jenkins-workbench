@@ -107,6 +107,9 @@ export interface JenkinsTestSummaryAction {
 }
 
 export interface JenkinsBuildCause {
+  upstreamProject?: string;
+  upstreamUrl?: string;
+  upstreamBuild?: number;
   shortDescription?: string;
   userId?: string;
   userName?: string;

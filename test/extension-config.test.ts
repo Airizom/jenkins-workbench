@@ -10,7 +10,8 @@ const {
   getCurrentBranchPullRequestJobNamePatterns,
   getMaxCacheEntries,
   getQueuePollIntervalSeconds,
-  getStatusRefreshIntervalSeconds
+  getStatusRefreshIntervalSeconds,
+  getWatchNotificationOptions
 } = await import("../src/extension/ExtensionConfig");
 
 const packageJson = JSON.parse(readFileSync(`${process.cwd()}/package.json`, "utf8")) as {
@@ -18,7 +19,14 @@ const packageJson = JSON.parse(readFileSync(`${process.cwd()}/package.json`, "ut
     configuration: {
       properties: Record<
         string,
-        { default?: unknown; maximum?: number; minimum?: number; pattern?: string; type?: string }
+        {
+          default?: unknown;
+          maximum?: number;
+          minimum?: number;
+          pattern?: string;
+          type?: string;
+          scope?: string;
+        }
       >;
     };
   };
@@ -30,6 +38,56 @@ function createConfig(values: Record<string, unknown>): vscode.WorkspaceConfigur
       Object.hasOwn(values, key) ? (values[key] as T) : (defaultValue as T)
   } as vscode.WorkspaceConfiguration;
 }
+
+describe("watch notification configuration", () => {
+  const categories = [
+    "enabled",
+    "failure",
+    "recovery",
+    "completion",
+    "pendingInput",
+    "watchError"
+  ] as const;
+
+  it("matches the enabled, window-scoped manifest defaults", () => {
+    const options = getWatchNotificationOptions(createConfig({}));
+    for (const category of categories) {
+      const schema =
+        packageJson.contributes.configuration.properties[
+          `jenkinsWorkbench.watchNotifications.${category}`
+        ];
+      assert.equal(schema.type, "boolean");
+      assert.equal(schema.scope, "window");
+      assert.equal(schema.default, true);
+      assert.equal(options[category], schema.default);
+    }
+  });
+
+  it.each(categories)("reads explicit boolean overrides for %s independently", (category) => {
+    for (const enabled of [false, true]) {
+      const options = getWatchNotificationOptions(
+        createConfig({ [`watchNotifications.${category}`]: enabled })
+      );
+      assert.equal(options[category], enabled);
+      for (const other of categories.filter((value) => value !== category)) {
+        assert.equal(options[other], true);
+      }
+    }
+  });
+
+  it.each([null, undefined, "false", "true", 0, 1, [], {}])(
+    "uses defaults for invalid values %j",
+    (invalid) => {
+      const values = Object.fromEntries(
+        categories.map((category) => [`watchNotifications.${category}`, invalid])
+      );
+      assert.deepEqual(
+        getWatchNotificationOptions(createConfig(values)),
+        getWatchNotificationOptions(createConfig({}))
+      );
+    }
+  );
+});
 
 describe("ExtensionConfig polling intervals", () => {
   it("clamps status refresh intervals below the manifest minimum", () => {

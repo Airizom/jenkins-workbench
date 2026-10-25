@@ -262,7 +262,52 @@ export interface PendingInputViewModel {
   parameters: PendingInputParameterViewModel[];
 }
 
+/** Navigation targets are opaque identifiers scoped to the current panel load. */
+export interface RelatedBuildViewModel {
+  targetId: string;
+  jobName: string;
+  number: number;
+  resultLabel?: string;
+  resultClass?: string;
+}
+
+export interface BuildRelationshipsViewModel {
+  upstream: RelatedBuildViewModel[];
+  downstream: RelatedBuildViewModel[];
+  loading: boolean;
+  searched: boolean;
+  lastCheckedAt?: number;
+  jobsSearched: number;
+  buildsSearched: number;
+  partialReasons: string[];
+  error?: string;
+}
+
+export interface BuildNavigationViewModel {
+  canGoBack: boolean;
+  canGoForward: boolean;
+  busy: boolean;
+}
+
+export const EMPTY_BUILD_RELATIONSHIPS: BuildRelationshipsViewModel = {
+  upstream: [],
+  downstream: [],
+  loading: false,
+  searched: false,
+  jobsSearched: 0,
+  buildsSearched: 0,
+  partialReasons: []
+};
+
+export const EMPTY_BUILD_NAVIGATION: BuildNavigationViewModel = {
+  canGoBack: false,
+  canGoForward: false,
+  busy: false
+};
+
 export interface BuildDetailsViewModel {
+  relationships?: BuildRelationshipsViewModel;
+  navigation?: BuildNavigationViewModel;
   displayName: string;
   buildUrl?: string;
   /** Plain-text build description with markup stripped; omitted when empty. */

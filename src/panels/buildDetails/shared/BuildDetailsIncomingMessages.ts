@@ -7,6 +7,10 @@ import {
   isBuildDetailsPanelUiState
 } from "./BuildDetailsPanelWebviewState";
 
+export interface BuildDetailsReadyMessage {
+  type: "buildDetailsReady";
+}
+
 export interface ToggleFollowLogMessage {
   type: "toggleFollowLog";
   value?: unknown;
@@ -16,6 +20,10 @@ export type { OpenExternalMessage };
 
 export interface ExportConsoleMessage {
   type: "exportConsole";
+}
+
+export interface DownloadAllArtifactsMessage {
+  type: "downloadAllArtifacts";
 }
 
 export interface ArtifactActionMessage {
@@ -103,12 +111,37 @@ export interface DeleteBuildMessage {
 
 export type BuildManagementMessage = SetKeepForeverMessage | EditBuildMessage | DeleteBuildMessage;
 
+export interface SetRelatedBuildsExpandedMessage {
+  type: "setRelatedBuildsExpanded";
+  expanded: boolean;
+}
+
+export interface RefreshRelatedBuildsMessage {
+  type: "refreshRelatedBuilds";
+}
+
+export interface OpenRelatedBuildMessage {
+  type: "openRelatedBuild";
+  targetId: string;
+}
+
+export interface NavigateBuildMessage {
+  type: "navigateBuild";
+  direction: "back" | "forward";
+}
+
 export type BuildDetailsIncomingMessage =
+  | BuildDetailsReadyMessage
+  | SetRelatedBuildsExpandedMessage
+  | RefreshRelatedBuildsMessage
+  | OpenRelatedBuildMessage
+  | NavigateBuildMessage
   | RefreshBuildDetailsMessage
   | ToggleFollowLogMessage
   | OpenExternalMessage
   | ExportConsoleMessage
   | ArtifactActionMessage
+  | DownloadAllArtifactsMessage
   | ApproveInputMessage
   | RejectInputMessage
   | RestartPipelineFromStageMessage
@@ -139,6 +172,12 @@ export function isRefreshBuildDetailsMessage(
   message: unknown
 ): message is RefreshBuildDetailsMessage {
   return hasMessageType(message, "refreshBuildDetails");
+}
+
+export function isDownloadAllArtifactsMessage(
+  message: unknown
+): message is DownloadAllArtifactsMessage {
+  return hasMessageType(message, "downloadAllArtifacts");
 }
 
 export function isArtifactActionMessage(message: unknown): message is ArtifactActionMessage {
@@ -268,4 +307,37 @@ export function isPersistUiStateMessage(message: unknown): message is PersistUiS
   // A uiState that only clears fields normalizes to undefined but must still be accepted;
   // withBuildDetailsPanelUiState normalizes the merged result.
   return isBuildDetailsPanelUiState(message.uiState);
+}
+
+export function isSetRelatedBuildsExpandedMessage(
+  message: unknown
+): message is SetRelatedBuildsExpandedMessage {
+  return (
+    hasMessageType(message, "setRelatedBuildsExpanded") && typeof message.expanded === "boolean"
+  );
+}
+
+export function isRefreshRelatedBuildsMessage(
+  message: unknown
+): message is RefreshRelatedBuildsMessage {
+  return hasMessageType(message, "refreshRelatedBuilds");
+}
+
+export function isOpenRelatedBuildMessage(message: unknown): message is OpenRelatedBuildMessage {
+  return (
+    hasMessageType(message, "openRelatedBuild") &&
+    typeof message.targetId === "string" &&
+    message.targetId.trim().length > 0
+  );
+}
+
+export function isNavigateBuildMessage(message: unknown): message is NavigateBuildMessage {
+  return (
+    hasMessageType(message, "navigateBuild") &&
+    (message.direction === "back" || message.direction === "forward")
+  );
+}
+
+export function isBuildDetailsReadyMessage(message: unknown): message is BuildDetailsReadyMessage {
+  return hasMessageType(message, "buildDetailsReady");
 }

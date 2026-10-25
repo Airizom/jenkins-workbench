@@ -48,39 +48,6 @@ async function runPendingInputAction(
   });
 }
 
-export async function stopBuild(
-  dataService: JenkinsDataService,
-  refreshHost: BuildCommandRefreshHost,
-  item?: BuildTreeItem
-): Promise<void> {
-  const selected = requireSelection(item, "Select a running build to stop.");
-  if (!selected) {
-    return;
-  }
-
-  if (!selected.isBuilding) {
-    void vscode.window.showInformationMessage("That build is not running.");
-    return;
-  }
-
-  const label = getTreeItemLabel(selected);
-  const confirmLabel = "Stop Build";
-  const confirmation = await vscode.window.showWarningMessage(
-    `Stop the running build ${label}?`,
-    { modal: true },
-    confirmLabel
-  );
-  if (confirmation !== confirmLabel) {
-    return;
-  }
-
-  await runBuildAction(refreshHost, selected, {
-    errorMessage: `Failed to stop build ${label}`,
-    successMessage: `Stopped build ${label}.`,
-    action: (environment, buildUrl) => dataService.stopBuild(environment, buildUrl)
-  });
-}
-
 export async function approveInput(
   dataService: JenkinsDataService,
   refreshHost: BuildCommandRefreshHost,

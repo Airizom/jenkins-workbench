@@ -334,7 +334,8 @@ export class BuildDetailsPanelRuntime {
     try {
       const details = await statusBackend.getBuildDetails(
         this.options.state.environment,
-        this.options.state.currentBuildUrl
+        this.options.state.currentBuildUrl,
+        this.options.state.currentDetails ? undefined : { includeCauses: true }
       );
       if (!this.options.isTokenCurrent(token)) {
         return undefined;

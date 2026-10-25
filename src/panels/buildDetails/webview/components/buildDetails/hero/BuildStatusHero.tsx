@@ -20,7 +20,10 @@ import {
 } from "../../../../../shared/webview/icons";
 import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
-import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
+import type {
+  BuildNavigationViewModel,
+  BuildTestsSummaryViewModel
+} from "../../../../shared/BuildDetailsContracts";
 import type { BuildManagementMessage } from "../../../../shared/BuildDetailsPanelMessages";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
 import { describeTestOutcome } from "../testResults/testResultsUtils";
@@ -317,6 +320,8 @@ function HeroActions({
 }
 
 type BuildStatusHeroProps = HeroManagementProps & {
+  navigation?: BuildNavigationViewModel;
+  onNavigateBuild?: (direction: "back" | "forward") => void;
   displayName: string;
   /** Plain text; rendered as text, never as HTML. */
   description?: string;
@@ -360,6 +365,26 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-3">
+      {props.navigation && props.onNavigateBuild ? (
+        <nav aria-label="Build history" className="mb-2 flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!props.navigation.canGoBack || props.navigation.busy}
+            onClick={() => props.onNavigateBuild?.("back")}
+          >
+            Back
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!props.navigation.canGoForward || props.navigation.busy}
+            onClick={() => props.onNavigateBuild?.("forward")}
+          >
+            Forward
+          </Button>
+        </nav>
+      ) : null}
       <div className="flex items-center justify-between gap-3">
         <HeroIdentity
           displayName={props.displayName}

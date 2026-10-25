@@ -11,7 +11,11 @@ const now = Date.now();
  * scenario shows only button combinations a real node can produce.
  */
 function capabilitiesFor(input: NodeActionEligibilityInput) {
-  return buildNodeActionCapabilities(input);
+  return {
+    ...buildNodeActionCapabilities(input),
+    canManageNode: true,
+    canDisconnectAgent: input.offline === false || input.temporarilyOffline === true
+  };
 }
 
 const online: NodeDetailsViewModel = {

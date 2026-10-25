@@ -50,6 +50,7 @@ export async function activateRuntime(
 
   const treeDataProvider = container.get("treeDataProvider");
   const treeView = container.get("treeView");
+  const treeBulkSelection = container.get("treeBulkSelection");
   const poller = container.get("poller");
   const queuePoller = container.get("queuePoller");
   const statusRefreshService = container.get("statusRefreshService");
@@ -168,6 +169,7 @@ export async function activateRuntime(
 
   context.subscriptions.push(
     treeView,
+    treeBulkSelection,
     treeDataProvider,
     treeExpansionState,
     pendingInputCoordinator,

@@ -16,14 +16,32 @@ import { OverflowText } from "./BuildFailureOverflowText";
 export function BuildFailureArtifactsCard({
   items,
   overflowCount,
+  onDownloadAllArtifacts,
   onArtifactAction
 }: {
   items: BuildFailureArtifact[];
   overflowCount: number;
+  onDownloadAllArtifacts: () => void;
   onArtifactAction: (action: ArtifactAction, artifact: BuildFailureArtifact) => void;
 }) {
   return (
-    <BuildFailureInsightCard icon={<FileIcon className="h-4 w-4 shrink-0" />} title="Artifacts">
+    <BuildFailureInsightCard
+      icon={<FileIcon className="h-4 w-4 shrink-0" />}
+      title="Artifacts"
+      headerExtra={
+        items.length > 0 || overflowCount > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-auto min-h-7 whitespace-normal"
+            onClick={onDownloadAllArtifacts}
+          >
+            <DownloadIcon className="h-3.5 w-3.5 shrink-0" />
+            <span>Download All Artifacts as ZIP</span>
+          </Button>
+        ) : undefined
+      }
+    >
       {items.length > 0 ? (
         <ArtifactsList items={items} onArtifactAction={onArtifactAction} />
       ) : (

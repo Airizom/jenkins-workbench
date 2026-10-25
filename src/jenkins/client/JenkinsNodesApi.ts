@@ -1,6 +1,8 @@
+import type { NodeAgentLogOptions, NodeAgentLogResult } from "../NodeManagement";
 import type { JenkinsNode, JenkinsNodeDetails } from "../types";
 import { buildActionUrl, buildApiUrlFromBase, buildApiUrlFromItem } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
+import { JenkinsNodeLogClient } from "./JenkinsNodeLogClient";
 
 const NODE_EXECUTABLE_FIELDS =
   "number,url,fullDisplayName,displayName,result,timestamp,duration,estimatedDuration,building";
@@ -79,5 +81,44 @@ export class JenkinsNodesApi {
   async launchNodeAgent(nodeUrl: string): Promise<void> {
     const url = buildActionUrl(nodeUrl, "launchSlaveAgent");
     await this.context.requestVoidWithCrumb(url);
+  }
+  async getNodeConfigXml(nodeUrl: string): Promise<string> {
+    return this.context.requestText(buildActionUrl(nodeUrl, "config.xml"));
+  }
+
+  async updateNodeConfigXml(nodeUrl: string, xml: string): Promise<void> {
+    await this.context.requestPostWithCrumbRaw(buildActionUrl(nodeUrl, "config.xml"), xml, {
+      "Content-Type": "application/xml; charset=utf-8"
+    });
+  }
+
+  async disconnectNodeAgent(nodeUrl: string, reason?: string): Promise<void> {
+    const body = new URLSearchParams({ offlineMessage: reason?.trim() ?? "" }).toString();
+    await this.context.requestVoidWithCrumb(buildActionUrl(nodeUrl, "doDisconnect"), body);
+  }
+
+  async deleteNode(nodeUrl: string): Promise<void> {
+    await this.context.requestVoidWithCrumb(buildActionUrl(nodeUrl, "doDelete"));
+  }
+
+  async createNode(name: string, xml: string): Promise<void> {
+    const url = new URL(buildActionUrl(this.context.baseUrl, "computer/createItem"));
+    url.searchParams.set("name", name);
+    await this.context.requestPostWithCrumbRaw(url.toString(), xml, {
+      "Content-Type": "application/xml; charset=utf-8"
+    });
+  }
+
+  async copyNode(sourceName: string, name: string): Promise<void> {
+    const url = buildActionUrl(this.context.baseUrl, "computer/createItem");
+    const body = new URLSearchParams({ name, mode: "copy", from: sourceName }).toString();
+    await this.context.requestVoidWithCrumb(url, body);
+  }
+
+  async getNodeAgentLog(
+    nodeUrl: string,
+    options?: NodeAgentLogOptions
+  ): Promise<NodeAgentLogResult> {
+    return new JenkinsNodeLogClient(this.context).getLog(nodeUrl, options);
   }
 }

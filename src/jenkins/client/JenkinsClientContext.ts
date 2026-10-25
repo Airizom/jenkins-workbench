@@ -3,7 +3,10 @@ import type { JenkinsBufferResponse, JenkinsPostResponse, JenkinsStreamResponse 
 
 export interface JenkinsClientContext {
   baseUrl: string;
-  requestJson<T>(url: string): Promise<T>;
+  requestJson<T>(
+    url: string,
+    options?: { beforeRequest?: () => void; signal?: AbortSignal }
+  ): Promise<T>;
   requestHeaders(url: string): Promise<IncomingHttpHeaders>;
   requestText(url: string): Promise<string>;
   requestTextWithHeaders(
@@ -14,7 +17,10 @@ export interface JenkinsClientContext {
     url: string,
     options?: { maxBytes?: number }
   ): Promise<JenkinsBufferResponse>;
-  requestStream(url: string, options?: { maxBytes?: number }): Promise<JenkinsStreamResponse>;
+  requestStream(
+    url: string,
+    options?: { maxBytes?: number; signal?: AbortSignal }
+  ): Promise<JenkinsStreamResponse>;
   requestVoidWithCrumb(url: string, body?: string | Uint8Array): Promise<void>;
   requestPostWithCrumb(url: string, body?: string | Uint8Array): Promise<JenkinsPostResponse>;
   requestPostWithCrumbRaw(

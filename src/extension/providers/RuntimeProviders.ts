@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
+import { BulkActionService } from "../../commands/bulk/BulkActionService";
 import { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
 import { CurrentBranchCommitHistory } from "../../currentBranch/CurrentBranchCommitHistory";
@@ -37,6 +38,7 @@ import { JenkinsfileValidationCodeLensProvider } from "../../validation/editor/J
 import { JenkinsfileValidationHoverProvider } from "../../validation/editor/JenkinsfileValidationHoverProvider";
 import { JenkinsStatusPoller } from "../../watch/JenkinsStatusPoller";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
+import { getExtensionConfiguration, getWatchNotificationOptions } from "../ExtensionConfig";
 import { createExtensionRefreshHost } from "../ExtensionRefreshHost";
 import { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLinkBuildHandler";
 import { JenkinsWorkbenchDeepLinkJobHandler } from "../JenkinsWorkbenchDeepLinkJobHandler";
@@ -55,6 +57,16 @@ export interface RuntimeProviderOptions {
 
 export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
   return {
+    bulkActionService: (container) => {
+      const service = new BulkActionService({
+        dataService: container.get("dataService"),
+        watchStore: container.get("watchStore"),
+        pinStore: container.get("pinStore"),
+        refreshHost: container.get("refreshHost")
+      });
+      options.context.subscriptions.push(service);
+      return service;
+    },
     historyService: (container) => {
       const service = new HistoryService(container.get("dataService"));
       options.context.subscriptions.push(
@@ -95,7 +107,8 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
     },
     statusRefreshService: (_container) =>
       new JenkinsStatusRefreshService(options.statusRefreshIntervalSeconds),
-    statusNotifier: (_container) => new VscodeStatusNotifier(),
+    statusNotifier: (_container) =>
+      new VscodeStatusNotifier(() => getWatchNotificationOptions(getExtensionConfiguration())),
     currentBranchRepositoryResolver: (_container) => new CurrentBranchRepositoryResolver(),
     commitHistory: (container) => new CurrentBranchCommitHistory(container.get("dataService")),
     commitWatchService: (container) =>

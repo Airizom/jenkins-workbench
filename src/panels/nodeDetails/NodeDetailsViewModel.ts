@@ -5,7 +5,7 @@ import {
   formatExecutorWorkLabel
 } from "../../jenkins/NodeExecutorFormatters";
 import { formatNodeOfflineReason, resolveNodeStatusDescriptor } from "../../jenkins/NodeFormatters";
-import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
+import { buildNodeActionCapabilities, isBuiltInNode } from "../../jenkins/nodeActionCapabilities";
 import type {
   JenkinsNodeDetails,
   JenkinsNodeExecutable,
@@ -88,6 +88,13 @@ export function buildNodeDetailsViewModel(input: NodeDetailsViewModelInput): Nod
 
   return {
     refreshFailed: Boolean(input.refreshFailed),
+    canManageNode:
+      details !== undefined &&
+      !isBuiltInNode({ ...details, nodeUrl: details.url ?? input.fallbackUrl }),
+    canDisconnectAgent:
+      details !== undefined &&
+      !isBuiltInNode({ ...details, nodeUrl: details.url ?? input.fallbackUrl }) &&
+      (details.offline === false || details.temporarilyOffline === true),
     environmentLabel: trimToUndefined(input.environmentLabel) ?? FALLBACK_ENVIRONMENT_LABEL,
     ...buildNodeIdentity(details, input.fallbackUrl, updatedAt),
     ...buildNodeStatus(details),

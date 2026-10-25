@@ -70,3 +70,25 @@ npm run test:integration:ci
 Use a valid API token for the local instance if its persisted credentials differ. `JENKINS_REPLAY_EMPTY_JOB_URL` is optional; supplying it also checks that a job without completed builds never receives a replay request. The test starts a real replay build and verifies that unsaved editor text runs while the original parameters and loaded script remain intact.
 
 To check denied replay access, also supply `JENKINS_REPLAY_READER_USER` and `JENKINS_REPLAY_READER_TOKEN` for your own fixture account that can read the job/build but cannot replay it. The fixture script does not create accounts or change authorization. Both reader variables are optional; omit them to skip this permission check.
+
+## Build relationship validation
+
+Run [relationship-validation.groovy](relationship-validation.groovy) in the local Jenkins Script Console. It creates a dedicated folder and seeds a Pipeline fan-out with two builds of one child job plus a child in a nested folder, and a freestyle parent/child pair. Existing fixture jobs and history are preserved.
+
+Open the Fanout build in Build Details and expand Downstream builds. Confirm that all three child builds link back to the same parent, that Back/Forward restores the selected tab, and that collapsing the section or hiding the panel stops an active search. The Classic Parent build exercises configured downstream-job discovery. A small `buildDetails.relatedBuilds.maxJobs` limit exercises partial-result notices.
+
+## Node management validation
+
+Run [node-management-validation.groovy](node-management-validation.groovy) in the local Jenkins Script Console. It creates `Workbench Node Management Agent` and `Workbench Node Management Busy` only when absent, without changing existing nodes, jobs, or permissions.
+
+Open the new agent's Jenkins page and follow its inbound-agent connection instructions. Its remote root is `/tmp/workbench-node-management-agent`, and it has one executor. Run the Busy job to occupy that executor for one minute. In Jenkins Workbench, verify that deletion is blocked while the job runs, label edits preserve the agent configuration, and Disconnect warns about interrupting work. Also test Disconnect after Take Offline: a temporarily offline agent can still be connected. Stop or finish the job before testing idle deletion.
+
+Open the Agent Log tab to check live output, Pause/Follow, Refresh, Copy, and hide/show behavior. Copy the agent under a new name, confirm that Jenkins opens its configuration for review, and remove only the validation resources when finished. The fixture's default authorization grants every authenticated user full control, so use unauthenticated requests for denied-access checks; do not change global permissions on a shared fixture merely to run this test.
+
+With the fixture running, execute the automated node round-trip and panel smoke checks:
+
+```bash
+JENKINS_NODE_LIVE=1 JENKINS_PANELS_LIVE=1 npm run test:integration
+```
+
+The node test creates uniquely named agents and removes them afterward. The panel test runs the existing Success, Failure, and Slow Queue sample jobs and checks all five panels, tree/watch/queue refresh, artifacts, baseline selection, and hidden-history cancellation. Sample build history remains available for inspection. Override the fixture connection with `JENKINS_NODE_URL`, `JENKINS_NODE_USER`, `JENKINS_NODE_TOKEN` and the corresponding `JENKINS_PANELS_*` variables. Both suites require a loopback URL.

@@ -9,6 +9,7 @@ import type {
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsPanelLoadOptions {
+  initialDetails?: JenkinsBuildDetails;
   label?: string;
   panelState?: unknown;
 }

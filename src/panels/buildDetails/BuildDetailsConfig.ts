@@ -65,3 +65,16 @@ export function getBuildDetailsCoverageEnabledConfigKey(): string {
 export function getBuildDetailsCoverageDecorationsEnabledConfigKey(): string {
   return `${CONFIG_SECTION}.${BUILD_DETAILS_COVERAGE_DECORATIONS_ENABLED_KEY}`;
 }
+
+export function getRelatedBuildSearchLimits(
+  config: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(CONFIG_SECTION)
+): { maxJobs: number; maxBuildsPerJob: number } {
+  const bounded = (key: string, fallback: number, maximum: number): number => {
+    const value = config.get<number>(`buildDetails.relatedBuilds.${key}`, fallback);
+    return Number.isFinite(value) ? Math.min(maximum, Math.max(1, Math.floor(value))) : fallback;
+  };
+  return {
+    maxJobs: bounded("maxJobs", 50, 200),
+    maxBuildsPerJob: bounded("maxBuildsPerJob", 100, 1000)
+  };
+}

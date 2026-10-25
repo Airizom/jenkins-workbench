@@ -9,7 +9,11 @@ import type {
   BuildFailureInsightsViewModel,
   BuildTestsSummaryViewModel
 } from "../../shared/BuildDetailsContracts";
-import { EMPTY_BUILD_DIAGNOSTICS } from "../../shared/BuildDetailsContracts";
+import {
+  EMPTY_BUILD_DIAGNOSTICS,
+  EMPTY_BUILD_NAVIGATION,
+  EMPTY_BUILD_RELATIONSHIPS
+} from "../../shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "../../shared/BuildDetailsErrorHelpers";
 import type { BuildDetailsStateMessage } from "../../shared/BuildDetailsPanelMessages";
 import type { ConsoleHtmlModel } from "../lib/consoleHtml";
@@ -74,6 +78,8 @@ export const DEFAULT_COVERAGE_STATE: BuildDetailsCoverageStateViewModel = {
 
 const FALLBACK_STATE: BuildDetailsState = {
   displayName: "Build Details",
+  relationships: EMPTY_BUILD_RELATIONSHIPS,
+  navigation: EMPTY_BUILD_NAVIGATION,
   description: undefined,
   keptForever: false,
   canDelete: false,
@@ -245,6 +251,12 @@ export function buildDetailsReducer(
         consoleError
       };
     }
+    case "setBuildRelationships": {
+      return { ...state, relationships: action.relationships };
+    }
+    case "setBuildNavigation": {
+      return { ...state, navigation: action.navigation };
+    }
     case "setBuildDiagnostics": {
       return { ...state, diagnostics: action.diagnostics };
     }
@@ -322,6 +334,8 @@ function mergeBuildDetailsDefaults(candidate: BuildDetailsViewModel): BuildDetai
   return {
     ...FALLBACK_STATE,
     ...candidate,
+    relationships: candidate.relationships ?? EMPTY_BUILD_RELATIONSHIPS,
+    navigation: candidate.navigation ?? EMPTY_BUILD_NAVIGATION,
     testState: candidate.testState ?? DEFAULT_TEST_STATE,
     coverageState: candidate.coverageState ?? DEFAULT_COVERAGE_STATE,
     insights: candidate.insights ?? DEFAULT_INSIGHTS,

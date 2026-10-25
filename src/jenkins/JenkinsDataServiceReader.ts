@@ -1,8 +1,13 @@
 import type {
+  DownstreamBuildSearchOptions,
+  DownstreamBuildSearchResult
+} from "./BuildRelationships";
+import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "./coverage/JenkinsCoverageTypes";
 import { JenkinsBuildDataOperations } from "./data/JenkinsBuildDataOperations";
+import { JenkinsBuildRelationships } from "./data/JenkinsBuildRelationships";
 import {
   JenkinsCoverageDataOperations,
   type JenkinsCoverageRequestOptions
@@ -48,11 +53,20 @@ import type {
 import type {
   JenkinsArtifactRetrievalRuntimeSurface,
   JenkinsBuildInspectionRuntimeSurface,
+  JenkinsBuildRelationshipsRuntimeSurface,
   JenkinsCoverageRuntimeSurface,
   JenkinsPendingInputActionRuntimeSurface
 } from "./JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
+import type {
+  NodeAgentLogOptions,
+  NodeAgentLogResult,
+  NodeConfiguration,
+  NodeCreateInput,
+  NodeCreationResult,
+  NodeLabelsUpdateResult
+} from "./NodeManagement";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type { JenkinsTestReport } from "./types";
 
@@ -65,11 +79,13 @@ export class JenkinsDataServiceReader
   implements
     JenkinsArtifactRetrievalRuntimeSurface,
     JenkinsBuildInspectionRuntimeSurface,
+    JenkinsBuildRelationshipsRuntimeSurface,
     JenkinsCoverageRuntimeSurface,
     JenkinsPendingInputActionRuntimeSurface
 {
   private readonly runtimeContext: JenkinsDataRuntimeContext;
   private readonly jobIndex: JenkinsJobIndex;
+  private readonly buildRelationships: JenkinsBuildRelationships;
   protected readonly buildOperations: JenkinsBuildDataOperations;
   private readonly coverageOperations: JenkinsCoverageDataOperations;
   private readonly pendingInputOperations: JenkinsPendingInputDataOperations;
@@ -83,6 +99,7 @@ export class JenkinsDataServiceReader
       this.runtimeContext.getCacheTtlMs()
     );
     this.buildOperations = new JenkinsBuildDataOperations(this.runtimeContext);
+    this.buildRelationships = new JenkinsBuildRelationships(this.runtimeContext);
     this.coverageOperations = new JenkinsCoverageDataOperations(this.runtimeContext);
     this.pendingInputOperations = new JenkinsPendingInputDataOperations(this.runtimeContext);
     this.nodeOperations = new JenkinsNodeDataOperations(this.runtimeContext);
@@ -175,6 +192,14 @@ export class JenkinsDataServiceReader
     }
   ): Promise<JenkinsBuildDetails> {
     return this.buildOperations.getBuildDetails(environment, buildUrl, options);
+  }
+
+  async getDownstreamBuilds(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: DownstreamBuildSearchOptions
+  ): Promise<DownstreamBuildSearchResult> {
+    return this.buildRelationships.getDownstreamBuilds(environment, buildUrl, options);
   }
 
   async getBuildArtifacts(
@@ -272,6 +297,14 @@ export class JenkinsDataServiceReader
     options?: { maxBytes?: number }
   ): Promise<JenkinsStreamResponse> {
     return this.buildOperations.getArtifactStream(environment, buildUrl, relativePath, options);
+  }
+
+  async getArtifactArchiveStream(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { maxBytes?: number; signal?: AbortSignal }
+  ): Promise<JenkinsStreamResponse> {
+    return this.buildOperations.getArtifactArchiveStream(environment, buildUrl, options);
   }
 
   async getWorkspaceEntries(
@@ -416,5 +449,62 @@ export class JenkinsDataServiceReader
     nodeUrl: string
   ): Promise<NodeLaunchResult> {
     return this.nodeOperations.launchNodeAgent(environment, nodeUrl);
+  }
+  async getNodeConfiguration(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string
+  ): Promise<NodeConfiguration> {
+    return this.nodeOperations.getNodeConfiguration(environment, nodeUrl);
+  }
+
+  async updateNodeLabels(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string,
+    labels: string,
+    expectedLabels: string
+  ): Promise<NodeLabelsUpdateResult> {
+    return this.nodeOperations.updateNodeLabels(environment, nodeUrl, labels, expectedLabels);
+  }
+
+  async disconnectNodeAgent(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string,
+    reason?: string
+  ): Promise<{ status: "requested" | "no_change"; details: JenkinsNodeDetails }> {
+    return this.nodeOperations.disconnectNodeAgent(environment, nodeUrl, reason);
+  }
+
+  async checkNodeDeletion(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string
+  ): Promise<JenkinsNodeDetails> {
+    return this.nodeOperations.checkNodeDeletion(environment, nodeUrl);
+  }
+
+  async deleteNode(environment: JenkinsEnvironmentRef, nodeUrl: string): Promise<void> {
+    return this.nodeOperations.deleteNode(environment, nodeUrl);
+  }
+
+  async createNode(
+    environment: JenkinsEnvironmentRef,
+    input: NodeCreateInput
+  ): Promise<NodeCreationResult> {
+    return this.nodeOperations.createNode(environment, input);
+  }
+
+  async copyNode(
+    environment: JenkinsEnvironmentRef,
+    sourceUrl: string,
+    name: string
+  ): Promise<NodeCreationResult> {
+    return this.nodeOperations.copyNode(environment, sourceUrl, name);
+  }
+
+  async getNodeAgentLog(
+    environment: JenkinsEnvironmentRef,
+    nodeUrl: string,
+    options?: NodeAgentLogOptions
+  ): Promise<NodeAgentLogResult> {
+    return this.nodeOperations.getNodeAgentLog(environment, nodeUrl, options);
   }
 }

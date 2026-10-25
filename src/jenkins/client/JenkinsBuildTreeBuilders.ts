@@ -8,7 +8,8 @@ const BUILD_CHANGE_SET_FIELDS = [
 const BUILD_ACTION_BASE_FIELDS = ["_class", "urlName", "lastBuiltRevision[SHA1]", "remoteUrls"];
 const REVISION_FIELDS =
   "_class,lastBuiltRevision[SHA1],remoteUrls,revision[_class,pullHash,mergeHash,head[sourceOwner,sourceRepo,checkoutStrategy]]";
-const BUILD_ACTION_CAUSE_FIELD = "causes[shortDescription,userId,userName]";
+const BUILD_ACTION_CAUSE_FIELD =
+  "causes[shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild]";
 const BUILD_ACTION_PARAMETER_FIELD = "parameters[name,value]";
 const BUILD_MANAGEMENT_FIELDS = "number,url,building,keepLog,displayName,description";
 

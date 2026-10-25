@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   isArtifactActionMessage,
+  isDownloadAllArtifactsMessage,
   isPersistUiStateMessage,
   isSelectPipelineLogNodeMessage
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelMessages";
@@ -15,6 +16,20 @@ import {
 const validTarget = { key: "stage-1", kind: "stage", name: "Build", nodeId: "12" };
 
 describe("build details incoming message guards", () => {
+  it("accepts only the archive download message type", () => {
+    assert.equal(isDownloadAllArtifactsMessage({ type: "downloadAllArtifacts" }), true);
+    for (const message of [
+      undefined,
+      null,
+      "downloadAllArtifacts",
+      {},
+      { type: "artifactAction" }
+    ]) {
+      assert.equal(isDownloadAllArtifactsMessage(message), false);
+    }
+    assert.equal(isArtifactActionMessage({ type: "artifactAction", action: "downloadAll" }), false);
+  });
+
   it("validates optional artifact file names", () => {
     const base = { type: "artifactAction", action: "download", relativePath: "a" };
     assert.equal(isArtifactActionMessage(base), true);

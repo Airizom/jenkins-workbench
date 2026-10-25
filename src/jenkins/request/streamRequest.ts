@@ -55,6 +55,10 @@ export function requestJenkinsStream(
       }
 
       const stream = new PassThrough();
+      // The source can fail before the async caller receives this stream and
+      // attaches pipeline/error handlers. Keep that interval safe; consumers
+      // still observe the stored stream error when they start reading.
+      stream.on("error", () => {});
       const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       let timeoutId: NodeJS.Timeout | undefined;
       let aborted = false;
