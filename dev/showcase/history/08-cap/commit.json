@@ -1,0 +1,1 @@
+{ "branch": "feature/stacked-discounts", "author": "Sam Lee <sam.lee@acme.dev>", "hoursAgo": 1, "message": "Cap combined discounts at the order subtotal" }

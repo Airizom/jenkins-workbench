@@ -1,0 +1,59 @@
+pipeline {
+    agent { label 'node' }
+    environment {
+        NO_COLOR = '1'
+    }
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+    stages {
+        stage('Install dependencies') {
+            steps {
+                sh 'rm -rf dist reports coverage && npm ci --offline --no-audit --no-fund'
+            }
+        }
+        stage('Verify') {
+            parallel {
+                stage('Typecheck') {
+                    steps {
+                        sh 'npm run typecheck'
+                    }
+                }
+                stage('Unit tests') {
+                    steps {
+                        sh 'npm test'
+                    }
+                    post {
+                        always {
+                            junit testResults: 'reports/junit.xml', allowEmptyResults: true
+                            script {
+                                if (env.BRANCH_NAME != 'main') {
+                                    discoverReferenceBuild referenceJob: 'storefront/main'
+                                }
+                            }
+                            recordCoverage tools: [[parser: 'COBERTURA', pattern: 'coverage/cobertura-coverage.xml']],
+                                sourceDirectories: [[path: '.']],
+                                enabledForFailure: true
+                        }
+                    }
+                }
+            }
+        }
+        stage('Package') {
+            steps {
+                sh 'mkdir -p dist && npm run pack:release'
+            }
+        }
+        stage('Deploy to staging') {
+            when { branch 'main' }
+            steps {
+                echo "Deploying storefront ${env.GIT_COMMIT.take(7)} to staging"
+            }
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'reports/junit.xml, coverage/coverage-summary.json, dist/*.tgz', allowEmptyArchive: true
+        }
+    }
+}

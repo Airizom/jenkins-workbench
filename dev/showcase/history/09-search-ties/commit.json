@@ -1,0 +1,1 @@
+{ "branch": "fix/search-ranking", "from": "main", "author": "Priya Shah <priya.shah@acme.dev>", "hoursAgo": 3, "message": "Prefer in-stock products when search scores tie" }

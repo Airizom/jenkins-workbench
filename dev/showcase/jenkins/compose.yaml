@@ -1,0 +1,44 @@
+name: jenkins-workbench-showcase
+
+services:
+  jenkins:
+    build:
+      context: .
+      additional_contexts:
+        project-deps: ../project
+    container_name: jenkins-workbench-showcase
+    environment:
+      JAVA_OPTS: >-
+        -Djenkins.install.runSetupWizard=false
+        -Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=true
+      SHOWCASE_PUBLIC_URL: "http://ci.acme.localhost:${SHOWCASE_HTTP_PORT:-8091}/"
+    ports:
+      # *.localhost resolves to ::1 first on macOS, so publish on both loopback addresses.
+      - "127.0.0.1:${SHOWCASE_HTTP_PORT:-8091}:8080"
+      - "[::1]:${SHOWCASE_HTTP_PORT:-8091}:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ../.state/git:/srv/git:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8080/api/json"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  agent:
+    image: jenkins/inbound-agent:latest-jdk21
+    container_name: jenkins-workbench-showcase-agent
+    profiles: ["agent"]
+    environment:
+      JENKINS_URL: http://jenkins:8080
+      JENKINS_AGENT_NAME: linux-agent-01
+      JENKINS_SECRET: "${SHOWCASE_AGENT_SECRET:-}"
+      JENKINS_AGENT_WORKDIR: /home/jenkins/agent
+      JENKINS_WEB_SOCKET: "true"
+    depends_on:
+      jenkins:
+        condition: service_healthy
+
+volumes:
+  jenkins_home:

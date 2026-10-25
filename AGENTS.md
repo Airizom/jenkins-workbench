@@ -68,6 +68,7 @@ If you change one side, update the others in the same pass.
 - Artifact downloads require a workspace folder, but previews do not (`README.md` settings/troubleshooting sections).
 - Editing an environment's URL keeps its id and rebases every stored absolute URL (pins, watches, presets, bindings, repository links, baselines, view state, commit watches) via `EnvironmentUrlRebaseService`; the record keeps `previousUrls` so activation can rebase stores in other workspaces. A new store that holds job URLs must add a rebase method and be wired into that service.
 - Environment auth migration exists (`migrateLegacyAuthConfigs`) and moves old token/username style auth into secret-backed auth config (`src/storage/JenkinsEnvironmentStore.ts`).
+- README screenshots in `docs/images/` come from `dev/showcase/` (seeded Jenkins plus an isolated VS Code; see its README). `launch-vscode.mjs` writes the `jenkinsWorkbench.environments` and `jenkinsWorkbench.repositoryLinks` globalState shapes directly, so update it when `JenkinsEnvironmentStore` or `JenkinsRepositoryLinkStore` change their stored format.
 
 ## 4) DI Container Constraints (Easy Failure Mode)
 

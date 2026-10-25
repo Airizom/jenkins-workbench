@@ -1,0 +1,17 @@
+{
+  "name": "storefront",
+  "version": "2.14.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --coverage",
+    "pack:release": "npm run build && npm pack --pack-destination dist"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "3.2.4",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

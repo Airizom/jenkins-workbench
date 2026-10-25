@@ -1,13 +1,13 @@
 # Jenkins Workbench
 
-![Jenkins Workbench — Jenkins, inside VS Code. Build Details shows pipeline stages, test results, coverage, and failure diagnostics.](resources/marketplace-hero.png)
-
-[![CI Build](https://img.shields.io/github/actions/workflow/status/Airizom/jenkins-workbench/ci.yml?style=flat-square&label=CI)](https://github.com/Airizom/jenkins-workbench/actions/workflows/ci.yml)
-[![Release Build](https://img.shields.io/github/actions/workflow/status/Airizom/jenkins-workbench/release.yml?style=flat-square&label=Release)](https://github.com/Airizom/jenkins-workbench/actions/workflows/release.yml)
-[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/airizom.jenkins-workbench?style=flat-square&label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench)
+[![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version-short/airizom.jenkins-workbench.svg?label=VS%20Marketplace&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench)
+[![Visual Studio Marketplace Installs](https://vsmarketplacebadges.dev/installs-short/airizom.jenkins-workbench.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=airizom.jenkins-workbench)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/airizom/jenkins-workbench?style=flat-square&label=Open%20VSX)](https://open-vsx.org/extension/airizom/jenkins-workbench)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/airizom/jenkins-workbench?style=flat-square&label=downloads)](https://open-vsx.org/extension/airizom/jenkins-workbench)
+[![CI](https://img.shields.io/github/actions/workflow/status/Airizom/jenkins-workbench/ci.yml?branch=main&event=push&style=flat-square&label=CI)](https://github.com/Airizom/jenkins-workbench/actions/workflows/ci.yml?query=branch%3Amain)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com/)
+
+![Jenkins Workbench in VS Code: the Jenkins sidebar lists jobs awaiting input, failing, unstable, and running, next to Build Details for a failed branch build with its stages, failure history, test results, coverage, a TypeScript diagnostic, and the changelog. The status bar shows the failed build for the checked-out branch.](docs/images/hero.png)
 
 VS Code extension that brings Jenkins into your editor. Browse jobs, trigger builds, stream console logs, watch for status changes, and manage CI/CD pipelines without leaving VS Code.
 
@@ -28,6 +28,8 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
 - **Deep Links** — Open builds and jobs through supported VS Code extension URIs (`vscode://airizom.jenkins-workbench/...`)
 - **Summary Badges** — Section counts in the tree, a running-jobs badge on the view, and a banner when watched jobs cannot be checked
+
+![Node Capacity panel showing queued and stuck work, saturated label pools, and busy, idle, and offline executors across agents.](docs/images/capacity.png)
 
 ### Current Branch Workflow
 
@@ -61,6 +63,8 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Artifact Preview & Download** — Open images/text artifacts, download individual files, or download all build artifacts as a ZIP to your workspace
 - **Workspace Browsing** — Browse a classic job's current Jenkins workspace and preview files without leaving VS Code
 
+![Build Compare panel contrasting two branch builds: one new test failure, one still failing, three added tests, commits, a regressed stage, and a diverging console.](docs/images/compare.png)
+
 ### Build Details Panel
 
 - **Live Console Streaming** — Watch build output in real-time with automatic scrolling
@@ -73,11 +77,15 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
 
+![A TypeScript error from the Jenkins build underlined in the local source file and listed in Problems, with coverage highlighting on the changed lines and the failed Typecheck stage open in Build Details.](docs/images/diagnostics.png)
+
 In the Overview tab, **Related Builds** shows upstream builds immediately. Expand **Downstream builds** to search for running or completed builds triggered by this build. **Refresh** repeats the search; results do not poll automatically. Back/Forward restores the build and its selected tab for this panel session.
 
 Downstream discovery checks configured downstream jobs first, then other accessible jobs, matching their structured upstream causes. By default it checks up to 50 jobs and 100 recent builds per job. All discovery and history requests share a 100-request budget, four concurrent requests, and a 30-second deadline. Search limits and access failures are shown alongside any matches; an empty result does not prove that no downstream builds exist. Queued work remains in the queue view. Collapsing the section, hiding the panel, or navigating away cancels discovery. Use Refresh to check for newly started builds.
 
 ### Cross-build failure history
+
+![Job History panel for a branch: an automatically detected main baseline, build success rate, and per-test failure rates with new and still-failing labels.](docs/images/history.png)
 
 Open **Jenkins: Open Job History** from the Command Palette or a job/branch context menu. A multibranch parent prompts for a branch. The panel shows the latest 20 completed builds by default; choose 10, 20, or 50, search tests, or select a build to inspect its baseline evidence. Build and test outcome links open Build Details, and Compare actions use the selected build as the target.
 

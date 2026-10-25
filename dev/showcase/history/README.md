@@ -1,0 +1,1 @@
+Each directory is one commit replayed by `seed.mjs` in name order. `commit.json` names the branch, author, and message; `files/` is copied over the working tree before committing. A step with `"build": false` is pushed with the next step so one build records both commits in its changelog.
