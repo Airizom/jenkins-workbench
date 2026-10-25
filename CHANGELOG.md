@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.59.0] - 2026-10-25
+
 ### Added
 
 - feat(artifacts): download all build artifacts as a Jenkins-generated ZIP from build context menus or Build Details, with cancellable progress and the existing workspace download size limit.
@@ -14,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(nodes): edit permanent-agent labels, disconnect agents, follow bounded agent logs in Node Details, create inbound agents, copy agent configuration, and delete idle permanent agents from tree and panel actions.
 
 - feat(builds): navigate direct upstream and downstream builds from Related Builds in Build Details, with same-panel Back/Forward history, configurable bounded downstream discovery, and explicit partial-result notices.
+
+- feat(bulk): stop builds, cancel queue items, watch or unwatch jobs, and pin or unpin jobs from multi-selection, with deduplication, batch confirmation, cancellation, and result reporting.
+
+- feat(watch): configure watch notifications and mute all notifications while polling and tree updates continue.
 
 ## [1.58.0] - 2026-10-25
 
