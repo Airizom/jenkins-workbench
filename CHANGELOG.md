@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.57.0] - 2026-10-24
+
+### Changed
+
+- feat(panels): Build Details adds a progress card for running builds, shows when a build is paused for input, and scrolls the stage strip to the failed or running stage. Failed builds show the failure count first instead of the test donut.
+- feat(panels): Build Compare keeps the header and section nav pinned, shows test groups as tables, highlights the changed words in parameters, shows console logs side by side, and flags stages that newly fail.
+- feat(panels): Job History adds a Started column with relative and absolute times, marks the selected build, shows which rows are visible, and collapses correctly when embedded in Build Details.
+- feat(panels): Node Capacity adds a label/node/job filter, a needs-attention toggle, a per-pool node limit with Show all, Build Details links for running builds, and a section for builds tied to one agent.
+- feat(panels): Node Details reuses an in-flight diagnostics fetch, stops repeating overview facts, shows how long an offline node has been offline, and warns only about blocked or stuck queue items.
+- feat(theme): status and coverage colors are contributed theme colors shared by the tree and panels, console AnsiColor output uses the terminal ANSI colors, and animations respect VS Code's reduce-motion setting.
+- chore(deps): bump Biome, Vitest, Vite, @types/vscode, Radix, and js-yaml 5.x; move Vite and Vitest configs to `.mts`; validate contributed color ids in the manifest script.
+
 ## [1.56.1] - 2026-10-11
 
 ### Fixed
