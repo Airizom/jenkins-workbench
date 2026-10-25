@@ -39,7 +39,9 @@ export function RawJsonCard({
             <div>
               <div className="text-xs font-medium">Raw JSON</div>
               <div className="text-caption text-muted-foreground">
-                {advancedLoaded ? "Full payload." : "Current detail level."}
+                {advancedLoaded
+                  ? "Jenkins API response, including monitors."
+                  : "Jenkins API response, without monitors."}
               </div>
             </div>
           </button>

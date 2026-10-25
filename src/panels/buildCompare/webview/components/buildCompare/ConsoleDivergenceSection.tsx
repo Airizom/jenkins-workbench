@@ -111,7 +111,7 @@ export function ConsoleDivergenceSection({
       {hasSnippets ? (
         <>
           <DivergenceIndicator label={section.divergenceLineLabel} />
-          <ConsoleComparison section={section} />
+          <ConsoleComparison section={section} baseline={baseline} target={target} />
         </>
       ) : null}
       {fallback ? (

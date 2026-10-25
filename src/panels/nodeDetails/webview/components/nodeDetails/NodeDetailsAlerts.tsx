@@ -18,9 +18,12 @@ export function NodeDetailsAlerts({
     return null;
   }
 
+  // A failed refresh still shows the last loaded details, so it warns rather
+  // than presenting the panel as broken.
   return (
     <PanelErrorList
       errors={errors}
+      tone={refreshFailed ? "warning" : "destructive"}
       title={
         refreshFailed
           ? "Refresh failed. Showing the last loaded details."

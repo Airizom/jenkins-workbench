@@ -3,6 +3,7 @@ import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefresh
 import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import { NodeCapacityPanel } from "../panels/NodeCapacityPanel";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type {
@@ -22,13 +23,21 @@ export function registerNodeCapacityCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
   environmentStore: JenkinsEnvironmentStore,
-  refreshHost: EnvironmentScopedRefreshHost
+  refreshHost: EnvironmentScopedRefreshHost,
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.showNodeCapacity",
       (item?: NodeCapacityCommandSource) =>
-        showNodeCapacity(dataService, environmentStore, refreshHost, context.extensionUri, item)
+        showNodeCapacity(
+          dataService,
+          environmentStore,
+          refreshHost,
+          buildDetailsPanelLauncher,
+          context.extensionUri,
+          item
+        )
     )
   );
 }
@@ -37,6 +46,7 @@ async function showNodeCapacity(
   dataService: JenkinsDataService,
   environmentStore: JenkinsEnvironmentStore,
   refreshHost: EnvironmentScopedRefreshHost,
+  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
   extensionUri: vscode.Uri,
   item?: NodeCapacityCommandSource
 ): Promise<void> {
@@ -50,7 +60,8 @@ async function showNodeCapacity(
       dataService,
       environment,
       extensionUri,
-      refreshHost
+      refreshHost,
+      buildDetailsPanelLauncher
     });
   });
 }

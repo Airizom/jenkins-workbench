@@ -45,7 +45,8 @@ function drainingNode(): NodeCapacityNodeViewModel {
 function renderPool(
   nodes: NodeCapacityNodeViewModel[],
   totals: Partial<NodeCapacityPoolViewModel>,
-  isOpen = true
+  isOpen = true,
+  options: { showAllNodes?: boolean; nodeQuery?: string } = {}
 ) {
   const pool: NodeCapacityPoolViewModel = {
     id: "linux",
@@ -75,10 +76,14 @@ function renderPool(
       createElement(NodeCapacityPoolPanel, {
         pool,
         isOpen,
+        showAllNodes: options.showAllNodes ?? false,
+        nodeQuery: options.nodeQuery ?? "",
         onOpenExternal: () => undefined,
         onOpenNodeDetails: () => undefined,
+        onOpenBuildDetails: () => undefined,
         onRetryExecutors: () => undefined,
-        onToggleExpanded: () => undefined
+        onToggleExpanded: () => undefined,
+        onShowAllNodesChange: () => undefined
       })
     )
   );
@@ -113,7 +118,10 @@ describe("NodeCapacityPoolPanel", () => {
       idleExecutors: 1,
       offlineExecutors: 3
     });
-    assert.match(html, /aria-label="Executors: 3 busy, 1 idle, 2 offline"/);
+    assert.match(html, /aria-label="Executors"/);
+    assert.match(html, />3<\/span> busy/);
+    assert.match(html, />1<\/span> idle/);
+    assert.match(html, />2<\/span> offline/);
   });
 
   it("summarizes offline capacity in the header instead of repeating offline nodes", () => {
@@ -126,16 +134,26 @@ describe("NodeCapacityPoolPanel", () => {
     assert.doesNotMatch(html, /Offline capacity impact/);
   });
 
-  it("renders an inline count summary for narrow layouts with tones on problem values", () => {
+  it("labels the bar counts directly with tones on problem values", () => {
     const html = renderPool([drainingNode()], {
       totalExecutors: 2,
       busyExecutors: 1,
       offlineExecutors: 2,
       queuedCount: 3
     });
-    assert.match(html, /lg:hidden/);
+    // Queued with no idle executor is starved: queued and idle both read as failures.
     assert.match(html, /text-failure-foreground[^"]*"><span[^>]*>3<\/span> queued/);
-    assert.match(html, /text-warning-foreground[^"]*"><span[^>]*>2<\/span> offline/);
+    assert.match(html, /text-failure-foreground[^"]*"><span[^>]*>0<\/span> idle/);
+    assert.match(html, /text-warning-foreground[^"]*"><span[^>]*>1<\/span> offline/);
+    // The overlay would swallow hover, so nothing in the header uses `title`.
+    const header = html.slice(0, html.indexOf('id="capacity-pool-'));
+    assert.doesNotMatch(header, /title=/);
+  });
+
+  it("says when nothing is queued instead of rendering an empty queue section", () => {
+    const html = renderPool([drainingNode()], { totalExecutors: 2, offlineExecutors: 2 });
+    assert.match(html, />Nothing queued</);
+    assert.doesNotMatch(html, /Queued work/);
   });
 
   it("makes the node name the Node Details link and keeps one Open in Jenkins action", () => {
@@ -206,15 +224,68 @@ describe("NodeCapacityPoolPanel", () => {
 
   it("uses warning for temporarily offline nodes and failure for disconnected ones", () => {
     const temporary = renderPool([drainingNode()], { totalExecutors: 2 });
-    assert.match(temporary, /border-warning-border bg-warning-soft/);
-    assert.doesNotMatch(temporary, /bg-failure-soft/);
+    assert.match(temporary, /border-l-2 border-l-warning/);
+    assert.doesNotMatch(temporary, /border-l-failure/);
 
     const disconnected = renderPool(
       [{ ...drainingNode(), isTemporarilyOffline: false, statusLabel: "Offline" }],
       { totalExecutors: 2 }
     );
-    assert.match(disconnected, /border-failure-border bg-failure-soft/);
+    assert.match(disconnected, /border-l-2 border-l-failure/);
     assert.match(disconnected, /text-failure-foreground[^"]*">Offline<\/span>/);
+  });
+
+  it("opens running builds in Build Details and keeps a separate Open in Jenkins action", () => {
+    const html = renderPool([drainingNode()], { totalExecutors: 2, busyExecutors: 1 });
+    assert.match(html, /title="api » main #7 \(open build details\)"/);
+    assert.match(html, /, running on agent-2, open build details/);
+    assert.match(html, /aria-label="Open api » main #7 in Jenkins"/);
+  });
+
+  it("opens non-build work only in Jenkins", () => {
+    const node = drainingNode();
+    const html = renderPool(
+      [
+        {
+          ...node,
+          executors: [{ ...node.executors[0], workUrl: "https://jenkins.example/job/api/" }]
+        }
+      ],
+      { totalExecutors: 2, busyExecutors: 1 }
+    );
+    assert.doesNotMatch(html, /open build details/);
+    assert.match(html, /aria-label="Open api » main #7 in Jenkins \(running on agent-2\)"/);
+  });
+
+  it("caps long node lists, leading with offline nodes", () => {
+    const online = (index: number): NodeCapacityNodeViewModel => ({
+      ...drainingNode(),
+      name: `node-${index}`,
+      displayName: `node-${index}`,
+      nodeUrl: `https://jenkins.example/computer/node-${index}/`,
+      isOffline: false,
+      isTemporarilyOffline: false,
+      statusLabel: "Online"
+    });
+    const nodes = [...Array.from({ length: 14 }, (_, index) => online(index)), drainingNode()];
+
+    const capped = renderPool(nodes, {});
+    assert.match(capped, />Show all 15 nodes</);
+    assert.ok(capped.indexOf("agent-2") < capped.indexOf("node-0"), "offline node first");
+    assert.match(capped, /node-8/);
+    assert.doesNotMatch(capped, /node-9</);
+
+    const all = renderPool(nodes, {}, true, { showAllNodes: true });
+    assert.match(all, /node-13/);
+    assert.match(all, />Show fewer nodes</);
+  });
+
+  it("lists only the nodes matching a node-name filter", () => {
+    const other = { ...drainingNode(), name: "other", displayName: "other", nodeUrl: undefined };
+    const html = renderPool([drainingNode(), other], {}, true, { nodeQuery: "AGENT" });
+    assert.match(html, /agent-2/);
+    assert.doesNotMatch(html, />other</);
+    assert.match(html, /1 of 2/);
   });
 
   it("keeps the full offline reason reachable", () => {

@@ -8,6 +8,7 @@ import type { NodeCapacityNodeExecutorsResult } from "../shared/nodeCapacity/Nod
 import { buildNodeCapacityErrorViewModel } from "../shared/nodeCapacity/NodeCapacityDefaults";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
+import type { BuildDetailsPanelLauncher } from "./BuildDetailsPanelLauncher";
 import { NodeDetailsPanel } from "./NodeDetailsPanel";
 import {
   nodeCapacityWebviewEntryName,
@@ -16,6 +17,7 @@ import {
 } from "./nodeCapacity/NodeCapacityRenderer";
 import {
   isLoadNodeCapacityExecutorsMessage,
+  isOpenBuildDetailsMessage,
   isOpenExternalMessage,
   isOpenNodeDetailsMessage,
   isRefreshNodeCapacityMessage,
@@ -54,6 +56,8 @@ interface NodeCapacityPanelShowOptions {
   environment: JenkinsEnvironmentRef;
   extensionUri: vscode.Uri;
   refreshHost?: NodeCapacityRefreshHost;
+  /** Opens running builds in Build Details; without it they open in the browser. */
+  buildDetailsPanelLauncher?: BuildDetailsPanelLauncher;
 }
 
 interface NodeCapacityPanelReviveOptions {
@@ -61,6 +65,7 @@ interface NodeCapacityPanelReviveOptions {
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
   refreshHost?: NodeCapacityRefreshHost;
+  buildDetailsPanelLauncher?: BuildDetailsPanelLauncher;
 }
 
 export class NodeCapacityPanel {
@@ -72,6 +77,7 @@ export class NodeCapacityPanel {
   private refreshTimer?: NodeJS.Timeout;
   private refreshHost?: NodeCapacityRefreshHost;
   private dataService?: JenkinsDataService;
+  private buildDetailsPanelLauncher?: BuildDetailsPanelLauncher;
   private capacityService?: NodeCapacityService;
   private environment?: JenkinsEnvironmentRef;
   private readonly loadTokenTracker = new LoadTokenTracker();
@@ -83,7 +89,8 @@ export class NodeCapacityPanel {
   private nonce = createNonce();
 
   static async show(options: NodeCapacityPanelShowOptions): Promise<void> {
-    const { dataService, environment, extensionUri, refreshHost } = options;
+    const { dataService, environment, extensionUri, refreshHost, buildDetailsPanelLauncher } =
+      options;
 
     if (!NodeCapacityPanel.currentPanel) {
       const panel = vscode.window.createWebviewPanel(
@@ -102,6 +109,7 @@ export class NodeCapacityPanel {
 
     const activePanel = NodeCapacityPanel.currentPanel;
     activePanel.dataService = dataService;
+    activePanel.buildDetailsPanelLauncher = buildDetailsPanelLauncher;
     activePanel.capacityService = new NodeCapacityService(dataService);
     activePanel.environment = environment;
     activePanel.setRefreshHost(refreshHost);
@@ -121,6 +129,7 @@ export class NodeCapacityPanel {
     const revived = new NodeCapacityPanel(panel, options.extensionUri);
     NodeCapacityPanel.currentPanel = revived;
     revived.dataService = options.dataService;
+    revived.buildDetailsPanelLauncher = options.buildDetailsPanelLauncher;
     revived.capacityService = new NodeCapacityService(options.dataService);
     revived.setRefreshHost(options.refreshHost);
 
@@ -164,6 +173,10 @@ export class NodeCapacityPanel {
         }
         if (isOpenNodeDetailsMessage(message)) {
           void this.openNodeDetails(message.nodeUrl, message.label);
+          return;
+        }
+        if (isOpenBuildDetailsMessage(message)) {
+          void this.openBuildDetails(message.buildUrl, message.label);
           return;
         }
         if (isLoadNodeCapacityExecutorsMessage(message)) {
@@ -321,20 +334,47 @@ export class NodeCapacityPanel {
   }
 
   /**
-   * Webview-supplied node URLs feed authenticated requests, so only accept
-   * URLs inside this panel's environment (same prefix containment as the URI
-   * handler and task provider).
+   * Webview-supplied node and build URLs feed authenticated requests, so only
+   * accept URLs inside this panel's environment (same prefix containment as
+   * the URI handler and task provider).
    */
-  private isNodeUrlWithinEnvironment(nodeUrl: string): boolean {
+  private isUrlWithinEnvironment(url: string): boolean {
     const environmentUrl = this.environment?.url;
     if (!environmentUrl) {
       return false;
     }
     try {
       const normalizedBase = ensureTrailingSlash(new URL(environmentUrl).toString());
-      return new URL(nodeUrl).toString().startsWith(normalizedBase);
+      return new URL(url).toString().startsWith(normalizedBase);
     } catch {
       return false;
+    }
+  }
+
+  private async openBuildDetails(buildUrl: string, label?: string): Promise<void> {
+    if (!this.environment) {
+      return;
+    }
+    if (!this.isUrlWithinEnvironment(buildUrl)) {
+      console.warn(
+        `Node Capacity ignored a build details request outside the environment: ${buildUrl}`
+      );
+      return;
+    }
+    if (!this.buildDetailsPanelLauncher) {
+      await this.openExternalUrl(buildUrl);
+      return;
+    }
+    try {
+      await this.buildDetailsPanelLauncher.show({
+        environment: this.environment,
+        buildUrl,
+        label
+      });
+    } catch (error) {
+      void vscode.window.showErrorMessage(
+        `Unable to open build details: ${formatActionError(error)}`
+      );
     }
   }
 
@@ -342,7 +382,7 @@ export class NodeCapacityPanel {
     if (!this.dataService || !this.environment) {
       return;
     }
-    if (!this.isNodeUrlWithinEnvironment(nodeUrl)) {
+    if (!this.isUrlWithinEnvironment(nodeUrl)) {
       console.warn(
         `Node Capacity ignored a node details request outside the environment: ${nodeUrl}`
       );
@@ -368,7 +408,7 @@ export class NodeCapacityPanel {
     const environmentId = environment.environmentId;
     const candidateNodeUrls = [...new Set(nodeUrls.filter((nodeUrl) => nodeUrl.trim().length > 0))];
     const uniqueNodeUrls = candidateNodeUrls.filter((nodeUrl) =>
-      this.isNodeUrlWithinEnvironment(nodeUrl)
+      this.isUrlWithinEnvironment(nodeUrl)
     );
     if (uniqueNodeUrls.length < candidateNodeUrls.length) {
       console.warn("Node Capacity ignored executor requests for URLs outside the environment.");

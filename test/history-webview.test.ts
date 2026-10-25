@@ -209,6 +209,52 @@ describe("history webview states", () => {
     });
     expect(html).toContain("Compare with #3");
     expect(html).toContain("—");
+    // Compare comes before "Build details" so "Build details" keeps one position on every row.
+    expect(html.indexOf("Compare with #3")).toBeLessThan(
+      html.indexOf('aria-label="Open build #4 details"')
+    );
+  });
+  it("shows when each build started and marks the selected build", () => {
+    const model = failingModel();
+    const timestamp = Date.now() - 3 * 60 * 60 * 1000;
+    const html = render({
+      ...model,
+      builds: [{ ...model.builds[0], build: { ...model.builds[0].build, timestamp } }]
+    });
+    expect(html).toContain(`dateTime="${new Date(timestamp).toISOString()}"`);
+    expect(html).toContain(">3h ago</time>");
+    expect(html).toContain("history-selected-cell");
+    expect(html).toContain('aria-pressed="true"');
+  });
+  it("names the anchor build in the baseline line and shows progress while resolving", () => {
+    const model = failingModel();
+    const resolved = render({
+      ...model,
+      baseline: { status: "available", build: { number: 2, url: "https://jenkins.test/job/a/2/" } }
+    });
+    expect(resolved).toContain("last completed before #3 started");
+    const resolving = render({ ...model, baseline: undefined });
+    expect(resolving).toContain("Resolving…");
+    expect(resolving).toContain("animate-spin");
+  });
+  it("labels test pages with the visible row range", () => {
+    const model = failingModel();
+    const template = model.tests[0];
+    const tests = Array.from({ length: 60 }, (_, index) => ({
+      ...template,
+      key: `k${index}`,
+      name: `t${index}`
+    }));
+    const html = renderToStaticMarkup(
+      createElement(HistoryTestsSection, {
+        model: { ...model, tests, evidence: {} },
+        ui: normalizeHistoryUi({}),
+        setUi: () => undefined,
+        send: () => undefined
+      })
+    );
+    expect(html).toContain("1–50 of 60");
+    expect(html).toContain('aria-label="Test pages"');
   });
   it("renders the expanded test with its baseline outcome", () => {
     const model = failingModel();
@@ -226,7 +272,9 @@ describe("history webview states", () => {
       })
     );
     expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain("Outcomes by build, newest first.");
+    // The visible heading does not repeat the row's test name; screen readers still get it.
+    expect(html).toContain('Outcomes by build<span class="sr-only"> for suite · test</span>');
+    expect(html).toContain("Newest first.");
     expect(html).toContain("Baseline: Also failing");
     expect(html).toContain("suite");
   });
@@ -352,8 +400,9 @@ describe("history test ordering and labels", () => {
         send: () => undefined
       })
     );
-    expect(html).toContain("No test report for build #4");
-    expect(html).toContain("not counted as passes");
+    expect(html).toContain(
+      "No test report for build #4. That build is left out of failure rates and transitions; it is not counted as a pass."
+    );
     // A truncated report leaves test-level gaps, which stay on the row.
     const truncated: HistoryViewModel = {
       ...unavailable,

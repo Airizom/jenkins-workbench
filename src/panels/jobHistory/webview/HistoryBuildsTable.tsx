@@ -1,4 +1,5 @@
 import { formatDurationMs } from "../../../formatters/DurationFormatters";
+import { formatRelativeTimestampMs } from "../../../formatters/RelativeTimeFormatters";
 import { historyMetrics } from "../../../history/HistoryAnalysis";
 import { SectionHeading } from "../../shared/webview/components/SectionHeading";
 import { Badge } from "../../shared/webview/components/ui/badge";
@@ -14,7 +15,7 @@ import {
 import { cn } from "../../shared/webview/lib/utils";
 import type { HistoryViewModel } from "../shared/HistoryContracts";
 import { BuildResultLabel, type HistorySend, SelectedBuildBadge } from "./HistoryOutcomes";
-import { compareBuildsLabel } from "./historyPresentation";
+import { compareBuildsLabel, formatHistoryTimestamp } from "./historyPresentation";
 
 const COMPLETED_RESULTS = ["SUCCESS", "UNSTABLE", "FAILURE"];
 const LOADING_TITLE = "Wait for history to finish loading";
@@ -63,6 +64,21 @@ function reportBadge(report: HistoryBuildItem["report"]) {
 }
 
 const PARTIAL_REASON = "Only part of this test report was sampled";
+
+/** Relative start time ("3h ago"); the absolute time is the tooltip and machine-readable value. */
+function StartedAt({ timestamp }: { timestamp?: number }) {
+  const relative = timestamp && timestamp > 0 ? formatRelativeTimestampMs(timestamp) : undefined;
+  if (!timestamp || !relative) return <span className="text-muted-foreground">—</span>;
+  return (
+    <time
+      className="whitespace-nowrap"
+      dateTime={new Date(timestamp).toISOString()}
+      title={formatHistoryTimestamp(timestamp)}
+    >
+      {relative}
+    </time>
+  );
+}
 
 function DurationBar({
   build,
@@ -136,12 +152,15 @@ function HistoryBuildRow({
   const selected = model.selectedBuild === build.number;
   return (
     <TableRow className={cn(selected && "bg-accent-soft hover:bg-accent-soft")}>
-      <TableCell className="whitespace-nowrap">
+      <TableCell className={cn("whitespace-nowrap", selected && "history-selected-cell")}>
         <span className="flex items-center gap-2">
           <Button
-            variant={selected ? "secondary" : "outline"}
+            variant={selected ? "default" : "outline"}
             size="xs"
-            className="tabular-nums aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            className={cn(
+              "tabular-nums aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+              selected && "hc-active-ring"
+            )}
             aria-pressed={selected}
             aria-describedby={SELECT_HELP_ID}
             aria-disabled={loading || undefined}
@@ -158,11 +177,16 @@ function HistoryBuildRow({
       <TableCell data-label="Result">
         <BuildResultLabel result={build.result} building={build.building} />
       </TableCell>
+      <TableCell data-label="Started">
+        <StartedAt timestamp={build.timestamp} />
+      </TableCell>
       <TableCell data-label="Duration">
         <DurationBar build={build} maxDuration={maxDuration} />
       </TableCell>
       <TableCell data-label="Test report">{reportBadge(report)}</TableCell>
-      <TableCell className="whitespace-nowrap text-right max-sm:whitespace-normal">
+      {/* "Build details" stays last so it keeps one position whether or not Compare shows. */}
+      <TableCell className="text-right">
+        <CompareButton model={model} buildNumber={build.number} loading={loading} send={send} />
         <Button
           variant="ghost"
           size="xs"
@@ -171,7 +195,6 @@ function HistoryBuildRow({
         >
           Build details
         </Button>
-        <CompareButton model={model} buildNumber={build.number} loading={loading} send={send} />
       </TableCell>
     </TableRow>
   );
@@ -200,11 +223,12 @@ export function HistoryBuildsTable({
         Select a build number to analyze its test failures; other rows then compare against it.
       </p>
       <div className="history-stack-table relative overflow-x-auto rounded-lg border border-border">
-        <Table className="min-w-[36rem] text-xs">
+        <Table className="min-w-[48rem] text-xs">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>Build</TableHead>
               <TableHead>Result</TableHead>
+              <TableHead>Started</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Test report</TableHead>
               <TableHead>

@@ -1,7 +1,14 @@
 import type * as React from "react";
 import { Badge } from "../../../../shared/webview/components/ui/badge";
-import type { NodeExecutorViewModel } from "../../../shared/NodeDetailsContracts";
-import { type ExecutorUtilization, summarizeExecutorUtilization } from "./executorUtilization";
+import {
+  NODE_DETAIL_NOT_AVAILABLE_LABEL,
+  type NodeExecutorViewModel
+} from "../../../shared/NodeDetailsContracts";
+import {
+  type ExecutorUtilization,
+  formatOneOffExecutors,
+  summarizeExecutorUtilization
+} from "./executorUtilization";
 
 type ExecutorUtilizationSummaryProps = {
   executors: NodeExecutorViewModel[];
@@ -20,17 +27,21 @@ export function ExecutorUtilizationSummary({
   const utilization = summarizeExecutorUtilization(executors, oneOffExecutors, isOffline);
 
   if (utilization.total === 0) {
+    // Offline is already stated by the badge and banner above, and an
+    // unreported activity adds nothing.
+    const showActivity = !isOffline && activityLabel !== NODE_DETAIL_NOT_AVAILABLE_LABEL;
     return (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>
-          Executors: <span className="font-medium text-foreground">{executorsLabel}</span>
+          {executorsLabel === NODE_DETAIL_NOT_AVAILABLE_LABEL
+            ? "Executor data not available"
+            : "No executors"}
         </span>
-        {/* Offline is already stated by the badge and banner above. */}
-        {isOffline ? null : (
+        {showActivity ? (
           <span>
             Activity: <span className="font-medium text-foreground">{activityLabel}</span>
           </span>
-        )}
+        ) : null}
         <OneOffExecutorBadge utilization={utilization} />
       </div>
     );
@@ -97,7 +108,7 @@ function OneOffExecutorBadge({
       variant="outline"
       className="text-micro px-1.5 py-0 border-border bg-muted-soft text-muted-foreground"
     >
-      +{utilization.oneOffBusy}/{utilization.oneOffTotal} one-off
+      {formatOneOffExecutors(utilization)}
     </Badge>
   );
 }

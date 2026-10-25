@@ -5,9 +5,9 @@ import type {
   BuildCompareStageDeltaDirection,
   BuildCompareStageDiffItem
 } from "../../../shared/BuildCompareContracts";
-import { CompareChangeBadge } from "./shared/CompareDiffRowShell";
+import { CompareChangeBadge } from "./shared/CompareChangeBadge";
 import { CompareTableEmptyValue } from "./shared/CompareTable";
-import { isStageStatusRegression } from "./stageDiffModel";
+import { isNewUnsuccessfulStage, isStageStatusRegression } from "./stageDiffModel";
 
 const DELTA_PRESENTATIONS = {
   slower: { icon: ArrowUpIcon, significantToneClass: "text-failure" },
@@ -92,23 +92,34 @@ function StageDeltaCell({
   );
 }
 
+/** Screen-reader text for rows tinted as getting worse. */
+function resolveStageAlert(item: BuildCompareStageDiffItem): string | undefined {
+  if (isStageStatusRegression(item)) {
+    return "(status regressed)";
+  }
+  if (isNewUnsuccessfulStage(item)) {
+    return "(new stage did not succeed)";
+  }
+  return undefined;
+}
+
 export function StageDiffRow({ item }: { item: BuildCompareStageDiffItem }) {
-  const regressed = isStageStatusRegression(item);
+  const alert = resolveStageAlert(item);
   return (
-    <tr className={cn(regressed && "bg-failure-surface")}>
+    <tr className={cn("align-top", alert && "bg-failure-surface")}>
       <th scope="row" className="px-3 py-2 text-left font-normal">
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          {/* Stage paths wrap instead of truncating; parallel branches get long. */}
           <span
             className={cn(
-              "truncate font-medium",
+              "min-w-0 font-medium [overflow-wrap:anywhere]",
               item.changeType === "removed" && "text-muted-foreground line-through"
             )}
-            title={item.name}
           >
             {item.name}
           </span>
           <CompareChangeBadge changeType={item.changeType} />
-          {regressed ? <span className="sr-only">(status regressed)</span> : null}
+          {alert ? <span className="sr-only">{alert}</span> : null}
         </div>
       </th>
       <StageSideCell

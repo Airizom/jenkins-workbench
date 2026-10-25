@@ -1,6 +1,7 @@
 import type { BuildCompareChangesetsSectionViewModel } from "../../../shared/BuildCompareContracts";
 import { ChangesetColumn } from "./ChangesetColumn";
 import { SectionCard, type SectionCardDisclosureProps } from "./shared/SectionCard";
+import { CHANGESETS_EMPTY_LABEL } from "./shared/sectionStatusBadge";
 
 export function ChangesetsSection({
   section,
@@ -17,6 +18,7 @@ export function ChangesetsSection({
       summary={section.summaryLabel}
       detail={section.detail}
       status={section.status}
+      emptyLabel={CHANGESETS_EMPTY_LABEL}
       {...disclosure}
     >
       {hasItems ? (

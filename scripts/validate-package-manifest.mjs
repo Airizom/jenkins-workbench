@@ -46,6 +46,7 @@ for (const scriptName of [
 }
 
 const supportedContributionPoints = new Set([
+  "colors",
   "commands",
   "configuration",
   "keybindings",
@@ -401,6 +402,55 @@ if (!taskParametersSchema) {
       fail(`jenkinsWorkbench task parameters schema rejects supported example ${index + 1}`);
     }
   });
+}
+
+const contributedColors = packageJson.contributes?.colors ?? [];
+const contributedColorIds = contributedColors.map((entry, index) => {
+  assertNonEmptyString(entry.id, `contributes.colors[${index}].id`);
+  assertNonEmptyString(entry.description, `contributes.colors[${index}].description`);
+  for (const themeKind of ["dark", "light", "highContrast", "highContrastLight"]) {
+    assertNonEmptyString(
+      entry.defaults?.[themeKind],
+      `contributes.colors[${index}].defaults.${themeKind}`
+    );
+  }
+  return entry.id;
+});
+assertUnique(contributedColorIds, "contributes.colors");
+
+// Extension color ids (the `status.` and `coverage.` namespaces) are referenced
+// from host code as string literals and
+// from webview CSS as `--vscode-<id with dots as dashes>`; both must be contributed.
+const readThemedSourceFiles = async (dir) => {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await readThemedSourceFiles(fullPath)));
+    } else if (entry.isFile() && /\.(ts|tsx|css)$/.test(entry.name)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+};
+const contributedColorIdSet = new Set(contributedColorIds);
+const contributedColorVariables = new Set(
+  contributedColorIds.map((id) => `--vscode-${id.replaceAll(".", "-")}`)
+);
+for (const file of await readThemedSourceFiles(path.join(rootDir, "src"))) {
+  const source = await readFile(file, "utf8");
+  const relativePath = path.relative(rootDir, file);
+  for (const match of source.matchAll(/"(jenkinsWorkbench\.(?:status|coverage)\.[^"]+)"/g)) {
+    if (!contributedColorIdSet.has(match[1])) {
+      fail(`${relativePath} references uncontributed theme color ${match[1]}`);
+    }
+  }
+  for (const match of source.matchAll(/--vscode-jenkinsWorkbench-[A-Za-z0-9-]+/g)) {
+    if (!contributedColorVariables.has(match[0])) {
+      fail(`${relativePath} references uncontributed theme color variable ${match[0]}`);
+    }
+  }
 }
 
 if (errors.length > 0) {

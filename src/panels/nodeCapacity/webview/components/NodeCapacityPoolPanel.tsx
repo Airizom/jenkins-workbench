@@ -1,5 +1,6 @@
 import * as React from "react";
 import type {
+  NodeCapacityExecutorViewModel,
   NodeCapacityNodeViewModel,
   NodeCapacityPoolViewModel,
   NodeCapacitySeverity
@@ -27,8 +28,20 @@ import {
   resolveSeverityBadgeClass
 } from "../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../shared/webview/lib/utils";
+import {
+  CAPACITY_TONE_TEXT_CLASSES,
+  filterPoolNodes,
+  getVisiblePoolNodes,
+  isNodeListCapped,
+  orderPoolNodes,
+  resolveIdleTone,
+  resolveOfflineTone,
+  resolveQueuedTone
+} from "../state/nodeCapacityView";
+import { ExecutorCapacityBar } from "./ExecutorCapacityBar";
 import { NodeCapacityQueueList } from "./NodeCapacityQueue";
 import type {
+  OpenBuildDetailsHandler,
   OpenExternalHandler,
   OpenNodeDetailsHandler,
   RetryExecutorsHandler
@@ -48,25 +61,59 @@ const POOL_SEVERITY_BORDER_CLASSES: Record<NodeCapacitySeverity, string> = {
  * The header is a heading plus a disclosure button whose accessible name is
  * only the pool label and status. The button's `::after` covers the whole
  * header (see styles.css), so the counts and bar stay clickable without
- * becoming part of the button's name.
+ * becoming part of the button's name. Nothing else in the header relies on
+ * hover (no `title` tooltips), since the overlay would intercept it.
  */
 export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
   pool,
   isOpen,
+  showAllNodes,
+  nodeQuery,
   onOpenExternal,
   onOpenNodeDetails,
+  onOpenBuildDetails,
   onRetryExecutors,
-  onToggleExpanded
+  onToggleExpanded,
+  onShowAllNodesChange
 }: {
   pool: NodeCapacityPoolViewModel;
   isOpen: boolean;
+  showAllNodes: boolean;
+  nodeQuery: string;
   onOpenExternal: OpenExternalHandler;
   onOpenNodeDetails: OpenNodeDetailsHandler;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
   onRetryExecutors: RetryExecutorsHandler;
   onToggleExpanded: (poolId: string, open: boolean) => void;
+  onShowAllNodesChange: (poolId: string, showAll: boolean) => void;
 }): React.JSX.Element {
   const contentId = `capacity-pool-${React.useId()}`;
-  const counts = buildPoolCounts(pool);
+  const matchingNodes = React.useMemo(() => filterPoolNodes(pool, nodeQuery), [pool, nodeQuery]);
+  const orderedNodes = React.useMemo(() => orderPoolNodes(matchingNodes), [matchingNodes]);
+  const visibleNodes = React.useMemo(
+    () => getVisiblePoolNodes(orderedNodes, showAllNodes),
+    [orderedNodes, showAllNodes]
+  );
+  const handleShowAllChange = React.useCallback(
+    (showAll: boolean) => onShowAllNodesChange(pool.id, showAll),
+    [onShowAllNodesChange, pool.id]
+  );
+  const hasQueue = pool.queueItems.length > 0;
+  const nodeList = (
+    <NodeList
+      nodes={visibleNodes}
+      totalCount={orderedNodes.length}
+      poolNodeCount={pool.nodes.length}
+      capped={isNodeListCapped(orderedNodes.length, showAllNodes)}
+      canCollapse={showAllNodes && isNodeListCapped(orderedNodes.length, false)}
+      wide={!hasQueue}
+      onShowAllChange={handleShowAllChange}
+      onOpenNodeDetails={onOpenNodeDetails}
+      onOpenBuildDetails={onOpenBuildDetails}
+      onOpenExternal={onOpenExternal}
+      onRetryExecutors={onRetryExecutors}
+    />
+  );
 
   return (
     <section
@@ -78,20 +125,20 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
     >
       {/* Bottom corners square off when open so the hover highlight meets the content edge. */}
       <div className="capacity-pool-header relative rounded-lg px-4 py-3 transition-colors hover:bg-accent-soft group-data-[open]/pool:rounded-b-none">
-        <div className="grid gap-3 lg:grid-cols-6 lg:items-center">
-          <div className="flex min-w-0 items-start gap-2 lg:col-span-2">
-            <ChevronRightIcon
-              aria-hidden="true"
-              className="capacity-pool-chevron mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none"
-            />
-            <div className="min-w-0 flex-1">
-              <h2 className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold">
+        <div className="flex items-start gap-2">
+          <ChevronRightIcon
+            aria-hidden="true"
+            className="capacity-pool-chevron mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none"
+          />
+          <div className="grid min-w-0 flex-1 gap-x-6 gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)] sm:items-center">
+            <div className="min-w-0">
+              <h2 className="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
+                {/* Labels can be long expressions; wrap instead of truncating so none is hidden. */}
                 <button
                   type="button"
-                  className="capacity-pool-toggle min-w-0 max-w-full cursor-pointer truncate text-left"
+                  className="capacity-pool-toggle min-w-0 cursor-pointer text-left [overflow-wrap:anywhere]"
                   aria-expanded={isOpen}
                   aria-controls={contentId}
-                  title={pool.label}
                   onClick={() => onToggleExpanded(pool.id, !isOpen)}
                 >
                   {pool.label}
@@ -105,45 +152,74 @@ export const NodeCapacityPoolPanel = React.memo(function NodeCapacityPoolPanel({
                   />
                 </span>
               </h2>
-              <div className="mt-0.5 text-xs text-muted-foreground">
+              <PoolQueueLine pool={pool} />
+              <p className="m-0 mt-0.5 text-xs text-muted-foreground">
                 {formatPoolAvailability(pool)}
-              </div>
-              <PoolInlineCounts counts={counts} />
-              <ExecutorCapacityBar
-                total={pool.totalExecutors}
-                busy={pool.busyExecutors}
-                idle={pool.idleExecutors}
-              />
+              </p>
             </div>
-          </div>
-          <div className="hidden lg:contents">
-            {counts.map((count) => (
-              <PoolMetric key={count.label} count={count} />
-            ))}
+            <ExecutorCapacityBar
+              counts={resolvePoolExecutorSegments(pool)}
+              tones={{
+                idle: resolveIdleTone(pool),
+                offline: resolveOfflineTone(pool.offlineExecutors)
+              }}
+            />
           </div>
         </div>
       </div>
 
-      <div
-        id={contentId}
-        hidden={!isOpen}
-        className="grid gap-4 border-t border-border p-4 lg:grid-cols-2"
-      >
+      <div id={contentId} hidden={!isOpen} className="border-t border-border p-4">
         {isOpen ? (
-          <>
-            <NodeList
-              nodes={pool.nodes}
-              onOpenNodeDetails={onOpenNodeDetails}
-              onOpenExternal={onOpenExternal}
-              onRetryExecutors={onRetryExecutors}
-            />
-            <NodeCapacityQueueList items={pool.queueItems} onOpenExternal={onOpenExternal} />
-          </>
+          hasQueue ? (
+            // Queued work comes first: it is what a degraded pool is waiting on,
+            // and it stays above the node list when the columns stack.
+            <div className="grid gap-4 lg:grid-cols-2">
+              <NodeCapacityQueueList
+                items={pool.queueItems}
+                pool={pool}
+                onOpenExternal={onOpenExternal}
+              />
+              {nodeList}
+            </div>
+          ) : (
+            nodeList
+          )
         ) : null}
       </div>
     </section>
   );
 });
+
+/**
+ * Pool `offlineExecutors` also counts builds still running on draining nodes
+ * (already in `busy`), so the offline segment is whatever capacity remains.
+ */
+function resolvePoolExecutorSegments(pool: NodeCapacityPoolViewModel) {
+  return {
+    busy: pool.busyExecutors,
+    idle: pool.idleExecutors,
+    offline: Math.max(0, pool.totalExecutors - pool.busyExecutors - pool.idleExecutors)
+  };
+}
+
+function PoolQueueLine({ pool }: { pool: NodeCapacityPoolViewModel }): React.JSX.Element {
+  if (pool.queuedCount === 0) {
+    return <p className="m-0 mt-1 text-xs text-muted-foreground">Nothing queued</p>;
+  }
+  const tone = resolveQueuedTone(pool);
+  return (
+    <p className={cn("m-0 mt-1 text-xs", tone ? CAPACITY_TONE_TEXT_CLASSES[tone] : undefined)}>
+      <span className="font-semibold tabular-nums">{pool.queuedCount}</span> queued
+      {pool.stuckCount > 0 ? (
+        <>
+          <span aria-hidden="true"> · </span>
+          <span className="sr-only">, </span>
+          <span className="font-semibold tabular-nums">{pool.stuckCount}</span> stuck
+        </>
+      ) : null}
+    </p>
+  );
+}
 
 function formatPoolAvailability(pool: NodeCapacityPoolViewModel): string {
   const parts: string[] = [];
@@ -162,134 +238,6 @@ function formatPoolAvailability(pool: NodeCapacityPoolViewModel): string {
   return parts.join(" · ");
 }
 
-type PoolCount = { label: string; value: number; tone?: "warning" | "failure" };
-
-const POOL_COUNT_TONE_CLASSES: Record<NonNullable<PoolCount["tone"]>, string> = {
-  warning: "text-warning-foreground",
-  failure: "text-failure-foreground"
-};
-
-function buildPoolCounts(pool: NodeCapacityPoolViewModel): PoolCount[] {
-  const starved = pool.queuedCount > 0 && pool.idleExecutors === 0;
-  return [
-    {
-      label: "Queued",
-      value: pool.queuedCount,
-      tone:
-        pool.stuckCount > 0 || starved ? "failure" : pool.queuedCount > 0 ? "warning" : undefined
-    },
-    { label: "Idle", value: pool.idleExecutors, tone: starved ? "failure" : undefined },
-    { label: "Busy", value: pool.busyExecutors },
-    {
-      label: "Offline",
-      value: pool.offlineExecutors,
-      tone: pool.offlineExecutors > 0 ? "warning" : undefined
-    }
-  ];
-}
-
-/** Compact one-line counts used below the `lg` breakpoint instead of the tiles. */
-function PoolInlineCounts({ counts }: { counts: PoolCount[] }): React.JSX.Element {
-  return (
-    <p className="mt-1 mb-0 text-xs text-muted-foreground lg:hidden">
-      {counts.map((count, index) => (
-        <React.Fragment key={count.label}>
-          {index > 0 ? <span aria-hidden="true"> · </span> : null}
-          <span className={cn(count.tone && POOL_COUNT_TONE_CLASSES[count.tone])}>
-            <span className="font-semibold tabular-nums">{count.value}</span>{" "}
-            {count.label.toLowerCase()}
-          </span>
-          {index < counts.length - 1 ? <span className="sr-only">,</span> : null}
-        </React.Fragment>
-      ))}
-    </p>
-  );
-}
-
-// Idle uses a foreground tint well above the `bg-muted` track so free capacity
-// reads as a segment rather than empty track. `hc-outline` gives every segment
-// a contrast border in high-contrast themes.
-const CAPACITY_SEGMENTS = [
-  { key: "busy", label: "busy", className: "bg-progress" },
-  { key: "idle", label: "idle", className: "bg-muted-foreground/45" },
-  { key: "offline", label: "offline", className: "bg-warning" }
-] as const;
-
-/**
- * Stacked busy/idle/offline split so saturation reads before the numbers do.
- * Pool `offlineExecutors` also counts builds still running on draining nodes
- * (already in `busy`), so the offline segment is whatever capacity remains.
- */
-function ExecutorCapacityBar({
-  total,
-  busy,
-  idle
-}: {
-  total: number;
-  busy: number;
-  idle: number;
-}): React.JSX.Element | null {
-  if (total <= 0) {
-    return null;
-  }
-  const counts = { busy, idle, offline: Math.max(0, total - busy - idle) };
-  const description = CAPACITY_SEGMENTS.map(
-    (segment) => `${counts[segment.key]} ${segment.label}`
-  ).join(", ");
-  return (
-    <div className="mt-2 flex max-w-80 flex-wrap items-center gap-x-3 gap-y-1">
-      <div
-        role="img"
-        aria-label={`Executors: ${description}`}
-        title={description}
-        className="flex h-1.5 w-full max-w-64 gap-px overflow-hidden rounded-full bg-muted"
-      >
-        {CAPACITY_SEGMENTS.map((segment) =>
-          counts[segment.key] > 0 ? (
-            <span
-              key={segment.key}
-              className={cn("hc-outline", segment.className)}
-              style={{ width: `${(counts[segment.key] / total) * 100}%` }}
-            />
-          ) : null
-        )}
-      </div>
-      {/* The bar's accessible name already lists the counts; the legend is visual only. */}
-      <ul
-        aria-hidden="true"
-        className="m-0 flex list-none gap-2.5 p-0 text-micro leading-none text-muted-foreground"
-      >
-        {CAPACITY_SEGMENTS.map((segment) => (
-          <li key={segment.key} className="flex items-center gap-1">
-            <span
-              className={cn("hc-outline inline-block h-1.5 w-2.5 rounded-full", segment.className)}
-            />
-            {segment.label}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function PoolMetric({ count }: { count: PoolCount }): React.JSX.Element {
-  return (
-    <div className="rounded-md border border-border bg-surface-sunken px-3 py-1.5">
-      <div
-        className={cn(
-          "text-lg font-semibold tabular-nums leading-tight",
-          count.tone && POOL_COUNT_TONE_CLASSES[count.tone]
-        )}
-      >
-        {count.value}
-      </div>
-      <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
-        {count.label}
-      </div>
-    </div>
-  );
-}
-
 /**
  * Memoized so toggling a pool open/closed does not re-render every node row;
  * capacity data updates always replace the `nodes` array, so real changes
@@ -297,16 +245,35 @@ function PoolMetric({ count }: { count: PoolCount }): React.JSX.Element {
  */
 const NodeList = React.memo(function NodeList({
   nodes,
+  totalCount,
+  poolNodeCount,
+  capped,
+  canCollapse,
+  wide,
+  onShowAllChange,
   onOpenNodeDetails,
+  onOpenBuildDetails,
   onOpenExternal,
   onRetryExecutors
 }: {
-  nodes: NodeCapacityNodeViewModel[];
+  nodes: readonly NodeCapacityNodeViewModel[];
+  /** Nodes that pass the filter. */
+  totalCount: number;
+  /** Every node in the pool, to say when the filter narrowed the list. */
+  poolNodeCount: number;
+  /** More nodes exist than `nodes` shows. */
+  capped: boolean;
+  /** Every node shows and the list could be capped again. */
+  canCollapse: boolean;
+  /** Full width (no queue column), so rows flow into two columns. */
+  wide: boolean;
+  onShowAllChange: (showAll: boolean) => void;
   onOpenNodeDetails: OpenNodeDetailsHandler;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
   onOpenExternal: OpenExternalHandler;
   onRetryExecutors: RetryExecutorsHandler;
 }): React.JSX.Element {
-  if (nodes.length === 0) {
+  if (totalCount === 0) {
     return (
       <section>
         <SectionHeading title="Nodes" icon={<ServerIcon className="h-3.5 w-3.5" />} />
@@ -325,79 +292,48 @@ const NodeList = React.memo(function NodeList({
       <SectionHeading
         title="Nodes"
         icon={<ServerIcon className="h-3.5 w-3.5" />}
-        count={nodes.length}
+        count={
+          totalCount < poolNodeCount ? (
+            // The heading is uppercase; keep "of" readable.
+            <span className="normal-case">
+              {totalCount} of {poolNodeCount}
+            </span>
+          ) : (
+            totalCount
+          )
+        }
       />
-      <div className="space-y-2">
-        {nodes.map((node) => {
-          const offlineTone = resolveNodeOfflineTone(node);
-          return (
-            <div
-              key={node.nodeUrl ?? node.name}
-              className={cn(
-                "rounded-md border p-3",
-                offlineTone
-                  ? NODE_OFFLINE_ROW_CLASSES[offlineTone]
-                  : "border-border bg-surface-sunken"
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <NodeName node={node} onOpenNodeDetails={onOpenNodeDetails} />
-                    {offlineTone ? (
-                      <ToneBadge
-                        label={node.statusLabel}
-                        className={resolveNodeStatusStyle(offlineTone).badge}
-                      />
-                    ) : (
-                      <Badge variant="muted">{node.statusLabel}</Badge>
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{node.executorSummary}</div>
-                  {node.offlineReason ? (
-                    <ClampedText
-                      text={node.offlineReason}
-                      className="mt-1"
-                      textClassName="text-xs text-muted-foreground"
-                    />
-                  ) : null}
-                  <NodeRunningWork
-                    node={node}
-                    onOpenExternal={onOpenExternal}
-                    onRetryExecutors={onRetryExecutors}
-                  />
-                </div>
-                {node.nodeUrl ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        aria-label={`Open ${node.displayName} in Jenkins`}
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0"
-                        onClick={() => node.nodeUrl && onOpenExternal(node.nodeUrl)}
-                      >
-                        <ExternalLinkIcon className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Open in Jenkins</TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
+      <div className={cn("gap-2", wide ? "grid lg:grid-cols-2" : "flex flex-col")}>
+        {nodes.map((node) => (
+          <NodeRow
+            key={node.nodeUrl ?? node.name}
+            node={node}
+            onOpenNodeDetails={onOpenNodeDetails}
+            onOpenBuildDetails={onOpenBuildDetails}
+            onOpenExternal={onOpenExternal}
+            onRetryExecutors={onRetryExecutors}
+          />
+        ))}
       </div>
+      {capped || canCollapse ? (
+        <Button variant="ghost" size="sm" className="mt-2" onClick={() => onShowAllChange(capped)}>
+          {capped ? `Show all ${totalCount} nodes` : "Show fewer nodes"}
+        </Button>
+      ) : null}
     </section>
   );
 });
 
 type NodeOfflineTone = "offline" | "temporary";
 
-/** Same tones as Node Details: disconnected is a fault, temporarily offline is intentional. */
-const NODE_OFFLINE_ROW_CLASSES: Record<NodeOfflineTone, string> = {
-  offline: "border-failure-border bg-failure-soft",
-  temporary: "border-warning-border bg-warning-soft"
+/**
+ * Same tones as Node Details: disconnected is a fault, temporarily offline is
+ * intentional. A left accent plus the status badge marks the row; a full tint
+ * would stack a third red/yellow layer inside an already-toned pool.
+ */
+const NODE_OFFLINE_ACCENT_CLASSES: Record<NodeOfflineTone, string> = {
+  offline: "border-l-failure",
+  temporary: "border-l-warning"
 };
 
 function resolveNodeOfflineTone(node: NodeCapacityNodeViewModel): NodeOfflineTone | undefined {
@@ -405,6 +341,96 @@ function resolveNodeOfflineTone(node: NodeCapacityNodeViewModel): NodeOfflineTon
     return undefined;
   }
   return node.isTemporarilyOffline ? "temporary" : "offline";
+}
+
+function NodeRow({
+  node,
+  onOpenNodeDetails,
+  onOpenBuildDetails,
+  onOpenExternal,
+  onRetryExecutors
+}: {
+  node: NodeCapacityNodeViewModel;
+  onOpenNodeDetails: OpenNodeDetailsHandler;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
+  onOpenExternal: OpenExternalHandler;
+  onRetryExecutors: RetryExecutorsHandler;
+}): React.JSX.Element {
+  const offlineTone = resolveNodeOfflineTone(node);
+  return (
+    <div
+      className={cn(
+        "min-w-0 rounded-md border border-border bg-surface-sunken p-3",
+        offlineTone && cn("border-l-2", NODE_OFFLINE_ACCENT_CLASSES[offlineTone])
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <NodeName node={node} onOpenNodeDetails={onOpenNodeDetails} />
+            {offlineTone ? (
+              <ToneBadge
+                label={node.statusLabel}
+                className={resolveNodeStatusStyle(offlineTone).badge}
+              />
+            ) : (
+              <Badge variant="muted">{node.statusLabel}</Badge>
+            )}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">{node.executorSummary}</div>
+          {node.offlineReason ? (
+            <ClampedText
+              text={node.offlineReason}
+              className="mt-1"
+              textClassName="text-xs text-muted-foreground"
+            />
+          ) : null}
+          <NodeRunningWork
+            node={node}
+            onOpenBuildDetails={onOpenBuildDetails}
+            onOpenExternal={onOpenExternal}
+            onRetryExecutors={onRetryExecutors}
+          />
+        </div>
+        {node.nodeUrl ? (
+          <OpenInJenkinsButton
+            label={`Open ${node.displayName} in Jenkins`}
+            onClick={() => node.nodeUrl && onOpenExternal(node.nodeUrl)}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function OpenInJenkinsButton({
+  label,
+  size = "icon",
+  onClick
+}: {
+  label: string;
+  size?: "icon" | "icon-sm";
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={label}
+          variant="ghost"
+          size={size}
+          className={cn(
+            "shrink-0 text-muted-foreground hover:text-foreground",
+            size === "icon-sm" && "h-5 w-5"
+          )}
+          onClick={onClick}
+        >
+          <ExternalLinkIcon className={size === "icon" ? "h-4 w-4" : "h-3 w-3"} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Open in Jenkins</TooltipContent>
+    </Tooltip>
+  );
 }
 
 /** The node name doubles as the Node Details link, so each row keeps one icon action. */
@@ -434,10 +460,12 @@ function NodeName({
 
 function NodeRunningWork({
   node,
+  onOpenBuildDetails,
   onOpenExternal,
   onRetryExecutors
 }: {
   node: NodeCapacityNodeViewModel;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
   onOpenExternal: OpenExternalHandler;
   onRetryExecutors: RetryExecutorsHandler;
 }): React.JSX.Element | null {
@@ -471,7 +499,13 @@ function NodeRunningWork({
     );
   }
   if (node.executorsLoaded) {
-    return <ExecutorWorkList node={node} onOpenExternal={onOpenExternal} />;
+    return (
+      <ExecutorWorkList
+        node={node}
+        onOpenBuildDetails={onOpenBuildDetails}
+        onOpenExternal={onOpenExternal}
+      />
+    );
   }
   if (node.executorsLoadState === "loading") {
     return <div className="mt-2 text-xs text-muted-foreground">Loading running work…</div>;
@@ -479,11 +513,16 @@ function NodeRunningWork({
   return null;
 }
 
+/** Jenkins build URLs end in the build number, e.g. `/job/api/job/main/7/`. */
+const BUILD_URL_PATTERN = /\/\d+\/?$/;
+
 function ExecutorWorkList({
   node,
+  onOpenBuildDetails,
   onOpenExternal
 }: {
   node: NodeCapacityNodeViewModel;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
   onOpenExternal: OpenExternalHandler;
 }): React.JSX.Element {
   const busyExecutors = node.executors.filter((executor) => !executor.isIdle);
@@ -493,31 +532,74 @@ function ExecutorWorkList({
 
   return (
     <ul className="mt-2 m-0 list-none space-y-0.5 border-l border-border p-0 pl-2.5">
-      {busyExecutors.map((executor) => {
-        const label = executor.workLabel ?? executor.statusLabel;
-        const workUrl = executor.workUrl;
-        return (
-          <li key={executor.id} className="flex min-w-0 items-center gap-2 text-xs">
-            <span className="w-6 shrink-0 text-caption tabular-nums text-muted-foreground">
-              {executor.id}
-            </span>
-            {workUrl ? (
-              <button
-                type="button"
-                className="focus-ring group flex min-w-0 items-center gap-1 rounded-sm text-left text-link hover:text-link-hover hover:underline"
-                aria-label={`Open ${label} in Jenkins (running on ${node.displayName})`}
-                title={label}
-                onClick={() => onOpenExternal(workUrl)}
-              >
-                <span className="truncate">{label}</span>
-                <ExternalLinkIcon className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-              </button>
-            ) : (
-              <TruncatedText text={label} />
-            )}
-          </li>
-        );
-      })}
+      {busyExecutors.map((executor) => (
+        <li key={executor.id} className="flex min-w-0 items-center gap-2 text-xs">
+          <span className="w-6 shrink-0 text-caption tabular-nums text-muted-foreground">
+            {executor.id}
+          </span>
+          <ExecutorWork
+            executor={executor}
+            nodeName={node.displayName}
+            onOpenBuildDetails={onOpenBuildDetails}
+            onOpenExternal={onOpenExternal}
+          />
+        </li>
+      ))}
     </ul>
+  );
+}
+
+/**
+ * Same pattern as a node row: the name opens the in-editor details panel and
+ * a separate icon opens Jenkins. Work that is not a build URL only opens Jenkins.
+ */
+function ExecutorWork({
+  executor,
+  nodeName,
+  onOpenBuildDetails,
+  onOpenExternal
+}: {
+  executor: NodeCapacityExecutorViewModel;
+  nodeName: string;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
+  onOpenExternal: OpenExternalHandler;
+}): React.JSX.Element {
+  const label = executor.workLabel ?? executor.statusLabel;
+  const workUrl = executor.workUrl;
+  if (!workUrl) {
+    return <TruncatedText text={label} />;
+  }
+  const linkClassName =
+    "focus-ring min-w-0 truncate rounded-sm text-left text-link underline-offset-2 hover:text-link-hover hover:underline";
+  if (!BUILD_URL_PATTERN.test(workUrl)) {
+    return (
+      <button
+        type="button"
+        className={linkClassName}
+        aria-label={`Open ${label} in Jenkins (running on ${nodeName})`}
+        title={label}
+        onClick={() => onOpenExternal(workUrl)}
+      >
+        {label}
+      </button>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        className={linkClassName}
+        title={`${label} (open build details)`}
+        onClick={() => onOpenBuildDetails(workUrl, label)}
+      >
+        {label}
+        <span className="sr-only">, running on {nodeName}, open build details</span>
+      </button>
+      <OpenInJenkinsButton
+        label={`Open ${label} in Jenkins`}
+        size="icon-sm"
+        onClick={() => onOpenExternal(workUrl)}
+      />
+    </>
   );
 }

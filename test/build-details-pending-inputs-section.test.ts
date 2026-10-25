@@ -74,8 +74,25 @@ describe("PendingInputsSection", () => {
     assert.doesNotMatch(html, /Submitter: Submitter:/);
     assert.match(html, /<dt[^>]*>.*REGION.*Choice/);
     assert.match(html, /Choices: us-east-1/);
-    assert.match(html, /Approve/);
+    // Parameters are chosen in VS Code prompts, so Approve takes an ellipsis.
+    assert.match(html, />Approve…</);
+    assert.match(html, /You choose these values when you approve\./);
     assert.match(html, /Reject/);
+  });
+
+  it("keeps a plain Approve label for inputs without parameters", () => {
+    const html = renderToStaticMarkup(
+      createElement(PendingInputsSection, {
+        pendingInputs: [
+          { id: "go", message: "Proceed?", submitterLabel: "", parametersLabel: "", parameters: [] }
+        ],
+        onApprove: () => undefined,
+        onReject: () => undefined
+      })
+    );
+
+    assert.match(html, />Approve</);
+    assert.doesNotMatch(html, /Approve…/);
   });
 
   it("renders nothing without pending inputs", () => {

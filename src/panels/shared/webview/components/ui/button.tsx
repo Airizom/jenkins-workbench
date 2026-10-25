@@ -14,8 +14,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary-hover",
+        // Filled variants carry the theme's button borders, which high-contrast
+        // themes use in place of a fill and modern themes use as a subtle edge.
+        default:
+          "border border-primary-border bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover",
+        secondary:
+          "border border-secondary-border bg-secondary text-secondary-foreground hover:bg-secondary-hover",
         outline:
           "border border-input bg-transparent hover:border-border-strong hover:bg-accent-soft hover:text-accent-foreground",
         ghost: "hover:bg-accent-soft hover:text-accent-foreground",

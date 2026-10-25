@@ -40,6 +40,148 @@
     outline: 1px solid var(--vscode-focusBorder, var(--ring));
     outline-offset: 1px;
   }
+
+  /* AnsiColor output, mapped from its fixed palette onto the theme's terminal
+   * colors (see consoleAnsiStyles.ts). */
+  .console-ansi-fg-0 {
+    color: var(--vscode-terminal-ansiBlack);
+  }
+
+  .console-ansi-fg-1 {
+    color: var(--vscode-terminal-ansiRed);
+  }
+
+  .console-ansi-fg-2 {
+    color: var(--vscode-terminal-ansiGreen);
+  }
+
+  .console-ansi-fg-3 {
+    color: var(--vscode-terminal-ansiYellow);
+  }
+
+  .console-ansi-fg-4 {
+    color: var(--vscode-terminal-ansiBlue);
+  }
+
+  .console-ansi-fg-5 {
+    color: var(--vscode-terminal-ansiMagenta);
+  }
+
+  .console-ansi-fg-6 {
+    color: var(--vscode-terminal-ansiCyan);
+  }
+
+  .console-ansi-fg-7 {
+    color: var(--vscode-terminal-ansiWhite);
+  }
+
+  .console-ansi-fg-8 {
+    color: var(--vscode-terminal-ansiBrightBlack);
+  }
+
+  .console-ansi-fg-9 {
+    color: var(--vscode-terminal-ansiBrightRed);
+  }
+
+  .console-ansi-fg-10 {
+    color: var(--vscode-terminal-ansiBrightGreen);
+  }
+
+  .console-ansi-fg-11 {
+    color: var(--vscode-terminal-ansiBrightYellow);
+  }
+
+  .console-ansi-fg-12 {
+    color: var(--vscode-terminal-ansiBrightBlue);
+  }
+
+  .console-ansi-fg-13 {
+    color: var(--vscode-terminal-ansiBrightMagenta);
+  }
+
+  .console-ansi-fg-14 {
+    color: var(--vscode-terminal-ansiBrightCyan);
+  }
+
+  .console-ansi-fg-15 {
+    color: var(--vscode-terminal-ansiBrightWhite);
+  }
+
+  .console-ansi-bg-0 {
+    background-color: var(--vscode-terminal-ansiBlack);
+  }
+
+  .console-ansi-bg-1 {
+    background-color: var(--vscode-terminal-ansiRed);
+  }
+
+  .console-ansi-bg-2 {
+    background-color: var(--vscode-terminal-ansiGreen);
+  }
+
+  .console-ansi-bg-3 {
+    background-color: var(--vscode-terminal-ansiYellow);
+  }
+
+  .console-ansi-bg-4 {
+    background-color: var(--vscode-terminal-ansiBlue);
+  }
+
+  .console-ansi-bg-5 {
+    background-color: var(--vscode-terminal-ansiMagenta);
+  }
+
+  .console-ansi-bg-6 {
+    background-color: var(--vscode-terminal-ansiCyan);
+  }
+
+  .console-ansi-bg-7 {
+    background-color: var(--vscode-terminal-ansiWhite);
+  }
+
+  .console-ansi-bg-8 {
+    background-color: var(--vscode-terminal-ansiBrightBlack);
+  }
+
+  .console-ansi-bg-9 {
+    background-color: var(--vscode-terminal-ansiBrightRed);
+  }
+
+  .console-ansi-bg-10 {
+    background-color: var(--vscode-terminal-ansiBrightGreen);
+  }
+
+  .console-ansi-bg-11 {
+    background-color: var(--vscode-terminal-ansiBrightYellow);
+  }
+
+  .console-ansi-bg-12 {
+    background-color: var(--vscode-terminal-ansiBrightBlue);
+  }
+
+  .console-ansi-bg-13 {
+    background-color: var(--vscode-terminal-ansiBrightMagenta);
+  }
+
+  .console-ansi-bg-14 {
+    background-color: var(--vscode-terminal-ansiBrightCyan);
+  }
+
+  .console-ansi-bg-15 {
+    background-color: var(--vscode-terminal-ansiBrightWhite);
+  }
+
+  .console-ansi-bold {
+    font-weight: 700;
+  }
+
+  .console-ansi-italic {
+    font-style: italic;
+  }
+
+  .console-ansi-underline {
+    text-decoration: underline;
+  }
 }
 
 @layer components {
@@ -98,14 +240,6 @@
     background-size: 16px 16px;
   }
 
-  .stage-strip {
-    scrollbar-width: thin;
-  }
-
-  .stage-strip::-webkit-scrollbar {
-    height: 4px;
-  }
-
   .stage-strip-bar--running {
     animation: stage-strip-pulse 1.6s ease-in-out infinite;
   }
@@ -143,7 +277,7 @@
 .pipeline-graph-node--selected {
   box-shadow:
     inset 0 0 0 2px var(--vscode-focusBorder, var(--ring)),
-    0 10px 20px -10px color-mix(in srgb, var(--foreground) 35%, transparent);
+    var(--shadow-lg);
   outline: 1px dashed var(--vscode-contrastActiveBorder, transparent);
   outline-offset: -4px;
 }
@@ -166,14 +300,20 @@
 @keyframes hero-status-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning) 35%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 35%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--info) 12%, transparent);
   }
 }
 
 @layer utilities {
+  /* Stages that did not run sit on a tinted hero, where the default border
+   * tint washes out in light themes. In this layer to outrank the `bg-*` fill. */
+  .stage-strip-bar--not-run {
+    background-color: var(--border-strong);
+  }
+
   /* High-contrast themes map the neutral fill to the contrast border color,
    * which reads as a progress bar. Show stages that did not run as an empty,
    * dashed outline instead. Lives in the utilities layer so it outranks the
@@ -183,14 +323,11 @@
     border: 1px dashed var(--vscode-contrastBorder, currentColor);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .stage-strip-bar--running,
-    .hero-status-glyph--running {
-      animation: none;
-    }
+  .vscode-reduce-motion :is(.stage-strip-bar--running, .hero-status-glyph--running) {
+    animation: none;
+  }
 
-    .donut-segment {
-      transition: none;
-    }
+  .vscode-reduce-motion .donut-segment {
+    transition: none;
   }
 }

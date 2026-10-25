@@ -131,7 +131,7 @@ describe("resolveCompareSectionNavChip", () => {
       stages: { status: "unavailable", summaryLabel: "", items: [] }
     });
     assert.deepEqual(resolveCompareSectionNavChip("stages", model), {
-      text: "n/a",
+      text: "no data",
       tone: "muted"
     });
     assert.deepEqual(resolveCompareSectionNavChip("parameters", model), {
@@ -205,7 +205,7 @@ describe("resolveCompareSectionNavChip", () => {
       changesets: { status: "empty", summaryLabel: "", baselineItems: [], targetItems: [] }
     });
     assert.deepEqual(resolveCompareSectionNavChip("changesets", empty), {
-      text: "none",
+      text: "no commits",
       tone: "neutral"
     });
   });
@@ -274,6 +274,34 @@ describe("resolveCompareSectionNavChip", () => {
     });
     assert.deepEqual(resolveCompareSectionNavChip("stages", model), {
       text: "1 regressed",
+      tone: "failure"
+    });
+  });
+
+  it("counts a new stage that did not succeed alongside regressions", () => {
+    const model = createModel({
+      stages: {
+        status: "available",
+        summaryLabel: "",
+        items: [
+          stage({ key: "a", targetStatusClass: "failure" }),
+          stage({
+            key: "b",
+            changeType: "added",
+            baselineStatusClass: undefined,
+            targetStatusClass: "failure"
+          }),
+          stage({
+            key: "c",
+            changeType: "added",
+            baselineStatusClass: undefined,
+            targetStatusClass: "success"
+          })
+        ]
+      }
+    });
+    assert.deepEqual(resolveCompareSectionNavChip("stages", model), {
+      text: "1 regressed, 1 new failing",
       tone: "failure"
     });
   });

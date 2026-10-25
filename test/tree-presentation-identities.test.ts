@@ -34,7 +34,7 @@ describe("alternate job presentation identities", () => {
         contextFlags: "pinned watched enabled",
         description: "Running • Pinned • Watched",
         tooltip: undefined,
-        iconColor: "charts.blue"
+        iconColor: "jenkinsWorkbench.status.running"
       },
       {
         variant: "quickAccess" as const,
@@ -44,7 +44,7 @@ describe("alternate job presentation identities", () => {
         contextFlags: "pinned watched enabled",
         description: "Failed • Watched",
         tooltip: "demo\nFailed • Watched",
-        iconColor: "charts.red"
+        iconColor: "jenkinsWorkbench.status.failure"
       },
       {
         variant: "activity" as const,
@@ -57,7 +57,7 @@ describe("alternate job presentation identities", () => {
         contextFlags: "pinned watched disabled",
         description: "team / demo • Disabled • Pinned • Watched",
         tooltip: `demo\nteam / demo\nteam / demo • Disabled • Pinned • Watched\n${jobUrl}`,
-        iconColor: "charts.gray"
+        iconColor: "disabledForeground"
       }
     ];
 

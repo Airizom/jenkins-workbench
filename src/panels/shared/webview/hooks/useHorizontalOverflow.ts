@@ -1,4 +1,5 @@
 import * as React from "react";
+import { prefersReducedMotion } from "../lib/motion";
 
 /** Width of the `.overflow-fade-x` edge mask in base.css. */
 const FADE_WIDTH_PX = 24;
@@ -41,21 +42,17 @@ export function resolveRevealScrollLeft(
   return undefined;
 }
 
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
-
 function syncOverflowAttributes(element: HTMLElement): void {
   const { start, end } = resolveHorizontalOverflow(element);
   element.toggleAttribute("data-overflow-start", start);
   element.toggleAttribute("data-overflow-end", end);
 }
 
-function revealItem(container: HTMLElement, item: HTMLElement, behavior: ScrollBehavior): void {
+export function revealItem(
+  container: HTMLElement,
+  item: HTMLElement,
+  behavior: ScrollBehavior
+): void {
   const containerRect = container.getBoundingClientRect();
   const itemRect = item.getBoundingClientRect();
   // Scrolls only the strip; `scrollIntoView` would also scroll the page
@@ -73,7 +70,7 @@ function revealItem(container: HTMLElement, item: HTMLElement, behavior: ScrollB
  * Tracks horizontal overflow on a scroll strip. Sets `data-overflow-start` /
  * `data-overflow-end` (pair with the `overflow-fade-x` class for edge fades) and
  * scrolls the item matching `activeSelector` into view whenever it changes.
- * Smooth scrolling is skipped under `prefers-reduced-motion`.
+ * Smooth scrolling is skipped when VS Code reduces motion.
  */
 export function useHorizontalOverflow<T extends HTMLElement>(
   ref: React.RefObject<T | null>,

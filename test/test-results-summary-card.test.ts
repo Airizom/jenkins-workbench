@@ -39,6 +39,20 @@ describe("TestResultsSummaryCard", () => {
     assert.match(html, /aria-valuenow="75"/);
   });
 
+  it("keeps the pass-rate badge neutral when tests failed", () => {
+    const html = renderSummaryCard({
+      totalCount: 926,
+      failedCount: 2,
+      passedCount: 924,
+      summaryLabel: "2 failed, 924 passed"
+    });
+
+    const badge = html.match(/<[^>]+class="([^"]*)"[^>]*>99\.7% passed</);
+    assert.ok(badge);
+    assert.match(badge[1], /text-muted-foreground/);
+    assert.doesNotMatch(badge[1], /failure/);
+  });
+
   it("does not report 100% passed when any test failed", () => {
     const html = renderSummaryCard({
       totalCount: 200,

@@ -106,7 +106,11 @@ export function NodeDetailsApp(): React.JSX.Element {
   };
 
   const handleDiagnosticsToggle = (value: NodeDetailsTab) => {
-    loadAdvancedNodeDetailsForTab(value, state.advancedLoaded, requestAdvancedDetails);
+    loadAdvancedNodeDetailsForTab(
+      value,
+      state.advancedLoaded || state.advancedRequested,
+      requestAdvancedDetails
+    );
   };
 
   // Nothing loaded yet and the load failed: show one failure view instead of
@@ -172,6 +176,7 @@ export function NodeDetailsApp(): React.JSX.Element {
           showOfflineBanner={showOfflineBanner}
           isOffline={state.isOffline}
           offlineReason={state.offlineReason}
+          offlineSinceMs={state.offlineSinceMs}
           executors={state.executors}
           oneOffExecutors={state.oneOffExecutors}
           executorsLabel={state.executorsLabel}

@@ -19,27 +19,43 @@ type DecorationRanges = Record<
 
 const MAX_SUFFIX_SEARCH_RESULTS = 5;
 
+/**
+ * Line tint plus a gutter-side bar, using the extension's contributed colors.
+ * VS Code's `testing.covered*` colors are not used because they postdate the
+ * supported engine. High-contrast defaults leave the tint transparent, so the
+ * bar keeps coverage visible there.
+ */
+function createCoverageDecorationType(
+  backgroundColorId: string,
+  gutterColorId: string
+): vscode.TextEditorDecorationType {
+  const gutterColor = new vscode.ThemeColor(gutterColorId);
+  return vscode.window.createTextEditorDecorationType({
+    isWholeLine: true,
+    backgroundColor: new vscode.ThemeColor(backgroundColorId),
+    borderColor: gutterColor,
+    borderStyle: "solid",
+    borderWidth: "0 0 0 2px",
+    overviewRulerColor: gutterColor,
+    overviewRulerLane: vscode.OverviewRulerLane.Full
+  });
+}
+
 export class CoverageDecorationService implements vscode.Disposable {
-  private readonly coveredDecorationType = vscode.window.createTextEditorDecorationType({
-    isWholeLine: true,
-    backgroundColor: "rgba(46, 160, 67, 0.14)",
-    overviewRulerColor: "rgba(46, 160, 67, 0.8)",
-    overviewRulerLane: vscode.OverviewRulerLane.Full
-  });
+  private readonly coveredDecorationType = createCoverageDecorationType(
+    "jenkinsWorkbench.coverage.coveredBackground",
+    "jenkinsWorkbench.coverage.coveredGutterBackground"
+  );
 
-  private readonly missedDecorationType = vscode.window.createTextEditorDecorationType({
-    isWholeLine: true,
-    backgroundColor: "rgba(248, 81, 73, 0.14)",
-    overviewRulerColor: "rgba(248, 81, 73, 0.85)",
-    overviewRulerLane: vscode.OverviewRulerLane.Full
-  });
+  private readonly missedDecorationType = createCoverageDecorationType(
+    "jenkinsWorkbench.coverage.uncoveredBackground",
+    "jenkinsWorkbench.coverage.uncoveredGutterBackground"
+  );
 
-  private readonly partialDecorationType = vscode.window.createTextEditorDecorationType({
-    isWholeLine: true,
-    backgroundColor: "rgba(187, 128, 9, 0.16)",
-    overviewRulerColor: "rgba(187, 128, 9, 0.85)",
-    overviewRulerLane: vscode.OverviewRulerLane.Full
-  });
+  private readonly partialDecorationType = createCoverageDecorationType(
+    "jenkinsWorkbench.coverage.partialBackground",
+    "jenkinsWorkbench.coverage.partialGutterBackground"
+  );
 
   private readonly decorationTypes = [
     this.coveredDecorationType,

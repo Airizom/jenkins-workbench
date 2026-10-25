@@ -43,7 +43,6 @@ vi.doMock("../src/panels/buildDetails/webview/hooks/consoleSearch/buildConsoleSe
   normalizeConsoleSourceReferences: () => []
 }));
 vi.doMock("../src/panels/buildDetails/webview/hooks/useConsoleOutputScroll", () => ({
-  prefersReducedMotion: () => false,
   useConsoleOutputScroll: () => ({
     showScrollToTop: false,
     isAtBottom: true,

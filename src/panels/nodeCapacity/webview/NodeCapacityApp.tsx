@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { NodeCapacityPoolViewModel } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { Progress } from "../../shared/webview/components/ui/progress";
@@ -7,22 +8,27 @@ import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExtern
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import type {
   NodeCapacityIncomingMessage,
+  OpenBuildDetailsMessage,
   OpenNodeDetailsMessage
 } from "../shared/NodeCapacityPanelMessages";
 import { NodeCapacityHeader } from "./components/NodeCapacityHeader";
 import { NodeCapacityPoolList } from "./components/NodeCapacityPoolList";
-import { HiddenLabelQueue } from "./components/NodeCapacityQueue";
+import { NodeCapacityPoolToolbar } from "./components/NodeCapacityPoolToolbar";
+import { PinnedNodeQueue } from "./components/NodeCapacityQueue";
 import { NodeCapacitySummary } from "./components/NodeCapacitySummary";
 import type {
+  OpenBuildDetailsHandler,
   OpenExternalHandler,
   OpenNodeDetailsHandler,
   RetryExecutorsHandler
 } from "./components/NodeCapacityViewTypes";
 import { useCapacityTimestamp } from "./hooks/useCapacityTimestamp";
 import {
+  isPoolOpen,
   type PoolOpenStates,
   useNodeCapacityExecutorLoading,
-  usePoolOpenStates
+  usePoolOpenStates,
+  useShowAllNodesPools
 } from "./hooks/useNodeCapacityExecutorLoading";
 import { useNodeCapacityMessages } from "./hooks/useNodeCapacityMessages";
 import {
@@ -30,48 +36,123 @@ import {
   type NodeCapacityState,
   nodeCapacityReducer
 } from "./state/nodeCapacityState";
+import {
+  buildPinnedNodeIndex,
+  EMPTY_POOL_FILTER,
+  filterPinnedQueueItems,
+  filterPools,
+  type PoolFilter,
+  poolNeedsAttention
+} from "./state/nodeCapacityView";
 
-const { useCallback, useReducer } = React;
+const { useCallback, useEffect, useMemo, useReducer, useState } = React;
+
+/** Executor loads follow the filter once typing pauses, not on every keystroke. */
+const FILTER_LOAD_DELAY_MS = 300;
+
+function useSettledValue<T>(value: T, delayMs: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setSettled(value), delayMs);
+    return () => clearTimeout(timeoutId);
+  }, [value, delayMs]);
+  return settled;
+}
 
 /**
  * The header Refresh button is the single refresh action: error banners and
  * the empty state do not repeat it.
+ *
+ * Builds pinned to one node sit with the pools in severity order: above them
+ * when one is stuck, after them otherwise.
  */
 function NodeCapacityContent({
   state,
+  visiblePools,
+  filter,
   poolOpenStates,
+  showAllNodesPoolIds,
+  onFilterChange,
+  onCollapsePools,
   onOpenExternal,
   onOpenNodeDetails,
+  onOpenBuildDetails,
   onRetryExecutors,
-  onToggleExpanded
+  onToggleExpanded,
+  onShowAllNodesChange
 }: {
   state: NodeCapacityState;
+  visiblePools: readonly NodeCapacityPoolViewModel[];
+  filter: PoolFilter;
   poolOpenStates: PoolOpenStates;
+  showAllNodesPoolIds: ReadonlySet<string>;
+  onFilterChange: (filter: PoolFilter) => void;
+  onCollapsePools: (poolIds: readonly string[]) => void;
   onOpenExternal: OpenExternalHandler;
   onOpenNodeDetails: OpenNodeDetailsHandler;
+  onOpenBuildDetails: OpenBuildDetailsHandler;
   onRetryExecutors: RetryExecutorsHandler;
   onToggleExpanded: (poolId: string, open: boolean) => void;
+  onShowAllNodesChange: (poolId: string, showAll: boolean) => void;
 }): React.JSX.Element {
+  const pinnedNodes = useMemo(() => buildPinnedNodeIndex(state.pools), [state.pools]);
+  const pinnedItems = useMemo(
+    () => filterPinnedQueueItems(state.hiddenLabelQueueItems, filter),
+    [state.hiddenLabelQueueItems, filter]
+  );
+  const attentionCount = useMemo(
+    () => state.pools.filter(poolNeedsAttention).length,
+    [state.pools]
+  );
+  const openVisiblePoolIds = visiblePools
+    .filter((pool) => isPoolOpen(pool, poolOpenStates))
+    .map((pool) => pool.id);
+  const pinnedQueue =
+    pinnedItems.length > 0 ? (
+      <PinnedNodeQueue
+        items={pinnedItems}
+        pinnedNodes={pinnedNodes}
+        onOpenExternal={onOpenExternal}
+        onOpenNodeDetails={onOpenNodeDetails}
+      />
+    ) : null;
+  const pinnedFirst = pinnedItems.some((item) => item.stuck);
+
   return (
     <>
       <PanelErrorList
         errors={state.errors}
         title="Refresh failed. Showing the last loaded capacity."
       />
-      {/* Six zero counts add nothing above the empty state. */}
-      {state.pools.length > 0 ? <NodeCapacitySummary state={state} /> : null}
-      {state.hiddenLabelQueueItems.length > 0 ? (
-        <HiddenLabelQueue items={state.hiddenLabelQueueItems} onOpenExternal={onOpenExternal} />
+      {/* Zero counts add nothing above the empty state. */}
+      {state.pools.length > 0 ? <NodeCapacitySummary summary={state.summary} /> : null}
+      {state.pools.length > 1 ? (
+        <NodeCapacityPoolToolbar
+          filter={filter}
+          totalCount={state.pools.length}
+          shownCount={visiblePools.length}
+          attentionCount={attentionCount}
+          canCollapse={openVisiblePoolIds.length > 0}
+          onFilterChange={onFilterChange}
+          onCollapseAll={() => onCollapsePools(openVisiblePoolIds)}
+        />
       ) : null}
-
+      {pinnedFirst ? pinnedQueue : null}
       <NodeCapacityPoolList
-        pools={state.pools}
+        pools={visiblePools}
+        nodeQuery={filter.query}
+        hasPools={state.pools.length > 0}
         poolOpenStates={poolOpenStates}
+        showAllNodesPoolIds={showAllNodesPoolIds}
+        onClearFilter={() => onFilterChange(EMPTY_POOL_FILTER)}
         onOpenExternal={onOpenExternal}
         onOpenNodeDetails={onOpenNodeDetails}
+        onOpenBuildDetails={onOpenBuildDetails}
         onRetryExecutors={onRetryExecutors}
         onToggleExpanded={onToggleExpanded}
+        onShowAllNodesChange={onShowAllNodesChange}
       />
+      {pinnedFirst ? null : pinnedQueue}
     </>
   );
 }
@@ -83,11 +164,22 @@ export function NodeCapacityApp(): React.JSX.Element {
   useNodeCapacityMessages(dispatch);
 
   const timestamp = useCapacityTimestamp(state.updatedAt, state.hasLoaded);
-  const { poolOpenStates, handlePoolToggle } = usePoolOpenStates(state.pools);
+  const [filter, setFilter] = useState<PoolFilter>(EMPTY_POOL_FILTER);
+  const visiblePools = useMemo(() => filterPools(state.pools, filter), [state.pools, filter]);
+  // Rows a filter change reveals load their running work once typing pauses.
+  const loadingFilter = useSettledValue(filter, FILTER_LOAD_DELAY_MS);
+  const loadingPools = useMemo(
+    () => (loadingFilter === filter ? visiblePools : filterPools(state.pools, loadingFilter)),
+    [loadingFilter, filter, visiblePools, state.pools]
+  );
+  const { poolOpenStates, handlePoolToggle, collapsePools } = usePoolOpenStates(state.pools);
+  const { showAllNodesPoolIds, handleShowAllNodesChange } = useShowAllNodesPools();
   const { handleRetryExecutors, reloadAllExecutors } = useNodeCapacityExecutorLoading(
-    state.pools,
+    loadingPools,
     state.updatedAt,
     poolOpenStates,
+    showAllNodesPoolIds,
+    loadingFilter.query,
     dispatch,
     postMessage
   );
@@ -95,6 +187,14 @@ export function NodeCapacityApp(): React.JSX.Element {
   const handleOpenNodeDetails = useCallback(
     (nodeUrl: string, label?: string) => {
       const message: OpenNodeDetailsMessage = { type: "openNodeDetails", nodeUrl, label };
+      postMessage(message);
+    },
+    [postMessage]
+  );
+
+  const handleOpenBuildDetails = useCallback(
+    (buildUrl: string, label?: string) => {
+      const message: OpenBuildDetailsMessage = { type: "openBuildDetails", buildUrl, label };
       postMessage(message);
     },
     [postMessage]
@@ -143,11 +243,18 @@ export function NodeCapacityApp(): React.JSX.Element {
           ) : (
             <NodeCapacityContent
               state={state}
+              visiblePools={visiblePools}
+              filter={filter}
               poolOpenStates={poolOpenStates}
+              showAllNodesPoolIds={showAllNodesPoolIds}
+              onFilterChange={setFilter}
+              onCollapsePools={collapsePools}
               onOpenExternal={handleOpenExternal}
               onOpenNodeDetails={handleOpenNodeDetails}
+              onOpenBuildDetails={handleOpenBuildDetails}
               onRetryExecutors={handleRetryExecutors}
               onToggleExpanded={handlePoolToggle}
+              onShowAllNodesChange={handleShowAllNodesChange}
             />
           )}
         </main>

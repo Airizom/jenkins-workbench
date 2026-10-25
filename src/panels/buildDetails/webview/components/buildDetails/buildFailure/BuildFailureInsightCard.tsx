@@ -14,11 +14,11 @@ export function BuildFailureInsightCard({
   return (
     <div className="rounded border border-border p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+        {/* Card titles match the Overview's Tests and Coverage cards; uppercase
+         * is reserved for the section headings that group these cards. */}
+        <div className="flex items-center gap-2">
           {icon}
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-            {title}
-          </span>
+          <h3 className="m-0 text-sm font-semibold leading-tight">{title}</h3>
         </div>
         {headerExtra}
       </div>

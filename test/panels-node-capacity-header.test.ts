@@ -57,18 +57,27 @@ function pool(
   };
 }
 
-function renderPools(pools: NodeCapacityPoolViewModel[]): string {
+function renderPools(
+  pools: NodeCapacityPoolViewModel[],
+  options: { hasPools?: boolean } = {}
+): string {
   return renderToStaticMarkup(
     createElement(
       TooltipProvider,
       null,
       createElement(NodeCapacityPoolList, {
         pools,
+        nodeQuery: "",
+        hasPools: options.hasPools ?? pools.length > 0,
         poolOpenStates: new Map(),
+        showAllNodesPoolIds: new Set<string>(),
+        onClearFilter: () => undefined,
         onOpenExternal: () => undefined,
         onOpenNodeDetails: () => undefined,
+        onOpenBuildDetails: () => undefined,
         onRetryExecutors: () => undefined,
-        onToggleExpanded: () => undefined
+        onToggleExpanded: () => undefined,
+        onShowAllNodesChange: () => undefined
       })
     )
   );
@@ -112,6 +121,14 @@ describe("NodeCapacityPoolList", () => {
     assert.match(html, /No node capacity data/);
     assert.match(html, /aria-label="Label pools"/);
     assert.doesNotMatch(html, /<button/);
+  });
+
+  it("offers to clear the filter when no pool matches it", () => {
+    const html = renderPools([], { hasPools: true });
+
+    assert.match(html, /No pools match/);
+    assert.match(html, />Clear filter<\/button>/);
+    assert.doesNotMatch(html, /No node capacity data/);
   });
 
   it("renders a panel per pool", () => {

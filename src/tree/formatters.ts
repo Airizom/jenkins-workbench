@@ -20,15 +20,25 @@ import { resolveBuildElapsedMs } from "./BuildTiming";
 
 type NormalizedStatus = JobColorStatus;
 
-const STATUS_THEME_COLORS: Record<NormalizedStatus, vscode.ThemeColor> = {
-  success: new vscode.ThemeColor("charts.green"),
-  failed: new vscode.ThemeColor("charts.red"),
-  unstable: new vscode.ThemeColor("charts.yellow"),
-  aborted: new vscode.ThemeColor("charts.gray"),
-  notBuilt: new vscode.ThemeColor("charts.gray"),
-  disabled: new vscode.ThemeColor("charts.gray"),
-  running: new vscode.ThemeColor("charts.blue"),
-  unknown: new vscode.ThemeColor("charts.gray")
+// Contributed in package.json `contributes.colors` so themes and
+// `workbench.colorCustomizations` recolor the tree and the panels together. The
+// webviews read the same colors as CSS variables (see `base.css` status tokens).
+export const STATUS_SUCCESS_THEME_COLOR = new vscode.ThemeColor("jenkinsWorkbench.status.success");
+export const STATUS_FAILURE_THEME_COLOR = new vscode.ThemeColor("jenkinsWorkbench.status.failure");
+export const STATUS_WARNING_THEME_COLOR = new vscode.ThemeColor("jenkinsWorkbench.status.warning");
+export const STATUS_RUNNING_THEME_COLOR = new vscode.ThemeColor("jenkinsWorkbench.status.running");
+// Builds that did not produce a result read as inactive, like other disabled UI.
+export const STATUS_INACTIVE_THEME_COLOR = new vscode.ThemeColor("disabledForeground");
+
+const STATUS_THEME_COLORS: Record<NormalizedStatus, vscode.ThemeColor | undefined> = {
+  success: STATUS_SUCCESS_THEME_COLOR,
+  failed: STATUS_FAILURE_THEME_COLOR,
+  unstable: STATUS_WARNING_THEME_COLOR,
+  aborted: STATUS_INACTIVE_THEME_COLOR,
+  notBuilt: STATUS_INACTIVE_THEME_COLOR,
+  disabled: STATUS_INACTIVE_THEME_COLOR,
+  running: STATUS_RUNNING_THEME_COLOR,
+  unknown: undefined
 };
 
 // The status-colored icon already conveys these; spelling them out on every row buries the

@@ -11,7 +11,6 @@ import {
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow
@@ -39,27 +38,31 @@ export function ExecutorsTableCard({
   onOpenExternal
 }: ExecutorsTableCardProps): React.JSX.Element {
   const [filter, setFilter] = React.useState<ExecutorFilter>("all");
+  const busyCount = entries.filter((entry) => !entry.isIdle).length;
+  // Filtering only helps when the table mixes busy and free executors. When it
+  // is hidden, show everything so a stale choice cannot leave the table empty.
+  const showFilter = busyCount > 0 && busyCount < entries.length;
+  const activeFilter: ExecutorFilter = showFilter ? filter : "all";
   const filteredEntries = React.useMemo(() => {
-    if (filter === "all") {
+    if (activeFilter === "all") {
       return entries;
     }
-    if (filter === "busy") {
+    if (activeFilter === "busy") {
       return entries.filter((entry) => !entry.isIdle);
     }
     return entries.filter((entry) => entry.isIdle);
-  }, [entries, filter]);
+  }, [entries, activeFilter]);
 
   if (entries.length === 0) {
     return (
       <EmptyState
         icon={<CpuIcon className="h-4 w-4" />}
-        title={`No ${title.toLowerCase()} data`}
+        title={`No ${title.toLowerCase()}`}
         className="py-6"
       />
     );
   }
 
-  const busyCount = entries.filter((entry) => !entry.isIdle).length;
   // Free executors on an offline node are unavailable, not idle.
   const freeLabel = isOffline ? "Offline" : "Idle";
 
@@ -69,7 +72,7 @@ export function ExecutorsTableCard({
         <div className="flex items-center gap-1.5">
           <CpuIcon className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">{title}</span>
-          <span className="text-caption text-muted-foreground">({filteredEntries.length})</span>
+          <span className="text-caption text-muted-foreground">({entries.length})</span>
           {/* Busy executors are normal work: progress tone, never warning. */}
           {busyCount > 0 ? (
             <Badge variant="info" size="sm">
@@ -81,71 +84,69 @@ export function ExecutorsTableCard({
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="hidden sm:block">
-            <ToggleGroup
-              type="single"
-              value={filter}
-              onValueChange={(value) => {
-                if (!value) {
-                  return;
-                }
-                setFilter(value as ExecutorFilter);
-              }}
-              aria-label="Executor filter"
-            >
-              <ToggleGroupItem value="all">All</ToggleGroupItem>
-              <ToggleGroupItem value="busy">Busy</ToggleGroupItem>
-              <ToggleGroupItem value="idle">{freeLabel}</ToggleGroupItem>
-            </ToggleGroup>
+        {showFilter ? (
+          <div className="flex items-center gap-1.5">
+            <div className="hidden sm:block">
+              <ToggleGroup
+                type="single"
+                value={activeFilter}
+                onValueChange={(value) => {
+                  if (!value) {
+                    return;
+                  }
+                  setFilter(value as ExecutorFilter);
+                }}
+                aria-label="Executor filter"
+              >
+                <ToggleGroupItem value="all">All</ToggleGroupItem>
+                <ToggleGroupItem value="busy">Busy</ToggleGroupItem>
+                <ToggleGroupItem value="idle">{freeLabel}</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            <div className="sm:hidden w-[120px]">
+              <Select
+                value={activeFilter}
+                onValueChange={(value) => setFilter(value as ExecutorFilter)}
+              >
+                <SelectTrigger className="h-7 text-xs" aria-label="Executor filter">
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="busy">Busy</SelectItem>
+                  <SelectItem value="idle">{freeLabel}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="sm:hidden w-[120px]">
-            <Select value={filter} onValueChange={(value) => setFilter(value as ExecutorFilter)}>
-              <SelectTrigger className="h-7 text-xs" aria-label="Executor filter">
-                <SelectValue placeholder="Filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="busy">Busy</SelectItem>
-                <SelectItem value="idle">{freeLabel}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        ) : null}
       </div>
       <div className="overflow-x-auto">
-        <Table>
+        {/* Fixed column widths keep the Executors and One-off tables aligned. */}
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead className="py-1.5 pl-3 pr-0 w-4">
+              <TableHead className="w-7 py-1.5 pl-3 pr-0">
                 <span className="sr-only">Status</span>
               </TableHead>
-              <TableHead className="py-1.5">#</TableHead>
+              <TableHead className="w-24 py-1.5 sm:w-28">Executor</TableHead>
               <TableHead className="py-1.5">Build</TableHead>
-              <TableHead className="hidden py-1.5 md:table-cell">Duration</TableHead>
-              <TableHead className="py-1.5">Progress</TableHead>
-              <TableHead className="py-1.5">
+              <TableHead className="hidden w-24 py-1.5 md:table-cell">Duration</TableHead>
+              <TableHead className="w-24 py-1.5 sm:w-48">Progress</TableHead>
+              <TableHead className="w-16 py-1.5">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredEntries.length > 0 ? (
-              filteredEntries.map((entry) => (
-                <ExecutorTableRow
-                  key={entry.id}
-                  entry={entry}
-                  isOffline={isOffline}
-                  onOpenExternal={onOpenExternal}
-                />
-              ))
-            ) : (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="py-4 text-center text-xs text-muted-foreground">
-                  No executors match this filter.
-                </TableCell>
-              </TableRow>
-            )}
+            {filteredEntries.map((entry) => (
+              <ExecutorTableRow
+                key={entry.id}
+                entry={entry}
+                isOffline={isOffline}
+                onOpenExternal={onOpenExternal}
+              />
+            ))}
           </TableBody>
         </Table>
       </div>

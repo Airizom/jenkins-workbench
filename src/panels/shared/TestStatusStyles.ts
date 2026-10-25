@@ -66,14 +66,16 @@ export function resolveStatusBorderClass(tone: StatusVisualTone): string {
   }
 }
 
+// Only failures earn a status border, so a failed tile outranks the passed
+// tile beside it; the other tones are tinted surfaces with a neutral edge.
 export function resolveMetricCardClass(tone: StatusVisualTone): string {
   switch (tone) {
     case "failed":
-      return "border-failure-border-subtle bg-failure-surface";
+      return "border-failure-border bg-failure-soft";
     case "skipped":
       return "border-border bg-warning-surface";
     case "passed":
-      return "border-success-border bg-success-soft";
+      return "border-border bg-success-surface";
     default:
       return "border-border bg-background";
   }

@@ -1,12 +1,35 @@
 import { cn } from "../../../../../shared/webview/lib/utils";
-import type { BuildCompareConsoleSectionViewModel } from "../../../../shared/BuildCompareContracts";
+import type { BuildCompareConsoleSnippetLine } from "../../../../shared/BuildCompareContracts";
 
+export function ConsoleLineNumber({ line }: { line: BuildCompareConsoleSnippetLine }) {
+  return (
+    <span className="flex select-none justify-end gap-1 text-muted-foreground">
+      {line.highlight ? (
+        <span aria-hidden="true" className="font-semibold text-warning">
+          ▸
+        </span>
+      ) : null}
+      {line.lineNumber}
+    </span>
+  );
+}
+
+export function ConsoleLineText({ line }: { line: BuildCompareConsoleSnippetLine }) {
+  return (
+    <span className="whitespace-pre-wrap wrap-break-word text-terminal-foreground">
+      {line.highlight ? <span className="sr-only">Diverges here: </span> : null}
+      {line.text.length > 0 ? line.text : " "}
+    </span>
+  );
+}
+
+/** One build's log window, used when the panel is too narrow for side-by-side. */
 export function ConsoleSnippet({
   title,
   lines
 }: {
   title: string;
-  lines: BuildCompareConsoleSectionViewModel["baselineLines"];
+  lines: BuildCompareConsoleSnippetLine[];
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-terminal">
@@ -23,18 +46,8 @@ export function ConsoleSnippet({
               line.highlight ? "border-l-warning bg-warning-soft" : "border-l-transparent"
             )}
           >
-            <span className="flex select-none justify-end gap-1 text-muted-foreground">
-              {line.highlight ? (
-                <span aria-hidden="true" className="font-semibold text-warning">
-                  ▸
-                </span>
-              ) : null}
-              {line.lineNumber}
-            </span>
-            <span className="whitespace-pre-wrap wrap-break-word text-terminal-foreground">
-              {line.highlight ? <span className="sr-only">Diverges here: </span> : null}
-              {line.text.length > 0 ? line.text : " "}
-            </span>
+            <ConsoleLineNumber line={line} />
+            <ConsoleLineText line={line} />
           </div>
         ))}
       </div>

@@ -5,12 +5,14 @@ import type {
   BuildDiagnosticsViewModel,
   BuildFailureArtifact,
   BuildFailureInsightsViewModel,
-  BuildTestsSummaryViewModel
+  BuildTestsSummaryViewModel,
+  PipelineStageViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../../hooks/useBuildDetailsTabs";
 import { BuildFailureInsightsSection, hasVisibleInsights } from "../BuildFailureInsightsSection";
 import { CoverageGlanceCard } from "./CoverageGlanceCard";
 import { OverviewSummaryCard } from "./OverviewSummaryCard";
+import { RunningProgressCard } from "./RunningProgressCard";
 import { TestPassDonutCard } from "./TestPassDonutCard";
 
 type OverviewTabProps = {
@@ -19,6 +21,8 @@ type OverviewTabProps = {
   durationLabel: string;
   timestampLabel: string;
   hasPipelineStages: boolean;
+  pipelineStages: PipelineStageViewModel[];
+  consoleText: string;
   testsSummary: BuildTestsSummaryViewModel;
   coverageState: BuildDetailsCoverageStateViewModel;
   insights: BuildFailureInsightsViewModel;
@@ -36,6 +40,8 @@ export function OverviewTab({
   durationLabel,
   timestampLabel,
   hasPipelineStages,
+  pipelineStages,
+  consoleText,
   testsSummary,
   coverageState,
   insights,
@@ -47,22 +53,34 @@ export function OverviewTab({
   onShowDiagnosticProblems,
   onConfigureBuildDiagnostics
 }: OverviewTabProps): React.JSX.Element {
+  const isRunning = resultClass === "running";
   const showTestsCard = hasTests && testsSummary.hasAnyResults;
-  const showCoverageCard = coverageState.status !== "disabled";
+  // Coverage is only fetched once a build completes, so a running build would
+  // only ever show a placeholder here.
+  const showCoverageCard = !isRunning && coverageState.status !== "disabled";
   const showInsights = hasVisibleInsights(resultClass, insights, diagnostics, !showTestsCard);
 
   return (
     <div className="space-y-3">
+      {isRunning ? (
+        <RunningProgressCard
+          pipelineStages={pipelineStages}
+          consoleText={consoleText}
+          hasPipelineStages={hasPipelineStages}
+          onNavigateTab={onNavigateTab}
+        />
+      ) : null}
       {showTestsCard || showCoverageCard ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {showTestsCard ? (
             <TestPassDonutCard summary={testsSummary} onShowTests={() => onNavigateTab("tests")} />
           ) : null}
-          <CoverageGlanceCard
-            coverageState={coverageState}
-            isRunning={resultClass === "running"}
-            onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
-          />
+          {showCoverageCard ? (
+            <CoverageGlanceCard
+              coverageState={coverageState}
+              onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
+            />
+          ) : null}
         </div>
       ) : null}
       {showInsights ? (
@@ -79,7 +97,7 @@ export function OverviewTab({
           onConfigureBuildDiagnostics={onConfigureBuildDiagnostics}
         />
       ) : null}
-      {!showTestsCard && !showCoverageCard && !showInsights ? (
+      {!isRunning && !showTestsCard && !showCoverageCard && !showInsights ? (
         <OverviewSummaryCard
           resultLabel={resultLabel}
           resultClass={resultClass}

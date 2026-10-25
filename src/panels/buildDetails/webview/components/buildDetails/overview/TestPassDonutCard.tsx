@@ -1,5 +1,4 @@
 import type * as React from "react";
-import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
@@ -31,19 +30,18 @@ export function TestPassDonutCard({
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between gap-2 pb-3">
-        <div className="flex items-center gap-2">
-          <TestTubeIcon className="h-4 w-4" />
-          <CardTitle>Tests</CardTitle>
-        </div>
-        {summary.hasAnyResults && !hasFailures ? (
-          <ToneBadge label={outcome.passRateLabel} tone={outcome.tone} />
-        ) : null}
+      <CardHeader className="flex-row items-center gap-2 pb-3">
+        <TestTubeIcon className="h-4 w-4" />
+        <CardTitle>Tests</CardTitle>
       </CardHeader>
       <CardContent className="pb-4">
         {summary.totalCount > 0 ? (
           <div className="flex flex-wrap items-center gap-4">
-            <TestPassDonut summary={summary} outcome={outcome} distribution={distribution} />
+            {/* A handful of failures is a sliver on a green ring, so failed runs
+             * lead with the count instead; clean runs show the pass-rate ring. */}
+            {hasFailures ? null : (
+              <TestPassDonut summary={summary} outcome={outcome} distribution={distribution} />
+            )}
             <div className="flex min-w-[240px] flex-1 flex-col gap-3">
               {hasFailures ? (
                 <p className="m-0 flex flex-wrap items-baseline gap-x-2">
@@ -86,18 +84,11 @@ export function TestPassDonutCard({
   );
 }
 
-/** Big number plus caption in the donut hole: failures first, then the pass rate. */
+/** Big number plus caption in the donut hole (the donut only renders for runs without failures). */
 function describeDonutCenter(
   summary: BuildTestsSummaryViewModel,
   outcome: TestOutcomeSummary
 ): { value: string; caption: string; className: string } {
-  if (summary.failedCount > 0) {
-    return {
-      value: summary.failedCount.toLocaleString(),
-      caption: "failed",
-      className: "fill-failure"
-    };
-  }
   if (outcome.passRate === undefined) {
     return {
       value: summary.skippedCount.toLocaleString(),
@@ -121,17 +112,13 @@ function TestPassDonut({
   outcome: TestOutcomeSummary;
   distribution: ReturnType<typeof getTestDistribution>;
 }): React.JSX.Element {
-  const { failedPct, skippedPct, passedPct } = distribution;
+  const { skippedPct, passedPct } = distribution;
   const segments = [
     { pct: passedPct, start: 0, className: "text-success" },
-    { pct: failedPct, start: passedPct, className: "text-failure" },
-    { pct: skippedPct, start: passedPct + failedPct, className: "text-warning" }
+    { pct: skippedPct, start: passedPct, className: "text-warning" }
   ];
   const center = describeDonutCenter(summary, outcome);
-  const label =
-    summary.failedCount > 0
-      ? `${summary.failedCount} of ${summary.totalCount} tests failed: ${outcome.passRateLabel}, ${summary.skippedCount} skipped`
-      : `Tests ${outcome.passRateLabel.toLowerCase()}: ${summary.passedCount} passed, ${summary.skippedCount} skipped`;
+  const label = `Tests ${outcome.passRateLabel.toLowerCase()}: ${summary.passedCount} passed, ${summary.skippedCount} skipped`;
 
   return (
     <svg viewBox="0 0 40 40" className="h-28 w-28 shrink-0" role="img" aria-label={label}>

@@ -100,7 +100,13 @@ export function registerExtensionCommands(
   registerBuildDiagnosticCommands(context, buildDiagnosticsCoordinator);
 
   registerNodeCommands(context, dataService, refreshHost);
-  registerNodeCapacityCommands(context, dataService, environmentStore, refreshHost);
+  registerNodeCapacityCommands(
+    context,
+    dataService,
+    environmentStore,
+    refreshHost,
+    buildDetailsPanelLauncher
+  );
 
   registerQueueCommands(context, dataService, refreshHost);
 

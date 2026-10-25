@@ -34,7 +34,8 @@ export function BuildCompareHeader({
   busy,
   busyAction,
   onRefresh,
-  onSwap
+  onSwap,
+  className
 }: {
   baseline: BuildCompareBuildViewModel;
   target: BuildCompareBuildViewModel;
@@ -43,12 +44,14 @@ export function BuildCompareHeader({
   busyAction?: BuildCompareBusyAction;
   onRefresh: () => void;
   onSwap: () => void;
+  className?: string;
 }) {
   const sharedJobName = resolveSharedJobName(baseline, target);
   const refreshing = busyAction === "refresh";
   const swapping = busyAction === "swap";
   return (
     <PanelHeader
+      className={className}
       maxWidthClassName="max-w-7xl"
       eyebrow="Build Compare"
       // Long job paths wrap instead of being clipped on narrow panels.

@@ -27,6 +27,10 @@ const ACTION_TITLES: Record<ProcessingAction, string> = {
   approve: "Approve this input and let the build continue",
   reject: "Reject this input and abort the build"
 };
+// Inputs with parameters open VS Code prompts for their values before
+// approving, so the button takes an ellipsis per the platform convention.
+const PROMPTED_APPROVE_LABEL = "Approve…";
+const PROMPTED_APPROVE_TITLE = "Choose parameter values, then approve and let the build continue";
 const NO_PROCESSING_ACTIONS: Record<string, ProcessingAction> = {};
 
 export function PendingInputsSection({
@@ -87,6 +91,7 @@ export function PendingInputsSection({
                 <PendingInputActionButton
                   action="approve"
                   processingAction={processingAction}
+                  promptsForValues={input.parameters.length > 0}
                   onAction={handleAction}
                 />
                 <PendingInputActionButton
@@ -98,21 +103,26 @@ export function PendingInputsSection({
             </div>
 
             {input.parameters.length > 0 ? (
-              <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5 border-t border-warning-border bg-card px-3 py-2.5 text-caption">
-                {input.parameters.map((param) => (
-                  <React.Fragment key={`${input.id}-${param.name}`}>
-                    <dt className="flex items-center gap-1.5">
-                      <span className="font-mono font-medium truncate">{param.name}</span>
-                      <Badge variant="secondary" size="sm">
-                        {param.kind}
-                      </Badge>
-                    </dt>
-                    <dd className="m-0 min-w-0 text-muted-foreground wrap-break-word">
-                      {describePendingInputParameter(param)}
-                    </dd>
-                  </React.Fragment>
-                ))}
-              </dl>
+              <div className="border-t border-warning-border bg-card px-3 py-2.5 text-caption">
+                <p className="m-0 mb-2 text-muted-foreground">
+                  You choose these values when you approve.
+                </p>
+                <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+                  {input.parameters.map((param) => (
+                    <React.Fragment key={`${input.id}-${param.name}`}>
+                      <dt className="flex items-center gap-1.5">
+                        <span className="font-mono font-medium truncate">{param.name}</span>
+                        <Badge variant="secondary" size="sm">
+                          {param.kind}
+                        </Badge>
+                      </dt>
+                      <dd className="m-0 min-w-0 text-muted-foreground wrap-break-word">
+                        {describePendingInputParameter(param)}
+                      </dd>
+                    </React.Fragment>
+                  ))}
+                </dl>
+              </div>
             ) : null}
           </div>
         );
@@ -124,14 +134,17 @@ export function PendingInputsSection({
 function PendingInputActionButton({
   action,
   processingAction,
+  promptsForValues = false,
   onAction
 }: {
   action: ProcessingAction;
   processingAction?: ProcessingAction;
+  promptsForValues?: boolean;
   onAction: (action: ProcessingAction) => void;
 }): React.JSX.Element {
   const isProcessing = processingAction === action;
   const ActionIcon = action === "approve" ? CheckIcon : XIcon;
+  const prompted = action === "approve" && promptsForValues;
 
   return (
     <Button
@@ -139,14 +152,18 @@ function PendingInputActionButton({
       size="sm"
       onClick={() => onAction(action)}
       disabled={Boolean(processingAction)}
-      title={ACTION_TITLES[action]}
+      title={prompted ? PROMPTED_APPROVE_TITLE : ACTION_TITLES[action]}
     >
       {isProcessing ? (
         <RefreshIcon className="h-3.5 w-3.5 animate-spin" />
       ) : (
         <ActionIcon className="h-3.5 w-3.5" />
       )}
-      {isProcessing ? PROCESSING_LABELS[action] : ACTION_LABELS[action]}
+      {isProcessing
+        ? PROCESSING_LABELS[action]
+        : prompted
+          ? PROMPTED_APPROVE_LABEL
+          : ACTION_LABELS[action]}
     </Button>
   );
 }

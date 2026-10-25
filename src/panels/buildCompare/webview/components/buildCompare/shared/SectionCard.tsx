@@ -31,6 +31,7 @@ export function SectionCard({
   summary,
   detail,
   status,
+  emptyLabel,
   open: controlledOpen,
   onOpenChange,
   children
@@ -40,6 +41,8 @@ export function SectionCard({
     summary: string;
     detail?: string;
     status: CompareSectionStatus;
+    /** Status badge text for an empty section; defaults to "No changes". */
+    emptyLabel?: string;
   } & SectionCardDisclosureProps
 >) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(true);
@@ -50,7 +53,7 @@ export function SectionCard({
     }
     onOpenChange?.(nextOpen);
   };
-  const statusBadge = resolveSectionStatusBadge(status);
+  const statusBadge = resolveSectionStatusBadge(status, emptyLabel);
   const idBase = useId();
   const summaryId = `${idBase}-summary`;
   const detailId = `${idBase}-detail`;

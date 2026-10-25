@@ -14,3 +14,8 @@ export function isStageStatusRegression(item: BuildCompareStageDiffItem): boolea
     statusSeverity(item.targetStatusClass) > statusSeverity(item.baselineStatusClass)
   );
 }
+
+/** A stage that only exists in the target build and did not succeed there. */
+export function isNewUnsuccessfulStage(item: BuildCompareStageDiffItem): boolean {
+  return item.changeType === "added" && statusSeverity(item.targetStatusClass) > 0;
+}

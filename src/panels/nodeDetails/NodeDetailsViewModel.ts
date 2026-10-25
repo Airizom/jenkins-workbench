@@ -15,10 +15,11 @@ import { clampPercent, isFiniteNumber } from "../../shared/numbers";
 import type { NodeQueuedWorkViewModel } from "../../shared/queueWork/QueueWorkContracts";
 import { isPlainRecord } from "../../shared/runtimeGuards";
 import { firstNonEmpty, trimToUndefined } from "../../shared/stringValues";
-import type {
-  NodeDetailsViewModel,
-  NodeExecutorViewModel,
-  NodeMonitorViewModel
+import {
+  NODE_DETAIL_NOT_AVAILABLE_LABEL,
+  type NodeDetailsViewModel,
+  type NodeExecutorViewModel,
+  type NodeMonitorViewModel
 } from "./shared/NodeDetailsContracts";
 
 export type { NodeDetailsViewModel } from "./shared/NodeDetailsContracts";
@@ -36,7 +37,7 @@ export interface NodeDetailsViewModelInput {
   queuedWork?: NodeQueuedWorkViewModel;
 }
 
-const UNKNOWN_LABEL = "Not available";
+const UNKNOWN_LABEL = NODE_DETAIL_NOT_AVAILABLE_LABEL;
 const FALLBACK_ENVIRONMENT_LABEL = "Jenkins";
 const MONITOR_STRING_KEYS = ["message", "status", "state", "description", "name"] as const;
 const MONITOR_NUMBER_KEYS = ["size", "count", "total"] as const;

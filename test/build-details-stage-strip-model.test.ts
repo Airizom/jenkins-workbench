@@ -8,6 +8,7 @@ import {
   describeSegmentBranches,
   describeSegmentDetail,
   describeSegmentTitle,
+  findAttentionSegmentKey,
   isDenseStrip
 } from "../src/panels/buildDetails/webview/components/buildDetails/stageStrip/stageStripModel";
 
@@ -197,5 +198,31 @@ describe("stageStripModel", () => {
     ]);
 
     assert.equal(countFailedSegments(segments), 2);
+  });
+
+  it("marks running segments as paused while the build awaits input", () => {
+    const stages = [
+      makeStage({ key: "a" }),
+      makeStage({ key: "b", statusClass: "running", statusLabel: "Running" })
+    ];
+
+    const [done, paused] = buildStageStripSegments(stages, true);
+    assert.equal(done?.paused, undefined);
+    assert.equal(paused?.paused, true);
+    assert.equal(paused?.statusClass, "running");
+    assert.equal(paused?.statusLabel, "Waiting for input");
+    assert.equal(buildStageStripSegments(stages)[1]?.paused, undefined);
+  });
+
+  it("points a clipped strip at the first failure, else the running stage", () => {
+    const running = makeStage({ key: "r", statusClass: "running" });
+    const failed = makeStage({ key: "f", statusClass: "failure" });
+
+    assert.equal(
+      findAttentionSegmentKey(buildStageStripSegments([makeStage(), running, failed])),
+      "f"
+    );
+    assert.equal(findAttentionSegmentKey(buildStageStripSegments([makeStage(), running])), "r");
+    assert.equal(findAttentionSegmentKey(buildStageStripSegments([makeStage()])), undefined);
   });
 });

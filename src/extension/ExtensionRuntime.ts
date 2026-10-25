@@ -117,7 +117,8 @@ export async function activateRuntime(
           dataService,
           environmentStore,
           extensionUri: context.extensionUri,
-          refreshHost
+          refreshHost,
+          buildDetailsPanelLauncher: container.lazy("buildDetailsPanelLauncher")
         });
       }
     }

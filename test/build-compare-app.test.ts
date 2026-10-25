@@ -115,7 +115,7 @@ describe("BuildCompareApp global loading state", () => {
       createState({ tests: "unavailable", parameters: "empty", changesets: "error" })
     );
 
-    assert.match(html, /Tests<span[^>]*>·<\/span><span[^>]*>n\/a</);
+    assert.match(html, /Tests<span[^>]*>·<\/span><span[^>]*>no data</);
     assert.match(html, /Parameters<span[^>]*>·<\/span><span[^>]*>no changes</);
     assert.match(html, /Commits<span[^>]*>·<\/span><span[^>]*>error</);
   });
@@ -157,7 +157,7 @@ describe("BuildCompareApp global loading state", () => {
     assert.match(html, /<button[^>]*disabled=""[^>]*>Swap sides</);
   });
 
-  it("shows a section error's detail once and names it in the summary list", () => {
+  it("shows a section error's message only in its section and names it in the banner", () => {
     const state = createState({ tests: "error" });
     state.tests = {
       ...state.tests,
@@ -167,7 +167,14 @@ describe("BuildCompareApp global loading state", () => {
     const html = render(state);
 
     assert.equal(html.split("Request failed with status 500.").length - 1, 1);
-    assert.match(html, /Tests: Test comparison unavailable/);
+    assert.equal(html.split("Test comparison unavailable").length - 1, 1);
+    assert.match(html, /Tests could not be compared\. Each section below explains why\./);
+  });
+
+  it("names every failed section in one banner line", () => {
+    const html = render(createState({ tests: "error", stages: "error", console: "error" }));
+
+    assert.match(html, /Tests, Stages, and Console could not be compared\./);
   });
 
   it("offers to open either build when the console is too large to compare", () => {
@@ -181,7 +188,7 @@ describe("BuildCompareApp global loading state", () => {
   it("labels build cards by start time and names their details buttons per side", () => {
     const html = render(createState({}));
 
-    assert.match(html, />Started</);
+    assert.match(html, /<dt[^>]*>Started<\/dt>/);
     assert.doesNotMatch(html, />Completed</);
     assert.match(html, /aria-label="Open build details for baseline build #1"/);
     assert.match(html, /aria-label="Open build details for target build #2"/);

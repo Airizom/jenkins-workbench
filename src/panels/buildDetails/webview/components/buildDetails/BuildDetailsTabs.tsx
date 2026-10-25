@@ -40,6 +40,17 @@ import type { PipelineStageRequest } from "./pipelineSectionState";
 import { TestResultsSection } from "./TestResultsSection";
 import { describeTestOutcome } from "./testResults/testResultsUtils";
 
+const TAB_TRIGGER_CLASS = "group/tab text-xs";
+
+/**
+ * Below 30rem inactive tabs collapse to icon plus status badge so every tab
+ * fits without scrolling; the active tab keeps its label, and the label stays
+ * in the accessible name either way.
+ */
+function TabLabel({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <span className="max-[30rem]:group-data-[state=inactive]/tab:sr-only">{children}</span>;
+}
+
 function PipelineTabStatus({
   failedCount,
   loading
@@ -230,14 +241,24 @@ export function BuildDetailsTabs({
        * long console log or test list. */}
       <div className="build-details-tabs-bar">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="overview" data-tab-value="overview" className="text-xs">
+          <TabsTrigger
+            value="overview"
+            data-tab-value="overview"
+            title="Overview"
+            className={TAB_TRIGGER_CLASS}
+          >
             <GaugeIcon className="h-3.5 w-3.5" />
-            Overview
+            <TabLabel>Overview</TabLabel>
           </TabsTrigger>
           {hasPendingInputs ? (
-            <TabsTrigger value="inputs" data-tab-value="inputs" className="text-xs">
+            <TabsTrigger
+              value="inputs"
+              data-tab-value="inputs"
+              title="Inputs"
+              className={TAB_TRIGGER_CLASS}
+            >
               <AlertCircleIcon className="h-3.5 w-3.5" />
-              Inputs
+              <TabLabel>Inputs</TabLabel>
               <TabStatusCount
                 count={pendingInputs.length}
                 tone="warning"
@@ -246,20 +267,35 @@ export function BuildDetailsTabs({
             </TabsTrigger>
           ) : null}
           {hasPipelineStages ? (
-            <TabsTrigger value="pipeline" data-tab-value="pipeline" className="text-xs">
+            <TabsTrigger
+              value="pipeline"
+              data-tab-value="pipeline"
+              title="Pipeline"
+              className={TAB_TRIGGER_CLASS}
+            >
               <WorkflowIcon className="h-3.5 w-3.5" />
-              Pipeline
+              <TabLabel>Pipeline</TabLabel>
               <PipelineTabStatus failedCount={stripFailedCount} loading={pipelineStagesLoading} />
             </TabsTrigger>
           ) : null}
-          <TabsTrigger value="console" data-tab-value="console" className="text-xs">
+          <TabsTrigger
+            value="console"
+            data-tab-value="console"
+            title="Console"
+            className={TAB_TRIGGER_CLASS}
+          >
             <TerminalIcon className="h-3.5 w-3.5" />
-            Console
+            <TabLabel>Console</TabLabel>
           </TabsTrigger>
           {hasTests ? (
-            <TabsTrigger value="tests" data-tab-value="tests" className="text-xs">
+            <TabsTrigger
+              value="tests"
+              data-tab-value="tests"
+              title="Tests"
+              className={TAB_TRIGGER_CLASS}
+            >
               <TestTubeIcon className="h-3.5 w-3.5" />
-              Tests
+              <TabLabel>Tests</TabLabel>
               <TestsTabStatus summary={testsSummary} />
             </TabsTrigger>
           ) : null}
@@ -273,6 +309,8 @@ export function BuildDetailsTabs({
           durationLabel={durationLabel}
           timestampLabel={timestampLabel}
           hasPipelineStages={hasPipelineStages}
+          pipelineStages={pipelineStages}
+          consoleText={consoleText}
           testsSummary={testsSummary}
           coverageState={coverageState}
           insights={insights}

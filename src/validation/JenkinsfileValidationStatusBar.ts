@@ -8,6 +8,10 @@ import type {
 
 const SELECT_ENVIRONMENT_COMMAND = "jenkinsWorkbench.jenkinsfile.selectValidationEnvironment";
 const SHOW_OUTPUT_COMMAND = "jenkinsWorkbench.jenkinsfile.showValidationOutput";
+// Status bar items only support these two background colors. VS Code pairs each
+// with its matching foreground, so `color` stays unset.
+const WARNING_BACKGROUND = new vscode.ThemeColor("statusBarItem.warningBackground");
+const ERROR_BACKGROUND = new vscode.ThemeColor("statusBarItem.errorBackground");
 
 type ValidatingState = {
   kind: "validating";
@@ -121,7 +125,7 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
         "$(warning) Select Jenkinsfile environment",
         "Jenkinsfile features: environment not configured",
         SELECT_ENVIRONMENT_COMMAND,
-        new vscode.ThemeColor("statusBarItem.warningForeground")
+        WARNING_BACKGROUND
       );
       return;
     }
@@ -131,7 +135,7 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
         "$(warning) Validation unavailable",
         this.buildTooltip("Validation unavailable", state.environment, state.message),
         SHOW_OUTPUT_COMMAND,
-        new vscode.ThemeColor("statusBarItem.warningForeground")
+        WARNING_BACKGROUND
       );
       return;
     }
@@ -141,17 +145,12 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
     const stateLabel =
       state.errorCount > 0 ? `Errors: ${state.errorCount}${stateSuffix}` : `Valid${stateSuffix}`;
     const icon = state.errorCount > 0 ? "$(error)" : "$(check)";
-    let color: vscode.ThemeColor | undefined;
-    if (isStale) {
-      color = new vscode.ThemeColor("statusBarItem.inactiveForeground");
-    } else if (state.errorCount > 0) {
-      color = new vscode.ThemeColor("statusBarItem.errorForeground");
-    }
+    // Stale results keep the default colors; the "(stale)" suffix carries that state.
     this.renderItem(
       `${icon} ${stateLabel}`,
       this.buildTooltip(stateLabel, state.environment),
       SHOW_OUTPUT_COMMAND,
-      color
+      !isStale && state.errorCount > 0 ? ERROR_BACKGROUND : undefined
     );
   }
 
@@ -159,10 +158,10 @@ export class JenkinsfileValidationStatusBar implements vscode.Disposable {
     text: string,
     tooltip: string,
     command: string,
-    color?: vscode.ThemeColor
+    backgroundColor?: vscode.ThemeColor
   ): void {
     this.item.text = text;
-    this.item.color = color;
+    this.item.backgroundColor = backgroundColor;
     this.item.tooltip = tooltip;
     this.item.command = command;
     this.item.show();

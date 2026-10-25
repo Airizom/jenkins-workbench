@@ -14,6 +14,26 @@ import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/Buil
 
 const COVERAGE_ICON = <FileIcon className="h-4 w-4" />;
 
+/**
+ * The overall gate result sits beside the build's own result badge, so it is
+ * labelled as a gate outcome rather than a second build status.
+ */
+export function formatQualityGateBadgeLabel(statusLabel: string): string {
+  return `Quality gate: ${statusLabel}`;
+}
+
+function describeQualityGatesPassed(
+  qualityGates: BuildDetailsCoverageStateViewModel["qualityGates"]
+): string | undefined {
+  if (qualityGates.length === 0) {
+    return undefined;
+  }
+  const passed = qualityGates.filter(
+    (gate) => resolveCoverageStatusClass(gate.statusClass) === "success"
+  ).length;
+  return `${passed} of ${qualityGates.length}`;
+}
+
 export function CoverageSection({
   coverageState
 }: {
@@ -33,9 +53,6 @@ export function CoverageSection({
     return null;
   }
 
-  const qualityGateCount = qualityGates.length;
-  const hasQualityGates = qualityGateCount > 0;
-
   return (
     <section className="space-y-3">
       <MetricsSummarySection
@@ -44,7 +61,7 @@ export function CoverageSection({
         badge={
           overallQualityGateStatusLabel ? (
             <ToneBadge
-              label={overallQualityGateStatusLabel}
+              label={formatQualityGateBadgeLabel(overallQualityGateStatusLabel)}
               className={resolveCoverageStatusBadgeClass(overallQualityGateStatusClass)}
             />
           ) : undefined
@@ -56,8 +73,8 @@ export function CoverageSection({
             <ToneMetricCard label="Modified files" value={modifiedFilesCoverage} tone="neutral" />
             <ToneMetricCard label="Modified lines" value={modifiedLinesCoverage} tone="neutral" />
             <ToneMetricCard
-              label="Quality gates"
-              value={hasQualityGates ? String(qualityGateCount) : undefined}
+              label="Gates passed"
+              value={describeQualityGatesPassed(qualityGates)}
               tone={coverageStatusClassToVisualTone(
                 resolveCoverageStatusClass(overallQualityGateStatusClass)
               )}
@@ -101,7 +118,7 @@ function renderCoverageFooter(coverageState: BuildDetailsCoverageStateViewModel)
   return (
     <>
       {qualityGates.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-2">
           {qualityGates.map((qualityGate) => (
             <div
               key={`${qualityGate.name}:${qualityGate.statusLabel}`}
@@ -132,12 +149,14 @@ function renderCoverageFooter(coverageState: BuildDetailsCoverageStateViewModel)
             {modifiedFiles.map((file) => (
               <div
                 key={file.path}
-                className="grid gap-2 px-3 py-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-2"
               >
-                <div className="min-w-0 text-sm text-foreground">{file.path}</div>
-                <CoverageLineCount label="Covered" value={file.coveredCount} tone="success" />
-                <CoverageLineCount label="Missed" value={file.missedCount} tone="failure" />
-                <CoverageLineCount label="Partial" value={file.partialCount} tone="warning" />
+                <div className="min-w-0 break-all text-sm text-foreground">{file.path}</div>
+                <div className="flex shrink-0 gap-3">
+                  <CoverageLineCount label="Covered" value={file.coveredCount} tone="success" />
+                  <CoverageLineCount label="Missed" value={file.missedCount} tone="failure" />
+                  <CoverageLineCount label="Partial" value={file.partialCount} tone="warning" />
+                </div>
               </div>
             ))}
           </div>

@@ -11,7 +11,11 @@ export interface StageStripSegment {
   durationLabel: string;
   branchCount: number;
   logTarget?: PipelineLogTargetViewModel;
+  /** Running, but the build is paused on an input step. */
+  paused?: boolean;
 }
+
+const PAUSED_STATUS_LABEL = "Waiting for input";
 
 const DENSE_STRIP_THRESHOLD = 10;
 
@@ -49,7 +53,14 @@ function countBranches(stage: PipelineStageViewModel): number {
   );
 }
 
-export function buildStageStripSegments(stages: PipelineStageViewModel[]): StageStripSegment[] {
+/**
+ * `awaitingInput` marks running segments as paused: Jenkins keeps reporting the
+ * stage that holds an input step as in progress while the build waits.
+ */
+export function buildStageStripSegments(
+  stages: PipelineStageViewModel[],
+  awaitingInput = false
+): StageStripSegment[] {
   return stages.map((stage) => {
     // Jenkins usually rolls branch results into the parent stage; escalate only
     // when the parent reads as fine but a nested branch ended worse.
@@ -62,14 +73,16 @@ export function buildStageStripSegments(stages: PipelineStageViewModel[]): Stage
         statusLabel = worst.statusLabel;
       }
     }
+    const paused = awaitingInput && statusClass === "running";
     return {
       key: stage.key,
       name: stage.name,
       statusClass,
-      statusLabel,
+      statusLabel: paused ? PAUSED_STATUS_LABEL : statusLabel,
       durationLabel: stage.durationLabel,
       branchCount: countBranches(stage),
-      logTarget: stage.logTarget
+      logTarget: stage.logTarget,
+      ...(paused ? { paused } : {})
     };
   });
 }
@@ -105,6 +118,17 @@ export function describeSegmentDetail(segment: StageStripSegment): string {
     parts.push(segment.durationLabel);
   }
   return parts.join(" · ");
+}
+
+/**
+ * Key of the segment a clipped strip should scroll into view: the first
+ * failure, otherwise the first stage still in progress.
+ */
+export function findAttentionSegmentKey(segments: StageStripSegment[]): string | undefined {
+  return (
+    segments.find((segment) => segment.statusClass === "failure") ??
+    segments.find((segment) => segment.statusClass === "running")
+  )?.key;
 }
 
 export function countFailedSegments(segments: StageStripSegment[]): number {

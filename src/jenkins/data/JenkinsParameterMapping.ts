@@ -60,7 +60,7 @@ function mapPendingInputParameters(action: JenkinsPendingInputAction): JobParame
 
   const results: JobParameter[] = [];
   for (const parameter of rawParameters) {
-    if (!parameter || !parameter.name) {
+    if (!parameter?.name) {
       continue;
     }
     results.push(mapPendingInputParameter(parameter));

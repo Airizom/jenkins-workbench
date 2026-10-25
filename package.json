@@ -1573,6 +1573,108 @@
         "contents": "**Connect your first Jenkins environment**\n\nAdd a Jenkins server to browse jobs, builds, queue activity, and nodes from this view.\n\n[Add Environment](command:jenkinsWorkbench.addEnvironment)",
         "when": "jenkinsWorkbench.noEnvironments"
       }
+    ],
+    "colors": [
+      {
+        "id": "jenkinsWorkbench.status.success",
+        "description": "Color for successful Jenkins builds, jobs, and stages in the tree and panels.",
+        "defaults": {
+          "dark": "testing.iconPassed",
+          "light": "testing.iconPassed",
+          "highContrast": "testing.iconPassed",
+          "highContrastLight": "testing.iconPassed"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.status.failure",
+        "description": "Color for failed Jenkins builds, jobs, and stages in the tree and panels.",
+        "defaults": {
+          "dark": "testing.iconFailed",
+          "light": "testing.iconFailed",
+          "highContrast": "testing.iconFailed",
+          "highContrastLight": "testing.iconFailed"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.status.warning",
+        "description": "Color for unstable Jenkins builds and warning states in the tree and panels.",
+        "defaults": {
+          "dark": "editorWarning.foreground",
+          "light": "editorWarning.foreground",
+          "highContrast": "editorWarning.foreground",
+          "highContrastLight": "editorWarning.foreground"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.status.running",
+        "description": "Color for running Jenkins builds and in-progress work in the tree and panels.",
+        "defaults": {
+          "dark": "charts.blue",
+          "light": "charts.blue",
+          "highContrast": "charts.blue",
+          "highContrastLight": "charts.blue"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.coverage.coveredBackground",
+        "description": "Editor line background for lines that Jenkins coverage reports as covered.",
+        "defaults": {
+          "dark": "#9CCC2C33",
+          "light": "#9CCC2C40",
+          "highContrast": "#00000000",
+          "highContrastLight": "#00000000"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.coverage.coveredGutterBackground",
+        "description": "Gutter bar and overview ruler color for lines that Jenkins coverage reports as covered.",
+        "defaults": {
+          "dark": "#2EA043CC",
+          "light": "#2EA043CC",
+          "highContrast": "charts.green",
+          "highContrastLight": "charts.green"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.coverage.uncoveredBackground",
+        "description": "Editor line background for lines that Jenkins coverage reports as not covered.",
+        "defaults": {
+          "dark": "#FF000033",
+          "light": "#FF000033",
+          "highContrast": "#00000000",
+          "highContrastLight": "#00000000"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.coverage.uncoveredGutterBackground",
+        "description": "Gutter bar and overview ruler color for lines that Jenkins coverage reports as not covered.",
+        "defaults": {
+          "dark": "#F85149D9",
+          "light": "#F85149D9",
+          "highContrast": "editorError.foreground",
+          "highContrastLight": "editorError.foreground"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.coverage.partialBackground",
+        "description": "Editor line background for lines that Jenkins coverage reports as partially covered.",
+        "defaults": {
+          "dark": "#BB800929",
+          "light": "#BB800929",
+          "highContrast": "#00000000",
+          "highContrastLight": "#00000000"
+        }
+      },
+      {
+        "id": "jenkinsWorkbench.coverage.partialGutterBackground",
+        "description": "Gutter bar and overview ruler color for lines that Jenkins coverage reports as partially covered.",
+        "defaults": {
+          "dark": "#BB8009D9",
+          "light": "#BB8009D9",
+          "highContrast": "editorWarning.foreground",
+          "highContrastLight": "editorWarning.foreground"
+        }
+      }
     ]
   },
   "scripts": {
@@ -1583,7 +1685,7 @@
     "watch:webview": "vite build --watch",
     "build:extension": "node scripts/build-extension.mjs",
     "watch:extension": "node scripts/build-extension.mjs --watch",
-    "preview:webview": "vite --config dev/webview-preview/vite.config.ts",
+    "preview:webview": "vite --config dev/webview-preview/vite.config.mts",
     "typecheck:webview": "tsc -p src/panels/tsconfig.json --noEmit",
     "typecheck:extension": "tsc -p ./ --noEmit",
     "test": "npm run test:manifest && npm run test:workflows && npm run typecheck:test && npm run test:coverage",
@@ -1606,47 +1708,56 @@
     "check:fix": "biome check src/ test/ scripts/ --write"
   },
   "devDependencies": {
-    "@babel/parser": "^7.29.7",
-    "@biomejs/biome": "^2.5.5",
-    "@radix-ui/react-accordion": "^1.2.20",
-    "@radix-ui/react-checkbox": "^1.3.11",
-    "@radix-ui/react-collapsible": "^1.1.20",
-    "@radix-ui/react-progress": "^1.1.16",
-    "@radix-ui/react-scroll-area": "^1.2.18",
-    "@radix-ui/react-select": "^2.3.7",
-    "@radix-ui/react-slot": "^1.3.3",
-    "@radix-ui/react-switch": "^1.3.7",
-    "@radix-ui/react-tabs": "^1.1.21",
-    "@radix-ui/react-toast": "^1.2.23",
-    "@radix-ui/react-toggle": "^1.1.18",
-    "@radix-ui/react-toggle-group": "^1.1.19",
-    "@radix-ui/react-tooltip": "^1.2.16",
+    "@babel/parser": "^8.0.8",
+    "@biomejs/biome": "^2.6.3",
+    "@radix-ui/react-accordion": "^1.3.1",
+    "@radix-ui/react-checkbox": "^1.4.1",
+    "@radix-ui/react-collapsible": "^1.2.1",
+    "@radix-ui/react-progress": "^1.2.1",
+    "@radix-ui/react-scroll-area": "^1.4.0",
+    "@radix-ui/react-select": "^2.4.1",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-switch": "^1.4.1",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "@radix-ui/react-toast": "^1.3.1",
+    "@radix-ui/react-toggle": "^1.2.1",
+    "@radix-ui/react-toggle-group": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.4.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/vscode": "^1.85.0",
-    "@vitejs/plugin-react": "^6.0.4",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "ajv": "^8.20.0",
     "class-variance-authority": "^0.7.1",
-    "concurrently": "^10.0.4",
+    "concurrently": "^10.0.6",
     "elkjs": "^0.12.0",
     "esbuild": "^0.28.2",
-    "fallow": "^3.9.1",
-    "js-yaml": "^4.3.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "fallow": "^3.35.0",
+    "js-yaml": "^5.5.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5",
-    "vitest": "^4.1.10"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "redos-detector": "^6.1.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
+  },
+  "overrides": {
+    "@vscode/test-cli": {
+      "mocha": "^12.0.3"
+    }
   }
 }

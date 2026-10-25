@@ -22,9 +22,12 @@ export function ToneMetricCard({
       : typeof value === "number"
         ? value.toLocaleString()
         : value;
+  // A zero count has nothing to flag, so its tile drops the status tint; the
+  // dot still identifies the category.
+  const surfaceTone = value === 0 ? "neutral" : tone;
 
   return (
-    <div className={cn("rounded border px-3 py-2", resolveMetricCardClass(tone))}>
+    <div className={cn("rounded border px-3 py-2", resolveMetricCardClass(surfaceTone))}>
       <div className="flex items-center gap-1.5">
         {showDot && tone !== "neutral" ? (
           <span
@@ -33,7 +36,9 @@ export function ToneMetricCard({
         ) : null}
         <span className="text-caption uppercase tracking-wide text-muted-foreground">{label}</span>
       </div>
-      <div className={cn("text-lg font-semibold tabular-nums", resolveMetricToneClass(tone))}>
+      <div
+        className={cn("text-lg font-semibold tabular-nums", resolveMetricToneClass(surfaceTone))}
+      >
         {displayValue}
       </div>
     </div>

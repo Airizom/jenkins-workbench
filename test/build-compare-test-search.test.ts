@@ -54,9 +54,9 @@ it("keeps an active test search visible and clearable after the result count dro
 
   changeQuery(render(TEST_DIFF_SEARCH_MIN_ITEMS).search, " T0 ");
   const filtered = render(2);
-  assert.match(filtered.html, /aria-label="Search changed tests by suite, class, or name"/);
+  assert.match(filtered.html, /aria-label="Filter listed tests by suite, class, or name"/);
   assert.match(filtered.html, /value=" T0 "/);
-  assert.match(filtered.html, /1 of 2 changed tests match/);
+  assert.match(filtered.html, /1 of 2 listed tests match/);
   assert.match(filtered.html, />t0<\/p>/);
   assert.doesNotMatch(filtered.html, />t1<\/p>/);
 
@@ -64,5 +64,5 @@ it("keeps an active test search visible and clearable after the result count dro
   const cleared = render(2);
   assert.match(cleared.html, />t0<\/p>/);
   assert.match(cleared.html, />t1<\/p>/);
-  assert.doesNotMatch(cleared.html, /Search changed tests/);
+  assert.doesNotMatch(cleared.html, /Filter listed tests/);
 });

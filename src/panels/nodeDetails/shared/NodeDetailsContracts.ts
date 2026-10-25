@@ -4,6 +4,9 @@ import type { NodeQueuedWorkViewModel } from "../../../shared/queueWork/QueueWor
 
 export type { NodeStatusClass };
 
+/** Value of `activityLabel` and `executorsLabel` when Jenkins did not report the field. */
+export const NODE_DETAIL_NOT_AVAILABLE_LABEL = "Not available";
+
 export interface NodeExecutorViewModel extends NodeCapacityExecutorViewModel {
   progressPercent?: number;
   progressLabel?: string;

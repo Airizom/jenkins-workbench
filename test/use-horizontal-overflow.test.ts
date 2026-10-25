@@ -36,7 +36,13 @@ describe("useHorizontalOverflow", () => {
         }
       );
       vi.stubGlobal("ResizeObserver", undefined);
-      vi.stubGlobal("window", { matchMedia: () => ({ matches: reducedMotion }) });
+      vi.stubGlobal("document", {
+        body: {
+          classList: {
+            contains: (name: string) => reducedMotion && name === "vscode-reduce-motion"
+          }
+        }
+      });
 
       let activeChild: { getBoundingClientRect: () => { left: number; width: number } } | null =
         null;

@@ -83,7 +83,7 @@ When adding a service, wire it through the appropriate provider catalog (`CorePr
 
 If you touch panel entrypoints, bundle naming, or Vite output:
 
-1. Confirm `vite.config.ts` still emits manifest entries for build compare, build details, job history, node capacity, and node details.
+1. Confirm `vite.config.mts` still emits manifest entries for build compare, build details, job history, node capacity, and node details.
 2. Run `npm run compile`.
 3. Verify `out/webview/manifest.json` includes expected entries.
 4. Launch Extension Development Host and open the Build Compare, Build Details, Job History, Node Capacity, and Node Details panels.
@@ -110,11 +110,11 @@ If this is skipped, `resolveWebviewAssets(...)` throws; panel helpers catch the 
 
 Automated coverage exists at two levels:
 
-- Unit tests: Vitest (`test/**/*.test.ts`, config in `vitest.config.ts`).
+- Unit tests: Vitest (`test/**/*.test.ts`, config in `vitest.config.mts`).
   - `npm run test:unit` (fast), `npm run test:watch` (watch mode), `npm run test:coverage` (v8 coverage with thresholds).
   - The `vscode` module is aliased to `test/helpers/vscodeStub.ts`; tests needing custom behavior use `vi.doMock("vscode", () => shim)` followed by a top-level `await import(...)` of the module under test. Never `require(...)` in tests.
   - `npm run typecheck:test` type-checks test files (`tsconfig.test.json`, noEmit).
-  - `npm test` runs manifest/workflow validation + test typecheck + coverage; CI enforces coverage thresholds — if a legitimate change dips below one, adjust the threshold in `vitest.config.ts` in the same PR and say why.
+  - `npm test` runs manifest/workflow validation + test typecheck + coverage; CI enforces coverage thresholds — if a legitimate change dips below one, adjust the threshold in `vitest.config.mts` in the same PR and say why.
 - Integration smoke tests: `npm run test:integration` (`@vscode/test-cli`, `.vscode-test.mjs`, `test/integration/`). Compiles the extension, downloads VS Code, and verifies activation + command registration in a real extension host.
 
 Unit tests do not exercise the webview UI or live Jenkins traffic. For changes to panels, tree interaction, or HTTP flows, still do the manual gate:

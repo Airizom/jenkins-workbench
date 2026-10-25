@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, vi } from "vitest";
+import type { QueueWorkItemViewModel } from "../src/shared/queueWork/QueueWorkContracts";
 import { NODE_DETAILS_TABS } from "../src/panels/nodeDetails/webview/nodeDetailsTabValues";
 import type { NodeDetailsState } from "../src/panels/nodeDetails/webview/state/nodeDetailsState";
 
@@ -39,7 +40,7 @@ for (const modulePath of [
   }));
 }
 
-const { NodeDetailsTabs } = await import(
+const { NodeDetailsTabs, resolveQueueTabTone } = await import(
   "../src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsTabs"
 );
 
@@ -72,4 +73,56 @@ describe("NodeDetailsTabs", () => {
 
     assert.deepEqual(values, [NODE_DETAILS_TABS.DIAGNOSTICS]);
   });
+
+  it("acts once when Radix reports the same tab twice for one click", () => {
+    const values: string[] = [];
+    renderToStaticMarkup(
+      React.createElement(NodeDetailsTabs, {
+        state: emptyState(),
+        onDiagnosticsToggle: (value) => values.push(value),
+        onRetryDiagnostics: () => undefined,
+        onCopyJson: () => undefined,
+        onOpenExternal: () => undefined
+      })
+    );
+
+    const activateTab = handleTabValueChange;
+    assert.ok(activateTab);
+    activateTab(NODE_DETAILS_TABS.DIAGNOSTICS);
+    activateTab(NODE_DETAILS_TABS.DIAGNOSTICS);
+    activateTab(NODE_DETAILS_TABS.OVERVIEW);
+
+    assert.deepEqual(values, [NODE_DETAILS_TABS.DIAGNOSTICS, NODE_DETAILS_TABS.OVERVIEW]);
+  });
 });
+
+describe("resolveQueueTabTone", () => {
+  const item = (flags: { blocked?: boolean; stuck?: boolean } = {}) =>
+    ({ blocked: false, stuck: false, ...flags }) as QueueWorkItemViewModel;
+
+  it("keeps waiting work neutral and escalates only blocked or stuck items", () => {
+    const queue = (items: QueueWorkItemViewModel[]) => ({
+      matchingQueueItems: items,
+      anyQueueItems: [],
+      selfLabelQueueItems: []
+    });
+    assert.equal(resolveQueueTabTone(queue([item(), item()])), "neutral");
+    assert.equal(resolveQueueTabTone(queue([item(), item({ blocked: true })])), "warning");
+    assert.equal(
+      resolveQueueTabTone(queue([item({ blocked: true }), item({ stuck: true })])),
+      "failure"
+    );
+  });
+});
+
+function emptyState(): NodeDetailsState {
+  return {
+    executors: [],
+    oneOffExecutors: [],
+    queuedWork: {
+      matchingQueueItems: [],
+      anyQueueItems: [],
+      selfLabelQueueItems: []
+    }
+  } as unknown as NodeDetailsState;
+}

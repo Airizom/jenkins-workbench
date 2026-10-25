@@ -27,7 +27,7 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        default: "before:bg-border",
+        default: "border-popover-border before:bg-border",
         success: "border-success-border before:bg-success",
         destructive: "border-failure-border before:bg-failure"
       }

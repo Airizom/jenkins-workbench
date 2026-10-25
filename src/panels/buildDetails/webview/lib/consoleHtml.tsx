@@ -2,6 +2,7 @@ import * as React from "react";
 import type { BuildDiagnosticConsoleReference } from "../../shared/BuildDetailsContracts";
 import { normalizeConsoleSourceReferences } from "../hooks/consoleSearch/buildConsoleSegments";
 import type { ConsoleMatch } from "../hooks/useConsoleSearch";
+import { resolveConsoleAnsiClassNames } from "./consoleAnsiStyles";
 
 type ConsoleHtmlNode =
   | { type: "text"; value: string }
@@ -431,7 +432,12 @@ function buildElementAttributes(element: HTMLElement, tag: string): Record<strin
     return attrs;
   }
   if (tag === "span") {
-    const className = element.getAttribute("class");
+    const className = [
+      element.getAttribute("class") ?? "",
+      ...resolveConsoleAnsiClassNames(element.getAttribute("style"))
+    ]
+      .join(" ")
+      .trim();
     if (className) {
       attrs.className = className;
     }

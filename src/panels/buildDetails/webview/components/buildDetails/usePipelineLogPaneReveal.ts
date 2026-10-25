@@ -1,5 +1,5 @@
 import * as React from "react";
-import { prefersReducedMotion } from "../../hooks/useConsoleOutputScroll";
+import { prefersReducedMotion } from "../../../../shared/webview/lib/motion";
 
 const { useCallback, useEffect, useRef } = React;
 

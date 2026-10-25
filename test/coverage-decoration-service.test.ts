@@ -39,6 +39,9 @@ vi.doMock("vscode", () => ({
   Range: MockRange,
   FileType: { File: 1 },
   OverviewRulerLane: { Full: 0 },
+  ThemeColor: class {
+    constructor(readonly id: string) {}
+  },
   Uri: {
     parse: (value: string) => fileUri(new URL(value).pathname),
     joinPath: (root: MockUri, ...segments: string[]) =>

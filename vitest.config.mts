@@ -8,7 +8,7 @@ export default defineConfig({
       // Unit tests resolve it to a lightweight stub; individual test files
       // override it with `vi.doMock("vscode", ...)` when they need custom
       // behavior.
-      vscode: path.resolve(__dirname, "test/helpers/vscodeStub.ts")
+      vscode: path.resolve(import.meta.dirname, "test/helpers/vscodeStub.ts")
     }
   },
   test: {

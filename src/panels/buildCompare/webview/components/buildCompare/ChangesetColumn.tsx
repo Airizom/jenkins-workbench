@@ -30,7 +30,12 @@ export function ChangesetColumn({
           <p className="text-sm [overflow-wrap:anywhere]">{item.message}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {item.author}
-            {item.commitId ? ` · ${item.commitId}` : ""}
+            {item.commitId ? (
+              <>
+                {" · "}
+                <span className="font-mono">{item.commitId}</span>
+              </>
+            ) : null}
           </p>
         </CompareMutedCard>
       ))}

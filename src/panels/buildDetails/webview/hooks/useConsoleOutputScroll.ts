@@ -1,4 +1,5 @@
 import * as React from "react";
+import { prefersReducedMotion } from "../../../shared/webview/lib/motion";
 
 const { useCallback, useEffect, useRef, useState } = React;
 
@@ -17,9 +18,6 @@ const USER_SCROLL_KEYS = new Set([
   "End",
   " "
 ]);
-
-export const prefersReducedMotion = () =>
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 export interface ConsoleScrollPosition {
   isScrollable: boolean;

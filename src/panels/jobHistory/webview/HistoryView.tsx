@@ -102,7 +102,7 @@ function HistoryToolbar({
         {loading ? "Loading…" : "Refresh history"}
       </Button>
       {embedded ? (
-        <Button variant="ghost" size="sm" onClick={() => send("openJob")}>
+        <Button variant="outline" size="sm" onClick={() => send("openJob")}>
           Open job history
         </Button>
       ) : null}

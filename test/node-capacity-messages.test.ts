@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import {
   isLoadNodeCapacityExecutorsMessage,
+  isOpenBuildDetailsMessage,
   isOpenNodeDetailsMessage,
   parseNodeCapacityOutgoingMessage
 } from "../src/panels/nodeCapacity/shared/NodeCapacityPanelMessages";
@@ -24,6 +25,21 @@ describe("NodeCapacityPanelMessages", () => {
     for (const message of invalidMessages) {
       assert.equal(isLoadNodeCapacityExecutorsMessage(message), false);
     }
+  });
+
+  it("validates open build details messages", () => {
+    const buildUrl = "https://jenkins.example/job/api/7/";
+    assert.equal(isOpenBuildDetailsMessage({ type: "openBuildDetails", buildUrl }), true);
+    assert.equal(
+      isOpenBuildDetailsMessage({ type: "openBuildDetails", buildUrl, label: "api #7" }),
+      true
+    );
+    assert.equal(isOpenBuildDetailsMessage({ type: "openBuildDetails" }), false);
+    assert.equal(isOpenBuildDetailsMessage({ type: "openBuildDetails", buildUrl: 7 }), false);
+    assert.equal(
+      isOpenBuildDetailsMessage({ type: "openBuildDetails", buildUrl, label: 1 }),
+      false
+    );
   });
 
   it("accepts load executor messages with string node URLs", () => {

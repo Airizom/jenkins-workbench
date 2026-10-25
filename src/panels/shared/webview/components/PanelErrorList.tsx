@@ -7,6 +7,11 @@ import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card";
 type PanelErrorListProps = {
   errors: string[];
   variant?: "alert" | "card";
+  /**
+   * Alert tone. Use "warning" when the panel still shows usable (older) data;
+   * it is announced politely instead of interrupting like "destructive".
+   */
+  tone?: "destructive" | "warning";
   title?: string;
   id?: string;
   className?: string;
@@ -42,6 +47,7 @@ function RetryButton({
 export function PanelErrorList({
   errors,
   variant = "alert",
+  tone = "destructive",
   title = "Errors",
   id,
   className,
@@ -78,7 +84,7 @@ export function PanelErrorList({
   });
 
   return (
-    <Alert id={id} variant="destructive" className={className ?? "mb-3 flex flex-col gap-1"}>
+    <Alert id={id} variant={tone} className={className ?? "mb-3 flex flex-col gap-1"}>
       {title ? <AlertTitle className="text-xs">{title}</AlertTitle> : null}
       {keyedErrors.map(({ error, key }) => (
         <AlertDescription className="text-xs" key={key}>

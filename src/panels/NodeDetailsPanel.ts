@@ -86,6 +86,7 @@ export class NodeDetailsPanel {
   private nonce = createNonce();
   private advancedLoaded = false;
   private advancedRequested = false;
+  private advancedLoad?: Promise<void>;
 
   static async show(options: NodeDetailsPanelShowOptions): Promise<void> {
     const { dataService, environment, nodeUrl, extensionUri, label, refreshHost } = options;
@@ -228,6 +229,7 @@ export class NodeDetailsPanel {
     this.lastQueuedWork = undefined;
     this.advancedLoaded = false;
     this.advancedRequested = false;
+    this.advancedLoad = undefined;
     this.loadTracker.resetLoadingRequests();
     const panelState =
       this.environment && this.nodeUrl
@@ -274,12 +276,22 @@ export class NodeDetailsPanel {
     await this.refreshDetailsWith(this.currentDetailLevel);
   }
 
-  private async loadAdvancedDetails(): Promise<void> {
+  private loadAdvancedDetails(): Promise<void> {
     if (this.advancedLoaded) {
-      return;
+      return Promise.resolve();
     }
-    this.advancedRequested = true;
-    await this.refreshDetailsWith("advanced");
+    // Share the in-flight request: revisiting the Diagnostics tab mid-load
+    // must not start another full-depth node fetch.
+    if (!this.advancedLoad) {
+      this.advancedRequested = true;
+      const request = this.refreshDetailsWith("advanced").finally(() => {
+        if (this.advancedLoad === request) {
+          this.advancedLoad = undefined;
+        }
+      });
+      this.advancedLoad = request;
+    }
+    return this.advancedLoad;
   }
 
   private async refreshDetailsWith(

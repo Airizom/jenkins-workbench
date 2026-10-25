@@ -22,7 +22,7 @@ describe("ChangesetColumn", () => {
     const html = renderToStaticMarkup(createElement(ChangesetColumn, { title: "Baseline", items }));
 
     assert.equal(html.match(/Merge branch main/g)?.length, 2);
-    assert.equal(html.match(/ · abc123/g)?.length, 2);
+    assert.equal(html.match(/ · <span class="font-mono">abc123<\/span>/g)?.length, 2);
     const keyWarnings = errorSpy.mock.calls.filter((args) =>
       args.some((arg) => typeof arg === "string" && arg.includes("same key"))
     );

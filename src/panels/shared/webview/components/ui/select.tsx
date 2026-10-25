@@ -15,8 +15,8 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-7 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-xs",
-      "text-foreground",
+      "inline-flex h-7 w-full items-center justify-between gap-2 rounded-md border border-dropdown-border bg-dropdown px-2 text-xs",
+      "text-dropdown-foreground",
       focusRingInsetClassName,
       "disabled:cursor-not-allowed disabled:opacity-50",
       className
@@ -42,7 +42,7 @@ export const SelectContent = React.forwardRef<
       position={position}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 max-h-[min(15rem,var(--radix-select-content-available-height,15rem))] min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-widget outline-none",
+        "z-50 max-h-[min(15rem,var(--radix-select-content-available-height,15rem))] min-w-32 overflow-hidden rounded-lg border border-popover-border bg-dropdown-list text-dropdown-foreground shadow-widget outline-none",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
         className
       )}

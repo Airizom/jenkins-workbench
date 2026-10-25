@@ -50,7 +50,7 @@ export function OverviewSummaryCard({
           culpritsLabel=""
           className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
         />
-        <p className="m-0 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {isRunning
             ? "Tests, coverage, changes, and artifacts appear here as the build reports them."
             : "This build reported no tests, coverage, changes, or artifacts."}

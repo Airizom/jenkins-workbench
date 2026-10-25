@@ -2,6 +2,11 @@ import type { PipelineGraphLayoutResult } from "./pipelineGraphTypes";
 
 const CANVAS_PADDING = 40;
 const MIN_SCALE = 0.45;
+// Below this, node labels render under ~9px, so automatic fitting stops here
+// and lets wide graphs overflow (the selected stage is revealed instead).
+const MIN_AUTO_FIT_SCALE = 0.8;
+const MIN_CANVAS_HEIGHT = 220;
+const MAX_CANVAS_HEIGHT = 440;
 const MAX_SCALE = 1.85;
 const MAX_FIT_SCALE = 1;
 
@@ -16,8 +21,9 @@ export interface ViewportContainerSize {
   clientHeight: number;
 }
 
-// Automatic fitting keeps the readable zoom minimum; an explicit Fit request may
-// go below it so large graphs are shown in full.
+// Automatic fitting keeps a readable zoom; an explicit Fit request may go below
+// it so large graphs are shown in full. A layout that still overflows is
+// aligned to its start edge rather than centred, so it opens on the first stage.
 export function createFittedViewport(
   layout: Pick<PipelineGraphLayoutResult, "width" | "height">,
   container: ViewportContainerSize,
@@ -30,10 +36,21 @@ export function createFittedViewport(
   const width = Math.max(container.clientWidth - CANVAS_PADDING * 2, 1);
   const height = Math.max(container.clientHeight - CANVAS_PADDING * 2, 1);
   const fittedScale = Math.min(width / layout.width, height / layout.height, MAX_FIT_SCALE);
-  const scale = options.allowBelowMinimum ? fittedScale : Math.max(fittedScale, MIN_SCALE);
-  const x = (container.clientWidth - layout.width * scale) / 2;
-  const y = (container.clientHeight - layout.height * scale) / 2;
-  return { scale, x, y };
+  const scale = options.allowBelowMinimum ? fittedScale : Math.max(fittedScale, MIN_AUTO_FIT_SCALE);
+  return {
+    scale,
+    x: alignAxis(container.clientWidth, layout.width * scale),
+    y: alignAxis(container.clientHeight, layout.height * scale)
+  };
+}
+
+function alignAxis(available: number, size: number): number {
+  return size + CANVAS_PADDING * 2 > available ? CANVAS_PADDING : (available - size) / 2;
+}
+
+/** Canvas height that fits the layout at natural size, within a readable range. */
+export function resolveCanvasHeight(layout: Pick<PipelineGraphLayoutResult, "height">): number {
+  return clamp(layout.height + CANVAS_PADDING * 2, MIN_CANVAS_HEIGHT, MAX_CANVAS_HEIGHT);
 }
 
 // Keeps the user's zoom and the layout point at the centre of the canvas when

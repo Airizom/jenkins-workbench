@@ -147,7 +147,7 @@ export async function scanMultibranch(
   deps: JobActionDependencies,
   item?: JenkinsFolderTreeItem
 ): Promise<void> {
-  if (!item || item.folderKind !== "multibranch") {
+  if (item?.folderKind !== "multibranch") {
     void vscode.window.showInformationMessage("Select a multibranch folder to scan.");
     return;
   }

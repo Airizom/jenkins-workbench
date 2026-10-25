@@ -727,7 +727,7 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 27. Exercise a long/noisy console and verify the byte and Problem caps are reported explicitly
 28. In both plain and Jenkins-annotated HTML console modes, verify source links compose with search highlighting, ANSI styling, and external Jenkins links
 29. Compare two builds and verify parameter, change, stage, test, and console-difference sections
-30. Open Node Capacity and verify queue, executor, offline-node, and label-pool summaries
+30. Open Node Capacity and verify queue, executor, offline-node, and label-pool summaries; filter pools by label, node, or job; open a running build in Build Details; and check builds pinned to a single node
 31. Open a completed build with Jenkins Coverage data and verify its summary, modified-file data, and editor decorations
 
 ## License

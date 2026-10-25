@@ -9,6 +9,10 @@ import {
 import type { CurrentBranchState } from "./CurrentBranchTypes";
 
 const ACTION_COMMAND = "jenkinsWorkbench.currentBranchActions";
+// Status bar items only support these two background colors. VS Code pairs each
+// with its matching foreground, so `color` stays unset.
+const WARNING_BACKGROUND = new vscode.ThemeColor("statusBarItem.warningBackground");
+const ERROR_BACKGROUND = new vscode.ThemeColor("statusBarItem.errorBackground");
 
 export class CurrentBranchStatusBar implements vscode.Disposable {
   private readonly item: vscode.StatusBarItem;
@@ -42,16 +46,18 @@ export class CurrentBranchStatusBar implements vscode.Disposable {
     }
 
     this.item.text = presentation.text;
-    this.item.color = presentation.color;
+    this.item.backgroundColor = presentation.backgroundColor;
     this.item.tooltip = presentation.tooltip;
     this.item.show();
   }
 }
 
-function getStatusBarPresentation(
-  state: CurrentBranchState
-):
-  | { text: string; color: vscode.ThemeColor | undefined; tooltip: vscode.StatusBarItem["tooltip"] }
+function getStatusBarPresentation(state: CurrentBranchState):
+  | {
+      text: string;
+      backgroundColor: vscode.ThemeColor | undefined;
+      tooltip: vscode.StatusBarItem["tooltip"];
+    }
   | undefined {
   switch (state.kind) {
     case "noGit":
@@ -62,31 +68,31 @@ function getStatusBarPresentation(
     case "resolving":
       return {
         text: "$(sync~spin) Jenkins: Resolving current branch",
-        color: undefined,
+        backgroundColor: undefined,
         tooltip: formatCurrentBranchTooltip(state)
       };
     case "matched":
       return {
         text: `${isCurrentBranchBuilding(state) ? "$(sync~spin)" : iconForMatchedState(state)} Jenkins: ${currentCommitLabel(state)}`,
-        color: colorForMatchedState(state),
+        backgroundColor: backgroundForMatchedState(state),
         tooltip: formatCurrentBranchTooltip(state)
       };
     case "branchMissing":
       return {
         text: `$(warning) Jenkins: ${state.branchName}`,
-        color: new vscode.ThemeColor("statusBarItem.warningForeground"),
+        backgroundColor: WARNING_BACKGROUND,
         tooltip: formatCurrentBranchTooltip(state)
       };
     case "requestFailed":
       return {
         text: `$(warning) Jenkins: ${formatFailedStatusLabel(state)}`,
-        color: new vscode.ThemeColor("statusBarItem.warningForeground"),
+        backgroundColor: WARNING_BACKGROUND,
         tooltip: formatCurrentBranchTooltip(state)
       };
     case "detachedHead":
       return {
         text: "$(circle-slash) Jenkins",
-        color: new vscode.ThemeColor("statusBarItem.inactiveForeground"),
+        backgroundColor: undefined,
         tooltip: formatCurrentBranchTooltip(state)
       };
   }
@@ -97,13 +103,14 @@ function iconForMatchedState(state: Extract<CurrentBranchState, { kind: "matched
   return result === "SUCCESS" ? "$(pass)" : result === "FAILURE" ? "$(error)" : "$(question)";
 }
 
-function colorForMatchedState(
+function backgroundForMatchedState(
   state: Extract<CurrentBranchState, { kind: "matched" }>
 ): vscode.ThemeColor | undefined {
   const result = state.commit?.current?.build.result;
-  return result === "FAILURE" || result === "UNSTABLE"
-    ? new vscode.ThemeColor("statusBarItem.warningForeground")
-    : undefined;
+  if (result === "FAILURE") {
+    return ERROR_BACKGROUND;
+  }
+  return result === "UNSTABLE" ? WARNING_BACKGROUND : undefined;
 }
 
 function formatFailedStatusLabel(

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { prefersReducedMotion } from "../../../shared/webview/lib/motion";
 
 const { useCallback, useEffect, useState } = React;
 
@@ -20,9 +21,6 @@ export function shouldShowScrollToTop({
 }): boolean {
   return scrollTop > Math.max(MIN_SCROLL_DISTANCE_PX, clientHeight / 2);
 }
-
-const prefersReducedMotion = () =>
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 export type ScrollToTopButtonState = {
   showButton: boolean;

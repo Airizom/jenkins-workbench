@@ -4,6 +4,7 @@ import {
   clampZoomScale,
   createFittedViewport,
   recenterViewportOnResize,
+  resolveCanvasHeight,
   revealRectInViewport
 } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineGraph/pipelineGraphViewport";
 
@@ -27,7 +28,25 @@ describe("createFittedViewport", () => {
       { clientWidth: 800, clientHeight: 440 }
     );
 
-    assert.equal(viewport.scale, 0.45);
+    assert.equal(viewport.scale, 0.8);
+  });
+
+  it("aligns an overflowing layout to its start edge instead of centring it", () => {
+    const viewport = createFittedViewport(
+      { width: 2000, height: 200 },
+      { clientWidth: 800, clientHeight: 440 }
+    );
+
+    assert.equal(viewport.x, 40);
+    assert.equal(viewport.y, (440 - 200 * 0.8) / 2);
+  });
+});
+
+describe("resolveCanvasHeight", () => {
+  it("fits short layouts and caps tall ones", () => {
+    assert.equal(resolveCanvasHeight({ height: 60 }), 220);
+    assert.equal(resolveCanvasHeight({ height: 200 }), 280);
+    assert.equal(resolveCanvasHeight({ height: 900 }), 440);
   });
 
   it("does not enlarge small layouts beyond their natural size", () => {

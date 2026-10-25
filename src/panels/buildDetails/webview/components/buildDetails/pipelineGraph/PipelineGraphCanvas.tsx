@@ -11,8 +11,10 @@ import {
   clampZoomScale,
   createFittedViewport,
   recenterViewportOnResize,
+  resolveCanvasHeight,
   revealRectInViewport,
   type ViewportContainerSize,
+  type ViewportRect,
   type ViewportState
 } from "./pipelineGraphViewport";
 
@@ -74,6 +76,20 @@ export function PipelineGraphCanvas({
     setViewport((current) => revealRectInViewport(current, node, container));
   }, []);
 
+  const { x, y, width, height } =
+    (selectedStageKey
+      ? layout.nodes.find((candidate) => candidate.id === selectedStageKey)
+      : undefined) ?? {};
+  // Automatic fits pan the selected stage into view; a graph wider than the
+  // canvas at the readable zoom would otherwise open away from it.
+  const selectedRectRef = useRef<ViewportRect | undefined>(undefined);
+  useEffect(() => {
+    selectedRectRef.current =
+      x === undefined || y === undefined || width === undefined || height === undefined
+        ? undefined
+        : { x, y, width, height };
+  }, [x, y, width, height]);
+
   useEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
@@ -92,30 +108,30 @@ export function PipelineGraphCanvas({
       clientWidth: container.clientWidth,
       clientHeight: container.clientHeight
     });
+    const fitToContainer = (size: ViewportContainerSize): ViewportState => {
+      const fitted = createFittedViewport(layoutRef.current, size);
+      const selectedRect = selectedRectRef.current;
+      return selectedRect ? revealRectInViewport(fitted, selectedRect, size) : fitted;
+    };
     let containerSize = readSize();
     const observer = new ResizeObserver(() => {
       const previousSize = containerSize;
       const nextSize = readSize();
       containerSize = nextSize;
       if (!userAdjustedViewportRef.current) {
-        setViewport(createFittedViewport(layoutRef.current, nextSize));
+        setViewport(fitToContainer(nextSize));
         return;
       }
       setViewport((current) => recenterViewportOnResize(current, previousSize, nextSize));
     });
     observer.observe(container);
     if (!hasAutoFittedRef.current) {
-      setViewport(createFittedViewport(layoutRef.current, container));
+      setViewport(fitToContainer(containerSize));
       hasAutoFittedRef.current = true;
     }
 
     return () => observer.disconnect();
   }, []);
-
-  const { x, y, width, height } =
-    (selectedStageKey
-      ? layout.nodes.find((candidate) => candidate.id === selectedStageKey)
-      : undefined) ?? {};
 
   // Reveal selection when it changes or its geometry arrives from a relayout.
   // Status-only updates should preserve the user's pan.
@@ -320,14 +336,14 @@ export function PipelineGraphCanvas({
         aria-label="Pipeline graph. Arrow keys pan, plus and minus zoom."
         // biome-ignore lint/a11y/noNoninteractiveTabindex: the canvas must be keyboard-focusable so arrow keys can pan and +/- can zoom without a pointer
         tabIndex={0}
-        className="pipeline-graph-canvas relative h-90 overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:h-110"
+        className="pipeline-graph-canvas relative max-h-90 overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:max-h-110"
         onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        style={{ cursor: isPanning ? "grabbing" : "grab" }}
+        style={{ cursor: isPanning ? "grabbing" : "grab", height: resolveCanvasHeight(layout) }}
       >
         <svg className="h-full w-full">
           <title>Pipeline stage graph</title>
@@ -410,9 +426,14 @@ const PipelineGraphStageNode = memo(function PipelineGraphStageNode({
             }
           }}
         >
+          {/* Neutral so it never reads as progress or as the running (blue) state. */}
           <div
-            className="h-1 rounded-full bg-linear-to-r from-primary to-primary/40"
+            aria-hidden="true"
+            className="h-1 rounded-full bg-muted-foreground/35"
             style={{ width: `${accentWidth}%` }}
+            title={`Duration relative to the longest stage${
+              node.stage.durationLabel ? ` (${node.stage.durationLabel})` : ""
+            }`}
           />
           <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">

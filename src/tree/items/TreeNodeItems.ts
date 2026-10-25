@@ -8,9 +8,10 @@ import {
   resolveNodeStatusDescriptor
 } from "../../jenkins/NodeFormatters";
 import { buildNodeActionCapabilities } from "../../jenkins/nodeActionCapabilities";
+import { STATUS_INACTIVE_THEME_COLOR } from "../formatters";
 
 const SERVER_ICON = new vscode.ThemeIcon("server");
-const SERVER_OFFLINE_ICON = new vscode.ThemeIcon("server", new vscode.ThemeColor("charts.gray"));
+const SERVER_OFFLINE_ICON = new vscode.ThemeIcon("server", STATUS_INACTIVE_THEME_COLOR);
 
 export class NodeTreeItem extends vscode.TreeItem {
   public readonly nodeUrl?: string;

@@ -285,24 +285,28 @@ describe("test diff paging and search", () => {
   const passes = (count: number) =>
     report(Array.from({ length: count }, (_, index) => ({ name: `t${index}`, status: "PASSED" })));
 
-  it("renders one page per group with a Show more control and a search box", () => {
+  it("renders one table page per group with a Show more control and a search box", () => {
     const section = buildTestsSection(availableReport(passes(120)), availableReport(failures(120)));
     const html = renderToStaticMarkup(createElement(TestDiffSection, { section }));
 
     assert.equal(section.newFailures.length, 120);
     // Long names wrap instead of truncating behind a tooltip.
-    assert.match(html, /class="min-w-0 text-sm font-medium \[overflow-wrap:anywhere\]">t0</);
+    assert.match(html, /class="min-w-0 font-medium \[overflow-wrap:anywhere\]">t0</);
     assert.equal((html.match(/>t\d+<\/p>/g) ?? []).length, TEST_DIFF_PAGE_SIZE);
+    // One header row per group; Baseline/Target are not repeated on every test.
+    assert.equal(html.match(/<thead/g)?.length, 1);
+    assert.equal(html.match(/>Baseline</g)?.length, 2);
+    assert.match(html, /<td class="px-3 py-2" data-label="Target">/);
     assert.match(html, /Show 50 more \(70 remaining\)/);
-    assert.match(html, /aria-label="Search changed tests by suite, class, or name"/);
-    assert.match(html, /120 changed tests/);
+    assert.match(html, /aria-label="Filter listed tests by suite, class, or name"/);
+    assert.match(html, /120 tests listed/);
   });
 
   it("omits the search box for a handful of changes", () => {
     const section = buildTestsSection(availableReport(passes(3)), availableReport(failures(3)));
     const html = renderToStaticMarkup(createElement(TestDiffSection, { section }));
 
-    assert.doesNotMatch(html, /Search changed tests/);
+    assert.doesNotMatch(html, /Filter listed tests/);
     assert.doesNotMatch(html, /Show \d+ more/);
   });
 

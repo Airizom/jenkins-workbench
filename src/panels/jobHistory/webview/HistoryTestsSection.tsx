@@ -36,6 +36,7 @@ import {
   HISTORY_SORT_LABELS,
   observationGaps,
   selectedBuildIndex,
+  testIdentityLabel,
   unavailableReportBuilds
 } from "./historyPresentation";
 
@@ -63,7 +64,8 @@ function FailureRate({ model, test }: { model: HistoryViewModel; test: TestHisto
   const gaps = observationGaps(test, model);
   return (
     <div className="space-y-1">
-      <div className="tabular-nums">
+      {/* Never-failing rows recede so the failing ones stand out. */}
+      <div className={cn("tabular-nums", test.failed === 0 && "text-muted-foreground")}>
         {rate === undefined ? "—" : `${Math.round(100 * rate)}%`}
         <span className="text-muted-foreground">
           {" "}
@@ -190,25 +192,23 @@ function TestDetailsRow({
   selectedLabel: string;
   send: HistorySend;
 }) {
-  const context = [test.suiteName, test.className].filter(Boolean).join(" · ");
   return (
     <TableRow className="hover:bg-transparent">
       <TableCell colSpan={4} className="bg-muted-soft px-3 pb-3 pt-2">
         <section id={detailsId} aria-labelledby={`${detailsId}-heading`}>
+          {/* The row above already shows the name and suite; only screen readers need them here. */}
           <h3
             id={`${detailsId}-heading`}
             ref={headingRef}
             tabIndex={-1}
-            className="focus-ring mb-1 rounded-sm text-sm font-semibold [overflow-wrap:anywhere]"
+            className="focus-ring mb-1 rounded-sm text-xs font-semibold"
           >
-            {test.name}
+            Outcomes by build
+            <span className="sr-only"> for {testIdentityLabel(test)}</span>
           </h3>
-          {context ? (
-            <p className="mb-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">{context}</p>
-          ) : null}
           <p className="mb-2 text-xs text-muted-foreground">
-            Outcomes by build, newest first. Ambiguous or unavailable results break transition
-            sequences and never count as passes.
+            Newest first. Ambiguous or unavailable results break transition sequences and never
+            count as passes.
           </p>
           <TestOutcomeTimeline
             model={model}
@@ -303,8 +303,9 @@ function UnavailableReportsNote({ model }: { model: HistoryViewModel }) {
       : shown.join(", ");
   return (
     <p className="text-xs text-muted-foreground">
-      No test report for {builds.length === 1 ? "build" : "builds"} {list}. Those builds are left
-      out of failure rates and transitions; they are not counted as passes.
+      {builds.length === 1
+        ? `No test report for build ${list}. That build is left out of failure rates and transitions; it is not counted as a pass.`
+        : `No test report for builds ${list}. Those builds are left out of failure rates and transitions; they are not counted as passes.`}
     </p>
   );
 }
@@ -326,6 +327,8 @@ export function HistoryTestsSection({
   const [page, setPage] = React.useState(0);
   const focusDetails = React.useRef(false);
   const detailsHeading = React.useRef<HTMLHeadingElement>(null);
+  const focusTop = React.useRef(false);
+  const sectionHeading = React.useRef<HTMLSpanElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: These changes reset pagination even though their values are not read by the effect.
   React.useEffect(() => {
     setPage(0);
@@ -336,6 +339,13 @@ export function HistoryTestsSection({
     focusDetails.current = false;
     detailsHeading.current?.focus();
   }, [ui.selectedTest]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only a user page change moves focus.
+  React.useEffect(() => {
+    if (!focusTop.current) return;
+    focusTop.current = false;
+    // Focusing the heading scrolls the new page's first rows into view and keeps keyboard order.
+    sectionHeading.current?.focus();
+  }, [page]);
   const tests = filterTests(model, ui);
   const pageCount = Math.max(1, Math.ceil(tests.length / HISTORY_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -344,6 +354,12 @@ export function HistoryTestsSection({
     currentPage * HISTORY_PAGE_SIZE,
     (currentPage + 1) * HISTORY_PAGE_SIZE
   );
+  const goToPage = (next: number) => {
+    focusTop.current = true;
+    setPage(next);
+  };
+  const firstShown = currentPage * HISTORY_PAGE_SIZE + 1;
+  const lastShown = currentPage * HISTORY_PAGE_SIZE + visible.length;
   const toggle = (key: string) => {
     const expanding = ui.selectedTest !== key;
     focusDetails.current = expanding;
@@ -356,7 +372,16 @@ export function HistoryTestsSection({
     <section aria-labelledby="history-tests-heading" className="space-y-2">
       <SectionHeading
         className="mb-0"
-        title={<span id="history-tests-heading">Tests</span>}
+        title={
+          <span
+            id="history-tests-heading"
+            ref={sectionHeading}
+            tabIndex={-1}
+            className="focus-ring rounded-sm"
+          >
+            Tests
+          </span>
+        }
         count={
           tests.length === model.tests.length
             ? tests.length
@@ -410,7 +435,7 @@ export function HistoryTestsSection({
             <colgroup>
               <col />
               <col className="w-36" />
-              <col className="w-24" />
+              <col className="w-28" />
               <col className="w-48" />
             </colgroup>
             <TableHeader>
@@ -452,18 +477,18 @@ export function HistoryTestsSection({
             variant="outline"
             size="sm"
             disabled={currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
+            onClick={() => goToPage(currentPage - 1)}
           >
             Previous
           </Button>
           <span className="tabular-nums text-muted-foreground">
-            Page {currentPage + 1} of {pageCount}
+            {firstShown}–{lastShown} of {tests.length}
           </span>
           <Button
             variant="outline"
             size="sm"
             disabled={currentPage + 1 >= pageCount}
-            onClick={() => setPage(currentPage + 1)}
+            onClick={() => goToPage(currentPage + 1)}
           >
             Next
           </Button>

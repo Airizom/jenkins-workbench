@@ -52,6 +52,23 @@ export function PlayCircleIcon(props: IconProps) {
     </IconBase>
   );
 }
+export function PauseCircleIcon(props: IconProps) {
+  return (
+    <IconBase defaultClassName="h-8 w-8 text-warning" {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="10" y1="15" x2="10" y2="9" />
+      <line x1="14" y1="15" x2="14" y2="9" />
+    </IconBase>
+  );
+}
+export function PauseIcon(props: IconProps) {
+  return (
+    <IconBase fill="currentColor" stroke="none" {...props}>
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
+    </IconBase>
+  );
+}
 export function StopSquareIcon(props: IconProps) {
   return (
     <IconBase fill="currentColor" stroke="none" {...props}>

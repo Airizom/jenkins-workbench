@@ -5,18 +5,36 @@ import type {
   BuildCompareTestDiffItem
 } from "../../../../shared/BuildCompareContracts";
 import { CompareSectionFrame } from "../shared/CompareSectionFrame";
+import { CompareTable } from "../shared/CompareTable";
 import { AmbiguousTestRow, TestDiffRow } from "./TestDiffRow";
 import { showMoreTestsLabel, TEST_DIFF_PAGE_SIZE } from "./testDiffModel";
 
 const { useState } = React;
 
-/** Renders the first page of a group and reveals the rest a page at a time. */
-function PagedItems<T>({ items, render }: { items: T[]; render: (item: T) => React.ReactNode }) {
+/** Test name first; the per-build columns stay narrow so statuses sit near the name. */
+const TEST_COLUMNS = [
+  { label: "Test" },
+  { label: "Baseline", className: "w-[20%]" },
+  { label: "Target", className: "w-[20%]" }
+];
+
+/** Renders the first page of a group as one table and reveals the rest a page at a time. */
+function PagedTestTable<T>({
+  caption,
+  items,
+  renderRow
+}: {
+  caption: string;
+  items: T[];
+  renderRow: (item: T) => React.ReactNode;
+}) {
   const [visibleCount, setVisibleCount] = useState(TEST_DIFF_PAGE_SIZE);
   const remaining = items.length - visibleCount;
   return (
     <>
-      {items.slice(0, visibleCount).map(render)}
+      <CompareTable caption={caption} columns={TEST_COLUMNS}>
+        {items.slice(0, visibleCount).map(renderRow)}
+      </CompareTable>
       {remaining > 0 ? (
         <Button
           variant="outline"
@@ -52,7 +70,11 @@ export function DiffList({
       description={description}
       tone={tone}
     >
-      <PagedItems items={items} render={(item) => <TestDiffRow key={item.key} item={item} />} />
+      <PagedTestTable
+        caption={title}
+        items={items}
+        renderRow={(item) => <TestDiffRow key={item.key} item={item} />}
+      />
     </CompareSectionFrame>
   );
 }
@@ -71,9 +93,10 @@ export function AmbiguousDiffList({
       total={total}
       description="Duplicate test identity — can't be matched reliably between builds. These tests are not counted as passing, failing, added, or removed."
     >
-      <PagedItems
+      <PagedTestTable
+        caption="Ambiguous tests"
         items={items}
-        render={(item) => <AmbiguousTestRow key={item.key} item={item} />}
+        renderRow={(item) => <AmbiguousTestRow key={item.key} item={item} />}
       />
     </CompareSectionFrame>
   );

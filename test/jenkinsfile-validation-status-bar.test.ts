@@ -8,7 +8,7 @@ const activeEditorListeners: Array<(editor?: vscode.TextEditor) => void> = [];
 let activeTextEditor: vscode.TextEditor | undefined;
 const statusBarItem = {
   text: "",
-  color: undefined as unknown,
+  backgroundColor: undefined as unknown,
   tooltip: undefined as unknown,
   command: undefined as unknown,
   show: vi.fn(),
@@ -63,6 +63,7 @@ describe("JenkinsfileValidationStatusBar", () => {
     activeTextEditor = { document: secondDocument } as vscode.TextEditor;
     activeEditorListeners[0](activeTextEditor);
     assert.equal(statusBarItem.text, "$(warning) Validation unavailable");
+    assert.equal(backgroundColorId(), "statusBarItem.warningBackground");
 
     statusBar.setValidating(secondDocument, environment);
     assert.equal(statusBarItem.text, "$(sync~spin) Validating...");
@@ -70,11 +71,20 @@ describe("JenkinsfileValidationStatusBar", () => {
     stateStore.setResultState(secondDocument, 2, environment, true);
     statusBar.refresh(secondDocument);
     assert.equal(statusBarItem.text, "$(error) Errors: 2 (stale)");
-    assert.equal((statusBarItem.color as { id: string }).id, "statusBarItem.inactiveForeground");
+    assert.equal(backgroundColorId(), undefined);
+
+    stateStore.setResultState(secondDocument, 2, environment);
+    statusBar.refresh(secondDocument);
+    assert.equal(statusBarItem.text, "$(error) Errors: 2");
+    assert.equal(backgroundColorId(), "statusBarItem.errorBackground");
 
     statusBar.dispose();
   });
 });
+
+function backgroundColorId(): string | undefined {
+  return (statusBarItem.backgroundColor as { id: string } | undefined)?.id;
+}
 
 function createDocument(uri: string): vscode.TextDocument {
   return {

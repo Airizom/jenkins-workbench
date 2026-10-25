@@ -22,13 +22,14 @@ import { StageTimingSection } from "./components/buildCompare/StageTimingSection
 import { TestDiffSection } from "./components/buildCompare/TestDiffSection";
 import { useBuildCompareMessages } from "./hooks/useBuildCompareMessages";
 import { useCollapsedSections } from "./hooks/useCollapsedSections";
+import { useStickyOffset } from "./hooks/useStickyOffset";
 import {
   type BuildCompareBusyAction,
   buildCompareReducer,
   createBuildCompareState
 } from "./state/buildCompareState";
 
-const { useEffect, useReducer } = React;
+const { useEffect, useReducer, useRef } = React;
 
 const SECTION_ORDER: BuildCompareSectionId[] = [
   "tests",
@@ -65,11 +66,19 @@ function sectionAnchorId(id: BuildCompareSectionId): string {
   return `compare-section-${id}`;
 }
 
+/** Height of the sticky header + section nav, measured by useStickyOffset. */
+const CHROME_HEIGHT_PROPERTY = "--bc-chrome-height";
+
+const SECTION_LIST_FORMAT = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+
 export function BuildCompareApp({ initialState }: { initialState: BuildCompareViewModel }) {
   const [state, dispatch] = useReducer(buildCompareReducer, initialState, createBuildCompareState);
   const { model, busyAction, actionError, completedAction } = state;
   const postMessage: (message: BuildCompareIncomingMessage) => void = postVsCodeMessage;
   const { isOpen, setOpen } = useCollapsedSections();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const chromeRef = useRef<HTMLDivElement>(null);
+  useStickyOffset(chromeRef, rootRef, CHROME_HEIGHT_PROPERTY);
   useBuildCompareMessages(dispatch);
 
   // Declared after useBuildCompareMessages so the message listener is attached
@@ -109,13 +118,17 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
     )
   };
 
-  // Each failed section explains itself in place; this list only names them.
-  const sectionErrors = SECTION_ORDER.flatMap((id) => {
-    const section = model[id];
-    return section.status === "error"
-      ? [`${COMPARE_SECTION_TITLES[id]}: ${section.summaryLabel}`]
+  // Each failed section explains itself in place; the banner only names them
+  // so the same message is not shown twice.
+  const failedSectionTitles = SECTION_ORDER.filter((id) => model[id].status === "error").map(
+    (id) => COMPARE_SECTION_TITLES[id]
+  );
+  const sectionErrors =
+    failedSectionTitles.length > 0
+      ? [
+          `${SECTION_LIST_FORMAT.format(failedSectionTitles)} could not be compared. Each section below explains why.`
+        ]
       : [];
-  });
   const isLoading = SECTION_ORDER.some((id) => model[id].status === "loading");
   // The console scan runs after the rest of the comparison and can take a while;
   // it must not lock Refresh or Swap (both restart it anyway).
@@ -131,20 +144,28 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
   }));
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div ref={rootRef} className="min-h-screen bg-background text-foreground">
       {busy ? (
         <div className="fixed inset-x-0 top-0 z-50">
           <Progress indeterminate className="h-px rounded-none" />
         </div>
       ) : null}
-      <BuildCompareHeader
-        baseline={model.baseline}
-        target={model.target}
-        busy={actionsBusy}
-        busyAction={busyAction}
-        onRefresh={() => runAction("refresh")}
-        onSwap={() => runAction("swap")}
-      />
+      {/* The header and section nav stick together, so the nav stays usable
+          down the whole comparison; the inner header drops its own sticky chrome. */}
+      <div ref={chromeRef} className="panel-header">
+        <BuildCompareHeader
+          className="static border-b-0 bg-transparent backdrop-filter-none"
+          baseline={model.baseline}
+          target={model.target}
+          busy={actionsBusy}
+          busyAction={busyAction}
+          onRefresh={() => runAction("refresh")}
+          onSwap={() => runAction("swap")}
+        />
+        <div className="mx-auto w-full max-w-7xl px-4 pb-2.5">
+          <CompareSectionNav items={navItems} />
+        </div>
+      </div>
 
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4" aria-busy={busy}>
         {actionError ? (
@@ -162,9 +183,12 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
           onRetry={actionsBusy ? undefined : () => runAction("refresh")}
         />
         <BuildCompareBuildPair baseline={model.baseline} target={model.target} />
-        <CompareSectionNav items={navItems} />
         {SECTION_ORDER.map((id) => (
-          <div key={id} id={sectionAnchorId(id)} className="scroll-mt-20">
+          <div
+            key={id}
+            id={sectionAnchorId(id)}
+            className="scroll-mt-[calc(var(--bc-chrome-height,7rem)+0.75rem)] outline-none"
+          >
             {sectionContent[id]}
           </div>
         ))}

@@ -1,6 +1,12 @@
 import * as React from "react";
-import { countQueuedWorkItems } from "../../../../../shared/queueWork/QueueWorkContracts";
-import { TabCountBadge } from "../../../../shared/webview/components/TabCountBadge";
+import {
+  countQueuedWorkItems,
+  type NodeQueuedWorkViewModel
+} from "../../../../../shared/queueWork/QueueWorkContracts";
+import {
+  TabCountBadge,
+  type TabCountTone
+} from "../../../../shared/webview/components/TabCountBadge";
 import {
   Tabs,
   TabsContent,
@@ -19,7 +25,23 @@ import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
 import { NodeDetailsQueuedWorkSection } from "./NodeDetailsQueuedWorkSection";
 
-const { useState } = React;
+const { useRef, useState } = React;
+
+/**
+ * Waiting work is normal, so the Queue count stays neutral unless an item
+ * needs attention: stuck items use the failure tone, blocked ones warning.
+ */
+export function resolveQueueTabTone(queuedWork: NodeQueuedWorkViewModel): TabCountTone {
+  const items = [
+    ...queuedWork.matchingQueueItems,
+    ...queuedWork.anyQueueItems,
+    ...queuedWork.selfLabelQueueItems
+  ];
+  if (items.some((item) => item.stuck)) {
+    return "failure";
+  }
+  return items.some((item) => item.blocked) ? "warning" : "neutral";
+}
 
 type NodeDetailsTabsProps = {
   state: NodeDetailsState;
@@ -36,12 +58,16 @@ export function NodeDetailsTabs({
   onOpenExternal
 }: NodeDetailsTabsProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<NodeDetailsTab>(NODE_DETAILS_TABS.OVERVIEW);
+  // Radix reports one mouse click twice (focus, then mousedown) before React
+  // re-renders, so compare against a ref rather than the rendered state.
+  const activeTabRef = useRef<NodeDetailsTab>(activeTab);
   const queuedWorkCount = countQueuedWorkItems(state.queuedWork);
 
   const handleValueChange = (value: string) => {
-    if (!isNodeDetailsTab(value)) {
+    if (!isNodeDetailsTab(value) || value === activeTabRef.current) {
       return;
     }
+    activeTabRef.current = value;
     setActiveTab(value);
     onDiagnosticsToggle(value);
   };
@@ -57,15 +83,14 @@ export function NodeDetailsTabs({
           <TabsTrigger value={NODE_DETAILS_TABS.EXECUTORS} className="text-xs">
             <CpuIcon className="h-3.5 w-3.5" />
             Executors
-            <TabCountBadge count={state.executors.length + state.oneOffExecutors.length} />
+            {/* Matches the hero's busy/idle counts; one-off executors are listed
+                separately in the tab. */}
+            <TabCountBadge count={state.executors.length} />
           </TabsTrigger>
           <TabsTrigger value={NODE_DETAILS_TABS.QUEUE} className="text-xs">
             <ClockIcon className="h-3.5 w-3.5" />
             Queue
-            <TabCountBadge
-              count={queuedWorkCount}
-              tone={queuedWorkCount > 0 ? "warning" : "neutral"}
-            />
+            <TabCountBadge count={queuedWorkCount} tone={resolveQueueTabTone(state.queuedWork)} />
           </TabsTrigger>
           <TabsTrigger value={NODE_DETAILS_TABS.DIAGNOSTICS} className="text-xs">
             <GaugeIcon className="h-3.5 w-3.5" />

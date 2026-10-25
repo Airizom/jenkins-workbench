@@ -13,12 +13,12 @@ export const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
+      // VS Code checkboxes keep their background when checked and show state
+      // with the glyph alone; `checkbox.select*` colors are for list rows.
       "peer h-4 w-4 shrink-0 rounded-md border border-checkbox-border bg-checkbox",
-      "text-checkbox-checkedForeground",
+      "text-checkbox-foreground",
       focusRingInsetClassName,
       "disabled:cursor-not-allowed disabled:opacity-50",
-      "data-[state=checked]:bg-checkbox-checked",
-      "data-[state=indeterminate]:bg-checkbox-checked",
       className
     )}
     {...props}

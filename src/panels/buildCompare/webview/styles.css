@@ -41,6 +41,26 @@
   .bc-diff-badge[data-change="removed"] {
     --bc-diff-color: var(--bc-diff-removed);
   }
+
+  /* Words that differ inside a changed parameter value. */
+  .bc-diff-token {
+    border-radius: 2px;
+    color: var(--foreground);
+    text-decoration: none;
+  }
+
+  .bc-diff-token[data-change="added"] {
+    background-color: color-mix(in srgb, var(--bc-diff-added) 24%, transparent);
+  }
+
+  .bc-diff-token[data-change="removed"] {
+    background-color: color-mix(in srgb, var(--bc-diff-removed) 24%, transparent);
+  }
+
+  /* High contrast themes need a boundary, not just a tint. */
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) .bc-diff-token {
+    outline: 1px dashed var(--vscode-contrastBorder, currentColor);
+  }
 }
 
 /* Narrow panels: comparison tables collapse into one stacked card per row with

@@ -22,7 +22,8 @@ type ExecutorSlotGridProps = {
 /**
  * Only busy slots are focusable: they open the running build, while idle and
  * offline slots are labelled images, so a large node does not add dozens of
- * tab stops. The grid's own label carries the counts.
+ * tab stops. Each list's own label carries the counts. One-off executors get
+ * their own row so they stay visible and distinct when the node overflows.
  */
 export function ExecutorSlotGrid({
   executors,
@@ -32,27 +33,73 @@ export function ExecutorSlotGrid({
   onViewAll,
   maxSlots = DEFAULT_MAX_SLOTS
 }: ExecutorSlotGridProps): React.JSX.Element | null {
-  const allExecutors = [
-    ...executors.map((executor) => ({ executor, key: `executor:${executor.id}` })),
-    ...oneOffExecutors.map((executor) => ({ executor, key: `one-off:${executor.id}` }))
-  ];
-  if (allExecutors.length === 0) {
+  if (executors.length === 0 && oneOffExecutors.length === 0) {
     return null;
   }
 
-  const visible = allExecutors.slice(0, maxSlots);
-  const overflow = allExecutors.length - visible.length;
-  const busyCount = allExecutors.filter(({ executor }) => !executor.isIdle).length;
+  return (
+    <div className="space-y-2">
+      {executors.length > 0 ? (
+        <SlotList
+          label="Executor slots"
+          executors={executors}
+          keyPrefix="executor"
+          isOffline={isOffline}
+          maxSlots={maxSlots}
+          onOpenExternal={onOpenExternal}
+          onViewAll={onViewAll}
+        />
+      ) : null}
+      {oneOffExecutors.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-caption text-muted-foreground" aria-hidden="true">
+            One-off
+          </span>
+          <SlotList
+            label="One-off executors"
+            executors={oneOffExecutors}
+            keyPrefix="one-off"
+            isOffline={isOffline}
+            maxSlots={maxSlots}
+            onOpenExternal={onOpenExternal}
+            onViewAll={onViewAll}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SlotList({
+  label,
+  executors,
+  keyPrefix,
+  isOffline,
+  maxSlots,
+  onOpenExternal,
+  onViewAll
+}: {
+  label: string;
+  executors: NodeExecutorViewModel[];
+  keyPrefix: string;
+  isOffline: boolean;
+  maxSlots: number;
+  onOpenExternal: (url: string) => void;
+  onViewAll?: () => void;
+}): React.JSX.Element {
+  const visible = executors.slice(0, maxSlots);
+  const overflow = executors.length - visible.length;
+  const busyCount = executors.filter((executor) => !executor.isIdle).length;
   const restLabel = isOffline ? "offline" : "idle";
 
   return (
     <ul
       className="executor-slot-grid"
-      aria-label={`Executor slots: ${busyCount} busy, ${allExecutors.length - busyCount} ${restLabel}`}
+      aria-label={`${label}: ${busyCount} busy, ${executors.length - busyCount} ${restLabel}`}
     >
-      {visible.map(({ executor, key }) => (
+      {visible.map((executor) => (
         <ExecutorSlot
-          key={key}
+          key={`${keyPrefix}:${executor.id}`}
           executor={executor}
           state={resolveSlotState(executor, isOffline)}
           onOpenExternal={onOpenExternal}

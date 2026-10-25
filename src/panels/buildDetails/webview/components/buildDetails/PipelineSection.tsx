@@ -5,13 +5,13 @@ import {
   ToggleGroupItem
 } from "../../../../shared/webview/components/ui/toggle-group";
 import { WorkflowIcon } from "../../../../shared/webview/icons";
+import { prefersReducedMotion } from "../../../../shared/webview/lib/motion";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
 import type { PipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
-import { prefersReducedMotion } from "../../hooks/useConsoleOutputScroll";
 import { useTabsBarHeightVariable } from "../../hooks/useTabsBarHeightVariable";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";

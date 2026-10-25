@@ -3,12 +3,13 @@ import type {
   CompareSectionStatus
 } from "../../../shared/BuildCompareContracts";
 import type { BuildCompareSectionId } from "../../../shared/BuildComparePanelWebviewState";
-import { isStageStatusRegression } from "./stageDiffModel";
+import { CHANGESETS_EMPTY_LABEL } from "./shared/sectionStatusBadge";
+import { isNewUnsuccessfulStage, isStageStatusRegression } from "./stageDiffModel";
 
 export type CompareNavTone = "failure" | "neutral" | "muted";
 
 export interface CompareSectionNavChip {
-  /** Short visible status, e.g. "2 new failures" or "n/a". */
+  /** Short visible status, e.g. "2 new failures" or "no data". */
   text: string;
   tone: CompareNavTone;
 }
@@ -21,9 +22,10 @@ export const COMPARE_SECTION_TITLES: Record<BuildCompareSectionId, string> = {
   console: "Console"
 };
 
+/** Same words as the section status badges (sectionStatusBadge.ts), shortened. */
 const STATUS_CHIPS: Partial<Record<CompareSectionStatus, CompareSectionNavChip>> = {
   loading: { text: "loading", tone: "muted" },
-  unavailable: { text: "n/a", tone: "muted" },
+  unavailable: { text: "no data", tone: "muted" },
   error: { text: "error", tone: "failure" },
   tooLarge: { text: "too large", tone: "muted" },
   identical: { text: "identical", tone: "neutral" },
@@ -54,8 +56,13 @@ function resolveTestsChip(tests: BuildCompareViewModel["tests"]): CompareSection
 
 function resolveStagesChip(stages: BuildCompareViewModel["stages"]): CompareSectionNavChip {
   const regressed = stages.items.filter(isStageStatusRegression).length;
-  if (regressed > 0) {
-    return { text: `${regressed} regressed`, tone: "failure" };
+  const newUnsuccessful = stages.items.filter(isNewUnsuccessfulStage).length;
+  if (regressed > 0 || newUnsuccessful > 0) {
+    const parts = [
+      regressed > 0 ? `${regressed} regressed` : undefined,
+      newUnsuccessful > 0 ? `${newUnsuccessful} new failing` : undefined
+    ];
+    return { text: parts.filter(Boolean).join(", "), tone: "failure" };
   }
   const slower = stages.items.filter(
     (item) => item.deltaSignificant && item.deltaDirection === "slower"
@@ -101,10 +108,10 @@ export function resolveCompareSectionNavChip(
 ): CompareSectionNavChip {
   const section = model[id];
   if (id === "changesets" && section.status === "empty") {
-    return { text: "none", tone: "neutral" };
+    return { text: CHANGESETS_EMPTY_LABEL.toLowerCase(), tone: "neutral" };
   }
   if (section.status !== "available") {
-    return STATUS_CHIPS[section.status] ?? { text: "n/a", tone: "muted" };
+    return STATUS_CHIPS[section.status] ?? { text: "no data", tone: "muted" };
   }
   switch (id) {
     case "tests":

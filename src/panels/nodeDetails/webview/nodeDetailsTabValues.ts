@@ -13,12 +13,13 @@ export function isNodeDetailsTab(value: string): value is NodeDetailsTab {
   return NODE_DETAILS_TAB_VALUES.includes(value);
 }
 
+/** `loadedOrRequested`: diagnostics are already loaded or a request is still pending. */
 export function loadAdvancedNodeDetailsForTab(
   tab: NodeDetailsTab,
-  advancedLoaded: boolean,
+  loadedOrRequested: boolean,
   load: () => void
 ): void {
-  if (tab === NODE_DETAILS_TABS.DIAGNOSTICS && !advancedLoaded) {
+  if (tab === NODE_DETAILS_TABS.DIAGNOSTICS && !loadedOrRequested) {
     load();
   }
 }

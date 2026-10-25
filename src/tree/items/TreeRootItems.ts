@@ -5,7 +5,12 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
 import { formatActivityGroupLabel } from "../ActivityTypes";
-import { AWAITING_INPUT_THEME_COLOR } from "../formatters";
+import {
+  AWAITING_INPUT_THEME_COLOR,
+  STATUS_FAILURE_THEME_COLOR,
+  STATUS_RUNNING_THEME_COLOR,
+  STATUS_WARNING_THEME_COLOR
+} from "../formatters";
 import { formatBoundedCount, formatCountLabel } from "../TreeCountLabels";
 import { formatEnvironmentIssueLabel, type TreeEnvironmentIssueKind } from "../TreeLoadErrors";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
@@ -19,18 +24,9 @@ const ACTIVITY_GROUP_AWAITING_INPUT_ICON = new vscode.ThemeIcon(
   "debug-pause",
   AWAITING_INPUT_THEME_COLOR
 );
-const ACTIVITY_GROUP_FAILING_ICON = new vscode.ThemeIcon(
-  "error",
-  new vscode.ThemeColor("charts.red")
-);
-const ACTIVITY_GROUP_RUNNING_ICON = new vscode.ThemeIcon(
-  "sync~spin",
-  new vscode.ThemeColor("charts.blue")
-);
-const ACTIVITY_GROUP_UNSTABLE_ICON = new vscode.ThemeIcon(
-  "warning",
-  new vscode.ThemeColor("charts.yellow")
-);
+const ACTIVITY_GROUP_FAILING_ICON = new vscode.ThemeIcon("error", STATUS_FAILURE_THEME_COLOR);
+const ACTIVITY_GROUP_RUNNING_ICON = new vscode.ThemeIcon("sync~spin", STATUS_RUNNING_THEME_COLOR);
+const ACTIVITY_GROUP_UNSTABLE_ICON = new vscode.ThemeIcon("warning", STATUS_WARNING_THEME_COLOR);
 const FOLDER_ICON = new vscode.ThemeIcon("folder");
 const LIST_UNORDERED_ICON = new vscode.ThemeIcon("list-unordered");
 const PINNED_ICON = new vscode.ThemeIcon("pinned");

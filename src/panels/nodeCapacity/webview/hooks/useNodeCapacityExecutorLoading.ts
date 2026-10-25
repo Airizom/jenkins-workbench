@@ -5,6 +5,7 @@ import type {
 } from "../../../../shared/nodeCapacity/NodeCapacityContracts";
 import type { NodeCapacityIncomingMessage } from "../../shared/NodeCapacityPanelMessages";
 import type { NodeCapacityAction } from "../state/nodeCapacityState";
+import { filterPoolNodes, getVisiblePoolNodes, orderPoolNodes } from "../state/nodeCapacityView";
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React;
 
@@ -99,6 +100,7 @@ export function planExecutorLoads(
 export function usePoolOpenStates(pools: readonly NodeCapacityPoolViewModel[]): {
   poolOpenStates: PoolOpenStates;
   handlePoolToggle: (poolId: string, open: boolean) => void;
+  collapsePools: (poolIds: readonly string[]) => void;
 } {
   const [userOpenStates, setUserOpenStates] = useState<PoolOpenStates>(() => new Map());
   const autoOpenedRef = useRef<ReadonlySet<string>>(new Set());
@@ -121,23 +123,83 @@ export function usePoolOpenStates(pools: readonly NodeCapacityPoolViewModel[]): 
       return next;
     });
   }, []);
-  return { poolOpenStates, handlePoolToggle };
+  // Recorded as user choices, so problem pools stay collapsed until toggled.
+  const collapsePools = useCallback((poolIds: readonly string[]) => {
+    setUserOpenStates((current) => {
+      const next = new Map(current);
+      for (const poolId of poolIds) {
+        next.set(poolId, false);
+      }
+      return next;
+    });
+  }, []);
+  return { poolOpenStates, handlePoolToggle, collapsePools };
+}
+
+/** Pools whose node list the user expanded past the preview limit. */
+export function useShowAllNodesPools(): {
+  showAllNodesPoolIds: ReadonlySet<string>;
+  handleShowAllNodesChange: (poolId: string, showAll: boolean) => void;
+} {
+  const [showAllNodesPoolIds, setShowAllNodesPoolIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
+  const handleShowAllNodesChange = useCallback((poolId: string, showAll: boolean) => {
+    setShowAllNodesPoolIds((current) => {
+      if (current.has(poolId) === showAll) {
+        return current;
+      }
+      const next = new Set(current);
+      if (showAll) {
+        next.add(poolId);
+      } else {
+        next.delete(poolId);
+      }
+      return next;
+    });
+  }, []);
+  return { showAllNodesPoolIds, handleShowAllNodesChange };
 }
 
 /**
- * Loads running work for nodes in expanded pools. `reloadAllExecutors` forces
- * the next plan to re-request every expanded node (used by manual refresh).
+ * Nodes whose rows are on screen: in expanded pools that pass the filter,
+ * narrowed by a node-name query, and within each pool's preview limit unless
+ * the user asked to see all of them. Mirrors `NodeCapacityPoolPanel`.
+ */
+export function collectRenderedNodes(
+  visiblePools: readonly NodeCapacityPoolViewModel[],
+  poolOpenStates: PoolOpenStates,
+  showAllNodesPoolIds: ReadonlySet<string>,
+  query: string
+): NodeCapacityNodeViewModel[] {
+  return visiblePools
+    .filter((pool) => isPoolOpen(pool, poolOpenStates))
+    .flatMap((pool) =>
+      getVisiblePoolNodes(
+        orderPoolNodes(filterPoolNodes(pool, query)),
+        showAllNodesPoolIds.has(pool.id)
+      )
+    );
+}
+
+/**
+ * Loads running work for rendered nodes (see `collectRenderedNodes`), so
+ * filtered-out pools and capped rows never cost a Jenkins request.
+ * `reloadAllExecutors` forces the next plan to re-request every rendered node
+ * (used by manual refresh).
  */
 export function useNodeCapacityExecutorLoading(
-  pools: readonly NodeCapacityPoolViewModel[],
+  visiblePools: readonly NodeCapacityPoolViewModel[],
   snapshotId: string,
   poolOpenStates: PoolOpenStates,
+  showAllNodesPoolIds: ReadonlySet<string>,
+  query: string,
   dispatch: React.Dispatch<NodeCapacityAction>,
   postMessage: (message: NodeCapacityIncomingMessage) => void
 ): { handleRetryExecutors: (nodeUrl: string) => void; reloadAllExecutors: () => void } {
   const expandedNodes = useMemo(
-    () => pools.filter((pool) => isPoolOpen(pool, poolOpenStates)).flatMap((pool) => pool.nodes),
-    [pools, poolOpenStates]
+    () => collectRenderedNodes(visiblePools, poolOpenStates, showAllNodesPoolIds, query),
+    [visiblePools, poolOpenStates, showAllNodesPoolIds, query]
   );
 
   const requestIdRef = useRef(0);

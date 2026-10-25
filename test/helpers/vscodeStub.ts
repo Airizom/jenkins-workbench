@@ -2,7 +2,7 @@
  * Default stub for the `vscode` module in Vitest unit tests.
  *
  * The real module only exists inside the extension host, so
- * `vitest.config.ts` aliases `vscode` to this file. It provides the small
+ * `vitest.config.mts` aliases `vscode` to this file. It provides the small
  * set of value classes and enums that pure-logic modules touch at import
  * time. Tests that need richer or observable behavior should override it
  * with `vi.doMock("vscode", () => ({ ...shim }))` before dynamically

@@ -16,7 +16,12 @@ export function TestResultsSummaryCard({ summary }: { summary: BuildTestsSummary
       title="Test results"
       badge={
         summary.hasAnyResults ? (
-          <ToneBadge label={outcome.passRateLabel} tone={outcome.tone} />
+          // A failure-toned "99.7% passed" contradicts itself; the failed tile
+          // already carries the alarm, so the rate stays neutral.
+          <ToneBadge
+            label={outcome.passRateLabel}
+            tone={outcome.tone === "failed" ? "neutral" : outcome.tone}
+          />
         ) : undefined
       }
       description={summary.summaryLabel}

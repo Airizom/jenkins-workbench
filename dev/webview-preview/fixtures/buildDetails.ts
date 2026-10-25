@@ -413,7 +413,14 @@ const freestyle: BuildDetailsViewModel = {
   pipelineStages: [],
   testState: running.testState,
   coverageState: running.coverageState,
-  insights: { ...failed.insights, hasFailedTests: false, artifacts: [], changelogItems: [] },
+  // The test report failed to load (see `errors`), so no test counts are known.
+  insights: {
+    ...failed.insights,
+    hasFailedTests: false,
+    testSummaryLabel: "",
+    artifacts: [],
+    changelogItems: []
+  },
   diagnostics: undefined,
   culpritsLabel: "",
   errors: ["Unable to load test report: HTTP 404 Not Found"]

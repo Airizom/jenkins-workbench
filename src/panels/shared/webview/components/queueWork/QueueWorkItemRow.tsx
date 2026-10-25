@@ -10,12 +10,18 @@ export type QueueWorkItemRowProps = {
   item: QueueWorkItemViewModel;
   onOpenExternal: (url: string) => void;
   action?: "open-button" | "external-icon";
+  /**
+   * Replaces the requested-label badge. Pass `null` to omit it where the
+   * surrounding context already names the label.
+   */
+  labelBadge?: React.ReactNode;
   className?: string;
 };
 export function QueueWorkItemRow({
   item,
   onOpenExternal,
   action = "open-button",
+  labelBadge,
   className
 }: QueueWorkItemRowProps): React.JSX.Element {
   const renderTaskAction = (taskUrl: string): React.JSX.Element =>
@@ -45,18 +51,24 @@ export function QueueWorkItemRow({
   return (
     <div className={className ?? "flex items-start justify-between gap-3"}>
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <TruncatedText text={item.name} className="text-sm font-medium" />
+        {/* The name gets its own line so every row lays out the same whether
+            the name is short or long enough to push the badges down. */}
+        <TruncatedText text={item.name} className="text-sm font-medium" />
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <Badge variant={item.stuck ? "failure" : item.blocked ? "warning" : "muted"}>
             {item.statusLabel}
           </Badge>
-          <Badge variant="outline" className="whitespace-normal wrap-anywhere rounded-md">
-            {item.queuedForLabels.length > 0 ? item.queuedForLabels.join(", ") : "Any node"}
-          </Badge>
-        </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          #{item.position} in queue
-          {item.queuedDurationLabel ? ` · ${item.queuedDurationLabel}` : ""}
+          {labelBadge === undefined ? (
+            <Badge variant="outline" className="whitespace-normal wrap-anywhere rounded-md">
+              {item.queuedForLabels.length > 0 ? item.queuedForLabels.join(", ") : "Any node"}
+            </Badge>
+          ) : (
+            labelBadge
+          )}
+          <span className="text-xs text-muted-foreground">
+            #{item.position} in queue
+            {item.queuedDurationLabel ? ` · ${item.queuedDurationLabel}` : ""}
+          </span>
         </div>
         {item.reason ? (
           <ClampedText

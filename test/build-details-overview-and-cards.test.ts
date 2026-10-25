@@ -59,6 +59,8 @@ function renderOverview(overrides: Partial<Parameters<typeof OverviewTab>[0]> = 
       durationLabel: "4m 52s",
       timestampLabel: "today",
       hasPipelineStages: true,
+      pipelineStages: [],
+      consoleText: "",
       testsSummary: NO_TESTS,
       coverageState: NO_COVERAGE,
       insights: NO_INSIGHTS,
@@ -88,6 +90,37 @@ describe("OverviewTab", () => {
     const html = renderOverview({ hasPipelineStages: false });
     assert.match(html, />View console</);
     assert.doesNotMatch(html, /View pipeline/);
+  });
+
+  it("shows what a running build is doing instead of a coverage placeholder", () => {
+    const html = renderOverview({
+      resultLabel: "Running",
+      resultClass: "running",
+      coverageState: { ...NO_COVERAGE, status: "idle" },
+      pipelineStages: [
+        {
+          key: "build",
+          name: "Compile",
+          statusLabel: "Running",
+          statusClass: "running",
+          durationLabel: "18s",
+          canRestartFromStage: false,
+          hasSteps: false,
+          stepsFailedOnly: [],
+          stepsAll: [],
+          parallelBranches: [],
+          canOpenLog: false
+        }
+      ],
+      consoleText: "+ npm ci\n\u001b[32madded 1284 packages\u001b[0m\n"
+    });
+
+    assert.match(html, />Now running</);
+    assert.match(html, />Compile</);
+    assert.match(html, /18s/);
+    assert.match(html, /\+ npm ci\nadded 1284 packages/);
+    assert.doesNotMatch(html, /Coverage/);
+    assert.doesNotMatch(html, />Build summary</);
   });
 
   it("skips the fallback when anything else is on the tab", () => {

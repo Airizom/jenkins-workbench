@@ -27,9 +27,11 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-border: var(--primary-border);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-border: var(--secondary-border);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted-soft: var(--muted-soft);
@@ -43,6 +45,14 @@
   --color-card-border: var(--card-border);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-popover-border: var(--popover-border);
+  --color-tooltip: var(--tooltip);
+  --color-tooltip-foreground: var(--tooltip-foreground);
+  --color-tooltip-border: var(--tooltip-border);
+  --color-dropdown: var(--dropdown);
+  --color-dropdown-foreground: var(--dropdown-foreground);
+  --color-dropdown-border: var(--dropdown-border);
+  --color-dropdown-list: var(--dropdown-list);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-border: var(--destructive-border);
@@ -53,8 +63,6 @@
   --color-checkbox: var(--checkbox);
   --color-checkbox-foreground: var(--checkbox-foreground);
   --color-checkbox-border: var(--checkbox-border);
-  --color-checkbox-checked: var(--checkbox-checked);
-  --color-checkbox-checked-foreground: var(--checkbox-checked-foreground);
   --color-list-active: var(--list-active);
   --color-list-active-foreground: var(--list-active-foreground);
   --color-list-hover: var(--list-hover);
@@ -70,6 +78,7 @@
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-soft: var(--success-soft);
+  --color-success-surface: var(--success-surface);
   --color-success-border: var(--success-border);
   --color-failure: var(--failure);
   --color-failure-foreground: var(--failure-foreground);
@@ -141,6 +150,12 @@
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
+/* VS Code's `workbench.reduceMotion` setting (which follows the OS by default)
+ * reaches webviews as `body.vscode-reduce-motion`, not as the media query, so
+ * `motion-reduce:` keys off the class. */
+@custom-variant motion-reduce (:where(.vscode-reduce-motion) &);
+@custom-variant motion-safe (:where(body:not(.vscode-reduce-motion)) &);
+
 @utility fade-in-0 {
   --tw-enter-opacity: 0;
 }
@@ -203,16 +218,10 @@
 
 /* Thin, theme-colored scrollbar for horizontal strips (tabs). Unlike
  * `no-scrollbar`, it keeps a visible cue that the strip scrolls; pair it with
- * `overflow-fade-x`. Chromium ignores the ::-webkit rules once the standard
- * properties are set, so both are declared. */
+ * `overflow-fade-x`. */
 @utility scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
 }
 
 /* Contrast outline for fills that carry meaning without a border (progress
@@ -239,10 +248,6 @@
 
 @utility text-list-hoverForeground {
   color: var(--list-hover-foreground);
-}
-
-@utility text-checkbox-checkedForeground {
-  color: var(--checkbox-checked-foreground);
 }
 
 @utility border-inputErrorBorder {
@@ -392,10 +397,21 @@
     border-color: var(--border);
   }
 
+  /* Native controls (search clear buttons, form internals) follow the VS Code
+   * theme kind. `light dark` would follow the OS, which VS Code does not track
+   * by default, so a light theme on a dark OS would get dark controls. */
+  :root:has(> body:is(.vscode-light, .vscode-high-contrast-light)),
+  body:is(.vscode-light, .vscode-high-contrast-light) {
+    color-scheme: light;
+  }
+
+  :root:has(> body:is(.vscode-dark, .vscode-high-contrast):not(.vscode-high-contrast-light)),
+  body:is(.vscode-dark, .vscode-high-contrast):not(.vscode-high-contrast-light) {
+    color-scheme: dark;
+  }
+
   :root,
   body {
-    color-scheme: light dark;
-
     /* Define theme tokens on both `:root` and `body` so they resolve no matter where
      * VS Code injects `--vscode-*` variables in the host. */
     --background: var(--vscode-editor-background);
@@ -410,23 +426,42 @@
     --surface: color-mix(in srgb, var(--background) 95%, var(--foreground));
     --surface-raised: color-mix(in srgb, var(--background) 92%, var(--foreground));
 
-    --shadow-tint: color-mix(in srgb, #000 22%, transparent);
-    --shadow-tint-weak: color-mix(in srgb, #000 12%, transparent);
+    /* Derived from `widget.shadow`, which high-contrast themes leave unset so
+     * elevation never stands in for a contrast border. */
+    --shadow-tint: color-mix(in srgb, var(--vscode-widget-shadow, transparent) 75%, transparent);
+    --shadow-tint-weak: color-mix(
+      in srgb,
+      var(--vscode-widget-shadow, transparent) 40%,
+      transparent
+    );
 
     --card: var(--surface);
     --card-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
     --card-border: var(--border);
 
     --popover: var(--vscode-editorWidget-background, var(--surface-raised));
-    --popover-foreground: var(--vscode-editor-foreground, var(--vscode-foreground));
+    --popover-foreground: var(--vscode-editorWidget-foreground, var(--foreground));
+    --popover-border: var(--vscode-editorWidget-border, var(--border));
+
+    /* Tooltips match VS Code's hovers; select menus match its dropdowns. */
+    --tooltip: var(--vscode-editorHoverWidget-background, var(--popover));
+    --tooltip-foreground: var(--vscode-editorHoverWidget-foreground, var(--popover-foreground));
+    --tooltip-border: var(--vscode-editorHoverWidget-border, var(--popover-border));
+    --dropdown: var(--vscode-dropdown-background, var(--input-background));
+    --dropdown-foreground: var(--vscode-dropdown-foreground, var(--foreground));
+    --dropdown-border: var(--vscode-dropdown-border, var(--input));
+    --dropdown-list: var(--vscode-dropdown-listBackground, var(--dropdown));
 
     --primary: var(--vscode-button-background);
     --primary-foreground: var(--vscode-button-foreground);
     --primary-hover: var(--vscode-button-hoverBackground);
+    /* High-contrast themes outline buttons with these rather than a fill. */
+    --primary-border: var(--vscode-button-border, transparent);
 
     --secondary: var(--vscode-button-secondaryBackground);
     --secondary-foreground: var(--vscode-button-secondaryForeground);
     --secondary-hover: var(--vscode-button-secondaryHoverBackground);
+    --secondary-border: var(--vscode-button-secondaryBorder, var(--primary-border));
 
     /* Translucent foreground tints, not opaque surfaces. They must stay visible
      * when layered on either the canvas or a card, which is why skeletons,
@@ -444,10 +479,17 @@
 
     --accent: var(--vscode-list-hoverBackground, var(--vscode-editor-background));
     --accent-foreground: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));
-    --accent-soft: color-mix(in srgb, var(--accent) 30%, transparent);
+    /* Hover fill for buttons, toggles, tabs, rows and cards. `toolbar.hoverBackground`
+     * is translucent, so it reads on the canvas and on raised surfaces alike;
+     * the opaque `list.hoverBackground` can match a card exactly. High-contrast
+     * themes leave it unset and get a foreground tint. */
+    --accent-soft: var(
+      --vscode-toolbar-hoverBackground,
+      color-mix(in srgb, var(--foreground) 10%, transparent)
+    );
 
     --destructive: var(--vscode-inputValidation-errorBackground);
-    --destructive-foreground: var(--vscode-inputValidation-errorForeground);
+    --destructive-foreground: var(--vscode-inputValidation-errorForeground, var(--foreground));
     --destructive-border: var(--vscode-inputValidation-errorBorder);
 
     /* `--vscode-panel-border` is absent or near-invisible in several themes, so
@@ -483,28 +525,35 @@
     --checkbox: var(--vscode-checkbox-background);
     --checkbox-foreground: var(--vscode-checkbox-foreground);
     --checkbox-border: var(--vscode-checkbox-border);
-    --checkbox-checked: var(--vscode-checkbox-selectBackground, var(--vscode-button-background));
-    --checkbox-checked-foreground: var(
-      --vscode-checkbox-selectForeground,
-      var(--vscode-button-foreground)
-    );
 
     /* Status `*-foreground` tokens are for text on the 10% `*-soft` tints. The raw
      * status colors drop to ~2.6:1 there in Light+ at 11px, so text keeps a
      * hint of the hue but is pulled 60% toward the canvas text color, which
      * keeps it above 4.5:1 in the default light and dark themes. Icons and
      * accents that are not text keep the raw status colors. */
-    --success: var(--vscode-testing-iconPassed, #4ec9b0);
+    /* Status hues come from the extension's contributed colors (package.json
+     * `contributes.colors`), shared with the tree view icons. */
+    --success: var(
+      --vscode-jenkinsWorkbench-status-success,
+      var(--vscode-testing-iconPassed, #4ec9b0)
+    );
     --success-foreground: color-mix(in srgb, var(--success) 40%, var(--foreground));
+    --success-surface: color-mix(in srgb, var(--success) 5%, transparent);
     --success-soft: color-mix(in srgb, var(--success) 10%, transparent);
     --success-border: color-mix(in srgb, var(--success) 50%, transparent);
-    --warning: var(--vscode-editorWarning-foreground, #cca700);
+    --warning: var(
+      --vscode-jenkinsWorkbench-status-warning,
+      var(--vscode-editorWarning-foreground, #cca700)
+    );
     --warning-foreground: color-mix(in srgb, var(--warning) 40%, var(--foreground));
     --warning-surface: color-mix(in srgb, var(--warning) 5%, transparent);
     --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
     --warning-badge: color-mix(in srgb, var(--warning) 20%, transparent);
     --warning-border: color-mix(in srgb, var(--warning) 50%, transparent);
-    --failure: var(--vscode-testing-iconFailed, #f14c4c);
+    --failure: var(
+      --vscode-jenkinsWorkbench-status-failure,
+      var(--vscode-testing-iconFailed, #f14c4c)
+    );
     --failure-foreground: color-mix(in srgb, var(--failure) 40%, var(--foreground));
     --failure-surface: color-mix(in srgb, var(--failure) 5%, transparent);
     --failure-soft: color-mix(in srgb, var(--failure) 10%, transparent);
@@ -516,7 +565,10 @@
     --aborted-border: color-mix(in srgb, var(--aborted) 50%, transparent);
     /* In-progress work. Kept distinct from `--warning` so a running build never
      * reads as unstable, including when reduced motion stops the pulse. */
-    --info: var(--vscode-charts-blue, var(--vscode-progressBar-background, #3794ff));
+    --info: var(
+      --vscode-jenkinsWorkbench-status-running,
+      var(--vscode-charts-blue, var(--vscode-progressBar-background, #3794ff))
+    );
     --info-foreground: color-mix(in srgb, var(--info) 40%, var(--foreground));
     --info-soft: color-mix(in srgb, var(--info) 10%, transparent);
     --info-border: color-mix(in srgb, var(--info) 50%, transparent);
@@ -616,34 +668,6 @@
     background-color: var(--selection);
     color: var(--selection-foreground);
   }
-
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--vscode-scrollbarSlider-background);
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    border-radius: 999px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--vscode-scrollbarSlider-hoverBackground);
-  }
-
-  ::-webkit-scrollbar-thumb:active {
-    background: var(--vscode-scrollbarSlider-activeBackground);
-  }
-
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
 }
 
 @layer components {
@@ -673,7 +697,7 @@
   }
 
   /* Hover lift for cards and rows that navigate or expand. Borders carry the
-   * affordance too, so the cue survives `prefers-reduced-motion`. */
+   * affordance too, so the cue survives reduced motion. */
   .surface-interactive {
     transition:
       background-color 140ms ease,
@@ -749,37 +773,38 @@
 }
 
 @layer utilities {
-  @media (prefers-reduced-motion: reduce) {
-    .animate-collapsible-down,
-    .animate-collapsible-up,
-    .animate-accordion-down,
-    .animate-accordion-up,
-    .animate-ping,
-    .animate-pulse,
-    .animate-spin,
-    .animate-progress-indeterminate,
-    .animate-fade-up,
-    .animate-shimmer,
-    .animate-in,
-    .animate-out {
-      animation: none;
-    }
+  .vscode-reduce-motion
+    :is(
+      .animate-collapsible-down,
+      .animate-collapsible-up,
+      .animate-accordion-down,
+      .animate-accordion-up,
+      .animate-ping,
+      .animate-pulse,
+      .animate-spin,
+      .animate-progress-indeterminate,
+      .animate-fade-up,
+      .animate-shimmer,
+      .animate-in,
+      .animate-out
+    ) {
+    animation: none;
+  }
 
-    .surface-interactive {
-      transition: none;
-    }
+  .vscode-reduce-motion .surface-interactive {
+    transition: none;
+  }
 
-    .surface-interactive:active {
-      transform: none;
-    }
+  .vscode-reduce-motion .surface-interactive:active {
+    transform: none;
+  }
 
-    /* Indeterminate progress indicators rely on animation to show activity; keep
-     * them visible as a static bar instead of a moving one. */
-    .animate-progress-indeterminate {
-      transform: none;
-      width: 100%;
-      opacity: 0.6;
-    }
+  /* Indeterminate progress indicators rely on animation to show activity; keep
+   * them visible as a static bar instead of a moving one. */
+  .vscode-reduce-motion .animate-progress-indeterminate {
+    transform: none;
+    width: 100%;
+    opacity: 0.6;
   }
 }
 
@@ -789,4 +814,12 @@
 body {
   padding: 0 !important;
   background-color: var(--background) !important;
+}
+
+/* The same stylesheet sets `scrollbar-color` on `html` with an editor-colored
+ * track, which then paints as a stripe across cards, wells and the console.
+ * Chromium ignores `::-webkit-scrollbar` rules while `scrollbar-color` is set,
+ * so the standard property is the only lever. */
+html {
+  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
 }

@@ -103,6 +103,30 @@ describe("StageTimingSection", () => {
     assert.match(html, /Not present/);
   });
 
+  it("flags a new stage that did not succeed and lets long stage names wrap", () => {
+    const html = render([
+      {
+        key: "it",
+        name: "Integration Tests / eu-west-1",
+        changeType: "added",
+        targetStatusLabel: "Failed",
+        targetStatusClass: "failure"
+      },
+      {
+        key: "lint",
+        name: "Lint",
+        changeType: "added",
+        targetStatusLabel: "Success",
+        targetStatusClass: "success"
+      }
+    ]);
+
+    assert.equal(html.match(/bg-failure-surface/g)?.length, 1);
+    assert.match(html, /\(new stage did not succeed\)/);
+    assert.doesNotMatch(html, /\btruncate\b[^"]*">Integration Tests/);
+    assert.match(html, /\[overflow-wrap:anywhere\]">Integration Tests/);
+  });
+
   it("only flags stages whose status got worse", () => {
     const matched = (
       key: string,

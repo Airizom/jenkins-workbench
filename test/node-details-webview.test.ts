@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, vi } from "vitest";
 import { nodeDetailsScenarios } from "../dev/webview-preview/fixtures/nodeDetails";
 import { buildNodeActionCapabilities } from "../src/jenkins/nodeActionCapabilities";
+import type { NodeExecutorViewModel } from "../src/panels/nodeDetails/shared/NodeDetailsContracts";
+import { ExecutorSlotGrid } from "../src/panels/nodeDetails/webview/components/nodeDetails/ExecutorSlotGrid";
 import { ExecutorsTableCard } from "../src/panels/nodeDetails/webview/components/nodeDetails/ExecutorsTableCard";
 import { NodeDetailsAdvancedSection } from "../src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsAdvancedSection";
 import { NodeDetailsAlerts } from "../src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsAlerts";
@@ -11,7 +13,10 @@ import {
   type NodeAction,
   NodeDetailsHero
 } from "../src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsHero";
-import { buildStatusRows } from "../src/panels/nodeDetails/webview/components/nodeDetails/nodeDetailsUtils";
+import {
+  buildConnectionRows,
+  formatOfflineSince
+} from "../src/panels/nodeDetails/webview/components/nodeDetails/nodeDetailsUtils";
 import {
   getInitialState,
   nodeDetailsReducer
@@ -93,48 +98,37 @@ describe("NodeDetailsAlerts", () => {
     assert.match(render(false, false), /Unable to load full node details/);
   });
 
+  it("warns instead of erroring when the last loaded details are still shown", () => {
+    assert.match(render(true, false), /role="status"[^>]*class="[^"]*bg-inputWarningBg/);
+    assert.match(render(false, false), /role="alert"[^>]*class="[^"]*bg-inputErrorBg/);
+  });
+
   it("disables Retry while loading", () => {
     assert.match(render(true, true), /<button[^>]*disabled=""[^>]*>.*Retry<\/button>/);
     assert.doesNotMatch(render(true, false), /disabled=""/);
   });
 });
 
-describe("buildStatusRows", () => {
-  const base = {
-    statusLabel: "Online",
-    executorsLabel: "1 of 2 busy",
-    activityLabel: "Running builds",
-    isOffline: false,
-    offlineSinceMs: undefined
-  };
-
-  it("does not repeat the hero status", () => {
-    const labels = buildStatusRows(base).map((row) => row.label);
-    assert.deepEqual(labels, ["Executors", "Activity"]);
-    assert.deepEqual(
-      buildStatusRows({ ...base, statusLabel: "Idle", activityLabel: "Idle" }).map(
-        (row) => row.label
-      ),
-      ["Executors"]
-    );
+describe("Overview helpers", () => {
+  it("formats when the node went offline with the full time as the title", () => {
+    const since = formatOfflineSince(Date.now() - 2 * 60 * 60_000);
+    assert.equal(since?.label, "2h ago");
+    assert.ok(since?.title);
+    assert.equal(formatOfflineSince(undefined), undefined);
   });
 
-  it("shows how long an offline node has been offline instead of Offline again", () => {
-    const rows = buildStatusRows({
-      ...base,
-      statusLabel: "Offline",
-      activityLabel: "Offline",
-      isOffline: true,
-      offlineSinceMs: Date.now() - 2 * 60 * 60_000
-    });
+  it("lists only the connection fields Jenkins reported", () => {
     assert.deepEqual(
-      rows.map((row) => [row.label, row.value]),
+      buildConnectionRows({
+        jnlpAgentLabel: "Yes",
+        launchSupportedLabel: undefined,
+        manualLaunchLabel: "No"
+      }).map((row) => [row.label, row.value]),
       [
-        ["Executors", "1 of 2 busy"],
-        ["Offline since", "2h ago"]
+        ["Inbound (JNLP) agent", "Yes"],
+        ["Manual launch", "No"]
       ]
     );
-    assert.ok(rows[1]?.title);
   });
 });
 
@@ -143,6 +137,7 @@ function renderHero(options: {
   nodeAction?: NodeAction;
   canLaunchAgent?: boolean;
   canOpenAgentInstructions?: boolean;
+  offlineSinceMs?: number;
 }): string {
   return renderToStaticMarkup(
     createElement(
@@ -166,6 +161,7 @@ function renderHero(options: {
         showOfflineBanner: options.statusClass !== "online",
         isOffline: options.statusClass !== "online",
         offlineReason: "Reason",
+        offlineSinceMs: options.offlineSinceMs,
         executors: [],
         oneOffExecutors: [],
         executorsLabel: "2 offline",
@@ -219,6 +215,15 @@ describe("NodeDetailsHero", () => {
     );
   });
 
+  it("says in the offline banner how long the node has been offline", () => {
+    const html = renderHero({
+      statusClass: "offline",
+      offlineSinceMs: Date.now() - 3 * 60 * 60_000
+    });
+    assert.match(html, /title="[^"]+"> · 3h ago<\/span>/);
+    assert.doesNotMatch(renderHero({ statusClass: "offline" }), / · \d/);
+  });
+
   it("uses the failure tone for disconnected nodes and warning for temporarily offline", () => {
     assert.match(renderHero({ statusClass: "offline" }), /border-failure-border bg-failure-soft/);
     assert.match(renderHero({ statusClass: "temporary" }), /border-warning-border bg-warning-soft/);
@@ -226,8 +231,9 @@ describe("NodeDetailsHero", () => {
 });
 
 describe("ExecutorsTableCard", () => {
-  const entries = [{ id: "0", statusLabel: "Offline", isIdle: true }];
-  const render = (isOffline: boolean) =>
+  const busy = { id: "0", statusLabel: "Busy", isIdle: false, workLabel: "web-app #12" };
+  const free = { id: "1", statusLabel: "Idle", isIdle: true };
+  const render = (entries: NodeExecutorViewModel[], isOffline = false) =>
     renderToStaticMarkup(
       createElement(ExecutorsTableCard, {
         title: "Executors",
@@ -238,13 +244,45 @@ describe("ExecutorsTableCard", () => {
     );
 
   it("labels the free-executor filter Offline on offline nodes", () => {
-    assert.match(render(true), />Offline</);
-    assert.doesNotMatch(render(true), />Idle</);
-    assert.match(render(false), />Idle</);
+    assert.match(render([busy, free], true), /<button[^>]*role="radio"[^>]*>Offline<\/button>/);
+    assert.match(render([busy, free], false), /<button[^>]*role="radio"[^>]*>Idle<\/button>/);
   });
 
   it("names the compact filter select", () => {
-    assert.match(render(false), /<button[^>]*aria-label="Executor filter"/);
+    assert.match(render([busy, free]), /<button[^>]*aria-label="Executor filter"/);
+  });
+
+  it("hides the filter when every executor is busy or every executor is free", () => {
+    assert.doesNotMatch(render([free, { ...free, id: "2" }]), /Executor filter/);
+    assert.doesNotMatch(render([busy]), /Executor filter/);
+  });
+
+  it("aligns tables with fixed column widths", () => {
+    assert.match(render([busy, free]), /<table class="[^"]*table-fixed/);
+  });
+});
+
+describe("ExecutorSlotGrid", () => {
+  const busy = { id: "0", statusLabel: "Busy", isIdle: false };
+  const free = { id: "1", statusLabel: "Idle", isIdle: true };
+
+  it("keeps one-off executors in their own list, outside the regular overflow", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(ExecutorSlotGrid, {
+          executors: [busy, free, { ...free, id: "2" }],
+          oneOffExecutors: [{ ...busy, id: "flyweight" }],
+          isOffline: false,
+          onOpenExternal: () => undefined,
+          maxSlots: 2
+        })
+      )
+    );
+    assert.match(html, /aria-label="Executor slots: 1 busy, 2 idle"/);
+    assert.match(html, /aria-label="One-off executors: 1 busy, 0 idle"/);
+    assert.match(html, />\+1</);
   });
 });
 

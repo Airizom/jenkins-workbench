@@ -33,17 +33,15 @@ export function summarizeExecutorUtilization(
   };
 }
 
-/** "3 busy · 1 idle" for online nodes, "4 offline" (plus any draining builds) for offline ones. */
-export function formatExecutorCounts(utilization: ExecutorUtilization): string {
-  if (utilization.isOffline) {
-    if (utilization.busy === 0) {
-      return `${utilization.offline} offline`;
-    }
-    return utilization.offline > 0
-      ? `${utilization.busy} busy · ${utilization.offline} offline`
-      : `${utilization.busy} busy · offline`;
-  }
-  return `${utilization.busy} busy · ${utilization.idle} idle`;
+/**
+ * "+1 one-off" when every one-off executor is running (the usual case: Jenkins
+ * creates them per flyweight task), else "+2 one-off · 1 busy".
+ */
+export function formatOneOffExecutors(utilization: ExecutorUtilization): string {
+  const total = `+${utilization.oneOffTotal} one-off`;
+  return utilization.oneOffBusy === utilization.oneOffTotal
+    ? total
+    : `${total} · ${utilization.oneOffBusy} busy`;
 }
 
 /** Executor ids are "#0" when Jenkins reports a number, else a label like "Executor 1". */

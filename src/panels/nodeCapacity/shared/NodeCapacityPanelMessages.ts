@@ -27,6 +27,13 @@ export interface OpenNodeDetailsMessage {
   label?: string;
 }
 
+/** Opens a running build from an executor row in the Build Details panel. */
+export interface OpenBuildDetailsMessage {
+  type: "openBuildDetails";
+  buildUrl: string;
+  label?: string;
+}
+
 export interface LoadNodeCapacityExecutorsMessage {
   type: "loadNodeCapacityExecutors";
   /** Webview-assigned id echoed in the response so superseded responses can be ignored. */
@@ -48,6 +55,7 @@ export type NodeCapacityIncomingMessage =
   | RefreshNodeCapacityMessage
   | OpenExternalMessage
   | OpenNodeDetailsMessage
+  | OpenBuildDetailsMessage
   | LoadNodeCapacityExecutorsMessage;
 
 export function parseNodeCapacityOutgoingMessage(
@@ -104,6 +112,14 @@ export function isOpenNodeDetailsMessage(message: unknown): message is OpenNodeD
   return (
     hasMessageType(message, "openNodeDetails") &&
     typeof message.nodeUrl === "string" &&
+    (message.label === undefined || typeof message.label === "string")
+  );
+}
+
+export function isOpenBuildDetailsMessage(message: unknown): message is OpenBuildDetailsMessage {
+  return (
+    hasMessageType(message, "openBuildDetails") &&
+    typeof message.buildUrl === "string" &&
     (message.label === undefined || typeof message.label === "string")
   );
 }

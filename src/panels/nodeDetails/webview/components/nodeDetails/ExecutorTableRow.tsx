@@ -30,7 +30,7 @@ function ExecutorStatusCell({
   freeLabel: string;
 }): React.JSX.Element {
   return (
-    <TableCell className="py-1.5 pl-3 pr-0 w-4">
+    <TableCell className="py-1.5 pl-3 pr-0">
       <span
         aria-hidden="true"
         className={cn(
@@ -55,7 +55,7 @@ function ExecutorWorkCell({
   const showStatus = !busy && entry.statusLabel && entry.statusLabel !== buildLabel;
   return (
     <TableCell className="py-1.5 px-3">
-      <div className="flex flex-col">
+      <div className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
         <span
           className={cn("text-xs", busy ? "text-foreground" : "text-muted-foreground")}
           title={entry.workLabel}
@@ -82,8 +82,9 @@ function ExecutorProgressCell({ entry }: { entry: ExecutorEntry }): React.JSX.El
   return (
     <TableCell className="py-1.5 px-3">
       <div className="flex items-center gap-1.5">
-        <Progress value={progressPercent} className="h-1.5 w-28" />
-        <span className="text-caption text-muted-foreground">
+        {/* Narrow panels keep the percent and drop the bar. */}
+        <Progress value={progressPercent} className="hidden h-1.5 w-28 shrink-0 sm:block" />
+        <span className="truncate text-caption text-muted-foreground">
           {entry.progressLabel ?? `${progressPercent}%`}
         </span>
       </div>
@@ -132,7 +133,10 @@ export function ExecutorTableRow({
   return (
     <TableRow>
       <ExecutorStatusCell busy={busy} freeLabel={freeLabel} />
-      <TableCell className="font-mono text-caption text-muted-foreground py-1.5 px-3">
+      <TableCell
+        className="truncate font-mono text-caption text-muted-foreground py-1.5 px-3"
+        title={entry.id}
+      >
         {entry.id}
       </TableCell>
       <ExecutorWorkCell entry={entry} busy={busy} buildLabel={buildLabel} />

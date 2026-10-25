@@ -181,12 +181,18 @@ describe("CoverageGlanceCard", () => {
     summaryOnly: false
   };
 
-  it("explains that coverage waits for completion on running builds", () => {
+  it("labels the overall gate result as a quality gate, not a build status", () => {
     const html = renderToStaticMarkup(
-      createElement(CoverageGlanceCard, { coverageState: idle, isRunning: true })
+      createElement(CoverageGlanceCard, {
+        coverageState: {
+          ...idle,
+          status: "available",
+          overallQualityGateStatusLabel: "Unstable",
+          overallQualityGateStatusClass: "warning"
+        }
+      })
     );
-    assert.match(html, /Coverage is available after the build completes\./);
-    assert.doesNotMatch(html, /Loading coverage/);
+    assert.match(html, />Quality gate: Unstable</);
   });
 
   it("links to coverage details with a matching accessible name", () => {

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { NodeExecutorViewModel } from "../src/panels/nodeDetails/shared/NodeDetailsContracts";
 import {
-  formatExecutorCounts,
   formatExecutorName,
+  formatOneOffExecutors,
   summarizeExecutorUtilization
 } from "../src/panels/nodeDetails/webview/components/nodeDetails/executorUtilization";
 
@@ -76,7 +76,6 @@ describe("offline executor utilization", () => {
 
     assert.equal(utilization.idle, 0);
     assert.equal(utilization.offline, 3);
-    assert.equal(formatExecutorCounts(utilization), "3 offline");
   });
 
   it("keeps draining builds visible next to the offline count", () => {
@@ -86,7 +85,7 @@ describe("offline executor utilization", () => {
       true
     );
 
-    assert.equal(formatExecutorCounts(utilization), "1 busy · 1 offline");
+    assert.deepEqual([utilization.busy, utilization.idle, utilization.offline], [1, 0, 1]);
   });
 
   it("keeps a fully busy offline node marked offline instead of idle", () => {
@@ -96,13 +95,14 @@ describe("offline executor utilization", () => {
       true
     );
 
-    assert.equal(formatExecutorCounts(utilization), "2 busy · offline");
+    assert.deepEqual([utilization.busy, utilization.idle, utilization.offline], [2, 0, 0]);
+    assert.equal(utilization.isOffline, true);
   });
 
   it("does not report idle executors for an offline node without executors", () => {
     const utilization = summarizeExecutorUtilization([], [], true);
 
-    assert.equal(formatExecutorCounts(utilization), "0 offline");
+    assert.deepEqual([utilization.idle, utilization.offline], [0, 0]);
   });
 
   it("formats online nodes as busy and idle counts", () => {
@@ -111,8 +111,18 @@ describe("offline executor utilization", () => {
       []
     );
 
-    assert.equal(utilization.offline, 0);
-    assert.equal(formatExecutorCounts(utilization), "1 busy · 1 idle");
+    assert.deepEqual([utilization.busy, utilization.idle, utilization.offline], [1, 1, 0]);
+  });
+});
+
+describe("formatOneOffExecutors", () => {
+  it("counts one-off executors and notes busy ones only when some are free", () => {
+    const busy = makeExecutor({ isIdle: false });
+    assert.equal(formatOneOffExecutors(summarizeExecutorUtilization([], [busy])), "+1 one-off");
+    assert.equal(
+      formatOneOffExecutors(summarizeExecutorUtilization([], [busy, makeExecutor({ id: "1" })])),
+      "+2 one-off · 1 busy"
+    );
   });
 });
 

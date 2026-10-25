@@ -15,7 +15,7 @@ scripts/**
 .nvmrc
 biome.json
 tsconfig.json
-vite.config.ts
+vite.config.mts
 postcss.config.cjs
 tailwind.config.cjs
 AGENTS.md
@@ -25,7 +25,7 @@ coverage/**
 .vscode-test.mjs
 tsconfig.test.json
 tsconfig.integration.json
-vitest.config.ts
+vitest.config.mts
 .fallow/**
 .fallowrc.jsonc
 fallow-baselines/**

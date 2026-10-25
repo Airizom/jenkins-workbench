@@ -152,13 +152,11 @@
 }
 
 @layer utilities {
-  @media (prefers-reduced-motion: reduce) {
-    .executor-slot[data-state="busy"] {
-      animation: none;
-    }
+  .vscode-reduce-motion .executor-slot[data-state="busy"] {
+    animation: none;
+  }
 
-    .monitor-gauge-fill {
-      transition: none;
-    }
+  .vscode-reduce-motion .monitor-gauge-fill {
+    transition: none;
   }
 }

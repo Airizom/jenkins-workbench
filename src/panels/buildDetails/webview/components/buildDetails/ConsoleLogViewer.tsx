@@ -1,7 +1,8 @@
 import * as React from "react";
+import { prefersReducedMotion } from "../../../../shared/webview/lib/motion";
 import type { BuildDiagnosticConsoleReference } from "../../../shared/BuildDetailsContracts";
 import { buildConsoleSegments } from "../../hooks/consoleSearch/buildConsoleSegments";
-import { prefersReducedMotion, useConsoleOutputScroll } from "../../hooks/useConsoleOutputScroll";
+import { useConsoleOutputScroll } from "../../hooks/useConsoleOutputScroll";
 import { useConsoleSearch } from "../../hooks/useConsoleSearch";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { renderConsoleHtmlWithHighlights } from "../../lib/consoleHtml";

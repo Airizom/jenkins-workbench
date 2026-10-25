@@ -64,6 +64,34 @@ it("keeps advanced details requested when an environment refresh interrupts the 
   assert.equal(updates[0].payload.advancedLoaded, true);
 });
 
+it("shares one in-flight advanced request when Diagnostics is requested repeatedly", async () => {
+  const details: JenkinsNodeDetails = {
+    displayName: "agent-1",
+    offline: false,
+    temporarilyOffline: false
+  };
+  let resolveRequest!: (value: JenkinsNodeDetails) => void;
+  const getNodeDetails = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<JenkinsNodeDetails>((resolve) => {
+          resolveRequest = resolve;
+        })
+    )
+    .mockResolvedValue(details);
+  const { panel } = createPanel({ dataService: { getNodeDetails } });
+
+  const first = panel["loadAdvancedDetails"]();
+  const second = panel["loadAdvancedDetails"]();
+  assert.equal(first, second);
+  resolveRequest(details);
+  await Promise.all([first, second]);
+  await panel["loadAdvancedDetails"]();
+
+  assert.equal(getNodeDetails.mock.calls.length, 1);
+});
+
 function createPanel(overrides: Record<string, unknown> = {}) {
   const postMessage = vi.fn();
   const panel = Object.assign(Object.create(NodeDetailsPanel.prototype), {

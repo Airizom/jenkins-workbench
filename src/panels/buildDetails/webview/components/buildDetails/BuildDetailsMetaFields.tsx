@@ -46,9 +46,16 @@ export function BuildDetailsMetaFields({
               ·
             </span>
           ) : null}
-          <span className="inline-flex items-center gap-1" id={`detail-${id}${idSuffix}`}>
-            <Icon className="h-3 w-3" />
-            {label}
+          {/* Containers wrap between items, never inside one; a culprits list
+           * longer than the row truncates instead. */}
+          <span
+            className="inline-flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap"
+            id={`detail-${id}${idSuffix}`}
+          >
+            <Icon className="h-3 w-3 shrink-0" />
+            <span className="truncate" title={label}>
+              {label}
+            </span>
           </span>
         </React.Fragment>
       ))}

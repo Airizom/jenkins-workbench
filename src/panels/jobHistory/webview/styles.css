@@ -2,11 +2,30 @@
  * This file stays because Build Details imports it for the embedded history view;
  * add rules here only inside `@layer components` and only when no utility fits. */
 
-/* Narrow panels: the builds and tests tables collapse into one stacked card per
- * row (as Build Compare's `bc-stack-table` does), with each cell labelled from
- * `data-label`, so outcomes and actions never scroll out of view. Kept unlayered
- * so it overrides the table's min-width and the cells' Tailwind utilities. */
-@media (max-width: 639.98px) {
+@layer components {
+  /* Selected build marker: a leading bar on the row's first cell (box-shadow on
+   * `tr` does not paint in tables). High-contrast themes use the active border. */
+  .history-selected-cell {
+    box-shadow: inset 3px 0 0 var(--primary);
+  }
+
+  :is(.vscode-high-contrast, .vscode-high-contrast-light) .history-selected-cell {
+    box-shadow: inset 3px 0 0 var(--hc-active);
+  }
+}
+
+/* The builds and tests tables collapse into one stacked card per row (as Build
+ * Compare's `bc-stack-table` does) whenever their own container is narrower than
+ * the tables' minimum width, so outcomes and actions never scroll out of view.
+ * A container query rather than a viewport query, because the same tables sit
+ * inside Build Details' padded "Failure history" disclosure. Each cell is
+ * labelled from `data-label`. Kept unlayered so it overrides the table's
+ * min-width and the cells' Tailwind utilities. */
+.history-stack-table {
+  container-type: inline-size;
+}
+
+@container (max-width: 47.99rem) {
   .history-stack-table table,
   .history-stack-table tbody,
   .history-stack-table tr,
@@ -40,6 +59,21 @@
   .history-stack-table td {
     padding: 0.125rem 0;
     text-align: left;
+    white-space: normal;
+  }
+
+  .history-stack-table td.history-selected-cell {
+    box-shadow: none;
+  }
+
+  .history-stack-table tr:has(> .history-selected-cell) {
+    box-shadow: inset 3px 0 0 var(--primary);
+  }
+
+  :is(.vscode-high-contrast, .vscode-high-contrast-light)
+    .history-stack-table
+    tr:has(> .history-selected-cell) {
+    box-shadow: inset 3px 0 0 var(--hc-active);
   }
 
   .history-stack-table td[data-label] {

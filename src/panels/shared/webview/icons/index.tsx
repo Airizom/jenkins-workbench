@@ -22,6 +22,8 @@ export {
   AlertTriangleIcon,
   CheckCircleIcon,
   InfoIcon,
+  PauseCircleIcon,
+  PauseIcon,
   PlayCircleIcon,
   StopCircleIcon,
   StopSquareIcon,

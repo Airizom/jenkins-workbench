@@ -15,6 +15,7 @@ import { resolveNodeStatusStyle } from "../../../../shared/webview/lib/statusSty
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeExecutorViewModel, NodeStatusClass } from "../../../shared/NodeDetailsContracts";
 import { ExecutorUtilizationSummary } from "./ExecutorUtilizationSummary";
+import { formatOfflineSince } from "./nodeDetailsUtils";
 
 export type NodeAction =
   | { type: "takeNodeOffline"; label: "Take offline…" }
@@ -57,6 +58,8 @@ type NodeDetailsHeroProps = {
   showOfflineBanner: boolean;
   isOffline: boolean;
   offlineReason?: string;
+  /** Epoch ms when the node went offline; shown in the banner as "3h ago". */
+  offlineSinceMs?: number;
   executors: NodeExecutorViewModel[];
   oneOffExecutors: NodeExecutorViewModel[];
   executorsLabel: string;
@@ -85,6 +88,7 @@ export function NodeDetailsHero({
   showOfflineBanner,
   isOffline,
   offlineReason,
+  offlineSinceMs,
   executors,
   oneOffExecutors,
   executorsLabel,
@@ -104,6 +108,7 @@ export function NodeDetailsHero({
   // One filled button at most: the action that resolves the current state.
   // Taking a healthy node offline and opening Jenkins stay secondary.
   const nodeActionIsPrimary = nodeAction?.type === "bringNodeOnline";
+  const offlineSince = formatOfflineSince(offlineSinceMs);
 
   return (
     <header className="node-hero" data-status={statusClass}>
@@ -222,7 +227,14 @@ export function NodeDetailsHero({
               aria-hidden="true"
             />
             <div className="min-w-0 text-xs [overflow-wrap:anywhere]">
-              <span className="font-semibold">{statusLabel}.</span>{" "}
+              <span className="font-semibold">{statusLabel}</span>
+              {offlineSince ? (
+                <span className="text-muted-foreground" title={offlineSince.title}>
+                  {" "}
+                  · {offlineSince.label}
+                </span>
+              ) : null}
+              .{" "}
               <span className="text-muted-foreground">
                 {offlineReason ?? "Jenkins reported this node as offline."}
               </span>

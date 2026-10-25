@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
-import { ExternalLinkIcon } from "../../../../../shared/webview/icons";
+import { ExternalLinkIcon, PauseCircleIcon } from "../../../../../shared/webview/icons";
 import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
@@ -61,23 +61,34 @@ export function describeTestsPill(
   return { label: outcome.countsLabel, className: TESTS_PILL_TONE_CLASSES[outcome.tone] };
 }
 
+// A build paused on an input step is not making progress, so it drops the
+// running pulse and takes the same warning tone as its "Waiting for input" badge.
+const PAUSED_VISUAL_CLASS = "unstable";
+
 function HeroStatusGlyph({
   resultClass,
-  isRunning
+  isRunning,
+  paused
 }: {
   resultClass: string;
   isRunning: boolean;
+  paused: boolean;
 }): React.JSX.Element {
-  const resultStyle = resolveBuildResultStyle(resultClass);
+  const resultStyle = resolveBuildResultStyle(paused ? PAUSED_VISUAL_CLASS : resultClass);
+  const iconClassName = cn("h-6 w-6", resultStyle.iconText);
   return (
     <div
       className={cn(
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs",
         resultStyle.badge,
-        isRunning && "hero-status-glyph--running"
+        isRunning && !paused && "hero-status-glyph--running"
       )}
     >
-      <BuildResultStatusIcon status={resultClass} className={cn("h-6 w-6", resultStyle.iconText)} />
+      {paused ? (
+        <PauseCircleIcon className={iconClassName} />
+      ) : (
+        <BuildResultStatusIcon status={resultClass} className={iconClassName} />
+      )}
     </div>
   );
 }
@@ -94,6 +105,7 @@ function HeroIdentity({
   badgeStatus,
   resultClass,
   isRunning,
+  paused,
   meta
 }: {
   displayName: string;
@@ -101,11 +113,12 @@ function HeroIdentity({
   badgeStatus: string;
   resultClass: string;
   isRunning: boolean;
+  paused: boolean;
   meta: HeroMetaProps;
 }): React.JSX.Element {
   return (
     <div className="flex flex-1 items-center gap-3 min-w-0">
-      <HeroStatusGlyph resultClass={resultClass} isRunning={isRunning} />
+      <HeroStatusGlyph resultClass={resultClass} isRunning={isRunning} paused={paused} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-x-2.5 gap-y-1 min-w-0">
           <h1
@@ -122,9 +135,12 @@ function HeroIdentity({
             className="shrink-0"
           />
         </div>
+        {/* No dot separators: when the row wraps one would dangle at a line end,
+         * and each item's icon already marks where it starts. */}
         <BuildDetailsMetaFields
           {...meta}
-          className="hidden sm:flex items-center gap-2 mt-1 text-xs text-muted-foreground"
+          showSeparators={false}
+          className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground"
         />
       </div>
     </div>
@@ -230,6 +246,7 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
           badgeStatus={badge.status}
           resultClass={resultClass}
           isRunning={isRunning}
+          paused={awaitingInput !== undefined}
           meta={meta}
         />
         <HeroActions
@@ -242,7 +259,8 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
       <BuildDetailsMetaFields
         idSuffix="-sm"
         {...meta}
-        className="sm:hidden flex items-center gap-2 mt-2 text-xs text-muted-foreground"
+        showSeparators={false}
+        className="sm:hidden flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-2 text-xs text-muted-foreground"
       />
       {awaitingInput ? (
         <AwaitingInputBanner summary={awaitingInput} onReview={props.onReviewInputs} />
@@ -253,16 +271,18 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
 
 export function BuildStatusHero(props: BuildStatusHeroProps): React.JSX.Element {
   const { loading, children, ...contentProps } = props;
-  const { resultClass, isRunning } = contentProps;
+  const { resultClass, isRunning, awaitingInput } = contentProps;
   const heroRef = useStickyHeroOffset();
-  const resultStyle = resolveBuildResultStyle(resultClass);
+  const paused = awaitingInput !== undefined;
+  const resultStyle = resolveBuildResultStyle(paused ? PAUSED_VISUAL_CLASS : resultClass);
+  const showActivity = (isRunning && !paused) || loading;
 
   return (
     <header ref={heroRef} className="sticky-header build-details-hero">
-      {isRunning || loading ? (
+      {showActivity ? (
         <Progress
           indeterminate
-          aria-label={isRunning ? "Build in progress" : "Loading build details"}
+          aria-label={isRunning && !paused ? "Build in progress" : "Loading build details"}
           className="h-px rounded-none"
         />
       ) : null}

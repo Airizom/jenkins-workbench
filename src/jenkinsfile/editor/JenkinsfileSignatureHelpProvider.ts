@@ -67,7 +67,7 @@ function buildParameterLabel(parameter: JenkinsfileStepParameter): string {
 
 function resolveActiveSignature(step: JenkinsfileStepDefinition, usesNamedArgs: boolean): number {
   const match = step.signatures.findIndex((signature) => signature.usesNamedArgs === usesNamedArgs);
-  return match >= 0 ? match : 0;
+  return Math.max(match, 0);
 }
 
 function resolveActiveParameter(
@@ -80,7 +80,7 @@ function resolveActiveParameter(
   }
   if (context.activeName) {
     const index = parameters.findIndex((parameter) => parameter.name === context.activeName);
-    return index >= 0 ? index : 0;
+    return Math.max(index, 0);
   }
   return Math.min(context.activeIndex, parameters.length - 1);
 }

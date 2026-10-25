@@ -11,16 +11,15 @@ import {
 } from "../../../../../shared/webview/components/ui/card";
 import { FileIcon } from "../../../../../shared/webview/icons";
 import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/BuildDetailsContracts";
+import { formatQualityGateBadgeLabel } from "../testResults/CoverageSection";
 
 type CoverageGlanceCardProps = {
   coverageState: BuildDetailsCoverageStateViewModel;
-  /** Coverage is only fetched once the build completes. */
-  isRunning?: boolean;
   onShowTests?: () => void;
 };
+/** Rendered for finished builds only; coverage is fetched once a build completes. */
 export function CoverageGlanceCard({
   coverageState,
-  isRunning = false,
   onShowTests
 }: CoverageGlanceCardProps): React.JSX.Element | null {
   if (coverageState.status === "disabled") {
@@ -36,13 +35,13 @@ export function CoverageGlanceCard({
         </div>
         {coverageState.overallQualityGateStatusLabel ? (
           <ToneBadge
-            label={coverageState.overallQualityGateStatusLabel}
+            label={formatQualityGateBadgeLabel(coverageState.overallQualityGateStatusLabel)}
             className={resolveCoverageStatusBadgeClass(coverageState.overallQualityGateStatusClass)}
           />
         ) : null}
       </CardHeader>
       <CardContent className="pb-4">
-        {renderCoverageContent(coverageState, isRunning)}
+        {renderCoverageContent(coverageState)}
         {onShowTests ? (
           <Button
             variant="link"
@@ -61,17 +60,10 @@ export function CoverageGlanceCard({
 
 /** Message for each non-data coverage state; undefined once metrics are ready. */
 function describeCoverageNotice(
-  coverageState: BuildDetailsCoverageStateViewModel,
-  isRunning: boolean
+  coverageState: BuildDetailsCoverageStateViewModel
 ): { message: string; isError: boolean } | undefined {
-  const pending = coverageState.status === "loading" || coverageState.status === "idle";
-  if (pending) {
-    return {
-      message: isRunning
-        ? "Coverage is available after the build completes."
-        : "Loading coverage results for this build.",
-      isError: false
-    };
+  if (coverageState.status === "loading" || coverageState.status === "idle") {
+    return { message: "Loading coverage results for this build.", isError: false };
   }
   if (coverageState.status === "error") {
     return {
@@ -88,10 +80,9 @@ function describeCoverageNotice(
 }
 
 function renderCoverageContent(
-  coverageState: BuildDetailsCoverageStateViewModel,
-  isRunning: boolean
+  coverageState: BuildDetailsCoverageStateViewModel
 ): React.JSX.Element {
-  const notice = describeCoverageNotice(coverageState, isRunning);
+  const notice = describeCoverageNotice(coverageState);
   if (notice) {
     const borderClass = notice.isError ? "border-failure-border-subtle" : "border-border";
     return (

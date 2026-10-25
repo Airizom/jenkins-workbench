@@ -26,7 +26,7 @@ function summary(overrides: Partial<BuildTestsSummaryViewModel>): BuildTestsSumm
 }
 
 describe("TestPassDonutCard", () => {
-  it("uses the skipped tone when every test was skipped", () => {
+  it("shows the skipped count in the ring when every test was skipped", () => {
     const html = renderToStaticMarkup(
       createElement(TestPassDonutCard, {
         summary: {
@@ -45,10 +45,9 @@ describe("TestPassDonutCard", () => {
       })
     );
 
-    const badge = html.match(/<span class="([^"]*)">All skipped<\/span>/);
-    assert.ok(badge);
-    assert.match(badge[1], /border-warning-border/);
-    assert.doesNotMatch(badge[1], /border-success-border/);
+    assert.match(html, /aria-label="Tests all skipped: 0 passed, 5 skipped"/);
+    assert.match(html, />5<\/text>.*>skipped<\/text>/);
+    assert.doesNotMatch(html, /text-success/);
   });
 
   it("never rounds a pass rate up to 100% while tests failed", () => {
@@ -68,9 +67,20 @@ describe("TestPassDonutCard", () => {
       })
     );
 
-    assert.match(html, />100% passed</);
-    assert.match(html, />100%</);
+    assert.match(html, />100%<\/text>.*>passed<\/text>/);
     assert.doesNotMatch(html, /99%/);
+  });
+
+  it("states the pass rate once instead of repeating it in a header badge", () => {
+    const html = renderToStaticMarkup(
+      createElement(TestPassDonutCard, {
+        summary: summary({ failedCount: 0, passedCount: 926 }),
+        onShowTests: () => {}
+      })
+    );
+
+    assert.equal(html.match(/>100%</g)?.length, 1);
+    assert.doesNotMatch(html, />100% passed</);
   });
 
   it("leads with the failed count when tests failed", () => {
@@ -83,6 +93,8 @@ describe("TestPassDonutCard", () => {
     assert.doesNotMatch(html, /100%/);
     assert.doesNotMatch(html, /[^.]\b99% passed/);
     assert.match(html, /View failed tests/);
+    // A couple of failures would be a sliver on a green ring, so no donut.
+    assert.doesNotMatch(html, /role="img"/);
   });
 
   it("keeps the link's visible text as its accessible name", () => {
@@ -95,7 +107,6 @@ describe("TestPassDonutCard", () => {
 
     assert.match(html, /View test results/);
     assert.doesNotMatch(html, /aria-label="Open the Tests tab"/);
-    assert.match(html, />100% passed</);
   });
 });
 

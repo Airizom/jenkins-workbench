@@ -19,9 +19,11 @@ function queueItem(
     name,
     position: id,
     statusLabel: stuck ? "Stuck" : "Waiting",
-    reason: `Waiting for next available executor on ‘${label}’`,
-    queuedForLabel: label,
-    queuedForLabels: [label],
+    reason: label
+      ? `Waiting for next available executor on ‘${label}’`
+      : "Waiting for next available executor",
+    queuedForLabel: label || undefined,
+    queuedForLabels: label ? [label] : [],
     inQueueSince: now - minutes * 60_000,
     queuedDurationLabel: `${minutes}m`,
     taskUrl: `https://jenkins.example.com/job/${name}/`,
@@ -55,9 +57,10 @@ function node(
     isOffline: offline !== false,
     isTemporarilyOffline: offline === "temporary",
     offlineReason,
-    labels,
+    // Jenkins adds each agent's own name as a label; the host hides it from pools.
+    labels: [...labels, name],
     poolLabels: labels,
-    hiddenLabels: [],
+    hiddenLabels: [name],
     totalExecutors: total,
     busyExecutors: offline ? 0 : busy,
     idleExecutors: idle,
@@ -82,7 +85,7 @@ function node(
 
 function pool(
   id: string,
-  label: string,
+  label: string | { any: true },
   severity: NodeCapacityPoolViewModel["severity"],
   statusLabel: string,
   nodes: NodeCapacityNodeViewModel[],
@@ -93,8 +96,8 @@ function pool(
   const offlineNodes = nodes.filter((item) => item.isOffline);
   return {
     id,
-    label,
-    kind: "label",
+    label: typeof label === "string" ? label : "Any node",
+    kind: typeof label === "string" ? "label" : "any",
     severity,
     statusLabel,
     nodes,
@@ -113,40 +116,43 @@ function pool(
   };
 }
 
+const linuxNodes = [
+  node("build-agent-01", ["linux", "docker"], 4, 4),
+  node("build-agent-02", ["linux", "docker"], 4, 4),
+  node(
+    "build-agent-03",
+    ["linux"],
+    4,
+    0,
+    "offline",
+    "Disconnected: java.nio.channels.ClosedChannelException. The agent process exited after the controller restarted; check the agent log on the machine for the full stack trace."
+  ),
+  node("build-agent-04", ["linux"], 2, 0, "temporary", "Draining for kernel upgrade (mia)")
+];
+const macNodes = [
+  node("mac-mini-01", ["macos", "xcode"], 2, 2),
+  node("mac-mini-02", ["macos", "xcode"], 2, 1)
+];
+const windowsNodes = [node("win-agent-01", ["windows"], 2, 0)];
+
 const pools: NodeCapacityPoolViewModel[] = [
+  pool("linux", "linux", "critical", "Stuck queue", linuxNodes, [
+    queueItem(1, "web-app-pr-842", "linux", 14, true),
+    queueItem(2, "api-gateway", "linux", 6),
+    queueItem(3, "billing-service", "linux", 2)
+  ]),
+  pool("macos", "macos", "warning", "Queue pressure", macNodes, [
+    queueItem(4, "ios-app", "macos", 3)
+  ]),
   pool(
-    "linux",
-    "linux",
-    "critical",
-    "Stuck queue",
-    [
-      node("build-agent-01", ["linux", "docker"], 4, 4),
-      node("build-agent-02", ["linux", "docker"], 4, 4),
-      node(
-        "build-agent-03",
-        ["linux"],
-        4,
-        0,
-        "offline",
-        "Disconnected: java.nio.channels.ClosedChannelException. The agent process exited after the controller restarted; check the agent log on the machine for the full stack trace."
-      ),
-      node("build-agent-04", ["linux"], 2, 0, "temporary", "Draining for kernel upgrade (mia)")
-    ],
-    [
-      queueItem(1, "web-app-pr-842", "linux", 14, true),
-      queueItem(2, "api-gateway", "linux", 6),
-      queueItem(3, "billing-service", "linux", 2)
-    ]
+    "any",
+    { any: true },
+    "normal",
+    "Available",
+    [...linuxNodes, ...macNodes, ...windowsNodes],
+    []
   ),
-  pool(
-    "macos",
-    "macos",
-    "warning",
-    "Queue pressure",
-    [node("mac-mini-01", ["macos", "xcode"], 2, 2), node("mac-mini-02", ["macos", "xcode"], 2, 1)],
-    [queueItem(4, "ios-app", "macos", 3)]
-  ),
-  pool("windows", "windows", "normal", "Available", [node("win-agent-01", ["windows"], 2, 0)], [])
+  pool("windows", "windows", "normal", "Available", windowsNodes, [])
 ];
 
 const busy: NodeCapacityViewModel = {
@@ -167,7 +173,7 @@ const busy: NodeCapacityViewModel = {
     saturatedPoolCount: 1
   },
   pools,
-  hiddenLabelQueueItems: [queueItem(5, "docs-site", "hugo", 1)],
+  hiddenLabelQueueItems: [queueItem(5, "docs-site", "mac-mini-02", 1)],
   errors: [],
   loading: false
 };
@@ -198,8 +204,65 @@ const error: NodeCapacityViewModel = {
   errors: ["Request failed with status 503 (Service Unavailable)."]
 };
 
+const stale: NodeCapacityViewModel = {
+  ...busy,
+  updatedAt: new Date(now - 5 * 60_000).toISOString(),
+  hiddenLabelQueueItems: [
+    queueItem(5, "docs-site", "mac-mini-02", 1),
+    queueItem(6, "firmware-flash", "build-agent-03", 32, true)
+  ]
+};
+
+// A larger controller: a long "Any node" list, many label pools, and a mix of
+// severities to exercise the filter, the node cap, and Collapse all.
+const fleetNodes = Array.from({ length: 28 }, (_, index) => {
+  const name = `fleet-${String(index + 1).padStart(2, "0")}`;
+  if (index === 17) {
+    return node(name, ["fleet", "arm64"], 2, 0, "offline", "Agent went offline unexpectedly");
+  }
+  return node(name, ["fleet", index % 2 === 0 ? "amd64" : "arm64"], 2, index % 3 === 0 ? 2 : 1);
+});
+const fleetPools: NodeCapacityPoolViewModel[] = [
+  pool("fleet", "fleet", "warning", "Queue pressure", fleetNodes, [
+    queueItem(7, "integration-tests", "fleet", 4)
+  ]),
+  pool("any", { any: true }, "normal", "Available", fleetNodes, []),
+  ...["amd64", "arm64", "gpu", "k8s-small", "k8s-large", "perf", "release", "sandbox"].map(
+    (label, index) =>
+      pool(
+        label,
+        label,
+        "normal",
+        "Available",
+        fleetNodes.filter((_, nodeIndex) => nodeIndex % 8 === index),
+        []
+      )
+  )
+];
+const fleet: NodeCapacityViewModel = {
+  ...busy,
+  summary: {
+    ...busy.summary,
+    totalNodes: 28,
+    onlineNodes: 27,
+    offlineNodes: 1,
+    totalExecutors: 54,
+    busyExecutors: 36,
+    idleExecutors: 18,
+    offlineExecutors: 2,
+    queuedCount: 1,
+    stuckCount: 0,
+    buildableCount: 1,
+    saturatedPoolCount: 0
+  },
+  pools: fleetPools,
+  hiddenLabelQueueItems: []
+};
+
 export const nodeCapacityScenarios: Record<string, NodeCapacityViewModel> = {
   busy,
+  stale,
+  fleet,
   empty,
   error
 };

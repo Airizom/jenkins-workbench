@@ -67,17 +67,18 @@ function TestSearch({
     <div className="flex flex-wrap items-center gap-2">
       <Input
         type="search"
-        aria-label="Search changed tests by suite, class, or name"
+        aria-label="Filter listed tests by suite, class, or name"
         aria-describedby={statusId}
-        placeholder="Search changed tests"
+        placeholder="Filter tests"
         className="w-72 max-w-full"
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
       />
       <p id={statusId} role="status" className="text-xs text-muted-foreground tabular-nums">
+        {/* "Listed" rather than "changed": the groups include still-failing and ambiguous tests. */}
         {filtering
-          ? `${matchCount.toLocaleString()} of ${totalCount.toLocaleString()} changed tests match`
-          : `${totalCount.toLocaleString()} changed tests`}
+          ? `${matchCount.toLocaleString()} of ${totalCount.toLocaleString()} listed tests match`
+          : `${totalCount.toLocaleString()} ${totalCount === 1 ? "test" : "tests"} listed`}
       </p>
     </div>
   );
@@ -126,7 +127,7 @@ export function TestDiffSection({
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
           No matching tests.
           <Button variant="outline" size="xs" onClick={() => setQuery("")}>
-            Clear search
+            Clear filter
           </Button>
         </div>
       ) : null}

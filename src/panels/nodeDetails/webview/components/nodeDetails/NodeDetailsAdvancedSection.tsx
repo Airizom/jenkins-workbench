@@ -2,7 +2,7 @@ import type * as React from "react";
 import { EmptyState } from "../../../../shared/webview/components/EmptyState";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { Skeleton } from "../../../../shared/webview/components/ui/skeleton";
-import { GaugeIcon, RefreshIcon } from "../../../../shared/webview/icons";
+import { CpuIcon, GaugeIcon, RefreshIcon } from "../../../../shared/webview/icons";
 import type { NodeMonitorViewModel } from "../../../shared/NodeDetailsContracts";
 import { MonitorCard } from "./MonitorCard";
 import { RawJsonCard } from "./RawJsonCard";
@@ -33,8 +33,16 @@ export function NodeDetailsAdvancedSection({
   if (advancedLoaded) {
     diagnosticsContent = (
       <div className="space-y-3">
-        <MonitorCard title="Monitors" entries={monitorData} />
-        <MonitorCard title="Load statistics" entries={loadStatistics} />
+        <MonitorCard
+          icon={<GaugeIcon className="h-4 w-4" />}
+          title="Monitors"
+          entries={monitorData}
+        />
+        <MonitorCard
+          icon={<CpuIcon className="h-4 w-4" />}
+          title="Load statistics"
+          entries={loadStatistics}
+        />
       </div>
     );
   } else if (loading || advancedRequested) {

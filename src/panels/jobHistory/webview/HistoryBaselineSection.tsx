@@ -1,5 +1,6 @@
 import { Badge } from "../../shared/webview/components/ui/badge";
 import { Button } from "../../shared/webview/components/ui/button";
+import { RefreshIcon } from "../../shared/webview/icons";
 import { type HistoryViewModel, historyJobDisplayName } from "../shared/HistoryContracts";
 import type { HistorySend } from "./HistoryOutcomes";
 import { formatHistoryTimestamp } from "./historyPresentation";
@@ -17,13 +18,15 @@ function baselineJobName(
 
 function baselineDetail(model: HistoryViewModel): string {
   const baseline = model.baseline;
-  if (!baseline) return "Resolving baseline…";
+  if (!baseline) return "";
   const parts: string[] = [];
   if (baseline.build) {
+    const anchor =
+      model.selectedBuild === undefined ? "the selected build" : `#${model.selectedBuild}`;
     parts.push(
       `Build #${baseline.build.number}`,
       `started ${formatHistoryTimestamp(baseline.build.timestamp)}`,
-      "latest to complete before the selected build started"
+      `last completed before ${anchor} started`
     );
   }
   if (baseline.message) parts.push(baseline.message);
@@ -40,6 +43,7 @@ export function HistoryBaselineSection({
 }) {
   const baseline = model.baseline;
   const custom = Boolean(baseline?.custom);
+  const detail = baselineDetail(model);
   return (
     <section
       aria-label="Baseline"
@@ -48,9 +52,14 @@ export function HistoryBaselineSection({
       <div className="min-w-0 flex-1 text-sm">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-muted-foreground">Baseline job:</span>
-          <span className="font-medium">
-            {baseline ? baselineJobName(baseline, model.environmentUrl) : "…"}
-          </span>
+          {baseline ? (
+            <span className="font-medium">{baselineJobName(baseline, model.environmentUrl)}</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <RefreshIcon aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+              Resolving…
+            </span>
+          )}
           {baseline?.automatic ? (
             <span className="text-xs text-muted-foreground" title={AUTOMATIC_BASELINE}>
               <span aria-hidden="true">(auto)</span>
@@ -63,7 +72,7 @@ export function HistoryBaselineSection({
             </Badge>
           ) : null}
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">{baselineDetail(model)}</p>
+        {detail ? <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {baseline?.build && model.selectedBuild !== undefined ? (

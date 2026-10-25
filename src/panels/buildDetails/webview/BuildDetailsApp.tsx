@@ -111,9 +111,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     [postMessage]
   );
 
+  const isAwaitingInput = awaitingInput !== undefined;
   const stripSegments = useMemo(
-    () => buildStageStripSegments(state.pipelineStages),
-    [state.pipelineStages]
+    () => buildStageStripSegments(state.pipelineStages, isAwaitingInput),
+    [state.pipelineStages, isAwaitingInput]
   );
   const stripFailedCount = useMemo(() => countFailedSegments(stripSegments), [stripSegments]);
 
@@ -233,10 +234,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             />
           </main>
 
-          {/* Hidden only while a running build follows the log (the page keeps
-           * jumping to the newest output); finished builds always get it. */}
+          {/* Hidden while a running build follows the log (the page keeps
+           * jumping to the newest output), and on the Console tab, whose log
+           * scrolls itself and has its own scroll-to-top control in the same
+           * corner. */}
           <BuildDetailsScrollToTopButton
-            show={showButton && !(isRunning && state.followLog)}
+            show={showButton && !(isRunning && state.followLog) && selectedTab !== "console"}
             onScrollToTop={scrollToTop}
           />
 
