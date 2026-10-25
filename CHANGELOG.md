@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-10-25
+
+### Added
+
+- feat(builds): follow triggered, rebuilt, replayed, and restarted builds until they start, then offer View Build Details, a live log preview, and completion notifications. Manage completion tracking with Show Followed Builds, or disable follow-up with `jenkinsWorkbench.followTriggeredBuilds`.
+
 ### Fixed
 
-- Build Details console links to diagnostic source files now land on the file path instead of drifting through later text. Offsets were computed against the raw log, which kept CRLF line breaks and dropped text annotated by Jenkins (such as the node in `Running on <node>`), while the console shows the HTML rendering.
+- fix(diagnostics): align Build Details console source links with rendered HTML, including CRLF line breaks and Jenkins-annotated text, so links land on the file path instead of later text.
+- fix(builds): match replay and restart causes across localized descriptions and custom display names, preserve proxy URLs, and recover exhausted log polling.
+
+### Changed
+
+- refactor: consolidate polling, concurrency, HTTP handling, storage, tree caches, Jenkinsfile parsing, artifact previews, and panel state contracts; expand regression coverage.
 
 ## [1.59.1] - 2026-10-25
 
