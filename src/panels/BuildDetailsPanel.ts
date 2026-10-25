@@ -6,6 +6,7 @@ import type { JenkinsBuildDetails } from "../jenkins/types";
 import { normalizeJenkinsUrlForComparison, parseBuildUrl } from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
+import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
 import {
@@ -70,6 +71,8 @@ export interface BuildDetailsPanelServices {
   buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
   /** Usually a lazy container reference, resolved on the first keep/edit/delete request. */
   buildManagementWorkflow?: BuildManagementWorkflow;
+  /** Usually a lazy container reference, resolved on the first restart from stage. */
+  buildFollowUp?: BuildFollowUpService;
 }
 
 interface BuildDetailsPanelShowOptions extends BuildDetailsPanelServices {
@@ -92,6 +95,7 @@ interface BuildDetailsPanelMutableServices {
   testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   buildManagementWorkflow?: BuildManagementWorkflow;
+  buildFollowUp?: BuildFollowUpService;
 }
 
 export class BuildDetailsPanel {
@@ -288,7 +292,8 @@ export class BuildDetailsPanel {
       getConsoleExporter: () => this.mutableServices.consoleExporter,
       getRefreshHost: () => this.mutableServices.refreshHost,
       getTestSourceNavigationUiService: () => this.mutableServices.testSourceNavigationUiService,
-      getBuildManagementWorkflow: () => this.mutableServices.buildManagementWorkflow
+      getBuildManagementWorkflow: () => this.mutableServices.buildManagementWorkflow,
+      getBuildFollowUp: () => this.mutableServices.buildFollowUp
     });
     this.messageRouter = createBuildDetailsMessageRouter({
       actions: this.actions,
@@ -638,7 +643,8 @@ function getMutableServices(
     pendingInputProvider: options.pendingInputProvider,
     testSourceResolver: options.testSourceResolver,
     testSourceNavigationUiService: options.testSourceNavigationUiService,
-    buildManagementWorkflow: options.buildManagementWorkflow
+    buildManagementWorkflow: options.buildManagementWorkflow,
+    buildFollowUp: options.buildFollowUp
   };
 }
 

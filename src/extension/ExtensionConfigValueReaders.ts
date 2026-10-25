@@ -16,11 +16,13 @@ export function getBoundedIntegerConfigValue(
   defaultValue: number,
   minimumValue: number
 ): number {
-  const value = config.get<number>(key, defaultValue);
-  if (!Number.isFinite(value)) {
-    return defaultValue;
-  }
-  return Math.max(minimumValue, Math.floor(value));
+  return getClampedIntegerConfigValue(
+    config,
+    key,
+    defaultValue,
+    minimumValue,
+    Number.POSITIVE_INFINITY
+  );
 }
 
 export function getClampedIntegerConfigValue(

@@ -60,6 +60,7 @@ If you change one side, update the others in the same pass.
 - Jenkins limits the exported `builds` list to 100 entries before applying tree ranges. History requests with an explicit offset use `allBuilds`; keep their cache keys separate from ordinary recent-build requests.
 - Cross-build test identity is suite/class/name. Duplicate identities and omitted observations must remain ambiguous/unavailable; neither implies a pass. History budgets and cancellation are shared by Build Details and Job History (`src/history/**`, `src/panels/jobHistory/**`).
 
+- Every flow that starts a build (Trigger Build, current-branch trigger, Rebuild, Quick Replay, replay drafts, local-Jenkinsfile replay, Restart from Stage) calls `BuildFollowUpService.prepare` before submitting and `announceAndFollow` after (`src/services/buildFollow/**`). Rebuild, replay and restart return no queue item, so the new build is found from the job's `nextBuildNumber` read before the submission plus its cause; a new trigger flow must keep that order. `jenkinsWorkbench.followTriggeredBuilds: false` restores the plain message and refresh.
 - Manual refresh is rate-limited (2s cooldown) in `TreeDataProvider.refresh()`. Repeated refresh requests may be ignored by design.
 - Pending input refreshes are queued/throttled with concurrency limits in `PendingInputRefreshCoordinator`; this protects Jenkins from burst traffic.
 - Build Details uses load tokens and panel-visibility-aware polling. If you alter refresh timing, preserve token checks to avoid stale postMessage updates.

@@ -1,6 +1,7 @@
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { runWithConcurrency } from "../shared/concurrency";
 import type {
   NodeCapacityNodeExecutorsResult,
   NodeCapacityViewModel
@@ -80,29 +81,4 @@ export class NodeCapacityService {
 
 function buildExecutorHydrationKey(environment: JenkinsEnvironmentRef, nodeUrl: string): string {
   return `${environment.scope}:${environment.environmentId}:${nodeUrl}`;
-}
-
-async function runWithConcurrency<T, TResult>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<TResult>
-): Promise<TResult[]> {
-  if (items.length === 0) {
-    return [];
-  }
-  const results: TResult[] = [];
-  let nextIndex = 0;
-  const workerCount = Math.min(Math.max(1, concurrency), items.length);
-
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (nextIndex < items.length) {
-        const currentIndex = nextIndex;
-        nextIndex += 1;
-        results[currentIndex] = await worker(items[currentIndex]);
-      }
-    })
-  );
-
-  return results;
 }

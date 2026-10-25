@@ -3,7 +3,7 @@ import { Progress } from "../../../../shared/webview/components/ui/progress";
 import { TableCell, TableRow } from "../../../../shared/webview/components/ui/table";
 import { cn } from "../../../../shared/webview/lib/utils";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
-import { formatExecutorName } from "./executorUtilization";
+import { formatExecutorName, formatFreeExecutorLabel } from "./executorUtilization";
 
 type ExecutorEntry = NodeDetailsState["executors"][number];
 
@@ -16,10 +16,6 @@ type ExecutorTableRowProps = {
 
 function resolveBuildLabel(entry: ExecutorEntry, busy: boolean, freeLabel: string): string {
   return entry.workLabel ?? (busy ? entry.statusLabel || "Busy" : freeLabel);
-}
-
-function resolveProgressPercent(entry: ExecutorEntry): number | undefined {
-  return typeof entry.progressPercent === "number" ? entry.progressPercent : undefined;
 }
 
 function ExecutorStatusCell({
@@ -71,7 +67,7 @@ function ExecutorWorkCell({
 }
 
 function ExecutorProgressCell({ entry }: { entry: ExecutorEntry }): React.JSX.Element {
-  const progressPercent = resolveProgressPercent(entry);
+  const progressPercent = entry.progressPercent;
   if (progressPercent === undefined) {
     return (
       <TableCell className="py-1.5 px-3">
@@ -127,7 +123,7 @@ export function ExecutorTableRow({
   onOpenExternal
 }: ExecutorTableRowProps): React.JSX.Element {
   const busy = !entry.isIdle;
-  const freeLabel = isOffline ? "Offline" : "Idle";
+  const freeLabel = formatFreeExecutorLabel(isOffline);
   const buildLabel = resolveBuildLabel(entry, busy, freeLabel);
 
   return (

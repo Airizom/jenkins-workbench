@@ -1,18 +1,18 @@
 import * as vscode from "vscode";
+import { isJobColorDisabled } from "../../formatters/JobColorFormatters";
 import type { JenkinsJobKind } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { trimToUndefined } from "../../shared/stringValues";
 import type { ActivityGroupKind } from "../ActivityTypes";
 import {
   formatMultibranchFolderDescription,
-  formatMultibranchFolderTooltip,
-  normalizeBranchFilter
+  formatMultibranchFolderTooltip
 } from "../branchFilters";
 import {
   formatJobColor,
   formatJobDescription,
   formatPinnedJobPathContext,
   formatPinnedJobTooltip,
-  isJobColorDisabled,
   jobIcon
 } from "../formatters";
 import {
@@ -72,7 +72,7 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
     this.id = JenkinsFolderTreeItem.buildId(environment, folderUrl, jobScope);
     this.contextValue =
       folderKind === "multibranch"
-        ? normalizeBranchFilter(options?.branchFilter)
+        ? trimToUndefined(options?.branchFilter)
           ? "multibranchFolder branchFiltered"
           : "multibranchFolder"
         : "folder";

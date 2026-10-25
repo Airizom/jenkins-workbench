@@ -1,11 +1,12 @@
 import type { IncomingMessage } from "node:http";
-import { JenkinsMaxBytesError, JenkinsRequestError } from "../errors";
+import { JenkinsRequestError } from "../errors";
 import type { RedirectDecision } from "./redirects";
 import {
+  collectBoundedResponseBuffer,
   collectBoundedResponseText,
-  normalizeMaxBytes,
-  rejectOversizedResponse
+  normalizeMaxBytes
 } from "./responseLimits";
+import { toError } from "./transport";
 import type { JenkinsCollectedResponseBody, JenkinsRequestOptions } from "./types";
 
 export type RequestResponseStatusPolicy = "requireSuccessStatus" | "skipStatusCheck";
@@ -19,15 +20,11 @@ export type RequestResponsePlan =
       statusPolicy: RequestResponseStatusPolicy;
     };
 
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
-function isSuccessStatusCode(statusCode: number): boolean {
+export function isSuccessStatusCode(statusCode: number): boolean {
   return statusCode >= 200 && statusCode < 300;
 }
 
-function buildStatusCodeError(
+export function buildStatusCodeError(
   statusCode: number,
   statusMessage: string | undefined,
   responseText?: string,
@@ -48,35 +45,9 @@ function collectResponseBody(
   statusCode: number,
   options: JenkinsRequestOptions
 ): Promise<JenkinsCollectedResponseBody> {
-  const collectBuffer = options.returnBuffer === true;
   const maxBytes = normalizeMaxBytes(options.maxBytes);
-  if (collectBuffer) {
-    const oversizedResponse = rejectOversizedResponse(res, statusCode, maxBytes);
-    if (oversizedResponse) {
-      return oversizedResponse;
-    }
-
-    return new Promise<JenkinsCollectedResponseBody>((resolve, reject) => {
-      const maxLength = maxBytes ?? Number.POSITIVE_INFINITY;
-      const chunks: Buffer[] = [];
-      let receivedBytes = 0;
-      res.on("data", (chunk) => {
-        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        receivedBytes += buffer.length;
-        if (receivedBytes > maxLength) {
-          reject(new JenkinsMaxBytesError(maxLength, statusCode));
-          res.destroy();
-          return;
-        }
-        chunks.push(buffer);
-      });
-      res.on("end", () => {
-        resolve({ buffer: Buffer.concat(chunks) });
-      });
-      res.on("error", (error) => {
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-    });
+  if (options.returnBuffer === true) {
+    return collectBoundedResponseBuffer(res, statusCode, maxBytes).then((buffer) => ({ buffer }));
   }
 
   return collectBoundedResponseText(res, statusCode, maxBytes, "reject").then((text) => ({ text }));
@@ -120,36 +91,17 @@ function getResponseTextForError(
   return body.text ?? "";
 }
 
-function resolveResponseStatusPolicy(
-  options: JenkinsRequestOptions,
-  redirectDecision: RedirectDecision
-): RequestResponseStatusPolicy {
-  if (
-    redirectDecision.type === "cannotFollow" &&
-    !options.parseJson &&
-    (options.returnHeaders || options.returnText || options.returnBuffer)
-  ) {
-    return "skipStatusCheck";
-  }
-  return "requireSuccessStatus";
-}
-
 export function buildRequestResponsePlan(
   options: JenkinsRequestOptions,
   redirectDecision: RedirectDecision
 ): RequestResponsePlan {
-  const statusPolicy = resolveResponseStatusPolicy(options, redirectDecision);
-  if (
-    redirectDecision.type === "cannotFollow" &&
-    statusPolicy === "requireSuccessStatus" &&
-    !options.parseJson
-  ) {
+  if (redirectDecision.type === "cannotFollow" && !options.parseJson) {
+    if (options.returnHeaders || options.returnText || options.returnBuffer) {
+      return { type: "collectAndMaterialize", statusPolicy: "skipStatusCheck" };
+    }
     return { type: "resolveImmediately" };
   }
-  return {
-    type: "collectAndMaterialize",
-    statusPolicy
-  };
+  return { type: "collectAndMaterialize", statusPolicy: "requireSuccessStatus" };
 }
 
 export async function decodeAndMaterializeResponse<T>(

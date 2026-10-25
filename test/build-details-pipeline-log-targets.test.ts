@@ -110,4 +110,30 @@ describe("findPipelineLogTargetStatus", () => {
     assert.equal(findPipelineLogTargetStatus(stages, buildTarget("missing", "stage")), undefined);
     assert.equal(findPipelineLogTargetStatus(stages, undefined), undefined);
   });
+
+  it("agrees with hasPipelineLogTarget on which targets exist", () => {
+    const stageTarget = buildTarget("stage:build", "stage");
+    const stepTarget = buildTarget("step:compile", "step");
+    const nestedStepTarget = buildTarget("step:archive", "step");
+    const missingTarget = buildTarget("step:missing", "step");
+    const stages = [
+      buildStage("build", stageTarget, {
+        stepsAll: [buildStep("compile", stepTarget)],
+        parallelBranches: [
+          buildStage("branch", undefined, {
+            stepsAll: [buildStep("archive", nestedStepTarget)]
+          })
+        ]
+      })
+    ];
+
+    for (const target of [stageTarget, stepTarget, nestedStepTarget, missingTarget]) {
+      assert.equal(
+        hasPipelineLogTarget(stages, target),
+        findPipelineLogTargetStatus(stages, target) !== undefined,
+        target.key
+      );
+    }
+    assert.equal(hasPipelineLogTarget(stages, missingTarget), false);
+  });
 });

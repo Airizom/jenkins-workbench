@@ -24,9 +24,11 @@ import {
   setVsCodeState
 } from "../../shared/webview/lib/vscodeApi";
 import {
+  HISTORY_WINDOW_SIZES,
   type HistoryUiState,
   type HistoryViewModel,
   historyJobDisplayName,
+  isHistoryWindowSize,
   normalizeHistoryUi
 } from "../shared/HistoryContracts";
 import { HistoryBaselineSection } from "./HistoryBaselineSection";
@@ -35,8 +37,6 @@ import { HistoryContext } from "./HistoryContext";
 import { type HistorySend, useHistoryAction } from "./HistoryOutcomes";
 import { HistoryTestsSection } from "./HistoryTestsSection";
 import { failureHistorySummary, historyAnnouncement } from "./historyPresentation";
-
-const WINDOW_SIZES = [10, 20, 50] as const;
 
 function LoadingState({ label }: { label: string }) {
   return (
@@ -68,7 +68,8 @@ function HistoryToolbar({
         <Select
           value={String(model.count)}
           onValueChange={(value) => {
-            const count = Number(value) as 10 | 20 | 50;
+            const count = Number(value);
+            if (!isHistoryWindowSize(count)) return;
             setUi({ ...ui, count });
             send("window", count);
           }}
@@ -77,7 +78,7 @@ function HistoryToolbar({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {WINDOW_SIZES.map((count) => (
+            {HISTORY_WINDOW_SIZES.map((count) => (
               <SelectItem key={count} value={String(count)}>
                 {count} builds
               </SelectItem>

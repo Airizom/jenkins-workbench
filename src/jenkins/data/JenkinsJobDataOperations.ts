@@ -33,6 +33,12 @@ export class JenkinsJobDataOperations {
     return client.getJob(jobUrl);
   }
 
+  /** Always asks Jenkins; a cached number would point at a build that already started. */
+  async getNextBuildNumber(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<number> {
+    const client = await this.context.getClient(environment);
+    return client.getNextBuildNumber(jobUrl);
+  }
+
   async getJobInfo(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<JenkinsJobInfo> {
     const cacheKey = await this.context.buildCacheKey(environment, "job", jobUrl);
     return this.context.getCache().getOrLoad(

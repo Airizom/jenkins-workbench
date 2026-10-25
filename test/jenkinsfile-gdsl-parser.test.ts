@@ -313,6 +313,18 @@ if (enclosingCall('node') && check(/* ) */ true)) { method(name: 'commented') }
     }
   });
 
+  it("resolves guards for many if blocks without rescanning the body", () => {
+    const count = 5_000;
+    const body = "if (enclosingCall('node')) { method(name: 'x') }\n".repeat(count);
+    const started = performance.now();
+    const calls = scanMethodCalls(body);
+    const elapsed = performance.now() - started;
+
+    assert.equal(calls.length, count);
+    assert.ok(calls.every((call) => call.requiresNodeContext));
+    assert.ok(elapsed < 2_000, `scanMethodCalls took ${elapsed}ms`);
+  });
+
   it("uses the shared string reader for escaped and triple-quoted strings", () => {
     const escaped = String.raw`'escaped \' quote' trailing`;
     const escapedResult = readGdslString(escaped, 0);

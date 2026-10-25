@@ -76,34 +76,6 @@ export function findMatchingDelimiter(
   throw new Error(`Unterminated GDSL delimiter '${openChar}'.`);
 }
 
-export function findMatchingDelimiterBackward(
-  text: string,
-  closeIndex: number,
-  openChar: string,
-  closeChar: string
-): number {
-  const openIndices: number[] = [];
-  let index = 0;
-  while (index <= closeIndex) {
-    const nextIndex = skipStringOrComment(text, index);
-    if (nextIndex !== undefined) {
-      index = nextIndex;
-      continue;
-    }
-    const character = text[index];
-    if (character === openChar) {
-      openIndices.push(index);
-    } else if (character === closeChar) {
-      const openIndex = openIndices.pop();
-      if (index === closeIndex && openIndex !== undefined) {
-        return openIndex;
-      }
-    }
-    index += 1;
-  }
-  throw new Error(`Unterminated GDSL delimiter '${closeChar}'.`);
-}
-
 export function readGdslString(
   text: string,
   start: number
@@ -213,7 +185,7 @@ export function readIdentifierBackward(text: string, end: number): string | unde
   return text.slice(start, end + 1);
 }
 
-function skipStringOrComment(text: string, index: number): number | undefined {
+export function skipStringOrComment(text: string, index: number): number | undefined {
   const character = text[index];
   if (character === "'" || character === '"') {
     return skipString(text, index);

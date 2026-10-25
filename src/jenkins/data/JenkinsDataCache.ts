@@ -31,13 +31,20 @@ export class JenkinsDataCache {
   }
 
   clearForEnvironment(environmentId: string): void {
-    const prefix = `${environmentId}:`;
+    this.clearByPrefix(`${environmentId}:`);
+  }
+
+  clearByPrefix(prefix: string): void {
     this.invalidatePendingLoads(prefix);
     for (const key of this.cache.keys()) {
       if (key.startsWith(prefix)) {
         this.cache.delete(key);
       }
     }
+  }
+
+  keys(): string[] {
+    return Array.from(this.cache.keys()).filter((key) => this.has(key));
   }
 
   get<T>(key: string): T | undefined {

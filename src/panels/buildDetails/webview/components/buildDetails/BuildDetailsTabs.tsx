@@ -29,10 +29,12 @@ import type {
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
+import { useTabsBarHeightVariable } from "../../hooks/useTabsBarHeightVariable";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import type { PendingInputProcessingAction } from "../../state/buildDetailsState";
 import { resolveBuildDetailsSelectedTab } from "./buildDetailsTabsModel";
 import { ConsoleOutputSection } from "./ConsoleOutputSection";
+import { LoadingDot } from "./LoadingDot";
 import { OverviewTab } from "./overview/OverviewTab";
 import type { RelatedBuildsSectionProps } from "./overview/RelatedBuildsSection";
 import { PendingInputsSection } from "./PendingInputsSection";
@@ -71,10 +73,7 @@ function PipelineTabStatus({
   if (loading) {
     return (
       <span className="inline-flex items-center">
-        <span
-          aria-hidden="true"
-          className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
-        />
+        <LoadingDot />
         <span className="sr-only">(Loading)</span>
       </span>
     );
@@ -235,6 +234,7 @@ export function BuildDetailsTabs({
     hasPipelineStages,
     hasTests
   });
+  useTabsBarHeightVariable();
 
   return (
     <Tabs

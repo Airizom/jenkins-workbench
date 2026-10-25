@@ -30,6 +30,8 @@ import { JobHistoryPanelLauncher } from "../../panels/JobHistoryPanelLauncher";
 import { BuildInspectionBackendAdapter } from "../../panels/shared/backend/BuildInspectionBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import { BuildManagementWorkflow } from "../../services/build/BuildManagementWorkflow";
+import { BuildCompletionTracker } from "../../services/buildFollow/BuildCompletionTracker";
+import { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
@@ -38,7 +40,11 @@ import { JenkinsfileValidationCodeLensProvider } from "../../validation/editor/J
 import { JenkinsfileValidationHoverProvider } from "../../validation/editor/JenkinsfileValidationHoverProvider";
 import { JenkinsStatusPoller } from "../../watch/JenkinsStatusPoller";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
-import { getExtensionConfiguration, getWatchNotificationOptions } from "../ExtensionConfig";
+import {
+  getExtensionConfiguration,
+  getFollowTriggeredBuilds,
+  getWatchNotificationOptions
+} from "../ExtensionConfig";
 import { createExtensionRefreshHost } from "../ExtensionRefreshHost";
 import { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLinkBuildHandler";
 import { JenkinsWorkbenchDeepLinkJobHandler } from "../JenkinsWorkbenchDeepLinkJobHandler";
@@ -180,8 +186,41 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         // Lazy: the workflow is built on the first hero action. Its draft manager is
         // resolved at activation (ExtensionRuntime), so only the workflow is deferred.
         buildManagementWorkflow: container.lazy("buildManagementWorkflow"),
+        // Lazy: the follow-up service holds a lazy launcher reference of its own.
+        buildFollowUp: container.lazy("buildFollowUpService"),
         extensionUri: options.extensionUri
       }),
+    // Shared by the started notification and the completion tracker; resolves its targets on use.
+    followedBuildActions: (container) => ({
+      showBuildDetails: (build) =>
+        container.get("buildDetailsPanelLauncher").show({
+          environment: build.environment,
+          buildUrl: build.buildUrl,
+          label: build.label
+        }),
+      previewLog: (build) => container.get("buildLogTailer").open(build)
+    }),
+    buildFollowUpService: (container) => {
+      const service = new BuildFollowUpService({
+        dataService: container.get("dataService"),
+        locator: container.get("triggeredBuildLocator"),
+        queuedBuildWaiter: container.get("queuedBuildWaiter"),
+        actions: container.get("followedBuildActions"),
+        completionTracker: container.lazy("buildCompletionTracker"),
+        isEnabled: () => getFollowTriggeredBuilds(getExtensionConfiguration())
+      });
+      options.context.subscriptions.push(service);
+      return service;
+    },
+    buildCompletionTracker: (container) => {
+      const tracker = new BuildCompletionTracker(container.get("dataService"), {
+        ...container.get("followedBuildActions"),
+        refreshEnvironment: (environmentId) =>
+          container.get("refreshHost").fullEnvironmentRefresh({ environmentId })
+      });
+      options.context.subscriptions.push(tracker);
+      return tracker;
+    },
     buildManagementWorkflow: (container) =>
       new BuildManagementWorkflow({
         dataService: container.get("dataService"),
@@ -202,7 +241,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       new CurrentBranchActionExecutor(
         container.get("dataService"),
         container.get("presetStore"),
-        container.get("queuedBuildWaiter"),
+        container.lazy("buildFollowUpService"),
         container.lazy("buildDetailsPanelLauncher"),
         container.get("refreshHost")
       ),

@@ -159,12 +159,7 @@ export class JenkinsWorkbenchTreeDataProvider
       return true;
     }
 
-    if (environmentId) {
-      this.onEnvironmentChanged(environmentId, refreshToken);
-      return true;
-    }
-
-    this.onEnvironmentChanged(undefined, refreshToken);
+    this.onEnvironmentChanged(environmentId || undefined, refreshToken);
     return true;
   }
 

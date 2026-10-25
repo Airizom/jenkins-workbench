@@ -140,6 +140,27 @@ describe("custom diagnostic matchers", () => {
     );
   });
 
+  it("rejects loop on a non-final pattern", () => {
+    const normalized = normalizeDiagnosticProfiles({
+      test: {
+        matchers: [
+          {
+            name: "early-loop",
+            pattern: [
+              { regexp: "^FILE (.+)$", file: 1, loop: true },
+              { regexp: "^(\\d+): (.*)$", line: 1, message: 2, loop: false }
+            ]
+          }
+        ]
+      }
+    });
+
+    assert.ok(
+      normalized.issues.some((issue) => issue.message === "Only the final pattern may use loop.")
+    );
+    assert.equal(normalized.profiles.get("test")?.matchers.length ?? 0, 0);
+  });
+
   it("resets a partial multiline match and retries the current line as a new start", () => {
     const matchers = getMatchers({
       matchers: [

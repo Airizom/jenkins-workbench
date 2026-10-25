@@ -1,9 +1,7 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
-import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import { NodeCapacityPanel } from "../panels/NodeCapacityPanel";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -12,7 +10,7 @@ import type {
   NodesFolderTreeItem,
   QueueItemTreeItem
 } from "../tree/TreeItems";
-import { withActionErrorMessage } from "./CommandUtils";
+import { pickJenkinsEnvironment, withActionErrorMessage } from "./CommandUtils";
 
 type NodeCapacityCommandSource =
   | NodesFolderTreeItem
@@ -78,30 +76,10 @@ async function resolveEnvironment(
     return item;
   }
 
-  const environments = await environmentStore.listEnvironmentsWithScope();
-  if (environments.length === 0) {
-    void vscode.window.showInformationMessage(
-      "Add a Jenkins environment before viewing node capacity."
-    );
-    return undefined;
-  }
-  if (environments.length === 1) {
-    return toJenkinsEnvironmentRef(environments[0]);
-  }
-
-  const pick = await vscode.window.showQuickPick(
-    environments.map((environment) => ({
-      label: formatEnvironmentDisplayName(environment),
-      description: environment.scope,
-      environment
-    })),
-    {
-      placeHolder: "Select a Jenkins environment for node capacity",
-      matchOnDescription: true
-    }
-  );
-
-  return pick ? toJenkinsEnvironmentRef(pick.environment) : undefined;
+  return pickJenkinsEnvironment(environmentStore, {
+    emptyMessage: "Add a Jenkins environment before viewing node capacity.",
+    placeHolder: "Select a Jenkins environment for node capacity"
+  });
 }
 
 function isEnvironmentRef(value: unknown): value is JenkinsEnvironmentRef {

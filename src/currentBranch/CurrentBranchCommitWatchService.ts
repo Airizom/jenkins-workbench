@@ -11,7 +11,7 @@ import {
   type CurrentBranchCommitHistory,
   type VerifiedCommitBuild
 } from "./CurrentBranchCommitHistory";
-import { commitResultLabel } from "./CurrentBranchCommitPresentation";
+import { verifiedCommitBuildLabel, verifiedCommitSummary } from "./CurrentBranchCommitPresentation";
 import { resolveCurrentBranchEnvironmentRef } from "./CurrentBranchEnvironmentResolver";
 import type { CurrentBranchState } from "./CurrentBranchTypes";
 
@@ -221,7 +221,7 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
   }
 
   private notify(watch: CommitWatch, current: VerifiedCommitBuild): void {
-    const message = `${watch.repositoryLabel} ${watch.head.slice(0, 7)} ${commitResultLabel(current.build)}${current.evidence.kind === "prMerge" ? " via PR merge" : ""} · ${watch.label} #${current.build.number}`;
+    const message = `${watch.repositoryLabel} ${verifiedCommitSummary(watch.head, current)} · ${watch.label} #${current.build.number}`;
     const action = "Open Build";
     const notification =
       current.build.result === "SUCCESS"
@@ -233,7 +233,7 @@ export class CurrentBranchCommitWatchService implements vscode.Disposable {
           .show({
             environment: watch.environment,
             buildUrl: current.build.url,
-            label: `${watch.head.slice(0, 7)} · #${current.build.number}`
+            label: verifiedCommitBuildLabel(watch.head, current.build)
           })
           .catch((error: unknown) => {
             void vscode.window.showErrorMessage(`Unable to open commit build: ${String(error)}`);

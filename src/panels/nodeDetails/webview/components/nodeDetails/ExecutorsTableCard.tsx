@@ -22,6 +22,7 @@ import {
 import { CpuIcon } from "../../../../shared/webview/icons";
 import type { NodeDetailsState } from "../../state/nodeDetailsState";
 import { ExecutorTableRow } from "./ExecutorTableRow";
+import { formatFreeExecutorLabel } from "./executorUtilization";
 
 type ExecutorFilter = "all" | "busy" | "idle";
 
@@ -63,8 +64,7 @@ export function ExecutorsTableCard({
     );
   }
 
-  // Free executors on an offline node are unavailable, not idle.
-  const freeLabel = isOffline ? "Offline" : "Idle";
+  const freeLabel = formatFreeExecutorLabel(isOffline);
 
   return (
     <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">

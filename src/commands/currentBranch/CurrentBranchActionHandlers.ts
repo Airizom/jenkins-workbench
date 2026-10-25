@@ -12,8 +12,8 @@ import {
   FORCE_REFRESH_OPTIONS,
   openRequest,
   resolveCurrentBranchSelection,
-  unwrapResolvedState,
-  withResolvedCurrentBranchState
+  resolveCurrentBranchState,
+  unwrapResolvedState
 } from "./CurrentBranchResolution";
 
 interface CurrentBranchActionContext {
@@ -78,17 +78,21 @@ export async function showCurrentBranchActions(
 export async function openCurrentBranchInJenkins(
   workflowService: CurrentBranchWorkflowService
 ): Promise<void> {
-  await withResolvedCurrentBranchState(workflowService, async (state) => {
-    await openRequest(workflowService.getOpenBranchRequest(state));
-  });
+  const state = await resolveCurrentBranchState(workflowService);
+  if (!state) {
+    return;
+  }
+  await openRequest(workflowService.getOpenBranchRequest(state));
 }
 
 export async function triggerCurrentBranchBuild(
   workflowService: CurrentBranchWorkflowService
 ): Promise<void> {
-  await withResolvedCurrentBranchState(workflowService, async (state) => {
-    await workflowService.triggerCurrentBranchBuild(state);
-  });
+  const state = await resolveCurrentBranchState(workflowService);
+  if (!state) {
+    return;
+  }
+  await workflowService.triggerCurrentBranchBuild(state);
 }
 
 async function triggerBuildForLatestState(

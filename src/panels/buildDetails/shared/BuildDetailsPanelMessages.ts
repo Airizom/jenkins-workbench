@@ -7,7 +7,6 @@ export type {
   ArtifactActionMessage,
   BuildDetailsIncomingMessage,
   BuildManagementMessage,
-  DownloadAllArtifactsMessage,
   OpenDiagnosticSourceMessage,
   OpenTestSourceMessage,
   PersistUiStateMessage,

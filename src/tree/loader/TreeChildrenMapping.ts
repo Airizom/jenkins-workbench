@@ -200,7 +200,7 @@ export function mapFilteredJobsToTreeItems(
       hasWatchedJobs && watchedJobs.has(job.url),
       isPinned
     );
-    if (isPinned && isPinnedJobTreeItem(item)) {
+    if (isPinned && item instanceof JobTreeItem) {
       pinnedItems.push(item);
     } else {
       unpinnedItems.push(item);
@@ -246,10 +246,6 @@ function createJobTreeItem(
         isPinned
       });
   }
-}
-
-function isPinnedJobTreeItem(item: WorkbenchTreeElement): item is JobTreeItem {
-  return item instanceof JobTreeItem;
 }
 
 function createFolderTreeItem(

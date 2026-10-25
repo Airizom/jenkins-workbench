@@ -5,6 +5,7 @@ import {
   type ActivityGroupKind
 } from "../ActivityTypes";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { deleteTreeEnvironmentKeys } from "../TreeEnvironmentKeys";
 import {
   buildScopedEnvironmentKey,
   isEnvironmentScopedChildKey,
@@ -76,12 +77,7 @@ export class TreeActivityCache {
 
   // Used by legacy refresh paths that only carry an environment id, not a scope.
   clearForEnvironmentIdAcrossScopes(environmentId: string): void {
-    const environmentSuffix = `:${environmentId}`;
-    for (const key of this.summaries.keys()) {
-      if (key.endsWith(environmentSuffix)) {
-        this.summaries.delete(key);
-      }
-    }
+    deleteTreeEnvironmentKeys(this.summaries, environmentId);
     for (const key of this.childKeys) {
       if (isEnvironmentScopedChildKey(key, environmentId)) {
         this.clearChildKey(key);

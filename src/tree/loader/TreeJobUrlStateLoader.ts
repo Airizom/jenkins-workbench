@@ -8,6 +8,8 @@ type PinnedJobUrlEntry = {
   readonly jobUrl: string;
 };
 
+export type JobUrlState = readonly [watchedJobs: Set<string>, pinnedJobs: Set<string>];
+
 export class TreeJobUrlStateLoader {
   constructor(
     private readonly cacheManager: TreeChildrenCacheManager,
@@ -15,35 +17,24 @@ export class TreeJobUrlStateLoader {
     private readonly pinStore: JenkinsPinStore
   ) {}
 
-  async getWatchedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
-    const cached = this.cacheManager.getCachedWatchedJobs(environment);
-    if (cached) {
-      return cached;
-    }
-
-    const generation = this.cacheManager.getWatchedJobsGeneration();
-    const watched = await this.watchStore.getWatchedJobUrls(
-      environment.scope,
-      environment.environmentId
-    );
-    this.cacheManager.setCachedWatchedJobsIfCurrent(environment, watched, generation);
-    return watched;
+  async getJobUrlState(environment: JenkinsEnvironmentRef): Promise<JobUrlState> {
+    return Promise.all([this.getWatchedJobUrls(environment), this.getPinnedJobUrls(environment)]);
   }
 
-  async getPinnedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
-    const cached = this.cacheManager.getCachedPinnedJobs(environment);
-    if (cached) {
-      return cached;
-    }
-
-    const generation = this.cacheManager.getPinnedJobsGeneration();
-    const pinnedEntries = await this.pinStore.listPinnedJobsForEnvironment(
-      environment.scope,
-      environment.environmentId
+  getWatchedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
+    return this.cacheManager.watchedJobUrls.getOrLoad(environment, () =>
+      this.watchStore.getWatchedJobUrls(environment.scope, environment.environmentId)
     );
-    const pinned = this.buildPinnedJobUrlSet(environment, pinnedEntries);
-    this.cacheManager.setCachedPinnedJobsIfCurrent(environment, pinned, generation);
-    return pinned;
+  }
+
+  getPinnedJobUrls(environment: JenkinsEnvironmentRef): Promise<Set<string>> {
+    return this.cacheManager.pinnedJobUrls.getOrLoad(environment, async () => {
+      const pinnedEntries = await this.pinStore.listPinnedJobsForEnvironment(
+        environment.scope,
+        environment.environmentId
+      );
+      return this.buildPinnedJobUrlSet(environment, pinnedEntries);
+    });
   }
 
   getPinnedJobUrlsFromEntries(
@@ -51,7 +42,7 @@ export class TreeJobUrlStateLoader {
     pinnedEntries: readonly PinnedJobUrlEntry[]
   ): Set<string> {
     const pinned = this.buildPinnedJobUrlSet(environment, pinnedEntries);
-    this.cacheManager.setCachedPinnedJobs(environment, pinned);
+    this.cacheManager.pinnedJobUrls.set(environment, pinned);
     return pinned;
   }
 

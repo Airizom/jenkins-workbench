@@ -69,8 +69,6 @@ function safeDecodeUriComponent(value: string): string {
   }
 }
 
-export { buildOccurrenceKey } from "../shared/TestCaseViewModel";
-
 function buildComparisonErrorDetail(
   label: string,
   baselineMessage?: string,

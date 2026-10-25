@@ -2,14 +2,16 @@ import * as React from "react";
 import type { NodeCapacityPoolViewModel } from "../../../shared/nodeCapacity/NodeCapacityContracts";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
-import { Progress } from "../../shared/webview/components/ui/progress";
+import { PanelLoadingBar } from "../../shared/webview/components/PanelLoadingBar";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
+import { usePanelMessages } from "../../shared/webview/hooks/usePanelMessages";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
-import type {
-  NodeCapacityIncomingMessage,
-  OpenBuildDetailsMessage,
-  OpenNodeDetailsMessage
+import {
+  type NodeCapacityIncomingMessage,
+  type OpenBuildDetailsMessage,
+  type OpenNodeDetailsMessage,
+  parseNodeCapacityOutgoingMessage
 } from "../shared/NodeCapacityPanelMessages";
 import { NodeCapacityHeader } from "./components/NodeCapacityHeader";
 import { NodeCapacityPoolList } from "./components/NodeCapacityPoolList";
@@ -30,7 +32,6 @@ import {
   usePoolOpenStates,
   useShowAllNodesPools
 } from "./hooks/useNodeCapacityExecutorLoading";
-import { useNodeCapacityMessages } from "./hooks/useNodeCapacityMessages";
 import {
   getInitialState,
   type NodeCapacityState,
@@ -161,7 +162,7 @@ export function NodeCapacityApp(): React.JSX.Element {
   const [state, dispatch] = useReducer(nodeCapacityReducer, undefined, getInitialState);
   const postMessage: (message: NodeCapacityIncomingMessage) => void = postVsCodeMessage;
   const handleOpenExternal = useOpenExternalMessage(postMessage);
-  useNodeCapacityMessages(dispatch);
+  usePanelMessages(parseNodeCapacityOutgoingMessage, dispatch);
 
   const timestamp = useCapacityTimestamp(state.updatedAt, state.hasLoaded);
   const [filter, setFilter] = useState<PoolFilter>(EMPTY_POOL_FILTER);
@@ -220,11 +221,7 @@ export function NodeCapacityApp(): React.JSX.Element {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background text-foreground">
-        {state.loading ? (
-          <div className="fixed inset-x-0 top-0 z-50">
-            <Progress indeterminate className="h-px rounded-none" />
-          </div>
-        ) : null}
+        <PanelLoadingBar loading={state.loading} />
         <NodeCapacityHeader
           environmentLabel={state.environmentLabel}
           loading={state.loading}

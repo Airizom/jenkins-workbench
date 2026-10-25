@@ -3,16 +3,13 @@ import type {
   PipelineNodeLogViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
-import type {
-  BuildDetailsPanelUiState,
-  PipelinePresentation
+import {
+  type BuildDetailsPanelUiState,
+  isPipelinePresentation,
+  type PipelinePresentation
 } from "../../../shared/BuildDetailsPanelWebviewState";
 import { findPipelineLogTargetStatus } from "./pipelineLogTargets";
-import {
-  findDefaultPipelineStage,
-  findStageByKey,
-  isPipelinePresentation
-} from "./pipelineSectionModel";
+import { findDefaultPipelineStage, findStageByKey } from "./pipelineSectionModel";
 
 const DEFAULT_PRESENTATION: PipelinePresentation = "list";
 

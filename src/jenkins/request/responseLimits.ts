@@ -33,23 +33,28 @@ export function rejectOversizedResponse(
   return Promise.reject(new JenkinsMaxBytesError(maxBytes, statusCode));
 }
 
-export function collectBoundedResponseText(
+interface BoundedResponseSink<T> {
+  write(chunk: Buffer): void;
+  /** Returns the collected body once the response ends. */
+  finish(): T;
+  /** Returns whatever was collected before a transport error. */
+  partial(): T;
+}
+
+function collectBoundedResponse<T>(
   response: IncomingMessage,
   statusCode: number,
   maxBytes: number | undefined,
-  errorPolicy: ResponseTextErrorPolicy
-): Promise<string> {
+  errorPolicy: ResponseTextErrorPolicy,
+  sink: BoundedResponseSink<T>
+): Promise<T> {
   const oversizedResponse = rejectOversizedResponse(response, statusCode, maxBytes);
   if (oversizedResponse) {
     return oversizedResponse;
   }
 
   return new Promise((resolve, reject) => {
-    let text = "";
     let receivedBytes = 0;
-    // Count raw bytes before decoding; the streaming decoder keeps multibyte
-    // characters intact across chunk boundaries.
-    const decoder = new StringDecoder("utf8");
     response.on("data", (chunk) => {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       receivedBytes += buffer.length;
@@ -58,18 +63,55 @@ export function collectBoundedResponseText(
         response.destroy();
         return;
       }
-      text += decoder.write(buffer);
+      sink.write(buffer);
     });
     response.on("end", () => {
-      text += decoder.end();
-      resolve(text);
+      resolve(sink.finish());
     });
     response.on("error", (error) => {
       if (errorPolicy === "resolvePartialText") {
-        resolve(text);
+        resolve(sink.partial());
         return;
       }
-      reject(error instanceof Error ? error : new Error(String(error)));
+      reject(error);
     });
+  });
+}
+
+export function collectBoundedResponseText(
+  response: IncomingMessage,
+  statusCode: number,
+  maxBytes: number | undefined,
+  errorPolicy: ResponseTextErrorPolicy
+): Promise<string> {
+  let text = "";
+  // Count raw bytes before decoding; the streaming decoder keeps multibyte
+  // characters intact across chunk boundaries.
+  const decoder = new StringDecoder("utf8");
+  return collectBoundedResponse(response, statusCode, maxBytes, errorPolicy, {
+    write: (chunk) => {
+      text += decoder.write(chunk);
+    },
+    finish: () => {
+      text += decoder.end();
+      return text;
+    },
+    partial: () => text
+  });
+}
+
+export function collectBoundedResponseBuffer(
+  response: IncomingMessage,
+  statusCode: number,
+  maxBytes: number | undefined
+): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  const concat = (): Buffer => Buffer.concat(chunks);
+  return collectBoundedResponse(response, statusCode, maxBytes, "reject", {
+    write: (chunk) => {
+      chunks.push(chunk);
+    },
+    finish: concat,
+    partial: concat
   });
 }

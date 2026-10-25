@@ -3,7 +3,10 @@ import type {
   PipelineLogTargetViewModel,
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
-import type { PipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
+import {
+  isPipelinePresentation,
+  type PipelinePresentation
+} from "../../../shared/BuildDetailsPanelWebviewState";
 import {
   getBuildDetailsPanelUiState,
   setBuildDetailsPanelUiState
@@ -11,7 +14,6 @@ import {
 import {
   derivePipelineSectionView,
   findStageLogTarget,
-  isPipelinePresentation,
   planRestoredLogTarget,
   resolvePersistedPipelineLogTarget
 } from "./pipelineSectionModel";

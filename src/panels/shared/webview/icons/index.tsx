@@ -49,6 +49,5 @@ export {
 export {
   CalendarIcon,
   ClockIcon,
-  IdleIcon,
   StatusIcon
 } from "./timeIcons";

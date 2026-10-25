@@ -126,9 +126,6 @@ function markExecutorsRequested(
   state: NodeCapacityState,
   action: NodeCapacityExecutorsRequestedAction
 ): NodeCapacityState {
-  if (action.nodeUrls.length === 0) {
-    return state;
-  }
   const requested = new Set(action.nodeUrls);
   const executorRequestIds = { ...state.executorRequestIds };
   for (const nodeUrl of requested) {

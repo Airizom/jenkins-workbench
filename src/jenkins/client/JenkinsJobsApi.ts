@@ -72,6 +72,20 @@ export class JenkinsJobsApi {
     return this.context.requestJson<JenkinsJob>(url);
   }
 
+  async getNextBuildNumber(jobUrl: string): Promise<number> {
+    const url = buildApiUrlFromItem(jobUrl, "nextBuildNumber");
+    const response = await this.context.requestJson<{ nextBuildNumber?: unknown }>(url);
+    const nextBuildNumber = response?.nextBuildNumber;
+    if (
+      typeof nextBuildNumber !== "number" ||
+      !Number.isSafeInteger(nextBuildNumber) ||
+      nextBuildNumber <= 0
+    ) {
+      throw new Error(`Jenkins returned an invalid next build number for ${jobUrl}.`);
+    }
+    return nextBuildNumber;
+  }
+
   classifyJob(job: JenkinsJob): JenkinsJobKind {
     const className = job._class;
     if (!className) {

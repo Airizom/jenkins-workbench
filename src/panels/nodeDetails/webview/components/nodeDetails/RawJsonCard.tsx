@@ -8,6 +8,7 @@ import {
 import { DisclosureChevron } from "../../../../shared/webview/components/ui/disclosure-chevron";
 import { ScrollArea } from "../../../../shared/webview/components/ui/scroll-area";
 import { CopyIcon } from "../../../../shared/webview/icons";
+import { OVERVIEW_CARD_CLASS, OVERVIEW_CARD_HEADER_CLASS } from "./OverviewCard";
 
 const { useState } = React;
 
@@ -24,12 +25,8 @@ export function RawJsonCard({
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm"
-    >
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
+    <Collapsible open={open} onOpenChange={setOpen} className={OVERVIEW_CARD_CLASS}>
+      <div className={OVERVIEW_CARD_HEADER_CLASS}>
         <CollapsibleTrigger asChild>
           <button
             type="button"

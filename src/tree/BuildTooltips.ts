@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { formatLocaleTimestampWithRelative } from "../formatters/DisplayFormatters";
+import { formatDurationMs } from "../formatters/DurationFormatters";
 import { resolveLastBuildChangeset } from "../jenkins/changesets/collectBuildChangesets";
 import type { JenkinsBuild, JenkinsBuildCause } from "../jenkins/JenkinsClient";
 import { resolveCustomBuildDisplayName } from "../shared/build/BuildDisplayName";
@@ -11,7 +12,6 @@ import { formatBuildParameterValueForTooltip } from "../shared/build/BuildParame
 import { toPlainTextDescription } from "../shared/html";
 import { normalizeWhitespace } from "../shared/stringValues";
 import { resolveBuildElapsedMs } from "./BuildTiming";
-import { formatDurationMs } from "./formatters";
 
 const DEFAULT_MAX_COMMIT_MESSAGE_LENGTH = 120;
 const DEFAULT_MAX_PARAMETER_COUNT = 5;

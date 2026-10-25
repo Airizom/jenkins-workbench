@@ -146,6 +146,45 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+export function rethrowIfCanceled(error: unknown, isCanceled: boolean): void {
+  if (error instanceof TaskCanceledError || isCanceled) {
+    throw new TaskCanceledError();
+  }
+}
+
+interface ConsecutivePollErrorOptions {
+  maxConsecutiveErrors: number;
+  /** Completes "Unable to ... after N consecutive errors". */
+  failureAction: string;
+  /** Prefixes "; retrying (n/max)." */
+  retryStatus: string;
+  writeStatus(message: string): void;
+}
+
+/**
+ * Records one failed poll and returns the next consecutive error count.
+ * Rethrows runner failures and throws once the retry limit is reached.
+ */
+export function recordConsecutivePollError(
+  error: unknown,
+  previousErrors: number,
+  options: ConsecutivePollErrorOptions
+): number {
+  if (error instanceof RunnerFailure) {
+    throw error;
+  }
+  const errors = previousErrors + 1;
+  if (errors >= options.maxConsecutiveErrors) {
+    throw new RunnerFailure(
+      `Unable to ${options.failureAction} after ${errors} consecutive errors: ${errorMessage(error)}`
+    );
+  }
+  options.writeStatus(
+    `${options.retryStatus}; retrying (${errors}/${options.maxConsecutiveErrors}).`
+  );
+  return errors;
+}
+
 export function formatByteLimit(bytes: number): string {
   const mebibytes = bytes / (1024 * 1024);
   return Number.isInteger(mebibytes) ? `${mebibytes} MiB` : `${bytes} bytes`;

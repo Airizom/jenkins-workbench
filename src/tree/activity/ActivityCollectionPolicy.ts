@@ -21,66 +21,18 @@ export function promoteAwaitingInputJobs(
     return;
   }
 
-  promoteCandidatesToAwaitingInput(groups, runningCandidates, awaitingInputJobUrls, maxItems);
-  removeAwaitingInputEntriesFromOtherGroups(groups, awaitingInputJobUrls);
-  backfillRunningEntries(groups, runningCandidates, awaitingInputJobUrls, maxItems);
-}
-
-function backfillRunningEntries(
-  groups: ActivityGroups,
-  runningCandidates: JobSearchEntry[],
-  excludedJobUrls: ReadonlySet<string>,
-  maxItems: number
-): void {
-  if (!groups.has("running")) {
-    return;
-  }
-
-  const backfilled: JobSearchEntry[] = [];
-  const includedJobUrls = new Set<string>();
-  for (const entry of runningCandidates) {
-    if (
-      backfilled.length >= maxItems ||
-      excludedJobUrls.has(entry.url) ||
-      includedJobUrls.has(entry.url)
-    ) {
-      continue;
-    }
-    backfilled.push(entry);
-    includedJobUrls.add(entry.url);
-  }
-  groups.set("running", backfilled);
-}
-
-function promoteCandidatesToAwaitingInput(
-  groups: ActivityGroups,
-  runningCandidates: JobSearchEntry[],
-  awaitingInputJobUrls: ReadonlySet<string>,
-  maxItems: number
-): void {
   const awaiting = groups.get("awaitingInput") ?? [];
   for (const entry of runningCandidates) {
     if (awaiting.length >= maxItems) {
       break;
     }
-    if (!awaitingInputJobUrls.has(entry.url)) {
-      continue;
+    if (awaitingInputJobUrls.has(entry.url)) {
+      awaiting.push(entry);
     }
-    awaiting.push(entry);
   }
   groups.set("awaitingInput", awaiting);
-}
-
-function removeAwaitingInputEntriesFromOtherGroups(
-  groups: ActivityGroups,
-  awaitingInputJobUrls: ReadonlySet<string>
-): void {
-  for (const group of ["failing", "unstable"] as const) {
-    const current = groups.get(group);
-    if (!current) {
-      continue;
-    }
-    const filtered = current.filter((entry) => !awaitingInputJobUrls.has(entry.url));
-    groups.set(group, filtered);
-  }
+  groups.set(
+    "running",
+    runningCandidates.filter((entry) => !awaitingInputJobUrls.has(entry.url)).slice(0, maxItems)
+  );
 }

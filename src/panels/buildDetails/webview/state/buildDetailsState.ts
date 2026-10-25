@@ -115,28 +115,16 @@ const FALLBACK_STATE: BuildDetailsState = {
   managementBusy: false
 };
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
-  const mergedDefaults = mergeBuildDetailsDefaults(initialState);
-  const pipelineNodeLog = mergedDefaults.pipelineNodeLog;
-  const merged: BuildDetailsState = {
-    ...mergedDefaults,
-    diagnostics: mergedDefaults.diagnostics ?? EMPTY_BUILD_DIAGNOSTICS,
-    pipelineNodeLog,
-    pipelineNodeLogHtmlModel: pipelineNodeLog.html
-      ? parseConsoleHtml(pipelineNodeLog.html)
-      : undefined,
-    consoleHtmlModel: undefined,
-    hasLoaded: !(initialState.loading ?? false),
+  const merged = mergeBuildDetailsDefaults(initialState);
+  return {
+    ...merged,
+    pipelineNodeLogHtmlModel: parsePipelineNodeLogHtml(merged.pipelineNodeLog),
+    consoleHtml: undefined,
+    consoleHtmlModel: merged.consoleHtml ? parseConsoleHtml(merged.consoleHtml) : undefined,
+    hasLoaded: !merged.loading,
     processingInputActions: Object.create(null),
     managementBusy: false
   };
-  if (merged.consoleHtml) {
-    return {
-      ...merged,
-      consoleHtmlModel: parseConsoleHtml(merged.consoleHtml),
-      consoleHtml: undefined
-    };
-  }
-  return merged;
 }
 export function buildDetailsReducer(
   state: BuildDetailsState,
@@ -178,7 +166,7 @@ export function buildDetailsReducer(
       };
     }
     case "setConsoleHtml": {
-      const nextModel = appendConsoleHtmlModel(undefined, action.html);
+      const nextModel = parseConsoleHtml(action.html);
       return {
         ...state,
         consoleHtml: undefined,
@@ -191,7 +179,7 @@ export function buildDetailsReducer(
       return {
         ...state,
         pipelineNodeLog: action.log,
-        pipelineNodeLogHtmlModel: action.log.html ? parseConsoleHtml(action.log.html) : undefined
+        pipelineNodeLogHtmlModel: parsePipelineNodeLogHtml(action.log)
       };
     }
     case "appendPipelineNodeLogHtml": {
@@ -309,11 +297,11 @@ export function buildDetailsReducer(
         insights: payload.insights,
         pipelineStages: payload.pipelineStages,
         pipelineNodeLog: payload.pipelineNodeLog,
-        pipelineNodeLogHtmlModel: payload.pipelineNodeLog.html
-          ? parseConsoleHtml(payload.pipelineNodeLog.html)
-          : state.pipelineNodeLog.target?.key === payload.pipelineNodeLog.target?.key
+        pipelineNodeLogHtmlModel:
+          parsePipelineNodeLogHtml(payload.pipelineNodeLog) ??
+          (state.pipelineNodeLog.target?.key === payload.pipelineNodeLog.target?.key
             ? state.pipelineNodeLogHtmlModel
-            : undefined,
+            : undefined),
         pendingInputs: payload.pendingInputs ?? [],
         processingInputActions: prunePendingInputActions(
           state.processingInputActions,
@@ -330,7 +318,9 @@ export function getInitialState(): BuildDetailsViewModel {
   return readInitialPanelState(FALLBACK_STATE, mergeBuildDetailsDefaults);
 }
 
-function mergeBuildDetailsDefaults(candidate: BuildDetailsViewModel): BuildDetailsViewModel {
+function mergeBuildDetailsDefaults(
+  candidate: BuildDetailsViewModel
+): BuildDetailsViewModel & Pick<BuildDetailsState, "diagnostics" | "loading"> {
   return {
     ...FALLBACK_STATE,
     ...candidate,
@@ -344,6 +334,10 @@ function mergeBuildDetailsDefaults(candidate: BuildDetailsViewModel): BuildDetai
     pendingInputs: candidate.pendingInputs ?? [],
     loading: candidate.loading ?? false
   };
+}
+
+function parsePipelineNodeLogHtml(log: { html?: string }): ConsoleHtmlModel | undefined {
+  return log.html ? parseConsoleHtml(log.html) : undefined;
 }
 
 function appendConsoleHtmlModel(

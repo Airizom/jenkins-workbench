@@ -8,7 +8,7 @@ vi.doMock("react", () => ({
   useMemo: <T>(factory: () => T): T => factory()
 }));
 vi.doMock("../src/buildDiagnostics/BuildDiagnosticConsoleText", () => ({
-  stripConsoleControlSequences: stripAnsiMock
+  toDisplayedConsoleText: stripAnsiMock
 }));
 vi.doMock("../src/panels/shared/webview/lib/vscodeApi", () => ({
   postVsCodeMessage: postVsCodeMessageMock

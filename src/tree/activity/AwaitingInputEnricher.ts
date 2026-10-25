@@ -5,6 +5,7 @@ import type {
 } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
+import { runWithConcurrency } from "../../shared/concurrency";
 
 export interface AwaitingInputEnrichmentOptions {
   buildListFetchOptions: BuildListFetchOptions;
@@ -123,34 +124,4 @@ function selectJobUrlsAwaitingInput(
     }
   }
   return awaitingJobUrls;
-}
-
-async function runWithConcurrency<T>(
-  items: T[],
-  concurrency: number,
-  operation: (item: T) => Promise<void>
-): Promise<void> {
-  if (items.length === 0) {
-    return;
-  }
-
-  let index = 0;
-  const workerCount = Math.trunc(Math.min(Math.max(1, concurrency), items.length));
-  const workers: Promise<void>[] = [];
-  for (let workerIndex = 0; workerIndex < workerCount; workerIndex += 1) {
-    workers.push(
-      (async () => {
-        for (;;) {
-          const current = index;
-          index += 1;
-          if (current >= items.length) {
-            return;
-          }
-          const item = items[current];
-          await operation(item);
-        }
-      })()
-    );
-  }
-  await Promise.all(workers);
 }

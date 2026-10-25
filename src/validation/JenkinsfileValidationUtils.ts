@@ -69,41 +69,21 @@ export function mergeSuggestions(
   existing: string[] | undefined,
   incoming: string[]
 ): string[] | undefined {
-  if (incoming.length === 0) {
-    return existing;
-  }
-  if (!existing || existing.length === 0) {
-    return uniqueSuggestions(incoming);
-  }
-  return collectUniqueSuggestions(existing, incoming);
+  return incoming.length === 0 ? existing : uniqueSuggestions([...(existing ?? []), ...incoming]);
 }
 
 export function uniqueSuggestions(values: string[]): string[] {
-  if (values.length === 0) {
-    return values;
-  }
-  return collectUniqueSuggestions(values);
-}
-
-function collectUniqueSuggestions(values: string[], additional?: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
-  const groupCount = additional ? 2 : 1;
-  for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
-    const group = groupIndex === 0 ? values : additional;
-    if (!group) {
+  for (const value of values) {
+    const normalized = value.toLowerCase();
+    if (seen.has(normalized)) {
       continue;
     }
-    for (const value of group) {
-      const normalized = value.toLowerCase();
-      if (seen.has(normalized)) {
-        continue;
-      }
-      seen.add(normalized);
-      result.push(value);
-      if (result.length >= MAX_SUGGESTIONS) {
-        return result;
-      }
+    seen.add(normalized);
+    result.push(value);
+    if (result.length >= MAX_SUGGESTIONS) {
+      break;
     }
   }
   return result;

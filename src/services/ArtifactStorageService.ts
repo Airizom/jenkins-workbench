@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { IncomingHttpHeaders } from "node:http";
 import * as path from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -7,6 +6,7 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsStreamResponse } from "../jenkins/request";
 import { normalizePosixRelativePath } from "../shared/posixPaths";
 import { buildArtifactJobSegment, sanitizeEnvironmentSegment } from "./ArtifactPathUtils";
+import { writeViaTemporaryFile } from "./TemporaryFileWriter";
 
 const INVALID_PATH_MESSAGE = "Artifact path is invalid and cannot be saved.";
 const INVALID_ROOT_MESSAGE =
@@ -109,30 +109,26 @@ export class ArtifactStorageService {
     response: JenkinsStreamResponse,
     signal?: AbortSignal
   ): Promise<ArtifactDownloadResult> {
-    const temporaryPath = path.join(
-      path.dirname(resolved.targetPath),
-      `.${path.basename(resolved.targetPath)}.${randomUUID()}.tmp`
-    );
     try {
-      signal?.throwIfAborted();
-      await this.filesystem.createDirectory(
-        path.dirname(resolved.targetPath),
-        request.workspaceRoot
-      );
-      signal?.throwIfAborted();
-      const writeStream = this.filesystem.createWriteStream(temporaryPath);
-      await pipeline(response.stream, writeStream, { signal });
-      signal?.throwIfAborted();
-      await this.filesystem.rename(
-        temporaryPath,
-        resolved.targetPath,
-        request.workspaceRoot,
-        signal
-      );
+      await writeViaTemporaryFile(resolved.targetPath, {
+        write: async (temporaryPath) => {
+          signal?.throwIfAborted();
+          await this.filesystem.createDirectory(
+            path.dirname(resolved.targetPath),
+            request.workspaceRoot
+          );
+          signal?.throwIfAborted();
+          const writeStream = this.filesystem.createWriteStream(temporaryPath);
+          await pipeline(response.stream, writeStream, { signal });
+          signal?.throwIfAborted();
+        },
+        rename: (temporaryPath) =>
+          this.filesystem.rename(temporaryPath, resolved.targetPath, request.workspaceRoot, signal),
+        delete: (temporaryPath) => this.filesystem.delete(temporaryPath)
+      });
     } catch (error) {
       // Setup can fail before pipeline owns the response; release its socket either way.
       response.abort();
-      await this.safeDelete(temporaryPath);
       throw error;
     }
 
@@ -142,14 +138,6 @@ export class ArtifactStorageService {
       safeRelativePath: resolved.safeRelativePath,
       label: resolved.label
     };
-  }
-
-  private async safeDelete(targetPath: string): Promise<void> {
-    try {
-      await this.filesystem.delete(targetPath);
-    } catch {
-      // Ignore cleanup errors.
-    }
   }
 }
 

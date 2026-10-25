@@ -69,6 +69,18 @@ it("discards the draft when the document stays closed", async () => {
   manager.dispose();
 });
 
+it("cancels a pending close discard when disposed", async () => {
+  const filesystem = createFilesystem();
+  const manager = new JobConfigDraftManager(filesystem as never);
+  const uri = manager.createDraft("job.xml", "<project/>", draftInfo);
+
+  closes.fire({ uri } as vscode.TextDocument);
+  manager.dispose();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(filesystem.hasDraft(uri), true);
+});
+
 const { JobConfigDraftManager } = await import("../src/services/JobConfigDraftManager");
 
 it("submits only when the latest save attempt was manual", () => {

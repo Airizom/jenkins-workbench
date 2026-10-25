@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import { buildConsoleReferences } from "../src/buildDiagnostics/BuildDiagnosticConsoleReferences";
 import type { RawBuildDiagnostic } from "../src/buildDiagnostics/BuildDiagnosticTypes";
 import { MAX_DIAGNOSTICS_MAX_PROBLEMS } from "../src/extension/ExtensionConfigDefinitions";
 import * as vscodeStub from "./helpers/vscodeStub";
 
 vi.doMock("vscode", () => vscodeStub);
 
-const { aggregateAndPublishBuildDiagnostics, buildConsoleReferences } = await import(
+const { aggregateAndPublishBuildDiagnostics } = await import(
   "../src/buildDiagnostics/BuildDiagnosticAggregation"
 );
 const { AUTOMATIC_DIAGNOSTIC_PROFILE } = await import(

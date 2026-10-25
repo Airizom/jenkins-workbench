@@ -147,14 +147,11 @@ function parseStoredStringHeaders(value: unknown): Record<string, string> | unde
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
   }
-  const stringHeaders: Record<string, string> = {};
-  for (const [key, headerValue] of Object.entries(value as Record<string, unknown>)) {
-    if (typeof headerValue !== "string") {
-      return undefined;
-    }
-    setNormalizedHeader(stringHeaders, key, headerValue);
+  const record = value as Record<string, unknown>;
+  if (Object.values(record).some((headerValue) => typeof headerValue !== "string")) {
+    return undefined;
   }
-  return stringHeaders;
+  return normalizeUnknownHeaders(record);
 }
 
 export function buildAuthHeaders(
@@ -228,20 +225,12 @@ function buildHeadersFromConfig(authConfig: JenkinsAuthConfig): JenkinsAuthHeade
       return cookie.length > 0 ? { headers: { Cookie: cookie } } : {};
     }
     case "headers":
-      return { headers: normalizeHeaders(authConfig.headers) };
+      return { headers: normalizeUnknownHeaders(authConfig.headers) };
     case "sso":
-      return { headers: normalizeHeaders(authConfig.headers ?? {}) };
+      return { headers: normalizeUnknownHeaders(authConfig.headers ?? {}) };
     default:
       return {};
   }
-}
-
-function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
-  const normalized: Record<string, string> = {};
-  for (const [key, value] of Object.entries(headers)) {
-    setNormalizedHeader(normalized, key, value);
-  }
-  return normalized;
 }
 
 export function normalizeUnknownHeaders(raw: Record<string, unknown>): Record<string, string> {
@@ -255,7 +244,7 @@ export function normalizeUnknownHeaders(raw: Record<string, unknown>): Record<st
 }
 
 function stableHeadersSignature(headers: Record<string, string>): string {
-  const normalized = normalizeHeaders(headers);
+  const normalized = normalizeUnknownHeaders(headers);
   const entries = Object.entries(normalized);
   if (entries.length === 0) {
     return "{}";

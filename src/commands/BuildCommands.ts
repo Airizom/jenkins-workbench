@@ -4,7 +4,8 @@ import type { BuildComparePanelLauncher } from "../panels/BuildComparePanelLaunc
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { BuildDescriptionDraftManager } from "../services/BuildDescriptionDraftManager";
 import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
-import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
+import type { BuildCompletionTracker } from "../services/buildFollow/BuildCompletionTracker";
+import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type {
   ArtifactTreeItem,
@@ -51,6 +52,11 @@ export interface BuildManagementCommandDependencies {
   descriptionDraftManager: BuildDescriptionDraftManager;
 }
 
+export interface BuildFollowCommandDependencies {
+  service: BuildFollowUpService;
+  completionTracker: Pick<BuildCompletionTracker, "showFollowedBuilds">;
+}
+
 export function registerBuildCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
@@ -59,7 +65,7 @@ export function registerBuildCommands(
   buildLogPreviewer: BuildLogPreviewer,
   buildComparePanelLauncher: BuildComparePanelLauncher,
   buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
-  queuedBuildWaiter: QueuedBuildWaiter,
+  buildFollow: BuildFollowCommandDependencies,
   replayBuildWorkflow: ReplayBuildWorkflow,
   localJenkinsfileReplayWorkflow: LocalJenkinsfileReplayWorkflow,
   refreshHost: BuildCommandRefreshHost,
@@ -67,11 +73,12 @@ export function registerBuildCommands(
   bulk: BulkCommandDependencies
 ): void {
   const { workflow: buildManagementWorkflow, descriptionDraftManager } = buildManagement;
+  const buildFollowUp = buildFollow.service;
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.triggerBuild",
       (item?: JobTreeItem | PipelineTreeItem) =>
-        triggerBuild(dataService, presetStore, queuedBuildWaiter, refreshHost, item)
+        triggerBuild(dataService, presetStore, buildFollowUp, refreshHost, item)
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.abortBuild",
@@ -95,13 +102,17 @@ export function registerBuildCommands(
       (input?: BuildTreeItem | vscode.Uri) => localJenkinsfileReplayWorkflow.run(refreshHost, input)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.quickReplayBuild", (item?: BuildTreeItem) =>
-      quickReplayBuild(dataService, refreshHost, item)
+      quickReplayBuild(dataService, buildFollowUp, refreshHost, item)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.runReplayDraft", (uri?: vscode.Uri) =>
       runReplayDraft(replayBuildWorkflow, refreshHost, uri)
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.rebuildBuild", (item?: BuildTreeItem) =>
-      rebuildBuild(dataService, refreshHost, item)
+      rebuildBuild(dataService, buildFollowUp, refreshHost, item)
+    ),
+    // SHOW_FOLLOWED_BUILDS_COMMAND; manifest validation needs registered ids as string literals.
+    vscode.commands.registerCommand("jenkinsWorkbench.showFollowedBuilds", () =>
+      buildFollow.completionTracker.showFollowedBuilds()
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.openInJenkins", (item?: OpenableTreeItem) =>
       openInJenkins(item)

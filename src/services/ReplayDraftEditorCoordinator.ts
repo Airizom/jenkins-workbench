@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
-import { DraftEditorService, disposeDraftResources } from "./DraftEditorService";
+import { DraftEditorService } from "./DraftEditorService";
 import type { ReplayDraftSession, ReplayDraftSessionStore } from "./ReplayDraftSessionStore";
 
 export class ReplayDraftEditorCoordinator implements vscode.Disposable {
   private readonly closingSessions = new Set<string>();
   private readonly promptingSessions = new Set<string>();
   private readonly subscriptions: vscode.Disposable[] = [];
-  private readonly pendingCloses = new Set<vscode.Disposable>();
 
   constructor(
     private readonly store: ReplayDraftSessionStore,
@@ -15,23 +14,22 @@ export class ReplayDraftEditorCoordinator implements vscode.Disposable {
     this.subscriptions.push(
       vscode.workspace.onDidOpenTextDocument((document) => this.syncDraftContent(document)),
       vscode.workspace.onDidChangeTextDocument((event) => this.syncDraftContent(event.document)),
-      vscode.workspace.onDidCloseTextDocument((document) => {
-        if (!this.store.hasDraft(document.uri)) {
-          return;
-        }
-        const pending = this.editorService.whenDocumentStaysClosed(document.uri, () => {
-          this.pendingCloses.delete(pending);
-          void this.handleDraftClosed(document.uri).catch((error) => {
+      this.editorService.onDraftClosed(
+        (document) => this.store.hasDraft(document.uri),
+        (uri) => {
+          void this.handleDraftClosed(uri).catch((error) => {
             console.warn("Failed to process replay draft close.", error);
           });
-        });
-        this.pendingCloses.add(pending);
-      })
+        }
+      )
     );
   }
 
   dispose(): void {
-    disposeDraftResources(this.subscriptions, this.pendingCloses);
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
+    this.subscriptions.length = 0;
     this.closingSessions.clear();
     this.promptingSessions.clear();
   }

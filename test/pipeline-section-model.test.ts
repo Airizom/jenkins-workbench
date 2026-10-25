@@ -4,12 +4,12 @@ import type {
   PipelineLogTargetViewModel,
   PipelineStageViewModel
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import { isPipelinePresentation } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 import {
   derivePipelineSectionView,
   findDefaultPipelineStage,
   findStageByKey,
   findStageLogTarget,
-  isPipelinePresentation,
   planRestoredLogTarget,
   resolvePersistedPipelineLogTarget
 } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineSectionModel";

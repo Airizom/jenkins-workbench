@@ -32,7 +32,8 @@ export function registerExtensionCommands(
   const buildLogPreviewer = container.lazy("buildLogPreviewer");
   const buildComparePanelLauncher = container.lazy("buildComparePanelLauncher");
   const buildDetailsPanelLauncher = container.lazy("buildDetailsPanelLauncher");
-  const queuedBuildWaiter = container.lazy("queuedBuildWaiter");
+  const buildFollowUpService = container.lazy("buildFollowUpService");
+  const buildCompletionTracker = container.lazy("buildCompletionTracker");
   const replayBuildWorkflow = container.lazy("replayBuildWorkflow");
   const localJenkinsfileReplayWorkflow = container.lazy("localJenkinsfileReplayWorkflow");
   const buildManagementWorkflow = container.lazy("buildManagementWorkflow");
@@ -78,7 +79,7 @@ export function registerExtensionCommands(
     buildLogPreviewer,
     buildComparePanelLauncher,
     buildDetailsPanelLauncher,
-    queuedBuildWaiter,
+    { service: buildFollowUpService, completionTracker: buildCompletionTracker },
     replayBuildWorkflow,
     localJenkinsfileReplayWorkflow,
     refreshHost,

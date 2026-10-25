@@ -5,10 +5,9 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import { PipelineGraphCanvas } from "./PipelineGraphCanvas";
 import { PipelineGraphInspector } from "./PipelineGraphInspector";
-import type { PipelineGraphLayoutResult } from "./pipelineGraphTypes";
 import { usePipelineGraphLayout } from "./usePipelineGraphLayout";
 
-const { useEffect, useRef } = React;
+const { useEffect } = React;
 
 export function PipelineGraphSection({
   stages,
@@ -29,15 +28,13 @@ export function PipelineGraphSection({
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onGraphError: () => void;
 }) {
-  const graphLayout = usePipelineGraphLayout(stages, true);
-  const lastReadyLayoutRef = useRef<PipelineGraphLayoutResult | undefined>(undefined);
+  const graphLayout = usePipelineGraphLayout(stages);
 
   useEffect(() => {
     if (graphLayout.status !== "ready") {
       return;
     }
 
-    lastReadyLayoutRef.current = graphLayout.layout;
     const [firstStageKey] = graphLayout.layout.model.orderedStageIds;
     if (!firstStageKey) {
       if (selectedStageKey !== undefined) {
@@ -58,7 +55,7 @@ export function PipelineGraphSection({
   }, [graphLayout, onGraphError]);
 
   const activeLayout =
-    graphLayout.status === "ready" ? graphLayout.layout : lastReadyLayoutRef.current;
+    graphLayout.status === "ready" ? graphLayout.layout : graphLayout.previousLayout;
   const selectedStage = selectedStageKey
     ? activeLayout?.model.stageById.get(selectedStageKey)
     : undefined;

@@ -20,16 +20,16 @@ export interface OpenExternalHttpUrlWarningOptions {
   showWarningMessage?: (message: string) => Thenable<unknown>;
 }
 
-async function openExternalHttpUrl(
+export async function openExternalHttpUrlWithWarning(
   url: string,
-  options: OpenExternalHttpUrlWarningOptions
+  options: OpenExternalHttpUrlWarningOptions = {}
 ): Promise<OpenExternalHttpUrlResult> {
   let uri: vscode.Uri | undefined;
   let reason: ExternalHttpUrlValidationFailureReason;
   try {
     uri = vscode.Uri.parse(url);
   } catch {
-    uri = undefined;
+    // Leave uri undefined so the URL is reported as invalid.
   }
 
   if (uri) {
@@ -64,15 +64,8 @@ export async function openJenkinsWorkbenchUrl(
   url: string,
   sourceLabel: string
 ): Promise<OpenExternalHttpUrlResult> {
-  return openExternalHttpUrl(url, {
+  return openExternalHttpUrlWithWarning(url, {
     targetLabel: "Jenkins URL",
     sourceLabel
   });
-}
-
-export async function openExternalHttpUrlWithWarning(
-  url: string,
-  options: OpenExternalHttpUrlWarningOptions = {}
-): Promise<OpenExternalHttpUrlResult> {
-  return openExternalHttpUrl(url, options);
 }

@@ -114,13 +114,6 @@ const REQUIRED_BOOLEAN_FIELDS = [
   "advancedLoaded"
 ] as const;
 
-const REQUIRED_ARRAY_FIELDS = [
-  "executors",
-  "oneOffExecutors",
-  "monitorData",
-  "loadStatistics"
-] as const;
-
 const QUEUED_WORK_ARRAY_FIELDS = [
   "matchingQueueItems",
   "anyQueueItems",
@@ -133,6 +126,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function isRecordArray(value: unknown): value is Record<string, unknown>[] {
   return Array.isArray(value) && value.every((entry) => isPlainRecord(entry));
+}
+
+function isArrayOf(value: unknown, isEntry: (entry: unknown) => boolean): boolean {
+  return Array.isArray(value) && value.every(isEntry);
 }
 
 function isNodeExecutorViewModel(value: unknown): boolean {
@@ -188,18 +185,11 @@ export function isNodeDetailsViewModel(value: unknown): value is NodeDetailsView
   if (!isStringArray(value.labels) || !isStringArray(value.errors)) {
     return false;
   }
-  if (!REQUIRED_ARRAY_FIELDS.every((field) => isRecordArray(value[field]))) {
-    return false;
-  }
   if (
-    !(value.executors as unknown[]).every(isNodeExecutorViewModel) ||
-    !(value.oneOffExecutors as unknown[]).every(isNodeExecutorViewModel)
-  ) {
-    return false;
-  }
-  if (
-    !(value.monitorData as unknown[]).every(isNodeMonitorViewModel) ||
-    !(value.loadStatistics as unknown[]).every(isNodeMonitorViewModel)
+    !isArrayOf(value.executors, isNodeExecutorViewModel) ||
+    !isArrayOf(value.oneOffExecutors, isNodeExecutorViewModel) ||
+    !isArrayOf(value.monitorData, isNodeMonitorViewModel) ||
+    !isArrayOf(value.loadStatistics, isNodeMonitorViewModel)
   ) {
     return false;
   }

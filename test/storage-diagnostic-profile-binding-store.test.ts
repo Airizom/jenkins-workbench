@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type * as vscode from "vscode";
-import {
-  JenkinsDiagnosticProfileBindingStore,
-  normalizeDiagnosticJobScopeUrl
-} from "../src/storage/JenkinsDiagnosticProfileBindingStore";
+import { normalizeJenkinsUrlForComparison } from "../src/jenkins/urls";
+import { JenkinsDiagnosticProfileBindingStore } from "../src/storage/JenkinsDiagnosticProfileBindingStore";
 import { createExtensionContext } from "./helpers/storageMocks";
 
 class AsyncMemento {
@@ -264,10 +262,10 @@ describe("JenkinsDiagnosticProfileBindingStore", () => {
   });
 });
 
-describe("normalizeDiagnosticJobScopeUrl", () => {
+describe("normalizeJenkinsUrlForComparison", () => {
   it("normalizes URL syntax and strips query and fragment data", () => {
     assert.equal(
-      normalizeDiagnosticJobScopeUrl("HTTPS://JENKINS.EXAMPLE:443/job/team%20one?x=1#fragment"),
+      normalizeJenkinsUrlForComparison("HTTPS://JENKINS.EXAMPLE:443/job/team%20one?x=1#fragment"),
       "https://jenkins.example/job/team%20one/"
     );
   });

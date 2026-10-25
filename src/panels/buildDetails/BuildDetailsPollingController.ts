@@ -14,12 +14,7 @@ import type {
   BuildDetailsStatusBackend,
   BuildDetailsTestsBackend
 } from "./BuildDetailsBackend";
-import {
-  type ConsoleFetchResult,
-  type ConsoleSnapshotResult,
-  ConsoleStreamManager,
-  type ConsoleTextByteRange
-} from "./ConsoleStreamManager";
+import { ConsoleStreamManager, type ConsoleTextByteRange } from "./ConsoleStreamManager";
 
 export interface BuildDetailsPollingCallbacks {
   onWorkflowFetchStart?: () => void;
@@ -202,60 +197,24 @@ export class BuildDetailsPollingController {
         this.pendingInputProvider.getPendingInputActions(this.environment, this.buildUrl)
       ]);
 
-    const errors: string[] = [];
-    let details: JenkinsBuildDetails | undefined;
-    let detailsError: unknown;
-    let consoleTextResult: JenkinsConsoleTextTail | undefined;
-    let consoleError: unknown;
-    let consoleHtmlResult: { html: string; truncated: boolean } | undefined;
-    let workflowRun: JenkinsWorkflowRun | undefined;
-    let workflowError: unknown;
-    let pendingInputs: PendingInputAction[] = [];
-    let pendingInputsError: unknown;
-
-    if (detailsResult.status === "fulfilled") {
-      details = detailsResult.value;
-    } else {
-      detailsError = detailsResult.reason;
-    }
-
-    if (workflowResult.status === "fulfilled") {
-      workflowRun = workflowResult.value;
-    } else {
-      workflowError = workflowResult.reason;
-    }
-
+    const { value: details, error: detailsError } = settled(detailsResult);
+    const { value: workflowRun, error: workflowError } = settled(workflowResult);
+    const { value: consoleSnapshot, error: consoleRejection } = settled(consoleResult);
+    const { value: pendingInputs = [], error: pendingInputsError } = settled(pendingInputsResult);
     if (pendingInputsResult.status === "fulfilled") {
-      pendingInputs = pendingInputsResult.value;
       this.lastPendingInputsCount = pendingInputs.length;
-    } else {
-      pendingInputsError = pendingInputsResult.reason;
     }
 
-    let consoleSnapshot: ConsoleSnapshotResult | undefined;
-    if (consoleResult.status === "fulfilled") {
-      consoleSnapshot = consoleResult.value;
-    } else {
-      consoleError = consoleResult.reason;
-    }
+    const consoleTextResult = consoleSnapshot?.consoleTextResult;
+    const consoleHtmlResult = consoleSnapshot?.consoleHtmlResult;
+    const consoleError = consoleSnapshot?.consoleError || consoleRejection;
 
-    if (consoleSnapshot) {
-      consoleTextResult = consoleSnapshot.consoleTextResult;
-      consoleHtmlResult = consoleSnapshot.consoleHtmlResult;
-      if (consoleSnapshot.consoleError) {
-        consoleError = consoleSnapshot.consoleError;
-      }
-    }
-
-    if (detailsError) {
-      errors.push(`Build details: ${this.formatError(detailsError)}`);
-    }
-    if (consoleError && !consoleHtmlResult) {
-      errors.push(`Console output: ${this.formatError(consoleError)}`);
-    }
-    if (pendingInputsError) {
-      errors.push(`Pending inputs: ${this.formatError(pendingInputsError)}`);
-    }
+    // The initial load shows rendered HTML when available, so a text-tail failure is not an error.
+    const errors = this.buildRequestErrors({
+      detailsError,
+      consoleError: consoleHtmlResult ? undefined : consoleError,
+      pendingInputsError
+    });
 
     if (workflowError && details?.building === false) {
       this.workflowRetryPending = true;
@@ -334,26 +293,12 @@ export class BuildDetailsPollingController {
         this.consoleStreamManager.fetchNext()
       ]);
 
-      let details: JenkinsBuildDetails | undefined;
-      let detailsError: unknown;
-      let consoleResult: ConsoleFetchResult | undefined;
-      let consoleError: unknown;
+      const { value: details, error: detailsError } = settled(detailsResult);
+      const { value: consoleResult, error: consoleError } = settled(consoleFetchResult);
       let workflowRun: JenkinsWorkflowRun | undefined;
       let workflowError: unknown;
       let pendingInputs: PendingInputAction[] = [];
       let pendingInputsError: unknown;
-
-      if (detailsResult.status === "fulfilled") {
-        details = detailsResult.value;
-      } else {
-        detailsError = detailsResult.reason;
-      }
-
-      if (consoleFetchResult.status === "fulfilled") {
-        consoleResult = consoleFetchResult.value;
-      } else {
-        consoleError = consoleFetchResult.reason;
-      }
 
       const shouldFetchPendingInputs =
         Boolean(details?.building ?? this.lastKnownBuilding) || this.lastPendingInputsCount > 0;
@@ -373,21 +318,15 @@ export class BuildDetailsPollingController {
         return;
       }
 
-      const errors: string[] = [];
-
-      if (detailsError) {
-        errors.push(`Build details: ${this.formatError(detailsError)}`);
-      }
-
       const consoleFailure = consoleError ?? consoleResult?.error;
-      if (consoleFailure) {
-        errors.push(`Console output: ${this.formatError(consoleFailure)}`);
-      } else if (consoleResult?.value) {
+      if (!consoleFailure && consoleResult?.value) {
         this.consoleStreamManager.applyResult(consoleResult);
       }
-      if (pendingInputsError) {
-        errors.push(`Pending inputs: ${this.formatError(pendingInputsError)}`);
-      }
+      const errors = this.buildRequestErrors({
+        detailsError,
+        consoleError: consoleFailure,
+        pendingInputsError
+      });
 
       if (details) {
         this.callbacks.onDetails(details);
@@ -488,4 +427,26 @@ export class BuildDetailsPollingController {
   private isPollCurrent(pollGeneration: number): boolean {
     return pollGeneration === this.pollGeneration && this.pollingActive && !this.disposed;
   }
+
+  private buildRequestErrors(failures: {
+    detailsError: unknown;
+    consoleError: unknown;
+    pendingInputsError: unknown;
+  }): string[] {
+    const errors: string[] = [];
+    if (failures.detailsError) {
+      errors.push(`Build details: ${this.formatError(failures.detailsError)}`);
+    }
+    if (failures.consoleError) {
+      errors.push(`Console output: ${this.formatError(failures.consoleError)}`);
+    }
+    if (failures.pendingInputsError) {
+      errors.push(`Pending inputs: ${this.formatError(failures.pendingInputsError)}`);
+    }
+    return errors;
+  }
+}
+
+function settled<T>(result: PromiseSettledResult<T>): { value?: T; error?: unknown } {
+  return result.status === "fulfilled" ? { value: result.value } : { error: result.reason };
 }

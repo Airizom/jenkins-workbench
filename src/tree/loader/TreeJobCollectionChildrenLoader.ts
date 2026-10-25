@@ -117,10 +117,7 @@ export class TreeJobCollectionChildrenLoader {
       return [this.createNoMatchesPlaceholder(options?.parentFolder)];
     }
 
-    const [watchedJobs, pinnedJobs] = await Promise.all([
-      this.jobUrlState.getWatchedJobUrls(environment),
-      this.jobUrlState.getPinnedJobUrls(environment)
-    ]);
+    const [watchedJobs, pinnedJobs] = await this.jobUrlState.getJobUrlState(environment);
     return mapFilteredJobsToTreeItems(
       environment,
       parentFolderKind === "multibranch"

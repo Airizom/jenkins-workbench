@@ -3,7 +3,7 @@ import type { JenkinsWorkflowStage, JenkinsWorkflowStep } from "../../jenkins/ty
 import { uniqueNonEmptyStrings } from "../../shared/arrays";
 import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
-import { htmlToText } from "./PipelineNodeLogContent";
+import { readFlowNodeLogSnapshot } from "./PipelineNodeLogContent";
 import { isWorkflowNodeActive } from "./PipelineWorkflowStatus";
 import type {
   PipelineLogTargetViewModel,
@@ -110,14 +110,7 @@ export class PipelineStageLogAggregator {
         });
         return;
       }
-      const text = htmlToText(snapshot.text ?? "");
-      this.nodeCache.set(nodeId, {
-        html: escapeHtml(text),
-        text,
-        hasMore: Boolean(snapshot.hasMore),
-        active: isWorkflowNodeActive(snapshot.nodeStatus),
-        consoleUrl: snapshot.consoleUrl
-      });
+      this.nodeCache.set(nodeId, readFlowNodeLogSnapshot(snapshot));
     });
 
     if (failure && !selectedNodeIds.some((nodeId) => this.hasLoadedSnapshot(nodeId))) {

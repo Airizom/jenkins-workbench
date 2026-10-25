@@ -4,6 +4,7 @@ import * as React from "react";
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 import { buildPipelineGraphModel } from "./pipelineGraphModel";
 import type {
+  PipelineGraphEdgeModel,
   PipelineGraphLayoutEdge,
   PipelineGraphLayoutNode,
   PipelineGraphLayoutResult,
@@ -13,32 +14,25 @@ import type {
 const { useEffect, useMemo, useRef, useState } = React;
 
 type PipelineGraphLayoutState =
-  | { status: "idle"; model: PipelineGraphModel }
-  | { status: "loading"; model: PipelineGraphModel }
+  | { status: "loading"; model: PipelineGraphModel; previousLayout?: PipelineGraphLayoutResult }
   | { status: "ready"; layout: PipelineGraphLayoutResult }
-  | { status: "error"; model: PipelineGraphModel; error: Error };
+  | {
+      status: "error";
+      model: PipelineGraphModel;
+      error: Error;
+      previousLayout?: PipelineGraphLayoutResult;
+    };
 
 const elk = new ELK();
-export function usePipelineGraphLayout(
-  stages: PipelineStageViewModel[],
-  enabled: boolean
-): PipelineGraphLayoutState {
-  const model = useMemo(
-    () => (enabled ? buildPipelineGraphModel(stages) : createEmptyGraphModel()),
-    [enabled, stages]
-  );
+export function usePipelineGraphLayout(stages: PipelineStageViewModel[]): PipelineGraphLayoutState {
+  const model = useMemo(() => buildPipelineGraphModel(stages), [stages]);
   const previousLayoutRef = useRef<PipelineGraphLayoutResult | undefined>(undefined);
-  const [state, setState] = useState<PipelineGraphLayoutState>(() =>
-    enabled ? { status: "loading", model } : { status: "idle", model }
-  );
+  const [state, setState] = useState<PipelineGraphLayoutState>(() => ({
+    status: "loading",
+    model
+  }));
 
   useEffect(() => {
-    if (!enabled) {
-      previousLayoutRef.current = undefined;
-      setState({ status: "idle", model });
-      return;
-    }
-
     if (model.nodes.length === 0) {
       const emptyLayout = {
         status: "ready",
@@ -68,7 +62,7 @@ export function usePipelineGraphLayout(
     }
 
     let cancelled = false;
-    setState({ status: "loading", model });
+    setState({ status: "loading", model, previousLayout });
 
     void layoutPipelineGraph(model)
       .then((layout) => {
@@ -85,27 +79,17 @@ export function usePipelineGraphLayout(
         setState({
           status: "error",
           model,
-          error: error instanceof Error ? error : new Error("Graph layout failed.")
+          error: error instanceof Error ? error : new Error("Graph layout failed."),
+          previousLayout
         });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [enabled, model]);
+  }, [model]);
 
   return state;
-}
-
-function createEmptyGraphModel(): PipelineGraphModel {
-  return {
-    topologyKey: "",
-    geometryKey: "",
-    nodes: [],
-    edges: [],
-    stageById: new Map<string, PipelineStageViewModel>(),
-    orderedStageIds: []
-  };
 }
 
 async function layoutPipelineGraph(model: PipelineGraphModel): Promise<PipelineGraphLayoutResult> {
@@ -191,7 +175,7 @@ function resolveLayoutEdges(
 
 function buildEdgePath(
   layoutEdge: ElkExtendedEdge,
-  sourceEdge: PipelineGraphLayoutEdge | PipelineGraphModel["edges"][number],
+  sourceEdge: PipelineGraphEdgeModel,
   nodeLookup: Map<string, PipelineGraphLayoutNode>
 ): string | undefined {
   const section = layoutEdge.sections?.[0];

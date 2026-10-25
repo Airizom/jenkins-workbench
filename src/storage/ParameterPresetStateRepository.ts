@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import type { StoredJobPresets, StoredParameterPreset } from "./ParameterPresetTypes";
 import { sanitizeParameterValues } from "./ParameterPresetValues";
+import { getScopedMemento } from "./StorageScope";
 
 const PARAMETER_PRESETS_KEY = "jenkinsWorkbench.parameterPresets";
 
@@ -33,7 +34,9 @@ export class ParameterPresetStateRepository {
   }
 
   readJobs(scope: EnvironmentScope): StoredJobPresets[] {
-    const stored = this.getMemento(scope).get<StoredPresetState>(PARAMETER_PRESETS_KEY);
+    const stored = getScopedMemento(this.context, scope).get<StoredPresetState>(
+      PARAMETER_PRESETS_KEY
+    );
     if (!stored || !Array.isArray(stored.jobs)) {
       return [];
     }
@@ -48,7 +51,7 @@ export class ParameterPresetStateRepository {
   }
 
   async writeJobs(scope: EnvironmentScope, jobs: StoredJobPresets[]): Promise<void> {
-    await this.getMemento(scope).update(PARAMETER_PRESETS_KEY, { jobs });
+    await getScopedMemento(this.context, scope).update(PARAMETER_PRESETS_KEY, { jobs });
   }
 
   findJobIndex(jobs: StoredJobPresets[], environmentId: string, jobUrl: string): number {
@@ -104,9 +107,5 @@ export class ParameterPresetStateRepository {
           ? { ...preset.secretKeys }
           : undefined
     };
-  }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
   }
 }

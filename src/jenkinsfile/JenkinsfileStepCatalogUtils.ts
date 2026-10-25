@@ -41,32 +41,30 @@ export function mergeStepCatalogs(
       }
     }
 
-    const enrichedLiveStep = {
-      ...liveStep,
-      signatures: liveStep.signatures.map((signature) => ({
-        ...signature,
-        parameters: signature.parameters.map((parameter) => {
-          const fallbackParameter = fallbackParameterDocs.get(parameter.name);
-          return {
-            ...parameter,
-            description: parameter.description ?? fallbackParameter?.description,
-            required:
-              typeof parameter.required === "boolean"
-                ? parameter.required
-                : fallbackParameter?.required
-          };
-        })
-      }))
-    };
-
     const signatures =
-      enrichedLiveStep.signatures.length > 0
-        ? enrichedLiveStep.signatures
-        : mergeSignatures(fallbackStep.signatures, []);
-    const mergedStep = mergeStepDefinitions(fallbackStep, enrichedLiveStep, signatures);
+      liveStep.signatures.length > 0
+        ? liveStep.signatures.map((signature) => ({
+            ...signature,
+            parameters: signature.parameters.map((parameter) => {
+              const fallbackParameter = fallbackParameterDocs.get(parameter.name);
+              return {
+                ...parameter,
+                description: parameter.description ?? fallbackParameter?.description,
+                required:
+                  typeof parameter.required === "boolean"
+                    ? parameter.required
+                    : fallbackParameter?.required
+              };
+            })
+          }))
+        : fallbackStep.signatures.map(normalizeSignature);
+
     merged.set(name, {
-      ...mergedStep,
-      requiresNodeContext: liveStep.requiresNodeContext
+      ...liveStep,
+      displayName: liveStep.displayName || fallbackStep.displayName,
+      documentation: liveStep.documentation ?? fallbackStep.documentation,
+      isAdvanced: fallbackStep.isAdvanced && liveStep.isAdvanced,
+      signatures
     });
   }
 
@@ -75,8 +73,7 @@ export function mergeStepCatalogs(
 
 function mergeStepDefinitions(
   baseStep: JenkinsfileStepDefinition,
-  nextStep: JenkinsfileStepDefinition,
-  signatures = mergeSignatures(baseStep.signatures, nextStep.signatures)
+  nextStep: JenkinsfileStepDefinition
 ): JenkinsfileStepDefinition {
   return {
     ...baseStep,
@@ -85,7 +82,7 @@ function mergeStepDefinitions(
     documentation: nextStep.documentation ?? baseStep.documentation,
     requiresNodeContext: baseStep.requiresNodeContext || nextStep.requiresNodeContext,
     isAdvanced: baseStep.isAdvanced && nextStep.isAdvanced,
-    signatures
+    signatures: mergeSignatures(baseStep.signatures, nextStep.signatures)
   };
 }
 

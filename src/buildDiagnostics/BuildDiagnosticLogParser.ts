@@ -201,5 +201,3 @@ export function parseBuildLog(
   const parser = new BuildDiagnosticLogParser(options);
   return [...parser.acceptChunk(text), ...parser.finish()];
 }
-
-export { normalizeBuildLogLine } from "./BuildDiagnosticParserSupport";

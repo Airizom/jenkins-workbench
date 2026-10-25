@@ -103,9 +103,6 @@ async function runTreeChangeAttempt<Result>(
   } finally {
     finishWaiting(false);
     subscription?.dispose();
-    if (timer) {
-      clearTimeout(timer);
-    }
   }
 }
 

@@ -108,7 +108,6 @@ function toNodeModel(rawNode: RawNode, durationRatio: number): PipelineGraphNode
     stage: rawNode.stage,
     width,
     height: rawNode.stage.parallelBranches.length > 0 ? PARALLEL_NODE_HEIGHT : NODE_HEIGHT,
-    durationMs: rawNode.stage.durationMs,
     durationRatio,
     order: rawNode.order
   };

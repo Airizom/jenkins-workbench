@@ -1,12 +1,10 @@
 import * as vscode from "vscode";
-import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import { CancellationError } from "../jenkins/errors";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
-import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JobHistoryPanelLauncher } from "../panels/JobHistoryPanelLauncher";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsFolderTreeItem, JobTreeItem } from "../tree/TreeItems";
-import { withActionErrorMessage } from "./CommandUtils";
+import { pickJenkinsEnvironment, withActionErrorMessage } from "./CommandUtils";
 
 const JOB_HISTORY_PICKER_MAX_RESULTS = 2000;
 
@@ -34,17 +32,11 @@ export function registerHistoryCommands(
           if (selected) await launcher.show(item.environment, selected.url);
           return;
         }
-        const entries = await environments.listEnvironmentsWithScope();
-        const chosen = await vscode.window.showQuickPick(
-          entries.map((entry) => ({
-            label: formatEnvironmentDisplayName(entry),
-            description: entry.username ? `${entry.scope} · ${entry.username}` : entry.scope,
-            entry
-          })),
-          { title: "Choose Jenkins environment", matchOnDescription: true }
-        );
-        if (!chosen) return;
-        const environment = toJenkinsEnvironmentRef(chosen.entry);
+        const environment = await pickJenkinsEnvironment(environments, {
+          emptyMessage: "Add a Jenkins environment before opening Job History.",
+          placeHolder: "Select a Jenkins environment for Job History"
+        });
+        if (!environment) return;
         const jobs = await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,

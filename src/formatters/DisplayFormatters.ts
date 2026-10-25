@@ -1,16 +1,9 @@
 import { formatDurationMs } from "./DurationFormatters";
-import { formatRelativeTimestampMs } from "./RelativeTimeFormatters";
+import { formatRelativeTimestampMs, LOCALE_TIMESTAMP_OPTIONS } from "./RelativeTimeFormatters";
 
 export function formatNumber(value: number): string {
   return value.toLocaleString();
 }
-
-// Medium date + short time ("Sep 26, 2026, 9:14 AM") keeps build timestamps compact and
-// consistent across panels, tooltips, and pickers.
-const LOCALE_TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
-  dateStyle: "medium",
-  timeStyle: "short"
-};
 
 export function formatOptionalLocaleTimestamp(timestamp?: number): string {
   if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {

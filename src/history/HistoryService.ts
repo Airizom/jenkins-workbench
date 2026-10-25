@@ -136,16 +136,16 @@ export class HistoryService implements vscode.Disposable {
     const cached = this.cache.get(key);
     if (!request.refresh && cached && cached.expires > Date.now()) return cached.report;
     const generation = this.generation;
+    // A cancelled share yields no report; retry only while this request is still current.
+    const settle = (report: HistoryReport | undefined): HistoryReport | Promise<HistoryReport> =>
+      report ??
+      (generation === this.generation && request.active()
+        ? this.report(request, build)
+        : { status: "unavailable", cases: [] });
     const pending = this.pending.get(key);
     if (pending) {
       pending.subscribers.push(request.active);
-      const report = await pending.promise;
-      return (
-        report ??
-        (generation === this.generation && request.active()
-          ? this.report(request, build)
-          : { status: "unavailable", cases: [] })
-      );
+      return settle(await pending.promise);
     }
     const subscribers = [request.active];
     const operation = this.schedule<HistoryReport | undefined>(request.environment, async () => {
@@ -194,12 +194,7 @@ export class HistoryService implements vscode.Disposable {
     } finally {
       if (this.pending.get(key)?.promise === operation) this.pending.delete(key);
     }
-    return (
-      report ??
-      (generation === this.generation && request.active()
-        ? this.report(request, build)
-        : { status: "unavailable", cases: [] })
-    );
+    return settle(report);
   }
 
   async load(input: HistoryRequest): Promise<HistoryWindow> {

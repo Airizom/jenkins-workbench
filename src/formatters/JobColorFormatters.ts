@@ -73,12 +73,7 @@ export function isFailingJobColor(color?: string): boolean {
 }
 
 export function resolveWatchStatusFromJobColor(color?: string): WatchStatusKind {
-  const status = resolveJobColorStatus(color);
-  if (!status) {
-    return "unknown";
-  }
-
-  switch (status) {
+  switch (resolveJobColorStatus(color)) {
     case "failed":
       return "failure";
     case "success":

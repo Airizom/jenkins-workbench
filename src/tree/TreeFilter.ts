@@ -3,8 +3,8 @@ import type { JenkinsJobKind } from "../jenkins/JenkinsClient";
 import type { JenkinsJobInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
+import { trimToUndefined } from "../shared/stringValues";
 import type { JenkinsViewStateStore } from "../storage/JenkinsViewStateStore";
-import { normalizeBranchFilter } from "./branchFilters";
 
 interface TreeFilterOptions {
   parentFolderKind?: JenkinsJobKind;
@@ -19,7 +19,7 @@ export class JenkinsTreeFilter {
   }
 
   getBranchFilter(environmentId: string, folderUrl: string): string | undefined {
-    return normalizeBranchFilter(this.viewStateStore.getBranchFilter(environmentId, folderUrl));
+    return trimToUndefined(this.viewStateStore.getBranchFilter(environmentId, folderUrl));
   }
 
   filterJobs(

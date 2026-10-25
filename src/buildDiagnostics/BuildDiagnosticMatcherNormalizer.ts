@@ -5,7 +5,6 @@ import {
   createNormalizedCustomDiagnosticPattern,
   isCustomMatcherCaptureIndex,
   isCustomMatcherLoop,
-  isCustomMatcherLoopAllowed,
   isCustomMatcherPatternKind,
   MAX_CUSTOM_MATCHER_CAPTURE_INDEX,
   MAX_CUSTOM_MATCHER_METADATA_LENGTH,
@@ -143,7 +142,7 @@ function validateMatcherPatterns(
     );
   }
   for (let index = 0; index < patterns.length - 1; index += 1) {
-    if (!isCustomMatcherLoopAllowed(patterns[index].loop, false)) {
+    if (patterns[index].loop) {
       addIssue(
         issues,
         `${matcherPath}.pattern[${index}].loop`,

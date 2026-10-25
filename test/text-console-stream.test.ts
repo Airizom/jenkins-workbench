@@ -9,7 +9,7 @@ import type {
 import {
   TextConsoleStream,
   type TextConsoleStreamDataService
-} from "../src/panels/buildDetails/TextConsoleStream";
+} from "../src/services/console/TextConsoleStream";
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",

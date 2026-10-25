@@ -20,19 +20,39 @@ export class DraftEditorService {
   }
 
   /**
-   * Runs `onClosed` only if the document stays closed. VS Code also fires
-   * `onDidCloseTextDocument` when a document's language changes, then reopens
-   * it right away; that is not the user closing the draft.
+   * Runs `onClosed` when a document matching `isDraft` closes and stays closed.
+   * VS Code also fires `onDidCloseTextDocument` when a document's language
+   * changes, then reopens it right away; that is not the user closing the draft.
+   * Disposing the result stops listening, then cancels pending close callbacks.
    */
-  whenDocumentStaysClosed(uri: vscode.Uri, onClosed: () => void): vscode.Disposable {
-    const key = uri.toString();
-    const timer = setTimeout(() => {
-      if (vscode.workspace.textDocuments.some((document) => document.uri.toString() === key)) {
+  onDraftClosed(
+    isDraft: (document: vscode.TextDocument) => boolean,
+    onClosed: (uri: vscode.Uri) => void
+  ): vscode.Disposable {
+    const pendingCloses = new Set<NodeJS.Timeout>();
+    const subscription = vscode.workspace.onDidCloseTextDocument((document) => {
+      if (!isDraft(document)) {
         return;
       }
-      onClosed();
-    }, 0);
-    return { dispose: () => clearTimeout(timer) };
+      const key = document.uri.toString();
+      const timer = setTimeout(() => {
+        pendingCloses.delete(timer);
+        if (vscode.workspace.textDocuments.some((open) => open.uri.toString() === key)) {
+          return;
+        }
+        onClosed(document.uri);
+      }, 0);
+      pendingCloses.add(timer);
+    });
+    return {
+      dispose: () => {
+        subscription.dispose();
+        for (const timer of pendingCloses) {
+          clearTimeout(timer);
+        }
+        pendingCloses.clear();
+      }
+    };
   }
 
   async openDocuments(uris: vscode.Uri[], options?: { focusUri?: vscode.Uri }): Promise<void> {
@@ -97,19 +117,4 @@ function getTabUri(tab: vscode.Tab): vscode.Uri | undefined {
     return input.modified;
   }
   return undefined;
-}
-
-/** Dispose draft listeners before cancelling delayed close callbacks. */
-export function disposeDraftResources(
-  subscriptions: vscode.Disposable[],
-  pendingCloses: Set<vscode.Disposable>
-): void {
-  for (const subscription of subscriptions) {
-    subscription.dispose();
-  }
-  subscriptions.length = 0;
-  for (const pending of pendingCloses) {
-    pending.dispose();
-  }
-  pendingCloses.clear();
 }

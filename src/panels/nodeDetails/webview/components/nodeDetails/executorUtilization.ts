@@ -44,6 +44,11 @@ export function formatOneOffExecutors(utilization: ExecutorUtilization): string 
     : `${total} · ${utilization.oneOffBusy} busy`;
 }
 
+/** A free executor on an offline node is unavailable, not idle. */
+export function formatFreeExecutorLabel(isOffline: boolean): "Offline" | "Idle" {
+  return isOffline ? "Offline" : "Idle";
+}
+
 /** Executor ids are "#0" when Jenkins reports a number, else a label like "Executor 1". */
 export function formatExecutorName(id: string): string {
   return /^#?\d+$/.test(id) ? `Executor #${id.replace(/^#/, "")}` : id;

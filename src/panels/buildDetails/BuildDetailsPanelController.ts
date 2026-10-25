@@ -312,7 +312,6 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
       runtime: this.runtime,
       diagnosticConsoleSync: this.diagnosticConsoleSync,
       pendingInputProvider: this.pendingInputProvider,
-      canOpenTestSource: this.canOpenTestSource,
       isTokenCurrent: (currentToken) => this.loadTokenTracker.isCurrent(currentToken),
       publishErrors: () => this.publishErrors(),
       onBuildDetailsChanged: (details) => this.handleBuildDetailsChanged(details)

@@ -16,12 +16,12 @@ import { createLazyOutputChannel } from "../shared/LazyOutputChannel";
 import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import type { JobTreeItem, PipelineTreeItem } from "../tree/TreeItems";
-import {
-  type BuildDiagnosticPublishedSnapshot,
-  type BuildDiagnosticSourceTarget,
-  buildConsoleReferences
+import type {
+  BuildDiagnosticPublishedSnapshot,
+  BuildDiagnosticSourceTarget
 } from "./BuildDiagnosticAggregation";
-import { stripConsoleControlSequences } from "./BuildDiagnosticConsoleText";
+import { buildConsoleReferences } from "./BuildDiagnosticConsoleReferences";
+import { toDisplayedConsoleText } from "./BuildDiagnosticConsoleText";
 import { BuildDiagnosticContextResolver, buildUrlToJobUrl } from "./BuildDiagnosticContextResolver";
 import { BuildDiagnosticScanRunner } from "./BuildDiagnosticScanRunner";
 import {
@@ -195,7 +195,7 @@ export class BuildDiagnosticsCoordinator
     return {
       ...this.currentViewModel,
       consoleReferences: buildConsoleReferences(
-        stripConsoleControlSequences(displayedConsoleText),
+        toDisplayedConsoleText(displayedConsoleText),
         this.published.resolvedReferences
       )
     };
@@ -360,9 +360,7 @@ export class BuildDiagnosticsCoordinator
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    this.published = undefined;
-    this.collection.clear();
-    this.publishViewModel({
+    this.clearPublishedDiagnostics({
       ...EMPTY_BUILD_DIAGNOSTICS,
       status: "error",
       message: `Build diagnostic scan failed: ${message}`
@@ -386,9 +384,7 @@ export class BuildDiagnosticsCoordinator
   private resetOwner(reason: string): void {
     this.generation += 1;
     this.scanRunner.reset();
-    this.published = undefined;
-    this.collection.clear();
-    this.publishViewModel({ ...EMPTY_BUILD_DIAGNOSTICS, status: "scanning" });
+    this.clearPublishedDiagnostics({ ...EMPTY_BUILD_DIAGNOSTICS, status: "scanning" });
     this.log(`Owner generation ${this.generation}: ${reason}.`);
   }
 

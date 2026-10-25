@@ -103,7 +103,8 @@ describe("registerHistoryCommands openJobHistory palette flow", () => {
     expect(progressOptions?.cancellable).toBe(true);
     expect(received?.cancellation).toBeDefined();
     expect(received?.maxResults).toBe(2000);
-    expect(quickPickCalls).toHaveLength(2);
+    // The single configured environment is chosen without a prompt; only the job picker opens.
+    expect(quickPickCalls).toHaveLength(1);
     expect(shown).toEqual(["https://jenkins.example.com/job/folder/job/app/"]);
   });
 
@@ -118,7 +119,7 @@ describe("registerHistoryCommands openJobHistory palette flow", () => {
 
     await command();
 
-    expect(quickPickCalls).toHaveLength(1);
+    expect(quickPickCalls).toHaveLength(0);
     expect(shown).toEqual([]);
     expect(errorMessages).toEqual([]);
   });

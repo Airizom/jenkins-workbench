@@ -33,6 +33,35 @@ describe("build details restart stage identifiers", () => {
     assert.equal(stages[1]?.canRestartFromStage, true);
     assert.equal(stages[1]?.name, " Build ");
   });
+
+  it("marks only stages from the state's normalized list as restartable", () => {
+    const state = new BuildDetailsPanelState();
+    state.setPipelineRestartInfo(true, ["Deploy", "", "   ", "Deploy"], "supported");
+    const pipelineRun: PipelineRun = {
+      stages: [
+        createStage("Deploy", "deploy"),
+        createStage("   ", "blank"),
+        createStage("", "empty")
+      ]
+    };
+
+    const stages = buildPipelineStagesViewModel(pipelineRun, {
+      details: {
+        number: 16,
+        url: "https://jenkins.example.com/job/demo/16/",
+        building: false,
+        result: "FAILURE"
+      },
+      restartEnabled: state.pipelineRestartEnabled,
+      restartableStages: state.pipelineRestartableStages
+    });
+
+    assert.deepEqual(state.pipelineRestartableStages, ["Deploy"]);
+    assert.deepEqual(
+      stages.map((stage) => stage.canRestartFromStage),
+      [true, false, false]
+    );
+  });
 });
 
 function createStage(name: string, key: string): PipelineRun["stages"][number] {

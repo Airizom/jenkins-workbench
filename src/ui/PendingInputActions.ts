@@ -42,9 +42,8 @@ export async function handlePendingInputAction(
     await refreshAfterInputAction(options.onRefresh, label);
     return true;
   } catch (error) {
-    const verb = options.action === "approve" ? "approve" : "reject";
     void vscode.window.showErrorMessage(
-      `Failed to ${verb} input for ${label}: ${formatActionError(error)}`
+      `Failed to ${options.action} input for ${label}: ${formatActionError(error)}`
     );
     return false;
   }

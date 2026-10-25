@@ -163,10 +163,10 @@ function buildTestResultsViewModel(
       status: normalized.status,
       statusLabel: normalized.statusLabel,
       durationLabel: normalized.durationLabel,
-      errorDetails: normalizeTestText(testCase.errorDetails, true),
-      errorStackTrace: normalizeTestText(testCase.errorStackTrace, true),
-      stdout: normalizeTestText(testCase.stdout, true),
-      stderr: normalizeTestText(testCase.stderr, true),
+      errorDetails: normalizeTestText(testCase.errorDetails),
+      errorStackTrace: normalizeTestText(testCase.errorStackTrace),
+      stdout: normalizeTestText(testCase.stdout),
+      stderr: normalizeTestText(testCase.stderr),
       canOpenSource: Boolean(options?.canOpenSource?.(normalized.className))
     });
   });
@@ -200,12 +200,12 @@ function compareTestCases(left: BuildTestCaseViewModel, right: BuildTestCaseView
   return left.name.localeCompare(right.name);
 }
 
-function normalizeTestText(value?: string, allowTruncation = false): string | undefined {
+function normalizeTestText(value?: string): string | undefined {
   const trimmed = value?.trim();
   if (!trimmed) {
     return undefined;
   }
-  if (!allowTruncation || trimmed.length <= MAX_TEST_CASE_LOG_CHARS) {
+  if (trimmed.length <= MAX_TEST_CASE_LOG_CHARS) {
     return trimmed;
   }
   return `${trimmed.slice(0, MAX_TEST_CASE_LOG_CHARS)}${TEST_CASE_LOG_TRUNCATION_SUFFIX}`;

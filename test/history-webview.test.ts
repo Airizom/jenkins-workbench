@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { analyzeTests, normalizeHistoryReport } from "../src/history/HistoryAnalysis";
 import {
   emptyHistory,
+  HISTORY_FILTERS,
+  HISTORY_WINDOW_SIZES,
   type HistoryViewModel,
   historyJobDisplayName,
   isHistoryAction,
@@ -17,6 +19,7 @@ import {
   failureHistorySummary,
   filterTests,
   formatHistoryTimestamp,
+  HISTORY_FILTER_LABELS,
   historyAnnouncement,
   observationGaps,
   outcomePresentation
@@ -40,6 +43,21 @@ describe("history webview contract", () => {
       false
     );
     expect(normalizeHistoryUi({ count: 1000, filter: "invalid" }).count).toBe(20);
+  });
+  it("accepts every build-window size from the shared list and nothing else", () => {
+    const state = emptyHistory();
+    for (const count of HISTORY_WINDOW_SIZES) {
+      expect(normalizeHistoryUi({ count }).count).toBe(count);
+      expect(historyReducer(state, { ...state, revision: 1, count }).count).toBe(count);
+    }
+    expect(historyReducer(state, { ...state, revision: 1, count: 30 })).toBe(state);
+    expect(historyReducer(state, { ...state, revision: 1, count: "50" })).toBe(state);
+  });
+  it("accepts every labeled filter from the shared list and nothing else", () => {
+    expect(Object.keys(HISTORY_FILTER_LABELS).sort()).toEqual([...HISTORY_FILTERS].sort());
+    for (const filter of HISTORY_FILTERS)
+      expect(normalizeHistoryUi({ filter }).filter).toBe(filter);
+    expect(normalizeHistoryUi({ filter: "invalid" }).filter).toBe("all");
   });
   it("preserves embedded UI state only for the same build", () => {
     const environment = {

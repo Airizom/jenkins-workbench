@@ -110,6 +110,15 @@ export function normalizeDiagnosticProfiles(value: unknown): NormalizedDiagnosti
   return { profiles, issues };
 }
 
+export function logDiagnosticProfileIssues(
+  normalized: NormalizedDiagnosticProfiles,
+  log: (message: string) => void
+): void {
+  for (const issue of normalized.issues) {
+    log(`Profile ${issue.severity}: ${issue.path}: ${issue.message}`);
+  }
+}
+
 export function resolveDiagnosticProfile(
   normalized: NormalizedDiagnosticProfiles,
   requestedId?: string

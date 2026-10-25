@@ -7,7 +7,7 @@ import type { BuildCommandRefreshHost } from "../commands/build/BuildCommandType
 import { withActionErrorMessage } from "../commands/CommandUtils";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
-import type { QueuedBuildWaiter } from "../services/QueuedBuildWaiter";
+import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type {
   CurrentBranchBuildDetailsTarget,
@@ -18,7 +18,7 @@ export class CurrentBranchActionExecutor {
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly presetStore: JenkinsParameterPresetStore,
-    private readonly queuedBuildWaiter: QueuedBuildWaiter,
+    private readonly buildFollowUp: BuildFollowUpService,
     private readonly buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
     private readonly refreshHost: BuildCommandRefreshHost
   ) {}
@@ -30,7 +30,7 @@ export class CurrentBranchActionExecutor {
     return triggerBuildForTarget(
       this.dataService,
       this.presetStore,
-      this.queuedBuildWaiter,
+      this.buildFollowUp,
       this.refreshHost,
       target,
       options

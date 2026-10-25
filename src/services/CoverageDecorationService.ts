@@ -73,10 +73,10 @@ export class CoverageDecorationService implements vscode.Disposable {
   constructor(private readonly repositoryLinkStore: JenkinsRepositoryLinkStore) {
     this.subscriptions.push(
       this.repositoryLinkStore.onDidChange(() => {
-        this.handleRepositorySourcesChanged();
+        this.refreshActiveDecorations();
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
-        this.handleRepositorySourcesChanged();
+        this.refreshActiveDecorations();
       }),
       vscode.window.onDidChangeVisibleTextEditors(() => {
         void this.applyDecorationsToVisibleEditors(this.resolveGeneration);
@@ -89,7 +89,7 @@ export class CoverageDecorationService implements vscode.Disposable {
 
   dispose(): void {
     this.coverageContexts.clear();
-    this.deactivateActiveOwner();
+    this.switchActiveOwner(undefined);
     while (this.subscriptions.length > 0) {
       this.subscriptions.pop()?.dispose();
     }
@@ -137,10 +137,6 @@ export class CoverageDecorationService implements vscode.Disposable {
     }
   }
 
-  private deactivateActiveOwner(): void {
-    this.switchActiveOwner(undefined);
-  }
-
   private switchActiveOwner(ownerId: string | undefined): void {
     this.activeOwnerId = ownerId;
     this.resetActiveResolution();
@@ -154,10 +150,6 @@ export class CoverageDecorationService implements vscode.Disposable {
     this.resolveGeneration += 1;
     this.resolvedFileMap.clear();
     this.linkedRepositoryRootsPromise = undefined;
-  }
-
-  private handleRepositorySourcesChanged(): void {
-    this.refreshActiveDecorations();
   }
 
   private refreshActiveDecorations(): void {
@@ -236,7 +228,7 @@ export class CoverageDecorationService implements vscode.Disposable {
     relativePath: string,
     generation: number
   ): Promise<vscode.Uri | undefined> {
-    const cacheKey = normalizeCoveragePath(relativePath);
+    const cacheKey = normalizePosixPathForComparison(relativePath);
     const cached = this.resolvedFileMap.get(cacheKey);
     if (cached !== undefined) {
       return cached ?? undefined;
@@ -318,10 +310,10 @@ export class CoverageDecorationService implements vscode.Disposable {
     }
     this.subscriptions.push(
       gitApi.onDidOpenRepository(() => {
-        this.handleRepositorySourcesChanged();
+        this.refreshActiveDecorations();
       }),
       gitApi.onDidCloseRepository(() => {
-        this.handleRepositorySourcesChanged();
+        this.refreshActiveDecorations();
       })
     );
   }
@@ -411,8 +403,4 @@ function toRepositoryRootKey(uri: vscode.Uri): string {
     normalizedPath = normalizedPath.toLowerCase();
   }
   return normalizedPath;
-}
-
-function normalizeCoveragePath(relativePath: string): string {
-  return normalizePosixPathForComparison(relativePath);
 }

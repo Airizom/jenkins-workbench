@@ -5,7 +5,6 @@ export interface PipelineGraphNodeModel {
   stage: PipelineStageViewModel;
   width: number;
   height: number;
-  durationMs?: number;
   durationRatio: number;
   order: number;
 }

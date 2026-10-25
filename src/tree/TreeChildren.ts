@@ -31,6 +31,7 @@ import { TreeJobCollectionChildrenLoader } from "./loader/TreeJobCollectionChild
 import { TreeJobUrlStateLoader } from "./loader/TreeJobUrlStateLoader";
 import { TreePinnedChildrenLoader } from "./loader/TreePinnedChildrenLoader";
 import { TreeWorkspaceChildrenLoader } from "./loader/TreeWorkspaceChildrenLoader";
+import { buildTreeEnvironmentKey, deleteTreeEnvironmentKeys } from "./TreeEnvironmentKeys";
 import type { JenkinsTreeFilter } from "./TreeFilter";
 import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "./TreeJobScope";
 import { describeTreeLoadError } from "./TreeLoadErrors";
@@ -176,7 +177,7 @@ export class JenkinsTreeChildrenLoader {
   async getChildren(element?: WorkbenchTreeElement): Promise<WorkbenchTreeElement[]> {
     if (!element) {
       return this.environmentLoader.getInstanceItems((environment) =>
-        this.environmentIssues.get(buildEnvironmentIssueKey(environment.scope, environment.id))
+        this.environmentIssues.get(buildTreeEnvironmentKey(environment.scope, environment.id))
       );
     }
 
@@ -227,7 +228,7 @@ export class JenkinsTreeChildrenLoader {
     environment: JenkinsEnvironmentRef,
     issue: InstanceTreeItemIssue
   ): void {
-    const key = buildEnvironmentIssueKey(environment.scope, environment.environmentId);
+    const key = buildTreeEnvironmentKey(environment.scope, environment.environmentId);
     if (this.environmentIssues.get(key)?.kind === issue.kind) {
       return;
     }
@@ -240,11 +241,7 @@ export class JenkinsTreeChildrenLoader {
       this.environmentIssues.clear();
       return;
     }
-    for (const key of this.environmentIssues.keys()) {
-      if (key.endsWith(`:${environmentId}`)) {
-        this.environmentIssues.delete(key);
-      }
-    }
+    deleteTreeEnvironmentKeys(this.environmentIssues, environmentId);
   }
 
   clearWatchCacheForEnvironment(environmentId?: string): void {
@@ -356,10 +353,6 @@ export class JenkinsTreeChildrenLoader {
   ): PlaceholderTreeItem {
     return new PlaceholderTreeItem(label, description, "empty", options);
   }
-}
-
-function buildEnvironmentIssueKey(scope: string, environmentId: string): string {
-  return `${scope}:${environmentId}`;
 }
 
 function resolveTreeElementEnvironment(

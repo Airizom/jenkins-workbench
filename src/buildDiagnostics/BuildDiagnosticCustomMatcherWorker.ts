@@ -105,11 +105,6 @@ function postDiagnostics(
   diagnostics: RawBuildDiagnostic[],
   lineTruncated: boolean
 ): void {
-  if (diagnostics.length > MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH) {
-    throw new Error(
-      `Custom matchers exceeded ${MAX_CUSTOM_MATCHER_DIAGNOSTICS_PER_BATCH} diagnostics in one batch.`
-    );
-  }
   const response: CustomMatcherWorkerResponse = {
     protocolVersion: CUSTOM_MATCHER_WORKER_PROTOCOL_VERSION,
     id,

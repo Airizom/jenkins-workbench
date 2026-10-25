@@ -6,34 +6,23 @@ import type {
   JenkinsProgressiveConsoleHtml,
   JenkinsProgressiveConsoleText
 } from "../../jenkins/types";
-import { type ConsoleTextByteRange, HtmlConsoleStream } from "./HtmlConsoleStream";
-import { TextConsoleStream } from "./TextConsoleStream";
+import { TextConsoleStream } from "../../services/console/TextConsoleStream";
+import {
+  HtmlConsoleStream,
+  type HtmlConsoleStreamCallbacks,
+  type HtmlConsoleStreamDataService
+} from "./HtmlConsoleStream";
 
-export interface ConsoleStreamCallbacks {
+export interface ConsoleStreamCallbacks extends HtmlConsoleStreamCallbacks {
   onConsoleAppend(text: string): void;
   onConsoleSet(payload: { text: string; truncated: boolean }): void;
-  onConsoleHtmlAppend(
-    html: string,
-    textRange: ConsoleTextByteRange,
-    appendedTextRange: ConsoleTextByteRange
-  ): void;
-  onConsoleHtmlSet(payload: {
-    html: string;
-    truncated: boolean;
-    textRange: ConsoleTextByteRange;
-  }): void;
 }
 
 export type { ConsoleTextByteRange } from "./HtmlConsoleStream";
 
-export interface ConsoleStreamDataService extends JenkinsConsoleTextClient {
-  getConsoleHtmlProgressive(
-    environment: JenkinsEnvironmentRef,
-    buildUrl: string,
-    start: number,
-    annotator?: string
-  ): Promise<JenkinsProgressiveConsoleHtml>;
-}
+export interface ConsoleStreamDataService
+  extends JenkinsConsoleTextClient,
+    HtmlConsoleStreamDataService {}
 
 export type ConsoleSnapshotResult = {
   consoleTextResult?: JenkinsConsoleTextTail;
@@ -119,12 +108,7 @@ export class ConsoleStreamManager {
       // Without a tail there is no bounded HTML start; let a later probe initialize HTML.
       return { consoleTextResult, consoleError };
     }
-    let consoleHtmlResult: { html: string; truncated: boolean } | undefined;
-    try {
-      consoleHtmlResult = await this.htmlConsoleStream.tryInitialize(consoleTextResult);
-    } catch {
-      consoleHtmlResult = undefined;
-    }
+    const consoleHtmlResult = await this.htmlConsoleStream.tryInitialize(consoleTextResult);
     return { consoleTextResult, consoleHtmlResult, consoleError };
   }
 

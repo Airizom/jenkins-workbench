@@ -80,7 +80,7 @@ export function formatNodeTreeDescription(
 ): string {
   const state = resolveNodeConnectivityState(node);
   if (state === "temporary-offline" || state === "offline") {
-    return resolveNodeStatusDescriptor(node).label;
+    return NODE_STATUS_DESCRIPTORS[state].label;
   }
 
   const ratio = formatNodeBusyExecutorRatio(node, { suffix: " busy" });
@@ -107,7 +107,7 @@ export function resolveBusyExecutors(
   node: NodeExecutorCountFields,
   totalExecutors: number
 ): number {
-  if (typeof node.busyExecutors === "number" && Number.isFinite(node.busyExecutors)) {
+  if (isFiniteNumber(node.busyExecutors)) {
     return Math.min(totalExecutors, toNonNegativeInteger(node.busyExecutors));
   }
   if (!Array.isArray(node.executors)) {

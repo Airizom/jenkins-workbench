@@ -1,5 +1,7 @@
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import type { TriggerCauseKind } from "../../services/buildFollow/BuildFollowTypes";
+import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { BuildTreeItem } from "../../tree/TreeItems";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
@@ -7,21 +9,33 @@ import { refreshEnvironment } from "./BuildCommandRefresh";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 import type { ReplayBuildWorkflow } from "./ReplayBuildWorkflow";
 
-interface BuildActionOptions {
+interface FollowedBuildActionOptions {
+  cause: TriggerCauseKind;
   errorMessage: string;
-  successMessage: string;
+  /** Without a trailing period, for example "Rebuild requested for #12". */
+  requestedMessage: string;
   action: (environment: BuildTreeItem["environment"], buildUrl: string) => Promise<void>;
 }
 
-async function runBuildAction(
+async function runFollowedBuildAction(
+  buildFollowUp: BuildFollowUpService,
   refreshHost: BuildCommandRefreshHost,
   selected: BuildTreeItem,
-  options: BuildActionOptions
+  options: FollowedBuildActionOptions
 ): Promise<void> {
   await withActionErrorMessage(options.errorMessage, async () => {
+    const prepared = await buildFollowUp.prepare({
+      kind: "cause",
+      environment: selected.environment,
+      sourceBuildUrl: selected.buildUrl,
+      cause: options.cause,
+      jobLabel: selected.jobNameHint
+    });
     await options.action(selected.environment, selected.buildUrl);
-    void vscode.window.showInformationMessage(options.successMessage);
-    refreshEnvironment(refreshHost, selected.environment.environmentId);
+    buildFollowUp.announceAndFollow(prepared, {
+      requestedMessage: options.requestedMessage,
+      refresh: () => refreshEnvironment(refreshHost, selected.environment.environmentId)
+    });
   });
 }
 
@@ -82,6 +96,7 @@ export async function replayBuild(
 
 export async function quickReplayBuild(
   dataService: JenkinsDataService,
+  buildFollowUp: BuildFollowUpService,
   refreshHost: BuildCommandRefreshHost,
   item?: BuildTreeItem
 ): Promise<void> {
@@ -91,9 +106,10 @@ export async function quickReplayBuild(
   }
 
   const label = getTreeItemLabel(selected);
-  await runBuildAction(refreshHost, selected, {
+  await runFollowedBuildAction(buildFollowUp, refreshHost, selected, {
+    cause: "replay",
     errorMessage: `Failed to replay build ${label}`,
-    successMessage: `Replay requested for ${label}.`,
+    requestedMessage: `Replay requested for ${label}`,
     action: (environment, buildUrl) => dataService.quickReplayBuild(environment, buildUrl)
   });
 }
@@ -108,6 +124,7 @@ export async function runReplayDraft(
 
 export async function rebuildBuild(
   dataService: JenkinsDataService,
+  buildFollowUp: BuildFollowUpService,
   refreshHost: BuildCommandRefreshHost,
   item?: BuildTreeItem
 ): Promise<void> {
@@ -117,9 +134,10 @@ export async function rebuildBuild(
   }
 
   const label = getTreeItemLabel(selected);
-  await runBuildAction(refreshHost, selected, {
+  await runFollowedBuildAction(buildFollowUp, refreshHost, selected, {
+    cause: "rebuild",
     errorMessage: `Failed to rebuild ${label}`,
-    successMessage: `Rebuild requested for ${label}.`,
+    requestedMessage: `Rebuild requested for ${label}`,
     action: (environment, buildUrl) => dataService.rebuildBuild(environment, buildUrl)
   });
 }

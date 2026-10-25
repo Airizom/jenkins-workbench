@@ -162,7 +162,7 @@ function eventSource<T = void>() {
 
 function createHarness(
   initialState: CurrentBranchState,
-  options: { actions?: unknown[]; localRevision?: string } = {}
+  options: { actions?: unknown[]; localRevision?: string; log?: string } = {}
 ) {
   const currentBranch = new FakeCurrentBranchService(initialState);
   const bindingChanges = eventSource();
@@ -174,7 +174,7 @@ function createHarness(
   const logs = new Map<string, string>([
     [
       "https://jenkins.example/job/project/job/main/1/",
-      "src/current.ts:2:3: error: current failed\n"
+      options.log ?? "src/current.ts:2:3: error: current failed\n"
     ],
     ["https://jenkins.example/job/other/2/", "src/panel.ts:4:5: warning: panel warning\n"]
   ]);
@@ -384,6 +384,34 @@ describe("BuildDiagnosticsCoordinator ownership", () => {
     }
   });
 
+  it("logs profile issues once per normalization rather than on every scan", async () => {
+    const currentBuild = "https://jenkins.example/job/project/job/main/1/";
+    configurationValues.set("diagnostics.profiles", {
+      broken: { pathMappings: [{ type: "unknown" }] }
+    });
+    const profileIssueCount = () =>
+      outputLines.filter((line) => line.includes("Profile error:")).length;
+    const harness = createHarness(matchedState("FAILURE", currentBuild));
+    try {
+      harness.coordinator.start();
+      await waitForScans(harness.coordinator);
+      assert.equal(profileIssueCount(), 1);
+
+      harness.currentBranch.update(matchedState("FAILURE", currentBuild));
+      await waitForScans(harness.coordinator);
+      await harness.coordinator.refresh();
+      assert.equal(profileIssueCount(), 1);
+
+      configurationEmitter.fire({
+        affectsConfiguration: (section) => section === "jenkinsWorkbench.diagnostics"
+      });
+      await waitForScans(harness.coordinator);
+      assert.equal(profileIssueCount(), 2);
+    } finally {
+      harness.coordinator.dispose();
+    }
+  });
+
   it("does not reuse a completed scan after the console byte limit changes", async () => {
     const currentBuild = "https://jenkins.example/job/project/job/main/1/";
     configurationValues.set("diagnostics.maxLogBytes", 64 * 1024);
@@ -511,6 +539,32 @@ describe("BuildDiagnosticsCoordinator ownership", () => {
 
     harness.coordinator.showProblems();
     assert.deepEqual(executedCommands, ["workbench.actions.view.problems"]);
+    harness.coordinator.dispose();
+  });
+
+  it("locates console references in the console as Build Details displays it", async () => {
+    const currentBuild = "https://jenkins.example/job/project/job/main/1/";
+    const note = "\u001b[8mha:////4M/hWhlhw5tN4KcfAOIF2I4xi0Q8XNOAlOjZ5p+AAAA==\u001b[0m";
+    const rawLog = [
+      " > git fetch --no-tags origin # timeout=10",
+      `Running on ${note}Jenkins in /var/jenkins_home/workspace/project`,
+      "src/current.ts:2:3: error: current failed",
+      ""
+    ].join("\r\n");
+    const harness = createHarness(matchedState("FAILURE", currentBuild), { log: rawLog });
+    harness.coordinator.start();
+    await waitForScans(harness.coordinator);
+
+    // The HTML console drops notes and turns CRLF into LF, so offsets must follow that text.
+    const displayed = [
+      " > git fetch --no-tags origin # timeout=10",
+      "Running on Jenkins in /var/jenkins_home/workspace/project",
+      "src/current.ts:2:3: error: current failed",
+      ""
+    ].join("\n");
+    const [reference] = harness.coordinator.getDiagnostics(currentBuild, rawLog).consoleReferences;
+    assert.ok(reference);
+    assert.equal(displayed.slice(reference.startOffset, reference.endOffset), "src/current.ts");
     harness.coordinator.dispose();
   });
 

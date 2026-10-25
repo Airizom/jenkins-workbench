@@ -4,7 +4,6 @@ import type { JenkinsDataService, JobSearchEntry } from "../src/jenkins/JenkinsD
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { PendingInputRefreshCoordinator } from "../src/services/PendingInputRefreshCoordinator";
 import type { TreeActivityOptions } from "../src/tree/ActivityTypes";
-import { ActivityClassifier } from "../src/tree/activity/ActivityClassifier";
 import {
   ActivityCollector,
   type ActivityCollectorOptions
@@ -119,12 +118,7 @@ function createCollector(
 ) {
   const { dataService, yieldedBatchIndexes, iterateOptions } = createDataService(batches);
   const { enricher, calls: enricherCalls } = createEnricher(awaitingInputJobUrls);
-  const collector = new ActivityCollector(
-    dataService,
-    coordinatorStub,
-    new ActivityClassifier(),
-    enricher
-  );
+  const collector = new ActivityCollector(dataService, coordinatorStub, enricher);
   return { collector, yieldedBatchIndexes, iterateOptions, enricherCalls };
 }
 

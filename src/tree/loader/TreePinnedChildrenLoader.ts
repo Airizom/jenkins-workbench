@@ -2,6 +2,7 @@ import { JenkinsActionError, JenkinsRequestError } from "../../jenkins/errors";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { decodeJenkinsJobName } from "../../jenkins/JenkinsJobNames";
+import { runWithConcurrency } from "../../shared/concurrency";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { ScopedJobStoreEntry } from "../../storage/ScopedJobStore";
 import { JobTreeItem, StalePinnedJobTreeItem } from "../items/TreeJobItems";
@@ -111,21 +112,9 @@ export class TreePinnedChildrenLoader {
     watchedJobs: Set<string>,
     pinnedJobs: Set<string>
   ): Promise<WorkbenchTreeElement[]> {
-    const items: WorkbenchTreeElement[] = [];
-
-    for (let index = 0; index < pinnedEntries.length; index += PINNED_ITEM_LOOKUP_CONCURRENCY) {
-      const limit = Math.min(index + PINNED_ITEM_LOOKUP_CONCURRENCY, pinnedEntries.length);
-      const pending: Promise<WorkbenchTreeElement>[] = [];
-      for (let batchIndex = index; batchIndex < limit; batchIndex++) {
-        pending.push(
-          this.loadPinnedItem(environment, pinnedEntries[batchIndex], watchedJobs, pinnedJobs)
-        );
-      }
-      const loaded = await Promise.all(pending);
-      items.push(...loaded);
-    }
-
-    return items;
+    return runWithConcurrency(pinnedEntries, PINNED_ITEM_LOOKUP_CONCURRENCY, (entry) =>
+      this.loadPinnedItem(environment, entry, watchedJobs, pinnedJobs)
+    );
   }
 
   private async updatePinnedEntryUrlIfNeeded(

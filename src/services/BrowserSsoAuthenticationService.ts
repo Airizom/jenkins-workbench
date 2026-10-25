@@ -178,6 +178,13 @@ function createCallbackServer(expectedState: string): Promise<{
 }
 
 function parseCallbackResult(url: URL): CallbackResult {
+  return {
+    headers: parseCallbackHeaders(url),
+    expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
+  };
+}
+
+function parseCallbackHeaders(url: URL): Record<string, string> {
   const headersParam = url.searchParams.get("headers");
   if (headersParam) {
     const parsed = JSON.parse(Buffer.from(headersParam, "base64url").toString("utf8")) as unknown;
@@ -188,27 +195,18 @@ function parseCallbackResult(url: URL): CallbackResult {
     if (Object.keys(headers).length === 0) {
       throw new Error("Browser SSO callback did not provide any headers.");
     }
-    return {
-      headers,
-      expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
-    };
+    return headers;
   }
 
   const cookie = url.searchParams.get("cookie")?.trim();
   if (cookie) {
-    return {
-      headers: { Cookie: cookie },
-      expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
-    };
+    return { Cookie: cookie };
   }
 
   const cookieName = url.searchParams.get("cookie_name")?.trim();
   const cookieValue = url.searchParams.get("cookie_value")?.trim();
   if (cookieName && cookieValue) {
-    return {
-      headers: { Cookie: `${cookieName}=${cookieValue}` },
-      expiresAt: parseExpiresAt(url.searchParams.get("expires_at"))
-    };
+    return { Cookie: `${cookieName}=${cookieValue}` };
   }
 
   throw new Error("Browser SSO callback did not include session headers.");

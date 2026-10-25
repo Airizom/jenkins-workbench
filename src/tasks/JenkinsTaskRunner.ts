@@ -21,25 +21,12 @@ import {
   QueueCanceledError,
   type QueueOwnership,
   RunnerFailure,
+  recordConsecutivePollError,
   resolveRunnerOptions,
+  rethrowIfCanceled,
   TaskCanceledError,
   updateQueueOwnership
 } from "./JenkinsTaskRunnerSupport";
-
-export type {
-  JenkinsTaskBuildDetails,
-  JenkinsTaskPendingInputSummary,
-  JenkinsTaskProgressiveConsoleResult,
-  JenkinsTaskQueueItem,
-  JenkinsTaskRunnerBackend,
-  JenkinsTaskRunnerOptions,
-  JenkinsTaskRunnerOutput,
-  JenkinsTaskRunnerState,
-  JenkinsTaskRunRequest,
-  JenkinsTaskRunResult
-} from "./JenkinsTaskRunnerContracts";
-export { JENKINS_TASK_EXIT_CODES } from "./JenkinsTaskRunnerContracts";
-export { mapJenkinsBuildResult } from "./JenkinsTaskRunnerSupport";
 
 const MAX_RETRY_DELAY_MS = 30_000;
 
@@ -242,22 +229,17 @@ export class JenkinsTaskRunner {
           lastStatus = status;
         }
       } catch (error) {
-        if (error instanceof TaskCanceledError || this.cancelRequested) {
-          throw new TaskCanceledError();
-        }
+        rethrowIfCanceled(error, this.cancelRequested);
         if (error instanceof QueueCanceledError) {
           this.stateValue = "completed";
           throw error;
         }
-        errors++;
-        if (errors >= this.options.maxConsecutiveErrors) {
-          throw new RunnerFailure(
-            `Unable to follow Jenkins queue item ${queueId} after ${errors} consecutive errors: ${errorMessage(error)}`
-          );
-        }
-        output.writeStatus(
-          `Queue status unavailable; retrying (${errors}/${this.options.maxConsecutiveErrors}).`
-        );
+        errors = recordConsecutivePollError(error, errors, {
+          maxConsecutiveErrors: this.options.maxConsecutiveErrors,
+          failureAction: `follow Jenkins queue item ${queueId}`,
+          retryStatus: "Queue status unavailable",
+          writeStatus: (message) => output.writeStatus(message)
+        });
       }
       await this.waitForNextPoll(errors);
     }

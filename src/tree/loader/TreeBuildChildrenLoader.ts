@@ -9,7 +9,7 @@ import type { JobTreeItem, PipelineTreeItem } from "../items/TreeJobItems";
 import { WorkspaceRootTreeItem } from "../items/TreeWorkspaceItems";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
 import { resolveTreeItemLabel } from "../TreeItemLabels";
-import { ROOT_TREE_JOB_SCOPE, type TreeJobScope } from "../TreeJobScope";
+import type { TreeJobScope } from "../TreeJobScope";
 import type { TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
 import {
@@ -190,8 +190,8 @@ export class TreeBuildChildrenLoader {
   private async getArtifactsForBuild(
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
-    jobScope: TreeJobScope = ROOT_TREE_JOB_SCOPE,
-    isCurrentLoad: () => boolean = () => true
+    jobScope: TreeJobScope,
+    isCurrentLoad: () => boolean
   ): Promise<JenkinsArtifact[]> {
     const key = this.buildArtifactChildrenKey(environment, buildUrl, jobScope);
     const cached = this.cacheManager.getCachedArtifacts<JenkinsArtifact[]>(key);

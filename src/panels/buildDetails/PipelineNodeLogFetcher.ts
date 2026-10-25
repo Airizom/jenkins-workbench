@@ -3,8 +3,7 @@ import type { JenkinsFlowNodeLog } from "../../jenkins/types";
 import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 import { escapeHtml } from "../../shared/html";
 import type { BuildDetailsConsoleBackend } from "./BuildDetailsBackend";
-import { htmlToText } from "./PipelineNodeLogContent";
-import { isWorkflowNodeActive } from "./PipelineWorkflowStatus";
+import { htmlToText, readFlowNodeLogSnapshot } from "./PipelineNodeLogContent";
 import type {
   PipelineLogTargetViewModel,
   PipelineNodeLogViewModel
@@ -79,11 +78,8 @@ export class PipelineNodeLogFetcher {
     if (this.activeNodeId === nodeId) {
       return;
     }
-    this.generation += 1;
+    this.reset();
     this.activeNodeId = nodeId;
-    this.progressiveSupported = undefined;
-    this.progressiveOffset = 0;
-    this.annotator = undefined;
   }
 
   private async tryFetchProgressive(
@@ -180,16 +176,15 @@ export class PipelineNodeLogFetcher {
         error: "This Jenkins instance did not return a log for the selected pipeline node."
       };
     }
-    const text = htmlToText(snapshot.text ?? "");
+    const content = readFlowNodeLogSnapshot(snapshot);
     return {
       target,
-      html: escapeHtml(text),
-      text,
-      truncated: Boolean(snapshot.hasMore),
+      html: content.html,
+      text: content.text,
+      truncated: content.hasMore,
       loading: false,
-      // `hasMore` marks truncation, not activity; only an active node can change.
-      polling: isWorkflowNodeActive(snapshot.nodeStatus),
-      consoleUrl: snapshot.consoleUrl
+      polling: content.active,
+      consoleUrl: content.consoleUrl
     };
   }
 }

@@ -5,9 +5,9 @@ import { buildSync } from "esbuild";
 import { describe, it } from "vitest";
 import {
   BuildDiagnosticLogParser,
-  normalizeBuildLogLine,
   parseBuildLog
 } from "../src/buildDiagnostics/BuildDiagnosticLogParser";
+import { normalizeBuildLogLine } from "../src/buildDiagnostics/BuildDiagnosticParserSupport";
 
 describe("built-in build diagnostic parsers", () => {
   it("parses GCC/Clang and generic compiler locations", () => {

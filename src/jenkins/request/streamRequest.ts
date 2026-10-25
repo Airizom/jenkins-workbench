@@ -6,6 +6,7 @@ import {
   normalizeMaxBytes,
   rejectOversizedResponse
 } from "./responseLimits";
+import { buildStatusCodeError, isSuccessStatusCode } from "./responses";
 import { buildRequestHeaders, createTimeoutError, DEFAULT_TIMEOUT_MS } from "./transport";
 import type { JenkinsStreamRequestOptions, JenkinsStreamResponse } from "./types";
 
@@ -31,7 +32,7 @@ export function requestJenkinsStream(
           new JenkinsRequestError("Jenkins returned a redirect that cannot be followed.")
         );
       }
-      if (statusCode < 200 || statusCode >= 300) {
+      if (!isSuccessStatusCode(statusCode)) {
         return collectBoundedResponseText(
           response,
           statusCode,
@@ -39,12 +40,7 @@ export function requestJenkinsStream(
           "resolvePartialText"
         ).then((responseText) =>
           Promise.reject(
-            new JenkinsRequestError(
-              `Jenkins API request failed (${statusCode} ${response.statusMessage ?? ""})`,
-              statusCode,
-              responseText,
-              response.headers
-            )
+            buildStatusCodeError(statusCode, response.statusMessage, responseText, response.headers)
           )
         );
       }
@@ -100,9 +96,7 @@ export function requestJenkinsStream(
         clearStreamTimeout();
       });
       response.on("close", clearStreamTimeout);
-      response.on("error", (error) => {
-        abort(error instanceof Error ? error : new Error(String(error)));
-      });
+      response.on("error", abort);
       stream.on("close", () => {
         if (responseEnded) {
           clearStreamTimeout();

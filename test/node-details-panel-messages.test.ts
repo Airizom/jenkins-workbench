@@ -142,8 +142,13 @@ describe("NodeDetailsPanelMessages", () => {
       createNodeDetailsViewModel({ executors: undefined }),
       createNodeDetailsViewModel({ executors: [{ id: 0, statusLabel: "Idle", isIdle: true }] }),
       createNodeDetailsViewModel({ oneOffExecutors: [null] }),
+      createNodeDetailsViewModel({ executors: { id: "0", statusLabel: "Idle", isIdle: true } }),
+      createNodeDetailsViewModel({ oneOffExecutors: undefined }),
       createNodeDetailsViewModel({ monitorData: [{ key: "disk" }] }),
+      createNodeDetailsViewModel({ monitorData: "disk" }),
+      createNodeDetailsViewModel({ monitorData: ["disk"] }),
       createNodeDetailsViewModel({ loadStatistics: {} }),
+      createNodeDetailsViewModel({ loadStatistics: [null] }),
       createNodeDetailsViewModel({ queuedWork: undefined }),
       createNodeDetailsViewModel({ queuedWork: { matchingQueueItems: [] } }),
       createNodeDetailsViewModel({

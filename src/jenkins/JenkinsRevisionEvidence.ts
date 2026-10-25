@@ -59,6 +59,13 @@ function record(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
+function normalizedRemotes(action: Record<string, unknown> | undefined): string[] {
+  return (Array.isArray(action?.remoteUrls) ? action.remoteUrls : [])
+    .filter((url): url is string => typeof url === "string")
+    .map(normalizeRepositoryUrl)
+    .filter((url): url is string => !!url);
+}
+
 /** Only checkout records with repository identity can establish a commit verdict. */
 export function assessBuildRevision(
   build: JenkinsBuild,
@@ -69,14 +76,14 @@ export function assessBuildRevision(
   const checkoutRecords = (build.actions ?? [])
     .map(record)
     .filter((action) => Array.isArray(action?.remoteUrls));
+  // Source owner/repo identify a fork, but not its server. Require one Git checkout
+  // with one server before associating provider metadata with repository identity.
+  const checkout = checkoutRecords.length === 1 ? checkoutRecords[0] : undefined;
+  const checkoutHosts = new Set(normalizedRemotes(checkout).map((url) => url.split("/")[0]));
   for (const raw of build.actions ?? []) {
     const action = record(raw);
     if (!action) continue;
-    const remotes = Array.isArray(action.remoteUrls) ? action.remoteUrls : [];
-    const matches = remotes
-      .filter((url): url is string => typeof url === "string")
-      .map(normalizeRepositoryUrl)
-      .filter((url): url is string => !!url && repositories.includes(url));
+    const matches = normalizedRemotes(action).filter((url) => repositories.includes(url));
     const revision = fullGitRevision(record(action.lastBuiltRevision)?.SHA1);
     if (matches.length) {
       if (!revision) conflicting = true;
@@ -97,25 +104,15 @@ export function assessBuildRevision(
       scm?._class !== "org.jenkinsci.plugins.github_branch_source.PullRequestSCMRevision"
     )
       continue;
-    // Source owner/repo identify a fork, but not its server. Require one Git checkout
-    // with one server before associating provider metadata with repository identity.
-    const checkout = checkoutRecords.length === 1 ? checkoutRecords[0] : undefined;
-    const hosts = new Set(
-      (Array.isArray(checkout?.remoteUrls) ? checkout.remoteUrls : [])
-        .filter((url): url is string => typeof url === "string")
-        .map(normalizeRepositoryUrl)
-        .filter((url): url is string => !!url)
-        .map((url) => url.split("/")[0])
-    );
     const owner = head?.sourceOwner;
     const repo = head?.sourceRepo;
     const sourceUrl =
-      hosts.size === 1 &&
+      checkoutHosts.size === 1 &&
       typeof owner === "string" &&
       typeof repo === "string" &&
       /^[^/]+$/.test(owner) &&
       /^[^/]+$/.test(repo)
-        ? normalizeRepositoryUrl(`ssh://${[...hosts][0]}/${owner}/${repo}`)
+        ? normalizeRepositoryUrl(`ssh://${[...checkoutHosts][0]}/${owner}/${repo}`)
         : undefined;
     if (!sourceUrl || !repositories.includes(sourceUrl)) continue;
     const pull = fullGitRevision(scm.pullHash);

@@ -136,6 +136,11 @@ export class JenkinsClient {
     return this.jobsApi.getJob(jobUrl);
   }
 
+  // fallow-ignore-next-line unused-class-member -- invoked through the data-operation client provider
+  async getNextBuildNumber(jobUrl: string): Promise<number> {
+    return this.jobsApi.getNextBuildNumber(jobUrl);
+  }
+
   async getBuilds(
     jobUrl: string,
     limit = 20,

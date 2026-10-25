@@ -40,18 +40,12 @@ async function promptForParameterValue(parameter: JobParameter): Promise<string 
     });
   }
 
-  const input = await vscode.window.showInputBox({
+  return vscode.window.showInputBox({
     prompt,
     placeHolder: description,
     value: parameter.defaultValue !== undefined ? String(parameter.defaultValue) : undefined,
     ignoreFocusOut: true
   });
-
-  if (input === undefined) {
-    return undefined;
-  }
-
-  return input;
 }
 
 export async function promptBooleanParameterValue(

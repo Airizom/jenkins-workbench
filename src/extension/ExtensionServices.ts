@@ -15,7 +15,7 @@ import { createRuntimeProviderCatalog } from "./providers/RuntimeProviders";
 import { createTreeProviderCatalog } from "./providers/TreeProviders";
 import { createValidationProviderCatalog } from "./providers/ValidationProviders";
 
-export interface ExtensionServicesOptions {
+export interface ExtensionRuntimeOptions {
   cacheTtlMs: number;
   maxCacheEntries: number;
   requestTimeoutMs: number;
@@ -29,9 +29,6 @@ export interface ExtensionServicesOptions {
   buildCompareOptionsProvider: () => BuildCompareOptions;
   jenkinsfileIntelligenceConfig: JenkinsfileIntelligenceConfig;
   jenkinsfileValidationConfig: JenkinsfileValidationConfig;
-}
-
-export interface ExtensionRuntimeOptions extends ExtensionServicesOptions {
   extensionUri: vscode.Uri;
   currentBranchPullRequestJobNamePatterns: readonly string[];
   statusRefreshIntervalSeconds: number;
@@ -44,43 +41,12 @@ export function registerExtensionProviders(
   context: vscode.ExtensionContext,
   options: ExtensionRuntimeOptions
 ): void {
-  const coreCatalog = createCoreProviderCatalog({
-    context,
-    cacheTtlMs: options.cacheTtlMs,
-    maxCacheEntries: options.maxCacheEntries,
-    requestTimeoutMs: options.requestTimeoutMs,
-    artifactActionOptionsProvider: options.artifactActionOptionsProvider,
-    artifactPreviewOptionsProvider: options.artifactPreviewOptionsProvider,
-    artifactPreviewCacheOptions: options.artifactPreviewCacheOptions
-  });
-
-  const treeCatalog = createTreeProviderCatalog({
-    buildTooltipOptions: options.buildTooltipOptions,
-    buildListFetchOptions: options.buildListFetchOptions,
-    treeViewCurationOptions: options.treeViewCurationOptions,
-    activityOptions: options.activityOptions
-  });
-
-  const validationCatalog = createValidationProviderCatalog({
-    context,
-    jenkinsfileIntelligenceConfig: options.jenkinsfileIntelligenceConfig,
-    jenkinsfileValidationConfig: options.jenkinsfileValidationConfig
-  });
-
-  const runtimeCatalog = createRuntimeProviderCatalog({
-    context,
-    extensionUri: options.extensionUri,
-    buildCompareOptionsProvider: options.buildCompareOptionsProvider,
-    currentBranchPullRequestJobNamePatterns: options.currentBranchPullRequestJobNamePatterns,
-    statusRefreshIntervalSeconds: options.statusRefreshIntervalSeconds,
-    watchErrorThreshold: options.watchErrorThreshold,
-    queuePollIntervalSeconds: options.queuePollIntervalSeconds
-  });
-
+  // Each catalog reads only the fields its own options type declares.
+  const catalogOptions = { context, ...options };
   registerProviderCatalogs(container, [
-    coreCatalog,
-    treeCatalog,
-    validationCatalog,
-    runtimeCatalog
+    createCoreProviderCatalog(catalogOptions),
+    createTreeProviderCatalog(catalogOptions),
+    createValidationProviderCatalog(catalogOptions),
+    createRuntimeProviderCatalog(catalogOptions)
   ]);
 }

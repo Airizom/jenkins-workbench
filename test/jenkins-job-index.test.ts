@@ -7,7 +7,7 @@ import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef
 import { CancellationError } from "../src/jenkins/errors";
 import { JenkinsDataCache } from "../src/jenkins/data/JenkinsDataCache";
 import { JenkinsJobIndex } from "../src/jenkins/data/JenkinsJobIndex";
-import { JenkinsDataServiceReader } from "../src/jenkins/JenkinsDataServiceReader";
+import { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -81,7 +81,7 @@ describe("JenkinsJobIndex", () => {
       getClient: async (): Promise<JenkinsClient> => client,
       getAuthSignature: async (): Promise<string> => "auth"
     } as unknown as JenkinsClientProvider;
-    const reader = new JenkinsDataServiceReader(clientProvider, {
+    const reader = new JenkinsDataService(clientProvider, {
       buildParameterRequestPreparer: {
         prepareBuildParameters: async () => ({ hasParameters: false })
       },

@@ -358,7 +358,7 @@ export class BuildDetailsPanelRuntime {
     }
   }
 
-  private postStateUpdate(): void {
+  postStateUpdate(): void {
     this.options.view.postStateUpdate(this.options.state, {
       coverageEnabled: getBuildDetailsCoverageEnabled(),
       canOpenSource: (className) =>

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { stripConsoleControlSequences as stripAnsi } from "../../../../../buildDiagnostics/BuildDiagnosticConsoleText";
+import { toDisplayedConsoleText } from "../../../../../buildDiagnostics/BuildDiagnosticConsoleText";
 import { postVsCodeMessage } from "../../../../shared/webview/lib/vscodeApi";
 import type { BuildDiagnosticConsoleReference } from "../../../shared/BuildDetailsContracts";
 import type { BuildDetailsIncomingMessage } from "../../../shared/BuildDetailsPanelMessages";
@@ -44,7 +44,7 @@ export function ConsoleOutputSection({
   onOpenDiagnosticSource?: (targetId: string) => void;
 }) {
   const displayConsoleText = useMemo(
-    () => (consoleHtmlModel ? consoleText : stripAnsi(consoleText)),
+    () => (consoleHtmlModel ? consoleText : toDisplayedConsoleText(consoleText)),
     [consoleHtmlModel, consoleText]
   );
 

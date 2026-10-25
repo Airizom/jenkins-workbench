@@ -7,7 +7,6 @@ import {
 import { formatDurationMs, formatQueueDuration } from "../formatters/DurationFormatters";
 import {
   formatJobColorStatusLabel,
-  isJobColorDisabled,
   type JobColorStatus,
   resolveJobColorIconId,
   resolveJobColorStatus
@@ -208,11 +207,6 @@ export function formatQueueItemDescription(
   return parts.length > 0 ? parts.join(" • ") : undefined;
 }
 
-export function normalizeQueueReason(reason?: string): string | undefined {
-  const trimmed = reason?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : undefined;
-}
-
 function resolveBuildStatus(build: JenkinsBuild): NormalizedStatus {
   return mapBuildResultClassToTreeStatus(
     resolveBuildResultClass(build.result, build.building),
@@ -241,13 +235,9 @@ function mapBuildResultClassToTreeStatus(
   }
 }
 
-export { isJobColorDisabled };
-
 function formatDurationLabel(durationMs?: number): string | undefined {
   if (!Number.isFinite(durationMs)) {
     return undefined;
   }
   return formatDurationMs(Math.max(0, durationMs as number));
 }
-
-export { formatDurationMs };

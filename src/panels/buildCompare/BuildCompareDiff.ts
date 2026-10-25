@@ -22,18 +22,12 @@ export function forEachKeyedDiff<T>(
   for (const key of unionSortedMapKeys(baseline, target)) {
     const baselineValue = baseline.get(key);
     const targetValue = target.get(key);
-    if (baselineValue === undefined && targetValue === undefined) {
-      continue;
-    }
-    if (baselineValue === undefined && targetValue !== undefined) {
-      handlers.onAdded(key, targetValue);
-      continue;
-    }
-    if (baselineValue !== undefined && targetValue === undefined) {
+    // Keys come from the union of both maps, so at least one side is present.
+    if (baselineValue === undefined) {
+      handlers.onAdded(key, targetValue as T);
+    } else if (targetValue === undefined) {
       handlers.onRemoved(key, baselineValue);
-      continue;
-    }
-    if (baselineValue !== undefined && targetValue !== undefined) {
+    } else {
       handlers.onBoth(key, baselineValue, targetValue);
     }
   }

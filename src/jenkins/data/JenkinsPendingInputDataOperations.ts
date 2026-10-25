@@ -1,4 +1,5 @@
 import { JenkinsRequestError } from "../errors";
+import type { JenkinsClient } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
 import { toBuildActionError } from "./JenkinsDataErrors";
@@ -88,14 +89,9 @@ export class JenkinsPendingInputDataOperations {
     inputId: string,
     options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
   ): Promise<void> {
-    const client = await this.context.getClient(environment);
-    try {
-      await client.proceedInput(buildUrl, inputId, options);
-    } catch (error) {
-      throw toBuildActionError(error);
-    } finally {
-      await this.clearPendingInputCache(environment, buildUrl);
-    }
+    await this.runInputAction(environment, buildUrl, (client) =>
+      client.proceedInput(buildUrl, inputId, options)
+    );
   }
 
   async rejectInput(
@@ -104,9 +100,19 @@ export class JenkinsPendingInputDataOperations {
     inputId: string,
     abortUrl?: string
   ): Promise<void> {
+    await this.runInputAction(environment, buildUrl, (client) =>
+      client.abortInput(buildUrl, inputId, abortUrl)
+    );
+  }
+
+  private async runInputAction(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    action: (client: JenkinsClient) => Promise<void>
+  ): Promise<void> {
     const client = await this.context.getClient(environment);
     try {
-      await client.abortInput(buildUrl, inputId, abortUrl);
+      await action(client);
     } catch (error) {
       throw toBuildActionError(error);
     } finally {

@@ -6,11 +6,11 @@ import type {
   RequiredJenkinsTaskRunnerOptions
 } from "./JenkinsTaskRunnerContracts";
 import {
-  errorMessage,
   formatByteLimit,
   isProgressiveConsoleUnsupported,
   RunnerFailure,
-  TaskCanceledError
+  recordConsecutivePollError,
+  rethrowIfCanceled
 } from "./JenkinsTaskRunnerSupport";
 
 const MAX_FINAL_CONSOLE_STABLE_MORE_DATA_POLLS = 3;
@@ -103,9 +103,7 @@ export class JenkinsTaskConsoleFollower {
           moreData: result.moreData
         };
       } catch (error) {
-        if (error instanceof TaskCanceledError || this.control.isCanceled()) {
-          throw new TaskCanceledError();
-        }
+        rethrowIfCanceled(error, this.control.isCanceled());
         if (isProgressiveConsoleUnsupported(error)) {
           this.output.writeStatus(
             "Progressive console is unsupported; switching to full console polling."
@@ -220,21 +218,13 @@ export class JenkinsTaskConsoleFollower {
         moreData: false
       };
     } catch (error) {
-      if (error instanceof TaskCanceledError || this.control.isCanceled()) {
-        throw new TaskCanceledError();
-      }
-      if (error instanceof RunnerFailure) {
-        throw error;
-      }
-      const nextErrors = errors + 1;
-      if (nextErrors >= this.options.maxConsecutiveErrors) {
-        throw new RunnerFailure(
-          `Unable to stream Jenkins console output after ${nextErrors} consecutive errors: ${errorMessage(error)}`
-        );
-      }
-      this.output.writeStatus(
-        `Console output unavailable; retrying (${nextErrors}/${this.options.maxConsecutiveErrors}).`
-      );
+      rethrowIfCanceled(error, this.control.isCanceled());
+      const nextErrors = recordConsecutivePollError(error, errors, {
+        maxConsecutiveErrors: this.options.maxConsecutiveErrors,
+        failureAction: "stream Jenkins console output",
+        retryStatus: "Console output unavailable",
+        writeStatus: (message) => this.output.writeStatus(message)
+      });
       return {
         progressive: false,
         offset,

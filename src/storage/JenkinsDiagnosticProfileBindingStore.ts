@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { normalizeJenkinsUrlForComparison, rebaseEnvironmentUrl } from "../jenkins/urls";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
+import { getScopedMemento, toRepositoryKey } from "./StorageScope";
 
 interface StoredDiagnosticProfileBinding {
   environmentId: string;
@@ -53,7 +54,7 @@ export class JenkinsDiagnosticProfileBindingStore {
     jobScopeUrl: string,
     repositoryUri: vscode.Uri | string
   ): JenkinsDiagnosticProfileBinding | undefined {
-    const normalizedUrl = normalizeDiagnosticJobScopeUrl(jobScopeUrl);
+    const normalizedUrl = normalizeJenkinsUrlForComparison(jobScopeUrl);
     const repositoryKey = toRepositoryKey(repositoryUri);
     const binding = this.readBindings(scope).find(
       (candidate) =>
@@ -69,7 +70,7 @@ export class JenkinsDiagnosticProfileBindingStore {
     environmentId: string,
     jobScopeUrl: string
   ): readonly JenkinsDiagnosticProfileBinding[] {
-    const normalizedUrl = normalizeDiagnosticJobScopeUrl(jobScopeUrl);
+    const normalizedUrl = normalizeJenkinsUrlForComparison(jobScopeUrl);
     return this.readBindings(scope)
       .filter(
         (binding) =>
@@ -86,7 +87,7 @@ export class JenkinsDiagnosticProfileBindingStore {
       const bindings = this.readBindings(scope);
       const identity = {
         environmentId: input.environmentId,
-        jobScopeUrl: normalizeDiagnosticJobScopeUrl(input.jobScopeUrl),
+        jobScopeUrl: normalizeJenkinsUrlForComparison(input.jobScopeUrl),
         repositoryUri: toRepositoryKey(input.repositoryUri)
       };
       const index = bindings.findIndex((candidate) => isSameBinding(candidate, identity));
@@ -114,7 +115,7 @@ export class JenkinsDiagnosticProfileBindingStore {
     jobScopeUrl: string,
     repositoryUri: vscode.Uri | string
   ): Promise<boolean> {
-    const normalizedUrl = normalizeDiagnosticJobScopeUrl(jobScopeUrl);
+    const normalizedUrl = normalizeJenkinsUrlForComparison(jobScopeUrl);
     const repositoryKey = toRepositoryKey(repositoryUri);
     return this.mutationQueue(() =>
       this.removeMatching(scope, (binding) =>
@@ -133,8 +134,8 @@ export class JenkinsDiagnosticProfileBindingStore {
     oldJobScopeUrl: string,
     newJobScopeUrl: string
   ): Promise<boolean> {
-    const oldUrl = normalizeDiagnosticJobScopeUrl(oldJobScopeUrl);
-    const newUrl = normalizeDiagnosticJobScopeUrl(newJobScopeUrl);
+    const oldUrl = normalizeJenkinsUrlForComparison(oldJobScopeUrl);
+    const newUrl = normalizeJenkinsUrlForComparison(newJobScopeUrl);
     if (oldUrl === newUrl) {
       return Promise.resolve(false);
     }
@@ -190,7 +191,7 @@ export class JenkinsDiagnosticProfileBindingStore {
             ? rebaseEnvironmentUrl(binding.jobScopeUrl, oldBases, newBase)
             : undefined;
         if (jobScopeUrl) {
-          moved.push({ ...binding, jobScopeUrl: normalizeDiagnosticJobScopeUrl(jobScopeUrl) });
+          moved.push({ ...binding, jobScopeUrl: normalizeJenkinsUrlForComparison(jobScopeUrl) });
         } else {
           unaffected.push(binding);
         }
@@ -219,7 +220,7 @@ export class JenkinsDiagnosticProfileBindingStore {
     environmentId: string,
     jobScopeUrl: string
   ): Promise<boolean> {
-    const normalizedUrl = normalizeDiagnosticJobScopeUrl(jobScopeUrl);
+    const normalizedUrl = normalizeJenkinsUrlForComparison(jobScopeUrl);
     return this.mutationQueue(() =>
       this.removeMatching(
         scope,
@@ -251,7 +252,9 @@ export class JenkinsDiagnosticProfileBindingStore {
   }
 
   private readBindings(scope: EnvironmentScope): StoredDiagnosticProfileBinding[] {
-    const stored = this.getMemento(scope).get<StoredDiagnosticProfileBinding[]>(STATE_KEY);
+    const stored = getScopedMemento(this.context, scope).get<StoredDiagnosticProfileBinding[]>(
+      STATE_KEY
+    );
     return Array.isArray(stored) ? stored.map((binding) => ({ ...binding })) : [];
   }
 
@@ -259,25 +262,13 @@ export class JenkinsDiagnosticProfileBindingStore {
     scope: EnvironmentScope,
     bindings: readonly StoredDiagnosticProfileBinding[]
   ): Promise<void> {
-    await this.getMemento(scope).update(STATE_KEY, bindings);
+    await getScopedMemento(this.context, scope).update(STATE_KEY, bindings);
   }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
-  }
-}
-
-export function normalizeDiagnosticJobScopeUrl(value: string): string {
-  return normalizeJenkinsUrlForComparison(value);
 }
 
 function normalizeProfileId(profileId: string | undefined): string | undefined {
   const normalized = profileId?.trim();
   return normalized ? normalized : undefined;
-}
-
-function toRepositoryKey(repositoryUri: vscode.Uri | string): string {
-  return typeof repositoryUri === "string" ? repositoryUri : repositoryUri.toString();
 }
 
 function isSameBinding(

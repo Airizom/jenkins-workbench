@@ -96,9 +96,9 @@ class ConsoleComparisonReader {
     }
   }
 
-  async ensureBufferWithLimit(maxBytes?: number): Promise<void> {
+  async ensureBufferWithLimit(): Promise<void> {
     while (this.buffer.length === 0 && this.moreData && !this.stalled) {
-      const remaining = Math.min(maxBytes ?? this.maxBytes, this.getRemainingByteBudget());
+      const remaining = this.getRemainingByteBudget();
       if (remaining <= 0) {
         return;
       }
@@ -106,19 +106,15 @@ class ConsoleComparisonReader {
     }
   }
 
-  async appendUntilLineCountWithLimit(lineCount: number, maxBytes?: number): Promise<void> {
-    let remainingBytes = maxBytes;
-    while (
-      countLineBreaks(this.buffer) < lineCount &&
-      this.moreData &&
-      (remainingBytes === undefined || remainingBytes > 0)
-    ) {
-      const bytesRead = await this.appendNextChunk(remainingBytes);
-      if (bytesRead <= 0) {
-        break;
+  async appendUntilLineCountWithLimit(lineCount: number): Promise<void> {
+    while (countLineBreaks(this.buffer) < lineCount && this.moreData) {
+      const remaining = this.getRemainingByteBudget();
+      if (remaining <= 0) {
+        return;
       }
-      if (remainingBytes !== undefined) {
-        remainingBytes -= bytesRead;
+      const bytesRead = await this.appendNextChunk(remaining);
+      if (bytesRead <= 0) {
+        return;
       }
     }
   }
@@ -197,8 +193,8 @@ async function compareConsoleReaders(
   let sharedTail = "";
 
   while (true) {
-    await baselineReader.ensureBufferWithLimit(baselineReader.getRemainingByteBudget());
-    await targetReader.ensureBufferWithLimit(targetReader.getRemainingByteBudget());
+    await baselineReader.ensureBufferWithLimit();
+    await targetReader.ensureBufferWithLimit();
 
     if (baselineReader.buffer.length === 0 && targetReader.buffer.length === 0) {
       if (
@@ -268,43 +264,33 @@ async function compareConsoleReaders(
       continue;
     }
 
-    // A stalled reader (zero-byte chunk with moreData, e.g. a running build with
-    // no new output yet) would be refetched forever; treat its available output
-    // as ended so the comparison reports the divergence below instead.
-    if (baselineReader.buffer.length === 0 && baselineReader.moreData && !baselineReader.stalled) {
-      if (baselineReader.getRemainingByteBudget() > 0) {
-        continue;
-      }
-      // The buffer cannot grow (byte budget exhausted) and nothing was consumed
-      // this iteration, so the comparison hit its scan limit.
-      return buildConsoleTooLargeResult(options);
-    }
-    if (targetReader.buffer.length === 0 && targetReader.moreData && !targetReader.stalled) {
-      if (targetReader.getRemainingByteBudget() > 0) {
-        continue;
-      }
+    // Exactly one buffer is empty here. ensureBufferWithLimit only leaves a
+    // non-stalled reader with moreData empty once its byte budget is exhausted,
+    // so the comparison hit its scan limit.
+    if (
+      (baselineReader.buffer.length === 0 && baselineReader.moreData && !baselineReader.stalled) ||
+      (targetReader.buffer.length === 0 && targetReader.moreData && !targetReader.stalled)
+    ) {
       return buildConsoleTooLargeResult(options);
     }
 
-    if (baselineReader.buffer.length === 0 || targetReader.buffer.length === 0) {
-      // A truncated fallback ending is a scan limit, not a genuine EOF.
-      if (
-        (baselineReader.buffer.length === 0 && baselineReader.truncatedByLimit) ||
-        (targetReader.buffer.length === 0 && targetReader.truncatedByLimit)
-      ) {
-        return buildConsoleTooLargeResult(options);
-      }
-      const divergenceLine = comparedLineBreaks + 1;
-      return finalizeConsoleDivergence(
-        baselineReader,
-        targetReader,
-        sharedTail,
-        divergenceLine,
-        options
-      );
+    // A truncated fallback ending is a scan limit, not a genuine EOF.
+    if (
+      (baselineReader.buffer.length === 0 && baselineReader.truncatedByLimit) ||
+      (targetReader.buffer.length === 0 && targetReader.truncatedByLimit)
+    ) {
+      return buildConsoleTooLargeResult(options);
     }
 
-    return buildConsoleTooLargeResult(options);
+    // The empty side ended (or stalled, e.g. a running build with no new output
+    // yet, which would otherwise be refetched forever), so the logs diverge here.
+    return finalizeConsoleDivergence(
+      baselineReader,
+      targetReader,
+      sharedTail,
+      comparedLineBreaks + 1,
+      options
+    );
   }
 }
 
@@ -315,14 +301,8 @@ async function finalizeConsoleDivergence(
   divergenceLine: number,
   options: BuildCompareConsoleOptions
 ): Promise<ConsoleComparisonResult> {
-  await baselineReader.appendUntilLineCountWithLimit(
-    TRAILING_CONTEXT_LINES,
-    baselineReader.getRemainingByteBudget()
-  );
-  await targetReader.appendUntilLineCountWithLimit(
-    TRAILING_CONTEXT_LINES,
-    targetReader.getRemainingByteBudget()
-  );
+  await baselineReader.appendUntilLineCountWithLimit(TRAILING_CONTEXT_LINES);
+  await targetReader.appendUntilLineCountWithLimit(TRAILING_CONTEXT_LINES);
   const baselineSnippet = takeFirstLines(
     leadingContext + baselineReader.buffer,
     LEADING_CONTEXT_LINES + TRAILING_CONTEXT_LINES

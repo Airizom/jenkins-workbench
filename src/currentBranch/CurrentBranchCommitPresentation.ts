@@ -1,10 +1,10 @@
 import type { JenkinsBuild } from "../jenkins/types";
-import { COMMIT_HISTORY_LIMIT } from "./CurrentBranchCommitHistory";
+import { COMMIT_HISTORY_LIMIT, type VerifiedCommitBuild } from "./CurrentBranchCommitHistory";
 import type { CurrentBranchState } from "./CurrentBranchTypes";
 
 type Matched = Extract<CurrentBranchState, { kind: "matched" }>;
 
-export function commitResultLabel(build: Pick<JenkinsBuild, "building" | "result">): string {
+function commitResultLabel(build: Pick<JenkinsBuild, "building" | "result">): string {
   if (build.building) return "building";
   switch (build.result?.toUpperCase()) {
     case "SUCCESS":
@@ -22,12 +22,26 @@ export function commitResultLabel(build: Pick<JenkinsBuild, "building" | "result
   }
 }
 
+export function verifiedCommitSummary(
+  head: string | undefined,
+  current: VerifiedCommitBuild
+): string {
+  return `${head?.slice(0, 7)} ${commitResultLabel(current.build)}${current.evidence.kind === "prMerge" ? " via PR merge" : ""}`;
+}
+
+export function verifiedCommitBuildLabel(
+  head: string | undefined,
+  build: Pick<JenkinsBuild, "number">
+): string {
+  return `${head?.slice(0, 7)} · #${build.number}`;
+}
+
 export function currentCommitLabel(state: Matched): string {
   const { commit, checkout } = state;
   if (!checkout || !commit) return "Checking current commit";
   const current = commit.current;
   let label = current
-    ? `${checkout.head?.slice(0, 7)} ${commitResultLabel(current.build)}${current.evidence.kind === "prMerge" ? " via PR merge" : ""} · #${current.build.number}`
+    ? `${verifiedCommitSummary(checkout.head, current)} · #${current.build.number}`
     : commit.kind === "unverified"
       ? `Build ${commitResultLabel(state.lastBuild ?? {})} · revision unverified`
       : `${checkout.head?.slice(0, 7) ?? "HEAD"} · no verified build`;

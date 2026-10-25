@@ -67,24 +67,13 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
   }
 
   registerArtifact(data: Uint8Array, fileName: string): vscode.Uri {
-    if (data.byteLength > this.maxTotalBytes) {
-      throw new ArtifactPreviewCacheLimitError(data.byteLength, this.maxTotalBytes);
-    }
-
     const now = Date.now();
-    this.purgeExpired(now);
+    // Only in-use previews survive eviction, so this check alone guarantees the bytes fit.
     const retainedBytes = this.getRetainedBytes();
     if (retainedBytes + data.byteLength > this.maxTotalBytes) {
       throw new ArtifactPreviewCacheLimitError(data.byteLength, this.maxTotalBytes, retainedBytes);
     }
     this.evictIfNeeded(now, undefined, data.byteLength);
-    if (this.totalBytes + data.byteLength > this.maxTotalBytes) {
-      throw new ArtifactPreviewCacheLimitError(
-        data.byteLength,
-        this.maxTotalBytes,
-        this.totalBytes
-      );
-    }
 
     const id = this.createId();
     const entry: ArtifactPreviewEntry = {
@@ -105,6 +94,41 @@ export class ArtifactPreviewProvider implements vscode.FileSystemProvider, vscod
       scheme: ARTIFACT_PREVIEW_SCHEME,
       path: `/${id}/${safeFileName}`
     });
+  }
+
+  /**
+   * Replaces a registered preview's bytes and notifies VS Code so an open document reloads.
+   * Returns false, leaving the entry unchanged, when the entry is gone or the new bytes
+   * would exceed the cache limit even after evicting unused previews.
+   */
+  updateArtifact(uri: vscode.Uri, data: Uint8Array): boolean {
+    const id = this.getPathParts(uri)[0];
+    const entry = id ? this.entries.get(id) : undefined;
+    if (!id || !entry) {
+      return false;
+    }
+
+    const now = Date.now();
+    const growth = data.byteLength - entry.size;
+    if (growth > 0 && this.totalBytes + growth > this.maxTotalBytes) {
+      const retainedByOthers = this.getRetainedBytes() - (entry.inUseCount > 0 ? entry.size : 0);
+      if (retainedByOthers + data.byteLength > this.maxTotalBytes) {
+        return false;
+      }
+      this.evictIfNeeded(now, id, growth);
+      if (this.totalBytes + growth > this.maxTotalBytes) {
+        return false;
+      }
+    }
+
+    entry.data = data;
+    entry.size = data.byteLength;
+    // VS Code compares mtimes to decide whether to reload, so they must strictly increase.
+    entry.mtime = Math.max(now, entry.mtime + 1);
+    entry.lastAccess = now;
+    this.totalBytes += growth;
+    this.onDidChangeFileEmitter.fire([{ type: vscode.FileChangeType.Changed, uri }]);
+    return true;
   }
 
   stat(uri: vscode.Uri): vscode.FileStat {

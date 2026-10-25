@@ -13,7 +13,8 @@ import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
-import { JENKINS_TASK_EXIT_CODES, JenkinsTaskRunner } from "./JenkinsTaskRunner";
+import { JenkinsTaskRunner } from "./JenkinsTaskRunner";
+import { JENKINS_TASK_EXIT_CODES } from "./JenkinsTaskRunnerContracts";
 import {
   type JenkinsTaskDefinition,
   normalizeEnvironmentUrl,

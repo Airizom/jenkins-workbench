@@ -6,6 +6,7 @@ import type {
   JenkinsReplayDefinition,
   JenkinsReplayResult
 } from "../src/jenkins/types";
+import type { TriggeredBuildLocation } from "../src/services/buildFollow/BuildFollowTypes";
 import type { BuildTreeItem } from "../src/tree/TreeItems";
 import { Uri } from "./helpers/vscodeStub";
 
@@ -37,6 +38,9 @@ vi.doMock("vscode", () => ({
 const { LocalJenkinsfileReplayWorkflow } = await import(
   "../src/commands/build/LocalJenkinsfileReplayWorkflow"
 );
+const { BuildFollowUpService } = await import("../src/services/buildFollow/BuildFollowUpService");
+
+let followEnabled = false;
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -80,14 +84,35 @@ function fixture() {
     )
   };
   const waiter = { awaitQueuedBuildStart: vi.fn(async () => undefined) };
+  const locator = {
+    locate: vi.fn(async (): Promise<TriggeredBuildLocation> => ({ kind: "unknown" }))
+  };
+  const getNextBuildNumber = vi.fn(async () => 10);
+  const buildFollowUp = new BuildFollowUpService({
+    dataService: { getNextBuildNumber },
+    locator,
+    queuedBuildWaiter: waiter,
+    actions: { showBuildDetails: vi.fn(), previewLog: vi.fn() },
+    completionTracker: { follow: vi.fn(() => true) },
+    isEnabled: () => followEnabled
+  });
   const refreshHost = { fullEnvironmentRefresh: vi.fn(() => ({ executed: true })) };
   const workflow = new LocalJenkinsfileReplayWorkflow(
     dataService,
     sourceResolver,
     jobPicker,
-    waiter
+    buildFollowUp
   );
-  return { workflow, sourceResolver, jobPicker, dataService, waiter, refreshHost };
+  return {
+    workflow,
+    sourceResolver,
+    jobPicker,
+    dataService,
+    waiter,
+    locator,
+    getNextBuildNumber,
+    refreshHost
+  };
 }
 
 function treeBuild(): BuildTreeItem {
@@ -102,6 +127,7 @@ function treeBuild(): BuildTreeItem {
 
 beforeEach(() => {
   canceled = false;
+  followEnabled = false;
   progressOptions.length = 0;
   vi.clearAllMocks();
 });
@@ -310,5 +336,59 @@ describe("LocalJenkinsfileReplayWorkflow", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it("follows the replay through its queue item when following is on", async () => {
+    followEnabled = true;
+    const { workflow, dataService, waiter, locator, getNextBuildNumber, refreshHost } = fixture();
+
+    await workflow.run(refreshHost, treeBuild());
+
+    expect(getNextBuildNumber).toHaveBeenCalledWith(environment, jobUrl);
+    expect(getNextBuildNumber.mock.invocationCallOrder[0]).toBeLessThan(
+      dataService.runReplay.mock.invocationCallOrder[0]
+    );
+    expect(showInformationMessage).toHaveBeenCalledWith(
+      "Local Jenkinsfile replay requested for folder/demo #4. Waiting for it to start…"
+    );
+    await vi.waitFor(() =>
+      expect(locator.locate).toHaveBeenCalledWith(
+        {
+          kind: "queue",
+          environment,
+          jobUrl,
+          label: "folder/demo",
+          queueLocation: "https://jenkins.example/queue/item/12/"
+        },
+        expect.anything()
+      )
+    );
+    expect(waiter.awaitQueuedBuildStart).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({ environmentId: "env-1" })
+    );
+  });
+
+  it("matches the replay cause when Jenkins returns no queue item", async () => {
+    followEnabled = true;
+    const { workflow, dataService, locator, refreshHost } = fixture();
+    dataService.runReplay.mockResolvedValue({});
+
+    await workflow.run(refreshHost, treeBuild());
+
+    await vi.waitFor(() =>
+      expect(locator.locate).toHaveBeenCalledWith(
+        {
+          kind: "cause",
+          environment,
+          jobUrl,
+          label: "folder/demo",
+          firstCandidateNumber: 10,
+          sourceBuildNumber: 4,
+          cause: "replay"
+        },
+        expect.anything()
+      )
+    );
   });
 });

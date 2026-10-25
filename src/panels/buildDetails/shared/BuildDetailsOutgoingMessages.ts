@@ -97,7 +97,7 @@ export function parseBuildDetailsOutgoingMessage(
       };
     }
     case "setPipelineNodeLog": {
-      const log = parsePipelineNodeLogPayload(record.log, { rejectInvalidTarget: true });
+      const log = parsePipelineNodeLogPayload(record.log);
       return log ? { type: "setPipelineNodeLog", log } : undefined;
     }
     case "appendPipelineNodeLogHtml": {
@@ -127,9 +127,7 @@ export function parseBuildDetailsOutgoingMessage(
       if (!isBuildDetailsUpdateMessage(record)) {
         return undefined;
       }
-      const pipelineNodeLog = parsePipelineNodeLogPayload(record.pipelineNodeLog, {
-        rejectInvalidTarget: true
-      });
+      const pipelineNodeLog = parsePipelineNodeLogPayload(record.pipelineNodeLog);
       return pipelineNodeLog ? { ...record, pipelineNodeLog } : undefined;
     }
     case "setErrors": {
@@ -182,7 +180,6 @@ function isBuildDetailsUpdateMessage(
     isTestStatePayload(record.testState) &&
     isCoverageStatePayload(record.coverageState) &&
     isInsightsPayload(record.insights) &&
-    asRecord(record.pipelineNodeLog) !== undefined &&
     Array.isArray(record.pipelineStages) &&
     record.pipelineStages.every(isPipelineStagePayload) &&
     Array.isArray(record.pendingInputs)
@@ -237,10 +234,7 @@ function isPipelineStagePayload(value: unknown): boolean {
   );
 }
 
-function parsePipelineNodeLogPayload(
-  value: unknown,
-  options: { rejectInvalidTarget?: boolean } = {}
-): PipelineNodeLogViewModel | undefined {
+function parsePipelineNodeLogPayload(value: unknown): PipelineNodeLogViewModel | undefined {
   const record = asRecord(value);
   if (!record) {
     return undefined;
@@ -249,7 +243,7 @@ function parsePipelineNodeLogPayload(
     typeof record.target === "undefined" ? undefined : normalizePipelineLogTarget(record.target);
   // A target that was sent but failed validation must not be treated as "no target",
   // or the log would be applied to the wrong (or no) pipeline node.
-  if (options.rejectInvalidTarget && typeof record.target !== "undefined" && !target) {
+  if (typeof record.target !== "undefined" && !target) {
     return undefined;
   }
   const html = typeof record.html === "string" ? record.html : undefined;

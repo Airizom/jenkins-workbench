@@ -115,7 +115,7 @@ export class BuildComparePanelController {
     this.view.setTitle(
       options?.label ?? `${model.baseline.displayName} vs ${model.target.displayName}`
     );
-    this.view.renderBuildCompare(model, assets, {
+    this.view.renderModel(model, assets, {
       nonce,
       panelState: options?.panelState
     });

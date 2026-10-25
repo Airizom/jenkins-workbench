@@ -15,12 +15,7 @@ import type {
   BuildDetailsIncomingMessage,
   BuildManagementMessage
 } from "../shared/BuildDetailsPanelMessages";
-import {
-  buildArtifactActionMessage,
-  buildDownloadAllArtifactsMessage,
-  buildOpenTestSourceMessage,
-  buildReloadTestReportMessage
-} from "./buildDetailsWebviewMessages";
+import { buildArtifactActionMessage } from "./buildDetailsWebviewMessages";
 import {
   BuildDetailsErrors,
   hasLoadedBuildHeader
@@ -257,12 +252,21 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               onToggleFollowLog={handleToggleFollowLog}
               onExportLogs={handleExportConsole}
               onOpenExternal={handleOpenExternal}
-              onDownloadAllArtifacts={() => postMessage(buildDownloadAllArtifactsMessage())}
+              onDownloadAllArtifacts={() => postMessage({ type: "downloadAllArtifacts" })}
               onArtifactAction={(action, artifact) =>
                 postMessage(buildArtifactActionMessage(action, artifact))
               }
-              onReloadTestResults={() => postMessage(buildReloadTestReportMessage())}
-              onOpenTestSource={(testCase) => postMessage(buildOpenTestSourceMessage(testCase))}
+              onReloadTestResults={() =>
+                postMessage({ type: "reloadTestReport", includeCaseLogs: true })
+              }
+              onOpenTestSource={(testCase) =>
+                postMessage({
+                  type: "openTestSource",
+                  testName: testCase.name,
+                  className: testCase.className,
+                  suiteName: testCase.suiteName
+                })
+              }
               onOpenDiagnosticSource={(targetId) =>
                 postMessage({ type: "openDiagnosticSource", targetId })
               }

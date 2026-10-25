@@ -3,6 +3,7 @@ import { parseAuthConfig } from "../jenkins/auth";
 import type { JenkinsAuthConfig } from "../jenkins/types";
 import { ensureTrailingSlash, stripUrlCredentials } from "../jenkins/urls";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
+import { getScopedMemento } from "./StorageScope";
 
 export type EnvironmentScope = "workspace" | "global";
 
@@ -90,14 +91,16 @@ export class JenkinsEnvironmentStore {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   getEnvironments(scope: EnvironmentScope): Promise<JenkinsEnvironment[]> {
-    const memento = this.getMemento(scope);
+    const memento = getScopedMemento(this.context, scope);
     const stored = memento.get<JenkinsEnvironment[]>(ENVIRONMENTS_KEY);
     return Promise.resolve(Array.isArray(stored) ? stored : []);
   }
 
   /** Resolves TLS policy from current state rather than a potentially stale environment reference. */
   getAllowInsecureTls(scope: EnvironmentScope, id: string, url: string): boolean {
-    const stored = this.getMemento(scope).get<JenkinsEnvironment[]>(ENVIRONMENTS_KEY);
+    const stored = getScopedMemento(this.context, scope).get<JenkinsEnvironment[]>(
+      ENVIRONMENTS_KEY
+    );
     const environment = Array.isArray(stored)
       ? stored.find((entry) => entry?.id === id)
       : undefined;
@@ -113,7 +116,7 @@ export class JenkinsEnvironmentStore {
     environments: JenkinsEnvironment[],
     change: JenkinsEnvironmentStoreChange = { kind: "bulk-update", scope }
   ): Promise<void> {
-    const memento = this.getMemento(scope);
+    const memento = getScopedMemento(this.context, scope);
     await memento.update(ENVIRONMENTS_KEY, environments);
     this.emitter.fire(change);
   }
@@ -183,7 +186,7 @@ export class JenkinsEnvironmentStore {
 
       const tlsPolicyChanged = hasInsecureTls(previous) !== hasInsecureTls(next);
       environments[index] = next;
-      await this.getMemento(scope).update(ENVIRONMENTS_KEY, environments);
+      await getScopedMemento(this.context, scope).update(ENVIRONMENTS_KEY, environments);
       const update = { previous, next };
       try {
         await options.beforeNotify?.(update);
@@ -357,10 +360,6 @@ export class JenkinsEnvironmentStore {
     if (didUpdate) {
       await this.saveEnvironments(scope, next);
     }
-  }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
   }
 
   private getTokenKey(scope: EnvironmentScope, id: string): string {

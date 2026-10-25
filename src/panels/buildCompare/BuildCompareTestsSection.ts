@@ -16,7 +16,7 @@ import type {
   BuildCompareTestsSectionViewModel
 } from "./shared/BuildCompareContracts";
 
-type NormalizedTestCase = NormalizedTestCaseBase;
+type NormalizedTestCaseGroup = [NormalizedTestCaseBase, ...NormalizedTestCaseBase[]];
 
 type TestCompareEmptyFields = Pick<
   BuildCompareTestsSectionViewModel,
@@ -32,16 +32,9 @@ type TestCompareEmptyFields = Pick<
   | "targetSummaryLabel"
 >;
 
-const EMPTY_TEST_DIFF_LISTS: Pick<
-  BuildCompareTestsSectionViewModel,
-  | "newFailures"
-  | "stillFailing"
-  | "newPasses"
-  | "addedTests"
-  | "removedTests"
-  | "otherChanges"
-  | "ambiguousTests"
-  | "unchangedCount"
+const EMPTY_TEST_DIFF_LISTS: Omit<
+  TestCompareEmptyFields,
+  "baselineSummaryLabel" | "targetSummaryLabel"
 > = {
   newFailures: [],
   stillFailing: [],
@@ -51,11 +44,6 @@ const EMPTY_TEST_DIFF_LISTS: Pick<
   otherChanges: [],
   ambiguousTests: [],
   unchangedCount: 0
-};
-
-const UNAVAILABLE_TEST_SUMMARY_LABELS = {
-  baselineSummaryLabel: "Unavailable",
-  targetSummaryLabel: "Unavailable"
 };
 
 export function buildTestsSection(
@@ -78,12 +66,7 @@ export function buildTestsSection(
     unavailableSummaryLabel: "Test report data unavailable",
     bothUnavailableDetail: "Neither build exposed a Jenkins test report.",
     partialUnavailableDetail: "Both builds need test report data for a reliable comparison.",
-    emptyFields: {
-      ...EMPTY_TEST_DIFF_LISTS,
-      ...UNAVAILABLE_TEST_SUMMARY_LABELS
-    },
-    resolveErrorFields: () => testSummaryFields,
-    resolvePartialFields: () => testSummaryFields,
+    emptyFields: testSummaryFields,
     onAvailable: (baselineValue, targetValue) =>
       buildAvailableTestsSection(baselineValue, targetValue)
   });
@@ -106,8 +89,8 @@ function buildAvailableTestsSection(
 
   const collectAmbiguous = (
     key: string,
-    baseline: NormalizedTestCase[],
-    target: NormalizedTestCase[]
+    baseline: NormalizedTestCaseBase[],
+    target: NormalizedTestCaseBase[]
   ): boolean => {
     if (baseline.length <= 1 && target.length <= 1) {
       return false;
@@ -122,9 +105,6 @@ function buildAvailableTestsSection(
         return;
       }
       const [target] = targetCases;
-      if (!target) {
-        return;
-      }
       const item = buildSingleSideTestDiffItem(target, "added");
       // A test that first appears already failing is a regression in the target build.
       if (target.status === "failed") {
@@ -138,9 +118,7 @@ function buildAvailableTestsSection(
         return;
       }
       const [baseline] = baselineCases;
-      if (baseline) {
-        removedTests.push(buildSingleSideTestDiffItem(baseline, "removed"));
-      }
+      removedTests.push(buildSingleSideTestDiffItem(baseline, "removed"));
     },
     onBoth: (key, baselineCases, targetCases) => {
       if (collectAmbiguous(key, baselineCases, targetCases)) {
@@ -148,9 +126,6 @@ function buildAvailableTestsSection(
       }
       const [baseline] = baselineCases;
       const [target] = targetCases;
-      if (!baseline || !target) {
-        return;
-      }
       const item = buildTestDiffItem(baseline, target);
       if (target.status === "failed" && baseline.status !== "failed") {
         newFailures.push(item);
@@ -230,8 +205,8 @@ function buildTestSummaryLabel(result: BuildCompareOptionalResult<JenkinsTestRep
  * case on either side are reported as ambiguous instead of being paired by
  * position, which could otherwise fabricate passes, failures, or removals.
  */
-function groupTestCases(report: JenkinsTestReport): Map<string, NormalizedTestCase[]> {
-  const groups = new Map<string, NormalizedTestCase[]>();
+function groupTestCases(report: JenkinsTestReport): Map<string, NormalizedTestCaseGroup> {
+  const groups = new Map<string, NormalizedTestCaseGroup>();
   forEachNormalizedTestCase(report, (testCase, { suiteName }) => {
     const normalized = normalizeTestCaseBase(testCase, suiteName);
     if (!normalized) {
@@ -249,8 +224,8 @@ function groupTestCases(report: JenkinsTestReport): Map<string, NormalizedTestCa
 
 function buildAmbiguousTestItem(
   key: string,
-  baseline: NormalizedTestCase[],
-  target: NormalizedTestCase[]
+  baseline: NormalizedTestCaseBase[],
+  target: NormalizedTestCaseBase[]
 ): BuildCompareAmbiguousTestItem {
   const representative = target[0] ?? baseline[0];
   return {
@@ -264,8 +239,8 @@ function buildAmbiguousTestItem(
 }
 
 function buildTestDiffItem(
-  baseline: NormalizedTestCase,
-  target: NormalizedTestCase
+  baseline: NormalizedTestCaseBase,
+  target: NormalizedTestCaseBase
 ): BuildCompareTestDiffItem {
   return {
     key: baseline.key,
@@ -282,7 +257,7 @@ function buildTestDiffItem(
 }
 
 function buildSingleSideTestDiffItem(
-  testCase: NormalizedTestCase,
+  testCase: NormalizedTestCaseBase,
   side: "added" | "removed"
 ): BuildCompareTestDiffItem {
   return {

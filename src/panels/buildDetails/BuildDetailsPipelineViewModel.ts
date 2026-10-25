@@ -56,11 +56,8 @@ function mapPipelineStage(
   const parallelBranches = mapParallelBranches(stage, restartState);
   const hasSteps = stepsAll.length > 0 || parallelBranches.some((branch) => branch.hasSteps);
   const logTarget = buildStageLogTarget(stage);
-  const stageName = stage.name;
   const canRestartFromStage =
-    restartState.enabled &&
-    stageName.trim().length > 0 &&
-    restartState.restartableStages.has(stageName);
+    restartState.enabled && restartState.restartableStages.has(stage.name);
 
   return {
     key,
@@ -97,13 +94,8 @@ function createPipelineStageRestartState(
   if (!context || !isPipelineRestartEligible(context.details) || !context.restartEnabled) {
     return { enabled: false, restartableStages: new Set<string>() };
   }
-  const restartableStages = new Set<string>();
-  for (const stage of context.restartableStages) {
-    if (stage.trim().length === 0) {
-      continue;
-    }
-    restartableStages.add(stage);
-  }
+  // BuildDetailsPanelState.setPipelineRestartInfo already drops blank and duplicate names.
+  const restartableStages = new Set(context.restartableStages);
   return { enabled: restartableStages.size > 0, restartableStages };
 }
 

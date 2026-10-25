@@ -12,7 +12,6 @@ import type {
   PipelineStageViewModel
 } from "../../../shared/BuildDetailsContracts";
 import type { PipelinePresentation } from "../../../shared/BuildDetailsPanelWebviewState";
-import { useTabsBarHeightVariable } from "../../hooks/useTabsBarHeightVariable";
 import type { ConsoleHtmlModel } from "../../lib/consoleHtml";
 import { PipelineNodeLogPane } from "./PipelineNodeLogPane";
 import { PipelineStagesSection } from "./PipelineStagesSection";
@@ -169,8 +168,6 @@ export function PipelineSection(props: PipelineSectionProps) {
     onSelectPipelineLog,
     onStageRequestOpened: revealRequestedStage
   });
-
-  useTabsBarHeightVariable();
 
   const handleUserSelectPipelineLog = (target: PipelineLogTargetViewModel) => {
     state.markUserSelection();

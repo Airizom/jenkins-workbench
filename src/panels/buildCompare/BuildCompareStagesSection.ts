@@ -1,16 +1,14 @@
 import { normalizePipelineStatus } from "../../formatters/BuildStatusFormatters";
 import { formatNumber } from "../../formatters/DisplayFormatters";
 import { formatDurationMs } from "../../formatters/DurationFormatters";
-import {
-  type PipelineRun,
-  type PipelineStage,
-  toPipelineRun
-} from "../../jenkins/pipeline/JenkinsPipelineAdapter";
+import { toPipelineRun } from "../../jenkins/pipeline/JenkinsPipelineAdapter";
+import type { PipelineRun, PipelineStage } from "../../jenkins/pipeline/PipelineTypes";
 import type { JenkinsWorkflowRun } from "../../jenkins/types";
 import { trimToUndefined } from "../../shared/stringValues";
+import { buildOccurrenceKey } from "../shared/TestCaseViewModel";
 import { forEachKeyedDiff } from "./BuildCompareDiff";
 import type { BuildCompareOptionalResult } from "./BuildCompareLoadState";
-import { buildOccurrenceKey, evaluateStandardCompareSection } from "./BuildCompareSectionShared";
+import { evaluateStandardCompareSection } from "./BuildCompareSectionShared";
 import type {
   BuildCompareStageDeltaDirection,
   BuildCompareStageDiffItem,

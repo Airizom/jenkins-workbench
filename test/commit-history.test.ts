@@ -5,7 +5,9 @@ import {
 } from "../src/currentBranch/CurrentBranchCommitHistory";
 import {
   currentCommitLabel,
-  currentCommitTooltip
+  currentCommitTooltip,
+  verifiedCommitBuildLabel,
+  verifiedCommitSummary
 } from "../src/currentBranch/CurrentBranchCommitPresentation";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import type { CurrentBranchState } from "../src/currentBranch/CurrentBranchTypes";
@@ -104,6 +106,19 @@ describe("commit presentation", () => {
       "aaaaaaa passed · #60 · local changes untested · 2 commits ahead of upstream"
     );
     expect(currentCommitTooltip(state())).toContain("Job queued · commit not yet verified");
+  });
+
+  it("shares verified commit wording between labels and notifications", () => {
+    const current = state().commit?.current;
+    if (!current) throw new Error("expected verified commit");
+    expect(verifiedCommitSummary(head, current)).toBe("aaaaaaa passed");
+    expect(
+      verifiedCommitSummary(head, {
+        ...current,
+        evidence: { ...current.evidence, kind: "prMerge" }
+      })
+    ).toBe("aaaaaaa passed via PR merge");
+    expect(verifiedCommitBuildLabel(head, current.build)).toBe("aaaaaaa · #60");
   });
 
   it("never presents a green job as verified when metadata or checkout state is unavailable", () => {

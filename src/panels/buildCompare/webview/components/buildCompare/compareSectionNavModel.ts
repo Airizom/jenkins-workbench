@@ -23,7 +23,7 @@ export const COMPARE_SECTION_TITLES: Record<BuildCompareSectionId, string> = {
 };
 
 /** Same words as the section status badges (sectionStatusBadge.ts), shortened. */
-const STATUS_CHIPS: Partial<Record<CompareSectionStatus, CompareSectionNavChip>> = {
+const STATUS_CHIPS: Record<Exclude<CompareSectionStatus, "available">, CompareSectionNavChip> = {
   loading: { text: "loading", tone: "muted" },
   unavailable: { text: "no data", tone: "muted" },
   error: { text: "error", tone: "failure" },
@@ -111,7 +111,7 @@ export function resolveCompareSectionNavChip(
     return { text: CHANGESETS_EMPTY_LABEL.toLowerCase(), tone: "neutral" };
   }
   if (section.status !== "available") {
-    return STATUS_CHIPS[section.status] ?? { text: "no data", tone: "muted" };
+    return STATUS_CHIPS[section.status];
   }
   switch (id) {
     case "tests":

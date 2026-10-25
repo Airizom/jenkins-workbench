@@ -16,6 +16,8 @@ import {
 import { BuildDescriptionDraftFilesystem } from "../../services/BuildDescriptionDraftFilesystem";
 import { BuildDescriptionDraftManager } from "../../services/BuildDescriptionDraftManager";
 import { BuildParameterRequestPreparerService } from "../../services/BuildParameterRequestPreparerService";
+import { BuildLogTailer } from "../../services/buildFollow/BuildLogTailer";
+import { TriggeredBuildLocator } from "../../services/buildFollow/TriggeredBuildLocator";
 import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 import { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
 import { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
@@ -97,20 +99,23 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
     pendingInputCoordinator: (container) =>
       new PendingInputRefreshCoordinator(container.get("dataService")),
     queuedBuildWaiter: (container) => new QueuedBuildWaiter(container.get("dataService")),
+    triggeredBuildLocator: (container) =>
+      new TriggeredBuildLocator(container.get("dataService"), container.get("queuedBuildWaiter")),
+    buildLogTailer: (container) => {
+      const tailer = new BuildLogTailer(
+        container.get("dataService"),
+        container.get("artifactPreviewProvider"),
+        MAX_CONSOLE_CHARS
+      );
+      options.context.subscriptions.push(tailer);
+      return tailer;
+    },
     consoleExporter: (container) =>
       new BuildConsoleExporter(container.get("dataService"), createNodeBuildConsoleFilesystem(), {
         maxConsoleChars: MAX_CONSOLE_CHARS
       }),
-    artifactStorageService: (container) => {
-      const dataService = container.get("dataService");
-      return new ArtifactStorageService(
-        {
-          getArtifactStream: (...args) => dataService.getArtifactStream(...args),
-          getArtifactArchiveStream: (...args) => dataService.getArtifactArchiveStream(...args)
-        },
-        createFileArtifactFilesystem()
-      );
-    },
+    artifactStorageService: (container) =>
+      new ArtifactStorageService(container.get("dataService"), createFileArtifactFilesystem()),
     artifactPreviewProvider: (_container) =>
       new ArtifactPreviewProvider(options.artifactPreviewCacheOptions),
     buildLogPreviewer: (container) =>
@@ -181,20 +186,17 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
               : undefined;
           }
         },
-        container.get("queuedBuildWaiter")
+        container.lazy("buildFollowUpService")
       ),
     replayBuildWorkflow: (container) =>
       new ReplayBuildWorkflow(
         container.get("dataService"),
         container.get("replayDraftManager"),
-        container.get("queuedBuildWaiter")
+        container.lazy("buildFollowUpService")
       ),
     artifactActionHandler: (container) => {
-      const dataService = container.get("dataService");
       const artifactPreviewer = new ArtifactPreviewer(
-        {
-          getArtifact: (...args) => dataService.getArtifact(...args)
-        },
+        container.get("dataService"),
         container.get("artifactPreviewProvider"),
         options.artifactPreviewOptionsProvider
       );

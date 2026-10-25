@@ -14,7 +14,8 @@ import {
   emptyHistory,
   type HistoryUiState,
   type HistoryViewModel,
-  isHistoryAction
+  isHistoryAction,
+  isHistoryWindowSize
 } from "./shared/HistoryContracts";
 
 export interface HistoryDependencies {
@@ -274,8 +275,8 @@ export class HistoryController {
       await this.load(true);
       return;
     }
-    if (message.action === "window" && [10, 20, 50].includes(message.value ?? 0)) {
-      this.model.count = message.value as 10 | 20 | 50;
+    if (message.action === "window" && isHistoryWindowSize(message.value)) {
+      this.model.count = message.value;
       await this.load();
       return;
     }

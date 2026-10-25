@@ -142,6 +142,37 @@ describe("BuildDetailsPollingController concurrent fetches", () => {
     }
   });
 
+  it("reports the same build details error from loadInitial and poll", async () => {
+    let signalErrors!: () => void;
+    const errorsPublished = new Promise<void>((resolve) => {
+      signalErrors = resolve;
+    });
+    const polledErrors: string[][] = [];
+    const controller = createController(
+      async () => {
+        throw new Error("details failed");
+      },
+      undefined,
+      (value) => {
+        polledErrors.push(value);
+        signalErrors();
+      }
+    );
+
+    try {
+      const initial = await controller.loadInitial();
+      assert.deepEqual(initial.errors, ["Build details: Error: details failed"]);
+      controller.start();
+      await errorsPublished;
+      // The fake console backend only supports the initial text tail, so compare the shared entry.
+      const buildDetailsError = (errors: string[] | undefined) =>
+        errors?.find((error) => error.startsWith("Build details:"));
+      assert.equal(buildDetailsError(polledErrors[0]), initial.errors[0]);
+    } finally {
+      controller.dispose();
+    }
+  });
+
   it("still reports completion when stopped during the completing poll's workflow fetch", async () => {
     let building = true;
     let workflowCalls = 0;

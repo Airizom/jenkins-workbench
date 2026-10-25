@@ -22,7 +22,7 @@ export class WorkspaceTestSourceFileMatchConfig implements TestSourceFileMatchCo
         readStringArray,
         EMPTY_STRING_ARRAY
       ),
-      excludeGlob: readRequiredSetting(configuration, "excludeGlob", readOptionalString, ""),
+      excludeGlob: readRequiredSetting(configuration, "excludeGlob", trimToUndefined, ""),
       maxResultsPerPattern: readBoundedIntegerSetting(
         configuration,
         "maxResultsPerPattern",
@@ -51,10 +51,6 @@ function readStringArray(value: unknown): string[] | undefined {
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
   return normalized.length > 0 ? normalized : undefined;
-}
-
-function readOptionalString(value: unknown): string | undefined {
-  return trimToUndefined(value);
 }
 
 function readOptionalNumber(value: unknown): number | undefined {
@@ -94,7 +90,7 @@ function readPathPreferences(value: unknown): TestSourcePathPreference[] | undef
       if (typeof entry !== "object" || entry === null) {
         return undefined;
       }
-      const fragment = "fragment" in entry ? readOptionalString(entry.fragment) : undefined;
+      const fragment = "fragment" in entry ? trimToUndefined(entry.fragment) : undefined;
       const score = "score" in entry ? readOptionalNumber(entry.score) : undefined;
       if (!fragment || typeof score === "undefined") {
         return undefined;

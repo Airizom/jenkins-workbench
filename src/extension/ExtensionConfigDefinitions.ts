@@ -11,6 +11,7 @@ export const CONFIG_KEYS = {
   watchNotificationsPendingInput: "watchNotifications.pendingInput",
   watchNotificationsWatchError: "watchNotifications.watchError",
   queuePollIntervalSeconds: "queuePollIntervalSeconds",
+  followTriggeredBuilds: "followTriggeredBuilds",
   taskRunnerPollIntervalSeconds: "taskRunner.pollIntervalSeconds",
   taskRunnerMaxConsecutiveErrors: "taskRunner.maxConsecutiveErrors",
   diagnosticsEnabled: "diagnostics.enabled",
@@ -54,6 +55,7 @@ export const DEFAULT_WATCH_NOTIFICATION_OPTIONS = {
   watchError: true
 } as const;
 export const DEFAULT_QUEUE_POLL_INTERVAL_SECONDS = 10;
+export const DEFAULT_FOLLOW_TRIGGERED_BUILDS = true;
 export const MIN_QUEUE_POLL_INTERVAL_SECONDS = 2;
 export const DEFAULT_TASK_RUNNER_POLL_INTERVAL_SECONDS = 2;
 export const MIN_TASK_RUNNER_POLL_INTERVAL_SECONDS = 1;

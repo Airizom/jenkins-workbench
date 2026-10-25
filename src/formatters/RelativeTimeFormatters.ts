@@ -1,8 +1,14 @@
 const MINUTE_MS = 60_000;
 
+// Medium date + short time ("Sep 26, 2026, 9:14 AM") keeps build timestamps compact and
+// consistent across panels, tooltips, and pickers.
+export const LOCALE_TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
+  dateStyle: "medium",
+  timeStyle: "short"
+};
+
 interface RelativeTimeBucket {
   divisor: number;
-  rounding: "floor" | "round";
   maxExclusive?: number;
   format: (value: number) => string;
 }
@@ -25,10 +31,7 @@ function formatElapsedTimestamp(
 
   let elapsed = ageMs;
   for (const bucket of policy.buckets) {
-    elapsed =
-      bucket.rounding === "floor"
-        ? Math.floor(elapsed / bucket.divisor)
-        : Math.round(elapsed / bucket.divisor);
+    elapsed = Math.floor(elapsed / bucket.divisor);
     if (bucket.maxExclusive === undefined || elapsed < bucket.maxExclusive) {
       return bucket.format(elapsed);
     }
@@ -37,14 +40,17 @@ function formatElapsedTimestamp(
   return policy.fallback(timestampMs);
 }
 
+const MINUTE_AND_HOUR_BUCKETS: readonly RelativeTimeBucket[] = [
+  { divisor: MINUTE_MS, maxExclusive: 60, format: (value) => `${value}m ago` },
+  { divisor: 60, maxExclusive: 24, format: (value) => `${value}h ago` }
+];
+
 const TIMESTAMP_POLICY: RelativeTimePolicy = {
   justNow: "just now",
   buckets: [
-    { divisor: MINUTE_MS, rounding: "floor", maxExclusive: 60, format: (value) => `${value}m ago` },
-    { divisor: 60, rounding: "floor", maxExclusive: 24, format: (value) => `${value}h ago` },
+    ...MINUTE_AND_HOUR_BUCKETS,
     {
       divisor: 24,
-      rounding: "floor",
       maxExclusive: 7,
       format: (value) => (value === 1 ? "yesterday" : `${value} days ago`)
     }
@@ -58,12 +64,9 @@ const TIMESTAMP_POLICY: RelativeTimePolicy = {
  */
 const UPDATED_POLICY: RelativeTimePolicy = {
   justNow: "just now",
-  buckets: [
-    { divisor: MINUTE_MS, rounding: "floor", maxExclusive: 60, format: (value) => `${value}m ago` },
-    { divisor: 60, rounding: "floor", maxExclusive: 24, format: (value) => `${value}h ago` }
-  ],
+  buckets: MINUTE_AND_HOUR_BUCKETS,
   fallback: (timestampMs) =>
-    new Date(timestampMs).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+    new Date(timestampMs).toLocaleString(undefined, LOCALE_TIMESTAMP_OPTIONS)
 };
 
 export function formatRelativeTimestampMs(timestampMs: number): string | undefined {

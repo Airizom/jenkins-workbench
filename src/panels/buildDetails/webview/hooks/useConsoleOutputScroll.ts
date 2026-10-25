@@ -77,14 +77,11 @@ export function useConsoleOutputScroll(
   }, [consoleOutputRef]);
 
   useEffect(() => {
+    updateConsoleScrollState();
     const output = consoleOutputRef.current;
     if (!output) {
-      setShowScrollToTop(false);
-      setIsAtBottom(true);
       return;
     }
-
-    updateConsoleScrollState();
 
     const markUserIntent = () => {
       lastUserIntentRef.current = Date.now();

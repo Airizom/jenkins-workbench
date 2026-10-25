@@ -16,14 +16,6 @@ export class BuildComparePanelView extends EnvironmentPanelView<BuildCompareView
     super(panel, extensionUri, "buildCompare", "compare", "Build Compare", renderBuildCompareHtml);
   }
 
-  renderBuildCompare(
-    model: BuildCompareViewModel,
-    assets: NonNullable<ReturnType<BuildComparePanelView["resolveAssets"]>>,
-    options: BuildComparePanelRenderOptions
-  ): void {
-    this.renderModel(model, assets, options);
-  }
-
   postMessage(message: unknown): Thenable<boolean> {
     return this.panel.webview.postMessage(message);
   }

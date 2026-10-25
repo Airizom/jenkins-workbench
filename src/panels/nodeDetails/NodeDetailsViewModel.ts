@@ -1,9 +1,6 @@
 import { formatDurationMs } from "../../formatters/DurationFormatters";
 import { collectAssignedLabelNames } from "../../jenkins/labels";
-import {
-  buildBaseNodeExecutorSummaries,
-  formatExecutorWorkLabel
-} from "../../jenkins/NodeExecutorFormatters";
+import { buildBaseNodeExecutorSummaries } from "../../jenkins/NodeExecutorFormatters";
 import { formatNodeOfflineReason, resolveNodeStatusDescriptor } from "../../jenkins/NodeFormatters";
 import { buildNodeActionCapabilities, isBuiltInNode } from "../../jenkins/nodeActionCapabilities";
 import type {
@@ -234,8 +231,7 @@ function enrichExecutorViewModel(
     ...base,
     progressPercent,
     progressLabel: progressPercent === undefined ? undefined : `${progressPercent}%`,
-    workLabel: formatWorkLabel(workItem) ?? base.workLabel,
-    workUrl: trimToUndefined(workItem?.url) ?? base.workUrl,
+    workLabel: appendWorkResult(base.workLabel, workItem),
     workDurationLabel: workDuration.label,
     workDurationMs: workDuration.ms
   };
@@ -248,18 +244,12 @@ function normalizeProgressPercent(progress?: number): number | undefined {
   return clampPercent(progress);
 }
 
-function formatWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
-  if (!work) {
-    return undefined;
-  }
-
-  const name = formatExecutorWorkLabel(work);
-  const result = trimToUndefined(work.result);
-
-  if (name && result) {
-    return `${name} (${result})`;
-  }
-  return name;
+function appendWorkResult(
+  workLabel: string | undefined,
+  work: JenkinsNodeExecutable | undefined
+): string | undefined {
+  const result = trimToUndefined(work?.result);
+  return workLabel && result ? `${workLabel} (${result})` : workLabel;
 }
 
 function resolveWorkDuration(

@@ -7,6 +7,7 @@ import type {
   BuildManagementTarget,
   BuildManagementWorkflow
 } from "../../services/build/BuildManagementWorkflow";
+import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { buildTestSourceNavigationContext } from "../../services/TestSourceResolver";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
@@ -25,6 +26,7 @@ interface BuildDetailsPanelActionsOptions {
   getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
   getTestSourceNavigationUiService: () => TestSourceNavigationUiService | undefined;
   getBuildManagementWorkflow: () => BuildManagementWorkflow | undefined;
+  getBuildFollowUp?: () => BuildFollowUpService | undefined;
 }
 
 interface PendingInputContext {
@@ -46,6 +48,7 @@ export class BuildDetailsPanelActions {
     | TestSourceNavigationUiService
     | undefined;
   private readonly getBuildManagementWorkflow: () => BuildManagementWorkflow | undefined;
+  private readonly getBuildFollowUp: () => BuildFollowUpService | undefined;
 
   constructor(options: BuildDetailsPanelActionsOptions) {
     this.controller = options.controller;
@@ -54,6 +57,7 @@ export class BuildDetailsPanelActions {
     this.getRefreshHost = options.getRefreshHost;
     this.getTestSourceNavigationUiService = options.getTestSourceNavigationUiService;
     this.getBuildManagementWorkflow = options.getBuildManagementWorkflow;
+    this.getBuildFollowUp = options.getBuildFollowUp ?? (() => undefined);
   }
 
   /**
@@ -200,11 +204,6 @@ export class BuildDetailsPanelActions {
       return;
     }
     const stageName = message.stageName;
-    if (!stageName.trim()) {
-      void vscode.window.showErrorMessage("Select a valid stage to restart from.");
-      return;
-    }
-
     const isRestartable =
       this.controller.getPipelineRestartEnabled() &&
       this.controller.getPipelineRestartableStages().includes(stageName);
@@ -222,11 +221,25 @@ export class BuildDetailsPanelActions {
     }
     const loadingRequest = this.controller.beginLoading();
     try {
+      const buildFollowUp = this.getBuildFollowUp();
+      // Read the next build number before submitting so the new build can be told apart.
+      const prepared = await buildFollowUp?.prepare({
+        kind: "cause",
+        environment,
+        sourceBuildUrl: buildUrl,
+        cause: "restart",
+        stageName
+      });
       await restartBackend.restartPipelineFromStage(environment, buildUrl, stageName);
-      void vscode.window.showInformationMessage(
-        `Requested restart from stage "${stageName}" for ${label}.`
-      );
-      this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
+      const requestedMessage = `Requested restart from stage "${stageName}" for ${label}`;
+      const refresh = () =>
+        this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
+      if (buildFollowUp && prepared) {
+        buildFollowUp.announceAndFollow(prepared, { requestedMessage, refresh });
+      } else {
+        void vscode.window.showInformationMessage(`${requestedMessage}.`);
+        refresh();
+      }
     } catch (error) {
       void vscode.window.showErrorMessage(
         `Failed to restart ${label} from stage "${stageName}": ${formatActionError(error)}`
@@ -328,19 +341,11 @@ export class BuildDetailsPanelActions {
     }
 
     const consoleExporter = this.getConsoleExporter();
-    const defaultFileName = consoleExporter.getDefaultFileName(details);
-    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-    const defaultUri = workspaceUri
-      ? vscode.Uri.joinPath(workspaceUri, defaultFileName)
-      : undefined;
-    const targetUri = await vscode.window.showSaveDialog({
-      title: "Export Jenkins Console Output",
-      saveLabel: "Export Logs",
-      defaultUri,
-      filters: {
-        "Log files": ["log", "txt"]
-      }
-    });
+    const targetUri = await promptLogSaveTarget(
+      "Export Jenkins Console Output",
+      "Export Logs",
+      consoleExporter.getDefaultFileName(details)
+    );
 
     if (!targetUri) {
       return;
@@ -384,19 +389,11 @@ export class BuildDetailsPanelActions {
       return;
     }
 
-    const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-    const defaultFileName = `jenkins-${sanitizeFilePart(target.name)}-${target.kind}-log.txt`;
-    const defaultUri = workspaceUri
-      ? vscode.Uri.joinPath(workspaceUri, defaultFileName)
-      : undefined;
-    const targetUri = await vscode.window.showSaveDialog({
-      title: "Export Pipeline Node Log",
-      saveLabel: "Export Log",
-      defaultUri,
-      filters: {
-        "Log files": ["log", "txt"]
-      }
-    });
+    const targetUri = await promptLogSaveTarget(
+      "Export Pipeline Node Log",
+      "Export Log",
+      `jenkins-${sanitizeFilePart(target.name)}-${target.kind}-log.txt`
+    );
     if (!targetUri) {
       return;
     }
@@ -444,6 +441,23 @@ async function confirmRestartFromStage(label: string, stageName: string): Promis
     RESTART_CONFIRM_LABEL
   );
   return choice === RESTART_CONFIRM_LABEL;
+}
+
+function promptLogSaveTarget(
+  title: string,
+  saveLabel: string,
+  defaultFileName: string
+): Thenable<vscode.Uri | undefined> {
+  const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+  const defaultUri = workspaceUri ? vscode.Uri.joinPath(workspaceUri, defaultFileName) : undefined;
+  return vscode.window.showSaveDialog({
+    title,
+    saveLabel,
+    defaultUri,
+    filters: {
+      "Log files": ["log", "txt"]
+    }
+  });
 }
 
 function sanitizeFilePart(value: string): string {

@@ -103,7 +103,7 @@ async function loadWithPendingConsole() {
     scriptUri: "",
     styleUris: []
   });
-  vi.spyOn(BuildComparePanelView.prototype, "renderBuildCompare").mockImplementation(() => {});
+  vi.spyOn(BuildComparePanelView.prototype, "renderModel").mockImplementation(() => {});
   assert.deepEqual(await controller.load(backend, OPTIONS, ENVIRONMENT, BASELINE_URL, TARGET_URL), {
     status: "ok"
   });

@@ -3,11 +3,10 @@ import * as vscode from "vscode";
 import type { CurrentBranchRepositoryResolver } from "../currentBranch/CurrentBranchRepositoryResolver";
 import type { CurrentBranchRepositoryInfo } from "../currentBranch/CurrentBranchTypes";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { ensureTrailingSlash } from "../jenkins/urls";
-import {
-  type JenkinsDiagnosticProfileBinding,
-  type JenkinsDiagnosticProfileBindingStore,
-  normalizeDiagnosticJobScopeUrl
+import { ensureTrailingSlash, normalizeJenkinsUrlForComparison } from "../jenkins/urls";
+import type {
+  JenkinsDiagnosticProfileBinding,
+  JenkinsDiagnosticProfileBindingStore
 } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import { serializeCustomDiagnosticMatchers } from "./BuildDiagnosticCustomMatcherProtocol";
@@ -195,7 +194,7 @@ export function buildUrlToJobUrl(buildUrl: string): string {
   url.pathname = `/${segments.join("/")}/`;
   url.search = "";
   url.hash = "";
-  return normalizeDiagnosticJobScopeUrl(url.toString());
+  return normalizeJenkinsUrlForComparison(url.toString());
 }
 
 export function toParentJobUrl(jobUrl: string): string | undefined {
@@ -211,7 +210,7 @@ export function toParentJobUrl(jobUrl: string): string | undefined {
   url.pathname = `/${segments.join("/")}/`;
   url.search = "";
   url.hash = "";
-  return normalizeDiagnosticJobScopeUrl(url.toString());
+  return normalizeJenkinsUrlForComparison(url.toString());
 }
 
 function chooseBinding(

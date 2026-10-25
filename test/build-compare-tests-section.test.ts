@@ -254,6 +254,27 @@ describe("buildTestsSection", () => {
     assert.doesNotMatch(html, /No test changes between these builds\./);
   });
 
+  it("labels each side's test summary when the comparison is unavailable", () => {
+    const bothUnavailable = buildTestsSection({ status: "unavailable" }, { status: "unavailable" });
+    assert.equal(bothUnavailable.baselineSummaryLabel, "Unavailable");
+    assert.equal(bothUnavailable.targetSummaryLabel, "Unavailable");
+
+    const partial = buildTestsSection({ status: "unavailable" }, availableReport(report([])));
+    assert.equal(partial.status, "unavailable");
+    assert.equal(partial.baselineSummaryLabel, "Unavailable");
+    assert.notEqual(partial.targetSummaryLabel, "Unavailable");
+
+    const error = buildTestsSection(
+      { status: "unavailable" },
+      { status: "error", message: "request failed" }
+    );
+    assert.equal(error.status, "error");
+    assert.equal(error.baselineSummaryLabel, "Unavailable");
+    assert.equal(error.targetSummaryLabel, "Error");
+    assert.deepEqual(error.newFailures, []);
+    assert.equal(error.unchangedCount, 0);
+  });
+
   it("describes identical test reports in plain words", () => {
     const tests = report([{ name: "a", status: "PASSED" }]);
     const section = buildTestsSection(availableReport(tests), availableReport(tests));

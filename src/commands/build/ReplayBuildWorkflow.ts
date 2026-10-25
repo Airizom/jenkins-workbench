@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
+import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { ReplayDraftManager, ReplayDraftSession } from "../../services/ReplayDraftManager";
 import { buildReplaySessionKey } from "../../services/ReplayDraftSessionStore";
 import { formatActionError } from "../CommandUtils";
@@ -19,7 +19,7 @@ export class ReplayBuildWorkflow {
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly draftManager: ReplayDraftManager,
-    private readonly queuedBuildWaiter: QueuedBuildWaiter
+    private readonly buildFollowUp: BuildFollowUpService
   ) {}
 
   async openReplay(target: ReplayBuildTarget): Promise<void> {
@@ -66,13 +66,28 @@ export class ReplayBuildWorkflow {
 
     try {
       const payload = this.draftManager.buildSubmissionPayload(session);
-      const result = await vscode.window.withProgress(
+      const { prepared, result } = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: `Running replay for ${session.label}...`,
           cancellable: false
         },
-        () => this.dataService.runReplay(session.environment, session.buildUrl, payload)
+        async () => {
+          // Read the next build number before submitting so the new build can be told apart.
+          const prepared = await this.buildFollowUp.prepare({
+            kind: "cause",
+            environment: session.environment,
+            sourceBuildUrl: session.buildUrl,
+            cause: "replay",
+            mayReturnQueueItem: true
+          });
+          const result = await this.dataService.runReplay(
+            session.environment,
+            session.buildUrl,
+            payload
+          );
+          return { prepared, result };
+        }
       );
 
       const closeSucceeded = await this.draftManager.discardSession(session.sessionId, {
@@ -83,13 +98,14 @@ export class ReplayBuildWorkflow {
       }
 
       const location = result.location ?? result.queueLocation ?? result.buildLocation;
-      const message = location
-        ? `Replay started for ${session.label}. Location: ${location}`
-        : `Replay started for ${session.label}.`;
-      void vscode.window.showInformationMessage(message);
-
-      void this.waitForReplayAndRefresh(session, refreshHost, location).catch((error) => {
-        console.warn(`Failed to refresh replayed build state for ${session.label}.`, error);
+      this.buildFollowUp.announceAndFollow(prepared, {
+        location,
+        requestedMessage: `Replay requested for ${session.label}`,
+        plainMessage: location
+          ? `Replay started for ${session.label}. Location: ${location}`
+          : `Replay started for ${session.label}.`,
+        refresh: () =>
+          refreshHost.fullEnvironmentRefresh({ environmentId: session.environment.environmentId })
       });
     } catch (error) {
       void vscode.window.showErrorMessage(
@@ -129,18 +145,6 @@ export class ReplayBuildWorkflow {
 
     void vscode.window.showInformationMessage("Open a replay draft to run it.");
     return null;
-  }
-
-  private async waitForReplayAndRefresh(
-    session: ReplayDraftSession,
-    refreshHost: BuildCommandRefreshHost,
-    location: string | undefined
-  ): Promise<void> {
-    try {
-      await this.queuedBuildWaiter.awaitQueuedBuildStart(session.environment, location);
-    } finally {
-      refreshHost.fullEnvironmentRefresh({ environmentId: session.environment.environmentId });
-    }
   }
 
   private async openReplaySession(target: ReplayBuildTarget): Promise<void> {

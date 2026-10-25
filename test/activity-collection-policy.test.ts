@@ -68,20 +68,17 @@ describe("promoteAwaitingInputJobs", () => {
     assertPromotesNothing((running) => new Set([running.url]), 0);
   });
 
-  it("promotes awaiting-input candidates and removes them from the other groups", () => {
+  it("promotes awaiting-input candidates out of the running group", () => {
     const groups = createActivityGroups();
     const awaitingJob = createEntry("deploy", "red_anime");
     const otherRunning = createEntry("build", "blue_anime");
-    const failing = createEntry("deploy", "red");
     groups.get("running")?.push(awaitingJob);
     groups.get("running")?.push(otherRunning);
-    groups.get("failing")?.push(failing);
 
     promoteAwaitingInputJobs(groups, [awaitingJob, otherRunning], new Set([awaitingJob.url]), 5);
 
     assert.deepEqual(groups.get("awaitingInput"), [awaitingJob]);
     assert.deepEqual(groups.get("running"), [otherRunning]);
-    assert.deepEqual(groups.get("failing"), []);
   });
 
   it("skips candidates that are not awaiting input", () => {
@@ -122,14 +119,13 @@ describe("promoteAwaitingInputJobs", () => {
     assert.deepEqual(groups.get("running"), [running]);
   });
 
-  it("preserves candidate order while excluding, deduplicating, and limiting running jobs", () => {
+  it("preserves candidate order while excluding and limiting running jobs", () => {
     const groups = createActivityGroups();
     const awaiting = createEntry("awaiting", "red_anime");
     const first = createEntry("first", "blue_anime");
-    const duplicate = { ...first, name: "duplicate" };
     const second = createEntry("second", "blue_anime");
     const third = createEntry("third", "blue_anime");
-    const candidates = [awaiting, first, duplicate, second, third];
+    const candidates = [awaiting, first, second, third];
     groups.set("running", candidates);
 
     promoteAwaitingInputJobs(groups, candidates, new Set([awaiting.url]), 2);
@@ -149,17 +145,5 @@ describe("promoteAwaitingInputJobs", () => {
 
     assert.deepEqual(groups.get("awaitingInput"), [existing]);
     assert.deepEqual(groups.get("running"), []);
-  });
-
-  it("tolerates group maps that are missing group entries", () => {
-    const candidate = createEntry("candidate", "red_anime");
-    const groups: ActivityGroups = new Map();
-
-    promoteAwaitingInputJobs(groups, [candidate], new Set([candidate.url]), 2);
-
-    assert.deepEqual(groups.get("awaitingInput"), [candidate]);
-    assert.equal(groups.get("failing"), undefined);
-    assert.equal(groups.get("unstable"), undefined);
-    assert.equal(groups.get("running"), undefined);
   });
 });

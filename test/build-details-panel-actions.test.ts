@@ -8,6 +8,7 @@ import * as vscodeStub from "./helpers/vscodeStub";
 
 const warningPrompts: Array<{ message: string; options: unknown; items: string[] }> = [];
 const errorMessages: string[] = [];
+const infoMessages: string[] = [];
 let warningResponse: string | undefined;
 
 vi.doMock("vscode", () => ({
@@ -17,7 +18,10 @@ vi.doMock("vscode", () => ({
       warningPrompts.push({ message, options, items });
       return warningResponse;
     },
-    showInformationMessage: async () => undefined,
+    showInformationMessage: async (message: string) => {
+      infoMessages.push(message);
+      return undefined;
+    },
     showErrorMessage: async (message: string) => {
       errorMessages.push(message);
       return undefined;
@@ -45,6 +49,8 @@ function createActions(options?: {
   workflowError?: Error;
   withoutWorkflow?: boolean;
   withoutArtifactHandler?: boolean;
+  buildFollowUp?: unknown;
+  onRestart?: () => void;
 }) {
   const artifactRequests: ArtifactActionRequest[] = [];
   const posted: BuildDetailsOutgoingMessage[] = [];
@@ -83,6 +89,7 @@ function createActions(options?: {
       restart: {
         restartPipelineFromStage: async (_env: unknown, _url: string, stage: string) => {
           restarts.push(stage);
+          options?.onRestart?.();
         }
       }
     }),
@@ -119,7 +126,8 @@ function createActions(options?: {
     },
     getRefreshHost: () => undefined,
     getTestSourceNavigationUiService: () => undefined,
-    getBuildManagementWorkflow: () => (options?.withoutWorkflow ? undefined : (workflow as never))
+    getBuildManagementWorkflow: () => (options?.withoutWorkflow ? undefined : (workflow as never)),
+    getBuildFollowUp: () => options?.buildFollowUp as never
   });
   return { actions, posted, restarts, rejects, statusRefreshes, workflowCalls, artifactRequests };
 }
@@ -128,6 +136,7 @@ describe("BuildDetailsPanelActions", () => {
   beforeEach(() => {
     warningPrompts.length = 0;
     errorMessages.length = 0;
+    infoMessages.length = 0;
     warningResponse = undefined;
   });
 
@@ -174,6 +183,52 @@ describe("BuildDetailsPanelActions", () => {
     await actions.handleRestartPipelineFromStage({ stageName: "Deploy" });
 
     assert.deepEqual(restarts, ["Deploy"]);
+    assert.deepEqual(infoMessages, ['Requested restart from stage "Deploy" for app #9.']);
+  });
+
+  it("prepares, restarts, then announces and follows the restarted build", async () => {
+    const calls: string[] = [];
+    const prepared = { request: { kind: "cause" }, causeOrigin: { kind: "cause", label: "app" } };
+    const announced: Array<{ prepared: unknown; options: Record<string, unknown> }> = [];
+    const buildFollowUp = {
+      prepare: async (request: unknown) => {
+        calls.push("prepare");
+        assert.deepEqual(request, {
+          kind: "cause",
+          environment,
+          sourceBuildUrl: "https://jenkins.example/job/app/9/",
+          cause: "restart",
+          stageName: "Deploy"
+        });
+        return prepared;
+      },
+      announceAndFollow: (value: unknown, options: Record<string, unknown>) => {
+        calls.push("announceAndFollow");
+        announced.push({ prepared: value, options });
+      }
+    };
+    const { actions, restarts } = createActions({
+      buildFollowUp,
+      onRestart: () => calls.push("restart")
+    });
+    warningResponse = "Restart";
+
+    await actions.handleRestartPipelineFromStage({ stageName: "Deploy" });
+
+    assert.deepEqual(restarts, ["Deploy"]);
+    assert.deepEqual(calls, ["prepare", "restart", "announceAndFollow"]);
+    assert.deepEqual(infoMessages, []);
+    assert.equal(announced.length, 1);
+    assert.equal(announced[0]?.prepared, prepared);
+    assert.equal(
+      announced[0]?.options.requestedMessage,
+      'Requested restart from stage "Deploy" for app #9'
+    );
+    assert.equal(typeof announced[0]?.options.refresh, "function");
+    assert.deepEqual(Object.keys(announced[0]?.options ?? {}).sort(), [
+      "refresh",
+      "requestedMessage"
+    ]);
   });
 
   it("reports pending-input completion after the confirmation is dismissed", async () => {

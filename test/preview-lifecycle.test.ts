@@ -139,3 +139,55 @@ it.each([
   await open(provider, uri);
   assert.equal(release.mock.calls.length, 1);
 });
+
+it.each([
+  ["resource", openResourcePreview],
+  ["text", openTextPreview]
+] as const)("releases a %s preview that never opens in a tab", async (kind, open) => {
+  const { provider, uri, release } = createPreview();
+  if (kind === "resource") {
+    executeCommand.mockImplementationOnce(async () => undefined);
+  } else {
+    showTextDocument.mockImplementationOnce(
+      async () => ({ document: { uri, languageId: "plaintext" } }) as vscode.TextEditor
+    );
+  }
+  await open(provider, uri);
+  assert.equal(release.mock.calls.length, 1);
+});
+
+it("calls onReleased once when the text preview's tab closes", async () => {
+  const { provider, uri, release } = createPreview();
+  const onReleased = vi.fn();
+
+  await openTextPreview(provider, uri, { onReleased });
+  assert.equal(onReleased.mock.calls.length, 0);
+
+  const tab = tabGroups[0].tabs[0];
+  closeTab(tab);
+  closeTab(tab);
+  assert.equal(onReleased.mock.calls.length, 1);
+  assert.equal(release.mock.calls.length, 1);
+});
+
+it("calls onReleased once when the text preview never opens in a tab", async () => {
+  const { provider, uri } = createPreview();
+  const onReleased = vi.fn();
+  showTextDocument.mockImplementationOnce(
+    async () => ({ document: { uri, languageId: "plaintext" } }) as vscode.TextEditor
+  );
+
+  await openTextPreview(provider, uri, { onReleased });
+  assert.equal(onReleased.mock.calls.length, 1);
+});
+
+it("calls onReleased once when opening the text preview fails", async () => {
+  const { provider, uri } = createPreview();
+  const onReleased = vi.fn();
+  showTextDocument.mockImplementationOnce(async () => {
+    throw new Error("open failed");
+  });
+
+  await assert.rejects(openTextPreview(provider, uri, { onReleased }), /open failed/);
+  assert.equal(onReleased.mock.calls.length, 1);
+});

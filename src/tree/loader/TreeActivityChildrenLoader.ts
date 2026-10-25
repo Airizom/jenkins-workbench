@@ -15,10 +15,8 @@ import { ROOT_TREE_JOB_SCOPE } from "../TreeJobScope";
 import { TreeActivityCache } from "./TreeActivityCache";
 import { buildScopedEnvironmentKey, type TreeChildrenKeyBuilder } from "./TreeCacheKeys";
 import type { TreeChildrenCacheManager } from "./TreeChildrenCacheManager";
-import type { TreeJobUrlStateLoader } from "./TreeJobUrlStateLoader";
+import type { JobUrlState, TreeJobUrlStateLoader } from "./TreeJobUrlStateLoader";
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
-
-type JobUrlState = readonly [watchedJobs: Set<string>, pinnedJobs: Set<string>];
 
 export class TreeActivityChildrenLoader {
   private readonly activityCache: TreeActivityCache;
@@ -61,7 +59,7 @@ export class TreeActivityChildrenLoader {
       const groups: ActivityGroupTreeItem[] = [];
       let jobUrlStatePromise: Promise<JobUrlState> | undefined;
       const getJobUrlState = () => {
-        jobUrlStatePromise ??= this.getJobUrlState(folder.environment);
+        jobUrlStatePromise ??= this.jobUrlState.getJobUrlState(folder.environment);
         return jobUrlStatePromise;
       };
       for (const group of viewModel.groups) {
@@ -197,12 +195,5 @@ export class TreeActivityChildrenLoader {
         pathContext: entry.pathContext
       });
     });
-  }
-
-  private async getJobUrlState(environment: JenkinsEnvironmentRef): Promise<JobUrlState> {
-    return Promise.all([
-      this.jobUrlState.getWatchedJobUrls(environment),
-      this.jobUrlState.getPinnedJobUrls(environment)
-    ]);
   }
 }

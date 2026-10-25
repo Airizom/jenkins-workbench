@@ -6,6 +6,7 @@ import {
   PipelineNodeLogFetcher,
   type PipelineNodeLogFetchResult
 } from "../src/panels/buildDetails/PipelineNodeLogFetcher";
+import { readFlowNodeLogSnapshot } from "../src/panels/buildDetails/PipelineNodeLogContent";
 import { PipelineNodeLogManager } from "../src/panels/buildDetails/PipelineNodeLogManager";
 import { PipelineStageLogAggregator } from "../src/panels/buildDetails/PipelineStageLogAggregator";
 import { isWorkflowNodeActive } from "../src/panels/buildDetails/PipelineWorkflowStatus";
@@ -99,6 +100,36 @@ async function fetchFreshAfterReset(
   fake.resolveNext(buildChunk({ html: "fresh<br>", textSize: 7, moreData: false }));
   return freshFetch;
 }
+
+describe("readFlowNodeLogSnapshot", () => {
+  it("reads a truncated finished snapshot as escaped text that does not poll", () => {
+    assert.deepEqual(
+      readFlowNodeLogSnapshot({
+        text: "a &lt;b&gt;<br>c",
+        hasMore: true,
+        nodeStatus: "SUCCESS",
+        consoleUrl: "http://jenkins/log"
+      }),
+      {
+        html: "a &lt;b&gt;\nc",
+        text: "a <b>\nc",
+        hasMore: true,
+        active: false,
+        consoleUrl: "http://jenkins/log"
+      }
+    );
+  });
+
+  it("marks an in-progress snapshot active and defaults missing fields", () => {
+    assert.deepEqual(readFlowNodeLogSnapshot({ nodeStatus: "IN_PROGRESS" }), {
+      html: "",
+      text: "",
+      hasMore: false,
+      active: true,
+      consoleUrl: undefined
+    });
+  });
+});
 
 describe("PipelineNodeLogFetcher", () => {
   it.each(["IN_PROGRESS", "PAUSED_PENDING_INPUT", "QUEUED", "NOT_STARTED", "RUNNING"])(

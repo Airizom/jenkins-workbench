@@ -65,20 +65,15 @@ export class JenkinsfileStepCatalogService implements JenkinsfileStepCatalogInva
     const authSignature = await this.clientProvider.getAuthSignature(environment);
     const key = buildCacheKey(environment, authSignature);
     const cached = this.cache.get(key);
-    const loadError = this.loadErrors.get(key);
     if (cached) {
-      if (cached.expiresAt <= Date.now() && shouldRetryAfterLoadError(loadError)) {
+      if (cached.expiresAt <= Date.now()) {
         this.ensureCatalogLoaded(environment, key);
       }
       return createLiveResult(cached.catalog, environment);
     }
 
-    if (loadError) {
-      if (shouldRetryAfterLoadError(loadError)) {
-        this.loadErrors.delete(key);
-        this.ensureCatalogLoaded(environment, key);
-        return createFallbackLoadingResult(environment);
-      }
+    const loadError = this.loadErrors.get(key);
+    if (loadError && !shouldRetryAfterLoadError(loadError)) {
       return createFallbackLoadFailedResult(environment, loadError.error);
     }
     this.ensureCatalogLoaded(environment, key);
@@ -220,13 +215,13 @@ function createFallbackLoadingResult(
 
 function createFallbackLoadFailedResult(
   environment: JenkinsEnvironmentRef,
-  error: unknown
+  error: Error
 ): JenkinsfileStepCatalogResult {
   return {
     catalog: FALLBACK_JENKINSFILE_STEP_CATALOG,
     kind: "fallback-load-failed",
     environment,
-    error: normalizeCatalogError(error)
+    error
   };
 }
 

@@ -3,6 +3,7 @@ import { describe, it } from "vitest";
 import type { NodeExecutorViewModel } from "../src/panels/nodeDetails/shared/NodeDetailsContracts";
 import {
   formatExecutorName,
+  formatFreeExecutorLabel,
   formatOneOffExecutors,
   summarizeExecutorUtilization
 } from "../src/panels/nodeDetails/webview/components/nodeDetails/executorUtilization";
@@ -123,6 +124,13 @@ describe("formatOneOffExecutors", () => {
       formatOneOffExecutors(summarizeExecutorUtilization([], [busy, makeExecutor({ id: "1" })])),
       "+2 one-off · 1 busy"
     );
+  });
+});
+
+describe("formatFreeExecutorLabel", () => {
+  it("labels free executors on an offline node as offline", () => {
+    assert.equal(formatFreeExecutorLabel(true), "Offline");
+    assert.equal(formatFreeExecutorLabel(false), "Idle");
   });
 });
 

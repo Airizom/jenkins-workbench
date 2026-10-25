@@ -141,13 +141,9 @@ function formatQueueStatus(item: JenkinsQueueItemInfo): string {
 }
 
 function inferQueuedLabelsFromBlockedNodeReason(
-  reason: string | undefined,
+  reason: string,
   labelsByNodeName: ReadonlyMap<string, string[]>
 ): string[] {
-  if (!reason) {
-    return [];
-  }
-
   const nodeNamePattern = /['"‘’]([^'"‘’]+)['"‘’]\s+is offline/gi;
   const labels: string[] = [];
   const seenLabelKeys = new Set<string>();

@@ -26,56 +26,35 @@ import { activateRuntime } from "./ExtensionRuntime";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getExtensionConfiguration();
-  const cacheTtlMs = getCacheTtlMs(config);
-  const statusRefreshIntervalSeconds = getStatusRefreshIntervalSeconds(config);
-  const watchErrorThreshold = getWatchErrorThreshold(config);
-  const queuePollIntervalSeconds = getQueuePollIntervalSeconds(config);
-  const maxCacheEntries = getMaxCacheEntries(config);
-  const requestTimeoutMs = getRequestTimeoutMs(config);
-  const buildTooltipOptions = getBuildTooltipOptions(config);
-  const buildListFetchOptions = getBuildListFetchOptions(config);
-  const treeViewCurationOptions = getTreeViewCurationOptions(config);
-  const activityOptions = getTreeActivityOptions(config);
-  const artifactPreviewCacheOptions = {
-    maxEntries: getArtifactPreviewCacheMaxEntries(config),
-    maxTotalBytes: getArtifactPreviewCacheMaxBytes(config),
-    ttlMs: getArtifactPreviewCacheTtlMs(config)
-  };
-  const currentBranchPullRequestJobNamePatterns =
-    getCurrentBranchPullRequestJobNamePatterns(config);
-  const jenkinsfileIntelligenceConfig = getJenkinsfileIntelligenceConfig(config);
-  const jenkinsfileValidationConfig = getJenkinsfileValidationConfig(config);
-  const artifactActionOptionsProvider = (
-    workspaceFolder: vscode.WorkspaceFolder
-  ): { downloadRoot: string; maxBytes?: number } => {
-    const folderConfig = vscode.workspace.getConfiguration(CONFIG_SECTION, workspaceFolder.uri);
-    return getArtifactActionOptions(folderConfig);
-  };
-  const artifactPreviewOptionsProvider = (): { maxBytes?: number } => {
-    const previewConfig = getExtensionConfiguration();
-    return { maxBytes: getArtifactMaxDownloadBytes(previewConfig) };
-  };
-  const buildCompareOptionsProvider = () => getBuildCompareOptions(getExtensionConfiguration());
 
   await activateRuntime(context, {
-    cacheTtlMs,
-    maxCacheEntries,
-    requestTimeoutMs,
-    buildTooltipOptions,
-    buildListFetchOptions,
-    treeViewCurationOptions,
-    activityOptions,
-    artifactActionOptionsProvider,
-    artifactPreviewOptionsProvider,
-    artifactPreviewCacheOptions,
-    buildCompareOptionsProvider,
-    jenkinsfileIntelligenceConfig,
-    jenkinsfileValidationConfig,
-    currentBranchPullRequestJobNamePatterns,
+    cacheTtlMs: getCacheTtlMs(config),
+    maxCacheEntries: getMaxCacheEntries(config),
+    requestTimeoutMs: getRequestTimeoutMs(config),
+    buildTooltipOptions: getBuildTooltipOptions(config),
+    buildListFetchOptions: getBuildListFetchOptions(config),
+    treeViewCurationOptions: getTreeViewCurationOptions(config),
+    activityOptions: getTreeActivityOptions(config),
+    artifactActionOptionsProvider: (workspaceFolder) =>
+      getArtifactActionOptions(
+        vscode.workspace.getConfiguration(CONFIG_SECTION, workspaceFolder.uri)
+      ),
+    artifactPreviewOptionsProvider: () => ({
+      maxBytes: getArtifactMaxDownloadBytes(getExtensionConfiguration())
+    }),
+    artifactPreviewCacheOptions: {
+      maxEntries: getArtifactPreviewCacheMaxEntries(config),
+      maxTotalBytes: getArtifactPreviewCacheMaxBytes(config),
+      ttlMs: getArtifactPreviewCacheTtlMs(config)
+    },
+    buildCompareOptionsProvider: () => getBuildCompareOptions(getExtensionConfiguration()),
+    jenkinsfileIntelligenceConfig: getJenkinsfileIntelligenceConfig(config),
+    jenkinsfileValidationConfig: getJenkinsfileValidationConfig(config),
+    currentBranchPullRequestJobNamePatterns: getCurrentBranchPullRequestJobNamePatterns(config),
     extensionUri: context.extensionUri,
-    statusRefreshIntervalSeconds,
-    watchErrorThreshold,
-    queuePollIntervalSeconds
+    statusRefreshIntervalSeconds: getStatusRefreshIntervalSeconds(config),
+    watchErrorThreshold: getWatchErrorThreshold(config),
+    queuePollIntervalSeconds: getQueuePollIntervalSeconds(config)
   });
 }
 

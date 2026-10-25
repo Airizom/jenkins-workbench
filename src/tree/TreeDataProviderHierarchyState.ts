@@ -5,6 +5,7 @@ import {
   InstanceTreeItem
 } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import { buildTreeEnvironmentKey, deleteTreeEnvironmentKeys } from "./TreeEnvironmentKeys";
 
 export class TreeDataProviderHierarchyState {
   private readonly parentMap = new WeakMap<
@@ -42,9 +43,7 @@ export class TreeDataProviderHierarchyState {
     if (parent !== undefined) {
       return;
     }
-    this.instanceItems.clear();
-    this.queueFolderItems.clear();
-    this.activityFolderItems.clear();
+    this.clearEnvironment();
   }
 
   private trackRenderedItem(child: WorkbenchTreeElement): void {
@@ -78,13 +77,8 @@ export class TreeDataProviderHierarchyState {
 
   clearEnvironment(environmentId?: string): void {
     if (environmentId) {
-      const environmentSuffix = `:${environmentId}`;
       for (const map of [this.instanceItems, this.queueFolderItems, this.activityFolderItems]) {
-        for (const key of map.keys()) {
-          if (key.endsWith(environmentSuffix)) {
-            map.delete(key);
-          }
-        }
+        deleteTreeEnvironmentKeys(map, environmentId);
       }
       return;
     }
@@ -95,6 +89,6 @@ export class TreeDataProviderHierarchyState {
   }
 
   private buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
-    return `${environment.scope}:${environment.environmentId}`;
+    return buildTreeEnvironmentKey(environment.scope, environment.environmentId);
   }
 }

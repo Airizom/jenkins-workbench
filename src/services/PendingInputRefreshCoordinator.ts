@@ -226,9 +226,6 @@ export class PendingInputRefreshCoordinator implements vscode.Disposable {
       while (this.inFlight < this.concurrency && this.queueHead < this.queue.length) {
         const item = this.queue[this.queueHead];
         this.queueHead += 1;
-        if (!item) {
-          break;
-        }
         const key = this.buildKey(item.environment, item.buildUrl);
         this.queuedKeys.delete(key);
         if (this.inFlightPromises.has(key)) {
@@ -283,7 +280,11 @@ export class PendingInputRefreshCoordinator implements vscode.Disposable {
     const last = this.refreshAt.get(environmentKey) ?? 0;
     const elapsed = now - last;
     if (elapsed < this.refreshThrottleMs) {
-      const pendingForEnv = this.getOrCreatePendingChanges(environmentKey);
+      let pendingForEnv = this.pendingChanges.get(environmentKey);
+      if (!pendingForEnv) {
+        pendingForEnv = new Map<string, PendingInputSummaryChange>();
+        this.pendingChanges.set(environmentKey, pendingForEnv);
+      }
       pendingForEnv.set(change.buildUrl, change);
       if (!this.pendingTimers.has(environmentKey)) {
         const delay = Math.max(0, this.refreshThrottleMs - elapsed);
@@ -296,19 +297,6 @@ export class PendingInputRefreshCoordinator implements vscode.Disposable {
     }
     this.refreshAt.set(environmentKey, now);
     this.emitChange(change);
-  }
-
-  private getOrCreatePendingChanges(
-    environmentKey: string
-  ): Map<string, PendingInputSummaryChange> {
-    const existing = this.pendingChanges.get(environmentKey);
-    if (existing) {
-      return existing;
-    }
-
-    const pending = new Map<string, PendingInputSummaryChange>();
-    this.pendingChanges.set(environmentKey, pending);
-    return pending;
   }
 
   private flushPendingChanges(environmentKey: string): void {

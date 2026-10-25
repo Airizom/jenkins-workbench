@@ -5,7 +5,7 @@ import {
   TooltipTrigger
 } from "../../../../shared/webview/components/ui/tooltip";
 import type { NodeExecutorViewModel } from "../../../shared/NodeDetailsContracts";
-import { formatExecutorName } from "./executorUtilization";
+import { formatExecutorName, formatFreeExecutorLabel } from "./executorUtilization";
 
 const DEFAULT_MAX_SLOTS = 48;
 
@@ -90,7 +90,7 @@ function SlotList({
   const visible = executors.slice(0, maxSlots);
   const overflow = executors.length - visible.length;
   const busyCount = executors.filter((executor) => !executor.isIdle).length;
-  const restLabel = isOffline ? "offline" : "idle";
+  const restLabel = formatFreeExecutorLabel(isOffline).toLowerCase();
 
   return (
     <ul
@@ -134,8 +134,8 @@ function resolveSlotState(executor: NodeExecutorViewModel, isOffline: boolean): 
 
 const SLOT_STATE_LABELS: Record<SlotState, string> = {
   busy: "Busy",
-  idle: "Idle",
-  offline: "Offline"
+  idle: formatFreeExecutorLabel(false),
+  offline: formatFreeExecutorLabel(true)
 };
 
 function ExecutorSlot({

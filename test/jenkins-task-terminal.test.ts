@@ -68,15 +68,6 @@ vi.doMock("../src/extension/ExtensionConfig", () => ({
   })
 }));
 vi.doMock("../src/tasks/JenkinsTaskRunner", () => ({
-  JENKINS_TASK_EXIT_CODES: {
-    success: 0,
-    unstable: 1,
-    failure: 2,
-    notBuilt: 3,
-    aborted: 4,
-    error: 5,
-    canceled: 130
-  },
   JenkinsTaskRunner: TestJenkinsTaskRunner
 }));
 

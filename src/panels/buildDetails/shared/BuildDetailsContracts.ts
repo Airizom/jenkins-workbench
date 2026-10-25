@@ -340,29 +340,26 @@ export interface BuildDetailsViewModel {
   loading?: boolean;
 }
 
-export interface BuildDetailsUpdateMessage {
-  type: "updateDetails";
-  displayName: string;
-  /** Plain-text build description with markup stripped; omitted when empty. */
-  description?: string;
-  keptForever: boolean;
-  /** Only completed builds can be deleted. */
-  canDelete: boolean;
-  /** Keep/edit/delete need a loaded build with a known URL and environment. */
-  canManage: boolean;
-  resultLabel: string;
-  resultClass: string;
-  durationLabel: string;
-  timestampLabel: string;
-  culpritsLabel: string;
-  pipelineStagesLoading: boolean;
-  testState: BuildDetailsTestStateViewModel;
-  coverageState: BuildDetailsCoverageStateViewModel;
-  insights: BuildFailureInsightsViewModel;
-  pipelineStages: PipelineStageViewModel[];
-  pipelineNodeLog: PipelineNodeLogViewModel;
-  pendingInputs: PendingInputViewModel[];
-}
+export type BuildDetailsUpdateMessage = { type: "updateDetails" } & Pick<
+  BuildDetailsViewModel,
+  | "displayName"
+  | "description"
+  | "keptForever"
+  | "canDelete"
+  | "canManage"
+  | "resultLabel"
+  | "resultClass"
+  | "durationLabel"
+  | "timestampLabel"
+  | "culpritsLabel"
+  | "pipelineStagesLoading"
+  | "testState"
+  | "coverageState"
+  | "insights"
+  | "pipelineStages"
+  | "pipelineNodeLog"
+  | "pendingInputs"
+>;
 
 function isPipelineLogTargetKind(value: unknown): value is PipelineLogTargetKind {
   return value === "stage" || value === "step";

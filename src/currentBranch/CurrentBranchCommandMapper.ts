@@ -1,4 +1,5 @@
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { verifiedCommitBuildLabel } from "./CurrentBranchCommitPresentation";
 import {
   formatCurrentBranchBuildDetailsLabel,
   formatCurrentBranchJobLabel
@@ -62,7 +63,7 @@ export class CurrentBranchCommandMapper {
     return {
       environment: state.environment,
       buildUrl: build.url,
-      label: `${state.checkout?.head?.slice(0, 7)} · #${build.number}`
+      label: verifiedCommitBuildLabel(state.checkout?.head, build)
     };
   }
 

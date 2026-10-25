@@ -90,8 +90,7 @@ describe("TreeActivityChildrenLoader", () => {
         { collect } as unknown as ActivityCollector,
         cacheManager,
         {
-          getWatchedJobUrls: async () => new Set<string>(),
-          getPinnedJobUrls: async () => new Set<string>()
+          getJobUrlState: async () => [new Set<string>(), new Set<string>()] as const
         } as unknown as TreeJobUrlStateLoader,
         (kind, env, extra) => childrenCache.buildKey(env, kind, extra),
         {} as never,

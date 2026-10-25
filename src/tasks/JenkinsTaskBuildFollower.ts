@@ -14,14 +14,14 @@ import {
   type RequiredJenkinsTaskRunnerOptions
 } from "./JenkinsTaskRunnerContracts";
 import {
-  errorMessage,
   isBuildComplete,
   isInputEnforcementRequested,
   mapJenkinsBuildResult,
   type QueueOwnership,
   RunnerFailure,
+  recordConsecutivePollError,
   resolvePendingInputs,
-  TaskCanceledError
+  rethrowIfCanceled
 } from "./JenkinsTaskRunnerSupport";
 
 interface JenkinsTaskBuildControl extends JenkinsTaskPollingControl {
@@ -75,18 +75,13 @@ export class JenkinsTaskBuildFollower {
         }
         statusErrors = 0;
       } catch (error) {
-        if (error instanceof TaskCanceledError || this.control.isCanceled()) {
-          throw new TaskCanceledError();
-        }
-        statusErrors++;
-        if (statusErrors >= this.options.maxConsecutiveErrors) {
-          throw new RunnerFailure(
-            `Unable to read Jenkins build status after ${statusErrors} consecutive errors: ${errorMessage(error)}`
-          );
-        }
-        this.output.writeStatus(
-          `Build status unavailable; retrying (${statusErrors}/${this.options.maxConsecutiveErrors}).`
-        );
+        rethrowIfCanceled(error, this.control.isCanceled());
+        statusErrors = recordConsecutivePollError(error, statusErrors, {
+          maxConsecutiveErrors: this.options.maxConsecutiveErrors,
+          failureAction: "read Jenkins build status",
+          retryStatus: "Build status unavailable",
+          writeStatus: (message) => this.output.writeStatus(message)
+        });
       }
 
       const consoleResult = await this.consoleFollower.poll(
@@ -173,22 +168,14 @@ export class JenkinsTaskBuildFollower {
           }
           inputErrors = 0;
         } catch (error) {
-          if (error instanceof TaskCanceledError || this.control.isCanceled()) {
-            throw new TaskCanceledError();
-          }
-          if (error instanceof RunnerFailure) {
-            throw error;
-          }
+          rethrowIfCanceled(error, this.control.isCanceled());
           nextInputPollAt = this.options.now() + this.options.inputPollIntervalMs;
-          inputErrors++;
-          if (inputErrors >= this.options.maxConsecutiveErrors) {
-            throw new RunnerFailure(
-              `Unable to check Jenkins input steps after ${inputErrors} consecutive errors: ${errorMessage(error)}`
-            );
-          }
-          this.output.writeStatus(
-            `Input-step status unavailable; retrying (${inputErrors}/${this.options.maxConsecutiveErrors}).`
-          );
+          inputErrors = recordConsecutivePollError(error, inputErrors, {
+            maxConsecutiveErrors: this.options.maxConsecutiveErrors,
+            failureAction: "check Jenkins input steps",
+            retryStatus: "Input-step status unavailable",
+            writeStatus: (message) => this.output.writeStatus(message)
+          });
         }
       }
 

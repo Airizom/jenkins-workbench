@@ -1,5 +1,5 @@
 import type { BuildDiagnosticConsoleReference } from "../panels/buildDetails/shared/BuildDetailsContracts";
-import { stripConsoleControlSequences } from "./BuildDiagnosticConsoleText";
+import { toDisplayedConsoleText } from "./BuildDiagnosticConsoleText";
 
 export interface BuildDiagnosticResolvedReference {
   targetId: string;
@@ -59,7 +59,7 @@ function findLineScopedPathStart(
   reference: BuildDiagnosticResolvedReference,
   state: ConsoleReferenceSearchState
 ): number | null | undefined {
-  const normalizedLine = stripConsoleControlSequences(reference.rawText).replace(/\r$/, "");
+  const normalizedLine = toDisplayedConsoleText(reference.rawText).replace(/\n$/, "");
   const pathOffsetInLine = normalizedLine.indexOf(reference.rawPath);
   if (!normalizedLine || pathOffsetInLine < 0) {
     return undefined;

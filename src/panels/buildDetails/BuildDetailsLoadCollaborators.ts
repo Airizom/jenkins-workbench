@@ -2,7 +2,6 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { JenkinsBuildDetails } from "../../jenkins/types";
 import type { BuildDetailsBackend, BuildDetailsPendingInputProvider } from "./BuildDetailsBackend";
 import {
-  getBuildDetailsCoverageEnabled,
   getBuildDetailsRefreshIntervalMs,
   getTestReportIncludeCaseLogs,
   MAX_CONSOLE_CHARS
@@ -21,7 +20,6 @@ import {
   createBuildDetailsPollingCallbacks
 } from "./BuildDetailsPollingCallbacks";
 import { BuildDetailsPollingController } from "./BuildDetailsPollingController";
-import type { BuildDetailsCanOpenTestSource } from "./BuildDetailsTestSource";
 import { PipelineNodeLogManager } from "./PipelineNodeLogManager";
 
 /** The build a Build Details panel load is bound to. */
@@ -52,14 +50,13 @@ export interface BuildDetailsPanelPollingControllerOptions {
   view: Pick<BuildDetailsPanelView, "postMessage" | "setTitle">;
   runtime: Pick<
     BuildDetailsPanelRuntime,
-    "showCompletionToast" | "handleBuildCompleted" | "handlePipelineLoading"
+    "handleBuildCompleted" | "handlePipelineLoading" | "postStateUpdate"
   >;
   diagnosticConsoleSync: Pick<
     BuildDetailsDiagnosticConsoleSync,
     "appendAndNotify" | "replaceAndNotify" | "sync"
   >;
   pendingInputProvider?: BuildDetailsPendingInputProvider;
-  canOpenTestSource?: BuildDetailsCanOpenTestSource;
   isTokenCurrent: (token: number) => boolean;
   publishErrors: () => void;
   onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void;
@@ -93,21 +90,16 @@ export function createBuildDetailsPanelPollingController(
 function createPanelPollingCallbackHooks(
   options: BuildDetailsPanelPollingControllerOptions
 ): BuildDetailsPollingCallbackHooks {
-  const { state, view, runtime, diagnosticConsoleSync, canOpenTestSource } = options;
+  const { view, runtime, diagnosticConsoleSync } = options;
   return {
     postMessage: (message) => view.postMessage(message),
     setTitle: (title) => view.setTitle(title),
     publishErrors: () => options.publishErrors(),
     isTokenCurrent: (token) => options.isTokenCurrent(token),
-    showCompletionToast: (details) => {
-      void runtime.showCompletionToast(details);
-    },
     handleBuildCompleted: (details, token) => {
       runtime.handleBuildCompleted(details, token);
     },
-    getCoverageEnabled: () => getBuildDetailsCoverageEnabled(),
-    canOpenSource: (className) =>
-      canOpenTestSource?.(state.environment, state.currentBuildUrl, className) ?? false,
+    postStateUpdate: () => runtime.postStateUpdate(),
     onPipelineLoading: (token) => runtime.handlePipelineLoading(token),
     onBuildDetailsChanged: (details) => options.onBuildDetailsChanged?.(details),
     onConsoleTextAppend: (text) => diagnosticConsoleSync.appendAndNotify(text),

@@ -106,10 +106,6 @@ export function formatBuildIdentity(details: JenkinsBuildDetails, buildUrl: stri
   return `Jenkins build #${details.number ?? new URL(buildUrl).pathname.split("/").filter(Boolean).at(-1) ?? "?"}`;
 }
 
-function getUnambiguousJenkinsRevision(details: JenkinsBuildDetails): string | undefined {
-  return getUnambiguousCheckoutRevision(details);
-}
-
 export function getCheckoutMismatchWarning(
   details: JenkinsBuildDetails,
   repository: CurrentBranchRepositoryInfo | undefined,
@@ -118,7 +114,7 @@ export function getCheckoutMismatchWarning(
   if (!repository) {
     return undefined;
   }
-  const remote = getUnambiguousJenkinsRevision(details);
+  const remote = getUnambiguousCheckoutRevision(details);
   if (!localRevision || !remote || revisionsMatch(localRevision, remote)) {
     return undefined;
   }

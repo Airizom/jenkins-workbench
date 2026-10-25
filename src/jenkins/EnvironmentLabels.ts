@@ -10,11 +10,7 @@ function tryParseEnvironmentUrl(rawUrl: string): URL | undefined {
   try {
     return new URL(rawUrl);
   } catch {
-    try {
-      return new URL(`https://${rawUrl}`);
-    } catch {
-      return undefined;
-    }
+    return undefined;
   }
 }
 

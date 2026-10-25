@@ -2,6 +2,7 @@ import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef"
 import type { ScopedCache } from "../../services/ScopedCache";
 import type { PlaceholderTreeItem } from "../items/TreePlaceholderItem";
 import type { WorkbenchTreeElement } from "../items/WorkbenchTreeElement";
+import { deleteTreeEnvironmentKeys } from "../TreeEnvironmentKeys";
 import type { TreeJobScope } from "../TreeJobScope";
 import {
   buildScopedEnvironmentKey,
@@ -16,11 +17,47 @@ import {
   buildWorkspaceRootChildrenKey
 } from "./TreeChildrenMapping";
 
+class JobUrlSetCache {
+  private readonly cache = new Map<string, Set<string>>();
+  private generation = 0;
+
+  async getOrLoad(
+    environment: JenkinsEnvironmentRef,
+    load: () => Promise<Set<string>>
+  ): Promise<Set<string>> {
+    const cached = this.cache.get(buildScopedEnvironmentKey(environment));
+    if (cached) {
+      return cached;
+    }
+
+    const generation = this.generation;
+    const values = await load();
+    if (generation === this.generation) {
+      this.set(environment, values);
+    }
+    return values;
+  }
+
+  // Every write or invalidation bumps the generation so older in-flight
+  // store reads cannot repopulate the cache with stale URLs.
+  set(environment: JenkinsEnvironmentRef, values: Set<string>): void {
+    this.generation += 1;
+    this.cache.set(buildScopedEnvironmentKey(environment), values);
+  }
+
+  clearForEnvironment(environmentId?: string): void {
+    this.generation += 1;
+    if (!environmentId) {
+      this.cache.clear();
+      return;
+    }
+    deleteTreeEnvironmentKeys(this.cache, environmentId);
+  }
+}
+
 export class TreeChildrenCacheManager {
-  private readonly watchedUrlsCache = new Map<string, Set<string>>();
-  private readonly pinnedUrlsCache = new Map<string, Set<string>>();
-  private watchedUrlsGeneration = 0;
-  private pinnedUrlsGeneration = 0;
+  readonly watchedJobUrls = new JobUrlSetCache();
+  readonly pinnedJobUrls = new JobUrlSetCache();
   private readonly pendingLoads = new Map<string, Promise<void>>();
   private readonly loadTokens = new Map<string, number>();
   private loadSequence = 0;
@@ -71,78 +108,12 @@ export class TreeChildrenCacheManager {
     this.artifactCache.delete(key);
   }
 
-  getCachedWatchedJobs(environment: JenkinsEnvironmentRef): Set<string> | undefined {
-    return this.watchedUrlsCache.get(buildScopedEnvironmentKey(environment));
-  }
-
-  getWatchedJobsGeneration(): number {
-    return this.watchedUrlsGeneration;
-  }
-
-  setCachedWatchedJobs(environment: JenkinsEnvironmentRef, values: Set<string>): void {
-    this.watchedUrlsGeneration += 1;
-    this.watchedUrlsCache.set(buildScopedEnvironmentKey(environment), values);
-  }
-
-  setCachedWatchedJobsIfCurrent(
-    environment: JenkinsEnvironmentRef,
-    values: Set<string>,
-    generation: number
-  ): void {
-    if (generation === this.watchedUrlsGeneration) {
-      this.setCachedWatchedJobs(environment, values);
-    }
-  }
-
-  getCachedPinnedJobs(environment: JenkinsEnvironmentRef): Set<string> | undefined {
-    return this.pinnedUrlsCache.get(buildScopedEnvironmentKey(environment));
-  }
-
-  getPinnedJobsGeneration(): number {
-    return this.pinnedUrlsGeneration;
-  }
-
-  setCachedPinnedJobs(environment: JenkinsEnvironmentRef, values: Set<string>): void {
-    this.pinnedUrlsGeneration += 1;
-    this.pinnedUrlsCache.set(buildScopedEnvironmentKey(environment), values);
-  }
-
-  setCachedPinnedJobsIfCurrent(
-    environment: JenkinsEnvironmentRef,
-    values: Set<string>,
-    generation: number
-  ): void {
-    if (generation === this.pinnedUrlsGeneration) {
-      this.setCachedPinnedJobs(environment, values);
-    }
-  }
-
-  // Every watch/pin cache write or invalidation bumps the generation so older in-flight
-  // store reads cannot repopulate the cache with stale URLs.
   clearWatchCacheForEnvironment(environmentId?: string): void {
-    this.watchedUrlsGeneration += 1;
-    this.clearUrlCacheForEnvironment(this.watchedUrlsCache, environmentId);
+    this.watchedJobUrls.clearForEnvironment(environmentId);
   }
 
   clearPinCacheForEnvironment(environmentId?: string): void {
-    this.pinnedUrlsGeneration += 1;
-    this.clearUrlCacheForEnvironment(this.pinnedUrlsCache, environmentId);
-  }
-
-  private clearUrlCacheForEnvironment(
-    cache: Map<string, Set<string>>,
-    environmentId?: string
-  ): void {
-    if (!environmentId) {
-      cache.clear();
-      return;
-    }
-    const environmentSuffix = `:${environmentId}`;
-    for (const key of cache.keys()) {
-      if (key.endsWith(environmentSuffix)) {
-        cache.delete(key);
-      }
-    }
+    this.pinnedJobUrls.clearForEnvironment(environmentId);
   }
 
   clearChildrenCacheForEnvironment(environmentId?: string): void {
@@ -235,7 +206,7 @@ export class TreeChildrenCacheManager {
     this.childrenCache.delete(key);
     this.pendingLoads.delete(key);
     if (hadPending) {
-      this.bumpLoadToken(key);
+      this.nextLoadToken(key);
     } else {
       this.loadTokens.delete(key);
     }
@@ -311,10 +282,6 @@ export class TreeChildrenCacheManager {
     const next = ++this.loadSequence;
     this.loadTokens.set(key, next);
     return next;
-  }
-
-  private bumpLoadToken(key: string): void {
-    this.nextLoadToken(key);
   }
 
   private isCurrentLoadToken(key: string, token: number): boolean {

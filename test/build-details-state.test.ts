@@ -25,6 +25,30 @@ describe("buildInitialState", () => {
     assert.deepEqual(state.diagnostics, EMPTY_BUILD_DIAGNOSTICS);
   });
 
+  it("parses initial console html and applies defaults for missing fields", () => {
+    const originalDOMParser = globalThis.DOMParser;
+    const originalNode = globalThis.Node;
+    globalThis.DOMParser = class {
+      parseFromString() {
+        return { body: { childNodes: [{ nodeType: 3, textContent: "hello" }] } };
+      }
+    } as unknown as typeof DOMParser;
+    globalThis.Node = { TEXT_NODE: 3, ELEMENT_NODE: 1 } as unknown as typeof Node;
+    let state: ReturnType<typeof buildInitialState>;
+    try {
+      state = buildInitialState({ consoleHtml: "hello" } as BuildDetailsViewModel);
+    } finally {
+      globalThis.DOMParser = originalDOMParser;
+      globalThis.Node = originalNode;
+    }
+
+    assert.equal(state.consoleHtml, undefined);
+    assert.equal(state.consoleHtmlModel?.text, "hello");
+    assert.deepEqual(state.diagnostics, EMPTY_BUILD_DIAGNOSTICS);
+    assert.equal(state.loading, false);
+    assert.equal(state.hasLoaded, true);
+  });
+
   it("replaces build diagnostics independently from build detail updates", () => {
     const state = buildInitialState({} as BuildDetailsViewModel);
     const diagnostics = {
@@ -150,6 +174,42 @@ describe("buildInitialState", () => {
 
     assert.deepEqual(Object.keys(updated.processingInputActions), []);
     assert.equal(Object.getPrototypeOf(updated.processingInputActions), null);
+  });
+});
+
+describe("pipeline node log html", () => {
+  const target = { key: "stage-1", kind: "stage" as const, name: "Build" };
+
+  it("keeps the node log html model across same-target updates without html", () => {
+    const logWithoutHtml = { target, text: "two", truncated: false, loading: false };
+    const set = {
+      ...buildDetailsReducer(buildInitialState({} as BuildDetailsViewModel), {
+        type: "setPipelineNodeLog",
+        log: logWithoutHtml
+      }),
+      pipelineNodeLogHtmlModel: { nodes: [], text: "two" }
+    };
+    assert.equal(
+      buildDetailsReducer(set, { type: "setPipelineNodeLog", log: logWithoutHtml })
+        .pipelineNodeLogHtmlModel,
+      undefined
+    );
+
+    const kept = buildDetailsReducer(set, {
+      type: "updateDetails",
+      payload: { ...set, type: "updateDetails", pipelineNodeLog: logWithoutHtml }
+    });
+    assert.equal(kept.pipelineNodeLogHtmlModel, set.pipelineNodeLogHtmlModel);
+
+    const cleared = buildDetailsReducer(set, {
+      type: "updateDetails",
+      payload: {
+        ...set,
+        type: "updateDetails",
+        pipelineNodeLog: { ...logWithoutHtml, target: { ...target, key: "stage-2" } }
+      }
+    });
+    assert.equal(cleared.pipelineNodeLogHtmlModel, undefined);
   });
 });
 

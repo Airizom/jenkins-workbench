@@ -3,7 +3,7 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsReplaySubmissionPayload } from "../../jenkins/types";
 import { buildActionUrl } from "../../jenkins/urls";
-import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
+import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { BuildTreeItem } from "../../tree/TreeItems";
 import { formatActionError, getTreeItemLabel } from "../CommandUtils";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
@@ -27,6 +27,8 @@ interface LocalReplayBuildTarget {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   label: string;
+  /** Job label for follow-up messages; derived from the build URL when absent. */
+  jobLabel?: string;
 }
 
 interface PreparedLocalReplay {
@@ -44,7 +46,7 @@ export class LocalJenkinsfileReplayWorkflow {
     >,
     private readonly sourceResolver: LocalReplaySourceResolver,
     private readonly jobPicker: LocalReplayJobPicker,
-    private readonly queuedBuildWaiter: Pick<QueuedBuildWaiter, "awaitQueuedBuildStart">
+    private readonly buildFollowUp: Pick<BuildFollowUpService, "prepare" | "announceAndFollow">
   ) {}
 
   async run(
@@ -120,25 +122,39 @@ export class LocalJenkinsfileReplayWorkflow {
       }
 
       const { target, payload } = prepared;
-      const result = await vscode.window.withProgress(
+      const { follow, result } = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: `Running local Jenkinsfile replay for ${target.label}...`,
           cancellable: false
         },
-        () => this.dataService.runReplay(target.environment, target.buildUrl, payload)
+        async () => {
+          // Read the next build number before submitting so the new build can be told apart.
+          const follow = await this.buildFollowUp.prepare({
+            kind: "cause",
+            environment: target.environment,
+            sourceBuildUrl: target.buildUrl,
+            cause: "replay",
+            jobLabel: target.jobLabel,
+            mayReturnQueueItem: true
+          });
+          const result = await this.dataService.runReplay(
+            target.environment,
+            target.buildUrl,
+            payload
+          );
+          return { follow, result };
+        }
       );
       const location = result.location ?? result.queueLocation ?? result.buildLocation;
-      void vscode.window.showInformationMessage(
-        location
+      this.buildFollowUp.announceAndFollow(follow, {
+        location,
+        requestedMessage: `Local Jenkinsfile replay requested for ${target.label}`,
+        plainMessage: location
           ? `Local Jenkinsfile replay started for ${target.label}. Location: ${location}`
-          : `Local Jenkinsfile replay started for ${target.label}.`
-      );
-      void this.waitForReplayAndRefresh(target, refreshHost, location).catch((error) => {
-        console.warn(
-          `Failed to refresh local Jenkinsfile replay state for ${target.label}.`,
-          error
-        );
+          : `Local Jenkinsfile replay started for ${target.label}.`,
+        refresh: () =>
+          refreshHost.fullEnvironmentRefresh({ environmentId: target.environment.environmentId })
       });
     } catch (error) {
       if (!preparationToken?.isCancellationRequested) {
@@ -160,7 +176,8 @@ export class LocalJenkinsfileReplayWorkflow {
         buildUrl: selection.buildUrl,
         label: selection.jobNameHint
           ? `${selection.jobNameHint} ${getTreeItemLabel(selection)}`
-          : getTreeItemLabel(selection)
+          : getTreeItemLabel(selection),
+        jobLabel: selection.jobNameHint
       };
     }
 
@@ -179,20 +196,9 @@ export class LocalJenkinsfileReplayWorkflow {
     return {
       environment: selection.environment,
       buildUrl: buildActionUrl(selection.jobUrl, `${completed.number}/`),
-      label: `${selection.label} #${completed.number}`
+      label: `${selection.label} #${completed.number}`,
+      jobLabel: selection.label
     };
-  }
-
-  private async waitForReplayAndRefresh(
-    target: LocalReplayBuildTarget,
-    refreshHost: BuildCommandRefreshHost,
-    location: string | undefined
-  ): Promise<void> {
-    try {
-      await this.queuedBuildWaiter.awaitQueuedBuildStart(target.environment, location);
-    } finally {
-      refreshHost.fullEnvironmentRefresh({ environmentId: target.environment.environmentId });
-    }
   }
 }
 

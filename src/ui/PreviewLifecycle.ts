@@ -5,50 +5,47 @@ export async function openResourcePreview(
   previewProvider: ArtifactPreviewProvider,
   uri: vscode.Uri
 ): Promise<void> {
-  await withPreviewLease(
-    previewProvider,
-    uri,
-    (release) => onPreviewTabsClosed(uri, release),
-    async (release) => {
-      await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
-      if (!isUriOpenInTabs(uri)) {
-        release();
-      }
-    }
-  );
+  await withPreviewLease(previewProvider, uri, async () => {
+    await vscode.commands.executeCommand("vscode.open", uri, { preview: true });
+  });
 }
 
 export async function openTextPreview(
   previewProvider: ArtifactPreviewProvider,
   uri: vscode.Uri,
-  options?: { languageId?: string }
+  options?: {
+    languageId?: string;
+    /** Open in VS Code's reusable preview tab (default) or a regular tab. */
+    preview?: boolean;
+    /** Called once when the preview lease ends: its last tab closed, it never opened in a tab, or opening failed. */
+    onReleased?: () => void;
+  }
 ): Promise<vscode.TextEditor> {
   return withPreviewLease(
     previewProvider,
     uri,
-    (release) => onPreviewTabsClosed(uri, release),
-    async (release) => {
-      const editor = await vscode.window.showTextDocument(uri, { preview: true });
+    async () => {
+      const editor = await vscode.window.showTextDocument(uri, {
+        preview: options?.preview ?? true
+      });
       if (options?.languageId && editor.document.languageId !== options.languageId) {
         await vscode.languages.setTextDocumentLanguage(editor.document, options.languageId);
       }
-      if (!isUriOpenInTabs(uri)) {
-        release();
-      }
       return editor;
-    }
+    },
+    options?.onReleased
   );
 }
 
 async function withPreviewLease<T>(
   previewProvider: ArtifactPreviewProvider,
   uri: vscode.Uri,
-  onClose: (release: () => void) => vscode.Disposable,
-  open: (release: () => void) => Promise<T>
+  open: () => Promise<T>,
+  onReleased?: () => void
 ): Promise<T> {
   previewProvider.markInUse(uri);
   let released = false;
-  const releaseOnClose = onClose(release);
+  const releaseOnClose = onPreviewTabsClosed(uri, release);
 
   function release(): void {
     if (released) {
@@ -57,10 +54,15 @@ async function withPreviewLease<T>(
     released = true;
     releaseOnClose.dispose();
     previewProvider.release(uri);
+    onReleased?.();
   }
 
   try {
-    return await open(release);
+    const result = await open();
+    if (!isUriOpenInTabs(uri)) {
+      release();
+    }
+    return result;
   } catch (error) {
     release();
     throw error;

@@ -17,7 +17,7 @@ import type {
   BuildDiagnosticContextResolver
 } from "./BuildDiagnosticContextResolver";
 import { BuildDiagnosticPathResolver } from "./BuildDiagnosticPathResolver";
-import { normalizeDiagnosticProfiles } from "./BuildDiagnosticProfiles";
+import { logDiagnosticProfileIssues, normalizeDiagnosticProfiles } from "./BuildDiagnosticProfiles";
 import {
   BuildDiagnosticScanSession,
   type BuildDiagnosticScanSnapshot
@@ -81,11 +81,11 @@ export class BuildDiagnosticScanRunner {
       };
     }
 
-    this.normalizedProfiles ??= normalizeDiagnosticProfiles(config.profiles);
-    const profiles = this.normalizedProfiles;
-    for (const issue of profiles.issues) {
-      this.log(`Profile ${issue.severity}: ${issue.path}: ${issue.message}`);
+    if (!this.normalizedProfiles) {
+      this.normalizedProfiles = normalizeDiagnosticProfiles(config.profiles);
+      logDiagnosticProfileIssues(this.normalizedProfiles, this.log);
     }
+    const profiles = this.normalizedProfiles;
     const context = this.contextResolver.resolve({
       environment: owner.environment,
       buildUrl: owner.buildUrl,

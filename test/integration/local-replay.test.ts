@@ -10,14 +10,33 @@ async function modules() {
   assert.ok(extension);
   const load = (relative: string) =>
     import(vscode.Uri.joinPath(extension.extensionUri, "out-test", "host", relative).fsPath);
-  const [resolver, matcher, workflow, client, waiter] = await Promise.all([
+  const [resolver, matcher, workflow, client, waiter, followUp] = await Promise.all([
     load("commands/build/LocalJenkinsfileResolver.js"),
     load("validation/JenkinsfileMatcher.js"),
     load("commands/build/LocalJenkinsfileReplayWorkflow.js"),
     load("jenkins/JenkinsClient.js"),
-    load("services/QueuedBuildWaiter.js")
+    load("services/QueuedBuildWaiter.js"),
+    load("services/buildFollow/BuildFollowUpService.js")
   ]);
-  return { ...resolver, ...matcher, ...workflow, ...client, ...waiter };
+  const createBuildFollowUp = (queuedBuildWaiter: {
+    awaitQueuedBuildStart: (environment: unknown, queueLocation?: string) => Promise<void>;
+  }) =>
+    new followUp.BuildFollowUpService({
+      dataService: {
+        getNextBuildNumber: async () => {
+          throw new Error("Not used while following is off");
+        }
+      },
+      locator: { locate: async () => ({ kind: "unknown" }) },
+      queuedBuildWaiter,
+      actions: {
+        showBuildDetails: async () => undefined,
+        previewLog: async () => undefined
+      },
+      completionTracker: { follow: () => true },
+      isEnabled: () => false
+    });
+  return { ...resolver, ...matcher, ...workflow, ...client, ...waiter, createBuildFollowUp };
 }
 
 async function until(check: () => Promise<boolean> | boolean, message: string) {
@@ -81,8 +100,12 @@ async function withJenkinsfile(
 describe("local Jenkinsfile replay", () => {
   it("submits real dirty editor text through tree and editor flows without saving or touching drafts", async function () {
     this.timeout(30_000);
-    const { LocalJenkinsfileResolver, JenkinsfileMatcher, LocalJenkinsfileReplayWorkflow } =
-      await modules();
+    const {
+      LocalJenkinsfileResolver,
+      JenkinsfileMatcher,
+      LocalJenkinsfileReplayWorkflow,
+      createBuildFollowUp
+    } = await modules();
     await withJenkinsfile(async (document, other, diskText) => {
       const matcher = new JenkinsfileMatcher(["**/Jenkinsfile"], ["file"]);
       const resolver = new LocalJenkinsfileResolver(matcher);
@@ -133,7 +156,7 @@ describe("local Jenkinsfile replay", () => {
             return cancelled ? undefined : { environment, jobUrl, label: "example" };
           }
         },
-        { awaitQueuedBuildStart: async () => undefined }
+        createBuildFollowUp({ awaitQueuedBuildStart: async () => undefined })
       );
       const refreshHost = {
         fullEnvironmentRefresh: ({ environmentId }: { environmentId: string }) => {
@@ -179,7 +202,8 @@ describe("local Jenkinsfile replay", () => {
         JenkinsfileMatcher,
         LocalJenkinsfileReplayWorkflow,
         JenkinsClient,
-        QueuedBuildWaiter
+        QueuedBuildWaiter,
+        createBuildFollowUp
       } = await modules();
       const url = process.env.JENKINS_REPLAY_URL ?? "http://127.0.0.1:8080/";
       assert.ok(
@@ -226,7 +250,8 @@ describe("local Jenkinsfile replay", () => {
           dataService,
           new LocalJenkinsfileResolver(matcher),
           { pick: async () => ({ environment, jobUrl, label: "Live replay" }) },
-          new QueuedBuildWaiter(dataService)
+          // Following is off: the workflow waits on the queue item and refreshes, as before.
+          createBuildFollowUp(new QueuedBuildWaiter(dataService))
         );
         try {
           await workflow.run(

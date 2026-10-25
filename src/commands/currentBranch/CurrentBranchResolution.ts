@@ -49,18 +49,6 @@ export async function resolveCurrentBranchSelection(
   return state ? { state } : undefined;
 }
 
-export async function withResolvedCurrentBranchState(
-  workflowService: CurrentBranchWorkflowService,
-  action: (state: CurrentBranchState) => Promise<void>
-): Promise<void> {
-  const state = await resolveCurrentBranchState(workflowService);
-  if (!state) {
-    return;
-  }
-
-  await action(state);
-}
-
 export function unwrapResolvedState(
   result: CurrentBranchResolutionResult
 ): CurrentBranchState | undefined {

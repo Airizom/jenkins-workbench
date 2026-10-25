@@ -54,16 +54,14 @@ const ACTIVITY_CONFIG_KEYS = [
   CONFIG_KEYS.activityRefreshIntervalSeconds
 ] as const;
 
-type ConfigReactionKey = ConfigKey;
-
 interface ConfigReaction {
-  keys: readonly ConfigReactionKey[];
-  run: (config: vscode.WorkspaceConfiguration, changedKeys: ReadonlySet<ConfigReactionKey>) => void;
+  keys: readonly ConfigKey[];
+  run: (config: vscode.WorkspaceConfiguration, changedKeys: ReadonlySet<ConfigKey>) => void;
 }
 
 interface ConfigReactionMatch {
   reaction: ConfigReaction;
-  changedKeys: ReadonlySet<ConfigReactionKey>;
+  changedKeys: ReadonlySet<ConfigKey>;
 }
 
 function resolveConfigReactionMatches(
@@ -72,7 +70,7 @@ function resolveConfigReactionMatches(
 ): ConfigReactionMatch[] {
   const matches: ConfigReactionMatch[] = [];
   for (const reaction of reactions) {
-    const changedKeys = new Set<ConfigReactionKey>();
+    const changedKeys = new Set<ConfigKey>();
     for (const key of reaction.keys) {
       if (event.affectsConfiguration(buildConfigKey(key))) {
         changedKeys.add(key);
@@ -234,7 +232,7 @@ export function registerExtensionSubscriptions(
 
   const collapseSubscription = treeView.onDidCollapseElement((event) => {
     if (event.element instanceof ActivityFolderTreeItem) {
-      activityRefreshService.handleActivityFolderCollapsed(event.element.environment);
+      activityRefreshService.handleEnvironmentCollapsed(event.element.environment);
       return;
     }
     if (event.element instanceof BuildQueueFolderTreeItem) {

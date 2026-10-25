@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import { rebaseEnvironmentUrl } from "../jenkins/urls";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
+import { getScopedMemento } from "./StorageScope";
 
 export interface ScopedJobStoreEntry {
   environmentId: string;
@@ -32,10 +33,8 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
   protected async listWithScope<TPublic extends TEntry & { scope: EnvironmentScope }>(
     toScoped: (scope: EnvironmentScope, entry: TEntry) => TPublic
   ): Promise<TPublic[]> {
-    const [workspace, global] = await Promise.all([
-      this.readEntries("workspace"),
-      this.readEntries("global")
-    ]);
+    const workspace = this.readEntries("workspace");
+    const global = this.readEntries("global");
     return [
       ...workspace.map((entry) => toScoped("workspace", entry)),
       ...global.map((entry) => toScoped("global", entry))
@@ -43,7 +42,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
   }
 
   protected async getJobUrls(scope: EnvironmentScope, environmentId: string): Promise<Set<string>> {
-    const entries = await this.readEntries(scope);
+    const entries = this.readEntries(scope);
     return new Set(
       entries.filter((entry) => entry.environmentId === environmentId).map((entry) => entry.jobUrl)
     );
@@ -54,7 +53,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     environmentId: string,
     jobUrl: string
   ): Promise<boolean> {
-    const entries = await this.readEntries(scope);
+    const entries = this.readEntries(scope);
     return entries.some((entry) => this.isSameJob(entry, { environmentId, jobUrl }));
   }
 
@@ -64,7 +63,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     merge: (existing: TEntry, incoming: TEntry) => TEntry
   ): Promise<void> {
     return this.mutationQueue(async () => {
-      const entries = await this.readEntries(scope);
+      const entries = this.readEntries(scope);
       const index = entries.findIndex((item) => this.isSameJob(item, entry));
 
       if (index >= 0) {
@@ -85,7 +84,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     update: (entry: TEntry) => TEntry | undefined
   ): Promise<boolean> {
     return this.mutationQueue(async () => {
-      const entries = await this.readEntries(scope);
+      const entries = this.readEntries(scope);
       let changed = false;
       const next: TEntry[] = [];
 
@@ -162,9 +161,56 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     newJobName: string | undefined,
     merge: (existing: TEntry, incoming: TEntry) => TEntry
   ): Promise<boolean> {
-    return this.mutationQueue(() =>
-      this.updateUrlUnlocked(scope, environmentId, oldJobUrl, newJobUrl, newJobName, merge)
-    );
+    return this.mutationQueue(async () => {
+      const entries = this.readEntries(scope);
+      const sourceEntries = entries.filter((entry) =>
+        this.isSameJob(entry, { environmentId, jobUrl: oldJobUrl })
+      );
+
+      if (sourceEntries.length === 0) {
+        return false;
+      }
+
+      const incomingEntries = sourceEntries.map((entry) => ({
+        ...entry,
+        jobUrl: newJobUrl,
+        jobName: newJobName ?? entry.jobName
+      }));
+      const targetEntry =
+        oldJobUrl === newJobUrl
+          ? undefined
+          : entries.find((entry) => this.isSameJob(entry, { environmentId, jobUrl: newJobUrl }));
+      const mergedEntry = incomingEntries.reduce(
+        (merged, incoming) => merge(merged, incoming),
+        targetEntry ?? incomingEntries[0]
+      );
+      const shouldWriteAtTarget = Boolean(targetEntry);
+      let wroteMergedEntry = false;
+      const next: TEntry[] = [];
+
+      for (const entry of entries) {
+        if (this.isSameJob(entry, { environmentId, jobUrl: oldJobUrl })) {
+          if (!shouldWriteAtTarget && !wroteMergedEntry) {
+            next.push(mergedEntry);
+            wroteMergedEntry = true;
+          }
+          continue;
+        }
+
+        if (this.isSameJob(entry, { environmentId, jobUrl: newJobUrl })) {
+          if (shouldWriteAtTarget && !wroteMergedEntry) {
+            next.push(mergedEntry);
+            wroteMergedEntry = true;
+          }
+          continue;
+        }
+
+        next.push(entry);
+      }
+
+      await this.writeEntries(scope, next);
+      return true;
+    });
   }
 
   /**
@@ -179,7 +225,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     merge: (existing: TEntry, incoming: TEntry) => TEntry
   ): Promise<number> {
     return this.mutationQueue(async () => {
-      const entries = await this.readEntries(scope);
+      const entries = this.readEntries(scope);
       const movedIndexes = new Set<number>();
       const rebased = entries.map((entry, index) => {
         const jobUrl =
@@ -228,64 +274,6 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     });
   }
 
-  private async updateUrlUnlocked(
-    scope: EnvironmentScope,
-    environmentId: string,
-    oldJobUrl: string,
-    newJobUrl: string,
-    newJobName: string | undefined,
-    merge: (existing: TEntry, incoming: TEntry) => TEntry
-  ): Promise<boolean> {
-    const entries = await this.readEntries(scope);
-    const sourceEntries = entries.filter((entry) =>
-      this.isSameJob(entry, { environmentId, jobUrl: oldJobUrl })
-    );
-
-    if (sourceEntries.length === 0) {
-      return false;
-    }
-
-    const incomingEntries = sourceEntries.map((entry) => ({
-      ...entry,
-      jobUrl: newJobUrl,
-      jobName: newJobName ?? entry.jobName
-    }));
-    const targetEntry =
-      oldJobUrl === newJobUrl
-        ? undefined
-        : entries.find((entry) => this.isSameJob(entry, { environmentId, jobUrl: newJobUrl }));
-    const mergedEntry = incomingEntries.reduce(
-      (merged, incoming) => merge(merged, incoming),
-      targetEntry ?? incomingEntries[0]
-    );
-    const shouldWriteAtTarget = Boolean(targetEntry);
-    let wroteMergedEntry = false;
-    const next: TEntry[] = [];
-
-    for (const entry of entries) {
-      if (this.isSameJob(entry, { environmentId, jobUrl: oldJobUrl })) {
-        if (!shouldWriteAtTarget && !wroteMergedEntry) {
-          next.push(mergedEntry);
-          wroteMergedEntry = true;
-        }
-        continue;
-      }
-
-      if (this.isSameJob(entry, { environmentId, jobUrl: newJobUrl })) {
-        if (shouldWriteAtTarget && !wroteMergedEntry) {
-          next.push(mergedEntry);
-          wroteMergedEntry = true;
-        }
-        continue;
-      }
-
-      next.push(entry);
-    }
-
-    await this.writeEntries(scope, next);
-    return true;
-  }
-
   protected isSameJob(entry: TEntry, other: { environmentId: string; jobUrl: string }): boolean {
     return entry.environmentId === other.environmentId && entry.jobUrl === other.jobUrl;
   }
@@ -294,7 +282,7 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     scope: EnvironmentScope,
     shouldRemove: (entry: TEntry) => boolean
   ): Promise<number> {
-    const entries = await this.readEntries(scope);
+    const entries = this.readEntries(scope);
     const next = entries.filter((entry) => !shouldRemove(entry));
     const removed = entries.length - next.length;
     if (removed > 0) {
@@ -303,19 +291,15 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     return removed;
   }
 
-  private readEntries(scope: EnvironmentScope): Promise<TEntry[]> {
-    const memento = this.getMemento(scope);
+  private readEntries(scope: EnvironmentScope): TEntry[] {
+    const memento = getScopedMemento(this.context, scope);
     const stored = memento.get<TEntry[]>(this.storageKey);
     // Copy so mutations never touch the memento's cached instance before update resolves.
-    return Promise.resolve(Array.isArray(stored) ? [...stored] : []);
+    return Array.isArray(stored) ? [...stored] : [];
   }
 
   private async writeEntries(scope: EnvironmentScope, entries: TEntry[]): Promise<void> {
-    const memento = this.getMemento(scope);
+    const memento = getScopedMemento(this.context, scope);
     await memento.update(this.storageKey, entries);
-  }
-
-  private getMemento(scope: EnvironmentScope): vscode.Memento {
-    return scope === "workspace" ? this.context.workspaceState : this.context.globalState;
   }
 }

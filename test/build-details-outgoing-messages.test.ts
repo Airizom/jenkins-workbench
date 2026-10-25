@@ -121,6 +121,16 @@ describe("Build Details outgoing messages", () => {
     }
   });
 
+  it.each([undefined, null, "log", 5])(
+    "rejects updateDetails with a non-object pipeline node log (%j)",
+    (pipelineNodeLog) => {
+      assert.equal(
+        parseBuildDetailsOutgoingMessage({ ...validUpdate, pipelineNodeLog }),
+        undefined
+      );
+    }
+  );
+
   it("normalizes the updateDetails pipeline node log", () => {
     const parsed = parseBuildDetailsOutgoingMessage({
       ...validUpdate,

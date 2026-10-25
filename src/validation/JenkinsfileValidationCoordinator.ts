@@ -254,7 +254,6 @@ export class JenkinsfileValidationCoordinator
       return { status: "skipped" };
     }
 
-    const version = document.version;
     const outcome = await this.runner.run(document, options, {
       onValidationStart: () => {
         this.statusBar.setValidating(document);
@@ -266,10 +265,6 @@ export class JenkinsfileValidationCoordinator
         this.restoreStatusBar(document);
       }
     });
-
-    if (document.version !== version) {
-      return { status: "skipped", reason: "changed" };
-    }
 
     if (outcome.status === "skipped" && outcome.reason === "cached") {
       this.setResultStaleState(document, false);
@@ -297,9 +292,6 @@ export class JenkinsfileValidationCoordinator
     }
 
     const diagnostics = buildValidationDiagnostics(document, outcome.findings);
-    if (document.isClosed) {
-      return { status: "skipped", reason: "closed" };
-    }
     if (diagnostics.length === 0) {
       this.diagnostics.delete(document.uri);
     } else {

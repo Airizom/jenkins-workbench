@@ -103,6 +103,11 @@ export function getQueuePollIntervalSeconds(config: vscode.WorkspaceConfiguratio
   return Math.max(definitions.MIN_QUEUE_POLL_INTERVAL_SECONDS, pollIntervalSeconds);
 }
 
+export function getFollowTriggeredBuilds(config: vscode.WorkspaceConfiguration): boolean {
+  const value = config.get<unknown>(definitions.CONFIG_KEYS.followTriggeredBuilds);
+  return typeof value === "boolean" ? value : definitions.DEFAULT_FOLLOW_TRIGGERED_BUILDS;
+}
+
 export function getJenkinsTaskRunnerOptions(
   config: vscode.WorkspaceConfiguration = getExtensionConfiguration()
 ): {
@@ -213,11 +218,12 @@ export function getArtifactActionOptions(config: vscode.WorkspaceConfiguration):
 export function getArtifactMaxDownloadBytes(
   config: vscode.WorkspaceConfiguration
 ): number | undefined {
-  const value = config.get<number>(
+  const value = getFiniteNumberConfigValue(
+    config,
     "artifactMaxDownloadMb",
     definitions.DEFAULT_ARTIFACT_MAX_DOWNLOAD_MB
   );
-  if (!Number.isFinite(value) || value <= 0) {
+  if (value <= 0) {
     return undefined;
   }
   return Math.floor(value * 1024 * 1024);

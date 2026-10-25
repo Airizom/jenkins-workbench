@@ -1,4 +1,5 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { buildTreeEnvironmentKey } from "../TreeEnvironmentKeys";
 
 export type TreeChildrenKeyBuilder = (
   kind: string,
@@ -7,7 +8,7 @@ export type TreeChildrenKeyBuilder = (
 ) => string;
 
 export function buildScopedEnvironmentKey(environment: JenkinsEnvironmentRef): string {
-  return `${environment.scope}:${environment.environmentId}`;
+  return buildTreeEnvironmentKey(environment.scope, environment.environmentId);
 }
 
 export function isEnvironmentScopedChildKey(key: string, environmentId: string): boolean {

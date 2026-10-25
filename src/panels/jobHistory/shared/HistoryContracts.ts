@@ -21,6 +21,11 @@ export const HISTORY_STATUSES = [
 export type HistoryStatus = (typeof HISTORY_STATUSES)[number];
 /** Why history is `paused`: the panel was hidden mid-load, or the anchor build is still running. */
 export type HistoryPausedReason = "hidden" | "building";
+export const HISTORY_WINDOW_SIZES = [10, 20, 50] as const;
+export type HistoryWindowSize = (typeof HISTORY_WINDOW_SIZES)[number];
+export function isHistoryWindowSize(value: unknown): value is HistoryWindowSize {
+  return (HISTORY_WINDOW_SIZES as readonly unknown[]).includes(value);
+}
 
 export interface HistoryViewModel {
   type: "historyUpdate";
@@ -30,7 +35,7 @@ export interface HistoryViewModel {
   jobUrl: string;
   /** Environment URL whose path is the Jenkins context path, used to name jobs. */
   environmentUrl?: string;
-  count: 10 | 20 | 50;
+  count: HistoryWindowSize;
   builds: Array<{
     build: HistoryBuild["build"];
     report: { status: HistoryBuild["report"]["status"]; message?: string; truncated?: boolean };
@@ -46,10 +51,19 @@ export interface HistoryViewModel {
 }
 export const HISTORY_SORTS = ["relevance", "failureRate", "transitions", "name"] as const;
 export type HistorySort = (typeof HISTORY_SORTS)[number];
+export const HISTORY_FILTERS = [
+  "all",
+  "intermittent",
+  "failed",
+  "new",
+  "continuing",
+  "baseline"
+] as const;
+export type HistoryFilter = (typeof HISTORY_FILTERS)[number];
 export interface HistoryUiState {
-  count: 10 | 20 | 50;
+  count: HistoryWindowSize;
   search: string;
-  filter: "all" | "intermittent" | "failed" | "new" | "continuing" | "baseline";
+  filter: HistoryFilter;
   sort: HistorySort;
   /** Whether the embedded "Failure history" disclosure is expanded. */
   open: boolean;
@@ -59,16 +73,11 @@ export interface HistoryUiState {
 export function normalizeHistoryUi(value: unknown): HistoryUiState {
   const state = isPlainRecord(value) ? value : {};
   return {
-    count: state.count === 10 || state.count === 50 ? state.count : 20,
+    count: isHistoryWindowSize(state.count) ? state.count : 20,
     search: typeof state.search === "string" ? state.search.slice(0, 1000) : "",
-    filter:
-      state.filter === "intermittent" ||
-      state.filter === "failed" ||
-      state.filter === "new" ||
-      state.filter === "continuing" ||
-      state.filter === "baseline"
-        ? state.filter
-        : "all",
+    filter: (HISTORY_FILTERS as readonly unknown[]).includes(state.filter)
+      ? (state.filter as HistoryFilter)
+      : "all",
     sort: (HISTORY_SORTS as readonly unknown[]).includes(state.sort)
       ? (state.sort as HistorySort)
       : "relevance",

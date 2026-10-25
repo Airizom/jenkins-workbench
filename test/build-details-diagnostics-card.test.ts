@@ -75,7 +75,7 @@ describe("Build Details diagnostics card", () => {
     assert.match(html, /Configure diagnostics…/);
   });
 
-  it("says how many diagnostics the card does not list and links to Problems", () => {
+  it("says how many diagnostics the card does not list and offers one Show problems action", () => {
     const item = { severity: "error" as const, message: "Boom", targetId: "t" };
     const html = renderCard({
       ...EMPTY_BUILD_DIAGNOSTICS,
@@ -87,7 +87,7 @@ describe("Build Details diagnostics card", () => {
     });
 
     assert.match(html, /\+3 more not shown here/);
-    assert.equal(html.match(/>Show problems</g)?.length, 2);
+    assert.equal(html.match(/>Show problems</g)?.length, 1);
     assert.equal(countHiddenDiagnostics({ ...EMPTY_BUILD_DIAGNOSTICS, errorCount: 2 }, 2), 0);
   });
 

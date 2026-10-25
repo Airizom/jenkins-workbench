@@ -67,11 +67,7 @@ export function buildStageStripSegments(
     let statusClass = stage.statusClass;
     let statusLabel = stage.statusLabel;
     if (statusClass === "success" || statusClass === "neutral") {
-      const worst = worstBranchStatus(stage);
-      if (severityOf(worst.statusClass) < severityOf(statusClass)) {
-        statusClass = worst.statusClass;
-        statusLabel = worst.statusLabel;
-      }
+      ({ statusClass, statusLabel } = worstBranchStatus(stage));
     }
     const paused = awaitingInput && statusClass === "running";
     return {

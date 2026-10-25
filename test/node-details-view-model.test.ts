@@ -155,6 +155,44 @@ describe("NodeDetailsViewModel", () => {
     assert.equal(viewModel.oneOffExecutors[0]?.workDurationLabel, "Est. 1m 30s");
   });
 
+  it("uses the base executor work label and url, adding only the result suffix", () => {
+    const viewModel = buildNodeDetailsViewModel({
+      details: {
+        displayName: "agent-one",
+        offline: false,
+        temporarilyOffline: false,
+        executors: [
+          {
+            number: 0,
+            currentExecutable: {
+              fullDisplayName: "folder/job #42",
+              result: " FAILURE ",
+              url: "  https://jenkins.example/job/folder/job/job/42/  "
+            }
+          },
+          {
+            number: 1,
+            currentWorkUnit: {
+              url: " https://jenkins.example/job/unit/ ",
+              result: "SUCCESS"
+            }
+          },
+          { number: 2, idle: true }
+        ]
+      },
+      errors: [],
+      updatedAt: "2026-05-30T18:00:00.000Z"
+    });
+
+    const [executable, workUnit, idle] = viewModel.executors;
+    assert.equal(executable?.workLabel, "folder/job #42 (FAILURE)");
+    assert.equal(executable?.workUrl, "https://jenkins.example/job/folder/job/job/42/");
+    assert.equal(workUnit?.workLabel, "https://jenkins.example/job/unit/ (SUCCESS)");
+    assert.equal(workUnit?.workUrl, "https://jenkins.example/job/unit/");
+    assert.equal(idle?.workLabel, undefined);
+    assert.equal(idle?.workUrl, undefined);
+  });
+
   it("summarizes monitor values and serializes node details as indented JSON", () => {
     const details: JenkinsNodeDetails = {
       displayName: "Built-in Node",

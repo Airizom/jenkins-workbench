@@ -12,7 +12,8 @@ describe("BuildDetailsPollingCallbacks", () => {
       setTitle: () => undefined,
       publishErrors: () => undefined,
       isTokenCurrent: (token) => token === 4,
-      showCompletionToast: () => undefined,
+      handleBuildCompleted: () => undefined,
+      postStateUpdate: () => undefined,
       onConsoleHtmlChanged
     });
 
@@ -38,5 +39,52 @@ describe("BuildDetailsPollingCallbacks", () => {
       ],
       [{ start: 12, end: 20 }]
     ]);
+  });
+
+  it("forwards completion to handleBuildCompleted only for the current token", () => {
+    const handleBuildCompleted = vi.fn();
+    let currentToken = 7;
+    const callbacks = createBuildDetailsPollingCallbacks(new BuildDetailsPanelState(), 7, {
+      postMessage: () => undefined,
+      setTitle: () => undefined,
+      publishErrors: () => undefined,
+      isTokenCurrent: (token) => token === currentToken,
+      handleBuildCompleted,
+      postStateUpdate: () => undefined
+    });
+    const details = { number: 1, building: false } as Parameters<typeof callbacks.onComplete>[0];
+
+    callbacks.onComplete(details);
+    currentToken = 8;
+    callbacks.onComplete(details);
+
+    assert.deepEqual(handleBuildCompleted.mock.calls, [[details, 7]]);
+  });
+
+  it("routes state changes through postStateUpdate instead of building messages itself", () => {
+    const messages: unknown[] = [];
+    const postStateUpdate = vi.fn();
+    const state = new BuildDetailsPanelState();
+    let currentToken = 3;
+    const callbacks = createBuildDetailsPollingCallbacks(state, 3, {
+      postMessage: (message) => messages.push(message),
+      setTitle: () => undefined,
+      publishErrors: () => undefined,
+      isTokenCurrent: (token) => token === currentToken,
+      handleBuildCompleted: () => undefined,
+      postStateUpdate
+    });
+    const details = { number: 1, building: true } as Parameters<typeof callbacks.onDetails>[0];
+
+    callbacks.onDetails(details);
+    callbacks.onWorkflowRun(undefined);
+    callbacks.onWorkflowError(new Error("boom"));
+    callbacks.onPendingInputs([]);
+    currentToken = 4;
+    callbacks.onDetails(details);
+
+    assert.equal(postStateUpdate.mock.calls.length, 4);
+    assert.deepEqual(messages, []);
+    assert.equal(state.currentDetails, details);
   });
 });

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DraftEditorService, disposeDraftResources } from "./DraftEditorService";
+import { DraftEditorService } from "./DraftEditorService";
 
 /** The slice of an in-memory draft filesystem that a draft manager needs. */
 export interface DraftDocumentFilesystem {
@@ -21,7 +21,6 @@ export class DraftDocumentManager<TDraft extends { label: string }> implements v
   private readonly drafts = new Map<string, TDraft>();
   private readonly manualSaveQueue = new Set<string>();
   private readonly subscriptions: vscode.Disposable[] = [];
-  private readonly pendingCloses = new Set<vscode.Disposable>();
   private readonly submitEmitter = new vscode.EventEmitter<vscode.Uri>();
   readonly onDidRequestSubmit = this.submitEmitter.event;
 
@@ -36,37 +35,34 @@ export class DraftDocumentManager<TDraft extends { label: string }> implements v
           return;
         }
         if (event.reason === vscode.TextDocumentSaveReason.Manual) {
-          this.manualSaveQueue.add(event.document.uri.toString());
+          this.manualSaveQueue.add(getUriKey(event.document.uri));
         } else {
-          this.manualSaveQueue.delete(event.document.uri.toString());
+          this.manualSaveQueue.delete(getUriKey(event.document.uri));
         }
       }),
       vscode.workspace.onDidSaveTextDocument((document) => {
         if (!this.isDraftDocument(document)) {
           return;
         }
-        const key = document.uri.toString();
+        const key = getUriKey(document.uri);
         const shouldSubmit = this.manualSaveQueue.delete(key);
         if (shouldSubmit) {
           this.submitEmitter.fire(document.uri);
         }
       }),
-      vscode.workspace.onDidCloseTextDocument((document) => {
-        if (!this.isDraftDocument(document)) {
-          return;
-        }
-        const pending = this.editorService.whenDocumentStaysClosed(document.uri, () => {
-          this.pendingCloses.delete(pending);
-          this.discardDraft(document.uri);
-        });
-        this.pendingCloses.add(pending);
-      }),
+      this.editorService.onDraftClosed(
+        (document) => this.isDraftDocument(document),
+        (uri) => this.discardDraft(uri)
+      ),
       this.submitEmitter
     );
   }
 
   dispose(): void {
-    disposeDraftResources(this.subscriptions, this.pendingCloses);
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
+    this.subscriptions.length = 0;
     this.drafts.clear();
     this.manualSaveQueue.clear();
   }

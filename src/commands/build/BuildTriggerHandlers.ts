@@ -4,7 +4,7 @@ import type {
   JenkinsDataService,
   JobParameter
 } from "../../jenkins/JenkinsDataService";
-import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
+import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import { promptForBuildParameters } from "../../ui/BuildParameterPrompts";
@@ -31,7 +31,7 @@ export interface TriggerBuildForTargetOptions {
 export async function triggerBuild(
   dataService: JenkinsDataService,
   presetStore: JenkinsParameterPresetStore,
-  queuedBuildWaiter: QueuedBuildWaiter,
+  buildFollowUp: BuildFollowUpService,
   refreshHost: BuildCommandRefreshHost,
   item?: JobTreeItem | PipelineTreeItem
 ): Promise<void> {
@@ -40,7 +40,7 @@ export async function triggerBuild(
     return;
   }
 
-  await triggerBuildForTarget(dataService, presetStore, queuedBuildWaiter, refreshHost, {
+  await triggerBuildForTarget(dataService, presetStore, buildFollowUp, refreshHost, {
     environment: selected.environment,
     jobUrl: selected.jobUrl,
     label: getTreeItemLabel(selected)
@@ -50,7 +50,7 @@ export async function triggerBuild(
 export async function triggerBuildForTarget(
   dataService: JenkinsDataService,
   presetStore: JenkinsParameterPresetStore,
-  queuedBuildWaiter: QueuedBuildWaiter,
+  buildFollowUp: BuildFollowUpService,
   refreshHost: BuildCommandRefreshHost,
   target: JenkinsJobTarget,
   options?: TriggerBuildForTargetOptions
@@ -64,6 +64,12 @@ export async function triggerBuildForTarget(
     return;
   }
 
+  const prepared = await buildFollowUp.prepare({
+    kind: "queue",
+    environment: target.environment,
+    jobUrl: target.jobUrl,
+    label: target.label
+  });
   await withActionErrorMessage(`Failed to trigger build for ${target.label}`, async () => {
     const result = triggerOptions.useParameters
       ? await dataService.triggerBuildWithParameters(
@@ -75,35 +81,16 @@ export async function triggerBuildForTarget(
           }
         )
       : await dataService.triggerBuild(target.environment, target.jobUrl);
-    const message = result.queueLocation
-      ? `Triggered build for ${target.label}. Queued at ${result.queueLocation}`
-      : `Triggered build for ${target.label}.`;
-    void vscode.window.showInformationMessage(message);
-    void waitForQueuedBuildAndRefresh(
-      queuedBuildWaiter,
-      refreshHost,
-      target,
-      result.queueLocation,
-      options?.onQueuedBuildWaitSettled
-    ).catch((error) => {
-      console.warn(`Failed to refresh queued build state for ${target.label}.`, error);
+    buildFollowUp.announceAndFollow(prepared, {
+      location: result.queueLocation,
+      requestedMessage: `Triggered build for ${target.label}`,
+      plainMessage: result.queueLocation
+        ? `Triggered build for ${target.label}. Queued at ${result.queueLocation}`
+        : undefined,
+      refresh: () => refreshEnvironment(refreshHost, target.environment.environmentId),
+      onSettled: options?.onQueuedBuildWaitSettled
     });
   });
-}
-
-async function waitForQueuedBuildAndRefresh(
-  queuedBuildWaiter: QueuedBuildWaiter,
-  refreshHost: BuildCommandRefreshHost,
-  target: JenkinsJobTarget,
-  queueLocation: string | undefined,
-  onQueuedBuildWaitSettled?: () => Promise<unknown> | undefined
-): Promise<void> {
-  try {
-    await queuedBuildWaiter.awaitQueuedBuildStart(target.environment, queueLocation);
-  } finally {
-    refreshEnvironment(refreshHost, target.environment.environmentId);
-    await onQueuedBuildWaitSettled?.();
-  }
 }
 
 async function resolveBuildTriggerOptionsForTarget(

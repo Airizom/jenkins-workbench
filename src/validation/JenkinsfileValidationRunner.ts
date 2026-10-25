@@ -120,10 +120,6 @@ export class JenkinsfileValidationRunner {
       this.logger.logValidation(document, environment, output, options.reason);
 
       const findings = parseDeclarativeValidationOutput(output);
-      if (document.isClosed) {
-        return { status: "skipped", reason: "closed" };
-      }
-
       return {
         status: "completed",
         kind: "result",

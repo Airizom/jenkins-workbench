@@ -1,9 +1,10 @@
 import * as React from "react";
+import { formatUpdatedAtLabel } from "../../../formatters/RelativeTimeFormatters";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
 import { PanelHeader } from "../../shared/webview/components/PanelHeader";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
+import { PanelLoadingBar } from "../../shared/webview/components/PanelLoadingBar";
 import { Button } from "../../shared/webview/components/ui/button";
-import { Progress } from "../../shared/webview/components/ui/progress";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { TooltipProvider } from "../../shared/webview/components/ui/tooltip";
 import { useOpenExternalMessage } from "../../shared/webview/hooks/useOpenExternalMessage";
@@ -20,11 +21,7 @@ import { NodeDetailsAlerts } from "./components/nodeDetails/NodeDetailsAlerts";
 import type { NodeAction } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsHero } from "./components/nodeDetails/NodeDetailsHero";
 import { NodeDetailsTabs } from "./components/nodeDetails/NodeDetailsTabs";
-import {
-  formatUpdatedAtLabel,
-  isStaleUpdatedAt,
-  parseDate
-} from "./components/nodeDetails/nodeDetailsUtils";
+import { isStaleUpdatedAt, parseDate } from "./components/nodeDetails/nodeDetailsUtils";
 import { useNodeDetailsMessages } from "./hooks/useNodeDetailsMessages";
 import { loadAdvancedNodeDetailsForTab, type NodeDetailsTab } from "./nodeDetailsTabValues";
 import {
@@ -140,11 +137,7 @@ export function NodeDetailsApp(): React.JSX.Element {
   return (
     <TooltipProvider>
       <div className="min-h-screen flex flex-col bg-background text-foreground">
-        {state.loading ? (
-          <div className="fixed inset-x-0 top-0 z-50">
-            <Progress indeterminate className="h-px rounded-none" />
-          </div>
-        ) : null}
+        <PanelLoadingBar loading={state.loading} />
         <NodeDetailsHero
           environmentLabel={state.environmentLabel}
           displayName={state.displayName}
@@ -231,11 +224,7 @@ function NodeDetailsUnavailable({
 }): React.JSX.Element {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {state.loading ? (
-        <div className="fixed inset-x-0 top-0 z-50">
-          <Progress indeterminate className="h-px rounded-none" />
-        </div>
-      ) : null}
+      <PanelLoadingBar loading={state.loading} />
       <PanelHeader
         eyebrowIcon={<ServerIcon className="h-3.5 w-3.5" />}
         eyebrow={state.environmentLabel}

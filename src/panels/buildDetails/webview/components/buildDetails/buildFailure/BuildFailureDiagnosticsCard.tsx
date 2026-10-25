@@ -62,21 +62,8 @@ export function BuildFailureDiagnosticsCard({
       )}
 
       {hiddenCount > 0 ? (
-        <p className="m-0 flex flex-wrap items-center gap-x-1.5 text-caption text-muted-foreground">
-          <span>+{hiddenCount.toLocaleString()} more not shown here</span>
-          {showProblemsDisabled ? null : (
-            <>
-              <span aria-hidden="true">·</span>
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto p-0 text-caption"
-                onClick={onShowProblems}
-              >
-                Show problems
-              </Button>
-            </>
-          )}
+        <p className="m-0 text-caption text-muted-foreground">
+          +{hiddenCount.toLocaleString()} more not shown here
         </p>
       ) : null}
 

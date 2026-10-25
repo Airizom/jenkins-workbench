@@ -21,11 +21,9 @@ export type EnvironmentScopedRefreshHost = {
   fullEnvironmentRefresh(request: { environmentId: string }): RefreshExecutionResult;
 };
 
-export type HostInvalidateBuildArtifactsRequest = InvalidateBuildArtifactsRequest;
-
 export interface ExtensionRefreshHost extends FullEnvironmentRefreshHost {
   refreshQueueOnly(environment: JenkinsEnvironmentRef): void;
-  invalidateBuildArtifacts(request: HostInvalidateBuildArtifactsRequest): void;
+  invalidateBuildArtifacts(request: InvalidateBuildArtifactsRequest): void;
   refreshViewOnly(request?: RefreshViewOnlyRequest): void;
   onEnvironmentRemoved?(environment: JenkinsEnvironmentRef): void;
   onDidRefreshEnvironment?: vscode.Event<string | undefined>;

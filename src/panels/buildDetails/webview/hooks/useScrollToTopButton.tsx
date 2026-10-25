@@ -36,15 +36,12 @@ export function useScrollToTopButton(): ScrollToTopButtonState {
   useEffect(() => {
     updateVisibility();
 
-    const handleScroll = () => updateVisibility();
-    const handleResize = () => updateVisibility();
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", updateVisibility, { passive: true });
+    window.addEventListener("resize", updateVisibility);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", updateVisibility);
+      window.removeEventListener("resize", updateVisibility);
     };
   }, [updateVisibility]);
 

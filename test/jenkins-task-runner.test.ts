@@ -3,18 +3,24 @@ import { describe, it } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import { JenkinsTaskBuildFollower } from "../src/tasks/JenkinsTaskBuildFollower";
 import { ConsoleLineWriter } from "../src/tasks/JenkinsTaskConsoleFollower";
+import { JenkinsTaskRunner } from "../src/tasks/JenkinsTaskRunner";
 import {
   JENKINS_TASK_EXIT_CODES,
-  JenkinsTaskRunner,
   type JenkinsTaskBuildDetails,
   type JenkinsTaskPendingInputSummary,
   type JenkinsTaskProgressiveConsoleResult,
   type JenkinsTaskQueueItem,
   type JenkinsTaskRunRequest,
-  type JenkinsTaskRunnerBackend,
-  mapJenkinsBuildResult
-} from "../src/tasks/JenkinsTaskRunner";
-import { resolveRunnerOptions } from "../src/tasks/JenkinsTaskRunnerSupport";
+  type JenkinsTaskRunnerBackend
+} from "../src/tasks/JenkinsTaskRunnerContracts";
+import {
+  mapJenkinsBuildResult,
+  RunnerFailure,
+  recordConsecutivePollError,
+  resolveRunnerOptions,
+  rethrowIfCanceled,
+  TaskCanceledError
+} from "../src/tasks/JenkinsTaskRunnerSupport";
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env-1",
@@ -222,6 +228,48 @@ describe("JenkinsTaskRunner result mapping", () => {
     const result = mapJenkinsBuildResult(jenkinsResult);
     assert.equal(result.exitCode, exitCode);
     assert.equal(result.outcome, outcome);
+  });
+});
+
+describe("JenkinsTaskRunner poll error handling", () => {
+  const pollErrorOptions = (statuses: string[]) => ({
+    maxConsecutiveErrors: 3,
+    failureAction: "read Jenkins status",
+    retryStatus: "Status unavailable",
+    writeStatus: (message: string) => statuses.push(message)
+  });
+
+  it("converts any error into a cancellation once the task is canceled", () => {
+    assert.throws(() => rethrowIfCanceled(new Error("boom"), true), TaskCanceledError);
+    assert.throws(() => rethrowIfCanceled(new TaskCanceledError(), false), TaskCanceledError);
+    assert.doesNotThrow(() => rethrowIfCanceled(new Error("boom"), false));
+  });
+
+  it("reports retries below the limit and fails at the limit", () => {
+    const statuses: string[] = [];
+    const options = pollErrorOptions(statuses);
+    assert.equal(recordConsecutivePollError(new Error("boom"), 0, options), 1);
+    assert.equal(recordConsecutivePollError(new Error("boom"), 1, options), 2);
+    assert.throws(
+      () => recordConsecutivePollError(new Error("boom"), 2, options),
+      (error: unknown) =>
+        error instanceof RunnerFailure &&
+        error.message === "Unable to read Jenkins status after 3 consecutive errors: boom"
+    );
+    assert.deepEqual(statuses, [
+      "Status unavailable; retrying (1/3).",
+      "Status unavailable; retrying (2/3)."
+    ]);
+  });
+
+  it("rethrows runner failures without counting them", () => {
+    const statuses: string[] = [];
+    const failure = new RunnerFailure("fatal");
+    assert.throws(
+      () => recordConsecutivePollError(failure, 0, pollErrorOptions(statuses)),
+      (error: unknown) => error === failure
+    );
+    assert.deepEqual(statuses, []);
   });
 });
 

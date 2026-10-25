@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Build Details console links to diagnostic source files now land on the file path instead of drifting through later text. Offsets were computed against the raw log, which kept CRLF line breaks and dropped text annotated by Jenkins (such as the node in `Running on <node>`), while the console shows the HTML rendering.
+
 ## [1.59.1] - 2026-10-25
 
 ### Changed

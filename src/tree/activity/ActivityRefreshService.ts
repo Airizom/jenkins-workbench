@@ -10,6 +10,8 @@ export interface ActivityRefreshServiceOptions {
   refreshActivity: (environment: JenkinsEnvironmentRef) => void;
 }
 
+type EnvironmentKeyParts = Pick<JenkinsEnvironmentRef, "environmentId" | "scope">;
+
 interface ActivityRefreshState {
   environment: JenkinsEnvironmentRef;
   lastRefreshAt: number;
@@ -48,23 +50,18 @@ export class ActivityRefreshService {
     }
   }
 
-  handleActivityFolderCollapsed(environment: JenkinsEnvironmentRef): void {
-    this.clearEnvironment(environment.scope, environment.environmentId);
-  }
-
-  handleEnvironmentCollapsed(
-    environment: Pick<JenkinsEnvironmentRef, "environmentId" | "scope">
-  ): void {
-    this.clearEnvironment(environment.scope, environment.environmentId);
+  /** Stops refreshing when the Activity folder or its whole environment collapses. */
+  handleEnvironmentCollapsed(environment: EnvironmentKeyParts): void {
+    this.refreshStateByEnvironment.delete(buildEnvironmentKey(environment));
   }
 
   handleEnvironmentStoreChange(change: JenkinsEnvironmentStoreChange): void {
     switch (change.kind) {
       case "bulk-update":
-        this.clearAll();
+        this.refreshStateByEnvironment.clear();
         return;
       case "environment-removed":
-        this.clearEnvironment(change.scope, change.environmentId);
+        this.handleEnvironmentCollapsed(change);
         return;
       // The tree item keeps its id across an edit, so the folder stays expanded; the updated
       // ref arrives through updateEnvironment.
@@ -86,25 +83,9 @@ export class ActivityRefreshService {
       this.options.refreshActivity(state.environment);
     }
   }
-
-  private clearEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
-    const key = buildEnvironmentKeyParts(scope, environmentId);
-    this.refreshStateByEnvironment.delete(key);
-  }
-
-  private clearAll(): void {
-    this.refreshStateByEnvironment.clear();
-  }
 }
 
-function buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
-  return buildEnvironmentKeyParts(environment.scope, environment.environmentId);
-}
-
-function buildEnvironmentKeyParts(
-  scope: JenkinsEnvironmentRef["scope"],
-  environmentId: string
-): string {
+function buildEnvironmentKey({ scope, environmentId }: EnvironmentKeyParts): string {
   return `${scope}:${environmentId}`;
 }
 

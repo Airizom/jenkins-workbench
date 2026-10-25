@@ -197,6 +197,29 @@ describe("BuildComparePanelMessages", () => {
     }
   });
 
+  it("rejects the same invalid console sections on standalone and whole-comparison updates", () => {
+    const invalidSections: unknown[] = [
+      createConsoleSection({ status: "bogus" }),
+      createConsoleSection({ summaryLabel: undefined }),
+      [createConsoleSection()]
+    ];
+
+    for (const console of invalidSections) {
+      assert.equal(
+        parseBuildCompareOutgoingMessage({ type: "updateConsoleSection", console }),
+        undefined
+      );
+      assert.equal(
+        parseBuildCompareOutgoingMessage({
+          type: "updateBuildCompare",
+          model: { ...createModel(), console },
+          panelState: PANEL_STATE
+        }),
+        undefined
+      );
+    }
+  });
+
   it("parses refresh failures only with a string message", () => {
     assert.deepEqual(
       parseBuildCompareOutgoingMessage({ type: "buildCompareRefreshFailed", message: "HTTP 503" }),

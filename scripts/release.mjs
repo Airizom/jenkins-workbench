@@ -96,17 +96,25 @@ const installTools = () => {
   ]);
 };
 
-const capture = (command, args) => {
+const captureFailure = (command, args, result) =>
+  new Error(`${command} ${args.join(" ")} exited with status ${result.status}\n${result.stderr}`);
+
+// Returns the raw result so callers may tolerate specific non-zero statuses.
+const captureResult = (command, args) => {
   const result = spawnTool(command, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
   if (result.error) {
     throw result.error;
   }
 
+  return result;
+};
+
+const capture = (command, args) => {
+  const result = captureResult(command, args);
+
   if (result.status !== 0) {
-    throw new Error(
-      `${command} ${args.join(" ")} exited with status ${result.status}\n${result.stderr}`
-    );
+    throw captureFailure(command, args, result);
   }
 
   return result.stdout;
@@ -137,16 +145,8 @@ const packageDirOf = (file) => {
 
 const readProductionTree = (allowExtraneous = false) => {
   const args = ["ls", "--omit=dev", "--all", "--long", "--json"];
-  const result = spawnTool(npmCommand, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  const failure = () =>
-    new Error(
-      `${npmCommand} ${args.join(" ")} exited with status ${result.status}\n${result.stderr}`
-    );
+  const result = captureResult(npmCommand, args);
+  const failure = () => captureFailure(npmCommand, args, result);
   let tree;
   try {
     tree = JSON.parse(result.stdout);

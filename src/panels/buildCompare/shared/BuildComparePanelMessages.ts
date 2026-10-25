@@ -148,16 +148,12 @@ function isSectionBaseShape(value: unknown): value is Record<string, unknown> {
 function isBuildCompareConsoleSectionViewModel(
   value: unknown
 ): value is BuildCompareConsoleSectionViewModel {
-  const record = asRecord(value);
   return (
-    !!record &&
-    !Array.isArray(record) &&
-    compareSectionStatuses.includes(record.status as CompareSectionStatus) &&
-    typeof record.summaryLabel === "string" &&
-    isOptionalString(record.detail) &&
-    isOptionalString(record.divergenceLineLabel) &&
-    isConsoleSnippetLines(record.baselineLines) &&
-    isConsoleSnippetLines(record.targetLines)
+    isSectionBaseShape(value) &&
+    isOptionalString(value.detail) &&
+    isOptionalString(value.divergenceLineLabel) &&
+    isConsoleSnippetLines(value.baselineLines) &&
+    isConsoleSnippetLines(value.targetLines)
   );
 }
 
@@ -170,13 +166,11 @@ function isConsoleSnippetLines(value: unknown): boolean {
 }
 
 function isConsoleSnippetLine(value: unknown): boolean {
-  const record = asRecord(value);
   return (
-    !!record &&
-    !Array.isArray(record) &&
-    typeof record.lineNumber === "number" &&
-    typeof record.text === "string" &&
-    typeof record.highlight === "boolean"
+    isPlainRecord(value) &&
+    typeof value.lineNumber === "number" &&
+    typeof value.text === "string" &&
+    typeof value.highlight === "boolean"
   );
 }
 

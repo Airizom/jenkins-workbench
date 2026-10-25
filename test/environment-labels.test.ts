@@ -11,7 +11,11 @@ describe("formatEnvironmentLabel", () => {
     ["http://jenkins.example:8080/ci/", "jenkins.example:8080/ci"],
     ["jenkins.example/ci", "jenkins.example/ci"],
     ["localhost:8080", "localhost:8080"],
-    ["jenkins:8080/path", "jenkins:8080/path"]
+    ["jenkins:8080/path", "jenkins:8080/path"],
+    ["host:8080", "host:8080"],
+    ["https://host/jenkins/", "host/jenkins"],
+    ["not a url", "not a url"],
+    ["http://", "http://"]
   ])("formats %s as %s", (rawUrl, expected) => {
     assert.equal(formatEnvironmentLabel(rawUrl), expected);
   });

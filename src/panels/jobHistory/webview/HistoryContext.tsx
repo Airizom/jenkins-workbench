@@ -1,7 +1,12 @@
 import * as React from "react";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
-import { emptyHistory, HISTORY_STATUSES, type HistoryViewModel } from "../shared/HistoryContracts";
+import {
+  emptyHistory,
+  HISTORY_STATUSES,
+  type HistoryViewModel,
+  isHistoryWindowSize
+} from "../shared/HistoryContracts";
 
 export const HistoryContext = React.createContext<HistoryViewModel>(emptyHistory());
 export function historyReducer(state: HistoryViewModel, value: unknown): HistoryViewModel {
@@ -12,7 +17,7 @@ export function historyReducer(state: HistoryViewModel, value: unknown): History
     typeof value.revision !== "number" ||
     value.revision < state.revision ||
     typeof value.jobUrl !== "string" ||
-    ![10, 20, 50].includes(Number(value.count)) ||
+    !isHistoryWindowSize(value.count) ||
     !(HISTORY_STATUSES as readonly string[]).includes(String(value.status)) ||
     !Array.isArray(value.builds) ||
     !Array.isArray(value.tests) ||

@@ -6,7 +6,7 @@ import type {
   BuildTestResultsViewModel,
   BuildTestsSummaryViewModel
 } from "../../../shared/BuildDetailsContracts";
-import { useTabsBarHeightVariable } from "../../hooks/useTabsBarHeightVariable";
+import { LoadingDot } from "./LoadingDot";
 import {
   CoverageSection,
   TestResultsEmptyState,
@@ -35,7 +35,6 @@ export function TestResultsSection({
     results,
     failedCount: summary.failedCount
   });
-  useTabsBarHeightVariable();
   const emptyState = renderTestResultsEmptyState(
     results,
     summary,
@@ -59,10 +58,7 @@ export function TestResultsSection({
 
       {results.loading && !emptyState ? (
         <div role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span
-            aria-hidden="true"
-            className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
-          />
+          <LoadingDot />
           Loading test output…
         </div>
       ) : null}

@@ -145,10 +145,6 @@ export function useConsoleSearch(consoleText: string, shortcutsEnabled = true): 
     stepActiveMatch(event.shiftKey ? "prev" : "next");
   };
 
-  const handleSearchStep = (direction: "next" | "prev") => {
-    stepActiveMatch(direction);
-  };
-
   const handleClearSearch = () => {
     setSearchQuery("");
     setActiveMatchIndex(-1);
@@ -187,7 +183,7 @@ export function useConsoleSearch(consoleText: string, shortcutsEnabled = true): 
     consoleOutputRef,
     handleSearchChange,
     handleSearchKeyDown,
-    handleSearchStep,
+    handleSearchStep: stepActiveMatch,
     handleClearSearch,
     setUseRegex,
     openSearchToolbar

@@ -369,9 +369,9 @@ function requirePresetName(value: string): string {
 }
 
 function assertUniqueName(presets: StoredParameterPreset[], presetId: string, name: string): void {
-  const normalizedName = name.toLocaleLowerCase();
+  const normalizedName = normalizePresetName(name);
   const duplicate = presets.some(
-    (preset) => preset.id !== presetId && preset.name.trim().toLocaleLowerCase() === normalizedName
+    (preset) => preset.id !== presetId && normalizePresetName(preset.name) === normalizedName
   );
   if (duplicate) {
     throw new Error(`A preset named "${name}" already exists for this job.`);

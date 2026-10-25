@@ -3,7 +3,6 @@ import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { formatError } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
 import type { BuildDetailsPollingCallbacks } from "./BuildDetailsPollingController";
-import { buildUpdateMessageFromState } from "./BuildDetailsUpdateBuilder";
 import type { ConsoleTextByteRange } from "./ConsoleStreamManager";
 import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMessages";
 
@@ -12,10 +11,8 @@ export interface BuildDetailsPollingCallbackHooks {
   setTitle: (title: string) => void;
   publishErrors: () => void;
   isTokenCurrent: (token: number) => boolean;
-  showCompletionToast: (details: JenkinsBuildDetails) => void;
-  handleBuildCompleted?: (details: JenkinsBuildDetails, token: number) => void;
-  canOpenSource?: (className?: string) => boolean;
-  getCoverageEnabled?: () => boolean;
+  handleBuildCompleted: (details: JenkinsBuildDetails, token: number) => void;
+  postStateUpdate: () => void;
   onPipelineLoading?: (token: number) => void;
   onBuildDetailsChanged?: (details: JenkinsBuildDetails) => void;
   onConsoleTextAppend?: (text: string) => void;
@@ -31,15 +28,6 @@ export function createBuildDetailsPollingCallbacks(
   token: number,
   hooks: BuildDetailsPollingCallbackHooks
 ): BuildDetailsPollingCallbacks {
-  const postStateMessage = (): void => {
-    hooks.postMessage(
-      buildUpdateMessageFromState(state, {
-        canOpenSource: hooks.canOpenSource,
-        coverageEnabled: hooks.getCoverageEnabled?.()
-      })
-    );
-  };
-
   return {
     onDetails: (details) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -47,7 +35,7 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.updateDetails(details);
       hooks.onBuildDetailsChanged?.(details);
-      postStateMessage();
+      hooks.postStateUpdate();
     },
     onWorkflowFetchStart: () => {
       if (!hooks.isTokenCurrent(token)) {
@@ -61,7 +49,7 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setPipelineRun(toPipelineRun(workflowRun));
       hooks.publishErrors();
-      postStateMessage();
+      hooks.postStateUpdate();
     },
     onWorkflowError: (error) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -69,7 +57,7 @@ export function createBuildDetailsPollingCallbacks(
       }
       state.setPipelineError(`Pipeline stages: ${formatError(error)}`);
       hooks.publishErrors();
-      postStateMessage();
+      hooks.postStateUpdate();
     },
     onTitle: (title) => {
       if (!hooks.isTokenCurrent(token)) {
@@ -125,16 +113,13 @@ export function createBuildDetailsPollingCallbacks(
         return;
       }
       state.setPendingInputs(pendingInputs);
-      postStateMessage();
+      hooks.postStateUpdate();
     },
     onComplete: (details) => {
       if (!hooks.isTokenCurrent(token)) {
         return;
       }
-      hooks.handleBuildCompleted?.(details, token);
-      if (!hooks.handleBuildCompleted) {
-        hooks.showCompletionToast(details);
-      }
+      hooks.handleBuildCompleted(details, token);
     }
   };
 }

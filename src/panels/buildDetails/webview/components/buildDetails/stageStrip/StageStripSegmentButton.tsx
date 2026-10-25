@@ -11,7 +11,6 @@ import { getStageIcon } from "../pipelineStages/PipelineStageIcons";
 import type { StageStripSegment } from "./stageStripModel";
 import {
   describeSegmentAria,
-  describeSegmentBranches,
   describeSegmentDetail,
   describeSegmentTitle
 } from "./stageStripModel";
@@ -95,7 +94,6 @@ function DenseStatusGlyph({ segment }: { segment: StageStripSegment }): React.JS
 }
 
 function SegmentLabel({ segment }: { segment: StageStripSegment }): React.JSX.Element {
-  const branches = describeSegmentBranches(segment);
   const glyph = resolveSegmentIcon(segment);
   return (
     <span className="flex w-full items-center gap-1 text-caption leading-tight text-muted-foreground">
@@ -111,7 +109,7 @@ function SegmentLabel({ segment }: { segment: StageStripSegment }): React.JSX.El
         </span>
       ) : null}
       <span className="truncate">{segment.name}</span>
-      {branches ? (
+      {segment.branchCount > 0 ? (
         <span className="shrink-0 opacity-70" aria-hidden="true">
           ×{segment.branchCount}
         </span>

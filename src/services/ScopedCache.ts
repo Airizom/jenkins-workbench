@@ -3,12 +3,9 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 
 export class ScopedCache {
   private readonly cache: JenkinsDataCache;
-  private readonly keys = new Set<string>();
-  private readonly pruneThreshold: number;
 
   constructor(ttlMs: number, maxEntries: number) {
     this.cache = new JenkinsDataCache(ttlMs, maxEntries);
-    this.pruneThreshold = Math.max(1, maxEntries) * 2;
   }
 
   buildEnvironmentKey(environment: JenkinsEnvironmentRef): string {
@@ -20,17 +17,13 @@ export class ScopedCache {
   }
 
   get<T>(key: string): T | undefined {
-    const value = this.cache.get<T>(key);
-    if (value === undefined && !this.cache.has(key)) {
-      this.keys.delete(key);
-    }
-    return value;
+    return this.cache.get<T>(key);
   }
 
   values<T>(): T[] {
     const values: T[] = [];
-    for (const key of this.keys) {
-      const value = this.get<T>(key);
+    for (const key of this.cache.keys()) {
+      const value = this.cache.get<T>(key);
       if (value !== undefined) {
         values.push(value);
       }
@@ -40,60 +33,25 @@ export class ScopedCache {
 
   set<T>(key: string, value: T): void {
     this.cache.set(key, value);
-    this.keys.add(key);
-    this.pruneIfNeeded();
   }
 
   delete(key: string): void {
     this.cache.delete(key);
-    this.keys.delete(key);
   }
 
   clear(): void {
     this.cache.clear();
-    this.keys.clear();
   }
 
   clearForEnvironment(environmentId: string): void {
-    const prefix = `${environmentId}:`;
-    this.clearKeysWithPrefix(prefix);
+    this.cache.clearForEnvironment(environmentId);
   }
 
   clearForEnvironmentKind(environment: JenkinsEnvironmentRef, kind: string): void {
-    const prefix = `${this.buildEnvironmentKey(environment)}:${kind}:`;
-    this.clearKeysWithPrefix(prefix);
+    this.cache.clearByPrefix(`${this.buildEnvironmentKey(environment)}:${kind}:`);
   }
 
   clearByPrefix(prefix: string): void {
-    this.clearKeysWithPrefix(prefix);
-  }
-
-  private pruneIfNeeded(): void {
-    if (this.keys.size <= this.pruneThreshold) {
-      return;
-    }
-    this.pruneStaleKeys();
-  }
-
-  private pruneStaleKeys(): void {
-    for (const key of this.keys) {
-      if (!this.cache.has(key)) {
-        this.keys.delete(key);
-      }
-    }
-  }
-
-  private clearKeysWithPrefix(prefix: string): void {
-    for (const key of this.keys) {
-      if (!this.cache.has(key)) {
-        this.keys.delete(key);
-        continue;
-      }
-      if (!key.startsWith(prefix)) {
-        continue;
-      }
-      this.cache.delete(key);
-      this.keys.delete(key);
-    }
+    this.cache.clearByPrefix(prefix);
   }
 }

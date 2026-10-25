@@ -1,16 +1,15 @@
 import type { IncomingHttpHeaders } from "node:http";
 
-export interface JenkinsRequestOptions {
+export type JenkinsRequestMethod = "GET" | "POST" | "HEAD";
+
+/** Transport fields shared by every request option type; add new transport options here. */
+export interface RedirectableRequestOptions {
   signal?: AbortSignal;
   /** Called before every transport attempt, including redirects. Throw to stop scheduling. */
   beforeRequest?: () => void;
-  method?: "GET" | "POST" | "HEAD";
+  method?: JenkinsRequestMethod;
   headers?: Record<string, string>;
   body?: string | Uint8Array;
-  parseJson: boolean;
-  returnText?: boolean;
-  returnBuffer?: boolean;
-  returnHeaders?: boolean;
   redirectCount?: number;
   authHeader?: string;
   timeoutMs?: number;
@@ -18,7 +17,17 @@ export interface JenkinsRequestOptions {
   allowInsecureTls?: boolean;
   /** Jenkins environment URL; its path is the context path, not a route marker. */
   contextUrl?: string;
+}
+
+export interface JenkinsStreamRequestOptions extends RedirectableRequestOptions {
   maxBytes?: number;
+}
+
+export interface JenkinsRequestOptions extends JenkinsStreamRequestOptions {
+  parseJson: boolean;
+  returnText?: boolean;
+  returnBuffer?: boolean;
+  returnHeaders?: boolean;
 }
 
 export interface JenkinsTextResponse {
@@ -37,64 +46,23 @@ export interface JenkinsStreamResponse {
   abort(): void;
 }
 
-export interface JenkinsVoidRequestOptions {
+export interface JenkinsVoidRequestOptions
+  extends Omit<RedirectableRequestOptions, "signal" | "beforeRequest" | "method"> {
   method: "POST" | "GET";
-  headers?: Record<string, string>;
-  body?: string | Uint8Array;
-  redirectCount?: number;
-  authHeader?: string;
-  timeoutMs?: number;
-  /** Only literal true disables HTTPS certificate verification. */
-  allowInsecureTls?: boolean;
-  /** Jenkins environment URL; its path is the context path, not a route marker. */
-  contextUrl?: string;
 }
 
-export interface JenkinsTextRequestOptions {
-  method: "POST" | "GET" | "HEAD";
-  headers?: Record<string, string>;
-  body?: string | Uint8Array;
-  redirectCount?: number;
-  authHeader?: string;
-  timeoutMs?: number;
-  /** Only literal true disables HTTPS certificate verification. */
-  allowInsecureTls?: boolean;
-  /** Jenkins environment URL; its path is the context path, not a route marker. */
-  contextUrl?: string;
-  maxBytes?: number;
+export interface JenkinsTextRequestOptions
+  extends Omit<JenkinsStreamRequestOptions, "signal" | "beforeRequest" | "method"> {
+  method: JenkinsRequestMethod;
 }
 
-export interface JenkinsSimpleRequestOptions {
-  signal?: AbortSignal;
-  /** Called before every transport attempt, including redirects. Throw to stop scheduling. */
-  beforeRequest?: () => void;
-  authHeader?: string;
-  headers?: Record<string, string>;
-  timeoutMs?: number;
-  /** Only literal true disables HTTPS certificate verification. */
-  allowInsecureTls?: boolean;
-  /** Jenkins environment URL; its path is the context path, not a route marker. */
-  contextUrl?: string;
-  maxBytes?: number;
-}
+export type JenkinsSimpleRequestOptions = Omit<
+  JenkinsStreamRequestOptions,
+  "method" | "body" | "redirectCount"
+>;
 
 export interface JenkinsPostResponse {
   location?: string;
-}
-
-export interface JenkinsStreamRequestOptions {
-  signal?: AbortSignal;
-  method?: "GET" | "POST" | "HEAD";
-  headers?: Record<string, string>;
-  body?: string | Uint8Array;
-  redirectCount?: number;
-  authHeader?: string;
-  timeoutMs?: number;
-  /** Only literal true disables HTTPS certificate verification. */
-  allowInsecureTls?: boolean;
-  /** Jenkins environment URL; its path is the context path, not a route marker. */
-  contextUrl?: string;
-  maxBytes?: number;
 }
 
 export interface JenkinsCollectedResponseBody {

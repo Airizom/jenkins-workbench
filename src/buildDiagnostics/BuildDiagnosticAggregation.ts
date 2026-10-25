@@ -423,8 +423,3 @@ function compareRawLogOrder(
 function severityRank(severity: BuildDiagnosticSeverity): number {
   return severity === "error" ? 0 : severity === "warning" ? 1 : 2;
 }
-
-export {
-  type BuildDiagnosticResolvedReference,
-  buildConsoleReferences
-} from "./BuildDiagnosticConsoleReferences";

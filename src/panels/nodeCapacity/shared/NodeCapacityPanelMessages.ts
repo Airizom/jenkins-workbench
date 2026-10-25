@@ -2,7 +2,7 @@ import type {
   NodeCapacityNodeExecutorsUpdateMessage,
   NodeCapacityUpdateMessage
 } from "../../../shared/nodeCapacity/NodeCapacityContracts";
-import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
+import type { OpenExternalMessage, SetLoadingOutgoingMessage } from "../../../shared/runtimeGuards";
 import {
   hasMessageType,
   isOpenExternalMessage,
@@ -41,15 +41,10 @@ export interface LoadNodeCapacityExecutorsMessage {
   nodeUrls: string[];
 }
 
-export interface SetLoadingMessage {
-  type: "setLoading";
-  value: boolean;
-}
-
 export type NodeCapacityOutgoingMessage =
   | NodeCapacityUpdateMessage
   | NodeCapacityNodeExecutorsUpdateMessage
-  | SetLoadingMessage;
+  | SetLoadingOutgoingMessage;
 
 export type NodeCapacityIncomingMessage =
   | RefreshNodeCapacityMessage

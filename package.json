@@ -304,6 +304,12 @@
         "icon": "$(terminal)"
       },
       {
+        "command": "jenkinsWorkbench.showFollowedBuilds",
+        "title": "Show Followed Builds",
+        "category": "Jenkins",
+        "icon": "$(eye)"
+      },
+      {
         "command": "jenkinsWorkbench.openLastFailedBuild",
         "title": "Open Last Failed Build",
         "category": "Jenkins"
@@ -662,6 +668,11 @@
           "minimum": 2,
           "maximum": 2147483.647,
           "description": "Polling interval in seconds for the build queue while the Build Queue folder is expanded."
+        },
+        "jenkinsWorkbench.followTriggeredBuilds": {
+          "type": "boolean",
+          "default": true,
+          "description": "After you trigger, rebuild, replay, or restart a build, keep watching for the new build and show a notification with View Build Details, Preview Log, and Notify When Finished once it starts. Turn off to only refresh the tree."
         },
         "jenkinsWorkbench.taskRunner.pollIntervalSeconds": {
           "type": "number",

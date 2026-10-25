@@ -25,11 +25,3 @@ export function StatusIcon(props: IconProps) {
     </IconBase>
   );
 }
-export function IdleIcon(props: IconProps) {
-  return (
-    <IconBase defaultClassName="h-4 w-4 text-muted-foreground" {...props}>
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </IconBase>
-  );
-}

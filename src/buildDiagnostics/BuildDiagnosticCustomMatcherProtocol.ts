@@ -116,10 +116,6 @@ export function isCustomMatcherLoop(value: unknown): value is boolean | undefine
   return typeof value === "undefined" || typeof value === "boolean";
 }
 
-export function isCustomMatcherLoopAllowed(value: unknown, isFinal: boolean): boolean {
-  return isCustomMatcherLoop(value) && (!value || isFinal);
-}
-
 export function createNormalizedCustomDiagnosticPattern(
   value: Record<string, unknown>,
   regexpSource: string,

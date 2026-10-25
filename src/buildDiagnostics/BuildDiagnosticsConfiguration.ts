@@ -6,7 +6,7 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import { toParentJobUrl } from "./BuildDiagnosticContextResolver";
-import { normalizeDiagnosticProfiles } from "./BuildDiagnosticProfiles";
+import { logDiagnosticProfileIssues, normalizeDiagnosticProfiles } from "./BuildDiagnosticProfiles";
 
 export interface DiagnosticConfigurationTarget {
   environment: JenkinsEnvironmentRef;
@@ -56,9 +56,7 @@ export class BuildDiagnosticsConfiguration {
       repository.repositoryUriString
     );
     const normalized = normalizeDiagnosticProfiles(getBuildDiagnosticsConfig().profiles);
-    for (const issue of normalized.issues) {
-      this.log(`Profile ${issue.severity}: ${issue.path}: ${issue.message}`);
-    }
+    logDiagnosticProfileIssues(normalized, this.log);
     const choice = await vscode.window.showQuickPick(
       createDiagnosticProfileChoices(normalized, Boolean(existing)),
       { placeHolder: "Choose a diagnostic profile" }

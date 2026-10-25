@@ -27,7 +27,6 @@ export class ArtifactPreviewer {
   async preview(request: ArtifactPreviewRequest): Promise<void> {
     const options = this.optionsProvider();
     const previewPath = resolvePreviewPath(request);
-    const fileName = path.basename(previewPath);
 
     const response = await this.dataService.getArtifact(
       request.environment,
@@ -36,7 +35,7 @@ export class ArtifactPreviewer {
       { maxBytes: options.maxBytes }
     );
 
-    await openBufferedContentPreview(this.previewProvider, response, previewPath, fileName);
+    await openBufferedContentPreview(this.previewProvider, response, previewPath, "artifact");
   }
 }
 

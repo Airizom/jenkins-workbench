@@ -6,7 +6,7 @@ import type {
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { ActivityViewModel, TreeActivityOptions } from "../ActivityTypes";
-import { ActivityClassifier } from "./ActivityClassifier";
+import { classifyActivityGroup } from "./ActivityClassifier";
 import type { ActivityGroups } from "./ActivityCollectionModel";
 import { createActivityGroups, promoteAwaitingInputJobs } from "./ActivityCollectionPolicy";
 import { buildActivityViewModel } from "./ActivityViewModelBuilder";
@@ -29,7 +29,6 @@ export class ActivityCollector {
   constructor(
     private readonly dataService: JenkinsDataService,
     pendingInputCoordinator: PendingInputRefreshCoordinator,
-    private readonly classifier = new ActivityClassifier(),
     private readonly awaitingInputEnricher = new AwaitingInputEnricher(
       dataService,
       pendingInputCoordinator
@@ -59,7 +58,7 @@ export class ActivityCollector {
       maxResults: collectionOptions.maxScanResults,
       batchSize: collectionOptions.jobSearchBatchSize
     })) {
-      collectBatchEntries(scan, batch, this.classifier);
+      collectBatchEntries(scan, batch);
       if (scan.stop) {
         break;
       }
@@ -94,32 +93,24 @@ function createActivityScanState(
   };
 }
 
-function collectBatchEntries(
-  scan: ActivityScanState,
-  batch: JobSearchEntry[],
-  classifier: ActivityClassifier
-): void {
+function collectBatchEntries(scan: ActivityScanState, batch: JobSearchEntry[]): void {
   for (const entry of batch) {
-    collectEntry(scan, entry, classifier);
+    collectEntry(scan, entry);
     if (scan.stop) {
       return;
     }
   }
 }
 
-function collectEntry(
-  scan: ActivityScanState,
-  entry: JobSearchEntry,
-  classifier: ActivityClassifier
-): void {
-  const classification = classifier.classify(entry);
-  if (!classification) {
+function collectEntry(scan: ActivityScanState, entry: JobSearchEntry): void {
+  const group = classifyActivityGroup(entry);
+  if (!group) {
     return;
   }
 
-  const groupItems = scan.groups.get(classification.group);
+  const groupItems = scan.groups.get(group);
   const groupCollectionLimit =
-    classification.group === "running" ? scan.runningCollectionLimit : scan.collectionLimit;
+    group === "running" ? scan.runningCollectionLimit : scan.collectionLimit;
   if (groupItems && groupItems.length < groupCollectionLimit) {
     groupItems.push(entry);
   }

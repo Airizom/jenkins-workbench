@@ -67,7 +67,6 @@ export function parseDate(value: string | undefined): Date | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
-export { formatUpdatedAtLabel } from "../../../../../formatters/RelativeTimeFormatters";
 export function isStaleUpdatedAt(date: Date | undefined, now: number): boolean {
   if (!date) {
     return false;

@@ -1,21 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import {
-  buildArtifactActionMessage,
-  buildDownloadAllArtifactsMessage,
-  buildOpenTestSourceMessage,
-  buildReloadTestReportMessage
-} from "../src/panels/buildDetails/webview/buildDetailsWebviewMessages";
-import type {
-  BuildFailureArtifact,
-  BuildTestCaseViewModel
-} from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import { buildArtifactActionMessage } from "../src/panels/buildDetails/webview/buildDetailsWebviewMessages";
+import type { BuildFailureArtifact } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 
 describe("BuildDetails webview messages", () => {
-  it("builds a build-level archive request without an artifact path or URL", () => {
-    assert.deepEqual(buildDownloadAllArtifactsMessage(), { type: "downloadAllArtifacts" });
-  });
-
   it("builds artifact action messages with backend payload fields", () => {
     const artifact: BuildFailureArtifact = {
       name: "Report",
@@ -34,29 +22,6 @@ describe("BuildDetails webview messages", () => {
       action: "download",
       relativePath: "reports/report.html",
       fileName: undefined
-    });
-  });
-
-  it("builds test result messages", () => {
-    const testCase: BuildTestCaseViewModel = {
-      id: "suite/example test",
-      name: "example test",
-      className: "com.example.BuildTest",
-      suiteName: "BuildTest",
-      status: "failed",
-      statusLabel: "Failed",
-      canOpenSource: true
-    };
-
-    assert.deepEqual(buildReloadTestReportMessage(), {
-      type: "reloadTestReport",
-      includeCaseLogs: true
-    });
-    assert.deepEqual(buildOpenTestSourceMessage(testCase), {
-      type: "openTestSource",
-      testName: "example test",
-      className: "com.example.BuildTest",
-      suiteName: "BuildTest"
     });
   });
 });

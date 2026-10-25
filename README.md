@@ -47,6 +47,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Replay Build** — Edit the Pipeline script in a draft editor and re-run with changes, or quick-replay with the original script
 - **Replay with Local Jenkinsfile** — Run your workspace Jenkinsfile, including unsaved changes, against a Pipeline job without committing
 - **Rebuild** — Re-run a build with the same parameters
+- **Follow Triggered Builds** — After Trigger Build, Rebuild, Replay, or Restart from Stage, get a notification when the new build starts with **View Build Details**, **Preview Log** (updates live until the build finishes), and **Notify When Finished** (tracked in the status bar)
 - **Manage Builds** — Delete a completed build, keep it forever, or edit its display name and description (multi-line descriptions open in a draft editor)
 - **Preview Build Logs** — Open console output in a lightweight preview editor
 - **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds
@@ -328,6 +329,7 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for shared Jenkins status refreshes, including watched jobs and current-branch status. |
 | `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
 | `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
+| `jenkinsWorkbench.followTriggeredBuilds` | true | After a trigger, rebuild, replay, or restart, wait up to 10 minutes for the new build and offer View Build Details, Preview Log (live), and Notify When Finished when it starts. |
 | `jenkinsWorkbench.taskRunner.pollIntervalSeconds` | 2 | Polling interval while a task follows its queue item, build status, and console output. |
 | `jenkinsWorkbench.taskRunner.maxConsecutiveErrors` | 5 | Consecutive Jenkins API errors allowed per task-runner operation before cleanup and failure. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
@@ -526,6 +528,7 @@ activates there.
 | `Jenkins: Edit Build Description` | Edit the build description; multi-line descriptions open in a draft editor |
 | `Jenkins: Submit Build Description` | Submit the active build description draft |
 | `Jenkins: Preview Build Logs` | Open console output in a read-only preview |
+| `Jenkins: Show Followed Builds` | List builds you asked to be notified about; open one or stop following it |
 | `Jenkins: View Build Details` | Open the build details panel |
 | `Jenkins: Compare With Build` | Compare the selected build with another build of the same job |
 | `Jenkins: Open Last Failed Build` | Jump to the last failed build |
@@ -813,36 +816,37 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 2. Add a workspace and a global environment
 3. Verify jobs, builds, and nodes load correctly
 4. Test build actions (trigger, stop, replay, rebuild), including local Jenkinsfile replay from both editor and build context menus; verify unsaved edits, retained parameters/loaded scripts, missing completed builds, denied replay access, and the original replay commands
-5. Verify watch notifications work
-6. Test node actions and node details
-7. Trigger a multibranch scan and verify branch filtering still works
-8. Confirm removing an environment clears it from the tree
-9. Preview or download a build artifact
-10. Browse a classic job workspace, expand nested folders, and preview a workspace file
-11. Pin and unpin a job or pipeline, then verify the pinned section and remove any missing pins
-12. Run a successful Jenkins task and confirm it streams console output, exits with code 0, and allows a dependent task or `preLaunchTask` to continue
-13. Run failure, unstable, aborted, and not-built jobs and confirm the documented exit codes
-14. Run a task while its required executor is unavailable and confirm the Jenkins queue reason appears
-15. Cancel one task while queued and another while running; confirm queued work remains active and Jenkins only stops a build with a single verified trigger
-16. Exercise input-step `"wait"`, `"abort"`, and timeout behavior
-17. Configure a built-in or custom problem matcher and confirm Jenkins compiler or test output populates the Problems panel
-18. Set `waitForCompletion` to `false` and confirm the task returns after Jenkins accepts the trigger
-19. Confirm a trigger response without an attributable queue item fails without attaching to a different build
-20. Fail a current-branch build without a diagnostics profile and confirm Problems populates automatically
-21. Open a different Build Details build and confirm its Problems replace current-branch findings immediately
-22. Hide Build Details while editing source and confirm its diagnostic ownership remains; close it and confirm current-branch findings return
-23. Complete the current-branch build successfully and confirm prior Problems clear
-24. Configure one multibranch parent binding and verify both branch and PR builds use it
-25. Verify prefix and regex mappings open the intended local range while ambiguous suffixes stay non-clickable and absent from Problems
-26. Exercise compiler warnings/errors, grouped stack traces, a custom multiline matcher, malformed matcher validation, and a running build that appends findings without duplicates
-27. Exercise a long/noisy console and verify the byte and Problem caps are reported explicitly
-28. In both plain and Jenkins-annotated HTML console modes, verify source links compose with search highlighting, ANSI styling, and external Jenkins links
-29. Compare two builds and verify parameter, change, stage, test, and console-difference sections
-30. Open Node Capacity and verify queue, executor, offline-node, and label-pool summaries; filter pools by label, node, or job; open a running build in Build Details; and check builds pinned to a single node
-31. Open a completed build with Jenkins Coverage data and verify its summary, modified-file data, and editor decorations
-32. Keep a build forever and release it from the tree and from Build Details; delete a kept build with Stop Keeping and Delete and confirm an open Build Details panel for it closes
-33. Edit a build's display name (and reset it), a single-line description, and a multi-line description in the draft editor, including a remote-change conflict
-34. Multi-select jobs, running builds, and queue items with Ctrl/Cmd-click and Shift-click, including rows from different environments and repeated jobs in different sections; exercise all six bulk actions from the context menu and Command Palette, verify mixed watched/pinned states and row-only inline icons, decline a stop/cancel confirmation, cancel in-progress work, and check partial-failure details and refreshed tree/watch/queue state
+5. Trigger, rebuild, replay, and restart from stage; confirm the "started" notification names the new build and that View Build Details, Preview Log (live until completion), and Notify When Finished (status bar count) work. Cancel a queued item and expect the cancelled message; with `jenkinsWorkbench.followTriggeredBuilds` off, expect the previous messages
+6. Verify watch notifications work
+7. Test node actions and node details
+8. Trigger a multibranch scan and verify branch filtering still works
+9. Confirm removing an environment clears it from the tree
+10. Preview or download a build artifact
+11. Browse a classic job workspace, expand nested folders, and preview a workspace file
+12. Pin and unpin a job or pipeline, then verify the pinned section and remove any missing pins
+13. Run a successful Jenkins task and confirm it streams console output, exits with code 0, and allows a dependent task or `preLaunchTask` to continue
+14. Run failure, unstable, aborted, and not-built jobs and confirm the documented exit codes
+15. Run a task while its required executor is unavailable and confirm the Jenkins queue reason appears
+16. Cancel one task while queued and another while running; confirm queued work remains active and Jenkins only stops a build with a single verified trigger
+17. Exercise input-step `"wait"`, `"abort"`, and timeout behavior
+18. Configure a built-in or custom problem matcher and confirm Jenkins compiler or test output populates the Problems panel
+19. Set `waitForCompletion` to `false` and confirm the task returns after Jenkins accepts the trigger
+20. Confirm a trigger response without an attributable queue item fails without attaching to a different build
+21. Fail a current-branch build without a diagnostics profile and confirm Problems populates automatically
+22. Open a different Build Details build and confirm its Problems replace current-branch findings immediately
+23. Hide Build Details while editing source and confirm its diagnostic ownership remains; close it and confirm current-branch findings return
+24. Complete the current-branch build successfully and confirm prior Problems clear
+25. Configure one multibranch parent binding and verify both branch and PR builds use it
+26. Verify prefix and regex mappings open the intended local range while ambiguous suffixes stay non-clickable and absent from Problems
+27. Exercise compiler warnings/errors, grouped stack traces, a custom multiline matcher, malformed matcher validation, and a running build that appends findings without duplicates
+28. Exercise a long/noisy console and verify the byte and Problem caps are reported explicitly
+29. In both plain and Jenkins-annotated HTML console modes, verify source links compose with search highlighting, ANSI styling, and external Jenkins links
+30. Compare two builds and verify parameter, change, stage, test, and console-difference sections
+31. Open Node Capacity and verify queue, executor, offline-node, and label-pool summaries; filter pools by label, node, or job; open a running build in Build Details; and check builds pinned to a single node
+32. Open a completed build with Jenkins Coverage data and verify its summary, modified-file data, and editor decorations
+33. Keep a build forever and release it from the tree and from Build Details; delete a kept build with Stop Keeping and Delete and confirm an open Build Details panel for it closes
+34. Edit a build's display name (and reset it), a single-line description, and a multi-line description in the draft editor, including a remote-change conflict
+35. Multi-select jobs, running builds, and queue items with Ctrl/Cmd-click and Shift-click, including rows from different environments and repeated jobs in different sections; exercise all six bulk actions from the context menu and Command Palette, verify mixed watched/pinned states and row-only inline icons, decline a stop/cancel confirmation, cancel in-progress work, and check partial-failure details and refreshed tree/watch/queue state
 
 ## License
 

@@ -41,7 +41,7 @@ function formatExecutorId(number: number | undefined, fallbackLabel: string): st
   return isFiniteNumber(number) ? `#${number}` : fallbackLabel;
 }
 
-export function formatExecutorWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
+function formatExecutorWorkLabel(work?: JenkinsNodeExecutable): string | undefined {
   if (!work) {
     return undefined;
   }

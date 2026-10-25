@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { formatQueueItemDescription, normalizeQueueReason } from "../formatters";
+import { trimToUndefined } from "../../shared/stringValues";
+import { formatQueueItemDescription } from "../formatters";
 import { buildEnvironmentTreeItemId } from "./TreeItemIds";
 
 const CLOCK_ICON = new vscode.ThemeIcon("clock");
@@ -38,7 +39,7 @@ export class QueueItemTreeItem extends vscode.TreeItem {
 
   private buildTooltip(item: QueueTreeItemData): string {
     const parts: string[] = [];
-    const normalizedReason = normalizeQueueReason(item.reason);
+    const normalizedReason = trimToUndefined(item.reason);
     if (normalizedReason) {
       parts.push(normalizedReason);
     } else {

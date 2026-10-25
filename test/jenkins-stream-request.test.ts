@@ -277,6 +277,41 @@ describe("requestJenkinsStream", () => {
       response.destroy();
     }
   });
+
+  it("reports failed statuses with the same error as standard requests", async () => {
+    const captureError = async (
+      send: (url: string) => Promise<unknown>
+    ): Promise<JenkinsRequestError> => {
+      const response = createResponse();
+      response.statusCode = 500;
+      response.statusMessage = "Internal Server Error";
+      const restoreHttpRequest = mockHttpRequest(response);
+      try {
+        const result = send("http://jenkins.example/error");
+        await new Promise((resolve) => setImmediate(resolve));
+        response.end("boom");
+        const error = await result.then(
+          () => assert.fail("Expected request to reject."),
+          (rejection: unknown) => rejection
+        );
+        assert.ok(error instanceof JenkinsRequestError);
+        return error;
+      } finally {
+        restoreHttpRequest();
+        response.destroy();
+      }
+    };
+
+    const streamError = await captureError((url) => requestJenkinsStream(url, {}));
+    const standardError = await captureError((url) =>
+      request(url, { parseJson: false, returnText: true })
+    );
+
+    assert.equal(streamError.message, "Jenkins API request failed (500 Internal Server Error)");
+    assert.equal(streamError.message, standardError.message);
+    assert.equal(streamError.statusCode, standardError.statusCode);
+    assert.equal(streamError.responseText, standardError.responseText);
+  });
 });
 
 describe.each(["standard", "streaming"])("discarded %s response disposal", (mode) => {

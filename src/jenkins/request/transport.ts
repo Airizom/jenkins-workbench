@@ -4,6 +4,10 @@ import { JenkinsRequestError } from "../errors";
 
 export const DEFAULT_TIMEOUT_MS = 30000;
 
+export function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 export function buildRequestHeaders(options: {
   parseJson?: boolean;
   headers?: Record<string, string>;

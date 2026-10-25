@@ -4,8 +4,37 @@ import {
   deriveValidationCode,
   extractInvalidStepToken,
   findTokenOccurrence,
-  findTokenOccurrences
+  findTokenOccurrences,
+  mergeSuggestions
 } from "../src/validation/JenkinsfileValidationUtils";
+
+describe("JenkinsfileValidationUtils suggestion merging", () => {
+  it("keeps order, drops case-insensitive duplicates, and caps at ten", () => {
+    const incoming = ["echo", "bat", "SH", "a", "b", "c", "d", "e", "f", "g", "h"];
+    assert.deepEqual(mergeSuggestions(["sh", "Echo"], incoming), [
+      "sh",
+      "Echo",
+      "bat",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g"
+    ]);
+  });
+
+  it("dedupes incoming suggestions when nothing exists yet", () => {
+    assert.deepEqual(mergeSuggestions(undefined, ["sh", "SH", "bat"]), ["sh", "bat"]);
+  });
+
+  it("returns existing suggestions unchanged when nothing is incoming", () => {
+    const existing = ["sh"];
+    assert.equal(mergeSuggestions(existing, []), existing);
+    assert.equal(mergeSuggestions(undefined, []), undefined);
+  });
+});
 
 describe("JenkinsfileValidationUtils invalid step messages", () => {
   const cases = [

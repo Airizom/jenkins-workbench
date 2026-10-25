@@ -1,12 +1,11 @@
-import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
-import * as path from "node:path";
 import { finished, pipeline } from "node:stream/promises";
 import { BuildActionError } from "../jenkins/errors";
 import { JenkinsConsoleNoteFilter } from "../jenkins/JenkinsConsoleNotes";
 import type { JenkinsConsoleTextClient } from "../jenkins/JenkinsConsoleTextClient";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../jenkins/types";
+import { writeViaTemporaryFile } from "./TemporaryFileWriter";
 
 export interface BuildConsoleFilesystem {
   createWriteStream(
@@ -76,38 +75,24 @@ export class BuildConsoleExporter {
     buildUrl: string;
     targetPath: string;
   }): Promise<BuildConsoleExportResult> {
-    const temporaryPath = path.join(
-      path.dirname(options.targetPath),
-      `.${path.basename(options.targetPath)}.${randomUUID()}.tmp`
-    );
-    try {
-      let result: BuildConsoleExportResult;
-      try {
-        result = await this.writeConsoleProgressive(
-          temporaryPath,
-          options.environment,
-          options.buildUrl
-        );
-      } catch (error) {
-        if (!this.shouldFallbackToSnapshot(error)) {
-          throw error;
+    return writeViaTemporaryFile(options.targetPath, {
+      write: async (temporaryPath) => {
+        try {
+          return await this.writeConsoleProgressive(
+            temporaryPath,
+            options.environment,
+            options.buildUrl
+          );
+        } catch (error) {
+          if (!this.shouldFallbackToSnapshot(error)) {
+            throw error;
+          }
+          return this.writeConsoleSnapshot(temporaryPath, options.environment, options.buildUrl);
         }
-        result = await this.writeConsoleSnapshot(
-          temporaryPath,
-          options.environment,
-          options.buildUrl
-        );
-      }
-      await this.filesystem.rename(temporaryPath, options.targetPath);
-      return result;
-    } catch (error) {
-      try {
-        await this.filesystem.delete(temporaryPath);
-      } catch {
-        // Preserve the export error if cleanup fails.
-      }
-      throw error;
-    }
+      },
+      rename: (temporaryPath) => this.filesystem.rename(temporaryPath, options.targetPath),
+      delete: (temporaryPath) => this.filesystem.delete(temporaryPath)
+    });
   }
 
   private async writeConsoleProgressive(

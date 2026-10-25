@@ -1,27 +1,26 @@
-import { resolveKnownBuildResult } from "./BuildStatusFormatters";
+import {
+  type BuildResultCompletionSeverity,
+  resolveKnownBuildResult
+} from "./BuildStatusFormatters";
 import {
   formatJobColorStatusLabel,
   type JobColorStatus,
   resolveJobColorStatus
 } from "./JobColorFormatters";
 
-type CompletionSeverity = "info" | "warning";
-
-const JOB_COLOR_SEVERITY: Record<JobColorStatus, CompletionSeverity> = {
-  success: "info",
-  failed: "warning",
-  unstable: "warning",
-  aborted: "warning",
-  notBuilt: "info",
-  disabled: "info",
-  running: "info",
-  unknown: "info"
+// Job colors that describe a finished build reuse the build-result label and severity.
+const JOB_COLOR_RESULT_TOKEN: Partial<Record<JobColorStatus, string>> = {
+  success: "SUCCESS",
+  failed: "FAILURE",
+  unstable: "UNSTABLE",
+  aborted: "ABORTED",
+  notBuilt: "NOT_BUILT"
 };
 
 export function formatCompletionStatus(
   result?: unknown,
   color?: unknown
-): { label: string; severity: CompletionSeverity } {
+): { label: string; severity: BuildResultCompletionSeverity } {
   if (typeof result === "string") {
     const knownResult = resolveKnownBuildResult(result);
     if (knownResult) {
@@ -32,10 +31,12 @@ export function formatCompletionStatus(
   if (typeof color === "string" && color.trim()) {
     const status = resolveJobColorStatus(color);
     if (status) {
-      return {
-        label: formatJobColorStatusLabel(status),
-        severity: JOB_COLOR_SEVERITY[status]
-      };
+      return (
+        resolveKnownBuildResult(JOB_COLOR_RESULT_TOKEN[status]) ?? {
+          label: formatJobColorStatusLabel(status),
+          severity: "info"
+        }
+      );
     }
   }
 

@@ -8,8 +8,8 @@ const TABS_BAR_HEIGHT_VARIABLE = "--build-details-tabs-bar-height";
 /**
  * Publishes the docked tab bar height so sticky content below it (the test
  * results toolbar, revealed log panes) can dock underneath instead of
- * painting over the tabs. Several sections may call this; the value is left
- * in place on unmount because any remaining caller keeps it current.
+ * painting over the tabs. BuildDetailsTabs, which renders the bar, calls this
+ * once for every tab panel.
  */
 export function useTabsBarHeightVariable(): void {
   useEffect(() => {

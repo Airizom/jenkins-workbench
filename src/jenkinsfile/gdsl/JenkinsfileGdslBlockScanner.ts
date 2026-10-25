@@ -2,12 +2,11 @@ import {
   buildGdslCommentMask,
   findCallStart,
   findMatchingDelimiter,
-  findMatchingDelimiterBackward,
   findPreviousMeaningfulIndex,
   isCallStartAt,
   readIdentifierBackward,
-  skipGdslComment,
   skipString,
+  skipStringOrComment,
   skipWhitespace
 } from "./JenkinsfileGdslScannerUtils";
 import type { ContributorBlock, ScannedMethodCall } from "./JenkinsfileGdslTypes";
@@ -61,19 +60,18 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
   const guardStack: string[][] = [];
   const aliasScopes: Array<Map<string, string[]>> = [new Map()];
   const commentMask = buildGdslCommentMask(body);
+  // Open-paren index for each close paren seen so far, so guards resolve without rescanning.
+  const openParenByClose = new Map<number, number>();
+  const openParens: number[] = [];
   let index = 0;
 
   while (index < body.length) {
-    const character = body[index];
-    if (character === "'" || character === '"') {
-      index = skipString(body, index);
-      continue;
-    }
-    const nextIndex = skipGdslComment(body, index);
+    const nextIndex = skipStringOrComment(body, index);
     if (nextIndex !== undefined) {
       index = nextIndex;
       continue;
     }
+    const character = body[index];
     const aliasAssignment = findGuardAliasAssignment(body, index, aliasScopes);
     if (aliasAssignment) {
       // A declaration binds in the current scope; a reassignment updates the
@@ -88,11 +86,15 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
         }
       }
       aliasScopes[scopeIndex].set(aliasAssignment.name, aliasAssignment.guardNames);
+      trackParens(body, index, aliasAssignment.end, openParens, openParenByClose);
       index = aliasAssignment.end;
       continue;
     }
+    if (character === "(" || character === ")") {
+      trackParens(body, index, index + 1, openParens, openParenByClose);
+    }
     if (character === "{") {
-      guardStack.push(resolveGuardNames(body, index, aliasScopes, commentMask));
+      guardStack.push(resolveGuardNames(body, index, aliasScopes, commentMask, openParenByClose));
       aliasScopes.push(new Map());
       index += 1;
       continue;
@@ -128,18 +130,49 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
   return calls;
 }
 
+function trackParens(
+  text: string,
+  start: number,
+  end: number,
+  openParens: number[],
+  openParenByClose: Map<number, number>
+): void {
+  let index = start;
+  while (index < end) {
+    const nextIndex = skipStringOrComment(text, index);
+    if (nextIndex !== undefined) {
+      index = nextIndex;
+      continue;
+    }
+    if (text[index] === "(") {
+      openParens.push(index);
+    } else if (text[index] === ")") {
+      const openParen = openParens.pop();
+      if (openParen !== undefined) {
+        openParenByClose.set(index, openParen);
+      }
+    }
+    index += 1;
+  }
+}
+
 function resolveGuardNames(
   text: string,
   openBrace: number,
   aliasScopes: ReadonlyArray<ReadonlyMap<string, string[]>>,
-  commentMask: Uint8Array
+  commentMask: Uint8Array,
+  openParenByClose: ReadonlyMap<number, number>
 ): string[] {
   const previous = findPreviousMeaningfulIndex(text, openBrace - 1, commentMask);
   if (previous === undefined || text[previous] !== ")") {
     return [];
   }
 
-  const openParen = findMatchingDelimiterBackward(text, previous, "(", ")");
+  // Parens skipped as part of a method(...) call are never `if` conditions.
+  const openParen = openParenByClose.get(previous);
+  if (openParen === undefined) {
+    return [];
+  }
   const keywordEnd = findPreviousMeaningfulIndex(text, openParen - 1, commentMask);
   if (keywordEnd === undefined) {
     return [];

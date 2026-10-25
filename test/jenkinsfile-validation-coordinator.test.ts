@@ -345,3 +345,52 @@ it("keeps the prior result stale when text changes during a validation request",
   assert.equal(stateStore.getCachedValidation(document), undefined);
   coordinator.dispose();
 });
+
+it("skips a closed document when the validation request settles", async () => {
+  let isClosed = false;
+  const document = {
+    uri: vscodeStub.Uri.file("/workspace/Jenkinsfile"),
+    version: 1,
+    getText: () => "pipeline { agent any }",
+    get isClosed() {
+      return isClosed;
+    }
+  } as vscode.TextDocument;
+  activeDocument = document;
+  const environment: JenkinsEnvironmentRef = {
+    environmentId: "env",
+    scope: "workspace",
+    url: "https://jenkins.example/"
+  };
+  let resolveResponse!: (value: string) => void;
+  const response = new Promise<string>((resolve) => {
+    resolveResponse = resolve;
+  });
+  const validate = vi.fn(() => response);
+  const stateStore = new JenkinsfileValidationStateStore();
+  const statusBar = { setValidating: vi.fn(), refresh: vi.fn(), clear: vi.fn() };
+  const coordinator = new JenkinsfileValidationCoordinator(
+    { getClient: async () => ({ validateDeclarativeJenkinsfile: validate }) } as never,
+    { resolveForDocument: async () => environment } as never,
+    stateStore,
+    statusBar as never,
+    { matches: () => true } as never,
+    { enabled: true, runOnSave: false, changeDebounceMs: 0, filePatterns: ["Jenkinsfile"] }
+  );
+
+  try {
+    const command = coordinator.validateActiveEditor();
+    await vi.waitFor(() => assert.equal(validate.mock.calls.length, 1));
+    isClosed = true;
+    resolveResponse("WorkflowScript: 1: Missing required section 'stages' @ line 1");
+    await command;
+
+    assert.equal(published.length, 0);
+    assert.equal(output.length, 0);
+    assert.equal(showWarningMessage.mock.calls.length, 0);
+    assert.equal(stateStore.getValidationState(document), undefined);
+    assert.equal(stateStore.getCachedValidation(document), undefined);
+  } finally {
+    coordinator.dispose();
+  }
+});

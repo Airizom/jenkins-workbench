@@ -119,7 +119,9 @@ export function renderConsoleHtmlWithHighlights(
     activeMatchIndex,
     cursor: 0,
     matchPointer: 0,
-    sourceReferences: normalizeConsoleSourceReferences(sourceReferences, model.text.length),
+    sourceReferences: normalizeConsoleSourceReferences(sourceReferences, model.text.length).map(
+      (reference) => ({ start: reference.startOffset, end: reference.endOffset, reference })
+    ),
     sourcePointer: 0,
     keyIndex: 0,
     onOpenExternal,
@@ -129,12 +131,16 @@ export function renderConsoleHtmlWithHighlights(
   return renderNodes(model.nodes, context);
 }
 
+type TextRange = { start: number; end: number };
+
+type SourceReferenceRange = TextRange & { reference: BuildDiagnosticConsoleReference };
+
 type RenderContext = {
   matches: ConsoleMatch[];
   activeMatchIndex: number;
   cursor: number;
   matchPointer: number;
-  sourceReferences: BuildDiagnosticConsoleReference[];
+  sourceReferences: SourceReferenceRange[];
   sourcePointer: number;
   keyIndex: number;
   onOpenExternal?: (url: string) => void;
@@ -192,13 +198,16 @@ function renderTextNode(
   }
   const textStart = context.cursor;
   const textEnd = textStart + text.length;
-  let matchIndex = skipMatchesEndingBy(context.matches, context.matchPointer, textStart);
-  let referenceIndex = skipReferencesEndingBy(
+  let matchIndex = skipRangesEndingBy(context.matches, context.matchPointer, textStart);
+  let referenceIndex = skipRangesEndingBy(
     context.sourceReferences,
     context.sourcePointer,
     textStart
   );
-  if (!hasOverlapBefore(context, matchIndex, referenceIndex, textEnd)) {
+  if (
+    !startsBefore(context.matches[matchIndex], textEnd) &&
+    !startsBefore(context.sourceReferences[referenceIndex], textEnd)
+  ) {
     advanceTextCursor(context, matchIndex, referenceIndex, textEnd);
     return [text];
   }
@@ -214,8 +223,8 @@ function renderTextNode(
   for (let index = 0; index < boundaries.length - 1; index += 1) {
     const start = boundaries[index];
     const end = boundaries[index + 1];
-    matchIndex = skipMatchesEndingBy(context.matches, matchIndex, start);
-    referenceIndex = skipReferencesEndingBy(context.sourceReferences, referenceIndex, start);
+    matchIndex = skipRangesEndingBy(context.matches, matchIndex, start);
+    referenceIndex = skipRangesEndingBy(context.sourceReferences, referenceIndex, start);
     const content = renderTextSegment(
       text.slice(start - textStart, end - textStart),
       context,
@@ -232,18 +241,8 @@ function renderTextNode(
   return nodes;
 }
 
-function hasOverlapBefore(
-  context: RenderContext,
-  matchIndex: number,
-  referenceIndex: number,
-  textEnd: number
-): boolean {
-  const nextMatch = context.matches[matchIndex];
-  const nextReference = context.sourceReferences[referenceIndex];
-  return (
-    (nextMatch !== undefined && nextMatch.start < textEnd) ||
-    (nextReference !== undefined && nextReference.startOffset < textEnd)
-  );
+function startsBefore(range: TextRange | undefined, offset: number): boolean {
+  return range !== undefined && range.start < offset;
 }
 
 function collectSegmentBoundaries(
@@ -254,50 +253,37 @@ function collectSegmentBoundaries(
   textEnd: number
 ): number[] {
   const boundaries = new Set<number>([textStart, textEnd]);
-  const addRange = (start: number, end: number) => {
-    boundaries.add(Math.max(textStart, start));
-    boundaries.add(Math.min(textEnd, end));
+  const addRanges = (ranges: TextRange[], fromIndex: number) => {
+    for (let index = fromIndex; startsBefore(ranges[index], textEnd); index += 1) {
+      boundaries.add(Math.max(textStart, ranges[index].start));
+      boundaries.add(Math.min(textEnd, ranges[index].end));
+    }
   };
-  const { matches, sourceReferences: references } = context;
-  for (
-    let index = matchIndex;
-    index < matches.length && matches[index].start < textEnd;
-    index += 1
-  ) {
-    addRange(matches[index].start, matches[index].end);
-  }
-  for (
-    let index = referenceIndex;
-    index < references.length && references[index].startOffset < textEnd;
-    index += 1
-  ) {
-    addRange(references[index].startOffset, references[index].endOffset);
-  }
+  addRanges(context.matches, matchIndex);
+  addRanges(context.sourceReferences, referenceIndex);
   return [...boundaries].sort((left, right) => left - right);
 }
-
-type TextSegmentRange = { start: number; end: number };
 
 function renderTextSegment(
   segment: string,
   context: RenderContext,
-  range: TextSegmentRange,
+  range: TextRange,
   matchIndex: number,
-  reference: BuildDiagnosticConsoleReference | undefined
+  sourceReference: SourceReferenceRange | undefined
 ): React.ReactNode {
   const match = context.matches[matchIndex];
   let content: React.ReactNode = segment;
-  if (match && coversRange(match.start, match.end, range)) {
+  if (match && coversRange(match, range)) {
     content = renderMatch(content, context, matchIndex);
   }
-  if (reference && coversRange(reference.startOffset, reference.endOffset, range)) {
-    content = renderSourceLink(content, context, reference);
+  if (sourceReference && coversRange(sourceReference, range)) {
+    content = renderSourceLink(content, context, sourceReference.reference);
   }
   return content;
 }
 
-function coversRange(start: number, end: number, range: TextSegmentRange): boolean {
-  return start <= range.start && end >= range.end;
+function coversRange(outer: TextRange, range: TextRange): boolean {
+  return outer.start <= range.start && outer.end >= range.end;
 }
 
 function renderMatch(
@@ -344,26 +330,14 @@ function advanceTextCursor(
   referenceIndex: number,
   textEnd: number
 ): void {
-  context.matchPointer = skipMatchesEndingBy(context.matches, matchIndex, textEnd);
-  context.sourcePointer = skipReferencesEndingBy(context.sourceReferences, referenceIndex, textEnd);
+  context.matchPointer = skipRangesEndingBy(context.matches, matchIndex, textEnd);
+  context.sourcePointer = skipRangesEndingBy(context.sourceReferences, referenceIndex, textEnd);
   context.cursor = textEnd;
 }
 
-function skipMatchesEndingBy(matches: ConsoleMatch[], index: number, offset: number): number {
+function skipRangesEndingBy(ranges: TextRange[], index: number, offset: number): number {
   let current = index;
-  while (current < matches.length && matches[current].end <= offset) {
-    current += 1;
-  }
-  return current;
-}
-
-function skipReferencesEndingBy(
-  references: BuildDiagnosticConsoleReference[],
-  index: number,
-  offset: number
-): number {
-  let current = index;
-  while (current < references.length && references[current].endOffset <= offset) {
+  while (current < ranges.length && ranges[current].end <= offset) {
     current += 1;
   }
   return current;

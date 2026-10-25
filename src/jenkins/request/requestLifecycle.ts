@@ -1,21 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { decideRedirect, isCrossOriginRedirect, type RedirectDecision } from "./redirects";
-import { createRequestTarget, createTimeoutError } from "./transport";
-
-type RequestMethod = "GET" | "POST" | "HEAD";
-
-export interface RedirectableRequestOptions {
-  signal?: AbortSignal;
-  beforeRequest?: () => void;
-  method?: RequestMethod;
-  headers?: Record<string, string>;
-  authHeader?: string;
-  body?: string | Uint8Array;
-  timeoutMs?: number;
-  allowInsecureTls?: boolean;
-  redirectCount?: number;
-  contextUrl?: string;
-}
+import { createRequestTarget, createTimeoutError, toError } from "./transport";
+import type { RedirectableRequestOptions, JenkinsRequestMethod as RequestMethod } from "./types";
 
 export interface RequestLifecycleOptions<TOptions extends RedirectableRequestOptions, TResponse> {
   url: string;
@@ -29,10 +15,6 @@ export interface RequestLifecycleOptions<TOptions extends RedirectableRequestOpt
     method: RequestMethod;
     redirectDecision: RedirectDecision;
   }) => Promise<TResponse>;
-}
-
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }
 
 export function executeRequestLifecycle<TOptions extends RedirectableRequestOptions, TResponse>({
@@ -146,9 +128,7 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
       }
     );
 
-    req.on("error", (error) => {
-      safeReject(error instanceof Error ? error : new Error(String(error)));
-    });
+    req.on("error", safeReject);
 
     req.on("timeout", () => {
       req.destroy();

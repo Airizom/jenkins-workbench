@@ -1,6 +1,6 @@
 import * as React from "react";
 import { PanelErrorList } from "../../shared/webview/components/PanelErrorList";
-import { Progress } from "../../shared/webview/components/ui/progress";
+import { PanelLoadingBar } from "../../shared/webview/components/PanelLoadingBar";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
 import { toast } from "../../shared/webview/hooks/useToast";
 import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
@@ -145,11 +145,7 @@ export function BuildCompareApp({ initialState }: { initialState: BuildCompareVi
 
   return (
     <div ref={rootRef} className="min-h-screen bg-background text-foreground">
-      {busy ? (
-        <div className="fixed inset-x-0 top-0 z-50">
-          <Progress indeterminate className="h-px rounded-none" />
-        </div>
-      ) : null}
+      <PanelLoadingBar loading={busy} />
       {/* The header and section nav stick together, so the nav stays usable
           down the whole comparison; the inner header drops its own sticky chrome. */}
       <div ref={chromeRef} className="panel-header">

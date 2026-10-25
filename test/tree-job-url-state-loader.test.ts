@@ -106,4 +106,63 @@ describe("TreeJobUrlStateLoader", () => {
     assert.deepEqual([...(await loader.getWatchedJobUrls(environment))], [newJobUrl]);
     assert.equal(calls, 2);
   });
+
+  it.each([
+    {
+      name: "watched",
+      createStores: (read: () => Promise<string[]>) => ({
+        watchStore: {
+          getWatchedJobUrls: async () => new Set(await read())
+        } as unknown as Partial<JenkinsWatchStore>
+      }),
+      getUrls: (loader: TreeJobUrlStateLoader) => loader.getWatchedJobUrls(environment),
+      invalidate: (cacheManager: TreeChildrenCacheManager) =>
+        cacheManager.clearWatchCacheForEnvironment()
+    },
+    {
+      name: "pinned",
+      createStores: (read: () => Promise<string[]>) => ({
+        pinStore: {
+          listPinnedJobsForEnvironment: async () => (await read()).map((jobUrl) => ({ jobUrl }))
+        } as unknown as Partial<JenkinsPinStore>
+      }),
+      getUrls: (loader: TreeJobUrlStateLoader) => loader.getPinnedJobUrls(environment),
+      invalidate: (cacheManager: TreeChildrenCacheManager) =>
+        cacheManager.clearPinCacheForEnvironment()
+    }
+  ])("does not cache a $name read after clearing all environments", async (scenario) => {
+    const staleRead = createDeferred<string[]>();
+    let calls = 0;
+    const { loader, cacheManager } = createLoader(
+      scenario.createStores(async () => {
+        calls += 1;
+        return calls === 1 ? staleRead.promise : [newJobUrl];
+      })
+    );
+
+    const pending = scenario.getUrls(loader);
+    scenario.invalidate(cacheManager);
+    staleRead.resolve([oldJobUrl]);
+    assert.deepEqual([...(await pending)], [oldJobUrl]);
+
+    assert.deepEqual([...(await scenario.getUrls(loader))], [newJobUrl]);
+    assert.deepEqual([...(await scenario.getUrls(loader))], [newJobUrl]);
+    assert.equal(calls, 2);
+  });
+
+  it("returns watched and pinned job URLs together", async () => {
+    const { loader } = createLoader({
+      watchStore: {
+        getWatchedJobUrls: async () => new Set([oldJobUrl])
+      } as unknown as Partial<JenkinsWatchStore>,
+      pinStore: {
+        listPinnedJobsForEnvironment: async () => [{ jobUrl: newJobUrl }]
+      } as unknown as Partial<JenkinsPinStore>
+    });
+
+    const [watchedJobs, pinnedJobs] = await loader.getJobUrlState(environment);
+
+    assert.deepEqual([...watchedJobs], [oldJobUrl]);
+    assert.deepEqual([...pinnedJobs], [newJobUrl]);
+  });
 });

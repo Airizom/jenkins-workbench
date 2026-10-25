@@ -1,4 +1,4 @@
-import { isRunningJobColor } from "../formatters/JobColorFormatters";
+import { isJobColorDisabled, isRunningJobColor } from "../formatters/JobColorFormatters";
 import type {
   JenkinsJobInfo,
   JenkinsNodeInfo,
@@ -6,7 +6,6 @@ import type {
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { ScopedCache } from "../services/ScopedCache";
-import { isJobColorDisabled } from "./formatters";
 import type {
   JobsFolderSummary,
   NodesFolderSummary,
@@ -36,15 +35,15 @@ export class EnvironmentSummaryStore {
   }
 
   updateFromJobs(environment: JenkinsEnvironmentRef, jobs: JenkinsJobInfo[]): void {
-    this.updateSummary(environment, "jobs", buildJobsSummary(jobs), areJobSummariesEqual);
+    this.updateSummary(environment, "jobs", buildJobsSummary(jobs), areFlatSummariesEqual);
   }
 
   updateFromNodes(environment: JenkinsEnvironmentRef, nodes: JenkinsNodeInfo[]): void {
-    this.updateSummary(environment, "nodes", buildNodesSummary(nodes), areNodeSummariesEqual);
+    this.updateSummary(environment, "nodes", buildNodesSummary(nodes), areFlatSummariesEqual);
   }
 
   updateFromQueue(environment: JenkinsEnvironmentRef, items: JenkinsQueueItemInfo[]): void {
-    this.updateSummary(environment, "queue", { total: items.length }, areQueueSummariesEqual);
+    this.updateSummary(environment, "queue", { total: items.length }, areFlatSummariesEqual);
   }
 
   clearAll(): void {
@@ -154,41 +153,18 @@ function buildNodesSummary(nodes: JenkinsNodeInfo[]): NodesFolderSummary {
   return { total: nodes.length, online: nodes.length - offline, offline };
 }
 
-function areJobSummariesEqual(left?: JobsFolderSummary, right?: JobsFolderSummary): boolean {
-  if (!left && !right) {
-    return true;
-  }
+// Summaries are flat records of counts, so comparing every own key keeps new fields covered.
+function areFlatSummariesEqual<Summary extends object>(left?: Summary, right?: Summary): boolean {
   if (!left || !right) {
+    return left === right;
+  }
+  const leftRecord = left as Record<string, unknown>;
+  const rightRecord = right as Record<string, unknown>;
+  const leftKeys = Object.keys(leftRecord);
+  if (leftKeys.length !== Object.keys(rightRecord).length) {
     return false;
   }
-  return (
-    left.total === right.total &&
-    left.jobs === right.jobs &&
-    left.pipelines === right.pipelines &&
-    left.folders === right.folders &&
-    left.disabled === right.disabled &&
-    left.running === right.running
+  return leftKeys.every(
+    (key) => Object.hasOwn(rightRecord, key) && leftRecord[key] === rightRecord[key]
   );
-}
-
-function areNodeSummariesEqual(left?: NodesFolderSummary, right?: NodesFolderSummary): boolean {
-  if (!left && !right) {
-    return true;
-  }
-  if (!left || !right) {
-    return false;
-  }
-  return (
-    left.total === right.total && left.online === right.online && left.offline === right.offline
-  );
-}
-
-function areQueueSummariesEqual(left?: QueueFolderSummary, right?: QueueFolderSummary): boolean {
-  if (!left && !right) {
-    return true;
-  }
-  if (!left || !right) {
-    return false;
-  }
-  return left.total === right.total;
 }

@@ -69,7 +69,7 @@ describe("ActivityRefreshService", () => {
 
     service.handleActivityFolderExpanded(workspace);
     service.handleActivityFolderExpanded(global);
-    service.handleActivityFolderCollapsed(workspace);
+    service.handleEnvironmentCollapsed(workspace);
     service.handleEnvironmentStoreChange({
       kind: "environment-removed",
       scope: global.scope,
