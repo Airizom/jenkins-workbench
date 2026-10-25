@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type { JenkinsAuthConfig, JenkinsClientOptions } from "../src/jenkins/types";
-import type { JenkinsEnvironmentStore } from "../src/storage/JenkinsEnvironmentStore";
+import { JenkinsEnvironmentStore } from "../src/storage/JenkinsEnvironmentStore";
+import { createExtensionContext } from "./helpers/storageMocks";
 
 vi.doMock("../src/jenkins/JenkinsClient", () => ({
   JenkinsClient: class {
@@ -18,6 +19,7 @@ describe("JenkinsClientProvider client caching", () => {
     let authConfigReads = 0;
     let tokenReads = 0;
     const store = {
+      getAllowInsecureTls: () => false,
       getAuthConfigRevision: () => authConfigRevision,
       getAuthConfig: async () => {
         authConfigReads += 1;
@@ -85,6 +87,7 @@ describe("JenkinsClientProvider client caching", () => {
     let authConfigReads = 0;
     let releaseRead: (() => void) | undefined;
     const store = {
+      getAllowInsecureTls: () => false,
       getAuthConfigRevision: () => 0,
       getAuthConfig: async () => {
         authConfigReads += 1;
@@ -122,6 +125,7 @@ describe("JenkinsClientProvider client caching", () => {
     const firstRead: { release?: () => void } = {};
     let tokenReads = 0;
     const store = {
+      getAllowInsecureTls: () => false,
       getAuthConfigRevision: () => authConfigRevision,
       getAuthConfig: async () => undefined,
       getToken: async () => {
@@ -186,6 +190,7 @@ describe("JenkinsClientProvider SSO refresh", () => {
         return true;
       });
       const store = {
+        getAllowInsecureTls: () => false,
         getAuthConfigRevision: () => authConfigRevision,
         getAuthConfig: async () => storedConfig,
         setAuthConfigIfRevision: save
@@ -226,6 +231,7 @@ describe("JenkinsClientProvider SSO refresh", () => {
     };
     let authConfigRevision = 0;
     const store = {
+      getAllowInsecureTls: () => false,
       getAuthConfigRevision: () => authConfigRevision,
       getAuthConfig: async () => {
         authConfigRevision += 1;
@@ -270,6 +276,7 @@ describe("JenkinsClientProvider SSO refresh", () => {
     let authConfigRevision = 0;
     let storedConfig: JenkinsAuthConfig | undefined = originalConfig;
     const store = {
+      getAllowInsecureTls: () => false,
       getAuthConfigRevision: () => authConfigRevision,
       getAuthConfig: async () => storedConfig,
       setAuthConfigIfRevision: async (
@@ -319,5 +326,127 @@ describe("JenkinsClientProvider SSO refresh", () => {
 
     assert.equal(await refreshPromise, undefined);
     assert.deepEqual(storedConfig, editedConfig);
+  });
+});
+
+describe("JenkinsClientProvider TLS policy", () => {
+  const environment: JenkinsEnvironmentRef = {
+    environmentId: "tls-env",
+    scope: "workspace",
+    url: "https://jenkins.example.com/"
+  };
+
+  function options(client: unknown): JenkinsClientOptions {
+    return (client as { options: JenkinsClientOptions }).options;
+  }
+
+  it("uses current stored policy instead of stale references and recreates clients on changes", async () => {
+    const store = new JenkinsEnvironmentStore(createExtensionContext());
+    await store.addEnvironment("workspace", { id: "tls-env", url: environment.url });
+    const provider = new JenkinsClientProvider(store);
+    const staleInsecure = { ...environment, allowInsecureTls: true };
+    const secureClient = await provider.getClient(staleInsecure);
+    assert.equal(options(secureClient).allowInsecureTls, false);
+
+    await store.updateEnvironment("workspace", "tls-env", { allowInsecureTls: true });
+    const insecureClient = await provider.getClient(environment);
+    assert.notStrictEqual(insecureClient, secureClient);
+    assert.equal(options(insecureClient).allowInsecureTls, true);
+    assert.strictEqual(await provider.getClient(environment), insecureClient);
+
+    await store.updateEnvironment("workspace", "tls-env", { allowInsecureTls: false });
+    const restoredClient = await provider.getClient(staleInsecure);
+    assert.notStrictEqual(restoredClient, insecureClient);
+    assert.equal(options(restoredClient).allowInsecureTls, false);
+  });
+
+  it("isolates environments and scopes, and does not grant exceptions to an old origin", async () => {
+    const store = new JenkinsEnvironmentStore(createExtensionContext());
+    await store.addEnvironment("workspace", {
+      id: "tls-env",
+      url: environment.url,
+      allowInsecureTls: true
+    });
+    await store.addEnvironment("global", { id: "tls-env", url: environment.url });
+    await store.addEnvironment("workspace", { id: "other-env", url: environment.url });
+    const provider = new JenkinsClientProvider(store);
+    assert.equal(options(await provider.getClient(environment)).allowInsecureTls, true);
+    assert.equal(
+      options(await provider.getClient({ ...environment, scope: "global" })).allowInsecureTls,
+      false
+    );
+    assert.equal(
+      options(await provider.getClient({ ...environment, environmentId: "other-env" }))
+        .allowInsecureTls,
+      false
+    );
+    assert.equal(
+      options(await provider.getClient({ ...environment, environmentId: "missing" }))
+        .allowInsecureTls,
+      false
+    );
+
+    const nextUrl = "https://new-jenkins.example.com/";
+    await store.updateEnvironment("workspace", "tls-env", { url: nextUrl });
+    await store.updateEnvironment("workspace", "tls-env", { allowInsecureTls: true });
+    assert.equal(options(await provider.getClient(environment)).allowInsecureTls, false);
+    assert.equal(
+      options(await provider.getClient({ ...environment, url: nextUrl })).allowInsecureTls,
+      true
+    );
+  });
+
+  it.each([true, false])(
+    "rechecks a policy changed to %s during a pending secret read",
+    async (nextPolicy) => {
+      const store = new JenkinsEnvironmentStore(createExtensionContext());
+      await store.addEnvironment("workspace", {
+        id: "tls-env",
+        url: environment.url,
+        allowInsecureTls: !nextPolicy
+      });
+      const pending: { release?: () => void } = {};
+      const originalGetAuthConfig = store.getAuthConfig.bind(store);
+      let reads = 0;
+      vi.spyOn(store, "getAuthConfig").mockImplementation(async (scope, id) => {
+        if (reads++ === 0) {
+          await new Promise<void>((resolve) => {
+            pending.release = resolve;
+          });
+        }
+        return originalGetAuthConfig(scope, id);
+      });
+      const provider = new JenkinsClientProvider(store);
+      const clientPromise = provider.getClient(environment);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.ok(pending.release);
+      await store.updateEnvironment("workspace", "tls-env", { allowInsecureTls: nextPolicy });
+      pending.release();
+      const client = await clientPromise;
+      assert.equal(options(client).allowInsecureTls, nextPolicy);
+      assert.strictEqual(await provider.getClient(environment), client);
+    }
+  );
+
+  it("rechecks policy after a cached resolution yields back to its caller", async () => {
+    const store = new JenkinsEnvironmentStore(createExtensionContext());
+    await store.addEnvironment("workspace", {
+      id: "tls-env",
+      url: environment.url,
+      allowInsecureTls: true
+    });
+    const provider = new JenkinsClientProvider(store);
+    const insecureClient = await provider.getClient(environment);
+    let currentPolicy = true;
+    let reads = 0;
+    vi.spyOn(store, "getAllowInsecureTls").mockImplementation(() => {
+      // The first synchronous cache lookup observes the old policy. The next lookup,
+      // when getClient resumes after its await, observes the newly committed policy.
+      if (reads++ > 0) currentPolicy = false;
+      return currentPolicy;
+    });
+    const secureClient = await provider.getClient(environment);
+    assert.notStrictEqual(secureClient, insecureClient);
+    assert.equal(options(secureClient).allowInsecureTls, false);
   });
 });

@@ -3,7 +3,8 @@ import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
 import type { JenkinsBuild } from "../jenkins/types";
-import { ensureTrailingSlash, parseJobUrl } from "../jenkins/urls";
+import { ensureTrailingSlash, parseJobUrl, rebaseEnvironmentUrl } from "../jenkins/urls";
+import type { EnvironmentScope } from "../storage/JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "../storage/SerialTaskQueue";
 import { completionTime, type HistoryReport } from "./HistoryAnalysis";
 import type { HistoryRequest, HistoryService } from "./HistoryService";
@@ -28,12 +29,12 @@ const KEY = "jenkinsWorkbench.historyBaselines";
 export class HistoryBaselineStore {
   private readonly mutate = createSerialTaskQueue();
   constructor(private readonly context: vscode.ExtensionContext) {}
-  private state(environment: JenkinsEnvironmentRef) {
+  private state(environment: Pick<JenkinsEnvironmentRef, "scope">) {
     return environment.scope === "workspace"
       ? this.context.workspaceState
       : this.context.globalState;
   }
-  private key(environment: JenkinsEnvironmentRef, project: string) {
+  private key(environment: Pick<JenkinsEnvironmentRef, "environmentId">, project: string) {
     return JSON.stringify([environment.environmentId, ensureTrailingSlash(project)]);
   }
   get(environment: JenkinsEnvironmentRef, project: string): string | undefined {
@@ -51,6 +52,55 @@ export class HistoryBaselineStore {
       else delete values[key];
       await state.update(KEY, values);
     });
+  }
+  /**
+   * Moves an environment's baselines from any of `oldBases` onto `newBase` after its URL was
+   * edited, rewriting both the project in the key and the baseline job URL. A baseline already
+   * saved under the new project URL is kept.
+   */
+  rebaseBaselineUrls(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    return this.mutate(async () => {
+      const state = this.state({ scope });
+      const stored = state.get<Record<string, string>>(KEY, {}) ?? {};
+      const values: Record<string, string> = {};
+      const movedKeys: Array<[string, string]> = [];
+      let moved = 0;
+      for (const [key, url] of Object.entries(stored)) {
+        const { nextProject, nextUrl } = rebaseBaselineEntry(
+          key,
+          url,
+          environmentId,
+          oldBases,
+          newBase
+        );
+        if (nextProject || nextUrl) moved += 1;
+        if (nextProject) movedKeys.push([this.key({ environmentId }, nextProject), nextUrl ?? url]);
+        else values[key] = nextUrl ?? url;
+      }
+      if (moved === 0) return 0;
+      for (const [key, url] of movedKeys) values[key] ??= url;
+      await state.update(KEY, values);
+      return moved;
+    });
+  }
+}
+
+function parseBaselineKey(key: string, environmentId: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(key);
+    return Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed[0] === environmentId &&
+      typeof parsed[1] === "string"
+      ? parsed[1]
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -184,4 +234,19 @@ function latestCompletedBefore(
         entry.completed !== undefined && entry.completed <= timestamp
     )
     .sort((a, b) => b.completed - a.completed || b.build.number - a.build.number)[0]?.build;
+}
+
+function rebaseBaselineEntry(
+  key: string,
+  url: string,
+  environmentId: string,
+  oldBases: readonly string[],
+  newBase: string
+): { nextProject?: string; nextUrl?: string } {
+  const project = typeof url === "string" ? parseBaselineKey(key, environmentId) : undefined;
+  if (project === undefined) return {};
+  return {
+    nextProject: rebaseEnvironmentUrl(project, oldBases, newBase),
+    nextUrl: rebaseEnvironmentUrl(url, oldBases, newBase)
+  };
 }

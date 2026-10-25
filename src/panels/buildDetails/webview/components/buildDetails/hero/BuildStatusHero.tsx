@@ -3,16 +3,25 @@ import { BuildResultStatusIcon } from "../../../../../shared/webview/components/
 import { ResultBadge } from "../../../../../shared/webview/components/ResultBadge";
 import { Badge } from "../../../../../shared/webview/components/ui/badge";
 import { Button } from "../../../../../shared/webview/components/ui/button";
+import { ClampedText } from "../../../../../shared/webview/components/ui/clamped-text";
 import { Progress } from "../../../../../shared/webview/components/ui/progress";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
-import { ExternalLinkIcon, PauseCircleIcon } from "../../../../../shared/webview/icons";
+import {
+  ExternalLinkIcon,
+  LockIcon,
+  PauseCircleIcon,
+  PencilIcon,
+  TrashIcon,
+  UnlockIcon
+} from "../../../../../shared/webview/icons";
 import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
 import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestsSummaryViewModel } from "../../../../shared/BuildDetailsContracts";
+import type { BuildManagementMessage } from "../../../../shared/BuildDetailsPanelMessages";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
 import { describeTestOutcome } from "../testResults/testResultsUtils";
 import { AwaitingInputBanner, type AwaitingInputSummary } from "./AwaitingInputBanner";
@@ -106,6 +115,7 @@ function HeroIdentity({
   resultClass,
   isRunning,
   paused,
+  keptForever,
   meta
 }: {
   displayName: string;
@@ -114,6 +124,7 @@ function HeroIdentity({
   resultClass: string;
   isRunning: boolean;
   paused: boolean;
+  keptForever: boolean;
   meta: HeroMetaProps;
 }): React.JSX.Element {
   return (
@@ -134,6 +145,12 @@ function HeroIdentity({
             status={badgeStatus}
             className="shrink-0"
           />
+          {keptForever ? (
+            <Badge variant="muted" size="sm" id="detail-kept-forever" className="shrink-0">
+              <LockIcon className="h-3 w-3" />
+              Kept forever
+            </Badge>
+          ) : null}
         </div>
         {/* No dot separators: when the row wraps one would dangle at a line end,
          * and each item's icon already marks where it starts. */}
@@ -147,16 +164,117 @@ function HeroIdentity({
   );
 }
 
+type HeroManagementProps = {
+  keptForever: boolean;
+  /** Keep/edit/delete need a loaded build. */
+  canManage: boolean;
+  /** Only completed builds can be deleted. */
+  canDelete: boolean;
+  /** Set while the extension handles a management request. */
+  managementBusy: boolean;
+  onBuildManagement: (message: BuildManagementMessage) => void;
+};
+
+/**
+ * Icon-only action with a tooltip. The trigger is a wrapping span because a disabled
+ * button receives no pointer or focus events, and the tooltip must still explain why
+ * the action is unavailable; the span takes the tab stop only while the button is disabled.
+ */
+function HeroIconAction({
+  label,
+  tooltip,
+  disabled,
+  pressed,
+  onClick,
+  children
+}: {
+  label: string;
+  tooltip: string;
+  disabled: boolean;
+  pressed?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex rounded-md" tabIndex={disabled ? 0 : undefined}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="px-2"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            aria-pressed={pressed}
+          >
+            {children}
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function HeroManagementActions({
+  keptForever,
+  canManage,
+  canDelete,
+  managementBusy,
+  onBuildManagement
+}: HeroManagementProps): React.JSX.Element {
+  const unavailable = !canManage || managementBusy;
+  const keepLabel = keptForever ? "Stop keeping this build forever" : "Keep this build forever";
+  const editLabel = "Edit display name or description";
+  const deleteLabel = "Delete build";
+  return (
+    <>
+      <HeroIconAction
+        label={keepLabel}
+        tooltip={keepLabel}
+        disabled={unavailable}
+        pressed={keptForever}
+        onClick={() => onBuildManagement({ type: "setKeepForever", keep: !keptForever })}
+      >
+        {keptForever ? (
+          <LockIcon className="h-3.5 w-3.5" />
+        ) : (
+          <UnlockIcon className="h-3.5 w-3.5" />
+        )}
+      </HeroIconAction>
+      <HeroIconAction
+        label={editLabel}
+        tooltip={editLabel}
+        disabled={unavailable}
+        onClick={() => onBuildManagement({ type: "editBuild" })}
+      >
+        <PencilIcon className="h-3.5 w-3.5" />
+      </HeroIconAction>
+      <HeroIconAction
+        label={deleteLabel}
+        tooltip={canManage && !canDelete ? "Running builds can't be deleted" : deleteLabel}
+        disabled={unavailable || !canDelete}
+        onClick={() => onBuildManagement({ type: "deleteBuild" })}
+      >
+        <TrashIcon className="h-3.5 w-3.5" />
+      </HeroIconAction>
+    </>
+  );
+}
+
 function HeroActions({
   testsSummary,
   stageCount,
   buildUrl,
-  onOpenBuild
+  onOpenBuild,
+  management
 }: {
   testsSummary: BuildTestsSummaryViewModel;
   stageCount: number;
   buildUrl?: string;
   onOpenBuild: () => void;
+  management: HeroManagementProps;
 }): React.JSX.Element {
   const testsPill = describeTestsPill(testsSummary);
   return (
@@ -177,6 +295,7 @@ function HeroActions({
           {stageCount === 1 ? "1 stage" : `${stageCount} stages`}
         </Badge>
       ) : null}
+      <HeroManagementActions {...management} />
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -197,8 +316,10 @@ function HeroActions({
   );
 }
 
-type BuildStatusHeroProps = {
+type BuildStatusHeroProps = HeroManagementProps & {
   displayName: string;
+  /** Plain text; rendered as text, never as HTML. */
+  description?: string;
   resultLabel: string;
   resultClass: string;
   durationLabel: string;
@@ -247,6 +368,7 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
           resultClass={resultClass}
           isRunning={isRunning}
           paused={awaitingInput !== undefined}
+          keptForever={props.keptForever}
           meta={meta}
         />
         <HeroActions
@@ -254,6 +376,13 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
           stageCount={props.stageCount}
           buildUrl={props.buildUrl}
           onOpenBuild={props.onOpenBuild}
+          management={{
+            keptForever: props.keptForever,
+            canManage: props.canManage,
+            canDelete: props.canDelete,
+            managementBusy: props.managementBusy,
+            onBuildManagement: props.onBuildManagement
+          }}
         />
       </div>
       <BuildDetailsMetaFields
@@ -262,6 +391,14 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
         showSeparators={false}
         className="sm:hidden flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-2 text-xs text-muted-foreground"
       />
+      {props.description ? (
+        <ClampedText
+          text={props.description}
+          lines={2}
+          className="mt-2"
+          textClassName="whitespace-pre-line text-xs text-muted-foreground"
+        />
+      ) : null}
       {awaitingInput ? (
         <AwaitingInputBanner summary={awaitingInput} onReview={props.onReviewInputs} />
       ) : null}

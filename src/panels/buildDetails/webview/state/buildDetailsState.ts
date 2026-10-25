@@ -24,12 +24,15 @@ export type BuildDetailsState = Omit<BuildDetailsViewModel, "diagnostics"> & {
   hasLoaded: boolean;
   /** Webview-only: approve/reject requests awaiting `pendingInputActionComplete`. */
   processingInputActions: Record<string, PendingInputProcessingAction>;
+  /** Webview-only: a keep/edit/delete request awaiting `buildManagementActionComplete`. */
+  managementBusy: boolean;
 };
 
 export type BuildDetailsAction =
   | BuildDetailsStateMessage
   | { type: "setFollowLog"; value: boolean }
   | { type: "startPendingInputAction"; inputId: string; action: PendingInputProcessingAction }
+  | { type: "startBuildManagementAction" }
   | { type: "updateDetails"; payload: BuildDetailsUpdateMessage };
 export const DEFAULT_INSIGHTS: BuildFailureInsightsViewModel = {
   changelogItems: [],
@@ -71,6 +74,10 @@ export const DEFAULT_COVERAGE_STATE: BuildDetailsCoverageStateViewModel = {
 
 const FALLBACK_STATE: BuildDetailsState = {
   displayName: "Build Details",
+  description: undefined,
+  keptForever: false,
+  canDelete: false,
+  canManage: false,
   resultLabel: "Unknown",
   resultClass: "neutral",
   durationLabel: "Unknown",
@@ -98,7 +105,8 @@ const FALLBACK_STATE: BuildDetailsState = {
   followLog: true,
   loading: true,
   hasLoaded: false,
-  processingInputActions: Object.create(null)
+  processingInputActions: Object.create(null),
+  managementBusy: false
 };
 export function buildInitialState(initialState: BuildDetailsViewModel): BuildDetailsState {
   const mergedDefaults = mergeBuildDetailsDefaults(initialState);
@@ -112,7 +120,8 @@ export function buildInitialState(initialState: BuildDetailsViewModel): BuildDet
       : undefined,
     consoleHtmlModel: undefined,
     hasLoaded: !(initialState.loading ?? false),
-    processingInputActions: Object.create(null)
+    processingInputActions: Object.create(null),
+    managementBusy: false
   };
   if (merged.consoleHtml) {
     return {
@@ -256,6 +265,12 @@ export function buildDetailsReducer(
         })
       };
     }
+    case "startBuildManagementAction": {
+      return state.managementBusy ? state : { ...state, managementBusy: true };
+    }
+    case "buildManagementActionComplete": {
+      return state.managementBusy ? { ...state, managementBusy: false } : state;
+    }
     case "pendingInputActionComplete": {
       return {
         ...state,
@@ -266,6 +281,11 @@ export function buildDetailsReducer(
       const payload = action.payload;
       return {
         ...state,
+        displayName: payload.displayName,
+        description: payload.description,
+        keptForever: payload.keptForever,
+        canDelete: payload.canDelete,
+        canManage: payload.canManage,
         resultLabel: payload.resultLabel,
         resultClass: payload.resultClass,
         durationLabel: payload.durationLabel,

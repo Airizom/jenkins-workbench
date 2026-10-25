@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
-import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
+import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import { CancellationError } from "../jenkins/errors";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JobHistoryPanelLauncher } from "../panels/JobHistoryPanelLauncher";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { JenkinsFolderTreeItem, JobTreeItem } from "../tree/TreeItems";
-import { toJenkinsEnvironmentRef, withActionErrorMessage } from "./CommandUtils";
+import { withActionErrorMessage } from "./CommandUtils";
 
 const JOB_HISTORY_PICKER_MAX_RESULTS = 2000;
 
@@ -36,7 +37,7 @@ export function registerHistoryCommands(
         const entries = await environments.listEnvironmentsWithScope();
         const chosen = await vscode.window.showQuickPick(
           entries.map((entry) => ({
-            label: formatEnvironmentLabel(entry.url),
+            label: formatEnvironmentDisplayName(entry),
             description: entry.username ? `${entry.scope} · ${entry.username}` : entry.scope,
             entry
           })),

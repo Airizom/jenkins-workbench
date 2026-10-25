@@ -10,6 +10,7 @@ export interface RedirectableRequestOptions {
   authHeader?: string;
   body?: string | Uint8Array;
   timeoutMs?: number;
+  allowInsecureTls?: boolean;
   redirectCount?: number;
   contextUrl?: string;
 }
@@ -39,7 +40,11 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
   onResponse
 }: RequestLifecycleOptions<TOptions, TResponse>): Promise<TResponse> {
   const headers = buildHeaders(options);
-  const { parsed, client, timeoutMs } = createRequestTarget(url, options.timeoutMs);
+  const { parsed, client, timeoutMs, tlsOptions } = createRequestTarget(
+    url,
+    options.timeoutMs,
+    options.allowInsecureTls
+  );
   const method = options.method ?? "GET";
 
   return new Promise<TResponse>((resolve, reject) => {
@@ -78,7 +83,8 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
         port: parsed.port,
         path: `${parsed.pathname}${parsed.search}`,
         headers,
-        timeout: timeoutMs
+        timeout: timeoutMs,
+        ...tlsOptions
       },
       (response) => {
         const statusCode = response.statusCode ?? 0;
@@ -101,13 +107,14 @@ export function executeRequestLifecycle<TOptions extends RedirectableRequestOpti
         if (redirectDecision.type === "follow") {
           clearTimer();
           response.destroy();
-          // Never forward credentials to another origin.
+          // Never forward credentials or a certificate exception to another origin.
           const nextOptions: TOptions = isCrossOriginRedirect(url, redirectDecision.nextUrl)
             ? {
                 ...options,
                 redirectCount: redirectDecision.redirectCount,
                 authHeader: undefined,
-                headers: undefined
+                headers: undefined,
+                allowInsecureTls: false
               }
             : { ...options, redirectCount: redirectDecision.redirectCount };
           executeRequestLifecycle<TOptions, TResponse>({

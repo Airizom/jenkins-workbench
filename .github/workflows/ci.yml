@@ -29,7 +29,7 @@ jobs:
         run: npm run check
       - name: Test
         run: npm test
-      # Runs after Test so coverage/lcov.info exists and fallow can compute
+      # Runs after Test so coverage/coverage-final.json exists and fallow can compute
       # CRAP scores the same way they are computed locally.
       - name: Fallow audit
         run: npm run fallow:audit:ci

@@ -31,6 +31,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
   private readonly username?: string;
   private readonly token?: string;
   private readonly requestTimeoutMs?: number;
+  private readonly allowInsecureTls: boolean;
   private readonly refreshAuthConfig?: JenkinsAuthConfigRefresh;
   private currentAuthConfig?: JenkinsAuthConfig;
   private baseHeaders?: Record<string, string>;
@@ -49,6 +50,7 @@ export class JenkinsHttpClient implements JenkinsClientContext {
     this.username = username && username.length > 0 ? username : undefined;
     this.token = token && token.length > 0 ? token : undefined;
     this.requestTimeoutMs = options.requestTimeoutMs;
+    this.allowInsecureTls = options.allowInsecureTls === true;
     this.refreshAuthConfig = options.refreshAuthConfig;
     this.currentAuthConfig = options.authConfig;
     this.updateAuthHeaders();
@@ -154,7 +156,8 @@ export class JenkinsHttpClient implements JenkinsClientContext {
       authHeader: authHeaders.authHeader,
       headers: this.baseHeaders,
       timeoutMs: this.requestTimeoutMs,
-      contextUrl: this.baseUrl
+      contextUrl: this.baseUrl,
+      allowInsecureTls: this.allowInsecureTls
     };
     this.clearSsoLoginMatchers();
   }

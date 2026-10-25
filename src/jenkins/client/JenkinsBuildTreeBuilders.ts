@@ -10,17 +10,24 @@ const REVISION_FIELDS =
   "_class,lastBuiltRevision[SHA1],remoteUrls,revision[_class,pullHash,mergeHash,head[sourceOwner,sourceRepo,checkoutStrategy]]";
 const BUILD_ACTION_CAUSE_FIELD = "causes[shortDescription,userId,userName]";
 const BUILD_ACTION_PARAMETER_FIELD = "parameters[name,value]";
+const BUILD_MANAGEMENT_FIELDS = "number,url,building,keepLog,displayName,description";
 
 export function buildBuildsTree(options?: {
   offset?: number;
   includeDetails?: boolean;
   includeParameters?: boolean;
   includeRevisions?: boolean;
+  includeDescription?: boolean;
 }): string {
   const parts: string[] = [
     options?.offset === undefined ? "builds[" : "allBuilds[",
-    "number,url,result,building,timestamp,duration,estimatedDuration"
+    "number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName"
   ];
+
+  // Descriptions can be large HTML, so only callers that render them opt in.
+  if (options?.includeDescription) {
+    parts.push(",description");
+  }
 
   if (options?.includeDetails) {
     parts.push(",", BUILD_CHANGE_SET_FIELDS.join(","));
@@ -43,7 +50,11 @@ export function buildBuildDetailsTree(options?: {
   includeParameters?: boolean;
   statusOnly?: boolean;
   revisionsOnly?: boolean;
+  managementOnly?: boolean;
 }): string {
+  if (options?.managementOnly) {
+    return BUILD_MANAGEMENT_FIELDS;
+  }
   if (options?.revisionsOnly) {
     return `number,url,result,building,timestamp,actions[${REVISION_FIELDS}]`;
   }
@@ -58,7 +69,7 @@ export function buildBuildDetailsTree(options?: {
   });
   return [
     "number,url,result,building,timestamp,duration,estimatedDuration,",
-    "displayName,fullDisplayName,culprits[fullName],",
+    "keepLog,displayName,fullDisplayName,description,culprits[fullName],",
     "artifacts[fileName,relativePath],",
     `${BUILD_CHANGE_SET_FIELDS.join(",")},`,
     `actions[${actionParts.join(",")}]`

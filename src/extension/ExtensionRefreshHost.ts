@@ -1,5 +1,8 @@
 import * as vscode from "vscode";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsQueuePoller } from "../queue/JenkinsQueuePoller";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type {
@@ -43,12 +46,7 @@ export function createExtensionRefreshHost(
     if (!environment) {
       return;
     }
-    queuePoller.updateEnvironment({
-      environmentId: environment.id,
-      scope: environment.scope,
-      url: environment.url,
-      username: environment.username
-    });
+    queuePoller.updateEnvironment(toJenkinsEnvironmentRef(environment));
   };
 
   return {

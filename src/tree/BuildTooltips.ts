@@ -2,11 +2,13 @@ import * as vscode from "vscode";
 import { formatLocaleTimestampWithRelative } from "../formatters/DisplayFormatters";
 import { resolveLastBuildChangeset } from "../jenkins/changesets/collectBuildChangesets";
 import type { JenkinsBuild, JenkinsBuildCause } from "../jenkins/JenkinsClient";
+import { resolveCustomBuildDisplayName } from "../shared/build/BuildDisplayName";
 import {
   type BuildParameterFilterOptions,
   visitMatchingBuildParameters
 } from "../shared/build/BuildParameterCollection";
 import { formatBuildParameterValueForTooltip } from "../shared/build/BuildParameterFormatting";
+import { toPlainTextDescription } from "../shared/html";
 import { normalizeWhitespace } from "../shared/stringValues";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 import { formatDurationMs } from "./formatters";
@@ -60,6 +62,25 @@ export function buildBuildTooltip(
     tooltip.appendMarkdown(`**${label}:** `);
     hasSection = true;
   };
+
+  // Display names and descriptions are user-controlled (descriptions are often HTML), so
+  // they only ever go through appendText, which escapes Markdown, HTML, and links.
+  const displayName = resolveCustomBuildDisplayName(build);
+  if (displayName) {
+    appendHeader("Display name");
+    tooltip.appendText(displayName);
+  }
+
+  const description = toPlainTextDescription(build.description);
+  if (description) {
+    appendHeader("Description");
+    tooltip.appendText(description);
+  }
+
+  if (build.keepLog === true) {
+    appendHeader("Retention");
+    tooltip.appendText("Kept forever");
+  }
 
   const commit = resolveLastCommit(build, maxCommitMessageLength);
   if (commit) {

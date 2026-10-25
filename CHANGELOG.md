@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- feat(builds): manage individual builds from the tree and the Build Details header: delete a completed build (kept builds offer Stop Keeping and Delete, and deletion is verified), keep forever or release, and edit the display name or description. Multi-line descriptions open in a draft editor that checks for remote changes before submitting. The tree and Build Details show custom display names, descriptions as plain text, and the kept-forever state.
+
 ## [1.57.0] - 2026-10-24
 
 ### Changed

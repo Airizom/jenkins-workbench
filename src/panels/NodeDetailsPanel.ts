@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
-import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
+import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsNodeDetails } from "../jenkins/types";
@@ -8,18 +8,10 @@ import { NodeActionService } from "../services/NodeActionService";
 import { NodeQueuedWorkService } from "../services/NodeQueuedWorkService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
+import { routeNodeDetailsMessage } from "./nodeDetails/NodeDetailsMessageRouter";
 import { renderLoadingHtml, renderNodeDetailsHtml } from "./nodeDetails/NodeDetailsRenderer";
 import { buildNodeDetailsViewModel } from "./nodeDetails/NodeDetailsViewModel";
-import {
-  isBringNodeOnlineMessage,
-  isCopyNodeJsonMessage,
-  isLaunchNodeAgentMessage,
-  isLoadAdvancedNodeDetailsMessage,
-  isOpenExternalMessage,
-  isRefreshNodeDetailsMessage,
-  isTakeNodeOfflineMessage,
-  type NodeDetailsOutgoingMessage
-} from "./nodeDetails/shared/NodeDetailsPanelMessages";
+import type { NodeDetailsOutgoingMessage } from "./nodeDetails/shared/NodeDetailsPanelMessages";
 import {
   createNodeDetailsPanelState,
   isNodeDetailsPanelState
@@ -28,6 +20,7 @@ import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
   attachPanelLifecycle,
   bindEnvironmentRefresh,
+  closePanelForEnvironment,
   createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
   LoadTokenTracker,
@@ -155,6 +148,12 @@ export class NodeDetailsPanel {
     await revived.load();
   }
 
+  /** Closes the panel when it shows the given environment, e.g. after its URL changed. */
+  static closeForEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
+    const current = NodeDetailsPanel.currentPanel;
+    closePanelForEnvironment(current?.panel, current?.environment, scope, environmentId);
+  }
+
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
@@ -163,35 +162,14 @@ export class NodeDetailsPanel {
     );
     this.attachLifecycle();
     this.panel.webview.onDidReceiveMessage(
-      (message: unknown) => {
-        if (isRefreshNodeDetailsMessage(message)) {
-          void this.refreshDetails();
-          return;
-        }
-        if (isLoadAdvancedNodeDetailsMessage(message)) {
-          void this.loadAdvancedDetails();
-          return;
-        }
-        if (isTakeNodeOfflineMessage(message)) {
-          void this.handleNodeAction("takeNodeOffline");
-          return;
-        }
-        if (isBringNodeOnlineMessage(message)) {
-          void this.handleNodeAction("bringNodeOnline");
-          return;
-        }
-        if (isLaunchNodeAgentMessage(message)) {
-          void this.handleNodeAction("launchNodeAgent");
-          return;
-        }
-        if (isOpenExternalMessage(message)) {
-          void this.openExternalUrl(message.url);
-          return;
-        }
-        if (isCopyNodeJsonMessage(message)) {
-          void this.copyJson(message.content);
-        }
-      },
+      (message: unknown) =>
+        routeNodeDetailsMessage(message, {
+          refresh: () => this.refreshDetails(),
+          loadAdvanced: () => this.loadAdvancedDetails(),
+          performAction: (action) => this.handleNodeAction(action),
+          openExternal: (url) => this.openExternalUrl(url),
+          copyJson: (content) => this.copyJson(content)
+        }),
       null,
       this.disposables
     );
@@ -457,7 +435,7 @@ export class NodeDetailsPanel {
   }
 
   private get environmentLabel(): string | undefined {
-    return this.environment ? formatEnvironmentLabel(this.environment.url) : undefined;
+    return this.environment ? formatEnvironmentDisplayName(this.environment) : undefined;
   }
 
   private get currentDetailLevel(): "basic" | "advanced" {

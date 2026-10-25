@@ -10,5 +10,6 @@ export interface BuildListFetchOptions {
   offset?: number;
   detailLevel?: "summary" | "details" | "revisions";
   includeParameters?: boolean;
+  includeDescription?: boolean;
   bypassCache?: boolean;
 }

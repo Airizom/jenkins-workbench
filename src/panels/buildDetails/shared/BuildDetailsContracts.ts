@@ -265,6 +265,13 @@ export interface PendingInputViewModel {
 export interface BuildDetailsViewModel {
   displayName: string;
   buildUrl?: string;
+  /** Plain-text build description with markup stripped; omitted when empty. */
+  description?: string;
+  keptForever: boolean;
+  /** Only completed builds can be deleted. */
+  canDelete: boolean;
+  /** Keep/edit/delete need a loaded build with a known URL and environment. */
+  canManage: boolean;
   resultLabel: string;
   resultClass: string;
   durationLabel: string;
@@ -290,6 +297,14 @@ export interface BuildDetailsViewModel {
 
 export interface BuildDetailsUpdateMessage {
   type: "updateDetails";
+  displayName: string;
+  /** Plain-text build description with markup stripped; omitted when empty. */
+  description?: string;
+  keptForever: boolean;
+  /** Only completed builds can be deleted. */
+  canDelete: boolean;
+  /** Keep/edit/delete need a loaded build with a known URL and environment. */
+  canManage: boolean;
   resultLabel: string;
   resultClass: string;
   durationLabel: string;

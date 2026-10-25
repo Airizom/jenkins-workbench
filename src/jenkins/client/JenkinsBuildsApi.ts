@@ -42,6 +42,9 @@ const BUILD_ARTIFACTS_TREE = "artifacts[fileName,relativePath]";
 const LAST_FAILED_BUILD_TREE = "lastFailedBuild[number,url,result,building,timestamp,duration]";
 const REBUILD_AUTOREBUILD_BODY = "autorebuild=true";
 const BUILD_LIST_LIMIT_TOKEN = "{limit}";
+const FORM_CONTENT_HEADERS = {
+  "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+};
 
 export type JenkinsBuildTriggerOptions =
   | { mode: "build" }
@@ -71,6 +74,7 @@ export class JenkinsBuildsApi {
       includeDetails?: boolean;
       includeParameters?: boolean;
       includeRevisions?: boolean;
+      includeDescription?: boolean;
       offset?: number;
     }
   ): Promise<JenkinsBuild[]> {
@@ -104,6 +108,7 @@ export class JenkinsBuildsApi {
       includeParameters?: boolean;
       statusOnly?: boolean;
       revisionsOnly?: boolean;
+      managementOnly?: boolean;
     }
   ): Promise<JenkinsBuildDetails> {
     const tree = buildBuildDetailsTree(options);
@@ -252,6 +257,37 @@ export class JenkinsBuildsApi {
   async stopBuild(buildUrl: string): Promise<void> {
     const url = buildActionUrl(buildUrl, "stop");
     await this.context.requestVoidWithCrumb(url);
+  }
+
+  async deleteBuild(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "doDelete");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  /** Flips Jenkins' keep-forever flag; callers must read the current state first. */
+  async toggleBuildKeepLog(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "toggleLogKeep");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  async submitBuildDescription(buildUrl: string, description: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "submitDescription");
+    const body = `description=${encodeURIComponent(description)}`;
+    await this.context.requestPostWithCrumbRaw(url, body, FORM_CONTENT_HEADERS);
+  }
+
+  /**
+   * Jenkins' build configSubmit sets the display name and description together,
+   * so callers must pass the current description to keep it unchanged.
+   */
+  async submitBuildDisplayName(
+    buildUrl: string,
+    displayName: string,
+    description: string
+  ): Promise<void> {
+    const url = buildActionUrl(buildUrl, "configSubmit");
+    const body = `json=${encodeURIComponent(JSON.stringify({ displayName, description }))}`;
+    await this.context.requestPostWithCrumbRaw(url, body, FORM_CONTENT_HEADERS);
   }
 
   async quickReplayBuild(buildUrl: string): Promise<void> {

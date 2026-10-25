@@ -40,6 +40,14 @@ export class ActivityRefreshService {
     });
   }
 
+  /** Swaps in an edited environment (new URL or name) while its Activity folder stays expanded. */
+  updateEnvironment(environment: JenkinsEnvironmentRef): void {
+    const state = this.refreshStateByEnvironment.get(buildEnvironmentKey(environment));
+    if (state) {
+      state.environment = environment;
+    }
+  }
+
   handleActivityFolderCollapsed(environment: JenkinsEnvironmentRef): void {
     this.clearEnvironment(environment.scope, environment.environmentId);
   }
@@ -58,6 +66,9 @@ export class ActivityRefreshService {
       case "environment-removed":
         this.clearEnvironment(change.scope, change.environmentId);
         return;
+      // The tree item keeps its id across an edit, so the folder stays expanded; the updated
+      // ref arrives through updateEnvironment.
+      case "environment-updated":
       case "environment-added":
       case "auth-config-updated":
       case "auth-config-deleted":

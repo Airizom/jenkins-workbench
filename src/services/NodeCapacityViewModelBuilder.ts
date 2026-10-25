@@ -1,4 +1,4 @@
-import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
+import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import type { JenkinsNodeInfo, JenkinsQueueItemInfo } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { buildBaseNodeExecutorSummaries } from "../jenkins/NodeExecutorFormatters";
@@ -85,7 +85,7 @@ export function buildNodeCapacityViewModel(
   ].sort(comparePools);
 
   return {
-    environmentLabel: formatEnvironmentLabel(environment.url),
+    environmentLabel: formatEnvironmentDisplayName(environment),
     updatedAt,
     summary: buildSummary(nodeViewModels, queueViewModels, pools),
     pools,

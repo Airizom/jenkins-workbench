@@ -1,10 +1,13 @@
 import {
   type ApproveInputMessage,
   type ArtifactActionMessage,
+  type BuildManagementMessage,
   isApproveInputMessage,
   isArtifactActionMessage,
   isClearPipelineLogNodeMessage,
   isConfigureBuildDiagnosticsMessage,
+  isDeleteBuildMessage,
+  isEditBuildMessage,
   isExportConsoleMessage,
   isExportPipelineNodeLogMessage,
   isOpenDiagnosticSourceMessage,
@@ -16,6 +19,7 @@ import {
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
+  isSetKeepForeverMessage,
   isShowBuildDiagnosticProblemsMessage,
   isToggleFollowLogMessage,
   type OpenDiagnosticSourceMessage,
@@ -42,6 +46,7 @@ export interface BuildDetailsMessageRouterHandlers {
   onOpenDiagnosticSource(message: OpenDiagnosticSourceMessage): void;
   onConfigureBuildDiagnostics(): void;
   onShowBuildDiagnosticProblems(): void;
+  onBuildManagement(message: BuildManagementMessage): void;
   onPersistUiState(message: PersistUiStateMessage): void;
   onRefreshBuildDetails(): void;
   onToggleFollowLog(value: unknown): void;
@@ -90,6 +95,9 @@ function createMessageRoutes(
     createMessageRoute(isShowBuildDiagnosticProblemsMessage, () =>
       handlers.onShowBuildDiagnosticProblems()
     ),
+    createMessageRoute(isSetKeepForeverMessage, (message) => handlers.onBuildManagement(message)),
+    createMessageRoute(isEditBuildMessage, (message) => handlers.onBuildManagement(message)),
+    createMessageRoute(isDeleteBuildMessage, (message) => handlers.onBuildManagement(message)),
     createMessageRoute(isPersistUiStateMessage, (message) => handlers.onPersistUiState(message)),
     createMessageRoute(isToggleFollowLogMessage, (message) =>
       handlers.onToggleFollowLog(message.value)

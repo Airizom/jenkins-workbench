@@ -22,6 +22,7 @@ interface JenkinsClientCacheEntry {
   authConfigRevision: number;
   url: string;
   username?: string;
+  allowInsecureTls: boolean;
 }
 
 interface PendingAuthMaterial {
@@ -54,32 +55,44 @@ export class JenkinsClientProvider {
   }
 
   async getClient(environment: JenkinsEnvironmentRef): Promise<JenkinsClient> {
-    const { cacheKey, entry } = await this.resolveClientCache(environment);
-    if (entry.client) {
-      return entry.client;
-    }
+    for (;;) {
+      const { cacheKey, entry } = await this.resolveClientCache(environment);
+      // The policy may change between resolving the entry and resuming this caller.
+      if (entry.allowInsecureTls !== this.getAllowInsecureTls(environment)) {
+        continue;
+      }
+      if (entry.client) {
+        return entry.client;
+      }
 
-    const { authConfig, token } = entry.authMaterial;
-    const client = new JenkinsClient({
-      baseUrl: environment.url,
-      username: environment.username,
-      token,
-      authConfig,
-      refreshAuthConfig: (currentAuthConfig) =>
-        this.refreshBrowserSsoAuthConfig(environment, currentAuthConfig),
-      requestTimeoutMs: this.requestTimeoutMs
-    });
-
-    // Only publish onto the entry this client was built from; a newer resolution or an
-    // invalidation must not be replaced by a client carrying older credentials.
-    if (this.clientCache.get(cacheKey) === entry) {
-      this.clientCache.set(cacheKey, {
-        ...entry,
-        client
+      const { authConfig, token } = entry.authMaterial;
+      const client = new JenkinsClient({
+        baseUrl: environment.url,
+        username: environment.username,
+        token,
+        authConfig,
+        allowInsecureTls: entry.allowInsecureTls,
+        refreshAuthConfig: (currentAuthConfig) =>
+          this.refreshBrowserSsoAuthConfig(environment, currentAuthConfig),
+        requestTimeoutMs: this.requestTimeoutMs
       });
-    }
 
-    return client;
+      // Only publish onto the entry this client was built from; a newer resolution or an
+      // invalidation must not be replaced by a client carrying older settings.
+      if (this.clientCache.get(cacheKey) === entry) {
+        entry.client = client;
+      }
+      return client;
+    }
+  }
+
+  private getAllowInsecureTls(environment: JenkinsEnvironmentRef): boolean {
+    // Never trust a reference retained by a task, panel, or poller as TLS authority.
+    return this.store.getAllowInsecureTls(
+      environment.scope,
+      environment.environmentId,
+      environment.url
+    );
   }
 
   invalidateClient(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
@@ -182,11 +195,17 @@ export class JenkinsClientProvider {
   ): Promise<JenkinsClientCacheResolution> {
     const cacheKey = `${environment.scope}:${environment.environmentId}`;
     for (;;) {
+      const allowInsecureTls = this.getAllowInsecureTls(environment);
       const authConfigRevision = this.store.getAuthConfigRevision(
         environment.scope,
         environment.environmentId
       );
-      const cached = this.getCurrentCacheEntry(cacheKey, environment, authConfigRevision);
+      const cached = this.getCurrentCacheEntry(
+        cacheKey,
+        environment,
+        authConfigRevision,
+        allowInsecureTls
+      );
       if (cached) {
         return { cacheKey, entry: cached };
       }
@@ -196,11 +215,17 @@ export class JenkinsClientProvider {
       // publishing material for a revision that is already stale.
       if (
         this.store.getAuthConfigRevision(environment.scope, environment.environmentId) !==
-        authConfigRevision
+          authConfigRevision ||
+        this.getAllowInsecureTls(environment) !== allowInsecureTls
       ) {
         continue;
       }
-      const current = this.getCurrentCacheEntry(cacheKey, environment, authConfigRevision);
+      const current = this.getCurrentCacheEntry(
+        cacheKey,
+        environment,
+        authConfigRevision,
+        allowInsecureTls
+      );
       if (current) {
         return { cacheKey, entry: current };
       }
@@ -209,6 +234,7 @@ export class JenkinsClientProvider {
       const client =
         previous?.url === environment.url &&
         previous.username === environment.username &&
+        previous.allowInsecureTls === allowInsecureTls &&
         previous.client &&
         previous.authMaterial.authSignature === authMaterial.authSignature &&
         previous.authMaterial.token === authMaterial.token
@@ -219,7 +245,8 @@ export class JenkinsClientProvider {
         authMaterial,
         authConfigRevision,
         url: environment.url,
-        username: environment.username
+        username: environment.username,
+        allowInsecureTls
       };
       this.clientCache.set(cacheKey, entry);
       return { cacheKey, entry };
@@ -229,12 +256,14 @@ export class JenkinsClientProvider {
   private getCurrentCacheEntry(
     cacheKey: string,
     environment: JenkinsEnvironmentRef,
-    authConfigRevision: number
+    authConfigRevision: number,
+    allowInsecureTls: boolean
   ): JenkinsClientCacheEntry | undefined {
     const cached = this.clientCache.get(cacheKey);
     return cached?.url === environment.url &&
       cached.username === environment.username &&
-      cached.authConfigRevision === authConfigRevision
+      cached.authConfigRevision === authConfigRevision &&
+      cached.allowInsecureTls === allowInsecureTls
       ? cached
       : undefined;
   }

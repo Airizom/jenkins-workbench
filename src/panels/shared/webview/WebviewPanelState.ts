@@ -1,4 +1,7 @@
-import type { JenkinsEnvironmentRef } from "../../../jenkins/JenkinsEnvironmentRef";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../../../jenkins/JenkinsEnvironmentRef";
 import type {
   EnvironmentScope,
   JenkinsEnvironmentStore
@@ -63,10 +66,5 @@ export async function resolveEnvironmentRef(
   if (!match) {
     return undefined;
   }
-  return {
-    environmentId: match.id,
-    scope: state.scope,
-    url: match.url,
-    username: match.username
-  };
+  return toJenkinsEnvironmentRef({ ...match, scope: state.scope });
 }

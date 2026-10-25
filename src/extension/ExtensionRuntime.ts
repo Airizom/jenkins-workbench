@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { NodeCapacityPanel } from "../panels/NodeCapacityPanel";
 import { NodeDetailsPanel } from "../panels/NodeDetailsPanel";
+import { BUILD_DESCRIPTION_DRAFT_SCHEME } from "../services/BuildDescriptionDraftFilesystem";
 import { JOB_CONFIG_DRAFT_SCHEME } from "../services/JobConfigDraftFilesystem";
 import { REPLAY_DRAFT_SCHEME } from "../services/ReplayDraftFilesystem";
 import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
@@ -40,6 +41,12 @@ export async function activateRuntime(
   } catch (error) {
     console.warn("Failed to migrate legacy Jenkins repository links.", error);
   }
+  try {
+    // Replays URL edits made while this workspace was closed; a no-op once rebased.
+    await container.get("environmentUrlRebaseService").rebaseAll();
+  } catch (error) {
+    console.warn("Failed to rebase stored Jenkins URLs.", error);
+  }
 
   const treeDataProvider = container.get("treeDataProvider");
   const treeView = container.get("treeView");
@@ -62,6 +69,8 @@ export async function activateRuntime(
   const currentBranchStatusBar = container.get("currentBranchStatusBar");
   const replayDraftManager = container.get("replayDraftManager");
   const replayDraftFilesystem = container.get("replayDraftFilesystem");
+  const buildDescriptionDraftManager = container.get("buildDescriptionDraftManager");
+  const buildDescriptionDraftFilesystem = container.get("buildDescriptionDraftFilesystem");
   const buildDiagnosticsCoordinator = container.get("buildDiagnosticsCoordinator");
 
   await syncNoEnvironmentsContext(environmentStore);
@@ -140,6 +149,10 @@ export async function activateRuntime(
     REPLAY_DRAFT_SCHEME,
     replayDraftFilesystem
   );
+  const buildDescriptionDraftFilesystemRegistration = vscode.workspace.registerFileSystemProvider(
+    BUILD_DESCRIPTION_DRAFT_SCHEME,
+    buildDescriptionDraftFilesystem
+  );
 
   void currentBranchService.start().catch((error) => {
     console.warn("Failed to initialize current-branch state.", error);
@@ -160,11 +173,13 @@ export async function activateRuntime(
     pendingInputCoordinator,
     jobConfigDraftManager,
     replayDraftManager,
+    buildDescriptionDraftManager,
     buildDiagnosticsCoordinator,
     treeSummarySubscription,
     jobFilterDescriptionSubscription,
     jobConfigDraftFilesystemRegistration,
     replayDraftFilesystemRegistration,
+    buildDescriptionDraftFilesystemRegistration,
     buildCompareSerializer,
     buildDetailsSerializer,
     nodeCapacitySerializer,
@@ -182,6 +197,9 @@ export async function activateRuntime(
       void syncJenkinsfileContext(jenkinsfileMatcher);
     }),
     vscode.workspace.onDidRenameFiles(() => {
+      void syncJenkinsfileContext(jenkinsfileMatcher);
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
       void syncJenkinsfileContext(jenkinsfileMatcher);
     }),
     vscode.workspace.onDidCloseTextDocument((document) => {

@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import { getExtensionConfiguration, getJobSearchTuningOptions } from "../extension/ExtensionConfig";
 import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService, JobSearchEntry } from "../jenkins/JenkinsDataService";
+import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import { toJenkinsEnvironmentRef } from "./JenkinsTaskEnvironment";
 import { JenkinsTaskTerminal } from "./JenkinsTaskTerminal";
 import {
   isJenkinsTaskDefinition,

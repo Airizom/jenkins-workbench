@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
-import { formatEnvironmentLabel } from "../../jenkins/EnvironmentLabels";
+import {
+  formatEnvironmentDisplayName,
+  formatEnvironmentLabel
+} from "../../jenkins/EnvironmentLabels";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
@@ -65,23 +68,27 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
   public readonly environmentId: string;
   public readonly scope: EnvironmentScope;
   public readonly url: string;
+  public readonly name?: string;
   public readonly username?: string;
+  public readonly allowInsecureTls?: boolean;
 
   constructor(
     environment: JenkinsEnvironment & { scope: EnvironmentScope },
     issue?: InstanceTreeItemIssue
   ) {
-    const label = formatEnvironmentLabel(environment.url);
-    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    super(formatEnvironmentDisplayName(environment), vscode.TreeItemCollapsibleState.Collapsed);
     this.environmentId = environment.id;
     this.scope = environment.scope;
     this.url = environment.url;
+    this.name = normalizeEnvironmentName(environment.name);
     this.username = environment.username;
+    this.allowInsecureTls = environment.allowInsecureTls === true ? true : undefined;
     this.id = InstanceTreeItem.buildId(this);
     this.contextValue = "environment";
     const identity = [formatScopeLabel(environment.scope), environment.username].filter(Boolean);
+    const parts = issue ? [formatEnvironmentIssueLabel(issue.kind), ...identity] : identity;
     this.description = (
-      issue ? [formatEnvironmentIssueLabel(issue.kind), ...identity] : identity
+      this.name ? [formatEnvironmentLabel(environment.url), ...parts] : parts
     ).join(" • ");
     this.iconPath = issue ? SERVER_ENVIRONMENT_ISSUE_ICON : SERVER_ENVIRONMENT_ICON;
     this.tooltip = buildEnvironmentTooltip(environment, issue);
@@ -224,14 +231,24 @@ function buildEnvironmentTooltip(
   issue?: InstanceTreeItemIssue
 ): string {
   const scopeLabel = formatScopeLabel(environment.scope);
-  const parts = [`${environment.url}`, `Scope: ${scopeLabel}`];
+  const name = normalizeEnvironmentName(environment.name);
+  const parts = name ? [`Name: ${name}`] : [];
+  parts.push(environment.url, `Scope: ${scopeLabel}`);
   if (environment.username) {
     parts.push(`User: ${environment.username}`);
+  }
+  if (environment.allowInsecureTls === true) {
+    parts.push("TLS verification disabled");
   }
   if (issue) {
     parts.push("", `${formatEnvironmentIssueLabel(issue.kind)}: ${issue.message}`);
   }
   return parts.join("\n");
+}
+
+function normalizeEnvironmentName(name: string | undefined): string | undefined {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function formatJobsSummaryDescription(summary: JobsFolderSummary): string {

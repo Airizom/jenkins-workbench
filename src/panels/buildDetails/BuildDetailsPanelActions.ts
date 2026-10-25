@@ -2,6 +2,11 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import { formatActionError } from "../../formatters/ErrorFormatters";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
+import type {
+  BuildManagementResult,
+  BuildManagementTarget,
+  BuildManagementWorkflow
+} from "../../services/build/BuildManagementWorkflow";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { buildTestSourceNavigationContext } from "../../services/TestSourceResolver";
 import type { ArtifactActionHandler } from "../../ui/ArtifactActionHandler";
@@ -11,6 +16,7 @@ import { MAX_CONSOLE_CHARS } from "./BuildDetailsConfig";
 import type { BuildDetailsPanelControllerAccess } from "./BuildDetailsPanelController";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 import type { PipelineLogTargetViewModel } from "./shared/BuildDetailsContracts";
+import type { BuildManagementMessage } from "./shared/BuildDetailsPanelMessages";
 
 interface BuildDetailsPanelActionsOptions {
   controller: BuildDetailsPanelControllerAccess;
@@ -18,6 +24,7 @@ interface BuildDetailsPanelActionsOptions {
   getConsoleExporter: () => BuildConsoleExporter;
   getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
   getTestSourceNavigationUiService: () => TestSourceNavigationUiService | undefined;
+  getBuildManagementWorkflow: () => BuildManagementWorkflow | undefined;
 }
 
 interface PendingInputContext {
@@ -38,6 +45,7 @@ export class BuildDetailsPanelActions {
   private readonly getTestSourceNavigationUiService: () =>
     | TestSourceNavigationUiService
     | undefined;
+  private readonly getBuildManagementWorkflow: () => BuildManagementWorkflow | undefined;
 
   constructor(options: BuildDetailsPanelActionsOptions) {
     this.controller = options.controller;
@@ -45,6 +53,52 @@ export class BuildDetailsPanelActions {
     this.getConsoleExporter = options.getConsoleExporter;
     this.getRefreshHost = options.getRefreshHost;
     this.getTestSourceNavigationUiService = options.getTestSourceNavigationUiService;
+    this.getBuildManagementWorkflow = options.getBuildManagementWorkflow;
+  }
+
+  /**
+   * Runs a keep-forever, edit, or delete request from the hero. The webview keeps its
+   * management buttons disabled until `buildManagementActionComplete` arrives.
+   */
+  async handleBuildManagement(message: BuildManagementMessage): Promise<void> {
+    try {
+      const workflow = this.getBuildManagementWorkflow();
+      const target = this.getBuildManagementTarget();
+      if (!workflow || !target) {
+        void vscode.window.showErrorMessage("Build details are not ready.");
+        return;
+      }
+      const result = await runBuildManagementAction(workflow, target, message);
+      if (result === "changed") {
+        // The data service drops cached details on every mutation, so this re-reads the
+        // display name, description, and keep-forever state and posts them to the webview.
+        await this.controller.refreshBuildStatus(this.controller.getLoadToken());
+      }
+    } catch (error) {
+      // The workflow reports Jenkins errors itself; this only covers unexpected failures.
+      void vscode.window.showErrorMessage(
+        `Build management action failed: ${formatActionError(error)}`
+      );
+    } finally {
+      // A "deleted" result has already closed the panel; the controller ignores posts
+      // after disposal.
+      this.controller.postMessage({ type: "buildManagementActionComplete" });
+    }
+  }
+
+  private getBuildManagementTarget(): BuildManagementTarget | undefined {
+    const environment = this.controller.getEnvironment();
+    const buildUrl = this.controller.getBuildUrl();
+    const details = this.controller.getCurrentDetails();
+    if (!environment || !buildUrl || !details) {
+      return undefined;
+    }
+    return {
+      environment,
+      buildUrl,
+      label: details.fullDisplayName ?? details.displayName ?? `#${details.number}`,
+      isBuilding: Boolean(details.building)
+    };
   }
 
   async handleApproveInput(message: { inputId: string }): Promise<void> {
@@ -349,6 +403,23 @@ export class BuildDetailsPanelActions {
       targetLabel: "Jenkins URL",
       sourceLabel: "Build Details"
     });
+  }
+}
+
+function runBuildManagementAction(
+  workflow: BuildManagementWorkflow,
+  target: BuildManagementTarget,
+  message: BuildManagementMessage
+): Promise<BuildManagementResult> {
+  switch (message.type) {
+    case "setKeepForever":
+      // Apply the state the hero button offered, not whatever Jenkins holds now: a
+      // stale panel must not release a build that was kept from the tree meanwhile.
+      return workflow.setKeepForever(target, message.keep);
+    case "editBuild":
+      return workflow.editBuild(target);
+    case "deleteBuild":
+      return workflow.deleteBuild(target);
   }
 }
 

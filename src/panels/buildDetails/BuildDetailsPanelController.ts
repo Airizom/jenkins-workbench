@@ -60,6 +60,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   private pendingInputProvider?: BuildDetailsPendingInputProvider;
   private initialActivation?: BuildDetailsInitialActivation;
   private readonly diagnosticConsoleSync: BuildDetailsDiagnosticConsoleSync;
+  private disposed = false;
 
   constructor(
     panel: vscode.WebviewPanel,
@@ -99,6 +100,7 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   dispose(): void {
+    this.disposed = true;
     // Invalidate the current load token first so an in-flight load() that resolves after
     // disposal treats itself as stale and does not render or start runtime work.
     this.loadTokenTracker.next();
@@ -380,6 +382,11 @@ export class BuildDetailsPanelController implements BuildDetailsPanelControllerA
   }
 
   postMessage(message: BuildDetailsOutgoingMessage): void {
+    // Actions such as delete close the panel before their completion message is sent, and a
+    // disposed webview throws on access.
+    if (this.disposed) {
+      return;
+    }
     this.view.postMessage(message);
   }
 }

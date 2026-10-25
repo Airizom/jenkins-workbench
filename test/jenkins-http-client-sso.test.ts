@@ -9,6 +9,7 @@ import type { JenkinsAuthConfig } from "../src/jenkins/types";
 interface RequestAttempt {
   url: string;
   headers?: Record<string, string>;
+  allowInsecureTls?: boolean;
 }
 
 let streamAttempts: RequestAttempt[] = [];
@@ -21,9 +22,13 @@ const requestMock = {
   },
   requestStream: async (
     url: string,
-    options?: { headers?: Record<string, string> }
+    options?: { headers?: Record<string, string>; allowInsecureTls?: boolean }
   ): Promise<JenkinsStreamResponse> => {
-    streamAttempts.push({ url, headers: options?.headers });
+    streamAttempts.push({
+      url,
+      headers: options?.headers,
+      allowInsecureTls: options?.allowInsecureTls
+    });
     if (options?.headers?.Cookie === "session=stale") {
       throw new JenkinsRequestError(
         "Jenkins API request failed (403 Forbidden)",
@@ -132,6 +137,7 @@ async function runSsoStreamRetry<T>(
   assert.equal(streamAttempts.length, 2);
   assert.equal(streamAttempts[0].headers?.Cookie, "session=stale");
   assert.equal(streamAttempts[1].headers?.Cookie, "session=fresh");
+  assert.ok(streamAttempts.every((attempt) => attempt.allowInsecureTls === true));
   return result;
 }
 
@@ -146,6 +152,7 @@ function createSsoHttpClient(
   };
   return new JenkinsHttpClient({
     baseUrl,
+    allowInsecureTls: true,
     authConfig,
     refreshAuthConfig: async (currentAuthConfig): Promise<JenkinsAuthConfig> => ({
       type: "sso",

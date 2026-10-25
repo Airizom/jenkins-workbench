@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { parseAuthConfig } from "../jenkins/auth";
 import type { JenkinsAuthConfig } from "../jenkins/types";
+import { ensureTrailingSlash, stripUrlCredentials } from "../jenkins/urls";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 
 export type EnvironmentScope = "workspace" | "global";
@@ -8,7 +9,40 @@ export type EnvironmentScope = "workspace" | "global";
 export interface JenkinsEnvironment {
   id: string;
   url: string;
+  /** Optional display name shown instead of the host label. */
+  name?: string;
   username?: string;
+  /** Explicit opt-in to skipping HTTPS certificate and hostname verification. */
+  allowInsecureTls?: boolean;
+  /**
+   * Base URLs this environment used before its URL was edited, newest first. Stores that only
+   * live in one workspace are rebased lazily from these on activation.
+   */
+  previousUrls?: string[];
+}
+
+export interface JenkinsEnvironmentPatch {
+  /** `null` or an empty string clears the name. */
+  name?: string | null;
+  url?: string;
+  allowInsecureTls?: boolean;
+  /** Pass `null` to clear a legacy username. */
+  username?: null;
+}
+
+export interface JenkinsEnvironmentUpdate {
+  previous: JenkinsEnvironment;
+  next: JenkinsEnvironment;
+}
+
+export interface JenkinsEnvironmentUpdateOptions {
+  /** Prevents a TLS prompt for an old origin from authorizing a newly edited server. */
+  expectedTlsOrigin?: string;
+  /**
+   * Runs after the record is saved but before `environment-updated` fires, so listeners never
+   * see the new URL while dependent stores still hold URLs under the old one.
+   */
+  beforeNotify?: (update: JenkinsEnvironmentUpdate) => Promise<void>;
 }
 
 export interface EnvironmentWithScope extends JenkinsEnvironment {
@@ -28,12 +62,22 @@ export type JenkinsEnvironmentStoreChange =
       environmentId: string;
     }
   | {
+      kind: "environment-updated";
+      scope: EnvironmentScope;
+      environmentId: string;
+      urlChanged: boolean;
+      tlsPolicyChanged?: boolean;
+      /** The record as saved by this update. */
+      environment: JenkinsEnvironment;
+    }
+  | {
       kind: "bulk-update";
       scope?: EnvironmentScope;
     };
 
 const ENVIRONMENTS_KEY = "jenkinsWorkbench.environments";
 const AUTH_CONFIG_KEY = "jenkinsWorkbench.envAuthConfig";
+const MAX_PREVIOUS_URLS = 5;
 
 export class JenkinsEnvironmentStore {
   private readonly authConfigRevisions = new Map<string, number>();
@@ -49,6 +93,19 @@ export class JenkinsEnvironmentStore {
     const memento = this.getMemento(scope);
     const stored = memento.get<JenkinsEnvironment[]>(ENVIRONMENTS_KEY);
     return Promise.resolve(Array.isArray(stored) ? stored : []);
+  }
+
+  /** Resolves TLS policy from current state rather than a potentially stale environment reference. */
+  getAllowInsecureTls(scope: EnvironmentScope, id: string, url: string): boolean {
+    const stored = this.getMemento(scope).get<JenkinsEnvironment[]>(ENVIRONMENTS_KEY);
+    const environment = Array.isArray(stored)
+      ? stored.find((entry) => entry?.id === id)
+      : undefined;
+    return (
+      environment !== undefined &&
+      hasInsecureTls(environment) &&
+      getUrlOrigin(environment.url) === getUrlOrigin(url)
+    );
   }
 
   async saveEnvironments(
@@ -95,6 +152,52 @@ export class JenkinsEnvironmentStore {
       await this.deleteToken(scope, id);
       await this.deleteAuthConfig(scope, id);
       return true;
+    });
+  }
+
+  /**
+   * Edits an environment in place, keeping its id (and with it every per-environment record).
+   * A URL change records the old URL in `previousUrls` so stored job URLs can be rebased.
+   */
+  updateEnvironment(
+    scope: EnvironmentScope,
+    id: string,
+    patch: JenkinsEnvironmentPatch,
+    options: JenkinsEnvironmentUpdateOptions = {}
+  ): Promise<JenkinsEnvironmentUpdate | undefined> {
+    return this.mutationQueue(async () => {
+      const environments = [...(await this.getEnvironments(scope))];
+      const index = environments.findIndex((environment) => environment.id === id);
+      if (index < 0) {
+        return undefined;
+      }
+      const previous = environments[index];
+      if (
+        options.expectedTlsOrigin !== undefined &&
+        getUrlOrigin(previous.url) !== options.expectedTlsOrigin
+      ) {
+        return undefined;
+      }
+      const next = applyEnvironmentPatch(previous, patch);
+      const urlChanged = next.url !== previous.url;
+
+      const tlsPolicyChanged = hasInsecureTls(previous) !== hasInsecureTls(next);
+      environments[index] = next;
+      await this.getMemento(scope).update(ENVIRONMENTS_KEY, environments);
+      const update = { previous, next };
+      try {
+        await options.beforeNotify?.(update);
+      } finally {
+        this.emitter.fire({
+          kind: "environment-updated",
+          scope,
+          environmentId: id,
+          urlChanged,
+          ...(tlsPolicyChanged ? { tlsPolicyChanged: true } : {}),
+          environment: next
+        });
+      }
+      return update;
     });
   }
 
@@ -317,4 +420,61 @@ function createScopedChange(
   environmentId: string
 ): JenkinsEnvironmentStoreChange {
   return { kind, scope, environmentId };
+}
+
+function getUrlOrigin(url: string): string | undefined {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function hasInsecureTls(environment: JenkinsEnvironment): boolean {
+  return (
+    environment.allowInsecureTls === true &&
+    getUrlOrigin(environment.url)?.startsWith("https://") === true
+  );
+}
+
+function applyEnvironmentPatch(
+  previous: JenkinsEnvironment,
+  patch: JenkinsEnvironmentPatch
+): JenkinsEnvironment {
+  const next = { ...previous };
+  if (patch.name !== undefined) {
+    const name = patch.name?.trim() ?? "";
+    if (name.length > 0) {
+      next.name = name;
+    } else {
+      delete next.name;
+    }
+  }
+  if (patch.username === null) {
+    delete next.username;
+  }
+
+  if (patch.allowInsecureTls !== undefined) {
+    if (patch.allowInsecureTls === true) {
+      next.allowInsecureTls = true;
+    } else {
+      delete next.allowInsecureTls;
+    }
+  }
+
+  if (patch.url === undefined || patch.url === previous.url) {
+    return next;
+  }
+  next.url = patch.url;
+  if (getUrlOrigin(previous.url) !== getUrlOrigin(next.url) || !getUrlOrigin(next.url)) {
+    delete next.allowInsecureTls;
+  }
+  const newBase = ensureTrailingSlash(patch.url);
+  const previousUrls = [
+    // Legacy URLs may embed credentials; never copy them into plain extension state.
+    ensureTrailingSlash(stripUrlCredentials(previous.url)),
+    ...(previous.previousUrls ?? [])
+  ].filter((url, position, all) => url !== newBase && all.indexOf(url) === position);
+  next.previousUrls = previousUrls.slice(0, MAX_PREVIOUS_URLS);
+  return next;
 }

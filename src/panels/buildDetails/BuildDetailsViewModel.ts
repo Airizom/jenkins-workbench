@@ -9,6 +9,7 @@ import type {
   JenkinsConsoleText,
   JenkinsTestReport
 } from "../../jenkins/types";
+import { toPlainTextDescription } from "../../shared/html";
 import { buildCoverageStateViewModel } from "./BuildDetailsCoverageViewModel";
 import { buildBuildFailureInsights } from "./BuildDetailsFailureInsightsViewModel";
 import { formatBuildDetailsHeaderLabels, truncateConsoleText } from "./BuildDetailsFormatters";
@@ -26,6 +27,8 @@ export type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
 export interface BuildDetailsViewModelInput {
   details?: JenkinsBuildDetails;
   buildUrl?: string;
+  /** Whether the panel knows the build's environment, which build management requires. */
+  hasEnvironment?: boolean;
   pipelineRun?: PipelineRun;
   pipelineLoading?: boolean;
   testReport?: JenkinsTestReport;
@@ -62,6 +65,8 @@ export interface BuildDetailsSectionsInput
   extends Pick<
     BuildDetailsViewModelInput,
     | "details"
+    | "buildUrl"
+    | "hasEnvironment"
     | "testReport"
     | "testReportFetched"
     | "testReportLogsIncluded"
@@ -82,6 +87,26 @@ export interface BuildDetailsSectionsInput
     | "canOpenTestSource"
   > {}
 
+/** The hero shows more of the description than tree tooltips, behind a "Show more" toggle. */
+const DESCRIPTION_MAX_LENGTH = 2000;
+
+export function buildBuildManagementViewModel(
+  details: JenkinsBuildDetails | undefined,
+  options: { buildUrl?: string; hasEnvironment?: boolean }
+): Pick<
+  BuildDetailsViewModel,
+  "displayName" | "description" | "keptForever" | "canDelete" | "canManage"
+> {
+  const canManage = Boolean(details && options.hasEnvironment && (details.url || options.buildUrl));
+  return {
+    displayName: details?.fullDisplayName ?? details?.displayName ?? "Build Details",
+    description: toPlainTextDescription(details?.description, DESCRIPTION_MAX_LENGTH),
+    keptForever: Boolean(details?.keepLog),
+    canDelete: canManage && !details?.building,
+    canManage
+  };
+}
+
 export function assembleBuildDetailsSections(input: BuildDetailsSectionsInput) {
   const details = input.details;
   const testState = buildTestStateViewModel(details, input.testReport, {
@@ -92,6 +117,10 @@ export function assembleBuildDetailsSections(input: BuildDetailsSectionsInput) {
   });
 
   return {
+    ...buildBuildManagementViewModel(details, {
+      buildUrl: input.buildUrl,
+      hasEnvironment: input.hasEnvironment
+    }),
     ...formatBuildDetailsHeaderLabels(details),
     pipelineStagesLoading: Boolean(input.pipelineLoading),
     testState,
@@ -130,9 +159,8 @@ export function buildBuildDetailsViewModel(
   const sections = assembleBuildDetailsSections(input);
 
   return {
-    displayName: details?.fullDisplayName ?? details?.displayName ?? "Build Details",
-    buildUrl,
     ...sections,
+    buildUrl,
     consoleText: truncated.text,
     consoleHtml: input.consoleHtmlResult?.html,
     consoleTruncated,

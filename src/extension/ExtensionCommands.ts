@@ -26,6 +26,7 @@ export function registerExtensionCommands(
   const watchStore = container.lazy("watchStore");
   const pinStore = container.lazy("pinStore");
   const clientProvider = container.lazy("clientProvider");
+  const environmentUrlRebaseService = container.lazy("environmentUrlRebaseService");
   const dataService = container.lazy("dataService");
   const artifactActionHandler = container.lazy("artifactActionHandler");
   const buildLogPreviewer = container.lazy("buildLogPreviewer");
@@ -33,6 +34,9 @@ export function registerExtensionCommands(
   const buildDetailsPanelLauncher = container.lazy("buildDetailsPanelLauncher");
   const queuedBuildWaiter = container.lazy("queuedBuildWaiter");
   const replayBuildWorkflow = container.lazy("replayBuildWorkflow");
+  const localJenkinsfileReplayWorkflow = container.lazy("localJenkinsfileReplayWorkflow");
+  const buildManagementWorkflow = container.lazy("buildManagementWorkflow");
+  const buildDescriptionDraftManager = container.lazy("buildDescriptionDraftManager");
   const viewStateStore = container.lazy("viewStateStore");
   const treeNavigator = container.lazy("treeNavigator");
   const treeDataProvider = container.lazy("treeDataProvider");
@@ -58,6 +62,7 @@ export function registerExtensionCommands(
     watchStore,
     pinStore,
     clientProvider,
+    environmentUrlRebaseService,
     refreshHost
   );
 
@@ -71,7 +76,12 @@ export function registerExtensionCommands(
     buildDetailsPanelLauncher,
     queuedBuildWaiter,
     replayBuildWorkflow,
-    refreshHost
+    localJenkinsfileReplayWorkflow,
+    refreshHost,
+    {
+      workflow: buildManagementWorkflow,
+      descriptionDraftManager: buildDescriptionDraftManager
+    }
   );
 
   registerCurrentBranchCommands(context, currentBranchWorkflowService);

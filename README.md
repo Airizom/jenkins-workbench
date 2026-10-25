@@ -43,7 +43,9 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Reusable Parameter Presets** — Save named per-job presets and reuse them when triggering builds
 - **Stop Builds** — Abort running builds directly from the tree
 - **Replay Build** — Edit the Pipeline script in a draft editor and re-run with changes, or quick-replay with the original script
+- **Replay with Local Jenkinsfile** — Run your workspace Jenkinsfile, including unsaved changes, against a Pipeline job without committing
 - **Rebuild** — Re-run a build with the same parameters
+- **Manage Builds** — Delete a completed build, keep it forever, or edit its display name and description (multi-line descriptions open in a draft editor)
 - **Preview Build Logs** — Open console output in a lightweight preview editor
 - **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds
 - **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
@@ -65,6 +67,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Failure-to-Source Diagnostics** — Turn compiler, linter, and stack-trace failures into local Problems and clickable console/source links
 - **Pipeline Visualization** — View stage-by-stage progress for Pipeline jobs
 - **Restart From Stage** — Restart failed/unstable Declarative runs from eligible stages
+- **Build Management** — Keep forever, edit, or delete the build from the header; shows a Kept forever badge and the build description
 - **Stage Load Feedback** — Inline loading states while pipeline stages resolve
 - **Test Results** — See test summary when builds complete; optionally include per-test logs
 - **Build Notifications** — Get notified when watched builds finish
@@ -83,6 +86,14 @@ Build Details loads history separately when a visible, completed build has faili
 History lookup stops after 500 build summaries per job. The panel shows sample sizes, unavailable reports, and lookup truncation. Historical requests omit logs, use at most three concurrent report/list requests per environment, and reuse a bounded five-minute in-memory report cache. Hidden panels stop scheduling work. Refresh reloads the selected window; history reports are not persisted to disk.
 
 Large suites use a bounded active sample of 50,000 observations, divided across the chosen window, and at most 5,000 distinct displayed tests. Failing cases take priority within each report. The panel discloses truncation and treats omitted observations as unavailable.
+
+### Replay with a Local Jenkinsfile
+
+Open a workspace Jenkinsfile and choose **Jenkins: Replay with Local Jenkinsfile** from the Command Palette or editor menu. Select a Pipeline job; its latest completed build supplies the replay context. The job picker suggests the file’s linked current-branch job when available.
+
+Alternatively, right-click a build and choose **Replay with Local Jenkinsfile** to use that exact build. The command uses the active workspace Jenkinsfile or offers matching files from your workspace. File detection follows `jenkinsWorkbench.jenkinsfileValidation.filePatterns`.
+
+The command submits the current editor text, including unsaved changes, without saving, committing, opening a draft, or requiring a successful lint. Only the main script is replaced: Jenkins retains the source build’s parameters and loaded Groovy scripts, and other workspace files are not uploaded. A completed source build is required for editor invocation, and Jenkins must permit editable replay. After submission, the editor stays open and Jenkins state refreshes as the replay starts.
 
 ### Jenkinsfile Validation
 
@@ -121,20 +132,24 @@ Large suites use a bounded active sample of 50,000 observations, divided across 
    - **Global** — Available across all workspaces
 4. **Enter your Jenkins details**:
    - **URL** — Your Jenkins base URL (e.g., `https://jenkins.example.com`)
-5. **Select an auth method**:
+   - **Display name** (optional) — Shown in the tree and pickers instead of the host name; leave empty to skip
+5. **Choose TLS certificate validation** for HTTPS environments:
+   - **Verify certificates (recommended)** — Keep certificate and hostname verification enabled
+   - **Allow insecure TLS** — Accept self-signed or untrusted certificates after confirming the warning; see [TLS Certificate Errors](#tls-certificate-errors)
+6. **Select an auth method**:
    - **None** — No authentication headers
    - **Basic** — Username + API token
    - **Bearer token** — `Authorization: Bearer <token>`
    - **Cookie header** — Send a `Cookie` header with every request
    - **Custom headers (JSON)** — Arbitrary headers (e.g., `{"Cookie":"JSESSIONID=...","X-Forwarded-User":"jenkins"}`)
    - **Browser SSO** — Open a browser sign-in flow and store returned session headers
-6. **Provide credentials if prompted**:
+7. **Provide credentials if prompted**:
    - **Basic** — Username + API token
    - **Bearer token** — Token value
    - **Cookie header** — Cookie string
    - **Custom headers (JSON)** — JSON object of headers
    - **Browser SSO** — Sign in through your browser when prompted
-7. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
+8. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
 ## Deep Links
 
@@ -437,9 +452,16 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 | Command | Description |
 |---------|-------------|
 | `Jenkins: Add Environment` | Add a new Jenkins environment |
+| `Jenkins: Edit Environment...` | Rename an environment, change its URL, update its credentials, or configure TLS certificate validation |
 | `Jenkins: Sign in with Browser SSO` | Refresh a Browser SSO environment session |
 | `Jenkins: Remove Environment` | Remove the selected environment |
 | `Jenkins: Refresh` | Refresh the tree view and clear cache |
+
+Editing an environment keeps it in place, so its pins, watches, parameter presets, diagnostic profile
+bindings, and history baselines are kept. Changing the URL moves those saved records to the new URL
+and closes open panels for the environment. If the scheme, host, or port changes, you are offered a credentials
+update for the new URL. Workspace-only data in other workspaces is moved the next time the extension
+activates there.
 
 ### Build Actions
 
@@ -450,7 +472,14 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 | `Jenkins: Replay Build` | Open an editable draft of the Pipeline script and replay with changes |
 | `Jenkins: Quick Replay Build` | Replay a Pipeline build immediately using the original script |
 | `Jenkins: Run Replay Draft` | Submit an edited replay draft from the editor |
+| `Jenkins: Replay with Local Jenkinsfile` | Submit a workspace Jenkinsfile directly, including unsaved changes |
 | `Jenkins: Rebuild` | Rebuild with the same parameters |
+| `Jenkins: Delete Build` | Delete a completed build; kept builds offer Stop Keeping and Delete |
+| `Jenkins: Keep Build Forever` | Protect a build from log rotation |
+| `Jenkins: Stop Keeping Build Forever` | Let log rotation remove the build again |
+| `Jenkins: Edit Build Display Name` | Set a custom build name; leave it empty to reset to `#N` |
+| `Jenkins: Edit Build Description` | Edit the build description; multi-line descriptions open in a draft editor |
+| `Jenkins: Submit Build Description` | Submit the active build description draft |
 | `Jenkins: Preview Build Logs` | Open console output in a read-only preview |
 | `Jenkins: View Build Details` | Open the build details panel |
 | `Jenkins: Compare With Build` | Compare the selected build with another build of the same job |
@@ -592,6 +621,16 @@ Security notes:
 - Test that `/api/json` returns JSON data in your browser
 - Check that your network allows connections to Jenkins
 
+### TLS Certificate Errors
+
+Certificate verification is enabled by default. An internal CA trusted by the OS certificate store used by the VS Code extension host should work with normal verification. Prefer a trusted certificate whenever possible.
+
+For a self-signed or untrusted Jenkins certificate, run **Jenkins: Edit Environment...**, select the HTTPS environment, choose **TLS Certificate Validation**, and select **Allow insecure TLS**. Confirm **Allow Insecure TLS** after reading the warning. This disables both certificate-chain and hostname verification, allowing an attacker to impersonate Jenkins and intercept credentials or build data. The environment tooltip and edit menu show **TLS verification disabled** while the exception is enabled.
+
+The exception applies only to extension-managed requests for that environment, including API calls, build actions, console streams, and artifact previews/downloads. Cross-origin redirects use certificate verification. Browser SSO and links opened in an external browser retain the browser's certificate checks.
+
+Select **Verify certificates (recommended)** to restore verification. Changing this setting closes the environment's open panels; reopen them to use the new policy. Changing the environment URL's scheme, host, or port resets the exception to secure defaults. Path-only URL changes preserve it.
+
 ### 403 Forbidden Errors
 
 - Confirm your account has read permissions for jobs
@@ -612,6 +651,11 @@ Security notes:
   - **Rebuild** requires the Rebuild Plugin
   - **Restart from Stage** requires Declarative Pipeline support from Pipeline: Model Definition
 - Check that the plugins are installed and the user has permissions
+
+### Build Management Refused
+
+- **Delete Build** needs Run/Delete; keep forever, display name, and description edits need Run/Update
+- Jenkins refuses to delete or release a build that another build or a retention rule keeps; the extension checks the result and reports it instead of assuming success
 
 ### Artifact Downloads
 
@@ -701,7 +745,7 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 1. Run `npm run compile`, `npm run check`, and `npm test`, then press F5 to launch the Extension Development Host
 2. Add a workspace and a global environment
 3. Verify jobs, builds, and nodes load correctly
-4. Test build actions (trigger, stop, replay, rebuild)
+4. Test build actions (trigger, stop, replay, rebuild), including local Jenkinsfile replay from both editor and build context menus; verify unsaved edits, retained parameters/loaded scripts, missing completed builds, denied replay access, and the original replay commands
 5. Verify watch notifications work
 6. Test node actions and node details
 7. Trigger a multibranch scan and verify branch filtering still works
@@ -729,6 +773,8 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 29. Compare two builds and verify parameter, change, stage, test, and console-difference sections
 30. Open Node Capacity and verify queue, executor, offline-node, and label-pool summaries; filter pools by label, node, or job; open a running build in Build Details; and check builds pinned to a single node
 31. Open a completed build with Jenkins Coverage data and verify its summary, modified-file data, and editor decorations
+32. Keep a build forever and release it from the tree and from Build Details; delete a kept build with Stop Keeping and Delete and confirm an open Build Details panel for it closes
+33. Edit a build's display name (and reset it), a single-line description, and a multi-line description in the draft editor, including a remote-change conflict
 
 ## License
 

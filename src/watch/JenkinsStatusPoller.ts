@@ -1,7 +1,10 @@
 import * as vscode from "vscode";
 import { JenkinsRequestError } from "../jenkins/errors";
 import type { JenkinsDataService, PendingInputSummary } from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { EnvironmentScope, JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -9,6 +12,7 @@ import type { JenkinsWatchStore, WatchedJobEntry } from "../storage/JenkinsWatch
 import { JenkinsJobStatusEvaluator } from "./JenkinsJobStatusEvaluator";
 import type { StatusNotifier } from "./StatusNotifier";
 import { formatWatchJobLabel } from "./WatchJobLabelFormatter";
+import { WatchRuntimeStateStore } from "./WatchRuntimeStateStore";
 
 export interface JenkinsStatusPollerHost {
   /** Refreshes one environment, or all of them when `environmentId` is omitted. */
@@ -28,11 +32,6 @@ export interface StatusPollerStartOptions {
   initialDelayMs?: number;
 }
 
-interface WatchRuntimeState {
-  failureCount: number;
-  pendingInput: { buildUrl: string; signature: string } | undefined;
-}
-
 export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPollerRuntimeSurface {
   private tickSubscription: vscode.Disposable | undefined;
   private initialPollHandle: ReturnType<typeof setTimeout> | undefined;
@@ -43,7 +42,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
   private disposed = false;
   private readonly _onDidChangeWatchErrorCount = new vscode.EventEmitter<number>();
   private readonly evaluator: JenkinsJobStatusEvaluator;
-  private readonly watchStates = new Map<string, WatchRuntimeState>();
+  private readonly watchStates = new WatchRuntimeStateStore();
   private maxConsecutiveErrors: number;
   private watchErrorCount = 0;
 
@@ -74,9 +73,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     }
 
     this.maxConsecutiveErrors = next;
-    for (const state of this.watchStates.values()) {
-      state.failureCount = 0;
-    }
+    this.watchStates.resetFailureCounts();
     this.synchronizeWatchErrorCount();
   }
 
@@ -139,15 +136,8 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     try {
       do {
         this.hasPendingPoll = false;
-        const watched = await this.watchStore.listWatchedJobs();
-        if (this.disposed) {
-          return;
-        }
-        if (watched.length === 0) {
-          this.clearWatchState();
-        } else if ((await this.checkWatchedJobs(watched, environmentPolls)) && !this.disposed) {
-          this.host.fullEnvironmentRefresh();
-        }
+        await this.discoverWatchedJobs(environmentPolls);
+        if (this.disposed) return;
       } while (this.hasPendingPoll && !this.disposed);
     } catch (error) {
       if (!this.disposed) {
@@ -160,6 +150,20 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     await Promise.all(environmentPolls);
   }
 
+  private async discoverWatchedJobs(environmentPolls: Promise<void>[]): Promise<void> {
+    const watched = await this.watchStore.listWatchedJobs();
+    if (this.disposed) {
+      return;
+    }
+    if (watched.length === 0) {
+      if (this.watchStates.clear()) {
+        this.synchronizeWatchErrorCount();
+      }
+    } else if ((await this.checkWatchedJobs(watched, environmentPolls)) && !this.disposed) {
+      this.host.fullEnvironmentRefresh();
+    }
+  }
+
   private async checkWatchedJobs(
     watched: WatchedJobEntry[],
     environmentPolls: Promise<void>[]
@@ -169,23 +173,16 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       return false;
     }
     const environmentMap = new Map(
-      environments.map((environment) => {
-        const ref: JenkinsEnvironmentRef = {
-          environmentId: environment.id,
-          scope: environment.scope,
-          url: environment.url,
-          username: environment.username
-        };
-        return [`${environment.scope}:${environment.id}`, ref];
-      })
+      environments.map((environment) => [
+        `${environment.scope}:${environment.id}`,
+        toJenkinsEnvironmentRef(environment)
+      ])
     );
 
     const staleByScope = new Map<EnvironmentScope, Set<string>>();
-    const activeWatchKeys = new Set<string>();
     const watchesByEnvironment = new Map<JenkinsEnvironmentRef, WatchedJobEntry[]>();
 
     for (const entry of watched) {
-      activeWatchKeys.add(this.buildWatchKey(entry));
       const environment = environmentMap.get(`${entry.scope}:${entry.environmentId}`);
       if (!environment) {
         this.trackStaleEnvironment(staleByScope, entry);
@@ -214,7 +211,8 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     }
     let didChange = false;
 
-    this.pruneInactiveWatchStates(activeWatchKeys);
+    this.watchStates.pruneInactive(watched);
+    this.synchronizeWatchErrorCount();
 
     for (const [scope, environmentIds] of staleByScope) {
       for (const environmentId of environmentIds) {
@@ -225,7 +223,8 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
         if (this.disposed) {
           return false;
         }
-        this.clearWatchStatesForEnvironment(scope, environmentId);
+        this.watchStates.clearEnvironment(scope, environmentId);
+        this.synchronizeWatchErrorCount();
         didChange = true;
       }
     }
@@ -268,7 +267,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
         if (!current || this.disposed) {
           return;
         }
-        environment = { ...environment, url: current.url, username: current.username };
+        environment = toJenkinsEnvironmentRef(current);
         entries = watched.filter(
           (entry) =>
             entry.scope === environment.scope && entry.environmentId === environment.environmentId
@@ -299,7 +298,9 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       if (this.disposed) {
         return false;
       }
-      this.resetFailureCount(entry);
+      if (this.watchStates.resetFailureCount(entry, this.maxConsecutiveErrors)) {
+        this.synchronizeWatchErrorCount();
+      }
       const evaluation = this.evaluator.evaluate(
         entry,
         job.name,
@@ -363,14 +364,15 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       if (this.disposed) {
         return false;
       }
-      this.removeWatchState(entry);
+      this.watchStates.remove(entry);
+      this.synchronizeWatchErrorCount();
       this.notifier.notifyWatchError(
         `${formatWatchJobLabel(entry)} was removed because Jenkins reported it missing in ${environment.url}.`
       );
       return true;
     }
 
-    const state = this.getOrCreateWatchState(entry);
+    const state = this.watchStates.getOrCreate(entry);
     state.failureCount += 1;
 
     if (state.failureCount === this.maxConsecutiveErrors) {
@@ -383,82 +385,8 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     return false;
   }
 
-  private buildWatchKey(entry: WatchedJobEntry): string {
-    return `${entry.scope}:${entry.environmentId}:${entry.jobUrl}`;
-  }
-
-  private getOrCreateWatchState(entry: WatchedJobEntry): WatchRuntimeState {
-    const key = this.buildWatchKey(entry);
-    const existing = this.watchStates.get(key);
-    if (existing) {
-      return existing;
-    }
-    const state: WatchRuntimeState = {
-      failureCount: 0,
-      pendingInput: undefined
-    };
-    this.watchStates.set(key, state);
-    return state;
-  }
-
-  private resetFailureCount(entry: WatchedJobEntry): void {
-    const state = this.watchStates.get(this.buildWatchKey(entry));
-    if (!state || state.failureCount === 0) {
-      return;
-    }
-    const wasErrored = state.failureCount >= this.maxConsecutiveErrors;
-    state.failureCount = 0;
-    if (wasErrored) {
-      this.synchronizeWatchErrorCount();
-    }
-  }
-
-  private clearPendingInputsForJob(entry: WatchedJobEntry): void {
-    const state = this.watchStates.get(this.buildWatchKey(entry));
-    if (state) {
-      state.pendingInput = undefined;
-    }
-  }
-
-  private pruneInactiveWatchStates(activeKeys: Set<string>): void {
-    for (const key of this.watchStates.keys()) {
-      if (!activeKeys.has(key)) {
-        this.watchStates.delete(key);
-      }
-    }
-    this.synchronizeWatchErrorCount();
-  }
-
-  private clearWatchStatesForEnvironment(scope: EnvironmentScope, environmentId: string): void {
-    const prefix = `${scope}:${environmentId}:`;
-    for (const key of this.watchStates.keys()) {
-      if (key.startsWith(prefix)) {
-        this.watchStates.delete(key);
-      }
-    }
-    this.synchronizeWatchErrorCount();
-  }
-
-  private removeWatchState(entry: WatchedJobEntry): void {
-    this.watchStates.delete(this.buildWatchKey(entry));
-    this.synchronizeWatchErrorCount();
-  }
-
-  private clearWatchState(): void {
-    if (this.watchStates.size === 0) {
-      return;
-    }
-    this.watchStates.clear();
-    this.synchronizeWatchErrorCount();
-  }
-
   private synchronizeWatchErrorCount(): void {
-    let nextCount = 0;
-    for (const state of this.watchStates.values()) {
-      if (state.failureCount >= this.maxConsecutiveErrors) {
-        nextCount += 1;
-      }
-    }
+    const nextCount = this.watchStates.countErrors(this.maxConsecutiveErrors);
 
     if (nextCount === this.watchErrorCount) {
       return;
@@ -476,11 +404,11 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
   ): Promise<void> {
     const buildUrl = lastBuild?.url;
     if (!buildUrl || !lastBuild.building) {
-      this.clearPendingInputsForJob(entry);
+      this.watchStates.clearPendingInput(entry);
       return;
     }
 
-    const state = this.watchStates.get(this.buildWatchKey(entry));
+    const state = this.watchStates.get(entry);
     if (state?.pendingInput && state.pendingInput.buildUrl !== buildUrl) {
       state.pendingInput = undefined;
     }
@@ -513,10 +441,10 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     jobName?: string
   ): void {
     if (!summary.awaitingInput || !summary.signature) {
-      this.clearPendingInputsForJob(entry);
+      this.watchStates.clearPendingInput(entry);
       return;
     }
-    const runtimeState = this.getOrCreateWatchState(entry);
+    const runtimeState = this.watchStates.getOrCreate(entry);
     const previous = runtimeState.pendingInput;
     if (previous?.buildUrl !== buildUrl || previous.signature !== summary.signature) {
       runtimeState.pendingInput = { buildUrl, signature: summary.signature };

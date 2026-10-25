@@ -1,4 +1,7 @@
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 
 export interface CurrentBranchEnvironmentIdentity {
@@ -18,10 +21,5 @@ export async function resolveCurrentBranchEnvironmentRef(
     return undefined;
   }
 
-  return {
-    environmentId: match.id,
-    scope: match.scope,
-    url: match.url,
-    username: match.username
-  };
+  return toJenkinsEnvironmentRef(match);
 }

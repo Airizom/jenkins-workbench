@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import type { BuildDetailsViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import type {
+  BuildDetailsUpdateMessage,
+  BuildDetailsViewModel
+} from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import { EMPTY_BUILD_DIAGNOSTICS } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import {
   buildDetailsReducer,
@@ -126,6 +129,10 @@ describe("buildInitialState", () => {
       type: "updateDetails",
       payload: {
         type: "updateDetails",
+        displayName: "app #9",
+        keptForever: false,
+        canDelete: false,
+        canManage: true,
         resultLabel: "Running",
         resultClass: "running",
         durationLabel: "1m",
@@ -143,5 +150,108 @@ describe("buildInitialState", () => {
 
     assert.deepEqual(Object.keys(updated.processingInputActions), []);
     assert.equal(Object.getPrototypeOf(updated.processingInputActions), null);
+  });
+});
+
+describe("build management state", () => {
+  function updatePayload(
+    state: ReturnType<typeof buildInitialState>,
+    patch: Partial<BuildDetailsUpdateMessage>
+  ): BuildDetailsUpdateMessage {
+    return {
+      type: "updateDetails",
+      displayName: state.displayName,
+      description: state.description,
+      keptForever: state.keptForever,
+      canDelete: state.canDelete,
+      canManage: state.canManage,
+      resultLabel: state.resultLabel,
+      resultClass: state.resultClass,
+      durationLabel: state.durationLabel,
+      timestampLabel: state.timestampLabel,
+      culpritsLabel: state.culpritsLabel,
+      pipelineStagesLoading: false,
+      testState: state.testState,
+      coverageState: state.coverageState,
+      insights: state.insights,
+      pipelineStages: [],
+      pipelineNodeLog: state.pipelineNodeLog,
+      pendingInputs: [],
+      ...patch
+    };
+  }
+
+  it("defaults management fields for initial state without them", () => {
+    const state = buildInitialState({} as BuildDetailsViewModel);
+
+    assert.equal(state.keptForever, false);
+    assert.equal(state.canDelete, false);
+    assert.equal(state.canManage, false);
+    assert.equal(state.description, undefined);
+    assert.equal(state.managementBusy, false);
+  });
+
+  it("reads management fields from the initial view model", () => {
+    const state = buildInitialState({
+      displayName: "app Release 1.0",
+      description: "Nightly\nfrom main",
+      keptForever: true,
+      canDelete: true,
+      canManage: true
+    } as BuildDetailsViewModel);
+
+    assert.equal(state.displayName, "app Release 1.0");
+    assert.equal(state.description, "Nightly\nfrom main");
+    assert.equal(state.keptForever, true);
+    assert.equal(state.canDelete, true);
+    assert.equal(state.canManage, true);
+  });
+
+  it("applies a rename, keep change, and cleared description from updateDetails", () => {
+    const state = buildInitialState({
+      displayName: "app #9",
+      description: "Old",
+      keptForever: false,
+      canDelete: false,
+      canManage: true
+    } as BuildDetailsViewModel);
+
+    const updated = buildDetailsReducer(state, {
+      type: "updateDetails",
+      payload: updatePayload(state, {
+        displayName: "app Release 1.0",
+        description: undefined,
+        keptForever: true,
+        canDelete: true
+      })
+    });
+
+    assert.equal(updated.displayName, "app Release 1.0");
+    assert.equal(updated.description, undefined);
+    assert.equal(updated.keptForever, true);
+    assert.equal(updated.canDelete, true);
+    assert.equal(updated.canManage, true);
+  });
+
+  it("stays busy across updates until the extension reports completion", () => {
+    const state = buildInitialState({} as BuildDetailsViewModel);
+
+    const started = buildDetailsReducer(state, { type: "startBuildManagementAction" });
+    assert.equal(started.managementBusy, true);
+    assert.equal(buildDetailsReducer(started, { type: "startBuildManagementAction" }), started);
+
+    const refreshed = buildDetailsReducer(started, {
+      type: "updateDetails",
+      payload: updatePayload(started, { keptForever: true })
+    });
+    assert.equal(refreshed.managementBusy, true);
+
+    const completed = buildDetailsReducer(refreshed, { type: "buildManagementActionComplete" });
+    assert.equal(completed.managementBusy, false);
+    assert.equal(completed.keptForever, true);
+    assert.equal(
+      buildDetailsReducer(completed, { type: "buildManagementActionComplete" }),
+      completed
+    );
   });
 });

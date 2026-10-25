@@ -50,6 +50,11 @@ function renderHero(overrides: Partial<Parameters<typeof BuildStatusHero>[0]> = 
         testsSummary: EMPTY_TESTS,
         stageCount: 0,
         onOpenBuild: () => undefined,
+        keptForever: false,
+        canManage: true,
+        canDelete: true,
+        managementBusy: false,
+        onBuildManagement: () => undefined,
         ...overrides
       })
     )
@@ -86,6 +91,79 @@ describe("BuildStatusHero", () => {
       describeAwaitingInput({ count: 2, message: "Deploy?" }),
       "2 inputs are waiting for a response."
     );
+  });
+});
+
+function findButton(html: string, label: string): string {
+  const match = html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`));
+  assert.ok(match, `missing button ${label}`);
+  return match[0];
+}
+
+describe("BuildStatusHero build management", () => {
+  it("renders keep, edit, and delete before Open in Jenkins", () => {
+    const html = renderHero({ isRunning: false, resultClass: "success" });
+
+    const keep = findButton(html, "Keep this build forever");
+    assert.match(keep, /aria-pressed="false"/);
+    assert.doesNotMatch(keep, / disabled=""/);
+    assert.doesNotMatch(findButton(html, "Edit display name or description"), / disabled=""/);
+    assert.doesNotMatch(findButton(html, "Delete build"), / disabled=""/);
+    const order = [
+      "Keep this build forever",
+      "Edit display name or description",
+      "Delete build",
+      "Open in Jenkins"
+    ].map((label) => html.indexOf(`aria-label="${label}"`));
+    assert.deepEqual(
+      [...order].sort((a, b) => a - b),
+      order
+    );
+    assert.doesNotMatch(html, /Kept forever/);
+  });
+
+  it("marks a kept build with a pressed toggle and a badge", () => {
+    const html = renderHero({ keptForever: true });
+
+    assert.match(findButton(html, "Stop keeping this build forever"), /aria-pressed="true"/);
+    assert.match(html, /id="detail-kept-forever"[^>]*>.*Kept forever/);
+  });
+
+  it("disables delete for running builds but keeps the other actions", () => {
+    const html = renderHero({ canDelete: false });
+
+    assert.match(findButton(html, "Delete build"), / disabled=""/);
+    assert.doesNotMatch(findButton(html, "Keep this build forever"), / disabled=""/);
+    assert.doesNotMatch(findButton(html, "Edit display name or description"), / disabled=""/);
+    // The wrapper keeps a tab stop so the tooltip can explain the disabled button.
+    assert.match(html, /<span[^>]*tabindex="0"[^>]*><button[^>]*aria-label="Delete build"/);
+  });
+
+  it.each([
+    ["details are not loaded", { canManage: false, canDelete: false }],
+    ["a request is in progress", { managementBusy: true }]
+  ])("disables every management action while %s", (_label, overrides) => {
+    const html = renderHero(overrides);
+
+    for (const label of [
+      "Keep this build forever",
+      "Edit display name or description",
+      "Delete build"
+    ]) {
+      assert.match(findButton(html, label), / disabled=""/);
+    }
+  });
+
+  it("renders the description as plain text with preserved line breaks", () => {
+    const html = renderHero({ description: 'Line one <img src=x onerror="alert(1)">\nLine two' });
+
+    assert.match(html, /class="[^"]*whitespace-pre-line[^"]*"/);
+    assert.match(html, /Line one &lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;\nLine two/);
+    assert.doesNotMatch(html, /<img/);
+  });
+
+  it("omits the description block when there is none", () => {
+    assert.doesNotMatch(renderHero(), /whitespace-pre-line/);
   });
 });
 

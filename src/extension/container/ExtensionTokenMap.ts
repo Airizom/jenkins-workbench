@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
+import type { LocalJenkinsfileReplayWorkflow } from "../../commands/build/LocalJenkinsfileReplayWorkflow";
 import type { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import type { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import type { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
@@ -33,7 +34,11 @@ import type { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
 import type { ArtifactStorageService } from "../../services/ArtifactStorageService";
 import type { BrowserSsoAuthenticationService } from "../../services/BrowserSsoAuthenticationService";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
+import type { BuildDescriptionDraftFilesystem } from "../../services/BuildDescriptionDraftFilesystem";
+import type { BuildDescriptionDraftManager } from "../../services/BuildDescriptionDraftManager";
+import type { BuildManagementWorkflow } from "../../services/build/BuildManagementWorkflow";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
+import type { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
 import type { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import type { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
 import type { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
@@ -86,6 +91,7 @@ export interface ExtensionTokenMap {
   historyDependencies: HistoryDependencies;
   jobHistoryPanelLauncher: JobHistoryPanelLauncher;
   environmentStore: JenkinsEnvironmentStore;
+  environmentUrlRebaseService: EnvironmentUrlRebaseService;
   diagnosticBindingStore: JenkinsDiagnosticProfileBindingStore;
   browserSsoAuthenticator: BrowserSsoAuthenticationService;
   clientProvider: JenkinsClientProvider;
@@ -109,6 +115,10 @@ export interface ExtensionTokenMap {
   testSourceResolver: TestSourceResolver;
   testSourceNavigationUiService: TestSourceNavigationUiService;
   replayBuildWorkflow: ReplayBuildWorkflow;
+  localJenkinsfileReplayWorkflow: LocalJenkinsfileReplayWorkflow;
+  buildDescriptionDraftFilesystem: BuildDescriptionDraftFilesystem;
+  buildDescriptionDraftManager: BuildDescriptionDraftManager;
+  buildManagementWorkflow: BuildManagementWorkflow;
   artifactActionHandler: ArtifactActionHandler;
   buildComparePanelLauncher: BuildComparePanelLauncher;
   buildDetailsPanelLauncher: BuildDetailsPanelLauncher;

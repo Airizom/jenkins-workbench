@@ -201,6 +201,30 @@ describe("persistent commit watches", () => {
     expect(h.store.list().map((entry) => entry.id)).toEqual(["second"]);
   });
 
+  it("drops a poll write that read the watch before an environment URL rebase", async () => {
+    const h = setup();
+    await h.store.add({
+      ...watch,
+      observedBuild: { url: "https://ci.test/job/main/4/", number: 4 }
+    });
+    const snapshot = h.store.list()[0];
+    await h.store.rebaseCommitWatchUrls(
+      "workspace",
+      "ci",
+      ["https://ci.test/"],
+      "https://new.test/"
+    );
+
+    await h.store.update({ ...snapshot, blockedReason: "stale poll" });
+
+    expect(h.store.list()[0]).toMatchObject({
+      environment: { url: "https://new.test/" },
+      jobUrl: "https://new.test/job/main/",
+      observedBuild: { url: "https://new.test/job/main/4/", number: 4 }
+    });
+    expect(h.store.list()[0].blockedReason).toBeUndefined();
+  });
+
   it("does not rewrite pending watches whose state did not change", async () => {
     const h = setup();
     await h.store.add(watch);

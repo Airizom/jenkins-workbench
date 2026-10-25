@@ -19,6 +19,7 @@ interface TextPostAttempt {
 }
 
 let crumbFetches = 0;
+let crumbOptions: Array<JenkinsSimpleRequestOptions | undefined> = [];
 let postAttempts: TextPostAttempt[] = [];
 let postBehavior: (attempt: TextPostAttempt) => Promise<string> = async () => "";
 const bufferRequest = vi.fn(async (_url: string, _options?: JenkinsSimpleRequestOptions) => ({
@@ -34,7 +35,8 @@ const streamRequest = vi.fn(async (_url: string, _options?: JenkinsSimpleRequest
 const requestMock = {
   requestBufferWithHeaders: bufferRequest,
   requestStream: streamRequest,
-  requestTextWithHeaders: async () => {
+  requestTextWithHeaders: async (_url: string, options?: JenkinsSimpleRequestOptions) => {
+    crumbOptions.push(options);
     crumbFetches += 1;
     return {
       text: JSON.stringify({
@@ -73,6 +75,7 @@ describe("JenkinsHttpClient crumb retry", () => {
       };
       const client = new JenkinsHttpClient({
         baseUrl: BASE_URL,
+        allowInsecureTls: true,
         authConfig: {
           type: "headers",
           headers: { cOoKiE: "auth=secret; JSESSIONID=stale", "X-Auth": "token" }
@@ -95,8 +98,10 @@ describe("JenkinsHttpClient crumb retry", () => {
       }
 
       assert.equal(crumbFetches, 2);
+      assert.ok(crumbOptions.every((options) => options?.allowInsecureTls === true));
       assert.equal(postAttempts.length, 2);
       for (const [index, attempt] of postAttempts.entries()) {
+        assert.equal(attempt.options?.allowInsecureTls, true);
         const suffix = method === "raw" || method === "text" ? "; preference=compact" : "";
         assert.equal(
           attempt.headers?.Cookie,
@@ -162,6 +167,7 @@ describe("JenkinsHttpClient crumb retry", () => {
       headers: { "X-Auth-Token": "secret" },
       timeoutMs: undefined,
       contextUrl: BASE_URL,
+      allowInsecureTls: false,
       maxBytes: 100
     });
     assert.deepEqual(streamRequest.mock.calls[0]?.[1], {
@@ -169,6 +175,7 @@ describe("JenkinsHttpClient crumb retry", () => {
       headers: { "X-Auth-Token": "secret" },
       timeoutMs: undefined,
       contextUrl: BASE_URL,
+      allowInsecureTls: false,
       maxBytes: 200
     });
   });
@@ -268,6 +275,7 @@ describe("JenkinsHttpClient crumb retry", () => {
 
 function resetHarness(): void {
   crumbFetches = 0;
+  crumbOptions = [];
   postAttempts = [];
   postBehavior = async () => "";
   bufferRequest.mockClear();

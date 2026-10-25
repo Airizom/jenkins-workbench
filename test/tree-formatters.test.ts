@@ -70,4 +70,37 @@ describe("formatBuildDescription", () => {
     );
     assert.equal(description, "Awaiting input • 1m");
   });
+
+  it("prefixes a custom display name on completed builds", () => {
+    vi.useFakeTimers({ now });
+    const description = formatBuildDescription(
+      build({
+        displayName: "  release   1.2 ",
+        result: "SUCCESS",
+        timestamp: now - 2 * 3_600_000 - 60_000,
+        duration: 60_000
+      })
+    );
+    assert.equal(description, "release 1.2 • Success • 1m • 2h ago");
+  });
+
+  it("prefixes a custom display name on running and paused builds", () => {
+    vi.useFakeTimers({ now });
+    const running = build({ displayName: "deploy", building: true, timestamp: now - 60_000 });
+    assert.equal(formatBuildDescription(running), "deploy • Running • 1m");
+    assert.equal(formatBuildDescription(running, true), "deploy • Awaiting input • 1m");
+  });
+
+  it("omits the default #N display name and blank names", () => {
+    vi.useFakeTimers({ now });
+    const base = { result: "FAILURE", timestamp: now - 120_000, duration: 60_000 };
+    assert.equal(
+      formatBuildDescription(build({ ...base, displayName: "#1" })),
+      "Failed • 1m • 1m ago"
+    );
+    assert.equal(
+      formatBuildDescription(build({ ...base, displayName: "  " })),
+      "Failed • 1m • 1m ago"
+    );
+  });
 });

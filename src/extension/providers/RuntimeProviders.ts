@@ -21,12 +21,14 @@ import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/Jenkinsf
 import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
 import { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
+import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { BuildCompareOptions } from "../../panels/buildCompare/BuildCompareOptions";
 import { BuildDetailsBackendAdapter } from "../../panels/buildDetails/BuildDetailsBackend";
 import { JobHistoryPanelLauncher } from "../../panels/JobHistoryPanelLauncher";
 import { BuildInspectionBackendAdapter } from "../../panels/shared/backend/BuildInspectionBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
+import { BuildManagementWorkflow } from "../../services/build/BuildManagementWorkflow";
 import { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
@@ -82,12 +84,15 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       openJob: (environment, jobUrl) =>
         container.get("jobHistoryPanelLauncher").show(environment, jobUrl)
     }),
-    jobHistoryPanelLauncher: (container) =>
-      new JobHistoryPanelLauncher(
+    jobHistoryPanelLauncher: (container) => {
+      const launcher = new JobHistoryPanelLauncher(
         container.get("historyDependencies"),
         options.extensionUri,
         container.get("environmentStore")
-      ),
+      );
+      options.context.subscriptions.push(launcher);
+      return launcher;
+    },
     statusRefreshService: (_container) =>
       new JenkinsStatusRefreshService(options.statusRefreshIntervalSeconds),
     statusNotifier: (_container) => new VscodeStatusNotifier(),
@@ -159,7 +164,18 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         pendingInputProvider: container.get("pendingInputCoordinator"),
         environmentStore: container.get("environmentStore"),
         buildDiagnosticsCoordinator: container.get("buildDiagnosticsCoordinator"),
+        // Lazy: the workflow is built on the first hero action. Its draft manager is
+        // resolved at activation (ExtensionRuntime), so only the workflow is deferred.
+        buildManagementWorkflow: container.lazy("buildManagementWorkflow"),
         extensionUri: options.extensionUri
+      }),
+    buildManagementWorkflow: (container) =>
+      new BuildManagementWorkflow({
+        dataService: container.get("dataService"),
+        refreshHost: container.get("refreshHost"),
+        draftManager: container.get("buildDescriptionDraftManager"),
+        closeBuildDetailsFor: (environment, buildUrl) =>
+          BuildDetailsPanel.closeForBuild(environment.scope, environment.environmentId, buildUrl)
       }),
     buildComparePanelLauncher: (container) =>
       new BuildComparePanelLauncher({

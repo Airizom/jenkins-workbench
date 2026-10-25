@@ -11,6 +11,7 @@ import type { CurrentBranchRepositoryInfo, CurrentBranchState } from "./CurrentB
 export type CurrentBranchLinkableEnvironment = {
   environment: JenkinsRepositoryLink["environment"];
   environmentUrl: string;
+  environmentName?: string;
 };
 
 export type CurrentBranchEnvironmentDiscoveryResult =
@@ -66,7 +67,8 @@ export class CurrentBranchLinkWorkflowService {
             environmentId: environment.id,
             scope: environment.scope
           },
-          environmentUrl: environment.url
+          environmentUrl: environment.url,
+          environmentName: environment.name
         }))
         .sort((left, right) =>
           `${left.environment.scope}/${left.environment.environmentId}`.localeCompare(

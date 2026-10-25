@@ -23,17 +23,21 @@ export function buildRequestHeaders(options: {
 
 export function createRequestTarget(
   url: string,
-  timeoutMs?: number
+  timeoutMs?: number,
+  allowInsecureTls?: boolean
 ): {
   parsed: URL;
   client: typeof http | typeof https;
   timeoutMs: number;
+  tlsOptions: Pick<https.RequestOptions, "rejectUnauthorized">;
 } {
   const parsed = new URL(url);
   return {
     parsed,
     client: parsed.protocol === "http:" ? http : https,
-    timeoutMs: timeoutMs ?? DEFAULT_TIMEOUT_MS
+    timeoutMs: timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    tlsOptions:
+      parsed.protocol === "https:" ? { rejectUnauthorized: allowInsecureTls !== true } : {}
   };
 }
 

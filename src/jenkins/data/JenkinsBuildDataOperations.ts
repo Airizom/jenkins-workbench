@@ -15,6 +15,7 @@ import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
 import type { JenkinsTestReport } from "../types";
+import { applyBuildKeepForever, deleteBuildWithRetention } from "./JenkinsBuildRetention";
 import { callOptionalBuildEndpoint, toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 import type {
@@ -23,9 +24,21 @@ import type {
   ConsoleTextTailResult,
   FlowNodeDetailsResult,
   FlowNodeLogResult,
+  JenkinsBuildManagementState,
   ProgressiveConsoleHtmlResult,
   ProgressiveConsoleTextResult
 } from "./JenkinsDataTypes";
+
+const BUILD_DETAILS_CACHE_KINDS = [
+  "build-revisions",
+  "build-status",
+  "build-details-causes-params",
+  "build-details-causes",
+  "build-details-params",
+  "build-details"
+] as const;
+
+type BuildDetailsCacheKind = (typeof BUILD_DETAILS_CACHE_KINDS)[number];
 
 export class JenkinsBuildDataOperations {
   constructor(private readonly context: JenkinsDataRuntimeContext) {}
@@ -38,11 +51,13 @@ export class JenkinsBuildDataOperations {
       detailLevel?: "summary" | "details" | "revisions";
       offset?: number;
       includeParameters?: boolean;
+      includeDescription?: boolean;
       bypassCache?: boolean;
     }
   ): Promise<JenkinsBuild[]> {
     const detailLevel = options?.detailLevel ?? "summary";
     const includeParameters = options?.includeParameters ?? false;
+    const includeDescription = options?.includeDescription ?? false;
     const bypassCache = options?.bypassCache ?? false;
     const client = await this.context.getClient(environment);
     const load = () =>
@@ -50,13 +65,15 @@ export class JenkinsBuildDataOperations {
         offset: options?.offset,
         includeDetails: detailLevel === "details",
         includeRevisions: detailLevel === "revisions",
-        includeParameters
+        includeParameters,
+        includeDescription
       });
     if (bypassCache) {
       return load();
     }
     const rangeKind = options?.offset === undefined ? "recent" : `paged-${options.offset}`;
-    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}-${limit}-${rangeKind}`;
+    const descriptionKind = includeDescription ? "-desc" : "";
+    const cacheKind = `builds-${detailLevel}-${includeParameters ? "params" : "noparams"}${descriptionKind}-${limit}-${rangeKind}`;
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, jobUrl);
     return this.context.getCache().getOrLoad(cacheKey, load, this.context.getCacheTtlMs());
   }
@@ -72,7 +89,7 @@ export class JenkinsBuildDataOperations {
       bypassCache?: boolean;
     }
   ): Promise<JenkinsBuildDetails> {
-    const cacheKind = options?.revisionsOnly
+    const cacheKind: BuildDetailsCacheKind = options?.revisionsOnly
       ? "build-revisions"
       : options?.statusOnly
         ? "build-status"
@@ -289,6 +306,83 @@ export class JenkinsBuildDataOperations {
     await this.runBuildAction(environment, (client) => client.stopBuild(buildUrl));
   }
 
+  /**
+   * Deletes a build and confirms it is gone. Jenkins can answer the delete POST
+   * successfully while refusing to delete kept or protected builds.
+   *
+   * With `releaseKeep`, a kept build is released first (refusing when a dependency
+   * keeps it). If the delete then fails, keep-forever is restored best effort and the
+   * delete error is rethrown.
+   */
+  async deleteBuild(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { releaseKeep?: boolean }
+  ): Promise<void> {
+    await this.runBuildMutation(environment, buildUrl, async (client) => {
+      await deleteBuildWithRetention(client, buildUrl, options?.releaseKeep);
+    });
+  }
+
+  /**
+   * Sets the keep-forever flag idempotently. Jenkins only exposes a toggle, so
+   * the current state is read first and the toggle is sent only when it differs.
+   * Resolves to the final state reported by Jenkins.
+   */
+  async setBuildKeepForever(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    keep: boolean
+  ): Promise<boolean> {
+    return this.runBuildMutation(
+      environment,
+      buildUrl,
+      async (client) => (await applyBuildKeepForever(client, buildUrl, keep)).value
+    );
+  }
+
+  async setBuildDescription(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    description: string
+  ): Promise<void> {
+    await this.runBuildMutation(environment, buildUrl, (client) =>
+      client.submitBuildDescription(buildUrl, description)
+    );
+  }
+
+  /**
+   * Jenkins sets the display name and description together, so the current
+   * description is read fresh and sent back unchanged. An empty display name
+   * resets the build to its default "#N" label.
+   */
+  async setBuildDisplayName(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    displayName: string
+  ): Promise<void> {
+    await this.runBuildMutation(environment, buildUrl, async (client) => {
+      const details = await client.getBuildDetails(buildUrl, { managementOnly: true });
+      await client.submitBuildDisplayName(buildUrl, displayName, details.description ?? "");
+    });
+  }
+
+  async getBuildManagementState(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsBuildManagementState> {
+    const details = await this.runBuildAction(environment, (client) =>
+      client.getBuildDetails(buildUrl, { managementOnly: true })
+    );
+    return {
+      number: details.number,
+      building: Boolean(details.building),
+      keepLog: Boolean(details.keepLog),
+      displayName: details.displayName ?? undefined,
+      description: details.description ?? undefined
+    };
+  }
+
   async quickReplayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     await this.runBuildAction(environment, (client) => client.quickReplayBuild(buildUrl));
   }
@@ -327,6 +421,32 @@ export class JenkinsBuildDataOperations {
     await this.runBuildAction(environment, (client) =>
       client.restartPipelineFromStage(buildUrl, stageName)
     );
+  }
+
+  private async runBuildMutation<T>(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    action: (client: JenkinsClient) => Promise<T>
+  ): Promise<T> {
+    try {
+      return await this.runBuildAction(environment, action);
+    } finally {
+      await this.invalidateBuildDetailsCache(environment, buildUrl);
+    }
+  }
+
+  private async invalidateBuildDetailsCache(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<void> {
+    try {
+      const cache = this.context.getCache();
+      for (const kind of BUILD_DETAILS_CACHE_KINDS) {
+        cache.delete(await this.context.buildCacheKey(environment, kind, buildUrl));
+      }
+    } catch {
+      // Cache cleanup is best effort; callers refresh the environment afterwards.
+    }
   }
 
   private async runBuildAction<T>(

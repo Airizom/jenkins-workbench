@@ -149,14 +149,42 @@ describe("Jenkins build tree builders", () => {
   it("includes shared change set and action fragments for build lists with details", () => {
     assert.equal(
       buildBuildsTree({ includeDetails: true, includeParameters: true }),
-      "builds[number,url,result,building,timestamp,duration,estimatedDuration,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,causes[shortDescription,userId,userName],parameters[name,value]]]{limit}"
+      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,causes[shortDescription,userId,userName],parameters[name,value]]]{limit}"
+    );
+  });
+
+  it("keeps keepLog and displayName but leaves large descriptions out of build lists by default", async () => {
+    const { context, requestedUrls } = createContextHarness();
+    const api = new JenkinsBuildsApi(context);
+    await api.getBuilds("https://jenkins.example.com/job/demo/", 100, { offset: 200 });
+
+    assert.equal(
+      buildBuildsTree(),
+      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName]{limit}"
+    );
+    assert.equal(
+      getTreeParameter(requestedUrls[0]),
+      "allBuilds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName]{200,300}"
+    );
+  });
+
+  it("adds descriptions to build lists only when requested", async () => {
+    const { context, requestedUrls } = createContextHarness();
+    await new JenkinsBuildsApi(context).getBuilds("https://jenkins.example.com/job/demo/", 20, {
+      includeDescription: true,
+      includeParameters: true
+    });
+
+    assert.equal(
+      getTreeParameter(requestedUrls[0]),
+      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,description,actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,parameters[name,value]]]{0,20}"
     );
   });
 
   it("includes shared change set and action fragments for build details", () => {
     assert.equal(
       buildBuildDetailsTree({ includeCauses: true, includeParameters: true }),
-      "number,url,result,building,timestamp,duration,estimatedDuration,displayName,fullDisplayName,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,failCount,skipCount,totalCount,causes[shortDescription,userId,userName],parameters[name,value]]"
+      "number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,fullDisplayName,description,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,failCount,skipCount,totalCount,causes[shortDescription,userId,userName],parameters[name,value]]"
     );
   });
 });

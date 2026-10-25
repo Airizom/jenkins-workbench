@@ -2,12 +2,20 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { DraftEditorService } from "../../services/DraftEditorService";
+import { resolveDraftForSubmit } from "../../services/DraftSubmitTarget";
 import type { JobConfigDraft, JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import type { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { formatActionError, getTreeItemLabel, requireSelection } from "../CommandUtils";
 
 type DraftMetadata = Parameters<JobConfigDraftManager["createDraft"]>[2];
+
+const JOB_CONFIG_SUBMIT_MESSAGES = {
+  noDraft: "Open a job config draft to submit.",
+  notDraft: "This document is not a Jenkins job config draft.",
+  pickDescription: "config.xml",
+  placeHolder: "Select which job config to submit"
+};
 
 export class JobConfigUpdateWorkflow {
   private readonly submittingDrafts = new Set<string>();
@@ -76,8 +84,11 @@ export class JobConfigUpdateWorkflow {
   }
 
   async submitDraft(refreshHost: EnvironmentScopedRefreshHost, uri?: vscode.Uri): Promise<void> {
-    const resolved = await this.resolveDraftForSubmit(
-      uri ?? vscode.window.activeTextEditor?.document.uri
+    const resolved = await resolveDraftForSubmit(
+      this.draftManager,
+      uri ?? vscode.window.activeTextEditor?.document.uri,
+      JOB_CONFIG_SUBMIT_MESSAGES,
+      { requireUri: true }
     );
     if (!resolved) {
       return;
@@ -214,49 +225,6 @@ export class JobConfigUpdateWorkflow {
     );
 
     return selected === overwriteLabel;
-  }
-
-  private async resolveDraftForSubmit(
-    uri: vscode.Uri | undefined
-  ): Promise<{ draft: JobConfigDraft; targetUri: vscode.Uri } | null> {
-    if (!uri) {
-      void vscode.window.showInformationMessage("Open a job config draft to submit.");
-      return null;
-    }
-
-    const draft = this.draftManager.getDraft(uri);
-    if (draft) {
-      return { draft, targetUri: uri };
-    }
-
-    const visibleDrafts = this.draftManager.getVisibleDrafts();
-    if (visibleDrafts.length === 1) {
-      const single = this.draftManager.getDraft(visibleDrafts[0].uri);
-      if (single) {
-        return { draft: single, targetUri: visibleDrafts[0].uri };
-      }
-    }
-
-    if (visibleDrafts.length > 1) {
-      const selected = await vscode.window.showQuickPick(
-        visibleDrafts.map((entry) => ({
-          label: entry.label,
-          description: "config.xml",
-          uri: entry.uri
-        })),
-        { placeHolder: "Select which job config to submit" }
-      );
-      if (!selected) {
-        return null;
-      }
-      const chosen = this.draftManager.getDraft(selected.uri);
-      if (chosen) {
-        return { draft: chosen, targetUri: selected.uri };
-      }
-    }
-
-    void vscode.window.showInformationMessage("This document is not a Jenkins job config draft.");
-    return null;
   }
 
   private async createDraftDocument(

@@ -9,6 +9,9 @@
     "src/panels/nodeDetails/webview/index.tsx"
   ],
   "ignorePatterns": [
+    // These are hand-written source directories, not generated build output.
+    "!src/**/build/**",
+    "!src/**/coverage/**",
     "out/**",
     "out-test/**",
     ".vscode-test/**",
@@ -180,6 +183,7 @@
     "ignoreImports": true
   },
   "health": {
+    "coverage": "coverage/coverage-final.json",
     "maxCyclomatic": 20,
     "maxCognitive": 15,
     "maxCrap": 30,

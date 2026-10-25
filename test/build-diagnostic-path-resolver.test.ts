@@ -189,7 +189,10 @@ describe("BuildDiagnosticPathResolver", () => {
     assert.equal(scan.omittedCount, 9_997);
     assert.equal(findFiles.mock.calls.length, 1);
     assert.equal(stat.mock.calls.length, 412);
-    const retentionCache = Reflect.get(session, "retentionPathByRawPath") as Map<string, unknown>;
+    const retentionCache = Reflect.get(
+      Reflect.get(session, "retention"),
+      "retentionPathByRawPath"
+    ) as Map<string, unknown>;
     assert.equal(retentionCache.size, 12);
 
     const published = await aggregateAndPublishBuildDiagnostics({

@@ -20,6 +20,7 @@ export class BuildTreeItem extends vscode.TreeItem {
   public readonly buildNumber: number;
   public readonly isBuilding: boolean;
   public readonly awaitingInput: boolean;
+  public readonly keptForever: boolean;
   public readonly jobNameHint?: string;
 
   constructor(
@@ -38,8 +39,16 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
     this.id = BuildTreeItem.buildId(environment, build.url, jobScope);
-    const contextValue = this.isBuilding ? "buildRunning" : "build";
-    this.contextValue = this.awaitingInput ? `${contextValue} awaitingInput` : contextValue;
+    this.keptForever = build.keepLog === true;
+    // Space-separated tokens; package.json menus match each with /(^|\s)token(\s|$)/.
+    const contextTokens = [this.isBuilding ? "buildRunning" : "build"];
+    if (this.awaitingInput) {
+      contextTokens.push("awaitingInput");
+    }
+    if (this.keptForever) {
+      contextTokens.push("keptForever");
+    }
+    this.contextValue = contextTokens.join(" ");
     this.description = formatBuildDescription(build, awaitingInput);
     this.iconPath = buildIcon(build, awaitingInput);
     this.tooltip = buildBuildTooltip(build, tooltipOptions);

@@ -1,7 +1,8 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { formatEnvironmentDisplayName } from "../../jenkins/EnvironmentLabels";
+import { toJenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsfileEnvironmentResolver } from "../../validation/JenkinsfileEnvironmentResolver";
@@ -25,9 +26,9 @@ export async function selectValidationEnvironment(
   }
 
   const picks = environments.map((environment) => ({
-    label: environment.url,
+    label: formatEnvironmentDisplayName(environment),
     description: formatScopeLabel(environment.scope),
-    detail: environment.id,
+    detail: environment.url,
     environment
   }));
   const workspaceLabel = workspaceFolder?.name ?? "this window";
@@ -42,6 +43,7 @@ export async function selectValidationEnvironment(
       ? `Select a Jenkins environment for ${workspaceFolder.name} Jenkinsfile features`
       : "Select a Jenkins environment for Jenkinsfile features",
     matchOnDescription: true,
+    matchOnDetail: true,
     ignoreFocusOut: true
   });
 
@@ -63,16 +65,11 @@ export async function selectValidationEnvironment(
     return;
   }
 
-  const ref: JenkinsEnvironmentRef = {
-    environmentId: selected.id,
-    scope: selected.scope,
-    url: selected.url,
-    username: selected.username
-  };
+  const ref = toJenkinsEnvironmentRef(selected);
   await resolver.setWorkspaceFolderOverride(workspaceFolder ?? undefined, ref);
   stepCatalogService?.invalidateEnvironment(ref);
   void vscode.window.showInformationMessage(
-    `Jenkinsfile features will use ${selected.url} (${formatScopeLabel(selected.scope)}).`
+    `Jenkinsfile features will use ${formatEnvironmentDisplayName(selected)} (${formatScopeLabel(selected.scope)}).`
   );
   if (workspaceFolder) {
     coordinator?.revalidateWorkspaceState(workspaceFolder);

@@ -133,6 +133,18 @@ export class BuildComparePanel {
     await revived.load({ suppressErrors: true });
   }
 
+  /** Closes the panel when it shows the given environment, e.g. after its URL changed. */
+  static closeForEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
+    const current = BuildComparePanel.currentPanel;
+    if (!current) {
+      return;
+    }
+    const environment = current.environment;
+    if (environment?.scope === scope && environment.environmentId === environmentId) {
+      current.panel.dispose();
+    }
+  }
+
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,

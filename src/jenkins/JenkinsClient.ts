@@ -139,6 +139,7 @@ export class JenkinsClient {
       includeDetails?: boolean;
       includeParameters?: boolean;
       includeRevisions?: boolean;
+      includeDescription?: boolean;
       offset?: number;
     }
   ): Promise<JenkinsBuild[]> {
@@ -152,6 +153,7 @@ export class JenkinsClient {
       includeParameters?: boolean;
       statusOnly?: boolean;
       revisionsOnly?: boolean;
+      managementOnly?: boolean;
     }
   ): Promise<JenkinsBuildDetails> {
     return this.buildsApi.getBuildDetails(buildUrl, options);
@@ -322,6 +324,26 @@ export class JenkinsClient {
 
   async stopBuild(buildUrl: string): Promise<void> {
     await this.buildsApi.stopBuild(buildUrl);
+  }
+
+  async deleteBuild(buildUrl: string): Promise<void> {
+    await this.buildsApi.deleteBuild(buildUrl);
+  }
+
+  async toggleBuildKeepLog(buildUrl: string): Promise<void> {
+    await this.buildsApi.toggleBuildKeepLog(buildUrl);
+  }
+
+  async submitBuildDescription(buildUrl: string, description: string): Promise<void> {
+    await this.buildsApi.submitBuildDescription(buildUrl, description);
+  }
+
+  async submitBuildDisplayName(
+    buildUrl: string,
+    displayName: string,
+    description: string
+  ): Promise<void> {
+    await this.buildsApi.submitBuildDisplayName(buildUrl, displayName, description);
   }
 
   async quickReplayBuild(buildUrl: string): Promise<void> {

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DraftEditorService } from "./DraftEditorService";
+import { DraftEditorService, disposeDraftResources } from "./DraftEditorService";
 import type { ReplayDraftSession, ReplayDraftSessionStore } from "./ReplayDraftSessionStore";
 
 export class ReplayDraftEditorCoordinator implements vscode.Disposable {
@@ -31,14 +31,7 @@ export class ReplayDraftEditorCoordinator implements vscode.Disposable {
   }
 
   dispose(): void {
-    for (const subscription of this.subscriptions) {
-      subscription.dispose();
-    }
-    this.subscriptions.length = 0;
-    for (const pending of this.pendingCloses) {
-      pending.dispose();
-    }
-    this.pendingCloses.clear();
+    disposeDraftResources(this.subscriptions, this.pendingCloses);
     this.closingSessions.clear();
     this.promptingSessions.clear();
   }

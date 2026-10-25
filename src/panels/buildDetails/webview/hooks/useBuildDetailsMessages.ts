@@ -22,6 +22,7 @@ function reduceBuildDetailsMessage(
     case "setErrors":
     case "setBuildDiagnostics":
     case "pendingInputActionComplete":
+    case "buildManagementActionComplete":
     case "setLoading":
       dispatch(message);
       break;

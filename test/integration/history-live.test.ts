@@ -106,12 +106,40 @@ describe("local Jenkins history", () => {
         token: process.env.JENKINS_HISTORY_TOKEN ?? "11decafbaddecafbaddecafbaddecafbad"
       });
       const data = container.get("dataService");
+      const clientProvider = container.get("clientProvider");
+      const allowInsecureTls = process.env.JENKINS_HISTORY_ALLOW_INSECURE_TLS === "1";
       const history = container.get("historyService");
       const baseline = container.get("historyBaselineResolver");
       const jobUrl = new URL("job/Workbench%20History%20Validation/job/feature/", url).href;
       const request = { environment, jobUrl, count: 20, active: () => true };
       try {
-        const result = await history.load(request);
+        if (allowInsecureTls) {
+          assert.equal(new URL(url).protocol, "https:", "The TLS fixture must use HTTPS");
+          const secureClient = await clientProvider.getClient(environment);
+          await assert.rejects(
+            () => secureClient.getRootJobs(),
+            (error: unknown) => {
+              assert.match(String(error), /self[- ]signed certificate/i);
+              return true;
+            },
+            "A self-signed Jenkins certificate must fail before explicit opt-in"
+          );
+          await store.updateEnvironment("workspace", environment.environmentId, {
+            allowInsecureTls: true
+          });
+        }
+        const anchorNumber = process.env.JENKINS_HISTORY_ANCHOR_BUILD;
+        if (anchorNumber !== undefined) {
+          assert.ok(
+            Number.isSafeInteger(Number(anchorNumber)) && Number(anchorNumber) > 0,
+            "JENKINS_HISTORY_ANCHOR_BUILD must be a positive build number"
+          );
+        }
+        const anchor =
+          anchorNumber === undefined
+            ? undefined
+            : await data.getBuildDetails(environment, `${jobUrl}${Number(anchorNumber)}/`);
+        const result = await history.load({ ...request, anchor });
         assert.ok(result.builds.length >= 3, "Run dev/jenkins/history-validation.groovy first");
         const target = result.builds[0];
         const tests = analysis.analyzeTests(result.builds);
@@ -279,6 +307,20 @@ describe("local Jenkins history", () => {
         }
         if (process.env.JENKINS_HISTORY_MANUAL_SMOKE)
           await new Promise((resolve) => setTimeout(resolve, 300_000));
+        if (allowInsecureTls) {
+          await store.updateEnvironment("workspace", environment.environmentId, {
+            allowInsecureTls: false
+          });
+          const restoredClient = await clientProvider.getClient(environment);
+          await assert.rejects(
+            () => restoredClient.getRootJobs(),
+            (error: unknown) => {
+              assert.match(String(error), /self[- ]signed certificate/i);
+              return true;
+            },
+            "Certificate verification must resume after the exception is revoked"
+          );
+        }
       } finally {
         await vscode.commands.executeCommand("workbench.action.closeAllEditors");
         for (const disposable of subscriptions.reverse()) disposable.dispose();

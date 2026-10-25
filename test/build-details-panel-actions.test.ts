@@ -6,6 +6,7 @@ import type { BuildDetailsOutgoingMessage } from "../src/panels/buildDetails/sha
 import * as vscodeStub from "./helpers/vscodeStub";
 
 const warningPrompts: Array<{ message: string; options: unknown; items: string[] }> = [];
+const errorMessages: string[] = [];
 let warningResponse: string | undefined;
 
 vi.doMock("vscode", () => ({
@@ -16,7 +17,10 @@ vi.doMock("vscode", () => ({
       return warningResponse;
     },
     showInformationMessage: async () => undefined,
-    showErrorMessage: async () => undefined,
+    showErrorMessage: async (message: string) => {
+      errorMessages.push(message);
+      return undefined;
+    },
     showQuickPick: async () => undefined
   }
 }));
@@ -31,8 +35,34 @@ const environment: JenkinsEnvironmentRef = {
   url: "https://jenkins.example/"
 };
 
-function createActions(options?: { rejectError?: Error }) {
+type ManagementResult = "changed" | "unchanged" | "cancelled" | "deleted" | "failed";
+
+function createActions(options?: {
+  rejectError?: Error;
+  details?: Record<string, unknown> | undefined;
+  workflowResult?: ManagementResult;
+  workflowError?: Error;
+  withoutWorkflow?: boolean;
+}) {
   const posted: BuildDetailsOutgoingMessage[] = [];
+  const statusRefreshes: number[] = [];
+  const workflowCalls: Array<{ method: string; target: unknown; keep?: boolean }> = [];
+  const workflowMethod = (method: string) => async (target: unknown, keep?: boolean) => {
+    workflowCalls.push(keep === undefined ? { method, target } : { method, target, keep });
+    if (options?.workflowError) {
+      throw options.workflowError;
+    }
+    return options?.workflowResult ?? "unchanged";
+  };
+  const workflow = {
+    setKeepForever: workflowMethod("setKeepForever"),
+    editBuild: workflowMethod("editBuild"),
+    deleteBuild: workflowMethod("deleteBuild")
+  };
+  const details =
+    options && "details" in options
+      ? options.details
+      : { number: 9, fullDisplayName: "app #9", building: false, result: "FAILURE" };
   const restarts: string[] = [];
   const rejects: string[] = [];
   const controller = {
@@ -55,18 +85,15 @@ function createActions(options?: { rejectError?: Error }) {
     }),
     getEnvironment: () => environment,
     getBuildUrl: () => "https://jenkins.example/job/app/9/",
-    getCurrentDetails: () => ({
-      number: 9,
-      fullDisplayName: "app #9",
-      building: false,
-      result: "FAILURE"
-    }),
+    getCurrentDetails: () => details,
     getLoadToken: () => 1,
     getPipelineRestartAvailability: () => "supported",
     getPipelineRestartEnabled: () => true,
     getPipelineRestartableStages: () => ["Deploy"],
     refreshPendingInputs: async () => undefined,
-    refreshBuildStatus: async () => undefined,
+    refreshBuildStatus: async (token: number) => {
+      statusRefreshes.push(token);
+    },
     beginLoading: () => 1,
     endLoading: () => undefined,
     postMessage: (message: BuildDetailsOutgoingMessage) => {
@@ -81,14 +108,16 @@ function createActions(options?: { rejectError?: Error }) {
       throw new Error("unused");
     },
     getRefreshHost: () => undefined,
-    getTestSourceNavigationUiService: () => undefined
+    getTestSourceNavigationUiService: () => undefined,
+    getBuildManagementWorkflow: () => (options?.withoutWorkflow ? undefined : (workflow as never))
   });
-  return { actions, posted, restarts, rejects };
+  return { actions, posted, restarts, rejects, statusRefreshes, workflowCalls };
 }
 
 describe("BuildDetailsPanelActions", () => {
   beforeEach(() => {
     warningPrompts.length = 0;
+    errorMessages.length = 0;
     warningResponse = undefined;
   });
 
@@ -139,5 +168,102 @@ describe("BuildDetailsPanelActions", () => {
     await actions.handleApproveInput({ inputId: "deploy" });
 
     assert.deepEqual(posted, [{ type: "pendingInputActionComplete", inputId: "deploy" }]);
+  });
+});
+
+describe("BuildDetailsPanelActions build management", () => {
+  beforeEach(() => {
+    errorMessages.length = 0;
+  });
+
+  const complete = { type: "buildManagementActionComplete" };
+
+  it.each([
+    [{ type: "setKeepForever", keep: true }, "setKeepForever", true],
+    [{ type: "setKeepForever", keep: false }, "setKeepForever", false],
+    [{ type: "editBuild" }, "editBuild", undefined],
+    [{ type: "deleteBuild" }, "deleteBuild", undefined]
+  ] as const)(
+    "routes %o to the shared workflow with the panel's build",
+    async (message, method, keep) => {
+      const { actions, workflowCalls, posted } = createActions();
+
+      await actions.handleBuildManagement(message);
+
+      const target = {
+        environment,
+        buildUrl: "https://jenkins.example/job/app/9/",
+        label: "app #9",
+        isBuilding: false
+      };
+      assert.deepEqual(workflowCalls, [
+        keep === undefined ? { method, target } : { method, target, keep }
+      ]);
+      assert.deepEqual(posted, [complete]);
+    }
+  );
+
+  it("labels the target from the display name or number and marks running builds", async () => {
+    const named = createActions({ details: { number: 9, displayName: "#9", building: true } });
+    await named.actions.handleBuildManagement({ type: "editBuild" });
+    assert.deepEqual(named.workflowCalls[0]?.target, {
+      environment,
+      buildUrl: "https://jenkins.example/job/app/9/",
+      label: "#9",
+      isBuilding: true
+    });
+
+    const numbered = createActions({ details: { number: 9 } });
+    await numbered.actions.handleBuildManagement({ type: "editBuild" });
+    assert.equal((numbered.workflowCalls[0]?.target as { label?: string })?.label, "#9");
+  });
+
+  it("applies the keep state from the message instead of the panel's loaded state", async () => {
+    const kept = createActions({
+      details: { number: 9, fullDisplayName: "app #9", building: false, keepLog: true }
+    });
+    await kept.actions.handleBuildManagement({ type: "setKeepForever", keep: true });
+    assert.equal(kept.workflowCalls[0]?.method, "setKeepForever");
+    assert.equal(kept.workflowCalls[0]?.keep, true);
+
+    const notKept = createActions();
+    await notKept.actions.handleBuildManagement({ type: "setKeepForever", keep: false });
+    assert.equal(notKept.workflowCalls[0]?.keep, false);
+  });
+
+  it("refreshes the build status only when Jenkins changed", async () => {
+    for (const workflowResult of ["unchanged", "cancelled", "failed", "deleted"] as const) {
+      const { actions, statusRefreshes, posted } = createActions({ workflowResult });
+      await actions.handleBuildManagement({ type: "setKeepForever", keep: true });
+      assert.deepEqual(statusRefreshes, [], workflowResult);
+      assert.deepEqual(posted, [complete], workflowResult);
+    }
+
+    const changed = createActions({ workflowResult: "changed" });
+    await changed.actions.handleBuildManagement({ type: "setKeepForever", keep: true });
+    assert.deepEqual(changed.statusRefreshes, [1]);
+    assert.deepEqual(changed.posted, [complete]);
+  });
+
+  it("reports completion even when the workflow throws", async () => {
+    const { actions, posted } = createActions({ workflowError: new Error("boom") });
+
+    await actions.handleBuildManagement({ type: "deleteBuild" });
+
+    assert.deepEqual(errorMessages, ["Build management action failed: boom"]);
+    assert.deepEqual(posted, [complete]);
+  });
+
+  it("explains when the build details are not ready", async () => {
+    for (const options of [{ details: undefined }, { withoutWorkflow: true }]) {
+      errorMessages.length = 0;
+      const { actions, posted, workflowCalls } = createActions(options);
+
+      await actions.handleBuildManagement({ type: "editBuild" });
+
+      assert.deepEqual(workflowCalls, []);
+      assert.deepEqual(errorMessages, ["Build details are not ready."]);
+      assert.deepEqual(posted, [complete]);
+    }
   });
 });

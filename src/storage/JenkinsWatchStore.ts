@@ -108,6 +108,15 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
   ): Promise<boolean> {
     return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName, mergeWatchEntry);
   }
+
+  async rebaseWatchUrls(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    return this.rebaseForEnvironment(scope, environmentId, oldBases, newBase, mergeWatchEntry);
+  }
 }
 
 function mergeWatchEntry(

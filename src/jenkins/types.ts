@@ -5,6 +5,8 @@ export interface JenkinsClientOptions {
   authConfig?: JenkinsAuthConfig;
   refreshAuthConfig?: JenkinsAuthConfigRefresh;
   requestTimeoutMs?: number;
+  /** Disable certificate verification only for this Jenkins environment. */
+  allowInsecureTls?: boolean;
 }
 
 export type ScanMultibranchResult = {
@@ -60,6 +62,9 @@ export interface JenkinsBuild {
   timestamp?: number;
   duration?: number;
   estimatedDuration?: number;
+  keepLog?: boolean;
+  displayName?: string;
+  description?: string | null;
   changeSet?: JenkinsChangeSet;
   changeSets?: JenkinsChangeSet[];
   actions?: Array<JenkinsBuildAction | null> | null;
@@ -175,7 +180,6 @@ export interface JenkinsTestReport {
 }
 
 export interface JenkinsBuildDetails extends JenkinsBuild {
-  displayName?: string;
   fullDisplayName?: string;
   culprits?: JenkinsUser[];
   artifacts?: JenkinsArtifact[];

@@ -3,6 +3,7 @@ import type {
   EnvironmentScopedRefreshHost,
   ExtensionRefreshHost
 } from "../../extension/ExtensionRefreshHost";
+import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 
 export type EnvironmentPanelRefreshHost = EnvironmentScopedRefreshHost &
   Pick<ExtensionRefreshHost, "onDidRefreshEnvironment">;
@@ -157,5 +158,17 @@ export class PanelLoadTracker {
     if (this.loadingRequests.size === 0) {
       this.postLoading(false);
     }
+  }
+}
+
+/** Close only the panel belonging to the environment being changed or removed. */
+export function closePanelForEnvironment(
+  panel: vscode.WebviewPanel | undefined,
+  environment: Pick<JenkinsEnvironmentRef, "scope" | "environmentId"> | undefined,
+  scope: JenkinsEnvironmentRef["scope"],
+  environmentId: string
+): void {
+  if (environment?.scope === scope && environment.environmentId === environmentId) {
+    panel?.dispose();
   }
 }

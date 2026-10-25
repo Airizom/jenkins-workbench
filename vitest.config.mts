@@ -18,7 +18,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts", "src/**/*.tsx"],
-      reporter: ["text-summary", "html", "lcov"],
+      reporter: ["text-summary", "html", "lcov", "json"],
       reportsDirectory: "coverage",
       // Ratchet, not target: set just below the measured baseline so CI
       // fails on regressions. Raise these as coverage grows; if a

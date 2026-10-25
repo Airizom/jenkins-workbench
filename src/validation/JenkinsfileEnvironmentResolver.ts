@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../formatters/ScopeFormatters";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../jenkins/JenkinsEnvironmentRef";
 import type { ReplayDraftManager } from "../services/ReplayDraftManager";
 import type {
   EnvironmentScope,
@@ -66,7 +70,7 @@ export class JenkinsfileEnvironmentResolver {
     }
 
     if (environments.length === 1) {
-      const resolved = toEnvironmentRef(environments[0]);
+      const resolved = toJenkinsEnvironmentRef(environments[0]);
       await this.setStoredSelection(workspaceKey, resolved);
       return resolved;
     }
@@ -128,9 +132,9 @@ export class JenkinsfileEnvironmentResolver {
     workspaceFolder?: vscode.WorkspaceFolder
   ): Promise<JenkinsEnvironmentRef | undefined> {
     const picks = environments.map((environment) => ({
-      label: environment.url,
+      label: formatEnvironmentDisplayName(environment),
       description: formatScopeLabel(environment.scope),
-      detail: environment.id,
+      detail: environment.url,
       environment
     }));
     const pick = await vscode.window.showQuickPick(picks, {
@@ -138,19 +142,11 @@ export class JenkinsfileEnvironmentResolver {
         ? `Select a Jenkins environment for ${workspaceFolder.name} Jenkinsfile features`
         : "Select a Jenkins environment for Jenkinsfile features",
       matchOnDescription: true,
+      matchOnDetail: true,
       ignoreFocusOut: true
     });
-    return pick ? toEnvironmentRef(pick.environment) : undefined;
+    return pick ? toJenkinsEnvironmentRef(pick.environment) : undefined;
   }
-}
-
-function toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-  return {
-    environmentId: environment.id,
-    scope: environment.scope,
-    url: environment.url,
-    username: environment.username
-  };
 }
 
 function findEnvironment(
@@ -160,5 +156,5 @@ function findEnvironment(
   const environment = environments.find(
     (entry) => entry.id === selection.environmentId && entry.scope === selection.scope
   );
-  return environment ? toEnvironmentRef(environment) : undefined;
+  return environment ? toJenkinsEnvironmentRef(environment) : undefined;
 }

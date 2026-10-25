@@ -23,6 +23,15 @@ export type JenkinsBuildInspectionRuntimeSurface = Pick<
   | "getTestReport"
 >;
 
+export type JenkinsBuildManagementRuntimeSurface = Pick<
+  JenkinsBuildDataOperations,
+  | "deleteBuild"
+  | "setBuildKeepForever"
+  | "setBuildDescription"
+  | "setBuildDisplayName"
+  | "getBuildManagementState"
+>;
+
 export type JenkinsCoverageRuntimeSurface = Pick<
   JenkinsCoverageDataOperations,
   "discoverCoverageActionPath" | "getCoverageOverview" | "getModifiedCoverageFiles"

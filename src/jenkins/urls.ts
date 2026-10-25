@@ -28,6 +28,51 @@ export function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
+/**
+ * Moves a stored URL from one of an environment's previous base URLs onto its new base.
+ * The longest matching old base wins, so moving `https://h/jenkins/` up to `https://h/` still
+ * rewrites `https://h/jenkins/job/a/`. Returns undefined when the URL needs no change: it belongs
+ * to none of the old bases, or it already sits under the new base more specifically than under
+ * any old base (which keeps `https://h/` -> `https://h/jenkins/` from double-prefixing).
+ */
+export function rebaseEnvironmentUrl(
+  url: string,
+  oldBases: readonly string[],
+  newBase: string
+): string | undefined {
+  const target = ensureTrailingSlash(newBase);
+  let source: string | undefined;
+  for (const oldBase of oldBases) {
+    const candidate = ensureTrailingSlash(oldBase);
+    if (
+      candidate !== target &&
+      url.startsWith(candidate) &&
+      candidate.length > (source?.length ?? -1)
+    ) {
+      source = candidate;
+    }
+  }
+  if (!source || (url.startsWith(target) && target.length >= source.length)) {
+    return undefined;
+  }
+  return target + url.slice(source.length);
+}
+
+/** Removes embedded `user:password@` credentials from a URL; other parts are kept as-is. */
+export function stripUrlCredentials(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.username && !parsed.password) {
+      return url;
+    }
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function normalizeJenkinsUrlForComparison(value: string): string {
   try {
     const url = new URL(value);

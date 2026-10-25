@@ -1,4 +1,5 @@
 import type * as vscode from "vscode";
+import { rebaseEnvironmentUrl } from "../jenkins/urls";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 
@@ -164,6 +165,67 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
     return this.mutationQueue(() =>
       this.updateUrlUnlocked(scope, environmentId, oldJobUrl, newJobUrl, newJobName, merge)
     );
+  }
+
+  /**
+   * Moves an environment's entries from any of `oldBases` onto `newBase` after its URL was
+   * edited. Entries landing on an already-tracked URL merge into it, as in updateUrl.
+   */
+  protected rebaseForEnvironment(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string,
+    merge: (existing: TEntry, incoming: TEntry) => TEntry
+  ): Promise<number> {
+    return this.mutationQueue(async () => {
+      const entries = await this.readEntries(scope);
+      const movedIndexes = new Set<number>();
+      const rebased = entries.map((entry, index) => {
+        const jobUrl =
+          entry.environmentId === environmentId
+            ? rebaseEnvironmentUrl(entry.jobUrl, oldBases, newBase)
+            : undefined;
+        if (!jobUrl) {
+          return entry;
+        }
+        movedIndexes.add(index);
+        return { ...entry, jobUrl };
+      });
+      if (movedIndexes.size === 0) {
+        return 0;
+      }
+
+      // Entries already at the new URL merge first (as `existing`) and keep their position.
+      const indexes = rebased.map((_entry, index) => index);
+      const mergeOrder = [
+        ...indexes.filter((index) => !movedIndexes.has(index)),
+        ...indexes.filter((index) => movedIndexes.has(index))
+      ];
+      const groups = new Map<string, { index: number; entry: TEntry }>();
+      for (const index of mergeOrder) {
+        const entry = rebased[index];
+        if (entry.environmentId !== environmentId) {
+          continue;
+        }
+        const group = groups.get(entry.jobUrl);
+        if (group) {
+          group.entry = merge(group.entry, entry);
+        } else {
+          groups.set(entry.jobUrl, { index, entry });
+        }
+      }
+
+      const next = rebased.flatMap((entry, index) => {
+        if (entry.environmentId !== environmentId) {
+          return [entry];
+        }
+        const group = groups.get(entry.jobUrl);
+        return group?.index === index ? [group.entry] : [];
+      });
+      await this.writeEntries(scope, next);
+      return movedIndexes.size;
+    });
   }
 
   private async updateUrlUnlocked(

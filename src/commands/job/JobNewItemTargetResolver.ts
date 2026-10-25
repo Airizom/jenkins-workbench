@@ -1,13 +1,15 @@
 import * as vscode from "vscode";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
+import { formatEnvironmentDisplayName } from "../../jenkins/EnvironmentLabels";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { toJenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import {
   InstanceTreeItem,
   type JenkinsFolderTreeItem,
   JobsFolderTreeItem
 } from "../../tree/TreeItems";
-import { getTreeItemLabel, toJenkinsEnvironmentRef } from "../CommandUtils";
+import { getTreeItemLabel } from "../CommandUtils";
 import type { JobNewItemTarget } from "./JobNewItemWorkflow";
 
 export type JobNewItemTreeTarget = InstanceTreeItem | JobsFolderTreeItem | JenkinsFolderTreeItem;
@@ -54,13 +56,15 @@ export class JobNewItemTargetResolver {
     }
 
     const picks = environments.map((environment) => ({
-      label: environment.url,
+      label: formatEnvironmentDisplayName(environment),
       description: formatScopeLabel(environment.scope),
+      detail: environment.name?.trim() ? environment.url : undefined,
       environment
     }));
     const selected = await vscode.window.showQuickPick(picks, {
       placeHolder: "Select a Jenkins environment for the new item",
       matchOnDescription: true,
+      matchOnDetail: true,
       ignoreFocusOut: true
     });
     if (!selected) {
@@ -77,5 +81,5 @@ export class JobNewItemTargetResolver {
 }
 
 function formatEnvironmentTargetLabel(environment: JenkinsEnvironmentRef): string {
-  return `${environment.url} (${formatScopeLabel(environment.scope)})`;
+  return `${formatEnvironmentDisplayName(environment)} (${formatScopeLabel(environment.scope)})`;
 }

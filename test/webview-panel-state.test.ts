@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import type { JenkinsEnvironmentStore } from "../src/storage/JenkinsEnvironmentStore";
 import {
   isSerializedEnvironmentState,
+  resolveEnvironmentRef,
   validateEnvironmentScopedPanelState
 } from "../src/panels/shared/webview/WebviewPanelState";
 
@@ -41,5 +43,22 @@ describe("validateEnvironmentScopedPanelState", () => {
     );
     assert.equal(seen.length, 2);
     assert.equal(seen[0], state);
+  });
+});
+
+describe("resolveEnvironmentRef", () => {
+  it("restores the current stored TLS policy without persisting it in panel state", async () => {
+    let allowInsecureTls = true;
+    const store = {
+      getEnvironments: async () => [
+        { id: "env", url: "https://jenkins.example/", allowInsecureTls }
+      ]
+    } as unknown as JenkinsEnvironmentStore;
+    const state = { environmentId: "env", scope: "workspace" as const };
+
+    assert.equal((await resolveEnvironmentRef(store, state))?.allowInsecureTls, true);
+    allowInsecureTls = false;
+    assert.equal((await resolveEnvironmentRef(store, state))?.allowInsecureTls, undefined);
+    assert.deepEqual(state, { environmentId: "env", scope: "workspace" });
   });
 });

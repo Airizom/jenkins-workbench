@@ -27,3 +27,9 @@ export function formatEnvironmentLabel(rawUrl: string): string {
   const path = parsed.pathname.replace(/\/+$/, "");
   return path && path !== "/" ? `${host}${path}` : host || rawUrl;
 }
+
+/** The user's display name for an environment, else its host label. */
+export function formatEnvironmentDisplayName(environment: { name?: string; url: string }): string {
+  const name = environment.name?.trim();
+  return name && name.length > 0 ? name : formatEnvironmentLabel(environment.url);
+}

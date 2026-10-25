@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { closeEnvironmentPanels } from "../panels/EnvironmentPanels";
 import type { JenkinsEnvironmentStoreChange } from "../storage/JenkinsEnvironmentStore";
 import {
   ActivityFolderTreeItem,
@@ -193,6 +195,19 @@ export function registerExtensionSubscriptions(
   const environmentStoreSubscription = environmentStore.onDidChange((change) => {
     invalidateJenkinsfileStepCatalog(jenkinsfileStepCatalogService, change);
     activityRefreshService.handleEnvironmentStoreChange(change);
+    if (change.kind !== "environment-updated") {
+      return;
+    }
+    if (change.urlChanged || change.tlsPolicyChanged) {
+      // Panels retain environment references; reopen them with the new URL or TLS policy.
+      // Job History panels close from their launcher.
+      closeEnvironmentPanels(change);
+    }
+    // Expanded queue and activity folders keep their tree ids across an edit, so point their
+    // pollers at the edited environment instead of dropping it.
+    const ref = toJenkinsEnvironmentRef({ ...change.environment, scope: change.scope });
+    queuePoller.updateEnvironment(ref);
+    activityRefreshService.updateEnvironment(ref);
   });
 
   const configSubscription = vscode.workspace.onDidChangeConfiguration((event) => {
@@ -250,18 +265,15 @@ function invalidateJenkinsfileStepCatalog(
   jenkinsfileStepCatalogService: ExtensionTokenMap["jenkinsfileStepCatalogService"],
   change: JenkinsEnvironmentStoreChange
 ): void {
-  switch (change.kind) {
-    case "bulk-update":
-      jenkinsfileStepCatalogService.invalidateAll();
-      return;
-    case "environment-added":
-    case "environment-removed":
-    case "auth-config-updated":
-    case "auth-config-deleted":
-      jenkinsfileStepCatalogService.invalidateEnvironment({
-        scope: change.scope,
-        environmentId: change.environmentId
-      });
-      return;
+  if (change.kind === "bulk-update") {
+    jenkinsfileStepCatalogService.invalidateAll();
+    return;
   }
+  if (change.kind === "environment-updated" && !change.urlChanged) {
+    return;
+  }
+  jenkinsfileStepCatalogService.invalidateEnvironment({
+    scope: change.scope,
+    environmentId: change.environmentId
+  });
 }

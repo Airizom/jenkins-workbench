@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import { Uri } from "vscode";
+import { NodeCapacityPanelNavigation } from "../src/panels/nodeCapacity/NodeCapacityPanelNavigation";
+import * as externalUrl from "../src/ui/OpenExternalUrl";
 import { NodeCapacityPanel } from "../src/panels/NodeCapacityPanel";
 import { NodeCapacityService } from "../src/services/NodeCapacityService";
 import { LoadTokenTracker, PanelLoadTracker } from "../src/panels/shared/PanelRuntimeHelpers";
@@ -119,6 +122,10 @@ describe("NodeCapacityPanel", () => {
           })
       },
       environment,
+      navigation: new NodeCapacityPanelNavigation(() => ({
+        environment,
+        extensionUri: Uri.file("/extension")
+      })),
       executorLoadGeneration: 1,
       capacityRequestCount: 0,
       hasRendered: true,
@@ -187,32 +194,31 @@ describe("NodeCapacityPanel", () => {
     };
     const buildUrl = "https://jenkins.example/job/api/7/";
     const show = vi.fn().mockResolvedValue(undefined);
-    const openExternalUrl = vi.fn().mockResolvedValue(undefined);
-    const panel = Object.create(NodeCapacityPanel.prototype) as NodeCapacityPanel;
-    Object.assign(panel, {
-      environment,
-      buildDetailsPanelLauncher: { show },
-      openExternalUrl
+    const openExternalUrl = vi.spyOn(externalUrl, "openJenkinsWorkbenchUrl").mockResolvedValue({
+      ok: true,
+      opened: true
     });
-    const openBuildDetails = Reflect.get(panel, "openBuildDetails") as (
-      this: NodeCapacityPanel,
-      buildUrl: string,
-      label?: string
-    ) => Promise<void>;
+    let useLauncher = true;
+    const navigation = new NodeCapacityPanelNavigation(() => ({
+      environment,
+      extensionUri: Uri.file("/extension"),
+      buildDetailsPanelLauncher: useLauncher ? { show } : undefined
+    }));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      await openBuildDetails.call(panel, buildUrl, "api #7");
+      await navigation.openBuildDetails(buildUrl, "api #7");
       assert.deepEqual(show.mock.calls, [[{ environment, buildUrl, label: "api #7" }]]);
 
-      await openBuildDetails.call(panel, "https://elsewhere.example/job/api/7/");
+      await navigation.openBuildDetails("https://elsewhere.example/job/api/7/");
       assert.equal(show.mock.calls.length, 1);
       assert.equal(openExternalUrl.mock.calls.length, 0);
 
-      Object.assign(panel, { buildDetailsPanelLauncher: undefined });
-      await openBuildDetails.call(panel, buildUrl);
-      assert.deepEqual(openExternalUrl.mock.calls, [[buildUrl]]);
+      useLauncher = false;
+      await navigation.openBuildDetails(buildUrl);
+      assert.deepEqual(openExternalUrl.mock.calls, [[buildUrl, "Node Capacity"]]);
     } finally {
       warn.mockRestore();
+      openExternalUrl.mockRestore();
     }
   });
 });

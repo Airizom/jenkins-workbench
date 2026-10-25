@@ -24,6 +24,9 @@ export type BuildDetailsOutgoingMessage =
   // Sent once the extension finishes handling an approve/reject request (including any
   // parameter prompt or confirmation), whether it succeeded, failed, or was cancelled.
   | { type: "pendingInputActionComplete"; inputId: string }
+  // Sent once a keep-forever, edit, or delete request settles (changed, cancelled, or failed)
+  // so the webview can re-enable its build management buttons.
+  | { type: "buildManagementActionComplete" }
   | { type: "setLoading"; value: boolean };
 
 export type BuildDetailsStateMessage = Exclude<
@@ -123,6 +126,9 @@ export function parseBuildDetailsOutgoingMessage(
         ? { type: "pendingInputActionComplete", inputId }
         : undefined;
     }
+    case "buildManagementActionComplete": {
+      return { type: "buildManagementActionComplete" };
+    }
     case "setLoading": {
       return parseSetLoadingOutgoingMessage(record);
     }
@@ -135,16 +141,19 @@ function isBuildDetailsUpdateMessage(
   record: Record<string, unknown>
 ): record is Record<string, unknown> & BuildDetailsUpdateMessage {
   const stringFields = [
+    "displayName",
     "resultLabel",
     "resultClass",
     "durationLabel",
     "timestampLabel",
     "culpritsLabel"
   ] as const;
+  const booleanFields = ["pipelineStagesLoading", "keptForever", "canDelete", "canManage"] as const;
   return (
     record.type === "updateDetails" &&
     stringFields.every((field) => typeof record[field] === "string") &&
-    typeof record.pipelineStagesLoading === "boolean" &&
+    (typeof record.description === "undefined" || typeof record.description === "string") &&
+    booleanFields.every((field) => typeof record[field] === "boolean") &&
     isTestStatePayload(record.testState) &&
     isCoverageStatePayload(record.coverageState) &&
     isInsightsPayload(record.insights) &&

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BrowserSsoAuthenticator } from "../services/BrowserSsoAuthenticationService";
+import type { EnvironmentUrlRebaseService } from "../services/EnvironmentUrlRebaseService";
 import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
@@ -9,6 +10,7 @@ import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import {
   addEnvironment,
+  editEnvironment,
   removeEnvironment,
   signInWithBrowserSso
 } from "./environment/EnvironmentCommandHandlers";
@@ -23,6 +25,7 @@ export function registerEnvironmentCommands(
   watchStore: JenkinsWatchStore,
   pinStore: JenkinsPinStore,
   clientProvider: JenkinsClientProvider,
+  urlRebaseService: EnvironmentUrlRebaseService,
   refreshHost: EnvironmentCommandRefreshHost
 ): void {
   context.subscriptions.push(
@@ -33,6 +36,14 @@ export function registerEnvironmentCommands(
       "jenkinsWorkbench.signInWithBrowserSso",
       (item?: JenkinsEnvironmentRef) =>
         signInWithBrowserSso(store, browserSsoAuthenticator, clientProvider, refreshHost, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.editEnvironment",
+      (item?: JenkinsEnvironmentRef) =>
+        editEnvironment(
+          { store, browserSsoAuthenticator, clientProvider, urlRebaseService, refreshHost },
+          item
+        )
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.removeEnvironment",

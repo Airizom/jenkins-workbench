@@ -6,19 +6,25 @@ export type {
   ApproveInputMessage,
   ArtifactActionMessage,
   BuildDetailsIncomingMessage,
+  BuildManagementMessage,
+  DeleteBuildMessage,
+  EditBuildMessage,
   OpenDiagnosticSourceMessage,
   OpenTestSourceMessage,
   PersistUiStateMessage,
   RejectInputMessage,
   ReloadTestReportMessage,
   RestartPipelineFromStageMessage,
-  SelectPipelineLogNodeMessage
+  SelectPipelineLogNodeMessage,
+  SetKeepForeverMessage
 } from "./BuildDetailsIncomingMessages";
 export {
   isApproveInputMessage,
   isArtifactActionMessage,
   isClearPipelineLogNodeMessage,
   isConfigureBuildDiagnosticsMessage,
+  isDeleteBuildMessage,
+  isEditBuildMessage,
   isExportConsoleMessage,
   isExportPipelineNodeLogMessage,
   isOpenDiagnosticSourceMessage,
@@ -30,6 +36,7 @@ export {
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
+  isSetKeepForeverMessage,
   isShowBuildDiagnosticProblemsMessage,
   isToggleFollowLogMessage
 } from "./BuildDetailsIncomingMessages";

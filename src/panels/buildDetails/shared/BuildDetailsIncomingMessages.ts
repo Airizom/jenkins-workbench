@@ -87,6 +87,22 @@ export interface ShowBuildDiagnosticProblemsMessage {
   type: "showBuildDiagnosticProblems";
 }
 
+/** Carries the state the hero offered, so a stale panel cannot flip a build kept elsewhere. */
+export interface SetKeepForeverMessage {
+  type: "setKeepForever";
+  keep: boolean;
+}
+
+export interface EditBuildMessage {
+  type: "editBuild";
+}
+
+export interface DeleteBuildMessage {
+  type: "deleteBuild";
+}
+
+export type BuildManagementMessage = SetKeepForeverMessage | EditBuildMessage | DeleteBuildMessage;
+
 export type BuildDetailsIncomingMessage =
   | RefreshBuildDetailsMessage
   | ToggleFollowLogMessage
@@ -104,6 +120,9 @@ export type BuildDetailsIncomingMessage =
   | OpenDiagnosticSourceMessage
   | ConfigureBuildDiagnosticsMessage
   | ShowBuildDiagnosticProblemsMessage
+  | SetKeepForeverMessage
+  | EditBuildMessage
+  | DeleteBuildMessage
   | PersistUiStateMessage;
 
 export function isToggleFollowLogMessage(message: unknown): message is ToggleFollowLogMessage {
@@ -228,6 +247,18 @@ export function isShowBuildDiagnosticProblemsMessage(
   message: unknown
 ): message is ShowBuildDiagnosticProblemsMessage {
   return hasMessageType(message, "showBuildDiagnosticProblems");
+}
+
+export function isSetKeepForeverMessage(message: unknown): message is SetKeepForeverMessage {
+  return hasMessageType(message, "setKeepForever") && typeof message.keep === "boolean";
+}
+
+export function isEditBuildMessage(message: unknown): message is EditBuildMessage {
+  return hasMessageType(message, "editBuild");
+}
+
+export function isDeleteBuildMessage(message: unknown): message is DeleteBuildMessage {
+  return hasMessageType(message, "deleteBuild");
 }
 
 export function isPersistUiStateMessage(message: unknown): message is PersistUiStateMessage {

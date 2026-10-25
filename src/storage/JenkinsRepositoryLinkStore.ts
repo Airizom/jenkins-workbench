@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { ensureTrailingSlash } from "../jenkins/urls";
+import { ensureTrailingSlash, rebaseEnvironmentUrl } from "../jenkins/urls";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 
 interface StoredRepositoryLink {
@@ -152,6 +152,35 @@ export class JenkinsRepositoryLinkStore {
     });
   }
 
+  /**
+   * Moves the multibranch folder URLs of an environment's links from any of `oldBases` onto
+   * `newBase` after its URL was edited. Both mementos are checked, as links record their scope.
+   */
+  rebaseLinkUrls(
+    environment: JenkinsRepositoryLinkEnvironment,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    return this.mutationQueue(async () => {
+      let moved = 0;
+      for (const scope of ["workspace", "global"] as const) {
+        const state = scope === "workspace" ? this.getWorkspaceState() : this.getGlobalState();
+        const rebased = rebaseRepositoryLinks(state.links ?? {}, environment, oldBases, newBase);
+
+        const count = Object.keys(rebased).length;
+        if (count > 0) {
+          await this.updateLinks(scope, (links) => Object.assign(links, rebased));
+          moved += count;
+        }
+      }
+
+      if (moved > 0) {
+        this.emitter.fire();
+      }
+      return moved;
+    });
+  }
+
   private getState(): StoredRepositoryLinksState {
     return {
       links: {
@@ -237,4 +266,23 @@ function normalizeLinkUrl(value: string): string {
   } catch {
     return ensureTrailingSlash(value);
   }
+}
+
+function rebaseRepositoryLinks(
+  links: Record<string, StoredRepositoryLink>,
+  environment: JenkinsRepositoryLinkEnvironment,
+  oldBases: readonly string[],
+  newBase: string
+): Record<string, StoredRepositoryLink> {
+  const rebased: Record<string, StoredRepositoryLink> = {};
+  for (const [key, link] of Object.entries(links)) {
+    const multibranchFolderUrl =
+      link.environmentId === environment.environmentId && link.scope === environment.scope
+        ? rebaseEnvironmentUrl(link.multibranchFolderUrl, oldBases, newBase)
+        : undefined;
+    if (multibranchFolderUrl) {
+      rebased[key] = { ...link, multibranchFolderUrl };
+    }
+  }
+  return rebased;
 }

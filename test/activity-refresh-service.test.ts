@@ -80,6 +80,55 @@ describe("ActivityRefreshService", () => {
     assert.deepEqual(refreshed, []);
   });
 
+  it("keeps refreshing an expanded environment with its edited URL", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const refreshed: JenkinsEnvironmentRef[] = [];
+    const service = new ActivityRefreshService({
+      activityOptions: createActivityOptions(5_000),
+      refreshActivity: (environment) => refreshed.push(environment)
+    });
+    const workspace = createEnvironment("workspace");
+    const edited = { ...workspace, url: "https://moved.jenkins.example/" };
+
+    service.handleActivityFolderExpanded(workspace);
+    service.handleEnvironmentStoreChange({
+      kind: "environment-updated",
+      scope: workspace.scope,
+      environmentId: workspace.environmentId,
+      urlChanged: true,
+      environment: { id: workspace.environmentId, url: "https://edited.example/" }
+    });
+    service.updateEnvironment(edited);
+    service.updateEnvironment(createEnvironment("global"));
+    service.handleStatusTick();
+
+    assert.deepEqual(refreshed, [edited]);
+  });
+
+  it("keeps refreshing an environment when an update leaves its URL alone", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const refreshed: JenkinsEnvironmentRef[] = [];
+    const service = new ActivityRefreshService({
+      activityOptions: createActivityOptions(5_000),
+      refreshActivity: (environment) => refreshed.push(environment)
+    });
+    const workspace = createEnvironment("workspace");
+
+    service.handleActivityFolderExpanded(workspace);
+    service.handleEnvironmentStoreChange({
+      kind: "environment-updated",
+      scope: workspace.scope,
+      environmentId: workspace.environmentId,
+      urlChanged: false,
+      environment: { id: workspace.environmentId, url: "https://edited.example/" }
+    });
+    service.handleStatusTick();
+
+    assert.deepEqual(refreshed, [workspace]);
+  });
+
   it("preserves the refresh timestamp when an expanded environment reference is updated", () => {
     vi.useFakeTimers();
     vi.setSystemTime(100_000);

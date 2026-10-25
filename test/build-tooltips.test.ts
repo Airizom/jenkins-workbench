@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import * as vscode from "vscode";
 import type { JenkinsBuild } from "../src/jenkins/JenkinsClient";
 import { buildBuildTooltip } from "../src/tree/BuildTooltips";
 
@@ -172,5 +173,56 @@ describe("buildBuildTooltip parameter limits", () => {
       parameterTooltipValue(2.9),
       "**Parameters:** BRANCH=main, API_TOKEN=[redacted] +1 more"
     );
+  });
+});
+
+describe("buildBuildTooltip build metadata", () => {
+  it("shows a custom display name, plain-text description, and kept-forever state", () => {
+    const tooltip = buildBuildTooltip(
+      createBuild({
+        displayName: "release-1.2",
+        description: "<p>Deployed to <b>staging</b> &amp; prod</p>",
+        keepLog: true
+      })
+    );
+    assert.equal(
+      tooltip.value,
+      "**Display name:** release-1.2\n\n**Description:** Deployed to staging & prod\n\n**Retention:** Kept forever"
+    );
+  });
+
+  it("omits the default display name and an empty description", () => {
+    const tooltip = buildBuildTooltip(
+      createBuild({ displayName: "#7", description: "<p> </p>", keepLog: false })
+    );
+    assert.equal(tooltip.value, "https://jenkins.example/job/demo/7/");
+  });
+
+  it("truncates long descriptions", () => {
+    const tooltip = buildBuildTooltip(createBuild({ description: "x".repeat(500) }));
+    const value = tooltip.value.replace("**Description:** ", "");
+    assert.equal(Array.from(value).length, 300);
+    assert.ok(value.endsWith("…"));
+  });
+
+  it("routes user-controlled text through appendText only", () => {
+    const appendMarkdown = vi.spyOn(vscode.MarkdownString.prototype, "appendMarkdown");
+    const appendText = vi.spyOn(vscode.MarkdownString.prototype, "appendText");
+    try {
+      const description =
+        '<a href="command:workbench.action.terminal.new">[run](command:evil)</a> **bold** <img src=x onerror=alert(1)>';
+      buildBuildTooltip(
+        createBuild({ displayName: "[name](command:evil)", description, keepLog: true })
+      );
+      const markdown = appendMarkdown.mock.calls.map(([text]) => text).join("");
+      assert.doesNotMatch(markdown, /command:|bold|evil|run|<|img/);
+      const text = appendText.mock.calls.map(([value]) => value);
+      assert.ok(text.includes("[name](command:evil)"));
+      assert.ok(text.includes("[run](command:evil) **bold**"));
+      assert.ok(text.every((value) => !value.includes("<")));
+    } finally {
+      appendMarkdown.mockRestore();
+      appendText.mockRestore();
+    }
   });
 });

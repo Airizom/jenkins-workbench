@@ -82,4 +82,19 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<ScopedJobStoreEntry> 
       mergeScopedJobEntryMetadata
     );
   }
+
+  async rebasePinUrls(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    return this.rebaseForEnvironment(
+      scope,
+      environmentId,
+      oldBases,
+      newBase,
+      mergeScopedJobEntryMetadata
+    );
+  }
 }

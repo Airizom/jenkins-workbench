@@ -17,7 +17,6 @@ interface PollerHarness {
   updateMaxConsecutiveErrors(maxConsecutiveErrors: number): void;
   synchronizeWatchErrorCount(): void;
   onDidChangeWatchErrorCount(listener: (count: number) => void): { dispose(): void };
-  watchStates: Map<string, { pendingInput: { buildUrl: string; signature: string } | undefined }>;
 }
 
 vi.doMock("vscode", () => createEventEmitterVscodeMock());
@@ -265,6 +264,8 @@ describe("JenkinsStatusPoller", () => {
         getPendingInputSummary,
         maxConsecutiveErrors: 1
       });
+      const errorCounts: number[] = [];
+      fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
       fixture.poller.start({ initialDelayMs: 60_000 });
       const poll = fixture.poller.poll();
       await vi.waitFor(() => assert.equal(getJob.mock.calls.length, 1));
@@ -293,7 +294,7 @@ describe("JenkinsStatusPoller", () => {
       assert.equal(updateWatchStatus.mock.calls.length, 0);
       assert.deepEqual(fixture.watchStore.removedWatches, []);
       assert.deepEqual(fixture.watchStore.removedEnvironments, removedEnvironments);
-      assert.equal(fixture.poller.watchStates.size, 0);
+      assert.deepEqual(errorCounts, []);
       assert.ok(Object.values(fixture.notifier.calls).every((calls) => calls.length === 0));
       assert.equal(fixture.hostRefreshes, hostRefreshes);
     }
@@ -834,13 +835,15 @@ describe("JenkinsStatusPoller", () => {
     buildNumber = 10;
     await fixture.poller.poll();
     await fixture.poller.poll();
+    buildNumber = 8;
+    await fixture.poller.poll();
 
-    const state = fixture.poller.watchStates.get("workspace:env-1:job/demo/");
-    assert.deepEqual(state?.pendingInput, {
-      buildUrl: "job/demo/10/",
-      signature: "input-job/demo/10/"
-    });
-    assert.equal(fixture.notifier.calls.pendingInputs.length, 3);
+    assert.deepEqual(
+      fixture.notifier.calls.pendingInputs.map(
+        (notification) => (notification as { buildUrl: string }).buildUrl
+      ),
+      ["job/demo/8/", "job/demo/9/", "job/demo/10/", "job/demo/8/"]
+    );
   });
 
   it("clears the pending input identity when a watched job is removed", async () => {

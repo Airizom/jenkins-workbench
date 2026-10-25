@@ -2,14 +2,13 @@ import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { ensureTrailingSlash } from "../jenkins/urls";
 import { NodeCapacityService } from "../services/NodeCapacityService";
 import type { NodeCapacityNodeExecutorsResult } from "../shared/nodeCapacity/NodeCapacityContracts";
 import { buildNodeCapacityErrorViewModel } from "../shared/nodeCapacity/NodeCapacityDefaults";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../ui/OpenExternalUrl";
 import type { BuildDetailsPanelLauncher } from "./BuildDetailsPanelLauncher";
-import { NodeDetailsPanel } from "./NodeDetailsPanel";
+import { NodeCapacityPanelNavigation } from "./nodeCapacity/NodeCapacityPanelNavigation";
 import {
   nodeCapacityWebviewEntryName,
   renderLoadingHtml,
@@ -27,6 +26,7 @@ import type { EnvironmentPanelRefreshHost } from "./shared/PanelRuntimeHelpers";
 import {
   attachPanelLifecycle,
   bindEnvironmentRefresh,
+  closePanelForEnvironment,
   createPanelLoadingTracker,
   disposeEnvironmentScopedPanel,
   LoadTokenTracker,
@@ -82,6 +82,7 @@ export class NodeCapacityPanel {
   private environment?: JenkinsEnvironmentRef;
   private readonly loadTokenTracker = new LoadTokenTracker();
   private readonly loadTracker: PanelLoadTracker;
+  private readonly navigation: NodeCapacityPanelNavigation;
   private executorLoadGeneration = 0;
   private capacityRequestCount = 0;
   private hasRendered = false;
@@ -154,9 +155,22 @@ export class NodeCapacityPanel {
     await revived.load();
   }
 
+  /** Closes the panel when it shows the given environment, e.g. after its URL changed. */
+  static closeForEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
+    const current = NodeCapacityPanel.currentPanel;
+    closePanelForEnvironment(current?.panel, current?.environment, scope, environmentId);
+  }
+
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.extensionUri = extensionUri;
+    this.navigation = new NodeCapacityPanelNavigation(() => ({
+      environment: this.environment,
+      dataService: this.dataService,
+      extensionUri: this.extensionUri,
+      refreshHost: this.refreshHost,
+      buildDetailsPanelLauncher: this.buildDetailsPanelLauncher
+    }));
     this.loadTracker = createPanelLoadingTracker((message: NodeCapacityOutgoingMessage) =>
       this.postMessage(message)
     );
@@ -172,11 +186,11 @@ export class NodeCapacityPanel {
           return;
         }
         if (isOpenNodeDetailsMessage(message)) {
-          void this.openNodeDetails(message.nodeUrl, message.label);
+          void this.navigation.openNodeDetails(message.nodeUrl, message.label);
           return;
         }
         if (isOpenBuildDetailsMessage(message)) {
-          void this.openBuildDetails(message.buildUrl, message.label);
+          void this.navigation.openBuildDetails(message.buildUrl, message.label);
           return;
         }
         if (isLoadNodeCapacityExecutorsMessage(message)) {
@@ -333,71 +347,6 @@ export class NodeCapacityPanel {
     await openJenkinsWorkbenchUrl(url, "Node Capacity");
   }
 
-  /**
-   * Webview-supplied node and build URLs feed authenticated requests, so only
-   * accept URLs inside this panel's environment (same prefix containment as
-   * the URI handler and task provider).
-   */
-  private isUrlWithinEnvironment(url: string): boolean {
-    const environmentUrl = this.environment?.url;
-    if (!environmentUrl) {
-      return false;
-    }
-    try {
-      const normalizedBase = ensureTrailingSlash(new URL(environmentUrl).toString());
-      return new URL(url).toString().startsWith(normalizedBase);
-    } catch {
-      return false;
-    }
-  }
-
-  private async openBuildDetails(buildUrl: string, label?: string): Promise<void> {
-    if (!this.environment) {
-      return;
-    }
-    if (!this.isUrlWithinEnvironment(buildUrl)) {
-      console.warn(
-        `Node Capacity ignored a build details request outside the environment: ${buildUrl}`
-      );
-      return;
-    }
-    if (!this.buildDetailsPanelLauncher) {
-      await this.openExternalUrl(buildUrl);
-      return;
-    }
-    try {
-      await this.buildDetailsPanelLauncher.show({
-        environment: this.environment,
-        buildUrl,
-        label
-      });
-    } catch (error) {
-      void vscode.window.showErrorMessage(
-        `Unable to open build details: ${formatActionError(error)}`
-      );
-    }
-  }
-
-  private async openNodeDetails(nodeUrl: string, label?: string): Promise<void> {
-    if (!this.dataService || !this.environment) {
-      return;
-    }
-    if (!this.isUrlWithinEnvironment(nodeUrl)) {
-      console.warn(
-        `Node Capacity ignored a node details request outside the environment: ${nodeUrl}`
-      );
-      return;
-    }
-    await NodeDetailsPanel.show({
-      dataService: this.dataService,
-      environment: this.environment,
-      nodeUrl,
-      extensionUri: this.extensionUri,
-      label,
-      refreshHost: this.refreshHost
-    });
-  }
-
   private async loadNodeExecutors(nodeUrls: string[], requestId: number): Promise<void> {
     if (!this.capacityService || !this.environment) {
       return;
@@ -408,7 +357,7 @@ export class NodeCapacityPanel {
     const environmentId = environment.environmentId;
     const candidateNodeUrls = [...new Set(nodeUrls.filter((nodeUrl) => nodeUrl.trim().length > 0))];
     const uniqueNodeUrls = candidateNodeUrls.filter((nodeUrl) =>
-      this.isUrlWithinEnvironment(nodeUrl)
+      this.navigation.isUrlWithinEnvironment(nodeUrl)
     );
     if (uniqueNodeUrls.length < candidateNodeUrls.length) {
       console.warn("Node Capacity ignored executor requests for URLs outside the environment.");

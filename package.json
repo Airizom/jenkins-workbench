@@ -71,6 +71,12 @@
         "icon": "$(add)"
       },
       {
+        "command": "jenkinsWorkbench.editEnvironment",
+        "title": "Edit Environment...",
+        "category": "Jenkins",
+        "icon": "$(edit)"
+      },
+      {
         "command": "jenkinsWorkbench.removeEnvironment",
         "title": "Remove Environment",
         "category": "Jenkins",
@@ -118,6 +124,12 @@
         "category": "Jenkins"
       },
       {
+        "command": "jenkinsWorkbench.replayWithLocalJenkinsfile",
+        "title": "Replay with Local Jenkinsfile",
+        "category": "Jenkins",
+        "icon": "$(debug-rerun)"
+      },
+      {
         "command": "jenkinsWorkbench.quickReplayBuild",
         "title": "Quick Replay Build",
         "category": "Jenkins"
@@ -127,6 +139,41 @@
         "title": "Run Replay Draft",
         "category": "Jenkins",
         "icon": "$(play)"
+      },
+      {
+        "command": "jenkinsWorkbench.deleteBuild",
+        "title": "Delete Build",
+        "category": "Jenkins",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "jenkinsWorkbench.keepBuildForever",
+        "title": "Keep Build Forever",
+        "category": "Jenkins",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "jenkinsWorkbench.stopKeepingBuild",
+        "title": "Stop Keeping Build Forever",
+        "category": "Jenkins",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "jenkinsWorkbench.editBuildDescription",
+        "title": "Edit Build Description",
+        "category": "Jenkins",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jenkinsWorkbench.editBuildDisplayName",
+        "title": "Edit Build Display Name",
+        "category": "Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.submitBuildDescription",
+        "title": "Submit Build Description",
+        "category": "Jenkins",
+        "icon": "$(cloud-upload)"
       },
       {
         "command": "jenkinsWorkbench.rebuildBuild",
@@ -1232,6 +1279,11 @@
           "group": "inline"
         },
         {
+          "command": "jenkinsWorkbench.editEnvironment",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "1_actions@0"
+        },
+        {
           "command": "jenkinsWorkbench.removeEnvironment",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
           "group": "9_danger@0"
@@ -1452,14 +1504,44 @@
           "group": "2_rebuild@0"
         },
         {
-          "command": "jenkinsWorkbench.quickReplayBuild",
+          "command": "jenkinsWorkbench.replayWithLocalJenkinsfile",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "2_rebuild@1"
         },
         {
-          "command": "jenkinsWorkbench.rebuildBuild",
+          "command": "jenkinsWorkbench.quickReplayBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "2_rebuild@2"
+        },
+        {
+          "command": "jenkinsWorkbench.rebuildBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "2_rebuild@3"
+        },
+        {
+          "command": "jenkinsWorkbench.keepBuildForever",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/ && !(viewItem =~ /(^|\\s)keptForever(\\s|$)/)",
+          "group": "2_manage@0"
+        },
+        {
+          "command": "jenkinsWorkbench.stopKeepingBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/ && viewItem =~ /(^|\\s)keptForever(\\s|$)/",
+          "group": "2_manage@0"
+        },
+        {
+          "command": "jenkinsWorkbench.editBuildDisplayName",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "2_manage@1"
+        },
+        {
+          "command": "jenkinsWorkbench.editBuildDescription",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "2_manage@2"
+        },
+        {
+          "command": "jenkinsWorkbench.deleteBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)build(\\s|$)/",
+          "group": "3_destructive@0"
         },
         {
           "command": "jenkinsWorkbench.linkRepositoryHere",
@@ -1492,6 +1574,16 @@
           "command": "jenkinsWorkbench.runReplayDraft",
           "when": "resourceScheme == jenkins-replay",
           "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.submitBuildDescription",
+          "when": "resourceScheme == jenkins-build-description",
+          "group": "navigation"
+        },
+        {
+          "command": "jenkinsWorkbench.replayWithLocalJenkinsfile",
+          "when": "jenkinsWorkbench.workspaceJenkinsfileActive",
+          "group": "navigation"
         }
       ],
       "editor/context": [
@@ -1499,6 +1591,11 @@
           "command": "jenkinsWorkbench.jenkinsfile.validateActive",
           "when": "jenkinsWorkbench.jenkinsfileActive",
           "group": "navigation@10"
+        },
+        {
+          "command": "jenkinsWorkbench.replayWithLocalJenkinsfile",
+          "when": "jenkinsWorkbench.workspaceJenkinsfileActive",
+          "group": "navigation@11"
         }
       ],
       "commandPalette": [
@@ -1509,6 +1606,30 @@
         {
           "command": "jenkinsWorkbench.runReplayDraft",
           "when": "resourceScheme == jenkins-replay"
+        },
+        {
+          "command": "jenkinsWorkbench.submitBuildDescription",
+          "when": "resourceScheme == jenkins-build-description"
+        },
+        {
+          "command": "jenkinsWorkbench.deleteBuild",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.keepBuildForever",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.stopKeepingBuild",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.editBuildDescription",
+          "when": "view == jenkinsWorkbench.tree"
+        },
+        {
+          "command": "jenkinsWorkbench.editBuildDisplayName",
+          "when": "view == jenkinsWorkbench.tree"
         },
         {
           "command": "jenkinsWorkbench.newItem"
@@ -1547,6 +1668,10 @@
         },
         {
           "command": "jenkinsWorkbench.jenkinsfile.showValidationOutput"
+        },
+        {
+          "command": "jenkinsWorkbench.replayWithLocalJenkinsfile",
+          "when": "jenkinsWorkbench.workspaceJenkinsfileActive"
         }
       ]
     },

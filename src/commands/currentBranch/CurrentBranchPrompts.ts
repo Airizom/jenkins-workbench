@@ -5,6 +5,7 @@ import type {
   CurrentBranchMultibranchTarget,
   CurrentBranchWorkflowService
 } from "../../currentBranch/CurrentBranchWorkflowService";
+import { formatEnvironmentDisplayName } from "../../jenkins/EnvironmentLabels";
 
 export async function pickRepository(
   workflowService: CurrentBranchWorkflowService,
@@ -101,13 +102,18 @@ async function pickLinkableEnvironment(
 
   const pick = await vscode.window.showQuickPick(
     environments.map((entry) => ({
-      label: `${entry.environment.scope} • ${entry.environment.environmentId}`,
-      description: entry.environmentUrl,
+      label: formatEnvironmentDisplayName({
+        name: entry.environmentName,
+        url: entry.environmentUrl
+      }),
+      description: entry.environment.scope,
+      detail: entry.environmentUrl,
       environment: entry
     })),
     {
       placeHolder: "Select a Jenkins environment",
       matchOnDescription: true,
+      matchOnDetail: true,
       ignoreFocusOut: true
     }
   );

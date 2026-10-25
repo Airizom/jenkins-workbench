@@ -10,7 +10,7 @@ export default defineConfig({
           ? ["--remote-debugging-port=9235", "--force-renderer-accessibility"]
           : [])
       ]
-    : [],
+    : [process.cwd()],
   mocha: {
     ui: "bdd",
     timeout: 20000

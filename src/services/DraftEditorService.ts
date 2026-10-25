@@ -98,3 +98,18 @@ function getTabUri(tab: vscode.Tab): vscode.Uri | undefined {
   }
   return undefined;
 }
+
+/** Dispose draft listeners before cancelling delayed close callbacks. */
+export function disposeDraftResources(
+  subscriptions: vscode.Disposable[],
+  pendingCloses: Set<vscode.Disposable>
+): void {
+  for (const subscription of subscriptions) {
+    subscription.dispose();
+  }
+  subscriptions.length = 0;
+  for (const pending of pendingCloses) {
+    pending.dispose();
+  }
+  pendingCloses.clear();
+}

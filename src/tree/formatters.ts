@@ -16,6 +16,7 @@ import { formatRelativeTimestampMs } from "../formatters/RelativeTimeFormatters"
 import { normalizeStatusToken } from "../formatters/StatusTokenUtils";
 import type { JenkinsBuild } from "../jenkins/JenkinsClient";
 import { parseJobUrl } from "../jenkins/urls";
+import { resolveCustomBuildDisplayName } from "../shared/build/BuildDisplayName";
 import { resolveBuildElapsedMs } from "./BuildTiming";
 
 type NormalizedStatus = JobColorStatus;
@@ -60,8 +61,16 @@ export function formatJobColor(color?: string): string | undefined {
 }
 
 export function formatBuildDescription(build: JenkinsBuild, awaitingInput = false): string {
+  // The label stays "#N" so sorting and identity read the same; a custom name leads the
+  // description instead.
+  const parts: string[] = [];
+  const customDisplayName = resolveCustomBuildDisplayName(build);
+  if (customDisplayName) {
+    parts.push(customDisplayName);
+  }
+
   if (build.building) {
-    const parts = awaitingInput ? ["Awaiting input"] : ["Running"];
+    parts.push(awaitingInput ? "Awaiting input" : "Running");
     const progress = formatRunningProgress(build);
     if (progress) {
       parts.push(progress);
@@ -69,7 +78,7 @@ export function formatBuildDescription(build: JenkinsBuild, awaitingInput = fals
     return parts.join(" • ");
   }
 
-  const parts = [resolveBuildResultLabel(build.result, build.building)];
+  parts.push(resolveBuildResultLabel(build.result, build.building));
   const durationLabel = formatDurationLabel(build.duration);
   if (durationLabel) {
     parts.push(durationLabel);

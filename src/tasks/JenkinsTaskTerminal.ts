@@ -7,12 +7,12 @@ import type { FullEnvironmentRefreshHost } from "../extension/ExtensionRefreshHo
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { parseJobUrl } from "../jenkins/urls";
 import type {
   EnvironmentWithScope,
   JenkinsEnvironmentStore
 } from "../storage/JenkinsEnvironmentStore";
-import { toJenkinsEnvironmentRef } from "./JenkinsTaskEnvironment";
 import { JENKINS_TASK_EXIT_CODES, JenkinsTaskRunner } from "./JenkinsTaskRunner";
 import {
   type JenkinsTaskDefinition,

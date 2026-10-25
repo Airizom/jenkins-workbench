@@ -1,28 +1,13 @@
 import * as vscode from "vscode";
-import { getExtensionConfiguration, getJobSearchTuningOptions } from "../extension/ExtensionConfig";
 import { formatError } from "../formatters/ErrorFormatters";
-import {
-  CancellationError,
-  type JenkinsDataService,
-  type JobSearchEntry
-} from "../jenkins/JenkinsDataService";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsViewStateStore, JobFilterMode } from "../storage/JenkinsViewStateStore";
-import { formatJobColor } from "../tree/formatters";
 import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
 import type { JenkinsFolderTreeItem } from "../tree/TreeItems";
 import type { JenkinsTreeNavigator } from "../tree/TreeNavigator";
+import { pickJenkinsJob } from "../ui/JenkinsJobPicker";
 import { openExternalHttpUrlWithWarning } from "../ui/OpenExternalUrl";
-import { toJenkinsEnvironmentRef } from "./CommandUtils";
-
-type JobQuickPickItem = vscode.QuickPickItem & {
-  environment: JenkinsEnvironmentRef;
-  entry: JobSearchEntry;
-};
-
-const MAX_JOB_RESULTS = 2000;
-const BATCH_SIZE = 50;
 
 export function registerSearchCommands(
   context: vscode.ExtensionContext,
@@ -66,123 +51,21 @@ async function goToJob(
   dataService: JenkinsDataService,
   navigator: JenkinsTreeNavigator
 ): Promise<void> {
-  const environments = await store.listEnvironmentsWithScope();
-  if (environments.length === 0) {
-    void vscode.window.showInformationMessage("No Jenkins environments configured.");
-    return;
-  }
-
-  const quickPick = vscode.window.createQuickPick<JobQuickPickItem>();
-  const cancellationSource = new vscode.CancellationTokenSource();
-  const cancellationToken = cancellationSource.token;
-  const picks: JobQuickPickItem[] = [];
-  let pending = environments.length;
-  let cleanupCompleted = false;
-
-  quickPick.placeholder = "Search jobs across all Jenkins environments";
-  quickPick.matchOnDescription = true;
-  quickPick.matchOnDetail = true;
-  quickPick.busy = true;
-
-  quickPick.onDidAccept(async () => {
-    const selection = quickPick.selectedItems[0];
-    if (!selection) {
-      return;
-    }
-    quickPick.hide();
-    const revealed = await navigator.revealJobPath(selection.environment, selection.entry);
-    if (!revealed) {
-      await openExternalHttpUrlWithWarning(selection.entry.url, {
-        targetLabel: "selected Jenkins job URL"
-      });
-    }
-  });
-
-  quickPick.onDidHide(() => {
-    if (cleanupCompleted) {
-      return;
-    }
-    cleanupCompleted = true;
-    cancellationSource.cancel();
-    cancellationSource.dispose();
-    quickPick.dispose();
-  });
-
-  quickPick.show();
-
-  const searchOptions = getJobSearchTuningOptions(getExtensionConfiguration());
-  const onLoadCompleted = (): void => {
-    pending -= 1;
-    if (cancellationToken.isCancellationRequested || pending > 0) {
-      return;
-    }
-
-    quickPick.busy = false;
-
-    if (picks.length === 0) {
-      void vscode.window.showInformationMessage("No jobs found with current search settings.");
-      return;
-    }
-  };
-
-  for (const environment of environments) {
-    const envRef = toJenkinsEnvironmentRef(environment);
-    const seenEntries = new Set<string>();
-    const appendEntries = (entries: JobSearchEntry[]): void => {
-      if (cancellationToken.isCancellationRequested) {
+  void pickJenkinsJob(dataService, store)
+    .then(async (selection) => {
+      if (!selection) {
         return;
       }
-      const previousCount = picks.length;
-      for (const entry of entries) {
-        if (seenEntries.has(entry.url)) {
-          continue;
-        }
-        seenEntries.add(entry.url);
-        const statusLabel = formatJobColor(entry.color) ?? "Unknown";
-        picks.push({
-          label: entry.name,
-          description: statusLabel,
-          detail: `${entry.fullName} • ${envRef.url}`,
-          environment: envRef,
-          entry
+      const revealed = await navigator.revealJobPath(selection.environment, selection.entry);
+      if (!revealed) {
+        await openExternalHttpUrlWithWarning(selection.entry.url, {
+          targetLabel: "selected Jenkins job URL"
         });
       }
-      if (picks.length > previousCount) {
-        const active = quickPick.activeItems[0];
-        picks.sort((a, b) => a.label.localeCompare(b.label));
-        quickPick.items = [...picks];
-        if (active) {
-          const restored = picks.find(
-            (pick) =>
-              pick.entry.url === active.entry.url &&
-              pick.environment.environmentId === active.environment.environmentId
-          );
-          if (restored) {
-            quickPick.activeItems = [restored];
-          }
-        }
-      }
-    };
-    void (async () => {
-      for await (const batch of dataService.iterateJobsForEnvironment(envRef, {
-        cancellation: cancellationToken,
-        maxResults: MAX_JOB_RESULTS,
-        batchSize: BATCH_SIZE,
-        ...searchOptions
-      })) {
-        appendEntries(batch);
-      }
-    })()
-      .catch((error) => {
-        if (error instanceof CancellationError || error instanceof vscode.CancellationError) {
-          return;
-        }
-        void vscode.window.showWarningMessage(
-          `Unable to load jobs for ${envRef.url}: ${formatError(error)}`
-        );
-      })
-      .finally(onLoadCompleted);
-  }
+    })
+    .catch((error) => {
+      void vscode.window.showWarningMessage(`Unable to go to Jenkins job: ${formatError(error)}`);
+    });
 }
 
 async function toggleJobFilterMode(

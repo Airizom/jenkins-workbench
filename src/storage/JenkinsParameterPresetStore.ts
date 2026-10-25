@@ -1,5 +1,6 @@
 import * as crypto from "node:crypto";
 import type * as vscode from "vscode";
+import { rebaseEnvironmentUrl } from "../jenkins/urls";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { ParameterPresetSecretStore } from "./ParameterPresetSecretStore";
 import { ParameterPresetStateRepository } from "./ParameterPresetStateRepository";
@@ -181,6 +182,66 @@ export class JenkinsParameterPresetStore {
     return this.mutationQueue(() =>
       this.updatePresetUrlUnlocked(scope, environmentId, oldJobUrl, newJobUrl)
     );
+  }
+
+  /**
+   * Moves an environment's presets from any of `oldBases` onto `newBase` after its URL was edited.
+   * Presets landing on a job that already has presets are merged, keeping the newest
+   * MAX_PRESETS_PER_JOB; secrets of presets dropped by the cap are deleted.
+   */
+  rebasePresetUrls(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    return this.mutationQueue(async () => {
+      const jobs: Array<StoredJobPresets | undefined> = this.state.readJobs(scope);
+      const movedIndexes: number[] = [];
+      jobs.forEach((entry, index) => {
+        const jobUrl =
+          entry?.environmentId === environmentId
+            ? rebaseEnvironmentUrl(entry.jobUrl, oldBases, newBase)
+            : undefined;
+        if (entry && jobUrl) {
+          jobs[index] = { ...entry, jobUrl };
+          movedIndexes.push(index);
+        }
+      });
+      if (movedIndexes.length === 0) {
+        return 0;
+      }
+
+      const dropped: StoredParameterPreset[] = [];
+      for (const sourceIndex of movedIndexes) {
+        const source = jobs[sourceIndex];
+        const targetIndex = jobs.findIndex(
+          (entry, index) =>
+            index !== sourceIndex &&
+            entry?.environmentId === environmentId &&
+            entry.jobUrl === source?.jobUrl
+        );
+        const target = jobs[targetIndex];
+        if (!source || !target) {
+          continue;
+        }
+
+        const presets = [
+          ...target.presets,
+          ...withUniqueNamesAndIds(source.presets, target.presets)
+        ].sort((a, b) => b.updatedAt - a.updatedAt || a.name.localeCompare(b.name));
+        dropped.push(...presets.slice(MAX_PRESETS_PER_JOB));
+        jobs[targetIndex] = { ...target, presets: presets.slice(0, MAX_PRESETS_PER_JOB) };
+        jobs[sourceIndex] = undefined;
+      }
+
+      await this.state.writeJobs(
+        scope,
+        jobs.filter((entry): entry is StoredJobPresets => entry !== undefined)
+      );
+      await this.deletePresetSecrets(dropped);
+      return movedIndexes.length;
+    });
   }
 
   private async savePresetUnlocked(

@@ -10,11 +10,15 @@ export {
   ExternalLinkIcon,
   EyeIcon,
   LaunchIcon,
+  LockIcon,
   MinusIcon,
+  PencilIcon,
   PlayIcon,
   PlusIcon,
   RefreshIcon,
   SearchIcon,
+  TrashIcon,
+  UnlockIcon,
   XIcon
 } from "./actionIcons";
 export {

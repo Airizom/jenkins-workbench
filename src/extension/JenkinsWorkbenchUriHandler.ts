@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../jenkins/JenkinsEnvironmentRef";
 import { ensureTrailingSlash } from "../jenkins/urls";
 import type { PipelineNodeSelection } from "../panels/BuildDetailsPanelLauncher";
 import type {
@@ -154,12 +158,13 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
     }
 
     if (matches.length === 1) {
-      return this.toEnvironmentRef(matches[0].environment);
+      return toJenkinsEnvironmentRef(matches[0].environment);
     }
 
     const items: EnvironmentPickItem[] = matches.map((match) => ({
-      label: match.normalizedUrl,
+      label: formatEnvironmentDisplayName(match.environment),
       description: match.environment.scope,
+      detail: match.normalizedUrl,
       environment: match.environment
     }));
 
@@ -167,7 +172,7 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
       placeHolder: "Select the Jenkins environment for this link"
     });
 
-    return selection ? this.toEnvironmentRef(selection.environment) : undefined;
+    return selection ? toJenkinsEnvironmentRef(selection.environment) : undefined;
   }
 
   private normalizeEnvironmentUrl(value: string): string | undefined {
@@ -176,14 +181,5 @@ export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
     } catch {
       return undefined;
     }
-  }
-
-  private toEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-    return {
-      environmentId: environment.id,
-      scope: environment.scope,
-      url: environment.url,
-      username: environment.username
-    };
   }
 }

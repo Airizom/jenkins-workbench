@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
-import { formatEnvironmentLabel } from "../jenkins/EnvironmentLabels";
+import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import { toJenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import { NodeCapacityPanel } from "../panels/NodeCapacityPanel";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
@@ -11,7 +12,7 @@ import type {
   NodesFolderTreeItem,
   QueueItemTreeItem
 } from "../tree/TreeItems";
-import { toJenkinsEnvironmentRef, withActionErrorMessage } from "./CommandUtils";
+import { withActionErrorMessage } from "./CommandUtils";
 
 type NodeCapacityCommandSource =
   | NodesFolderTreeItem
@@ -90,7 +91,7 @@ async function resolveEnvironment(
 
   const pick = await vscode.window.showQuickPick(
     environments.map((environment) => ({
-      label: formatEnvironmentLabel(environment.url),
+      label: formatEnvironmentDisplayName(environment),
       description: environment.scope,
       environment
     })),

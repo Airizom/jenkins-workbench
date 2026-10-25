@@ -136,7 +136,10 @@ describe("BuildDiagnosticScanSession", () => {
         fallbackRefreshIntervalMs: 0,
         resolveDiagnostic
       });
-      const cache = Reflect.get(session, "retentionPathByRawPath") as Map<string, unknown>;
+      const cache = Reflect.get(Reflect.get(session, "retention"), "retentionPathByRawPath") as Map<
+        string,
+        unknown
+      >;
 
       const running = await session.scan(true);
       assert.equal(running.complete, false);
@@ -182,7 +185,15 @@ describe("BuildDiagnosticScanSession", () => {
     const refreshed = await session.scan(true);
     assert.equal(resolveDiagnostic.mock.calls.length, 8);
     assert.equal(refreshed.diagnostics.length, 1);
-    assert.equal((Reflect.get(session, "retentionPathByRawPath") as Map<string, unknown>).size, 0);
+    assert.equal(
+      (
+        Reflect.get(Reflect.get(session, "retention"), "retentionPathByRawPath") as Map<
+          string,
+          unknown
+        >
+      ).size,
+      0
+    );
     session.dispose();
   });
 

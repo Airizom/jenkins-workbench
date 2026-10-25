@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { rebaseEnvironmentUrl } from "../jenkins/urls";
 
 export type JobFilterMode = "all" | "failing" | "running";
 
@@ -77,6 +78,40 @@ export class JenkinsViewStateStore {
 
   async clearBranchFilter(environmentId: string, folderUrl: string): Promise<void> {
     await this.setBranchFilter(environmentId, folderUrl, "");
+  }
+
+  /**
+   * Moves an environment's branch filters from folder URLs under any of `oldBases` onto
+   * `newBase` after its URL was edited. A filter already saved for the new URL is kept.
+   */
+  async rebaseBranchFilterUrls(
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    const state = this.getState();
+    const prefix = this.getBranchKey(environmentId, "");
+    const branchFilters = { ...(state.branchFilters ?? {}) };
+    let moved = 0;
+    for (const [key, filter] of Object.entries(state.branchFilters ?? {})) {
+      const folderUrl = key.startsWith(prefix)
+        ? rebaseEnvironmentUrl(key.slice(prefix.length), oldBases, newBase)
+        : undefined;
+      if (!folderUrl) {
+        continue;
+      }
+      delete branchFilters[key];
+      const nextKey = this.getBranchKey(environmentId, folderUrl);
+      branchFilters[nextKey] = state.branchFilters?.[nextKey] ?? filter;
+      moved += 1;
+    }
+    if (moved === 0) {
+      return 0;
+    }
+
+    await this.updateState({ ...state, branchFilters });
+    this.emitter.fire();
+    return moved;
   }
 
   private getState(): StoredViewState {

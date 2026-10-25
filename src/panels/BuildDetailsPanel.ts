@@ -4,6 +4,7 @@ import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefresh
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { normalizeJenkinsUrlForComparison, parseBuildUrl } from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
+import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
 import {
@@ -23,7 +24,8 @@ import {
   getBuildDetailsCoverageEnabledConfigKey,
   getTestReportIncludeCaseLogsConfigKey
 } from "./buildDetails/BuildDetailsConfig";
-import { BuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageRouter";
+import { createBuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageBindings";
+import type { BuildDetailsMessageRouter } from "./buildDetails/BuildDetailsMessageRouter";
 import { BuildDetailsPanelActions } from "./buildDetails/BuildDetailsPanelActions";
 import {
   BuildDetailsPanelController,
@@ -60,6 +62,8 @@ export interface BuildDetailsPanelServices {
   testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
+  /** Usually a lazy container reference, resolved on the first keep/edit/delete request. */
+  buildManagementWorkflow?: BuildManagementWorkflow;
 }
 
 interface BuildDetailsPanelShowOptions extends BuildDetailsPanelServices {
@@ -81,6 +85,7 @@ interface BuildDetailsPanelMutableServices {
   pendingInputProvider: BuildDetailsPendingInputProvider | undefined;
   testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
+  buildManagementWorkflow?: BuildManagementWorkflow;
 }
 
 export class BuildDetailsPanel {
@@ -193,6 +198,40 @@ export class BuildDetailsPanel {
     );
   }
 
+  /** Closes the panel when it shows the given environment, e.g. after its URL changed. */
+  static closeForEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
+    const current = BuildDetailsPanel.currentPanel;
+    if (!current) {
+      return;
+    }
+    const environment = current.controller.getEnvironment() ?? current.historyEnvironment;
+    if (environment?.scope === scope && environment.environmentId === environmentId) {
+      current.panel.dispose();
+    }
+  }
+
+  /** Closes the panel when it shows the given build, e.g. after the build was deleted. */
+  static closeForBuild(
+    scope: JenkinsEnvironmentRef["scope"],
+    environmentId: string,
+    buildUrl: string
+  ): void {
+    const current = BuildDetailsPanel.currentPanel;
+    if (!current) {
+      return;
+    }
+    const environment = current.controller.getEnvironment();
+    const currentBuildUrl = current.controller.getBuildUrl();
+    if (
+      environment?.scope === scope &&
+      environment.environmentId === environmentId &&
+      currentBuildUrl &&
+      areBuildUrlsEqual(currentBuildUrl, buildUrl)
+    ) {
+      current.panel.dispose();
+    }
+  }
+
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
@@ -236,69 +275,21 @@ export class BuildDetailsPanel {
       getArtifactActionHandler: () => this.artifactActionHandler,
       getConsoleExporter: () => this.mutableServices.consoleExporter,
       getRefreshHost: () => this.mutableServices.refreshHost,
-      getTestSourceNavigationUiService: () => this.mutableServices.testSourceNavigationUiService
+      getTestSourceNavigationUiService: () => this.mutableServices.testSourceNavigationUiService,
+      getBuildManagementWorkflow: () => this.mutableServices.buildManagementWorkflow
     });
-    this.messageRouter = new BuildDetailsMessageRouter({
-      onArtifactAction: (message) => {
-        void this.actions.handleArtifactAction(message);
-      },
-      onOpenExternal: (url) => {
-        void this.actions.openExternalUrl(url);
-      },
-      onExportConsole: () => {
-        void this.actions.handleExportConsole();
-      },
-      onRefreshBuildDetails: () => {
-        const details = this.controller.getCurrentDetails();
-        void this.controller.refreshBuildDetails({
-          label: details?.fullDisplayName ?? details?.displayName,
-          panelState: this.serializedState
-        });
-      },
-      onApproveInput: (message) => {
-        void this.actions.handleApproveInput(message);
-      },
-      onRejectInput: (message) => {
-        void this.actions.handleRejectInput(message);
-      },
-      onRestartPipelineFromStage: (message) => {
-        void this.actions.handleRestartPipelineFromStage(message);
-      },
-      onSelectPipelineLogNode: (message) => {
-        this.actions.handleSelectPipelineLogNode(message);
-      },
-      onClearPipelineLogNode: () => {
-        this.actions.handleClearPipelineLogNode();
-      },
-      onExportPipelineNodeLog: () => {
-        void this.actions.handleExportPipelineNodeLog();
-      },
-      onReloadTestReport: (message) => {
-        void this.actions.handleReloadTestReport(message);
-      },
-      onOpenTestSource: (message) => {
-        void this.actions.handleOpenTestSource(message);
-      },
-      onOpenDiagnosticSource: (message) => {
-        void this.buildDiagnosticsCoordinator.openSourceTarget(
-          message.targetId,
-          this.controller.getBuildUrl()
-        );
-      },
-      onConfigureBuildDiagnostics: () => {
-        void this.buildDiagnosticsCoordinator.configure();
-      },
-      onShowBuildDiagnosticProblems: () => {
-        this.buildDiagnosticsCoordinator.showProblems();
-      },
-      onPersistUiState: (message) => {
-        if (!this.serializedState) {
-          return;
+    this.messageRouter = createBuildDetailsMessageRouter({
+      actions: this.actions,
+      controller: this.controller,
+      buildDiagnosticsCoordinator: this.buildDiagnosticsCoordinator,
+      getSerializedState: () => this.serializedState,
+      persistUiState: (message) => {
+        if (this.serializedState) {
+          this.serializedState = withBuildDetailsPanelUiState(
+            this.serializedState,
+            message.uiState
+          );
         }
-        this.serializedState = withBuildDetailsPanelUiState(this.serializedState, message.uiState);
-      },
-      onToggleFollowLog: (value) => {
-        this.controller.setFollowLog(Boolean(value));
       }
     });
 
@@ -457,7 +448,8 @@ function getMutableServices(
     refreshHost: options.refreshHost,
     pendingInputProvider: options.pendingInputProvider,
     testSourceResolver: options.testSourceResolver,
-    testSourceNavigationUiService: options.testSourceNavigationUiService
+    testSourceNavigationUiService: options.testSourceNavigationUiService,
+    buildManagementWorkflow: options.buildManagementWorkflow
   };
 }
 

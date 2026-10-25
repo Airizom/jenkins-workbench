@@ -16,6 +16,8 @@ function buildSectionsInputFromPanelState(
 ): BuildDetailsSectionsInput {
   return {
     details: state.currentDetails,
+    buildUrl: state.currentBuildUrl,
+    hasEnvironment: Boolean(state.environment),
     testReport: state.currentTestReport,
     testReportFetched: state.testReportFetched,
     testReportLogsIncluded: state.testReportLogsIncluded,

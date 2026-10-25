@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { normalizeJenkinsUrlForComparison } from "../jenkins/urls";
+import { normalizeJenkinsUrlForComparison, rebaseEnvironmentUrl } from "../jenkins/urls";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 
@@ -167,6 +167,50 @@ export class JenkinsDiagnosticProfileBindingStore {
       await this.writeBindings(scope, unaffected);
       this.emitter.fire();
       return true;
+    });
+  }
+
+  /**
+   * Moves an environment's bindings from any of `oldBases` onto `newBase` after its URL was
+   * edited. On collision the most recently updated binding wins, as in updateBindingUrl.
+   */
+  rebaseBindingUrls(
+    scope: EnvironmentScope,
+    environmentId: string,
+    oldBases: readonly string[],
+    newBase: string
+  ): Promise<number> {
+    return this.mutationQueue(async () => {
+      const bindings = this.readBindings(scope);
+      const moved: StoredDiagnosticProfileBinding[] = [];
+      const unaffected: StoredDiagnosticProfileBinding[] = [];
+      for (const binding of bindings) {
+        const jobScopeUrl =
+          binding.environmentId === environmentId
+            ? rebaseEnvironmentUrl(binding.jobScopeUrl, oldBases, newBase)
+            : undefined;
+        if (jobScopeUrl) {
+          moved.push({ ...binding, jobScopeUrl: normalizeDiagnosticJobScopeUrl(jobScopeUrl) });
+        } else {
+          unaffected.push(binding);
+        }
+      }
+      if (moved.length === 0) {
+        return 0;
+      }
+
+      for (const binding of moved) {
+        const targetIndex = unaffected.findIndex((candidate) => isSameBinding(candidate, binding));
+        if (targetIndex < 0) {
+          unaffected.push(binding);
+        } else if (binding.updatedAt > unaffected[targetIndex].updatedAt) {
+          unaffected[targetIndex] = binding;
+        }
+      }
+
+      await this.writeBindings(scope, unaffected);
+      this.emitter.fire();
+      return moved.length;
     });
   }
 

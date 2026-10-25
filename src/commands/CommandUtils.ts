@@ -2,11 +2,11 @@ import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { canonicalizeJobUrlForEnvironment } from "../jenkins/urls";
-import type { EnvironmentWithScope } from "../storage/JenkinsEnvironmentStore";
 import { resolveTreeItemLabel } from "../tree/TreeItemLabels";
 import type { JobTreeItem } from "../tree/TreeItems";
+import { withActionErrorMessage } from "../ui/ActionErrorMessage";
 
-export { formatActionError };
+export { formatActionError, withActionErrorMessage };
 
 interface FullEnvironmentRefreshHost {
   fullEnvironmentRefresh(options: { environmentId: string }): void;
@@ -37,15 +37,6 @@ export function createEnvironmentRefreshCallback(
   };
 }
 
-export function toJenkinsEnvironmentRef(environment: EnvironmentWithScope): JenkinsEnvironmentRef {
-  return {
-    environmentId: environment.id,
-    scope: environment.scope,
-    url: environment.url,
-    username: environment.username
-  };
-}
-
 export function requireSelection<T>(
   item: T | undefined,
   missingSelectionMessage: string
@@ -60,17 +51,6 @@ export function requireSelection<T>(
 export async function confirmModalAction(prompt: string, actionLabel: string): Promise<boolean> {
   const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, actionLabel);
   return choice === actionLabel;
-}
-
-export async function withActionErrorMessage(
-  messagePrefix: string,
-  action: () => Promise<void>
-): Promise<void> {
-  try {
-    await action();
-  } catch (error) {
-    void vscode.window.showErrorMessage(`${messagePrefix}: ${formatActionError(error)}`);
-  }
 }
 
 interface JobScopedStateItem {

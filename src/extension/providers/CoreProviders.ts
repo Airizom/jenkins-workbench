@@ -1,4 +1,7 @@
 import type * as vscode from "vscode";
+import { LocalJenkinsfileReplayWorkflow } from "../../commands/build/LocalJenkinsfileReplayWorkflow";
+import { LocalJenkinsfileResolver } from "../../commands/build/LocalJenkinsfileResolver";
+import { resolveLocalReplayJobSuggestion } from "../../commands/build/LocalReplayJobSuggestion";
 import { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
@@ -10,8 +13,11 @@ import {
   BuildConsoleExporter,
   createNodeBuildConsoleFilesystem
 } from "../../services/BuildConsoleExporter";
+import { BuildDescriptionDraftFilesystem } from "../../services/BuildDescriptionDraftFilesystem";
+import { BuildDescriptionDraftManager } from "../../services/BuildDescriptionDraftManager";
 import { BuildParameterRequestPreparerService } from "../../services/BuildParameterRequestPreparerService";
 import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
+import { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
 import { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
 import { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
 import { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
@@ -40,6 +46,7 @@ import {
   type ArtifactPreviewProviderOptions
 } from "../../ui/ArtifactPreviewProvider";
 import { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
+import { pickJenkinsJob } from "../../ui/JenkinsJobPicker";
 import { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { WorkspacePreviewer } from "../../ui/WorkspacePreviewer";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
@@ -57,6 +64,19 @@ export interface CoreProviderOptions {
 export function createCoreProviderCatalog(options: CoreProviderOptions) {
   return {
     environmentStore: (_container) => new JenkinsEnvironmentStore(options.context),
+    environmentUrlRebaseService: (container) =>
+      new EnvironmentUrlRebaseService({
+        environmentStore: container.get("environmentStore"),
+        pinStore: container.get("pinStore"),
+        watchStore: container.get("watchStore"),
+        presetStore: container.get("presetStore"),
+        diagnosticBindingStore: container.get("diagnosticBindingStore"),
+        repositoryLinkStore: container.get("repositoryLinkStore"),
+        historyBaselineStore: container.get("historyBaselineStore"),
+        viewStateStore: container.get("viewStateStore"),
+        commitWatchStore: container.get("commitWatchStore"),
+        workspaceState: options.context.workspaceState
+      }),
     commitWatchStore: (_container) => new JenkinsCommitWatchStore(options.context.workspaceState),
     diagnosticBindingStore: (_container) =>
       new JenkinsDiagnosticProfileBindingStore(options.context),
@@ -115,6 +135,9 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
         container.get("jobConfigPreviewer"),
         container.get("jobConfigDraftManager")
       ),
+    buildDescriptionDraftFilesystem: (_container) => new BuildDescriptionDraftFilesystem(),
+    buildDescriptionDraftManager: (container) =>
+      new BuildDescriptionDraftManager(container.get("buildDescriptionDraftFilesystem")),
     replayDraftFilesystem: (_container) => new ReplayDraftFilesystem(),
     replayDraftManager: (container) =>
       new ReplayDraftManager(container.get("replayDraftFilesystem")),
@@ -128,6 +151,37 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
       ),
     testSourceNavigationUiService: (container) =>
       new TestSourceNavigationUiService(container.get("testSourceResolver")),
+    localJenkinsfileReplayWorkflow: (container) =>
+      new LocalJenkinsfileReplayWorkflow(
+        container.get("dataService"),
+        new LocalJenkinsfileResolver(container.get("jenkinsfileMatcher")),
+        {
+          pick: async (sourceUri) => {
+            const selection = await pickJenkinsJob(
+              container.get("dataService"),
+              container.get("environmentStore"),
+              {
+                filter: (entry) => entry.kind === "pipeline",
+                suggestion: resolveLocalReplayJobSuggestion(
+                  sourceUri,
+                  container.get("currentBranchWorkflowService")
+                ),
+                title: "Replay with Local Jenkinsfile",
+                placeholder: "Choose a Pipeline job to replay using its latest completed build",
+                noResultsMessage: "No Pipeline jobs found with current search settings."
+              }
+            );
+            return selection
+              ? {
+                  environment: selection.environment,
+                  jobUrl: selection.entry.url,
+                  label: selection.entry.fullName
+                }
+              : undefined;
+          }
+        },
+        container.get("queuedBuildWaiter")
+      ),
     replayBuildWorkflow: (container) =>
       new ReplayBuildWorkflow(
         container.get("dataService"),

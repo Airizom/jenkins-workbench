@@ -1,5 +1,9 @@
 import type { BuildParameterPayload } from "./BuildParameterRequests";
-import type { JenkinsQueueItemInfo, JobParameter } from "./data/JenkinsDataTypes";
+import type {
+  JenkinsBuildManagementState,
+  JenkinsQueueItemInfo,
+  JobParameter
+} from "./data/JenkinsDataTypes";
 import type {
   JenkinsItemCreateKind,
   JenkinsQueueItem,
@@ -8,6 +12,7 @@ import type {
 } from "./JenkinsClient";
 import { JenkinsDataServiceReader } from "./JenkinsDataServiceReader";
 import type {
+  JenkinsBuildManagementRuntimeSurface,
   JenkinsJobStateRuntimeSurface,
   JenkinsPipelineRestartRuntimeSurface
 } from "./JenkinsDataServiceRuntimeSurfaces";
@@ -20,6 +25,7 @@ import type {
 
 export type { BuildParameterPayload } from "./BuildParameterRequests";
 export type {
+  JenkinsBuildManagementState,
   JenkinsJobCollectionRequest,
   JenkinsJobInfo,
   JenkinsNodeInfo,
@@ -47,7 +53,10 @@ export type {
  */
 export class JenkinsDataService
   extends JenkinsDataServiceReader
-  implements JenkinsPipelineRestartRuntimeSurface, JenkinsJobStateRuntimeSurface
+  implements
+    JenkinsPipelineRestartRuntimeSurface,
+    JenkinsJobStateRuntimeSurface,
+    JenkinsBuildManagementRuntimeSurface
 {
   async getQueueItems(environment: JenkinsEnvironmentRef): Promise<JenkinsQueueItemInfo[]> {
     return this.queueAndJobManagementOperations.getQueueItems(environment);
@@ -97,6 +106,45 @@ export class JenkinsDataService
 
   async stopBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     return this.buildOperations.stopBuild(environment, buildUrl);
+  }
+
+  async deleteBuild(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    options?: { releaseKeep?: boolean }
+  ): Promise<void> {
+    return this.buildOperations.deleteBuild(environment, buildUrl, options);
+  }
+
+  async setBuildKeepForever(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    keep: boolean
+  ): Promise<boolean> {
+    return this.buildOperations.setBuildKeepForever(environment, buildUrl, keep);
+  }
+
+  async setBuildDescription(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    description: string
+  ): Promise<void> {
+    return this.buildOperations.setBuildDescription(environment, buildUrl, description);
+  }
+
+  async setBuildDisplayName(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    displayName: string
+  ): Promise<void> {
+    return this.buildOperations.setBuildDisplayName(environment, buildUrl, displayName);
+  }
+
+  async getBuildManagementState(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsBuildManagementState> {
+    return this.buildOperations.getBuildManagementState(environment, buildUrl);
   }
 
   async quickReplayBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {

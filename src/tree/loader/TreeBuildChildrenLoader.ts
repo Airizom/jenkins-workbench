@@ -134,7 +134,8 @@ export class TreeBuildChildrenLoader {
         environment,
         jobUrl,
         this.buildLimit,
-        this.getBuildListFetchOptions()
+        // Build items show descriptions in their tooltips; other build lists skip the large field.
+        { ...this.getBuildListFetchOptions(), includeDescription: true }
       );
       if (builds.length === 0) {
         return [

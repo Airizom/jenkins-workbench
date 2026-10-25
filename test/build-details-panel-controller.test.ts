@@ -301,4 +301,21 @@ describe("BuildDetailsPanelController", () => {
     assert.equal(sync.getText(), "");
     assert.equal(changed.mock.calls.length, 1);
   });
+
+  it("drops webview messages after disposal, such as a completion posted after delete", () => {
+    const postMessage = vi.fn();
+    const controller = withControllerPrototype({
+      view: { postMessage },
+      loadTokenTracker: new LoadTokenTracker(),
+      runtime: { dispose: vi.fn() },
+      diagnosticConsoleSync: { dispose: vi.fn() },
+      loadTracker: { resetLoadingRequests: vi.fn() }
+    });
+
+    controller.postMessage({ type: "buildManagementActionComplete" });
+    controller.dispose();
+    controller.postMessage({ type: "buildManagementActionComplete" });
+
+    assert.deepEqual(postMessage.mock.calls, [[{ type: "buildManagementActionComplete" }]]);
+  });
 });

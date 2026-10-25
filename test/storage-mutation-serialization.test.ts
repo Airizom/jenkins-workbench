@@ -31,6 +31,11 @@ interface EnvironmentStoreHarness {
     scope: "workspace" | "global"
   ): Promise<Array<{ id: string; url: string; username?: string }>>;
   removeEnvironment(scope: "workspace" | "global", id: string): Promise<boolean>;
+  updateEnvironment(
+    scope: "workspace" | "global",
+    id: string,
+    patch: { name?: string | null; url?: string; username?: null }
+  ): Promise<{ next: { id: string; url: string } } | undefined>;
   getAuthConfig(
     scope: "workspace" | "global",
     id: string
@@ -158,6 +163,34 @@ describe("JenkinsEnvironmentStore mutation serialization", () => {
 
     const environments = await store.getEnvironments("workspace");
     assert.deepEqual(environments.map((environment) => environment.id).sort(), ["env-1", "env-2"]);
+  });
+
+  it("serializes updates with concurrent adds and removes", async () => {
+    const { context } = createContext();
+    const store = new JenkinsEnvironmentStore(context);
+    await store.addEnvironment("workspace", { id: "env-1", url: "https://a.example" });
+    await store.addEnvironment("workspace", { id: "env-2", url: "https://b.example" });
+
+    const [, , removed, updatedAdded, updatedRemoved] = await Promise.all([
+      store.updateEnvironment("workspace", "env-1", { url: "https://c.example", name: "CI" }),
+      store.addEnvironment("workspace", { id: "env-3", url: "https://d.example" }),
+      store.removeEnvironment("workspace", "env-2"),
+      store.updateEnvironment("workspace", "env-3", { name: "Added" }),
+      store.updateEnvironment("workspace", "env-2", { name: "Gone" })
+    ]);
+
+    assert.equal(removed, true);
+    assert.equal(updatedAdded?.next.id, "env-3");
+    assert.equal(updatedRemoved, undefined);
+    assert.deepEqual(await store.getEnvironments("workspace"), [
+      {
+        id: "env-1",
+        url: "https://c.example",
+        name: "CI",
+        previousUrls: ["https://a.example/"]
+      },
+      { id: "env-3", url: "https://d.example", name: "Added" }
+    ]);
   });
 
   it("keeps a valid auth config saved during a stale invalid read", async () => {

@@ -205,7 +205,9 @@ export class JenkinsTreeChildrenLoader {
             environmentId: environment.environmentId,
             scope: environment.scope,
             url: environment.url,
-            username: environment.username
+            name: environment.name,
+            username: environment.username,
+            ...(environment.allowInsecureTls === true ? { allowInsecureTls: true } : {})
           } satisfies JenkinsEnvironmentRef
         ]
       });

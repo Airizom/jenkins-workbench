@@ -26,6 +26,7 @@ export function buildInitialBuildDetailsViewModel(
   return buildBuildDetailsViewModel({
     details: state.currentDetails,
     buildUrl: state.currentBuildUrl,
+    hasEnvironment: Boolean(state.environment),
     pipelineRun: state.currentPipelineRun,
     pipelineLoading: state.pipelineLoading,
     consoleTextResult: initialState.consoleTextResult,

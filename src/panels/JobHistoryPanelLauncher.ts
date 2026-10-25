@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { ensureTrailingSlash, parseJobUrl } from "../jenkins/urls";
 import { isPlainRecord } from "../shared/runtimeGuards";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import type {
+  JenkinsEnvironmentStore,
+  JenkinsEnvironmentStoreChange
+} from "../storage/JenkinsEnvironmentStore";
 import { HistoryController, type HistoryDependencies } from "./jobHistory/HistoryController";
 import { historyJobDisplayName, normalizeHistoryUi } from "./jobHistory/shared/HistoryContracts";
 import { getWebviewAssetsRoot, resolveWebviewAssets } from "./shared/webview/WebviewAssets";
@@ -30,13 +33,26 @@ function jobHistoryPanelKey(environment: JenkinsEnvironmentRef, jobUrl: string):
   ]);
 }
 
-export class JobHistoryPanelLauncher {
+function isPanelKeyForEnvironment(key: string, scope: string, environmentId: string): boolean {
+  const [keyScope, keyEnvironmentId] = JSON.parse(key) as [string, string, string];
+  return keyScope === scope && keyEnvironmentId === environmentId;
+}
+
+export class JobHistoryPanelLauncher implements vscode.Disposable {
   private panels = new Map<string, vscode.WebviewPanel>();
+  private readonly environmentSubscription: vscode.Disposable;
   constructor(
     private readonly dependencies: HistoryDependencies,
     private readonly extensionUri: vscode.Uri,
     private readonly environments: JenkinsEnvironmentStore
-  ) {}
+  ) {
+    this.environmentSubscription = environments.onDidChange((change) =>
+      this.handleEnvironmentChange(change)
+    );
+  }
+  dispose(): void {
+    this.environmentSubscription.dispose();
+  }
   async show(environment: JenkinsEnvironmentRef, jobUrl: string): Promise<void> {
     const existing = this.panels.get(jobHistoryPanelKey(environment, jobUrl));
     if (existing) {
@@ -70,6 +86,17 @@ export class JobHistoryPanelLauncher {
       return;
     }
     this.attach(panel, environment, state.jobUrl, state.historyUi);
+  }
+  /** Reopening panels resolves the current URL and TLS policy from the environment store. */
+  private handleEnvironmentChange(change: JenkinsEnvironmentStoreChange): void {
+    if (change.kind !== "environment-updated" || (!change.urlChanged && !change.tlsPolicyChanged)) {
+      return;
+    }
+    for (const [key, panel] of [...this.panels]) {
+      if (isPanelKeyForEnvironment(key, change.scope, change.environmentId)) {
+        panel.dispose();
+      }
+    }
   }
   private attach(
     panel: vscode.WebviewPanel,

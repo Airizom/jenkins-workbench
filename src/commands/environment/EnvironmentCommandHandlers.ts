@@ -1,190 +1,37 @@
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 import { formatError } from "../../formatters/ErrorFormatters";
-import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsAuthConfig } from "../../jenkins/types";
 import type { BrowserSsoAuthenticator } from "../../services/BrowserSsoAuthenticationService";
 import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type {
-  EnvironmentScope,
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
+import { promptAuthConfig } from "./EnvironmentAuthConfigPrompt";
+import {
+  formatEnvironmentTitle,
+  INVALID_URL_MESSAGE,
+  normalizeJenkinsUrl,
+  parseHttpUrl,
+  promptEnvironmentTarget,
+  toEnvironmentTarget
+} from "./EnvironmentCommandHelpers";
 import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
 import {
-  type EnvironmentAuthMode,
   promptAuthMode,
   promptBrowserSsoLoginUrl,
-  promptHeadersJson,
+  promptEnvironmentName,
   promptRequiredInput,
-  promptScope
+  promptScope,
+  promptTlsCertificateValidation
 } from "./EnvironmentPrompts";
 
-type EnvironmentTarget = {
-  id: string;
-  url: string;
-  scope: EnvironmentScope;
-};
-
-function parseHttpUrl(url: string): URL | undefined {
-  try {
-    const parsed = new URL(url.trim());
-    if (
-      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-      parsed.username.length > 0 ||
-      parsed.password.length > 0 ||
-      parsed.search.length > 0 ||
-      parsed.hash.length > 0
-    ) {
-      return undefined;
-    }
-    return parsed;
-  } catch {
-    return undefined;
-  }
-}
-
-function formatJenkinsUrlForDisplay(url: string): string {
-  try {
-    const parsed = new URL(url.trim());
-    parsed.username = "";
-    parsed.password = "";
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return "Invalid Jenkins URL";
-  }
-}
-
-function normalizeJenkinsUrl(url: string): string {
-  const parsed = parseHttpUrl(url);
-  if (!parsed) {
-    const trimmed = url.trim();
-    return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
-  }
-
-  if (!parsed.pathname.endsWith("/")) {
-    parsed.pathname = `${parsed.pathname}/`;
-  }
-
-  return parsed.toString();
-}
-
-async function promptAuthConfig(
-  authMode: EnvironmentAuthMode,
-  environmentUrl: string,
-  browserSsoAuthenticator: BrowserSsoAuthenticator
-): Promise<JenkinsAuthConfig | undefined> {
-  switch (authMode) {
-    case "none":
-      return { type: "none" };
-    case "basic": {
-      const authUsername = await promptRequiredInput("Username");
-      if (!authUsername) {
-        return undefined;
-      }
-      const authToken = await promptRequiredInput("API Token", undefined, true);
-      if (!authToken) {
-        return undefined;
-      }
-      return {
-        type: "basic",
-        username: authUsername,
-        token: authToken
-      };
-    }
-    case "bearer": {
-      const token = await promptRequiredInput("Bearer Token", undefined, true);
-      if (!token) {
-        return undefined;
-      }
-      return {
-        type: "bearer",
-        token
-      };
-    }
-    case "cookie": {
-      const cookie = await promptRequiredInput("Cookie Header Value", undefined, true);
-      if (!cookie) {
-        return undefined;
-      }
-      return {
-        type: "cookie",
-        cookie
-      };
-    }
-    case "headers": {
-      const headers = await promptHeadersJson();
-      if (!headers) {
-        return undefined;
-      }
-      return {
-        type: "headers",
-        headers
-      };
-    }
-    case "sso": {
-      const loginUrl = await promptBrowserSsoLoginUrl(environmentUrl);
-      if (!loginUrl) {
-        return undefined;
-      }
-      return browserSsoAuthenticator.authenticate({
-        environmentUrl,
-        loginUrl,
-        reason: "add"
-      });
-    }
-    default:
-      return undefined;
-  }
-}
-
-function toEnvironmentTarget(
-  environment: JenkinsEnvironmentRef | EnvironmentTarget
-): EnvironmentTarget {
-  if ("environmentId" in environment) {
-    return {
-      id: environment.environmentId,
-      url: environment.url,
-      scope: environment.scope
-    };
-  }
-
-  return environment;
-}
-
-async function promptEnvironmentTarget(
-  store: JenkinsEnvironmentStore,
-  copy: {
-    emptyMessage: string;
-    placeHolder: string;
-  }
-): Promise<EnvironmentTarget | undefined> {
-  const environments = await store.listEnvironmentsWithScope();
-  if (environments.length === 0) {
-    void vscode.window.showInformationMessage(copy.emptyMessage);
-    return undefined;
-  }
-
-  const picks = environments.map((environment) => ({
-    label: formatJenkinsUrlForDisplay(environment.url),
-    description: formatScopeLabel(environment.scope),
-    target: toEnvironmentTarget(environment)
-  }));
-
-  const pick = await vscode.window.showQuickPick(picks, {
-    placeHolder: copy.placeHolder,
-    matchOnDescription: true
-  });
-
-  return pick?.target;
-}
+export { type EditEnvironmentDependencies, editEnvironment } from "./EditEnvironmentCommand";
 
 export async function addEnvironment(
   store: JenkinsEnvironmentStore,
@@ -202,9 +49,7 @@ export async function addEnvironment(
   }
 
   if (!parseHttpUrl(rawUrl)) {
-    void vscode.window.showErrorMessage(
-      "Invalid Jenkins URL. Enter an HTTP or HTTPS base URL without embedded credentials, query parameters, or fragments. Configure credentials using the authentication prompts."
-    );
+    void vscode.window.showErrorMessage(INVALID_URL_MESSAGE);
     return;
   }
 
@@ -221,6 +66,17 @@ export async function addEnvironment(
     return;
   }
 
+  const name = await promptEnvironmentName(url);
+  if (name === undefined) {
+    return;
+  }
+
+  const allowInsecureTls =
+    new URL(url).protocol === "https:" ? await promptTlsCertificateValidation() : false;
+  if (allowInsecureTls === undefined) {
+    return;
+  }
+
   const authMode = await promptAuthMode();
   if (!authMode) {
     return;
@@ -233,27 +89,16 @@ export async function addEnvironment(
 
   const environment: JenkinsEnvironment = {
     id: crypto.randomUUID(),
-    url
+    url,
+    ...(name ? { name } : {}),
+    ...(allowInsecureTls ? { allowInsecureTls: true } : {})
   };
 
   await store.addEnvironment(scope, environment);
   try {
     await store.setAuthConfig(scope, environment.id, authConfig);
   } catch (error) {
-    const authErrorMessage = formatError(error);
-    try {
-      const removed = await store.removeEnvironment(scope, environment.id);
-      const cleanupMessage = removed
-        ? "The partially added environment was removed."
-        : "The partially added environment could not be found for cleanup.";
-      void vscode.window.showErrorMessage(
-        `Unable to store authentication settings for ${url}: ${authErrorMessage} ${cleanupMessage}`
-      );
-    } catch (rollbackError) {
-      void vscode.window.showErrorMessage(
-        `Unable to store authentication settings for ${url}: ${authErrorMessage} Failed to remove the partially added environment: ${formatError(rollbackError)}`
-      );
-    }
+    await rollbackEnvironment(store, scope, environment, error);
     return;
   }
   refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
@@ -338,9 +183,9 @@ export async function removeEnvironment(
   }
 
   const confirmLabel = "Remove Environment";
-  const displayUrl = formatJenkinsUrlForDisplay(target.url);
+  const displayName = formatEnvironmentTitle(target);
   const confirmation = await vscode.window.showWarningMessage(
-    `Remove the Jenkins environment ${displayUrl}? Its stored credentials and all pins, watches, parameter presets, and diagnostic profile bindings for this environment will also be removed.`,
+    `Remove the Jenkins environment ${displayName}? Its stored credentials and all pins, watches, parameter presets, and diagnostic profile bindings for this environment will also be removed.`,
     { modal: true },
     confirmLabel
   );
@@ -397,6 +242,29 @@ export async function removeEnvironment(
         ...(removalError ? [formatError(removalError)] : []),
         ...cleanupFailures.map((failure) => formatError(failure.reason))
       ].join("; ")}`
+    );
+  }
+}
+
+async function rollbackEnvironment(
+  store: JenkinsEnvironmentStore,
+  scope: JenkinsEnvironmentRef["scope"],
+  environment: JenkinsEnvironment,
+  error: unknown
+): Promise<void> {
+  const url = environment.url;
+  const authErrorMessage = formatError(error);
+  try {
+    const removed = await store.removeEnvironment(scope, environment.id);
+    const cleanupMessage = removed
+      ? "The partially added environment was removed."
+      : "The partially added environment could not be found for cleanup.";
+    void vscode.window.showErrorMessage(
+      `Unable to store authentication settings for ${url}: ${authErrorMessage} ${cleanupMessage}`
+    );
+  } catch (rollbackError) {
+    void vscode.window.showErrorMessage(
+      `Unable to store authentication settings for ${url}: ${authErrorMessage} Failed to remove the partially added environment: ${formatError(rollbackError)}`
     );
   }
 }

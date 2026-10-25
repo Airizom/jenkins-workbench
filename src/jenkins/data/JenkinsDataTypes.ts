@@ -71,6 +71,15 @@ export type ProgressiveConsoleHtmlResult = JenkinsProgressiveConsoleHtml;
 export type FlowNodeLogResult = JenkinsFlowNodeLog;
 export type FlowNodeDetailsResult = JenkinsWorkflowStage;
 
+/** Fresh, uncached build fields used to manage a single build. */
+export interface JenkinsBuildManagementState {
+  number: number;
+  building: boolean;
+  keepLog: boolean;
+  displayName?: string;
+  description?: string;
+}
+
 export interface JenkinsJobInfo {
   name: string;
   url: string;

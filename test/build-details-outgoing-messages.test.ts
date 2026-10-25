@@ -6,6 +6,11 @@ import { parseBuildDetailsOutgoingMessage } from "../src/panels/buildDetails/sha
 
 const validUpdate = {
   type: "updateDetails",
+  displayName: "demo #7",
+  description: "Release candidate",
+  keptForever: true,
+  canDelete: true,
+  canManage: true,
   resultLabel: "Success",
   resultClass: "success",
   durationLabel: "1m",
@@ -76,6 +81,27 @@ describe("Build Details outgoing messages", () => {
       undefined
     );
     assert.equal(parseBuildDetailsOutgoingMessage({ ...validUpdate, resultLabel: 1 }), undefined);
+  });
+
+  it("validates the build management fields of updateDetails", () => {
+    for (const patch of [
+      { displayName: undefined },
+      { description: 5 },
+      { keptForever: "yes" },
+      { canDelete: undefined },
+      { canManage: 1 }
+    ]) {
+      assert.equal(parseBuildDetailsOutgoingMessage({ ...validUpdate, ...patch }), undefined);
+    }
+    const { description: _description, ...withoutDescription } = validUpdate;
+    assert.deepEqual(parseBuildDetailsOutgoingMessage(withoutDescription), withoutDescription);
+  });
+
+  it("accepts the build management completion message", () => {
+    assert.deepEqual(
+      parseBuildDetailsOutgoingMessage({ type: "buildManagementActionComplete", extra: 1 }),
+      { type: "buildManagementActionComplete" }
+    );
   });
 
   it("rejects updateDetails messages with malformed nested state", () => {

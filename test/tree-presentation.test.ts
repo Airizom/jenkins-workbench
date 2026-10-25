@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
-import { ArtifactTreeItem } from "../src/tree/items/TreeBuildItems";
+import { ArtifactTreeItem, BuildTreeItem } from "../src/tree/items/TreeBuildItems";
 import { JenkinsFolderTreeItem } from "../src/tree/items/TreeJobItems";
 import { PlaceholderTreeItem } from "../src/tree/items/TreePlaceholderItem";
 import {
@@ -145,6 +145,23 @@ describe("root section items", () => {
 });
 
 describe("InstanceTreeItem", () => {
+  it.each([true, false, undefined, "true"])(
+    "shows a persistent TLS warning only for an explicit opt-in: %s",
+    (allowInsecureTls) => {
+      const item = new InstanceTreeItem({
+        id: "tls-env",
+        scope: "workspace",
+        url: "https://jenkins.example/",
+        allowInsecureTls: allowInsecureTls as boolean | undefined
+      });
+      assert.equal(item.allowInsecureTls, allowInsecureTls === true ? true : undefined);
+      assert.equal(
+        String(item.tooltip).includes("TLS verification disabled"),
+        allowInsecureTls === true
+      );
+    }
+  );
+
   const stored = { id: "env-1", scope: "workspace" as const, url: "https://jenkins.example/" };
 
   it("shows the user so environments on one host can be told apart", () => {
@@ -156,6 +173,40 @@ describe("InstanceTreeItem", () => {
     const item = new InstanceTreeItem(stored, { kind: "auth", message: "Unauthorized" });
     assert.equal(item.description, "Sign-in failed • Workspace");
     assert.match(String(item.tooltip), /Sign-in failed: Unauthorized/);
+  });
+
+  it("labels an unnamed environment by host and keeps the URL in the tooltip", () => {
+    const item = new InstanceTreeItem({ ...stored, username: "alice" });
+    assert.equal(item.label, "jenkins.example");
+    assert.equal(item.name, undefined);
+    assert.equal(item.tooltip, "https://jenkins.example/\nScope: Workspace\nUser: alice");
+  });
+
+  it("labels a named environment by name and moves the host into the description", () => {
+    const item = new InstanceTreeItem({ ...stored, name: "Production", username: "alice" });
+    assert.equal(item.label, "Production");
+    assert.equal(item.name, "Production");
+    assert.equal(item.description, "jenkins.example • Workspace • alice");
+    assert.equal(
+      item.tooltip,
+      "Name: Production\nhttps://jenkins.example/\nScope: Workspace\nUser: alice"
+    );
+  });
+
+  it("keeps the host first when a named environment has an issue", () => {
+    const item = new InstanceTreeItem(
+      { ...stored, name: "Production" },
+      { kind: "auth", message: "Unauthorized" }
+    );
+    assert.equal(item.description, "jenkins.example • Sign-in failed • Workspace");
+  });
+
+  it("treats a whitespace-only name as unnamed", () => {
+    const item = new InstanceTreeItem({ ...stored, name: "   " });
+    assert.equal(item.label, "jenkins.example");
+    assert.equal(item.name, undefined);
+    assert.equal(item.description, "Workspace");
+    assert.doesNotMatch(String(item.tooltip), /Name:/);
   });
 });
 
@@ -188,6 +239,44 @@ describe("ArtifactTreeItem", () => {
     const item = new ArtifactTreeItem(environment, "b", 1, "dist/app.jar", "app.jar");
     assert.equal(item.command, undefined);
     assert.match(String(item.tooltip), /Download/);
+  });
+});
+
+describe("BuildTreeItem context", () => {
+  const url = "https://jenkins.example/job/demo/7/";
+
+  it("adds a keptForever token only for kept builds", () => {
+    assert.equal(new BuildTreeItem(environment, { number: 7, url }).contextValue, "build");
+    assert.equal(
+      new BuildTreeItem(environment, { number: 7, url, keepLog: false }).contextValue,
+      "build"
+    );
+    const kept = new BuildTreeItem(environment, { number: 7, url, keepLog: true });
+    assert.equal(kept.contextValue, "build keptForever");
+    assert.equal(kept.keptForever, true);
+  });
+
+  it("orders running, awaiting input, and kept tokens", () => {
+    const item = new BuildTreeItem(
+      environment,
+      { number: 7, url, building: true, keepLog: true },
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+    assert.equal(item.contextValue, "buildRunning awaitingInput keptForever");
+  });
+
+  it("keeps the #N label when a custom display name is set", () => {
+    const item = new BuildTreeItem(environment, {
+      number: 7,
+      url,
+      displayName: "release-1.2",
+      result: "SUCCESS"
+    });
+    assert.equal(item.label, "#7");
+    assert.match(String(item.description), /^release-1\.2 • Success/);
   });
 });
 

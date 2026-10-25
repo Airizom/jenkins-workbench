@@ -44,4 +44,34 @@ describe("createExtensionRefreshHost", () => {
       process.off("unhandledRejection", onUnhandled);
     }
   });
+
+  it("copies the display name into the queue environment", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const environmentStore = {
+      listEnvironmentsWithScope: async () => [
+        { id: "env-1", scope: "global", url: "https://jenkins.example/", name: "Production" }
+      ]
+    } as unknown as JenkinsEnvironmentStore;
+    const updateEnvironment = vi.fn();
+    const host = createExtensionRefreshHost(
+      environmentStore,
+      { fullEnvironmentRefresh: () => true } as unknown as JenkinsWorkbenchTreeDataProvider,
+      { updateEnvironment } as unknown as JenkinsQueuePoller
+    );
+
+    host.fullEnvironmentRefresh({ environmentId: "env-1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(updateEnvironment.mock.calls, [
+      [
+        {
+          environmentId: "env-1",
+          scope: "global",
+          url: "https://jenkins.example/",
+          name: "Production",
+          username: undefined
+        }
+      ]
+    ]);
+  });
 });

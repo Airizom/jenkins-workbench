@@ -10,7 +10,10 @@ import type {
   BuildDetailsViewModel,
   PipelineLogTargetViewModel
 } from "../shared/BuildDetailsContracts";
-import type { BuildDetailsIncomingMessage } from "../shared/BuildDetailsPanelMessages";
+import type {
+  BuildDetailsIncomingMessage,
+  BuildManagementMessage
+} from "../shared/BuildDetailsPanelMessages";
 import {
   buildArtifactActionMessage,
   buildOpenTestSourceMessage,
@@ -103,6 +106,16 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     postMessage({ type: "refreshBuildDetails" });
   };
 
+  // Buttons stay disabled until the extension reports `buildManagementActionComplete`,
+  // so a confirmation or quick pick left open cannot be opened twice.
+  const handleBuildManagement = (message: BuildManagementMessage) => {
+    if (state.managementBusy) {
+      return;
+    }
+    dispatch({ type: "startBuildManagementAction" });
+    postMessage(message);
+  };
+
   // Stable identity: PipelineSection uses this callback in effect dependencies.
   const handleSelectPipelineLog = useCallback(
     (target: PipelineLogTargetViewModel) => {
@@ -146,6 +159,12 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
         <div className="min-h-screen flex flex-col">
           <BuildStatusHero
             displayName={state.displayName}
+            description={state.description}
+            keptForever={state.keptForever}
+            canManage={state.canManage}
+            canDelete={state.canDelete}
+            managementBusy={state.managementBusy}
+            onBuildManagement={handleBuildManagement}
             resultLabel={state.resultLabel}
             resultClass={state.resultClass}
             durationLabel={state.durationLabel}

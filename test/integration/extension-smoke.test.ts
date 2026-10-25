@@ -26,8 +26,10 @@ describe("extension smoke", () => {
     const expected = [
       "jenkinsWorkbench.openJobHistory",
       "jenkinsWorkbench.addEnvironment",
+      "jenkinsWorkbench.editEnvironment",
       "jenkinsWorkbench.removeEnvironment",
       "jenkinsWorkbench.triggerBuild",
+      "jenkinsWorkbench.replayWithLocalJenkinsfile",
       "jenkinsWorkbench.abortBuild",
       "jenkinsWorkbench.configureBuildDiagnostics",
       "jenkinsWorkbench.refreshBuildDiagnostics",
