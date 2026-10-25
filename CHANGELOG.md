@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.59.1] - 2026-10-25
+
+### Changed
+
+- docs: refresh the README with screenshots of build details, comparison, failure history, diagnostics, and node capacity, plus updated Marketplace and CI badges.
+- chore(dev): add a seeded Jenkins showcase, build history fixtures, and an isolated VS Code launcher with screenshot capture tools.
+
 ## [1.59.0] - 2026-10-25
 
 ### Added
