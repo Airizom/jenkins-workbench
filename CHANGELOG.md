@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-10-25
+
 ### Added
 
 - feat(builds): manage individual builds from the tree and the Build Details header: delete a completed build (kept builds offer Stop Keeping and Delete, and deletion is verified), keep forever or release, and edit the display name or description. Multi-line descriptions open in a draft editor that checks for remote changes before submitting. The tree and Build Details show custom display names, descriptions as plain text, and the kept-forever state.
+- feat(environments): edit environment names, URLs, and credentials while preserving saved job references. URL changes rebase pins, watches, presets, bindings, repository links, baselines, and view state; other workspaces update on activation.
+- feat(replay): replay with a local Jenkinsfile from the editor or a build context menu, including unsaved changes, while preserving the source build's parameters and loaded Groovy scripts.
+- feat(environments): configure TLS certificate verification per HTTPS environment, with explicit confirmation for insecure TLS and certificate verification retained for cross-origin redirects.
+
+### Changed
+
+- refactor: share build retention, environment, panel, draft editor, and watch helpers; expand regression and integration coverage.
 
 ## [1.57.0] - 2026-10-24
 
