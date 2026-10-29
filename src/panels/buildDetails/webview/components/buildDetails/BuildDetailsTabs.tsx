@@ -166,6 +166,7 @@ type BuildDetailsTabsProps = {
   followLog: boolean;
   onApproveInput: (inputId: string) => void;
   onRejectInput: (inputId: string) => void;
+  onOpenPendingInputInJenkins: (inputId: string) => void;
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onClearPipelineLog: () => void;
@@ -214,6 +215,7 @@ export function BuildDetailsTabs({
   followLog,
   onApproveInput,
   onRejectInput,
+  onOpenPendingInputInJenkins,
   onRestartStage,
   onSelectPipelineLog,
   onClearPipelineLog,
@@ -338,6 +340,7 @@ export function BuildDetailsTabs({
             processingActions={processingInputActions}
             onApprove={onApproveInput}
             onReject={onRejectInput}
+            onOpenInJenkins={onOpenPendingInputInJenkins}
           />
         </TabsContent>
       ) : null}

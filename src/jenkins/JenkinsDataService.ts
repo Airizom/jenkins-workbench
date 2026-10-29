@@ -44,6 +44,7 @@ import type {
   JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
+  JenkinsInputProceedOptions,
   JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsNodeDetails,
@@ -62,10 +63,11 @@ import type {
   JenkinsArtifactRetrievalRuntimeSurface,
   JenkinsBuildInspectionRuntimeSurface,
   JenkinsBuildManagementRuntimeSurface,
+  JenkinsBuildPermalinkRuntimeSurface,
   JenkinsBuildRelationshipsRuntimeSurface,
   JenkinsCoverageRuntimeSurface,
   JenkinsJobStateRuntimeSurface,
-  JenkinsPendingInputActionRuntimeSurface,
+  JenkinsPendingInputApprovalRuntimeSurface,
   JenkinsPipelineRestartRuntimeSurface
 } from "./JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
@@ -80,6 +82,7 @@ import type {
 } from "./NodeManagement";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type {
+  JenkinsBuildPermalink,
   JenkinsReplayDefinition,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload,
@@ -104,6 +107,8 @@ export type {
 export { CancellationError } from "./errors";
 export type { BuildListFetchOptions } from "./JenkinsDataServiceContracts";
 export type {
+  JenkinsBuildPermalink,
+  JenkinsInputParameterSubmission,
   JenkinsReplayDefinition,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload
@@ -118,10 +123,11 @@ export class JenkinsDataService
     JenkinsArtifactRetrievalRuntimeSurface,
     JenkinsBuildInspectionRuntimeSurface,
     JenkinsBuildManagementRuntimeSurface,
+    JenkinsBuildPermalinkRuntimeSurface,
     JenkinsBuildRelationshipsRuntimeSurface,
     JenkinsCoverageRuntimeSurface,
     JenkinsJobStateRuntimeSurface,
-    JenkinsPendingInputActionRuntimeSurface,
+    JenkinsPendingInputApprovalRuntimeSurface,
     JenkinsPipelineRestartRuntimeSurface
 {
   private readonly runtimeContext: JenkinsDataRuntimeContext;
@@ -311,7 +317,7 @@ export class JenkinsDataService
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+    options?: JenkinsInputProceedOptions
   ): Promise<void> {
     return this.pendingInputOperations.approveInput(environment, buildUrl, inputId, options);
   }
@@ -449,6 +455,14 @@ export class JenkinsDataService
     jobUrl: string
   ): Promise<JenkinsBuild | undefined> {
     return this.buildOperations.getLastFailedBuild(environment, jobUrl);
+  }
+
+  async getBuildPermalink(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    permalink: JenkinsBuildPermalink
+  ): Promise<JenkinsBuild | undefined> {
+    return this.buildOperations.getBuildPermalink(environment, jobUrl, permalink);
   }
 
   async getTestReport(

@@ -1,12 +1,25 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
-import type { PendingInputAction } from "../jenkins/JenkinsDataService";
-import type { JenkinsPendingInputActionRuntimeSurface } from "../jenkins/JenkinsDataServiceRuntimeSurfaces";
+import type {
+  JenkinsInputParameterSubmission,
+  PendingInputAction
+} from "../jenkins/JenkinsDataService";
+import type { JenkinsPendingInputApprovalRuntimeSurface } from "../jenkins/JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import { promptForParameters } from "./ParameterPrompts";
+import { buildPendingInputBrowserUrl } from "../jenkins/urls";
+import { isSensitiveParameter } from "./buildParameterPrompts/ParameterSensitivity";
+import {
+  promptParameterValue,
+  toInputSubmission
+} from "./buildParameterPrompts/ParameterValuePrompts";
+import {
+  formatPendingInputParameterKind,
+  getBrowserOnlyParameters
+} from "./buildParameterPrompts/PendingInputParameterSupport";
+import { openExternalHttpUrlWithWarning } from "./OpenExternalUrl";
 
 export interface PendingInputActionOptions {
-  dataService: JenkinsPendingInputActionRuntimeSurface;
+  dataService: JenkinsPendingInputApprovalRuntimeSurface;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   label?: string;
@@ -54,9 +67,14 @@ async function approvePendingInput(
   action: PendingInputAction,
   label: string
 ): Promise<boolean> {
-  let params: URLSearchParams | undefined;
+  if (getBrowserOnlyParameters(action.parameters).length > 0) {
+    await offerBrowserApproval(options, action);
+    return false;
+  }
+
+  let params: JenkinsInputParameterSubmission[] | undefined;
   if (action.parameters.length > 0) {
-    params = await promptForParameters(action.parameters);
+    params = await promptInputParameters(options, action);
     if (!params) {
       return false;
     }
@@ -68,6 +86,57 @@ async function approvePendingInput(
   });
   void vscode.window.showInformationMessage(`Approved input for ${label}.`);
   return true;
+}
+
+/** Prompts with the Trigger Build controls; resolves to `undefined` when any prompt is dismissed. */
+async function promptInputParameters(
+  options: PendingInputActionOptions,
+  action: PendingInputAction
+): Promise<JenkinsInputParameterSubmission[] | undefined> {
+  // No job of our own: run parameters reach this point only when Jenkins named their project
+  // (see requiresBrowserForPendingInput), and the run picker looks that project up instead.
+  const context = {
+    dataService: options.dataService,
+    environment: options.environment,
+    jobUrl: ""
+  };
+  const submissions: JenkinsInputParameterSubmission[] = [];
+  for (const parameter of action.parameters) {
+    // A second safeguard: the mapper already drops sensitive defaults, which wfapi reports in
+    // plaintext, so a sensitive prompt always starts empty.
+    const preset = isSensitiveParameter(parameter) ? "" : undefined;
+    const value = await promptParameterValue(context, parameter, preset);
+    if (value === undefined) {
+      return undefined;
+    }
+    submissions.push(toInputSubmission(parameter, value));
+  }
+  return submissions;
+}
+
+const OPEN_IN_JENKINS_LABEL = "Open in Jenkins";
+
+// An input step submits all of its parameters together, so one browser-only parameter means the
+// whole input is approved on the Jenkins input page.
+async function offerBrowserApproval(
+  options: PendingInputActionOptions,
+  action: PendingInputAction
+): Promise<void> {
+  const inputMessage = truncateForConfirmation(action.message.trim() || `Input ${action.id}`);
+  const parameters = getBrowserOnlyParameters(action.parameters)
+    .map((parameter) => `${parameter.name} (${formatPendingInputParameterKind(parameter)})`)
+    .join(", ");
+  const choice = await vscode.window.showWarningMessage(
+    `“${inputMessage}” needs the Jenkins web page for: ${parameters}.`,
+    { modal: true },
+    OPEN_IN_JENKINS_LABEL
+  );
+  if (choice !== OPEN_IN_JENKINS_LABEL) {
+    return;
+  }
+  await openExternalHttpUrlWithWarning(buildPendingInputBrowserUrl(options.buildUrl), {
+    targetLabel: "Jenkins input page"
+  });
 }
 
 async function rejectPendingInput(

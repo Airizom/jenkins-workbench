@@ -3,6 +3,7 @@ export {
   approveInput,
   quickReplayBuild,
   rebuildBuild,
+  rebuildBuildWithChanges,
   rejectInput,
   replayBuild,
   runReplayDraft

@@ -25,8 +25,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Go to Job...** — Quick search across all configured Jenkins environments
 - **Pin Jobs & Pipelines** — Keep critical items in a top-level pinned section for quick access
 - **Node Capacity** — Inspect executor utilization, queued work, offline impact, and label bottlenecks across an environment
-- **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
-- **Deep Links** — Open builds and jobs through supported VS Code extension URIs (`vscode://airizom.jenkins-workbench/...`)
+- **Open & Share Builds** — Open a build from a pasted Jenkins URL or build number, copy Jenkins or Workbench links, and follow deep links (`vscode://airizom.jenkins-workbench/...`)
 - **Summary Badges** — Section counts in the tree, a running-jobs badge on the view, and a banner when watched jobs cannot be checked
 
 ![Node Capacity panel showing queued and stuck work, saturated label pools, and busy, idle, and offline executors across agents.](docs/images/capacity.png)
@@ -36,8 +35,31 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Repository Linking** — Link a local Git repository to a Jenkins multibranch pipeline
 - **Persistent Repository Links** — Links are keyed to the repository path and stored on the local machine, so the same checkout reuses its link in any workspace
 - **PR-Aware Resolution** — Prefer the active GitHub pull request job (for example `PR-123`) when the GitHub Pull Requests extension can resolve one
-- **Status Bar Summary** — See current-branch Jenkins status in the VS Code status bar
+- **Commit-Aware Status** — See whether Jenkins tested your checked-out commit in the status bar, with repository and revision verification plus an indication of untested local changes
 - **Current Branch Actions** — Open the resolved Jenkins job, trigger builds, inspect the latest build, or relink without browsing the tree
+- **Open Build for Current Commit** — Jump to the newest repository-verified build of local HEAD
+- **Commit Completion Notifications** — Track an exact commit with **Notify When Current Commit Finishes**, even after switching branches or restarting VS Code; inspect or cancel pending watches with **Manage Commit Watches**
+
+See [commit-aware status](#commit-aware-status) for verification requirements and search limits.
+
+### Job Management & Configuration
+
+- **Create Jobs & Pipelines** — Use **New Item** to create a Freestyle job or Pipeline at an environment root or in a regular folder
+- **Copy, Rename & Delete Jobs** — Manage existing jobs and pipelines from their tree context menus
+- **Enable / Disable Jobs** — Change whether a job or pipeline is enabled without leaving the editor
+- **View & Edit Configuration** — Preview `config.xml`, or use **Update Job Config** to edit a draft alongside a diff, review XML diagnostics, and confirm submission to Jenkins
+
+See [Job Actions](#job-actions) for the command reference.
+
+### Node Administration
+
+- **Node Details & Agent Logs** — Inspect a node and follow its recent agent output in the Node Details panel
+- **Online / Offline Controls** — Take nodes temporarily offline, bring them back online, launch agents, or disconnect them
+- **Edit Node Labels** — Update configured labels on permanent agents
+- **Create, Copy & Delete Agents** — Create permanent inbound agents, copy permanent agents and review their configuration in Jenkins, or delete idle permanent agents after confirmation
+- **Open Nodes in Jenkins** — Jump from node items directly to their Jenkins page
+
+Use node context menus or the Node Details **Actions** menu for existing nodes, and **Create Node...** from the Nodes group or Command Palette. See [Nodes](#nodes) for supported node types, permissions, and action details.
 
 ### Build Management
 
@@ -47,10 +69,11 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Replay Build** — Edit the Pipeline script in a draft editor and re-run with changes, or quick-replay with the original script
 - **Replay with Local Jenkinsfile** — Run your workspace Jenkinsfile, including unsaved changes, against a Pipeline job without committing
 - **Rebuild** — Re-run a build with the same parameters
-- **Follow Triggered Builds** — After Trigger Build, Rebuild, Replay, or Restart from Stage, get a notification when the new build starts with **View Build Details**, **Preview Log** (updates live until the build finishes), and **Notify When Finished** (tracked in the status bar)
+- **Rebuild with Changes…** — Open a build's parameter values in one list, change the ones you need, and run; passwords and files must be entered again. Uses `buildWithParameters`, so it doesn't need the Rebuild Plugin
+- **Follow Triggered Builds** — After Trigger Build, Rebuild, Rebuild with Changes, Replay, or Restart from Stage, get a notification when the new build starts with **View Build Details**, **Preview Log** (updates live until the build finishes), and **Notify When Finished** (tracked in the status bar)
 - **Manage Builds** — Delete a completed build, keep it forever, or edit its display name and description (multi-line descriptions open in a draft editor)
 - **Preview Build Logs** — Open console output in a lightweight preview editor
-- **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds
+- **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds with the same controls as Trigger Build, such as multi-select and multiline text. Inputs with file, run, or plugin parameters open the Jenkins input page, because Jenkins doesn't report enough about them to fill them in from VS Code
 - **Open in Jenkins** — Jump to any job, pipeline, or build in your browser
 
 ### Build Insights & Artifacts
@@ -173,6 +196,35 @@ Stopping builds and cancelling queued items each show one confirmation for the w
    - **Custom headers (JSON)** — JSON object of headers
    - **Browser SSO** — Sign in through your browser when prompted
 8. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
+
+## Open and Share Builds
+
+**Jenkins: Open Build by URL or Number...** (command palette, or the Jenkins view's
+**...** menu) opens Build Details from whatever was shared. If the clipboard
+holds a URL for a configured environment, the input box is prefilled with it.
+It accepts:
+
+- build URLs and build sub-pages such as `/123/console`, `/123/testReport/...`,
+  `/123/artifact/...`, or `/123/pipeline-graph/` (query strings and fragments are
+  ignored), including view-scoped URLs such as `/view/All/job/app/123/`
+- Blue Ocean run URLs (`/blue/organizations/jenkins/<pipeline>/detail/<branch>/123/...`)
+- permalinks such as `/job/app/lastFailedBuild/`
+- job URLs, which offer Last Build, Last Failed Build, Enter Build Number..., or
+  Reveal Job in Tree
+- copied Workbench links
+- a bare build number (`123` or `#123`). The job comes from the job the command
+  was run on (**Open Build by Number...** in a job's context menu), then the
+  build open in Build Details, then the Jenkins job linked to the current Git
+  branch. If none of these apply, you are asked for a job URL.
+
+**Copy Jenkins Link** and **Copy Workbench Link** are available on build, job,
+and pipeline items in the tree. From the command palette they copy the build
+shown in Build Details. The **Copy link...** button in the Build Details header
+offers Jenkins, Workbench, and Markdown links. When a pipeline stage or step log
+is selected, Workbench and Markdown links reopen that stage or step. Workbench
+links use the URI scheme of the editor that copied them (for example
+`vscode-insiders://` or `cursor://`), so change the scheme if your recipients
+use a different editor.
 
 ## Deep Links
 
@@ -329,7 +381,7 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for shared Jenkins status refreshes, including watched jobs and current-branch status. |
 | `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
 | `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
-| `jenkinsWorkbench.followTriggeredBuilds` | true | After a trigger, rebuild, replay, or restart, wait up to 10 minutes for the new build and offer View Build Details, Preview Log (live), and Notify When Finished when it starts. |
+| `jenkinsWorkbench.followTriggeredBuilds` | true | After a trigger, rebuild (with or without changes), replay, or restart, wait up to 10 minutes for the new build and offer View Build Details, Preview Log (live), and Notify When Finished when it starts. |
 | `jenkinsWorkbench.taskRunner.pollIntervalSeconds` | 2 | Polling interval while a task follows its queue item, build status, and console output. |
 | `jenkinsWorkbench.taskRunner.maxConsecutiveErrors` | 5 | Consecutive Jenkins API errors allowed per task-runner operation before cleanup and failure. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
@@ -521,6 +573,7 @@ activates there.
 | `Jenkins: Run Replay Draft` | Submit an edited replay draft from the editor |
 | `Jenkins: Replay with Local Jenkinsfile` | Submit a workspace Jenkinsfile directly, including unsaved changes |
 | `Jenkins: Rebuild` | Rebuild with the same parameters |
+| `Jenkins: Rebuild with Changes…` | Edit the selected build's parameter values, then trigger the job with them |
 | `Jenkins: Delete Build` | Delete a completed build; kept builds offer Stop Keeping and Delete |
 | `Jenkins: Keep Build Forever` | Protect a build from log rotation |
 | `Jenkins: Stop Keeping Build Forever` | Let log rotation remove the build again |
@@ -815,8 +868,8 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 1. Run `npm run compile`, `npm run check`, and `npm test`, then press F5 to launch the Extension Development Host
 2. Add a workspace and a global environment
 3. Verify jobs, builds, and nodes load correctly
-4. Test build actions (trigger, stop, replay, rebuild), including local Jenkinsfile replay from both editor and build context menus; verify unsaved edits, retained parameters/loaded scripts, missing completed builds, denied replay access, and the original replay commands
-5. Trigger, rebuild, replay, and restart from stage; confirm the "started" notification names the new build and that View Build Details, Preview Log (live until completion), and Notify When Finished (status bar count) work. Cancel a queued item and expect the cancelled message; with `jenkinsWorkbench.followTriggeredBuilds` off, expect the previous messages
+4. Test build actions (trigger, stop, replay, rebuild, rebuild with changes), including local Jenkinsfile replay from both editor and build context menus; verify unsaved edits, retained parameters/loaded scripts, missing completed builds, denied replay access, and the original replay commands. For Rebuild with Changes, change one value and confirm the rest match the source build, that Run stays blocked until passwords and files are entered (a file can be left empty), and that a job without parameters points to Rebuild
+5. Trigger, rebuild, rebuild with changes, replay, and restart from stage; confirm the "started" notification names the new build and that View Build Details, Preview Log (live until completion), and Notify When Finished (status bar count) work. Cancel a queued item and expect the cancelled message; with `jenkinsWorkbench.followTriggeredBuilds` off, expect the previous messages
 6. Verify watch notifications work
 7. Test node actions and node details
 8. Trigger a multibranch scan and verify branch filtering still works

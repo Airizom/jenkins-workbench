@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- feat(builds): add Open Build by URL or Number..., which opens Build Details from a pasted Jenkins build, job, permalink, Blue Ocean, or Workbench URL, or from a build number of the selected, open, or current-branch job.
+- feat(builds): add Copy Jenkins Link and Copy Workbench Link for builds and jobs, plus a Copy link... button in Build Details that also copies Markdown and keeps the selected pipeline stage.
+- feat(links): offer Add Environment... when a link or pasted URL matches no configured Jenkins environment.
+- feat(builds): add Rebuild with Changes..., which opens the selected build's parameters in an editable list (passwords and files must be re-entered) and triggers a followed build.
+
 ## [1.60.0] - 2026-10-25
 
 ### Added

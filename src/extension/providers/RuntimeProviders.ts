@@ -46,6 +46,7 @@ import {
   getWatchNotificationOptions
 } from "../ExtensionConfig";
 import { createExtensionRefreshHost } from "../ExtensionRefreshHost";
+import { JenkinsEnvironmentUrlResolver } from "../JenkinsEnvironmentUrlResolver";
 import { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLinkBuildHandler";
 import { JenkinsWorkbenchDeepLinkJobHandler } from "../JenkinsWorkbenchDeepLinkJobHandler";
 import { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
@@ -296,13 +297,15 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("treeDataProvider"),
         container.get("queuePoller")
       ),
+    environmentUrlResolver: (container) =>
+      new JenkinsEnvironmentUrlResolver(container.get("environmentStore")),
     buildDeepLinkHandler: (container) =>
       new JenkinsWorkbenchDeepLinkBuildHandler(container.lazy("buildDetailsPanelLauncher")),
     jobDeepLinkHandler: (container) =>
       new JenkinsWorkbenchDeepLinkJobHandler(container.get("treeNavigator")),
     uriHandler: (container) =>
       new JenkinsWorkbenchUriHandler(
-        container.get("environmentStore"),
+        container.get("environmentUrlResolver"),
         container.get("buildDeepLinkHandler"),
         container.get("jobDeepLinkHandler")
       ),

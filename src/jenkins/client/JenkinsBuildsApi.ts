@@ -2,23 +2,26 @@ import type { PreparedBuildParametersRequest } from "../BuildParameterRequests";
 import { JenkinsRequestError } from "../errors";
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
-import type {
-  JenkinsArtifact,
-  JenkinsBuild,
-  JenkinsBuildDetails,
-  JenkinsConsoleText,
-  JenkinsConsoleTextTail,
-  JenkinsFlowNodeLog,
-  JenkinsPendingInputAction,
-  JenkinsProgressiveConsoleHtml,
-  JenkinsProgressiveConsoleText,
-  JenkinsReplayDefinition,
-  JenkinsReplayResult,
-  JenkinsReplaySubmissionPayload,
-  JenkinsRestartFromStageInfo,
-  JenkinsTestReport,
-  JenkinsWorkflowRun,
-  JenkinsWorkflowStage
+import {
+  isJenkinsBuildPermalink,
+  type JenkinsArtifact,
+  type JenkinsBuild,
+  type JenkinsBuildDetails,
+  type JenkinsBuildPermalink,
+  type JenkinsConsoleText,
+  type JenkinsConsoleTextTail,
+  type JenkinsFlowNodeLog,
+  type JenkinsInputProceedOptions,
+  type JenkinsPendingInputAction,
+  type JenkinsProgressiveConsoleHtml,
+  type JenkinsProgressiveConsoleText,
+  type JenkinsReplayDefinition,
+  type JenkinsReplayResult,
+  type JenkinsReplaySubmissionPayload,
+  type JenkinsRestartFromStageInfo,
+  type JenkinsTestReport,
+  type JenkinsWorkflowRun,
+  type JenkinsWorkflowStage
 } from "../types";
 import {
   buildActionUrl,
@@ -40,7 +43,7 @@ import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
 import { RestartFromStageClient } from "./RestartFromStageClient";
 
 const BUILD_ARTIFACTS_TREE = "artifacts[fileName,relativePath]";
-const LAST_FAILED_BUILD_TREE = "lastFailedBuild[number,url,result,building,timestamp,duration]";
+const BUILD_PERMALINK_FIELDS = "number,url,result,building,timestamp,duration";
 const REBUILD_AUTOREBUILD_BODY = "autorebuild=true";
 const BUILD_LIST_LIMIT_TOKEN = "{limit}";
 const FORM_CONTENT_HEADERS = {
@@ -223,11 +226,22 @@ export class JenkinsBuildsApi {
   }
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
-    const url = buildApiUrlFromItem(jobUrl, LAST_FAILED_BUILD_TREE);
-    const response = await this.context.requestJson<{
-      lastFailedBuild?: JenkinsBuild | null;
-    }>(url);
-    return response.lastFailedBuild ?? undefined;
+    return this.getBuildPermalink(jobUrl, "lastFailedBuild");
+  }
+
+  async getBuildPermalink(
+    jobUrl: string,
+    permalink: JenkinsBuildPermalink
+  ): Promise<JenkinsBuild | undefined> {
+    if (!isJenkinsBuildPermalink(permalink)) {
+      throw new Error(`Unsupported Jenkins build permalink: ${String(permalink)}`);
+    }
+    const url = buildApiUrlFromItem(jobUrl, `${permalink}[${BUILD_PERMALINK_FIELDS}]`);
+    const response =
+      await this.context.requestJson<Partial<Record<JenkinsBuildPermalink, JenkinsBuild | null>>>(
+        url
+      );
+    return response[permalink] ?? undefined;
   }
 
   async triggerBuild(
@@ -333,7 +347,7 @@ export class JenkinsBuildsApi {
   async proceedInput(
     buildUrl: string,
     inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+    options?: JenkinsInputProceedOptions
   ): Promise<void> {
     await this.pendingInputClient.proceedInput(buildUrl, inputId, options);
   }

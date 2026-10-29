@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { parseBuildUrl, parseJobUrl, parseQueueItemId } from "../../jenkins/urls";
+import { formatJobUrlLabel, parseBuildUrl, parseQueueItemId } from "../../jenkins/urls";
 import { withActionErrorMessage } from "../../ui/ActionErrorMessage";
 import type { PollCancellationToken } from "../polling/Polling";
 import type { QueuedBuildWaiter } from "../QueuedBuildWaiter";
@@ -158,7 +158,7 @@ export class BuildFollowUpService implements vscode.Disposable {
         kind: "cause",
         environment,
         jobUrl: parsed.jobUrl,
-        label: request.jobLabel ?? formatJobLabel(parsed.jobUrl, environment.url),
+        label: request.jobLabel ?? formatJobUrlLabel(parsed.jobUrl, environment.url),
         firstCandidateNumber,
         sourceBuildNumber: parsed.buildNumber,
         cause,
@@ -194,7 +194,7 @@ export class BuildFollowUpService implements vscode.Disposable {
       kind: "queue",
       environment,
       jobUrl,
-      label: causeOrigin?.label ?? request.jobLabel ?? formatJobLabel(jobUrl, environment.url),
+      label: causeOrigin?.label ?? request.jobLabel ?? formatJobUrlLabel(jobUrl, environment.url),
       queueLocation: location
     };
   }
@@ -286,10 +286,6 @@ export class BuildFollowUpService implements vscode.Disposable {
         return;
     }
   }
-}
-
-function formatJobLabel(jobUrl: string, environmentUrl: string): string {
-  return parseJobUrl(jobUrl, environmentUrl)?.fullPath.join("/") ?? jobUrl;
 }
 
 function once(callback: () => void): () => void {

@@ -1,12 +1,16 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import { formatJobUrlLabel, parseBuildUrl } from "../../jenkins/urls";
 import type { TriggerCauseKind } from "../../services/buildFollow/BuildFollowTypes";
 import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { BuildTreeItem } from "../../tree/TreeItems";
+import { promptRebuildParameterChanges } from "../../ui/buildParameterPrompts/RebuildParameterEditor";
+import { seedRebuildParameterValues } from "../../ui/buildParameterPrompts/RebuildParameterValues";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { getTreeItemLabel, requireSelection, withActionErrorMessage } from "../CommandUtils";
 import { refreshEnvironment } from "./BuildCommandRefresh";
 import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
+import { announceQueuedBuild } from "./BuildTriggerHandlers";
 import type { ReplayBuildWorkflow } from "./ReplayBuildWorkflow";
 
 interface FollowedBuildActionOptions {
@@ -140,4 +144,87 @@ export async function rebuildBuild(
     requestedMessage: `Rebuild requested for ${label}`,
     action: (environment, buildUrl) => dataService.rebuildBuild(environment, buildUrl)
   });
+}
+
+/**
+ * Triggers the job with the selected build's parameter values after letting the user edit them.
+ * Unlike Rebuild, this goes through buildWithParameters, so it doesn't need the Rebuild plugin
+ * and is followed through its queue item.
+ */
+export async function rebuildBuildWithChanges(
+  dataService: JenkinsDataService,
+  buildFollowUp: BuildFollowUpService,
+  refreshHost: BuildCommandRefreshHost,
+  item?: BuildTreeItem
+): Promise<void> {
+  const selected = requireSelection(item, "Select a build to rebuild with changes.");
+  if (!selected) {
+    return;
+  }
+
+  const { environment } = selected;
+  const parsed = parseBuildUrl(selected.buildUrl, environment.url);
+  if (!parsed) {
+    void vscode.window.showInformationMessage(
+      "The selected build URL could not be resolved to its Jenkins job."
+    );
+    return;
+  }
+
+  const { jobUrl } = parsed;
+  const label = getTreeItemLabel(selected);
+  const jobLabel = selected.jobNameHint ?? formatJobUrlLabel(jobUrl, environment.url);
+
+  let rebuildInstead = false;
+  await withActionErrorMessage(`Failed to rebuild ${label} with changes`, async () => {
+    const [parameters, details] = await Promise.all([
+      dataService.getJobParameters(environment, jobUrl),
+      dataService.getBuildDetails(environment, selected.buildUrl, {
+        includeParameters: true,
+        bypassCache: true
+      })
+    ]);
+
+    if (parameters.length === 0) {
+      const choice = await vscode.window.showInformationMessage(
+        `${jobLabel} has no parameters. Use Rebuild instead.`,
+        "Rebuild"
+      );
+      rebuildInstead = choice === "Rebuild";
+      return;
+    }
+
+    const payload = await promptRebuildParameterChanges({
+      dataService,
+      environment,
+      jobUrl,
+      jobLabel,
+      sourceLabel: label,
+      sourceBuildNumber: parsed.buildNumber,
+      ...seedRebuildParameterValues(parameters, details.actions)
+    });
+    if (!payload) {
+      return;
+    }
+
+    const prepared = await buildFollowUp.prepare({
+      kind: "queue",
+      environment,
+      jobUrl,
+      label: jobLabel
+    });
+    const result = await dataService.triggerBuildWithParameters(environment, jobUrl, payload, {
+      allowEmptyParams: true
+    });
+    announceQueuedBuild(buildFollowUp, refreshHost, prepared, {
+      environmentId: environment.environmentId,
+      queueLocation: result.queueLocation,
+      requestedMessage: `Rebuild with changes requested for ${label}`
+    });
+  });
+
+  // Outside the error scope above so Rebuild reports its own failures.
+  if (rebuildInstead) {
+    await rebuildBuild(dataService, buildFollowUp, refreshHost, selected);
+  }
 }

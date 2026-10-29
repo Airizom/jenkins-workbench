@@ -7,6 +7,7 @@ import {
   isBuildDetailsReadyMessage,
   isClearPipelineLogNodeMessage,
   isConfigureBuildDiagnosticsMessage,
+  isCopyBuildLinkMessage,
   isDeleteBuildMessage,
   isDownloadAllArtifactsMessage,
   isEditBuildMessage,
@@ -15,6 +16,7 @@ import {
   isNavigateBuildMessage,
   isOpenDiagnosticSourceMessage,
   isOpenExternalMessage,
+  isOpenPendingInputInJenkinsMessage,
   isOpenRelatedBuildMessage,
   isOpenTestSourceMessage,
   isPersistUiStateMessage,
@@ -29,6 +31,7 @@ import {
   isShowBuildDiagnosticProblemsMessage,
   isToggleFollowLogMessage,
   type OpenDiagnosticSourceMessage,
+  type OpenPendingInputInJenkinsMessage,
   type OpenTestSourceMessage,
   type PersistUiStateMessage,
   type RejectInputMessage,
@@ -46,9 +49,11 @@ export interface BuildDetailsMessageRouterHandlers {
   onArtifactAction(message: ArtifactActionMessage): void;
   onDownloadAllArtifacts(): void;
   onOpenExternal(url: string): void;
+  onCopyBuildLink(): void;
   onExportConsole(): void;
   onApproveInput(message: ApproveInputMessage): void;
   onRejectInput(message: RejectInputMessage): void;
+  onOpenPendingInputInJenkins(message: OpenPendingInputInJenkinsMessage): void;
   onRestartPipelineFromStage(message: RestartPipelineFromStageMessage): void;
   onSelectPipelineLogNode(message: SelectPipelineLogNodeMessage): void;
   onClearPipelineLogNode(): void;
@@ -94,10 +99,14 @@ function createMessageRoutes(
     createMessageRoute(isArtifactActionMessage, (message) => handlers.onArtifactAction(message)),
     createMessageRoute(isDownloadAllArtifactsMessage, () => handlers.onDownloadAllArtifacts()),
     createMessageRoute(isOpenExternalMessage, (message) => handlers.onOpenExternal(message.url)),
+    createMessageRoute(isCopyBuildLinkMessage, () => handlers.onCopyBuildLink()),
     createMessageRoute(isExportConsoleMessage, () => handlers.onExportConsole()),
     createMessageRoute(isRefreshBuildDetailsMessage, () => handlers.onRefreshBuildDetails()),
     createMessageRoute(isApproveInputMessage, (message) => handlers.onApproveInput(message)),
     createMessageRoute(isRejectInputMessage, (message) => handlers.onRejectInput(message)),
+    createMessageRoute(isOpenPendingInputInJenkinsMessage, (message) =>
+      handlers.onOpenPendingInputInJenkins(message)
+    ),
     createMessageRoute(isRestartPipelineFromStageMessage, (message) =>
       handlers.onRestartPipelineFromStage(message)
     ),

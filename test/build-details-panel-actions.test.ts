@@ -9,10 +9,17 @@ import * as vscodeStub from "./helpers/vscodeStub";
 const warningPrompts: Array<{ message: string; options: unknown; items: string[] }> = [];
 const errorMessages: string[] = [];
 const infoMessages: string[] = [];
+const openedUrls: string[] = [];
 let warningResponse: string | undefined;
 
 vi.doMock("vscode", () => ({
   ...vscodeStub,
+  env: {
+    openExternal: async (uri: vscodeStub.Uri) => {
+      openedUrls.push(`${uri.scheme}://${uri.authority}${uri.path}`);
+      return true;
+    }
+  },
   window: {
     showWarningMessage: async (message: string, options: unknown, ...items: string[]) => {
       warningPrompts.push({ message, options, items });
@@ -49,6 +56,7 @@ function createActions(options?: {
   workflowError?: Error;
   withoutWorkflow?: boolean;
   withoutArtifactHandler?: boolean;
+  withoutBuildUrl?: boolean;
   buildFollowUp?: unknown;
   onRestart?: () => void;
 }) {
@@ -94,7 +102,8 @@ function createActions(options?: {
       }
     }),
     getEnvironment: () => environment,
-    getBuildUrl: () => "https://jenkins.example/job/app/9/",
+    getBuildUrl: () =>
+      options?.withoutBuildUrl ? undefined : "https://jenkins.example/job/app/9/",
     getCurrentDetails: () => details,
     getLoadToken: () => 1,
     getPipelineRestartAvailability: () => "supported",
@@ -255,6 +264,28 @@ describe("BuildDetailsPanelActions", () => {
     await actions.handleApproveInput({ inputId: "deploy" });
 
     assert.deepEqual(posted, [{ type: "pendingInputActionComplete", inputId: "deploy" }]);
+  });
+
+  it("opens the panel build's Jenkins input page for browser-only inputs", async () => {
+    openedUrls.length = 0;
+    const { actions, posted } = createActions();
+
+    await actions.handleOpenPendingInputInJenkins({ inputId: "deploy" });
+
+    assert.deepEqual(openedUrls, ["https://jenkins.example/job/app/9/input/"]);
+    assert.deepEqual(errorMessages, []);
+    // Nothing was marked as processing, so no completion is posted.
+    assert.deepEqual(posted, []);
+  });
+
+  it("reports an error instead of opening Jenkins before the build URL is known", async () => {
+    openedUrls.length = 0;
+    const { actions } = createActions({ withoutBuildUrl: true });
+
+    await actions.handleOpenPendingInputInJenkins({ inputId: "deploy" });
+
+    assert.deepEqual(openedUrls, []);
+    assert.deepEqual(errorMessages, ["Build details are not ready for input approval."]);
   });
 });
 

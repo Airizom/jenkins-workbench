@@ -1,13 +1,19 @@
 import * as vscode from "vscode";
 import type { BuildDiagnosticsCoordinator } from "../buildDiagnostics/BuildDiagnosticsCoordinator";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
+import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../jenkins/types";
-import { normalizeJenkinsUrlForComparison, parseBuildUrl } from "../jenkins/urls";
+import {
+  canonicalizeBuildUrlForEnvironment,
+  normalizeJenkinsUrlForComparison,
+  parseBuildUrl
+} from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
 import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
+import { pickAndCopyBuildLink } from "../services/links/BuildShareLinks";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
 import {
   buildTestSourceNavigationContext,
@@ -87,6 +93,22 @@ interface BuildDetailsPanelReviveOptions extends BuildDetailsPanelServices {
   environmentStore: JenkinsEnvironmentStore;
   extensionUri: vscode.Uri;
 }
+
+export interface BuildDetailsPanelBuildContext {
+  environment: JenkinsEnvironmentRef;
+  buildUrl: string;
+  label?: string;
+  pipelineNode?: PipelineNodeSelection;
+}
+
+/** Reads the open Build Details build without constructing the panel launcher and its services. */
+export interface BuildDetailsCurrentBuildProvider {
+  getCurrentBuild(): BuildDetailsPanelBuildContext | undefined;
+}
+
+export const buildDetailsCurrentBuildProvider: BuildDetailsCurrentBuildProvider = {
+  getCurrentBuild: () => BuildDetailsPanel.getCurrentBuildContext()
+};
 
 interface BuildDetailsPanelMutableServices {
   consoleExporter: BuildConsoleExporter;
@@ -213,6 +235,11 @@ export class BuildDetailsPanel {
     );
   }
 
+  /** The build shown in the open panel, or undefined when no build is loaded. */
+  static getCurrentBuildContext(): BuildDetailsPanelBuildContext | undefined {
+    return BuildDetailsPanel.currentPanel?.getBuildContext();
+  }
+
   /** Closes the panel when it shows the given environment, e.g. after its URL changed. */
   static closeForEnvironment(scope: JenkinsEnvironmentRef["scope"], environmentId: string): void {
     const current = BuildDetailsPanel.currentPanel;
@@ -309,6 +336,11 @@ export class BuildDetailsPanel {
         if (target) {
           void this.navigateToBuild(target.buildUrl, `${target.jobName} #${target.number}`);
         }
+      },
+      copyBuildLink: () => {
+        void this.copyBuildLink().catch((error: unknown) => {
+          void vscode.window.showErrorMessage(`Unable to copy link: ${formatActionError(error)}`);
+        });
       },
       navigateBuild: (direction) => {
         this.recordDisplayedNavigation();
@@ -491,6 +523,38 @@ export class BuildDetailsPanel {
     }
   }
 
+  private getBuildContext(): BuildDetailsPanelBuildContext | undefined {
+    if (this.disposed) {
+      return undefined;
+    }
+    const environment = this.controller.getEnvironment();
+    const buildUrl = this.controller.getBuildUrl();
+    if (!environment || !buildUrl) {
+      return undefined;
+    }
+    const details = this.controller.getCurrentDetails();
+    return {
+      environment,
+      // Builds opened from a view keep the view path; share the canonical URL.
+      buildUrl: canonicalizeBuildUrlForEnvironment(environment.url, buildUrl) ?? buildUrl,
+      label: details?.fullDisplayName ?? details?.displayName,
+      pipelineNode: toPipelineNodeSelection(this.controller.getCurrentPipelineNodeLog()?.target)
+    };
+  }
+
+  private async copyBuildLink(): Promise<void> {
+    const context = this.getBuildContext();
+    if (!context) {
+      return;
+    }
+    await pickAndCopyBuildLink({
+      kind: "build",
+      url: context.buildUrl,
+      environmentUrl: context.environment.url,
+      node: context.pipelineNode
+    });
+  }
+
   private recordRecoveredNavigation(): void {
     if (this.disposed || !this.currentLoadComplete) {
       return;
@@ -652,7 +716,7 @@ function areBuildUrlsEqual(left: string, right: string): boolean {
   return normalizeJenkinsUrlForComparison(left) === normalizeJenkinsUrlForComparison(right);
 }
 
-function toPipelineLogTargetViewModel(
+export function toPipelineLogTargetViewModel(
   selection: PipelineNodeSelection | undefined
 ): PipelineLogTargetViewModel | undefined {
   const nodeId = selection?.nodeId.trim();
@@ -666,4 +730,16 @@ function toPipelineLogTargetViewModel(
     name,
     nodeId
   };
+}
+
+/** Inverse of toPipelineLogTargetViewModel; aggregated targets without a node id have no selection. */
+export function toPipelineNodeSelection(
+  target: PipelineLogTargetViewModel | undefined
+): PipelineNodeSelection | undefined {
+  const nodeId = target?.nodeId?.trim();
+  if (!target || !nodeId) {
+    return undefined;
+  }
+  const name = target.name.trim();
+  return name ? { kind: target.kind, nodeId, name } : { kind: target.kind, nodeId };
 }

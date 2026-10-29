@@ -43,6 +43,21 @@ export function resolveMultiDefaultValue(
   return [];
 }
 
+/**
+ * How a multi-select value is submitted: joined with the parameter's delimiter when it has one,
+ * otherwise one value per selection. An empty selection is submitted as an empty value.
+ */
+export function resolveMultiSelectSubmission(
+  parameter: Pick<JobParameter, "multiSelectDelimiter">,
+  values: readonly string[]
+): string | string[] {
+  if (values.length === 0) {
+    return "";
+  }
+  const delimiter = parameter.multiSelectDelimiter;
+  return delimiter ? values.join(delimiter) : [...values];
+}
+
 function splitMultiValue(value: string, delimiter?: string): string[] {
   const separator = delimiter || ",";
   return value

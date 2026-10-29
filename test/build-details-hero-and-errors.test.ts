@@ -50,6 +50,7 @@ function renderHero(overrides: Partial<Parameters<typeof BuildStatusHero>[0]> = 
         testsSummary: EMPTY_TESTS,
         stageCount: 0,
         onOpenBuild: () => undefined,
+        onCopyLink: () => undefined,
         keptForever: false,
         canManage: true,
         canDelete: true,
@@ -120,6 +121,17 @@ describe("BuildStatusHero build management", () => {
       order
     );
     assert.doesNotMatch(html, /Kept forever/);
+  });
+
+  it("places Copy link just before Open in Jenkins and disables it without a build URL", () => {
+    const html = renderHero({ buildUrl: "https://jenkins.example/job/app/1/" });
+    const copy = findButton(html, "Copy link");
+    assert.doesNotMatch(copy, / disabled=""/);
+    const copyIndex = html.indexOf('aria-label="Copy link"');
+    assert.ok(html.indexOf('aria-label="Delete build"') < copyIndex);
+    assert.ok(copyIndex < html.indexOf('aria-label="Open in Jenkins"'));
+
+    assert.match(findButton(renderHero(), "Copy link"), / disabled=""/);
   });
 
   it("marks a kept build with a pressed toggle and a badge", () => {

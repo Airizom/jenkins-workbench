@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import { formatActionError } from "../../formatters/ErrorFormatters";
+import { buildPendingInputBrowserUrl } from "../../jenkins/urls";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import type {
   BuildManagementResult,
@@ -111,6 +112,22 @@ export class BuildDetailsPanelActions {
 
   async handleRejectInput(message: { inputId: string }): Promise<void> {
     await this.handlePendingInput(message, "reject", "rejection");
+  }
+
+  /**
+   * Opens the build's Jenkins input page for inputs whose values can't be entered in VS Code.
+   * The URL comes from the panel's build, never from the webview.
+   */
+  async handleOpenPendingInputInJenkins(_message: { inputId: string }): Promise<void> {
+    const buildUrl = this.controller.getBuildUrl();
+    if (!buildUrl) {
+      void vscode.window.showErrorMessage("Build details are not ready for input approval.");
+      return;
+    }
+    await openExternalHttpUrlWithWarning(buildPendingInputBrowserUrl(buildUrl), {
+      targetLabel: "Jenkins input page",
+      sourceLabel: "Build Details"
+    });
   }
 
   private async handlePendingInput(

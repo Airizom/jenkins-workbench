@@ -15,11 +15,11 @@ describe("JenkinsPendingInputClient", () => {
       }
     });
     const client = new JenkinsPendingInputClient(context);
-    const params = new URLSearchParams({
-      json: "custom-json",
-      inputId: "custom-input-id",
-      proceed: "custom-proceed"
-    });
+    const params = [
+      { name: "json", value: "custom-json" },
+      { name: "inputId", value: "custom-input-id" },
+      { name: "proceed", value: "custom-proceed" }
+    ];
 
     await client.proceedInput(BUILD_URL, "approval", {
       params,
@@ -35,6 +35,44 @@ describe("JenkinsPendingInputClient", () => {
         { name: "json", value: "custom-json" },
         { name: "inputId", value: "custom-input-id" },
         { name: "proceed", value: "custom-proceed" }
+      ]
+    });
+  });
+
+  it("submits multi-value and run parameters in the shapes Jenkins binds", async () => {
+    let submittedUrl: string | undefined;
+    let submittedBody: string | undefined;
+    const context = createJenkinsClientContext({
+      requestVoidWithCrumb: async (url, body) => {
+        submittedUrl = url;
+        submittedBody = typeof body === "string" ? body : undefined;
+      }
+    });
+    const client = new JenkinsPendingInputClient(context);
+
+    await client.proceedInput(BUILD_URL, "approval", {
+      params: [
+        { name: "REGIONS", value: ["us", "eu"] },
+        { name: "UPSTREAM", value: "folder/app#12", runId: "folder/app#12" },
+        { name: "NOTES", value: "line one\nline two" }
+      ]
+    });
+
+    assert.equal(
+      submittedUrl,
+      "https://jenkins.example.com/job/demo/15/wfapi/inputSubmit?inputId=approval"
+    );
+    assert.ok(submittedBody);
+    const submitted = new URLSearchParams(submittedBody);
+    assert.deepEqual(submitted.getAll("REGIONS"), ["us", "eu"]);
+    assert.equal(submitted.get("UPSTREAM"), "folder/app#12");
+    assert.equal(submitted.get("NOTES"), "line one\nline two");
+    assert.equal(submitted.get("proceed"), "Proceed");
+    assert.deepEqual(JSON.parse(submitted.get("json") ?? ""), {
+      parameter: [
+        { name: "REGIONS", value: ["us", "eu"] },
+        { name: "UPSTREAM", value: "folder/app#12", runId: "folder/app#12" },
+        { name: "NOTES", value: "line one\nline two" }
       ]
     });
   });

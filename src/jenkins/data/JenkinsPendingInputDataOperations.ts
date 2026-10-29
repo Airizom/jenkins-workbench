@@ -1,5 +1,5 @@
 import { JenkinsRequestError } from "../errors";
-import type { JenkinsClient } from "../JenkinsClient";
+import type { JenkinsClient, JenkinsInputProceedOptions } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
 import { toBuildActionError } from "./JenkinsDataErrors";
@@ -87,7 +87,7 @@ export class JenkinsPendingInputDataOperations {
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+    options?: JenkinsInputProceedOptions
   ): Promise<void> {
     await this.runInputAction(environment, buildUrl, (client) =>
       client.proceedInput(buildUrl, inputId, options)

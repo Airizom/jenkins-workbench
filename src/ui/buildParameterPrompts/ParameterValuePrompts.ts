@@ -1,14 +1,23 @@
 import { basename } from "node:path";
 import * as vscode from "vscode";
-import type { BuildParameterPayload, JobParameter } from "../../jenkins/JenkinsDataService";
+import type {
+  BuildParameterPayload,
+  JenkinsInputParameterSubmission,
+  JobParameter
+} from "../../jenkins/JenkinsDataService";
 import { promptBooleanParameterValue, promptChoiceParameterValue } from "../ParameterPrompts";
 import type {
   BuildParameterPromptOptions,
   BuildParameterPromptValues,
-  ParameterValue
+  ParameterValue,
+  ParameterValuePromptContext
 } from "./BuildParameterPromptTypes";
 import { isSensitiveParameter } from "./ParameterSensitivity";
-import { resolveMultiDefaultValue, resolveSingleDefaultValue } from "./ParameterValueDefaults";
+import {
+  resolveMultiDefaultValue,
+  resolveMultiSelectSubmission,
+  resolveSingleDefaultValue
+} from "./ParameterValueDefaults";
 import { fetchRunBuildChoices } from "./RunParameterLookup";
 
 export async function promptParameterValues(
@@ -35,7 +44,7 @@ export async function promptParameterValues(
   return { payload, values };
 }
 
-function addParameterToPayload(
+export function addParameterToPayload(
   payload: BuildParameterPayload,
   parameter: JobParameter,
   value: ParameterValue
@@ -57,27 +66,36 @@ function addParameterToPayload(
     return;
   }
 
-  if (value.length === 0) {
-    payload.fields.push({ name: parameter.name, value: "" });
+  const submission = resolveMultiSelectSubmission(parameter, value);
+  if (typeof submission === "string") {
+    payload.fields.push({ name: parameter.name, value: submission });
     return;
   }
 
-  const delimiter = parameter.multiSelectDelimiter;
-  if (delimiter) {
-    payload.fields.push({
-      name: parameter.name,
-      value: value.join(delimiter)
-    });
-    return;
-  }
-
-  for (const entry of value) {
+  for (const entry of submission) {
     payload.fields.push({ name: parameter.name, value: entry });
   }
 }
 
-async function promptParameterValue(
-  options: BuildParameterPromptOptions,
+/**
+ * Shapes a prompted value for an input step. Multi-select values follow the same delimiter rule
+ * as Trigger Build, and run values also go out as `runId` so Jenkins can bind them.
+ */
+export function toInputSubmission(
+  parameter: JobParameter,
+  value: ParameterValue
+): JenkinsInputParameterSubmission {
+  if (Array.isArray(value)) {
+    return { name: parameter.name, value: resolveMultiSelectSubmission(parameter, value) };
+  }
+  if (parameter.kind === "run") {
+    return { name: parameter.name, value, runId: value };
+  }
+  return { name: parameter.name, value };
+}
+
+export async function promptParameterValue(
+  options: ParameterValuePromptContext,
   parameter: JobParameter,
   presetValue?: ParameterValue
 ): Promise<ParameterValue | undefined> {
@@ -143,7 +161,7 @@ async function promptParameterValue(
 }
 
 async function promptForRunParameter(
-  options: BuildParameterPromptOptions,
+  options: ParameterValuePromptContext,
   parameter: JobParameter,
   presetValue?: ParameterValue
 ): Promise<string | undefined> {
@@ -239,6 +257,11 @@ async function promptForFileParameter(
     }
   }
 
+  return chooseParameterFile(parameter);
+}
+
+/** Opens the file dialog for a file parameter; resolves to `undefined` when dismissed. */
+export async function chooseParameterFile(parameter: JobParameter): Promise<string | undefined> {
   const selected = await vscode.window.showOpenDialog({
     canSelectFiles: true,
     canSelectFolders: false,

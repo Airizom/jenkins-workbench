@@ -54,6 +54,22 @@ export interface JenkinsBuildSummary {
   timestamp?: number;
 }
 
+export const JENKINS_BUILD_PERMALINKS = [
+  "lastBuild",
+  "lastSuccessfulBuild",
+  "lastFailedBuild",
+  "lastStableBuild",
+  "lastUnstableBuild",
+  "lastUnsuccessfulBuild",
+  "lastCompletedBuild"
+] as const;
+
+export type JenkinsBuildPermalink = (typeof JENKINS_BUILD_PERMALINKS)[number];
+
+export function isJenkinsBuildPermalink(value: string): value is JenkinsBuildPermalink {
+  return (JENKINS_BUILD_PERMALINKS as readonly string[]).includes(value);
+}
+
 export interface JenkinsBuild {
   number: number;
   url: string;
@@ -198,6 +214,27 @@ export interface JenkinsPendingInputParameterDefinition {
   description?: string;
   projectName?: string;
   multiSelectDelimiter?: string;
+  /**
+   * wfapi nests the exported fields here: `defaultVal` for core types and `choices` for
+   * ChoiceParameterDefinition. Other types, including run parameters, leave it empty.
+   */
+  definition?: { defaultVal?: unknown; choices?: unknown; projectName?: string };
+}
+
+/**
+ * One input parameter value for wfapi/inputSubmit. Multi-value parameters carry an array, and run
+ * parameters also set `runId`, which is the key Jenkins' RunParameterValue binds from.
+ */
+export interface JenkinsInputParameterSubmission {
+  name: string;
+  value: string | string[];
+  runId?: string;
+}
+
+export interface JenkinsInputProceedOptions {
+  params?: JenkinsInputParameterSubmission[];
+  proceedText?: string;
+  proceedUrl?: string;
 }
 
 export interface JenkinsPendingInputAction {

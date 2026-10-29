@@ -43,9 +43,23 @@ export type JenkinsPendingInputActionRuntimeSurface = Pick<
   "getPendingInputActions" | "approveInput" | "rejectInput"
 >;
 
+/** Approving also looks up recent builds for run parameters. */
+export type JenkinsPendingInputApprovalRuntimeSurface = JenkinsPendingInputActionRuntimeSurface &
+  JenkinsRunParameterLookupRuntimeSurface;
+
+export type JenkinsRunParameterLookupRuntimeSurface = Pick<
+  JenkinsBuildDataOperations,
+  "getBuildsForJob"
+>;
+
 export type JenkinsPipelineRestartRuntimeSurface = Pick<
   JenkinsBuildDataOperations,
   "getRestartFromStageInfo" | "restartPipelineFromStage"
+>;
+
+export type JenkinsBuildPermalinkRuntimeSurface = Pick<
+  JenkinsBuildDataOperations,
+  "getBuildPermalink"
 >;
 
 export type JenkinsJobStateRuntimeSurface = Pick<

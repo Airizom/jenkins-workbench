@@ -47,6 +47,11 @@ export class CurrentBranchWorkflowService {
     return this.currentBranchService.listRepositories();
   }
 
+  /** The last resolved state, without refreshing Git or Jenkins. */
+  getCachedState(): CurrentBranchState {
+    return this.currentBranchService.getState();
+  }
+
   async openCurrentCommitBuild(state: CurrentBranchState): Promise<void> {
     const latest = await this.resolveLatest(state);
     const target = this.commandMapper.getCurrentCommitBuildTarget(latest);

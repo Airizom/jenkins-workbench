@@ -132,12 +132,20 @@
       "members": ["discoverCoverageActionPath", "getCoverageOverview", "getModifiedCoverageFiles"]
     },
     {
-      "implements": "JenkinsPendingInputActionRuntimeSurface",
+      "implements": "JenkinsPendingInputApprovalRuntimeSurface",
       "members": ["getPendingInputActions", "approveInput", "rejectInput"]
     },
     {
       "implements": "JenkinsPipelineRestartRuntimeSurface",
       "members": ["getRestartFromStageInfo", "restartPipelineFromStage"]
+    },
+    {
+      "implements": "JenkinsBuildPermalinkRuntimeSurface",
+      "members": ["getBuildPermalink"]
+    },
+    {
+      "implements": "JenkinsBuildPermalinkClientSurface",
+      "members": ["getBuildPermalink"]
     },
     {
       "implements": "JenkinsJobStateRuntimeSurface",

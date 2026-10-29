@@ -4,7 +4,10 @@ import type {
   JenkinsDataService,
   JobParameter
 } from "../../jenkins/JenkinsDataService";
-import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
+import type {
+  BuildFollowUpService,
+  PreparedFollow
+} from "../../services/buildFollow/BuildFollowUpService";
 import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
 import type { JobTreeItem, PipelineTreeItem } from "../../tree/TreeItems";
 import { promptForBuildParameters } from "../../ui/BuildParameterPrompts";
@@ -26,6 +29,31 @@ type BuildTriggerOptions = {
 
 export interface TriggerBuildForTargetOptions {
   onQueuedBuildWaitSettled?: () => Promise<unknown> | undefined;
+}
+
+export interface QueuedBuildAnnouncement {
+  environmentId: string;
+  queueLocation?: string;
+  /** Without a trailing period, for example "Triggered build for folder/demo". */
+  requestedMessage: string;
+  onSettled?: () => Promise<unknown> | undefined;
+}
+
+/** Announces a build submitted through the queue API and follows its queue item. */
+export function announceQueuedBuild(
+  buildFollowUp: BuildFollowUpService,
+  refreshHost: BuildCommandRefreshHost,
+  prepared: PreparedFollow,
+  announcement: QueuedBuildAnnouncement
+): void {
+  const { queueLocation, requestedMessage } = announcement;
+  buildFollowUp.announceAndFollow(prepared, {
+    location: queueLocation,
+    requestedMessage,
+    plainMessage: queueLocation ? `${requestedMessage}. Queued at ${queueLocation}` : undefined,
+    refresh: () => refreshEnvironment(refreshHost, announcement.environmentId),
+    onSettled: announcement.onSettled
+  });
 }
 
 export async function triggerBuild(
@@ -81,13 +109,10 @@ export async function triggerBuildForTarget(
           }
         )
       : await dataService.triggerBuild(target.environment, target.jobUrl);
-    buildFollowUp.announceAndFollow(prepared, {
-      location: result.queueLocation,
+    announceQueuedBuild(buildFollowUp, refreshHost, prepared, {
+      environmentId: target.environment.environmentId,
+      queueLocation: result.queueLocation,
       requestedMessage: `Triggered build for ${target.label}`,
-      plainMessage: result.queueLocation
-        ? `Triggered build for ${target.label}. Queued at ${result.queueLocation}`
-        : undefined,
-      refresh: () => refreshEnvironment(refreshHost, target.environment.environmentId),
       onSettled: options?.onQueuedBuildWaitSettled
     });
   });

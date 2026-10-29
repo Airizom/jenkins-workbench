@@ -1,7 +1,7 @@
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type {
   JenkinsCoverageRuntimeSurface,
-  JenkinsPendingInputActionRuntimeSurface,
+  JenkinsPendingInputApprovalRuntimeSurface,
   JenkinsPipelineRestartRuntimeSurface
 } from "../../jenkins/JenkinsDataServiceRuntimeSurfaces";
 import {
@@ -19,7 +19,7 @@ export type {
 
 export type BuildDetailsCoverageBackend = JenkinsCoverageRuntimeSurface;
 
-export type BuildDetailsPendingInputsBackend = JenkinsPendingInputActionRuntimeSurface;
+export type BuildDetailsPendingInputsBackend = JenkinsPendingInputApprovalRuntimeSurface;
 
 export type BuildDetailsRestartBackend = JenkinsPipelineRestartRuntimeSurface;
 

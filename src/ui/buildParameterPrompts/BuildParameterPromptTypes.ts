@@ -3,6 +3,7 @@ import type {
   JenkinsDataService,
   JobParameter
 } from "../../jenkins/JenkinsDataService";
+import type { JenkinsRunParameterLookupRuntimeSurface } from "../../jenkins/JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
   JenkinsParameterPresetStore,
@@ -27,6 +28,12 @@ export interface BuildParameterPromptOptions {
   jobUrl: string;
   jobLabel: string;
   parameters: JobParameter[];
+}
+
+/** What a single parameter prompt needs; run parameters look up builds through it. */
+export interface ParameterValuePromptContext
+  extends Pick<BuildParameterPromptOptions, "environment" | "jobUrl"> {
+  dataService: JenkinsRunParameterLookupRuntimeSurface;
 }
 
 export interface BuildParameterPromptResult {

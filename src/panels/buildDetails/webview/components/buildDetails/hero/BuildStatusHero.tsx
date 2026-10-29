@@ -12,6 +12,7 @@ import {
 } from "../../../../../shared/webview/components/ui/tooltip";
 import {
   ExternalLinkIcon,
+  LinkIcon,
   LockIcon,
   PauseCircleIcon,
   PencilIcon,
@@ -271,12 +272,14 @@ function HeroActions({
   stageCount,
   buildUrl,
   onOpenBuild,
+  onCopyLink,
   management
 }: {
   testsSummary: BuildTestsSummaryViewModel;
   stageCount: number;
   buildUrl?: string;
   onOpenBuild: () => void;
+  onCopyLink: () => void;
   management: HeroManagementProps;
 }): React.JSX.Element {
   const testsPill = describeTestsPill(testsSummary);
@@ -299,6 +302,14 @@ function HeroActions({
         </Badge>
       ) : null}
       <HeroManagementActions {...management} />
+      <HeroIconAction
+        label="Copy link"
+        tooltip="Copy link…"
+        disabled={!buildUrl}
+        onClick={onCopyLink}
+      >
+        <LinkIcon className="h-3.5 w-3.5" />
+      </HeroIconAction>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -340,6 +351,8 @@ type BuildStatusHeroProps = HeroManagementProps & {
   /** Omitted when the Inputs tab is already showing. */
   onReviewInputs?: () => void;
   onOpenBuild: () => void;
+  /** Opens the Jenkins/Workbench/Markdown link picker in the extension host. */
+  onCopyLink: () => void;
   children?: React.ReactNode;
 };
 function resolveHeroBadge(
@@ -401,6 +414,7 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
           stageCount={props.stageCount}
           buildUrl={props.buildUrl}
           onOpenBuild={props.onOpenBuild}
+          onCopyLink={props.onCopyLink}
           management={{
             keptForever: props.keptForever,
             canManage: props.canManage,

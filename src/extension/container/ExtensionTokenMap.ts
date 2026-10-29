@@ -86,6 +86,7 @@ import type { JenkinsfileValidationStateStore } from "../../validation/Jenkinsfi
 import type { JenkinsfileValidationStatusBar } from "../../validation/JenkinsfileValidationStatusBar";
 import type { JenkinsStatusPoller } from "../../watch/JenkinsStatusPoller";
 import type { ExtensionRefreshHost } from "../ExtensionRefreshHost";
+import type { JenkinsEnvironmentUrlResolver } from "../JenkinsEnvironmentUrlResolver";
 import type { JenkinsWorkbenchDeepLinkBuildHandler } from "../JenkinsWorkbenchDeepLinkBuildHandler";
 import type { JenkinsWorkbenchDeepLinkJobHandler } from "../JenkinsWorkbenchDeepLinkJobHandler";
 import type { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
@@ -176,6 +177,7 @@ export interface ExtensionTokenMap {
   poller: JenkinsStatusPoller;
   queuePoller: JenkinsQueuePoller;
   refreshHost: ExtensionRefreshHost;
+  environmentUrlResolver: JenkinsEnvironmentUrlResolver;
   buildDeepLinkHandler: JenkinsWorkbenchDeepLinkBuildHandler;
   jobDeepLinkHandler: JenkinsWorkbenchDeepLinkJobHandler;
   uriHandler: JenkinsWorkbenchUriHandler;

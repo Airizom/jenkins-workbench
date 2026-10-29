@@ -104,6 +104,10 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
     postMessage({ type: "exportConsole" });
   };
 
+  const handleCopyLink = () => {
+    postMessage({ type: "copyBuildLink" });
+  };
+
   const handleRetry = () => {
     postMessage({ type: "refreshBuildDetails" });
   };
@@ -182,6 +186,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             awaitingInput={awaitingInput}
             onReviewInputs={selectedTab === "inputs" ? undefined : () => setSelectedTab("inputs")}
             onOpenBuild={handleOpenBuild}
+            onCopyLink={handleCopyLink}
           >
             <PipelineStageStrip
               segments={stripSegments}
@@ -243,6 +248,9 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
               followLog={state.followLog}
               onApproveInput={(inputId) => startPendingInputAction(inputId, "approve")}
               onRejectInput={(inputId) => startPendingInputAction(inputId, "reject")}
+              onOpenPendingInputInJenkins={(inputId) =>
+                postMessage({ type: "openPendingInputInJenkins", inputId })
+              }
               onRestartStage={(stageName) =>
                 postMessage({ type: "restartPipelineFromStage", stageName })
               }

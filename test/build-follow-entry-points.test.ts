@@ -16,6 +16,9 @@ const showInformationMessage = vi.fn(async (_message: string) => undefined);
 const showErrorMessage = vi.fn(async (_message: string) => undefined);
 const showWarningMessage = vi.fn(async (_message: string) => undefined);
 const callOrder: string[] = [];
+const promptRebuildParameterChanges = vi.fn(
+  async (_options: unknown): Promise<unknown> => ({ fields: [], files: [] })
+);
 
 vi.doMock("vscode", () => ({
   ...vscodeStub,
@@ -33,9 +36,12 @@ vi.doMock("vscode", () => ({
     }
   }
 }));
+vi.doMock("../src/ui/buildParameterPrompts/RebuildParameterEditor", () => ({
+  promptRebuildParameterChanges
+}));
 
 const { triggerBuildForTarget } = await import("../src/commands/build/BuildTriggerHandlers");
-const { rebuildBuild, quickReplayBuild } = await import(
+const { rebuildBuild, rebuildBuildWithChanges, quickReplayBuild } = await import(
   "../src/commands/build/BuildLifecycleHandlers"
 );
 const { ReplayBuildWorkflow } = await import("../src/commands/build/ReplayBuildWorkflow");
@@ -374,6 +380,153 @@ describe.each([
     expect(showInformationMessage).not.toHaveBeenCalled();
     expect(followUp.announceAndFollow).not.toHaveBeenCalled();
     expect(followUp.locate).not.toHaveBeenCalled();
+    expect(refreshHost.fullEnvironmentRefresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("rebuildBuildWithChanges", () => {
+  const queueRequest = { kind: "queue", environment, jobUrl, label: "folder/demo" };
+  const payload = { fields: [{ name: "VERSION", value: "2.3.1" }], files: [] };
+
+  function createBuildItem(): BuildTreeItem {
+    return {
+      environment,
+      buildUrl: sourceBuildUrl,
+      buildNumber: 12,
+      label: "#12",
+      jobNameHint: "folder/demo"
+    } as unknown as BuildTreeItem;
+  }
+
+  function createDataService(options?: { parameters?: unknown[] }) {
+    return {
+      getJobParameters: vi.fn(
+        async () => options?.parameters ?? [{ name: "VERSION", kind: "string" }]
+      ),
+      getBuildDetails: vi.fn(async () => ({
+        number: 12,
+        url: sourceBuildUrl,
+        actions: [{ parameters: [{ name: "VERSION", value: "2.3.0" }] }]
+      })),
+      triggerBuildWithParameters: vi.fn(async () => {
+        callOrder.push("triggerBuildWithParameters");
+        return { queueLocation };
+      }),
+      rebuildBuild: vi.fn(async () => undefined)
+    };
+  }
+
+  it("prepares the queue origin, submits the edited values, and follows the queue item", async () => {
+    promptRebuildParameterChanges.mockResolvedValueOnce(payload);
+    const followUp = createFollowUp();
+    const dataService = createDataService();
+    const refreshHost = createRefreshHost();
+
+    await rebuildBuildWithChanges(
+      dataService as never,
+      followUp.service,
+      refreshHost,
+      createBuildItem()
+    );
+
+    expect(dataService.getBuildDetails).toHaveBeenCalledWith(environment, sourceBuildUrl, {
+      includeParameters: true,
+      bypassCache: true
+    });
+    expect(promptRebuildParameterChanges).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobUrl,
+        jobLabel: "folder/demo",
+        sourceLabel: "#12",
+        sourceBuildNumber: 12,
+        droppedNames: [],
+        entries: [expect.objectContaining({ status: "source", value: "2.3.0" })]
+      })
+    );
+    expect(followUp.prepare).toHaveBeenCalledWith(queueRequest);
+    expect(followUp.prepare.mock.invocationCallOrder[0]).toBeLessThan(
+      dataService.triggerBuildWithParameters.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(dataService.triggerBuildWithParameters).toHaveBeenCalledWith(
+      environment,
+      jobUrl,
+      payload,
+      { allowEmptyParams: true }
+    );
+    expect(followUp.announceAndFollow).toHaveBeenCalledWith(
+      { request: queueRequest },
+      {
+        location: queueLocation,
+        requestedMessage: "Rebuild with changes requested for #12",
+        plainMessage: `Rebuild with changes requested for #12. Queued at ${queueLocation}`,
+        refresh: expect.any(Function)
+      }
+    );
+    expect(showInformationMessage).toHaveBeenCalledWith(
+      "Rebuild with changes requested for #12. Waiting for it to start…"
+    );
+    lastAnnounceOptions(followUp.announceAndFollow).refresh();
+    expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({ environmentId: "env-1" });
+  });
+
+  it("submits nothing when the editor is cancelled", async () => {
+    promptRebuildParameterChanges.mockResolvedValueOnce(undefined);
+    const followUp = createFollowUp();
+    const dataService = createDataService();
+
+    await rebuildBuildWithChanges(
+      dataService as never,
+      followUp.service,
+      createRefreshHost(),
+      createBuildItem()
+    );
+
+    expect(followUp.prepare).not.toHaveBeenCalled();
+    expect(dataService.triggerBuildWithParameters).not.toHaveBeenCalled();
+    expect(showErrorMessage).not.toHaveBeenCalled();
+  });
+
+  it("offers Rebuild when the job has no parameters", async () => {
+    showInformationMessage.mockResolvedValueOnce("Rebuild" as never);
+    const followUp = createFollowUp();
+    const dataService = createDataService({ parameters: [] });
+    const item = createBuildItem();
+
+    await rebuildBuildWithChanges(
+      dataService as never,
+      followUp.service,
+      createRefreshHost(),
+      item
+    );
+
+    expect(showInformationMessage).toHaveBeenCalledWith(
+      "folder/demo has no parameters. Use Rebuild instead.",
+      "Rebuild"
+    );
+    expect(promptRebuildParameterChanges).not.toHaveBeenCalled();
+    expect(dataService.rebuildBuild).toHaveBeenCalledWith(environment, sourceBuildUrl);
+    expect(followUp.prepare).toHaveBeenCalledTimes(1);
+    expect(followUp.prepare).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "cause", cause: "rebuild" })
+    );
+    expect(dataService.triggerBuildWithParameters).not.toHaveBeenCalled();
+  });
+
+  it("shows an error and does not follow when the trigger fails", async () => {
+    const followUp = createFollowUp();
+    const dataService = createDataService();
+    dataService.triggerBuildWithParameters.mockRejectedValue(new Error("denied"));
+    const refreshHost = createRefreshHost();
+
+    await rebuildBuildWithChanges(
+      dataService as never,
+      followUp.service,
+      refreshHost,
+      createBuildItem()
+    );
+
+    expect(showErrorMessage).toHaveBeenCalledWith("Failed to rebuild #12 with changes: denied");
+    expect(followUp.announceAndFollow).not.toHaveBeenCalled();
     expect(refreshHost.fullEnvironmentRefresh).not.toHaveBeenCalled();
   });
 });

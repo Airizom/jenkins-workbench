@@ -7,7 +7,9 @@ import {
 import type { BuildDetailsPanelSerializedState } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 
 vi.doMock("vscode", () => ({ window: { showErrorMessage: vi.fn(async () => undefined) } }));
-const { BuildDetailsPanel } = await import("../src/panels/BuildDetailsPanel");
+const { BuildDetailsPanel, toPipelineLogTargetViewModel, toPipelineNodeSelection } = await import(
+  "../src/panels/BuildDetailsPanel"
+);
 
 const environment = {
   environmentId: "environment",
@@ -386,5 +388,82 @@ describe("BuildDetailsPanel navigation load integration", () => {
     await panel.load({}, {}, { ...environment, environmentId: "other" }, entry(3).buildUrl);
     assert.equal(panel.navigation.canGoBack, false);
     assert.equal(panel.navigation.canGoForward, false);
+  });
+});
+
+describe("BuildDetailsPanel pipeline node selection mapping", () => {
+  it("round-trips a deep-link selection through the log target view model", () => {
+    for (const selection of [
+      { kind: "stage" as const, nodeId: "12", name: "Build" },
+      { kind: "step" as const, nodeId: "40", name: "sh: make test" }
+    ]) {
+      assert.deepEqual(toPipelineNodeSelection(toPipelineLogTargetViewModel(selection)), selection);
+    }
+  });
+
+  it("keeps the default name and drops targets without a node id", () => {
+    assert.deepEqual(
+      toPipelineNodeSelection(toPipelineLogTargetViewModel({ kind: "step", nodeId: " 7 " })),
+      { kind: "step", nodeId: "7", name: "Step" }
+    );
+    assert.equal(
+      toPipelineNodeSelection({
+        key: "stage::Build",
+        kind: "stage",
+        name: "Build",
+        childNodeIds: ["3"]
+      }),
+      undefined
+    );
+    assert.equal(toPipelineNodeSelection(undefined), undefined);
+  });
+});
+
+describe("BuildDetailsPanel.getCurrentBuildContext", () => {
+  type PanelStatics = { currentPanel: unknown };
+
+  it("returns undefined without an open panel and the loaded build otherwise", () => {
+    const statics = BuildDetailsPanel as unknown as PanelStatics;
+    const previous = statics.currentPanel;
+    try {
+      statics.currentPanel = undefined;
+      assert.equal(BuildDetailsPanel.getCurrentBuildContext(), undefined);
+
+      const target = { key: "k", kind: "stage", name: "Build", nodeId: "12" };
+      statics.currentPanel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
+        disposed: false,
+        controller: {
+          getEnvironment: () => environment,
+          getBuildUrl: () => entry(5).buildUrl,
+          getCurrentDetails: () => ({ fullDisplayName: "example #5" }),
+          getCurrentPipelineNodeLog: () => ({ target, text: "", truncated: false, loading: false })
+        }
+      });
+      assert.deepEqual(BuildDetailsPanel.getCurrentBuildContext(), {
+        environment,
+        buildUrl: entry(5).buildUrl,
+        label: "example #5",
+        pipelineNode: { kind: "stage", nodeId: "12", name: "Build" }
+      });
+
+      statics.currentPanel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
+        disposed: false,
+        controller: {
+          getEnvironment: () => environment,
+          getBuildUrl: () => "https://jenkins.example/view/All/job/example/6/",
+          getCurrentDetails: () => undefined,
+          getCurrentPipelineNodeLog: () => undefined
+        }
+      });
+      assert.equal(BuildDetailsPanel.getCurrentBuildContext()?.buildUrl, entry(6).buildUrl);
+
+      statics.currentPanel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
+        disposed: false,
+        controller: { getEnvironment: () => environment, getBuildUrl: () => undefined }
+      });
+      assert.equal(BuildDetailsPanel.getCurrentBuildContext(), undefined);
+    } finally {
+      statics.currentPanel = previous;
+    }
   });
 });

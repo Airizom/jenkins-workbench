@@ -14,7 +14,7 @@ import type {
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
-import type { JenkinsTestReport } from "../types";
+import type { JenkinsBuildPermalink, JenkinsTestReport } from "../types";
 import { applyBuildKeepForever, deleteBuildWithRetention } from "./JenkinsBuildRetention";
 import { callOptionalBuildEndpoint, toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
@@ -273,6 +273,16 @@ export class JenkinsBuildDataOperations {
     jobUrl: string
   ): Promise<JenkinsBuild | undefined> {
     return this.runBuildAction(environment, (client) => client.getLastFailedBuild(jobUrl));
+  }
+
+  async getBuildPermalink(
+    environment: JenkinsEnvironmentRef,
+    jobUrl: string,
+    permalink: JenkinsBuildPermalink
+  ): Promise<JenkinsBuild | undefined> {
+    return this.runBuildAction(environment, (client) =>
+      client.getBuildPermalink(jobUrl, permalink)
+    );
   }
 
   async getTestReport(

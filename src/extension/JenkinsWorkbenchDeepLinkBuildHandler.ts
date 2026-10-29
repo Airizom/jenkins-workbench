@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { formatActionError } from "../formatters/ErrorFormatters";
+import { formatBuildLabel } from "../jenkins/BuildReferenceParser";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type {
   BuildDetailsPanelLauncher,
@@ -18,7 +19,7 @@ export class JenkinsWorkbenchDeepLinkBuildHandler {
       await this.buildDetailsPanelLauncher.show({
         environment,
         buildUrl,
-        label: this.deriveBuildLabel(buildUrl),
+        label: formatBuildLabel(buildUrl),
         pipelineNodeSelection
       });
     } catch (error) {
@@ -26,13 +27,5 @@ export class JenkinsWorkbenchDeepLinkBuildHandler {
         `Unable to open build details: ${formatActionError(error)}`
       );
     }
-  }
-
-  private deriveBuildLabel(buildUrl: string): string | undefined {
-    const match = buildUrl.match(/\/(\d+)\/?$/);
-    if (!match) {
-      return undefined;
-    }
-    return `#${match[1]}`;
   }
 }

@@ -38,13 +38,46 @@ export function parseUriQueryParams(
   return params;
 }
 
+const MAX_DEEP_LINK_PAYLOAD_LENGTH = 16_384;
+const DEEP_LINK_NODE_KEYS = ["nodeId", "nodeKind", "nodeName"] as const;
+
+export interface DeepLinkPayloadFields {
+  url: string;
+  nodeId?: string;
+  nodeKind?: string;
+  nodeName?: string;
+}
+
+/**
+ * Encodes the value of a payload= deep-link query (the inverse of parseDeepLinkPayload).
+ * Returns undefined when the encoded value would exceed what the parser accepts.
+ */
+export function encodeDeepLinkPayload(fields: DeepLinkPayloadFields): string | undefined {
+  if (fields.url.length === 0) {
+    return undefined;
+  }
+  const value: Record<string, string> = { url: fields.url };
+  for (const key of DEEP_LINK_NODE_KEYS) {
+    const field = fields[key];
+    if (field !== undefined) {
+      value[key] = field;
+    }
+  }
+  const encoded = Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+  return encoded.length <= MAX_DEEP_LINK_PAYLOAD_LENGTH ? encoded : undefined;
+}
+
 /** Parses the unambiguous deep-link form: payload=base64url(JSON fields). */
 export function parseDeepLinkPayload(query: string): Map<string, string> | undefined {
   if (!query.startsWith("payload=") || query.includes("&")) {
     return undefined;
   }
   const encoded = query.slice("payload=".length);
-  if (encoded.length === 0 || encoded.length > 16_384 || !/^[A-Za-z0-9_-]+$/.test(encoded)) {
+  if (
+    encoded.length === 0 ||
+    encoded.length > MAX_DEEP_LINK_PAYLOAD_LENGTH ||
+    !/^[A-Za-z0-9_-]+$/.test(encoded)
+  ) {
     return undefined;
   }
   try {
@@ -57,7 +90,7 @@ export function parseDeepLinkPayload(query: string): Map<string, string> | undef
       return undefined;
     }
     const result = new Map<string, string>([["url", fields.url]]);
-    for (const key of ["nodeId", "nodeKind", "nodeName"] as const) {
+    for (const key of DEEP_LINK_NODE_KEYS) {
       const field = fields[key];
       if (field !== undefined) {
         if (typeof field !== "string") {

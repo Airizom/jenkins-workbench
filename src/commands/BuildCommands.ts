@@ -30,6 +30,7 @@ import {
   previewBuildLog,
   quickReplayBuild,
   rebuildBuild,
+  rebuildBuildWithChanges,
   rejectInput,
   replayBuild,
   runReplayDraft,
@@ -109,6 +110,11 @@ export function registerBuildCommands(
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.rebuildBuild", (item?: BuildTreeItem) =>
       rebuildBuild(dataService, buildFollowUp, refreshHost, item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.rebuildBuildWithChanges",
+      (item?: BuildTreeItem) =>
+        rebuildBuildWithChanges(dataService, buildFollowUp, refreshHost, item)
     ),
     // SHOW_FOLLOWED_BUILDS_COMMAND; manifest validation needs registered ids as string literals.
     vscode.commands.registerCommand("jenkinsWorkbench.showFollowedBuilds", () =>

@@ -1,6 +1,54 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { parseDeepLinkPayload, parseUriQueryParams } from "../src/extension/UriQueryParams";
+import {
+  encodeDeepLinkPayload,
+  parseDeepLinkPayload,
+  parseUriQueryParams
+} from "../src/extension/UriQueryParams";
+
+describe("encodeDeepLinkPayload", () => {
+  it("round-trips through parseDeepLinkPayload including node fields", () => {
+    const fields = {
+      url: "https://ci.example/job/feature%2Fx/1/?a=1&b=2#h",
+      nodeId: "12",
+      nodeKind: "step",
+      nodeName: "build & test = ok ✓"
+    };
+    const encoded = encodeDeepLinkPayload(fields);
+
+    assert.ok(encoded);
+    assert.match(encoded, /^[A-Za-z0-9_-]+$/);
+    assert.deepEqual(Object.fromEntries(parseDeepLinkPayload(`payload=${encoded}`) ?? []), fields);
+  });
+
+  it("omits undefined fields", () => {
+    const encoded = encodeDeepLinkPayload({
+      url: "https://ci.example/job/app/",
+      nodeId: undefined,
+      nodeName: "Deploy"
+    });
+
+    assert.ok(encoded);
+    assert.deepEqual(JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")), {
+      url: "https://ci.example/job/app/",
+      nodeName: "Deploy"
+    });
+    assert.deepEqual(Object.fromEntries(parseDeepLinkPayload(`payload=${encoded}`) ?? []), {
+      url: "https://ci.example/job/app/",
+      nodeName: "Deploy"
+    });
+  });
+
+  it("returns undefined for an empty url or an oversized payload", () => {
+    assert.equal(encodeDeepLinkPayload({ url: "" }), undefined);
+    assert.equal(
+      encodeDeepLinkPayload({ url: `https://ci.example/job/${"a".repeat(16_384)}/` }),
+      undefined
+    );
+    const nearLimit = encodeDeepLinkPayload({ url: `https://ci.example/${"a".repeat(12_000)}` });
+    assert.ok(nearLimit && nearLimit.length <= 16_384);
+  });
+});
 
 describe("parseUriQueryParams", () => {
   it("round-trips a nested URL and node selection in an encoded payload", () => {

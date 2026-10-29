@@ -119,7 +119,11 @@ export function parseQueueItemId(queueLocation?: string): number | undefined {
   return Number.isSafeInteger(queueItemId) && queueItemId > 0 ? queueItemId : undefined;
 }
 
-function getContextPathLength(pathParts: readonly string[], environmentUrl?: string): number {
+/** Number of leading path parts that belong to the environment's context path (e.g. "/jenkins"). */
+export function getContextPathLength(
+  pathParts: readonly string[],
+  environmentUrl?: string
+): number {
   if (!environmentUrl) {
     return 0;
   }
@@ -171,6 +175,11 @@ function appendJobPathSegments(baseUrl: string, segments: readonly string[]): st
     url += `job/${encodeURIComponent(segments[index])}/`;
   }
   return url;
+}
+
+/** Job path for messages, for example "folder/my-job"; falls back to the URL. */
+export function formatJobUrlLabel(jobUrl: string, environmentUrl?: string): string {
+  return parseJobUrl(jobUrl, environmentUrl)?.fullPath.join("/") ?? jobUrl;
 }
 
 export function parseJobUrl(jobUrl: string, environmentUrl?: string): ParsedJobUrl | undefined {
@@ -313,6 +322,11 @@ export function buildActionUrl(itemUrl: string, action: string): string {
   const base = ensureTrailingSlash(itemUrl);
   const url = new URL(action, base);
   return url.toString();
+}
+
+/** The build's input page, which lists every pending input with Jenkins' own controls. */
+export function buildPendingInputBrowserUrl(buildUrl: string): string {
+  return buildActionUrl(buildUrl, "input/");
 }
 
 function encodePathSegments(path: string): string {

@@ -22,6 +22,10 @@ export interface ExportConsoleMessage {
   type: "exportConsole";
 }
 
+export interface CopyBuildLinkMessage {
+  type: "copyBuildLink";
+}
+
 export interface DownloadAllArtifactsMessage {
   type: "downloadAllArtifacts";
 }
@@ -40,6 +44,12 @@ export interface ApproveInputMessage {
 
 export interface RejectInputMessage {
   type: "rejectInput";
+  inputId: string;
+}
+
+/** The extension builds the input page URL from the panel's build; the webview only names the input. */
+export interface OpenPendingInputInJenkinsMessage {
+  type: "openPendingInputInJenkins";
   inputId: string;
 }
 
@@ -139,11 +149,13 @@ export type BuildDetailsIncomingMessage =
   | RefreshBuildDetailsMessage
   | ToggleFollowLogMessage
   | OpenExternalMessage
+  | CopyBuildLinkMessage
   | ExportConsoleMessage
   | ArtifactActionMessage
   | DownloadAllArtifactsMessage
   | ApproveInputMessage
   | RejectInputMessage
+  | OpenPendingInputInJenkinsMessage
   | RestartPipelineFromStageMessage
   | SelectPipelineLogNodeMessage
   | ClearPipelineLogNodeMessage
@@ -166,6 +178,10 @@ export { isOpenExternalMessage };
 
 export function isExportConsoleMessage(message: unknown): message is ExportConsoleMessage {
   return hasMessageType(message, "exportConsole");
+}
+
+export function isCopyBuildLinkMessage(message: unknown): message is CopyBuildLinkMessage {
+  return hasMessageType(message, "copyBuildLink");
 }
 
 export function isRefreshBuildDetailsMessage(
@@ -204,6 +220,16 @@ export function isApproveInputMessage(message: unknown): message is ApproveInput
 
 export function isRejectInputMessage(message: unknown): message is RejectInputMessage {
   if (!hasMessageType(message, "rejectInput")) {
+    return false;
+  }
+  const { inputId } = message;
+  return typeof inputId === "string" && inputId.length > 0;
+}
+
+export function isOpenPendingInputInJenkinsMessage(
+  message: unknown
+): message is OpenPendingInputInJenkinsMessage {
+  if (!hasMessageType(message, "openPendingInputInJenkins")) {
     return false;
   }
   const { inputId } = message;

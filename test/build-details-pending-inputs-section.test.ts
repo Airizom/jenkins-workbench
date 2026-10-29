@@ -6,7 +6,10 @@ import {
   describePendingInputParameter,
   PendingInputsSection
 } from "../src/panels/buildDetails/webview/components/buildDetails/PendingInputsSection";
+import type { PendingInputViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import type { PendingInputProcessingAction } from "../src/panels/buildDetails/webview/state/buildDetailsState";
+
+const BROWSER_APPROVE_TITLE = "Open the Jenkins input page to enter these values and approve";
 
 function invokeInputActions(node: ReactNode): void {
   for (const child of Children.toArray(node)) {
@@ -25,6 +28,34 @@ function invokeInputActions(node: ReactNode): void {
     invokeInputActions(child.props.children);
   }
 }
+
+function clickBrowserApprove(node: ReactNode): number {
+  let clicks = 0;
+  for (const child of Children.toArray(node)) {
+    if (!isValidElement<{ children?: ReactNode; title?: string; onClick?: () => void }>(child)) {
+      continue;
+    }
+    if (child.props.title === BROWSER_APPROVE_TITLE) {
+      child.props.onClick?.();
+      clicks += 1;
+    }
+    clicks += clickBrowserApprove(child.props.children);
+  }
+  return clicks;
+}
+
+const browserOnlyInput: PendingInputViewModel = {
+  id: "release",
+  message: "Upload the release notes?",
+  submitterLabel: "",
+  parametersLabel: "Parameters: NOTES (File), REGION (Choice), TAG (GitParameterDefinition)",
+  parameters: [
+    { name: "NOTES", kind: "File", requiresBrowser: true },
+    { name: "REGION", kind: "Choice", choices: ["us-east-1"] },
+    { name: "TAG", kind: "GitParameterDefinition", requiresBrowser: true }
+  ],
+  requiresBrowser: true
+};
 
 describe("PendingInputsSection", () => {
   it("describes parameter descriptions, choices, and defaults", () => {
@@ -50,6 +81,74 @@ describe("PendingInputsSection", () => {
       describePendingInputParameter({ name: "NOTE", kind: "String", defaultValue: "" }),
       "You will be prompted for a value."
     );
+    assert.equal(
+      describePendingInputParameter({ name: "NOTES", kind: "File", requiresBrowser: true }),
+      "Entered on the Jenkins input page."
+    );
+    assert.equal(
+      describePendingInputParameter({
+        name: "TAG",
+        kind: "GitParameterDefinition",
+        description: "Tag to deploy",
+        requiresBrowser: true
+      }),
+      "Tag to deploy"
+    );
+  });
+
+  it("swaps Approve for Approve in Jenkins when a parameter needs the browser", () => {
+    const html = renderToStaticMarkup(
+      createElement(PendingInputsSection, {
+        pendingInputs: [browserOnlyInput],
+        onApprove: () => undefined,
+        onReject: () => undefined,
+        onOpenInJenkins: () => undefined
+      })
+    );
+
+    assert.match(html, />Approve in Jenkins</);
+    assert.doesNotMatch(html, />Approve…</);
+    assert.ok(html.includes(`title="${BROWSER_APPROVE_TITLE}"`));
+    assert.match(html, />Reject</);
+    assert.match(
+      html,
+      /Approve this input in Jenkins: NOTES, TAG can&#x27;t be entered in VS Code\./
+    );
+    assert.doesNotMatch(html, /You choose these values when you approve\./);
+    // Only the browser-only parameters carry the badge.
+    assert.equal(html.match(/>Browser</g)?.length, 2);
+    assert.match(html, /<dt[^>]*>.*NOTES.*File.*Browser/);
+    assert.match(html, /Entered on the Jenkins input page\./);
+  });
+
+  it("opens Jenkins without marking the input as processing", () => {
+    const opened: string[] = [];
+    const section = PendingInputsSection({
+      pendingInputs: [browserOnlyInput],
+      processingActions: {},
+      onApprove: () => assert.fail("Browser-only inputs must not approve from VS Code"),
+      onReject: () => undefined,
+      onOpenInJenkins: (inputId) => opened.push(inputId)
+    });
+
+    assert.equal(clickBrowserApprove(section), 1);
+    assert.deepEqual(opened, ["release"]);
+  });
+
+  it("disables Approve in Jenkins while a rejection is processing", () => {
+    const html = renderToStaticMarkup(
+      createElement(PendingInputsSection, {
+        pendingInputs: [browserOnlyInput],
+        processingActions: { release: "reject" },
+        onApprove: () => undefined,
+        onReject: () => undefined,
+        onOpenInJenkins: () => undefined
+      })
+    );
+
+    assert.equal(html.match(/<button[^>]*disabled=""/g)?.length, 2);
+    assert.match(html, /Rejecting…/);
+    assert.match(html, />Approve in Jenkins</);
   });
 
   it("renders the prompt, submitter, parameters, and actions", () => {
@@ -61,11 +160,13 @@ describe("PendingInputsSection", () => {
             message: "Deploy to production?",
             submitterLabel: "Submitter: release-managers",
             parametersLabel: "Parameters: REGION (Choice)",
-            parameters: [{ name: "REGION", kind: "Choice", choices: ["us-east-1"] }]
+            parameters: [{ name: "REGION", kind: "Choice", choices: ["us-east-1"] }],
+            requiresBrowser: false
           }
         ],
         onApprove: () => undefined,
-        onReject: () => undefined
+        onReject: () => undefined,
+        onOpenInJenkins: () => undefined
       })
     );
 
@@ -84,10 +185,18 @@ describe("PendingInputsSection", () => {
     const html = renderToStaticMarkup(
       createElement(PendingInputsSection, {
         pendingInputs: [
-          { id: "go", message: "Proceed?", submitterLabel: "", parametersLabel: "", parameters: [] }
+          {
+            id: "go",
+            message: "Proceed?",
+            submitterLabel: "",
+            parametersLabel: "",
+            parameters: [],
+            requiresBrowser: false
+          }
         ],
         onApprove: () => undefined,
-        onReject: () => undefined
+        onReject: () => undefined,
+        onOpenInJenkins: () => undefined
       })
     );
 
@@ -100,7 +209,8 @@ describe("PendingInputsSection", () => {
       createElement(PendingInputsSection, {
         pendingInputs: [],
         onApprove: () => undefined,
-        onReject: () => undefined
+        onReject: () => undefined,
+        onOpenInJenkins: () => undefined
       })
     );
     assert.equal(html, "");
@@ -115,12 +225,14 @@ describe("PendingInputsSection", () => {
             message: "Deploy to production?",
             submitterLabel: "",
             parametersLabel: "",
-            parameters: []
+            parameters: [],
+            requiresBrowser: false
           }
         ],
         processingActions: { deploy: "reject" },
         onApprove: () => undefined,
-        onReject: () => undefined
+        onReject: () => undefined,
+        onOpenInJenkins: () => undefined
       })
     );
 
@@ -135,11 +247,19 @@ describe("PendingInputsSection", () => {
       const rejected: string[] = [];
       const section = PendingInputsSection({
         pendingInputs: [
-          { id, message: "Continue?", submitterLabel: "", parametersLabel: "", parameters: [] }
+          {
+            id,
+            message: "Continue?",
+            submitterLabel: "",
+            parametersLabel: "",
+            parameters: [],
+            requiresBrowser: false
+          }
         ],
         processingActions: {},
         onApprove: (inputId) => approved.push(inputId),
-        onReject: (inputId) => rejected.push(inputId)
+        onReject: (inputId) => rejected.push(inputId),
+        onOpenInJenkins: () => assert.fail("Inputs VS Code can submit must not open Jenkins")
       });
       const html = renderToStaticMarkup(section);
 
@@ -155,11 +275,19 @@ describe("PendingInputsSection", () => {
       it(`blocks both actions for an own ${action} entry for ${id}`, () => {
         const section = PendingInputsSection({
           pendingInputs: [
-            { id, message: "Continue?", submitterLabel: "", parametersLabel: "", parameters: [] }
+            {
+              id,
+              message: "Continue?",
+              submitterLabel: "",
+              parametersLabel: "",
+              parameters: [],
+              requiresBrowser: false
+            }
           ],
           processingActions: { [id]: action },
           onApprove: () => assert.fail("Approve must be blocked while processing"),
-          onReject: () => assert.fail("Reject must be blocked while processing")
+          onReject: () => assert.fail("Reject must be blocked while processing"),
+          onOpenInJenkins: () => assert.fail("Inputs VS Code can submit must not open Jenkins")
         });
         const html = renderToStaticMarkup(section);
 

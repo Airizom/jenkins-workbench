@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import {
+  BuildDetailsMessageRouter,
+  type BuildDetailsMessageRouterHandlers
+} from "../src/panels/buildDetails/BuildDetailsMessageRouter";
+import {
+  isApproveInputMessage,
   isArtifactActionMessage,
+  isCopyBuildLinkMessage,
   isDownloadAllArtifactsMessage,
+  isOpenPendingInputInJenkinsMessage,
   isPersistUiStateMessage,
   isSelectPipelineLogNodeMessage
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelMessages";
@@ -28,6 +35,54 @@ describe("build details incoming message guards", () => {
       assert.equal(isDownloadAllArtifactsMessage(message), false);
     }
     assert.equal(isArtifactActionMessage({ type: "artifactAction", action: "downloadAll" }), false);
+  });
+
+  it("accepts only the copy build link message type", () => {
+    assert.equal(isCopyBuildLinkMessage({ type: "copyBuildLink" }), true);
+    for (const message of [undefined, null, "copyBuildLink", {}, { type: "openExternal" }]) {
+      assert.equal(isCopyBuildLinkMessage(message), false);
+    }
+  });
+
+  it("accepts open-in-Jenkins requests only with an input id", () => {
+    assert.equal(
+      isOpenPendingInputInJenkinsMessage({ type: "openPendingInputInJenkins", inputId: "deploy" }),
+      true
+    );
+    for (const message of [
+      undefined,
+      null,
+      { type: "openPendingInputInJenkins" },
+      { type: "openPendingInputInJenkins", inputId: "" },
+      { type: "openPendingInputInJenkins", inputId: 7 },
+      { type: "approveInput", inputId: "deploy" }
+    ]) {
+      assert.equal(isOpenPendingInputInJenkinsMessage(message), false);
+    }
+    assert.equal(
+      isApproveInputMessage({ type: "openPendingInputInJenkins", inputId: "deploy" }),
+      false
+    );
+  });
+
+  it("routes open-in-Jenkins requests by input id without a webview URL", () => {
+    const onOpenPendingInputInJenkins = vi.fn();
+    const onApproveInput = vi.fn();
+    const onOpenExternal = vi.fn();
+    const router = new BuildDetailsMessageRouter({
+      onOpenPendingInputInJenkins,
+      onApproveInput,
+      onOpenExternal
+    } as unknown as BuildDetailsMessageRouterHandlers);
+
+    router.route({ type: "openPendingInputInJenkins", inputId: "deploy" });
+    router.route({ type: "openPendingInputInJenkins" });
+
+    assert.deepEqual(onOpenPendingInputInJenkins.mock.calls, [
+      [{ type: "openPendingInputInJenkins", inputId: "deploy" }]
+    ]);
+    assert.equal(onApproveInput.mock.calls.length, 0);
+    assert.equal(onOpenExternal.mock.calls.length, 0);
   });
 
   it("validates optional artifact file names", () => {

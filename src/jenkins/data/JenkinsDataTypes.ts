@@ -36,6 +36,8 @@ export interface JobParameter {
   runProjectName?: string;
   multiSelectDelimiter?: string;
   allowsMultiple?: boolean;
+  /** Set when `rawType` names a plugin type the mapper doesn't know, so `kind` is only a fallback. */
+  isUnrecognizedType?: boolean;
 }
 
 export interface PendingInputAction {

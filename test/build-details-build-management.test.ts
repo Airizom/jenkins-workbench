@@ -65,6 +65,16 @@ describe("BuildDetailsMessageRouter build management routes", () => {
     assert.deepEqual(onDownloadAllArtifacts.mock.calls, [[]]);
   });
 
+  it("routes copy build link requests without a payload", () => {
+    const onCopyBuildLink = vi.fn();
+    const router = new BuildDetailsMessageRouter({
+      onCopyBuildLink
+    } as unknown as BuildDetailsMessageRouterHandlers);
+    router.route({ type: "copyBuildLink" });
+    router.route({ type: "copyBuildLinks" });
+    assert.deepEqual(onCopyBuildLink.mock.calls, [[]]);
+  });
+
   it("routes keep, edit, and delete requests to the management handler", () => {
     const onBuildManagement = vi.fn();
     const handlers = new Proxy({ onBuildManagement } as Record<string, unknown>, {

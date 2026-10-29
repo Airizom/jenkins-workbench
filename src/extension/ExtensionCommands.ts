@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import { registerBuildCommands } from "../commands/BuildCommands";
 import { registerBuildDiagnosticCommands } from "../commands/BuildDiagnosticCommands";
+import { registerBuildLinkCommands } from "../commands/BuildLinkCommands";
 import { registerCurrentBranchCommands } from "../commands/CurrentBranchCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
 import { registerHistoryCommands } from "../commands/HistoryCommands";
@@ -13,6 +14,7 @@ import { registerQueueCommands } from "../commands/QueueCommands";
 import { registerRefreshCommands } from "../commands/RefreshCommands";
 import { registerSearchCommands } from "../commands/SearchCommands";
 import { registerWatchCommands } from "../commands/WatchCommands";
+import { buildDetailsCurrentBuildProvider } from "../panels/BuildDetailsPanel";
 import type { ExtensionContainer } from "./container/ExtensionContainer";
 
 export function registerExtensionCommands(
@@ -89,6 +91,16 @@ export function registerExtensionCommands(
     },
     bulk
   );
+
+  registerBuildLinkCommands(context, {
+    dataService,
+    buildDetailsPanelLauncher,
+    // Reads the open panel directly so palette copies don't build the launcher's services.
+    currentBuild: buildDetailsCurrentBuildProvider,
+    environmentUrlResolver: container.lazy("environmentUrlResolver"),
+    jobDeepLinkHandler: container.lazy("jobDeepLinkHandler"),
+    currentBranchWorkflowService
+  });
 
   registerCurrentBranchCommands(context, currentBranchWorkflowService);
   registerHistoryCommands(

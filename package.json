@@ -181,6 +181,11 @@
         "category": "Jenkins"
       },
       {
+        "command": "jenkinsWorkbench.rebuildBuildWithChanges",
+        "title": "Rebuild with Changes…",
+        "category": "Jenkins"
+      },
+      {
         "command": "jenkinsWorkbench.openInJenkins",
         "title": "Open in Jenkins",
         "category": "Jenkins",
@@ -313,6 +318,29 @@
         "command": "jenkinsWorkbench.openLastFailedBuild",
         "title": "Open Last Failed Build",
         "category": "Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.openBuild",
+        "title": "Open Build by URL or Number...",
+        "category": "Jenkins",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "jenkinsWorkbench.openBuildByNumber",
+        "title": "Open Build by Number...",
+        "category": "Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.copyJenkinsLink",
+        "title": "Copy Jenkins Link",
+        "category": "Jenkins",
+        "icon": "$(link)"
+      },
+      {
+        "command": "jenkinsWorkbench.copyWorkbenchLink",
+        "title": "Copy Workbench Link",
+        "category": "Jenkins",
+        "icon": "$(link)"
       },
       {
         "command": "jenkinsWorkbench.viewJobConfig",
@@ -1392,6 +1420,11 @@
           "command": "jenkinsWorkbench.filterJobsActive",
           "when": "view == jenkinsWorkbench.tree && jenkinsWorkbench.filterMode != all",
           "group": "navigation@3"
+        },
+        {
+          "command": "jenkinsWorkbench.openBuild",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "1_open@0"
         }
       ],
       "view/item/context": [
@@ -1521,6 +1554,11 @@
           "group": "1_actions@0"
         },
         {
+          "command": "jenkinsWorkbench.openBuildByNumber",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
+          "group": "1_actions@6"
+        },
+        {
           "command": "jenkinsWorkbench.viewJobConfig",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(jobItem|pipelineItem)(\\s|$)/",
           "group": "1_actions@1"
@@ -1631,6 +1669,16 @@
           "group": "1_actions@2"
         },
         {
+          "command": "jenkinsWorkbench.copyJenkinsLink",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning|jobItem|pipelineItem)(\\s|$)/",
+          "group": "1_share@0"
+        },
+        {
+          "command": "jenkinsWorkbench.copyWorkbenchLink",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning|jobItem|pipelineItem)(\\s|$)/",
+          "group": "1_share@1"
+        },
+        {
           "command": "jenkinsWorkbench.replayBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "2_rebuild@0"
@@ -1649,6 +1697,11 @@
           "command": "jenkinsWorkbench.rebuildBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
           "group": "2_rebuild@3"
+        },
+        {
+          "command": "jenkinsWorkbench.rebuildBuildWithChanges",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)(build|buildRunning)(\\s|$)/",
+          "group": "2_rebuild@4"
         },
         {
           "command": "jenkinsWorkbench.keepBuildForever",
@@ -1781,6 +1834,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "jenkinsWorkbench.openBuildByNumber",
+          "when": "false"
+        },
         {
           "command": "jenkinsWorkbench.submitJobConfig",
           "when": "resourceScheme == jenkins-config"

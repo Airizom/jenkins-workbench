@@ -20,10 +20,12 @@ import type {
   JenkinsArtifact,
   JenkinsBuild,
   JenkinsBuildDetails,
+  JenkinsBuildPermalink,
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
   JenkinsFlowNodeLog,
+  JenkinsInputProceedOptions,
   JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
@@ -57,6 +59,7 @@ export type {
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
   JenkinsFlowNodeLog,
+  JenkinsInputProceedOptions,
   JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
@@ -80,7 +83,10 @@ export type {
   ScanMultibranchResult
 } from "./types";
 
-export class JenkinsClient {
+/** Members the data layer calls on a client resolved per environment. */
+export type JenkinsBuildPermalinkClientSurface = Pick<JenkinsClient, "getBuildPermalink">;
+
+export class JenkinsClient implements JenkinsBuildPermalinkClientSurface {
   private readonly buildsApi: JenkinsBuildsApi;
   private readonly relationshipsApi: JenkinsRelationshipsApi;
   private readonly jobsApi: JenkinsJobsApi;
@@ -255,6 +261,13 @@ export class JenkinsClient {
 
   async getLastFailedBuild(jobUrl: string): Promise<JenkinsBuild | undefined> {
     return this.buildsApi.getLastFailedBuild(jobUrl);
+  }
+
+  async getBuildPermalink(
+    jobUrl: string,
+    permalink: JenkinsBuildPermalink
+  ): Promise<JenkinsBuild | undefined> {
+    return this.buildsApi.getBuildPermalink(jobUrl, permalink);
   }
 
   async getTestReport(
@@ -468,7 +481,7 @@ export class JenkinsClient {
   async proceedInput(
     buildUrl: string,
     inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+    options?: JenkinsInputProceedOptions
   ): Promise<void> {
     await this.buildsApi.proceedInput(buildUrl, inputId, options);
   }

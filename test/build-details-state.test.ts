@@ -129,7 +129,8 @@ describe("buildInitialState", () => {
               message: "Continue?",
               submitterLabel: "",
               parametersLabel: "",
-              parameters: []
+              parameters: [],
+              requiresBrowser: false
             }
           ]
         }

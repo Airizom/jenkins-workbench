@@ -1,185 +1,43 @@
 import * as vscode from "vscode";
-import { formatEnvironmentDisplayName } from "../jenkins/EnvironmentLabels";
-import {
-  type JenkinsEnvironmentRef,
-  toJenkinsEnvironmentRef
-} from "../jenkins/JenkinsEnvironmentRef";
-import { ensureTrailingSlash } from "../jenkins/urls";
-import type { PipelineNodeSelection } from "../panels/BuildDetailsPanelLauncher";
-import type {
-  EnvironmentWithScope,
-  JenkinsEnvironmentStore
-} from "../storage/JenkinsEnvironmentStore";
+import type { JenkinsEnvironmentUrlResolver } from "./JenkinsEnvironmentUrlResolver";
 import type { JenkinsWorkbenchDeepLinkBuildHandler } from "./JenkinsWorkbenchDeepLinkBuildHandler";
 import type { JenkinsWorkbenchDeepLinkJobHandler } from "./JenkinsWorkbenchDeepLinkJobHandler";
-import { parseDeepLinkPayload, parseUriQueryParams } from "./UriQueryParams";
-
-interface EnvironmentMatch {
-  environment: EnvironmentWithScope;
-  normalizedUrl: string;
-}
-
-interface EnvironmentPickItem extends vscode.QuickPickItem {
-  environment: EnvironmentWithScope;
-}
-
-const DEEP_LINK_QUERY_KEYS = new Set(["url", "nodeId", "nodeKind", "nodeName"]);
+import { parseWorkbenchDeepLink } from "./WorkbenchDeepLinks";
 
 export class JenkinsWorkbenchUriHandler implements vscode.UriHandler {
   constructor(
-    private readonly environmentStore: JenkinsEnvironmentStore,
+    private readonly environmentResolver: JenkinsEnvironmentUrlResolver,
     private readonly buildHandler: JenkinsWorkbenchDeepLinkBuildHandler,
     private readonly jobHandler: JenkinsWorkbenchDeepLinkJobHandler
   ) {}
 
   async handleUri(uri: vscode.Uri): Promise<void> {
-    const action = this.parseAction(uri);
-    if (!action) {
-      void vscode.window.showErrorMessage(
-        "Unsupported Jenkins Workbench link. Use /build?url= or /job?url=."
-      );
+    const link = parseWorkbenchDeepLink(this.getActionCandidate(uri), uri.query);
+    if (!link.ok) {
+      void vscode.window.showErrorMessage(link.message);
       return;
     }
 
-    const queryParams = uri.query.startsWith("payload=")
-      ? parseDeepLinkPayload(uri.query)
-      : parseUriQueryParams(uri.query, DEEP_LINK_QUERY_KEYS);
-    if (!queryParams) {
-      void vscode.window.showErrorMessage("Invalid Jenkins Workbench link payload.");
+    const resolved = await this.environmentResolver.resolve(link.url);
+    if (!resolved) {
       return;
     }
-    const targetUrlValue = this.getQueryParam(queryParams, "url");
-    if (!targetUrlValue) {
-      void vscode.window.showErrorMessage("Missing required 'url' query parameter.");
-      return;
-    }
+    const { environment } = resolved;
 
-    const targetUrl = this.parseHttpUrl(targetUrlValue);
-    if (!targetUrl) {
-      void vscode.window.showErrorMessage("Invalid Jenkins URL. Expected an http or https URL.");
-      return;
-    }
-
-    const environment = await this.resolveEnvironment(targetUrl);
-    if (!environment) {
-      return;
-    }
-
-    if (action === "build") {
+    if (link.action === "build") {
       await this.buildHandler.openBuildDetails(
         environment,
-        targetUrl.toString(),
-        this.getPipelineNodeSelectionParam(queryParams)
+        link.url.toString(),
+        link.nodeSelection
       );
       return;
     }
 
-    if (action === "job") {
-      await this.jobHandler.revealJob(environment, targetUrl.toString());
-    }
+    await this.jobHandler.revealJob(environment, link.url.toString());
   }
 
-  private parseAction(uri: vscode.Uri): "build" | "job" | undefined {
+  private getActionCandidate(uri: vscode.Uri): string | undefined {
     const segments = uri.path.split("/").filter((segment) => segment.length > 0);
-    const actionCandidate = segments.length > 0 ? segments[0] : uri.authority?.trim() || undefined;
-    if (!actionCandidate) {
-      return undefined;
-    }
-    const action = actionCandidate.toLowerCase();
-    switch (action) {
-      case "build":
-      case "job":
-        return action;
-      default:
-        return undefined;
-    }
-  }
-
-  private getQueryParam(params: ReadonlyMap<string, string>, key: string): string | undefined {
-    return params.get(key)?.trim() || undefined;
-  }
-
-  private getPipelineNodeSelectionParam(
-    params: ReadonlyMap<string, string>
-  ): PipelineNodeSelection | undefined {
-    const nodeId = this.getQueryParam(params, "nodeId");
-    if (!nodeId) {
-      return undefined;
-    }
-    const kindParam = this.getQueryParam(params, "nodeKind")?.toLowerCase();
-    const kind = kindParam === "step" ? "step" : "stage";
-    const name = this.getQueryParam(params, "nodeName");
-    return {
-      kind,
-      nodeId,
-      name
-    };
-  }
-
-  private parseHttpUrl(raw: string): URL | undefined {
-    try {
-      const parsed = new URL(raw);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        return undefined;
-      }
-      return parsed;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private async resolveEnvironment(targetUrl: URL): Promise<JenkinsEnvironmentRef | undefined> {
-    const environments = await this.environmentStore.listEnvironmentsWithScope();
-    if (environments.length === 0) {
-      void vscode.window.showErrorMessage(
-        "No Jenkins environments are configured. Add one in Jenkins Workbench first."
-      );
-      return undefined;
-    }
-
-    const targetValue = targetUrl.toString();
-    const matches: EnvironmentMatch[] = [];
-
-    for (const environment of environments) {
-      const normalizedUrl = this.normalizeEnvironmentUrl(environment.url);
-      if (!normalizedUrl) {
-        continue;
-      }
-      if (targetValue.startsWith(normalizedUrl)) {
-        matches.push({ environment, normalizedUrl });
-      }
-    }
-
-    if (matches.length === 0) {
-      void vscode.window.showErrorMessage(
-        "No Jenkins environment matches the provided URL. Verify the base URL in settings."
-      );
-      return undefined;
-    }
-
-    if (matches.length === 1) {
-      return toJenkinsEnvironmentRef(matches[0].environment);
-    }
-
-    const items: EnvironmentPickItem[] = matches.map((match) => ({
-      label: formatEnvironmentDisplayName(match.environment),
-      description: match.environment.scope,
-      detail: match.normalizedUrl,
-      environment: match.environment
-    }));
-
-    const selection = await vscode.window.showQuickPick(items, {
-      placeHolder: "Select the Jenkins environment for this link"
-    });
-
-    return selection ? toJenkinsEnvironmentRef(selection.environment) : undefined;
-  }
-
-  private normalizeEnvironmentUrl(value: string): string | undefined {
-    try {
-      return ensureTrailingSlash(new URL(value).toString());
-    } catch {
-      return undefined;
-    }
+    return segments.length > 0 ? segments[0] : uri.authority?.trim() || undefined;
   }
 }

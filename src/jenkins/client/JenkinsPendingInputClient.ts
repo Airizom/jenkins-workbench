@@ -1,5 +1,9 @@
 import { JenkinsRequestError } from "../errors";
-import type { JenkinsPendingInputAction } from "../types";
+import type {
+  JenkinsInputParameterSubmission,
+  JenkinsInputProceedOptions,
+  JenkinsPendingInputAction
+} from "../types";
 import { buildActionUrl } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
 import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
@@ -31,10 +35,10 @@ export class JenkinsPendingInputClient {
   async proceedInput(
     buildUrl: string,
     inputId: string,
-    options?: { params?: URLSearchParams; proceedText?: string; proceedUrl?: string }
+    options?: JenkinsInputProceedOptions
   ): Promise<void> {
     const params = options?.params;
-    if (params && params.size > 0) {
+    if (params && params.length > 0) {
       const url = new URL(buildActionUrl(buildUrl, "wfapi/inputSubmit"));
       url.searchParams.set("inputId", inputId);
       const body = this.buildInputSubmitBody(inputId, params, options?.proceedText);
@@ -45,7 +49,7 @@ export class JenkinsPendingInputClient {
     try {
       await this.context.requestVoidWithCrumb(
         proceedUrl,
-        this.buildInputSubmitBody(inputId, new URLSearchParams(), options?.proceedText)
+        this.buildInputSubmitBody(inputId, [], options?.proceedText)
       );
     } catch (error) {
       if (error instanceof JenkinsRequestError && error.statusCode === 404) {
@@ -76,16 +80,23 @@ export class JenkinsPendingInputClient {
 
   private buildInputSubmitBody(
     inputId: string,
-    params: URLSearchParams,
+    params: readonly JenkinsInputParameterSubmission[],
     proceedText?: string
   ): string {
-    const entries = Array.from(params.entries());
     const payload = {
-      parameter: entries.map(([name, value]) => ({ name, value }))
+      parameter: params.map(({ name, value, runId }) =>
+        runId === undefined ? { name, value } : { name, value, runId }
+      )
     };
     const body = new URLSearchParams();
-    for (const [name, value] of entries) {
-      body.set(name, value);
+    for (const { name, value } of params) {
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          body.append(name, entry);
+        }
+      } else {
+        body.set(name, value);
+      }
     }
     body.set("inputId", inputId);
     body.set("proceed", proceedText?.trim() || "Proceed");

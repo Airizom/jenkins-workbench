@@ -1,10 +1,10 @@
 import type { JobParameter } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import { buildJobUrl, ensureTrailingSlash, parseJobUrl } from "../../jenkins/urls";
-import type { BuildParameterPromptOptions } from "./BuildParameterPromptTypes";
+import type { ParameterValuePromptContext } from "./BuildParameterPromptTypes";
 
 export async function fetchRunBuildChoices(
-  options: BuildParameterPromptOptions,
+  options: ParameterValuePromptContext,
   parameter: JobParameter
 ): Promise<Array<{ number: number; runId: string; description?: string; detail?: string }>> {
   const jobUrl = resolveRunJobUrl(options.environment, options.jobUrl, parameter);

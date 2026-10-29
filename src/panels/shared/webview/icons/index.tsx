@@ -10,6 +10,7 @@ export {
   ExternalLinkIcon,
   EyeIcon,
   LaunchIcon,
+  LinkIcon,
   LockIcon,
   MinusIcon,
   PencilIcon,

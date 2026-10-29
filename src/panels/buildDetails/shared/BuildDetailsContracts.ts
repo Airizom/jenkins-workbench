@@ -252,6 +252,8 @@ export interface PendingInputParameterViewModel {
   description?: string;
   choices?: string[];
   defaultValue?: string | number | boolean | string[];
+  /** The value can only be entered on the Jenkins input page. */
+  requiresBrowser?: boolean;
 }
 
 export interface PendingInputViewModel {
@@ -260,6 +262,8 @@ export interface PendingInputViewModel {
   submitterLabel: string;
   parametersLabel: string;
   parameters: PendingInputParameterViewModel[];
+  /** At least one parameter can't be entered in VS Code, so approval happens in Jenkins. */
+  requiresBrowser: boolean;
 }
 
 /** Navigation targets are opaque identifiers scoped to the current panel load. */

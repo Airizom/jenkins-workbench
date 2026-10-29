@@ -13,6 +13,7 @@ interface BuildDetailsMessageBindings {
   persistUiState(message: PersistUiStateMessage): void;
   openRelatedBuild?(targetId: string): void;
   navigateBuild?(direction: "back" | "forward"): void;
+  copyBuildLink?(): void;
   onBuildDetailsReady?(): void;
 }
 
@@ -25,6 +26,7 @@ export function createBuildDetailsMessageRouter({
   persistUiState,
   openRelatedBuild,
   navigateBuild,
+  copyBuildLink,
   onBuildDetailsReady
 }: BuildDetailsMessageBindings): BuildDetailsMessageRouter {
   return new BuildDetailsMessageRouter({
@@ -44,6 +46,7 @@ export function createBuildDetailsMessageRouter({
     onOpenExternal: (url) => {
       void actions.openExternalUrl(url);
     },
+    onCopyBuildLink: () => copyBuildLink?.(),
     onExportConsole: () => {
       void actions.handleExportConsole();
     },
@@ -59,6 +62,9 @@ export function createBuildDetailsMessageRouter({
     },
     onRejectInput: (message) => {
       void actions.handleRejectInput(message);
+    },
+    onOpenPendingInputInJenkins: (message) => {
+      void actions.handleOpenPendingInputInJenkins(message);
     },
     onRestartPipelineFromStage: (message) => {
       void actions.handleRestartPipelineFromStage(message);

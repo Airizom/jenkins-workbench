@@ -22,7 +22,8 @@ export function mapJobParameter(parameter: JenkinsParameterDefinition): JobParam
     isSensitive: classification.isSensitive,
     runProjectName: parameter.projectName,
     multiSelectDelimiter: parameter.multiSelectDelimiter,
-    allowsMultiple: classification.allowsMultiple
+    allowsMultiple: classification.allowsMultiple,
+    ...(classification.isUnrecognizedType ? { isUnrecognizedType: true } : {})
   };
 }
 
@@ -69,15 +70,21 @@ function mapPendingInputParameters(action: JenkinsPendingInputAction): JobParame
 }
 
 function mapPendingInputParameter(parameter: JenkinsPendingInputParameterDefinition): JobParameter {
-  const choices = Array.isArray(parameter.choices)
-    ? parameter.choices.map((choice) => String(choice))
+  const definition = parameter.definition;
+  const rawChoices = parameter.choices ?? definition?.choices;
+  const choices = Array.isArray(rawChoices)
+    ? rawChoices.map((choice) => String(choice))
     : undefined;
   const classification = classifyParameterKind(parameter.type, {
     choices,
     includeLooseTokens: true
   });
 
-  const rawDefault = parameter.defaultParameterValue?.value ?? parameter.defaultValue;
+  // wfapi reports password defaults in plaintext. Approval never prefills sensitive values, so
+  // drop them here rather than carry them into summaries and the Build Details card.
+  const rawDefault = classification.isSensitive
+    ? undefined
+    : (parameter.defaultParameterValue?.value ?? parameter.defaultValue ?? definition?.defaultVal);
   const defaultValue = formatParameterDefaultValue(rawDefault);
 
   return {
@@ -88,16 +95,28 @@ function mapPendingInputParameter(parameter: JenkinsPendingInputParameterDefinit
     description: parameter.description,
     rawType: parameter.type,
     isSensitive: classification.isSensitive,
-    runProjectName: parameter.projectName,
+    runProjectName: parameter.projectName ?? definition?.projectName,
     multiSelectDelimiter: parameter.multiSelectDelimiter,
-    allowsMultiple: classification.allowsMultiple
+    allowsMultiple: classification.allowsMultiple,
+    ...(classification.isUnrecognizedType ? { isUnrecognizedType: true } : {})
   };
+}
+
+// Raw types that really are plain strings. Any other type that falls through to "string" is a
+// plugin parameter (Git Parameter, Active Choices, ...) that only gets a text-box fallback.
+const CORE_STRING_TYPE_TOKENS = ["string", "whideparameterdefinition"];
+
+interface ParameterKindClassification {
+  kind: JobParameterKind;
+  isSensitive: boolean;
+  allowsMultiple: boolean;
+  isUnrecognizedType?: boolean;
 }
 
 function classifyParameterKind(
   rawType: string | undefined,
   options?: { choices?: string[]; includeLooseTokens?: boolean }
-): { kind: JobParameterKind; isSensitive: boolean; allowsMultiple: boolean } {
+): ParameterKindClassification {
   const normalizedType = (rawType ?? "").toLowerCase();
   const hasChoices = Boolean(options?.choices && options.choices.length > 0);
   const includeLooseTokens = options?.includeLooseTokens === true;
@@ -140,5 +159,8 @@ function classifyParameterKind(
   ) {
     return { kind: "password", isSensitive: true, allowsMultiple: false };
   }
-  return { kind: "string", isSensitive: false, allowsMultiple: false };
+  const isUnrecognizedType =
+    normalizedType.trim().length > 0 &&
+    !CORE_STRING_TYPE_TOKENS.some((token) => normalizedType.includes(token));
+  return { kind: "string", isSensitive: false, allowsMultiple: false, isUnrecognizedType };
 }
