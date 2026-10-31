@@ -101,6 +101,18 @@
         "icon": "$(debug-stop)"
       },
       {
+        "command": "jenkinsWorkbench.terminateBuild",
+        "title": "Terminate Build (Pipeline)",
+        "category": "Jenkins",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "jenkinsWorkbench.killBuild",
+        "title": "Kill Build (Pipeline)",
+        "category": "Jenkins",
+        "icon": "$(close-all)"
+      },
+      {
         "command": "jenkinsWorkbench.approveInput",
         "title": "Approve Input",
         "category": "Jenkins",
@@ -324,6 +336,11 @@
         "title": "Open Build by URL or Number...",
         "category": "Jenkins",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "jenkinsWorkbench.loadMoreBuilds",
+        "title": "Load More Builds",
+        "category": "Jenkins"
       },
       {
         "command": "jenkinsWorkbench.openBuildByNumber",
@@ -1754,6 +1771,16 @@
           "group": "3_destructive@0"
         },
         {
+          "command": "jenkinsWorkbench.terminateBuild",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)buildRunning(\\s|$)/)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.terminate))",
+          "group": "3_destructive@1"
+        },
+        {
+          "command": "jenkinsWorkbench.killBuild",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)buildRunning(\\s|$)/)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.kill))",
+          "group": "3_destructive@2"
+        },
+        {
           "command": "jenkinsWorkbench.cancelQueueItem",
           "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem == queueItem)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.cancel))",
           "group": "3_destructive@0"
@@ -1836,6 +1863,10 @@
       "commandPalette": [
         {
           "command": "jenkinsWorkbench.openBuildByNumber",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.loadMoreBuilds",
           "when": "false"
         },
         {

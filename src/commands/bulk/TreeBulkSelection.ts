@@ -3,7 +3,16 @@ import type { WorkbenchTreeElement } from "../../tree/TreeItems";
 import { type BulkAction, isBulkActionEligible } from "./BulkActionTargets";
 
 const CONTEXT_PREFIX = "jenkinsWorkbench.bulkSelection";
-const ACTIONS: readonly BulkAction[] = ["stop", "cancel", "watch", "unwatch", "pin", "unpin"];
+const ACTIONS: readonly BulkAction[] = [
+  "stop",
+  "terminate",
+  "kill",
+  "cancel",
+  "watch",
+  "unwatch",
+  "pin",
+  "unpin"
+];
 
 /** Routes tree menu arguments without making explicit single-item callers depend on selection. */
 export class TreeBulkSelection implements vscode.Disposable {

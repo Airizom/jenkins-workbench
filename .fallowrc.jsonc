@@ -115,6 +115,7 @@
       "implements": "JenkinsBuildInspectionRuntimeSurface",
       "members": [
         "getBuildDetails",
+        "getBuildStopState",
         "getWorkflowRun",
         "getConsoleText",
         "getConsoleTextHead",
@@ -146,6 +147,10 @@
     {
       "implements": "JenkinsBuildPermalinkClientSurface",
       "members": ["getBuildPermalink"]
+    },
+    {
+      "implements": "JenkinsBuildStopClientSurface",
+      "members": ["terminateBuild", "killBuild", "getBuildStopState"]
     },
     {
       "implements": "JenkinsJobStateRuntimeSurface",

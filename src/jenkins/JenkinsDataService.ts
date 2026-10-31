@@ -15,6 +15,7 @@ import {
 } from "./data/JenkinsCoverageDataOperations";
 import { JenkinsDataRuntimeContext } from "./data/JenkinsDataRuntimeContext";
 import type {
+  BuildStopEscalationResult,
   ConsoleTextResult,
   ConsoleTextTailResult,
   FlowNodeDetailsResult,
@@ -83,6 +84,7 @@ import type {
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
 import type {
   JenkinsBuildPermalink,
+  JenkinsBuildStopState,
   JenkinsReplayDefinition,
   JenkinsReplayResult,
   JenkinsReplaySubmissionPayload,
@@ -91,6 +93,7 @@ import type {
 
 export type { BuildParameterPayload } from "./BuildParameterRequests";
 export type {
+  BuildStopEscalationResult,
   JenkinsBuildManagementState,
   JenkinsJobCollectionRequest,
   JenkinsJobInfo,
@@ -616,6 +619,21 @@ export class JenkinsDataService
 
   async stopBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     return this.buildOperations.stopBuild(environment, buildUrl);
+  }
+
+  async escalateBuildStop(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    step: "term" | "kill"
+  ): Promise<BuildStopEscalationResult> {
+    return this.buildOperations.escalateBuildStop(environment, buildUrl, step);
+  }
+
+  async getBuildStopState(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsBuildStopState> {
+    return this.buildOperations.getBuildStopState(environment, buildUrl);
   }
 
   async deleteBuild(

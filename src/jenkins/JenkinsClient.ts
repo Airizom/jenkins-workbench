@@ -21,6 +21,7 @@ import type {
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsBuildPermalink,
+  JenkinsBuildStopState,
   JenkinsClientOptions,
   JenkinsConsoleText,
   JenkinsConsoleTextTail,
@@ -86,7 +87,15 @@ export type {
 /** Members the data layer calls on a client resolved per environment. */
 export type JenkinsBuildPermalinkClientSurface = Pick<JenkinsClient, "getBuildPermalink">;
 
-export class JenkinsClient implements JenkinsBuildPermalinkClientSurface {
+/** Stop escalation calls these methods through the environment-resolved client adapter. */
+export type JenkinsBuildStopClientSurface = Pick<
+  JenkinsBuildsApi,
+  "terminateBuild" | "killBuild" | "getBuildStopState"
+>;
+
+export class JenkinsClient
+  implements JenkinsBuildPermalinkClientSurface, JenkinsBuildStopClientSurface
+{
   private readonly buildsApi: JenkinsBuildsApi;
   private readonly relationshipsApi: JenkinsRelationshipsApi;
   private readonly jobsApi: JenkinsJobsApi;
@@ -428,6 +437,18 @@ export class JenkinsClient implements JenkinsBuildPermalinkClientSurface {
 
   async stopBuild(buildUrl: string): Promise<void> {
     await this.buildsApi.stopBuild(buildUrl);
+  }
+
+  async terminateBuild(buildUrl: string): Promise<void> {
+    await this.buildsApi.terminateBuild(buildUrl);
+  }
+
+  async killBuild(buildUrl: string): Promise<void> {
+    await this.buildsApi.killBuild(buildUrl);
+  }
+
+  async getBuildStopState(buildUrl: string): Promise<JenkinsBuildStopState> {
+    return this.buildsApi.getBuildStopState(buildUrl);
   }
 
   async deleteBuild(buildUrl: string): Promise<void> {

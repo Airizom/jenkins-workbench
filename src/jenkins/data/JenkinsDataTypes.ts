@@ -73,6 +73,12 @@ export type ProgressiveConsoleHtmlResult = JenkinsProgressiveConsoleHtml;
 export type FlowNodeLogResult = JenkinsFlowNodeLog;
 export type FlowNodeDetailsResult = JenkinsWorkflowStage;
 
+/**
+ * Result of a Pipeline stop escalation (`/term` or `/kill`). Only Pipeline runs expose those
+ * endpoints, so other build types and a 404 from the endpoint are reported as unsupported.
+ */
+export type BuildStopEscalationResult = "sent" | "not-running" | "unsupported";
+
 /** Fresh, uncached build fields used to manage a single build. */
 export interface JenkinsBuildManagementState {
   number: number;

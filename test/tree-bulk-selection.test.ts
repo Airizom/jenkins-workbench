@@ -139,6 +139,8 @@ describe("TreeBulkSelection", () => {
     const stale = new StalePinnedJobTreeItem(environment, "old", `${environment.url}job/old/`);
     const f = fixture([running, queued, stale]);
     assert.equal(context("stop"), true);
+    assert.equal(context("terminate"), true);
+    assert.equal(context("kill"), true);
     assert.equal(context("cancel"), true);
     assert.equal(context("unpin"), true);
     assert.equal(context("watch"), false);
@@ -146,23 +148,37 @@ describe("TreeBulkSelection", () => {
     f.view.selection = [stale];
     f.refresh();
     assert.equal(context("stop"), false);
+    assert.equal(context("terminate"), false);
+    assert.equal(context("kill"), false);
     assert.equal(context("cancel"), false);
     assert.equal(context("unpin"), true);
     f.service.dispose();
     f.select([running, queued]);
     f.refresh();
-    for (const action of ["multiple", "stop", "cancel", "watch", "unwatch", "pin", "unpin"]) {
+    for (const action of [
+      "multiple",
+      "stop",
+      "terminate",
+      "kill",
+      "cancel",
+      "watch",
+      "unwatch",
+      "pin",
+      "unpin"
+    ]) {
       assert.equal(context(action), false, action);
     }
   });
 });
 
 describe("bulk action menus", () => {
-  it("keeps inline commands separate and exposes all six context commands", async () => {
+  it("keeps inline commands separate and exposes every bulk context command", async () => {
     const manifest = JSON.parse(await readFile("package.json", "utf8"));
     const menus = manifest.contributes.menus;
     const actions = [
       "abortBuild",
+      "terminateBuild",
+      "killBuild",
       "cancelQueueItem",
       "watchJob",
       "unwatchJob",

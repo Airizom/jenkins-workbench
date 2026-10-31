@@ -9,6 +9,7 @@ import type { TreeActivityOptions } from "./ActivityTypes";
 import { ActivityCollector } from "./activity/ActivityCollector";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import { EnvironmentSummaryStore, type EnvironmentSummaryTotals } from "./EnvironmentSummaryStore";
+import type { JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
 import { PlaceholderTreeItem, type PlaceholderTreeItemOptions } from "./items/TreePlaceholderItem";
 import { InstanceTreeItem, type InstanceTreeItemIssue } from "./items/TreeRootItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
@@ -309,6 +310,10 @@ export class JenkinsTreeChildrenLoader {
     );
     this.cacheManager.clearChildrenCache(artifactChildrenKey);
     this.cacheManager.deleteArtifact(artifactChildrenKey);
+  }
+
+  loadMoreBuilds(job: JobTreeItem | PipelineTreeItem): boolean {
+    return this.buildLoader.loadMoreBuilds(job);
   }
 
   invalidateForElement(element?: WorkbenchTreeElement): void {

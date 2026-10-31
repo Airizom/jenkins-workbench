@@ -20,6 +20,7 @@ VS Code extension that brings Jenkins into your editor. Browse jobs, trigger bui
 - **Activity Bar View** — Dedicated Jenkins sidebar with a hierarchical tree view
 - **Multi-Environment Support** — Connect to multiple Jenkins instances with workspace or global scope
 - **Browse Everything** — Explore folders, multibranch pipelines, jobs, builds, and nodes
+- **Older Builds** — A job lists its 20 most recent builds; **Load 20 more builds** at the end of the list extends it in place, up to 500 builds. The longer list stays through refreshes until the window reloads. Beyond 500, use **Open Build by Number...**
 - **Activity View** — See jobs awaiting input, failing, unstable, or running without digging through folders
 - **Curated Jenkins Views** — Browse Jenkins views in a dedicated section and hide noisy defaults
 - **Go to Job...** — Quick search across all configured Jenkins environments
@@ -65,7 +66,7 @@ Use node context menus or the Node Details **Actions** menu for existing nodes, 
 
 - **Trigger Builds** — Start builds with support for parameterized jobs (strings, booleans, choices, passwords, credentials, run, file, text, multi-choice)
 - **Reusable Parameter Presets** — Save named per-job presets and reuse them when triggering builds
-- **Stop Builds** — Abort running builds directly from the tree
+- **Stop Builds** — Abort running builds directly from the tree. If a Pipeline keeps running about 15 seconds after Stop, a notification offers **Terminate**, and then **Kill…**, the same escalation the Jenkins web UI offers
 - **Replay Build** — Edit the Pipeline script in a draft editor and re-run with changes, or quick-replay with the original script
 - **Replay with Local Jenkinsfile** — Run your workspace Jenkinsfile, including unsaved changes, against a Pipeline job without committing
 - **Rebuild** — Re-run a build with the same parameters
@@ -568,6 +569,8 @@ activates there.
 |---------|-------------|
 | `Jenkins: Trigger Build` | Start a new build for the selected job |
 | `Jenkins: Abort/Stop Build` | Stop a running build |
+| `Jenkins: Terminate Build (Pipeline)` | Forcibly terminate the running steps of a Pipeline build that ignored Stop (`/term`) |
+| `Jenkins: Kill Build (Pipeline)` | Hard-kill a Pipeline build that ignored Terminate (`/kill`); post and finally blocks do not run |
 | `Jenkins: Replay Build` | Open an editable draft of the Pipeline script and replay with changes |
 | `Jenkins: Quick Replay Build` | Replay a Pipeline build immediately using the original script |
 | `Jenkins: Run Replay Draft` | Submit an edited replay draft from the editor |
@@ -770,6 +773,13 @@ Select **Verify certificates (recommended)** to restore verification. Changing t
   - **Rebuild** requires the Rebuild Plugin
   - **Restart from Stage** requires Declarative Pipeline support from Pipeline: Model Definition
 - Check that the plugins are installed and the user has permissions
+
+### Build Keeps Running After Stop
+
+- A Pipeline can ignore Stop, for example when a step traps interrupts. About 15 seconds after Stop, the extension checks the build again and offers **Terminate**. If the build still runs 15 seconds after Terminate, it offers **Kill…**. Both are also available as **Terminate Build (Pipeline)** and **Kill Build (Pipeline)** on running builds, including multi-selections
+- Kill always asks for confirmation: it skips post and finally blocks and can leave agents, locks, or workspaces behind
+- Only Pipeline runs support Terminate and Kill. Freestyle, Matrix, and other build types are reported as unsupported and never receive the request; open them in Jenkins to handle them there
+- Task cancellation (**Terminate Task**) still only sends Stop and never escalates
 
 ### Build Management Refused
 

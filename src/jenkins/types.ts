@@ -271,6 +271,19 @@ export interface JenkinsWorkflowStage extends JenkinsWorkflowNode {
   execNode?: string;
 }
 
+/** Pipeline runs are the only build type that exposes `/term` and `/kill`. */
+export const PIPELINE_RUN_CLASS = "org.jenkinsci.plugins.workflow.job.WorkflowRun";
+
+export function isPipelineRun(className: string | undefined): boolean {
+  return className === PIPELINE_RUN_CLASS;
+}
+
+export interface JenkinsBuildStopState {
+  className?: string;
+  building: boolean;
+  result?: string;
+}
+
 export interface JenkinsWorkflowRun {
   id?: string;
   name?: string;

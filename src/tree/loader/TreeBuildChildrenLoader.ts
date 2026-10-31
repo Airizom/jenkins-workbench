@@ -20,8 +20,18 @@ import {
 import type { TreePlaceholderFactory } from "./TreePlaceholderFactory";
 
 const HISTORY_ICON = new vscode.ThemeIcon("history");
+/** The most builds a job lists in the tree; deeper builds open by number. */
+export const MAX_TREE_BUILDS = 500;
+/** Jobs whose extra build pages are remembered; the job paged least recently is dropped first. */
+export const REQUESTED_BUILD_COUNTS_MAX_ENTRIES = 200;
 
 export class TreeBuildChildrenLoader {
+  // Keyed by builds-children key (per tree section). Refreshes keep these counts so an expanded
+  // list does not shrink while it is being read; only a window reload resets them. A cached
+  // build list was always fetched with the job's current count: every change clears it.
+  private readonly requestedBuildCounts = new Map<string, number>();
+
+  /** `buildLimit` is both the first page of builds and the size of each further page. */
   constructor(
     private readonly dataService: JenkinsDataService,
     private readonly pendingInputCoordinator: PendingInputRefreshCoordinator,
@@ -47,12 +57,39 @@ export class TreeBuildChildrenLoader {
   async loadBuildChildren(
     element: JobTreeItem | PipelineTreeItem
   ): Promise<WorkbenchTreeElement[]> {
-    return await this.cacheManager.getOrLoadChildren(
-      this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope),
+    const key = this.buildBuildsChildrenKey(element.environment, element.jobUrl, element.jobScope);
+    const items = await this.cacheManager.getOrLoadChildren(
+      key,
       element,
       () => this.loadBuildsForJob(element, resolveTreeItemLabel(element)),
       "Loading builds..."
     );
+    // Section reloads (Activity refreshes, Pinned, folders) replace job items while the cached
+    // list survives, so the "more builds" row is added per read for the element being expanded:
+    // VS Code only refreshes a fired element it rendered. Loading and error placeholders hold
+    // no builds and get no row; fewer builds than requested means the history is exhausted.
+    const shown = items.filter((item) => item instanceof BuildTreeItem).length;
+    if (shown === 0 || shown < this.getRequestedBuildCount(key)) {
+      return items;
+    }
+    return [...items, this.createMoreBuildsItem(element, shown)];
+  }
+
+  /**
+   * Lists the next page of builds for a job. Counts are per builds-children key, which
+   * includes the presentation scope, so the Jobs folder, Pinned and Activity sections page
+   * independently. Clears only that key's cached children, so the caller must notify the
+   * rendered job element. Returns false once the cap is reached.
+   */
+  loadMoreBuilds(job: JobTreeItem | PipelineTreeItem): boolean {
+    const key = this.buildBuildsChildrenKey(job.environment, job.jobUrl, job.jobScope);
+    const current = this.getRequestedBuildCount(key);
+    if (current >= MAX_TREE_BUILDS) {
+      return false;
+    }
+    this.setRequestedBuildCount(key, Math.min(current + this.buildLimit, MAX_TREE_BUILDS));
+    this.cacheManager.clearChildrenCache(key);
+    return true;
   }
 
   async loadArtifactsForBuild(
@@ -124,19 +161,59 @@ export class TreeBuildChildrenLoader {
     return buildArtifactChildrenKey(this.buildChildrenKey, environment, buildUrl, jobScope);
   }
 
+  private getRequestedBuildCount(key: string): number {
+    return this.requestedBuildCounts.get(key) ?? this.buildLimit;
+  }
+
+  /** Re-inserts `key` as most recently paged and evicts the least recently paged job past the cap. */
+  private setRequestedBuildCount(key: string, count: number): void {
+    this.requestedBuildCounts.delete(key);
+    this.requestedBuildCounts.set(key, count);
+    if (this.requestedBuildCounts.size <= REQUESTED_BUILD_COUNTS_MAX_ENTRIES) {
+      return;
+    }
+    const oldestKey = this.requestedBuildCounts.keys().next().value;
+    if (oldestKey !== undefined) {
+      // Its cached list was fetched with the forgotten count, so it goes too.
+      this.requestedBuildCounts.delete(oldestKey);
+      this.cacheManager.clearChildrenCache(oldestKey);
+    }
+  }
+
+  private createMoreBuildsItem(
+    job: JobTreeItem | PipelineTreeItem,
+    shown: number
+  ): WorkbenchTreeElement {
+    const capped = shown >= MAX_TREE_BUILDS;
+    const label = capped
+      ? `Showing the ${MAX_TREE_BUILDS} most recent builds`
+      : `Load ${this.buildLimit} more builds`;
+    const description = capped ? "Open Build by Number…" : `Showing ${shown}`;
+    const command = capped
+      ? { command: "jenkinsWorkbench.openBuildByNumber", title: "Open Build by Number" }
+      : { command: "jenkinsWorkbench.loadMoreBuilds", title: "Load More Builds" };
+    return this.placeholders.createEmptyPlaceholder(label, description, {
+      icon: HISTORY_ICON,
+      command: { ...command, arguments: [job] }
+    });
+  }
+
   private async loadBuildsForJob(
     job: JobTreeItem | PipelineTreeItem,
     jobNameHint?: string
   ): Promise<WorkbenchTreeElement[]> {
     const { environment, jobUrl, jobScope } = job;
+    const count = this.getRequestedBuildCount(
+      this.buildBuildsChildrenKey(environment, jobUrl, jobScope)
+    );
     try {
-      const builds = await this.dataService.getBuildsForJob(
-        environment,
-        jobUrl,
-        this.buildLimit,
+      const builds = await this.dataService.getBuildsForJob(environment, jobUrl, count, {
+        ...this.getBuildListFetchOptions(),
         // Build items show descriptions in their tooltips; other build lists skip the large field.
-        { ...this.getBuildListFetchOptions(), includeDescription: true }
-      );
+        includeDescription: true,
+        // Jenkins caps the exported `builds` list at 100; an explicit offset reads `allBuilds`.
+        ...(count > this.buildLimit ? { offset: 0 } : {})
+      });
       if (builds.length === 0) {
         return [
           this.placeholders.createEmptyPlaceholder(
@@ -158,7 +235,7 @@ export class TreeBuildChildrenLoader {
             })
           : undefined;
 
-      const items: WorkbenchTreeElement[] = builds.map((build) => {
+      return builds.map((build) => {
         const summary = summariesByUrl?.get(build.url);
         return new BuildTreeItem(
           environment,
@@ -169,19 +246,6 @@ export class TreeBuildChildrenLoader {
           summary?.awaitingInput ?? false
         );
       });
-      if (builds.length >= this.buildLimit) {
-        items.push(
-          this.placeholders.createEmptyPlaceholder("Older builds…", "Open Job History", {
-            icon: HISTORY_ICON,
-            command: {
-              command: "jenkinsWorkbench.openJobHistory",
-              title: "Open Job History",
-              arguments: [job]
-            }
-          })
-        );
-      }
-      return items;
     } catch (error) {
       return [this.placeholders.createErrorPlaceholder("Unable to load builds.", error)];
     }

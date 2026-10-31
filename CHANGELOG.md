@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- feat(builds): offer Terminate and then Kill when a Pipeline build keeps running after Stop, mirroring the Jenkins web UI. Stop and Terminate re-check the builds for 15 seconds and show one combined prompt; Terminate Build (Pipeline) and Kill Build (Pipeline) are also available for running builds and multi-selections. Non-Pipeline builds are reported as unsupported and never receive `/term` or `/kill`.
+
 ## [1.61.0] - 2026-10-28
 
 ### Added

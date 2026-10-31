@@ -11,6 +11,7 @@ import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { TreeActivityOptions } from "./ActivityTypes";
 import type { BuildTooltipOptions } from "./BuildTooltips";
+import type { JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
@@ -208,6 +209,20 @@ export class JenkinsWorkbenchTreeDataProvider
     this._onDidChangeTreeData.fire(
       folder ?? this.hierarchyState.notifyEnvironmentInstance(environment)
     );
+  }
+
+  /**
+   * Lists the next page of a job's builds. Only that job's builds are re-fetched, so this
+   * bypasses the manual refresh cooldown. VS Code matches fired elements by identity, so
+   * `job` must be the rendered instance (the row's command argument).
+   */
+  loadMoreBuilds(job: JobTreeItem | PipelineTreeItem): boolean {
+    if (!this.childrenLoader.loadMoreBuilds(job)) {
+      return false;
+    }
+    this.notifyElement(job);
+    this.emitSummary();
+    return true;
   }
 
   invalidateBuildArtifacts(request: InvalidateBuildArtifactsRequest): void {

@@ -10,7 +10,15 @@ import {
   type WorkbenchTreeElement
 } from "../../tree/TreeItems";
 
-export type BulkAction = "stop" | "cancel" | "watch" | "unwatch" | "pin" | "unpin";
+export type BulkAction =
+  | "stop"
+  | "terminate"
+  | "kill"
+  | "cancel"
+  | "watch"
+  | "unwatch"
+  | "pin"
+  | "unpin";
 
 export type BulkActionTarget =
   | { kind: "build"; item: BuildTreeItem; url: string }
@@ -20,6 +28,8 @@ export type BulkActionTarget =
 export function isBulkActionEligible(action: BulkAction, item: WorkbenchTreeElement): boolean {
   switch (action) {
     case "stop":
+    case "terminate":
+    case "kill":
       return item instanceof BuildTreeItem && item.isBuilding;
     case "cancel":
       return item instanceof QueueItemTreeItem;

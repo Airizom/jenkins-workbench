@@ -89,7 +89,27 @@ function queue(id: number, env = environment): WorkbenchTreeElement {
   });
 }
 function harness() {
-  const dataService = { stopBuild: vi.fn(async () => {}), cancelQueueItem: vi.fn(async () => {}) };
+  const dataService = {
+    stopBuild: vi.fn(async () => {}),
+    escalateBuildStop: vi.fn(
+      async (_environment: unknown, _url: string, _step: string) =>
+        "sent" as "sent" | "not-running" | "unsupported"
+    ),
+    cancelQueueItem: vi.fn(async () => {})
+  };
+  const escalation = {
+    followUp: vi.fn(async (_stage: string, _items: readonly WorkbenchTreeElement[]) => {}),
+    dispose: vi.fn()
+  };
+  let escalationDependencies:
+    | {
+        runAction(
+          action: string,
+          items: readonly WorkbenchTreeElement[],
+          options: { confirmed?: boolean }
+        ): Promise<void>;
+      }
+    | undefined;
   const watchStore = {
     isWatched: vi.fn(async () => false),
     addWatch: vi.fn(async () => {}),
@@ -105,9 +125,25 @@ function harness() {
     dataService,
     watchStore,
     pinStore,
-    refreshHost
+    refreshHost,
+    createStopEscalation: (dependencies: NonNullable<typeof escalationDependencies>) => {
+      escalationDependencies = dependencies;
+      return escalation;
+    }
   } as unknown as ConstructorParameters<typeof BulkActionService>[0]);
-  return { service, dataService, watchStore, pinStore, refreshHost };
+  return {
+    service,
+    dataService,
+    watchStore,
+    pinStore,
+    refreshHost,
+    escalation,
+    escalationRun: (
+      action: string,
+      items: readonly WorkbenchTreeElement[],
+      options: { confirmed?: boolean } = {}
+    ) => escalationDependencies?.runAction(action, items, options)
+  };
 }
 
 beforeEach(() => {
@@ -399,4 +435,99 @@ describe("BulkActionService", () => {
       assert.equal(information.mock.calls.length, 0);
     }
   );
+
+  it("treats terminate and kill like stop for eligibility", () => {
+    const completed = Object.assign(build(2), { isBuilding: false });
+    for (const action of ["terminate", "kill"] as const) {
+      assert.equal(isBulkActionEligible(action, build(1)), true);
+      assert.equal(isBulkActionEligible(action, completed), false);
+      assert.equal(isBulkActionEligible(action, job("demo")), false);
+    }
+  });
+});
+
+describe("BulkActionService stop escalation", () => {
+  it("terminates Pipeline runs after a modal and starts the next follow-up", async () => {
+    const h = harness();
+    await h.service.run("terminate", [build(1)]);
+    assert.equal(warning.mock.calls.length, 1);
+    const [message, options, label] = warning.mock.calls[0];
+    assert.match(message, /Terminate Builds: 1 eligible/);
+    assert.equal((options as { modal: boolean }).modal, true);
+    assert.equal(label, "Terminate Builds");
+    assert.deepEqual(h.dataService.escalateBuildStop.mock.calls[0], [
+      environment,
+      "https://ci.example/job/demo/1/",
+      "term"
+    ]);
+    assert.equal(h.dataService.stopBuild.mock.calls.length, 0);
+    assert.equal(h.refreshHost.fullEnvironmentRefresh.mock.calls.length, 1);
+    assert.equal(h.escalation.followUp.mock.calls.length, 1);
+    assert.equal(h.escalation.followUp.mock.calls[0][0], "terminate");
+  });
+
+  it("skips the Terminate modal when the follow-up prompt already confirmed it", async () => {
+    const h = harness();
+    await h.escalationRun("terminate", [build(1)], { confirmed: true });
+    assert.equal(warning.mock.calls.length, 0);
+    assert.equal(h.dataService.escalateBuildStop.mock.calls.length, 1);
+  });
+
+  it("always shows the Kill modal with the hard-kill consequences", async () => {
+    const h = harness();
+    warning.mockResolvedValueOnce(undefined);
+    await h.escalationRun("kill", [build(1)], { confirmed: true });
+    assert.equal(warning.mock.calls.length, 1);
+    const [, options, label] = warning.mock.calls[0];
+    assert.equal(label, "Kill Builds");
+    assert.match((options as { detail: string }).detail, /post and finally blocks will not run/);
+    assert.match((options as { detail: string }).detail, /locks, or workspaces/);
+    assert.equal(h.dataService.escalateBuildStop.mock.calls.length, 0);
+
+    await h.service.run("kill", [build(1)]);
+    assert.deepEqual(h.dataService.escalateBuildStop.mock.calls[0]?.[2], "kill");
+    assert.equal(h.escalation.followUp.mock.calls.length, 0);
+  });
+
+  it("reports unsupported and finished builds without following up", async () => {
+    const h = harness();
+    h.dataService.escalateBuildStop.mockResolvedValueOnce("unsupported");
+    await h.service.run("terminate", [build(1)]);
+    h.dataService.escalateBuildStop.mockResolvedValueOnce("unsupported");
+    await h.service.run("kill", [build(2)]);
+    h.dataService.escalateBuildStop.mockResolvedValueOnce("not-running");
+    await h.service.run("terminate", [build(3)]);
+    assert.match(lines.join("\n"), /Terminate builds: 1 unsupported/);
+    assert.match(lines.join("\n"), /Kill builds: 1 unsupported/);
+    assert.match(lines.join("\n"), /Terminate builds: 1 unchanged/);
+    assert.equal(h.escalation.followUp.mock.calls.length, 0);
+    assert.equal(error.mock.calls.length, 0);
+  });
+
+  it("follows up only on builds whose Stop request succeeded", async () => {
+    const h = harness();
+    h.dataService.stopBuild.mockImplementation(async (...args: unknown[]) => {
+      if (String(args[1]).endsWith("/2/")) {
+        throw new Error("permission denied");
+      }
+    });
+    await h.service.run("stop", [build(1), build(2), job("demo")]);
+    assert.equal(h.escalation.followUp.mock.calls.length, 1);
+    const [stage, items] = h.escalation.followUp.mock.calls[0];
+    assert.equal(stage, "stop");
+    assert.deepEqual(
+      items.map((item) => (item as { buildNumber: number }).buildNumber),
+      [1]
+    );
+  });
+
+  it("does not follow up when nothing was stopped and disposes the follow-up", async () => {
+    const h = harness();
+    h.dataService.stopBuild.mockRejectedValue(new Error("timed out"));
+    await h.service.run("stop", [build(1)]);
+    await h.service.run("cancel", [queue(1)]);
+    assert.equal(h.escalation.followUp.mock.calls.length, 0);
+    h.service.dispose();
+    assert.equal(h.escalation.dispose.mock.calls.length, 1);
+  });
 });

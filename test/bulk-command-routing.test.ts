@@ -75,6 +75,8 @@ async function invoke(id: string, item?: WorkbenchTreeElement, selection?: Workb
 
 const actions = [
   ["abortBuild", "stop"],
+  ["terminateBuild", "terminate"],
+  ["killBuild", "kill"],
   ["cancelQueueItem", "cancel"],
   ["watchJob", "watch"],
   ["unwatchJob", "unwatch"],

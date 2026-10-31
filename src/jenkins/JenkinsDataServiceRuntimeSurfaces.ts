@@ -12,6 +12,7 @@ export type JenkinsArtifactRetrievalRuntimeSurface = Pick<
 export type JenkinsBuildInspectionRuntimeSurface = Pick<
   JenkinsBuildDataOperations,
   | "getBuildDetails"
+  | "getBuildStopState"
   | "getWorkflowRun"
   | "getConsoleText"
   | "getConsoleTextHead"

@@ -8,6 +8,7 @@ import {
   type JenkinsBuild,
   type JenkinsBuildDetails,
   type JenkinsBuildPermalink,
+  type JenkinsBuildStopState,
   type JenkinsConsoleText,
   type JenkinsConsoleTextTail,
   type JenkinsFlowNodeLog,
@@ -43,6 +44,7 @@ import { resolveTrustedJenkinsUrl } from "./JenkinsTrustedUrl";
 import { RestartFromStageClient } from "./RestartFromStageClient";
 
 const BUILD_ARTIFACTS_TREE = "artifacts[fileName,relativePath]";
+const BUILD_STOP_STATE_TREE = "_class,building,result";
 const BUILD_PERMALINK_FIELDS = "number,url,result,building,timestamp,duration";
 const REBUILD_AUTOREBUILD_BODY = "autorebuild=true";
 const BUILD_LIST_LIMIT_TOKEN = "{limit}";
@@ -280,6 +282,32 @@ export class JenkinsBuildsApi {
   async stopBuild(buildUrl: string): Promise<void> {
     const url = buildActionUrl(buildUrl, "stop");
     await this.context.requestVoidWithCrumb(url);
+  }
+
+  /** Pipeline-only: Jenkins' "forcibly terminate running steps" link. */
+  async terminateBuild(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "term");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  /** Pipeline-only: Jenkins' "forcibly kill entire build" link. */
+  async killBuild(buildUrl: string): Promise<void> {
+    const url = buildActionUrl(buildUrl, "kill");
+    await this.context.requestVoidWithCrumb(url);
+  }
+
+  async getBuildStopState(buildUrl: string): Promise<JenkinsBuildStopState> {
+    const url = buildApiUrlFromItem(buildUrl, BUILD_STOP_STATE_TREE);
+    const response = await this.context.requestJson<{
+      _class?: unknown;
+      building?: unknown;
+      result?: unknown;
+    }>(url);
+    return {
+      className: typeof response._class === "string" ? response._class : undefined,
+      building: response.building === true,
+      result: typeof response.result === "string" ? response.result : undefined
+    };
   }
 
   async deleteBuild(buildUrl: string): Promise<void> {

@@ -99,6 +99,7 @@ interface ProviderHarness {
     refreshToken?: number;
   }): boolean;
   resolveJobElement(environment: EnvironmentRef, entry: JobSearchEntry): Promise<unknown>;
+  loadMoreBuilds(job: unknown): boolean;
   dispose(): void;
 }
 
@@ -186,6 +187,7 @@ interface ProviderFixture {
   artifactResponses: ArtifactStub[][];
   artifactDelays: number[];
   builds: BuildInfoStub[];
+  buildRequests: Array<{ limit: number; offset?: number }>;
   jobCollections: Map<string, JobInfoStub[]>;
   jobCollectionDelays: Map<string, number>;
   filterJobs: (jobs: JobInfoStub[]) => JobInfoStub[];
@@ -220,6 +222,7 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
     artifactResponses: [],
     artifactDelays: [],
     builds: [],
+    buildRequests: [],
     jobCollections: new Map(),
     jobCollectionDelays: new Map(),
     filterJobs: (jobs) => jobs,
@@ -261,7 +264,15 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
       }
       return fixture.nodeResponses[loadIndex] ?? [];
     },
-    getBuildsForJob: async () => fixture.builds,
+    getBuildsForJob: async (
+      _environment: unknown,
+      _jobUrl: string,
+      limit: number,
+      options?: { offset?: number }
+    ) => {
+      fixture.buildRequests.push({ limit, offset: options?.offset });
+      return fixture.builds.slice(0, limit);
+    },
     getBuildArtifacts: async () => {
       const loadIndex = fixture.artifactLoads;
       fixture.artifactLoads += 1;
@@ -888,27 +899,87 @@ describe("JenkinsWorkbenchTreeDataProvider presentation", () => {
     fixture.provider.dispose();
   });
 
-  it("lists builds before the workspace and links older builds to Job History", async () => {
-    const fixture = createProviderFixture();
-    const jobUrl = "https://jenkins.example/job/demo/";
-    fixture.jobCollections.set("", [{ name: "demo", url: jobUrl, kind: "job", color: "blue" }]);
-    fixture.builds = Array.from({ length: 20 }, (_, index) => ({
-      number: 20 - index,
-      url: `${jobUrl}${20 - index}/`,
+  function createBuildStubs(jobUrl: string, count: number): BuildInfoStub[] {
+    return Array.from({ length: count }, (_, index) => ({
+      number: count - index,
+      url: `${jobUrl}${count - index}/`,
       building: false,
       result: "SUCCESS",
       timestamp: Date.now(),
       duration: 1000
     }));
+  }
+
+  it("lists builds before the workspace and offers to load more builds", async () => {
+    const fixture = createProviderFixture();
+    const jobUrl = "https://jenkins.example/job/demo/";
+    fixture.jobCollections.set("", [{ name: "demo", url: jobUrl, kind: "job", color: "blue" }]);
+    fixture.builds = createBuildStubs(jobUrl, 20);
     const { jobsFolder } = await expandToFolders(fixture);
     const [job] = await loadChildren(fixture, jobsFolder);
 
     const children = await loadChildren(fixture, job);
     assert.equal(asItem(children[0]).contextValue, "build");
-    const olderBuilds = asItem(children.at(-2));
-    assert.equal(olderBuilds.command?.command, "jenkinsWorkbench.openJobHistory");
-    assert.equal(olderBuilds.command?.arguments?.[0], job);
+    const loadMore = asItem(children.at(-2));
+    assert.equal(loadMore.label, "Load 20 more builds");
+    assert.equal(loadMore.description, "Showing 20");
+    assert.equal(loadMore.command?.command, "jenkinsWorkbench.loadMoreBuilds");
+    assert.equal(loadMore.command?.arguments?.[0], job);
     assert.equal(asItem(children.at(-1)).contextValue, "workspaceRoot");
+    assert.deepEqual(fixture.buildRequests, [{ limit: 20, offset: undefined }]);
+    fixture.provider.dispose();
+  });
+
+  it("omits the load more row when the job has fewer builds than requested", async () => {
+    const fixture = createProviderFixture();
+    const jobUrl = "https://jenkins.example/job/demo/";
+    fixture.jobCollections.set("", [{ name: "demo", url: jobUrl, kind: "job", color: "blue" }]);
+    fixture.builds = createBuildStubs(jobUrl, 19);
+    const { jobsFolder } = await expandToFolders(fixture);
+    const [job] = await loadChildren(fixture, jobsFolder);
+
+    const children = await loadChildren(fixture, job);
+    assert.equal(children.length, 20);
+    assert.equal(asItem(children.at(-1)).contextValue, "workspaceRoot");
+    fixture.provider.dispose();
+  });
+
+  it("loads more builds in place despite the refresh cooldown and keeps the count across refreshes", async () => {
+    const fixture = createProviderFixture();
+    const jobUrl = "https://jenkins.example/job/demo/";
+    fixture.jobCollections.set("", [{ name: "demo", url: jobUrl, kind: "job", color: "blue" }]);
+    fixture.builds = createBuildStubs(jobUrl, 45);
+    const { jobsFolder } = await expandToFolders(fixture);
+    const [job] = await loadChildren(fixture, jobsFolder);
+    await loadChildren(fixture, job);
+
+    assert.equal(fixture.provider.refresh(), true);
+    assert.equal(fixture.provider.refresh(), false);
+    const [refreshedJob] = await loadChildren(fixture, jobsFolder);
+    await loadChildren(fixture, refreshedJob);
+    fixture.events.length = 0;
+    fixture.buildRequests.length = 0;
+
+    assert.equal(fixture.provider.loadMoreBuilds(refreshedJob), true);
+    assert.deepEqual(fixture.events, [refreshedJob]);
+    const expanded = await fixture.provider.getChildren(refreshedJob);
+    assert.equal(expanded.filter((item) => asItem(item).contextValue === "build").length, 40);
+    assert.equal(asItem(expanded.at(-2)).description, "Showing 40");
+    assert.deepEqual(fixture.buildRequests, [{ limit: 40, offset: 0 }]);
+
+    fixture.provider.fullEnvironmentRefresh({
+      environmentId: fixture.environmentRef.environmentId,
+      trigger: "system"
+    });
+    const [jobAfterRefresh] = await loadChildren(fixture, jobsFolder);
+    const afterRefresh = await loadChildren(fixture, jobAfterRefresh);
+    assert.equal(afterRefresh.filter((item) => asItem(item).contextValue === "build").length, 40);
+
+    assert.equal(fixture.provider.loadMoreBuilds(jobAfterRefresh), true);
+    const exhausted = await fixture.provider.getChildren(jobAfterRefresh);
+    assert.equal(exhausted.filter((item) => asItem(item).contextValue === "build").length, 45);
+    assert.equal(asItem(exhausted.at(-1)).contextValue, "workspaceRoot");
+    assert.equal(exhausted.length, 46);
     fixture.provider.dispose();
   });
 

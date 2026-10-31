@@ -89,6 +89,14 @@ export function registerBuildCommands(
       "jenkinsWorkbench.abortBuild.single",
       createBulkCommandHandler(bulk, "stop", true)
     ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.terminateBuild",
+      createBulkCommandHandler(bulk, "terminate")
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.killBuild",
+      createBulkCommandHandler(bulk, "kill")
+    ),
     vscode.commands.registerCommand("jenkinsWorkbench.approveInput", (item?: BuildTreeItem) =>
       approveInput(dataService, refreshHost, item)
     ),

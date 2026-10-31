@@ -14,12 +14,18 @@ import type {
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
 import type { JenkinsTestReportOptions } from "../JenkinsTestReportOptions";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "../request";
-import type { JenkinsBuildPermalink, JenkinsTestReport } from "../types";
+import {
+  isPipelineRun,
+  type JenkinsBuildPermalink,
+  type JenkinsBuildStopState,
+  type JenkinsTestReport
+} from "../types";
 import { applyBuildKeepForever, deleteBuildWithRetention } from "./JenkinsBuildRetention";
 import { callOptionalBuildEndpoint, toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
 import type {
   BuildParameterPayload,
+  BuildStopEscalationResult,
   ConsoleTextResult,
   ConsoleTextTailResult,
   FlowNodeDetailsResult,
@@ -325,6 +331,47 @@ export class JenkinsBuildDataOperations {
 
   async stopBuild(environment: JenkinsEnvironmentRef, buildUrl: string): Promise<void> {
     await this.runBuildAction(environment, (client) => client.stopBuild(buildUrl));
+  }
+
+  /**
+   * Sends Jenkins' "forcibly terminate" (`term`) or "forcibly kill" (`kill`) request after
+   * checking that the build is a running Pipeline run. Never posts to other build types.
+   */
+  async escalateBuildStop(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string,
+    step: "term" | "kill"
+  ): Promise<BuildStopEscalationResult> {
+    return this.runBuildAction(environment, async (client) => {
+      const state = await client.getBuildStopState(buildUrl);
+      if (!isPipelineRun(state.className)) {
+        return "unsupported";
+      }
+      if (!state.building) {
+        return "not-running";
+      }
+      try {
+        if (step === "term") {
+          await client.terminateBuild(buildUrl);
+        } else {
+          await client.killBuild(buildUrl);
+        }
+      } catch (error) {
+        if (error instanceof JenkinsRequestError && error.statusCode === 404) {
+          return "unsupported";
+        }
+        throw error;
+      }
+      return "sent";
+    });
+  }
+
+  /** Uncached read of the run class and building flag, used before escalating a stop. */
+  async getBuildStopState(
+    environment: JenkinsEnvironmentRef,
+    buildUrl: string
+  ): Promise<JenkinsBuildStopState> {
+    return this.runBuildAction(environment, (client) => client.getBuildStopState(buildUrl));
   }
 
   /**

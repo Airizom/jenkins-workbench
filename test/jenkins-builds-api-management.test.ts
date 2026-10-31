@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { JenkinsBuildsApi } from "../src/jenkins/client/JenkinsBuildsApi";
 import { buildBuildDetailsTree } from "../src/jenkins/client/JenkinsBuildTreeBuilders";
+import { isPipelineRun, PIPELINE_RUN_CLASS } from "../src/jenkins/types";
 import { createJenkinsClientContext } from "./helpers/jenkinsClientContext";
 
 const BUILD_URL = "https://jenkins.example.com/job/demo/15/";
@@ -106,5 +107,35 @@ describe("JenkinsBuildsApi build management", () => {
     const tree = new URL(gets[0]).searchParams.get("tree");
     assert.equal(tree, "number,url,building,keepLog,displayName,description");
     assert.equal(buildBuildDetailsTree({ managementOnly: true }), tree);
+  });
+
+  it.each([
+    ["terminateBuild", "term"],
+    ["killBuild", "kill"]
+  ] as const)("%s posts %s with a crumb and no body", async (method, endpoint) => {
+    const { api, posts } = createHarness();
+
+    await api[method]("https://jenkins.example.com/job/demo/15");
+
+    assert.deepEqual(posts, [{ kind: "void", url: `${BUILD_URL}${endpoint}`, body: undefined }]);
+  });
+
+  it("reads only the run class, building flag, and result for stop escalation", async () => {
+    const { api, gets } = createHarness();
+
+    const state = await api.getBuildStopState(BUILD_URL);
+
+    assert.equal(gets.length, 1);
+    assert.equal(new URL(gets[0]).searchParams.get("tree"), "_class,building,result");
+    assert.deepEqual(state, { className: undefined, building: false, result: undefined });
+  });
+});
+
+describe("isPipelineRun", () => {
+  it("accepts only WorkflowRun builds", () => {
+    assert.equal(isPipelineRun(PIPELINE_RUN_CLASS), true);
+    assert.equal(isPipelineRun("hudson.model.FreeStyleBuild"), false);
+    assert.equal(isPipelineRun("hudson.matrix.MatrixBuild"), false);
+    assert.equal(isPipelineRun(undefined), false);
   });
 });

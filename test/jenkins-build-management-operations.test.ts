@@ -462,3 +462,73 @@ describe("JenkinsBuildDataOperations.getBuildsForJob descriptions", () => {
     );
   });
 });
+
+describe("JenkinsBuildDataOperations.escalateBuildStop", () => {
+  const PIPELINE = "org.jenkinsci.plugins.workflow.job.WorkflowRun";
+
+  function escalation(state: { className?: string; building: boolean }, postError?: Error) {
+    const fail = async () => {
+      if (postError) {
+        throw postError;
+      }
+    };
+    const extra = {
+      getBuildStopState: vi.fn(async () => state),
+      terminateBuild: vi.fn(fail),
+      killBuild: vi.fn(fail)
+    };
+    const { operations, client } = createOperations(extra as unknown as Partial<ClientStub>);
+    return { operations, client: client as unknown as typeof extra };
+  }
+
+  it.each([
+    ["term", "terminateBuild"],
+    ["kill", "killBuild"]
+  ] as const)("posts %s to a running Pipeline run", async (step, method) => {
+    const { operations, client } = escalation({ className: PIPELINE, building: true });
+
+    assert.equal(await operations.escalateBuildStop(environment, buildUrl, step), "sent");
+
+    assert.deepEqual(client[method].mock.calls, [[buildUrl]]);
+  });
+
+  it("never posts to builds that are not Pipeline runs", async () => {
+    const { operations, client } = escalation({
+      className: "hudson.model.FreeStyleBuild",
+      building: true
+    });
+
+    assert.equal(await operations.escalateBuildStop(environment, buildUrl, "kill"), "unsupported");
+
+    assert.equal(client.killBuild.mock.calls.length, 0);
+    assert.equal(client.terminateBuild.mock.calls.length, 0);
+  });
+
+  it("reports Pipeline runs that already finished as not running", async () => {
+    const { operations, client } = escalation({ className: PIPELINE, building: false });
+
+    assert.equal(await operations.escalateBuildStop(environment, buildUrl, "term"), "not-running");
+
+    assert.equal(client.terminateBuild.mock.calls.length, 0);
+  });
+
+  it("maps a 404 from the endpoint to unsupported and other failures to BuildActionError", async () => {
+    const missing = escalation(
+      { className: PIPELINE, building: true },
+      new JenkinsRequestError("Not Found", 404)
+    );
+    assert.equal(
+      await missing.operations.escalateBuildStop(environment, buildUrl, "kill"),
+      "unsupported"
+    );
+
+    const denied = escalation(
+      { className: PIPELINE, building: true },
+      new JenkinsRequestError("Forbidden", 403)
+    );
+    await assert.rejects(
+      denied.operations.escalateBuildStop(environment, buildUrl, "term"),
+      (error: unknown) => error instanceof BuildActionError && error.statusCode === 403
+    );
+  });
+});

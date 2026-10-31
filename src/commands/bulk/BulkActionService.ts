@@ -1,13 +1,21 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import { formatActionError } from "../../formatters/ErrorFormatters";
-import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import type {
+  BuildStopEscalationResult,
+  JenkinsDataService
+} from "../../jenkins/JenkinsDataService";
 import { stripUrlCredentials } from "../../jenkins/urls";
 import { createLazyOutputChannel } from "../../shared/LazyOutputChannel";
 import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
 import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
-import type { WorkbenchTreeElement } from "../../tree/TreeItems";
+import type { BuildTreeItem, WorkbenchTreeElement } from "../../tree/TreeItems";
 import { getTreeItemLabel } from "../CommandUtils";
+import {
+  BuildStopEscalation,
+  type BuildStopEscalationDependencies,
+  type BuildStopEscalationStage
+} from "./BuildStopEscalation";
 import {
   type BulkAction,
   type BulkActionTarget,
@@ -19,9 +27,25 @@ interface BulkActionDependencies {
   watchStore: JenkinsWatchStore;
   pinStore: JenkinsPinStore;
   refreshHost: EnvironmentScopedRefreshHost;
+  /** Replaces the post-Stop/Terminate follow-up; tests use it to observe or disable escalation. */
+  createStopEscalation?: (
+    dependencies: BuildStopEscalationDependencies
+  ) => Pick<BuildStopEscalation, "followUp" | "dispose">;
 }
 
-type Outcome = "succeeded" | "unchanged" | "failed" | "unattempted" | "incompatible" | "duplicate";
+export interface BulkActionRunOptions {
+  /** Skips the Terminate modal when the user already accepted a Terminate prompt. Ignored for Kill. */
+  confirmed?: boolean;
+}
+
+type Outcome =
+  | "succeeded"
+  | "unchanged"
+  | "failed"
+  | "unattempted"
+  | "incompatible"
+  | "duplicate"
+  | "unsupported";
 interface Result {
   item: WorkbenchTreeElement;
   outcome: Outcome;
@@ -30,11 +54,38 @@ interface Result {
 
 const titles: Record<BulkAction, string> = {
   stop: "Stop builds",
+  terminate: "Terminate builds",
+  kill: "Kill builds",
   cancel: "Cancel queue items",
   watch: "Watch jobs",
   unwatch: "Unwatch jobs",
   pin: "Pin jobs",
   unpin: "Unpin jobs"
+};
+
+const REMOTE_ACTIONS: ReadonlySet<BulkAction> = new Set(["stop", "terminate", "kill", "cancel"]);
+
+const CONFIRM_LABELS: Partial<Record<BulkAction, string>> = {
+  stop: "Stop Builds",
+  terminate: "Terminate Builds",
+  kill: "Kill Builds",
+  cancel: "Cancel Queue Items"
+};
+
+const CONFIRM_NOTES: Partial<Record<BulkAction, string>> = {
+  terminate:
+    "Terminate forcibly ends the running Pipeline steps. Only Pipeline runs support it; other builds are skipped.",
+  kill: [
+    "Kill hard-stops the entire Pipeline run without further cleanup:",
+    "post and finally blocks will not run, and agents, locks, or workspaces may be left behind.",
+    "Use it only when Stop and Terminate did not end the build. Only Pipeline runs support it; other builds are skipped."
+  ].join(" ")
+};
+
+const ESCALATION_OUTCOMES: Record<BuildStopEscalationResult, Outcome> = {
+  sent: "succeeded",
+  "not-running": "unchanged",
+  unsupported: "unsupported"
 };
 
 function environmentLabel(item: WorkbenchTreeElement): string {
@@ -74,16 +125,37 @@ function groupResults(results: readonly Result[]): Map<string, Result[]> {
 
 export class BulkActionService implements vscode.Disposable {
   private readonly output = createLazyOutputChannel("Jenkins Bulk Actions");
+  private readonly stopEscalation: Pick<BuildStopEscalation, "followUp" | "dispose">;
   private disposed = false;
 
-  constructor(private readonly dependencies: BulkActionDependencies) {}
+  constructor(private readonly dependencies: BulkActionDependencies) {
+    const escalationDependencies: BuildStopEscalationDependencies = {
+      dataService: dependencies.dataService,
+      refreshHost: dependencies.refreshHost,
+      runAction: (action, items, options) => this.run(action, items, options),
+      log: (lines) => {
+        for (const line of lines) {
+          this.output.appendLine(line);
+        }
+      },
+      showLog: () => this.output.show(true)
+    };
+    this.stopEscalation =
+      dependencies.createStopEscalation?.(escalationDependencies) ??
+      new BuildStopEscalation(escalationDependencies);
+  }
 
   dispose(): void {
     this.disposed = true;
+    this.stopEscalation.dispose();
     this.output.dispose();
   }
 
-  async run(action: BulkAction, items: readonly WorkbenchTreeElement[]): Promise<void> {
+  async run(
+    action: BulkAction,
+    items: readonly WorkbenchTreeElement[],
+    options: BulkActionRunOptions = {}
+  ): Promise<void> {
     const { targets, incompatible, duplicates } = resolveBulkActionTargets(action, [...items]);
     const results: Result[] = [
       ...incompatible.map((item): Result => ({ item, outcome: "incompatible" })),
@@ -93,15 +165,13 @@ export class BulkActionService implements vscode.Disposable {
       await this.report(action, results, "No eligible items selected");
       return;
     }
-    if (
-      (action === "stop" || action === "cancel") &&
-      !(await this.confirm(action, targets, results.length))
-    ) {
+    const remote = REMOTE_ACTIONS.has(action);
+    const preconfirmed = action === "terminate" && options.confirmed === true;
+    if (remote && !preconfirmed && !(await this.confirm(action, targets, results.length))) {
       return;
     }
 
     const refresh = new Set<string>();
-    const remote = action === "stop" || action === "cancel";
     let next = 0;
     let completed = 0;
     await vscode.window.withProgress(
@@ -137,7 +207,23 @@ export class BulkActionService implements vscode.Disposable {
     for (const environmentId of refresh) {
       this.dependencies.refreshHost.fullEnvironmentRefresh({ environmentId });
     }
-    await this.report(action, results);
+    const reporting = this.report(action, results);
+    if ((action === "stop" || action === "terminate") && !this.disposed) {
+      this.startStopEscalation(action, results);
+    }
+    await reporting;
+  }
+
+  private startStopEscalation(stage: BuildStopEscalationStage, results: readonly Result[]): void {
+    const stopped = results
+      .filter((result) => result.outcome === "succeeded")
+      .map((result) => result.item as BuildTreeItem);
+    if (stopped.length === 0) {
+      return;
+    }
+    void this.stopEscalation.followUp(stage, stopped).catch((error: unknown) => {
+      this.output.appendLine(`Stop follow-up failed: ${formatActionError(error)}`);
+    });
   }
 
   private async execute(
@@ -149,6 +235,9 @@ export class BulkActionService implements vscode.Disposable {
     const { dataService } = this.dependencies;
     const { environment } = target.item;
     if (target.kind === "build") {
+      if (action === "terminate" || action === "kill") {
+        return this.escalateBuild(action, target.url, environment);
+      }
       await dataService.stopBuild(environment, target.url);
       return "succeeded";
     }
@@ -161,6 +250,19 @@ export class BulkActionService implements vscode.Disposable {
       return this.addJobTarget(target, watching, refresh, token);
     }
     return this.removeJobTarget(target, watching, refresh);
+  }
+
+  private async escalateBuild(
+    action: "terminate" | "kill",
+    buildUrl: string,
+    environment: BuildTreeItem["environment"]
+  ): Promise<Outcome> {
+    const result = await this.dependencies.dataService.escalateBuildStop(
+      environment,
+      buildUrl,
+      action === "terminate" ? "term" : "kill"
+    );
+    return ESCALATION_OUTCOMES[result];
   }
 
   private async addJobTarget(
@@ -246,7 +348,11 @@ export class BulkActionService implements vscode.Disposable {
     if (skipped > 0) {
       lines.push(`${skipped} incompatible or duplicate selected row(s) will be skipped.`);
     }
-    const label = action === "stop" ? "Stop Builds" : "Cancel Queue Items";
+    const note = CONFIRM_NOTES[action];
+    if (note) {
+      lines.unshift(note, "");
+    }
+    const label = CONFIRM_LABELS[action] ?? titles[action];
     const choice = await vscode.window.showWarningMessage(
       `${label}: ${targets.length} eligible item(s)?`,
       { modal: true, detail: lines.join("\n") },
@@ -266,6 +372,24 @@ export class BulkActionService implements vscode.Disposable {
     }
     const summary = `${titles[action]}: ${message ?? [...counts].map(([outcome, count]) => `${count} ${outcome}`).join(", ")}.`;
     this.output.appendLine(`\n${new Date().toISOString()} — ${summary}`);
+    this.logResults(results);
+    const errors = counts.get("failed") ?? 0;
+    const succeeded = counts.get("succeeded") ?? 0;
+    const unsupported = counts.get("unsupported") ?? 0;
+    let choice: string | undefined;
+    if (errors > 0 && succeeded === 0) {
+      choice = await vscode.window.showErrorMessage(summary, "Show Details");
+    } else if (errors > 0 || unsupported > 0) {
+      choice = await vscode.window.showWarningMessage(summary, "Show Details");
+    } else {
+      choice = await vscode.window.showInformationMessage(summary, "Show Details");
+    }
+    if (choice === "Show Details") {
+      this.output.show(true);
+    }
+  }
+
+  private logResults(results: readonly Result[]): void {
     for (const [environment, group] of groupResults(results)) {
       this.output.appendLine(environment);
       for (const result of group) {
@@ -273,16 +397,6 @@ export class BulkActionService implements vscode.Disposable {
           `  ${result.outcome}: ${itemLabel(result.item)}${result.error === undefined ? "" : ` — ${formatActionError(result.error)}`}`
         );
       }
-    }
-    const errors = counts.get("failed") ?? 0;
-    const choice =
-      errors > 0
-        ? (counts.get("succeeded") ?? 0) > 0
-          ? await vscode.window.showWarningMessage(summary, "Show Details")
-          : await vscode.window.showErrorMessage(summary, "Show Details")
-        : await vscode.window.showInformationMessage(summary, "Show Details");
-    if (choice === "Show Details") {
-      this.output.show(true);
     }
   }
 }

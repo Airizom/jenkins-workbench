@@ -25,6 +25,7 @@ describe("extension smoke", () => {
     const registered = new Set(await vscode.commands.getCommands(true));
     const expected = [
       "jenkinsWorkbench.openJobHistory",
+      "jenkinsWorkbench.loadMoreBuilds",
       "jenkinsWorkbench.downloadAllArtifacts",
       "jenkinsWorkbench.addEnvironment",
       "jenkinsWorkbench.editEnvironment",
@@ -33,6 +34,8 @@ describe("extension smoke", () => {
       "jenkinsWorkbench.replayWithLocalJenkinsfile",
       "jenkinsWorkbench.abortBuild",
       "jenkinsWorkbench.abortBuild.single",
+      "jenkinsWorkbench.terminateBuild",
+      "jenkinsWorkbench.killBuild",
       "jenkinsWorkbench.cancelQueueItem",
       "jenkinsWorkbench.cancelQueueItem.single",
       "jenkinsWorkbench.watchJob",
