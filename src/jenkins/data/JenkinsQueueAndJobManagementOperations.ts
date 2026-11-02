@@ -1,7 +1,8 @@
 import { trimToUndefined } from "../../shared/stringValues";
 import type {
   JenkinsClient,
-  JenkinsItemCreateKind,
+  JenkinsModeCreateKind,
+  JenkinsMultibranchCreateOptions,
   JenkinsQueueItem,
   ScanMultibranchResult
 } from "../JenkinsClient";
@@ -70,13 +71,24 @@ export class JenkinsQueueAndJobManagementOperations {
   }
 
   async createItem(
-    kind: JenkinsItemCreateKind,
+    kind: JenkinsModeCreateKind,
     environment: JenkinsEnvironmentRef,
     parentUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
     return this.runJobManagementAction(environment, (client) =>
       client.createItem(kind, parentUrl, newName)
+    );
+  }
+
+  async createMultibranchPipeline(
+    environment: JenkinsEnvironmentRef,
+    parentUrl: string,
+    newName: string,
+    options: JenkinsMultibranchCreateOptions
+  ): Promise<{ newUrl: string }> {
+    return this.runJobManagementAction(environment, (client) =>
+      client.createMultibranchPipeline(parentUrl, newName, options)
     );
   }
 

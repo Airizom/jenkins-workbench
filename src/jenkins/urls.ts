@@ -73,6 +73,11 @@ export function stripUrlCredentials(url: string): string {
   }
 }
 
+/** Like `stripUrlCredentials`, but only for http(s) URLs; an SSH `git@host:` user is kept. */
+export function stripHttpUrlCredentials(url: string): string {
+  return /^https?:\/\//i.test(url) ? stripUrlCredentials(url) : url;
+}
+
 export function normalizeJenkinsUrlForComparison(value: string): string {
   try {
     const url = new URL(value);

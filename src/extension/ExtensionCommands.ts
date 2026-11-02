@@ -122,7 +122,8 @@ export function registerExtensionCommands(
     presetStore,
     pinStore,
     watchStore,
-    diagnosticBindingStore
+    diagnosticBindingStore,
+    container.lazy("repositoryLinkStore")
   );
 
   registerBuildDiagnosticCommands(context, buildDiagnosticsCoordinator);

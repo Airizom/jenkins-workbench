@@ -12,7 +12,13 @@ import type {
 
 export type { BuildParameterPayload } from "../BuildParameterRequests";
 
-export type JenkinsActionErrorCode = "forbidden" | "not_found" | "auth" | "redirect" | "unknown";
+export type JenkinsActionErrorCode =
+  | "forbidden"
+  | "not_found"
+  | "auth"
+  | "redirect"
+  | "duplicate_item"
+  | "unknown";
 
 export type JobParameterKind =
   | "boolean"

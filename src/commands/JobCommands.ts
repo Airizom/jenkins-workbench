@@ -6,6 +6,7 @@ import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDia
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
+import type { JenkinsRepositoryLinkStore } from "../storage/JenkinsRepositoryLinkStore";
 import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type {
   JenkinsFolderTreeItem,
@@ -47,11 +48,13 @@ export function registerJobCommands(
   presetStore: JenkinsParameterPresetStore,
   pinStore: JenkinsPinStore,
   watchStore: JenkinsWatchStore,
-  bindingStore: JenkinsDiagnosticProfileBindingStore
+  bindingStore: JenkinsDiagnosticProfileBindingStore,
+  repositoryLinkStore: JenkinsRepositoryLinkStore
 ): void {
   const newItemTargetResolver = new JobNewItemTargetResolver(environmentStore);
   const newItemWorkflow = new JobNewItemWorkflow({
     dataService,
+    repositoryLinkStore,
     onEnvironmentChanged: createEnvironmentRefreshCallback(refreshHost)
   });
 

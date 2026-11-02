@@ -46,8 +46,9 @@ import type {
   JenkinsBuild,
   JenkinsBuildDetails,
   JenkinsInputProceedOptions,
-  JenkinsItemCreateKind,
   JenkinsJob,
+  JenkinsModeCreateKind,
+  JenkinsMultibranchCreateOptions,
   JenkinsNodeDetails,
   JenkinsQueueItem,
   JenkinsRestartFromStageInfo,
@@ -759,11 +760,25 @@ export class JenkinsDataService
   }
 
   async createItem(
-    kind: JenkinsItemCreateKind,
+    kind: JenkinsModeCreateKind,
     environment: JenkinsEnvironmentRef,
     parentUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
     return this.queueAndJobManagementOperations.createItem(kind, environment, parentUrl, newName);
+  }
+
+  async createMultibranchPipeline(
+    environment: JenkinsEnvironmentRef,
+    parentUrl: string,
+    newName: string,
+    options: JenkinsMultibranchCreateOptions
+  ): Promise<{ newUrl: string }> {
+    return this.queueAndJobManagementOperations.createMultibranchPipeline(
+      environment,
+      parentUrl,
+      newName,
+      options
+    );
   }
 }

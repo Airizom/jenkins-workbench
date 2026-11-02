@@ -45,7 +45,7 @@ See [commit-aware status](#commit-aware-status) for verification requirements an
 
 ### Job Management & Configuration
 
-- **Create Jobs & Pipelines** — Use **New Item** to create a Freestyle job or Pipeline at an environment root or in a regular folder
+- **Create Jobs, Pipelines, Folders & Multibranch Pipelines** — Use **New Item** to create a Freestyle job, Pipeline, Folder, or Multibranch Pipeline at an environment root or in a regular folder. A Multibranch Pipeline gets a Git branch source (pick a workspace remote or enter a URL, with an optional credentials ID and Jenkinsfile path); Workbench starts its first branch scan and offers to link the workspace repository for current-branch status
 - **Copy, Rename & Delete Jobs** — Manage existing jobs and pipelines from their tree context menus
 - **Enable / Disable Jobs** — Change whether a job or pipeline is enabled without leaving the editor
 - **View & Edit Configuration** — Preview `config.xml`, or use **Update Job Config** to edit a draft alongside a diff, review XML diagnostics, and confirm submission to Jenkins
@@ -602,7 +602,7 @@ activates there.
 | `Jenkins: View Job Config` | Open the selected job or pipeline's `config.xml` in a read-only preview |
 | `Jenkins: Update Job Config` | Open an editable draft of `config.xml`, show a diff, validate XML, and submit with confirmation |
 | `Jenkins: Submit Job Config` | Submit the active job config draft after validation and confirmation |
-| `Jenkins: New Item` | Create a Freestyle job or Pipeline at an environment root or regular folder |
+| `Jenkins: New Item` | Create a Freestyle job, Pipeline, Folder, or Multibranch Pipeline (Git branch source, first scan, optional repository link) at an environment root or regular folder |
 | `Jenkins: Enable Job` | Enable a disabled job or pipeline |
 | `Jenkins: Disable Job` | Disable an enabled job or pipeline |
 | `Jenkins: Rename Job` | Rename the selected job or pipeline |

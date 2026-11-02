@@ -27,9 +27,10 @@ import type {
   JenkinsConsoleTextTail,
   JenkinsFlowNodeLog,
   JenkinsInputProceedOptions,
-  JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
+  JenkinsModeCreateKind,
+  JenkinsMultibranchCreateOptions,
   JenkinsNode,
   JenkinsNodeDetails,
   JenkinsParameterDefinition,
@@ -61,9 +62,10 @@ export type {
   JenkinsConsoleTextTail,
   JenkinsFlowNodeLog,
   JenkinsInputProceedOptions,
-  JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
+  JenkinsModeCreateKind,
+  JenkinsMultibranchCreateOptions,
   JenkinsNode,
   JenkinsNodeDetails,
   JenkinsParameterDefinition,
@@ -560,11 +562,19 @@ export class JenkinsClient
   }
 
   async createItem(
-    kind: JenkinsItemCreateKind,
+    kind: JenkinsModeCreateKind,
     parentUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
     return this.jobsApi.createItem(kind, parentUrl, newName);
+  }
+
+  async createMultibranchPipeline(
+    parentUrl: string,
+    newName: string,
+    options: JenkinsMultibranchCreateOptions
+  ): Promise<{ newUrl: string }> {
+    return this.jobsApi.createMultibranchPipeline(parentUrl, newName, options);
   }
 
   // fallow-ignore-next-line unused-class-member

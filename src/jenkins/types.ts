@@ -463,5 +463,13 @@ export interface JenkinsParameterDefinition {
   multiSelectDelimiter?: string;
 }
 
-export type JenkinsItemCreateKind = "job" | "pipeline";
+export type JenkinsItemCreateKind = "job" | "pipeline" | "folder" | "multibranch";
+/** Item kinds Jenkins creates from a `mode` class name alone. */
+export type JenkinsModeCreateKind = Exclude<JenkinsItemCreateKind, "multibranch">;
+
+export interface JenkinsMultibranchCreateOptions {
+  repositoryUrl: string;
+  credentialsId?: string;
+  scriptPath: string;
+}
 export type JenkinsJobKind = "folder" | "multibranch" | "pipeline" | "job" | "unknown";

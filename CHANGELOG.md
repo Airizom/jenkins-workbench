@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- feat(jobs): New Item creates Folders and Multibranch Pipelines. A Multibranch Pipeline is created with a Git branch source from a workspace remote or a typed URL, an optional credentials ID, and a Jenkinsfile path; Workbench starts the first branch scan, offers to link the workspace repository, and offers Open in Jenkins. When Jenkins rejects a Folder or Multibranch Pipeline, the error names the plugins it needs.
+
+### Fixed
+
+- fix(jobs): New Item and Copy Job report the new item's URL instead of the `configure` page Jenkins redirects to.
+
 ## [1.62.0] - 2026-10-31
 
 ### Added

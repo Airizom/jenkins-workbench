@@ -1,7 +1,10 @@
+import { JenkinsDuplicateItemError, JenkinsRequestError } from "../errors";
+import { buildMultibranchPipelineXml } from "../MultibranchPipelineXml";
 import type {
-  JenkinsItemCreateKind,
   JenkinsJob,
   JenkinsJobKind,
+  JenkinsModeCreateKind,
+  JenkinsMultibranchCreateOptions,
   JenkinsParameterDefinition,
   JenkinsView,
   ScanMultibranchResult
@@ -12,6 +15,7 @@ import {
   buildApiUrlFromItem,
   buildJobUrl,
   buildViewScopedJobUrl,
+  ensureTrailingSlash,
   parseJobUrl
 } from "../urls";
 import type { JenkinsClientContext } from "./JenkinsClientContext";
@@ -27,9 +31,10 @@ const VIEW_LIST_TREE = "views[name,url]";
 const JOB_PARAMETER_TREE =
   "parameterDefinitions[name,type,defaultParameterValue[value],defaultValue,choices,description,projectName,multiSelectDelimiter]";
 const JOB_PARAMETERS_TREE = `actions[${JOB_PARAMETER_TREE}],property[${JOB_PARAMETER_TREE}]`;
-const CREATE_ITEM_MODES: Record<JenkinsItemCreateKind, string> = {
+const CREATE_ITEM_MODES: Record<JenkinsModeCreateKind, string> = {
   job: "hudson.model.FreeStyleProject",
-  pipeline: "org.jenkinsci.plugins.workflow.job.WorkflowJob"
+  pipeline: "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+  folder: "com.cloudbees.hudson.plugins.folder.Folder"
 };
 
 const JOB_CLASSIFIER_TOKENS: Array<{ readonly token: string; readonly kind: JenkinsJobKind }> = [
@@ -168,11 +173,34 @@ export class JenkinsJobsApi {
   }
 
   async createItem(
-    kind: JenkinsItemCreateKind,
+    kind: JenkinsModeCreateKind,
     parentUrl: string,
     newName: string
   ): Promise<{ newUrl: string }> {
     return this.createItemWithMode(parentUrl, newName, CREATE_ITEM_MODES[kind]);
+  }
+
+  async createMultibranchPipeline(
+    parentUrl: string,
+    newName: string,
+    options: JenkinsMultibranchCreateOptions
+  ): Promise<{ newUrl: string }> {
+    return this.createItemFromXml(parentUrl, newName, buildMultibranchPipelineXml(options));
+  }
+
+  async createItemFromXml(
+    parentUrl: string,
+    newName: string,
+    xml: string
+  ): Promise<{ newUrl: string }> {
+    const url = new URL(buildActionUrl(parentUrl, "createItem"));
+    url.searchParams.set("name", newName);
+    const response = await withDuplicateNameError(newName, () =>
+      this.context.requestPostWithCrumbRaw(url.toString(), xml, {
+        "Content-Type": "application/xml; charset=utf-8"
+      })
+    );
+    return { newUrl: resolveCreatedItemUrl(parentUrl, newName, response.location) };
   }
 
   private async fetchJobs(url: string): Promise<JenkinsJob[]> {
@@ -199,12 +227,62 @@ export class JenkinsJobsApi {
       params.set("from", sourceName);
     }
     const fullUrl = `${url}?${params.toString()}`;
-    const response = await this.context.requestPostWithCrumb(fullUrl, "");
+    const response = await withDuplicateNameError(newName, () =>
+      this.context.requestPostWithCrumb(fullUrl, "")
+    );
 
-    if (response.location) {
-      return { newUrl: response.location };
-    }
-
-    return { newUrl: buildJobUrl(parentUrl, newName) };
+    return { newUrl: resolveCreatedItemUrl(parentUrl, newName, response.location) };
   }
+}
+
+const DUPLICATE_ITEM_PATTERN = /already exists|already contains an item/i;
+
+/**
+ * Jenkins rejects a taken name with a 400 or 500 whose only explanation is in the response body
+ * or `X-Error` header, which the generic request error leaves out of its message.
+ */
+async function withDuplicateNameError<T>(newName: string, request: () => Promise<T>): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    if (error instanceof JenkinsRequestError && isDuplicateItemResponse(error)) {
+      throw new JenkinsDuplicateItemError(
+        `An item named "${newName}" already exists in this location.`,
+        error.statusCode,
+        error.responseText,
+        error.responseHeaders
+      );
+    }
+    throw error;
+  }
+}
+
+function isDuplicateItemResponse(error: JenkinsRequestError): boolean {
+  if (error.statusCode !== 400 && error.statusCode !== 500) {
+    return false;
+  }
+  const header = error.responseHeaders?.["x-error"];
+  const headerText = Array.isArray(header) ? header.join(" ") : (header ?? "");
+  return (
+    DUPLICATE_ITEM_PATTERN.test(headerText) || DUPLICATE_ITEM_PATTERN.test(error.responseText ?? "")
+  );
+}
+
+/**
+ * Jenkins answers a form-style createItem with a redirect to the new item's `configure` page,
+ * sometimes relative, and an XML createItem with no Location at all. Both map to the item URL.
+ */
+function resolveCreatedItemUrl(parentUrl: string, newName: string, location?: string): string {
+  if (location) {
+    try {
+      const resolved = new URL(location, ensureTrailingSlash(parentUrl));
+      resolved.pathname = ensureTrailingSlash(resolved.pathname.replace(/\/configure\/?$/, "/"));
+      resolved.search = "";
+      resolved.hash = "";
+      return resolved.toString();
+    } catch {
+      // Fall back to the URL Jenkins uses for a new child item.
+    }
+  }
+  return buildJobUrl(parentUrl, newName);
 }

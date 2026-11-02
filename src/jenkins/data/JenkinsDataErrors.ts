@@ -1,6 +1,7 @@
 import {
   BuildActionError,
   JenkinsActionError,
+  JenkinsDuplicateItemError,
   JenkinsRequestError,
   JobManagementActionError
 } from "../errors";
@@ -17,6 +18,10 @@ const toActionError = <T extends JenkinsActionError>(
 ): T => {
   if (error instanceof ErrorType) {
     return error;
+  }
+
+  if (error instanceof JenkinsDuplicateItemError) {
+    return new ErrorType(error.message, "duplicate_item", error.statusCode);
   }
 
   if (error instanceof JenkinsRequestError) {

@@ -19,6 +19,9 @@ export class JenkinsRequestError extends Error {
   }
 }
 
+/** Jenkins refused to create an item because the parent already holds one with that name. */
+export class JenkinsDuplicateItemError extends JenkinsRequestError {}
+
 export class JenkinsMaxBytesError extends JenkinsRequestError {
   readonly maxBytes: number;
 

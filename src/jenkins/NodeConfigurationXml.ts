@@ -1,3 +1,4 @@
+import { escapeXml } from "../shared/xml";
 import {
   type NodeConfiguration,
   type NodeCreateInput,
@@ -101,15 +102,6 @@ export function updateNodeConfigurationLabels(xml: string, labels: string): stri
   const updated = `${xml.slice(0, start)}<label>${escapeXml(labels)}</label>${xml.slice(end)}`;
   parsePermanentConfiguration(updated);
   return updated;
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
 }
 
 export function buildInboundNodeConfiguration(input: NodeCreateInput): string {
