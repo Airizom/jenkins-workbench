@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.64.0] - 2026-11-05
+
+### Added
+
+- feat(scans): track multibranch scans from folder actions, linked repositories, and newly created pipelines, showing requested, queued, running, and completed status. Repeat requests follow active scans, and completion notifications accompany automatic branch and current-branch refreshes.
+- feat(scans): add View Scan Log to open searchable, read-only indexing logs that update while a scan runs, with bounded output, truncation notices, and links to Jenkins. Opening a log also follows scans started outside Workbench.
+
 ## [1.63.0] - 2026-11-01
 
 ### Added
