@@ -92,3 +92,9 @@ JENKINS_NODE_LIVE=1 JENKINS_PANELS_LIVE=1 npm run test:integration
 ```
 
 The node test creates uniquely named agents and removes them afterward. The panel test runs the existing Success, Failure, and Slow Queue sample jobs and checks all five panels, tree/watch/queue refresh, artifacts, baseline selection, and hidden-history cancellation. Sample build history remains available for inspection. Override the fixture connection with `JENKINS_NODE_URL`, `JENKINS_NODE_USER`, `JENKINS_NODE_TOKEN` and the corresponding `JENKINS_PANELS_*` variables. Both suites require a loopback URL.
+
+## Multibranch scan validation
+
+Run `JENKINS_SCAN_LIVE=1 npm run test:integration` against the local fixture. The test creates a uniquely named multibranch pipeline and a temporary Git repository, then verifies queued/running/completed status, live read-only logs, branch refresh, duplicate suppression, tracking after the editor closes, a repository authentication failure, and attachment to an external scan. It removes its job and temporary repository afterward.
+
+The test invokes [scan-validation.groovy](scan-validation.groovy) automatically. It serves only its temporary Git repository over an ephemeral HTTP port reachable by the Docker fixture. Override the loopback Jenkins connection with `JENKINS_SCAN_URL`, `JENKINS_SCAN_USER`, and `JENKINS_SCAN_TOKEN`; use `JENKINS_SCAN_GIT_HOST` if Jenkins reaches the host through a name other than `host.docker.internal`.

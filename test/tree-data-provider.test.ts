@@ -82,6 +82,7 @@ interface ProviderHarness {
   onDidChangeTreeData(listener: (element: unknown) => void): { dispose(): void };
   onDidChangeSummary(listener: (summary: TreeViewSummaryStub) => void): { dispose(): void };
   getChildren(element?: unknown): Promise<unknown[]>;
+  getTreeItem(element: unknown): TreeItemView;
   getParent(element: unknown): unknown;
   createRefreshWaiter(): TreeRefreshWaiter;
   refresh(refreshToken?: number): boolean;
@@ -113,6 +114,11 @@ const { JenkinsWorkbenchTreeDataProvider } = (await import(
 )) as unknown as {
   JenkinsWorkbenchTreeDataProvider: ProviderConstructor;
 };
+
+const { MultibranchScanStateStore } = await import(
+  "../src/services/multibranchScan/MultibranchScanState"
+);
+const { JenkinsFolderTreeItem } = await import("../src/tree/items/TreeJobItems");
 
 interface TreeItemView {
   id?: string;
@@ -198,6 +204,7 @@ interface ProviderFixture {
 }
 
 interface ProviderFixtureOptions {
+  scanState?: InstanceType<typeof MultibranchScanStateStore>;
   replayPendingInputSummaryOnSubscribe?: boolean;
 }
 
@@ -331,7 +338,8 @@ function createProviderFixture(options: ProviderFixtureOptions = {}): ProviderFi
     {},
     {},
     activityOptions,
-    pendingInputCoordinator
+    pendingInputCoordinator,
+    options.scanState
   );
   fixture.provider.onDidChangeTreeData((element) => fixture.events.push(element));
   fixture.provider.onDidChangeSummary((summary) => fixture.summaryEvents.push(summary));
@@ -362,6 +370,67 @@ async function expandToFolders(fixture: ProviderFixture): Promise<{
 }
 
 describe("JenkinsWorkbenchTreeDataProvider queue and activity refresh", () => {
+  it("decorates tracked multibranch folders without changing cached or unrelated items", () => {
+    const scanState = new MultibranchScanStateStore();
+    const fixture = createProviderFixture({ scanState });
+    const target = {
+      environment: fixture.environmentRef,
+      folderUrl: "https://jenkins.example/job/project/",
+      label: "project"
+    };
+    const folder = new JenkinsFolderTreeItem(
+      target.environment,
+      target.label,
+      target.folderUrl,
+      "multibranch"
+    );
+    const originalDescription = folder.description;
+    assert.equal(fixture.provider.getTreeItem(folder), folder);
+    scanState.set({ target, phase: "running", observedAt: 1, generation: 1, logRevision: 0 });
+    const decorated = fixture.provider.getTreeItem(folder);
+    assert.match(String(decorated.description), /Scan running/);
+    assert.equal(decorated.id, folder.id);
+    assert.equal(folder.description, originalDescription);
+    const ordinary = new JenkinsFolderTreeItem(
+      target.environment,
+      target.label,
+      target.folderUrl,
+      "folder"
+    );
+    assert.equal(fixture.provider.getTreeItem(ordinary), ordinary);
+    fixture.provider.dispose();
+    scanState.dispose();
+  });
+
+  it("refreshes scan presentation without clearing Jenkins data and ignores log-only updates", () => {
+    const scanState = new MultibranchScanStateStore();
+    const fixture = createProviderFixture({ scanState });
+    const target = {
+      environment: fixture.environmentRef,
+      folderUrl: "https://jenkins.example/job/project/",
+      label: "project"
+    };
+    const running = {
+      target,
+      phase: "running" as const,
+      observedAt: 1,
+      generation: 1,
+      logRevision: 0
+    };
+    scanState.set(running);
+    assert.deepEqual(fixture.events, [undefined]);
+    assert.equal(fixture.cacheClearsForEnvironment, 0);
+    scanState.set({ ...running, observedAt: 2 });
+    assert.equal(fixture.events.length, 1);
+    scanState.set({ ...running, phase: "completed", outcome: "success" });
+    assert.equal(fixture.events.length, 2);
+    assert.equal(fixture.cacheClearsForEnvironment, 0);
+    fixture.provider.dispose();
+    scanState.set(running);
+    assert.equal(fixture.events.length, 2);
+    scanState.dispose();
+  });
+
   it("constructs when pending input summary listeners replay immediately", () => {
     const fixture = createProviderFixture({ replayPendingInputSummaryOnSubscribe: true });
 

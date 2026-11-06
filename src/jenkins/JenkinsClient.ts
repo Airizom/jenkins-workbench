@@ -1,6 +1,7 @@
 import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
+import { JenkinsIndexingApi } from "./client/JenkinsIndexingApi";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
 import { JenkinsNodesApi } from "./client/JenkinsNodesApi";
 import { JenkinsPipelineSyntaxApi } from "./client/JenkinsPipelineSyntaxApi";
@@ -13,6 +14,7 @@ import type {
   JenkinsCoverageOverview,
   JenkinsModifiedCoverageFile
 } from "./coverage/JenkinsCoverageTypes";
+import type { JenkinsIndexingLog, JenkinsIndexingLogOptions } from "./JenkinsIndexingTypes";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import type { NodeAgentLogOptions, NodeAgentLogResult } from "./NodeManagement";
 import type { JenkinsBufferResponse, JenkinsStreamResponse } from "./request";
@@ -101,6 +103,7 @@ export class JenkinsClient
   private readonly buildsApi: JenkinsBuildsApi;
   private readonly relationshipsApi: JenkinsRelationshipsApi;
   private readonly jobsApi: JenkinsJobsApi;
+  private readonly indexingApi: JenkinsIndexingApi;
   private readonly nodesApi: JenkinsNodesApi;
   private readonly queueApi: JenkinsQueueApi;
   private readonly pipelineValidationApi: JenkinsPipelineValidationApi;
@@ -111,6 +114,7 @@ export class JenkinsClient
   constructor(options: JenkinsClientOptions) {
     const httpClient = new JenkinsHttpClient(options);
     this.jobsApi = new JenkinsJobsApi(httpClient);
+    this.indexingApi = new JenkinsIndexingApi(httpClient);
     this.buildsApi = new JenkinsBuildsApi(httpClient);
     this.relationshipsApi = new JenkinsRelationshipsApi(httpClient);
     this.nodesApi = new JenkinsNodesApi(httpClient);
@@ -539,6 +543,14 @@ export class JenkinsClient
 
   async disableJob(jobUrl: string): Promise<void> {
     await this.jobsApi.disableJob(jobUrl);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- called through the runtime client's structural interface
+  async getMultibranchScanLog(
+    folderUrl: string,
+    options?: JenkinsIndexingLogOptions
+  ): Promise<JenkinsIndexingLog> {
+    return this.indexingApi.getMultibranchScanLog(folderUrl, options);
   }
 
   async scanMultibranch(folderUrl: string): Promise<ScanMultibranchResult> {

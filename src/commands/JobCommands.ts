@@ -2,6 +2,10 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JobConfigDraftManager } from "../services/JobConfigDraftManager";
+import type { MultibranchScanLogViewer } from "../services/multibranchScan/MultibranchScanLogViewer";
+import type { MultibranchScanService } from "../services/multibranchScan/MultibranchScanService";
+import type { MultibranchScanTarget } from "../services/multibranchScan/MultibranchScanState";
+import { resolveMultibranchScanTarget } from "../services/multibranchScan/MultibranchScanTargetResolver";
 import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
@@ -16,7 +20,7 @@ import type {
 } from "../tree/TreeItems";
 import type { JobConfigPreviewer } from "../ui/JobConfigPreviewer";
 import type { WorkspacePreviewer } from "../ui/WorkspacePreviewer";
-import { createEnvironmentRefreshCallback } from "./CommandUtils";
+import { createEnvironmentRefreshCallback, withActionErrorMessage } from "./CommandUtils";
 import {
   copyJob,
   deleteJob,
@@ -49,16 +53,20 @@ export function registerJobCommands(
   pinStore: JenkinsPinStore,
   watchStore: JenkinsWatchStore,
   bindingStore: JenkinsDiagnosticProfileBindingStore,
-  repositoryLinkStore: JenkinsRepositoryLinkStore
+  repositoryLinkStore: JenkinsRepositoryLinkStore,
+  scanService: MultibranchScanService,
+  scanLogViewer: MultibranchScanLogViewer
 ): void {
   const newItemTargetResolver = new JobNewItemTargetResolver(environmentStore);
   const newItemWorkflow = new JobNewItemWorkflow({
     dataService,
     repositoryLinkStore,
+    scanService,
     onEnvironmentChanged: createEnvironmentRefreshCallback(refreshHost)
   });
 
   const actionDeps: JobActionDependencies = {
+    scanService,
     dataService,
     newItemTargetResolver,
     newItemWorkflow,
@@ -70,6 +78,25 @@ export function registerJobCommands(
   };
 
   context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.viewMultibranchScanLog",
+      async (item?: JenkinsFolderTreeItem | MultibranchScanTarget) => {
+        if (!item || ("folderKind" in item && item.folderKind !== "multibranch")) {
+          void vscode.window.showInformationMessage(
+            "Select a multibranch folder to view its scan log."
+          );
+          return;
+        }
+        const target: MultibranchScanTarget = {
+          environment: item.environment,
+          folderUrl: item.folderUrl,
+          label: typeof item.label === "string" ? item.label : (item.label?.label ?? "Multibranch")
+        };
+        await withActionErrorMessage("Unable to open the scan log", async () => {
+          await scanLogViewer.open(await resolveMultibranchScanTarget(target, environmentStore));
+        });
+      }
+    ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.viewJobConfig",
       (item?: JobTreeItem | PipelineTreeItem) =>

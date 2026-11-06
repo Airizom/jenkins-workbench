@@ -73,6 +73,7 @@ import type {
   JenkinsPipelineRestartRuntimeSurface
 } from "./JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
+import type { JenkinsIndexingLog, JenkinsIndexingLogOptions } from "./JenkinsIndexingTypes";
 import type { JenkinsTestReportOptions } from "./JenkinsTestReportOptions";
 import type {
   NodeAgentLogOptions,
@@ -726,6 +727,16 @@ export class JenkinsDataService
     return this.queueAndJobManagementOperations.disableJob(environment, jobUrl);
   }
 
+  async getMultibranchScanLog(
+    environment: JenkinsEnvironmentRef,
+    folderUrl: string,
+    options?: JenkinsIndexingLogOptions
+  ): Promise<JenkinsIndexingLog> {
+    const client = await this.runtimeContext.getClient(environment);
+    return client.getMultibranchScanLog(folderUrl, options);
+  }
+
+  // fallow-ignore-next-line unused-class-member -- called through MultibranchScanDataService
   async scanMultibranch(
     environment: JenkinsEnvironmentRef,
     folderUrl: string

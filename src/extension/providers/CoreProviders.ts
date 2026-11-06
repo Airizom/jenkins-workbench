@@ -22,6 +22,7 @@ import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
 import { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
 import { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
 import { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
+import { MultibranchScanStateStore } from "../../services/multibranchScan/MultibranchScanState";
 import { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import { ReplayDraftFilesystem } from "../../services/ReplayDraftFilesystem";
@@ -65,6 +66,11 @@ export interface CoreProviderOptions {
 
 export function createCoreProviderCatalog(options: CoreProviderOptions) {
   return {
+    multibranchScanState: (_container) => {
+      const state = new MultibranchScanStateStore();
+      options.context.subscriptions.push(state);
+      return state;
+    },
     environmentStore: (_container) => new JenkinsEnvironmentStore(options.context),
     environmentUrlRebaseService: (container) =>
       new EnvironmentUrlRebaseService({

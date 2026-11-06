@@ -5,6 +5,7 @@ import type {
   CurrentBranchState
 } from "../../currentBranch/CurrentBranchTypes";
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
+import { notifyMultibranchScan } from "../../services/multibranchScan/MultibranchScanNotifications";
 import { withActionErrorMessage } from "../CommandUtils";
 import { buildActionPicks, type CurrentBranchAction } from "./CurrentBranchActionPicks";
 import { linkCurrentRepository, unlinkCurrentRepository } from "./CurrentBranchLinkHandlers";
@@ -173,6 +174,8 @@ async function scanLinkedMultibranch(
       return;
     }
 
-    void vscode.window.showInformationMessage(result.message);
+    void notifyMultibranchScan(result.scan).catch((error) =>
+      console.warn("Unable to show scan actions.", error)
+    );
   });
 }

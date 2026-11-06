@@ -123,7 +123,9 @@ export function registerExtensionCommands(
     pinStore,
     watchStore,
     diagnosticBindingStore,
-    container.lazy("repositoryLinkStore")
+    container.lazy("repositoryLinkStore"),
+    container.lazy("multibranchScanService"),
+    container.lazy("multibranchScanLogViewer")
   );
 
   registerBuildDiagnosticCommands(context, buildDiagnosticsCoordinator);

@@ -1,3 +1,5 @@
+/// <reference types="node" />
+/// <reference types="mocha" />
 import * as assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import * as vscode from "vscode";
@@ -31,6 +33,8 @@ describe("extension smoke", () => {
       "jenkinsWorkbench.editEnvironment",
       "jenkinsWorkbench.removeEnvironment",
       "jenkinsWorkbench.triggerBuild",
+      "jenkinsWorkbench.scanMultibranch",
+      "jenkinsWorkbench.viewMultibranchScanLog",
       "jenkinsWorkbench.replayWithLocalJenkinsfile",
       "jenkinsWorkbench.abortBuild",
       "jenkinsWorkbench.abortBuild.single",

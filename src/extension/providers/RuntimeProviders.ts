@@ -34,6 +34,9 @@ import { BuildCompletionTracker } from "../../services/buildFollow/BuildCompleti
 import { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import { CoverageDecorationService } from "../../services/CoverageDecorationService";
 import { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
+import { MultibranchScanLogViewer } from "../../services/multibranchScan/MultibranchScanLogViewer";
+import { completeMultibranchScan } from "../../services/multibranchScan/MultibranchScanNotifications";
+import { MultibranchScanService } from "../../services/multibranchScan/MultibranchScanService";
 import { JenkinsfileHoverProvider } from "../../validation/editor/JenkinsfileHoverProvider";
 import { JenkinsfileQuickFixProvider } from "../../validation/editor/JenkinsfileQuickFixProvider";
 import { JenkinsfileValidationCodeLensProvider } from "../../validation/editor/JenkinsfileValidationCodeLensProvider";
@@ -64,6 +67,42 @@ export interface RuntimeProviderOptions {
 
 export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
   return {
+    multibranchScanService: (container) => {
+      const service = new MultibranchScanService(
+        container.get("dataService"),
+        container.get("multibranchScanState")
+      );
+      options.context.subscriptions.push(
+        service,
+        service.onDidComplete((state) => {
+          void completeMultibranchScan(state, container.get("refreshHost"), () =>
+            container.get("currentBranchService").refresh({ force: true })
+          ).catch((error) => console.warn("Unable to report scan completion.", error));
+        }),
+        container.get("environmentStore").onDidChange((change) => {
+          if (
+            change.kind === "environment-removed" ||
+            (change.kind === "environment-updated" &&
+              (change.urlChanged || change.tlsPolicyChanged))
+          ) {
+            service.stopEnvironment(
+              change.environmentId,
+              "Tracking stopped because the Jenkins environment changed. Open the scan log again to reconnect."
+            );
+          }
+        })
+      );
+      return service;
+    },
+    multibranchScanLogViewer: (container) => {
+      const viewer = new MultibranchScanLogViewer(
+        container.get("multibranchScanService"),
+        container.get("multibranchScanState"),
+        container.get("artifactPreviewProvider")
+      );
+      options.context.subscriptions.push(viewer);
+      return viewer;
+    },
     bulkActionService: (container) => {
       const service = new BulkActionService({
         dataService: container.get("dataService"),
@@ -153,7 +192,8 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       new CurrentBranchLinkWorkflowService(
         container.get("environmentStore"),
         container.get("dataService"),
-        container.get("repositoryLinkStore")
+        container.get("repositoryLinkStore"),
+        container.lazy("multibranchScanService")
       ),
     currentBranchCommandMapper: (_container) => new CurrentBranchCommandMapper(),
     coverageDecorationService: (container) => {

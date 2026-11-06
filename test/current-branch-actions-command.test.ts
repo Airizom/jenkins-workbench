@@ -124,7 +124,24 @@ function createWorkflowService(options?: {
     },
     scanLinkedMultibranch: async (state: CurrentBranchState) => {
       record("scanLinkedMultibranch", state);
-      return { message: "Scan queued for main." };
+      return {
+        message: "Scan queued for main.",
+        scan: {
+          target: {
+            environment: {
+              environmentId: "env-1",
+              scope: "workspace",
+              url: "https://jenkins.example"
+            },
+            folderUrl: "https://jenkins.example/job/main/",
+            label: "main"
+          },
+          phase: "queued",
+          observedAt: 0,
+          generation: 1,
+          logRevision: 0
+        }
+      };
     },
     refreshCurrentBranchStatus: async (refreshOptions: unknown) => {
       record("refreshCurrentBranchStatus", refreshOptions);

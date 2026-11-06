@@ -102,7 +102,13 @@ function createWorkflow(options: WorkflowOptions = {}) {
   const getLink = vi.fn(() => options.existingLink as never);
   const setLink = vi.fn(async () => {});
   const workflow = new JobNewItemWorkflow({
-    dataService: { createItem, createMultibranchPipeline, scanMultibranch } as never,
+    dataService: { createItem, createMultibranchPipeline } as never,
+    scanService: {
+      request: async (target) => {
+        await scanMultibranch(target.environment, target.folderUrl);
+        return { target, phase: "requested", observedAt: 0, generation: 1, logRevision: 0 };
+      }
+    },
     repositoryLinkStore: { getLink, setLink },
     onEnvironmentChanged: (environmentId) => {
       changedEnvironments.push(environmentId);
@@ -304,7 +310,7 @@ describe("JobNewItemWorkflow", () => {
         }
       ]);
       assert.ok(
-        informationMessages.includes('Created multibranch pipeline "demo". Branch scan started.')
+        informationMessages.includes('Created multibranch pipeline "demo". Scan requested.')
       );
       assert.ok(informationMessages.includes('Linked the repository to "demo".'));
       assert.deepEqual(errorMessages, []);

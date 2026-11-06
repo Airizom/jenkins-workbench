@@ -5,6 +5,10 @@ import type {
   JobSearchEntry
 } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
+import {
+  type MultibranchScanStateStore,
+  multibranchScanKey
+} from "../services/multibranchScan/MultibranchScanState";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
@@ -12,7 +16,9 @@ import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
 import type { TreeActivityOptions } from "./ActivityTypes";
 import type { BuildTooltipOptions } from "./BuildTooltips";
 import type { JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
+import { JenkinsFolderTreeItem } from "./items/TreeJobItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
+import { decorateMultibranchScanItem } from "./MultibranchScanPresentation";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
 import { TreeDataProviderHierarchyState } from "./TreeDataProviderHierarchyState";
@@ -68,6 +74,7 @@ export class JenkinsWorkbenchTreeDataProvider
   private readonly hierarchyState: TreeDataProviderHierarchyState;
   private readonly expansionResolver: TreeDataProviderExpansionResolver;
   private readonly summaryState: TreeDataProviderSummaryState;
+  private scanSubscription: vscode.Disposable | undefined;
   private pendingInputUnsubscribe: (() => void) | undefined;
 
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -84,8 +91,23 @@ export class JenkinsWorkbenchTreeDataProvider
     buildListFetchOptions: BuildListFetchOptions,
     viewCurationOptions: TreeViewCurationOptions,
     activityOptions: TreeActivityOptions,
-    pendingInputCoordinator: PendingInputRefreshCoordinator
+    pendingInputCoordinator: PendingInputRefreshCoordinator,
+    private readonly scanState?: MultibranchScanStateStore
   ) {
+    const scanPresentations = new Map<string, string>();
+    this.scanSubscription = scanState?.onDidChange((state) => {
+      const key = multibranchScanKey(state.target);
+      const presentation = JSON.stringify([
+        state.phase,
+        state.outcome,
+        state.detail,
+        state.logError
+      ]);
+      if (scanPresentations.get(key) !== presentation) {
+        scanPresentations.set(key, presentation);
+        this.notifyElement(undefined);
+      }
+    });
     this.hierarchyState = new TreeDataProviderHierarchyState();
     this.summaryState = new TreeDataProviderSummaryState();
     this.refreshCoordinator = new TreeDataProviderRefreshCoordinator(
@@ -124,6 +146,7 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   dispose(): void {
+    this.scanSubscription?.dispose();
     if (this.pendingInputUnsubscribe) {
       this.pendingInputUnsubscribe();
       this.pendingInputUnsubscribe = undefined;
@@ -281,6 +304,19 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   getTreeItem(element: WorkbenchTreeElement): vscode.TreeItem {
+    if (element instanceof JenkinsFolderTreeItem && element.folderKind === "multibranch") {
+      const state = this.scanState?.get({
+        environment: element.environment,
+        folderUrl: element.folderUrl,
+        label:
+          typeof element.label === "string"
+            ? element.label
+            : (element.label?.label ?? "Multibranch")
+      });
+      if (state) {
+        return decorateMultibranchScanItem(element, state);
+      }
+    }
     return element;
   }
 

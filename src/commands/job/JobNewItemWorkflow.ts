@@ -7,6 +7,15 @@ import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsItemCreateKind, JenkinsMultibranchCreateOptions } from "../../jenkins/types";
 import { formatJobUrlLabel } from "../../jenkins/urls";
+import {
+  openMultibranchScanLog,
+  VIEW_SCAN_LOG
+} from "../../services/multibranchScan/MultibranchScanNotifications";
+import type { MultibranchScanService } from "../../services/multibranchScan/MultibranchScanService";
+import {
+  formatMultibranchScanStatus,
+  type MultibranchScanTarget
+} from "../../services/multibranchScan/MultibranchScanState";
 import type { JenkinsRepositoryLinkStore } from "../../storage/JenkinsRepositoryLinkStore";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
 import { confirmModalAction, withActionErrorMessage } from "../CommandUtils";
@@ -68,6 +77,7 @@ export interface JobNewItemTarget {
 }
 
 export interface JobNewItemWorkflowDependencies {
+  scanService: Pick<MultibranchScanService, "request">;
   dataService: JenkinsDataService;
   repositoryLinkStore: Pick<JenkinsRepositoryLinkStore, "getLink" | "setLink">;
   onEnvironmentChanged(environmentId: string): void;
@@ -170,9 +180,15 @@ export class JobNewItemWorkflow {
     }
     const itemUrl = newUrl;
 
-    let scanSummary = "Branch scan started.";
+    const scanTarget: MultibranchScanTarget = {
+      environment: target.environment,
+      folderUrl: itemUrl,
+      label: newName
+    };
+    let scanSummary: string;
     try {
-      await this.deps.dataService.scanMultibranch(target.environment, itemUrl);
+      const scan = await this.deps.scanService.request(scanTarget);
+      scanSummary = `${formatMultibranchScanStatus(scan)}.`;
     } catch (error) {
       scanSummary = "Run Scan Multibranch Now to discover branches.";
       void vscode.window.showWarningMessage(
@@ -181,7 +197,9 @@ export class JobNewItemWorkflow {
     }
     this.deps.onEnvironmentChanged(target.environment.environmentId);
 
-    void this.showCreatedMessage(kindDefinition, newName, itemUrl, scanSummary);
+    void this.showCreatedMessage(kindDefinition, newName, itemUrl, scanSummary, scanTarget).catch(
+      (error) => console.warn("Unable to show created pipeline actions.", error)
+    );
 
     if (source.repositoryRootUri) {
       await this.offerRepositoryLink(target, newName, itemUrl, source.repositoryRootUri);
@@ -192,13 +210,17 @@ export class JobNewItemWorkflow {
     kindDefinition: NewItemKindDefinition,
     newName: string,
     itemUrl: string,
-    scanSummary: string
+    scanSummary: string,
+    scanTarget: MultibranchScanTarget
   ): Promise<void> {
     const choice = await vscode.window.showInformationMessage(
       `Created ${kindDefinition.promptLabel} "${newName}". ${scanSummary}`,
-      OPEN_IN_JENKINS_ACTION
+      OPEN_IN_JENKINS_ACTION,
+      VIEW_SCAN_LOG
     );
-    if (choice === OPEN_IN_JENKINS_ACTION) {
+    if (choice === VIEW_SCAN_LOG) {
+      await openMultibranchScanLog(scanTarget);
+    } else if (choice === OPEN_IN_JENKINS_ACTION) {
       await openExternalHttpUrlWithWarning(itemUrl, { targetLabel: "multibranch pipeline URL" });
     }
   }

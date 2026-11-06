@@ -49,6 +49,9 @@ import type { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlR
 import type { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import type { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
 import type { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
+import type { MultibranchScanLogViewer } from "../../services/multibranchScan/MultibranchScanLogViewer";
+import type { MultibranchScanService } from "../../services/multibranchScan/MultibranchScanService";
+import type { MultibranchScanStateStore } from "../../services/multibranchScan/MultibranchScanState";
 import type { PendingInputRefreshCoordinator } from "../../services/PendingInputRefreshCoordinator";
 import type { QueuedBuildWaiter } from "../../services/QueuedBuildWaiter";
 import type { ReplayDraftFilesystem } from "../../services/ReplayDraftFilesystem";
@@ -93,6 +96,9 @@ import type { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
 import type { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 
 export interface ExtensionTokenMap {
+  multibranchScanService: MultibranchScanService;
+  multibranchScanState: MultibranchScanStateStore;
+  multibranchScanLogViewer: MultibranchScanLogViewer;
   bulkActionService: BulkActionService;
   treeBulkSelection: TreeBulkSelection;
   historyService: HistoryService;

@@ -1,5 +1,10 @@
 import { formatError } from "../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import type { MultibranchScanService } from "../services/multibranchScan/MultibranchScanService";
+import {
+  formatMultibranchScanStatus,
+  type MultibranchScanState
+} from "../services/multibranchScan/MultibranchScanState";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type {
   JenkinsRepositoryLink,
@@ -42,6 +47,7 @@ export type CurrentBranchMultibranchDiscoveryResult =
     };
 
 export type CurrentBranchMultibranchScanResult = {
+  scan: MultibranchScanState;
   message: string;
   environmentId: string;
 };
@@ -50,7 +56,8 @@ export class CurrentBranchLinkWorkflowService {
   constructor(
     private readonly environmentStore: JenkinsEnvironmentStore,
     private readonly dataService: JenkinsDataService,
-    private readonly linkStore: JenkinsRepositoryLinkStore
+    private readonly linkStore: JenkinsRepositoryLinkStore,
+    private readonly scanService: Pick<MultibranchScanService, "request">
   ) {}
 
   async listLinkableEnvironments(): Promise<CurrentBranchEnvironmentDiscoveryResult> {
@@ -140,14 +147,14 @@ export class CurrentBranchLinkWorkflowService {
       return undefined;
     }
 
-    const result = await this.dataService.scanMultibranch(
-      state.environment,
-      state.link.multibranchFolderUrl
-    );
+    const scan = await this.scanService.request({
+      environment: state.environment,
+      folderUrl: state.link.multibranchFolderUrl,
+      label: state.link.multibranchLabel
+    });
     return {
-      message: result.queueLocation
-        ? `Triggered a multibranch scan. Queued at ${result.queueLocation}`
-        : "Triggered a multibranch scan.",
+      scan,
+      message: `${formatMultibranchScanStatus(scan)} for ${state.link.multibranchLabel}.`,
       environmentId: state.environment.environmentId
     };
   }

@@ -141,8 +141,6 @@ export class CurrentBranchWorkflowService {
       return undefined;
     }
 
-    this.actionExecutor.refreshEnvironment(result.environmentId);
-    await this.currentBranchService.refresh({ force: true });
     return result;
   }
 

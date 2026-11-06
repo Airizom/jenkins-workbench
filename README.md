@@ -156,6 +156,14 @@ The command submits the current editor text, including unsaved changes, without 
 - **Branch Filtering** — Filter branches within multibranch pipeline folders
 - **Quick Access** — Filter icons in the view title bar for one-click filtering
 
+### Multibranch Scans
+
+Choose **Scan Repository Now** on a multibranch folder to request branch discovery. The folder shows **Requested**, **Queued**, **Running**, or **Completed**, including the final result when Jenkins provides it. A repeat request follows an already queued or running scan. When a tracked scan completes, its branches and the current-branch match refresh automatically, including when indexing fails after discovering some branches.
+
+Choose **View Scan Log** from the folder context menu or a scan notification to open a searchable, read-only log editor. Logs open on demand and update while the scan runs. The editor includes the environment, status, observation time, and a link to Jenkins; large logs are bounded and clearly marked as truncated. Opening a log also follows a scan started outside VS Code. Browsing folders alone does not poll for scans.
+
+Tracking also applies to **Scan Linked Multibranch Now** and the initial scan after creating a multibranch pipeline. Closing a log editor leaves completion tracking active. Tracking is limited to the current extension session; after reloading VS Code, choose **View Scan Log** to reconnect to Jenkins's current/latest scan.
+
 ### Bulk Tree Actions
 
 Use **Ctrl-click** (Windows/Linux) or **Cmd-click** (macOS) to select individual rows, or **Shift-click** to select a range. Right-click the selection or use the existing Command Palette commands to stop running builds, cancel queued items, watch/unwatch jobs, or pin/unpin jobs. Inline row icons always act on that row alone.
@@ -608,7 +616,8 @@ activates there.
 | `Jenkins: Rename Job` | Rename the selected job or pipeline |
 | `Jenkins: Copy Job` | Copy the selected job or pipeline |
 | `Jenkins: Delete Job` | Delete the selected job or pipeline |
-| `Jenkins: Scan Repository Now` | Trigger a multibranch scan for the selected multibranch folder |
+| `Jenkins: Scan Repository Now` | Request or follow a multibranch scan and refresh branches on completion |
+| `Jenkins: View Scan Log` | Open the current/latest indexing log for the selected multibranch folder |
 
 ### Artifacts
 
@@ -774,6 +783,14 @@ Select **Verify certificates (recommended)** to restore verification. Changing t
   - **Restart from Stage** requires Declarative Pipeline support from Pipeline: Model Definition
 - Check that the plugins are installed and the user has permissions
 
+### Missing Branches After a Scan
+
+- Check the multibranch folder's scan status. **Requested** or **Queued** does not mean indexing has started; **Running** means indexing is in progress
+- Open **View Scan Log** to inspect credential, repository-access, and branch-discovery errors reported by Jenkins. A completed scan does not guarantee that a particular branch matches the project's discovery rules
+- **Status unavailable** means tracking could not establish the current result, rather than that the scan failed. Jenkins overwrites its indexing log at a stable URL, so a very fast scan can be indistinguishable from the previous scan. An old successful log is not treated as proof that the new request succeeded
+- Reopen **View Scan Log** to retry after a connection or authentication problem. **Open in Jenkins** is available when logs/status are unavailable, unsupported, or truncated
+- Editing an environment's URL or TLS policy stops its existing scan sessions. Reopen the log to connect with the updated environment
+
 ### Build Keeps Running After Stop
 
 - A Pipeline can ignore Stop, for example when a step traps interrupts. About 15 seconds after Stop, the extension checks the build again and offers **Terminate**. If the build still runs 15 seconds after Terminate, it offers **Kill…**. Both are also available as **Terminate Build (Pipeline)** and **Kill Build (Pipeline)** on running builds, including multi-selections
@@ -873,6 +890,8 @@ npm test
 
 Fallow runs in CI as a changed-code audit using the committed files in `fallow-baselines/`. Shrink those baselines as existing dead code, duplication, and complexity findings are cleaned up.
 
+With the [local Jenkins fixture](dev/jenkins/README.md) running and Git available, `JENKINS_SCAN_LIVE=1 npm run test:integration` exercises multibranch scan tracking and the live log editor against real Jenkins. The test creates a unique multibranch job and temporary HTTP Git repository, verifies success and credential failure, then removes them. Override the loopback connection with `JENKINS_SCAN_URL`, `JENKINS_SCAN_USER`, and `JENKINS_SCAN_TOKEN`. The Git fixture defaults to `host.docker.internal` for Docker Desktop; set `JENKINS_SCAN_GIT_HOST` to the test host's Jenkins-reachable address for other layouts.
+
 ### Manual Testing Checklist
 
 1. Run `npm run compile`, `npm run check`, and `npm test`, then press F5 to launch the Extension Development Host
@@ -882,7 +901,7 @@ Fallow runs in CI as a changed-code audit using the committed files in `fallow-b
 5. Trigger, rebuild, rebuild with changes, replay, and restart from stage; confirm the "started" notification names the new build and that View Build Details, Preview Log (live until completion), and Notify When Finished (status bar count) work. Cancel a queued item and expect the cancelled message; with `jenkinsWorkbench.followTriggeredBuilds` off, expect the previous messages
 6. Verify watch notifications work
 7. Test node actions and node details
-8. Trigger a multibranch scan and verify branch filtering still works
+8. Trigger a multibranch scan from the folder, current-branch action, and new-item flow; verify queued/running/completed status, live View Scan Log, completion notifications, automatic branch/current-branch refresh, and preserved branch filters. Repeat a request while active, close the log before completion, and attach to an externally started scan. Exercise a credentials/discovery failure, a delayed scan, and a reload followed by reopening the log
 9. Confirm removing an environment clears it from the tree
 10. Preview or download a build artifact
 11. Browse a classic job workspace, expand nested folders, and preview a workspace file

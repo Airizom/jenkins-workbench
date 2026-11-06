@@ -408,6 +408,11 @@
         "icon": "$(filter)"
       },
       {
+        "command": "jenkinsWorkbench.viewMultibranchScanLog",
+        "title": "View Scan Log",
+        "category": "Jenkins"
+      },
+      {
         "command": "jenkinsWorkbench.scanMultibranch",
         "title": "Scan Repository Now",
         "category": "Jenkins",
@@ -1754,6 +1759,11 @@
           "command": "jenkinsWorkbench.scanMultibranch",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)multibranchFolder(\\s|$)/",
           "group": "navigation@1"
+        },
+        {
+          "command": "jenkinsWorkbench.viewMultibranchScanLog",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)multibranchFolder(\\s|$)/",
+          "group": "navigation@1.5"
         },
         {
           "command": "jenkinsWorkbench.filterBranches",
