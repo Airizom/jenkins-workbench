@@ -450,3 +450,63 @@ describe("JenkinsClientProvider TLS policy", () => {
     assert.equal(options(secureClient).allowInsecureTls, false);
   });
 });
+
+describe("JenkinsClientProvider environment diagnostics", () => {
+  const environment: JenkinsEnvironmentRef = {
+    environmentId: "diagnostics-env",
+    scope: "global",
+    url: "https://jenkins.example.com/"
+  };
+  function options(client: unknown): JenkinsClientOptions {
+    return (client as { options: JenkinsClientOptions }).options;
+  }
+
+  it("creates isolated clients with current credentials and TLS policy and no SSO refresh", async () => {
+    const store = new JenkinsEnvironmentStore(createExtensionContext());
+    await store.addEnvironment("global", {
+      id: environment.environmentId,
+      url: environment.url,
+      allowInsecureTls: true
+    });
+    await store.setAuthConfig("global", environment.environmentId, {
+      type: "sso",
+      loginUrl: "https://id.example/login",
+      headers: { Cookie: "session=private" }
+    });
+    const authenticate = vi.fn(async () => undefined);
+    const provider = new JenkinsClientProvider(store, {
+      requestTimeoutMs: 15000,
+      browserSsoAuthenticator: { authenticate }
+    });
+    const normal = await provider.getClient(environment);
+    const first = await provider.createEnvironmentDiagnosticsClient(environment);
+    const second = await provider.createEnvironmentDiagnosticsClient(environment);
+    assert.notStrictEqual(first, normal);
+    assert.notStrictEqual(first, second);
+    assert.equal(options(first).refreshAuthConfig, undefined);
+    assert.equal(options(first).allowInsecureTls, true);
+    assert.equal(options(first).requestTimeoutMs, 15000);
+    assert.deepEqual(options(first).authConfig, {
+      type: "sso",
+      loginUrl: "https://id.example/login",
+      headers: { Cookie: "session=private" },
+      expiresAt: undefined
+    });
+    assert.equal(authenticate.mock.calls.length, 0);
+  });
+
+  it("applies updated timeouts to subsequent normal and diagnostic clients", async () => {
+    const store = new JenkinsEnvironmentStore(createExtensionContext());
+    await store.addEnvironment("global", { id: environment.environmentId, url: environment.url });
+    const provider = new JenkinsClientProvider(store, { requestTimeoutMs: 5000 });
+    const old = await provider.getClient(environment);
+    provider.updateRequestTimeoutMs(25000);
+    const current = await provider.getClient(environment);
+    assert.notStrictEqual(current, old);
+    assert.equal(options(current).requestTimeoutMs, 25000);
+    assert.equal(
+      options(await provider.createEnvironmentDiagnosticsClient(environment)).requestTimeoutMs,
+      25000
+    );
+  });
+});

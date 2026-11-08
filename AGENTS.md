@@ -4,7 +4,7 @@ This file is intentionally non-generic. It records only details that are easy to
 
 ## 1) The Real Runtime Shape (Do Not Assume Typical VS Code Extension Layout)
 
-- The extension backend is TypeScript (`src/**`) bundled by esbuild (`scripts/build-extension.mjs`) into `out/extension.js`, plus `out/BuildDiagnosticCustomMatcherWorker.js`, which `BuildDiagnosticCustomMatcherWorkerClient` loads by path. `tsc` only typechecks the host. The five panel UIs are entries in one Vite build under `src/panels/**`.
+- The extension backend is TypeScript (`src/**`) bundled by esbuild (`scripts/build-extension.mjs`) into `out/extension.js`, plus `out/BuildDiagnosticCustomMatcherWorker.js`, which `BuildDiagnosticCustomMatcherWorkerClient` loads by path. `tsc` only typechecks the host. The six panel UIs are entries in one Vite build under `src/panels/**`.
 - `package.json` `dependencies` (for example `redos-detector`) stay external to the bundle and load from the VSIX `node_modules`; everything else is inlined.
 - Webview assets are resolved from `out/webview/manifest.json` at runtime (`src/panels/shared/webview/WebviewAssets.ts`).
 - If the manifest or entry names drift, panels fail with missing assets.
@@ -55,6 +55,8 @@ If you change one side, update the others in the same pass.
   - Pollers: `src/watch/JenkinsStatusPoller.ts`, `src/queue/JenkinsQueuePoller.ts`
   - Risk: stale tree state or excessive Jenkins calls if invalidation paths are incomplete.
 
+- Environment Diagnostics uses isolated, uncached clients without automatic SSO refresh. Keep raw probe responses in the host; only sanitized contracts from `src/environmentDiagnostics/**` may enter the panel or copied reports. Unlike data panels, its launcher keeps the panel open after connection edits, aborts old runs, and retests the saved environment. Recovery must keep the existing credential revision checks, URL rebasing, and TLS confirmation paths.
+
 ## 3) Surprising Behaviors Worth Remembering
 
 - Jenkins limits the exported `builds` list to 100 entries before applying tree ranges. History requests with an explicit offset use `allBuilds`; keep their cache keys separate from ordinary recent-build requests.
@@ -86,10 +88,10 @@ When adding a service, wire it through the appropriate provider catalog (`CorePr
 
 If you touch panel entrypoints, bundle naming, or Vite output:
 
-1. Confirm `vite.config.mts` still emits manifest entries for build compare, build details, job history, node capacity, and node details.
+1. Confirm `vite.config.mts` still emits manifest entries for build compare, build details, job history, node capacity, node details, and environment diagnostics.
 2. Run `npm run compile`.
 3. Verify `out/webview/manifest.json` includes expected entries.
-4. Launch Extension Development Host and open the Build Compare, Build Details, Job History, Node Capacity, and Node Details panels.
+4. Launch Extension Development Host and open the Build Compare, Build Details, Job History, Node Capacity, Node Details, and Environment Diagnostics panels.
 
 If this is skipped, `resolveWebviewAssets(...)` throws; panel helpers catch the error and render a load-error view instead of the interactive panel.
 

@@ -4,6 +4,7 @@ import { LocalJenkinsfileResolver } from "../../commands/build/LocalJenkinsfileR
 import { resolveLocalReplayJobSuggestion } from "../../commands/build/LocalReplayJobSuggestion";
 import { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
+import { EnvironmentDiagnosticsService } from "../../environmentDiagnostics/EnvironmentDiagnosticsService";
 import { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { createFileArtifactFilesystem } from "../../services/ArtifactFilesystem";
@@ -66,6 +67,11 @@ export interface CoreProviderOptions {
 
 export function createCoreProviderCatalog(options: CoreProviderOptions) {
   return {
+    environmentDiagnosticsService: (container) =>
+      new EnvironmentDiagnosticsService(
+        container.get("dataService"),
+        container.get("environmentStore")
+      ),
     multibranchScanState: (_container) => {
       const state = new MultibranchScanStateStore();
       options.context.subscriptions.push(state);

@@ -52,6 +52,12 @@ export class JenkinsDataRuntimeContext {
     return this.clientProvider.getClient(environment);
   }
 
+  async createEnvironmentDiagnosticsClient(
+    environment: JenkinsEnvironmentRef
+  ): Promise<JenkinsClient> {
+    return this.clientProvider.createEnvironmentDiagnosticsClient(environment);
+  }
+
   async buildCacheKey(
     environment: JenkinsEnvironmentRef,
     kind: string,

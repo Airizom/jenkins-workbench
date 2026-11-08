@@ -3,6 +3,7 @@ import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type {
   EnvironmentScope,
+  JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../../storage/JenkinsEnvironmentStore";
 
@@ -121,4 +122,19 @@ export async function promptEnvironmentTarget(
   });
 
   return pick?.target;
+}
+
+/** Resolves stored settings rather than trusting references retained by tree items or panels. */
+export async function resolveSavedEnvironment(
+  store: JenkinsEnvironmentStore,
+  target: { scope: EnvironmentScope; id: string },
+  warnIfMissing = true
+): Promise<JenkinsEnvironment | undefined> {
+  const environment = (await store.getEnvironments(target.scope)).find(
+    (entry) => entry.id === target.id
+  );
+  if (!environment && warnIfMissing) {
+    void vscode.window.showWarningMessage("The selected environment no longer exists.");
+  }
+  return environment;
 }

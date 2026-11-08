@@ -26,6 +26,12 @@ export default defineConfig(() => {
       sourcemap: isWatch,
       rollupOptions: {
         input: {
+          environmentDiagnostics: path.join(
+            panelsRoot,
+            "environmentDiagnostics",
+            "webview",
+            "index.tsx"
+          ),
           jobHistory: path.join(panelsRoot, "jobHistory", "webview", "index.tsx"),
           buildCompare: buildCompareEntry,
           buildDetails: buildDetailsEntry,

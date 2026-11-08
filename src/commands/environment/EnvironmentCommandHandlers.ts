@@ -2,7 +2,11 @@ import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../../jenkins/JenkinsEnvironmentRef";
+import { rebaseEnvironmentUrl } from "../../jenkins/urls";
 import type { BrowserSsoAuthenticator } from "../../services/BrowserSsoAuthenticationService";
 import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type {
@@ -19,9 +23,14 @@ import {
   normalizeJenkinsUrl,
   parseHttpUrl,
   promptEnvironmentTarget,
+  resolveSavedEnvironment,
   toEnvironmentTarget
 } from "./EnvironmentCommandHelpers";
-import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
+import type {
+  EnvironmentCommandRefreshHost,
+  EnvironmentDiagnosticsOfferOptions
+} from "./EnvironmentCommandTypes";
+import { offerEnvironmentDiagnostics } from "./EnvironmentDiagnosticsOffer";
 import {
   promptAuthMode,
   promptBrowserSsoLoginUrl,
@@ -31,12 +40,13 @@ import {
   promptTlsCertificateValidation
 } from "./EnvironmentPrompts";
 
-export { type EditEnvironmentDependencies, editEnvironment } from "./EditEnvironmentCommand";
+export { editEnvironment } from "./EditEnvironmentCommand";
 
 export async function addEnvironment(
   store: JenkinsEnvironmentStore,
   browserSsoAuthenticator: BrowserSsoAuthenticator,
-  refreshHost: EnvironmentCommandRefreshHost
+  refreshHost: EnvironmentCommandRefreshHost,
+  options: EnvironmentDiagnosticsOfferOptions = {}
 ): Promise<void> {
   const scope = await promptScope();
   if (!scope) {
@@ -102,6 +112,13 @@ export async function addEnvironment(
     return;
   }
   refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
+  await offerEnvironmentDiagnostics(
+    store,
+    scope,
+    environment.id,
+    options,
+    `Jenkins environment ${formatEnvironmentTitle(environment)} was saved.`
+  );
 }
 
 export async function signInWithBrowserSso(
@@ -109,8 +126,9 @@ export async function signInWithBrowserSso(
   browserSsoAuthenticator: BrowserSsoAuthenticator,
   clientProvider: JenkinsClientProvider,
   refreshHost: EnvironmentCommandRefreshHost,
-  item?: JenkinsEnvironmentRef
-): Promise<void> {
+  item?: JenkinsEnvironmentRef,
+  options: EnvironmentDiagnosticsOfferOptions = {}
+): Promise<boolean> {
   const target = item
     ? toEnvironmentTarget(item)
     : await promptEnvironmentTarget(store, {
@@ -118,37 +136,59 @@ export async function signInWithBrowserSso(
         placeHolder: "Select an environment to sign in to"
       });
   if (!target) {
-    return;
+    return false;
   }
 
   if (!parseHttpUrl(target.url)) {
     void vscode.window.showErrorMessage(
       "The selected Jenkins environment has an invalid or unsafe URL. Remove it and add it again without embedded credentials, query parameters, or fragments."
     );
-    return;
+    return false;
   }
 
+  const environment = await resolveSavedEnvironment(store, target);
+  if (!environment) {
+    return false;
+  }
+  const current = toJenkinsEnvironmentRef({ ...environment, scope: target.scope });
+  if (!parseHttpUrl(current.url)) {
+    void vscode.window.showErrorMessage(INVALID_URL_MESSAGE);
+    return false;
+  }
   const existingAuthConfig = await store.getAuthConfig(target.scope, target.id);
   // Reading invalid credentials may clear them and advance the revision.
   const authConfigRevision = store.getAuthConfigRevision(target.scope, target.id);
   const loginUrl =
     existingAuthConfig?.type === "sso"
-      ? existingAuthConfig.loginUrl
-      : await promptBrowserSsoLoginUrl(target.url);
+      ? (rebaseEnvironmentUrl(
+          existingAuthConfig.loginUrl,
+          environment.previousUrls ?? [],
+          current.url
+        ) ?? existingAuthConfig.loginUrl)
+      : await promptBrowserSsoLoginUrl(current.url);
   if (!loginUrl) {
-    return;
+    return false;
   }
 
   const authConfig = await browserSsoAuthenticator.authenticate({
-    environmentUrl: target.url,
+    environmentUrl: current.url,
     loginUrl,
     currentAuthConfig: existingAuthConfig,
     reason: "manual"
   });
   if (!authConfig) {
-    return;
+    return false;
   }
 
+  const latest = (await store.getEnvironments(target.scope)).find(
+    (entry) => entry.id === target.id
+  );
+  if (latest?.url !== current.url) {
+    void vscode.window.showWarningMessage(
+      "The environment was removed or its URL changed while signing in. Try again."
+    );
+    return false;
+  }
   const saved = await store.setAuthConfigIfRevision(
     target.scope,
     target.id,
@@ -156,10 +196,12 @@ export async function signInWithBrowserSso(
     authConfigRevision
   );
   if (!saved) {
-    return;
+    return false;
   }
   clientProvider.invalidateClient(target.scope, target.id);
   refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
+  await offerEnvironmentDiagnostics(store, target.scope, target.id, options);
+  return true;
 }
 
 export async function removeEnvironment(

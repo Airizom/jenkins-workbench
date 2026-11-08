@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import * as vscode from "vscode";
 
 export type WebviewEntryName =
+  | "environmentDiagnostics"
   | "buildCompare"
   | "buildDetails"
   | "nodeCapacity"

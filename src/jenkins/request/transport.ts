@@ -46,5 +46,11 @@ export function createRequestTarget(
 }
 
 export function createTimeoutError(timeoutMs: number): JenkinsRequestError {
-  return new JenkinsRequestError(`Request timed out after ${timeoutMs}ms`);
+  return new JenkinsRequestError(
+    `Request timed out after ${timeoutMs}ms`,
+    undefined,
+    undefined,
+    undefined,
+    "ETIMEDOUT"
+  );
 }

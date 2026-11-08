@@ -70,7 +70,8 @@ export function registerExtensionCommands(
     pinStore,
     clientProvider,
     environmentUrlRebaseService,
-    refreshHost
+    refreshHost,
+    container.lazy("environmentDiagnosticsPanelLauncher")
   );
 
   registerBuildCommands(

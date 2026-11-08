@@ -204,7 +204,8 @@ Stopping builds and cancelling queued items each show one confirmation for the w
    - **Cookie header** — Cookie string
    - **Custom headers (JSON)** — JSON object of headers
    - **Browser SSO** — Sign in through your browser when prompted
-8. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
+8. **Test the connection** — Choose **Test Connection** after saving to open Environment Diagnostics. The environment stays saved if a check fails.
+9. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
 ## Open and Share Builds
 
@@ -561,15 +562,16 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 |---------|-------------|
 | `Jenkins: Add Environment` | Add a new Jenkins environment |
 | `Jenkins: Edit Environment...` | Rename an environment, change its URL, update its credentials, or configure TLS certificate validation |
+| `Jenkins: Test Connection / Environment Diagnostics` | Check connectivity, authentication, API access, and environment capabilities with recovery actions |
 | `Jenkins: Sign in with Browser SSO` | Refresh a Browser SSO environment session |
 | `Jenkins: Remove Environment` | Remove the selected environment |
 | `Jenkins: Refresh` | Refresh the tree view and clear cache |
 
 Editing an environment keeps it in place, so its pins, watches, parameter presets, diagnostic profile
 bindings, and history baselines are kept. Changing the URL moves those saved records to the new URL
-and closes open panels for the environment. If the scheme, host, or port changes, you are offered a credentials
-update for the new URL. Workspace-only data in other workspaces is moved the next time the extension
-activates there.
+and closes its data panels. Environment Diagnostics stays open and retests with the saved connection
+settings. If the scheme, host, or port changes, you are offered a credentials update for the new URL.
+Workspace-only data in other workspaces is moved the next time the extension activates there.
 
 ### Build Actions
 
@@ -745,6 +747,16 @@ Security notes:
 
 ## Troubleshooting
 
+### Environment Diagnostics
+
+Run **Jenkins: Test Connection / Environment Diagnostics**, or select it from an environment's context menu. **Test Connection** is also offered after adding an environment or changing its connection settings. The panel checks connectivity and TLS, current identity, root jobs/views API access, queue visibility, nodes, CSRF crumb availability, and Pipeline syntax support. It shows the test time and Jenkins version when available.
+
+Each result explains which features it affects and offers relevant actions, including **Edit URL**, **Edit Credentials**, **Sign In with Browser SSO**, **TLS Settings**, and **Retry**. Successful connection changes retest in the same panel. **Cancel** stops local diagnostic requests. Diagnostics do not automatically open an SSO browser, change certificate verification, or submit builds.
+
+Authentication and API permissions are checked separately: anonymous browsing does not prove that configured credentials were accepted, and a 403 does not by itself prove invalid credentials. An unavailable endpoint may reflect permissions, routing, or a missing capability. A successful crumb check does not prove permission to trigger builds; Pipeline syntax access does not verify Declarative validation or job-specific features. Empty job, queue, or node lists are valid results.
+
+**Copy Report** copies the displayed findings for troubleshooting without credentials, cookies, crumb values, custom header values, or raw response bodies. Reports include environment identification and the server URL. Results stay in the panel for the current session; they do not change the tree's health indicators or create diagnostic history.
+
 ### Empty Tree View
 
 - An environment marked **Sign-in failed** or **Unreachable** could not authenticate or connect; click any warning row beneath it to retry
@@ -760,7 +772,7 @@ For a self-signed or untrusted Jenkins certificate, run **Jenkins: Edit Environm
 
 The exception applies only to extension-managed requests for that environment, including API calls, build actions, console streams, and artifact previews/downloads. Cross-origin redirects use certificate verification. Browser SSO and links opened in an external browser retain the browser's certificate checks.
 
-Select **Verify certificates (recommended)** to restore verification. Changing this setting closes the environment's open panels; reopen them to use the new policy. Changing the environment URL's scheme, host, or port resets the exception to secure defaults. Path-only URL changes preserve it.
+Select **Verify certificates (recommended)** to restore verification. Changing this setting closes the environment's data panels; reopen them to use the new policy. Environment Diagnostics stays open and retests with the new settings. Changing the environment URL's scheme, host, or port resets the exception to secure defaults. Path-only URL changes preserve it.
 
 ### 403 Forbidden Errors
 
@@ -929,6 +941,7 @@ With the [local Jenkins fixture](dev/jenkins/README.md) running and Git availabl
 33. Keep a build forever and release it from the tree and from Build Details; delete a kept build with Stop Keeping and Delete and confirm an open Build Details panel for it closes
 34. Edit a build's display name (and reset it), a single-line description, and a multi-line description in the draft editor, including a remote-change conflict
 35. Multi-select jobs, running builds, and queue items with Ctrl/Cmd-click and Shift-click, including rows from different environments and repeated jobs in different sections; exercise all six bulk actions from the context menu and Command Palette, verify mixed watched/pinned states and row-only inline icons, decline a stop/cancel confirmation, cancel in-progress work, and check partial-failure details and refreshed tree/watch/queue state
+36. Open Environment Diagnostics from the palette, environment context menu, and post-save offer. Verify successful authenticated and anonymous setups, rejected credentials, expired SSO, incorrect context paths, certificate errors, and restricted API permissions. Exercise recovery and automatic retesting, cancel a run, hide/reveal the panel, edit/remove the environment during a run, and inspect Copy Report for secret exclusion. Confirm all six panels load and existing tree/watch/queue and artifact behavior remains intact
 
 ## License
 

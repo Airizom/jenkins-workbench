@@ -77,6 +77,12 @@
         "icon": "$(edit)"
       },
       {
+        "command": "jenkinsWorkbench.testConnection",
+        "title": "Test Connection / Environment Diagnostics",
+        "category": "Jenkins",
+        "icon": "$(pulse)"
+      },
+      {
         "command": "jenkinsWorkbench.removeEnvironment",
         "title": "Remove Environment",
         "category": "Jenkins",
@@ -1464,6 +1470,11 @@
           "command": "jenkinsWorkbench.editEnvironment",
           "when": "view == jenkinsWorkbench.tree && viewItem == environment",
           "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.testConnection",
+          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "group": "1_actions@2"
         },
         {
           "command": "jenkinsWorkbench.removeEnvironment",

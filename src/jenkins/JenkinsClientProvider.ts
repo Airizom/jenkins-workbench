@@ -86,6 +86,28 @@ export class JenkinsClientProvider {
     }
   }
 
+  updateRequestTimeoutMs(timeoutMs: number): void {
+    this.requestTimeoutMs = timeoutMs;
+    for (const entry of this.clientCache.values()) {
+      entry.client = undefined;
+    }
+  }
+
+  /** A fresh, uncached client that reports SSO expiry without opening a browser. */
+  async createEnvironmentDiagnosticsClient(
+    environment: JenkinsEnvironmentRef
+  ): Promise<JenkinsClient> {
+    const { entry } = await this.resolveClientCache(environment);
+    return new JenkinsClient({
+      baseUrl: environment.url,
+      username: environment.username,
+      token: entry.authMaterial.token,
+      authConfig: entry.authMaterial.authConfig,
+      allowInsecureTls: this.getAllowInsecureTls(environment),
+      requestTimeoutMs: this.requestTimeoutMs
+    });
+  }
+
   private getAllowInsecureTls(environment: JenkinsEnvironmentRef): boolean {
     // Never trust a reference retained by a task, panel, or poller as TLS authority.
     return this.store.getAllowInsecureTls(

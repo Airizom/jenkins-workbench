@@ -1,6 +1,7 @@
 export const CONFIG_SECTION = "jenkinsWorkbench";
 
 export const CONFIG_KEYS = {
+  requestTimeoutSeconds: "requestTimeoutSeconds",
   cacheTtlSeconds: "cacheTtlSeconds",
   statusRefreshIntervalSeconds: "pollIntervalSeconds",
   watchErrorThreshold: "watchErrorThreshold",

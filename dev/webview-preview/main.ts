@@ -1,5 +1,6 @@
 import { buildCompareScenarios } from "./fixtures/buildCompare";
 import { buildDetailsScenarios } from "./fixtures/buildDetails";
+import { environmentDiagnosticsScenarios } from "./fixtures/environmentDiagnostics";
 import { jobHistoryScenarios } from "./fixtures/jobHistory";
 import { nodeCapacityScenarios } from "./fixtures/nodeCapacity";
 import { nodeDetailsScenarios } from "./fixtures/nodeDetails";
@@ -11,7 +12,8 @@ type PanelName =
   | "jobHistory"
   | "jobHistoryEmbedded"
   | "nodeCapacity"
-  | "nodeDetails";
+  | "nodeDetails"
+  | "environmentDiagnostics";
 
 const panels: Record<
   PanelName,
@@ -43,6 +45,10 @@ const panels: Record<
   nodeCapacity: {
     scenarios: nodeCapacityScenarios,
     load: () => import("../../src/panels/nodeCapacity/webview/index")
+  },
+  environmentDiagnostics: {
+    scenarios: environmentDiagnosticsScenarios,
+    load: () => import("../../src/panels/environmentDiagnostics/webview/index")
   },
   nodeDetails: {
     scenarios: nodeDetailsScenarios,

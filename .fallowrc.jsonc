@@ -4,6 +4,7 @@
     "src/buildDiagnostics/BuildDiagnosticCustomMatcherWorker.ts",
     "src/panels/buildCompare/webview/index.tsx",
     "src/panels/buildDetails/webview/index.tsx",
+    "src/panels/environmentDiagnostics/webview/index.tsx",
     "src/panels/jobHistory/webview/index.tsx",
     "src/panels/nodeCapacity/webview/index.tsx",
     "src/panels/nodeDetails/webview/index.tsx"

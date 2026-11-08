@@ -161,6 +161,12 @@ export class JenkinsDataService
     );
   }
 
+  // DiagnosticsDataSource calls this member through its structural service interface.
+  // fallow-ignore-next-line unused-class-member
+  async createEnvironmentDiagnosticsClient(environment: JenkinsEnvironmentRef) {
+    return this.runtimeContext.createEnvironmentDiagnosticsClient(environment);
+  }
+
   clearCache(): void {
     this.runtimeContext.clearCache();
   }

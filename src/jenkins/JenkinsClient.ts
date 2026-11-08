@@ -1,5 +1,10 @@
 import type { JenkinsBuildTriggerOptions } from "./client/JenkinsBuildsApi";
 import { JenkinsBuildsApi } from "./client/JenkinsBuildsApi";
+import type {
+  EnvironmentProbeId,
+  EnvironmentProbeResponse
+} from "./client/JenkinsEnvironmentDiagnosticsApi";
+import { JenkinsEnvironmentDiagnosticsApi } from "./client/JenkinsEnvironmentDiagnosticsApi";
 import { JenkinsHttpClient } from "./client/JenkinsHttpClient";
 import { JenkinsIndexingApi } from "./client/JenkinsIndexingApi";
 import { JenkinsJobsApi } from "./client/JenkinsJobsApi";
@@ -100,6 +105,7 @@ export type JenkinsBuildStopClientSurface = Pick<
 export class JenkinsClient
   implements JenkinsBuildPermalinkClientSurface, JenkinsBuildStopClientSurface
 {
+  private readonly diagnosticsApi: JenkinsEnvironmentDiagnosticsApi;
   private readonly buildsApi: JenkinsBuildsApi;
   private readonly relationshipsApi: JenkinsRelationshipsApi;
   private readonly jobsApi: JenkinsJobsApi;
@@ -113,6 +119,7 @@ export class JenkinsClient
 
   constructor(options: JenkinsClientOptions) {
     const httpClient = new JenkinsHttpClient(options);
+    this.diagnosticsApi = new JenkinsEnvironmentDiagnosticsApi(options);
     this.jobsApi = new JenkinsJobsApi(httpClient);
     this.indexingApi = new JenkinsIndexingApi(httpClient);
     this.buildsApi = new JenkinsBuildsApi(httpClient);
@@ -123,6 +130,13 @@ export class JenkinsClient
     this.pipelineSyntaxApi = new JenkinsPipelineSyntaxApi(httpClient);
     this.workspaceApi = new JenkinsWorkspaceApi(httpClient);
     this.coverageApi = new JenkinsCoverageApi(httpClient);
+  }
+
+  async probeEnvironment(
+    id: EnvironmentProbeId,
+    signal: AbortSignal
+  ): Promise<EnvironmentProbeResponse> {
+    return this.diagnosticsApi.probe(id, signal);
   }
 
   // Fallow cannot resolve calls made after clients cross provider and data-operation boundaries.

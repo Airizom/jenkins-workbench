@@ -22,6 +22,7 @@ import {
   getJenkinsfileIntelligenceConfig,
   getJenkinsfileValidationConfig,
   getQueuePollIntervalSeconds,
+  getRequestTimeoutMs,
   getStatusRefreshIntervalSeconds,
   getTreeActivityOptions,
   getTreeViewCurationOptions,
@@ -108,6 +109,12 @@ export function registerExtensionSubscriptions(
   const jenkinsfileStepCatalogService = container.get("jenkinsfileStepCatalogService");
 
   const configReactions: ConfigReaction[] = [
+    {
+      keys: [CONFIG_KEYS.requestTimeoutSeconds],
+      run: (config) => {
+        container.get("clientProvider").updateRequestTimeoutMs(getRequestTimeoutMs(config));
+      }
+    },
     {
       keys: [CONFIG_KEYS.cacheTtlSeconds],
       run: (config) => {

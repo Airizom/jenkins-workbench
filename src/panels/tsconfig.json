@@ -16,6 +16,9 @@
     "skipLibCheck": true
   },
   "include": [
+    "environmentDiagnostics/webview/**/*.ts",
+    "environmentDiagnostics/webview/**/*.tsx",
+    "environmentDiagnostics/shared/**/*.ts",
     "buildCompare/webview/**/*.ts",
     "buildCompare/webview/**/*.tsx",
     "buildCompare/shared/**/*.ts",

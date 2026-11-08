@@ -164,7 +164,7 @@ export function getBuildDiagnosticsConfig(
 export function getRequestTimeoutMs(config: vscode.WorkspaceConfiguration): number {
   const timeoutSeconds = getFiniteNumberConfigValue(
     config,
-    "requestTimeoutSeconds",
+    definitions.CONFIG_KEYS.requestTimeoutSeconds,
     definitions.DEFAULT_REQUEST_TIMEOUT_SECONDS
   );
   return Math.max(5, timeoutSeconds) * 1000;

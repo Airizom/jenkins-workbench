@@ -20,6 +20,7 @@ import type { CurrentBranchStatusBar } from "../../currentBranch/CurrentBranchSt
 import type { CurrentBranchStatusResolver } from "../../currentBranch/CurrentBranchStatusResolver";
 import type { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBranchTargetResolver";
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
+import type { EnvironmentDiagnosticsService } from "../../environmentDiagnostics/EnvironmentDiagnosticsService";
 import type { HistoryBaselineResolver, HistoryBaselineStore } from "../../history/HistoryBaseline";
 import type { HistoryService } from "../../history/HistoryService";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
@@ -30,6 +31,7 @@ import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/Jenki
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
 import type { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
 import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
+import type { EnvironmentDiagnosticsPanelLauncher } from "../../panels/EnvironmentDiagnosticsPanel";
 import type { JobHistoryPanelLauncher } from "../../panels/JobHistoryPanelLauncher";
 import type { HistoryDependencies } from "../../panels/jobHistory/HistoryController";
 import type { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
@@ -96,6 +98,8 @@ import type { JenkinsWorkbenchUriHandler } from "../JenkinsWorkbenchUriHandler";
 import type { VscodeStatusNotifier } from "../VscodeStatusNotifier";
 
 export interface ExtensionTokenMap {
+  environmentDiagnosticsService: EnvironmentDiagnosticsService;
+  environmentDiagnosticsPanelLauncher: EnvironmentDiagnosticsPanelLauncher;
   multibranchScanService: MultibranchScanService;
   multibranchScanState: MultibranchScanStateStore;
   multibranchScanLogViewer: MultibranchScanLogViewer;

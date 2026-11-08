@@ -19,9 +19,14 @@ import {
   parseHttpUrl,
   promptEnvironmentTarget,
   redactJenkinsUrl,
+  resolveSavedEnvironment,
   toEnvironmentTarget
 } from "./EnvironmentCommandHelpers";
-import type { EnvironmentCommandRefreshHost } from "./EnvironmentCommandTypes";
+import type {
+  EnvironmentCommandRefreshHost,
+  EnvironmentDiagnosticsOfferOptions
+} from "./EnvironmentCommandTypes";
+import { offerEnvironmentDiagnostics } from "./EnvironmentDiagnosticsOffer";
 import {
   promptAuthMode,
   promptEditField,
@@ -48,7 +53,7 @@ function getUrlOrigin(url: string): string | undefined {
   }
 }
 
-export interface EditEnvironmentDependencies {
+export interface EditEnvironmentDependencies extends EnvironmentDiagnosticsOfferOptions {
   store: JenkinsEnvironmentStore;
   browserSsoAuthenticator: BrowserSsoAuthenticator;
   clientProvider: JenkinsClientProvider;
@@ -59,8 +64,9 @@ export interface EditEnvironmentDependencies {
 /** Edits an environment in place; its id, and with it every per-environment record, is kept. */
 export async function editEnvironment(
   dependencies: EditEnvironmentDependencies,
-  item?: JenkinsEnvironmentRef
-): Promise<void> {
+  item?: JenkinsEnvironmentRef,
+  selectedField?: "url" | "tls" | "credentials"
+): Promise<boolean> {
   const { store } = dependencies;
   const target = item
     ? toEnvironmentTarget(item)
@@ -69,57 +75,53 @@ export async function editEnvironment(
         placeHolder: "Select an environment to edit"
       });
   if (!target) {
-    return;
+    return false;
   }
 
   // The tree item or picker entry may be stale; edit the stored record.
-  const environment = (await store.getEnvironments(target.scope)).find(
-    (entry) => entry.id === target.id
-  );
+  const environment = await resolveSavedEnvironment(store, target);
   if (!environment) {
-    void vscode.window.showWarningMessage("The selected environment no longer exists.");
-    return;
+    return false;
   }
 
   const authConfig = await store.getAuthConfig(target.scope, environment.id);
-  const field = await promptEditField(
-    {
-      name: environment.name,
-      displayUrl: formatJenkinsUrlForDisplay(environment.url),
-      allowInsecureTls: environment.allowInsecureTls
-    },
-    authConfig?.type
-  );
+  const field =
+    selectedField ??
+    (await promptEditField(
+      {
+        name: environment.name,
+        displayUrl: formatJenkinsUrlForDisplay(environment.url),
+        allowInsecureTls: environment.allowInsecureTls
+      },
+      authConfig?.type
+    ));
   switch (field) {
     case "name":
-      await renameEnvironment(dependencies, target.scope, environment);
-      return;
+      return renameEnvironment(dependencies, target.scope, environment);
     case "url":
-      await changeEnvironmentUrl(dependencies, target.scope, environment);
-      return;
+      return changeEnvironmentUrl(dependencies, target.scope, environment);
     case "tls":
-      await updateEnvironmentTls(dependencies, target.scope, environment);
-      return;
+      return updateEnvironmentTls(dependencies, target.scope, environment);
     case "credentials":
-      await updateEnvironmentCredentials(dependencies, target.scope, environment);
-      return;
+      return updateEnvironmentCredentials(dependencies, target.scope, environment);
     default:
-      return;
+      return false;
   }
 }
 
 async function updateEnvironmentTls(
-  { store, clientProvider, refreshHost }: EditEnvironmentDependencies,
+  dependencies: EditEnvironmentDependencies,
   scope: EnvironmentScope,
   environment: JenkinsEnvironment
-): Promise<void> {
+): Promise<boolean> {
+  const { store, clientProvider, refreshHost } = dependencies;
   if (parseHttpUrl(environment.url)?.protocol !== "https:") {
-    return;
+    return false;
   }
   const current = environment.allowInsecureTls === true;
   const allowInsecureTls = await promptTlsCertificateValidation(current);
   if (allowInsecureTls === undefined || allowInsecureTls === current) {
-    return;
+    return false;
   }
   const updated = await store.updateEnvironment(
     scope,
@@ -131,23 +133,28 @@ async function updateEnvironmentTls(
     void vscode.window.showWarningMessage(
       "The selected environment was removed or its URL origin changed while editing TLS settings. Try again."
     );
-    return;
+    return false;
   }
   clientProvider.invalidateClient(scope, environment.id);
   refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
-  void vscode.window.showInformationMessage(
-    `TLS certificate validation for ${formatEnvironmentTitle(updated.next)} was ${allowInsecureTls ? "disabled" : "enabled"}. Open panels for this environment were closed; reopen them to use the new setting.`
+  await offerEnvironmentDiagnostics(
+    store,
+    scope,
+    environment.id,
+    dependencies,
+    `TLS certificate validation for ${formatEnvironmentTitle(updated.next)} was ${allowInsecureTls ? "disabled" : "enabled"}. Open panels showing build or node data were closed; reopen them to use the new setting.`
   );
+  return true;
 }
 
 async function renameEnvironment(
   { store, refreshHost }: EditEnvironmentDependencies,
   scope: EnvironmentScope,
   environment: JenkinsEnvironment
-): Promise<void> {
+): Promise<boolean> {
   const name = await promptEnvironmentName(environment.url, environment.name);
   if (name === undefined || name === (environment.name ?? "")) {
-    return;
+    return false;
   }
 
   const updated = await store.updateEnvironment(scope, environment.id, {
@@ -155,33 +162,34 @@ async function renameEnvironment(
   });
   if (!updated) {
     void vscode.window.showWarningMessage("The selected environment no longer exists.");
-    return;
+    return false;
   }
   refreshHost.fullEnvironmentRefresh({ environmentId: environment.id });
+  return true;
 }
 
 async function changeEnvironmentUrl(
   dependencies: EditEnvironmentDependencies,
   scope: EnvironmentScope,
   environment: JenkinsEnvironment
-): Promise<void> {
+): Promise<boolean> {
   const { store, clientProvider, urlRebaseService, refreshHost } = dependencies;
   const rawUrl = await promptRequiredInput("Jenkins URL", "https://jenkins.example.com", false, {
     value: redactJenkinsUrl(environment.url) ?? environment.url
   });
   if (!rawUrl) {
-    return;
+    return false;
   }
 
   if (!parseHttpUrl(rawUrl)) {
     void vscode.window.showErrorMessage(INVALID_URL_MESSAGE);
-    return;
+    return false;
   }
 
   const url = normalizeJenkinsUrl(rawUrl);
   if (url === normalizeJenkinsUrl(environment.url)) {
     void vscode.window.showInformationMessage("The Jenkins URL is unchanged.");
-    return;
+    return false;
   }
 
   const duplicate = (await store.getEnvironments(scope)).find(
@@ -191,7 +199,7 @@ async function changeEnvironmentUrl(
     void vscode.window.showWarningMessage(
       "Another environment for this URL already exists in this scope."
     );
-    return;
+    return false;
   }
 
   // Stored data is rebased before the change is announced; open panels for the environment
@@ -199,15 +207,19 @@ async function changeEnvironmentUrl(
   const changed = await urlRebaseService.changeUrl(scope, environment.id, url);
   if (!changed) {
     void vscode.window.showWarningMessage("The selected environment no longer exists.");
-    return;
+    return false;
   }
-  const {
-    update: { previous, next },
-    failures: rebaseFailures
-  } = changed;
-  clientProvider.invalidateClient(scope, next.id);
-  refreshHost.fullEnvironmentRefresh({ environmentId: next.id });
+  clientProvider.invalidateClient(scope, changed.update.next.id);
+  refreshHost.fullEnvironmentRefresh({ environmentId: changed.update.next.id });
+  await finishEnvironmentUrlChange(dependencies, scope, changed.update, changed.failures);
+  return true;
+}
 
+function describeEnvironmentUrlChange(
+  previous: JenkinsEnvironment,
+  next: JenkinsEnvironment,
+  rebaseFailures: readonly unknown[]
+): string | undefined {
   const title = formatEnvironmentTitle(next);
   const tlsResetMessage =
     previous.allowInsecureTls === true && next.allowInsecureTls !== true
@@ -219,36 +231,58 @@ async function changeEnvironmentUrl(
         .map((failure) => formatError(failure))
         .join("; ")}. This will be retried the next time the extension activates.${tlsResetMessage}`
     );
-  } else {
-    void vscode.window.showInformationMessage(
-      `The URL of ${title} was changed. Saved pins, watches, presets, and baselines now use the new URL, and open panels for this environment were closed.${tlsResetMessage}`
-    );
+    return undefined;
   }
+  return `The URL of ${title} was changed. Saved pins, watches, presets, and baselines now use the new URL, and open panels showing build or node data were closed.${tlsResetMessage}`;
+}
 
+async function finishEnvironmentUrlChange(
+  dependencies: EditEnvironmentDependencies,
+  scope: EnvironmentScope,
+  update: { previous: JenkinsEnvironment; next: JenkinsEnvironment },
+  rebaseFailures: readonly unknown[]
+): Promise<void> {
+  const { previous, next } = update;
+  const message = describeEnvironmentUrlChange(previous, next, rebaseFailures);
   if (getUrlOrigin(previous.url) === getUrlOrigin(next.url)) {
+    await offerEnvironmentDiagnostics(dependencies.store, scope, next.id, dependencies, message);
     return;
   }
-  const updateLabel = "Update";
+  if (!dependencies.diagnostics && !dependencies.suppressDiagnosticsOffer && message) {
+    void vscode.window.showInformationMessage(message);
+  }
   const choice = await vscode.window.showInformationMessage(
     "Update credentials for the new URL?",
-    updateLabel,
+    "Update",
     "Keep current"
   );
-  if (choice === updateLabel) {
-    await updateEnvironmentCredentials(dependencies, scope, next);
+  if (choice === "Update") {
+    await updateEnvironmentCredentials(
+      { ...dependencies, suppressDiagnosticsOffer: true },
+      scope,
+      next
+    );
   }
+  await offerEnvironmentDiagnostics(
+    dependencies.store,
+    scope,
+    next.id,
+    dependencies,
+    dependencies.diagnostics ? message : undefined
+  );
 }
 
 async function updateEnvironmentCredentials(
-  { store, browserSsoAuthenticator, clientProvider, refreshHost }: EditEnvironmentDependencies,
+  dependencies: EditEnvironmentDependencies,
   scope: EnvironmentScope,
   environment: JenkinsEnvironment
-): Promise<void> {
+): Promise<boolean> {
+  const { store, browserSsoAuthenticator, clientProvider, refreshHost } = dependencies;
   if (!parseHttpUrl(environment.url)) {
     void vscode.window.showErrorMessage(
       "The selected Jenkins environment has an invalid or unsafe URL. Change it to a URL without embedded credentials, query parameters, or fragments first."
     );
-    return;
+    return false;
   }
 
   const currentAuthConfig = await store.getAuthConfig(scope, environment.id);
@@ -256,7 +290,7 @@ async function updateEnvironmentCredentials(
   const authConfigRevision = store.getAuthConfigRevision(scope, environment.id);
   const authMode = await promptAuthMode(currentAuthConfig?.type);
   if (!authMode) {
-    return;
+    return false;
   }
 
   const authConfig = await promptAuthConfig(authMode, environment.url, browserSsoAuthenticator, {
@@ -270,9 +304,18 @@ async function updateEnvironmentCredentials(
     currentAuthConfig
   });
   if (!authConfig) {
-    return;
+    return false;
   }
 
+  const currentEnvironment = (await store.getEnvironments(scope)).find(
+    (entry) => entry.id === environment.id
+  );
+  if (currentEnvironment?.url !== environment.url) {
+    void vscode.window.showWarningMessage(
+      "The environment was removed or its URL changed while editing credentials. Try again."
+    );
+    return false;
+  }
   const title = formatEnvironmentTitle(environment);
   let saved: boolean;
   try {
@@ -286,13 +329,13 @@ async function updateEnvironmentCredentials(
     void vscode.window.showErrorMessage(
       `Unable to store authentication settings for ${title}: ${formatError(error)}`
     );
-    return;
+    return false;
   }
   if (!saved) {
     void vscode.window.showWarningMessage(
       `The credentials for ${title} were changed elsewhere while you were editing them. Try again.`
     );
-    return;
+    return false;
   }
 
   // Drop legacy credentials so they can't shadow the new auth config.
@@ -312,4 +355,6 @@ async function updateEnvironmentCredentials(
         .join("; ")}`
     );
   }
+  await offerEnvironmentDiagnostics(store, scope, environment.id, dependencies);
+  return true;
 }

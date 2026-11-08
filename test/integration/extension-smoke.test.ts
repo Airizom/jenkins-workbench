@@ -31,6 +31,7 @@ describe("extension smoke", () => {
       "jenkinsWorkbench.downloadAllArtifacts",
       "jenkinsWorkbench.addEnvironment",
       "jenkinsWorkbench.editEnvironment",
+      "jenkinsWorkbench.testConnection",
       "jenkinsWorkbench.removeEnvironment",
       "jenkinsWorkbench.triggerBuild",
       "jenkinsWorkbench.scanMultibranch",
@@ -70,7 +71,7 @@ describe("extension smoke", () => {
     const tasks = await vscode.tasks.fetchTasks({ type: "jenkinsWorkbench" });
     assert.ok(Array.isArray(tasks));
   });
-  it("packages all five webview entries", async () => {
+  it("packages all six webview entries", async () => {
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     assert.ok(extension);
     const manifest = JSON.parse(
@@ -80,6 +81,7 @@ describe("extension smoke", () => {
       )
     ) as Record<string, { file: string; isEntry?: boolean }>;
     for (const name of [
+      "environmentDiagnostics",
       "buildDetails",
       "buildCompare",
       "nodeDetails",

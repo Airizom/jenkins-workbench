@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import { BuildDiagnosticsCoordinator } from "../../buildDiagnostics/BuildDiagnosticsCoordinator";
 import { BulkActionService } from "../../commands/bulk/BulkActionService";
+import { recoverEnvironmentConnection } from "../../commands/environment/EnvironmentConnectionRecovery";
 import { CurrentBranchActionExecutor } from "../../currentBranch/CurrentBranchActionExecutor";
 import { CurrentBranchCommandMapper } from "../../currentBranch/CurrentBranchCommandMapper";
 import { CurrentBranchCommitHistory } from "../../currentBranch/CurrentBranchCommitHistory";
@@ -26,6 +27,7 @@ import { BuildDetailsPanel } from "../../panels/BuildDetailsPanel";
 import { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { BuildCompareOptions } from "../../panels/buildCompare/BuildCompareOptions";
 import { BuildDetailsBackendAdapter } from "../../panels/buildDetails/BuildDetailsBackend";
+import { EnvironmentDiagnosticsPanelLauncher } from "../../panels/EnvironmentDiagnosticsPanel";
 import { JobHistoryPanelLauncher } from "../../panels/JobHistoryPanelLauncher";
 import { BuildInspectionBackendAdapter } from "../../panels/shared/backend/BuildInspectionBackend";
 import { JenkinsQueuePoller } from "../../queue/JenkinsQueuePoller";
@@ -67,6 +69,32 @@ export interface RuntimeProviderOptions {
 
 export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
   return {
+    environmentDiagnosticsPanelLauncher: (container) => {
+      const launcher = new EnvironmentDiagnosticsPanelLauncher({
+        extensionUri: options.extensionUri,
+        store: container.get("environmentStore"),
+        service: container.get("environmentDiagnosticsService"),
+        recover: async (action, environment) => {
+          if (action === "retry" || action === "openJenkins") {
+            return false;
+          }
+          return recoverEnvironmentConnection(
+            {
+              store: container.get("environmentStore"),
+              browserSsoAuthenticator: container.get("browserSsoAuthenticator"),
+              clientProvider: container.get("clientProvider"),
+              urlRebaseService: container.get("environmentUrlRebaseService"),
+              refreshHost: container.get("refreshHost"),
+              suppressDiagnosticsOffer: true
+            },
+            action,
+            environment
+          );
+        }
+      });
+      options.context.subscriptions.push(launcher);
+      return launcher;
+    },
     multibranchScanService: (container) => {
       const service = new MultibranchScanService(
         container.get("dataService"),

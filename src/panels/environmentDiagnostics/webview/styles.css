@@ -1,0 +1,139 @@
+.diagnostics-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  line-height: 1.5;
+}
+.diagnostics-page h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.diagnostics-page h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+.diagnostics-page p {
+  margin: 6px 0;
+}
+.diagnostics-eyebrow {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+.diagnostics-url {
+  overflow-wrap: anywhere;
+}
+.diagnostics-meta,
+.diagnostics-footnote {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.diagnostics-toolbar,
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.diagnostics-button {
+  font: inherit;
+  padding: 5px 12px;
+  border-radius: 3px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+}
+.diagnostics-button:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+.diagnostics-button.secondary {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+.diagnostics-button.secondary:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+.diagnostics-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.diagnostics-button:focus-visible,
+.diagnostics-page summary:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 2px;
+}
+.diagnostics-overall {
+  margin: 24px 0 16px;
+  padding: 16px;
+  border-left: 3px solid var(--vscode-focusBorder);
+  background: var(--vscode-textBlockQuote-background);
+}
+.diagnostics-overall progress {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+}
+.diagnostics-checks {
+  display: grid;
+  gap: 12px;
+}
+.diagnostics-check {
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  border-radius: 5px;
+  padding: 16px;
+}
+.diagnostics-check-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.diagnostics-status {
+  font-size: 12px;
+  border: 1px solid currentColor;
+  padding: 1px 8px;
+  border-radius: 12px;
+}
+.diagnostics-status.passed {
+  color: var(--vscode-testing-iconPassed, var(--vscode-foreground));
+}
+.diagnostics-status.failed {
+  color: var(--vscode-errorForeground);
+}
+.diagnostics-status.warning,
+.diagnostics-status.unavailable {
+  color: var(--vscode-editorWarning-foreground);
+}
+.diagnostics-status.skipped {
+  color: var(--vscode-descriptionForeground);
+}
+.diagnostics-summary {
+  font-weight: 500;
+}
+.diagnostics-page details {
+  margin-top: 10px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+.diagnostics-evidence {
+  list-style: disc;
+  padding-left: 20px;
+}
+.diagnostics-page summary {
+  cursor: pointer;
+}
+.diagnostics-page .diagnostics-footnote {
+  margin-top: 20px;
+}
+@media (max-width: 480px) {
+  .diagnostics-page {
+    padding: 16px;
+  }
+}

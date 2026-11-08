@@ -109,7 +109,7 @@ export function decideRedirect({
   if (redirectCount >= MAX_REDIRECTS) {
     return {
       type: "reject",
-      error: new JenkinsRequestError("Too many redirects from Jenkins API.")
+      error: new JenkinsRequestError("Too many redirects from Jenkins API.", statusCode)
     };
   }
 

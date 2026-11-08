@@ -22,6 +22,8 @@ const errorMessages: string[] = [];
 const warningMessages: string[] = [];
 const infoMessages: Array<{ message: string; items: string[] }> = [];
 let quickPickItems: unknown;
+let quickPickResponse: unknown;
+const commandHandlers = new Map<string, (item?: JenkinsEnvironmentRef) => Promise<unknown>>();
 let warningMessageResponse: string | undefined;
 let infoMessageResponse: string | undefined;
 let jenkinsUrlInput: string | undefined = "https://jenkins.example";
@@ -35,6 +37,7 @@ const browserSsoLoginPrefills: Array<string | undefined> = [];
 let environmentNameInput: string | undefined = "";
 const environmentNamePrompts: Array<{ url: string; current?: string }> = [];
 let editFieldResponse: string | undefined;
+let editFieldPromptCount = 0;
 let tlsResponse: boolean | undefined = false;
 const tlsPromptCurrents: Array<boolean | undefined> = [];
 const requiredInputResponses = new Map<string, string | undefined>();
@@ -42,6 +45,12 @@ const requiredInputPrefills = new Map<string, string | undefined>();
 
 const vscodeMock = {
   EventEmitter,
+  commands: {
+    registerCommand: (id: string, handler: (item?: JenkinsEnvironmentRef) => Promise<unknown>) => {
+      commandHandlers.set(id, handler);
+      return { dispose() {} };
+    }
+  },
   window: {
     showErrorMessage: async (message: string) => {
       errorMessages.push(message);
@@ -57,7 +66,7 @@ const vscodeMock = {
     },
     showQuickPick: async (items: unknown) => {
       quickPickItems = items;
-      return undefined;
+      return quickPickResponse;
     },
     showInputBox: async () => undefined
   }
@@ -93,7 +102,10 @@ const promptsMock = {
     environmentNamePrompts.push({ url, current });
     return environmentNameInput;
   },
-  promptEditField: async () => editFieldResponse,
+  promptEditField: async () => {
+    editFieldPromptCount += 1;
+    return editFieldResponse;
+  },
   promptHeadersJson: async () => undefined
 };
 
@@ -101,6 +113,11 @@ vi.doMock("vscode", () => vscodeMock);
 vi.doMock("../src/commands/environment/EnvironmentPrompts", () => promptsMock);
 const { addEnvironment, editEnvironment, removeEnvironment, signInWithBrowserSso } = await import(
   "../src/commands/environment/EnvironmentCommandHandlers"
+);
+
+const { registerEnvironmentCommands } = await import("../src/commands/EnvironmentCommands");
+const { recoverEnvironmentConnection } = await import(
+  "../src/commands/environment/EnvironmentConnectionRecovery"
 );
 
 const { JenkinsEnvironmentStore: EnvironmentStore } = await import(
@@ -134,6 +151,8 @@ beforeEach(() => {
   warningMessages.length = 0;
   infoMessages.length = 0;
   quickPickItems = undefined;
+  quickPickResponse = undefined;
+  commandHandlers.clear();
   warningMessageResponse = undefined;
   infoMessageResponse = undefined;
   jenkinsUrlInput = "https://jenkins.example";
@@ -147,6 +166,7 @@ beforeEach(() => {
   environmentNameInput = "";
   environmentNamePrompts.length = 0;
   editFieldResponse = undefined;
+  editFieldPromptCount = 0;
   tlsResponse = false;
   tlsPromptCurrents.length = 0;
   requiredInputResponses.clear();
@@ -154,6 +174,70 @@ beforeEach(() => {
 });
 
 describe("addEnvironment", () => {
+  it("offers diagnostics after persisting and refreshing the environment", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    const events: string[] = [];
+    infoMessageResponse = "Test Connection";
+    const show = vi.fn(async (target: JenkinsEnvironmentRef) => {
+      assert.equal((await store.getEnvironments(target.scope))[0].id, target.environmentId);
+      assert.deepEqual(await store.getAuthConfig(target.scope, target.environmentId), {
+        type: "none"
+      });
+      events.push("diagnostics");
+    });
+    await addEnvironment(
+      store,
+      {} as BrowserSsoAuthenticator,
+      {
+        fullEnvironmentRefresh: () => {
+          events.push("refresh");
+          return { executed: true };
+        }
+      },
+      { diagnostics: { show } }
+    );
+    assert.deepEqual(events, ["refresh", "diagnostics"]);
+    assert.equal(show.mock.calls.length, 1);
+    assert.deepEqual(infoMessages[0].items, ["Test Connection"]);
+  });
+
+  it("retains the saved environment when opening diagnostics fails", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    infoMessageResponse = "Test Connection";
+    await addEnvironment(
+      store,
+      {} as BrowserSsoAuthenticator,
+      {
+        fullEnvironmentRefresh: () => ({ executed: true })
+      },
+      {
+        diagnostics: {
+          show: async () => {
+            throw new Error("private-server-error");
+          }
+        }
+      }
+    );
+    assert.equal((await store.getEnvironments("workspace")).length, 1);
+    assert.match(errorMessages[0], /environment was saved/);
+    assert.doesNotMatch(errorMessages[0], /private-server-error/);
+  });
+
+  it("does not start diagnostics when its offer is dismissed", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    const show = vi.fn(async () => undefined);
+    await addEnvironment(
+      store,
+      {} as BrowserSsoAuthenticator,
+      {
+        fullEnvironmentRefresh: () => ({ executed: true })
+      },
+      { diagnostics: { show } }
+    );
+    assert.equal(show.mock.calls.length, 0);
+    assert.equal((await store.getEnvironments("workspace")).length, 1);
+  });
+
   it.each([true, false])("saves the HTTPS TLS choice %s", async (enabled) => {
     tlsResponse = enabled;
     const store = new EnvironmentStore(createExtensionContext());
@@ -280,6 +364,71 @@ describe("addEnvironment display name", () => {
 });
 
 describe("signInWithBrowserSso", () => {
+  it("uses current storage and rebases a previous Jenkins sign-in URL", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    await store.addEnvironment("workspace", {
+      id: "env-1",
+      url: "https://current.example/",
+      previousUrls: ["https://old.example/"]
+    });
+    const config: JenkinsAuthConfig = {
+      type: "sso",
+      loginUrl: "https://old.example/__sso/login",
+      headers: { Cookie: "session=old" }
+    };
+    await store.setAuthConfig("workspace", "env-1", config);
+    const authenticate = vi.fn<BrowserSsoAuthenticator["authenticate"]>(async (request) => ({
+      ...config,
+      loginUrl: request.loginUrl,
+      headers: { Cookie: "session=new" }
+    }));
+    const changed = await signInWithBrowserSso(
+      store,
+      { authenticate },
+      { invalidateClient: vi.fn() } as unknown as JenkinsClientProvider,
+      { fullEnvironmentRefresh: () => ({ executed: true }) },
+      { environmentId: "env-1", scope: "workspace", url: "https://old.example/" }
+    );
+    assert.equal(changed, true);
+    assert.equal(authenticate.mock.calls[0][0].environmentUrl, "https://current.example/");
+    assert.equal(authenticate.mock.calls[0][0].loginUrl, "https://current.example/__sso/login");
+  });
+
+  it("rejects a sign-in completed after the environment URL changed", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    await store.addEnvironment("workspace", { id: "env-1", url: "https://jenkins.example/" });
+    await store.setAuthConfig("workspace", "env-1", {
+      type: "sso",
+      loginUrl: "https://login.example/",
+      headers: { Cookie: "old" }
+    });
+    const changed = await signInWithBrowserSso(
+      store,
+      {
+        authenticate: async () => {
+          await store.updateEnvironment("workspace", "env-1", { url: "https://new.example/" });
+          return { type: "sso", loginUrl: "https://login.example/", headers: { Cookie: "stale" } };
+        }
+      },
+      { invalidateClient: vi.fn() } as unknown as JenkinsClientProvider,
+      { fullEnvironmentRefresh: () => ({ executed: true }) },
+      { environmentId: "env-1", scope: "workspace", url: "https://jenkins.example/" }
+    );
+    assert.equal(changed, false);
+    assert.deepEqual(
+      (await store.getAuthConfig("workspace", "env-1"))?.type === "sso"
+        ? await store.getAuthConfig("workspace", "env-1")
+        : undefined,
+      {
+        type: "sso",
+        loginUrl: "https://login.example/",
+        headers: { Cookie: "old" },
+        expiresAt: undefined
+      }
+    );
+    assert.match(warningMessages[0], /URL changed/);
+  });
+
   it.each(["not-json", JSON.stringify({ type: "unsupported" })])(
     "saves credentials on the first sign-in after cleaning invalid auth: %s",
     async (invalidAuth) => {
@@ -710,6 +859,96 @@ describe("editEnvironment", () => {
     return { store, dependencies, events, rebase, rebaseFailures, authenticate, target, read };
   }
 
+  describe("diagnostic recovery", () => {
+    it("edits credentials directly and returns true without another test offer", async () => {
+      const { dependencies, target, store } = await createFixture({
+        auth: { type: "bearer", token: "old" }
+      });
+      const show = vi.fn(async () => undefined);
+      authModeResponse = "none";
+      const changed = await recoverEnvironmentConnection(
+        { ...dependencies, diagnostics: { show } },
+        "editCredentials",
+        target
+      );
+      assert.equal(changed, true);
+      assert.equal(editFieldPromptCount, 0);
+      assert.deepEqual(await store.getAuthConfig("workspace", "env-1"), { type: "none" });
+      assert.equal(show.mock.calls.length, 0);
+      assert.equal(
+        infoMessages.some((entry) => entry.items.includes("Test Connection")),
+        false
+      );
+    });
+
+    it("returns false and leaves settings intact when recovery is cancelled", async () => {
+      const { dependencies, target, events } = await createFixture();
+      authModeResponse = undefined;
+      assert.equal(
+        await recoverEnvironmentConnection(dependencies, "editCredentials", target),
+        false
+      );
+      assert.deepEqual(events, []);
+      jenkinsUrlInput = undefined;
+      assert.equal(await recoverEnvironmentConnection(dependencies, "editUrl", target), false);
+      tlsResponse = undefined;
+      assert.equal(await recoverEnvironmentConnection(dependencies, "tlsSettings", target), false);
+    });
+
+    it("resolves the current URL before targeted URL recovery", async () => {
+      const { dependencies, target, store } = await createFixture();
+      await store.updateEnvironment(target.scope, target.environmentId, {
+        url: "https://edited.example/ci/"
+      });
+      jenkinsUrlInput = "https://edited.example/ci/";
+      assert.equal(await recoverEnvironmentConnection(dependencies, "editUrl", target), false);
+      assert.equal(requiredInputPrefills.get("Jenkins URL"), "https://edited.example/ci/");
+    });
+
+    it("does not save credentials for a URL changed while prompting", async () => {
+      const { dependencies, target, store } = await createFixture({
+        auth: { type: "bearer", token: "old" }
+      });
+      onAuthModePrompt = async () => {
+        await store.updateEnvironment(target.scope, target.environmentId, {
+          url: "https://edited.example/"
+        });
+      };
+      assert.equal(
+        await recoverEnvironmentConnection(dependencies, "editCredentials", target),
+        false
+      );
+      assert.deepEqual(await store.getAuthConfig(target.scope, target.environmentId), {
+        type: "bearer",
+        token: "old"
+      });
+      assert.match(warningMessages[0], /URL changed/);
+    });
+
+    it("offers a single test after a URL change and optional credentials update", async () => {
+      const { dependencies, target } = await createFixture();
+      const show = vi.fn(async () => undefined);
+      editFieldResponse = "url";
+      jenkinsUrlInput = "https://new.example/";
+      infoMessageResponse = "Update";
+      assert.equal(await editEnvironment({ ...dependencies, diagnostics: { show } }, target), true);
+      assert.equal(
+        infoMessages.filter((entry) => entry.items.includes("Test Connection")).length,
+        1
+      );
+    });
+
+    it("does not offer diagnostics for renames", async () => {
+      const { dependencies, target } = await createFixture();
+      const show = vi.fn(async () => undefined);
+      editFieldResponse = "name";
+      environmentNameInput = "Production";
+      await editEnvironment({ ...dependencies, diagnostics: { show } }, target);
+      assert.equal(infoMessages.length, 0);
+      assert.equal(show.mock.calls.length, 0);
+    });
+  });
+
   it("warns when the selected environment no longer exists", async () => {
     const { dependencies, events, target } = await createFixture();
     editFieldResponse = "name";
@@ -1047,5 +1286,70 @@ describe("editEnvironment", () => {
 
       assert.equal(requiredInputPrefills.get("Username"), "legacy-user");
     });
+  });
+});
+
+describe("environment diagnostics command", () => {
+  function register(
+    store: JenkinsEnvironmentStore,
+    show: (environment: JenkinsEnvironmentRef) => Promise<void>
+  ) {
+    registerEnvironmentCommands(
+      { ...createExtensionContext(), subscriptions: [] },
+      store,
+      {} as JenkinsDiagnosticProfileBindingStore,
+      {} as BrowserSsoAuthenticator,
+      {} as JenkinsParameterPresetStore,
+      {} as JenkinsWatchStore,
+      {} as JenkinsPinStore,
+      {} as JenkinsClientProvider,
+      {} as EnvironmentUrlRebaseService,
+      { fullEnvironmentRefresh: () => ({ executed: true }) },
+      { show }
+    );
+  }
+
+  it("resolves a context-menu environment from current storage", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    await store.addEnvironment("workspace", {
+      id: "env-1",
+      name: "Edited",
+      url: "https://current.example/ci/"
+    });
+    const show = vi.fn(async (_environment: JenkinsEnvironmentRef) => undefined);
+    register(store, show);
+    await commandHandlers.get("jenkinsWorkbench.testConnection")?.({
+      environmentId: "env-1",
+      scope: "workspace",
+      url: "https://old.example/"
+    });
+    assert.equal(show.mock.calls.length, 1);
+    assert.equal(show.mock.calls[0][0].url, "https://current.example/ci/");
+    assert.equal(show.mock.calls[0][0].name, "Edited");
+  });
+
+  it("opens the selected environment from the command palette", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    await store.addEnvironment("global", { id: "env-1", url: "https://jenkins.example/" });
+    quickPickResponse = {
+      target: { id: "env-1", scope: "global", url: "https://jenkins.example/" }
+    };
+    const show = vi.fn(async (_environment: JenkinsEnvironmentRef) => undefined);
+    register(store, show);
+    await commandHandlers.get("jenkinsWorkbench.testConnection")?.();
+    assert.equal(show.mock.calls[0][0].scope, "global");
+  });
+
+  it("does not launch a removed environment", async () => {
+    const store = new EnvironmentStore(createExtensionContext());
+    const show = vi.fn(async () => undefined);
+    register(store, show);
+    await commandHandlers.get("jenkinsWorkbench.testConnection")?.({
+      environmentId: "missing",
+      scope: "workspace",
+      url: "https://old.example/"
+    });
+    assert.equal(show.mock.calls.length, 0);
+    assert.match(warningMessages[0], /no longer exists/);
   });
 });
