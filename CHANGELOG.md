@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.65.0] - 2026-11-08
+
+### Added
+
+- feat(environments): add Test Connection / Environment Diagnostics to check connectivity, TLS, authentication, API access, and Jenkins capabilities, with findings that explain which features are affected.
+- feat(environments): offer targeted connection recovery actions for URLs, credentials, Browser SSO, and TLS settings, and automatically retest saved changes in the same panel. Test Connection is also offered after saving an environment.
+- feat(diagnostics): copy sanitized troubleshooting reports without credentials, cookies, crumb values, custom header values, or raw response bodies.
+
 ## [1.64.0] - 2026-11-05
 
 ### Added
