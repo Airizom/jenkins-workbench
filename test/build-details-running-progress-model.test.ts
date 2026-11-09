@@ -34,6 +34,14 @@ describe("extractConsoleTail", () => {
     assert.deepEqual(extractConsoleTail("", 5), []);
     assert.deepEqual(extractConsoleTail("\n\n", 5), []);
   });
+
+  it("removes Jenkins annotations before selecting the latest visible lines", () => {
+    const text =
+      "older\nRunning on \u001b[8mha:serialized\npayload\u001b[0mJenkins\r\n" +
+      "\u001b]8;;https://example.com\u0007Build link\u001b]8;;\u0007\n" +
+      "\u001b[8mha:incomplete payload";
+    assert.deepEqual(extractConsoleTail(text, 2), ["Running on Jenkins", "Build link"]);
+  });
 });
 
 describe("findRunningStages", () => {

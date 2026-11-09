@@ -40,8 +40,9 @@ export class JenkinsTaskProvider implements vscode.TaskProvider {
       if (!environmentUrl) {
         continue;
       }
-      const scope =
-        environment.scope === "workspace" ? vscode.TaskScope.Workspace : vscode.TaskScope.Global;
+      // Environment storage scope is independent of task scope. VS Code does not
+      // support TaskScope.Global and silently omits those tasks from Run Task.
+      const scope = vscode.TaskScope.Workspace;
       const envRef = toJenkinsEnvironmentRef(environment);
       try {
         for await (const batch of this.dataService.iterateJobsForEnvironment(envRef, {

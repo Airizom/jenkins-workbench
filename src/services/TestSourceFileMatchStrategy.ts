@@ -16,7 +16,8 @@ export interface TestSourceFileMatchStrategyOptions {
 export interface TestSourceFileMatchStrategy {
   findMatches(
     repositoryRoots: readonly vscode.Uri[],
-    className: string
+    className: string,
+    suiteName?: string
   ): Promise<readonly vscode.Uri[]>;
 }
 
@@ -25,13 +26,17 @@ export class DefaultTestSourceFileMatchStrategy implements TestSourceFileMatchSt
 
   async findMatches(
     repositoryRoots: readonly vscode.Uri[],
-    className: string
+    className: string,
+    suiteName?: string
   ): Promise<readonly vscode.Uri[]> {
     const settings = this.config.getOptions();
-    const pattern = buildSearchPattern(className, settings.fileExtensions);
-    if (!pattern) {
+    const classPattern = buildSearchPattern(className, settings.fileExtensions);
+    const sourcePath = resolveSourcePath(suiteName, settings.fileExtensions);
+    const patterns = [...new Set([sourcePath, classPattern].filter((path) => path !== undefined))];
+    if (patterns.length === 0) {
       return [];
     }
+    const pattern = `**/${patterns.length === 1 ? patterns[0] : `{${patterns.join(",")}}`}`;
 
     const matches = new Map<string, vscode.Uri>();
     // Preserve the aggregate bound from the former one-search-per-extension implementation.
@@ -50,7 +55,9 @@ export class DefaultTestSourceFileMatchStrategy implements TestSourceFileMatchSt
     const expectedPath = className.replace(/\./g, "/").toLowerCase();
     return Array.from(matches.values(), (uri) => ({
       uri,
-      score: scoreCandidate(uri, expectedPath, settings.preferredPathScores),
+      score:
+        scoreCandidate(uri, expectedPath, settings.preferredPathScores) +
+        (sourcePath && uri.path.endsWith(`/${sourcePath}`) ? 200 : 0),
       fsPath: uri.fsPath
     }))
       .sort((left, right) => right.score - left.score || left.fsPath.localeCompare(right.fsPath))
@@ -62,6 +69,10 @@ function buildSearchPattern(
   className: string,
   fileExtensions: readonly string[]
 ): string | undefined {
+  const sourcePath = resolveSourcePath(className, fileExtensions);
+  if (sourcePath) {
+    return sourcePath;
+  }
   const pathSegments = className.split(".").filter(Boolean);
   if (pathSegments.length === 0 || fileExtensions.length === 0) {
     return undefined;
@@ -72,7 +83,26 @@ function buildSearchPattern(
   const packagePath = packagePrefix.length > 0 ? `${packagePrefix.join("/")}/` : "";
   const extensionPattern =
     fileExtensions.length === 1 ? fileExtensions[0] : `{${fileExtensions.join(",")}}`;
-  return `**/${packagePath}${fileBase}.${extensionPattern}`;
+  return `${packagePath}${fileBase}.${extensionPattern}`;
+}
+
+// Some JUnit publishers (including Vitest) use the source path as the suite name and
+// flatten it into a class name. Keep the original path instead of treating file dots
+// as Java package separators. Only accept literal relative paths within the repository.
+function resolveSourcePath(
+  value: string | undefined,
+  fileExtensions: readonly string[]
+): string | undefined {
+  const path = value?.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+  if (
+    !path ||
+    /[*?[\]{}:]/.test(path) ||
+    path.split("/").some((segment) => segment === "" || segment === "." || segment === "..") ||
+    !fileExtensions.some((extension) => path.endsWith(`.${extension}`))
+  ) {
+    return undefined;
+  }
+  return path;
 }
 
 function scoreCandidate(

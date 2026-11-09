@@ -97,6 +97,10 @@ describe("TestSourceResolver", () => {
         target: { testName: "build", className: "BuildTest" }
       }
     );
-    assert.deepEqual(fileMatchStrategy.findMatches.mock.calls[0], [[repositoryRoot], "BuildTest"]);
+    assert.deepEqual(fileMatchStrategy.findMatches.mock.calls[0], [
+      [repositoryRoot],
+      "BuildTest",
+      undefined
+    ]);
   });
 });

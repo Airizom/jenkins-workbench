@@ -96,4 +96,54 @@ describe("DefaultTestSourceFileMatchStrategy", () => {
       ]
     );
   });
+
+  it("finds Vitest source paths without interpreting filename dots as packages", async () => {
+    findFiles.mockClear();
+    findFiles.mockImplementationOnce(async () => [
+      vscodeStub.Uri.file("/workspace/one/src_cart_discounts.test.ts"),
+      vscodeStub.Uri.file("/workspace/one/src/cart/discounts.test.ts")
+    ]);
+    const strategy = new DefaultTestSourceFileMatchStrategy({
+      getOptions: () => ({
+        fileExtensions: ["ts"],
+        excludeGlob: "**/node_modules/**",
+        maxResultsPerPattern: 10,
+        preferredPathScores: []
+      })
+    });
+
+    const matches = await strategy.findMatches(
+      [vscodeStub.Uri.file("/workspace/one")] as never,
+      "src_cart_discounts.test.ts",
+      "src/cart/discounts.test.ts"
+    );
+
+    assert.equal(
+      findFiles.mock.calls[0][0].pattern,
+      "**/{src/cart/discounts.test.ts,src_cart_discounts.test.ts}"
+    );
+    assert.equal(matches[0].fsPath, "/workspace/one/src/cart/discounts.test.ts");
+  });
+
+  it.each(["../outside.test.ts", "/outside.test.ts", "**/other.test.ts"])(
+    "ignores unsafe suite path %s while retaining class matching",
+    async (suiteName) => {
+      findFiles.mockClear();
+      findFiles.mockImplementationOnce(async () => []);
+      const strategy = new DefaultTestSourceFileMatchStrategy({
+        getOptions: () => ({
+          fileExtensions: ["ts"],
+          excludeGlob: "",
+          maxResultsPerPattern: 10,
+          preferredPathScores: []
+        })
+      });
+      await strategy.findMatches(
+        [vscodeStub.Uri.file("/workspace/one")] as never,
+        "com.example.BuildTest",
+        suiteName
+      );
+      assert.equal(findFiles.mock.calls[0][0].pattern, "**/com/example/BuildTest.ts");
+    }
+  );
 });

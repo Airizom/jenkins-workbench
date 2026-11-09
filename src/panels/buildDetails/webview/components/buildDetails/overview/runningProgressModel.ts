@@ -1,3 +1,4 @@
+import { toDisplayedConsoleText } from "../../../../../../buildDiagnostics/BuildDiagnosticConsoleText";
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 
 export interface RunningStageSummary {
@@ -7,10 +8,6 @@ export interface RunningStageSummary {
   /** Parallel branches of this stage that are still running. */
   branchNames: string[];
 }
-
-// CSI sequences (colors, cursor moves) that AnsiColor-style plugins leave in plain console text.
-// biome-ignore lint/suspicious/noControlCharactersInRegex: matching the ESC control character is the point
-const ANSI_ESCAPE_PATTERN = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 
 function collectRunningBranchNames(stage: PipelineStageViewModel, names: string[]): string[] {
   for (const branch of stage.parallelBranches) {
@@ -34,18 +31,16 @@ export function findRunningStages(stages: PipelineStageViewModel[]): RunningStag
 }
 
 /**
- * Last `maxLines` non-blank lines of the console, without ANSI escapes. Scans
- * back from the end so a long log is never split in full on every update.
+ * Last `maxLines` non-blank lines of the displayed console. Remove annotations
+ * before selecting lines so multiline or incomplete notes cannot enter the preview.
  */
 export function extractConsoleTail(text: string, maxLines: number): string[] {
+  const displayedText = toDisplayedConsoleText(text);
   const lines: string[] = [];
-  let end = text.length;
+  let end = displayedText.length;
   while (end > 0 && lines.length < maxLines) {
-    const start = text.lastIndexOf("\n", end - 1);
-    const line = text
-      .slice(start + 1, end)
-      .replace(ANSI_ESCAPE_PATTERN, "")
-      .trimEnd();
+    const start = displayedText.lastIndexOf("\n", end - 1);
+    const line = displayedText.slice(start + 1, end).trimEnd();
     if (line.trim() !== "") {
       lines.push(line);
     }

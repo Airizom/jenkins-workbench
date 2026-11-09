@@ -47,7 +47,13 @@ export function formatBuildHeaderLabels(details?: JenkinsBuildDetails): BuildHea
   return {
     resultLabel: formatBuildResultLabel(details),
     resultClass: formatBuildResultClass(details),
-    durationLabel: formatBuildDuration(details.duration),
+    durationLabel: formatBuildDuration(
+      details.building &&
+        typeof details.timestamp === "number" &&
+        Number.isFinite(details.timestamp)
+        ? Math.max(0, Date.now() - details.timestamp)
+        : details.duration
+    ),
     timestampLabel: formatBuildTimestamp(details.timestamp)
   };
 }

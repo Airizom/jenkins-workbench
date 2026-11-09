@@ -80,7 +80,11 @@ export class TestSourceResolver {
       return { kind: "missingRepositoryLink" };
     }
 
-    const matches = await this.fileMatchStrategy.findMatches(repositoryRoots, className);
+    const matches = await this.fileMatchStrategy.findMatches(
+      repositoryRoots,
+      className,
+      target.suiteName
+    );
     if (matches.length === 0) {
       return { kind: "noMatches", target };
     }

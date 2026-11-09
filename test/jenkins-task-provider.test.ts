@@ -142,3 +142,37 @@ describe("JenkinsTaskProvider.resolveTask", () => {
     assert.notEqual(capturedTerminalDefinitions[0], originalDefinition);
   });
 });
+
+describe("JenkinsTaskProvider.provideTasks", () => {
+  it.each(["global", "workspace"] as const)(
+    "discovers runnable workspace tasks from a %s environment",
+    async (scope) => {
+      const provider = new JenkinsTaskProvider(
+        {
+          listEnvironmentsWithScope: async () => [
+            { id: "jenkins", scope, url: "https://jenkins.example/" }
+          ]
+        } as unknown as JenkinsEnvironmentStore,
+        {
+          async *iterateJobsForEnvironment() {
+            yield [
+              {
+                kind: "pipeline",
+                name: "build",
+                fullName: "project/build",
+                url: "https://jenkins.example/job/project/job/build/"
+              }
+            ];
+          }
+        } as unknown as JenkinsDataService,
+        { fullEnvironmentRefresh: vi.fn() }
+      );
+
+      const tasks = await provider.provideTasks();
+      assert.equal(tasks.length, 1);
+      assert.equal(tasks[0].scope, taskScope.Workspace);
+      assert.equal(tasks[0].definition.environmentId, "jenkins");
+      assert.equal(tasks[0].definition.jobUrl, "job/project/job/build/");
+    }
+  );
+});
