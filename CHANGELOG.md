@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.65.1] - 2026-11-08
+
+### Fixed
+
+- fix(builds): strip Jenkins annotations from running-build console previews and show elapsed time for active builds.
+- fix(tests): resolve test sources using suite file paths and prioritize exact path matches.
+- fix(tasks): show tasks for globally stored Jenkins environments in Run Task by using workspace task scope.
+- fix(environments): remove unsupported bold markup from the first-environment welcome text.
+
 ## [1.65.0] - 2026-11-08
 
 ### Added
