@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.66.0] - 2026-11-15
+
+### Added
+
+- feat(jenkinsfile): add context-aware declarative completions and `env.`, `params.`, and `currentBuild.` member completions, including environment keys and parameters declared in the file.
+- feat(jenkinsfile): show stages, sections, and methods in the Outline view, breadcrumbs, and Go to Symbol.
+- feat(jenkinsfile): discover local shared libraries and support configured checkouts with library-name and global completions, hover documentation, parameter hints, and Go to Definition.
+
+### Fixed
+
+- fix(jenkinsfile): improve Groovy string and interpolation handling, including slashy and dollar-slashy literals.
+
+### Changed
+
+- refactor(jenkinsfile): share a cached document model across language providers and load local shared libraries lazily while keeping library intelligence separate from declarative validation.
+
 ## [1.65.1] - 2026-11-08
 
 ### Fixed
