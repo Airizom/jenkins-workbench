@@ -24,6 +24,8 @@
     "*.vsix"
   ],
   "ignoreDependencies": [
+    // Dynamically resolved from the workspace by @vscode/test-cli's desktop runner.
+    "@vscode/test-electron",
     // Used only by the development-time validators in scripts/.
     "@babel/parser",
     "ajv",

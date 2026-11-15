@@ -1,22 +1,20 @@
 import * as vscode from "vscode";
 
+/** Runs hover providers in parallel and merges the hovers that contain the position, in order. */
 export class JenkinsfileHoverProvider implements vscode.HoverProvider {
-  constructor(
-    private readonly validationHoverProvider: vscode.HoverProvider,
-    private readonly stepHoverProvider: vscode.HoverProvider
-  ) {}
+  /** In merge order; another composite may extend this list to share the same instances. */
+  constructor(readonly providers: readonly vscode.HoverProvider[]) {}
 
   async provideHover(
     document: vscode.TextDocument,
     position: vscode.Position,
     token: vscode.CancellationToken
   ): Promise<vscode.Hover | undefined> {
-    const [validationHover, stepHover] = await Promise.all([
-      this.validationHoverProvider.provideHover(document, position, token),
-      this.stepHoverProvider.provideHover(document, position, token)
-    ]);
+    const hovers = await Promise.all(
+      this.providers.map((provider) => provider.provideHover(document, position, token))
+    );
 
-    return mergeHovers(position, [validationHover, stepHover]);
+    return mergeHovers(position, hovers);
   }
 }
 

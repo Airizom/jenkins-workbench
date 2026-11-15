@@ -1,23 +1,25 @@
 import * as vscode from "vscode";
-import type { JenkinsfileMatcher } from "../../validation/JenkinsfileMatcher";
 import { analyzeJenkinsfileContext } from "../JenkinsfileContextAnalyzer";
 import type { JenkinsfileIntelligenceConfigState } from "../JenkinsfileIntelligenceConfigState";
-import type { JenkinsfileStepSignature } from "../JenkinsfileIntelligenceTypes";
-import type { JenkinsfileStepCatalogService } from "../JenkinsfileStepCatalogService";
+import type {
+  JenkinsfileCatalogSource,
+  JenkinsfileDocumentScope,
+  JenkinsfileStepSignature
+} from "../JenkinsfileIntelligenceTypes";
 import { canProvideJenkinsfileIntelligence, getCallParameters } from "./JenkinsfileEditorSupport";
 
 export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
   constructor(
     private readonly intelligenceConfig: JenkinsfileIntelligenceConfigState,
-    private readonly matcher: JenkinsfileMatcher,
-    private readonly stepCatalogService: JenkinsfileStepCatalogService
+    private readonly scope: JenkinsfileDocumentScope,
+    private readonly catalogSource: JenkinsfileCatalogSource
   ) {}
 
   async provideHover(
     document: vscode.TextDocument,
     position: vscode.Position
   ): Promise<vscode.Hover | undefined> {
-    if (!canProvideJenkinsfileIntelligence(this.intelligenceConfig, this.matcher, document)) {
+    if (!canProvideJenkinsfileIntelligence(this.intelligenceConfig, this.scope, document)) {
       return;
     }
 
@@ -26,7 +28,7 @@ export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
       return;
     }
 
-    const result = await this.stepCatalogService.getCatalogForDocument(document);
+    const result = await this.catalogSource.getCatalogForDocument(document);
     const step = result.catalog.steps.get(analysis.identifier.name);
     if (!step) {
       return;
@@ -51,7 +53,13 @@ export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
       markdown.appendMarkdown("- Requires a node/workspace context.\n\n");
     }
 
-    if (result.kind === "live") {
+    if (step.source) {
+      // Library vars come from a local file, not from the Jenkins step metadata.
+      markdown.appendMarkdown("**Shared library** ");
+      markdown.appendText(step.source.library);
+      markdown.appendMarkdown("\n\n");
+      markdown.appendText(describeSourceFile(step.source.uri));
+    } else if (result.kind === "live") {
       markdown.appendMarkdown("**Jenkinsfile environment**\n");
       markdown.appendText(`${result.environment.url} (${result.environment.scope})`);
       markdown.appendMarkdown("\n\n");
@@ -81,6 +89,14 @@ export class JenkinsfileStepHoverProvider implements vscode.HoverProvider {
         document.positionAt(analysis.identifier.end)
       )
     );
+  }
+}
+
+function describeSourceFile(uri: string): string {
+  try {
+    return vscode.Uri.parse(uri).fsPath;
+  } catch {
+    return uri;
   }
 }
 

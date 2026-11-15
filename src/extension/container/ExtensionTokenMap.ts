@@ -26,9 +26,14 @@ import type { HistoryService } from "../../history/HistoryService";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
+import type { JenkinsfileDefinitionProvider } from "../../jenkinsfile/editor/JenkinsfileDefinitionProvider";
+import type { JenkinsfileDocumentSymbolProvider } from "../../jenkinsfile/editor/JenkinsfileDocumentSymbolProvider";
+import type { JenkinsfileIntelligenceDocumentScope } from "../../jenkinsfile/editor/JenkinsfileIntelligenceDocumentScope";
 import type { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import type { JenkinsfileIntelligenceConfigState } from "../../jenkinsfile/JenkinsfileIntelligenceConfigState";
 import type { JenkinsfileStepCatalogService } from "../../jenkinsfile/JenkinsfileStepCatalogService";
+import type { JenkinsfileDocumentCatalogResolver } from "../../jenkinsfile/sharedLibraries/JenkinsfileDocumentCatalogResolver";
+import type { JenkinsSharedLibraryIndex } from "../../jenkinsfile/sharedLibraries/JenkinsSharedLibraryIndex";
 import type { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
 import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import type { EnvironmentDiagnosticsPanelLauncher } from "../../panels/EnvironmentDiagnosticsPanel";
@@ -182,6 +187,9 @@ export interface ExtensionTokenMap {
   jenkinsfileValidationStatusBar: JenkinsfileValidationStatusBar;
   jenkinsfileIntelligenceConfigState: JenkinsfileIntelligenceConfigState;
   jenkinsfileStepCatalogService: JenkinsfileStepCatalogService;
+  jenkinsSharedLibraryIndex: JenkinsSharedLibraryIndex;
+  jenkinsfileDocumentCatalogResolver: JenkinsfileDocumentCatalogResolver;
+  jenkinsfileIntelligenceDocumentScope: JenkinsfileIntelligenceDocumentScope;
   statusRefreshService: JenkinsStatusRefreshService;
   statusNotifier: VscodeStatusNotifier;
   poller: JenkinsStatusPoller;
@@ -193,9 +201,12 @@ export interface ExtensionTokenMap {
   uriHandler: JenkinsWorkbenchUriHandler;
   jenkinsfileQuickFixProvider: JenkinsfileQuickFixProvider;
   jenkinsfileHoverProvider: JenkinsfileHoverProvider;
+  jenkinsfileIntelligenceHoverProvider: JenkinsfileHoverProvider;
   jenkinsfileCodeLensProvider: JenkinsfileValidationCodeLensProvider;
   jenkinsfileCompletionProvider: JenkinsfileCompletionProvider;
   jenkinsfileSignatureHelpProvider: JenkinsfileSignatureHelpProvider;
+  jenkinsfileDocumentSymbolProvider: JenkinsfileDocumentSymbolProvider;
+  jenkinsfileDefinitionProvider: JenkinsfileDefinitionProvider;
 }
 
 export type ExtensionToken = keyof ExtensionTokenMap;

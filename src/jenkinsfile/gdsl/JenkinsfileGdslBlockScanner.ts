@@ -1,3 +1,4 @@
+import { DECLARATIVE_DIRECTIVE_GUARD_NAMES } from "../declarative/JenkinsfileDeclarativeGrammar";
 import {
   buildGdslCommentMask,
   findCallStart,
@@ -12,19 +13,6 @@ import {
 import type { ContributorBlock, ScannedMethodCall } from "./JenkinsfileGdslTypes";
 import { parseCallExpression } from "./JenkinsfileGdslValueParser";
 
-const NON_STEP_GUARD_NAMES = new Set([
-  "agent",
-  "environment",
-  "input",
-  "options",
-  "parameters",
-  "post",
-  "stage",
-  "stages",
-  "tools",
-  "triggers",
-  "when"
-]);
 const IDENTIFIER_PATTERN = /[A-Za-z_$][\w$]*/y;
 
 export function scanContributorBlocks(text: string): ContributorBlock[] {
@@ -118,13 +106,12 @@ export function scanMethodCalls(body: string): ScannedMethodCall[] {
     }
 
     const closeParen = findMatchingDelimiter(body, openParen, "(", ")");
-    const activeGuardNames = guardStack.flat();
-    if (!shouldSuppressMethod(activeGuardNames)) {
-      calls.push({
-        call: parseCallExpression(body.slice(index, closeParen + 1)),
-        requiresNodeContext: activeGuardNames.includes("node")
-      });
-    }
+    const guardNames = [...new Set(guardStack.flat())];
+    calls.push({
+      call: parseCallExpression(body.slice(index, closeParen + 1)),
+      requiresNodeContext: guardNames.includes("node"),
+      guardNames
+    });
     index = closeParen + 1;
   }
   return calls;
@@ -187,8 +174,14 @@ function resolveGuardNames(
   return extractGuardNames(condition, aliasScopes);
 }
 
-function shouldSuppressMethod(guardNames: readonly string[]): boolean {
-  return guardNames.length > 0 && guardNames.every((name) => NON_STEP_GUARD_NAMES.has(name));
+/**
+ * True when a method is only available inside non-step enclosing calls such as
+ * `options` or `when`, which makes it a directive instead of a step.
+ */
+export function isNonStepGuardList(guardNames: readonly string[]): boolean {
+  return (
+    guardNames.length > 0 && guardNames.every((name) => DECLARATIVE_DIRECTIVE_GUARD_NAMES.has(name))
+  );
 }
 
 function findGuardAliasAssignment(

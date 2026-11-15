@@ -16,7 +16,68 @@ type PreviousToken =
 
 const LITERAL_TOKEN: PreviousToken = { kind: "literal" };
 
+/** Cursor offsets as a half-open range; `end` is `text.length + 1` when it runs to the end. */
+interface GroovyOffsetRange {
+  start: number;
+  end: number;
+}
+
+interface GroovyMaskResult {
+  maskedText: string;
+  /**
+   * Cursor offsets (`0..text.length`) inside a string literal or comment, in order. Interpolated
+   * code (`"${...}"`) counts as code, and so does the offset just after a closing delimiter.
+   */
+  nonCodeRanges: GroovyOffsetRange[];
+}
+
 export function maskGroovyText(text: string): string {
+  return scanGroovyText(text);
+}
+
+/** Masks like {@link maskGroovyText} and also records which cursor offsets are not code. */
+export function maskGroovyTextWithNonCodeRanges(text: string): GroovyMaskResult {
+  const recorder = new NonCodeRangeRecorder(text.length);
+  const maskedText = scanGroovyText(text, recorder);
+  return { maskedText, nonCodeRanges: recorder.finish() };
+}
+
+/**
+ * Records, for each cursor offset in order, whether an identifier character typed there would
+ * be masked. The scan marks each offset as it reaches it; a branch that consumes a
+ * multi-character token (a comment opener, triple quote, `${`, or escape) marks the offsets
+ * inside that token itself.
+ */
+class NonCodeRangeRecorder {
+  private readonly ranges: GroovyOffsetRange[] = [];
+  private openStart: number | undefined;
+  private nextOffset = 0;
+
+  constructor(private readonly textLength: number) {}
+
+  mark(offset: number, inside: boolean): void {
+    if (offset < this.nextOffset || offset > this.textLength) {
+      return;
+    }
+    this.nextOffset = offset + 1;
+    if (inside) {
+      this.openStart ??= offset;
+    } else if (this.openStart !== undefined) {
+      this.ranges.push({ start: this.openStart, end: offset });
+      this.openStart = undefined;
+    }
+  }
+
+  finish(): GroovyOffsetRange[] {
+    if (this.openStart !== undefined) {
+      this.ranges.push({ start: this.openStart, end: this.textLength + 1 });
+      this.openStart = undefined;
+    }
+    return this.ranges;
+  }
+}
+
+function scanGroovyText(text: string, recorder?: NonCodeRangeRecorder): string {
   const chars = text.split("");
   let index = 0;
   const modeStack: GroovyMaskMode[] = [];
@@ -32,6 +93,7 @@ export function maskGroovyText(text: string): string {
     const character = text[index];
     const next = text[index + 1];
     const nextTwo = text[index + 2];
+    recorder?.mark(index, inLineComment || inBlockComment || isNonCodeMode(currentMode));
 
     if (inLineComment) {
       if (character !== "\n") {
@@ -47,6 +109,7 @@ export function maskGroovyText(text: string): string {
       chars[index] = maskCharacter(character);
       if (character === "*" && next === "/") {
         chars[index + 1] = " ";
+        recorder?.mark(index + 1, true);
         inBlockComment = false;
         index += 2;
         continue;
@@ -59,6 +122,8 @@ export function maskGroovyText(text: string): string {
       if (character === "/" && next === "/") {
         chars[index] = " ";
         chars[index + 1] = " ";
+        // Between the slashes, a typed character would follow a lone `/`.
+        recorder?.mark(index + 1, canStartSlashyString(previousToken));
         inLineComment = true;
         index += 2;
         continue;
@@ -67,16 +132,24 @@ export function maskGroovyText(text: string): string {
       if (character === "/" && next === "*") {
         chars[index] = " ";
         chars[index + 1] = " ";
+        recorder?.mark(index + 1, canStartSlashyString(previousToken));
         inBlockComment = true;
         index += 2;
         continue;
       }
 
-      const nextIndex = enterStringMode(text, chars, index, modeStack, previousToken);
+      const nextIndex = enterStringMode(text, chars, index, modeStack, previousToken, recorder);
       if (nextIndex !== undefined) {
         index = nextIndex;
         continue;
       }
+    }
+
+    if (supportsInterpolation(currentMode) && character === "$" && next === "{") {
+      index = enterInterpolation(chars, index, modeStack, recorder);
+      brackets.push("{");
+      previousToken = { kind: "symbol", value: "{", end: index - 1 };
+      continue;
     }
 
     if (isQuotedMode(currentMode)) {
@@ -84,13 +157,8 @@ export function maskGroovyText(text: string): string {
         currentMode.type === "single" || currentMode.type === "triple-single" ? "'" : '"';
       chars[index] = maskCharacter(character);
       if (character === "\\") {
+        recorder?.mark(index + 1, true);
         index = maskEscapedCharacter(text, chars, index);
-        continue;
-      }
-      if (quote === '"' && character === "$" && next === "{") {
-        index = enterInterpolation(chars, index, modeStack);
-        brackets.push("{");
-        previousToken = { kind: "symbol", value: "{", end: index - 1 };
         continue;
       }
       if (currentMode.type === "single" || currentMode.type === "double") {
@@ -104,6 +172,8 @@ export function maskGroovyText(text: string): string {
       if (character === quote && next === quote && nextTwo === quote) {
         chars[index + 1] = " ";
         chars[index + 2] = " ";
+        recorder?.mark(index + 1, true);
+        recorder?.mark(index + 2, true);
         modeStack.pop();
         previousToken = LITERAL_TOKEN;
         index += 3;
@@ -116,6 +186,7 @@ export function maskGroovyText(text: string): string {
     if (currentMode?.type === "slashy" || currentMode?.type === "dollar-slashy") {
       chars[index] = maskCharacter(character);
       if (currentMode.type === "slashy" && character === "\\") {
+        recorder?.mark(index + 1, true);
         index = maskEscapedCharacter(text, chars, index);
         continue;
       }
@@ -125,13 +196,8 @@ export function maskGroovyText(text: string): string {
         (next === "$" || next === "/")
       ) {
         chars[index + 1] = " ";
+        recorder?.mark(index + 1, true);
         index += 2;
-        continue;
-      }
-      if (character === "$" && next === "{") {
-        index = enterInterpolation(chars, index, modeStack);
-        brackets.push("{");
-        previousToken = { kind: "symbol", value: "{", end: index - 1 };
         continue;
       }
       if (currentMode.type === "slashy" && character === "/") {
@@ -139,6 +205,7 @@ export function maskGroovyText(text: string): string {
         previousToken = LITERAL_TOKEN;
       } else if (currentMode.type === "dollar-slashy" && character === "/" && next === "$") {
         chars[index + 1] = " ";
+        recorder?.mark(index + 1, true);
         modeStack.pop();
         previousToken = LITERAL_TOKEN;
         index += 2;
@@ -150,6 +217,10 @@ export function maskGroovyText(text: string): string {
 
     // A backslash-newline continues the statement on the next line.
     if (character === "\\" && (next === "\n" || (next === "\r" && nextTwo === "\n"))) {
+      recorder?.mark(index + 1, false);
+      if (next === "\r") {
+        recorder?.mark(index + 2, false);
+      }
       index += next === "\n" ? 2 : 3;
       continue;
     }
@@ -168,7 +239,24 @@ export function maskGroovyText(text: string): string {
     index += 1;
   }
 
+  recorder?.mark(
+    text.length,
+    inLineComment || inBlockComment || isNonCodeMode(modeStack[modeStack.length - 1])
+  );
   return chars.join("");
+}
+
+function isNonCodeMode(mode: GroovyMaskMode | undefined): boolean {
+  return mode !== undefined && mode.type !== "interpolation";
+}
+
+function supportsInterpolation(mode: GroovyMaskMode | undefined): boolean {
+  return (
+    mode?.type === "double" ||
+    mode?.type === "triple-double" ||
+    mode?.type === "slashy" ||
+    mode?.type === "dollar-slashy"
+  );
 }
 
 function nextPreviousToken(
@@ -233,9 +321,16 @@ function maskEscapedCharacter(text: string, chars: string[], index: number): num
   return index + 2;
 }
 
-function enterInterpolation(chars: string[], index: number, modeStack: GroovyMaskMode[]): number {
+function enterInterpolation(
+  chars: string[],
+  index: number,
+  modeStack: GroovyMaskMode[],
+  recorder: NonCodeRangeRecorder | undefined
+): number {
   chars[index] = "$";
   chars[index + 1] = "{";
+  // Between `$` and `{` the string is still open.
+  recorder?.mark(index + 1, true);
   modeStack.push({ type: "interpolation", depth: 1 });
   return index + 2;
 }
@@ -245,25 +340,21 @@ function enterStringMode(
   chars: string[],
   index: number,
   modeStack: GroovyMaskMode[],
-  previousToken: PreviousToken
+  previousToken: PreviousToken,
+  recorder: NonCodeRangeRecorder | undefined
 ): number | undefined {
   const character = text[index];
   const next = text[index + 1];
   const nextTwo = text[index + 2];
 
-  if (character === "'" && next === "'" && nextTwo === "'") {
-    modeStack.push({ type: "triple-single" });
+  if ((character === "'" || character === '"') && next === character && nextTwo === character) {
+    modeStack.push({ type: character === "'" ? "triple-single" : "triple-double" });
     chars[index] = " ";
     chars[index + 1] = " ";
     chars[index + 2] = " ";
-    return index + 3;
-  }
-
-  if (character === '"' && next === '"' && nextTwo === '"') {
-    modeStack.push({ type: "triple-double" });
-    chars[index] = " ";
-    chars[index + 1] = " ";
-    chars[index + 2] = " ";
+    // After one quote a string is open; after two, an empty string has just closed.
+    recorder?.mark(index + 1, true);
+    recorder?.mark(index + 2, false);
     return index + 3;
   }
 
@@ -283,6 +374,8 @@ function enterStringMode(
     modeStack.push({ type: "dollar-slashy" });
     chars[index] = " ";
     chars[index + 1] = " ";
+    // After a lone `$`, a typed character extends an identifier.
+    recorder?.mark(index + 1, false);
     return index + 2;
   }
 

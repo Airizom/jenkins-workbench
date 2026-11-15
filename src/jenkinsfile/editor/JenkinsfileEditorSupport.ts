@@ -1,17 +1,17 @@
 import type * as vscode from "vscode";
-import type { JenkinsfileMatcher } from "../../validation/JenkinsfileMatcher";
 import type { JenkinsfileIntelligenceConfigState } from "../JenkinsfileIntelligenceConfigState";
 import type {
+  JenkinsfileDocumentScope,
   JenkinsfileStepParameter,
   JenkinsfileStepSignature
 } from "../JenkinsfileIntelligenceTypes";
 
 export function canProvideJenkinsfileIntelligence(
   intelligenceConfig: JenkinsfileIntelligenceConfigState,
-  matcher: JenkinsfileMatcher,
+  scope: JenkinsfileDocumentScope,
   document: vscode.TextDocument
 ): boolean {
-  return intelligenceConfig.isEnabled() && matcher.matches(document);
+  return intelligenceConfig.isEnabled() && scope.matches(document);
 }
 
 export function getCallParameters(signature: JenkinsfileStepSignature): JenkinsfileStepParameter[] {

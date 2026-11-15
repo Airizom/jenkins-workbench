@@ -13,6 +13,9 @@ const {
   getStatusRefreshIntervalSeconds,
   getWatchNotificationOptions
 } = await import("../src/extension/ExtensionConfig");
+const { getJenkinsfileSharedLibraryEntries } = await import(
+  "../src/extension/JenkinsfileExtensionConfig"
+);
 
 const packageJson = JSON.parse(readFileSync(`${process.cwd()}/package.json`, "utf8")) as {
   contributes: {
@@ -191,5 +194,36 @@ describe("artifact download root configuration schema", () => {
       getArtifactActionOptions(createConfig({ artifactDownloadRoot: "downloads " })).downloadRoot,
       "downloads "
     );
+  });
+});
+
+describe("Jenkinsfile shared library configuration", () => {
+  it("trims entries and drops ones without a name and path", () => {
+    const entries = getJenkinsfileSharedLibraryEntries(
+      createConfig({
+        "jenkinsfile.sharedLibraries": [
+          { name: " acme ", path: " ./libs/acme ", implicit: true },
+          { name: "plain", path: "/libs/plain", implicit: "yes" },
+          { name: "  ", path: "/libs/blank" },
+          { name: "noPath" },
+          { name: 3, path: "/libs/number" },
+          null,
+          "acme"
+        ]
+      })
+    );
+
+    assert.deepEqual(entries, [
+      { name: "acme", path: "./libs/acme", implicit: true },
+      { name: "plain", path: "/libs/plain" }
+    ]);
+  });
+
+  it("returns no entries for a non-array setting", () => {
+    assert.deepEqual(
+      getJenkinsfileSharedLibraryEntries(createConfig({ "jenkinsfile.sharedLibraries": {} })),
+      []
+    );
+    assert.deepEqual(getJenkinsfileSharedLibraryEntries(createConfig({})), []);
   });
 });

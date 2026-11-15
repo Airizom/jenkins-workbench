@@ -1,27 +1,27 @@
 import * as vscode from "vscode";
-import type { JenkinsfileMatcher } from "../../validation/JenkinsfileMatcher";
 import { analyzeJenkinsfileContext } from "../JenkinsfileContextAnalyzer";
 import type { JenkinsfileIntelligenceConfigState } from "../JenkinsfileIntelligenceConfigState";
 import type {
+  JenkinsfileCatalogSource,
+  JenkinsfileDocumentScope,
   JenkinsfileStepDefinition,
   JenkinsfileStepParameter,
   JenkinsfileStepSignature
 } from "../JenkinsfileIntelligenceTypes";
-import type { JenkinsfileStepCatalogService } from "../JenkinsfileStepCatalogService";
 import { canProvideJenkinsfileIntelligence, getCallParameters } from "./JenkinsfileEditorSupport";
 
 export class JenkinsfileSignatureHelpProvider implements vscode.SignatureHelpProvider {
   constructor(
     private readonly intelligenceConfig: JenkinsfileIntelligenceConfigState,
-    private readonly matcher: JenkinsfileMatcher,
-    private readonly stepCatalogService: JenkinsfileStepCatalogService
+    private readonly scope: JenkinsfileDocumentScope,
+    private readonly catalogSource: JenkinsfileCatalogSource
   ) {}
 
   async provideSignatureHelp(
     document: vscode.TextDocument,
     position: vscode.Position
   ): Promise<vscode.SignatureHelp | undefined> {
-    if (!canProvideJenkinsfileIntelligence(this.intelligenceConfig, this.matcher, document)) {
+    if (!canProvideJenkinsfileIntelligence(this.intelligenceConfig, this.scope, document)) {
       return;
     }
 
@@ -30,7 +30,7 @@ export class JenkinsfileSignatureHelpProvider implements vscode.SignatureHelpPro
       return;
     }
 
-    const result = await this.stepCatalogService.getCatalogForDocument(document);
+    const result = await this.catalogSource.getCatalogForDocument(document);
     const step = result.catalog.steps.get(analysis.activeCall.name);
     if (!step) {
       return;

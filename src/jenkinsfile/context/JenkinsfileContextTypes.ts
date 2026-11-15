@@ -17,6 +17,15 @@ export interface JenkinsfileArgumentContext {
   usesNamedArgs: boolean;
 }
 
+export interface JenkinsfileMemberAccess {
+  /** Identifier chain before the final dot, left to right. */
+  receiver: string[];
+  /** Member name typed so far after the final dot (may be empty). */
+  partial: string;
+  start: number;
+  end: number;
+}
+
 export interface JenkinsfileContextAnalysis {
   maskedText: string;
   identifier?: JenkinsfileIdentifier;
@@ -27,15 +36,14 @@ export interface JenkinsfileContextAnalysis {
   isStepAllowed: boolean;
   canSuggestStep: boolean;
   hasNodeContext: boolean;
-}
-
-export interface JenkinsfileParenEntry {
-  openParen: number;
-  callName?: string;
-}
-
-export interface JenkinsfileBraceEntry {
-  label?: string;
+  /**
+   * Declarative section around the cursor: `"root"` at the top level, the innermost
+   * block label inside `pipeline { ... }`, or undefined in scripted code.
+   */
+  declarativeContext?: string;
+  /** True when the cursor is where a new statement (step call) may begin. */
+  isStatementStart: boolean;
+  memberAccess?: JenkinsfileMemberAccess;
 }
 
 export interface JenkinsfileClosedCall {

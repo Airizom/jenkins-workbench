@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import type { JenkinsfileIntelligenceConfig } from "../jenkinsfile/JenkinsfileIntelligenceTypes";
+import type { JenkinsSharedLibraryConfigEntry } from "../jenkinsfile/sharedLibraries/JenkinsSharedLibraryTypes";
 import type { JenkinsfileValidationConfig } from "../validation/JenkinsfileValidationTypes";
 import * as definitions from "./ExtensionConfigDefinitions";
 import { getBoundedIntegerConfigValue, normalizeStringList } from "./ExtensionConfigValueReaders";
@@ -66,4 +67,31 @@ export function getJenkinsfileIntelligenceConfig(
   return {
     enabled: getJenkinsfileIntelligenceEnabled(config)
   };
+}
+
+/**
+ * Reads `jenkinsfile.sharedLibraries`: trims names and paths and drops entries without both.
+ * This is the only place the setting is validated; the library index trusts these entries.
+ */
+export function getJenkinsfileSharedLibraryEntries(
+  config: vscode.WorkspaceConfiguration
+): JenkinsSharedLibraryConfigEntry[] {
+  const value = config.get<unknown>(definitions.CONFIG_KEYS.jenkinsfileSharedLibraries, []);
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const entries: JenkinsSharedLibraryConfigEntry[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === "string" ? record.name.trim() : "";
+    const path = typeof record.path === "string" ? record.path.trim() : "";
+    if (!name || !path) {
+      continue;
+    }
+    entries.push(record.implicit === true ? { name, path, implicit: true } : { name, path });
+  }
+  return entries;
 }

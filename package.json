@@ -1395,7 +1395,35 @@
         "jenkinsWorkbench.jenkinsfile.intelligence.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable Jenkinsfile step completions, hover docs, and parameter hints."
+          "description": "Enable Jenkinsfile language intelligence: step, declarative directive, env/params/currentBuild and shared library completions, hover docs, parameter hints, the stage outline, and go-to-definition for shared library vars."
+        },
+        "jenkinsWorkbench.jenkinsfile.sharedLibraries": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "path"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Library name as used in @Library('name') or library 'name'."
+              },
+              "path": {
+                "type": "string",
+                "description": "Local checkout of the library (the folder that contains vars/). Absolute, relative to the first workspace folder, or starting with ${workspaceFolder}, ${workspaceFolder:<folder name>}, or ~/."
+              },
+              "implicit": {
+                "type": "boolean",
+                "default": false,
+                "description": "Offer this library's vars in every Jenkinsfile, like a library Jenkins loads implicitly."
+              }
+            },
+            "additionalProperties": false
+          },
+          "markdownDescription": "Map shared library names to local checkouts so Jenkinsfiles get completions, hover docs, and go-to-definition for `vars/*.groovy`. Workspace folders with a top-level `vars/` directory are discovered automatically (library name = folder name); entries here take precedence."
         },
         "jenkinsWorkbench.jenkinsfileValidation.runOnSave": {
           "type": "boolean",

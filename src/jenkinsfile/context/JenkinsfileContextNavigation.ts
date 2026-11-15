@@ -1,5 +1,11 @@
 import { BARE_CALL_PREFIX_KEYWORDS, WORD_CHAR_PATTERN } from "./JenkinsfileContextConstants";
-import type { JenkinsfileClosedCall, JenkinsfileIdentifier } from "./JenkinsfileContextTypes";
+import type {
+  JenkinsfileClosedCall,
+  JenkinsfileIdentifier,
+  JenkinsfileMemberAccess
+} from "./JenkinsfileContextTypes";
+
+const IDENTIFIER_START_PATTERN = /[A-Za-z_$]/;
 
 export function findIdentifierAt(
   maskedText: string,
@@ -26,6 +32,87 @@ export function findPartialIdentifier(
     };
   }
   return undefined;
+}
+
+/**
+ * Resolves `a.b.par|` style member access at the cursor. Every receiver segment must be a
+ * plain identifier joined by `.` or `?.` without surrounding whitespace.
+ */
+export function findMemberAccess(
+  maskedText: string,
+  offset: number
+): JenkinsfileMemberAccess | undefined {
+  let partialStart = offset;
+  while (partialStart > 0 && WORD_CHAR_PATTERN.test(maskedText[partialStart - 1])) {
+    partialStart -= 1;
+  }
+  const partial = maskedText.slice(partialStart, offset);
+  if (partial && !IDENTIFIER_START_PATTERN.test(partial[0])) {
+    return undefined;
+  }
+  const receiver = readReceiverChain(maskedText, partialStart);
+  return receiver ? { receiver, partial, start: partialStart, end: offset } : undefined;
+}
+
+/** The identifier at a cursor and, when it follows a `.`, the receiver it is read from. */
+export interface JenkinsfileMemberAccessAt {
+  member: JenkinsfileIdentifier;
+  /**
+   * Identifier chain before the member, left to right. Undefined when the receiver is not a
+   * plain chain: a call or index result, a spread (`*.`) or range (`..`) operator, or
+   * whitespace around a `.`.
+   */
+  receiver?: string[];
+}
+
+/**
+ * Resolves the member identifier at `offset` together with its receiver chain, for
+ * example `previousBuild` in `currentBuild.previousBuild.result` gives receiver
+ * `["currentBuild"]`. Undefined when the identifier does not follow a `.`.
+ */
+export function findMemberAccessAt(
+  maskedText: string,
+  offset: number
+): JenkinsfileMemberAccessAt | undefined {
+  const member = findIdentifierAt(maskedText, offset);
+  if (!member || !IDENTIFIER_START_PATTERN.test(member.name[0])) {
+    return undefined;
+  }
+  const receiver = readReceiverChain(maskedText, member.start);
+  if (receiver === undefined) {
+    return undefined;
+  }
+  return receiver ? { member, receiver } : { member };
+}
+
+/**
+ * Reads the receiver chain before the `.` or `?.` that ends at `memberStart`. Returns
+ * undefined when no `.` precedes the member (whitespace allowed), and null when one does but
+ * the receiver is not a whitespace-free chain of plain identifiers.
+ */
+function readReceiverChain(maskedText: string, memberStart: number): string[] | null | undefined {
+  const receiver: string[] = [];
+  let dot = memberStart - 1;
+  while (maskedText[dot] === ".") {
+    const segmentEnd = maskedText[dot - 1] === "?" ? dot - 1 : dot;
+    if (segmentEnd <= 0 || !WORD_CHAR_PATTERN.test(maskedText[segmentEnd - 1])) {
+      return null;
+    }
+    const segmentStart = findIdentifierStart(maskedText, segmentEnd - 1);
+    const segment = maskedText.slice(segmentStart, segmentEnd);
+    if (!IDENTIFIER_START_PATTERN.test(segment[0])) {
+      return null;
+    }
+    receiver.unshift(segment);
+    dot = segmentStart - 1;
+  }
+
+  // A `.` across whitespace still makes this a member access, just not a plain chain.
+  const previous = findPreviousMeaningfulIndex(maskedText, dot);
+  if (previous !== undefined && maskedText[previous] === ".") {
+    return null;
+  }
+  return receiver.length > 0 ? receiver : undefined;
 }
 
 export function readIdentifier(maskedText: string, index: number): JenkinsfileIdentifier {

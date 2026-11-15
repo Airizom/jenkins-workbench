@@ -50,7 +50,7 @@ class TestSnippetString {
 
 vi.doMock("vscode", () => ({
   CompletionItem: TestCompletionItem,
-  CompletionItemKind: { Function: 3 },
+  CompletionItemKind: { Function: 3, Variable: 6 },
   CompletionList: TestCompletionList,
   MarkdownString: class {},
   Range: TestRange,
@@ -62,6 +62,14 @@ vi.doMock("../src/jenkinsfile/JenkinsfileContextAnalyzer", () => ({
     hasNodeContext: true
   })
 }));
+
+const position = { line: 0, character: 0 };
+const document = {
+  getText: () => "",
+  version: 1,
+  offsetAt: () => 0,
+  positionAt: () => position
+};
 
 const { JenkinsfileCompletionProvider } = await import(
   "../src/jenkinsfile/editor/JenkinsfileCompletionProvider"
@@ -98,15 +106,10 @@ describe("JenkinsfileCompletionProvider", () => {
       { isEnabled: () => true } as never,
       { matches: () => true } as never,
       {
-        getCatalogForDocument: async () => ({ catalog: { steps } })
+        getCatalogForDocument: async () => ({ catalog: { steps, directives: new Map() } })
       } as never
     );
-    const position = { line: 0, character: 0 };
-
-    const result = await provider.provideCompletionItems(
-      { positionAt: () => position } as never,
-      position as never
-    );
+    const result = await provider.provideCompletionItems(document as never, position as never);
 
     assert.ok(result);
     const ordinary = result.items.find((item) => item.label === "ordinary");
@@ -124,12 +127,7 @@ describe("JenkinsfileCompletionProvider", () => {
         getCatalogForDocument: async () => ({ catalog: FALLBACK_JENKINSFILE_STEP_CATALOG })
       } as never
     );
-    const position = { line: 0, character: 0 };
-
-    const result = await provider.provideCompletionItems(
-      { positionAt: () => position } as never,
-      position as never
-    );
+    const result = await provider.provideCompletionItems(document as never, position as never);
 
     const parallel = result?.items.find((item) => item.label === "parallel");
     assert.equal(
@@ -182,20 +180,16 @@ describe("JenkinsfileCompletionProvider", () => {
     const provider = new JenkinsfileCompletionProvider(
       { isEnabled: () => true } as never,
       { matches: () => true } as never,
-      { getCatalogForDocument: async () => ({ catalog: { steps } }) } as never
+      {
+        getCatalogForDocument: async () => ({ catalog: { steps, directives: new Map() } })
+      } as never
     );
-    const position = { line: 0, character: 0 };
-
-    const result = await provider.provideCompletionItems(
-      { positionAt: () => position } as never,
-      position as never
-    );
+    const result = await provider.provideCompletionItems(document as never, position as never);
 
     const snippets = Object.fromEntries(
-      (result?.items ?? []).map((item) => [
-        item.label,
-        (item.insertText as TestSnippetString | undefined)?.value
-      ])
+      (result?.items ?? [])
+        .filter((item) => item.kind === 3)
+        .map((item) => [item.label, (item.insertText as TestSnippetString | undefined)?.value])
     );
     // biome-ignore-start lint/suspicious/noTemplateCurlyInString: VS Code snippet placeholder syntax.
     assert.deepEqual(snippets, {

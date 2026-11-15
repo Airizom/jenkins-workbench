@@ -5,70 +5,118 @@ import type {
   JenkinsfileStepSignature
 } from "./JenkinsfileIntelligenceTypes";
 
+export interface JenkinsfileDirectiveEntry {
+  guard: string;
+  step: JenkinsfileStepDefinition;
+}
+
 export function createStepCatalog(
-  steps: Iterable<JenkinsfileStepDefinition>
+  steps: Iterable<JenkinsfileStepDefinition>,
+  directives: Iterable<JenkinsfileDirectiveEntry> = []
 ): JenkinsfileStepCatalog {
-  const map = new Map<string, JenkinsfileStepDefinition>();
+  const stepMap = new Map<string, JenkinsfileStepDefinition>();
   for (const step of steps) {
-    const normalized = normalizeStepDefinition(step);
-    const existing = map.get(step.name);
-    map.set(step.name, existing ? mergeStepDefinitions(existing, normalized) : normalized);
+    addStepDefinition(stepMap, step);
   }
-  return { steps: map };
+  const directiveMap = new Map<string, Map<string, JenkinsfileStepDefinition>>();
+  for (const { guard, step } of directives) {
+    let guardMap = directiveMap.get(guard);
+    if (!guardMap) {
+      guardMap = new Map();
+      directiveMap.set(guard, guardMap);
+    }
+    addStepDefinition(guardMap, step);
+  }
+  return { steps: stepMap, directives: directiveMap };
 }
 
 export function mergeStepCatalogs(
   fallbackCatalog: JenkinsfileStepCatalog,
   liveCatalog: JenkinsfileStepCatalog
 ): JenkinsfileStepCatalog {
-  const merged = new Map<string, JenkinsfileStepDefinition>();
-
-  for (const [name, step] of fallbackCatalog.steps) {
-    merged.set(name, step);
+  const directives = new Map<string, ReadonlyMap<string, JenkinsfileStepDefinition>>();
+  const guards = new Set([...fallbackCatalog.directives.keys(), ...liveCatalog.directives.keys()]);
+  for (const guard of guards) {
+    directives.set(
+      guard,
+      mergeDefinitionMaps(
+        fallbackCatalog.directives.get(guard) ?? EMPTY_DEFINITIONS,
+        liveCatalog.directives.get(guard) ?? EMPTY_DEFINITIONS
+      )
+    );
   }
+  return {
+    steps: mergeDefinitionMaps(fallbackCatalog.steps, liveCatalog.steps),
+    directives
+  };
+}
 
-  for (const [name, liveStep] of liveCatalog.steps) {
+const EMPTY_DEFINITIONS: ReadonlyMap<string, JenkinsfileStepDefinition> = new Map();
+
+function addStepDefinition(
+  map: Map<string, JenkinsfileStepDefinition>,
+  step: JenkinsfileStepDefinition
+): void {
+  const normalized = normalizeStepDefinition(step);
+  const existing = map.get(step.name);
+  map.set(step.name, existing ? mergeStepDefinitions(existing, normalized) : normalized);
+}
+
+function mergeDefinitionMaps(
+  fallbackDefinitions: ReadonlyMap<string, JenkinsfileStepDefinition>,
+  liveDefinitions: ReadonlyMap<string, JenkinsfileStepDefinition>
+): Map<string, JenkinsfileStepDefinition> {
+  const merged = new Map<string, JenkinsfileStepDefinition>(fallbackDefinitions);
+
+  for (const [name, liveStep] of liveDefinitions) {
     const fallbackStep = merged.get(name);
     if (!fallbackStep) {
       merged.set(name, liveStep);
       continue;
     }
-
-    const fallbackParameterDocs = new Map<string, JenkinsfileStepParameter>();
-    for (const signature of fallbackStep.signatures) {
-      for (const parameter of signature.parameters) {
-        fallbackParameterDocs.set(parameter.name, parameter);
-      }
-    }
-
-    const signatures =
-      liveStep.signatures.length > 0
-        ? liveStep.signatures.map((signature) => ({
-            ...signature,
-            parameters: signature.parameters.map((parameter) => {
-              const fallbackParameter = fallbackParameterDocs.get(parameter.name);
-              return {
-                ...parameter,
-                description: parameter.description ?? fallbackParameter?.description,
-                required:
-                  typeof parameter.required === "boolean"
-                    ? parameter.required
-                    : fallbackParameter?.required
-              };
-            })
-          }))
-        : fallbackStep.signatures.map(normalizeSignature);
-
-    merged.set(name, {
-      ...liveStep,
-      displayName: liveStep.displayName || fallbackStep.displayName,
-      documentation: liveStep.documentation ?? fallbackStep.documentation,
-      isAdvanced: fallbackStep.isAdvanced && liveStep.isAdvanced,
-      signatures
-    });
+    merged.set(name, mergeLiveOverFallback(fallbackStep, liveStep));
   }
 
-  return { steps: merged };
+  return merged;
+}
+
+function mergeLiveOverFallback(
+  fallbackStep: JenkinsfileStepDefinition,
+  liveStep: JenkinsfileStepDefinition
+): JenkinsfileStepDefinition {
+  const fallbackParameterDocs = new Map<string, JenkinsfileStepParameter>();
+  for (const signature of fallbackStep.signatures) {
+    for (const parameter of signature.parameters) {
+      fallbackParameterDocs.set(parameter.name, parameter);
+    }
+  }
+
+  const signatures =
+    liveStep.signatures.length > 0
+      ? liveStep.signatures.map((signature) => ({
+          ...signature,
+          parameters: signature.parameters.map((parameter) => {
+            const fallbackParameter = fallbackParameterDocs.get(parameter.name);
+            return {
+              ...parameter,
+              description: parameter.description ?? fallbackParameter?.description,
+              required:
+                typeof parameter.required === "boolean"
+                  ? parameter.required
+                  : fallbackParameter?.required
+            };
+          })
+        }))
+      : fallbackStep.signatures.map(normalizeSignature);
+
+  return {
+    ...liveStep,
+    displayName: liveStep.displayName || fallbackStep.displayName,
+    documentation: liveStep.documentation ?? fallbackStep.documentation,
+    isAdvanced: fallbackStep.isAdvanced && liveStep.isAdvanced,
+    ...withSource(liveStep.source ?? fallbackStep.source),
+    signatures
+  };
 }
 
 function mergeStepDefinitions(
@@ -82,8 +130,15 @@ function mergeStepDefinitions(
     documentation: nextStep.documentation ?? baseStep.documentation,
     requiresNodeContext: baseStep.requiresNodeContext || nextStep.requiresNodeContext,
     isAdvanced: baseStep.isAdvanced && nextStep.isAdvanced,
+    ...withSource(nextStep.source ?? baseStep.source),
     signatures: mergeSignatures(baseStep.signatures, nextStep.signatures)
   };
+}
+
+function withSource(
+  source: JenkinsfileStepDefinition["source"]
+): Pick<JenkinsfileStepDefinition, "source"> {
+  return source ? { source } : {};
 }
 
 function normalizeStepDefinition(step: JenkinsfileStepDefinition): JenkinsfileStepDefinition {

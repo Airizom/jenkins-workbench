@@ -26,6 +26,8 @@ export interface ContributorBlock {
 export interface ScannedMethodCall {
   call: GdslCall;
   requiresNodeContext: boolean;
+  /** Active, de-duplicated `enclosingCall(...)` guard names around the method. */
+  guardNames: string[];
 }
 
 export type TokenType =

@@ -2,43 +2,53 @@ import type * as vscode from "vscode";
 import { analyzeActiveCallArguments, findBareActiveCall } from "./context/JenkinsfileCallAnalysis";
 import {
   findIdentifierAt,
+  findMemberAccess,
   findPartialIdentifier,
-  isValidStepStart,
-  isWordStart,
-  readIdentifier,
-  resolveBraceLabel,
-  resolveCallName
+  isValidStepStart
 } from "./context/JenkinsfileContextNavigation";
-import { computeHasNodeContext, computeIsStepAllowed } from "./context/JenkinsfileContextRules";
+import {
+  computeDeclarativeContext,
+  computeHasNodeContext,
+  computeIsStepAllowed
+} from "./context/JenkinsfileContextRules";
 import type {
   JenkinsfileActiveCall,
-  JenkinsfileBraceEntry,
-  JenkinsfileClosedCall,
-  JenkinsfileContextAnalysis,
-  JenkinsfileParenEntry
+  JenkinsfileContextAnalysis
 } from "./context/JenkinsfileContextTypes";
-import { maskGroovyText } from "./context/JenkinsfileGroovyTextMasker";
-
-const CLOSED_CALL_RESET_CHARACTERS = new Set([",", ":", "[", "]", ";"]);
+import {
+  findEnclosingCallSpan,
+  getBlockAncestors,
+  isInsideInterpolation,
+  type JenkinsfileDocumentModel
+} from "./model/JenkinsfileDocumentModel";
+import { getJenkinsfileDocumentModel } from "./model/JenkinsfileDocumentModelCache";
 
 export type { JenkinsfileContextAnalysis } from "./context/JenkinsfileContextTypes";
 
+/**
+ * Cursor queries over the cached document model: the block path and the enclosing call come
+ * from the model; only cursor-local scans (identifiers, bare calls, arguments) happen here.
+ */
 export function analyzeJenkinsfileContext(
   document: vscode.TextDocument,
   position: vscode.Position
 ): JenkinsfileContextAnalysis {
-  const text = document.getText();
-  const maskedText = maskGroovyText(text);
+  const model = getJenkinsfileDocumentModel(document);
+  const { maskedText } = model;
   const offset = document.offsetAt(position);
   const partialIdentifier = findPartialIdentifier(maskedText, offset);
   const identifier = findIdentifierAt(maskedText, offset);
-  const { blockPath, activeCall } = scanContextState(maskedText, offset);
+  const blockPath = getBlockAncestors(model, offset)
+    .map((block) => block.label)
+    .filter((label): label is string => label !== undefined);
+  const activeCall = findActiveCall(model, offset);
   const argumentContext = activeCall
     ? analyzeActiveCallArguments(maskedText, activeCall, offset)
     : undefined;
   const isStepAllowed = computeIsStepAllowed(blockPath);
   const hasNodeContext = computeHasNodeContext(blockPath);
-  const canSuggestStep = isStepAllowed && isValidStepStart(maskedText, offset);
+  const isStatementStart = isValidStepStart(maskedText, offset);
+  const canSuggestStep = isStepAllowed && isStatementStart;
 
   return {
     maskedText,
@@ -49,94 +59,29 @@ export function analyzeJenkinsfileContext(
     blockPath,
     isStepAllowed,
     canSuggestStep,
-    hasNodeContext
+    hasNodeContext,
+    // Interpolated code is an expression, never a declarative section.
+    declarativeContext: isInsideInterpolation(model, offset)
+      ? undefined
+      : computeDeclarativeContext(blockPath),
+    isStatementStart,
+    memberAccess: findMemberAccess(maskedText, offset)
   };
 }
 
-function scanContextState(
-  maskedText: string,
+/** The innermost named call whose parentheses hold the cursor, else a bare call. */
+function findActiveCall(
+  model: JenkinsfileDocumentModel,
   offset: number
-): { blockPath: string[]; activeCall?: JenkinsfileActiveCall } {
-  const braceStack: JenkinsfileBraceEntry[] = [];
-  const parenStack: JenkinsfileParenEntry[] = [];
-  let lastClosedCall: JenkinsfileClosedCall | undefined;
-  let index = 0;
-
-  while (index < offset) {
-    const character = maskedText[index];
-    if (!character.trim()) {
-      index += 1;
-      continue;
-    }
-
-    if (isWordStart(maskedText, index)) {
-      const token = readIdentifier(maskedText, index);
-      lastClosedCall = undefined;
-      index = token.end;
-      continue;
-    }
-
-    if (character === "(") {
-      parenStack.push({
-        openParen: index,
-        callName: resolveCallName(maskedText, index)
-      });
-      lastClosedCall = undefined;
-      index += 1;
-      continue;
-    }
-
-    if (character === ")") {
-      const closed = parenStack.pop();
-      lastClosedCall = closed?.callName
-        ? {
-            name: closed.callName,
-            closeParen: index
-          }
-        : undefined;
-      index += 1;
-      continue;
-    }
-
-    if (character === "{") {
-      braceStack.push({
-        label: resolveBraceLabel(maskedText, index, lastClosedCall)
-      });
-      lastClosedCall = undefined;
-      index += 1;
-      continue;
-    }
-
-    if (character === "}") {
-      braceStack.pop();
-      lastClosedCall = undefined;
-      index += 1;
-      continue;
-    }
-
-    if (CLOSED_CALL_RESET_CHARACTERS.has(character)) {
-      lastClosedCall = undefined;
-    }
-
-    index += 1;
+): JenkinsfileActiveCall | undefined {
+  const span = findEnclosingCallSpan(model, offset);
+  if (span?.name !== undefined) {
+    return {
+      name: span.name,
+      syntax: "paren",
+      callStart: span.openParen,
+      openParen: span.openParen
+    };
   }
-
-  const activeCallEntry = [...parenStack].reverse().find((entry) => entry.callName);
-  const parenCall = activeCallEntry?.callName
-    ? {
-        name: activeCallEntry.callName,
-        syntax: "paren" as const,
-        callStart: activeCallEntry.openParen,
-        openParen: activeCallEntry.openParen
-      }
-    : undefined;
-  const activeCall = parenCall ?? findBareActiveCall(maskedText, offset);
-  const blockPath = braceStack
-    .map((entry) => entry.label)
-    .filter((label): label is string => Boolean(label));
-
-  return {
-    blockPath,
-    activeCall
-  };
+  return findBareActiveCall(model.maskedText, offset);
 }

@@ -38,7 +38,8 @@ export const CONFIG_KEYS = {
   jenkinsfileValidationRunOnSave: "jenkinsfileValidation.runOnSave",
   jenkinsfileValidationChangeDebounce: "jenkinsfileValidation.changeDebounceMs",
   jenkinsfileValidationFilePatterns: "jenkinsfileValidation.filePatterns",
-  jenkinsfileIntelligenceEnabled: "jenkinsfile.intelligence.enabled"
+  jenkinsfileIntelligenceEnabled: "jenkinsfile.intelligence.enabled",
+  jenkinsfileSharedLibraries: "jenkinsfile.sharedLibraries"
 } as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS];

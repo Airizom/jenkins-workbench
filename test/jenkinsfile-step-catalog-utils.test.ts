@@ -129,6 +129,138 @@ describe("JenkinsfileStepCatalogUtils", () => {
 
     assert.deepEqual(catalog.steps.get("x")?.signatures, nextStep.signatures);
   });
+
+  it("groups directives by guard and merges duplicates when creating a catalog", () => {
+    const baseStep = createStepDefinition({ name: "timeout", documentation: "Base" });
+    const nextStep = createStepDefinition({
+      name: "timeout",
+      documentation: undefined,
+      signatures: [{ ...baseStep.signatures[0], label: "timeout(time: int)" }]
+    });
+    const catalog = createStepCatalog(
+      [createStepDefinition()],
+      [
+        { guard: "options", step: baseStep },
+        { guard: "options", step: nextStep },
+        { guard: "when", step: createStepDefinition({ name: "branch" }) }
+      ]
+    );
+
+    assert.deepEqual([...catalog.steps.keys()], ["x"]);
+    assert.deepEqual([...catalog.directives.keys()], ["options", "when"]);
+    const timeout = catalog.directives.get("options")?.get("timeout");
+    assert.equal(timeout?.documentation, "Base");
+    assert.deepEqual(
+      timeout?.signatures.map((signature) => signature.label),
+      ["timeout(time: int)", "x()"]
+    );
+    assert.ok(catalog.directives.get("when")?.has("branch"));
+    assert.equal(createStepCatalog([]).directives.size, 0);
+    assert.equal(FALLBACK_JENKINSFILE_STEP_CATALOG.directives.size, 0);
+  });
+
+  it("merges directives per guard preferring live metadata over fallback metadata", () => {
+    const fallbackCatalog = createStepCatalog(
+      [],
+      [
+        {
+          guard: "options",
+          step: createStepDefinition({
+            name: "timeout",
+            displayName: "Fallback timeout",
+            documentation: "Fallback docs",
+            isAdvanced: true,
+            signatures: [
+              {
+                label: "timeout(time: int)",
+                parameters: [{ name: "time", type: "int", description: "Fallback time" }],
+                usesNamedArgs: true,
+                takesClosure: false
+              }
+            ]
+          })
+        },
+        { guard: "options", step: createStepDefinition({ name: "fallbackOnly" }) },
+        { guard: "triggers", step: createStepDefinition({ name: "cron" }) }
+      ]
+    );
+    const liveCatalog = createStepCatalog(
+      [],
+      [
+        {
+          guard: "options",
+          step: createStepDefinition({
+            name: "timeout",
+            displayName: "",
+            isAdvanced: true,
+            signatures: [
+              {
+                label: "timeout(time: int, unit: String)",
+                parameters: [{ name: "time", type: "int" }, { name: "unit" }],
+                usesNamedArgs: true,
+                takesClosure: false
+              }
+            ]
+          })
+        },
+        { guard: "when", step: createStepDefinition({ name: "branch" }) }
+      ]
+    );
+
+    const merged = mergeStepCatalogs(fallbackCatalog, liveCatalog);
+
+    assert.deepEqual([...merged.directives.keys()].sort(), ["options", "triggers", "when"]);
+    assert.deepEqual([...(merged.directives.get("options")?.keys() ?? [])].sort(), [
+      "fallbackOnly",
+      "timeout"
+    ]);
+    const timeout = merged.directives.get("options")?.get("timeout");
+    assert.equal(timeout?.displayName, "Fallback timeout");
+    assert.equal(timeout?.documentation, "Fallback docs");
+    assert.equal(timeout?.isAdvanced, true);
+    assert.deepEqual(timeout?.signatures, [
+      {
+        label: "timeout(time: int, unit: String)",
+        parameters: [
+          { name: "time", type: "int", description: "Fallback time", required: undefined },
+          { name: "unit", description: undefined, required: undefined }
+        ],
+        usesNamedArgs: true,
+        takesClosure: false
+      }
+    ]);
+    assert.ok(merged.directives.get("triggers")?.has("cron"));
+    assert.ok(merged.directives.get("when")?.has("branch"));
+    assert.equal(merged.steps.size, 0);
+  });
+
+  it("keeps shared-library sources when merging step definitions", () => {
+    const source = {
+      kind: "sharedLibrary" as const,
+      library: "lib",
+      uri: "file:///lib/vars/x.groovy",
+      line: 1,
+      character: 0,
+      members: []
+    };
+    const created = createStepCatalog([
+      createStepDefinition({ source }),
+      createStepDefinition({ documentation: "Next" })
+    ]);
+    assert.deepEqual(created.steps.get("x")?.source, source);
+
+    const merged = mergeStepCatalogs(created, createStepCatalog([createStepDefinition()]));
+    assert.deepEqual(merged.steps.get("x")?.source, source);
+    assert.ok(
+      !(
+        "source" in
+        (mergeStepCatalogs(
+          createStepCatalog([createStepDefinition()]),
+          createStepCatalog([createStepDefinition()])
+        ).steps.get("x") ?? {})
+      )
+    );
+  });
 });
 
 function createStepDefinition(

@@ -58,6 +58,8 @@ export async function activateRuntime(
   const refreshHost = container.get("refreshHost");
   const jenkinsfileMatcher = container.get("jenkinsfileMatcher");
   const jenkinsfileValidationCoordinator = container.get("jenkinsfileValidationCoordinator");
+  // Lazy: no file-system reads or watcher until a Jenkinsfile feature asks for libraries.
+  const jenkinsSharedLibraryIndex = container.get("jenkinsSharedLibraryIndex");
   const dataService = container.get("dataService");
   const pendingInputCoordinator = container.get("pendingInputCoordinator");
   const artifactPreviewProvider = container.get("artifactPreviewProvider");
@@ -202,6 +204,7 @@ export async function activateRuntime(
       void syncJenkinsfileContext(jenkinsfileMatcher);
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      jenkinsSharedLibraryIndex.invalidate();
       void syncJenkinsfileContext(jenkinsfileMatcher);
     }),
     vscode.workspace.onDidCloseTextDocument((document) => {
@@ -222,11 +225,15 @@ export async function activateRuntime(
     registerJenkinsfileLanguageFeatures(jenkinsfileMatcher, {
       quickFix: container.get("jenkinsfileQuickFixProvider"),
       hover: container.get("jenkinsfileHoverProvider"),
+      intelligenceHover: container.get("jenkinsfileIntelligenceHoverProvider"),
       completion: container.get("jenkinsfileCompletionProvider"),
       signatureHelp: container.get("jenkinsfileSignatureHelpProvider"),
-      codeLens: jenkinsfileCodeLensProvider
+      codeLens: jenkinsfileCodeLensProvider,
+      documentSymbol: container.get("jenkinsfileDocumentSymbolProvider"),
+      definition: container.get("jenkinsfileDefinitionProvider")
     }),
-    jenkinsfileMatcher
+    jenkinsfileMatcher,
+    jenkinsSharedLibraryIndex
   );
 
   registerExtensionSubscriptions(context, container);

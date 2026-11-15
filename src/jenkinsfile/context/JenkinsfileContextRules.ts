@@ -1,28 +1,19 @@
-import { DECLARATIVE_NON_STEP_BLOCKS } from "./JenkinsfileContextConstants";
+import {
+  DECLARATIVE_NON_STEP_CONTEXT_NAMES,
+  DECLARATIVE_POST_CONDITION_NAMES
+} from "../declarative/JenkinsfileDeclarativeGrammar";
 
 const NODE_CONTEXT_BLOCKS = new Set(["node", "steps", "script", "post"]);
-const POST_CONDITIONS = new Set([
-  "always",
-  "changed",
-  "fixed",
-  "regression",
-  "aborted",
-  "failure",
-  "success",
-  "unstable",
-  "unsuccessful",
-  "cleanup"
-]);
 
 export function computeIsStepAllowed(blockPath: string[]): boolean {
-  if (blockPath.some((label) => DECLARATIVE_NON_STEP_BLOCKS.has(label))) {
+  if (blockPath.some((label) => DECLARATIVE_NON_STEP_CONTEXT_NAMES.has(label))) {
     return false;
   }
   const postIndex = blockPath.indexOf("post");
   if (
     blockPath.includes("pipeline") &&
     postIndex !== -1 &&
-    !POST_CONDITIONS.has(blockPath[postIndex + 1])
+    !DECLARATIVE_POST_CONDITION_NAMES.has(blockPath[postIndex + 1])
   ) {
     return false;
   }
@@ -37,4 +28,11 @@ export function computeIsStepAllowed(blockPath: string[]): boolean {
 
 export function computeHasNodeContext(blockPath: string[]): boolean {
   return blockPath.some((label) => NODE_CONTEXT_BLOCKS.has(label));
+}
+
+export function computeDeclarativeContext(blockPath: string[]): string | undefined {
+  if (blockPath.length === 0) {
+    return "root";
+  }
+  return blockPath.includes("pipeline") ? blockPath[blockPath.length - 1] : undefined;
 }

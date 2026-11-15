@@ -27,6 +27,9 @@ vi.doMock("vscode", () => ({
       readonly start: unknown,
       readonly end: unknown
     ) {}
+  },
+  Uri: {
+    parse: (value: string) => ({ fsPath: decodeURIComponent(value.replace(/^file:\/\//, "")) })
   }
 }));
 vi.doMock("../src/jenkinsfile/JenkinsfileContextAnalyzer", () => ({
@@ -60,7 +63,7 @@ describe("JenkinsfileStepHoverProvider", () => {
       {
         getCatalogForDocument: async () => ({
           kind: "fallback-no-environment",
-          catalog: { steps: new Map([["echo", step]]) }
+          catalog: { steps: new Map([["echo", step]]), directives: new Map() }
         })
       } as never
     );
@@ -77,5 +80,51 @@ describe("JenkinsfileStepHoverProvider", () => {
     assert.match(markdown, /- `` `edge` ``\n/);
     assert.match(markdown, /message: &lt;b&gt;text&lt;\/b&gt;/);
     assert.doesNotMatch(markdown, /<\/?[ib]>/);
+  });
+
+  it("shows the shared library and vars file instead of the Jenkins metadata footer", async () => {
+    const step = {
+      name: "echo",
+      displayName: "echo (shared library acme)",
+      documentation: "Library echo.",
+      signatures: [{ label: "echo(message: String)", parameters: [] }],
+      source: {
+        kind: "sharedLibrary",
+        library: "acme",
+        uri: "file:///libs/acme%20lib/vars/echo.groovy",
+        line: 0,
+        character: 0,
+        members: []
+      }
+    };
+    const markdownFor = async (kind: string) => {
+      const provider = new JenkinsfileStepHoverProvider(
+        { isEnabled: () => true } as never,
+        { matches: () => true } as never,
+        {
+          getCatalogForDocument: async () => ({
+            kind,
+            environment: { url: "https://jenkins.example/", scope: "workspace" },
+            catalog: { steps: new Map([["echo", step]]), directives: new Map() }
+          })
+        } as never
+      );
+      const hover = await provider.provideHover(
+        { positionAt: (offset: number) => offset } as never,
+        { line: 0, character: 1 } as never
+      );
+      assert.ok(hover);
+      return (hover.contents as unknown as TestMarkdownString).value;
+    };
+
+    for (const kind of ["live", "fallback-no-environment", "fallback-loading"]) {
+      const markdown = await markdownFor(kind);
+      assert.match(
+        markdown,
+        /\*\*Shared library\*\* acme\n\n\/libs\/acme lib\/vars\/echo\.groovy$/
+      );
+      assert.doesNotMatch(markdown, /Metadata source|Bundled fallback|Jenkinsfile environment/);
+      assert.doesNotMatch(markdown, /Pipeline Syntax|pipeline-syntax/);
+    }
   });
 });

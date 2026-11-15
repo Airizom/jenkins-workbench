@@ -6,14 +6,24 @@ import {
   findBareActiveCall
 } from "../src/jenkinsfile/context/JenkinsfileCallAnalysis";
 import {
+  findMemberAccess,
   findPartialIdentifier,
   isValidStepStart
 } from "../src/jenkinsfile/context/JenkinsfileContextNavigation";
 import {
+  computeDeclarativeContext,
   computeHasNodeContext,
   computeIsStepAllowed
 } from "../src/jenkinsfile/context/JenkinsfileContextRules";
 import { maskGroovyText } from "../src/jenkinsfile/context/JenkinsfileGroovyTextMasker";
+import {
+  DECLARATIVE_NON_STEP_CONTEXT_NAMES,
+  resolveDeclarativeGrammar
+} from "../src/jenkinsfile/declarative/JenkinsfileDeclarativeGrammar";
+import {
+  getBlockAncestors,
+  parseJenkinsfileModel
+} from "../src/jenkinsfile/model/JenkinsfileDocumentModel";
 
 const CURSOR = "/*cursor*/";
 
@@ -331,6 +341,83 @@ pipeline {
     assert.equal(computeHasNodeContext(["pipeline", "environment"]), false);
   });
 
+  it("finds the enclosing call from the model's call spans", () => {
+    const activeCall = (source: string) => analyzeMarkedText(source).activeCall?.name;
+
+    // Nested calls and grouping parentheses.
+    assert.equal(activeCall(`foo(a, bar(b, ${CURSOR}))`), "bar");
+    assert.equal(activeCall(`foo(a, bar(b), ${CURSOR})`), "foo");
+    assert.equal(activeCall(`foo((1 + ${CURSOR}) * 2)`), "foo");
+    // A closure argument still reports the call that takes it.
+    assert.equal(activeCall(`parallel(a: { ${CURSOR} })`), "parallel");
+    assert.equal(activeCall(`parallel(a: { sh 'x' }, ${CURSOR})`), "parallel");
+    // Calls inside `${...}`, and the call around a GString argument.
+    assert.equal(activeCall(`sh "\${format('%s', ${CURSOR})}"`), "format");
+    assert.equal(activeCall(`sh(script: "\${a(b)}", ${CURSOR})`), "sh");
+    // Outside every call, bare calls are still found at the cursor.
+    assert.equal(activeCall(`sh script: ${CURSOR}`), "sh");
+
+    // An unclosed paren at EOF stays active, with its arguments.
+    const unclosed = analyzeMarkedText(`timeout(time: 5, ${CURSOR}`);
+    assert.equal(unclosed.activeCall?.name, "timeout");
+    assert.equal(unclosed.argumentContext?.activeIndex, 1);
+    assert.equal(unclosed.argumentContext?.usesNamedArgs, true);
+  });
+
+  it("does not leak a paren left open in a closed block into later code", () => {
+    const later = analyzeMarkedText(`node {\n  sh(\n}\nnode {\n  ec${CURSOR}\n}`);
+    assert.equal(later.activeCall, undefined);
+    assert.deepEqual(later.blockPath, ["node"]);
+    assert.equal(later.canSuggestStep, true);
+
+    // Inside the block that left it open, it is still the active call.
+    assert.equal(analyzeMarkedText(`node {\n  sh(${CURSOR}\n}`).activeCall?.name, "sh");
+    // The paren left open in a closure argument does not hide the call that takes it.
+    assert.equal(analyzeMarkedText(`foo(a, { bar( }, ${CURSOR})`).activeCall?.name, "foo");
+  });
+
+  it("takes the block path from the document model's block tree", () => {
+    const cases: Array<[string, string[]]> = [
+      [`node {\n  if (ready) {\n    ${CURSOR}\n  }\n}`, ["node", "if"]],
+      [`node {\n  if (a) { x } else { ${CURSOR} }\n}`, ["node", "else"]],
+      [`node {\n  try { x } catch (e) { ${CURSOR} }\n}`, ["node", "catch"]],
+      [`node {\n  try {\n    ${CURSOR}\n  } finally {}\n}`, ["node", "try"]],
+      [`stages {\n  stage('x') {\n    ${CURSOR}\n  }\n}`, ["stages", "stage"]],
+      [`options {\n  timeout(time: 1, unit: 'HOURS') { ${CURSOR} }\n}`, ["options", "timeout"]],
+      [`node {\n  stage('x')\n  {\n    ${CURSOR}\n  }\n}`, ["node", "stage"]],
+      [`node {\n  foo(a), { ${CURSOR} }\n}`, ["node"]],
+      [`node {\n  stage("Deploy \${env.T}") { ${CURSOR} }\n}`, ["node", "stage"]],
+      [`node {\n  echo "\${items.collect { ${CURSOR} }}"\n}`, ["node"]],
+      [`steps {\n  echo '}'\n  // }\n  ${CURSOR}\n}`, ["steps"]]
+    ];
+
+    for (const [source, expected] of cases) {
+      const { text, offset } = withCursor(source);
+      const analysis = analyzeMarkedText(source);
+      const modelPath = getBlockAncestors(parseJenkinsfileModel(text), offset)
+        .map((block) => block.label)
+        .filter((label) => label !== undefined);
+      assert.deepEqual(analysis.blockPath, expected, source);
+      assert.deepEqual(modelPath, expected, source);
+    }
+  });
+
+  it("reports no declarative context inside GString interpolation", () => {
+    const agent = analyzeMarkedText(`pipeline {\n  agent { label "\${${CURSOR}}" }\n}`);
+    assert.deepEqual(agent.blockPath, ["pipeline", "agent"]);
+    assert.equal(agent.declarativeContext, undefined);
+    assert.equal(agent.isStepAllowed, false);
+
+    const steps = analyzeMarkedText(
+      `pipeline { stages { stage('x') { steps { echo "\${${CURSOR}}" } } } }`
+    );
+    assert.equal(steps.declarativeContext, undefined);
+    assert.equal(steps.canSuggestStep, true);
+
+    const after = analyzeMarkedText(`pipeline {\n  agent { label "\${x}" ${CURSOR} }\n}`);
+    assert.equal(after.declarativeContext, "agent");
+  });
+
   it("validates step-start navigation around member access and keyword prefixes", () => {
     const text = "foo.bar\nreturn sh\nst";
     const maskedText = maskGroovyText(text);
@@ -345,5 +432,123 @@ pipeline {
       start: text.indexOf("st"),
       end: partialOffset
     });
+  });
+
+  it("takes the non-step blocks from the declarative grammar", () => {
+    assert.deepEqual([...DECLARATIVE_NON_STEP_CONTEXT_NAMES].sort(), [
+      "agent",
+      "environment",
+      "input",
+      "options",
+      "parameters",
+      "tools",
+      "triggers",
+      "when"
+    ]);
+    for (const name of DECLARATIVE_NON_STEP_CONTEXT_NAMES) {
+      assert.equal(computeIsStepAllowed(["pipeline", "stages", "stage", name]), false, name);
+      if (name !== "environment") {
+        assert.equal(resolveDeclarativeGrammar(name, ["pipeline", name])?.key, name, name);
+      }
+    }
+    assert.equal(computeIsStepAllowed(["pipeline", "stages", "stage", "steps"]), true);
+  });
+
+  it("computes the declarative context from the block path", () => {
+    assert.equal(computeDeclarativeContext([]), "root");
+    assert.equal(computeDeclarativeContext(["pipeline"]), "pipeline");
+    assert.equal(computeDeclarativeContext(["pipeline", "options"]), "options");
+    assert.equal(computeDeclarativeContext(["pipeline", "stages", "stage", "when"]), "when");
+    assert.equal(computeDeclarativeContext(["node"]), undefined);
+    assert.equal(computeDeclarativeContext(["node", "stage"]), undefined);
+
+    assert.equal(analyzeMarkedText(`${CURSOR}`).declarativeContext, "root");
+    assert.equal(
+      analyzeMarkedText(`pipeline {\n  options {\n    ${CURSOR}\n  }\n}`).declarativeContext,
+      "options"
+    );
+    assert.equal(
+      analyzeMarkedText(`pipeline {\n  stages {\n    stage('x') {\n      ${CURSOR}\n    }\n  }\n}`)
+        .declarativeContext,
+      "stage"
+    );
+    assert.equal(analyzeMarkedText(`node {\n  ${CURSOR}\n}`).declarativeContext, undefined);
+  });
+
+  it("reports statement starts independently of step-allowed rules", () => {
+    const options = analyzeMarkedText(`pipeline {\n  options {\n    tim${CURSOR}\n  }\n}`);
+    assert.equal(options.isStepAllowed, false);
+    assert.equal(options.isStatementStart, true);
+    assert.equal(options.canSuggestStep, false);
+
+    const steps = analyzeMarkedText(`pipeline { stages { stage('x') { steps { ec${CURSOR} } } } }`);
+    assert.equal(steps.isStepAllowed, true);
+    assert.equal(steps.isStatementStart, true);
+    assert.equal(steps.canSuggestStep, true);
+
+    const member = analyzeMarkedText(`node {\n  env.BR${CURSOR}\n}`);
+    assert.equal(member.isStepAllowed, true);
+    assert.equal(member.isStatementStart, false);
+    assert.equal(member.canSuggestStep, false);
+
+    const argument = analyzeMarkedText(
+      `pipeline {\n  options {\n    timeout(time: ${CURSOR})\n  }\n}`
+    );
+    assert.equal(argument.isStatementStart, false);
+  });
+
+  it("finds member access chains at the cursor", () => {
+    const cases: Array<[string, { receiver: string[]; partial: string } | undefined]> = [
+      [`env.${CURSOR}`, { receiver: ["env"], partial: "" }],
+      [`env.BR${CURSOR}`, { receiver: ["env"], partial: "BR" }],
+      [
+        `currentBuild.previousBuild.res${CURSOR}`,
+        { receiver: ["currentBuild", "previousBuild"], partial: "res" }
+      ],
+      [
+        `currentBuild?.previousBuild?.${CURSOR}`,
+        { receiver: ["currentBuild", "previousBuild"], partial: "" }
+      ],
+      [`echo params.TAR${CURSOR}`, { receiver: ["params"], partial: "TAR" }],
+      [`foo().bar.${CURSOR}`, undefined],
+      [`list[0].na${CURSOR}`, undefined],
+      [`env .BR${CURSOR}`, undefined],
+      [`env. BR${CURSOR}`, undefined],
+      [`x. env.BR${CURSOR}`, undefined],
+      [`list*.na${CURSOR}`, undefined],
+      [`def x = 1.5${CURSOR}`, undefined],
+      [`def x = 1.${CURSOR}`, undefined],
+      [`0..x${CURSOR}`, undefined],
+      [`plain${CURSOR}`, undefined],
+      [`.${CURSOR}`, undefined]
+    ];
+
+    for (const [source, expected] of cases) {
+      const { text, offset } = withCursor(source);
+      const access = findMemberAccess(maskGroovyText(text), offset);
+      if (!expected) {
+        assert.equal(access, undefined, source);
+        continue;
+      }
+      assert.deepEqual(
+        access,
+        { ...expected, start: offset - expected.partial.length, end: offset },
+        source
+      );
+    }
+  });
+
+  it("finds member access inside GString interpolation", () => {
+    const analysis = analyzeMarkedText(`node {\n  echo "branch \${env.BR${CURSOR}}"\n}`);
+    const { text, offset } = withCursor(`node {\n  echo "branch \${env.BR${CURSOR}}"\n}`);
+
+    assert.deepEqual(analysis.memberAccess, {
+      receiver: ["env"],
+      partial: "BR",
+      start: offset - 2,
+      end: offset
+    });
+    assert.equal(text.slice(offset - 2, offset), "BR");
+    assert.equal(analyzeMarkedText(`echo "plain env.BR${CURSOR} text"`).memberAccess, undefined);
   });
 });

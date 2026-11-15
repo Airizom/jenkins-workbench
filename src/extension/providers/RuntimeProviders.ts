@@ -20,6 +20,10 @@ import { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchW
 import { HistoryBaselineResolver, HistoryBaselineStore } from "../../history/HistoryBaseline";
 import { HistoryService } from "../../history/HistoryService";
 import { JenkinsfileCompletionProvider } from "../../jenkinsfile/editor/JenkinsfileCompletionProvider";
+import { JenkinsfileDefinitionProvider } from "../../jenkinsfile/editor/JenkinsfileDefinitionProvider";
+import { JenkinsfileDocumentSymbolProvider } from "../../jenkinsfile/editor/JenkinsfileDocumentSymbolProvider";
+import { JenkinsfileLibraryHoverProvider } from "../../jenkinsfile/editor/JenkinsfileLibraryHoverProvider";
+import { JenkinsfileMemberHoverProvider } from "../../jenkinsfile/editor/JenkinsfileMemberHoverProvider";
 import { JenkinsfileSignatureHelpProvider } from "../../jenkinsfile/editor/JenkinsfileSignatureHelpProvider";
 import { JenkinsfileStepHoverProvider } from "../../jenkinsfile/editor/JenkinsfileStepHoverProvider";
 import { BuildComparePanelLauncher } from "../../panels/BuildComparePanelLauncher";
@@ -379,18 +383,34 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       ),
     jenkinsfileQuickFixProvider: (container) =>
       new JenkinsfileQuickFixProvider(container.get("jenkinsfileMatcher")),
+    // Jenkinsfiles: validation first, then the intelligence hovers (the same instances).
     jenkinsfileHoverProvider: (container) =>
-      new JenkinsfileHoverProvider(
+      new JenkinsfileHoverProvider([
         new JenkinsfileValidationHoverProvider(
           container.get("jenkinsfileMatcher"),
           container.get("jenkinsfileValidationCoordinator")
         ),
+        ...container.get("jenkinsfileIntelligenceHoverProvider").providers
+      ]),
+    // Shared library vars files: intelligence hovers only, never validation.
+    jenkinsfileIntelligenceHoverProvider: (container) =>
+      new JenkinsfileHoverProvider([
         new JenkinsfileStepHoverProvider(
           container.get("jenkinsfileIntelligenceConfigState"),
-          container.get("jenkinsfileMatcher"),
-          container.get("jenkinsfileStepCatalogService")
+          container.get("jenkinsfileIntelligenceDocumentScope"),
+          container.get("jenkinsfileDocumentCatalogResolver")
+        ),
+        new JenkinsfileMemberHoverProvider(
+          container.get("jenkinsfileIntelligenceConfigState"),
+          container.get("jenkinsfileIntelligenceDocumentScope"),
+          container.get("jenkinsfileDocumentCatalogResolver")
+        ),
+        new JenkinsfileLibraryHoverProvider(
+          container.get("jenkinsfileIntelligenceConfigState"),
+          container.get("jenkinsfileIntelligenceDocumentScope"),
+          container.get("jenkinsSharedLibraryIndex")
         )
-      ),
+      ]),
     jenkinsfileCodeLensProvider: (container) =>
       new JenkinsfileValidationCodeLensProvider(
         container.get("jenkinsfileMatcher"),
@@ -399,14 +419,26 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
     jenkinsfileCompletionProvider: (container) =>
       new JenkinsfileCompletionProvider(
         container.get("jenkinsfileIntelligenceConfigState"),
-        container.get("jenkinsfileMatcher"),
-        container.get("jenkinsfileStepCatalogService")
+        container.get("jenkinsfileIntelligenceDocumentScope"),
+        container.get("jenkinsfileDocumentCatalogResolver"),
+        container.get("jenkinsSharedLibraryIndex")
       ),
     jenkinsfileSignatureHelpProvider: (container) =>
       new JenkinsfileSignatureHelpProvider(
         container.get("jenkinsfileIntelligenceConfigState"),
-        container.get("jenkinsfileMatcher"),
-        container.get("jenkinsfileStepCatalogService")
+        container.get("jenkinsfileIntelligenceDocumentScope"),
+        container.get("jenkinsfileDocumentCatalogResolver")
+      ),
+    jenkinsfileDocumentSymbolProvider: (container) =>
+      new JenkinsfileDocumentSymbolProvider(
+        container.get("jenkinsfileIntelligenceConfigState"),
+        container.get("jenkinsfileIntelligenceDocumentScope")
+      ),
+    jenkinsfileDefinitionProvider: (container) =>
+      new JenkinsfileDefinitionProvider(
+        container.get("jenkinsfileIntelligenceConfigState"),
+        container.get("jenkinsfileIntelligenceDocumentScope"),
+        container.get("jenkinsfileDocumentCatalogResolver")
       )
   } satisfies PartialExtensionProviderCatalog;
 }

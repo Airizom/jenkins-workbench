@@ -137,6 +137,10 @@ The command submits the current editor text, including unsaved changes, without 
 
 - **Declarative Linting** — Validate Jenkinsfiles against the Jenkins declarative linter
 - **Step Intelligence** — Get step autocompletion, hover docs, and parameter hints for Jenkinsfiles
+- **Declarative Completions** — Complete pipeline sections, stage directives, `post` conditions, and `options`/`when`/`triggers`/`parameters`/`tools` entries, including entries contributed by plugins on the selected Jenkins
+- **Globals** — Complete `env.`, `params.`, and `currentBuild.` members, including environment keys and parameters declared in the file
+- **Stage Outline** — See stages, sections, and methods in the Outline view, breadcrumbs, and Go to Symbol
+- **Shared Libraries** — Complete `@Library` names and `vars/*.groovy` globals from local library checkouts, with hover docs, parameter hints, and Go to Definition
 - **Automatic Validation** — Optionally validate Jenkinsfiles on open, change, and save
 - **Diagnostics & Quick Fixes** — See errors inline and apply guided fixes
 - **CodeLens** — Inline validation status above the pipeline block
@@ -549,10 +553,26 @@ Custom matchers support one pattern or an ordered multiline pattern array with t
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `jenkinsWorkbench.jenkinsfileValidation.enabled` | true | Enable Jenkinsfile validation using the Jenkins declarative linter. |
-| `jenkinsWorkbench.jenkinsfile.intelligence.enabled` | true | Enable Jenkinsfile step completions, hover docs, and parameter hints. |
+| `jenkinsWorkbench.jenkinsfile.intelligence.enabled` | true | Enable Jenkinsfile language intelligence: completions, hover docs, parameter hints, the stage outline, and shared library go-to-definition. |
+| `jenkinsWorkbench.jenkinsfile.sharedLibraries` | `[]` | Map shared library names to local checkouts (`{ "name", "path", "implicit" }`). Workspace folders with a top-level `vars/` are discovered automatically. |
 | `jenkinsWorkbench.jenkinsfileValidation.runOnSave` | true | Enable automatic Jenkinsfile validation on open, change, and save. |
 | `jenkinsWorkbench.jenkinsfileValidation.changeDebounceMs` | 500 | Debounce delay in milliseconds before validating Jenkinsfiles on change (0 = immediate). |
 | `jenkinsWorkbench.jenkinsfileValidation.filePatterns` | `["**/Jenkinsfile","**/*.jenkinsfile","**/Jenkinsfile.*"]` | Glob patterns used to detect Jenkinsfile documents for validation and language intelligence. |
+
+#### Shared libraries
+
+Jenkinsfile intelligence reads shared libraries from local folders only; it never fetches library sources from Jenkins or Git. A workspace folder with a top-level `vars/` directory is treated as a library named after the folder. To use another checkout, or a library whose name differs from its folder, map it explicitly:
+
+```json
+"jenkinsWorkbench.jenkinsfile.sharedLibraries": [
+  { "name": "pipeline-utils", "path": "${workspaceFolder}/../pipeline-utils" },
+  { "name": "org-defaults", "path": "/src/org-defaults", "implicit": true }
+]
+```
+
+A `path` is absolute, relative to the first workspace folder, or starts with `${workspaceFolder}`, `${workspaceFolder:<folder name>}`, or `~/`. When two workspace folders share a name, the first one is used.
+
+A Jenkinsfile gets completions for the vars of the libraries it loads with `@Library(...)`, the `library` step, or `lib(...)` in a declarative `libraries` directive, plus libraries marked `implicit`. Hovering a library name that has no local mapping explains how to add one. Files under a library's `vars/` folder get completions, hover, and Go to Definition, but are never sent to the declarative linter.
 
 ## Commands
 
@@ -942,6 +962,7 @@ With the [local Jenkins fixture](dev/jenkins/README.md) running and Git availabl
 34. Edit a build's display name (and reset it), a single-line description, and a multi-line description in the draft editor, including a remote-change conflict
 35. Multi-select jobs, running builds, and queue items with Ctrl/Cmd-click and Shift-click, including rows from different environments and repeated jobs in different sections; exercise all six bulk actions from the context menu and Command Palette, verify mixed watched/pinned states and row-only inline icons, decline a stop/cancel confirmation, cancel in-progress work, and check partial-failure details and refreshed tree/watch/queue state
 36. Open Environment Diagnostics from the palette, environment context menu, and post-save offer. Verify successful authenticated and anonymous setups, rejected credentials, expired SSO, incorrect context paths, certificate errors, and restricted API permissions. Exercise recovery and automatic retesting, cancel a run, hide/reveal the panel, edit/remove the environment during a run, and inspect Copy Report for secret exclusion. Confirm all six panels load and existing tree/watch/queue and artifact behavior remains intact
+37. In a declarative Jenkinsfile, check completions in `pipeline`, `stage`, `post`, `options`, and `when`, plus `env.`, `params.`, and `currentBuild.`; confirm the Outline view, breadcrumbs, and Go to Symbol list stages. With a local shared library (auto-discovered `vars/` folder and a `jenkinsfile.sharedLibraries` entry), check `@Library('` name completion, var completion/hover/parameter hints, Go to Definition for vars and `var.method`, and the unmapped-library hover; open a `vars/*.groovy` file and confirm completions work without linter diagnostics or CodeLens. Turn `jenkinsfile.intelligence.enabled` off and confirm all of it stops
 
 ## License
 

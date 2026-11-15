@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import { parseJenkinsfileGdsl } from "../src/jenkinsfile/JenkinsfileGdslParser";
 import {
+  DECLARATIVE_DIRECTIVE_GUARD_NAMES,
+  resolveDeclarativeGrammar
+} from "../src/jenkinsfile/declarative/JenkinsfileDeclarativeGrammar";
+import {
+  isNonStepGuardList,
   scanContributorBlocks,
   scanMethodCalls
 } from "../src/jenkinsfile/gdsl/JenkinsfileGdslBlockScanner";
@@ -123,10 +128,9 @@ if (enclosingCall('node')) { method(name: 'insideNode') }
       const condition = `(enclosingCall('${guardName}'))`;
       const body = "{ method(name: 'sh', type: 'Object') }";
       const expected = scanMethodCalls(`if ${condition} ${body}`);
-      assert.equal(expected.length, guardName === "node" ? 1 : 0);
-      if (guardName === "node") {
-        assert.equal(expected[0].requiresNodeContext, true);
-      }
+      assert.equal(expected.length, 1);
+      assert.equal(expected[0].requiresNodeContext, guardName === "node");
+      assert.deepEqual(expected[0].guardNames, [guardName]);
 
       for (const [beforeCondition, beforeBody] of [
         [comment, ""],
@@ -167,6 +171,7 @@ if (guarded) { method(name: 'echo', type: 'Object') }
       assert.equal(calls.length, 1);
       assert.equal(calls[0].call.args[0]?.value, "echo");
       assert.equal(calls[0].requiresNodeContext, false);
+      assert.deepEqual(calls[0].guardNames, []);
     }
   });
 
@@ -183,13 +188,14 @@ if (guarded) { method(name: 'outer') }
 `);
 
       assert.deepEqual(
-        calls.map(({ call, requiresNodeContext }) => ({
+        calls.map(({ call, requiresNodeContext, guardNames }) => ({
           name: call.args[0]?.value,
-          requiresNodeContext
+          requiresNodeContext,
+          guardNames
         })),
         [
-          { name: "inner", requiresNodeContext: false },
-          ...(guardName === "node" ? [{ name: "outer", requiresNodeContext: true }] : [])
+          { name: "inner", requiresNodeContext: false, guardNames: [] },
+          { name: "outer", requiresNodeContext: guardName === "node", guardNames: [guardName] }
         ]
       );
     }
@@ -206,6 +212,7 @@ if (guarded) { method(name: 'echo', type: 'Object') }
 
       assert.equal(calls.length, 1);
       assert.equal(calls[0].requiresNodeContext, false);
+      assert.deepEqual(calls[0].guardNames, []);
     }
   );
 
@@ -223,17 +230,71 @@ if (guarded) { method(name: 'outer') }
 `);
 
       assert.deepEqual(
-        calls.map(({ call, requiresNodeContext }) => ({
+        calls.map(({ call, requiresNodeContext, guardNames }) => ({
           name: call.args[0]?.value,
-          requiresNodeContext
+          requiresNodeContext,
+          guardNames
         })),
         [
-          { name: "inner", requiresNodeContext: false },
-          ...(guardName === "node" ? [{ name: "outer", requiresNodeContext: true }] : [])
+          { name: "inner", requiresNodeContext: false, guardNames: [] },
+          { name: "outer", requiresNodeContext: guardName === "node", guardNames: [guardName] }
         ]
       );
     }
   );
+
+  it("reports de-duplicated active guard names without suppressing directive methods", () => {
+    const calls = scanMethodCalls(`
+if (enclosingCall('options')) {
+  method(name: 'timeout')
+  if (enclosingCall('options') && enclosingCall('when')) { method(name: 'nested') }
+}
+if (enclosingCall('node') && enclosingCall('stage')) { method(name: 'mixed') }
+`);
+
+    assert.deepEqual(
+      calls.map(({ call, requiresNodeContext, guardNames }) => ({
+        name: call.args[0]?.value,
+        requiresNodeContext,
+        guardNames
+      })),
+      [
+        { name: "timeout", requiresNodeContext: false, guardNames: ["options"] },
+        { name: "nested", requiresNodeContext: false, guardNames: ["options", "when"] },
+        { name: "mixed", requiresNodeContext: true, guardNames: ["node", "stage"] }
+      ]
+    );
+  });
+
+  it("catalogs methods guarded only by non-step calls as directives", () => {
+    const catalog = parseJenkinsfileGdsl(`
+contributor(context(type: 'org.jenkinsci.plugins.workflow.cps.CpsScript')) {
+  if (enclosingCall('options')) {
+    method(name: 'timeout', namedParams: [parameter(name: 'time', type: 'int')], doc: 'Timeout')
+  }
+  if (enclosingCall('when')) { method(name: 'branch', params: [pattern: 'String']) }
+  if (enclosingCall('options') && enclosingCall('when')) { method(name: 'shared') }
+  if (enclosingCall('node') && enclosingCall('stage')) { method(name: 'mixed') }
+  method(name: 'echo', params: [message: 'String'])
+}
+`);
+
+    assert.deepEqual([...catalog.steps.keys()].sort(), ["echo", "mixed"]);
+    assert.equal(catalog.steps.get("mixed")?.requiresNodeContext, true);
+    assert.deepEqual([...catalog.directives.keys()].sort(), ["options", "when"]);
+    assert.deepEqual([...(catalog.directives.get("options")?.keys() ?? [])].sort(), [
+      "shared",
+      "timeout"
+    ]);
+    assert.deepEqual([...(catalog.directives.get("when")?.keys() ?? [])].sort(), [
+      "branch",
+      "shared"
+    ]);
+    const timeout = catalog.directives.get("options")?.get("timeout");
+    assert.equal(timeout?.documentation, "Timeout");
+    assert.equal(timeout?.requiresNodeContext, false);
+    assert.ok(!catalog.steps.has("timeout"));
+  });
 
   it("still scans methods declared in unconstrained assignment values", () => {
     const calls = scanMethodCalls(`
@@ -392,5 +453,36 @@ contributor(context(type: 'org.jenkinsci.plugins.workflow.cps.CpsScript')) {
     });
     assert.equal(skipString(unterminated, 0), unterminated.length);
     assert.throws(() => new GdslTokenizer(unterminated), /Unterminated GDSL string/);
+  });
+});
+
+describe("GDSL directive guards", () => {
+  it("are the declarative grammar contexts plus environment", () => {
+    assert.deepEqual([...DECLARATIVE_DIRECTIVE_GUARD_NAMES].sort(), [
+      "agent",
+      "environment",
+      "input",
+      "options",
+      "parameters",
+      "post",
+      "stage",
+      "stages",
+      "tools",
+      "triggers",
+      "when"
+    ]);
+    for (const name of DECLARATIVE_DIRECTIVE_GUARD_NAMES) {
+      if (name !== "environment") {
+        assert.equal(resolveDeclarativeGrammar(name, ["pipeline", name])?.key, name, name);
+      }
+    }
+  });
+
+  it("marks methods guarded only by directive contexts as non-steps", () => {
+    assert.equal(isNonStepGuardList(["options"]), true);
+    assert.equal(isNonStepGuardList(["environment", "when"]), true);
+    assert.equal(isNonStepGuardList(["options", "node"]), false);
+    assert.equal(isNonStepGuardList(["libraries"]), false);
+    assert.equal(isNonStepGuardList([]), false);
   });
 });

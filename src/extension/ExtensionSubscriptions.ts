@@ -185,6 +185,12 @@ export function registerExtensionSubscriptions(
       }
     },
     {
+      keys: [CONFIG_KEYS.jenkinsfileSharedLibraries],
+      run: () => {
+        container.get("jenkinsSharedLibraryIndex").invalidate();
+      }
+    },
+    {
       keys: JENKINSFILE_VALIDATION_CONFIG_KEYS,
       run: (config) => {
         jenkinsfileValidationCoordinator.updateConfig(getJenkinsfileValidationConfig(config));
