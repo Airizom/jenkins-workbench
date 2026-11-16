@@ -1,6 +1,13 @@
 import * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { ensureTrailingSlash, rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 import { getScopedMemento, toRepositoryKey } from "./StorageScope";
 
@@ -27,9 +34,16 @@ export interface JenkinsRepositoryLink {
   multibranchLabel: string;
 }
 
+interface LinkWrite {
+  scope: JenkinsEnvironmentRef["scope"];
+  key: string;
+  previous: StoredRepositoryLink | undefined;
+  next: StoredRepositoryLink | undefined;
+}
+
 const STATE_KEY = "jenkinsWorkbench.repositoryLinks";
 
-export class JenkinsRepositoryLinkStore {
+export class JenkinsRepositoryLinkStore implements EnvironmentRecordStore {
   private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<void>();
 
@@ -129,9 +143,10 @@ export class JenkinsRepositoryLinkStore {
   async clearLink(repositoryUri: vscode.Uri | string): Promise<boolean> {
     return this.mutationQueue(async () => {
       const key = toRepositoryKey(repositoryUri);
-      const hasWorkspaceLink = Boolean(this.getWorkspaceState().links?.[key]);
-      const hasGlobalLink = Boolean(this.getGlobalState().links?.[key]);
-      if (!hasWorkspaceLink && !hasGlobalLink) {
+      const hasLink = (["workspace", "global"] as const).some((scope) =>
+        Boolean(this.getScopeState(scope).links?.[key])
+      );
+      if (!hasLink) {
         return false;
       }
 
@@ -173,6 +188,119 @@ export class JenkinsRepositoryLinkStore {
       }
       return moved;
     });
+  }
+
+  /**
+   * Re-points an environment's repository links at another environment id or scope (a
+   * repository links to one environment). Links move into the target scope's memento, except
+   * that a user-wide link stays for other workspaces when the target is workspace-scoped; the
+   * workspace copy takes precedence here. A repository already linked in the target memento
+   * keeps that link. See EnvironmentRecordsCopy.
+   */
+  copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return Promise.resolve(NO_RECORDS_COPIED);
+    }
+    return this.mutationQueue(async () => {
+      const writes: LinkWrite[] = [];
+      const targetLinks = this.getScopeState(to.scope).links ?? {};
+      // Keys a workspace link was moved to in the global memento; that link took precedence.
+      const movedToGlobal = new Set<string>();
+      // Workspace first: it shadows the global memento, so its link wins a shared key.
+      for (const scope of ["workspace", "global"] as const) {
+        const matching = Object.entries(this.getScopeState(scope).links ?? {}).filter(
+          ([, link]) => link.environmentId === from.environmentId && link.scope === from.scope
+        );
+        for (const [key, link] of matching) {
+          const next = { ...link, environmentId: to.environmentId, scope: to.scope };
+          if (scope === to.scope) {
+            if (!movedToGlobal.has(key)) {
+              writes.push({ scope, key, previous: link, next });
+            }
+          } else if (to.scope === "global") {
+            // A workspace link would shadow the global one, so move it as setLink does.
+            writes.push({ scope: "global", key, previous: targetLinks[key], next });
+            writes.push({ scope, key, previous: link, next: undefined });
+            movedToGlobal.add(key);
+          } else if (!targetLinks[key]) {
+            writes.push({ scope: "workspace", key, previous: undefined, next });
+          }
+        }
+      }
+      if (writes.length === 0) {
+        return NO_RECORDS_COPIED;
+      }
+      await this.applyLinkWrites(writes);
+      this.emitter.fire();
+      return {
+        copied: new Set(writes.map((write) => write.key)).size,
+        undo: () => this.undoLinkWrites(writes)
+      };
+    });
+  }
+
+  /**
+   * Removes the links to an environment from its scope's memento: user-wide for a global
+   * environment, this workspace's for a workspace one. Links re-pointed at another environment no
+   * longer match and stay.
+   */
+  removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    return this.mutationQueue(async () => {
+      const links = this.getScopeState(ref.scope).links ?? {};
+      const keys = Object.keys(links).filter(
+        (key) => links[key].environmentId === ref.environmentId && links[key].scope === ref.scope
+      );
+      if (keys.length === 0) {
+        return;
+      }
+      await this.updateLinks(ref.scope, (next) => {
+        for (const key of keys) {
+          delete next[key];
+        }
+      });
+      this.emitter.fire();
+    });
+  }
+
+  private undoLinkWrites(writes: readonly LinkWrite[]): Promise<void> {
+    return this.mutationQueue(async () => {
+      const reverts = writes
+        .filter(
+          (write) =>
+            JSON.stringify(this.getScopeState(write.scope).links?.[write.key]) ===
+            JSON.stringify(write.next)
+        )
+        .map((write) => ({ ...write, previous: write.next, next: write.previous }));
+      if (reverts.length > 0) {
+        await this.applyLinkWrites(reverts);
+        this.emitter.fire();
+      }
+    });
+  }
+
+  private async applyLinkWrites(writes: readonly LinkWrite[]): Promise<void> {
+    for (const scope of ["global", "workspace"] as const) {
+      const inScope = writes.filter((write) => write.scope === scope);
+      if (inScope.length === 0) {
+        continue;
+      }
+      await this.updateLinks(scope, (links) => {
+        for (const { key, next } of inScope) {
+          if (next) {
+            links[key] = next;
+          } else {
+            delete links[key];
+          }
+        }
+      });
+    }
+  }
+
+  private getScopeState(scope: JenkinsEnvironmentRef["scope"]): StoredRepositoryLinksState {
+    return scope === "workspace" ? this.getWorkspaceState() : this.getGlobalState();
   }
 
   private getState(): StoredRepositoryLinksState {

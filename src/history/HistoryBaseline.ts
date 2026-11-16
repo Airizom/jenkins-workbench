@@ -4,6 +4,13 @@ import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
 import type { JenkinsBuild } from "../jenkins/types";
 import { ensureTrailingSlash, parseJobUrl, rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "../storage/EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "../storage/EnvironmentRecordParticipant";
 import type { EnvironmentScope } from "../storage/JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "../storage/SerialTaskQueue";
 import { completionTime, type HistoryReport } from "./HistoryAnalysis";
@@ -26,7 +33,7 @@ type BaselineOrigin = Pick<BaselineEvidence, "custom" | "automatic" | "jobUrl">;
 
 const KEY = "jenkinsWorkbench.historyBaselines";
 
-export class HistoryBaselineStore {
+export class HistoryBaselineStore implements EnvironmentRecordStore {
   private readonly mutate = createSerialTaskQueue();
   constructor(private readonly context: vscode.ExtensionContext) {}
   private state(environment: Pick<JenkinsEnvironmentRef, "scope">) {
@@ -86,6 +93,73 @@ export class HistoryBaselineStore {
       for (const [key, url] of movedKeys) values[key] ??= url;
       await state.update(KEY, values);
       return moved;
+    });
+  }
+
+  /**
+   * Copies an environment's baselines to another environment id or scope. A project that already
+   * has a baseline under the target keeps it. See EnvironmentRecordsCopy.
+   */
+  copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return Promise.resolve(NO_RECORDS_COPIED);
+    }
+    return this.mutate(async () => {
+      const source = this.state(from).get<Record<string, string>>(KEY, {}) ?? {};
+      const targetState = this.state(to);
+      const values = { ...(targetState.get<Record<string, string>>(KEY, {}) ?? {}) };
+      const added: Array<[string, string]> = [];
+      for (const [key, url] of Object.entries(source)) {
+        const project =
+          typeof url === "string" ? parseBaselineKey(key, from.environmentId) : undefined;
+        const targetKey =
+          project === undefined
+            ? undefined
+            : this.key({ environmentId: to.environmentId }, project);
+        if (targetKey && !(targetKey in values)) {
+          values[targetKey] = url;
+          added.push([targetKey, url]);
+        }
+      }
+      if (added.length === 0) {
+        return NO_RECORDS_COPIED;
+      }
+      await targetState.update(KEY, values);
+      return {
+        copied: added.length,
+        undo: () =>
+          this.mutate(async () => {
+            const current = { ...(targetState.get<Record<string, string>>(KEY, {}) ?? {}) };
+            let changed = false;
+            for (const [key, url] of added) {
+              if (current[key] === url) {
+                delete current[key];
+                changed = true;
+              }
+            }
+            if (changed) await targetState.update(KEY, current);
+          })
+      };
+    });
+  }
+
+  /** Removes an environment's baselines from its scope's memento. */
+  removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    return this.mutate(async () => {
+      const state = this.state(ref);
+      const stored = state.get<Record<string, string>>(KEY, {}) ?? {};
+      const values = { ...stored };
+      let removed = 0;
+      for (const key of Object.keys(stored)) {
+        if (parseBaselineKey(key, ref.environmentId) !== undefined) {
+          delete values[key];
+          removed += 1;
+        }
+      }
+      if (removed > 0) await state.update(KEY, values);
     });
   }
 }

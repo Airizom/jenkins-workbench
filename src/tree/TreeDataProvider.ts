@@ -204,7 +204,15 @@ export class JenkinsWorkbenchTreeDataProvider
     this._onDidChangeTreeData.fire(element);
   }
 
+  /** Whether the environment is shown with a sign-in row, so none of its folders can load. */
+  isSignInRequired(environment: JenkinsEnvironmentRef): boolean {
+    return this.childrenLoader.isSignInRequired(environment);
+  }
+
   refreshQueueOnly(environment: JenkinsEnvironmentRef): void {
+    if (this.isSignInRequired(environment)) {
+      return;
+    }
     this.childrenLoader.clearQueueCache(environment);
     this.notifyEnvironmentFolder(
       this.hierarchyState.notifyQueueFolderInstance(environment),
@@ -214,6 +222,9 @@ export class JenkinsWorkbenchTreeDataProvider
 
   // fallow-ignore-next-line unused-class-member -- invoked through the tree refresh host
   refreshActivity(environment: JenkinsEnvironmentRef): void {
+    if (this.isSignInRequired(environment)) {
+      return;
+    }
     this.childrenLoader.refreshActivityCache(environment);
     this.notifyEnvironmentFolder(
       this.hierarchyState.notifyActivityFolderInstance(environment),

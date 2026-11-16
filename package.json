@@ -42,6 +42,15 @@
     "onUri"
   ],
   "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Jenkins environments declared in workspace or folder settings are ignored until the workspace is trusted.",
+      "restrictedConfigurations": [
+        "jenkinsWorkbench.environments"
+      ]
+    }
+  },
   "contributes": {
     "commands": [
       {
@@ -93,6 +102,48 @@
         "title": "Sign in with Browser SSO",
         "category": "Jenkins",
         "icon": "$(account)"
+      },
+      {
+        "command": "jenkinsWorkbench.signInToEnvironment",
+        "title": "Sign In to Environment",
+        "category": "Jenkins",
+        "icon": "$(sign-in)"
+      },
+      {
+        "command": "jenkinsWorkbench.openEnvironmentDeclaration",
+        "title": "Open Environment in Settings",
+        "category": "Jenkins",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "jenkinsWorkbench.hideEnvironment",
+        "title": "Hide Shared Environment",
+        "category": "Jenkins",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "jenkinsWorkbench.showHiddenEnvironments",
+        "title": "Show Hidden Environments",
+        "category": "Jenkins",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "jenkinsWorkbench.exportEnvironments",
+        "title": "Export Environments...",
+        "category": "Jenkins",
+        "icon": "$(export)"
+      },
+      {
+        "command": "jenkinsWorkbench.importEnvironments",
+        "title": "Import Environments...",
+        "category": "Jenkins",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "jenkinsWorkbench.shareEnvironmentInSettings",
+        "title": "Share Environment in Settings...",
+        "category": "Jenkins",
+        "icon": "$(share)"
       },
       {
         "command": "jenkinsWorkbench.triggerBuild",
@@ -705,6 +756,110 @@
     "configuration": {
       "title": "Jenkins Workbench",
       "properties": {
+        "jenkinsWorkbench.environments": {
+          "type": "array",
+          "default": [],
+          "scope": "resource",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "url"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+                "description": "Stable identifier for this environment (1-64 letters, digits, '-', '_' or '.', starting with a letter or digit). Pins, watches and credentials are kept per id; changing it creates a new environment."
+              },
+              "url": {
+                "type": "string",
+                "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/?#@]+(/[^?#]*)?$",
+                "description": "Jenkins base URL (http or https), without credentials, query, or fragment."
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name shown instead of the host."
+              },
+              "allowInsecureTls": {
+                "type": "boolean",
+                "default": false,
+                "markdownDescription": "Skip HTTPS certificate and hostname verification for this server. **Honored only in user settings**; ignored in workspace and folder settings."
+              },
+              "auth": {
+                "description": "How to sign in. Credentials are never read from settings; you are asked for them on first use.",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "const": "none",
+                        "description": "The server allows anonymous access."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "const": "basic",
+                        "description": "Username and API token."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "const": "bearer",
+                        "description": "Bearer token."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "loginUrl"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "const": "sso",
+                        "description": "Browser single sign-on."
+                      },
+                      "loginUrl": {
+                        "type": "string",
+                        "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://",
+                        "description": "Page that starts the browser sign-in (http or https, without credentials)."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "markdownDescription": "Jenkins environments shared through settings. Put them in workspace settings (`.vscode/settings.json`) to share with a team, or in user settings to follow you across machines. Each person signs in separately; credentials are never stored in settings. Workspace and folder entries are ignored in untrusted workspaces."
+        },
+        "jenkinsWorkbench.syncEnvironments": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Sync global Jenkins environments, pinned jobs, and watched jobs through Settings Sync. Credentials never sync; each machine signs in separately."
+        },
         "jenkinsWorkbench.cacheTtlSeconds": {
           "type": "number",
           "default": 300,
@@ -1481,6 +1636,21 @@
           "command": "jenkinsWorkbench.openBuild",
           "when": "view == jenkinsWorkbench.tree",
           "group": "1_open@0"
+        },
+        {
+          "command": "jenkinsWorkbench.showHiddenEnvironments",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "2_environments@0"
+        },
+        {
+          "command": "jenkinsWorkbench.exportEnvironments",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "2_environments@1"
+        },
+        {
+          "command": "jenkinsWorkbench.importEnvironments",
+          "when": "view == jenkinsWorkbench.tree",
+          "group": "2_environments@2"
         }
       ],
       "view/item/context": [
@@ -1491,32 +1661,57 @@
         },
         {
           "command": "jenkinsWorkbench.refresh",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment/",
           "group": "inline"
         },
         {
           "command": "jenkinsWorkbench.editEnvironment",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment/",
           "group": "1_actions@0"
         },
         {
           "command": "jenkinsWorkbench.testConnection",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(Declared)?$/",
           "group": "1_actions@2"
         },
         {
           "command": "jenkinsWorkbench.removeEnvironment",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(SignIn)?$/",
           "group": "9_danger@0"
         },
         {
+          "command": "jenkinsWorkbench.shareEnvironmentInSettings",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(SignIn)?$/",
+          "group": "1_actions@4"
+        },
+        {
           "command": "jenkinsWorkbench.signInWithBrowserSso",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(Declared)?$/",
           "group": "1_actions@1"
         },
         {
+          "command": "jenkinsWorkbench.signInToEnvironment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(Declared)?SignIn$/",
+          "group": "inline"
+        },
+        {
+          "command": "jenkinsWorkbench.signInToEnvironment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(Declared)?SignIn$/",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "jenkinsWorkbench.openEnvironmentDeclaration",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environmentDeclared/",
+          "group": "1_actions@3"
+        },
+        {
+          "command": "jenkinsWorkbench.hideEnvironment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environmentDeclared/",
+          "group": "9_danger@0"
+        },
+        {
           "command": "jenkinsWorkbench.newItem",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment(Declared)?$/",
           "group": "navigation@0"
         },
         {
@@ -1536,7 +1731,7 @@
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && viewItem == environment",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /^environment/",
           "group": "1_actions@0"
         },
         {
@@ -1910,6 +2105,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "jenkinsWorkbench.hideEnvironment",
+          "when": "false"
+        },
         {
           "command": "jenkinsWorkbench.openBuildByNumber",
           "when": "false"

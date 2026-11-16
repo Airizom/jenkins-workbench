@@ -1,6 +1,13 @@
 import type * as vscode from "vscode";
 import type { HistoryBaselineStore } from "../history/HistoryBaseline";
 import { rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "../storage/EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "../storage/EnvironmentRecordParticipant";
 import type { JenkinsCommitWatchStore } from "../storage/JenkinsCommitWatchStore";
 import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
 import type {
@@ -43,13 +50,14 @@ const REBASED_URLS_KEY = "jenkinsWorkbench.environmentUrlRebases";
  * Every store rebase is idempotent, which lets activation replay it for workspaces that were
  * closed when the edit happened.
  */
-export class EnvironmentUrlRebaseService {
+export class EnvironmentUrlRebaseService implements EnvironmentRecordStore {
   constructor(private readonly dependencies: EnvironmentUrlRebaseDependencies) {}
 
   /**
    * Changes an environment's URL and rebases its stored data before `environment-updated`
    * fires, so listeners see one consistent state. Returns undefined if the environment is gone.
    */
+  // fallow-ignore-next-line unused-class-member -- called through the edit command rebase dependency
   async changeUrl(
     scope: EnvironmentScope,
     id: string,
@@ -144,6 +152,51 @@ export class EnvironmentUrlRebaseService {
     return failures;
   }
 
+  /**
+   * Copies this workspace's rebase marker for an environment to another environment id or scope,
+   * so records copied there are not rebased again. See EnvironmentRecordsCopy.
+   */
+  async copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return NO_RECORDS_COPIED;
+    }
+    const rebased = this.readRebasedUrls();
+    const url = rebased[toRebaseKey(from)];
+    const targetKey = toRebaseKey(to);
+    if (typeof url !== "string" || targetKey in rebased) {
+      return NO_RECORDS_COPIED;
+    }
+    const { workspaceState } = this.dependencies;
+    await workspaceState.update(REBASED_URLS_KEY, { ...rebased, [targetKey]: url });
+    return {
+      copied: 1,
+      undo: async () => {
+        const current = this.readRebasedUrls();
+        if (current[targetKey] !== url) {
+          return;
+        }
+        const next = { ...current };
+        delete next[targetKey];
+        await workspaceState.update(REBASED_URLS_KEY, next);
+      }
+    };
+  }
+
+  /** Removes this workspace's rebase marker for an environment. */
+  async removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    const rebased = this.readRebasedUrls();
+    const key = toRebaseKey(ref);
+    if (!(key in rebased)) {
+      return;
+    }
+    const next = { ...rebased };
+    delete next[key];
+    await this.dependencies.workspaceState.update(REBASED_URLS_KEY, next);
+  }
+
   private readRebasedUrls(): Record<string, string> {
     const stored = this.dependencies.workspaceState.get<unknown>(REBASED_URLS_KEY);
     return stored && typeof stored === "object" ? (stored as Record<string, string>) : {};
@@ -201,7 +254,11 @@ export class EnvironmentUrlRebaseService {
 }
 
 function rebaseKey(environment: EnvironmentWithScope): string {
-  return `${environment.scope}:${environment.id}`;
+  return toRebaseKey({ scope: environment.scope, environmentId: environment.id });
+}
+
+function toRebaseKey(ref: EnvironmentRecordsRef): string {
+  return `${ref.scope}:${ref.environmentId}`;
 }
 
 function toRebaseFailure(label: string, reason: unknown): Error {

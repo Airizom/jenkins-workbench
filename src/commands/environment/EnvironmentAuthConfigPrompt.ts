@@ -12,6 +12,11 @@ type AuthConfigPromptOptions = {
   username?: string;
   /** Prefills the Browser SSO sign-in URL. */
   loginUrl?: string;
+  /**
+   * Uses this Browser SSO sign-in URL without asking, as a shared environment's auth hint
+   * names it.
+   */
+  fixedLoginUrl?: string;
   reason: "add" | "manual";
   currentAuthConfig?: JenkinsAuthConfig;
 };
@@ -25,23 +30,8 @@ export async function promptAuthConfig(
   switch (authMode) {
     case "none":
       return { type: "none" };
-    case "basic": {
-      const authUsername = await promptRequiredInput("Username", undefined, false, {
-        value: options.username
-      });
-      if (!authUsername) {
-        return undefined;
-      }
-      const authToken = await promptRequiredInput("API Token", undefined, true);
-      if (!authToken) {
-        return undefined;
-      }
-      return {
-        type: "basic",
-        username: authUsername,
-        token: authToken
-      };
-    }
+    case "basic":
+      return promptBasicAuthConfig(options.username);
     case "bearer": {
       const token = await promptRequiredInput("Bearer Token", undefined, true);
       if (!token) {
@@ -73,7 +63,8 @@ export async function promptAuthConfig(
       };
     }
     case "sso": {
-      const loginUrl = await promptBrowserSsoLoginUrl(environmentUrl, options.loginUrl);
+      const loginUrl =
+        options.fixedLoginUrl ?? (await promptBrowserSsoLoginUrl(environmentUrl, options.loginUrl));
       if (!loginUrl) {
         return undefined;
       }
@@ -87,4 +78,15 @@ export async function promptAuthConfig(
     default:
       return undefined;
   }
+}
+
+async function promptBasicAuthConfig(
+  username: string | undefined
+): Promise<JenkinsAuthConfig | undefined> {
+  const authUsername = await promptRequiredInput("Username", undefined, false, { value: username });
+  if (!authUsername) {
+    return undefined;
+  }
+  const token = await promptRequiredInput("API Token", undefined, true);
+  return token ? { type: "basic", username: authUsername, token } : undefined;
 }

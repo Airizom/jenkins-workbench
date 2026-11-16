@@ -1,5 +1,12 @@
 import * as vscode from "vscode";
 import { normalizeJenkinsUrlForComparison, rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 import { getScopedMemento, toRepositoryKey } from "./StorageScope";
@@ -27,7 +34,7 @@ export interface JenkinsDiagnosticProfileBindingInput {
 
 const STATE_KEY = "jenkinsWorkbench.diagnosticProfileBindings";
 
-export class JenkinsDiagnosticProfileBindingStore {
+export class JenkinsDiagnosticProfileBindingStore implements EnvironmentRecordStore {
   private readonly mutationQueue = createSerialTaskQueue();
   private readonly emitter = new vscode.EventEmitter<void>();
 
@@ -215,6 +222,46 @@ export class JenkinsDiagnosticProfileBindingStore {
     });
   }
 
+  /**
+   * Copies an environment's bindings to another environment id or scope. A binding the target
+   * already has for the same job scope and repository is kept. See EnvironmentRecordsCopy.
+   */
+  copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return Promise.resolve(NO_RECORDS_COPIED);
+    }
+    return this.mutationQueue(async () => {
+      const targetBindings = this.readBindings(to.scope);
+      const copied: StoredDiagnosticProfileBinding[] = [];
+      for (const binding of this.readBindings(from.scope)) {
+        const copy = { ...binding, environmentId: to.environmentId };
+        if (
+          binding.environmentId === from.environmentId &&
+          ![...targetBindings, ...copied].some((existing) => isSameBinding(existing, copy))
+        ) {
+          copied.push(copy);
+        }
+      }
+      if (copied.length === 0) {
+        return NO_RECORDS_COPIED;
+      }
+      await this.writeBindings(to.scope, [...targetBindings, ...copied]);
+      this.emitter.fire();
+      return {
+        copied: copied.length,
+        undo: () =>
+          this.mutationQueue(async () => {
+            await this.removeMatching(to.scope, (binding) =>
+              copied.some((copy) => isSameBinding(binding, copy))
+            );
+          })
+      };
+    });
+  }
+
   removeBindingsForJob(
     scope: EnvironmentScope,
     environmentId: string,
@@ -234,6 +281,10 @@ export class JenkinsDiagnosticProfileBindingStore {
     return this.mutationQueue(() =>
       this.removeMatching(scope, (binding) => binding.environmentId === environmentId)
     );
+  }
+
+  async removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    await this.removeBindingsForEnvironment(ref.scope, ref.environmentId);
   }
 
   private async removeMatching(

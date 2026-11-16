@@ -93,7 +93,10 @@ function seedExtensionState() {
   );
   const environmentId = "acme-ci";
   const value = {
-    "jenkinsWorkbench.environments": [{ id: environmentId, url: jenkinsUrl, name: "Acme CI" }],
+    // The showcase Jenkins is anonymous; the "none" hint matches the absent auth config.
+    "jenkinsWorkbench.environments": [
+      { id: environmentId, url: jenkinsUrl, name: "Acme CI", authHint: { type: "none" } }
+    ],
     "jenkinsWorkbench.repositoryLinks": {
       links: {
         [pathToFileURL(workspace).href]: {

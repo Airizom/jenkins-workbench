@@ -211,6 +211,99 @@ Stopping builds and cancelling queued items each show one confirmation for the w
 8. **Test the connection** — Choose **Test Connection** after saving to open Environment Diagnostics. The environment stays saved if a check fails.
 9. **Browse your jobs** — Expand the environment to see jobs, builds, and nodes
 
+## Sharing Environments
+
+Environments can also come from settings, an export file, or Settings Sync. Only server details
+are shared: credentials stay in each user's VS Code SecretStorage, and everyone signs in on their
+own machine.
+
+### Declaring environments in settings
+
+Add `jenkinsWorkbench.environments` to the workspace's `.vscode/settings.json` to share with
+everyone who opens the repository, or to your user settings to keep your own list:
+
+```jsonc
+{
+  "jenkinsWorkbench.environments": [
+    {
+      "id": "ci",
+      "name": "CI",
+      "url": "https://ci.example.com/",
+      "auth": { "type": "sso", "loginUrl": "https://ci.example.com/securityRealm/commenceLogin" }
+    },
+    {
+      "id": "release",
+      "url": "https://jenkins.example.com/release/",
+      "auth": { "type": "basic" }
+    }
+  ]
+}
+```
+
+- **`id` is required**: up to 64 letters, digits, `-`, `_`, or `.`, starting with a letter or
+  digit. Keep it stable, because your credentials, pins, and watches for the environment are
+  stored under it.
+- **`url`** must be `http://` or `https://`, without credentials, query, or fragment.
+- **`auth`** is an optional hint, never a credential: `none`, `basic`, `bearer`, or `sso` with a
+  `loginUrl`. It preselects the sign-in method. Without it, you pick the method when you sign in.
+- **Scope**: user settings entries are **Global** environments. Workspace and folder settings
+  entries are **Workspace** environments. A workspace entry hides a user entry with the same `id`
+  or server.
+- **Workspace Trust**: in Restricted Mode, workspace and folder entries are ignored until you trust
+  the workspace.
+- **`allowInsecureTls`** is honored only in user settings. To skip certificate checks for a
+  workspace entry, add an entry with the same `id` and server to your user settings with
+  `"allowInsecureTls": true`.
+- Invalid entries are skipped and listed in the **Jenkins Environments** output channel.
+
+A new shared environment shows **Sign in required**. Expand it or run
+**Jenkins: Sign In to Environment**, confirm **Connect to &lt;origin&gt;?**, then enter
+credentials (Browser SSO opens the `loginUrl`; when it is on another origin, the confirmation names
+that sign-in page too). With `"auth": { "type": "none" }`, confirming the server is enough. If the
+settings entry later points at a different server or sign-in page origin, you confirm again, and
+your pins and watches move to the new URL. Credentials for workspace-shared environments belong to
+that workspace: another repository declaring the same `id` does not see them.
+
+Shared environments are read-only and show **Shared** in the tree. **Edit Environment** offers only
+**Update Credentials** and **Open in Settings** (also **Jenkins: Open Environment in Settings**).
+**Hide Shared Environment** replaces Remove: like Remove, it deletes your credentials and every
+record kept for it (pins, watches, parameter presets, diagnostic profile bindings, repository
+links, history baselines, commit watches, branch filters, Jenkinsfile environment selections) and
+hides it for you only. Use
+**Jenkins: Show Hidden Environments** to restore it.
+
+**Linking an existing environment**: when a declaration has the same URL as an environment you
+added by hand, you are asked once to **Link to Shared Definition**, **Keep Separate** (both are
+listed), or decide **Later** (only your own entry is listed until then). Linking carries your
+credentials, pins, watches, presets, bindings, repository links, history baselines, commit
+watches, and branch filters over. In the same scope the manual entry is then removed; across
+scopes (for example a Global entry and a workspace declaration) it is kept but hidden in this
+workspace. If any copy fails, nothing changes.
+
+### Export, import, and Share in Settings
+
+- **Jenkins: Export Environments...** writes the environments you pick to a
+  `*.jenkins-environments.json` file of the form `{ "version": 1, "environments": [...] }`, using
+  the same entries as the setting. Manually added environments get an `id` from their name or host,
+  and the `auth` hint of their sign-in method. Nothing secret is written.
+- **Jenkins: Import Environments...** reads such a file into **Workspace settings**, **User
+  settings**, or **Local only** (Global environments on this machine). Entries whose `id` or URL
+  already exists are skipped. A summary lists what was added and skipped, with **Sign In Now** for
+  environments that need it.
+- **Share Environment in Settings...** (context menu of a manually added environment, or the
+  command palette) writes it to workspace or user settings under an `id` you choose, then links it
+  without asking.
+
+### Settings Sync
+
+With `jenkinsWorkbench.syncEnvironments` on (the default), Settings Sync carries your **Global**
+environments, pinned jobs, and watched jobs to your other machines. Workspace environments and
+credentials never sync. On another machine, a synced environment shows **Sign in required** until
+you sign in there. Environments that use Cookie or Custom headers auth have no hint, so they don't
+ask; they connect without credentials until you update them with **Edit Environment**. Changes from other machines or windows
+are picked up when the window regains focus. Turning the setting off stops syncing these keys, but
+data that has already synced stays on other machines.
+
 ## Open and Share Builds
 
 **Jenkins: Open Build by URL or Number...** (command palette, or the Jenkins view's
@@ -379,6 +472,13 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | Workspace | A file-based workspace folder is required to download artifacts; previews do not require a workspace folder |
 
 ## Extension Settings
+
+### Environments
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `jenkinsWorkbench.environments` | `[]` | Environments shared through user or workspace settings; see [Sharing Environments](#sharing-environments). Ignored in workspace and folder settings of untrusted workspaces. |
+| `jenkinsWorkbench.syncEnvironments` | true | Sync Global environments, pinned jobs, and watched jobs through Settings Sync. Credentials never sync. |
 
 ### Caching & Performance
 
@@ -585,6 +685,12 @@ A Jenkinsfile gets completions for the vars of the libraries it loads with `@Lib
 | `Jenkins: Test Connection / Environment Diagnostics` | Check connectivity, authentication, API access, and environment capabilities with recovery actions |
 | `Jenkins: Sign in with Browser SSO` | Refresh a Browser SSO environment session |
 | `Jenkins: Remove Environment` | Remove the selected environment |
+| `Jenkins: Sign In to Environment` | Confirm the server and enter credentials for an environment that shows **Sign in required** |
+| `Jenkins: Export Environments...` | Write environments to a `*.jenkins-environments.json` file, without credentials |
+| `Jenkins: Import Environments...` | Add environments from an export file to workspace settings, user settings, or this machine |
+| `Jenkins: Share Environment in Settings...` | Move a manually added environment into workspace or user settings |
+| `Jenkins: Show Hidden Environments` | Restore shared environments you hid |
+| `Jenkins: Open Environment in Settings` | Open the settings entry behind a shared environment |
 | `Jenkins: Refresh` | Refresh the tree view and clear cache |
 
 Editing an environment keeps it in place, so its pins, watches, parameter presets, diagnostic profile
@@ -754,6 +860,7 @@ Jenkins permissions still apply: label changes require **Agent/Configure**; crea
 Security notes:
 
 - **Credential storage** — API tokens, bearer tokens, cookie values, custom headers, and Browser SSO session headers are stored in VS Code SecretStorage
+- **Shared environments** — `jenkinsWorkbench.environments`, export files, and Settings Sync carry server details and an optional sign-in hint, never credentials. You confirm a server (and a Browser SSO sign-in page on another origin) declared in settings before the extension contacts it
 - **Auth headers** — Basic, Bearer, Cookie, and custom headers are sent on every request, including CSRF crumb acquisition
 - **CSRF crumbs** — Supports the Jenkins crumb issuer when CSRF protection is enabled
 - **Transport** — The extension does not enforce HTTPS; credentials will be sent in cleartext if an `http://` URL is configured. Always use `https://` for production instances

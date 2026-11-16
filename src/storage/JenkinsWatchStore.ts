@@ -1,4 +1,6 @@
 import type * as vscode from "vscode";
+import type { EnvironmentRecordsCopy, EnvironmentRecordsRef } from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import {
   JenkinsScopedJobStore,
@@ -18,9 +20,12 @@ export interface WatchedJobEntry extends StoredWatchedJobEntry {
   scope: EnvironmentScope;
 }
 
-const WATCHED_JOBS_KEY = "jenkinsWorkbench.watchedJobs";
+export const WATCHED_JOBS_KEY = "jenkinsWorkbench.watchedJobs";
 
-export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEntry> {
+export class JenkinsWatchStore
+  extends JenkinsScopedJobStore<StoredWatchedJobEntry>
+  implements EnvironmentRecordStore
+{
   constructor(context: vscode.ExtensionContext) {
     super(context, WATCHED_JOBS_KEY);
   }
@@ -107,6 +112,18 @@ export class JenkinsWatchStore extends JenkinsScopedJobStore<StoredWatchedJobEnt
     newJobName?: string
   ): Promise<boolean> {
     return this.updateUrl(scope, environmentId, oldJobUrl, newJobUrl, newJobName, mergeWatchEntry);
+  }
+
+  /** Copies an environment's watched jobs to another environment id or scope; see EnvironmentRecordsCopy. */
+  copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    return this.copyForEnvironment(from, to);
+  }
+
+  removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    return this.removeWatchesForEnvironment(ref.scope, ref.environmentId);
   }
 
   async rebaseWatchUrls(

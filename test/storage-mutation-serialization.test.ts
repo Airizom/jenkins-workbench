@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type * as vscode from "vscode";
 import { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
+import { createAdoptionHarness, declaredEnvironment } from "./helpers/adoptionHarness";
 import { createFakeSecretStorage } from "./helpers/storageMocks";
 import { createEventEmitterVscodeMock } from "./helpers/vscodeMocks";
 
@@ -383,5 +384,81 @@ describe("JenkinsRepositoryLinkStore mutation serialization", () => {
       "file:///repo-a",
       "file:///repo-b"
     ]);
+  });
+});
+
+describe("EnvironmentAdoptionService mutation serialization", () => {
+  const URL = "https://ci.example/";
+  const JOB = `${URL}job/a/`;
+
+  async function setupAdoption() {
+    const context = {
+      workspaceState: new AsyncMemento(),
+      globalState: new AsyncMemento(),
+      secrets: createFakeSecretStorage()
+    } as unknown as vscode.ExtensionContext;
+    const harness = await createAdoptionHarness(context, [declaredEnvironment(URL, "global")]);
+    await harness.environmentStore.addEnvironment("global", { id: "manual", url: URL });
+    await harness.environmentStore.setAuthConfig("global", "manual", {
+      type: "bearer",
+      token: "secret"
+    });
+    await harness.pinStore.addPin("global", { environmentId: "manual", jobUrl: JOB });
+    const [candidate] = await harness.service.findCandidates();
+    return { ...harness, candidate };
+  }
+
+  it("keeps other environments and copied records when an edit races an adoption", async () => {
+    const harness = await setupAdoption();
+    const { environmentStore } = harness;
+
+    const [result, renamed] = await Promise.all([
+      harness.service.adopt(harness.candidate),
+      environmentStore.updateEnvironment("global", "manual", { name: "Renamed" }),
+      environmentStore.addEnvironment("global", { id: "other", url: "https://other.example/" }),
+      harness.pinStore.addPin("global", { environmentId: "other", jobUrl: JOB })
+    ]);
+
+    assert.deepEqual(result, { status: "adopted", warnings: [] });
+    assert.equal(renamed?.next.name, "Renamed");
+    assert.deepEqual(
+      (await environmentStore.getStoredEnvironments("global")).map((entry) => entry.id),
+      ["other"]
+    );
+    assert.deepEqual(
+      (await harness.pinStore.listPinnedJobs()).map((entry) => entry.environmentId).sort(),
+      ["other", "settings:ci"]
+    );
+    assert.deepEqual(await environmentStore.getAuthConfig("global", "settings:ci"), {
+      type: "bearer",
+      token: "secret"
+    });
+  });
+
+  it("rolls back when the manual environment moves to another server mid-adoption", async () => {
+    const harness = await setupAdoption();
+    const { environmentStore } = harness;
+    const copyPins = harness.pinStore.copyEnvironmentRecords.bind(harness.pinStore);
+    vi.spyOn(harness.pinStore, "copyEnvironmentRecords").mockImplementation(async (from, to) => {
+      const copy = await copyPins(from, to);
+      await environmentStore.updateEnvironment("global", "manual", {
+        url: "https://moved.example/"
+      });
+      return copy;
+    });
+
+    const result = await harness.service.adopt(harness.candidate);
+
+    assert.deepEqual(result, { status: "unavailable" });
+    assert.deepEqual(
+      (await environmentStore.getStoredEnvironments("global")).map((entry) => entry.url),
+      ["https://moved.example/"]
+    );
+    assert.deepEqual(
+      (await harness.pinStore.listPinnedJobs()).map((entry) => entry.environmentId),
+      ["manual"]
+    );
+    assert.equal(await environmentStore.getAuthConfig("global", "settings:ci"), undefined);
+    assert.ok(await environmentStore.getAuthConfig("global", "manual"));
   });
 });

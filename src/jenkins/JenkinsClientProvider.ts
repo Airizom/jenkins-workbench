@@ -1,6 +1,11 @@
 import type { BrowserSsoAuthenticator } from "../services/BrowserSsoAuthenticationService";
-import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
+import {
+  hasEnvironmentCredentials,
+  type JenkinsEnvironmentStore
+} from "../storage/JenkinsEnvironmentStore";
 import { buildAuthSignature } from "./auth";
+import { formatEnvironmentDisplayName } from "./EnvironmentLabels";
+import { EnvironmentSignInRequiredError } from "./errors";
 import { JenkinsClient } from "./JenkinsClient";
 import type { JenkinsEnvironmentRef } from "./JenkinsEnvironmentRef";
 import type { JenkinsAuthConfig } from "./types";
@@ -33,6 +38,14 @@ interface PendingAuthMaterial {
 interface JenkinsClientCacheResolution {
   cacheKey: string;
   entry: JenkinsClientCacheEntry;
+}
+
+interface ResolveClientCacheOptions {
+  /**
+   * Resolve auth material even when credentials the environment asks for are missing; the
+   * result is not cached. Server confirmation is still required.
+   */
+  allowMissingCredentials?: boolean;
 }
 
 export class JenkinsClientProvider {
@@ -93,11 +106,16 @@ export class JenkinsClientProvider {
     }
   }
 
-  /** A fresh, uncached client that reports SSO expiry without opening a browser. */
+  /**
+   * A fresh, uncached client that reports SSO expiry without opening a browser. Missing
+   * credentials do not block diagnostics; an unconfirmed shared server does.
+   */
   async createEnvironmentDiagnosticsClient(
     environment: JenkinsEnvironmentRef
   ): Promise<JenkinsClient> {
-    const { entry } = await this.resolveClientCache(environment);
+    const { entry } = await this.resolveClientCache(environment, {
+      allowMissingCredentials: true
+    });
     return new JenkinsClient({
       baseUrl: environment.url,
       username: environment.username,
@@ -212,8 +230,14 @@ export class JenkinsClientProvider {
     return promise;
   }
 
+  /**
+   * Cached entries exist only for environments that needed no sign-in when they were built.
+   * Everything that can bring sign-in back (credential edits, URL or origin changes, hiding)
+   * advances the auth revision, changes the URL, or invalidates the client.
+   */
   private async resolveClientCache(
-    environment: JenkinsEnvironmentRef
+    environment: JenkinsEnvironmentRef,
+    options: ResolveClientCacheOptions = {}
   ): Promise<JenkinsClientCacheResolution> {
     const cacheKey = `${environment.scope}:${environment.environmentId}`;
     for (;;) {
@@ -233,6 +257,11 @@ export class JenkinsClientProvider {
       }
 
       const authMaterial = await this.loadAuthMaterial(cacheKey, environment, authConfigRevision);
+      const requirement = await this.store.getSignInRequirement(
+        environment.scope,
+        environment.environmentId,
+        { hasCredentials: hasEnvironmentCredentials(authMaterial) }
+      );
       // Credentials changed while this read was pending; resolve again rather than
       // publishing material for a revision that is already stale.
       if (
@@ -241,6 +270,20 @@ export class JenkinsClientProvider {
         this.getAllowInsecureTls(environment) !== allowInsecureTls
       ) {
         continue;
+      }
+      if (requirement !== "none") {
+        if (requirement === "credentials" && options.allowMissingCredentials) {
+          return {
+            cacheKey,
+            entry: { authMaterial, authConfigRevision, url: environment.url, allowInsecureTls }
+          };
+        }
+        throw new EnvironmentSignInRequiredError(
+          environment.scope,
+          environment.environmentId,
+          requirement,
+          formatEnvironmentDisplayName(environment)
+        );
       }
       const current = this.getCurrentCacheEntry(
         cacheKey,
@@ -253,15 +296,7 @@ export class JenkinsClientProvider {
       }
 
       const previous = this.clientCache.get(cacheKey);
-      const client =
-        previous?.url === environment.url &&
-        previous.username === environment.username &&
-        previous.allowInsecureTls === allowInsecureTls &&
-        previous.client &&
-        previous.authMaterial.authSignature === authMaterial.authSignature &&
-        previous.authMaterial.token === authMaterial.token
-          ? previous.client
-          : undefined;
+      const client = getReusableClient(previous, environment, allowInsecureTls, authMaterial);
       const entry: JenkinsClientCacheEntry = {
         client,
         authMaterial,
@@ -289,4 +324,22 @@ export class JenkinsClientProvider {
       ? cached
       : undefined;
   }
+}
+
+function getReusableClient(
+  previous: JenkinsClientCacheEntry | undefined,
+  environment: JenkinsEnvironmentRef,
+  allowInsecureTls: boolean,
+  authMaterial: JenkinsAuthMaterial
+): JenkinsClient | undefined {
+  const client =
+    previous?.url === environment.url &&
+    previous.username === environment.username &&
+    previous.allowInsecureTls === allowInsecureTls &&
+    previous.client &&
+    previous.authMaterial.authSignature === authMaterial.authSignature &&
+    previous.authMaterial.token === authMaterial.token
+      ? previous.client
+      : undefined;
+  return client;
 }

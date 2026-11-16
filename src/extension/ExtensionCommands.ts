@@ -63,15 +63,18 @@ export function registerExtensionCommands(
   registerEnvironmentCommands(
     context,
     environmentStore,
-    diagnosticBindingStore,
+    container.lazy("declaredEnvironmentRegistry"),
+    // Holds lazy store references, so building the list builds no store.
+    container.get("environmentRecordParticipants"),
     browserSsoAuthenticator,
-    presetStore,
-    watchStore,
-    pinStore,
     clientProvider,
     environmentUrlRebaseService,
     refreshHost,
-    container.lazy("environmentDiagnosticsPanelLauncher")
+    container.lazy("environmentDiagnosticsPanelLauncher"),
+    {
+      source: container.lazy("declaredEnvironmentSource"),
+      adoption: container.lazy("environmentAdoptionService")
+    }
   );
 
   registerBuildCommands(

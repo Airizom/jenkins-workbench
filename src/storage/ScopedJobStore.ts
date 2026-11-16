@@ -1,5 +1,11 @@
 import type * as vscode from "vscode";
 import { rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "./EnvironmentRecordCopy";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 import { getScopedMemento } from "./StorageScope";
@@ -271,6 +277,41 @@ export abstract class JenkinsScopedJobStore<TEntry extends ScopedJobStoreEntry> 
       });
       await this.writeEntries(scope, next);
       return movedIndexes.size;
+    });
+  }
+
+  /** See `EnvironmentRecordsCopy` for the contract. */
+  protected copyForEnvironment(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return Promise.resolve(NO_RECORDS_COPIED);
+    }
+    return this.mutationQueue(async () => {
+      const targetEntries = this.readEntries(to.scope);
+      const copied: TEntry[] = [];
+      for (const entry of this.readEntries(from.scope)) {
+        const copy = { ...entry, environmentId: to.environmentId };
+        if (
+          entry.environmentId === from.environmentId &&
+          !targetEntries.some((existing) => this.isSameJob(existing, copy)) &&
+          !copied.some((existing) => this.isSameJob(existing, copy))
+        ) {
+          copied.push(copy);
+        }
+      }
+      if (copied.length === 0) {
+        return NO_RECORDS_COPIED;
+      }
+      await this.writeEntries(to.scope, [...targetEntries, ...copied]);
+      const jobUrls = new Set(copied.map((entry) => entry.jobUrl));
+      return {
+        copied: copied.length,
+        undo: async () => {
+          await this.removeJobs(to.scope, to.environmentId, jobUrls);
+        }
+      };
     });
   }
 

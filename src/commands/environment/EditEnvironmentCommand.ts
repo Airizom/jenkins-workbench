@@ -1,15 +1,24 @@
 import * as vscode from "vscode";
 import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
-import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import { rebaseEnvironmentUrl } from "../../jenkins/urls";
+import {
+  type JenkinsEnvironmentRef,
+  toJenkinsEnvironmentRef
+} from "../../jenkins/JenkinsEnvironmentRef";
+import { getUrlOrigin, rebaseEnvironmentUrl } from "../../jenkins/urls";
 import type { BrowserSsoAuthenticator } from "../../services/BrowserSsoAuthenticationService";
 import type { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
+import { isDeclaredEnvironmentId } from "../../storage/DeclaredEnvironmentView";
 import type {
   EnvironmentScope,
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../../storage/JenkinsEnvironmentStore";
+import {
+  type DeclaredEnvironmentEditAction,
+  openEnvironmentDeclaration,
+  promptDeclaredEnvironmentEditAction
+} from "./DeclaredEnvironmentCommands";
 import { promptAuthConfig } from "./EnvironmentAuthConfigPrompt";
 import {
   formatEnvironmentTitle,
@@ -20,6 +29,7 @@ import {
   promptEnvironmentTarget,
   redactJenkinsUrl,
   resolveSavedEnvironment,
+  saveEnvironmentAuthConfig,
   toEnvironmentTarget
 } from "./EnvironmentCommandHelpers";
 import type {
@@ -28,12 +38,14 @@ import type {
 } from "./EnvironmentCommandTypes";
 import { offerEnvironmentDiagnostics } from "./EnvironmentDiagnosticsOffer";
 import {
+  formatAuthModeLabel,
   promptAuthMode,
   promptEditField,
   promptEnvironmentName,
   promptRequiredInput,
   promptTlsCertificateValidation
 } from "./EnvironmentPrompts";
+import { type EnvironmentSignInRegistry, signInToEnvironment } from "./EnvironmentSignInCommand";
 
 /**
  * A sign-in URL saved under one of the environment's previous URLs would sign in to the old
@@ -45,16 +57,9 @@ function resolveStoredLoginUrl(loginUrl: string, environment: JenkinsEnvironment
   );
 }
 
-function getUrlOrigin(url: string): string | undefined {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return undefined;
-  }
-}
-
 export interface EditEnvironmentDependencies extends EnvironmentDiagnosticsOfferOptions {
   store: JenkinsEnvironmentStore;
+  registry: EnvironmentSignInRegistry;
   browserSsoAuthenticator: BrowserSsoAuthenticator;
   clientProvider: JenkinsClientProvider;
   urlRebaseService: Pick<EnvironmentUrlRebaseService, "changeUrl">;
@@ -84,6 +89,10 @@ export async function editEnvironment(
     return false;
   }
 
+  if (isDeclaredEnvironmentId(environment.id)) {
+    return editDeclaredEnvironment(dependencies, target.scope, environment, selectedField);
+  }
+
   const authConfig = await store.getAuthConfig(target.scope, environment.id);
   const field =
     selectedField ??
@@ -104,6 +113,45 @@ export async function editEnvironment(
       return updateEnvironmentTls(dependencies, target.scope, environment);
     case "credentials":
       return updateEnvironmentCredentials(dependencies, target.scope, environment);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Name, URL, TLS and sign-in method of a shared environment come from settings, so only the
+ * local credentials can change here; everything else opens the declaring settings file.
+ */
+async function editDeclaredEnvironment(
+  dependencies: EditEnvironmentDependencies,
+  scope: EnvironmentScope,
+  environment: JenkinsEnvironment,
+  selectedField: "url" | "tls" | "credentials" | undefined
+): Promise<boolean> {
+  const { store } = dependencies;
+  const ref = toJenkinsEnvironmentRef({ ...environment, scope });
+  const needsSignIn = (await store.getSignInRequirement(scope, environment.id)) !== "none";
+  let action: DeclaredEnvironmentEditAction | undefined;
+  if (selectedField === "credentials") {
+    action = needsSignIn ? "signIn" : "credentials";
+  } else if (selectedField) {
+    action = "openSettings";
+  } else {
+    const authConfig = await store.getAuthConfig(scope, environment.id);
+    action = await promptDeclaredEnvironmentEditAction(
+      needsSignIn,
+      authConfig ? formatAuthModeLabel(authConfig.type) : "Not set"
+    );
+  }
+  switch (action) {
+    case "signIn":
+      return signInToEnvironment(dependencies, ref);
+    case "credentials":
+      return updateEnvironmentCredentials(dependencies, scope, environment);
+    case "openSettings":
+      // Nothing changed yet; settings edits arrive through the declaration watcher.
+      await openEnvironmentDeclaration(store, dependencies.registry, ref);
+      return false;
     default:
       return false;
   }
@@ -317,26 +365,20 @@ async function updateEnvironmentCredentials(
     return false;
   }
   const title = formatEnvironmentTitle(environment);
-  let saved: boolean;
-  try {
-    saved = await store.setAuthConfigIfRevision(
-      scope,
-      environment.id,
+  if (
+    !(await saveEnvironmentAuthConfig(
+      store,
+      { ...environment, scope },
       authConfig,
-      authConfigRevision
-    );
-  } catch (error) {
-    void vscode.window.showErrorMessage(
-      `Unable to store authentication settings for ${title}: ${formatError(error)}`
-    );
-    return false;
-  }
-  if (!saved) {
-    void vscode.window.showWarningMessage(
+      authConfigRevision,
       `The credentials for ${title} were changed elsewhere while you were editing them. Try again.`
-    );
+    ))
+  ) {
     return false;
   }
+
+  // A shared environment reaches this only once confirmed: editing credentials never confirms a
+  // changed server or sign-in page (sign-in does, after showing them).
 
   // Drop legacy credentials so they can't shadow the new auth config.
   const cleanupResults = await Promise.allSettled([

@@ -6,6 +6,12 @@ import {
   toJenkinsEnvironmentRef
 } from "../jenkins/JenkinsEnvironmentRef";
 import type { ReplayDraftManager } from "../services/ReplayDraftManager";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "../storage/EnvironmentRecordCopy";
 import type {
   EnvironmentScope,
   EnvironmentWithScope,
@@ -147,6 +153,76 @@ export class JenkinsfileEnvironmentResolver {
     });
     return pick ? toJenkinsEnvironmentRef(pick.environment) : undefined;
   }
+}
+
+/**
+ * Re-points the per-folder Jenkinsfile environment selections in `workspaceState` from one
+ * environment to another (a folder selects one environment). See EnvironmentRecordsCopy.
+ */
+export async function copyJenkinsfileEnvironmentSelections(
+  workspaceState: vscode.Memento,
+  from: EnvironmentRecordsRef,
+  to: EnvironmentRecordsRef
+): Promise<EnvironmentRecordsCopy> {
+  const keys = await repointSelections(workspaceState, from, to);
+  return keys.length === 0
+    ? NO_RECORDS_COPIED
+    : {
+        copied: keys.length,
+        undo: async () => {
+          await repointSelections(workspaceState, to, from, new Set(keys));
+        }
+      };
+}
+
+/** Removes this workspace's per-folder Jenkinsfile environment selections of an environment. */
+export async function removeJenkinsfileEnvironmentSelections(
+  workspaceState: vscode.Memento,
+  ref: EnvironmentRecordsRef
+): Promise<void> {
+  const state = workspaceState.get<StoredSelections>(STATE_KEY) ?? {};
+  const selections = { ...(state.selections ?? {}) };
+  const keys = Object.entries(selections)
+    .filter(
+      ([, selection]) =>
+        selection?.environmentId === ref.environmentId && selection.scope === ref.scope
+    )
+    .map(([key]) => key);
+  if (keys.length === 0) {
+    return;
+  }
+  for (const key of keys) {
+    delete selections[key];
+  }
+  await workspaceState.update(STATE_KEY, { ...state, selections });
+}
+
+async function repointSelections(
+  workspaceState: vscode.Memento,
+  from: EnvironmentRecordsRef,
+  to: EnvironmentRecordsRef,
+  onlyKeys?: ReadonlySet<string>
+): Promise<string[]> {
+  if (isSameEnvironmentRecordsRef(from, to)) {
+    return [];
+  }
+  const state = workspaceState.get<StoredSelections>(STATE_KEY) ?? {};
+  const selections = { ...(state.selections ?? {}) };
+  const moved: string[] = [];
+  for (const [key, selection] of Object.entries(selections)) {
+    if (
+      selection?.environmentId === from.environmentId &&
+      selection.scope === from.scope &&
+      (!onlyKeys || onlyKeys.has(key))
+    ) {
+      selections[key] = { environmentId: to.environmentId, scope: to.scope };
+      moved.push(key);
+    }
+  }
+  if (moved.length > 0) {
+    await workspaceState.update(STATE_KEY, { ...state, selections });
+  }
+  return moved;
 }
 
 function findEnvironment(

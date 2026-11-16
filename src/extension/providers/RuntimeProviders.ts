@@ -85,6 +85,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
           return recoverEnvironmentConnection(
             {
               store: container.get("environmentStore"),
+              registry: container.get("declaredEnvironmentRegistry"),
               browserSsoAuthenticator: container.get("browserSsoAuthenticator"),
               clientProvider: container.get("clientProvider"),
               urlRebaseService: container.get("environmentUrlRebaseService"),

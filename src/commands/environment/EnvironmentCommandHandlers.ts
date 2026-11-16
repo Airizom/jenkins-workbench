@@ -1,21 +1,24 @@
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
+import type { DeclaredEnvironmentRegistry } from "../../environments/sharing/DeclaredEnvironmentRegistry";
 import { formatError } from "../../formatters/ErrorFormatters";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import {
   type JenkinsEnvironmentRef,
   toJenkinsEnvironmentRef
 } from "../../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsAuthConfig } from "../../jenkins/types";
 import { rebaseEnvironmentUrl } from "../../jenkins/urls";
 import type { BrowserSsoAuthenticator } from "../../services/BrowserSsoAuthenticationService";
-import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
+import { isDeclaredEnvironmentId } from "../../storage/DeclaredEnvironmentView";
+import {
+  type EnvironmentRecordParticipant,
+  removeAllEnvironmentRecords
+} from "../../storage/EnvironmentRecordParticipant";
 import type {
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../../storage/JenkinsEnvironmentStore";
-import type { JenkinsParameterPresetStore } from "../../storage/JenkinsParameterPresetStore";
-import type { JenkinsPinStore } from "../../storage/JenkinsPinStore";
-import type { JenkinsWatchStore } from "../../storage/JenkinsWatchStore";
 import { promptAuthConfig } from "./EnvironmentAuthConfigPrompt";
 import {
   formatEnvironmentTitle,
@@ -39,6 +42,7 @@ import {
   promptScope,
   promptTlsCertificateValidation
 } from "./EnvironmentPrompts";
+import { type EnvironmentSignInRegistry, signInToEnvironment } from "./EnvironmentSignInCommand";
 
 export { editEnvironment } from "./EditEnvironmentCommand";
 
@@ -69,10 +73,15 @@ export async function addEnvironment(
   const duplicate = existingEnvironments.find(
     (environment) => normalizeJenkinsUrl(environment.url) === url
   );
-  if (duplicate) {
+  if (duplicate && duplicate.source !== "settings") {
     void vscode.window.showWarningMessage(
       "An environment for this URL already exists in this scope. Remove it before adding a new one."
     );
+    return;
+  }
+  const sharedDuplicate = await findSharedEnvironmentForUrl(store, url);
+  if (sharedDuplicate) {
+    void vscode.window.showWarningMessage(sharedDuplicate);
     return;
   }
 
@@ -123,6 +132,7 @@ export async function addEnvironment(
 
 export async function signInWithBrowserSso(
   store: JenkinsEnvironmentStore,
+  registry: EnvironmentSignInRegistry,
   browserSsoAuthenticator: BrowserSsoAuthenticator,
   clientProvider: JenkinsClientProvider,
   refreshHost: EnvironmentCommandRefreshHost,
@@ -155,17 +165,23 @@ export async function signInWithBrowserSso(
     void vscode.window.showErrorMessage(INVALID_URL_MESSAGE);
     return false;
   }
+  const declared = isDeclaredEnvironmentId(target.id);
+  // For a shared environment, what the user confirmed must cover this server and the hint's
+  // sign-in page before a browser is pointed at either. Read in the same turn as `environment`,
+  // so both describe the same declaration.
+  const acknowledgment = declared
+    ? registry.getExpectedAcknowledgment(target.scope, target.id)
+    : undefined;
+  if (declared && !registry.isOriginAcknowledged(target.scope, target.id)) {
+    return signInToEnvironment(
+      { store, registry, browserSsoAuthenticator, clientProvider, refreshHost, ...options },
+      current
+    );
+  }
   const existingAuthConfig = await store.getAuthConfig(target.scope, target.id);
   // Reading invalid credentials may clear them and advance the revision.
   const authConfigRevision = store.getAuthConfigRevision(target.scope, target.id);
-  const loginUrl =
-    existingAuthConfig?.type === "sso"
-      ? (rebaseEnvironmentUrl(
-          existingAuthConfig.loginUrl,
-          environment.previousUrls ?? [],
-          current.url
-        ) ?? existingAuthConfig.loginUrl)
-      : await promptBrowserSsoLoginUrl(current.url);
+  const loginUrl = await resolveBrowserSsoLoginUrl(environment, existingAuthConfig);
   if (!loginUrl) {
     return false;
   }
@@ -198,19 +214,24 @@ export async function signInWithBrowserSso(
   if (!saved) {
     return false;
   }
+  if (declared) {
+    await registry.acknowledgeOrigin(target.scope, target.id, { expected: acknowledgment });
+  }
   clientProvider.invalidateClient(target.scope, target.id);
   refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
   await offerEnvironmentDiagnostics(store, target.scope, target.id, options);
   return true;
 }
 
+/**
+ * Removes a stored environment, or hides a shared one for this user, then removes every record
+ * kept for it (see `EnvironmentRecordParticipant`).
+ */
 export async function removeEnvironment(
   store: JenkinsEnvironmentStore,
-  bindingStore: JenkinsDiagnosticProfileBindingStore,
-  presetStore: JenkinsParameterPresetStore,
-  watchStore: JenkinsWatchStore,
-  pinStore: JenkinsPinStore,
-  clientProvider: JenkinsClientProvider,
+  registry: Pick<DeclaredEnvironmentRegistry, "hideDeclaredEnvironment">,
+  participants: readonly EnvironmentRecordParticipant[],
+  clientProvider: Pick<JenkinsClientProvider, "invalidateClient">,
   refreshHost: EnvironmentCommandRefreshHost,
   item?: JenkinsEnvironmentRef
 ): Promise<void> {
@@ -224,53 +245,37 @@ export async function removeEnvironment(
     return;
   }
 
-  const confirmLabel = "Remove Environment";
+  // A shared environment stays in settings; removing it hides it for this user.
+  const hide = isDeclaredEnvironmentId(target.id);
+  const confirmLabel = hide ? "Hide Environment" : "Remove Environment";
   const displayName = formatEnvironmentTitle(target);
   const confirmation = await vscode.window.showWarningMessage(
-    `Remove the Jenkins environment ${displayName}? Its stored credentials and all pins, watches, parameter presets, and diagnostic profile bindings for this environment will also be removed.`,
+    hide
+      ? `Hide the shared Jenkins environment ${displayName}? Your stored credentials, pins, watches, parameter presets, diagnostic profile bindings and other local data for it will be removed. It stays in settings; use Show Hidden Environments to restore it.`
+      : `Remove the Jenkins environment ${displayName}? Its stored credentials and all pins, watches, parameter presets, diagnostic profile bindings, and other data kept for this environment will also be removed.`,
     { modal: true },
     confirmLabel
   );
   if (confirmation !== confirmLabel) {
     return;
   }
+  const removedVerb = hide ? "hidden" : "removed";
 
-  let removalError: unknown;
-  let removed: boolean;
-  try {
-    removed = await store.removeEnvironment(target.scope, target.id);
-  } catch (error) {
-    removalError = error;
-    try {
-      removed = !(await store.getEnvironments(target.scope)).some(
-        (environment) => environment.id === target.id
-      );
-    } catch (lookupError) {
-      void vscode.window.showErrorMessage(
-        `Unable to determine whether the environment was removed: ${formatError(error)}; ${formatError(lookupError)}`
-      );
-      return;
-    }
-    if (!removed) {
-      void vscode.window.showErrorMessage(
-        `The environment was not removed. Its related records were left intact: ${formatError(error)}`
-      );
-      return;
-    }
+  const removal = await removeEnvironmentRecord(store, registry, target, hide, removedVerb);
+  if (!removal) {
+    return;
   }
+  const { removed, removalError } = removal;
 
   if (!removed) {
     void vscode.window.showWarningMessage("The selected environment no longer exists.");
     return;
   }
 
-  const cleanupResults = await Promise.allSettled([
-    bindingStore.removeBindingsForEnvironment(target.scope, target.id),
-    presetStore.removePresetsForEnvironment(target.scope, target.id),
-    watchStore.removeWatchesForEnvironment(target.scope, target.id),
-    pinStore.removePinsForEnvironment(target.scope, target.id)
-  ]);
-  const cleanupFailures = cleanupResults.filter((result) => result.status === "rejected");
+  const cleanupFailures = await removeAllEnvironmentRecords(participants, {
+    scope: target.scope,
+    environmentId: target.id
+  });
   clientProvider.invalidateClient(target.scope, target.id);
   refreshHost.onEnvironmentRemoved?.({
     environmentId: target.id,
@@ -280,12 +285,34 @@ export async function removeEnvironment(
   refreshHost.fullEnvironmentRefresh({ environmentId: target.id });
   if (removalError || cleanupFailures.length > 0) {
     void vscode.window.showErrorMessage(
-      `The environment was removed, but some stored data could not be cleaned up: ${[
+      `The environment was ${removedVerb}, but some stored data could not be cleaned up: ${[
         ...(removalError ? [formatError(removalError)] : []),
-        ...cleanupFailures.map((failure) => formatError(failure.reason))
+        ...cleanupFailures.map((failure) => formatError(failure))
       ].join("; ")}`
     );
   }
+}
+
+/**
+ * A shared environment already declared for this server in either scope. Adding a manual copy
+ * would only be linked back to it.
+ */
+async function findSharedEnvironmentForUrl(
+  store: JenkinsEnvironmentStore,
+  url: string
+): Promise<string | undefined> {
+  for (const scope of ["workspace", "global"] as const) {
+    const shared = (await store.getEnvironments(scope)).find(
+      (environment) =>
+        environment.source === "settings" && normalizeJenkinsUrl(environment.url) === url
+    );
+    if (shared) {
+      return `${formatEnvironmentTitle(shared)} is already shared for this URL through ${
+        scope === "global" ? "user" : "workspace"
+      } settings. Use it instead of adding another environment.`;
+    }
+  }
+  return undefined;
 }
 
 async function rollbackEnvironment(
@@ -309,4 +336,55 @@ async function rollbackEnvironment(
       `Unable to store authentication settings for ${url}: ${authErrorMessage} Failed to remove the partially added environment: ${formatError(rollbackError)}`
     );
   }
+}
+
+async function resolveBrowserSsoLoginUrl(
+  environment: JenkinsEnvironment,
+  authConfig: JenkinsAuthConfig | undefined
+): Promise<string | undefined> {
+  if (authConfig?.type === "sso") {
+    return (
+      rebaseEnvironmentUrl(authConfig.loginUrl, environment.previousUrls ?? [], environment.url) ??
+      authConfig.loginUrl
+    );
+  }
+  if (isDeclaredEnvironmentId(environment.id) && environment.authHint?.type === "sso") {
+    return environment.authHint.loginUrl;
+  }
+  return promptBrowserSsoLoginUrl(environment.url);
+}
+
+async function removeEnvironmentRecord(
+  store: JenkinsEnvironmentStore,
+  registry: Pick<DeclaredEnvironmentRegistry, "hideDeclaredEnvironment">,
+  target: ReturnType<typeof toEnvironmentTarget>,
+  hide: boolean,
+  removedVerb: string
+): Promise<{ removed: boolean; removalError: unknown } | undefined> {
+  let removalError: unknown;
+  let removed: boolean;
+  try {
+    removed = hide
+      ? await registry.hideDeclaredEnvironment(target.scope, target.id)
+      : await store.removeEnvironment(target.scope, target.id);
+  } catch (error) {
+    removalError = error;
+    try {
+      removed = !(await store.getEnvironments(target.scope)).some(
+        (environment) => environment.id === target.id
+      );
+    } catch (lookupError) {
+      void vscode.window.showErrorMessage(
+        `Unable to determine whether the environment was removed: ${formatError(error)}; ${formatError(lookupError)}`
+      );
+      return;
+    }
+    if (!removed) {
+      void vscode.window.showErrorMessage(
+        `The environment was not ${removedVerb}. Its related records were left intact: ${formatError(error)}`
+      );
+      return;
+    }
+  }
+  return { removed, removalError };
 }

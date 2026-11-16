@@ -63,6 +63,11 @@ export function createExtensionRefreshHost(
       return { executed: true };
     },
     refreshQueueOnly: (environment) => {
+      if (treeDataProvider.isSignInRequired(environment)) {
+        // Its queue folder is no longer rendered; stop polling until it is expanded again.
+        queuePoller.clearEnvironment(environment);
+        return;
+      }
       treeDataProvider.refreshQueueOnly(environment);
     },
     invalidateBuildArtifacts: (request) => {

@@ -8,10 +8,9 @@ import type {
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../src/storage/JenkinsEnvironmentStore";
-import type { JenkinsDiagnosticProfileBindingStore } from "../src/storage/JenkinsDiagnosticProfileBindingStore";
-import type { JenkinsParameterPresetStore } from "../src/storage/JenkinsParameterPresetStore";
-import type { JenkinsPinStore } from "../src/storage/JenkinsPinStore";
-import type { JenkinsWatchStore } from "../src/storage/JenkinsWatchStore";
+import type { DeclaredEnvironmentRegistry } from "../src/environments/sharing/DeclaredEnvironmentRegistry";
+import { NO_RECORDS_COPIED } from "../src/storage/EnvironmentRecordCopy";
+import type { EnvironmentRecordParticipant } from "../src/storage/EnvironmentRecordParticipant";
 
 import { createExtensionContext } from "./helpers/storageMocks";
 import { EventEmitter } from "./helpers/vscodeStub";
@@ -123,6 +122,9 @@ const { recoverEnvironmentConnection } = await import(
 const { JenkinsEnvironmentStore: EnvironmentStore } = await import(
   "../src/storage/JenkinsEnvironmentStore"
 );
+
+/** Stored-environment flows never touch the registry; a call would throw. */
+const UNUSED_REGISTRY = {} as DeclaredEnvironmentRegistry;
 
 class FailingAuthEnvironmentStore {
   readonly added: Array<{ scope: EnvironmentScope; environment: JenkinsEnvironment }> = [];
@@ -384,6 +386,7 @@ describe("signInWithBrowserSso", () => {
     }));
     const changed = await signInWithBrowserSso(
       store,
+      UNUSED_REGISTRY,
       { authenticate },
       { invalidateClient: vi.fn() } as unknown as JenkinsClientProvider,
       { fullEnvironmentRefresh: () => ({ executed: true }) },
@@ -404,6 +407,7 @@ describe("signInWithBrowserSso", () => {
     });
     const changed = await signInWithBrowserSso(
       store,
+      UNUSED_REGISTRY,
       {
         authenticate: async () => {
           await store.updateEnvironment("workspace", "env-1", { url: "https://new.example/" });
@@ -457,6 +461,7 @@ describe("signInWithBrowserSso", () => {
 
       await signInWithBrowserSso(
         store,
+        UNUSED_REGISTRY,
         { authenticate },
         { invalidateClient } as unknown as JenkinsClientProvider,
         { fullEnvironmentRefresh },
@@ -502,6 +507,7 @@ describe("signInWithBrowserSso", () => {
       const run = (authenticate: BrowserSsoAuthenticator["authenticate"]) =>
         signInWithBrowserSso(
           store,
+          UNUSED_REGISTRY,
           { authenticate },
           { invalidateClient } as unknown as JenkinsClientProvider,
           { fullEnvironmentRefresh },
@@ -536,6 +542,7 @@ describe("signInWithBrowserSso", () => {
 
     await signInWithBrowserSso(
       { getAuthConfig } as unknown as JenkinsEnvironmentStore,
+      UNUSED_REGISTRY,
       { authenticate } as unknown as BrowserSsoAuthenticator,
       {} as JenkinsClientProvider,
       { fullEnvironmentRefresh: () => ({ executed: true }) },
@@ -568,15 +575,9 @@ describe("removeEnvironment", () => {
       }
     } as unknown as JenkinsEnvironmentStore;
 
-    await removeEnvironment(
-      store,
-      {} as JenkinsDiagnosticProfileBindingStore,
-      {} as JenkinsParameterPresetStore,
-      {} as JenkinsWatchStore,
-      {} as JenkinsPinStore,
-      {} as JenkinsClientProvider,
-      { fullEnvironmentRefresh: () => ({ executed: true }) }
-    );
+    await removeEnvironment(store, UNUSED_REGISTRY, [], {} as JenkinsClientProvider, {
+      fullEnvironmentRefresh: () => ({ executed: true })
+    });
 
     const picks = quickPickItems as Array<{ label: string }>;
     assert.equal(picks[0].label, "https://jenkins.example.com/");
@@ -596,15 +597,9 @@ describe("removeEnvironment", () => {
       }
     } as unknown as JenkinsEnvironmentStore;
 
-    await removeEnvironment(
-      store,
-      {} as JenkinsDiagnosticProfileBindingStore,
-      {} as JenkinsParameterPresetStore,
-      {} as JenkinsWatchStore,
-      {} as JenkinsPinStore,
-      {} as JenkinsClientProvider,
-      { fullEnvironmentRefresh: () => ({ executed: true }) }
-    );
+    await removeEnvironment(store, UNUSED_REGISTRY, [], {} as JenkinsClientProvider, {
+      fullEnvironmentRefresh: () => ({ executed: true })
+    });
 
     const picks = quickPickItems as Array<{ label: string; detail?: string }>;
     assert.equal(picks[0].label, "Production");
@@ -614,10 +609,8 @@ describe("removeEnvironment", () => {
   it("names a named environment in the removal confirmation", async () => {
     await removeEnvironment(
       {} as JenkinsEnvironmentStore,
-      {} as JenkinsDiagnosticProfileBindingStore,
-      {} as JenkinsParameterPresetStore,
-      {} as JenkinsWatchStore,
-      {} as JenkinsPinStore,
+      UNUSED_REGISTRY,
+      [],
       {} as JenkinsClientProvider,
       { fullEnvironmentRefresh: () => ({ executed: true }) },
       {
@@ -663,39 +656,13 @@ describe("removeEnvironment", () => {
           return true;
         }
       } as unknown as JenkinsEnvironmentStore;
-      const presetStore = {
-        async removePresetsForEnvironment(
-          scope: EnvironmentScope,
-          environmentId: string
-        ): Promise<void> {
-          await runCleanup("presets", scope, environmentId);
-        }
-      } as unknown as JenkinsParameterPresetStore;
-      const bindingStore = {
-        async removeBindingsForEnvironment(
-          scope: EnvironmentScope,
-          environmentId: string
-        ): Promise<boolean> {
-          await runCleanup("bindings", scope, environmentId);
-          return true;
-        }
-      } as unknown as JenkinsDiagnosticProfileBindingStore;
-      const watchStore = {
-        async removeWatchesForEnvironment(
-          scope: EnvironmentScope,
-          environmentId: string
-        ): Promise<void> {
-          await runCleanup("watches", scope, environmentId);
-        }
-      } as unknown as JenkinsWatchStore;
-      const pinStore = {
-        async removePinsForEnvironment(
-          scope: EnvironmentScope,
-          environmentId: string
-        ): Promise<void> {
-          await runCleanup("pins", scope, environmentId);
-        }
-      } as unknown as JenkinsPinStore;
+      const participants = (["bindings", "presets", "watches", "pins"] as const).map(
+        (cleanup): EnvironmentRecordParticipant => ({
+          label: cleanup,
+          copyEnvironmentRecords: async () => NO_RECORDS_COPIED,
+          removeEnvironmentRecords: (ref) => runCleanup(cleanup, ref.scope, ref.environmentId)
+        })
+      );
       const clientProvider = {
         invalidateClient(scope: EnvironmentScope, environmentId: string): void {
           events.push(`invalidate:${scope}:${environmentId}`);
@@ -704,10 +671,8 @@ describe("removeEnvironment", () => {
 
       await removeEnvironment(
         store,
-        bindingStore,
-        presetStore,
-        watchStore,
-        pinStore,
+        UNUSED_REGISTRY,
+        participants,
         clientProvider,
         {
           onEnvironmentRemoved: (environment) => {
@@ -760,12 +725,14 @@ describe("removeEnvironment", () => {
 
       await removeEnvironment(
         store,
-        {
-          removeBindingsForEnvironment: cleanup
-        } as unknown as JenkinsDiagnosticProfileBindingStore,
-        { removePresetsForEnvironment: cleanup } as unknown as JenkinsParameterPresetStore,
-        { removeWatchesForEnvironment: cleanup } as unknown as JenkinsWatchStore,
-        { removePinsForEnvironment: cleanup } as unknown as JenkinsPinStore,
+        UNUSED_REGISTRY,
+        ["bindings", "presets", "watches", "pins"].map(
+          (label): EnvironmentRecordParticipant => ({
+            label,
+            copyEnvironmentRecords: async () => NO_RECORDS_COPIED,
+            removeEnvironmentRecords: cleanup
+          })
+        ),
         { invalidateClient } as unknown as JenkinsClientProvider,
         { onEnvironmentRemoved, fullEnvironmentRefresh },
         { environmentId: "env-1", scope: "workspace", url: "https://jenkins.example/" }
@@ -835,6 +802,7 @@ describe("editEnvironment", () => {
     const authenticate = vi.fn<BrowserSsoAuthenticator["authenticate"]>(async () => undefined);
     const dependencies = {
       store,
+      registry: UNUSED_REGISTRY,
       browserSsoAuthenticator: { authenticate },
       clientProvider: {
         invalidateClient(scope: EnvironmentScope, environmentId: string): void {
@@ -1297,11 +1265,9 @@ describe("environment diagnostics command", () => {
     registerEnvironmentCommands(
       { ...createExtensionContext(), subscriptions: [] },
       store,
-      {} as JenkinsDiagnosticProfileBindingStore,
+      UNUSED_REGISTRY,
+      [],
       {} as BrowserSsoAuthenticator,
-      {} as JenkinsParameterPresetStore,
-      {} as JenkinsWatchStore,
-      {} as JenkinsPinStore,
       {} as JenkinsClientProvider,
       {} as EnvironmentUrlRebaseService,
       { fullEnvironmentRefresh: () => ({ executed: true }) },

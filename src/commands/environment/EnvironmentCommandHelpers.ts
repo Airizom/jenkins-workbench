@@ -1,11 +1,16 @@
 import * as vscode from "vscode";
+import { formatError } from "../../formatters/ErrorFormatters";
 import { formatScopeLabel } from "../../formatters/ScopeFormatters";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import type { JenkinsAuthConfig } from "../../jenkins/types";
 import type {
   EnvironmentScope,
   JenkinsEnvironment,
   JenkinsEnvironmentStore
 } from "../../storage/JenkinsEnvironmentStore";
+
+// Re-exported so existing callers keep importing the URL helpers from here.
+export { normalizeJenkinsUrl, parseHttpUrl } from "../../environments/EnvironmentUrlValidation";
 
 type EnvironmentTarget = {
   id: string;
@@ -16,24 +21,6 @@ type EnvironmentTarget = {
 
 export const INVALID_URL_MESSAGE =
   "Invalid Jenkins URL. Enter an HTTP or HTTPS base URL without embedded credentials, query parameters, or fragments. Configure credentials using the authentication prompts.";
-
-export function parseHttpUrl(url: string): URL | undefined {
-  try {
-    const parsed = new URL(url.trim());
-    if (
-      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-      parsed.username.length > 0 ||
-      parsed.password.length > 0 ||
-      parsed.search.length > 0 ||
-      parsed.hash.length > 0
-    ) {
-      return undefined;
-    }
-    return parsed;
-  } catch {
-    return undefined;
-  }
-}
 
 export function redactJenkinsUrl(url: string): string | undefined {
   try {
@@ -56,20 +43,6 @@ export function formatJenkinsUrlForDisplay(url: string): string {
 export function formatEnvironmentTitle(environment: { name?: string; url: string }): string {
   const name = environment.name?.trim();
   return name ? name : formatJenkinsUrlForDisplay(environment.url);
-}
-
-export function normalizeJenkinsUrl(url: string): string {
-  const parsed = parseHttpUrl(url);
-  if (!parsed) {
-    const trimmed = url.trim();
-    return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
-  }
-
-  if (!parsed.pathname.endsWith("/")) {
-    parsed.pathname = `${parsed.pathname}/`;
-  }
-
-  return parsed.toString();
 }
 
 export function toEnvironmentTarget(
@@ -137,4 +110,27 @@ export async function resolveSavedEnvironment(
     void vscode.window.showWarningMessage("The selected environment no longer exists.");
   }
   return environment;
+}
+
+/** Saves credentials only while the revision shown to the user is still current. */
+export async function saveEnvironmentAuthConfig(
+  store: JenkinsEnvironmentStore,
+  target: { scope: EnvironmentScope; id: string; url: string; name?: string },
+  authConfig: JenkinsAuthConfig,
+  revision: number,
+  conflictMessage: string
+): Promise<boolean> {
+  let saved: boolean;
+  try {
+    saved = await store.setAuthConfigIfRevision(target.scope, target.id, authConfig, revision);
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Unable to store authentication settings for ${formatEnvironmentTitle(target)}: ${formatError(error)}`
+    );
+    return false;
+  }
+  if (!saved) {
+    void vscode.window.showWarningMessage(conflictMessage);
+  }
+  return saved;
 }

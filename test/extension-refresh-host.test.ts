@@ -74,4 +74,26 @@ describe("createExtensionRefreshHost", () => {
       ]
     ]);
   });
+
+  it("stops queue polling instead of refreshing an environment that needs sign-in", () => {
+    const signedOut = { environmentId: "settings:ci", scope: "workspace", url: "https://ci/" };
+    const signedIn = { environmentId: "env-1", scope: "global", url: "https://jenkins/" };
+    const refreshQueueOnly = vi.fn();
+    const clearEnvironment = vi.fn();
+    const host = createExtensionRefreshHost(
+      {} as JenkinsEnvironmentStore,
+      {
+        isSignInRequired: (environment: { environmentId: string }) =>
+          environment.environmentId === "settings:ci",
+        refreshQueueOnly
+      } as unknown as JenkinsWorkbenchTreeDataProvider,
+      { clearEnvironment } as unknown as JenkinsQueuePoller
+    );
+
+    host.refreshQueueOnly(signedOut as never);
+    host.refreshQueueOnly(signedIn as never);
+
+    assert.deepEqual(clearEnvironment.mock.calls, [[signedOut]]);
+    assert.deepEqual(refreshQueueOnly.mock.calls, [[signedIn]]);
+  });
 });

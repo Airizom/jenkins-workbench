@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { JenkinsRequestError } from "../jenkins/errors";
+import { EnvironmentSignInRequiredError, JenkinsRequestError } from "../jenkins/errors";
 import type { JenkinsDataService, PendingInputSummary } from "../jenkins/JenkinsDataService";
 import {
   type JenkinsEnvironmentRef,
@@ -7,6 +7,11 @@ import {
 } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsStatusRefreshService } from "../services/JenkinsStatusRefreshService";
 import type { PendingInputRefreshCoordinator } from "../services/PendingInputRefreshCoordinator";
+import { isDeclaredEnvironmentId } from "../storage/DeclaredEnvironmentView";
+import type {
+  EnvironmentRecordsCopy,
+  EnvironmentRecordsRef
+} from "../storage/EnvironmentRecordCopy";
 import type { EnvironmentScope, JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { JenkinsWatchStore, WatchedJobEntry } from "../storage/JenkinsWatchStore";
 import { JenkinsJobStatusEvaluator } from "./JenkinsJobStatusEvaluator";
@@ -74,6 +79,29 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
 
     this.maxConsecutiveErrors = next;
     this.watchStates.resetFailureCounts();
+    this.synchronizeWatchErrorCount();
+  }
+
+  /**
+   * Copies in-memory watch state (failure counts, notified pending inputs) to another
+   * environment id or scope when an environment is linked to a shared definition.
+   */
+  // fallow-ignore-next-line unused-class-member -- called through the lazy poller record adapter in CoreProviders
+  copyWatchRuntimeState(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): EnvironmentRecordsCopy {
+    const copy = this.watchStates.copyEnvironmentRecords(from, to);
+    if (copy.copied > 0) {
+      this.synchronizeWatchErrorCount();
+    }
+    return copy;
+  }
+
+  /** Drops an environment's in-memory watch state once it is removed or hidden. */
+  // fallow-ignore-next-line unused-class-member -- called through the lazy poller record adapter in CoreProviders
+  removeWatchRuntimeState(ref: EnvironmentRecordsRef): void {
+    this.watchStates.clearEnvironment(ref.scope, ref.environmentId);
     this.synchronizeWatchErrorCount();
   }
 
@@ -181,11 +209,18 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
 
     const staleByScope = new Map<EnvironmentScope, Set<string>>();
     const watchesByEnvironment = new Map<JenkinsEnvironmentRef, WatchedJobEntry[]>();
+    const storedIdsByScope = new Map<EnvironmentScope, Set<string>>();
 
     for (const entry of watched) {
       const environment = environmentMap.get(`${entry.scope}:${entry.environmentId}`);
       if (!environment) {
-        this.trackStaleEnvironment(staleByScope, entry);
+        // Hidden or suppressed environments are only out of view; poll them later, never prune.
+        if (await this.isEnvironmentGone(entry, storedIdsByScope)) {
+          this.trackStaleEnvironment(staleByScope, entry);
+        }
+        if (this.disposed) {
+          return false;
+        }
         continue;
       }
       const entries = watchesByEnvironment.get(environment) ?? [];
@@ -243,18 +278,28 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       while (!this.disposed) {
         this.pendingEnvironments.delete(key);
         let changed = false;
+        let signInRequired = false;
         for (const entry of entries) {
           if (this.disposed) {
             return;
           }
-          if (await this.checkWatchedJob(environment, entry)) {
+          const result = await this.checkWatchedJob(environment, entry);
+          if (result === "sign-in-required") {
+            // Not an error: the user has not signed in yet. Skip the environment quietly
+            // until a later tick finds it signed in.
+            this.clearFailureCounts(entries);
+            signInRequired = true;
+            break;
+          }
+          if (result) {
             changed = true;
           }
         }
+        // Watches checked before a sign-in stop may already have persisted a new status.
         if (changed && !this.disposed) {
           this.host.fullEnvironmentRefresh(environment.environmentId);
         }
-        if (this.disposed || !this.pendingEnvironments.delete(key)) {
+        if (signInRequired || this.disposed || !this.pendingEnvironments.delete(key)) {
           return;
         }
         // Reload after completion so queued ticks use the status just persisted.
@@ -280,6 +325,28 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     }
   }
 
+  /**
+   * Whether a watch's environment no longer exists at all. Stored records hidden in this
+   * workspace (linked to a shared definition) still exist, and a settings declaration can be
+   * missing only for a while (another branch, a hidden or suppressed entry), so declared ids are
+   * never pruned here.
+   */
+  private async isEnvironmentGone(
+    entry: WatchedJobEntry,
+    storedIdsByScope: Map<EnvironmentScope, Set<string>>
+  ): Promise<boolean> {
+    if (isDeclaredEnvironmentId(entry.environmentId)) {
+      return false;
+    }
+    let storedIds = storedIdsByScope.get(entry.scope);
+    if (!storedIds) {
+      const stored = await this.store.getStoredEnvironments(entry.scope);
+      storedIds = new Set(stored.map((environment) => environment.id));
+      storedIdsByScope.set(entry.scope, storedIds);
+    }
+    return !storedIds.has(entry.environmentId);
+  }
+
   private trackStaleEnvironment(
     staleByScope: Map<EnvironmentScope, Set<string>>,
     entry: WatchedJobEntry
@@ -289,10 +356,21 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     staleByScope.set(entry.scope, scoped);
   }
 
+  private clearFailureCounts(entries: readonly WatchedJobEntry[]): void {
+    let changed = false;
+    for (const entry of entries) {
+      changed = this.watchStates.resetFailureCount(entry, this.maxConsecutiveErrors) || changed;
+    }
+    if (changed) {
+      this.synchronizeWatchErrorCount();
+    }
+  }
+
+  /** Whether the watch changed, or that the environment needs sign-in before it can be polled. */
   private async checkWatchedJob(
     environment: JenkinsEnvironmentRef,
     entry: WatchedJobEntry
-  ): Promise<boolean> {
+  ): Promise<boolean | "sign-in-required"> {
     try {
       const job = await this.dataService.getJob(environment, entry.jobUrl);
       if (this.disposed) {
@@ -347,6 +425,9 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
 
       return shouldUpdateEntry;
     } catch (error) {
+      if (error instanceof EnvironmentSignInRequiredError) {
+        return "sign-in-required";
+      }
       return await this.handlePollingError(entry, environment, error);
     }
   }

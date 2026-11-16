@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import {
   AUTOMATIC_DIAGNOSTIC_PROFILE,
   BROAD_CORE_DIAGNOSTIC_PARSERS,
@@ -74,6 +74,37 @@ describe("diagnostic profile normalization", () => {
       regexMapping?.type === "regex" && regexMapping.regexp.test("/container/a.ts"),
       true
     );
+  });
+
+  it("accepts a safe regex mapping however slow the host is, and still rejects unsafe ones", () => {
+    // A clock that jumps a second per read stands in for a cold or busy extension host.
+    let now = 0;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => {
+      now += 1_000;
+      return now;
+    });
+    try {
+      const normalized = normalizeDiagnosticProfiles({
+        slowHost: {
+          pathMappings: [{ type: "regex", remote: "^/container/(.*)$", replace: "$1" }]
+        },
+        unsafe: {
+          // Passes the local shape check; redos-detector rejects it by its step limit.
+          pathMappings: [{ type: "regex", remote: "^/(.*)/(.*)/(.*)/(.*)/x$", replace: "$1" }]
+        }
+      });
+
+      assert.equal(normalized.profiles.get("slowHost")?.valid, true);
+      assert.equal(normalized.profiles.get("slowHost")?.pathMappings.length, 1);
+      assert.deepEqual(
+        normalized.issues
+          .filter((issue) => issue.path.startsWith("profiles.unsafe"))
+          .map((issue) => issue.message),
+        ["Unsafe regular expression for path mapping."]
+      );
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("rejects undocumented aliases while accepting the manifest property names", () => {

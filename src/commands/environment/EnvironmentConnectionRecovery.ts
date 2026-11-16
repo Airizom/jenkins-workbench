@@ -27,6 +27,7 @@ export async function recoverEnvironmentConnection(
     case "signIn":
       return signInWithBrowserSso(
         dependencies.store,
+        dependencies.registry,
         dependencies.browserSsoAuthenticator,
         dependencies.clientProvider,
         dependencies.refreshHost,

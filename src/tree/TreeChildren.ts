@@ -171,6 +171,10 @@ export class JenkinsTreeChildrenLoader {
     this.activityLoader.updateOptions(options);
   }
 
+  isSignInRequired(environment: JenkinsEnvironmentRef): boolean {
+    return this.environmentLoader.isSignInRequired(environment);
+  }
+
   getSummaryTotals(): EnvironmentSummaryTotals {
     return this.environmentSummaryStore.getTotals();
   }
@@ -316,6 +320,7 @@ export class JenkinsTreeChildrenLoader {
     return this.buildLoader.loadMoreBuilds(job);
   }
 
+  // fallow-ignore-next-line unused-class-member -- called through the tree refresh coordinator loader dependency
   invalidateForElement(element?: WorkbenchTreeElement): void {
     if (!element) {
       this.clearChildrenCacheForEnvironment();

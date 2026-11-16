@@ -112,7 +112,7 @@ export async function promptRequiredInput(
   return trimmed.length === 0 ? undefined : trimmed;
 }
 
-export const MAX_ENVIRONMENT_NAME_LENGTH = 80;
+const MAX_ENVIRONMENT_NAME_LENGTH = 80;
 
 /**
  * Prompts for an optional display name. Returns the trimmed name, an empty string when the
@@ -245,7 +245,8 @@ function resolveDefaultBrowserSsoLoginUrl(environmentUrl: string): string {
 
 /** Returns undefined when the selection or enabling confirmation is dismissed. */
 export async function promptTlsCertificateValidation(
-  current?: boolean
+  current?: boolean,
+  options: { placeHolder?: string } = {}
 ): Promise<boolean | undefined> {
   const items = [
     {
@@ -260,7 +261,7 @@ export async function promptTlsCertificateValidation(
     }
   ];
   const pick = await vscode.window.showQuickPick(items, {
-    placeHolder: "TLS Certificate Validation",
+    placeHolder: options.placeHolder ?? "TLS Certificate Validation",
     matchOnDescription: true
   });
   if (!pick?.allowInsecureTls || current === true) {

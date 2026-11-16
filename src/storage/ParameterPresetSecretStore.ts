@@ -80,6 +80,35 @@ export class ParameterPresetSecretStore {
     return { secretKeys, newlyStoredKeys };
   }
 
+  /**
+   * Stores each mapped secret value again under a fresh key, so a copied preset never shares
+   * keys with its source (deleting either must not delete the other's secrets). Secrets missing
+   * from storage are skipped. On failure the new keys are deleted and the error rethrown.
+   */
+  async copyMappedKeys(secretKeys: Record<string, string> | undefined): Promise<{
+    secretKeys: Record<string, string>;
+    newlyStoredKeys: string[];
+  }> {
+    const copied: Record<string, string> = Object.create(null);
+    const newlyStoredKeys: string[] = [];
+    try {
+      for (const [name, key] of Object.entries(secretKeys ?? {})) {
+        const value = await this.secrets.get(key);
+        if (typeof value !== "string") {
+          continue;
+        }
+        const secretKey = this.buildSecretKey();
+        await this.secrets.store(secretKey, value);
+        copied[name] = secretKey;
+        newlyStoredKeys.push(secretKey);
+      }
+    } catch (error) {
+      await this.deleteKeyValuesBestEffort(newlyStoredKeys);
+      throw error;
+    }
+    return { secretKeys: copied, newlyStoredKeys };
+  }
+
   async deleteUnused(
     previousSecretKeys: Record<string, string>,
     nextSecretKeys: Record<string, string>

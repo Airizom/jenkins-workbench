@@ -1,4 +1,6 @@
 import type * as vscode from "vscode";
+import type { EnvironmentRecordsCopy, EnvironmentRecordsRef } from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import {
   JenkinsScopedJobStore,
@@ -10,9 +12,12 @@ export interface PinnedJobEntry extends ScopedJobStoreEntry {
   scope: EnvironmentScope;
 }
 
-const PINNED_JOBS_KEY = "jenkinsWorkbench.pinnedJobs";
+export const PINNED_JOBS_KEY = "jenkinsWorkbench.pinnedJobs";
 
-export class JenkinsPinStore extends JenkinsScopedJobStore<ScopedJobStoreEntry> {
+export class JenkinsPinStore
+  extends JenkinsScopedJobStore<ScopedJobStoreEntry>
+  implements EnvironmentRecordStore
+{
   constructor(context: vscode.ExtensionContext) {
     super(context, PINNED_JOBS_KEY);
   }
@@ -81,6 +86,18 @@ export class JenkinsPinStore extends JenkinsScopedJobStore<ScopedJobStoreEntry> 
       newJobName,
       mergeScopedJobEntryMetadata
     );
+  }
+
+  /** Copies an environment's pinned jobs to another environment id or scope; see EnvironmentRecordsCopy. */
+  copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    return this.copyForEnvironment(from, to);
+  }
+
+  removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    return this.removePinsForEnvironment(ref.scope, ref.environmentId);
   }
 
   async rebasePinUrls(

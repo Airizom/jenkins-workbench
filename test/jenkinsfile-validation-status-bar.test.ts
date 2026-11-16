@@ -33,11 +33,13 @@ vi.doMock("vscode", () => ({
   }
 }));
 
-const [{ JenkinsfileValidationStateStore }, { JenkinsfileValidationStatusBar }] = await Promise.all(
-  [
-    import("../src/validation/JenkinsfileValidationStateStore"),
-    import("../src/validation/JenkinsfileValidationStatusBar")
-  ]
+// Sequential on purpose: concurrent dynamic imports can race `vi.doMock("vscode")`, so a module
+// may load the default stub (no `window`) and fail intermittently under load.
+const { JenkinsfileValidationStateStore } = await import(
+  "../src/validation/JenkinsfileValidationStateStore"
+);
+const { JenkinsfileValidationStatusBar } = await import(
+  "../src/validation/JenkinsfileValidationStatusBar"
 );
 
 const environment: JenkinsEnvironmentRef = {

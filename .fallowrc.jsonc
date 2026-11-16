@@ -58,6 +58,10 @@
   // every runtime call path.
   "usedClassMembers": [
     {
+      "implements": "EnvironmentRecordStore",
+      "members": ["copyEnvironmentRecords", "removeEnvironmentRecords"]
+    },
+    {
       "implements": "vscode.CodeActionProvider",
       "members": ["provideCodeActions"]
     },

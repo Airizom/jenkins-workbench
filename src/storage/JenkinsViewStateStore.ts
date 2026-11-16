@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
 import { rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 
 export type JobFilterMode = "all" | "failing" | "running";
 
@@ -10,10 +16,9 @@ interface StoredViewState {
 
 const VIEW_STATE_KEY = "jenkinsWorkbench.viewState";
 
-export class JenkinsViewStateStore {
+export class JenkinsViewStateStore implements EnvironmentRecordStore {
   private readonly emitter = new vscode.EventEmitter<void>();
 
-  // fallow-ignore-next-line unused-class-member
   readonly onDidChange = this.emitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
@@ -112,6 +117,73 @@ export class JenkinsViewStateStore {
     await this.updateState({ ...state, branchFilters });
     this.emitter.fire();
     return moved;
+  }
+
+  /**
+   * Copies an environment's branch filters to another environment id. Filters live in this
+   * workspace and are keyed by id only, so the scopes do not matter; a filter the target already
+   * has for a folder is kept. See EnvironmentRecordsCopy.
+   */
+  async copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (from.environmentId === to.environmentId) {
+      return NO_RECORDS_COPIED;
+    }
+    const state = this.getState();
+    const prefix = this.getBranchKey(from.environmentId, "");
+    const branchFilters = { ...(state.branchFilters ?? {}) };
+    const added: Array<[string, string]> = [];
+    for (const [key, filter] of Object.entries(state.branchFilters ?? {})) {
+      const targetKey = key.startsWith(prefix)
+        ? this.getBranchKey(to.environmentId, key.slice(prefix.length))
+        : undefined;
+      if (targetKey && !(targetKey in branchFilters)) {
+        branchFilters[targetKey] = filter;
+        added.push([targetKey, filter]);
+      }
+    }
+    if (added.length === 0) {
+      return NO_RECORDS_COPIED;
+    }
+    await this.updateState({ ...state, branchFilters });
+    this.emitter.fire();
+    return {
+      copied: added.length,
+      undo: async () => {
+        const current = this.getState();
+        const next = { ...(current.branchFilters ?? {}) };
+        const removed = added.filter(([key, filter]) => next[key] === filter);
+        if (removed.length === 0) {
+          return;
+        }
+        for (const [key] of removed) {
+          delete next[key];
+        }
+        await this.updateState({ ...current, branchFilters: next });
+        this.emitter.fire();
+      }
+    };
+  }
+
+  /**
+   * Removes an environment's branch filters. Like the copy, this matches the id only: filters
+   * live in this workspace and are not keyed by scope.
+   */
+  async removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    const state = this.getState();
+    const prefix = this.getBranchKey(ref.environmentId, "");
+    const branchFilters = { ...(state.branchFilters ?? {}) };
+    const keys = Object.keys(branchFilters).filter((key) => key.startsWith(prefix));
+    if (keys.length === 0) {
+      return;
+    }
+    for (const key of keys) {
+      delete branchFilters[key];
+    }
+    await this.updateState({ ...state, branchFilters });
+    this.emitter.fire();
   }
 
   private getState(): StoredViewState {

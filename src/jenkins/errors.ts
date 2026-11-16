@@ -53,3 +53,25 @@ export class CancellationError extends Error {
     super("Operation cancelled.");
   }
 }
+
+export type EnvironmentSignInRequirementKind = "credentials" | "confirm-origin";
+
+/**
+ * The user has to act (confirm a shared environment's server, or enter credentials) before this
+ * extension contacts the environment. Background work treats it as a silent skip.
+ */
+export class EnvironmentSignInRequiredError extends Error {
+  constructor(
+    readonly scope: "workspace" | "global",
+    readonly environmentId: string,
+    readonly requirement: EnvironmentSignInRequirementKind,
+    environmentLabel: string
+  ) {
+    super(
+      requirement === "confirm-origin"
+        ? `Connect to ${environmentLabel} first: run "Sign In to Environment" to confirm the server.`
+        : `Sign in to ${environmentLabel} first: run "Sign In to Environment" to enter credentials.`
+    );
+    this.name = "EnvironmentSignInRequiredError";
+  }
+}

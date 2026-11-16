@@ -5,7 +5,12 @@ import {
   formatEnvironmentLabel
 } from "../../jenkins/EnvironmentLabels";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
-import type { EnvironmentScope, JenkinsEnvironment } from "../../storage/JenkinsEnvironmentStore";
+import type { EnvironmentAuthHint } from "../../storage/EnvironmentAuthHint";
+import type {
+  EnvironmentScope,
+  EnvironmentSignInRequirement,
+  JenkinsEnvironment
+} from "../../storage/JenkinsEnvironmentStore";
 import type { ActivityDisplaySummary, ActivityGroupKind } from "../ActivityTypes";
 import { formatActivityGroupLabel } from "../ActivityTypes";
 import {
@@ -40,6 +45,8 @@ const SERVER_ENVIRONMENT_ISSUE_ICON = new vscode.ThemeIcon(
   new vscode.ThemeColor("list.warningForeground")
 );
 const SERVER_ICON = new vscode.ThemeIcon("server");
+const SHARED_LABEL = "Shared";
+const SIGN_IN_REQUIRED_LABEL = "Sign in required";
 
 export class ViewsFolderTreeItem extends vscode.TreeItem {
   static buildId(environment: JenkinsEnvironmentRef): string {
@@ -60,6 +67,22 @@ export interface InstanceTreeItemIssue {
   message: string;
 }
 
+interface InstanceTreeItemOptions {
+  /** Anything other than "none" replaces the environment's children with a sign-in row. */
+  signInRequirement?: EnvironmentSignInRequirement;
+}
+
+/**
+ * `environment` (stored), `environmentSignIn` (stored, needs sign-in), `environmentDeclared`
+ * (from settings), `environmentDeclaredSignIn` (from settings, needs sign-in).
+ */
+function resolveEnvironmentContextValue(
+  declared: boolean,
+  signInRequirement: EnvironmentSignInRequirement
+): string {
+  return `environment${declared ? "Declared" : ""}${signInRequirement === "none" ? "" : "SignIn"}`;
+}
+
 export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironmentRef {
   static buildId(environment: JenkinsEnvironmentRef): string {
     return buildEnvironmentTreeItemId("environment", environment);
@@ -71,10 +94,15 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
   public readonly name?: string;
   public readonly username?: string;
   public readonly allowInsecureTls?: boolean;
+  /** Declared in `jenkinsWorkbench.environments` rather than stored by this extension. */
+  public readonly declared: boolean;
+  public readonly signInRequirement: EnvironmentSignInRequirement;
+  public readonly authHint?: EnvironmentAuthHint;
 
   constructor(
     environment: JenkinsEnvironment & { scope: EnvironmentScope },
-    issue?: InstanceTreeItemIssue
+    issue?: InstanceTreeItemIssue,
+    options: InstanceTreeItemOptions = {}
   ) {
     super(formatEnvironmentDisplayName(environment), vscode.TreeItemCollapsibleState.Collapsed);
     this.environmentId = environment.id;
@@ -83,15 +111,30 @@ export class InstanceTreeItem extends vscode.TreeItem implements JenkinsEnvironm
     this.name = normalizeEnvironmentName(environment.name);
     this.username = environment.username;
     this.allowInsecureTls = environment.allowInsecureTls === true ? true : undefined;
+    this.declared = environment.source === "settings";
+    this.signInRequirement = options.signInRequirement ?? "none";
+    this.authHint = environment.authHint;
     this.id = InstanceTreeItem.buildId(this);
-    this.contextValue = "environment";
-    const identity = [formatScopeLabel(environment.scope), environment.username].filter(Boolean);
-    const parts = issue ? [formatEnvironmentIssueLabel(issue.kind), ...identity] : identity;
+    this.contextValue = resolveEnvironmentContextValue(this.declared, this.signInRequirement);
+    const needsSignIn = this.signInRequirement !== "none";
+    const identity = [
+      formatScopeLabel(environment.scope),
+      environment.username,
+      this.declared ? SHARED_LABEL : undefined
+    ].filter(Boolean);
+    const status = [
+      ...(issue ? [formatEnvironmentIssueLabel(issue.kind)] : []),
+      ...(needsSignIn ? [SIGN_IN_REQUIRED_LABEL] : [])
+    ];
+    const parts = [...status, ...identity];
     this.description = (
       this.name ? [formatEnvironmentLabel(environment.url), ...parts] : parts
     ).join(" • ");
     this.iconPath = issue ? SERVER_ENVIRONMENT_ISSUE_ICON : SERVER_ENVIRONMENT_ICON;
-    this.tooltip = buildEnvironmentTooltip(environment, issue);
+    this.tooltip = buildEnvironmentTooltip(environment, issue, {
+      declared: this.declared,
+      needsSignIn
+    });
   }
 }
 
@@ -228,7 +271,8 @@ export class PinnedSectionTreeItem extends vscode.TreeItem {
 
 function buildEnvironmentTooltip(
   environment: JenkinsEnvironment & { scope: EnvironmentScope },
-  issue?: InstanceTreeItemIssue
+  issue: InstanceTreeItemIssue | undefined,
+  state: { declared: boolean; needsSignIn: boolean }
 ): string {
   const scopeLabel = formatScopeLabel(environment.scope);
   const name = normalizeEnvironmentName(environment.name);
@@ -239,6 +283,12 @@ function buildEnvironmentTooltip(
   }
   if (environment.allowInsecureTls === true) {
     parts.push("TLS verification disabled");
+  }
+  if (state.declared) {
+    parts.push("Shared through jenkinsWorkbench.environments settings");
+  }
+  if (state.needsSignIn) {
+    parts.push(SIGN_IN_REQUIRED_LABEL);
   }
   if (issue) {
     parts.push("", `${formatEnvironmentIssueLabel(issue.kind)}: ${issue.message}`);

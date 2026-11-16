@@ -1,16 +1,22 @@
 import * as vscode from "vscode";
+import type { DeclaredEnvironmentRegistry } from "../environments/sharing/DeclaredEnvironmentRegistry";
+import type { DeclaredEnvironmentSource } from "../environments/sharing/DeclaredEnvironmentSource";
+import { EnvironmentSettingsWriter } from "../environments/sharing/EnvironmentSettingsWriter";
 import type { JenkinsClientProvider } from "../jenkins/JenkinsClientProvider";
 import {
   type JenkinsEnvironmentRef,
   toJenkinsEnvironmentRef
 } from "../jenkins/JenkinsEnvironmentRef";
 import type { BrowserSsoAuthenticator } from "../services/BrowserSsoAuthenticationService";
+import type { EnvironmentAdoptionService } from "../services/EnvironmentAdoptionService";
 import type { EnvironmentUrlRebaseService } from "../services/EnvironmentUrlRebaseService";
-import type { JenkinsDiagnosticProfileBindingStore } from "../storage/JenkinsDiagnosticProfileBindingStore";
+import { createLazyOutputChannel } from "../shared/LazyOutputChannel";
+import type { EnvironmentRecordParticipant } from "../storage/EnvironmentRecordParticipant";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
-import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
-import type { JenkinsPinStore } from "../storage/JenkinsPinStore";
-import type { JenkinsWatchStore } from "../storage/JenkinsWatchStore";
+import {
+  openEnvironmentDeclaration,
+  showHiddenEnvironments
+} from "./environment/DeclaredEnvironmentCommands";
 import {
   addEnvironment,
   editEnvironment,
@@ -26,20 +32,55 @@ import type {
   EnvironmentCommandRefreshHost,
   EnvironmentDiagnosticsLauncher
 } from "./environment/EnvironmentCommandTypes";
+import {
+  type EnvironmentSharingDependencies,
+  exportEnvironments,
+  importEnvironments,
+  shareEnvironmentInSettings
+} from "./environment/EnvironmentSharingCommands";
+import { signInToEnvironment } from "./environment/EnvironmentSignInCommand";
+
+/** Services behind Export, Import and Share in Settings; lazy references are fine. */
+export interface EnvironmentSharingServices {
+  source: DeclaredEnvironmentSource;
+  adoption: EnvironmentAdoptionService;
+}
 
 export function registerEnvironmentCommands(
   context: vscode.ExtensionContext,
   store: JenkinsEnvironmentStore,
-  bindingStore: JenkinsDiagnosticProfileBindingStore,
+  registry: DeclaredEnvironmentRegistry,
+  participants: readonly EnvironmentRecordParticipant[],
   browserSsoAuthenticator: BrowserSsoAuthenticator,
-  presetStore: JenkinsParameterPresetStore,
-  watchStore: JenkinsWatchStore,
-  pinStore: JenkinsPinStore,
   clientProvider: JenkinsClientProvider,
   urlRebaseService: EnvironmentUrlRebaseService,
   refreshHost: EnvironmentCommandRefreshHost,
-  diagnostics?: EnvironmentDiagnosticsLauncher
+  diagnostics?: EnvironmentDiagnosticsLauncher,
+  sharing?: EnvironmentSharingServices
 ): void {
+  const sharingLog = createLazyOutputChannel("Jenkins Environment Sharing");
+  context.subscriptions.push(sharingLog);
+  // Built once so concurrent settings writes are serialized.
+  const sharingDependencies: EnvironmentSharingDependencies | undefined = sharing
+    ? {
+        store,
+        source: sharing.source,
+        adoption: sharing.adoption,
+        writer: new EnvironmentSettingsWriter({ source: sharing.source, store }),
+        refreshHost,
+        log: sharingLog
+      }
+    : undefined;
+  const withSharing =
+    <T>(run: (dependencies: EnvironmentSharingDependencies) => Promise<T>) =>
+    async (): Promise<T | undefined> => {
+      if (!sharingDependencies) {
+        void vscode.window.showErrorMessage("Environment sharing is not available.");
+        return undefined;
+      }
+      return run(sharingDependencies);
+    };
+
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.testConnection",
@@ -73,9 +114,15 @@ export function registerEnvironmentCommands(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.signInWithBrowserSso",
       (item?: JenkinsEnvironmentRef) =>
-        signInWithBrowserSso(store, browserSsoAuthenticator, clientProvider, refreshHost, item, {
-          diagnostics
-        })
+        signInWithBrowserSso(
+          store,
+          registry,
+          browserSsoAuthenticator,
+          clientProvider,
+          refreshHost,
+          item,
+          { diagnostics }
+        )
     ),
     vscode.commands.registerCommand(
       "jenkinsWorkbench.editEnvironment",
@@ -83,6 +130,7 @@ export function registerEnvironmentCommands(
         editEnvironment(
           {
             store,
+            registry,
             browserSsoAuthenticator,
             clientProvider,
             urlRebaseService,
@@ -93,20 +141,47 @@ export function registerEnvironmentCommands(
         )
     ),
     vscode.commands.registerCommand(
-      "jenkinsWorkbench.removeEnvironment",
+      "jenkinsWorkbench.signInToEnvironment",
       (item?: JenkinsEnvironmentRef) =>
-        removeEnvironment(
-          store,
-          bindingStore,
-          presetStore,
-          watchStore,
-          pinStore,
-          clientProvider,
-          refreshHost,
+        signInToEnvironment(
+          { store, registry, browserSsoAuthenticator, clientProvider, refreshHost, diagnostics },
           item
         )
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.openEnvironmentDeclaration",
+      (item?: JenkinsEnvironmentRef) => openEnvironmentDeclaration(store, registry, item)
+    ),
+    vscode.commands.registerCommand("jenkinsWorkbench.showHiddenEnvironments", () =>
+      showHiddenEnvironments(registry, refreshHost)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.removeEnvironment",
+      (item?: JenkinsEnvironmentRef) => remove(item)
+    ),
+    // Tree title for shared environments; the same flow hides instead of removing them.
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.hideEnvironment",
+      (item?: JenkinsEnvironmentRef) => remove(item)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.exportEnvironments",
+      withSharing(exportEnvironments)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.importEnvironments",
+      withSharing(importEnvironments)
+    ),
+    vscode.commands.registerCommand(
+      "jenkinsWorkbench.shareEnvironmentInSettings",
+      (item?: JenkinsEnvironmentRef) =>
+        withSharing((dependencies) => shareEnvironmentInSettings(dependencies, item))()
     )
   );
+
+  function remove(item?: JenkinsEnvironmentRef): Promise<void> {
+    return removeEnvironment(store, registry, participants, clientProvider, refreshHost, item);
+  }
 }
 
 export type { EnvironmentCommandRefreshHost };

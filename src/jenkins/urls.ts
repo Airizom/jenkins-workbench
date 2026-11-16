@@ -58,6 +58,15 @@ export function rebaseEnvironmentUrl(
   return target + url.slice(source.length);
 }
 
+/** The URL's origin (`scheme://host[:port]`), or undefined when it does not parse. */
+export function getUrlOrigin(url: string): string | undefined {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Removes embedded `user:password@` credentials from a URL; other parts are kept as-is. */
 export function stripUrlCredentials(url: string): string {
   try {

@@ -31,22 +31,24 @@ export async function activateRuntime(
 
   const environmentStore = container.get("environmentStore");
   const repositoryLinkStore = container.get("repositoryLinkStore");
-  try {
-    await environmentStore.migrateLegacyAuthConfigs();
-  } catch (error) {
-    console.warn("Failed to migrate legacy Jenkins auth config.", error);
-  }
-  try {
-    await repositoryLinkStore.migrateLegacyWorkspaceLinks();
-  } catch (error) {
-    console.warn("Failed to migrate legacy Jenkins repository links.", error);
-  }
-  try {
-    // Replays URL edits made while this workspace was closed; a no-op once rebased.
-    await container.get("environmentUrlRebaseService").rebaseAll();
-  } catch (error) {
-    console.warn("Failed to rebase stored Jenkins URLs.", error);
-  }
+  await runStartupStep("Failed to migrate legacy Jenkins auth config.", () =>
+    environmentStore.migrateLegacyAuthConfigs()
+  );
+  // After migration, so migrated records get the hint of their new auth config.
+  await runStartupStep("Failed to record Jenkins environment sign-in methods.", () =>
+    environmentStore.backfillAuthHints()
+  );
+  await runStartupStep("Failed to migrate legacy Jenkins repository links.", () =>
+    repositoryLinkStore.migrateLegacyWorkspaceLinks()
+  );
+  // Replays URL edits made while this workspace was closed; a no-op once rebased.
+  await runStartupStep("Failed to rebase stored Jenkins URLs.", () =>
+    container.get("environmentUrlRebaseService").rebaseAll()
+  );
+  // Records declared URL changes made while closed and follows settings edits.
+  await runStartupStep("Failed to reconcile Jenkins environments from settings.", () =>
+    container.get("declaredEnvironmentCoordinator").start()
+  );
 
   const treeDataProvider = container.get("treeDataProvider");
   const treeView = container.get("treeView");
@@ -78,6 +80,12 @@ export async function activateRuntime(
 
   await syncNoEnvironmentsContext(environmentStore);
   void syncJenkinsfileContext(jenkinsfileMatcher);
+  try {
+    // Registers the Settings Sync keys and follows synced changes on window focus.
+    container.get("environmentSyncService").start();
+  } catch (error) {
+    console.warn("Failed to start Jenkins environment sync.", error);
+  }
 
   const watchErrorSubscription = poller.onDidChangeWatchErrorCount((count) => {
     treeDataProvider.setWatchErrorCount(count);
@@ -245,4 +253,12 @@ function applyTreeSummary(treeView: vscode.TreeView<unknown>, summary: TreeViewS
   const presentation = formatTreeViewSummary(summary);
   treeView.message = presentation.message;
   treeView.badge = presentation.badge;
+}
+
+async function runStartupStep(message: string, run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    console.warn(message, error);
+  }
 }

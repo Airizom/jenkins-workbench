@@ -5,6 +5,17 @@ import { resolveLocalReplayJobSuggestion } from "../../commands/build/LocalRepla
 import { ReplayBuildWorkflow } from "../../commands/build/ReplayBuildWorkflow";
 import { JobConfigUpdateWorkflow } from "../../commands/job/JobConfigUpdateWorkflow";
 import { EnvironmentDiagnosticsService } from "../../environmentDiagnostics/EnvironmentDiagnosticsService";
+import { DeclaredEnvironmentCoordinator } from "../../environments/sharing/DeclaredEnvironmentCoordinator";
+import {
+  createDeclaredEnvironmentView,
+  DeclaredEnvironmentRegistry
+} from "../../environments/sharing/DeclaredEnvironmentRegistry";
+import { DeclaredEnvironmentSource } from "../../environments/sharing/DeclaredEnvironmentSource";
+import {
+  type DeclaredEnvironmentStateReader,
+  DeclaredEnvironmentStateStore
+} from "../../environments/sharing/DeclaredEnvironmentStateStore";
+import { EnvironmentSyncService } from "../../environments/sync/EnvironmentSyncService";
 import { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
 import { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { createFileArtifactFilesystem } from "../../services/ArtifactFilesystem";
@@ -20,6 +31,7 @@ import { BuildParameterRequestPreparerService } from "../../services/BuildParame
 import { BuildLogTailer } from "../../services/buildFollow/BuildLogTailer";
 import { TriggeredBuildLocator } from "../../services/buildFollow/TriggeredBuildLocator";
 import { MAX_CONSOLE_CHARS } from "../../services/ConsoleOutputConfig";
+import { EnvironmentAdoptionService } from "../../services/EnvironmentAdoptionService";
 import { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
 import { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
 import { JobConfigDraftManager } from "../../services/JobConfigDraftManager";
@@ -32,6 +44,8 @@ import { WorkspaceTestSourceFileMatchConfig } from "../../services/TestSourceFil
 import { DefaultTestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
 import { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { TestSourceResolver } from "../../services/TestSourceResolver";
+import { createLazyOutputChannel } from "../../shared/LazyOutputChannel";
+import { createEnvironmentRecordParticipants } from "../../storage/EnvironmentRecordParticipant";
 import { JenkinsCommitWatchStore } from "../../storage/JenkinsCommitWatchStore";
 import { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
@@ -53,7 +67,12 @@ import { BuildLogPreviewer } from "../../ui/BuildLogPreviewer";
 import { pickJenkinsJob } from "../../ui/JenkinsJobPicker";
 import { JobConfigPreviewer } from "../../ui/JobConfigPreviewer";
 import { WorkspacePreviewer } from "../../ui/WorkspacePreviewer";
+import {
+  copyJenkinsfileEnvironmentSelections,
+  removeJenkinsfileEnvironmentSelections
+} from "../../validation/JenkinsfileEnvironmentResolver";
 import type { PartialExtensionProviderCatalog } from "../container/ExtensionContainer";
+import { syncNoEnvironmentsContext } from "../contextKeys";
 
 export interface CoreProviderOptions {
   context: vscode.ExtensionContext;
@@ -66,6 +85,13 @@ export interface CoreProviderOptions {
 }
 
 export function createCoreProviderCatalog(options: CoreProviderOptions) {
+  // Only the registry gets the writable store; the `declaredEnvironmentState` token exposes it
+  // read-only, so the registry stays the only writer of declared local state.
+  let declaredState: DeclaredEnvironmentStateStore | undefined;
+  const getDeclaredState = () => {
+    declaredState ??= new DeclaredEnvironmentStateStore(options.context);
+    return declaredState;
+  };
   return {
     environmentDiagnosticsService: (container) =>
       new EnvironmentDiagnosticsService(
@@ -77,7 +103,91 @@ export function createCoreProviderCatalog(options: CoreProviderOptions) {
       options.context.subscriptions.push(state);
       return state;
     },
-    environmentStore: (_container) => new JenkinsEnvironmentStore(options.context),
+    environmentStore: (container) =>
+      new JenkinsEnvironmentStore(
+        options.context,
+        createDeclaredEnvironmentView({
+          source: container.get("declaredEnvironmentSource"),
+          state: container.get("declaredEnvironmentState")
+        })
+      ),
+    declaredEnvironmentRegistry: (container) =>
+      new DeclaredEnvironmentRegistry({
+        source: container.get("declaredEnvironmentSource"),
+        state: getDeclaredState(),
+        environmentStore: container.get("environmentStore"),
+        // Dropping cached clients never needs the provider built first.
+        clientProvider: container.lazy("clientProvider")
+      }),
+    declaredEnvironmentSource: (_container) => {
+      const log = createLazyOutputChannel("Jenkins Environments");
+      const source = new DeclaredEnvironmentSource({ log });
+      options.context.subscriptions.push(source, log);
+      return source;
+    },
+    declaredEnvironmentState: (_container): DeclaredEnvironmentStateReader => getDeclaredState(),
+    declaredEnvironmentCoordinator: (container) => {
+      const coordinator = new DeclaredEnvironmentCoordinator({
+        source: container.get("declaredEnvironmentSource"),
+        registry: container.get("declaredEnvironmentRegistry"),
+        urlRebaseService: container.get("environmentUrlRebaseService"),
+        // Resolved on the first settings change, not at activation.
+        clientProvider: container.lazy("clientProvider"),
+        refreshHost: container.lazy("refreshHost"),
+        adoptionService: container.lazy("environmentAdoptionService")
+      });
+      options.context.subscriptions.push(coordinator);
+      return coordinator;
+    },
+    environmentAdoptionService: (container) =>
+      new EnvironmentAdoptionService({
+        source: container.get("declaredEnvironmentSource"),
+        state: container.get("declaredEnvironmentState"),
+        registry: container.get("declaredEnvironmentRegistry"),
+        environmentStore: container.get("environmentStore"),
+        participants: container.get("environmentRecordParticipants"),
+        urlRebaseService: container.get("environmentUrlRebaseService"),
+        clientProvider: container.lazy("clientProvider"),
+        refreshHost: container.lazy("refreshHost")
+      }),
+    // The one list of per-environment record stores, used to link, remove and hide environments.
+    // Every store is referenced lazily: none is built until records are copied or removed.
+    environmentRecordParticipants: (container) =>
+      createEnvironmentRecordParticipants({
+        pinStore: container.lazy("pinStore"),
+        watchStore: container.lazy("watchStore"),
+        watchRuntimeState: {
+          copyEnvironmentRecords: (from, to) =>
+            container.lazy("poller").copyWatchRuntimeState(from, to),
+          removeEnvironmentRecords: async (ref) =>
+            container.lazy("poller").removeWatchRuntimeState(ref)
+        },
+        presetStore: container.lazy("presetStore"),
+        diagnosticBindingStore: container.lazy("diagnosticBindingStore"),
+        repositoryLinkStore: container.lazy("repositoryLinkStore"),
+        historyBaselineStore: container.lazy("historyBaselineStore"),
+        commitWatchStore: container.lazy("commitWatchStore"),
+        viewStateStore: container.lazy("viewStateStore"),
+        jenkinsfileSelections: {
+          copyEnvironmentRecords: (from, to) =>
+            copyJenkinsfileEnvironmentSelections(options.context.workspaceState, from, to),
+          removeEnvironmentRecords: (ref) =>
+            removeJenkinsfileEnvironmentSelections(options.context.workspaceState, ref)
+        },
+        urlRebaseService: container.lazy("environmentUrlRebaseService")
+      }),
+    environmentSyncService: (container) => {
+      const service = new EnvironmentSyncService({
+        globalState: options.context.globalState,
+        environmentStore: container.get("environmentStore"),
+        clientProvider: container.lazy("clientProvider"),
+        refreshHost: container.lazy("refreshHost"),
+        syncNoEnvironmentsContext: () =>
+          syncNoEnvironmentsContext(container.get("environmentStore"))
+      });
+      options.context.subscriptions.push(service);
+      return service;
+    },
     environmentUrlRebaseService: (container) =>
       new EnvironmentUrlRebaseService({
         environmentStore: container.get("environmentStore"),

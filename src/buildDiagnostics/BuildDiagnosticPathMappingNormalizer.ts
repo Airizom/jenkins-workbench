@@ -97,7 +97,10 @@ function normalizeRegexPathMapping(
     return undefined;
   }
   try {
-    if (!isSafePattern(pattern, { maxScore: 200, maxSteps: 500, timeout: 25 }).safe) {
+    // maxSteps and maxScore bound the analysis deterministically. No wall-clock timeout: the
+    // first check in a cold or busy host can exceed a few milliseconds, and a timeout reports
+    // a safe pattern as unsafe, so a valid mapping would be rejected at random.
+    if (!isSafePattern(pattern, { maxScore: 200, maxSteps: 500 }).safe) {
       addIssue(issues, `${mappingPath}.remote`, "Unsafe regular expression for path mapping.");
       return undefined;
     }

@@ -1,6 +1,13 @@
 import * as crypto from "node:crypto";
 import type * as vscode from "vscode";
 import { rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { ParameterPresetSecretStore } from "./ParameterPresetSecretStore";
 import { ParameterPresetStateRepository } from "./ParameterPresetStateRepository";
@@ -21,7 +28,7 @@ export type {
 
 const MAX_PRESETS_PER_JOB = 20;
 
-export class JenkinsParameterPresetStore {
+export class JenkinsParameterPresetStore implements EnvironmentRecordStore {
   private readonly mutationQueue = createSerialTaskQueue();
   private readonly state: ParameterPresetStateRepository;
   private readonly secrets: ParameterPresetSecretStore;
@@ -170,6 +177,11 @@ export class JenkinsParameterPresetStore {
     });
   }
 
+  /** Removes an environment's presets and their secrets. */
+  removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    return this.removePresetsForEnvironment(ref.scope, ref.environmentId);
+  }
+
   updatePresetUrl(
     scope: EnvironmentScope,
     environmentId: string,
@@ -241,6 +253,105 @@ export class JenkinsParameterPresetStore {
       );
       await this.deletePresetSecrets(dropped);
       return movedIndexes.length;
+    });
+  }
+
+  /**
+   * Copies an environment's presets to another environment id or scope, storing their secret
+   * values under new keys. A preset whose id already exists for the target job is skipped; a
+   * copied preset whose name is taken there gets a numbered name. See EnvironmentRecordsCopy.
+   */
+  async copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return NO_RECORDS_COPIED;
+    }
+    return this.mutationQueue(async () => {
+      const sources = this.state
+        .readJobs(from.scope)
+        .filter((entry) => entry.environmentId === from.environmentId);
+      const jobs = this.state.readJobs(to.scope);
+      const added: Array<{ jobUrl: string; preset: StoredParameterPreset }> = [];
+      const newlyStoredKeys: string[] = [];
+      try {
+        for (const source of sources) {
+          const targetIndex = this.state.findJobIndex(jobs, to.environmentId, source.jobUrl);
+          const existing = targetIndex >= 0 ? jobs[targetIndex].presets : [];
+          const existingIds = new Set(existing.map((preset) => preset.id));
+          const incoming = withUniqueNamesAndIds(
+            source.presets.filter((preset) => !existingIds.has(preset.id)),
+            existing
+          );
+          if (incoming.length === 0) {
+            continue;
+          }
+          const copies: StoredParameterPreset[] = [];
+          for (const preset of incoming) {
+            const secrets = await this.secrets.copyMappedKeys(preset.secretKeys);
+            newlyStoredKeys.push(...secrets.newlyStoredKeys);
+            copies.push({
+              ...preset,
+              values: { ...preset.values },
+              secretKeys:
+                Object.keys(secrets.secretKeys).length > 0 ? secrets.secretKeys : undefined
+            });
+          }
+          if (targetIndex >= 0) {
+            jobs[targetIndex] = {
+              ...jobs[targetIndex],
+              presets: [...jobs[targetIndex].presets, ...copies]
+            };
+          } else {
+            jobs.push({ environmentId: to.environmentId, jobUrl: source.jobUrl, presets: copies });
+          }
+          added.push(...copies.map((preset) => ({ jobUrl: source.jobUrl, preset })));
+        }
+        if (added.length === 0) {
+          return NO_RECORDS_COPIED;
+        }
+        await this.state.writeJobs(to.scope, jobs);
+      } catch (error) {
+        await this.secrets.deleteKeyValuesBestEffort(newlyStoredKeys);
+        throw error;
+      }
+      return {
+        copied: added.length,
+        undo: () => this.removeCopiedPresets(to, added)
+      };
+    });
+  }
+
+  private removeCopiedPresets(
+    to: EnvironmentRecordsRef,
+    added: ReadonlyArray<{ jobUrl: string; preset: StoredParameterPreset }>
+  ): Promise<void> {
+    return this.mutationQueue(async () => {
+      const removed: StoredParameterPreset[] = [];
+      const jobs = this.state.readJobs(to.scope).flatMap((entry) => {
+        if (entry.environmentId !== to.environmentId) {
+          return [entry];
+        }
+        const presets = entry.presets.filter((preset) => {
+          const copy = added.some(
+            (item) => item.jobUrl === entry.jobUrl && item.preset.id === preset.id
+          );
+          if (copy) {
+            removed.push(preset);
+          }
+          return !copy;
+        });
+        return presets.length > 0 ? [{ ...entry, presets }] : [];
+      });
+      if (removed.length > 0) {
+        await this.state.writeJobs(to.scope, jobs);
+      }
+      // Both the keys the copy stored and any a later edit of a removed copy stored.
+      const keys = [...added.map((item) => item.preset), ...removed].flatMap((preset) =>
+        Object.values(preset.secretKeys ?? {})
+      );
+      await this.secrets.deleteKeyValuesBestEffort([...new Set(keys)]);
     });
   }
 

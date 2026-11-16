@@ -21,6 +21,11 @@ import type { CurrentBranchStatusResolver } from "../../currentBranch/CurrentBra
 import type { CurrentBranchTargetResolver } from "../../currentBranch/CurrentBranchTargetResolver";
 import type { CurrentBranchWorkflowService } from "../../currentBranch/CurrentBranchWorkflowService";
 import type { EnvironmentDiagnosticsService } from "../../environmentDiagnostics/EnvironmentDiagnosticsService";
+import type { DeclaredEnvironmentCoordinator } from "../../environments/sharing/DeclaredEnvironmentCoordinator";
+import type { DeclaredEnvironmentRegistry } from "../../environments/sharing/DeclaredEnvironmentRegistry";
+import type { DeclaredEnvironmentSource } from "../../environments/sharing/DeclaredEnvironmentSource";
+import type { DeclaredEnvironmentStateReader } from "../../environments/sharing/DeclaredEnvironmentStateStore";
+import type { EnvironmentSyncService } from "../../environments/sync/EnvironmentSyncService";
 import type { HistoryBaselineResolver, HistoryBaselineStore } from "../../history/HistoryBaseline";
 import type { HistoryService } from "../../history/HistoryService";
 import type { JenkinsClientProvider } from "../../jenkins/JenkinsClientProvider";
@@ -52,6 +57,7 @@ import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollo
 import type { BuildLogTailer } from "../../services/buildFollow/BuildLogTailer";
 import type { TriggeredBuildLocator } from "../../services/buildFollow/TriggeredBuildLocator";
 import type { CoverageDecorationService } from "../../services/CoverageDecorationService";
+import type { EnvironmentAdoptionService } from "../../services/EnvironmentAdoptionService";
 import type { EnvironmentUrlRebaseService } from "../../services/EnvironmentUrlRebaseService";
 import type { JenkinsStatusRefreshService } from "../../services/JenkinsStatusRefreshService";
 import type { JobConfigDraftFilesystem } from "../../services/JobConfigDraftFilesystem";
@@ -67,6 +73,7 @@ import type { TestSourceFileMatchConfig } from "../../services/TestSourceFileMat
 import type { TestSourceFileMatchStrategy } from "../../services/TestSourceFileMatchStrategy";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import type { TestSourceResolver } from "../../services/TestSourceResolver";
+import type { EnvironmentRecordParticipant } from "../../storage/EnvironmentRecordParticipant";
 import type { JenkinsCommitWatchStore } from "../../storage/JenkinsCommitWatchStore";
 import type { JenkinsDiagnosticProfileBindingStore } from "../../storage/JenkinsDiagnosticProfileBindingStore";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
@@ -116,7 +123,15 @@ export interface ExtensionTokenMap {
   historyDependencies: HistoryDependencies;
   jobHistoryPanelLauncher: JobHistoryPanelLauncher;
   environmentStore: JenkinsEnvironmentStore;
+  declaredEnvironmentSource: DeclaredEnvironmentSource;
+  /** Read-only; `declaredEnvironmentRegistry` holds the writable store and is its only writer. */
+  declaredEnvironmentState: DeclaredEnvironmentStateReader;
+  declaredEnvironmentRegistry: DeclaredEnvironmentRegistry;
+  environmentRecordParticipants: readonly EnvironmentRecordParticipant[];
+  declaredEnvironmentCoordinator: DeclaredEnvironmentCoordinator;
   environmentUrlRebaseService: EnvironmentUrlRebaseService;
+  environmentAdoptionService: EnvironmentAdoptionService;
+  environmentSyncService: EnvironmentSyncService;
   diagnosticBindingStore: JenkinsDiagnosticProfileBindingStore;
   browserSsoAuthenticator: BrowserSsoAuthenticationService;
   clientProvider: JenkinsClientProvider;

@@ -2,6 +2,13 @@ import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import { fullGitRevision } from "../jenkins/JenkinsRevisionEvidence";
 import { rebaseEnvironmentUrl } from "../jenkins/urls";
+import {
+  type EnvironmentRecordsCopy,
+  type EnvironmentRecordsRef,
+  isSameEnvironmentRecordsRef,
+  NO_RECORDS_COPIED
+} from "./EnvironmentRecordCopy";
+import type { EnvironmentRecordStore } from "./EnvironmentRecordParticipant";
 import type { EnvironmentScope } from "./JenkinsEnvironmentStore";
 import { createSerialTaskQueue } from "./SerialTaskQueue";
 
@@ -21,7 +28,7 @@ export interface CommitWatch {
 
 const KEY = "jenkinsWorkbench.commitWatches.v1";
 
-export class JenkinsCommitWatchStore {
+export class JenkinsCommitWatchStore implements EnvironmentRecordStore {
   private readonly mutationQueue = createSerialTaskQueue();
 
   constructor(private readonly state: vscode.Memento) {}
@@ -56,8 +63,8 @@ export class JenkinsCommitWatchStore {
   }
 
   update(watch: CommitWatch): Promise<boolean> {
-    // A poll that read the watch before an environment URL rebase must not write the old URLs
-    // back; the next poll evaluates the rebased watch instead.
+    // A poll that read the watch before an environment URL rebase or re-point must not write the
+    // old URLs or environment back; the next poll evaluates the updated watch instead.
     return this.mutate(
       watch.id,
       (existing) => (existing && !isStaleSnapshot(existing, watch) ? watch : existing),
@@ -113,6 +120,72 @@ export class JenkinsCommitWatchStore {
     });
   }
 
+  /**
+   * Re-points an environment's commit watches at another environment id or scope; a watch
+   * follows one environment, and this store is per workspace. See EnvironmentRecordsCopy.
+   */
+  copyEnvironmentRecords(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef
+  ): Promise<EnvironmentRecordsCopy> {
+    if (isSameEnvironmentRecordsRef(from, to)) {
+      return Promise.resolve(NO_RECORDS_COPIED);
+    }
+    return this.repoint(from, to).then((ids) =>
+      ids.length === 0
+        ? NO_RECORDS_COPIED
+        : {
+            copied: ids.length,
+            undo: async () => {
+              await this.repoint(to, from, new Set(ids));
+            }
+          }
+    );
+  }
+
+  /** Removes this workspace's commit watches for an environment. */
+  removeEnvironmentRecords(ref: EnvironmentRecordsRef): Promise<void> {
+    return this.mutationQueue(async () => {
+      const watches = this.list();
+      const next = watches.filter(
+        (watch) =>
+          watch.environment.environmentId !== ref.environmentId ||
+          watch.environment.scope !== ref.scope
+      );
+      if (next.length !== watches.length) {
+        await this.state.update(KEY, next);
+      }
+    });
+  }
+
+  private repoint(
+    from: EnvironmentRecordsRef,
+    to: EnvironmentRecordsRef,
+    onlyIds?: ReadonlySet<string>
+  ): Promise<string[]> {
+    return this.mutationQueue(async () => {
+      const moved: string[] = [];
+      const watches = this.list().map((watch) => {
+        if (
+          watch.environment.environmentId !== from.environmentId ||
+          watch.environment.scope !== from.scope ||
+          (onlyIds && !onlyIds.has(watch.id))
+        ) {
+          return watch;
+        }
+        moved.push(watch.id);
+        return {
+          ...watch,
+          environment: { ...watch.environment, environmentId: to.environmentId, scope: to.scope }
+        };
+      });
+      if (moved.length > 0) {
+        await this.state.update(KEY, watches);
+      }
+      return moved;
+    });
+  }
+
   private mutate(
     id: string,
     change: (existing: CommitWatch | undefined) => CommitWatch | undefined,
@@ -135,7 +208,12 @@ export class JenkinsCommitWatchStore {
 }
 
 function isStaleSnapshot(stored: CommitWatch, incoming: CommitWatch): boolean {
-  return stored.environment.url !== incoming.environment.url || stored.jobUrl !== incoming.jobUrl;
+  return (
+    stored.environment.url !== incoming.environment.url ||
+    stored.environment.environmentId !== incoming.environment.environmentId ||
+    stored.environment.scope !== incoming.environment.scope ||
+    stored.jobUrl !== incoming.jobUrl
+  );
 }
 
 function isSameWatch(left: CommitWatch, right: CommitWatch): boolean {

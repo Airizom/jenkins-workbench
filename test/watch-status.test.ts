@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
 import type { WatchNotificationOptions } from "../src/extension/ExtensionConfig";
-import { JenkinsRequestError } from "../src/jenkins/errors";
+import { EnvironmentSignInRequiredError, JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsJob } from "../src/jenkins/types";
 import { JenkinsJobStatusEvaluator } from "../src/watch/JenkinsJobStatusEvaluator";
 import type { StatusNotifier } from "../src/watch/StatusNotifier";
@@ -638,6 +638,36 @@ describe("JenkinsStatusPoller", () => {
     assert.equal(fixture.hostRefreshes, 1);
   });
 
+  it("keeps watches of hidden, suppressed, or briefly missing environments without polling them", async () => {
+    const requested: unknown[] = [];
+    const fixture = createPollerFixture({
+      // Visible: only env-1. The linked global record is hidden in this workspace but stored.
+      environments: [{ id: "env-1", scope: "workspace", url: "https://jenkins.example" }],
+      storedEnvironments: [
+        { id: "env-1", scope: "workspace", url: "https://jenkins.example" },
+        { id: "linked", scope: "global", url: "https://linked.example" }
+      ],
+      watched: [
+        watchedEntry(),
+        watchedEntry({ scope: "global", environmentId: "linked" }),
+        watchedEntry({ environmentId: "settings:ci" }),
+        watchedEntry({ environmentId: "deleted" })
+      ],
+      getJob: async (environment) => {
+        requested.push((environment as { environmentId: string }).environmentId);
+        return { name: "demo", url: "job/demo/", color: "blue" };
+      }
+    });
+
+    await fixture.poller.poll();
+
+    assert.deepEqual(requested, ["env-1"]);
+    // Only the record that no longer exists anywhere loses its watches.
+    assert.deepEqual(fixture.watchStore.removedEnvironments, [
+      { scope: "workspace", environmentId: "deleted" }
+    ]);
+  });
+
   it("removes a watched job immediately when Jenkins reports 404", async () => {
     const fixture = createPollerFixture({
       getJob: async () => {
@@ -681,6 +711,86 @@ describe("JenkinsStatusPoller", () => {
     await fixture.poller.poll();
 
     assert.deepEqual(errorCounts, [1, 0]);
+  });
+
+  it("skips an environment that needs sign-in without counting errors or notifying", async () => {
+    const watched = [watchedEntry(), watchedEntry({ jobUrl: "job/other/", jobName: "other" })];
+    const requested: string[] = [];
+    const fixture = createPollerFixture({
+      watched,
+      maxConsecutiveErrors: 2,
+      getJob: async (_environment, jobUrl) => {
+        requested.push(jobUrl);
+        throw new EnvironmentSignInRequiredError("workspace", "env-1", "credentials", "CI");
+      }
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+
+    // The first job proves the environment is blocked; the rest are not attempted.
+    assert.deepEqual(requested, ["job/demo/", "job/demo/", "job/demo/"]);
+    assert.deepEqual(errorCounts, []);
+    assert.deepEqual(fixture.notifier.calls.watchErrors, []);
+    assert.deepEqual(fixture.watchStore.removedWatches, []);
+    assert.equal(fixture.hostRefreshes, 0);
+  });
+
+  it("still refreshes for watches that changed before a later one needed sign-in", async () => {
+    const watched = [
+      watchedEntry(),
+      watchedEntry({ jobUrl: "job/other/", jobName: "other" }),
+      watchedEntry({ jobUrl: "job/third/", jobName: "third" })
+    ];
+    const requested: string[] = [];
+    const fixture = createPollerFixture({
+      watched,
+      getJob: async (_environment, jobUrl) => {
+        requested.push(jobUrl);
+        if (jobUrl === "job/other/") {
+          throw new EnvironmentSignInRequiredError("workspace", "env-1", "credentials", "CI");
+        }
+        return {
+          name: "demo",
+          url: jobUrl,
+          color: "blue",
+          lastCompletedBuild: { number: 1, result: "SUCCESS" }
+        };
+      }
+    });
+
+    await fixture.poller.poll();
+
+    // The first watch's seeded status was persisted, so the environment is refreshed once;
+    // the watch after the sign-in stop is not attempted.
+    assert.deepEqual(requested, ["job/demo/", "job/other/"]);
+    assert.deepEqual(fixture.refreshedEnvironmentIds, ["env-1"]);
+    assert.deepEqual(fixture.notifier.calls.watchErrors, []);
+  });
+
+  it("clears an existing watch error once the environment needs sign-in", async () => {
+    const fixture = createPollerFixture({
+      maxConsecutiveErrors: 2,
+      getJob: async () => {
+        throw new Error("network");
+      }
+    });
+    const errorCounts: number[] = [];
+    fixture.poller.onDidChangeWatchErrorCount((count) => errorCounts.push(count));
+    await fixture.poller.poll();
+    await fixture.poller.poll();
+    assert.deepEqual(errorCounts, [1]);
+
+    fixture.getJob = async () => {
+      throw new EnvironmentSignInRequiredError("workspace", "env-1", "confirm-origin", "CI");
+    };
+    await fixture.poller.poll();
+
+    assert.deepEqual(errorCounts, [1, 0]);
+    assert.equal(fixture.notifier.calls.watchErrors.length, 1);
   });
 
   it.each([0, 1, 2, 3])(
@@ -1154,6 +1264,8 @@ interface PollerFixtureOptions {
     url: string;
     username?: string;
   }>;
+  /** Persisted records, including hidden ones; defaults to the visible environments. */
+  storedEnvironments?: Array<{ id: string; scope: "workspace" | "global"; url: string }>;
   watched?: WatchedJobEntry[];
   listWatchedJobs?: () => Promise<WatchedJobEntry[]>;
   getJob?: (environment: unknown, jobUrl: string) => Promise<JenkinsJob>;
@@ -1242,11 +1354,16 @@ function createPollerFixture(options: PollerFixtureOptions = {}): {
     hostRefreshes: 0,
     refreshedEnvironmentIds: [] as Array<string | undefined>
   };
+  const visibleEnvironments = () =>
+    options.environments ?? [
+      { id: "env-1", scope: "workspace" as const, url: "https://jenkins.example" }
+    ];
   const store = {
-    listEnvironmentsWithScope: async () =>
-      options.environments ?? [
-        { id: "env-1", scope: "workspace" as const, url: "https://jenkins.example" }
-      ]
+    listEnvironmentsWithScope: async () => visibleEnvironments(),
+    getStoredEnvironments: async (scope: "workspace" | "global") =>
+      (options.storedEnvironments ?? visibleEnvironments()).filter(
+        (environment) => environment.scope === scope && !environment.id.startsWith("settings:")
+      )
   };
   const dataService = {
     getJob: (environment: unknown, jobUrl: string) => fixture.getJob(environment, jobUrl)
