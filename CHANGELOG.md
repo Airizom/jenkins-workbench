@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.67.0] - 2026-11-15
+
+### Added
+
+- feat(environments): declare shared Jenkins environments in user, workspace, or folder settings, with workspace trust checks, server confirmation, and per-user sign-in.
+- feat(environments): add Import Environments, Export Environments, and Share Environment in Settings commands, sharing server details and authentication hints without credentials.
+- feat(environments): link existing environments to shared definitions while preserving credentials and saved job records, and hide or restore shared environments locally.
+- feat(sync): sync Global environments, pinned jobs, and watched jobs through Settings Sync, keeping credentials and workspace environments local.
+
 ## [1.66.0] - 2026-11-15
 
 ### Added
