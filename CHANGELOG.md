@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.68.0] - 2026-11-19
+
+### Added
+
+- feat(builds): follow running builds from the Jenkins tree or Build Details and receive a completion notification even after closing the panel.
+- feat(builds): follow queued runs from the tree and automatically switch to tracking the build when Jenkins assigns it a number.
+- feat(builds): open the status bar’s followed-builds list to see tracked queue items and builds, open a started build, or stop following it.
+
 ## [1.67.0] - 2026-11-15
 
 ### Added
