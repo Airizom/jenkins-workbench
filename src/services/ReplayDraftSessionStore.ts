@@ -18,6 +18,7 @@ export interface ReplayDraftSession {
   buildKey: string;
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
+  buildNumber?: number;
   label: string;
   scripts: ReplayDraftScript[];
 }
@@ -70,7 +71,8 @@ export class ReplayDraftSessionStore {
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     label: string,
-    definition: JenkinsReplayDefinition
+    definition: JenkinsReplayDefinition,
+    buildNumber?: number
   ): ReplayDraftSession {
     const existing = this.getSessionForBuild(environment, buildUrl);
     if (existing) {
@@ -119,6 +121,7 @@ export class ReplayDraftSessionStore {
       buildKey,
       environment,
       buildUrl,
+      buildNumber,
       label,
       scripts
     };

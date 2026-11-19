@@ -262,6 +262,7 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         buildManagementWorkflow: container.lazy("buildManagementWorkflow"),
         // Lazy: the follow-up service holds a lazy launcher reference of its own.
         buildFollowUp: container.lazy("buildFollowUpService"),
+        completionTracker: container.lazy("buildCompletionTracker"),
         extensionUri: options.extensionUri
       }),
     // Shared by the started notification and the completion tracker; resolves its targets on use.
@@ -270,7 +271,8 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
         container.get("buildDetailsPanelLauncher").show({
           environment: build.environment,
           buildUrl: build.buildUrl,
-          label: build.label
+          label: build.label,
+          expectedRun: build
         }),
       previewLog: (build) => container.get("buildLogTailer").open(build)
     }),
@@ -287,12 +289,18 @@ export function createRuntimeProviderCatalog(options: RuntimeProviderOptions) {
       return service;
     },
     buildCompletionTracker: (container) => {
+      const store = container.get("environmentStore");
       const tracker = new BuildCompletionTracker(container.get("dataService"), {
         ...container.get("followedBuildActions"),
+        isCurrentController: (ref) =>
+          store.isCurrentController(ref.scope, ref.environmentId, ref.url),
         refreshEnvironment: (environmentId) =>
           container.get("refreshHost").fullEnvironmentRefresh({ environmentId })
       });
-      options.context.subscriptions.push(tracker);
+      options.context.subscriptions.push(
+        tracker,
+        store.onDidChange(() => tracker.pruneChangedControllers())
+      );
       return tracker;
     },
     buildManagementWorkflow: (container) =>

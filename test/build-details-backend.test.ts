@@ -1,9 +1,46 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
+import type { JenkinsClientProvider } from "../src/jenkins/JenkinsClientProvider";
+import { JenkinsBuildDataOperations } from "../src/jenkins/data/JenkinsBuildDataOperations";
+import { JenkinsDataRuntimeContext } from "../src/jenkins/data/JenkinsDataRuntimeContext";
 import type { JenkinsDataService } from "../src/jenkins/JenkinsDataService";
 import { BuildDetailsBackendAdapter } from "../src/panels/buildDetails/BuildDetailsBackend";
 
 describe("BuildDetailsBackendAdapter", () => {
+  it.each(["12", "lastBuild"])(
+    "rechecks %s when the previous completed details are cached",
+    async (selector) => {
+      const environment = { environmentId: "env", scope: "workspace" as const, url: "https://ci/" };
+      const url = `${environment.url}job/app/${selector}/`;
+      const old = { number: 12, queueId: 17, url, building: false };
+      const next = { ...old, queueId: 18, building: true };
+      const getBuildDetails = vi.fn().mockResolvedValueOnce(old).mockResolvedValue(next);
+      const builds = new JenkinsBuildDataOperations(
+        new JenkinsDataRuntimeContext(
+          {
+            getClient: async () => ({ getBuildDetails }),
+            getAuthSignature: async () => "auth"
+          } as unknown as JenkinsClientProvider,
+          {
+            buildParameterRequestPreparer: {
+              prepareBuildParameters: async () => ({ hasParameters: false })
+            }
+          }
+        )
+      );
+      const options = { includeCauses: true };
+      assert.deepEqual(await builds.getBuildDetails(environment, url, options), old);
+      assert.deepEqual(await builds.getBuildDetails(environment, url, options), old);
+      assert.equal(getBuildDetails.mock.calls.length, 1);
+      const panel = new BuildDetailsBackendAdapter(builds as unknown as JenkinsDataService);
+      assert.deepEqual(await panel.status.getBuildDetails(environment, url, options), next);
+      assert.deepEqual(getBuildDetails.mock.calls[1], [
+        url,
+        { includeCauses: true, bypassCache: true }
+      ]);
+    }
+  );
+
   it("exposes capability views without losing the data service receiver", async () => {
     const receivers: unknown[] = [];
     const dataService = {

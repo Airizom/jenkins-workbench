@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import { BuildDetailsDiagnosticConsoleSync } from "../src/panels/buildDetails/BuildDetailsDiagnosticConsoleSync";
+import { buildInitialBuildDetailsViewModel } from "../src/panels/buildDetails/BuildDetailsInitialState";
 import { BuildDetailsPanelController } from "../src/panels/buildDetails/BuildDetailsPanelController";
 import { BuildDetailsPanelState } from "../src/panels/buildDetails/BuildDetailsPanelState";
 import { LoadTokenTracker } from "../src/panels/shared/PanelRuntimeHelpers";
@@ -10,6 +11,7 @@ vi.mock("../src/panels/buildDetails/BuildDetailsConfig", async (importOriginal) 
     await importOriginal<typeof import("../src/panels/buildDetails/BuildDetailsConfig")>();
   return {
     ...actual,
+    getBuildDetailsCoverageEnabled: () => true,
     getBuildDetailsRefreshIntervalMs: () => 5000
   };
 });
@@ -47,6 +49,17 @@ function createDiagnosticConsoleSync(
 }
 
 describe("BuildDetailsPanelController", () => {
+  it("renders test cases that finished loading before the initial webview was ready", () => {
+    const state = new BuildDetailsPanelState();
+    state.setTestReport({
+      totalCount: 1,
+      suites: [{ cases: [{ name: "checkout", status: "PASSED" }] }]
+    });
+    const model = buildInitialBuildDetailsViewModel(state, { errors: [] }, undefined);
+    assert.equal(model.testState.summary.hasDetailedResults, true);
+    assert.equal(model.testState.results.items[0]?.name, "checkout");
+  });
+
   it("retries build details through a full load", async () => {
     const backend = {};
     const environment = { id: "environment" };
@@ -185,14 +198,13 @@ describe("BuildDetailsPanelController", () => {
         }
         state.updateDetails(details as never);
       });
-      const refreshTestReport = vi.fn(async () => undefined);
-      const refreshCoverage = vi.fn(async () => undefined);
+      const loadTerminalReports = vi.fn(async () => undefined);
       const postErrors = vi.fn();
       const controller = withControllerPrototype({
         loadTokenTracker,
         state,
         view: { isVisible: () => true, postErrors },
-        runtime: { refreshBuildStatus, refreshTestReport, refreshCoverage },
+        runtime: { refreshBuildStatus, loadTerminalReports },
         pollingController: { start: vi.fn() }
       });
       const activate = (
@@ -210,15 +222,14 @@ describe("BuildDetailsPanelController", () => {
 
       await vi.advanceTimersByTimeAsync(5000);
       assert.equal(refreshBuildStatus.mock.calls.length, 1);
-      assert.equal(refreshTestReport.mock.calls.length, 0);
+      assert.equal(loadTerminalReports.mock.calls.length, 0);
 
       await vi.advanceTimersByTimeAsync(5000);
       assert.equal(refreshBuildStatus.mock.calls.length, 2);
       assert.equal(state.currentDetails, details);
       assert.deepEqual(state.currentErrors, ["Pipeline stages: unavailable"]);
       assert.deepEqual(postErrors.mock.calls, [[["Pipeline stages: unavailable"]]]);
-      assert.equal(refreshTestReport.mock.calls.length, 1);
-      assert.equal(refreshCoverage.mock.calls.length, 1);
+      assert.deepEqual(loadTerminalReports.mock.calls, [[token]]);
 
       await vi.advanceTimersByTimeAsync(30000);
       assert.equal(refreshBuildStatus.mock.calls.length, 2);

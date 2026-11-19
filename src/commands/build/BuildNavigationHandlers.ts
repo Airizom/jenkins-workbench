@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
+import { getTreeBuildDetailsUrl, reportedBuildDetailsUrl } from "../../jenkins/ReportedBuildUrl";
 import type { BuildDetailsPanelLauncher } from "../../panels/BuildDetailsPanelLauncher";
 import { JenkinsViewTreeItem } from "../../tree/items/TreeJobItems";
 import {
@@ -27,7 +28,7 @@ export type OpenableTreeItem =
 
 function getOpenUrl(item: OpenableTreeItem): string | undefined {
   if (item instanceof BuildTreeItem) {
-    return item.buildUrl;
+    return getTreeBuildDetailsUrl(item);
   }
   if (item instanceof NodeTreeItem) {
     return item.nodeUrl;
@@ -72,7 +73,7 @@ export async function openInJenkins(item?: OpenableTreeItem): Promise<void> {
 }
 
 export async function showBuildDetails(
-  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
+  buildDetailsPanelLauncher: Pick<BuildDetailsPanelLauncher, "show">,
   item?: BuildTreeItem
 ): Promise<void> {
   const selected = requireSelection(item, "Select a build to view details.");
@@ -80,10 +81,17 @@ export async function showBuildDetails(
     return;
   }
 
+  const buildUrl = getTreeBuildDetailsUrl(selected);
+  if (!buildUrl) {
+    void vscode.window.showInformationMessage(
+      `Jenkins did not identify a URL for build #${selected.buildNumber}.`
+    );
+    return;
+  }
   await withActionErrorMessage("Unable to open build details", async () => {
     await buildDetailsPanelLauncher.show({
       environment: selected.environment,
-      buildUrl: selected.buildUrl,
+      buildUrl,
       label: getTreeItemLabel(selected)
     });
   });
@@ -111,7 +119,7 @@ export async function openLastFailedBuild(
 
 export async function openLastFailedBuildForTarget(
   dataService: JenkinsDataService,
-  buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
+  buildDetailsPanelLauncher: Pick<BuildDetailsPanelLauncher, "show">,
   target: JenkinsJobTarget
 ): Promise<void> {
   await withActionErrorMessage(
@@ -129,9 +137,20 @@ export async function openLastFailedBuildForTarget(
         return;
       }
 
+      const buildUrl = reportedBuildDetailsUrl(
+        target.environment.url,
+        lastFailed.url,
+        lastFailed.number
+      );
+      if (!buildUrl) {
+        void vscode.window.showInformationMessage(
+          `Jenkins did not identify a URL for build #${lastFailed.number}.`
+        );
+        return;
+      }
       await buildDetailsPanelLauncher.show({
         environment: target.environment,
-        buildUrl: lastFailed.url,
+        buildUrl,
         label: `#${lastFailed.number}`
       });
     }
@@ -149,9 +168,16 @@ export async function previewBuildLog(
 
   const label = getTreeItemLabel(selected);
   const fileName = `build-${selected.buildNumber}.log`;
+  const buildUrl = getTreeBuildDetailsUrl(selected);
+  if (!buildUrl) {
+    void vscode.window.showInformationMessage(
+      `Jenkins did not identify a URL for build #${selected.buildNumber}.`
+    );
+    return;
+  }
 
   await withActionErrorMessage(`Failed to preview logs for ${label}`, async () => {
-    const result = await previewer.preview(selected.environment, selected.buildUrl, fileName);
+    const result = await previewer.preview(selected.environment, buildUrl, fileName);
     if (result.truncated) {
       void vscode.window.showInformationMessage(
         `Showing last ${result.maxChars.toLocaleString()} characters of console output for ${label}.`

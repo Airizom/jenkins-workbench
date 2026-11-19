@@ -73,6 +73,7 @@ export function isJenkinsBuildPermalink(value: string): value is JenkinsBuildPer
 export interface JenkinsBuild {
   number: number;
   url: string;
+  queueId?: number;
   result?: string;
   building?: boolean;
   timestamp?: number;

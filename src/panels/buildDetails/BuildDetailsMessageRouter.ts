@@ -26,6 +26,7 @@ import {
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
+  isSetBuildFollowingMessage,
   isSetKeepForeverMessage,
   isSetRelatedBuildsExpandedMessage,
   isShowBuildDiagnosticProblemsMessage,
@@ -37,11 +38,12 @@ import {
   type RejectInputMessage,
   type ReloadTestReportMessage,
   type RestartPipelineFromStageMessage,
-  type SelectPipelineLogNodeMessage
+  type SelectPipelineLogNodeMessage,
+  type SetBuildFollowingMessage
 } from "./shared/BuildDetailsPanelMessages";
 
 export interface BuildDetailsMessageRouterHandlers {
-  onBuildDetailsReady?(): void;
+  onBuildDetailsReady?(loadToken: number, documentId: string): void;
   onSetRelatedBuildsExpanded?(expanded: boolean): void;
   onRefreshRelatedBuilds?(): void;
   onOpenRelatedBuild?(targetId: string): void;
@@ -63,6 +65,7 @@ export interface BuildDetailsMessageRouterHandlers {
   onOpenDiagnosticSource(message: OpenDiagnosticSourceMessage): void;
   onConfigureBuildDiagnostics(): void;
   onShowBuildDiagnosticProblems(): void;
+  onSetBuildFollowing(message: SetBuildFollowingMessage): void;
   onBuildManagement(message: BuildManagementMessage): void;
   onPersistUiState(message: PersistUiStateMessage): void;
   onRefreshBuildDetails(): void;
@@ -85,7 +88,9 @@ function createMessageRoutes(
   handlers: BuildDetailsMessageRouterHandlers
 ): Array<(message: unknown) => boolean> {
   return [
-    createMessageRoute(isBuildDetailsReadyMessage, () => handlers.onBuildDetailsReady?.()),
+    createMessageRoute(isBuildDetailsReadyMessage, (message) =>
+      handlers.onBuildDetailsReady?.(message.loadToken, message.documentId)
+    ),
     createMessageRoute(isSetRelatedBuildsExpandedMessage, (message) =>
       handlers.onSetRelatedBuildsExpanded?.(message.expanded)
     ),
@@ -127,6 +132,9 @@ function createMessageRoutes(
     ),
     createMessageRoute(isShowBuildDiagnosticProblemsMessage, () =>
       handlers.onShowBuildDiagnosticProblems()
+    ),
+    createMessageRoute(isSetBuildFollowingMessage, (message) =>
+      handlers.onSetBuildFollowing(message)
     ),
     createMessageRoute(isSetKeepForeverMessage, (message) => handlers.onBuildManagement(message)),
     createMessageRoute(isEditBuildMessage, (message) => handlers.onBuildManagement(message)),

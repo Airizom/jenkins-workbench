@@ -298,7 +298,8 @@ describe("promptParameterValues run parameters", () => {
   it.each([
     "folder/upstream",
     "job/folder/job/upstream/",
-    "https://jenkins.example/job/folder/job/upstream/"
+    "https://jenkins.example/job/folder/job/upstream/",
+    "jenkins/job/folder/job/upstream/"
   ])("submits the externalizable run ID for %s", async (runProjectName) => {
     const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName }]);
     options.dataService = {
@@ -320,7 +321,13 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
     ["foo", "https://jenkins.example/job/foo/"],
     ["folder/foo", "https://jenkins.example/job/folder/job/foo/"],
     ["job/folder/job/foo", "https://jenkins.example/job/folder/job/foo/"],
-    ["https://jenkins.example/job/foo", "https://jenkins.example/job/foo/"]
+    ["https://jenkins.example/job/foo", "https://jenkins.example/job/foo/"],
+    ["jenkins/job/upstream/", "https://jenkins.example/jenkins/job/upstream/"],
+    ["/jenkins/job/upstream/", "https://jenkins.example/jenkins/job/upstream/"],
+    [
+      "https://jenkins.example/jenkins/job/upstream/",
+      "https://jenkins.example/jenkins/job/upstream/"
+    ]
   ])("queries one Jenkins job URL for %s", async (runProjectName, expectedJobUrl) => {
     const requestedJobUrls: string[] = [];
     const options = createOptions([
@@ -372,6 +379,20 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
     }
   );
 
+  it.each(["https://jenkins.example/other/job/upstream/", "/other/job/upstream/"])(
+    "keeps the run parameter URL %s within its configured controller",
+    async (runProjectName) => {
+      const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName }]);
+      options.environment = { ...options.environment, url: "https://jenkins.example/ci/" };
+      const getBuildsForJob = vi.fn(async () => []);
+      options.dataService = {
+        getBuildsForJob
+      } as unknown as BuildParameterPromptOptions["dataService"];
+      assert.deepEqual(await fetchRunBuildChoices(options, options.parameters[0]), []);
+      assert.equal(getBuildsForJob.mock.calls.length, 0);
+    }
+  );
+
   it("does not offer current-job builds when an explicit target has no builds", async () => {
     const requestedJobUrls: string[] = [];
     const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName: "foo" }]);
@@ -391,25 +412,29 @@ describe("fetchRunBuildChoices run parameter lookup", () => {
     assert.deepEqual(requestedJobUrls, ["https://jenkins.example/job/foo/"]);
   });
 
-  it("uses the current job when no run target is configured", async () => {
-    const requestedJobUrls: string[] = [];
-    const options = createOptions([{ name: "RUN_BUILD", kind: "run" }]);
-    options.dataService = {
-      getBuildsForJob: async (
-        _environment: BuildParameterPromptOptions["environment"],
-        jobUrl: string
-      ) => {
-        requestedJobUrls.push(jobUrl);
-        return [{ number: 42 }];
-      }
-    } as unknown as BuildParameterPromptOptions["dataService"];
+  it.each(["job/demo/", "jenkins/job/demo/"])(
+    "uses the current job %s when no run target is configured",
+    async (path) => {
+      const requestedJobUrls: string[] = [];
+      const options = createOptions([{ name: "RUN_BUILD", kind: "run" }]);
+      options.jobUrl = new URL(path, options.environment.url).href;
+      options.dataService = {
+        getBuildsForJob: async (
+          _environment: BuildParameterPromptOptions["environment"],
+          jobUrl: string
+        ) => {
+          requestedJobUrls.push(jobUrl);
+          return [{ number: 42 }];
+        }
+      } as unknown as BuildParameterPromptOptions["dataService"];
 
-    const choices = await fetchRunBuildChoices(options, options.parameters[0]);
+      const choices = await fetchRunBuildChoices(options, options.parameters[0]);
 
-    assert.equal(choices[0]?.number, 42);
-    assert.equal(choices[0]?.runId, "demo#42");
-    assert.deepEqual(requestedJobUrls, [options.jobUrl]);
-  });
+      assert.equal(choices[0]?.number, 42);
+      assert.equal(choices[0]?.runId, "demo#42");
+      assert.deepEqual(requestedJobUrls, [options.jobUrl]);
+    }
+  );
 
   it("returns no choices after one failed lookup", async () => {
     const options = createOptions([{ name: "RUN_BUILD", kind: "run", runProjectName: "foo" }]);

@@ -1,6 +1,7 @@
 import type * as vscode from "vscode";
 import { registerBuildCommands } from "../commands/BuildCommands";
 import { registerBuildDiagnosticCommands } from "../commands/BuildDiagnosticCommands";
+import { registerBuildFollowCommands } from "../commands/BuildFollowCommands";
 import { registerBuildLinkCommands } from "../commands/BuildLinkCommands";
 import { registerCurrentBranchCommands } from "../commands/CurrentBranchCommands";
 import { registerEnvironmentCommands } from "../commands/EnvironmentCommands";
@@ -85,7 +86,7 @@ export function registerExtensionCommands(
     buildLogPreviewer,
     buildComparePanelLauncher,
     buildDetailsPanelLauncher,
-    { service: buildFollowUpService, completionTracker: buildCompletionTracker },
+    buildFollowUpService,
     replayBuildWorkflow,
     localJenkinsfileReplayWorkflow,
     refreshHost,
@@ -96,6 +97,7 @@ export function registerExtensionCommands(
     bulk
   );
 
+  registerBuildFollowCommands(context, buildCompletionTracker);
   registerBuildLinkCommands(context, {
     dataService,
     buildDetailsPanelLauncher,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it, vi } from "vitest";
+import { JenkinsActionError } from "../src/jenkins/errors";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import * as vscodeStub from "./helpers/vscodeStub";
 
@@ -70,7 +71,7 @@ function createDeps(
   options: {
     currentBuild?: CurrentBuild;
     currentBranchJob?: { environment: JenkinsEnvironmentRef; jobUrl: string };
-    permalinkBuild?: { number: number; url: string };
+    permalinkBuild?: { number: number; url?: string };
     matches?: boolean;
   } = {}
 ) {
@@ -78,6 +79,10 @@ function createDeps(
   const getBuildPermalink = vi.fn(
     async (_environment: unknown, _jobUrl: string, _permalink: string) => options.permalinkBuild
   );
+  const getBuildDetails = vi.fn(async (_environment: unknown, buildUrl: string) => ({
+    number: Number(new URL(buildUrl).pathname.split("/").at(-2)),
+    building: true
+  }));
   const revealJob = vi.fn(async () => undefined);
   const resolve = vi.fn(async (url: URL) =>
     options.matches === false
@@ -86,14 +91,14 @@ function createDeps(
   );
   const hasMatch = vi.fn(async (url: URL) => url.toString().startsWith(environment.url));
   const deps = {
-    dataService: { getBuildPermalink },
+    dataService: { getBuildPermalink, getBuildDetails },
     buildDetailsPanelLauncher: { show },
     currentBuild: { getCurrentBuild: () => options.currentBuild },
     environmentUrlResolver: { resolve, hasMatch },
     jobDeepLinkHandler: { revealJob },
     resolveCurrentBranchJob: () => options.currentBranchJob
   };
-  return { deps: deps as never, show, getBuildPermalink, revealJob, resolve };
+  return { deps: deps as never, show, getBuildPermalink, getBuildDetails, revealJob, resolve };
 }
 
 beforeEach(() => {
@@ -171,6 +176,172 @@ describe("openBuild", () => {
     );
   });
 
+  it.each([
+    "https://ci.example/job/app/custom-runs/42/",
+    "https://ci.example/view/team/custom-runs/42/",
+    "https://ci.example/user/alice/my-views/view/team/custom-runs/42/",
+    "https://ci.example/view/team/custom-runs/job/matrix/os=linux/42/",
+    "https://ci.example/plugin/example/job/app/42/"
+  ])("opens the exact public endpoint pasted into Open Build for %s", async (url) => {
+    const { deps, show } = createDeps();
+    inputAnswers.push(url);
+    await openBuild(deps);
+    assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, url);
+  });
+
+  it.each(
+    (["jenkins", "workbench"] as const).flatMap((kind) =>
+      ["custom-runs/job/app/42/", "custom-runs/42/"].map((path) => ({ kind, path }))
+    )
+  )(
+    "reopens a copied $kind link to a confirmed $path run under a job-shaped controller",
+    async ({ kind, path }) => {
+      const env = { ...environment, url: "https://ci.example/job/" };
+      const buildUrl = `${env.url}${path}`;
+      await copyBuildOrJobLink(kind, { getCurrentBuild: () => ({ environment: env, buildUrl }) });
+      const { deps, show, resolve } = createDeps();
+      resolve.mockResolvedValue({
+        environment: env,
+        environmentUrl: env.url,
+        matchedUrl: buildUrl
+      });
+      inputAnswers.push(clipboard.written[0]);
+      await openBuild(deps);
+      assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, buildUrl);
+    }
+  );
+
+  it.each(["jenkins", "workbench"] as const)(
+    "reopens a copied %s link from a folder view action at its verified endpoint",
+    async (kind) => {
+      const env = { ...environment, url: "https://ci.example/jenkins/" };
+      const buildUrl = `${env.url}job/folder/view/team/custom-runs/job/app/42/`;
+      await copyBuildOrJobLink(
+        kind,
+        { getCurrentBuild: () => undefined },
+        { environment: env, buildUrl }
+      );
+      const { deps, show, resolve, getBuildDetails } = createDeps();
+      resolve.mockResolvedValue({
+        environment: env,
+        environmentUrl: env.url,
+        matchedUrl: buildUrl
+      });
+      inputAnswers.push(clipboard.written[0]);
+      await openBuild(deps);
+      assert.deepEqual(getBuildDetails.mock.calls, [
+        [env, buildUrl, { statusOnly: true, bypassCache: true }]
+      ]);
+      assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, buildUrl);
+    }
+  );
+
+  it.each(["custom-runs/42/", "custom-runs/job/app/42/", "custom-runs/job/matrix/os=linux/42/"])(
+    "verifies the owning run for an artifact below nested folder views at %s",
+    async (path) => {
+      const { deps, show, getBuildDetails } = createDeps();
+      const buildUrl = `${environment.url}job/folder/view/Outer/view/Inner/${path}`;
+      inputAnswers.push(`${buildUrl}artifact/job/other/9/`);
+      await openBuild(deps);
+      assert.deepEqual(getBuildDetails.mock.calls, [
+        [environment, buildUrl, { statusOnly: true, bypassCache: true }]
+      ]);
+      assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, buildUrl);
+    }
+  );
+
+  it.each(["console", "execution/node/5/", "artifact/job/other/9/"])(
+    "verifies the owning endpoint for a custom build link to %s",
+    async (subpage) => {
+      for (const route of [
+        "jenkins/job/app",
+        "custom-runs",
+        "job/app/custom-runs",
+        "job/folder/custom-runs/job/app",
+        "job/folder/custom-runs/job/123/job/matrix/os=linux",
+        "plugin/example/custom-runs/job/app"
+      ]) {
+        const { deps, show, getBuildDetails } = createDeps();
+        const buildUrl = `${environment.url}${route}/42/`;
+        inputAnswers.push(buildUrl + subpage);
+        await openBuild(deps);
+        assert.deepEqual(getBuildDetails.mock.calls, [
+          [environment, buildUrl, { statusOnly: true, bypassCache: true }]
+        ]);
+        assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, buildUrl);
+      }
+    }
+  );
+
+  it.each(["console", "execution/node/5/", "artifact/job/app/7/"])(
+    "checks numeric plugin grouping pages before the build owning %s",
+    async (subpage) => {
+      const { deps, show, getBuildDetails } = createDeps();
+      const group = `${environment.url}job/folder/custom-runs/2026/`;
+      const buildUrl = `${group}job/app/42/`;
+      getBuildDetails.mockResolvedValueOnce({ number: 0, building: false });
+      inputAnswers.push(buildUrl + subpage);
+      await openBuild(deps);
+      assert.deepEqual(
+        getBuildDetails.mock.calls,
+        [group, buildUrl].map((url) => [environment, url, { statusOnly: true, bypassCache: true }])
+      );
+      assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, buildUrl);
+    }
+  );
+
+  it.each(["custom-runs", "view/team/custom-runs", "job/folder/custom-runs"])(
+    "keeps the nested job and permalink after a numeric grouping page under %s",
+    async (action) => {
+      const group = `${environment.url}${action}/2026/`;
+      const job = `${group}job/team/job/app/`;
+      const numbered = `${job}42/`;
+      const { deps, show, revealJob, getBuildPermalink, getBuildDetails } = createDeps({
+        permalinkBuild: { number: 42, url: numbered }
+      });
+      getBuildDetails.mockResolvedValue({ number: 0, building: false });
+      inputAnswers.push(`${job}configure`, `${job}lastBuild/console`);
+      quickPickAnswers.push("reveal");
+      await openBuild(deps);
+      await openBuild(deps);
+      assert.deepEqual(
+        getBuildDetails.mock.calls.map(([, url]) => url),
+        [group, group]
+      );
+      assert.deepEqual(revealJob.mock.calls, [[environment, job]]);
+      assert.deepEqual(getBuildPermalink.mock.calls, [[environment, job, "lastBuild"]]);
+      assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, numbered);
+    }
+  );
+
+  it("checks unknown numbered endpoints against Jenkins and rejects non-builds", async () => {
+    const { deps, show, getBuildDetails } = createDeps();
+    const url = "https://ci.example/custom-runs/42/";
+    getBuildDetails.mockResolvedValue({ number: 41, building: true });
+    inputAnswers.push(url, "https://ci.example/queue/item/42/");
+    await openBuild(deps);
+    await openBuild(deps);
+    assert.deepEqual(getBuildDetails.mock.calls, [
+      [environment, url, { statusOnly: true, bypassCache: true }]
+    ]);
+    assert.equal(show.mock.calls.length, 0);
+    assert.equal(errorMessages.length, 2);
+  });
+
+  it.each([
+    ["job/app/custom-runs/42/", "job/app/"],
+    ["job/folder/custom-runs/job/app/42/console", "job/folder/"],
+    ["job/folder/view/team/custom-runs/job/app/42/", "job/folder/"]
+  ])("offers the owning job if %s does not identify a run", async (endpoint, owner) => {
+    const { deps, revealJob, getBuildDetails, show } = createDeps();
+    getBuildDetails.mockResolvedValue({ number: 9, building: false });
+    inputAnswers.push(`${environment.url}${endpoint}`);
+    quickPickAnswers.push("reveal");
+    await openBuild(deps);
+    assert.deepEqual(revealJob.mock.calls, [[environment, `${environment.url}${owner}`]]);
+    assert.equal(show.mock.calls.length, 0);
+  });
+
   it("opens canonical build URLs with the pipeline node from a Workbench link", async () => {
     const { deps, show } = createDeps();
     const payload = Buffer.from(
@@ -193,9 +364,94 @@ describe("openBuild", () => {
     });
   });
 
+  it.each(["job/app/custom-runs/42/", "view/team/job/app/custom-runs/42/"])(
+    "verifies and opens the public run advertised by a job permalink at %s",
+    async (route) => {
+      const url = environment.url + route;
+      const { deps, show, getBuildDetails } = createDeps({ permalinkBuild: { number: 42, url } });
+      inputAnswers.push(`${environment.url}job/app/lastBuild/`);
+      await openBuild(deps);
+      assert.deepEqual(getBuildDetails.mock.calls, [
+        [environment, url, { statusOnly: true, bypassCache: true }]
+      ]);
+      assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, url);
+    }
+  );
+
+  it.each([
+    "job/other/custom-runs/42/",
+    "job/app/job/other/42/",
+    "job/app/custom-runs/41/",
+    "job/app/7/artifact/42/",
+    "job/app/os=linux/42/",
+    "job/app/custom-runs/42/"
+  ])("keeps the requested permalink's job when %s contradicts its run", async (route) => {
+    const { deps, show, getBuildDetails } = createDeps({
+      permalinkBuild: { number: 42, url: environment.url + route }
+    });
+    getBuildDetails.mockResolvedValue({ number: 11, building: true });
+    inputAnswers.push(`${environment.url}job/app/lastBuild/`);
+    await openBuild(deps);
+    assert.equal(
+      (show.mock.calls[0][0] as { buildUrl: string }).buildUrl,
+      `${environment.url}job/app/42/`
+    );
+  });
+
+  it.each([
+    ["lastBuild", "job/app/0/"],
+    ["lastFailedBuild", "view/All/job/app/0/"],
+    ["lastBuild", "job/app/custom-runs/0/"]
+  ])("opens build zero from %s only at Jenkins' verified endpoint %s", async (permalink, path) => {
+    const url = environment.url + path;
+    const { deps, show, getBuildDetails } = createDeps({ permalinkBuild: { number: 0, url } });
+    inputAnswers.push(`${environment.url}job/app/${permalink}/`);
+    await openBuild(deps);
+    assert.deepEqual(getBuildDetails.mock.calls, [
+      [environment, url, { statusOnly: true, bypassCache: true }]
+    ]);
+    assert.equal((show.mock.calls[0][0] as { buildUrl: string }).buildUrl, url);
+  });
+
+  it.each([
+    undefined,
+    "https://other.example/job/app/0/",
+    "https://ci.example/job/other/0/",
+    "https://ci.example/job/app/5/artifact/0/"
+  ])("declines an uncorroborated zero permalink report %s", async (url) => {
+    const { deps, show, getBuildDetails } = createDeps({ permalinkBuild: { number: 0, url } });
+    inputAnswers.push(`${environment.url}job/app/lastBuild/`);
+    await openBuild(deps);
+    assert.equal(getBuildDetails.mock.calls.length, 0);
+    assert.equal(show.mock.calls.length, 0);
+  });
+
+  it.each([0, 42])(
+    "bypasses a stale cached terminal result when reported build %s is missing",
+    async (number) => {
+      const url = `${environment.url}job/app/custom-runs/${number}/`;
+      const { deps, show, getBuildDetails } = createDeps({ permalinkBuild: { number, url } });
+      getBuildDetails.mockImplementation(
+        async (_env, _url, options?: { bypassCache?: boolean }) => {
+          if (options?.bypassCache) throw new JenkinsActionError("Not found", "not_found", 404);
+          return { number, building: false };
+        }
+      );
+      inputAnswers.push(`${environment.url}job/app/lastFailedBuild/`);
+      await openBuild(deps);
+      assert.deepEqual(getBuildDetails.mock.calls, [
+        [environment, url, { statusOnly: true, bypassCache: true }]
+      ]);
+      assert.deepEqual(
+        show.mock.calls.map(([request]) => (request as { buildUrl: string }).buildUrl),
+        number === 0 ? [] : [`${environment.url}job/app/42/`]
+      );
+    }
+  );
+
   it("opens a permalink build, or reports that it does not exist", async () => {
     const found = createDeps({
-      permalinkBuild: { number: 3, url: "https://ci.example/job/app/3/" }
+      permalinkBuild: { number: 3, url: "http://internal.example/view/All/job/app/3/" }
     });
     inputAnswers.push("https://ci.example/job/app/lastFailedBuild/console");
     await openBuild(found.deps);
@@ -322,6 +578,32 @@ describe("copyBuildOrJobLink", () => {
       "https://ci.example/job/app/"
     ]);
   });
+
+  it.each(["jenkins", "workbench"] as const)(
+    "copies %s only for the numbered row, including legacy zero",
+    async (kind) => {
+      const launcher = {
+        getCurrentBuild: () => ({ environment, buildUrl: "https://ci.example/job/other/42/" })
+      };
+      await copyBuildOrJobLink(kind, launcher, {
+        environment,
+        buildUrl: "https://ci.example/job/app/41/",
+        buildNumber: 42
+      });
+      assert.equal(clipboard.written.length, 0);
+      assert.deepEqual(infoMessages, ["Jenkins did not identify a URL for build #42."]);
+      const zeroUrl = "https://ci.example/job/app/0/";
+      await copyBuildOrJobLink(kind, launcher, { environment, buildUrl: zeroUrl, buildNumber: 0 });
+      assert.equal(clipboard.written.length, 1);
+      const copied = clipboard.written[0];
+      assert.equal(
+        kind === "jenkins"
+          ? copied
+          : parseDeepLinkPayload(copied.slice(copied.indexOf("?") + 1))?.get("url"),
+        zeroUrl
+      );
+    }
+  );
 
   it("copies the open Build Details build with its pipeline node", async () => {
     const launcher = {

@@ -22,6 +22,9 @@ describe("JenkinsEnvironmentStore.updateEnvironment", () => {
     const first = await store.updateEnvironment("workspace", "env-1", {
       url: "https://b.example"
     });
+    expect(store.isCurrentController("workspace", "env-1", "https://a.example/")).toBe(false);
+    expect(store.isCurrentController("workspace", "env-1", "https://b.example/")).toBe(true);
+    expect(store.isCurrentController("global", "env-1", "https://b.example/")).toBe(false);
     expect(first?.previous).toEqual({ id: "env-1", url: "https://a.example" });
     expect(first?.next).toEqual({
       id: "env-1",

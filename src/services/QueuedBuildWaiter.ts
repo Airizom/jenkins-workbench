@@ -1,7 +1,12 @@
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
-import type { JenkinsQueueItem } from "../jenkins/types";
 import { parseQueueItemId } from "../jenkins/urls";
+import type { RunStatus } from "./buildFollow/BuildFollowEntry";
+import {
+  QueueItemEvidence,
+  type QueueObservation,
+  type SubmittedQueueObservations
+} from "./buildFollow/FollowedQueueBuild";
 import {
   createPollBackoff,
   delay,
@@ -15,7 +20,14 @@ const DEFAULT_FALLBACK_DELAY_MS = 4000;
 const MAX_CONSECUTIVE_ERRORS = 3;
 
 export type QueuedBuildOutcome =
-  | { kind: "started"; number: number; url?: string }
+  | {
+      kind: "started";
+      number: number;
+      url: string;
+      fallbackUrl?: string;
+      queueStatus?: RunStatus;
+      observedRunQueueId?: number;
+    }
   | { kind: "cancelled" }
   | { kind: "unknown" };
 
@@ -23,6 +35,9 @@ export interface AwaitQueuedBuildOptions {
   timeoutMs: number;
   maxPollIntervalMs: number;
   token?: PollCancellationToken;
+  /** The job whose successful submission returned this queue location. */
+  submittedJobUrl?: string;
+  observations?: SubmittedQueueObservations;
 }
 
 export class QueuedBuildWaiter {
@@ -41,17 +56,21 @@ export class QueuedBuildWaiter {
 
   async awaitQueuedBuildStart(
     environment: JenkinsEnvironmentRef,
-    queueLocation?: string
-  ): Promise<void> {
+    queueLocation?: string,
+    submittedJobUrl?: string,
+    observations?: SubmittedQueueObservations
+  ): Promise<QueuedBuildOutcome | undefined> {
     if (!parseQueueItemId(queueLocation)) {
       if (this.fallbackDelayMs > 0) {
         await delay(this.fallbackDelayMs);
       }
       return;
     }
-    await this.awaitQueuedBuild(environment, queueLocation, {
+    return this.awaitQueuedBuild(environment, queueLocation, {
       timeoutMs: this.timeoutMs,
-      maxPollIntervalMs: this.pollIntervalMs
+      maxPollIntervalMs: this.pollIntervalMs,
+      submittedJobUrl,
+      observations
     });
   }
 
@@ -70,38 +89,59 @@ export class QueuedBuildWaiter {
     }
 
     const deadline = Date.now() + options.timeoutMs;
-    const backoff = createPollBackoff(this.pollIntervalMs, options.maxPollIntervalMs);
-    let consecutiveErrors = 0;
-    while (Date.now() < deadline && !options.token?.isCancellationRequested) {
-      try {
-        const item = await this.dataService.getQueueItem(environment, queueId);
-        const outcome = resolveQueueItemOutcome(item);
-        if (outcome) {
-          return outcome;
+    const local = new QueueItemEvidence({ environment, queueId, label: "" });
+    local.rememberSubmittedJob(options.submittedJobUrl);
+    const shared = options.observations;
+    let active = true;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const shouldPoll = () =>
+      active && Date.now() < deadline && !options.token?.isCancellationRequested;
+    const poll = async (): Promise<QueueObservation> => {
+      const backoff = createPollBackoff(this.pollIntervalMs, options.maxPollIntervalMs);
+      let consecutiveErrors = 0;
+      while (shouldPoll()) {
+        try {
+          const item = await this.dataService.getQueueItem(environment, queueId);
+          if (!active || options.token?.isCancellationRequested) return;
+          const outcome = (shared ?? local).observe(item);
+          if (outcome?.kind === "unknown") return shared?.afterPendingReads();
+          if (outcome) return outcome;
+          consecutiveErrors = 0;
+        } catch (error) {
+          consecutiveErrors += 1;
+          if (isClientError(error) || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            return shared?.afterPendingReads();
+          }
         }
-        consecutiveErrors = 0;
-      } catch (error) {
-        // A client error (item gone, auth) will not recover; retry others a few times.
-        consecutiveErrors += 1;
-        if (isClientError(error) || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-          return { kind: "unknown" };
-        }
+        await delay(backoff.next());
       }
-      await delay(backoff.next());
+      return undefined;
+    };
+    try {
+      const outcome = shared
+        ? await Promise.race([
+            poll(),
+            shared.whenIdentified,
+            new Promise<undefined>((resolve) => {
+              timeout = setTimeout(() => resolve(undefined), options.timeoutMs);
+            })
+          ])
+        : await poll();
+      return outcome?.kind === "started"
+        ? {
+            kind: "started",
+            number: outcome.build.buildNumber,
+            url: outcome.build.buildUrl,
+            ...(outcome.build.fallbackUrl && { fallbackUrl: outcome.build.fallbackUrl }),
+            ...(outcome.build.queueStatus && { queueStatus: outcome.build.queueStatus }),
+            ...(outcome.build.observedRunQueueId !== undefined && {
+              observedRunQueueId: outcome.build.observedRunQueueId
+            })
+          }
+        : (outcome ?? { kind: "unknown" });
+    } finally {
+      active = false;
+      clearTimeout(timeout);
     }
-    return { kind: "unknown" };
   }
-}
-
-function resolveQueueItemOutcome(item: JenkinsQueueItem): QueuedBuildOutcome | undefined {
-  if (item.cancelled) {
-    return { kind: "cancelled" };
-  }
-  if (!item.executable) {
-    return undefined;
-  }
-  const { number, url } = item.executable;
-  return Number.isSafeInteger(number) && number > 0
-    ? { kind: "started", number, url: url || undefined }
-    : { kind: "unknown" };
 }

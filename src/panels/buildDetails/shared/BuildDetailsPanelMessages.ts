@@ -14,7 +14,8 @@ export type {
   RejectInputMessage,
   ReloadTestReportMessage,
   RestartPipelineFromStageMessage,
-  SelectPipelineLogNodeMessage
+  SelectPipelineLogNodeMessage,
+  SetBuildFollowingMessage
 } from "./BuildDetailsIncomingMessages";
 export {
   isApproveInputMessage,
@@ -41,6 +42,7 @@ export {
   isReloadTestReportMessage,
   isRestartPipelineFromStageMessage,
   isSelectPipelineLogNodeMessage,
+  isSetBuildFollowingMessage,
   isSetKeepForeverMessage,
   isSetRelatedBuildsExpandedMessage,
   isShowBuildDiagnosticProblemsMessage,

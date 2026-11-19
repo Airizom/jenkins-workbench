@@ -1,7 +1,11 @@
 import type { OpenExternalMessage } from "../../../shared/runtimeGuards";
 import { hasMessageType, isOpenExternalMessage } from "../../../shared/runtimeGuards";
 import type { ArtifactAction, PipelineLogTargetViewModel } from "./BuildDetailsContracts";
-import { isPipelineLogTargetViewModel } from "./BuildDetailsContracts";
+import {
+  isBuildQueueId,
+  isFollowTargetToken,
+  isPipelineLogTargetViewModel
+} from "./BuildDetailsContracts";
 import {
   type BuildDetailsPanelUiState,
   isBuildDetailsPanelUiState
@@ -9,6 +13,17 @@ import {
 
 export interface BuildDetailsReadyMessage {
   type: "buildDetailsReady";
+  loadToken: number;
+  documentId: string;
+}
+
+export interface SetBuildFollowingMessage {
+  type: "setBuildFollowing";
+  loadToken: number;
+  followTargetToken: number;
+  buildNumber: number;
+  queueId?: number;
+  following: boolean;
 }
 
 export interface ToggleFollowLogMessage {
@@ -147,6 +162,7 @@ export type BuildDetailsIncomingMessage =
   | OpenRelatedBuildMessage
   | NavigateBuildMessage
   | RefreshBuildDetailsMessage
+  | SetBuildFollowingMessage
   | ToggleFollowLogMessage
   | OpenExternalMessage
   | CopyBuildLinkMessage
@@ -169,6 +185,19 @@ export type BuildDetailsIncomingMessage =
   | EditBuildMessage
   | DeleteBuildMessage
   | PersistUiStateMessage;
+
+export function isSetBuildFollowingMessage(message: unknown): message is SetBuildFollowingMessage {
+  return (
+    hasMessageType(message, "setBuildFollowing") &&
+    Number.isSafeInteger(message.loadToken) &&
+    isFollowTargetToken(message.followTargetToken) &&
+    typeof message.buildNumber === "number" &&
+    Number.isSafeInteger(message.buildNumber) &&
+    message.buildNumber > 0 &&
+    (message.queueId === undefined || isBuildQueueId(message.queueId)) &&
+    typeof message.following === "boolean"
+  );
+}
 
 export function isToggleFollowLogMessage(message: unknown): message is ToggleFollowLogMessage {
   return hasMessageType(message, "toggleFollowLog");
@@ -365,5 +394,13 @@ export function isNavigateBuildMessage(message: unknown): message is NavigateBui
 }
 
 export function isBuildDetailsReadyMessage(message: unknown): message is BuildDetailsReadyMessage {
-  return hasMessageType(message, "buildDetailsReady");
+  return (
+    hasMessageType(message, "buildDetailsReady") &&
+    typeof message.documentId === "string" &&
+    message.documentId.length > 0 &&
+    message.documentId.length <= 64 &&
+    typeof message.loadToken === "number" &&
+    Number.isSafeInteger(message.loadToken) &&
+    message.loadToken > 0
+  );
 }

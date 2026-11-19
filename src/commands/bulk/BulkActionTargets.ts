@@ -1,7 +1,4 @@
-import {
-  canonicalizeBuildUrlForEnvironment,
-  canonicalizeJobUrlForEnvironment
-} from "../../jenkins/urls";
+import { canonicalizeJobUrlForEnvironment, resolveBuildMutationTarget } from "../../jenkins/urls";
 import {
   BuildTreeItem,
   JobTreeItem,
@@ -55,6 +52,7 @@ export function resolveBulkActionTargets(
     }
     const resolved = resolveTarget(item);
     if (!resolved) {
+      incompatible.push(item);
       continue;
     }
     const { target, identity } = resolved;
@@ -84,10 +82,10 @@ function resolveTarget(
   let target: BulkActionTarget;
   let identity: string;
   if (item instanceof BuildTreeItem) {
-    const url =
-      canonicalizeBuildUrlForEnvironment(item.environment.url, item.buildUrl) ?? item.buildUrl;
-    target = { kind: "build", item, url };
-    identity = url;
+    const run = resolveBuildMutationTarget(item.environment.url, item.buildUrl, item.buildNumber);
+    if (!run) return undefined;
+    target = { kind: "build", item, url: run.url };
+    identity = run.identity;
   } else if (item instanceof QueueItemTreeItem) {
     target = { kind: "queue", item };
     identity = String(item.queueId);

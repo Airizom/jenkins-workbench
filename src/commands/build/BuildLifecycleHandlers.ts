@@ -2,7 +2,11 @@ import * as vscode from "vscode";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { formatJobUrlLabel, parseBuildUrl } from "../../jenkins/urls";
 import type { TriggerCauseKind } from "../../services/buildFollow/BuildFollowTypes";
-import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
+import {
+  type BuildFollowUpService,
+  resolveFollowSourceJob,
+  submittedUrlSource
+} from "../../services/buildFollow/BuildFollowUpService";
 import type { BuildTreeItem } from "../../tree/TreeItems";
 import { promptRebuildParameterChanges } from "../../ui/buildParameterPrompts/RebuildParameterEditor";
 import { seedRebuildParameterValues } from "../../ui/buildParameterPrompts/RebuildParameterValues";
@@ -32,6 +36,7 @@ async function runFollowedBuildAction(
       kind: "cause",
       environment: selected.environment,
       sourceBuildUrl: selected.buildUrl,
+      sourceBuildNumber: selected.buildNumber,
       cause: options.cause,
       jobLabel: selected.jobNameHint
     });
@@ -94,6 +99,7 @@ export async function replayBuild(
   await workflow.openReplay({
     environment: selected.environment,
     buildUrl: selected.buildUrl,
+    buildNumber: selected.buildNumber,
     label: getTreeItemLabel(selected)
   });
 }
@@ -207,10 +213,17 @@ export async function rebuildBuildWithChanges(
       return;
     }
 
+    // The submitted public job endpoint owns the queue result, including custom job routes.
+    // A URL advertised outside the configured base still needs its proxy translation.
+    const followJobUrl =
+      submittedUrlSource(environment, jobUrl) === "configured"
+        ? jobUrl
+        : (resolveFollowSourceJob(environment, selected.buildUrl, selected.buildNumber)?.jobUrl ??
+          jobUrl);
     const prepared = await buildFollowUp.prepare({
       kind: "queue",
       environment,
-      jobUrl,
+      jobUrl: followJobUrl,
       label: jobLabel
     });
     const result = await dataService.triggerBuildWithParameters(environment, jobUrl, payload, {

@@ -29,10 +29,16 @@ export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** A 4xx from Jenkins (item gone, auth) that retrying will not fix. */
+/** An HTTP 4xx response from Jenkins. */
 export function isClientError(error: unknown): boolean {
   const statusCode = getJenkinsStatusCode(error) ?? 0;
   return statusCode >= 400 && statusCode < 500;
+}
+
+/** Explicit queue subscriptions retry timeouts and throttling under the usual error budget. */
+export function isTerminalClientError(error: unknown): boolean {
+  const status = getJenkinsStatusCode(error);
+  return isClientError(error) && status !== 408 && status !== 425 && status !== 429;
 }
 
 export function isNotFoundError(error: unknown): boolean {

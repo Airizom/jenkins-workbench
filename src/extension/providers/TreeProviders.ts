@@ -36,7 +36,8 @@ export function createTreeProviderCatalog(options: TreeProviderOptions) {
         options.treeViewCurationOptions,
         options.activityOptions,
         container.get("pendingInputCoordinator"),
-        container.get("multibranchScanState")
+        container.get("multibranchScanState"),
+        container.lazy("buildCompletionTracker")
       ),
     treeView: (container) =>
       vscode.window.createTreeView<WorkbenchTreeElement>(VIEW_ID, {

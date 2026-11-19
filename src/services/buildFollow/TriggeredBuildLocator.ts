@@ -1,8 +1,20 @@
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsBuildCause, JenkinsBuildDetails } from "../../jenkins/types";
-import { buildActionUrl } from "../../jenkins/urls";
-import { createPollBackoff, delay, isClientError, isNotFoundError } from "../polling/Polling";
+import {
+  buildActionUrl,
+  parseQueueItemId,
+  resolveBuildIdentityForEnvironment
+} from "../../jenkins/urls";
+import { isBuildQueueId } from "../../shared/build/BuildCompletionEvidence";
+import {
+  createPollBackoff,
+  delay,
+  isClientError,
+  isNotFoundError,
+  isTerminalClientError
+} from "../polling/Polling";
 import type { QueuedBuildWaiter } from "../QueuedBuildWaiter";
+import { nextBuildObservationOrder } from "./BuildFollowObservationOrder";
 import type {
   CauseTriggeredBuildOrigin,
   QueueTriggeredBuildOrigin,
@@ -11,6 +23,8 @@ import type {
   TriggeredBuildLocatorToken,
   TriggeredBuildOrigin
 } from "./BuildFollowTypes";
+
+import { QueueItemEvidence } from "./FollowedQueueBuild";
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const DEFAULT_POLL_INTERVAL_MS = 2000;
@@ -116,18 +130,38 @@ export class TriggeredBuildLocator {
     this.candidateWindow = Math.max(1, options?.candidateWindow ?? DEFAULT_CANDIDATE_WINDOW);
   }
 
-  locate(
+  async locate(
     origin: TriggeredBuildOrigin,
     token?: TriggeredBuildLocatorToken
   ): Promise<TriggeredBuildLocation> {
-    return origin.kind === "queue"
-      ? this.locateQueued(origin, token)
-      : this.locateByCause(origin, token);
+    const deadline = Date.now() + this.timeoutMs;
+    const discovery =
+      origin.kind === "queue"
+        ? this.locateQueued(origin, token, deadline)
+        : this.locateByCause(origin, token, deadline);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const location = await Promise.race([
+        discovery,
+        new Promise<TriggeredBuildLocation>((resolve) => {
+          timer = setTimeout(
+            () => resolve({ kind: "unknown" }),
+            Math.max(0, deadline - Date.now())
+          );
+        })
+      ]);
+      return Date.now() < deadline && !token?.isCancellationRequested
+        ? location
+        : { kind: "unknown" };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async locateQueued(
     origin: QueueTriggeredBuildOrigin,
-    token: TriggeredBuildLocatorToken | undefined
+    token: TriggeredBuildLocatorToken | undefined,
+    deadline: number
   ): Promise<TriggeredBuildLocation> {
     if (!origin.queueLocation) {
       return { kind: "unknown" };
@@ -135,28 +169,88 @@ export class TriggeredBuildLocator {
     const outcome = await this.queuedBuildWaiter.awaitQueuedBuild(
       origin.environment,
       origin.queueLocation,
-      { timeoutMs: this.timeoutMs, maxPollIntervalMs: this.maxPollIntervalMs, token }
+      {
+        timeoutMs: this.timeoutMs,
+        maxPollIntervalMs: this.maxPollIntervalMs,
+        token,
+        submittedJobUrl: origin.jobUrl,
+        ...(origin.observations && { observations: origin.observations })
+      }
     );
     if (outcome.kind !== "started") {
       return outcome;
     }
-    return startedBuild(origin, outcome.number);
+    const build = {
+      environment: origin.environment,
+      buildUrl: outcome.url,
+      buildNumber: outcome.number,
+      label: `${origin.label} #${outcome.number}`
+    };
+    if (!outcome.fallbackUrl)
+      return {
+        kind: "started",
+        ...build,
+        ...(isBuildQueueId(outcome.observedRunQueueId) && {
+          observedRunQueueId: outcome.observedRunQueueId
+        }),
+        ...(outcome.queueStatus && { queueStatus: outcome.queueStatus })
+      };
+    const id = parseQueueItemId(origin.queueLocation);
+    const active = () => !token?.isCancellationRequested && Date.now() < deadline;
+    if (!id || !active()) return { kind: "unknown" };
+    const evidence =
+      origin.observations ??
+      new QueueItemEvidence({ environment: origin.environment, queueId: id, label: origin.label });
+    const executable = { ...build, fallbackUrl: outcome.fallbackUrl };
+    const verify = () =>
+      evidence.selectExecutable(
+        executable,
+        async (target) => {
+          const requestOrder = nextBuildObservationOrder();
+          const details = await this.dataService.getBuildDetails(
+            target.environment,
+            target.buildUrl,
+            {
+              statusOnly: true,
+              bypassCache: true
+            }
+          );
+          return { ...details, requestOrder };
+        },
+        active
+      );
+    const verifyWithBackoff = async () => {
+      const backoff = createPollBackoff(this.pollIntervalMs, this.maxPollIntervalMs);
+      for (let attempt = 1; active(); attempt++) {
+        try {
+          return await verify();
+        } catch (error) {
+          if (isTerminalClientError(error) || attempt >= MAX_CONSECUTIVE_ERRORS || !active()) break;
+          await delay(Math.min(backoff.next(), deadline - Date.now()));
+        }
+      }
+      return undefined;
+    };
+    const selected = await verifyWithBackoff();
+    return selected ? { kind: "started", ...selected } : { kind: "unknown" };
   }
 
   private async locateByCause(
     origin: CauseTriggeredBuildOrigin,
-    token: TriggeredBuildLocatorToken | undefined
+    token: TriggeredBuildLocatorToken | undefined,
+    deadline: number
   ): Promise<TriggeredBuildLocation> {
-    const deadline = Date.now() + this.timeoutMs;
     const backoff = createPollBackoff(this.pollIntervalMs, this.maxPollIntervalMs);
     const lastCandidate = origin.firstCandidateNumber + this.candidateWindow - 1;
     let candidate = origin.firstCandidateNumber;
     let consecutiveErrors = 0;
+    const expired = () => Date.now() >= deadline || token?.isCancellationRequested;
     while (candidate <= lastCandidate) {
-      if (token?.isCancellationRequested || Date.now() >= deadline) {
+      if (expired()) {
         return { kind: "unknown" };
       }
       const buildUrl = buildActionUrl(origin.jobUrl, `${candidate}/`);
+      const requestOrder = nextBuildObservationOrder();
       let details: JenkinsBuildDetails;
       try {
         details = await this.dataService.getBuildDetails(origin.environment, buildUrl, {
@@ -168,25 +262,15 @@ export class TriggeredBuildLocator {
         if (isNotFoundError(error)) {
           // The candidate has not started yet; wait and look at the same number again.
           consecutiveErrors = 0;
-          await delay(backoff.next());
-          continue;
-        }
-        consecutiveErrors += 1;
-        if (isClientError(error) || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        } else if (isClientError(error) || ++consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
           return { kind: "unknown" };
         }
-        await delay(backoff.next());
+        await delay(Math.max(0, Math.min(backoff.next(), deadline - Date.now())));
         continue;
       }
-      if (
-        matchesTriggerCause(
-          collectCauses(details),
-          origin.cause,
-          origin.sourceBuildNumber,
-          origin.stageName
-        )
-      ) {
-        return startedBuild(origin, candidate);
+      if (expired()) return { kind: "unknown" };
+      if (matchesCauseCandidate(details, origin, candidate)) {
+        return observedCauseBuild(origin, candidate, buildUrl, requestOrder, details);
       }
       // Another trigger took this number; ours, if it started, is later.
       candidate += 1;
@@ -195,14 +279,52 @@ export class TriggeredBuildLocator {
   }
 }
 
-function startedBuild(origin: TriggeredBuildOrigin, buildNumber: number): TriggeredBuildLocation {
+function matchesCauseCandidate(
+  details: JenkinsBuildDetails,
+  origin: CauseTriggeredBuildOrigin,
+  candidate: number
+): boolean {
+  return (
+    details.number === candidate &&
+    matchesTriggerCause(
+      collectCauses(details),
+      origin.cause,
+      origin.sourceBuildNumber,
+      origin.stageName
+    )
+  );
+}
+
+function observedCauseBuild(
+  origin: CauseTriggeredBuildOrigin,
+  candidate: number,
+  buildUrl: string,
+  requestOrder: number,
+  details: JenkinsBuildDetails
+): TriggeredBuildLocation {
+  const verifiedEndpoint =
+    resolveBuildIdentityForEnvironment(
+      origin.environment.url,
+      buildUrl,
+      "request",
+      { buildNumber: candidate },
+      "configured"
+    )?.buildNumber === candidate;
   return {
     kind: "started",
     environment: origin.environment,
-    // Jenkins' configured root URL may differ from the reachable proxy host or context path.
-    buildUrl: buildActionUrl(origin.jobUrl, `${buildNumber}/`),
-    buildNumber,
-    label: `${origin.label} #${buildNumber}`
+    buildUrl,
+    buildNumber: candidate,
+    ...(isBuildQueueId(details.queueId) ? { queueId: details.queueId } : {}),
+    ...(verifiedEndpoint
+      ? {
+          causeObservation: {
+            requestOrder,
+            building: typeof details.building === "boolean" ? details.building : undefined
+          }
+        }
+      : {}),
+    label: `${origin.label} #${candidate}`
   };
 }
 

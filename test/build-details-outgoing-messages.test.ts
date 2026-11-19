@@ -213,6 +213,36 @@ describe("Build Details outgoing messages", () => {
     );
   });
 
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "updates status, stages and tests without a follow action for build %s",
+    (number) => {
+      const state = new BuildDetailsPanelState();
+      const environment = {
+        scope: "workspace" as const,
+        environmentId: "env",
+        url: "https://jenkins.example/"
+      };
+      const url = `${environment.url}job/demo/${number}/`;
+      state.resetForLoad(environment, url, "current");
+      state.updateDetails({ number, url, queueId: 12, building: true });
+      state.setPipelineRun({
+        stages: [{ key: "unit", name: "Unit", steps: [], parallelBranches: [] }]
+      });
+      state.setTestReport({ totalCount: 5, passCount: 5 });
+
+      const message = JSON.parse(JSON.stringify(buildUpdateMessageFromState(state)));
+      const update = parseBuildDetailsOutgoingMessage(message);
+      assert.ok(update?.type === "updateDetails");
+      assert.equal(update.resultClass, "running");
+      assert.equal(update.pipelineStages[0]?.name, "Unit");
+      assert.equal(update.testState.summary.totalCount, 5);
+      assert.equal(update.canManage, true);
+      assert.ok(!("buildNumber" in update));
+      assert.ok(!("queueId" in update));
+      assert.equal(state.getRunningFollowTarget(), undefined);
+    }
+  );
+
   it("accepts updateDetails messages produced by the host update builder", () => {
     const empty = new BuildDetailsPanelState();
     const populated = new BuildDetailsPanelState();

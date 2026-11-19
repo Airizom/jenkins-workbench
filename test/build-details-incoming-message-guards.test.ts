@@ -11,7 +11,8 @@ import {
   isDownloadAllArtifactsMessage,
   isOpenPendingInputInJenkinsMessage,
   isPersistUiStateMessage,
-  isSelectPipelineLogNodeMessage
+  isSelectPipelineLogNodeMessage,
+  parseBuildDetailsOutgoingMessage
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelMessages";
 import type { PipelineLogTargetViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import {
@@ -23,6 +24,43 @@ import {
 const validTarget = { key: "stage-1", kind: "stage", name: "Build", nodeId: "12" };
 
 describe("build details incoming message guards", () => {
+  it("routes only follow requests carrying a boolean and the displayed load token", () => {
+    const onSetBuildFollowing = vi.fn();
+    const router = new BuildDetailsMessageRouter({
+      onSetBuildFollowing
+    } as unknown as BuildDetailsMessageRouterHandlers);
+    const input = {
+      type: "setBuildFollowing",
+      followTargetToken: 5,
+      loadToken: 4,
+      buildNumber: 9,
+      queueId: 77,
+      following: true
+    };
+    router.route(input);
+    const output = { ...input, type: "buildFollowingChanged" };
+    assert.deepEqual(parseBuildDetailsOutgoingMessage(output), output);
+    for (const invalid of [
+      { followTargetToken: undefined },
+      { followTargetToken: 0 },
+      { followTargetToken: -1 },
+      { followTargetToken: 1.5 },
+      { followTargetToken: "5" },
+      { loadToken: "4" },
+      { loadToken: 1.5 },
+      { buildNumber: undefined },
+      { buildNumber: 0 },
+      { queueId: 0 },
+      { queueId: -1 },
+      { queueId: "77" },
+      { following: undefined }
+    ]) {
+      router.route({ ...input, ...invalid });
+      assert.equal(parseBuildDetailsOutgoingMessage({ ...output, ...invalid }), undefined);
+    }
+    assert.deepEqual(onSetBuildFollowing.mock.calls, [[input]]);
+  });
+
   it("accepts only the archive download message type", () => {
     assert.equal(isDownloadAllArtifactsMessage({ type: "downloadAllArtifacts" }), true);
     for (const message of [

@@ -93,7 +93,13 @@ function fixture() {
     locator,
     queuedBuildWaiter: waiter,
     actions: { showBuildDetails: vi.fn(), previewLog: vi.fn() },
-    completionTracker: { follow: vi.fn(() => true) },
+    completionTracker: {
+      onDidNotifyCompletion: () => ({ dispose() {} }),
+      observeBuildIdentity: () => undefined,
+      watchQueueCancellation: () => ({ claim: () => true, dispose() {} }),
+      beginSubmittedQueueDiscovery: () => ({ finish() {} }),
+      followStartedBuild: vi.fn(async () => "following" as const)
+    },
     isEnabled: () => followEnabled
   });
   const refreshHost = { fullEnvironmentRefresh: vi.fn(() => ({ executed: true })) };
@@ -154,7 +160,8 @@ describe("LocalJenkinsfileReplayWorkflow", () => {
     );
     expect(waiter.awaitQueuedBuildStart).toHaveBeenCalledWith(
       environment,
-      "https://jenkins.example/queue/item/12/"
+      "https://jenkins.example/queue/item/12/",
+      jobUrl
     );
     expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({ environmentId: "env-1" });
     expect(showInformationMessage).toHaveBeenCalledWith(expect.stringContaining("folder/demo #9"));

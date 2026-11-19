@@ -145,6 +145,11 @@ describe("Jenkins task-runner manifest contract", () => {
 });
 
 describe("normalizeJobUrl context paths", () => {
+  it("keeps an advertised servlet prefix inside the configured controller", () => {
+    const jobUrl = "https://ci.example/jenkins/job/app/";
+    assert.deepEqual(normalizeJobUrl("https://ci.example/", jobUrl), { jobUrl });
+  });
+
   it("does not treat a context path named job as a job route", () => {
     const environmentUrl = "https://ci.example/job/";
     assert.ok("error" in normalizeJobUrl(environmentUrl, "https://ci.example/job/login"));

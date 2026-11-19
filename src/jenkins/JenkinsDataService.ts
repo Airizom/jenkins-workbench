@@ -272,9 +272,10 @@ export class JenkinsDataService
 
   async getWorkflowRun(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    run?: Pick<JenkinsBuildDetails, "queueId" | "result">
   ): Promise<JenkinsWorkflowRun | undefined> {
-    return this.buildOperations.getWorkflowRun(environment, buildUrl);
+    return this.buildOperations.getWorkflowRun(environment, buildUrl, run);
   }
 
   async discoverCoverageActionPath(

@@ -218,7 +218,37 @@ describe("BuildStopEscalation", () => {
     assert.equal(h.refreshHost.fullEnvironmentRefresh.mock.calls.length, 0);
   });
 
-  it("ignores a stale prompt choice for a build a newer follow-up took over", async () => {
+  it("keeps separate escalation owners for an opaque run and its same-number classic sibling", async () => {
+    const h = harness({ 42: { className: PIPELINE, building: true } });
+    const classic = build(42);
+    const url = `${environment.url}view/team/custom-runs/job/demo/42/`;
+    const custom = Object.assign(build(42), { buildUrl: url });
+    const first = h.escalation.followUp("stop", [custom]);
+    const second = h.escalation.followUp("terminate", [classic]);
+    await settle(Promise.all([first, second]).then(() => {}));
+    assert.equal(warning.mock.calls.length, 2);
+    assert.deepEqual(
+      new Set(h.getBuildStopState.mock.calls.map(([, endpoint]) => endpoint)),
+      new Set([url, classic.buildUrl])
+    );
+  });
+
+  it("polls the exact proxy-reported folder build and its distinct same-number sibling", async () => {
+    const h = harness({ 7: { className: PIPELINE, building: false } });
+    const env = { ...environment, url: "https://public/job/" };
+    const nested = Object.assign(build(7, env), {
+      buildUrl: "http://internal/job/team/job/app/7/"
+    });
+    const sibling = Object.assign(build(7, env), { buildUrl: `${env.url}job/app/7/` });
+    const unresolved = Object.assign(build(7, env), { buildUrl: "http://internal/plugin/runs/7/" });
+    await settle(h.escalation.followUp("stop", [nested, sibling, unresolved]));
+    assert.deepEqual(h.getBuildStopState.mock.calls, [
+      [env, `${env.url}job/team/job/app/7/`],
+      [env, sibling.buildUrl]
+    ]);
+  });
+
+  it("ignores a stale prompt when a newer follow-up takes over through a different view alias", async () => {
     const h = harness({ 1: { className: PIPELINE, building: true } });
     let choose: ((value: unknown) => void) | undefined;
     warning.mockImplementationOnce(
@@ -227,9 +257,11 @@ describe("BuildStopEscalation", () => {
           choose = resolve;
         })
     );
-    const older = h.escalation.followUp("stop", [build(1)]);
+    const alias = Object.assign(build(1), { buildUrl: "view/All/job/demo/1/" });
+    const older = h.escalation.followUp("stop", [alias]);
     await vi.advanceTimersByTimeAsync(15000);
     assert.ok(choose);
+    assert.equal(h.getBuildStopState.mock.calls[0][1], environment.url + alias.buildUrl);
     const newer = h.escalation.followUp("terminate", [build(1)]);
     choose?.("Terminate");
     await settle(Promise.all([older, newer]).then(() => {}));

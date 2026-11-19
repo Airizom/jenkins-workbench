@@ -18,7 +18,7 @@ function classifyUrl(input: string): Extract<BuildReferenceInput, { kind: "url" 
   return result as Extract<BuildReferenceInput, { kind: "url" }>;
 }
 
-function resolve(input: string, environmentUrl = ENV): ResolvedBuildReference {
+function resolve(input: string, environmentUrl = ENV) {
   return resolveBuildReferenceUrl(classifyUrl(input).url, environmentUrl);
 }
 
@@ -141,13 +141,41 @@ describe("resolveBuildReferenceUrl", () => {
     );
   });
 
+  it.each(["alice", "job"])(
+    "opens a build shared from %s's personal view under a context",
+    (user) => {
+      assert.deepEqual(
+        resolve(`${CONTEXT_ENV}user/${user}/my-views/view/Active/job/app/42/console`, CONTEXT_ENV),
+        expectBuild(`${CONTEXT_ENV}job/app/`, 42)
+      );
+    }
+  );
+
   it.each([
     "https://ci.example/view/All/job/a/job/b/12/",
+    "https://ci.example/view/job/job/a/view/job/job/b/12/",
     "https://ci.example/view/Outer/view/Inner/job/a/job/b/12/console",
     "https://ci.example/job/a/view/Folder%20View/job/b/12/"
   ])("canonicalizes view-scoped URL %s to the environment root", (input) => {
     assert.deepEqual(resolve(input), expectBuild("https://ci.example/job/a/job/b/", 12));
   });
+
+  it("opens a shared matrix configuration run", () => {
+    assert.deepEqual(
+      resolve("https://ci.example/view/job/job/matrix/os=linux,jdk=21/7/console"),
+      expectBuild("https://ci.example/job/matrix/os=linux,jdk=21/", 7)
+    );
+  });
+
+  it.each(["console", "artifact/job/report/index.html", "artifact/job/foo/7/"])(
+    "opens the owning build for a view-mounted link to %s",
+    (subpage) => {
+      assert.deepEqual(
+        resolve(`${ENV}view/job/app/42/${subpage}`),
+        expectBuild(`${ENV}job/app/`, 42)
+      );
+    }
+  );
 
   it("round-trips encoded nested folder names exactly", () => {
     assert.deepEqual(

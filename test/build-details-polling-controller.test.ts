@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
 import type { JenkinsBuildDetails, JenkinsWorkflowRun } from "../src/jenkins/types";
+import { BuildDetailsPanelState } from "../src/panels/buildDetails/BuildDetailsPanelState";
 import { BuildDetailsPollingController } from "../src/panels/buildDetails/BuildDetailsPollingController";
 import { ConsoleStreamManager } from "../src/panels/buildDetails/ConsoleStreamManager";
 
@@ -22,8 +23,14 @@ function createController(
   getBuildDetails: () => Promise<JenkinsBuildDetails>,
   getWorkflowRun: () => Promise<JenkinsWorkflowRun | undefined> = async () => undefined,
   onErrors: (errors: string[]) => void = () => {},
-  onComplete: (details: JenkinsBuildDetails) => void = () => {}
+  onComplete: (details: JenkinsBuildDetails) => void = () => {},
+  state = new BuildDetailsPanelState()
 ): BuildDetailsPollingController {
+  state.resetForLoad(
+    { environmentId: "env", scope: "global", url: "https://jenkins.example/" },
+    buildUrl,
+    "load"
+  );
   return new BuildDetailsPollingController({
     statusBackend: { getBuildDetails, getWorkflowRun },
     testsBackend: {} as never,
@@ -44,7 +51,9 @@ function createController(
     getRefreshIntervalMs: () => 1,
     formatError: (error) => String(error),
     callbacks: {
-      onDetails: () => {},
+      getBuilding: () => state.currentDetails?.building,
+      getRunTarget: () => state.runTarget,
+      onDetails: (details) => state.updateDetails(details),
       onWorkflowRun: () => {},
       onWorkflowError: () => {},
       onPendingInputs: () => {},
@@ -64,7 +73,7 @@ async function nextTurn(): Promise<void> {
 }
 
 describe("BuildDetailsPollingController concurrent fetches", () => {
-  it("handles an early workflow rejection while initial details are pending", async () => {
+  it("waits for the identified initial Run and reports a workflow rejection", async () => {
     const pending = deferredDetails();
     const failure = new Error("workflow failed");
     const unhandled: unknown[] = [];
@@ -72,17 +81,16 @@ describe("BuildDetailsPollingController concurrent fetches", () => {
       unhandled.push(reason);
     };
     process.on("unhandledRejection", onUnhandled);
-    const controller = createController(
-      () => pending.promise,
-      async () => {
-        throw failure;
-      }
-    );
+    const workflow = vi.fn(async () => {
+      throw failure;
+    });
+    const controller = createController(() => pending.promise, workflow);
 
     try {
       const load = controller.loadInitial();
       await nextTurn();
       assert.deepEqual(unhandled, []);
+      assert.equal(workflow.mock.calls.length, 0);
       pending.resolve(details);
       const result = await load;
       assert.equal(result.details, details);
@@ -173,8 +181,38 @@ describe("BuildDetailsPollingController concurrent fetches", () => {
     }
   });
 
+  it("continues polling a running build through a partial status and emits one explicit completion", async () => {
+    vi.useFakeTimers();
+    const state = new BuildDetailsPanelState();
+    const running = { ...details, building: true, queueId: 8 };
+    const pending = { number: 1, url: buildUrl };
+    const terminal = { ...details, result: "SUCCESS" };
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce(running)
+      .mockResolvedValueOnce(pending)
+      .mockResolvedValueOnce(terminal);
+    const completed = vi.fn();
+    const controller = createController(read, undefined, undefined, completed, state);
+    try {
+      state.applyInitialState(await controller.loadInitial(), undefined, undefined);
+      controller.start();
+      await vi.advanceTimersToNextTimerAsync();
+      assert.equal(completed.mock.calls.length, 0);
+      assert.equal(state.currentDetails?.building, true);
+      assert.equal(state.currentDetails?.queueId, 8);
+      await vi.advanceTimersToNextTimerAsync();
+      assert.deepEqual(completed.mock.calls, [[terminal]]);
+      assert.equal(state.currentDetails?.building, false);
+    } finally {
+      controller.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it("still reports completion when stopped during the completing poll's workflow fetch", async () => {
     let building = true;
+    const state = new BuildDetailsPanelState();
     let workflowCalls = 0;
     let resolveWorkflow!: (value: JenkinsWorkflowRun | undefined) => void;
     let signalWorkflowStarted!: () => void;
@@ -195,11 +233,12 @@ describe("BuildDetailsPollingController concurrent fetches", () => {
         });
       },
       undefined,
-      (value) => completed.push(value)
+      (value) => completed.push(value),
+      state
     );
 
     try {
-      await controller.loadInitial();
+      state.applyInitialState(await controller.loadInitial(), undefined, undefined);
       building = false;
       controller.start();
       await workflowStarted;

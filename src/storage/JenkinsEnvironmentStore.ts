@@ -2,7 +2,12 @@ import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 import { parseAuthConfig } from "../jenkins/auth";
 import type { JenkinsAuthConfig } from "../jenkins/types";
-import { ensureTrailingSlash, getUrlOrigin, stripUrlCredentials } from "../jenkins/urls";
+import {
+  ensureTrailingSlash,
+  getUrlOrigin,
+  normalizeJenkinsUrlForComparison,
+  stripUrlCredentials
+} from "../jenkins/urls";
 import {
   type DeclaredEnvironmentRecord,
   type DeclaredEnvironmentView,
@@ -197,11 +202,27 @@ export class JenkinsEnvironmentStore {
     return isDeclaredEnvironmentId(id);
   }
 
-  /** Resolves TLS policy from current state rather than a potentially stale environment reference. */
-  getAllowInsecureTls(scope: EnvironmentScope, id: string, url: string): boolean {
-    const environment = isDeclaredEnvironmentId(id)
+  private currentRecord(scope: EnvironmentScope, id: string) {
+    return isDeclaredEnvironmentId(id)
       ? this.declared?.getDeclaration(scope, id)
       : this.readStored(scope).find((entry) => entry?.id === id);
+  }
+
+  isCurrentController(scope: EnvironmentScope, id: string, url: string): boolean {
+    // Removing a shared environment hides it locally while its declaration stays in settings.
+    if (isDeclaredEnvironmentId(id) && this.declared?.getLocalState(scope, id).hidden) {
+      return false;
+    }
+    const current = this.currentRecord(scope, id);
+    return (
+      current !== undefined &&
+      normalizeJenkinsUrlForComparison(current.url) === normalizeJenkinsUrlForComparison(url)
+    );
+  }
+
+  /** Resolves TLS policy from current state rather than a potentially stale environment reference. */
+  getAllowInsecureTls(scope: EnvironmentScope, id: string, url: string): boolean {
+    const environment = this.currentRecord(scope, id);
     return (
       environment !== undefined &&
       hasInsecureTls(environment) &&

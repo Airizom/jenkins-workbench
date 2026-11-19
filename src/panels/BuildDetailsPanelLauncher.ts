@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { TestSourceNavigationUiService } from "../services/TestSourceNavigationUiService";
 import type { TestSourceResolver } from "../services/TestSourceResolver";
+import type { BuildRunExpectation } from "../shared/build/BuildCompletionEvidence";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { BuildDetailsPanel, type BuildDetailsPanelServices } from "./BuildDetailsPanel";
 
@@ -16,6 +17,7 @@ export interface BuildDetailsPanelLaunchRequest {
   buildUrl: string;
   label?: string;
   pipelineNodeSelection?: PipelineNodeSelection;
+  expectedRun?: BuildRunExpectation;
 }
 
 export interface BuildDetailsPanelLauncherOptions extends BuildDetailsPanelServices {
@@ -31,10 +33,7 @@ export class BuildDetailsPanelLauncher {
   async show(request: BuildDetailsPanelLaunchRequest): Promise<void> {
     await BuildDetailsPanel.show({
       ...this.options,
-      environment: request.environment,
-      buildUrl: request.buildUrl,
-      label: request.label,
-      pipelineNodeSelection: request.pipelineNodeSelection
+      ...request
     });
   }
 

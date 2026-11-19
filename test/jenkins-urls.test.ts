@@ -7,7 +7,9 @@ import {
   canonicalizeJobUrlForEnvironment,
   isAuthRedirect,
   parseBuildUrl,
-  parseJobUrl
+  parseJobUrl,
+  resolveBuildIdentityForEnvironment,
+  resolveExactJobUrlForEnvironment
 } from "../src/jenkins/urls";
 
 describe("Jenkins URL parsers", () => {
@@ -51,6 +53,138 @@ describe("Jenkins URL parsers", () => {
     );
   });
 
+  it.each([
+    ["https://public/job/", "http://internal/job/team/job/app/7/", "job/team/job/app/7/"],
+    ["https://public/job/", "https://public/job/team/job/app/7/", "job/team/job/app/7/"],
+    ["https://public/job/", "https://public/job/job/team/job/app/7/", "job/team/job/app/7/"],
+    ["https://public/job/", "/job/team/job/app/7/", "job/team/job/app/7/"],
+    ["https://public/job/team/", "/job/team/job/app/7/", undefined],
+    ["https://public/job/team/", "job/app/7/", "job/app/7/"],
+    ["https://public/job/team/", "//public/job/team/job/app/7/", "job/app/7/"],
+    ["https://public/view/", "http://internal/view/job/job/team/job/app/7/", "job/team/job/app/7/"],
+    ["https://public/job/", "http://internal/job/job/job/view/7/", "job/job/job/view/7/"],
+    ["https://public/job/", "http://internal/job/view/job/job/job/7/", "job/job/7/"],
+    ["https://public/job/team/", "https://public/job/team/job/app/7/", "job/app/7/"],
+    ["https://public/job/job/", "http://internal/job/job/job/app/7/", undefined]
+  ])("checks both route boundaries for %s and %s", (configured, reported, suffix) => {
+    assert.equal(
+      resolveBuildIdentityForEnvironment(configured, reported)?.buildUrl,
+      suffix ? `${configured}${suffix}` : undefined
+    );
+  });
+
+  it("requires a route boundary after the configured context for a same-origin queue task", () => {
+    const environmentUrl = "https://public/job/";
+    const nested = "https://public/job/job/team/job/app/";
+    assert.equal(
+      resolveExactJobUrlForEnvironment(environmentUrl, "https://public/job/team/job/app/"),
+      nested
+    );
+    assert.equal(resolveExactJobUrlForEnvironment(environmentUrl, nested), nested);
+  });
+
+  it.each(["job/app/", "view/All/job/app/"])(
+    "recognizes %s after an internal controller's view context",
+    (path) => {
+      const environmentUrl = "https://public/ci/";
+      const task = `http://internal/view/${path}`;
+      assert.equal(
+        canonicalizeJobUrlForEnvironment(environmentUrl, task),
+        `${environmentUrl}job/app/`
+      );
+      assert.equal(
+        canonicalizeJobUrlForEnvironment(environmentUrl, `https://public/view/${path}`),
+        `${environmentUrl}job/app/`
+      );
+      assert.equal(
+        resolveExactJobUrlForEnvironment(environmentUrl, task),
+        `${environmentUrl}job/app/`
+      );
+      assert.equal(
+        resolveBuildIdentityForEnvironment(environmentUrl, `${task}7/`)?.buildUrl,
+        `${environmentUrl}job/app/7/`
+      );
+      assert.equal(
+        resolveBuildIdentityForEnvironment(
+          environmentUrl,
+          "http://internal/view/job/job/os=linux/7/"
+        )?.buildUrl,
+        undefined
+      );
+    }
+  );
+
+  it.each([
+    ["http://internal", "https://public/ci/"],
+    ["https://public", "https://public/ci/"],
+    ["http://internal", "https://public/"],
+    ["https://public", "https://public/"]
+  ])(
+    "skips an internal proxy prefix containing view segments on %s for controller %s",
+    (origin, env) => {
+      for (const prefix of ["view/team/jenkins", "view", "view/view/All"]) {
+        const task = `${origin}/${prefix}/job/app/`;
+        assert.equal(canonicalizeJobUrlForEnvironment(env, task), `${env}job/app/`);
+        const publicViewAction = task.startsWith(env);
+        assert.equal(
+          resolveExactJobUrlForEnvironment(env, task),
+          publicViewAction ? undefined : `${env}job/app/`
+        );
+        assert.equal(
+          resolveBuildIdentityForEnvironment(env, `${task}7/`, "request", { buildNumber: 7 })
+            ?.buildUrl,
+          publicViewAction ? `${task}7/` : `${env}job/app/7/`
+        );
+      }
+      const ambiguous = `${origin}/view/job/jenkins/job/app/`;
+      assert.equal(resolveExactJobUrlForEnvironment(env, ambiguous), undefined);
+      assert.equal(resolveBuildIdentityForEnvironment(env, `${ambiguous}7/`)?.buildUrl, undefined);
+    }
+  );
+
+  it("requires a job route after a configured job-shaped context in a run-parameter reference", () => {
+    const environmentUrl = "https://ci/job/team/";
+    assert.equal(parseJobUrl(`${environmentUrl}upstream/`, environmentUrl), undefined);
+    assert.deepEqual(parseJobUrl(`${environmentUrl}job/upstream/`, environmentUrl)?.fullPath, [
+      "upstream"
+    ]);
+  });
+
+  it.each(["https://public", "http://internal"])(
+    "recognizes a job-shaped mount on %s and stops at a numbered build subpage",
+    (origin) => {
+      const env = "https://public/";
+      const task = `${origin}/job/job/team/job/app/`;
+      assert.equal(resolveExactJobUrlForEnvironment(env, task), `${env}job/team/job/app/`);
+      assert.equal(
+        resolveBuildIdentityForEnvironment(env, `${task}7/`)?.buildUrl,
+        `${env}job/team/job/app/7/`
+      );
+      const artifact = `${origin}/view/job/app/42/artifact/job/foo/7/`;
+      assert.equal(
+        resolveBuildIdentityForEnvironment(env, artifact, "request", { buildNumber: 7 }),
+        undefined
+      );
+    }
+  );
+
+  it.each(["os=linux", "com.example$library"])(
+    "requires an unambiguous plain job before deriving a run URL for %s",
+    (child) => {
+      const environmentUrl = "https://public/job/";
+      const taskPath = `job/job/job/${child}/`;
+      assert.equal(resolveExactJobUrlForEnvironment(environmentUrl, `/${taskPath}`), undefined);
+      assert.equal(
+        resolveExactJobUrlForEnvironment(environmentUrl, `http://internal/${taskPath}`),
+        undefined
+      );
+      assert.equal(
+        resolveExactJobUrlForEnvironment(environmentUrl, `${environmentUrl}${taskPath}`),
+        `${environmentUrl}job/job/job/${encodeURIComponent(child)}/`
+      );
+    }
+  );
+
   it("retains canonicalization for URLs outside the environment context", () => {
     assert.equal(
       canonicalizeJobUrlForEnvironment(
@@ -60,6 +194,33 @@ describe("Jenkins URL parsers", () => {
       "https://jenkins.example/job/job/demo/"
     );
   });
+
+  it("preserves advertised parents for rebuild and comparison and canonical action endpoints", () => {
+    const environmentUrl = "https://ci/";
+    for (const prefix of ["jenkins/", "plugin/example/"]) {
+      const parent = `${environmentUrl}${prefix}job/app/`;
+      assert.deepEqual(parseBuildUrl(`${parent}42/`, environmentUrl), {
+        jobUrl: parent,
+        buildNumber: 42
+      });
+      assert.equal(
+        canonicalizeBuildUrlForEnvironment(environmentUrl, `${parent}42/`),
+        "https://ci/job/app/42/"
+      );
+    }
+  });
+
+  it.each(["os=linux,jdk=21", "com.example$module"])(
+    "retains project child %s in the command target",
+    (child) => {
+      const parent = `https://ci/mount/view/job/job/app/${child}/`;
+      assert.deepEqual(parseBuildUrl(`${parent}42/`, "https://ci/"), {
+        jobUrl: parent,
+        buildNumber: 42
+      });
+      assert.equal(canonicalizeBuildUrlForEnvironment("https://ci/", `${parent}42/`), undefined);
+    }
+  );
 
   it("parses nested job paths with a Jenkins context path", () => {
     assert.deepEqual(

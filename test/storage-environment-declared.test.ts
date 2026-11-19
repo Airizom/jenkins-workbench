@@ -276,6 +276,23 @@ describe("JenkinsEnvironmentStore with settings declarations", () => {
     expect(await registry.hideDeclaredEnvironment("workspace", "settings:missing")).toBe(false);
   });
 
+  it("rejects a hidden controller before removal is announced and recognizes it after restore", async () => {
+    const environment = declared("ci", "https://ci.example/");
+    const { store, registry, changes, invalidateClient } = setup([environment]);
+    const isCurrent = () =>
+      store.isCurrentController(environment.scope, environment.id, environment.url);
+    expect(isCurrent()).toBe(true);
+    invalidateClient.mockImplementationOnce(() => {
+      expect(changes).toEqual([]);
+      expect(isCurrent()).toBe(false);
+    });
+    await registry.hideDeclaredEnvironment(environment.scope, environment.id);
+    expect(invalidateClient).toHaveBeenCalledWith(environment.scope, environment.id);
+    expect(isCurrent()).toBe(false);
+    await registry.unhideEnvironment(environment.scope, environment.id);
+    expect(isCurrent()).toBe(true);
+  });
+
   it("reads TLS policy from user-level declarations", () => {
     const { store } = setup([
       declared("personal", "https://personal.example/", {

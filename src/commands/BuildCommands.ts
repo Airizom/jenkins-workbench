@@ -4,7 +4,6 @@ import type { BuildComparePanelLauncher } from "../panels/BuildComparePanelLaunc
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { BuildDescriptionDraftManager } from "../services/BuildDescriptionDraftManager";
 import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
-import type { BuildCompletionTracker } from "../services/buildFollow/BuildCompletionTracker";
 import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
 import type {
@@ -53,11 +52,6 @@ export interface BuildManagementCommandDependencies {
   descriptionDraftManager: BuildDescriptionDraftManager;
 }
 
-export interface BuildFollowCommandDependencies {
-  service: BuildFollowUpService;
-  completionTracker: Pick<BuildCompletionTracker, "showFollowedBuilds">;
-}
-
 export function registerBuildCommands(
   context: vscode.ExtensionContext,
   dataService: JenkinsDataService,
@@ -66,7 +60,7 @@ export function registerBuildCommands(
   buildLogPreviewer: BuildLogPreviewer,
   buildComparePanelLauncher: BuildComparePanelLauncher,
   buildDetailsPanelLauncher: BuildDetailsPanelLauncher,
-  buildFollow: BuildFollowCommandDependencies,
+  buildFollowUp: BuildFollowUpService,
   replayBuildWorkflow: ReplayBuildWorkflow,
   localJenkinsfileReplayWorkflow: LocalJenkinsfileReplayWorkflow,
   refreshHost: BuildCommandRefreshHost,
@@ -74,7 +68,6 @@ export function registerBuildCommands(
   bulk: BulkCommandDependencies
 ): void {
   const { workflow: buildManagementWorkflow, descriptionDraftManager } = buildManagement;
-  const buildFollowUp = buildFollow.service;
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "jenkinsWorkbench.triggerBuild",
@@ -123,10 +116,6 @@ export function registerBuildCommands(
       "jenkinsWorkbench.rebuildBuildWithChanges",
       (item?: BuildTreeItem) =>
         rebuildBuildWithChanges(dataService, buildFollowUp, refreshHost, item)
-    ),
-    // SHOW_FOLLOWED_BUILDS_COMMAND; manifest validation needs registered ids as string literals.
-    vscode.commands.registerCommand("jenkinsWorkbench.showFollowedBuilds", () =>
-      buildFollow.completionTracker.showFollowedBuilds()
     ),
     vscode.commands.registerCommand("jenkinsWorkbench.openInJenkins", (item?: OpenableTreeItem) =>
       openInJenkins(item)

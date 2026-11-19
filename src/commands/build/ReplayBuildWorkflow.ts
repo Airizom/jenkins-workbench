@@ -10,6 +10,7 @@ import type { BuildCommandRefreshHost } from "./BuildCommandTypes";
 export interface ReplayBuildTarget {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
+  buildNumber: number;
   label: string;
 }
 
@@ -78,6 +79,7 @@ export class ReplayBuildWorkflow {
             kind: "cause",
             environment: session.environment,
             sourceBuildUrl: session.buildUrl,
+            sourceBuildNumber: session.buildNumber,
             cause: "replay",
             mayReturnQueueItem: true
           });
@@ -169,7 +171,8 @@ export class ReplayBuildWorkflow {
         target.environment,
         target.buildUrl,
         target.label,
-        definition
+        definition,
+        target.buildNumber
       );
     await this.draftManager.openSession(session);
   }

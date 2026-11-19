@@ -378,6 +378,21 @@
         "icon": "$(terminal)"
       },
       {
+        "command": "jenkinsWorkbench.followBuild",
+        "title": "Follow This Build",
+        "category": "Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.followQueueItem",
+        "title": "Follow Queue Item",
+        "category": "Jenkins"
+      },
+      {
+        "command": "jenkinsWorkbench.stopFollowing",
+        "title": "Stop Following",
+        "category": "Jenkins"
+      },
+      {
         "command": "jenkinsWorkbench.showFollowedBuilds",
         "title": "Show Followed Builds",
         "category": "Jenkins",
@@ -1741,7 +1756,7 @@
         },
         {
           "command": "jenkinsWorkbench.openInJenkins",
-          "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)queueItem(\\s|$)/",
           "group": "1_actions@0"
         },
         {
@@ -1886,7 +1901,7 @@
         },
         {
           "command": "jenkinsWorkbench.cancelQueueItem.single",
-          "when": "view == jenkinsWorkbench.tree && viewItem == queueItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)queueItem(\\s|$)/",
           "group": "inline@0"
         },
         {
@@ -1908,6 +1923,21 @@
           "command": "jenkinsWorkbench.compareWithBuild",
           "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)build(\\s|$)/",
           "group": "1_actions@0"
+        },
+        {
+          "command": "jenkinsWorkbench.followBuild",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)buildRunning(\\s|$)/ && !(viewItem =~ /(^|\\s)(followed|followUnavailable)(\\s|$)/)",
+          "group": "2_watch@0"
+        },
+        {
+          "command": "jenkinsWorkbench.followQueueItem",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)queueItem(\\s|$)/ && !(viewItem =~ /(^|\\s)followed(\\s|$)/)",
+          "group": "2_watch@0"
+        },
+        {
+          "command": "jenkinsWorkbench.stopFollowing",
+          "when": "view == jenkinsWorkbench.tree && viewItem =~ /(^|\\s)followed(\\s|$)/",
+          "group": "2_watch@0"
         },
         {
           "command": "jenkinsWorkbench.showBuildDetails",
@@ -2026,7 +2056,7 @@
         },
         {
           "command": "jenkinsWorkbench.cancelQueueItem",
-          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem == queueItem)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.cancel))",
+          "when": "view == jenkinsWorkbench.tree && ((!jenkinsWorkbench.bulkSelection.multiple && (viewItem =~ /(^|\\s)queueItem(\\s|$)/)) || (jenkinsWorkbench.bulkSelection.multiple && jenkinsWorkbench.bulkSelection.cancel))",
           "group": "3_destructive@0"
         },
         {
@@ -2205,6 +2235,18 @@
         },
         {
           "command": "jenkinsWorkbench.unpinJob.single",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.followBuild",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.followQueueItem",
+          "when": "false"
+        },
+        {
+          "command": "jenkinsWorkbench.stopFollowing",
           "when": "false"
         }
       ]

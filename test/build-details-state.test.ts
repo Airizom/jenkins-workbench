@@ -1,3 +1,4 @@
+import { buildFollowActionMessage } from "../src/panels/buildDetails/webview/buildDetailsWebviewMessages";
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type {
@@ -11,6 +12,85 @@ import {
 } from "../src/panels/buildDetails/webview/state/buildDetailsState";
 
 describe("buildInitialState", () => {
+  it("applies follow changes only for the current panel load", () => {
+    const initial = buildInitialState({ loadToken: 3 } as BuildDetailsViewModel);
+    const message = {
+      type: "buildFollowingChanged",
+      followTargetToken: 8,
+      loadToken: 3,
+      buildNumber: 9,
+      queueId: 77,
+      following: true
+    } as const;
+    const followed = buildDetailsReducer(initial, message);
+    assert.deepEqual(followed.followState, {
+      followTargetToken: 8,
+      buildNumber: 9,
+      queueId: 77,
+      following: true
+    });
+    assert.equal(
+      buildDetailsReducer(followed, { ...message, following: false, loadToken: 2 }),
+      followed
+    );
+    assert.equal(
+      buildDetailsReducer(followed, { ...message, following: false }).followState?.following,
+      false
+    );
+  });
+
+  it.each(["follow first", "details first"])(
+    "waits for the matching same-number header and follow token (%s)",
+    (order) => {
+      const initial = buildInitialState({
+        resultClass: "running",
+        loadToken: 3,
+        buildNumber: 9,
+        followTargetToken: 8
+      } as BuildDetailsViewModel);
+      const follow = {
+        type: "buildFollowingChanged",
+        loadToken: 3,
+        buildNumber: 9,
+        following: false,
+        followTargetToken: 8
+      } as const;
+      const original = buildDetailsReducer(initial, follow);
+      assert.equal(buildFollowActionMessage(initial), undefined);
+      assert.equal(buildFollowActionMessage(original)?.followTargetToken, 8);
+      const nextDetails = {
+        type: "updateDetails",
+        payload: { ...original, type: "updateDetails", followTargetToken: 9 }
+      } as const;
+      const nextFollow = { ...follow, followTargetToken: 9, following: true };
+      const intermediate = buildDetailsReducer(
+        original,
+        order === "details first" ? nextDetails : nextFollow
+      );
+      assert.equal(buildFollowActionMessage(intermediate), undefined);
+      const synced = buildDetailsReducer(
+        intermediate,
+        order === "details first" ? nextFollow : nextDetails
+      );
+      assert.deepEqual(buildFollowActionMessage(synced), {
+        type: "setBuildFollowing",
+        buildNumber: 9,
+        queueId: undefined,
+        loadToken: 3,
+        followTargetToken: 9,
+        following: false
+      });
+      const hidden = buildDetailsReducer(synced, {
+        ...nextFollow,
+        followTargetToken: 10,
+        buildNumber: null,
+        following: false
+      });
+      assert.equal(buildDetailsReducer(hidden, nextFollow), hidden);
+      assert.equal(buildFollowActionMessage(hidden), undefined);
+    }
+  );
+
   it("falls back when legacy initial state has no pipeline node log", () => {
     const state = buildInitialState({
       pipelineNodeLog: undefined

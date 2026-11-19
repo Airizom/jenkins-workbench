@@ -47,7 +47,15 @@ const relationships: BuildRelationshipsViewModel = {
 
 describe("related build messages", () => {
   it("accepts the webview hydration handshake only with the expected message type", () => {
-    assert.equal(isBuildDetailsReadyMessage({ type: "buildDetailsReady" }), true);
+    assert.equal(
+      isBuildDetailsReadyMessage({ type: "buildDetailsReady", loadToken: 1, documentId: "first" }),
+      true
+    );
+    assert.equal(isBuildDetailsReadyMessage({ type: "buildDetailsReady" }), false);
+    assert.equal(
+      isBuildDetailsReadyMessage({ type: "buildDetailsReady", loadToken: 0, documentId: "first" }),
+      false
+    );
     assert.equal(isBuildDetailsReadyMessage({ type: "ready" }), false);
     assert.equal(isBuildDetailsReadyMessage(null), false);
   });

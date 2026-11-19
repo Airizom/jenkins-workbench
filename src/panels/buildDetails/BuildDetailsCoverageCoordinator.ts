@@ -16,6 +16,7 @@ import {
 import type { BuildDetailsCoverageDecorationsAdapter } from "./BuildDetailsCoverageDecorationsAdapter";
 import { formatError } from "./BuildDetailsFormatters";
 import type { BuildDetailsPanelState } from "./BuildDetailsPanelState";
+import type { PanelRunTarget } from "./BuildDetailsRunIdentity";
 
 interface BuildDetailsCoverageCoordinatorOptions {
   state: BuildDetailsPanelState;
@@ -87,6 +88,10 @@ export class BuildDetailsCoverageCoordinator {
     this.options.decorationsAdapter.dispose();
   }
 
+  clearRunDecorations(): void {
+    this.options.decorationsAdapter.clear();
+  }
+
   handlePanelVisible(): void {
     this.options.decorationsAdapter.activate();
   }
@@ -95,12 +100,22 @@ export class BuildDetailsCoverageCoordinator {
     this.options.decorationsAdapter.deactivate();
   }
 
-  async refresh(token: number, options?: { showLoading?: boolean }): Promise<void> {
+  /** Returns false when part of the requested coverage data should be retried. */
+  async refresh(token: number, options?: { showLoading?: boolean }): Promise<boolean> {
+    if (!this.options.isTokenCurrent(token)) return true;
     const refreshGeneration = ++this.refreshGeneration;
+    const run = this.options.state.terminalRun;
+    const isCurrent = () =>
+      this.options.isTokenCurrent(token) &&
+      refreshGeneration === this.refreshGeneration &&
+      this.options.state.terminalRun === run;
     const plan = planCoverageRefresh({
       coverageBackend: this.options.getCoverageBackend(),
       environment: this.options.state.environment,
-      buildUrl: this.options.state.currentBuildUrl,
+      buildUrl:
+        this.options.state.currentDetails?.building === false
+          ? run?.buildUrl
+          : this.options.state.currentBuildUrl,
       details: this.options.state.currentDetails,
       coverageEnabled: getBuildDetailsCoverageEnabled(),
       decorationsEnabled: getBuildDetailsCoverageDecorationsEnabled(),
@@ -108,38 +123,40 @@ export class BuildDetailsCoverageCoordinator {
     });
 
     if (plan.kind === "skip") {
-      return;
+      return true;
     }
     if (plan.kind === "clear") {
       this.clearResolvedCoverage();
-      return;
+      return true;
     }
 
     try {
-      await this.loadCoverageForRequest(token, refreshGeneration, plan.request);
+      if (!run) return true;
+      return await this.loadCoverageForRequest(plan.request, run, isCurrent);
     } catch (error) {
-      this.handleRefreshError(token, refreshGeneration, error);
+      if (isCurrent()) this.handleRefreshError(error);
+      return false;
     }
   }
 
   private async loadCoverageForRequest(
-    token: number,
-    refreshGeneration: number,
-    request: CoverageRefreshRequest
-  ): Promise<void> {
+    request: CoverageRefreshRequest,
+    run: PanelRunTarget,
+    isCurrent: () => boolean
+  ): Promise<boolean> {
     const actionPath = hasCoverageAction(request.details)
       ? resolveCoverageActionPath(request.details)
       : await request.coverageBackend.discoverCoverageActionPath(
           request.environment,
           request.buildUrl,
-          { buildCompleted: true }
+          { buildCompleted: true, run }
         );
-    if (this.isStale(token, refreshGeneration)) {
-      return;
+    if (!isCurrent()) {
+      return true;
     }
     if (!actionPath) {
       this.clearResolvedCoverage(true);
-      return;
+      return true;
     }
     this.options.state.setCoverageActionPath(actionPath);
 
@@ -147,12 +164,13 @@ export class BuildDetailsCoverageCoordinator {
       this.showCoverageLoading();
     }
 
-    const result = await loadCoverage(request, actionPath);
-    if (this.isStale(token, refreshGeneration)) {
-      return;
+    const result = await loadCoverage(request, run, actionPath, isCurrent);
+    if (!isCurrent()) {
+      return true;
     }
 
     this.applyCoverageResult(request, result);
+    return result.overviewError === undefined && !result.modifiedFilesFailed;
   }
 
   private showCoverageLoading(): void {
@@ -188,18 +206,11 @@ export class BuildDetailsCoverageCoordinator {
     this.postStateUpdateIfVisible();
   }
 
-  private handleRefreshError(token: number, refreshGeneration: number, error: unknown): void {
-    if (this.isStale(token, refreshGeneration)) {
-      return;
-    }
+  private handleRefreshError(error: unknown): void {
     this.options.decorationsAdapter.clear();
     this.options.state.setCoverageError(formatError(error));
     this.options.state.setCoverageLoading(false);
     this.postStateUpdateIfVisible();
-  }
-
-  private isStale(token: number, refreshGeneration: number): boolean {
-    return !this.options.isTokenCurrent(token) || refreshGeneration !== this.refreshGeneration;
   }
 
   private clearResolvedCoverage(fetched = false): void {
@@ -223,11 +234,14 @@ interface BuildDetailsCoverageLoadResult {
   coverageOverview: JenkinsCoverageOverview | undefined;
   modifiedCoverageFiles: JenkinsModifiedCoverageFile[] | undefined;
   overviewError?: string;
+  modifiedFilesFailed: boolean;
 }
 
 async function loadCoverage(
   request: CoverageRefreshRequest,
-  actionPath: string
+  run: PanelRunTarget,
+  actionPath: string,
+  isCurrent: () => boolean
 ): Promise<BuildDetailsCoverageLoadResult> {
   const { coverageBackend, environment, buildUrl, coverageEnabled, decorationsEnabled } = request;
   let coverageOverview: JenkinsCoverageOverview | undefined;
@@ -236,6 +250,7 @@ async function loadCoverage(
     try {
       coverageOverview = await coverageBackend.getCoverageOverview(environment, buildUrl, {
         buildCompleted: true,
+        run,
         actionPath
       });
     } catch (error) {
@@ -244,17 +259,20 @@ async function loadCoverage(
   }
 
   let modifiedCoverageFiles: JenkinsModifiedCoverageFile[] | undefined;
-  if (coverageEnabled || decorationsEnabled) {
+  let modifiedFilesFailed = false;
+  if ((coverageEnabled || decorationsEnabled) && isCurrent()) {
     try {
       modifiedCoverageFiles = await coverageBackend.getModifiedCoverageFiles(
         environment,
         buildUrl,
         {
           buildCompleted: true,
+          run,
           actionPath
         }
       );
     } catch (error) {
+      modifiedFilesFailed = true;
       if (!coverageOverview && overviewError === undefined) {
         throw error;
       }
@@ -264,6 +282,7 @@ async function loadCoverage(
   return {
     coverageOverview,
     modifiedCoverageFiles,
-    overviewError
+    overviewError,
+    modifiedFilesFailed
   };
 }

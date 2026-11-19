@@ -22,7 +22,7 @@ export function buildBuildsTree(options?: {
 }): string {
   const parts: string[] = [
     options?.offset === undefined ? "builds[" : "allBuilds[",
-    "number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName"
+    "number,url,queueId,result,building,timestamp,duration,estimatedDuration,keepLog,displayName"
   ];
 
   // Descriptions can be large HTML, so only callers that render them opt in.
@@ -60,7 +60,7 @@ export function buildBuildDetailsTree(options?: {
     return `number,url,result,building,timestamp,actions[${REVISION_FIELDS}]`;
   }
   if (options?.statusOnly) {
-    return "number,url,result,building";
+    return "number,url,queueId,result,building";
   }
 
   const actionParts = buildActionFields({
@@ -69,7 +69,7 @@ export function buildBuildDetailsTree(options?: {
     includeParameters: options?.includeParameters
   });
   return [
-    "number,url,result,building,timestamp,duration,estimatedDuration,",
+    "number,url,queueId,result,building,timestamp,duration,estimatedDuration,",
     "keepLog,displayName,fullDisplayName,description,culprits[fullName],",
     "artifacts[fileName,relativePath],",
     `${BUILD_CHANGE_SET_FIELDS.join(",")},`,

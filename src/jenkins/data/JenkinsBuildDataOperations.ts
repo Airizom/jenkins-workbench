@@ -108,7 +108,7 @@ export class JenkinsBuildDataOperations {
             : "build-details";
     const cacheKey = await this.context.buildCacheKey(environment, cacheKind, buildUrl);
     const cached = this.context.getCache().get<JenkinsBuildDetails>(cacheKey);
-    if (cached && !cached.building && !options?.bypassCache) {
+    if (cached?.building === false && !options?.bypassCache) {
       return cached;
     }
 
@@ -116,7 +116,7 @@ export class JenkinsBuildDataOperations {
       const client = await this.context.getClient(environment);
       try {
         const details = await client.getBuildDetails(buildUrl, options);
-        if (!details.building) {
+        if (details.building === false) {
           cache.set(cacheKey, details, this.context.getCacheTtlMs());
         } else {
           cache.delete(cacheKey);
@@ -138,13 +138,19 @@ export class JenkinsBuildDataOperations {
 
   async getWorkflowRun(
     environment: JenkinsEnvironmentRef,
-    buildUrl: string
+    buildUrl: string,
+    run?: Pick<JenkinsBuildDetails, "queueId" | "result">
   ): Promise<JenkinsWorkflowRun | undefined> {
-    const unsupportedKey = await this.context.buildCacheKey(
+    const unsupportedKey = await this.context.buildRunCacheKey(
       environment,
       "wfapi-unsupported",
-      buildUrl
+      buildUrl,
+      run
     );
+    if (!unsupportedKey) {
+      const client = await this.context.getClient(environment);
+      return callOptionalBuildEndpoint(() => client.getWorkflowRun(buildUrl));
+    }
     if (this.context.getCache().has(unsupportedKey)) {
       return undefined;
     }

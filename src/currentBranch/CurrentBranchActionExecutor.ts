@@ -6,6 +6,7 @@ import {
 import type { BuildCommandRefreshHost } from "../commands/build/BuildCommandTypes";
 import { withActionErrorMessage } from "../commands/CommandUtils";
 import type { JenkinsDataService } from "../jenkins/JenkinsDataService";
+import { reportedBuildDetailsUrl } from "../jenkins/ReportedBuildUrl";
 import type { BuildDetailsPanelLauncher } from "../panels/BuildDetailsPanelLauncher";
 import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { JenkinsParameterPresetStore } from "../storage/JenkinsParameterPresetStore";
@@ -41,7 +42,7 @@ export class CurrentBranchActionExecutor {
     await withActionErrorMessage("Unable to open the latest build details", async () => {
       await this.buildDetailsPanelLauncher.show({
         environment: target.environment,
-        buildUrl: target.buildUrl,
+        buildUrl: reportedBuildDetailsUrl(target.environment.url, target.buildUrl),
         label: target.label
       });
     });
@@ -49,9 +50,5 @@ export class CurrentBranchActionExecutor {
 
   openLastFailedBuild(target: CurrentBranchJobActionTarget): Promise<void> {
     return openLastFailedBuildForTarget(this.dataService, this.buildDetailsPanelLauncher, target);
-  }
-
-  refreshEnvironment(environmentId: string): void {
-    this.refreshHost.fullEnvironmentRefresh({ environmentId });
   }
 }

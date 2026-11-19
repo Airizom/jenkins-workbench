@@ -161,6 +161,12 @@ describe("JenkinsTaskProvider.provideTasks", () => {
                 name: "build",
                 fullName: "project/build",
                 url: "https://jenkins.example/job/project/job/build/"
+              },
+              {
+                kind: "job",
+                name: "app",
+                fullName: "app",
+                url: "https://jenkins.example/jenkins/job/app/"
               }
             ];
           }
@@ -169,10 +175,16 @@ describe("JenkinsTaskProvider.provideTasks", () => {
       );
 
       const tasks = await provider.provideTasks();
-      assert.equal(tasks.length, 1);
+      assert.equal(tasks.length, 2);
       assert.equal(tasks[0].scope, taskScope.Workspace);
       assert.equal(tasks[0].definition.environmentId, "jenkins");
       assert.equal(tasks[0].definition.jobUrl, "job/project/job/build/");
+      assert.equal(tasks[1].definition.jobUrl, "jenkins/job/app/");
+      const selected = provider.resolveTask(tasks[1]);
+      assert.ok(selected);
+      const execution = selected.execution as unknown as TestCustomExecution;
+      await execution.callback(selected.definition);
+      assert.equal(capturedTerminalDefinitions.at(-1)?.jobUrl, "jenkins/job/app/");
     }
   );
 });

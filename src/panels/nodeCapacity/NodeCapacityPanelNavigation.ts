@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { formatActionError } from "../../formatters/ErrorFormatters";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { reportedBuildDetailsUrl } from "../../jenkins/ReportedBuildUrl";
 import { ensureTrailingSlash } from "../../jenkins/urls";
 import { openJenkinsWorkbenchUrl } from "../../ui/OpenExternalUrl";
 import type { BuildDetailsPanelLauncher } from "../BuildDetailsPanelLauncher";
@@ -55,7 +56,7 @@ export class NodeCapacityPanelNavigation {
     try {
       await buildDetailsPanelLauncher.show({
         environment,
-        buildUrl,
+        buildUrl: reportedBuildDetailsUrl(environment.url, buildUrl),
         label
       });
     } catch (error) {

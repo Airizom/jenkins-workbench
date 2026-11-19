@@ -50,7 +50,7 @@ export interface BuildDetailsPanelPollingControllerOptions {
   view: Pick<BuildDetailsPanelView, "postMessage" | "setTitle">;
   runtime: Pick<
     BuildDetailsPanelRuntime,
-    "handleBuildCompleted" | "handlePipelineLoading" | "postStateUpdate"
+    "handleBuildCompleted" | "handlePipelineLoading" | "postStateUpdate" | "readBuildDetails"
   >;
   diagnosticConsoleSync: Pick<
     BuildDetailsDiagnosticConsoleSync,
@@ -68,7 +68,14 @@ export function createBuildDetailsPanelPollingController(
 ): BuildDetailsPollingController {
   const { backend, environment, buildUrl } = target;
   return new BuildDetailsPollingController({
-    statusBackend: backend.status,
+    waitForWebviewReady: true,
+    statusBackend: {
+      getBuildDetails: (...args) =>
+        options.runtime.readBuildDetails(options.token, () =>
+          backend.status.getBuildDetails(...args)
+        ),
+      getWorkflowRun: (...args) => backend.status.getWorkflowRun(...args)
+    },
     testsBackend: backend.tests,
     consoleBackend: backend.console,
     pendingInputsBackend: backend.pendingInputs,
@@ -101,7 +108,7 @@ function createPanelPollingCallbackHooks(
     },
     postStateUpdate: () => runtime.postStateUpdate(),
     onPipelineLoading: (token) => runtime.handlePipelineLoading(token),
-    onBuildDetailsChanged: (details) => options.onBuildDetailsChanged?.(details),
+    onBuildDetailsChanged: options.onBuildDetailsChanged,
     onConsoleTextAppend: (text) => diagnosticConsoleSync.appendAndNotify(text),
     onConsoleTextSet: (text) => diagnosticConsoleSync.replaceAndNotify(text),
     onConsoleHtmlChanged: (textRange, appendedTextRange) => {

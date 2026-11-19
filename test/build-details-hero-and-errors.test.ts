@@ -85,6 +85,22 @@ describe("BuildStatusHero", () => {
     assert.equal(reviewed, false);
   });
 
+  it("offers a completion follow while paused and switches to Stop Following", () => {
+    const paused = { count: 1, message: "Deploy?" };
+    const action = { following: false, onClick: () => undefined };
+    const before = renderHero({ awaitingInput: paused, followAction: action });
+    assert.match(findButton(before, "Follow This Build"), /aria-pressed="false"/);
+    const after = renderHero({
+      awaitingInput: paused,
+      followAction: { ...action, following: true }
+    });
+    assert.match(findButton(after, "Stop Following"), /aria-pressed="true"/);
+    assert.doesNotMatch(
+      renderHero({ isRunning: false, resultClass: "success" }),
+      /Follow This Build/
+    );
+  });
+
   it("omits the review action when the Inputs tab is already open", () => {
     const html = renderHero({ awaitingInput: { count: 2, message: "Deploy?" } });
     assert.doesNotMatch(html, />Review</);

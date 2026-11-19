@@ -1,10 +1,13 @@
 import { isJenkinsBuildPermalink, type JenkinsBuildPermalink } from "./types";
 import {
   buildJobUrl,
-  canonicalizeBuildUrlForEnvironment,
-  canonicalizeJobUrlForEnvironment,
   ensureTrailingSlash,
   getContextPathLength,
+  isProjectChildSegment,
+  normalizeJenkinsUrlForComparison,
+  parseClassicJobPath,
+  publicJobRouteStart,
+  resolveClassicJobPath,
   stripUrlCredentials
 } from "./urls";
 
@@ -13,11 +16,26 @@ export type BuildReferenceInput =
   | { kind: "url"; url: URL }
   | { kind: "invalid"; message: string };
 
+interface NumberedRunReference {
+  kind: "build";
+  buildUrl: string;
+  jobUrl: string;
+  buildNumber: number;
+}
+
 export type ResolvedBuildReference =
-  | { kind: "build"; buildUrl: string; jobUrl: string; buildNumber: number }
+  | NumberedRunReference
   | { kind: "permalink"; jobUrl: string; permalink: JenkinsBuildPermalink }
   | { kind: "job"; jobUrl: string }
   | { kind: "invalid"; message: string };
+
+type ParsedBuildReference =
+  | ResolvedBuildReference
+  | {
+      kind: "candidates";
+      candidates: NumberedRunReference[];
+      fallback?: Extract<ResolvedBuildReference, { kind: "job" | "permalink" }>;
+    };
 
 const NUMBER_LIKE_PATTERN = /^#?\s*[-+]?\d+(?:\.\d+)?$/;
 const BUILD_NUMBER_PATTERN = /^\d+$/;
@@ -58,14 +76,14 @@ export function classifyBuildReference(input: string): BuildReferenceInput {
  * Resolves a Jenkins URL on the matched environment to a canonical job/build reference rooted at
  * environmentUrl. Classic build sub-pages, view prefixes and Blue Ocean pages are folded away.
  */
-export function resolveBuildReferenceUrl(url: URL, environmentUrl: string): ResolvedBuildReference {
+export function resolveBuildReferenceUrl(url: URL, environmentUrl: string): ParsedBuildReference {
   const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
   const contextLength = getContextPathLength(pathParts, environmentUrl);
   const parts = pathParts.slice(contextLength);
   if (parts[0] === "blue") {
     return resolveBlueOceanUrl(parts, environmentUrl);
   }
-  return resolveClassicUrl(url, pathParts, contextLength, environmentUrl);
+  return resolveClassicUrl(url, pathParts, environmentUrl);
 }
 
 /** Display label such as "#42" for a build URL. */
@@ -77,33 +95,210 @@ export function formatBuildLabel(buildUrl: string): string | undefined {
 function resolveClassicUrl(
   url: URL,
   pathParts: readonly string[],
-  contextLength: number,
   environmentUrl: string
-): ResolvedBuildReference {
-  const firstJobIndex = pathParts.indexOf("job", contextLength);
-  if (firstJobIndex < 0 || firstJobIndex + 1 >= pathParts.length) {
-    return { kind: "invalid", message: NOT_A_JOB_OR_BUILD };
+): ParsedBuildReference {
+  // A pasted URL below the configured base is a public endpoint. Only known,
+  // contiguous job/view routes can discard their prefixes when sharing a build.
+  const onController = normalizeJenkinsUrlForComparison(withoutCredentials(url).href).startsWith(
+    normalizeJenkinsUrlForComparison(environmentUrl)
+  );
+  const configured = onController
+    ? resolveClassicJobPath(url.origin, pathParts, environmentUrl, "configured")
+    : undefined;
+  let job = configured ?? resolveClassicJobPath(url.origin, pathParts, environmentUrl);
+  const { publicViewAction, actionStart, viewMount } = findClassicAction(
+    pathParts,
+    environmentUrl,
+    onController,
+    configured,
+    job
+  );
+  const fallbackJobUrl =
+    publicViewAction && configured ? toJobUrl(environmentUrl, configured.segments) : undefined;
+  if (actionStart !== undefined) {
+    // Resolve the owning run before interpreting build subpages, which can
+    // have numbers and job markers of their own (pipeline nodes, artifacts).
+    const run = resolveActionRun(url, pathParts, actionStart, fallbackJobUrl);
+    if (run) return run;
+    if (!job || publicViewAction) job = findActionJob(pathParts, actionStart);
   }
+  if (!job) return jobReference(fallbackJobUrl) ?? { kind: "invalid", message: NOT_A_JOB_OR_BUILD };
+  const opaquePrefix = publicViewAction || (onController && !configured && !viewMount);
+  return resolveClassicJobReference(url, pathParts, environmentUrl, job, {
+    opaquePrefix,
+    onController,
+    fallbackJobUrl
+  });
+}
 
-  const jobEnd = findJobPathEnd(pathParts, firstJobIndex);
-  const jobPathUrl = `${url.origin}/${pathParts.slice(0, jobEnd).join("/")}/`;
-  const jobUrl = canonicalizeJobUrlForEnvironment(environmentUrl, jobPathUrl);
-  if (!jobUrl) {
-    return { kind: "invalid", message: NOT_A_JOB_OR_BUILD };
+function findActionJob(parts: readonly string[], start: number) {
+  const marker = parts.indexOf("job", start);
+  return marker >= 0 ? parseClassicJobPath(parts, marker) : undefined;
+}
+
+function jobReference(jobUrl: string | undefined) {
+  return jobUrl ? { kind: "job" as const, jobUrl } : undefined;
+}
+
+type ClassicJobPath = NonNullable<ReturnType<typeof resolveClassicJobPath>>;
+
+function findClassicAction(
+  pathParts: readonly string[],
+  environmentUrl: string,
+  onController: boolean,
+  configured: ClassicJobPath | undefined,
+  job: ClassicJobPath | undefined
+) {
+  const offset = getContextPathLength(pathParts, environmentUrl);
+  const route = publicJobRouteStart(pathParts, offset);
+  // The last job can own views, just as the controller can. Only contiguous
+  // view/name pairs may precede the action that owns a custom run endpoint.
+  const viewStart = configured?.jobEnd ?? route;
+  let action = viewStart;
+  while (action >= 0 && pathParts[action] === "view" && action + 1 < pathParts.length) {
+    action += 2;
   }
+  const viewMount = pathParts[offset] === "view" && job?.firstJobIndex === offset + 1;
+  const publicViewAction =
+    onController &&
+    !viewMount &&
+    action > viewStart &&
+    action < pathParts.length - 1 &&
+    !["job", "view", "queue", "ws", "artifact", "api"].includes(pathParts[action]);
+  const controllerAction =
+    onController &&
+    route < 0 &&
+    pathParts.length >= offset + 2 &&
+    !["queue", "computer", "manage", "user", "me", "api", "ws", "artifact"].includes(
+      pathParts[offset]
+    );
+  return {
+    publicViewAction,
+    viewMount,
+    actionStart: publicViewAction ? action + 1 : controllerAction ? offset + 1 : undefined
+  };
+}
 
+function resolveClassicJobReference(
+  url: URL,
+  pathParts: readonly string[],
+  environmentUrl: string,
+  job: ClassicJobPath,
+  {
+    opaquePrefix,
+    onController,
+    fallbackJobUrl
+  }: {
+    opaquePrefix: boolean;
+    onController: boolean;
+    fallbackJobUrl?: string;
+  }
+): ParsedBuildReference {
+  const projectChild = pathParts[job.jobEnd];
+  const jobEnd = projectChild && isProjectChildSegment(projectChild) ? job.jobEnd + 1 : job.jobEnd;
+  const projectUrl = opaquePrefix
+    ? `${url.origin}/${pathParts.slice(0, job.jobEnd).join("/")}/`
+    : toJobUrl(environmentUrl, job.segments);
+  const jobUrl = jobEnd > job.jobEnd ? `${projectUrl}${projectChild}/` : projectUrl;
   const next = pathParts[jobEnd];
   const buildNumber = next === undefined ? undefined : parsePositiveBuildNumber(next);
   if (buildNumber !== undefined) {
-    const buildUrl = canonicalizeBuildUrlForEnvironment(environmentUrl, `${jobPathUrl}${next}/`);
-    return buildUrl
-      ? { kind: "build", buildUrl, jobUrl, buildNumber }
-      : { kind: "invalid", message: NOT_A_JOB_OR_BUILD };
+    if (opaquePrefix)
+      return {
+        kind: "candidates",
+        candidates: [numberedEndpoint(url, pathParts.slice(0, jobEnd + 1), buildNumber)],
+        fallback: jobReference(fallbackJobUrl)
+      };
+    return { kind: "build", buildUrl: `${jobUrl}${buildNumber}/`, jobUrl, buildNumber };
   }
   if (next !== undefined && isJenkinsBuildPermalink(next)) {
     return { kind: "permalink", jobUrl, permalink: next };
   }
-  return { kind: "job", jobUrl };
+  const fallback = fallbackJobUrl ?? jobUrl;
+  const run = onController && resolveJobAction(url, pathParts, jobEnd, fallback);
+  return run || { kind: "job", jobUrl: fallback };
+}
+
+function resolveJobAction(url: URL, parts: readonly string[], jobEnd: number, jobUrl: string) {
+  const next = parts[jobEnd];
+  if (
+    !next ||
+    jobEnd >= parts.length - 1 ||
+    ["ws", "artifact", "queue", "api", "view", "job"].includes(next)
+  )
+    return undefined;
+  return resolveActionRun(url, parts, jobEnd + 1, jobUrl);
+}
+
+/** A numeric plugin path segment can be a grouping page. Try numbered endpoints
+ * from the outside in, stopping as soon as Jenkins confirms the owning run. */
+function resolveActionRun(
+  url: URL,
+  parts: readonly string[],
+  start: number,
+  fallbackJobUrl?: string
+): ParsedBuildReference | undefined {
+  const candidates: NumberedRunReference[] = [];
+  let nestedFallback: Extract<ResolvedBuildReference, { kind: "job" | "permalink" }> | undefined;
+  for (let index = start; index < parts.length; ) {
+    const step = readActionSegment(url, parts, index);
+    if (step.fallback) nestedFallback = step.fallback;
+    if (step.end === undefined) break;
+    if (step.run) candidates.push(step.run);
+    index = step.end;
+  }
+  if (candidates.length === 0) return nestedFallback;
+  return {
+    kind: "candidates",
+    candidates,
+    fallback: nestedFallback ?? jobReference(fallbackJobUrl)
+  };
+}
+
+interface ActionPathStep {
+  end?: number;
+  run?: NumberedRunReference;
+  fallback?: Extract<ResolvedBuildReference, { kind: "job" | "permalink" }>;
+}
+
+function readActionSegment(url: URL, parts: readonly string[], index: number): ActionPathStep {
+  const segment = parts[index];
+  if (segment === "job") {
+    const job = readActionJob(url, parts, index);
+    if (job?.fallback?.kind === "permalink") return { fallback: job.fallback };
+    return job ?? {};
+  }
+  if (segment === "view") return { end: index + 2 };
+  if (["ws", "artifact", "queue", "api"].includes(segment) || isJenkinsBuildPermalink(segment))
+    return {};
+  const number = parsePositiveBuildNumber(segment);
+  return {
+    end: index + 1,
+    run: number === undefined ? undefined : numberedEndpoint(url, parts.slice(0, index + 1), number)
+  };
+}
+
+function readActionJob(url: URL, parts: readonly string[], index: number) {
+  const job = parseClassicJobPath(parts, index);
+  if (!job) return undefined;
+  const child = parts[job.jobEnd];
+  const end = child && isProjectChildSegment(child) ? job.jobEnd + 1 : job.jobEnd;
+  const jobUrl = `${url.origin}/${parts.slice(0, end).join("/")}/`;
+  const next = parts[end];
+  if (next && isJenkinsBuildPermalink(next))
+    return { end, fallback: { kind: "permalink", jobUrl, permalink: next } as const };
+  if (!next || !BUILD_NUMBER_PATTERN.test(next))
+    return { end, fallback: { kind: "job", jobUrl } as const };
+  return { end };
+}
+
+function numberedEndpoint(
+  url: URL,
+  parts: readonly string[],
+  buildNumber: number
+): NumberedRunReference {
+  const jobUrl = `${url.origin}/${parts.slice(0, -1).join("/")}/`;
+  return { kind: "build", buildUrl: `${jobUrl}${parts.at(-1)}/`, jobUrl, buildNumber };
 }
 
 /**
@@ -145,36 +340,6 @@ function resolveBlueOceanUrl(
       : buildJobUrl(pipelineJobUrl, branchOrJob);
   const buildUrl = new URL(`${buildNumber}/`, jobUrl).toString();
   return { kind: "build", buildUrl, jobUrl, buildNumber };
-}
-
-/**
- * Walks job/<name> pairs, skipping folder view/<name> pairs (which may nest) only when a job
- * follows them, and returns the index just past the last job name.
- */
-function findJobPathEnd(pathParts: readonly string[], firstJobIndex: number): number {
-  let jobEnd = firstJobIndex;
-  let index = firstJobIndex;
-  while (index + 1 < pathParts.length) {
-    if (pathParts[index] === "job") {
-      index += 2;
-      jobEnd = index;
-      continue;
-    }
-    const afterViews = skipViewPairs(pathParts, index);
-    if (afterViews === index || pathParts[afterViews] !== "job") {
-      break;
-    }
-    index = afterViews;
-  }
-  return jobEnd;
-}
-
-function skipViewPairs(pathParts: readonly string[], start: number): number {
-  let index = start;
-  while (pathParts[index] === "view" && index + 1 < pathParts.length) {
-    index += 2;
-  }
-  return index;
 }
 
 function toJobUrl(environmentUrl: string, segments: readonly string[]): string {

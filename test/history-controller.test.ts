@@ -106,6 +106,17 @@ describe("history panel coordination", () => {
   });
   it("rejects unknown build ids and actions from stale revisions", async () => {
     const h = harness();
+    const first = window.builds[0];
+    h.load.mockResolvedValue({
+      ...window,
+      builds: [
+        { ...first, build: { ...first.build, number: 4 } },
+        {
+          ...first,
+          build: { ...first.build, url: `${environment.url}view/team/custom-runs/job/a/3/` }
+        }
+      ]
+    });
     h.controller.setContext(environment, "https://jenkins.test/job/a/");
     await vi.waitFor(() => expect(h.latest().status).toBe("available"));
     h.messages.fire({
@@ -115,6 +126,12 @@ describe("history panel coordination", () => {
       value: 999
     });
     h.messages.fire({ type: "historyAction", revision: -1, action: "openBuild", value: 3 });
+    h.messages.fire({
+      type: "historyAction",
+      revision: h.latest().revision,
+      action: "openBuild",
+      value: 4
+    });
     expect(h.openBuild).not.toHaveBeenCalled();
     h.messages.fire({
       type: "historyAction",
@@ -122,7 +139,10 @@ describe("history panel coordination", () => {
       action: "openBuild",
       value: 3
     });
-    expect(h.openBuild).toHaveBeenCalledWith(environment, "https://jenkins.test/job/a/3/");
+    expect(h.openBuild).toHaveBeenCalledWith(
+      environment,
+      `${environment.url}view/team/custom-runs/job/a/3/`
+    );
     h.controller.dispose();
   });
   it("does not abandon a window load when selection arrives mid-refresh", async () => {

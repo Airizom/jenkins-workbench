@@ -14,11 +14,28 @@ import type {
   BuildDetailsStatusBackend,
   BuildDetailsTestsBackend
 } from "./BuildDetailsBackend";
-import { ConsoleStreamManager, type ConsoleTextByteRange } from "./ConsoleStreamManager";
+import { BuildDetailsRunConsole } from "./BuildDetailsRunConsole";
+import { type PanelRunTarget, resolvePanelRunTarget } from "./BuildDetailsRunIdentity";
+import type {
+  ConsoleSnapshotResult,
+  ConsoleStreamManager,
+  ConsoleTextByteRange
+} from "./ConsoleStreamManager";
+
+export interface BuildDetailsStatusChange {
+  superseded?: boolean;
+  targetChanged?: boolean;
+  building: boolean | undefined;
+  firstTerminal: boolean;
+  completedNow: boolean;
+}
 
 export interface BuildDetailsPollingCallbacks {
+  getBuilding(): boolean | undefined;
+  getRunTarget(): PanelRunTarget | undefined;
   onWorkflowFetchStart?: () => void;
-  onDetails(details: JenkinsBuildDetails): void;
+  hasNewerDisplayedDetails?(details: JenkinsBuildDetails): boolean;
+  onDetails(details: JenkinsBuildDetails): BuildDetailsStatusChange | undefined;
   onWorkflowRun(workflowRun: JenkinsWorkflowRun | undefined): void;
   onWorkflowError(error: unknown): void;
   onPendingInputs(pendingInputs: PendingInputAction[]): void;
@@ -35,11 +52,12 @@ export interface BuildDetailsPollingCallbacks {
     truncated: boolean;
     textRange: ConsoleTextByteRange;
   }): void;
-  onErrors(errors: string[]): void;
+  onErrors(errors: string[], preserveConsoleError?: boolean): void;
   onComplete(details: JenkinsBuildDetails): void;
 }
 
 export interface BuildDetailsPollingOptions {
+  waitForWebviewReady?: boolean;
   statusBackend: BuildDetailsStatusBackend;
   testsBackend: BuildDetailsTestsBackend;
   consoleBackend: BuildDetailsConsoleBackend;
@@ -56,6 +74,7 @@ export interface BuildDetailsPollingOptions {
 
 export interface BuildDetailsInitialState {
   details?: JenkinsBuildDetails;
+  runTarget?: PanelRunTarget;
   consoleTextResult?: JenkinsConsoleTextTail;
   consoleHtmlResult?: { html: string; truncated: boolean };
   workflowRun?: JenkinsWorkflowRun;
@@ -83,14 +102,15 @@ export class BuildDetailsPollingController {
   private testReportOptions?: JenkinsTestReportOptions;
   private readonly callbacks: BuildDetailsPollingCallbacks;
   private readonly formatError: (error: unknown) => string;
-  private readonly consoleStreamManager: ConsoleStreamManager;
+  private readonly runConsole: BuildDetailsRunConsole;
+  private consoleReady: boolean;
+  private pollingStream?: ConsoleStreamManager;
   private pollTimer: NodeJS.Timeout | undefined;
   private pollInFlight = false;
   private pollingActive = false;
   private disposed = false;
   private pollGeneration = 0;
   private lastWorkflowFetchAt = 0;
-  private lastKnownBuilding: boolean | undefined;
   private workflowRetryPending = false;
   private lastPendingInputsCount = 0;
 
@@ -105,7 +125,8 @@ export class BuildDetailsPollingController {
     this.testReportOptions = options.testReportOptions;
     this.callbacks = options.callbacks;
     this.formatError = options.formatError;
-    this.consoleStreamManager = new ConsoleStreamManager({
+    this.consoleReady = !options.waitForWebviewReady;
+    this.runConsole = new BuildDetailsRunConsole({
       dataService: options.consoleBackend,
       environment: this.environment,
       buildUrl: this.buildUrl,
@@ -120,21 +141,51 @@ export class BuildDetailsPollingController {
   }
 
   // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
-  async refreshConsoleSnapshot(): Promise<{
-    consoleTextResult?: JenkinsConsoleTextTail;
-    consoleHtmlResult?: { html: string; truncated: boolean };
-  }> {
-    return this.consoleStreamManager.refreshSnapshot();
+  refreshConsoleSnapshot(use: (snapshot: ConsoleSnapshotResult) => void): Promise<void> {
+    // A reveal may refresh the tail before React installs its listener. The ready
+    // handshake consumes this same snapshot and its cursors.
+    const postSnapshot = this.consoleReady;
+    return this.runConsole.withSnapshot((snapshot) => {
+      if (postSnapshot && this.consoleReady) use(snapshot);
+    }, true);
+  }
+
+  get consoleUrl(): string | undefined {
+    return this.runConsole.url;
+  }
+
+  selectConsoleRun(details?: JenkinsBuildDetails) {
+    // A recreated document can re-seed the same numbered run while the poll is
+    // waiting for status. Only the stream that produced its chunk can commit it.
+    const missedConsole =
+      this.pollInFlight && (!this.pollingStream || this.pollingStream !== this.runConsole.stream);
+    return this.runConsole.select(details, !this.consoleReady || missedConsole);
+  }
+
+  withConsoleSnapshot(
+    use: (snapshot: ConsoleSnapshotResult) => void,
+    refresh = false
+  ): Promise<void> {
+    return this.runConsole.withSnapshot(use, refresh);
+  }
+
+  get canPostConsole(): boolean {
+    return this.consoleReady;
+  }
+
+  setConsoleReady(ready: boolean): void {
+    this.consoleReady = ready;
   }
 
   // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
   async fetchTestReport(
+    buildUrl: string,
     options?: JenkinsTestReportOptions
   ): Promise<BuildDetailsTestReportFetchResult> {
     const effectiveOptions = this.resolveTestReportOptions(options);
     const report = await this.testsBackend.getTestReport(
       this.environment,
-      this.buildUrl,
+      buildUrl,
       effectiveOptions
     );
     return { report, effectiveOptions };
@@ -147,22 +198,31 @@ export class BuildDetailsPollingController {
   }
 
   // fallow-ignore-next-line unused-class-member -- invoked through BuildDetailsPanelRuntime's polling-controller lookup
-  async fetchWorkflowRunWithCallbacks(): Promise<void> {
-    if (this.disposed) {
+  async fetchWorkflowRunWithCallbacks(isCurrent: () => boolean): Promise<void> {
+    if (this.disposed || !isCurrent()) {
       return;
     }
+    const run = this.callbacks.getRunTarget();
+    if (!run) return;
+    const canApply = () => !this.disposed && isCurrent() && this.callbacks.getRunTarget() === run;
     this.callbacks.onWorkflowFetchStart?.();
     try {
-      const workflowRun = await this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
-      if (this.disposed) {
-        return;
-      }
+      const workflowRun = await this.statusBackend.getWorkflowRun(
+        this.environment,
+        run.buildUrl,
+        run
+      );
+      if (!canApply()) return;
       this.callbacks.onWorkflowRun(workflowRun);
+      this.workflowRetryPending = false;
     } catch (error) {
-      if (this.disposed) {
-        return;
-      }
+      if (!canApply()) return;
       this.callbacks.onWorkflowError(error);
+      if (this.callbacks.getBuilding() === false) {
+        this.workflowRetryPending = true;
+        this.lastWorkflowFetchAt = Date.now();
+        this.start();
+      }
     }
   }
 
@@ -185,20 +245,49 @@ export class BuildDetailsPollingController {
   }
 
   async loadInitial(initialDetails?: JenkinsBuildDetails): Promise<BuildDetailsInitialState> {
+    const read = initialDetails
+      ? Promise.resolve(initialDetails)
+      : this.statusBackend.getBuildDetails(this.environment, this.buildUrl, {
+          includeCauses: true
+        });
+    const status = read.then((details) => ({
+      details,
+      runTarget: resolvePanelRunTarget(this.environment, this.buildUrl, details)
+    }));
+    // Even a numbered URL can be reused. Start the workflow from its identified
+    // Run so URL resolution and the unsupported-endpoint cache use the same evidence.
+    const workflow = status.then(
+      ({ details, runTarget }) =>
+        runTarget && !this.disposed && !this.callbacks.hasNewerDisplayedDetails?.(details)
+          ? this.statusBackend.getWorkflowRun(this.environment, runTarget.buildUrl, runTarget)
+          : undefined,
+      () => undefined
+    );
+    const consoleSnapshotRead = status
+      .then(
+        ({ details }) => {
+          if (!this.callbacks.hasNewerDisplayedDetails?.(details)) this.selectConsoleRun(details);
+        },
+        () => {}
+      )
+      .then(async () => {
+        let result: ConsoleSnapshotResult | undefined;
+        await this.withConsoleSnapshot((snapshot) => {
+          result = snapshot;
+        });
+        return result;
+      });
     const [detailsResult, workflowResult, consoleResult, pendingInputsResult] =
       await Promise.allSettled([
-        initialDetails
-          ? Promise.resolve(initialDetails)
-          : this.statusBackend.getBuildDetails(this.environment, this.buildUrl, {
-              includeCauses: true
-            }),
-        this.statusBackend.getWorkflowRun(this.environment, this.buildUrl),
-        this.consoleStreamManager.loadInitialConsole(),
+        status,
+        workflow,
+        consoleSnapshotRead,
         this.pendingInputProvider.getPendingInputActions(this.environment, this.buildUrl)
       ]);
-
-    const { value: details, error: detailsError } = settled(detailsResult);
-    const { value: workflowRun, error: workflowError } = settled(workflowResult);
+    const { value: initial, error: detailsError } = settled(detailsResult);
+    const details = initial?.details;
+    const { value: workflowRun, error: workflowError } =
+      !details || this.callbacks.hasNewerDisplayedDetails?.(details) ? {} : settled(workflowResult);
     const { value: consoleSnapshot, error: consoleRejection } = settled(consoleResult);
     const { value: pendingInputs = [], error: pendingInputsError } = settled(pendingInputsResult);
     if (pendingInputsResult.status === "fulfilled") {
@@ -223,10 +312,10 @@ export class BuildDetailsPollingController {
     if (workflowRun || workflowError) {
       this.lastWorkflowFetchAt = Date.now();
     }
-    this.lastKnownBuilding = details?.building;
 
     return {
       details,
+      runTarget: initial?.runTarget,
       consoleTextResult,
       consoleHtmlResult,
       workflowRun,
@@ -260,6 +349,7 @@ export class BuildDetailsPollingController {
   dispose(): void {
     this.stop();
     this.disposed = true;
+    this.runConsole.dispose();
   }
 
   private scheduleNextPoll(): void {
@@ -288,9 +378,11 @@ export class BuildDetailsPollingController {
     const pollGeneration = this.pollGeneration;
 
     try {
+      const stream = this.consoleReady ? this.runConsole.stream : undefined;
+      this.pollingStream = stream;
       const [detailsResult, consoleFetchResult] = await Promise.allSettled([
         this.statusBackend.getBuildDetails(this.environment, this.buildUrl),
-        this.consoleStreamManager.fetchNext()
+        stream?.fetchNext()
       ]);
 
       const { value: details, error: detailsError } = settled(detailsResult);
@@ -301,14 +393,14 @@ export class BuildDetailsPollingController {
       let pendingInputsError: unknown;
 
       const shouldFetchPendingInputs =
-        Boolean(details?.building ?? this.lastKnownBuilding) || this.lastPendingInputsCount > 0;
+        Boolean(details?.building ?? this.callbacks.getBuilding()) ||
+        this.lastPendingInputsCount > 0;
       if (shouldFetchPendingInputs) {
         try {
           pendingInputs = await this.pendingInputProvider.getPendingInputActions(
             this.environment,
             this.buildUrl
           );
-          this.lastPendingInputsCount = pendingInputs.length;
         } catch (error) {
           pendingInputsError = error;
         }
@@ -317,48 +409,67 @@ export class BuildDetailsPollingController {
       if (!this.isPollCurrent(pollGeneration)) {
         return;
       }
-
       const consoleFailure = consoleError ?? consoleResult?.error;
-      if (!consoleFailure && consoleResult?.value) {
-        this.consoleStreamManager.applyResult(consoleResult);
+      if (consoleFailure || !consoleResult?.value) this.pollingStream = undefined;
+      const change = details ? this.callbacks.onDetails(details) : undefined;
+      if (change?.superseded) {
+        // Console, pending inputs and workflow all belong to the discarded observation.
+        if (
+          change.building !== false ||
+          this.workflowRetryPending ||
+          this.runConsole.stream?.shouldContinuePolling()
+        )
+          this.scheduleNextPoll();
+        else this.stop();
+        return;
       }
-      const errors = this.buildRequestErrors({
-        detailsError,
-        consoleError: consoleFailure,
-        pendingInputsError
-      });
 
+      if (stream && stream === this.runConsole.stream && !consoleFailure && consoleResult?.value) {
+        stream.applyResult(consoleResult);
+      }
       if (details) {
-        this.callbacks.onDetails(details);
         const title = details.fullDisplayName ?? details.displayName;
         if (title) {
           this.callbacks.onTitle(title);
         }
       }
       if (!pendingInputsError && shouldFetchPendingInputs) {
+        this.lastPendingInputsCount = pendingInputs.length;
         this.callbacks.onPendingInputs(pendingInputs);
       }
 
-      const building = details?.building;
-      const completedNow = Boolean(this.lastKnownBuilding) && building === false;
-      if (details) {
-        this.lastKnownBuilding = building;
-      }
+      const building = change?.building ?? this.callbacks.getBuilding();
+      const completedNow = change?.completedNow === true;
 
-      const shouldFetchWorkflow = this.shouldFetchWorkflow(building, completedNow);
-      if (shouldFetchWorkflow) {
+      const shouldFetchWorkflow = this.shouldFetchWorkflow(
+        building,
+        change?.firstTerminal === true || change?.targetChanged === true
+      );
+      const run = this.callbacks.getRunTarget();
+      const newerStatusDisplayed = () =>
+        details && this.callbacks.hasNewerDisplayedDetails?.(details);
+      if (!run) this.workflowRetryPending = false;
+      if (shouldFetchWorkflow && run) {
+        const isCurrent = () =>
+          this.isPollCurrent(pollGeneration) && run === this.callbacks.getRunTarget();
         const workflowStart = Date.now();
         this.callbacks.onWorkflowFetchStart?.();
         try {
-          workflowRun = await this.statusBackend.getWorkflowRun(this.environment, this.buildUrl);
-          if (!this.isPollCurrent(pollGeneration)) {
+          workflowRun = await this.statusBackend.getWorkflowRun(
+            this.environment,
+            run.buildUrl,
+            run
+          );
+          if (!isCurrent()) {
+            if (this.isPollCurrent(pollGeneration)) this.scheduleNextPoll();
             this.deliverStaleCompletion(completedNow, details);
             return;
           }
           this.callbacks.onWorkflowRun(workflowRun);
           this.workflowRetryPending = false;
         } catch (error) {
-          if (!this.isPollCurrent(pollGeneration)) {
+          if (!isCurrent()) {
+            if (this.isPollCurrent(pollGeneration)) this.scheduleNextPoll();
             this.deliverStaleCompletion(completedNow, details);
             return;
           }
@@ -368,19 +479,25 @@ export class BuildDetailsPollingController {
             this.workflowRetryPending = true;
           }
         } finally {
-          if (this.isPollCurrent(pollGeneration)) {
+          if (isCurrent()) {
             this.lastWorkflowFetchAt = workflowStart;
           }
         }
       }
 
-      this.callbacks.onErrors(errors);
+      const currentConsoleRead = stream !== undefined && stream === this.runConsole.stream;
+      const errors = this.buildRequestErrors({
+        detailsError,
+        consoleError: currentConsoleRead ? consoleFailure : undefined,
+        pendingInputsError
+      });
+      if (!newerStatusDisplayed()) this.callbacks.onErrors(errors, !currentConsoleRead);
 
       const shouldContinuePolling =
         !details ||
-        details.building ||
+        building !== false ||
         this.workflowRetryPending ||
-        this.consoleStreamManager.shouldContinuePolling();
+        this.runConsole.stream?.shouldContinuePolling();
       if (shouldContinuePolling) {
         this.scheduleNextPoll();
       } else {
@@ -390,11 +507,12 @@ export class BuildDetailsPollingController {
         this.callbacks.onComplete(details);
       }
     } finally {
+      this.pollingStream = undefined;
       this.pollInFlight = false;
     }
   }
 
-  // onDetails and lastKnownBuilding already consumed the completion transition before the
+  // onDetails already applied the completion transition before the
   // workflow fetch, so a stop() during that fetch must not swallow the completion callback.
   private deliverStaleCompletion(
     completedNow: boolean,
@@ -405,8 +523,8 @@ export class BuildDetailsPollingController {
     }
   }
 
-  private shouldFetchWorkflow(building: boolean | undefined, completedNow: boolean): boolean {
-    if (completedNow) {
+  private shouldFetchWorkflow(building: boolean | undefined, targetChanged: boolean): boolean {
+    if (targetChanged) {
       return true;
     }
     if (!this.lastWorkflowFetchAt) {

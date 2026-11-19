@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import { isPipelineRun } from "../../jenkins/types";
-import { canonicalizeBuildUrlForEnvironment, stripUrlCredentials } from "../../jenkins/urls";
+import { resolveBuildMutationTarget, stripUrlCredentials } from "../../jenkins/urls";
 import { resolveTreeItemLabel } from "../../tree/TreeItemLabels";
 import type { BuildTreeItem } from "../../tree/TreeItems";
 import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
@@ -41,6 +41,8 @@ export interface BuildStopEscalationDependencies {
 
 interface Tracked {
   item: BuildTreeItem;
+  url: string;
+  key: string;
   className?: string;
 }
 
@@ -74,12 +76,11 @@ export class BuildStopEscalation implements vscode.Disposable {
       return;
     }
     const run = {};
-    for (const item of items) {
-      this.owners.set(buildKey(item), run);
-    }
-    const owned = (entry: Tracked): boolean => this.owners.get(buildKey(entry.item)) === run;
+    const tracked = this.claimBuilds(items, run);
+    if (tracked.length === 0) return;
+    const owned = (entry: Tracked): boolean => this.owners.get(entry.key) === run;
     try {
-      let remaining: Tracked[] = items.map((item) => ({ item }));
+      let remaining = tracked;
       let anyFinished = false;
       const deadline = Date.now() + this.timing.windowMs;
       while (true) {
@@ -106,17 +107,28 @@ export class BuildStopEscalation implements vscode.Disposable {
         await this.prompt(stage, remaining, owned);
       }
     } finally {
-      this.releaseOwnership(items, run);
+      this.releaseClaims(tracked, owned);
     }
   }
 
-  private releaseOwnership(items: readonly BuildTreeItem[], run: object): void {
-    for (const item of items) {
-      const key = buildKey(item);
-      if (this.owners.get(key) === run) {
-        this.owners.delete(key);
-      }
+  private releaseClaims(tracked: Tracked[], owned: (entry: Tracked) => boolean): void {
+    for (const entry of tracked) {
+      if (owned(entry)) this.owners.delete(entry.key);
     }
+  }
+
+  private claimBuilds(items: readonly BuildTreeItem[], run: object): Tracked[] {
+    const tracked: Tracked[] = [];
+    for (const item of items) {
+      const { environment, buildUrl, buildNumber } = item;
+      const target = resolveBuildMutationTarget(environment.url, buildUrl, buildNumber);
+      if (!target) continue;
+      const key = JSON.stringify([environment.scope, environment.environmentId, target.identity]);
+      if (this.owners.get(key) === run) continue;
+      tracked.push({ item, url: target.url, key });
+      this.owners.set(key, run);
+    }
+    return tracked;
   }
 
   private async stillRunning(tracked: readonly Tracked[]): Promise<Tracked[]> {
@@ -129,10 +141,10 @@ export class BuildStopEscalation implements vscode.Disposable {
         try {
           const state = await this.dependencies.dataService.getBuildStopState(
             entry.item.environment,
-            entry.item.buildUrl
+            entry.url
           );
           running[index] = state.building
-            ? { item: entry.item, className: state.className ?? entry.className }
+            ? { ...entry, className: state.className ?? entry.className }
             : undefined;
         } catch {
           // A failed read proves nothing; keep offering the next step for this build.
@@ -188,7 +200,7 @@ export class BuildStopEscalation implements vscode.Disposable {
       return;
     }
     if (choice === OPEN_IN_JENKINS) {
-      await openExternalHttpUrlWithWarning(remaining[0].item.buildUrl, {
+      await openExternalHttpUrlWithWarning(remaining[0].url, {
         targetLabel: "Jenkins URL"
       });
       return;
@@ -242,12 +254,6 @@ function escalationActions(
     actions.push(OPEN_IN_JENKINS);
   }
   return actions;
-}
-
-function buildKey(item: BuildTreeItem): string {
-  const url =
-    canonicalizeBuildUrlForEnvironment(item.environment.url, item.buildUrl) ?? item.buildUrl;
-  return JSON.stringify([item.environment.scope, item.environment.environmentId, url]);
 }
 
 function describeBuild(item: BuildTreeItem): string {

@@ -5,6 +5,7 @@ import type { HistoryBaselineResolver } from "../../history/HistoryBaseline";
 import type { HistoryRequest, HistoryService } from "../../history/HistoryService";
 import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { reportedBuildDetailsUrl } from "../../jenkins/ReportedBuildUrl";
 import type { JenkinsBuild } from "../../jenkins/types";
 import type { JenkinsEnvironmentStore } from "../../storage/JenkinsEnvironmentStore";
 import { openJenkinsWorkbenchUrl } from "../../ui/OpenExternalUrl";
@@ -309,9 +310,10 @@ export class HistoryController {
       this.model = { ...this.model, revision: this.generation, selectedBuild: build.number };
       const request = this.request(false);
       if (request) await this.select(request);
-    } else if (message.action === "openBuild")
-      await this.dependencies.openBuild(environment, build.url);
-    else if (message.action === "compare") {
+    } else if (message.action === "openBuild") {
+      const target = reportedBuildDetailsUrl(environment.url, build.url, build.number);
+      if (target) await this.dependencies.openBuild(environment, target);
+    } else if (message.action === "compare") {
       const selected = this.model.builds.find(
         (item) => item.build.number === this.model.selectedBuild
       )?.build;

@@ -4,6 +4,7 @@ import type {
 } from "../coverage/JenkinsCoverageTypes";
 import type { JenkinsClient } from "../JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
+import type { JenkinsBuildDetails } from "../types";
 import type { JenkinsDataCache } from "./JenkinsDataCache";
 import { toBuildActionError } from "./JenkinsDataErrors";
 import type { JenkinsDataRuntimeContext } from "./JenkinsDataRuntimeContext";
@@ -13,6 +14,7 @@ const DEFAULT_COVERAGE_ACTION_PATH = "coverage";
 export interface JenkinsCoverageRequestOptions {
   buildCompleted?: boolean;
   actionPath?: string;
+  run?: Pick<JenkinsBuildDetails, "queueId" | "result">;
 }
 
 export class JenkinsCoverageDataOperations {
@@ -29,7 +31,7 @@ export class JenkinsCoverageDataOperations {
       "coverage-overview",
       buildUrl,
       actionPath,
-      options?.buildCompleted,
+      options,
       (client) => client.getCoverageOverview(buildUrl, actionPath)
     );
   }
@@ -45,7 +47,7 @@ export class JenkinsCoverageDataOperations {
       "coverage-modified",
       buildUrl,
       actionPath,
-      options?.buildCompleted,
+      options,
       (client) => client.getModifiedCoverageFiles(buildUrl, actionPath)
     );
   }
@@ -60,7 +62,7 @@ export class JenkinsCoverageDataOperations {
       "coverage-action-path",
       buildUrl,
       "",
-      options?.buildCompleted,
+      options,
       (client) => client.discoverCoverageActionPath(buildUrl)
     );
   }
@@ -70,25 +72,34 @@ export class JenkinsCoverageDataOperations {
     cacheKind: string,
     buildUrl: string,
     actionPath: string,
-    buildCompleted: boolean | undefined,
+    options: JenkinsCoverageRequestOptions | undefined,
     operation: (client: JenkinsClient) => Promise<T | undefined>
   ): Promise<T | undefined> {
-    const completed = Boolean(buildCompleted);
-    const cacheKey = await this.buildCacheKey(environment, cacheKind, buildUrl, actionPath);
+    const completed = Boolean(options?.buildCompleted);
+    const cacheKey = await this.runtimeContext.buildRunCacheKey(
+      environment,
+      cacheKind,
+      `${buildUrl}::${actionPath}`,
+      options?.run
+    );
+    const load = async () => {
+      const client = await this.runtimeContext.getClient(environment);
+      try {
+        return await operation(client);
+      } catch (error) {
+        throw toBuildActionError(error);
+      }
+    };
+    if (!cacheKey) return load();
     const cached = this.getCompletedBuildCacheEntry<T>(cacheKey, completed);
     if (cached !== undefined) {
       return cached;
     }
 
     return this.runtimeContext.getCache().withWriteGuard([cacheKey], async (cache) => {
-      const client = await this.runtimeContext.getClient(environment);
-      try {
-        const value = await operation(client);
-        this.updateCompletedBuildCache(cache, cacheKey, value, completed);
-        return value;
-      } catch (error) {
-        throw toBuildActionError(error);
-      }
+      const value = await load();
+      this.updateCompletedBuildCache(cache, cacheKey, value, completed);
+      return value;
     });
   }
 
@@ -120,15 +131,6 @@ export class JenkinsCoverageDataOperations {
     } else {
       cache.delete(cacheKey);
     }
-  }
-
-  private async buildCacheKey(
-    environment: JenkinsEnvironmentRef,
-    kind: string,
-    buildUrl: string,
-    actionPath: string
-  ): Promise<string> {
-    return this.runtimeContext.buildCacheKey(environment, kind, `${buildUrl}::${actionPath}`);
   }
 }
 

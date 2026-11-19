@@ -1,3 +1,4 @@
+import { QueuedBuildWaiter } from "../src/services/QueuedBuildWaiter";
 import type * as vscode from "vscode";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BuildCommandRefreshHost } from "../src/commands/build/BuildCommandTypes";
@@ -8,11 +9,14 @@ import type {
   TriggeredBuildOrigin
 } from "../src/services/buildFollow/BuildFollowTypes";
 import type { AnnounceAndFollowOptions } from "../src/services/buildFollow/BuildFollowUpService";
+import { TriggeredBuildLocator } from "../src/services/buildFollow/TriggeredBuildLocator";
 import type { ReplayDraftSession } from "../src/services/ReplayDraftManager";
 import type { BuildTreeItem } from "../src/tree/TreeItems";
 import * as vscodeStub from "./helpers/vscodeStub";
 
-const showInformationMessage = vi.fn(async (_message: string) => undefined);
+const showInformationMessage = vi.fn(
+  async (_message: string): Promise<string | undefined> => undefined
+);
 const showErrorMessage = vi.fn(async (_message: string) => undefined);
 const showWarningMessage = vi.fn(async (_message: string) => undefined);
 const callOrder: string[] = [];
@@ -73,14 +77,22 @@ function createFollowUp(options?: { enabled?: boolean }) {
       new Promise<TriggeredBuildLocation>(() => undefined)
   );
   const awaitQueuedBuildStart = vi.fn(
-    async (_environment: JenkinsEnvironmentRef, _location?: string) => undefined
+    async (_environment: JenkinsEnvironmentRef, _location?: string, _submittedJobUrl?: string) =>
+      undefined
   );
+  const follow = vi.fn(async () => "following" as const);
   const service = new BuildFollowUpService({
     dataService: { getNextBuildNumber },
     locator: { locate },
     queuedBuildWaiter: { awaitQueuedBuildStart },
     actions: { showBuildDetails: vi.fn(), previewLog: vi.fn() },
-    completionTracker: { follow: vi.fn(() => true) },
+    completionTracker: {
+      onDidNotifyCompletion: () => ({ dispose() {} }),
+      observeBuildIdentity: () => undefined,
+      watchQueueCancellation: () => ({ claim: () => true, dispose() {} }),
+      beginSubmittedQueueDiscovery: () => ({ finish() {} }),
+      followStartedBuild: follow
+    },
     isEnabled: () => enabled
   });
   services.push(service);
@@ -89,6 +101,7 @@ function createFollowUp(options?: { enabled?: boolean }) {
   const announceAndFollow = vi.spyOn(service, "announceAndFollow");
   return {
     service,
+    follow,
     getNextBuildNumber,
     locate,
     awaitQueuedBuildStart,
@@ -208,7 +221,7 @@ describe("triggerBuildForTarget", () => {
     );
     expect(lastAnnounceOptions(followUp.announceAndFollow).onSettled).toBeUndefined();
     expect(followUp.locate).not.toHaveBeenCalled();
-    expect(followUp.awaitQueuedBuildStart).toHaveBeenCalledWith(environment, queueLocation);
+    expect(followUp.awaitQueuedBuildStart).toHaveBeenCalledWith(environment, queueLocation, jobUrl);
     expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({ environmentId: "env-1" });
   });
 
@@ -232,7 +245,7 @@ describe("triggerBuildForTarget", () => {
     });
     expect(showInformationMessage).toHaveBeenCalledWith("Triggered build for folder/demo.");
     expect(followUp.locate).not.toHaveBeenCalled();
-    expect(followUp.awaitQueuedBuildStart).toHaveBeenCalledWith(environment, undefined);
+    expect(followUp.awaitQueuedBuildStart).toHaveBeenCalledWith(environment, undefined, jobUrl);
     expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledTimes(1);
   });
 
@@ -282,6 +295,7 @@ describe.each([
     kind: "cause",
     environment,
     sourceBuildUrl,
+    sourceBuildNumber: 12,
     cause,
     jobLabel: "folder/demo"
   };
@@ -332,6 +346,59 @@ describe.each([
     lastAnnounceOptions(followUp.announceAndFollow).refresh();
     expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({ environmentId: "env-1" });
   });
+
+  it.each([
+    {
+      envUrl: "https://ci/job/",
+      posted: "https://ci/job/custom-runs/job/app/",
+      expected: "https://ci/job/custom-runs/job/app/"
+    },
+    {
+      envUrl: "https://ci/job/",
+      posted: "https://ci/job/view/team/job/app/",
+      expected: "https://ci/job/view/team/job/app/"
+    },
+    {
+      envUrl: "https://public/jenkins/",
+      posted: "https://internal/ci/view/team/job/app/",
+      expected: "https://public/jenkins/job/app/"
+    }
+  ])(
+    "reads and follows the job of the exact action submitted to $posted",
+    async ({ envUrl, posted, expected }) => {
+      const env = { ...environment, url: envUrl };
+      const item = {
+        ...createBuildItem(),
+        environment: env,
+        buildUrl: `${posted}12/`
+      } as BuildTreeItem;
+      const followUp = createFollowUp();
+      const { action, dataService } = createDataService();
+      const observedCause =
+        cause === "rebuild"
+          ? { _class: "RebuildCause", upstreamBuild: 12 }
+          : { _class: "ReplayCause", shortDescription: "Replayed #12" };
+      const getBuildDetails = vi
+        .fn()
+        .mockResolvedValue({ number: 13, actions: [{ causes: [observedCause] }] });
+      const locator = new TriggeredBuildLocator({ getBuildDetails }, { awaitQueuedBuild: vi.fn() });
+      followUp.locate.mockImplementation((origin) => locator.locate(origin));
+      showInformationMessage
+        .mockImplementationOnce(async () => undefined)
+        .mockResolvedValueOnce("Notify When Finished");
+      await run(dataService as never, followUp.service, createRefreshHost(), item);
+      await flush();
+      expect(action).toHaveBeenCalledWith(env, `${posted}12/`);
+      expect(followUp.getNextBuildNumber).toHaveBeenCalledWith(env, expected);
+      expect(getBuildDetails).toHaveBeenCalledWith(env, `${expected}13/`, expect.anything());
+      expect(followUp.follow).toHaveBeenCalledWith(
+        expect.objectContaining({ environment: env, buildUrl: `${expected}13/`, buildNumber: 13 }),
+        "configured",
+        undefined,
+        undefined
+      );
+    }
+  );
 
   it("keeps the plain message and refreshes immediately when following is off", async () => {
     const followUp = createFollowUp({ enabled: false });
@@ -469,6 +536,57 @@ describe("rebuildBuildWithChanges", () => {
     expect(refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({ environmentId: "env-1" });
   });
 
+  it.each([
+    {
+      environmentUrl: "https://ci/job/",
+      submitted: "https://ci/job/custom-runs/job/app/",
+      followed: "https://ci/job/custom-runs/job/app/"
+    },
+    {
+      environmentUrl: "https://public/jenkins/",
+      submitted: "https://internal/ci/view/team/job/app/",
+      followed: "https://public/jenkins/job/app/"
+    }
+  ])(
+    "follows the exact queued build for a submission to $submitted",
+    async ({ environmentUrl, submitted, followed }) => {
+      const env = { ...environment, url: environmentUrl };
+      const selected = createBuildItem();
+      const item = { ...selected, environment: env, buildUrl: `${submitted}12/` } as BuildTreeItem;
+      const followUp = createFollowUp();
+      const locator = new TriggeredBuildLocator(
+        { getBuildDetails: vi.fn() },
+        new QueuedBuildWaiter({
+          getQueueItem: vi.fn().mockResolvedValue({ id: 42, executable: { number: 17 } })
+        })
+      );
+      followUp.locate.mockImplementation((origin) => locator.locate(origin));
+      showInformationMessage
+        .mockImplementationOnce(async () => undefined)
+        .mockResolvedValueOnce("Notify When Finished");
+      const dataService = createDataService();
+      await rebuildBuildWithChanges(
+        dataService as never,
+        followUp.service,
+        createRefreshHost(),
+        item
+      );
+      await flush();
+      expect(dataService.triggerBuildWithParameters).toHaveBeenCalledWith(
+        env,
+        submitted,
+        expect.anything(),
+        { allowEmptyParams: true }
+      );
+      expect(followUp.follow).toHaveBeenCalledWith(
+        expect.objectContaining({ environment: env, buildUrl: `${followed}17/`, buildNumber: 17 }),
+        "configured",
+        undefined,
+        undefined
+      );
+    }
+  );
+
   it("submits nothing when the editor is cancelled", async () => {
     promptRebuildParameterChanges.mockResolvedValueOnce(undefined);
     const followUp = createFollowUp();
@@ -537,6 +655,7 @@ describe("ReplayBuildWorkflow.runDraft", () => {
     buildKey: "key",
     environment,
     buildUrl: sourceBuildUrl,
+    buildNumber: 12,
     label: "folder/demo #12",
     scripts: []
   };
@@ -545,6 +664,7 @@ describe("ReplayBuildWorkflow.runDraft", () => {
     kind: "cause",
     environment,
     sourceBuildUrl,
+    sourceBuildNumber: 12,
     cause: "replay",
     mayReturnQueueItem: true
   };
@@ -644,7 +764,8 @@ describe("ReplayBuildWorkflow.runDraft", () => {
     expect(withLocation.followUp.locate).not.toHaveBeenCalled();
     expect(withLocation.followUp.awaitQueuedBuildStart).toHaveBeenCalledWith(
       environment,
-      queueLocation
+      queueLocation,
+      jobUrl
     );
     expect(withLocation.refreshHost.fullEnvironmentRefresh).toHaveBeenCalledWith({
       environmentId: "env-1"
@@ -656,6 +777,7 @@ describe("ReplayBuildWorkflow.runDraft", () => {
     expect(showInformationMessage).toHaveBeenLastCalledWith("Replay started for folder/demo #12.");
     expect(withoutLocation.followUp.awaitQueuedBuildStart).toHaveBeenCalledWith(
       environment,
+      undefined,
       undefined
     );
     expect(withoutLocation.refreshHost.fullEnvironmentRefresh).toHaveBeenCalledTimes(1);

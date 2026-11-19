@@ -26,6 +26,11 @@ export type BuildDetailsState = Omit<BuildDetailsViewModel, "diagnostics"> & {
   consoleHtmlModel?: ConsoleHtmlModel;
   pipelineNodeLogHtmlModel?: ConsoleHtmlModel;
   hasLoaded: boolean;
+  /** Session state supplied by the extension for this load. */
+  followState?: Pick<
+    Extract<BuildDetailsStateMessage, { type: "buildFollowingChanged" }>,
+    "followTargetToken" | "buildNumber" | "queueId" | "following"
+  >;
   /** Webview-only: approve/reject requests awaiting `pendingInputActionComplete`. */
   processingInputActions: Record<string, PendingInputProcessingAction>;
   /** Webview-only: a keep/edit/delete request awaiting `buildManagementActionComplete`. */
@@ -131,6 +136,8 @@ export function buildDetailsReducer(
   action: BuildDetailsAction
 ): BuildDetailsState {
   switch (action.type) {
+    // The host sends read failures and recoveries through setErrors. The bytes
+    // themselves may be a retained snapshot delivered after a failed read.
     case "appendConsole": {
       if (!action.text) {
         return state;
@@ -139,8 +146,7 @@ export function buildDetailsReducer(
         ...state,
         consoleText: state.consoleText + action.text,
         consoleHtml: undefined,
-        consoleHtmlModel: undefined,
-        consoleError: undefined
+        consoleHtmlModel: undefined
       };
     }
     case "appendConsoleHtml": {
@@ -151,8 +157,7 @@ export function buildDetailsReducer(
       return {
         ...state,
         consoleHtml: undefined,
-        consoleHtmlModel: nextModel,
-        consoleError: undefined
+        consoleHtmlModel: nextModel
       };
     }
     case "setConsole": {
@@ -161,8 +166,7 @@ export function buildDetailsReducer(
         consoleText: action.text,
         consoleHtml: undefined,
         consoleHtmlModel: undefined,
-        consoleTruncated: action.truncated,
-        consoleError: undefined
+        consoleTruncated: action.truncated
       };
     }
     case "setConsoleHtml": {
@@ -171,8 +175,7 @@ export function buildDetailsReducer(
         ...state,
         consoleHtml: undefined,
         consoleHtmlModel: nextModel,
-        consoleTruncated: action.truncated,
-        consoleError: undefined
+        consoleTruncated: action.truncated
       };
     }
     case "setPipelineNodeLog": {
@@ -242,6 +245,15 @@ export function buildDetailsReducer(
     case "setBuildRelationships": {
       return { ...state, relationships: action.relationships };
     }
+    case "buildFollowingChanged": {
+      if (
+        action.loadToken !== state.loadToken ||
+        (state.followState && action.followTargetToken < state.followState.followTargetToken)
+      )
+        return state;
+      const { followTargetToken, buildNumber, queueId, following } = action;
+      return { ...state, followState: { followTargetToken, buildNumber, queueId, following } };
+    }
     case "setBuildNavigation": {
       return { ...state, navigation: action.navigation };
     }
@@ -281,6 +293,9 @@ export function buildDetailsReducer(
       const payload = action.payload;
       return {
         ...state,
+        followTargetToken: payload.followTargetToken,
+        buildNumber: payload.buildNumber,
+        queueId: payload.queueId,
         displayName: payload.displayName,
         description: payload.description,
         keptForever: payload.keptForever,

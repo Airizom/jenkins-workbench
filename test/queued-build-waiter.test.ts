@@ -30,6 +30,7 @@ describe("QueuedBuildWaiter", () => {
       .fn()
       .mockRejectedValueOnce(new BuildActionError("Server error", "unknown", 503))
       .mockResolvedValueOnce({
+        id: 42,
         executable: { number: 1, url: "https://jenkins.example/job/a/1/" }
       });
     let resolved = false;
@@ -81,8 +82,44 @@ describe("QueuedBuildWaiter", () => {
 describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
   const options = { timeoutMs: 10_000, maxPollIntervalMs: 200 };
 
+  it("uses the exact queue item's earlier task URL for a later number-only executable", async () => {
+    vi.useFakeTimers();
+    const taskUrl = "https://jenkins.example/job/replayed/";
+    const getQueueItem = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 42, task: { url: taskUrl } })
+      .mockResolvedValueOnce({ id: 42 })
+      .mockResolvedValueOnce({ id: 42, executable: { number: 7 } });
+    const outcome = createWaiter(getQueueItem).awaitQueuedBuild(
+      environment,
+      queueLocation,
+      options
+    );
+    await vi.advanceTimersByTimeAsync(400);
+    assert.deepEqual(await outcome, { kind: "started", number: 7, url: `${taskUrl}7/` });
+  });
+
+  it("correlates a classic view alias and the same job across reads", async () => {
+    vi.useFakeTimers();
+    const job = `${environment.url}job/replayed/`;
+    const viewJob = "view/Team/job/replayed/";
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce({ id: 42, task: { url: job } })
+      .mockResolvedValueOnce({ id: 42, task: { url: viewJob } })
+      .mockResolvedValueOnce({ id: 42, executable: { number: 7 } });
+    const outcome = createWaiter(read).awaitQueuedBuild(environment, queueLocation, options);
+    await vi.advanceTimersByTimeAsync(400);
+    assert.deepEqual(await outcome, {
+      kind: "started",
+      number: 7,
+      url: `${environment.url}${viewJob}7/`
+    });
+  });
+
   it("reports the started build number and url", async () => {
     const getQueueItem = vi.fn().mockResolvedValue({
+      id: 42,
       executable: { number: 7, url: "https://jenkins.example/job/a/7/" }
     });
     const outcome = await createWaiter(getQueueItem).awaitQueuedBuild(
@@ -98,8 +135,51 @@ describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
     assert.deepEqual(getQueueItem.mock.calls[0], [environment, 42]);
   });
 
+  it.each([
+    {
+      id: 42,
+      task: { url: "https://jenkins.example/job/task/" },
+      executable: { number: 8 },
+      expected: "https://jenkins.example/job/task/8/"
+    },
+    {
+      id: 42,
+      executable: { url: "http://internal/job/worker/8/" },
+      expected: "https://jenkins.example/job/worker/8/"
+    },
+    { id: 42, executable: { number: 8, url: "https://jenkins.example/job/worker/9/" } },
+    {
+      id: 42,
+      task: { url: "https://jenkins.example/job/task/8/console/" },
+      executable: { number: 8 }
+    },
+    { id: 91, executable: { number: 8, url: "https://jenkins.example/job/unrelated/8/" } }
+  ])(
+    "validates the queue, task and executable before using the submitted job ($id, $expected)",
+    async ({ expected, ...queueItem }) => {
+      const waiter = createWaiter(vi.fn().mockResolvedValue(queueItem));
+      const outcome = await waiter.awaitQueuedBuild(environment, queueLocation, {
+        ...options,
+        submittedJobUrl: "https://jenkins.example/job/submitted/"
+      });
+      assert.deepEqual(
+        outcome,
+        expected
+          ? {
+              kind: "started",
+              number: 8,
+              url: expected,
+              ...(queueItem.executable.url && {
+                fallbackUrl: "https://jenkins.example/job/submitted/8/"
+              })
+            }
+          : { kind: "unknown" }
+      );
+    }
+  );
+
   it("reports a cancelled queue item", async () => {
-    const getQueueItem = vi.fn().mockResolvedValue({ cancelled: true });
+    const getQueueItem = vi.fn().mockResolvedValue({ id: 42, cancelled: true });
     const outcome = await createWaiter(getQueueItem).awaitQueuedBuild(
       environment,
       queueLocation,
@@ -111,7 +191,7 @@ describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
   it.each([0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
     "returns unknown for an invalid executable number: %s",
     async (number) => {
-      const getQueueItem = vi.fn().mockResolvedValue({ executable: { number } });
+      const getQueueItem = vi.fn().mockResolvedValue({ id: 42, executable: { number } });
       const outcome = await createWaiter(getQueueItem).awaitQueuedBuild(
         environment,
         queueLocation,
@@ -157,7 +237,7 @@ describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
       .fn()
       .mockRejectedValueOnce(new BuildActionError("Server error", "unknown", 503))
       .mockRejectedValueOnce(new BuildActionError("Server error", "unknown", 503))
-      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ id: 42 })
       .mockRejectedValue(new BuildActionError("Server error", "unknown", 503));
     let outcome: unknown;
     const promise = createWaiter(getQueueItem)
@@ -179,7 +259,7 @@ describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
     const start = Date.now();
     const getQueueItem = vi.fn(async () => {
       callTimes.push(Date.now() - start);
-      return {};
+      return { id: 42 };
     });
     const promise = createWaiter(getQueueItem).awaitQueuedBuild(environment, queueLocation, {
       timeoutMs: 60_000,
@@ -195,7 +275,7 @@ describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
 
   it("returns unknown when the deadline passes", async () => {
     vi.useFakeTimers();
-    const getQueueItem = vi.fn().mockResolvedValue({});
+    const getQueueItem = vi.fn().mockResolvedValue({ id: 42 });
     let outcome: unknown;
     const promise = createWaiter(getQueueItem)
       .awaitQueuedBuild(environment, queueLocation, { timeoutMs: 1000, maxPollIntervalMs: 200 })
@@ -214,7 +294,7 @@ describe("QueuedBuildWaiter.awaitQueuedBuild", () => {
   it("stops polling once the token is cancelled", async () => {
     vi.useFakeTimers();
     const token = { isCancellationRequested: false };
-    const getQueueItem = vi.fn().mockResolvedValue({});
+    const getQueueItem = vi.fn().mockResolvedValue({ id: 42 });
     const promise = createWaiter(getQueueItem).awaitQueuedBuild(environment, queueLocation, {
       ...options,
       token

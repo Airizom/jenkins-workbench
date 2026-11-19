@@ -40,9 +40,10 @@ export class ReplayDraftManager implements vscode.Disposable {
     environment: JenkinsEnvironmentRef,
     buildUrl: string,
     label: string,
-    definition: JenkinsReplayDefinition
+    definition: JenkinsReplayDefinition,
+    buildNumber?: number
   ): ReplayDraftSession {
-    return this.store.createSession(environment, buildUrl, label, definition);
+    return this.store.createSession(environment, buildUrl, label, definition, buildNumber);
   }
 
   async openSession(session: ReplayDraftSession, focusUri?: vscode.Uri): Promise<void> {

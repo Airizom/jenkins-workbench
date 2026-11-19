@@ -15,7 +15,7 @@ export interface BuildDetailsInitialActivationOptions {
   view: Pick<BuildDetailsPanelView, "isVisible">;
   runtime: Pick<
     BuildDetailsPanelRuntime,
-    "refreshBuildStatus" | "refreshTestReport" | "refreshCoverage" | "handlePanelHidden"
+    "refreshBuildStatus" | "loadTerminalReports" | "handlePanelHidden"
   >;
   getPollingController: () => BuildDetailsPollingController | undefined;
   isTokenCurrent: (token: number) => boolean;
@@ -42,8 +42,8 @@ export class BuildDetailsInitialActivation {
       this.scheduleRetry(1);
       return;
     }
-    if (details.building) {
-      this.activateRunningBuild();
+    if (details.building !== false) {
+      this.startStatusPolling();
       return;
     }
     await this.activateCompletedBuild();
@@ -91,13 +91,10 @@ export class BuildDetailsInitialActivation {
     if (this.options.workflowError && this.options.view.isVisible()) {
       this.options.getPollingController()?.start();
     }
-    await Promise.all([
-      runtime.refreshTestReport(token, { showLoading: true }),
-      runtime.refreshCoverage(token, { showLoading: true })
-    ]);
+    await runtime.loadTerminalReports(token);
   }
 
-  private activateRunningBuild(): void {
+  private startStatusPolling(): void {
     if (this.options.view.isVisible()) {
       this.options.getPollingController()?.start();
       return;

@@ -144,14 +144,14 @@ describe("Jenkins build tree builders", () => {
     });
 
     assert.equal(requestedUrls.length, 1);
-    assert.equal(getTreeParameter(requestedUrls[0]), "number,url,result,building");
-    assert.equal(buildBuildDetailsTree({ statusOnly: true }), "number,url,result,building");
+    assert.equal(getTreeParameter(requestedUrls[0]), "number,url,queueId,result,building");
+    assert.equal(buildBuildDetailsTree({ statusOnly: true }), "number,url,queueId,result,building");
   });
 
   it("includes shared change set and action fragments for build lists with details", () => {
     assert.equal(
       buildBuildsTree({ includeDetails: true, includeParameters: true }),
-      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,causes[_class,shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild],parameters[name,value]]]{limit}"
+      "builds[number,url,queueId,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,causes[_class,shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild],parameters[name,value]]]{limit}"
     );
   });
 
@@ -162,11 +162,11 @@ describe("Jenkins build tree builders", () => {
 
     assert.equal(
       buildBuildsTree(),
-      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName]{limit}"
+      "builds[number,url,queueId,result,building,timestamp,duration,estimatedDuration,keepLog,displayName]{limit}"
     );
     assert.equal(
       getTreeParameter(requestedUrls[0]),
-      "allBuilds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName]{200,300}"
+      "allBuilds[number,url,queueId,result,building,timestamp,duration,estimatedDuration,keepLog,displayName]{200,300}"
     );
   });
 
@@ -179,14 +179,14 @@ describe("Jenkins build tree builders", () => {
 
     assert.equal(
       getTreeParameter(requestedUrls[0]),
-      "builds[number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,description,actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,parameters[name,value]]]{0,20}"
+      "builds[number,url,queueId,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,description,actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,parameters[name,value]]]{0,20}"
     );
   });
 
   it("includes shared change set and action fragments for build details", () => {
     assert.equal(
       buildBuildDetailsTree({ includeCauses: true, includeParameters: true }),
-      "number,url,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,fullDisplayName,description,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,failCount,skipCount,totalCount,causes[_class,shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild],parameters[name,value]]"
+      "number,url,queueId,result,building,timestamp,duration,estimatedDuration,keepLog,displayName,fullDisplayName,description,culprits[fullName],artifacts[fileName,relativePath],changeSet[items[commitId,msg,author[fullName]]],changeSets[items[commitId,msg,author[fullName]]],actions[_class,urlName,lastBuiltRevision[SHA1],remoteUrls,failCount,skipCount,totalCount,causes[_class,shortDescription,userId,userName,upstreamProject,upstreamUrl,upstreamBuild],parameters[name,value]]"
     );
   });
 });

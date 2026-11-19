@@ -1,3 +1,4 @@
+import { isBuildQueueId } from "../../shared/build/BuildCompletionEvidence";
 import type {
   BuildParameterPayload,
   BuildParameterRequestPreparer,
@@ -6,6 +7,7 @@ import type {
 import type { JenkinsClient } from "../JenkinsClient";
 import type { JenkinsClientProvider } from "../JenkinsClientProvider";
 import type { JenkinsEnvironmentRef } from "../JenkinsEnvironmentRef";
+import type { JenkinsBuildDetails } from "../types";
 import { JenkinsDataCache } from "./JenkinsDataCache";
 
 export interface JenkinsDataRuntimeContextOptions {
@@ -65,6 +67,19 @@ export class JenkinsDataRuntimeContext {
   ): Promise<string> {
     const authSignature = await this.clientProvider.getAuthSignature(environment);
     return this.cache.buildKey(environment, kind, path, authSignature);
+  }
+
+  /** A numbered URL may be reused. Only share observed run data across loads with queue evidence. */
+  async buildRunCacheKey(
+    environment: JenkinsEnvironmentRef,
+    kind: string,
+    path: string,
+    run?: Pick<JenkinsBuildDetails, "queueId" | "result">
+  ): Promise<string | undefined> {
+    if (!run) return this.buildCacheKey(environment, kind, path);
+    if (!isBuildQueueId(run.queueId)) return undefined;
+    const identity = JSON.stringify([environment.scope, path, run.queueId, run.result]);
+    return this.buildCacheKey(environment, kind, identity);
   }
 
   async prepareBuildParameters(

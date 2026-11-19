@@ -19,6 +19,10 @@ import type { JobTreeItem, PipelineTreeItem } from "./items/TreeJobItems";
 import { JenkinsFolderTreeItem } from "./items/TreeJobItems";
 import type { WorkbenchTreeElement } from "./items/WorkbenchTreeElement";
 import { decorateMultibranchScanItem } from "./MultibranchScanPresentation";
+import {
+  TreeBuildFollowPresentation,
+  type TreeBuildFollowState
+} from "./TreeBuildFollowPresentation";
 import { JenkinsTreeChildrenLoader } from "./TreeChildren";
 import { TreeDataProviderExpansionResolver } from "./TreeDataProviderExpansionResolver";
 import { TreeDataProviderHierarchyState } from "./TreeDataProviderHierarchyState";
@@ -74,6 +78,7 @@ export class JenkinsWorkbenchTreeDataProvider
   private readonly hierarchyState: TreeDataProviderHierarchyState;
   private readonly expansionResolver: TreeDataProviderExpansionResolver;
   private readonly summaryState: TreeDataProviderSummaryState;
+  private readonly buildFollowPresentation?: TreeBuildFollowPresentation;
   private scanSubscription: vscode.Disposable | undefined;
   private pendingInputUnsubscribe: (() => void) | undefined;
 
@@ -92,8 +97,14 @@ export class JenkinsWorkbenchTreeDataProvider
     viewCurationOptions: TreeViewCurationOptions,
     activityOptions: TreeActivityOptions,
     pendingInputCoordinator: PendingInputRefreshCoordinator,
-    private readonly scanState?: MultibranchScanStateStore
+    private readonly scanState?: MultibranchScanStateStore,
+    buildFollowTracker?: TreeBuildFollowState
   ) {
+    if (buildFollowTracker) {
+      this.buildFollowPresentation = new TreeBuildFollowPresentation(buildFollowTracker, (row) =>
+        this.notifyElement(row)
+      );
+    }
     const scanPresentations = new Map<string, string>();
     this.scanSubscription = scanState?.onDidChange((state) => {
       const key = multibranchScanKey(state.target);
@@ -146,6 +157,7 @@ export class JenkinsWorkbenchTreeDataProvider
   }
 
   dispose(): void {
+    this.buildFollowPresentation?.dispose();
     this.scanSubscription?.dispose();
     if (this.pendingInputUnsubscribe) {
       this.pendingInputUnsubscribe();
@@ -328,7 +340,7 @@ export class JenkinsWorkbenchTreeDataProvider
         return decorateMultibranchScanItem(element, state);
       }
     }
-    return element;
+    return this.buildFollowPresentation?.getTreeItem(element) ?? element;
   }
 
   // fallow-ignore-next-line unused-class-member -- invoked through watch status callbacks
@@ -375,6 +387,9 @@ export class JenkinsWorkbenchTreeDataProvider
   ): Promise<WorkbenchTreeElement[]> {
     const items = await this.childrenLoader.getChildren(element);
     const withParent = this.hierarchyState.withParent(element, items, trackRenderedItems);
+    if (trackRenderedItems) {
+      this.buildFollowPresentation?.trackChildren(element, items);
+    }
     this.emitSummary();
     return withParent;
   }

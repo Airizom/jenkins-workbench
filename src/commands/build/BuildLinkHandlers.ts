@@ -5,16 +5,23 @@ import { parseWorkbenchDeepLinkText } from "../../extension/WorkbenchDeepLinks";
 import {
   classifyBuildReference,
   formatBuildLabel,
+  type ResolvedBuildReference,
   resolveBuildReferenceUrl
 } from "../../jenkins/BuildReferenceParser";
+import type { JenkinsDataService } from "../../jenkins/JenkinsDataService";
 import type { JenkinsBuildPermalinkRuntimeSurface } from "../../jenkins/JenkinsDataServiceRuntimeSurfaces";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import {
+  resolvePermalinkBuildIdentity,
+  resolvePermalinkBuildZeroUrl
+} from "../../jenkins/PermalinkBuildUrl";
+import { getTreeBuildDetailsUrl } from "../../jenkins/ReportedBuildUrl";
 import type { JenkinsBuildPermalink } from "../../jenkins/types";
 import {
-  canonicalizeBuildUrlForEnvironment,
   canonicalizeJobUrlForEnvironment,
   ensureTrailingSlash,
-  formatJobUrlLabel
+  formatJobUrlLabel,
+  normalizeJenkinsUrlForComparison
 } from "../../jenkins/urls";
 import type { BuildDetailsCurrentBuildProvider } from "../../panels/BuildDetailsPanel";
 import type {
@@ -26,6 +33,7 @@ import {
   copyWorkbenchLink,
   type ShareLinkTarget
 } from "../../services/links/BuildShareLinks";
+import { isNotFoundError } from "../../services/polling/Polling";
 import { withActionErrorMessage } from "../CommandUtils";
 
 /** Job used when the input is a bare build number. */
@@ -36,7 +44,7 @@ export interface BuildNumberContext {
 }
 
 export interface OpenBuildDependencies {
-  dataService: JenkinsBuildPermalinkRuntimeSurface;
+  dataService: JenkinsBuildPermalinkRuntimeSurface & Pick<JenkinsDataService, "getBuildDetails">;
   buildDetailsPanelLauncher: Pick<BuildDetailsPanelLauncher, "show">;
   currentBuild: BuildDetailsCurrentBuildProvider;
   environmentUrlResolver: Pick<JenkinsEnvironmentUrlResolver, "resolve" | "hasMatch">;
@@ -47,7 +55,7 @@ export interface OpenBuildDependencies {
 
 /** Tree items the open and copy commands accept; builds carry buildUrl, jobs carry jobUrl. */
 export type BuildLinkTreeItem =
-  | { environment: JenkinsEnvironmentRef; buildUrl: string }
+  | { environment: JenkinsEnvironmentRef; buildUrl: string; buildNumber?: number }
   | { environment: JenkinsEnvironmentRef; jobUrl: string };
 
 interface ResolvedBuildTarget {
@@ -118,7 +126,7 @@ export async function openBuild(
     if (!match) {
       return;
     }
-    const resolved = resolveBuildReferenceUrl(reference.url, match.environmentUrl);
+    const resolved = await resolvePastedReference(deps, reference.url, match);
     switch (resolved.kind) {
       case "build":
         await showBuild(deps, {
@@ -158,7 +166,9 @@ export async function copyBuildOrJobLink(
   const target = getShareLinkTarget(currentBuild, item);
   if (!target) {
     void vscode.window.showInformationMessage(
-      "Select a build or job in the Jenkins tree, or open Build Details."
+      item && "buildUrl" in item
+        ? `Jenkins did not identify a URL for build #${item.buildNumber}.`
+        : "Select a build or job in the Jenkins tree, or open Build Details."
     );
     return;
   }
@@ -177,9 +187,11 @@ function getShareLinkTarget(
     const environmentUrl = item.environment.url;
     // Tree URLs can be view-scoped; share the canonical job or build URL.
     if ("buildUrl" in item) {
+      const url = getTreeBuildDetailsUrl(item);
+      if (!url) return undefined;
       return {
         kind: "build",
-        url: canonicalizeBuildUrlForEnvironment(environmentUrl, item.buildUrl) ?? item.buildUrl,
+        url,
         environmentUrl
       };
     }
@@ -221,6 +233,11 @@ async function resolveNumberContext(
 function jobUrlForBuild(buildUrl: string, environmentUrl: string): string | undefined {
   try {
     const resolved = resolveBuildReferenceUrl(new URL(buildUrl), environmentUrl);
+    if (resolved.kind === "candidates") {
+      // Build Details supplies the already identified numbered URL.
+      const exact = normalizeJenkinsUrlForComparison(buildUrl, environmentUrl);
+      return resolved.candidates.find((candidate) => candidate.buildUrl === exact)?.jobUrl;
+    }
     return resolved.kind === "build" ? resolved.jobUrl : undefined;
   } catch {
     return undefined;
@@ -297,12 +314,50 @@ async function promptForJobContext(
   if (!match) {
     return undefined;
   }
-  const resolved = resolveBuildReferenceUrl(reference.url, match.environmentUrl);
+  const resolved = await resolvePastedReference(deps, reference.url, match);
   if (resolved.kind === "invalid") {
     void vscode.window.showErrorMessage(resolved.message);
     return undefined;
   }
   return { environment: match.environment, jobUrl: resolved.jobUrl };
+}
+
+async function resolvePastedReference(
+  deps: OpenBuildDependencies,
+  url: URL,
+  match: { environmentUrl: string; environment: JenkinsEnvironmentRef }
+): Promise<ResolvedBuildReference> {
+  const resolved = resolveBuildReferenceUrl(url, match.environmentUrl);
+  if (resolved.kind !== "candidates") return resolved;
+  for (const candidate of resolved.candidates) {
+    if (
+      await confirmsNumberedRun(deps, match.environment, candidate.buildUrl, candidate.buildNumber)
+    )
+      return candidate;
+  }
+  if (resolved.fallback) return resolved.fallback;
+  return { kind: "invalid", message: "That URL did not identify a numbered Jenkins build." };
+}
+
+async function confirmsNumberedRun(
+  deps: OpenBuildDependencies,
+  environment: JenkinsEnvironmentRef,
+  buildUrl: string,
+  number: number
+): Promise<boolean> {
+  try {
+    const details = await deps.dataService.getBuildDetails(environment, buildUrl, {
+      statusOnly: true,
+      bypassCache: true
+    });
+    return (
+      details.number === number &&
+      (typeof details.building === "boolean" || typeof details.result === "string")
+    );
+  } catch (error) {
+    if (!isNotFoundError(error)) throw error;
+    return false;
+  }
 }
 
 async function showJobActions(
@@ -370,13 +425,43 @@ async function openPermalink(
   permalink: JenkinsBuildPermalink
 ): Promise<void> {
   const build = await deps.dataService.getBuildPermalink(environment, jobUrl, permalink);
-  if (!build?.url) {
+  let buildUrl: string | undefined;
+  if (build?.number === 0) {
+    const literal = resolvePermalinkBuildZeroUrl(environment.url, jobUrl, build.url);
+    if (literal && (await confirmsNumberedRun(deps, environment, literal, 0))) buildUrl = literal;
+  } else if (build) {
+    buildUrl = resolvePermalinkBuildIdentity(
+      environment.url,
+      jobUrl,
+      build.number,
+      build.url
+    )?.buildUrl;
+    if (
+      buildUrl &&
+      build.url &&
+      buildUrl === normalizeJenkinsUrlForComparison(build.url, environment.url)
+    ) {
+      const pinned = resolvePermalinkBuildIdentity(
+        environment.url,
+        jobUrl,
+        build.number,
+        undefined
+      )?.buildUrl;
+      if (
+        pinned !== buildUrl &&
+        !(await confirmsNumberedRun(deps, environment, buildUrl, build.number))
+      ) {
+        buildUrl = pinned;
+      }
+    }
+  }
+  if (!buildUrl) {
     void vscode.window.showInformationMessage(
       `No ${describePermalink(permalink)} for ${formatJobUrlLabel(jobUrl, environment.url)}.`
     );
     return;
   }
-  await showBuild(deps, { environment, buildUrl: build.url });
+  await showBuild(deps, { environment, buildUrl });
 }
 
 function describePermalink(permalink: JenkinsBuildPermalink): string {

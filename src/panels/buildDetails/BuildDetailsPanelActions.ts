@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { EnvironmentScopedRefreshHost } from "../../extension/ExtensionRefreshHost";
 import { formatActionError } from "../../formatters/ErrorFormatters";
+import type { JenkinsBuildDetails } from "../../jenkins/types";
 import { buildPendingInputBrowserUrl } from "../../jenkins/urls";
 import type { BuildConsoleExporter } from "../../services/BuildConsoleExporter";
 import type {
@@ -8,6 +9,7 @@ import type {
   BuildManagementTarget,
   BuildManagementWorkflow
 } from "../../services/build/BuildManagementWorkflow";
+import type { BuildCompletionTracker } from "../../services/buildFollow/BuildCompletionTracker";
 import type { BuildFollowUpService } from "../../services/buildFollow/BuildFollowUpService";
 import type { TestSourceNavigationUiService } from "../../services/TestSourceNavigationUiService";
 import { buildTestSourceNavigationContext } from "../../services/TestSourceResolver";
@@ -16,9 +18,13 @@ import { openExternalHttpUrlWithWarning } from "../../ui/OpenExternalUrl";
 import { handlePendingInputAction } from "../../ui/PendingInputActions";
 import { MAX_CONSOLE_CHARS } from "./BuildDetailsConfig";
 import type { BuildDetailsPanelControllerAccess } from "./BuildDetailsPanelController";
+import { resolveDisplayedRun } from "./BuildDetailsRunIdentity";
 import { isPipelineRestartEligible } from "./PipelineRestartEligibility";
 import type { PipelineLogTargetViewModel } from "./shared/BuildDetailsContracts";
-import type { BuildManagementMessage } from "./shared/BuildDetailsPanelMessages";
+import type {
+  BuildManagementMessage,
+  SetBuildFollowingMessage
+} from "./shared/BuildDetailsPanelMessages";
 
 interface BuildDetailsPanelActionsOptions {
   controller: BuildDetailsPanelControllerAccess;
@@ -27,6 +33,14 @@ interface BuildDetailsPanelActionsOptions {
   getRefreshHost: () => EnvironmentScopedRefreshHost | undefined;
   getTestSourceNavigationUiService: () => TestSourceNavigationUiService | undefined;
   getBuildManagementWorkflow: () => BuildManagementWorkflow | undefined;
+  completionTracker: Pick<
+    BuildCompletionTracker,
+    | "followObservedBuild"
+    | "getObservedBuildState"
+    | "isFollowingQueueItem"
+    | "stopFollowingObservedBuild"
+    | "observeRunningBuild"
+  >;
   getBuildFollowUp?: () => BuildFollowUpService | undefined;
 }
 
@@ -49,16 +63,69 @@ export class BuildDetailsPanelActions {
     | TestSourceNavigationUiService
     | undefined;
   private readonly getBuildManagementWorkflow: () => BuildManagementWorkflow | undefined;
+  private readonly completionTracker: BuildDetailsPanelActionsOptions["completionTracker"];
   private readonly getBuildFollowUp: () => BuildFollowUpService | undefined;
+
+  private publishedFollowTarget?: { token: number; buildUrl: string };
 
   constructor(options: BuildDetailsPanelActionsOptions) {
     this.controller = options.controller;
+    this.completionTracker = options.completionTracker;
     this.getArtifactActionHandler = options.getArtifactActionHandler;
     this.getConsoleExporter = options.getConsoleExporter;
     this.getRefreshHost = options.getRefreshHost;
     this.getTestSourceNavigationUiService = options.getTestSourceNavigationUiService;
     this.getBuildManagementWorkflow = options.getBuildManagementWorkflow;
     this.getBuildFollowUp = options.getBuildFollowUp ?? (() => undefined);
+  }
+
+  postBuildFollowState(source: "details" | "tracker" = "tracker"): void {
+    let target = this.controller.getRunningFollowTarget();
+    if (
+      source === "tracker" &&
+      target?.queueId !== undefined &&
+      this.completionTracker.isFollowingQueueItem(target.environment, target.queueId)
+    ) {
+      this.completionTracker.observeRunningBuild(target, false);
+      target = this.controller.getRunningFollowTarget();
+    }
+    const state = target && this.completionTracker.getObservedBuildState(target);
+    const displayed = state === "conflict" ? undefined : target;
+    const followTargetToken = this.controller.getFollowTargetToken();
+    this.publishedFollowTarget = displayed
+      ? { token: followTargetToken, buildUrl: displayed.buildUrl }
+      : undefined;
+    this.controller.postMessage({
+      type: "buildFollowingChanged",
+      followTargetToken,
+      loadToken: this.controller.getLoadToken(),
+      buildNumber: displayed?.buildNumber ?? null,
+      ...(displayed?.queueId !== undefined && { queueId: displayed.queueId }),
+      following: state === "following"
+    });
+  }
+
+  handleSetBuildFollowing(message: SetBuildFollowingMessage): void {
+    if (message.loadToken !== this.controller.getLoadToken()) {
+      return;
+    }
+    const target = this.controller.getRunningFollowTarget();
+    if (
+      !target ||
+      !this.publishedFollowTarget ||
+      this.publishedFollowTarget.token !== message.followTargetToken ||
+      this.publishedFollowTarget.buildUrl !== target.buildUrl ||
+      this.controller.getFollowTargetToken() !== message.followTargetToken ||
+      target.buildNumber !== message.buildNumber ||
+      target.queueId !== message.queueId
+    ) {
+      return;
+    }
+    if (message.following) {
+      this.completionTracker.followObservedBuild(target);
+    } else {
+      this.completionTracker.stopFollowingObservedBuild(target);
+    }
   }
 
   /**
@@ -202,35 +269,16 @@ export class BuildDetailsPanelActions {
       );
       return;
     }
-    if (details.building) {
-      void vscode.window.showInformationMessage(
-        "This build is still running. Restart from stage is available after it completes."
-      );
-      return;
-    }
-    if (!isPipelineRestartEligible(details)) {
-      void vscode.window.showInformationMessage(
-        "Restart from stage is only available for failed or unstable completed builds."
-      );
-      return;
-    }
-    if (this.controller.getPipelineRestartAvailability() === "unsupported") {
-      void vscode.window.showInformationMessage(
-        "Restart from stage is not available on this Jenkins instance."
-      );
-      return;
-    }
     const stageName = message.stageName;
-    const isRestartable =
-      this.controller.getPipelineRestartEnabled() &&
-      this.controller.getPipelineRestartableStages().includes(stageName);
-    if (!isRestartable) {
+    if (!this.canRestartStage(details, stageName)) return;
+
+    const run = resolveDisplayedRun(environment, buildUrl, details);
+    if (!run) {
       void vscode.window.showErrorMessage(
-        `Stage "${stageName}" is not restartable for this build. Refresh pipeline details and try again.`
+        "Could not identify the build to restart. Open its numbered build link and try again."
       );
       return;
     }
-
     const environmentId = environment.environmentId;
     const label = details.fullDisplayName ?? details.displayName ?? `#${details.number}`;
     if (!(await confirmRestartFromStage(label, stageName))) {
@@ -238,16 +286,18 @@ export class BuildDetailsPanelActions {
     }
     const loadingRequest = this.controller.beginLoading();
     try {
-      const buildFollowUp = this.getBuildFollowUp();
+      const buildFollowUp = run.buildNumber > 0 ? this.getBuildFollowUp() : undefined;
       // Read the next build number before submitting so the new build can be told apart.
       const prepared = await buildFollowUp?.prepare({
         kind: "cause",
         environment,
-        sourceBuildUrl: buildUrl,
+        sourceBuildUrl: run.buildUrl,
+        sourceUrlKind: "configured",
+        sourceBuildNumber: run.buildNumber,
         cause: "restart",
         stageName
       });
-      await restartBackend.restartPipelineFromStage(environment, buildUrl, stageName);
+      await restartBackend.restartPipelineFromStage(environment, run.buildUrl, stageName);
       const requestedMessage = `Requested restart from stage "${stageName}" for ${label}`;
       const refresh = () =>
         this.getRefreshHost()?.fullEnvironmentRefresh({ environmentId: environmentId });
@@ -264,6 +314,38 @@ export class BuildDetailsPanelActions {
     } finally {
       this.controller.endLoading(loadingRequest);
     }
+  }
+
+  private canRestartStage(details: JenkinsBuildDetails, stageName: string): boolean {
+    if (details.building) {
+      void vscode.window.showInformationMessage(
+        "This build is still running. Restart from stage is available after it completes."
+      );
+      return false;
+    }
+    if (!isPipelineRestartEligible(details)) {
+      void vscode.window.showInformationMessage(
+        "Restart from stage is only available for failed or unstable completed builds."
+      );
+      return false;
+    }
+    if (this.controller.getPipelineRestartAvailability() === "unsupported") {
+      void vscode.window.showInformationMessage(
+        "Restart from stage is not available on this Jenkins instance."
+      );
+      return false;
+    }
+    const isRestartable =
+      this.controller.getPipelineRestartEnabled() &&
+      this.controller.getPipelineRestartableStages().includes(stageName);
+    if (!isRestartable) {
+      void vscode.window.showErrorMessage(
+        `Stage "${stageName}" is not restartable for this build. Refresh pipeline details and try again.`
+      );
+      return false;
+    }
+
+    return true;
   }
 
   handleSelectPipelineLogNode(message: { target: PipelineLogTargetViewModel }): void {

@@ -48,7 +48,9 @@ vi.doMock("vscode", () => ({
 }));
 
 const { BuildManagementWorkflow } = await import("../src/services/build/BuildManagementWorkflow");
-const { toBuildManagementTarget } = await import("../src/commands/build/BuildManagementHandlers");
+const { deleteBuild: deleteTreeBuild, toBuildManagementTarget } = await import(
+  "../src/commands/build/BuildManagementHandlers"
+);
 
 const environment = {
   environmentId: "env-1",
@@ -195,6 +197,27 @@ describe("deleteBuild", () => {
     assert.equal(result, "deleted");
     assert.deepEqual(calls, ["getState", "delete", `close:${buildUrl}`, "refresh:env-1"]);
     assert.deepEqual(informationMessages, ["Deleted build demo #12."]);
+  });
+
+  it.each([
+    "https://jenkins.example/view/All/job/demo/12/",
+    "https://jenkins.example/view/team/custom-runs/job/demo/12/",
+    "https://internal.example/ci/job/demo/12/"
+  ])("uses the verified tree deletion endpoint %s to match Build Details", async (url) => {
+    warningChoice = "Delete";
+    await deleteTreeBuild(createWorkflow(), {
+      ...target,
+      label: "#12",
+      buildNumber: 12,
+      buildUrl: url
+    } as never);
+    assert.deepEqual(dataService.getBuildManagementState.mock.calls[0], [environment, url]);
+    assert.deepEqual(dataService.deleteBuild.mock.calls[0], [
+      environment,
+      url,
+      { releaseKeep: false }
+    ]);
+    assert.deepEqual(calls, ["getState", "delete", `close:${url}`, "refresh:env-1"]);
   });
 
   it("asks the data layer to release keep-forever when deleting a kept build", async () => {

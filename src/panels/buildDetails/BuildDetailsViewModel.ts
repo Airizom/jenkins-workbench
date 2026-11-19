@@ -20,6 +20,7 @@ import type {
   BuildDetailsViewModel,
   PipelineNodeLogViewModel
 } from "./shared/BuildDetailsContracts";
+import { isBuildQueueId } from "./shared/BuildDetailsContracts";
 import { splitBuildDetailsErrors } from "./shared/BuildDetailsErrorHelpers";
 
 export type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
@@ -27,6 +28,7 @@ export type { BuildDetailsViewModel } from "./shared/BuildDetailsContracts";
 export interface BuildDetailsViewModelInput {
   details?: JenkinsBuildDetails;
   buildUrl?: string;
+  followTargetToken?: number;
   /** Whether the panel knows the build's environment, which build management requires. */
   hasEnvironment?: boolean;
   pipelineRun?: PipelineRun;
@@ -66,6 +68,7 @@ export interface BuildDetailsSectionsInput
     BuildDetailsViewModelInput,
     | "details"
     | "buildUrl"
+    | "followTargetToken"
     | "hasEnvironment"
     | "testReport"
     | "testReportFetched"
@@ -116,7 +119,16 @@ export function assembleBuildDetailsSections(input: BuildDetailsSectionsInput) {
     canOpenSource: input.canOpenTestSource
   });
 
+  const followIdentity =
+    details && Number.isSafeInteger(details.number) && details.number > 0
+      ? {
+          buildNumber: details.number,
+          queueId: isBuildQueueId(details.queueId) ? details.queueId : undefined
+        }
+      : undefined;
   return {
+    ...followIdentity,
+    followTargetToken: input.followTargetToken,
     ...buildBuildManagementViewModel(details, {
       buildUrl: input.buildUrl,
       hasEnvironment: input.hasEnvironment

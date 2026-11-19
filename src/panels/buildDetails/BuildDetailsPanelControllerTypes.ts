@@ -1,5 +1,6 @@
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../../jenkins/types";
+import type { FollowedBuild } from "../../services/buildFollow/BuildFollowTypes";
 import type { BuildDetailsBackend } from "./BuildDetailsBackend";
 import type { PipelineRestartAvailability } from "./BuildDetailsPanelState";
 import type {
@@ -10,6 +11,8 @@ import type { BuildDetailsOutgoingMessage } from "./shared/BuildDetailsPanelMess
 
 export interface BuildDetailsPanelLoadOptions {
   initialDetails?: JenkinsBuildDetails;
+  /** The follow action verified this exact snapshot for the first render. */
+  verifiedSelection?: boolean;
   label?: string;
   panelState?: unknown;
 }
@@ -27,6 +30,8 @@ export interface BuildDetailsPanelControllerAccess {
   getEnvironment(): JenkinsEnvironmentRef | undefined;
   getBuildUrl(): string | undefined;
   getCurrentDetails(): JenkinsBuildDetails | undefined;
+  getFollowTargetToken(): number;
+  getRunningFollowTarget(): FollowedBuild | undefined;
   getLoadToken(): number;
   getPipelineRestartAvailability(): PipelineRestartAvailability;
   getPipelineRestartEnabled(): boolean;

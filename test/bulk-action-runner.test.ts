@@ -35,6 +35,7 @@ vi.doMock("vscode", () => ({
   ProgressLocation: { Notification: 15 },
   window: {
     showInformationMessage: information,
+    showInputBox: async () => "app-copy",
     showWarningMessage: warning,
     showErrorMessage: error,
     withProgress,
@@ -42,6 +43,7 @@ vi.doMock("vscode", () => ({
   }
 }));
 
+const { copyJob } = await import("../src/commands/job/JobActionHandlers");
 const { BulkActionService } = await import("../src/commands/bulk/BulkActionService");
 const { resolveBulkActionTargets, isBulkActionEligible } = await import(
   "../src/commands/bulk/BulkActionTargets"
@@ -205,7 +207,160 @@ describe("bulk target resolution", () => {
   });
 });
 
+it("copies an advertised job under its original servlet parent", async () => {
+  const copy = vi.fn(async () => ({}));
+  await copyJob(
+    {
+      dataService: { copyJob: copy },
+      refreshHost: { fullEnvironmentRefresh: vi.fn() }
+    } as unknown as Parameters<typeof copyJob>[0],
+    job("app", environment, `${environment.url}jenkins/job/app/`) as InstanceType<
+      typeof JobTreeItem
+    >
+  );
+  assert.deepEqual(copy.mock.calls, [
+    [environment, `${environment.url}jenkins/`, "app", "app-copy"]
+  ]);
+});
+
 describe("BulkActionService", () => {
+  it.each(["stop", "terminate", "kill"] as const)(
+    "sends %s to each selected run and keeps public plugin endpoints separate from classic aliases",
+    async (action) => {
+      const h = harness();
+      const targets = [
+        build(42, environment, `${environment.url}jenkins/job/app/42/`),
+        build(8, environment, `${environment.url}view/job/view/All/job/app/8/`),
+        build(9, environment, "http://internal/view/job/job/app/9/"),
+        build(42, environment, `${environment.url}view/team/custom-runs/job/app/42/`),
+        build(42, environment, `${environment.url}job/app/42/`),
+        build(42, environment, `${environment.url}view/All/job/app/42/`),
+        build(42, environment, `${environment.url}job/folder/view/team/custom-runs/job/app/42/`),
+        build(10, environment, "http://internal/job/matrix/os=linux/10/")
+      ];
+      const urls = [
+        `${environment.url}jenkins/job/app/42/`,
+        `${environment.url}job/app/8/`,
+        `${environment.url}job/app/9/`,
+        `${environment.url}view/team/custom-runs/job/app/42/`,
+        `${environment.url}job/app/42/`,
+        `${environment.url}job/folder/view/team/custom-runs/job/app/42/`,
+        `${environment.url}job/matrix/os=linux/10/`
+      ];
+      await h.service.run(action, targets);
+      if (action === "stop") {
+        assert.deepEqual(
+          h.dataService.stopBuild.mock.calls,
+          urls.map((url) => [environment, url])
+        );
+      } else {
+        assert.deepEqual(
+          h.dataService.escalateBuildStop.mock.calls,
+          urls.map((url) => [environment, url, action === "terminate" ? "term" : "kill"])
+        );
+      }
+      h.service.dispose();
+    }
+  );
+
+  it.each(["stop", "terminate", "kill"] as const)(
+    "targets the selected folder run for %s across proxy and public aliases",
+    async (action) => {
+      const h = harness();
+      const env = { ...environment, url: "https://public/job/" };
+      const nested = `${env.url}job/team/job/app/7/`;
+      const sibling = `${env.url}job/app/7/`;
+      await h.service.run(action, [
+        build(7, env, "http://internal/job/team/job/app/7/"),
+        build(7, env, "/job/team/job/app/7/"),
+        build(7, env, "job/team/job/app/7/"),
+        build(7, env, nested),
+        build(7, env, sibling)
+      ]);
+      if (action === "stop") {
+        assert.deepEqual(h.dataService.stopBuild.mock.calls, [
+          [env, nested],
+          [env, sibling]
+        ]);
+      } else {
+        const step = action === "terminate" ? "term" : "kill";
+        assert.deepEqual(h.dataService.escalateBuildStop.mock.calls, [
+          [env, nested, step],
+          [env, sibling, step]
+        ]);
+      }
+      h.service.dispose();
+    }
+  );
+
+  it.each(["stop", "terminate", "kill"] as const)(
+    "declines %s when a public endpoint and proxy interpretation name different runs",
+    async (action) => {
+      const h = harness();
+      const env = { ...environment, url: "https://public/job/" };
+      await h.service.run(action, [
+        build(42, env, `${env.url}custom-runs/42/`),
+        build(42, env, "/job/custom-runs/42/"),
+        build(42, env, "//public/job/custom-runs/job/app/42/"),
+        build(7, env, "/job/team/job/app/7/"),
+        build(0, env, `${env.url}custom-runs/0/`)
+      ]);
+      assert.equal(h.dataService.stopBuild.mock.calls.length, 0);
+      assert.equal(h.dataService.escalateBuildStop.mock.calls.length, 0);
+      h.service.dispose();
+    }
+  );
+
+  it.each(["stop", "terminate", "kill"] as const)(
+    "sends %s once through a selected view alias and preserves explicit base-relative actions",
+    async (action) => {
+      const h = harness();
+      const env = { ...environment, url: "https://public/job/" };
+      const view = "view/All/job/app/7/";
+      const plugin = "custom-runs/42/";
+      const namedJob = "job/custom-runs/42/";
+      await h.service.run(action, [
+        build(7, env, view),
+        build(7, env, `${env.url}job/app/7/`),
+        build(7, env, `${env.url}view/Other/job/app/7/`),
+        build(42, env, plugin),
+        build(42, env, namedJob)
+      ]);
+      const urls = [view, plugin, namedJob].map((path) => env.url + path);
+      if (action === "stop") {
+        assert.deepEqual(
+          h.dataService.stopBuild.mock.calls,
+          urls.map((url) => [env, url])
+        );
+      } else {
+        const step = action === "terminate" ? "term" : "kill";
+        assert.deepEqual(
+          h.dataService.escalateBuildStop.mock.calls,
+          urls.map((url) => [env, url, step])
+        );
+      }
+      h.service.dispose();
+    }
+  );
+
+  it.each(["stop", "terminate", "kill"] as const)(
+    "skips %s for ambiguous foreign roots, plugin routes or mismatched run numbers",
+    async (action) => {
+      const h = harness();
+      const env = { ...environment, url: `${environment.url}job/team/` };
+      await h.service.run(action, [
+        build(7, env, "http://internal/job/team/job/app/7/"),
+        build(7, environment, "http://internal/view/job/view/job/b/7/"),
+        build(7, environment, "http://internal/plugin/custom/job/app/7/"),
+        build(7, environment, "http://internal/custom-run/7/"),
+        build(7, environment, "http://internal/job/app/8/")
+      ]);
+      assert.equal(h.dataService.stopBuild.mock.calls.length, 0);
+      assert.equal(h.dataService.escalateBuildStop.mock.calls.length, 0);
+      h.service.dispose();
+    }
+  );
+
   it("does nothing when confirmation is declined and keeps output lazy", async () => {
     const h = harness();
     warning.mockResolvedValueOnce(undefined);

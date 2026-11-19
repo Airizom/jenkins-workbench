@@ -27,6 +27,7 @@ interface LocalReplayBuildTarget {
   environment: JenkinsEnvironmentRef;
   buildUrl: string;
   label: string;
+  buildNumber: number;
   /** Job label for follow-up messages; derived from the build URL when absent. */
   jobLabel?: string;
 }
@@ -134,6 +135,7 @@ export class LocalJenkinsfileReplayWorkflow {
             kind: "cause",
             environment: target.environment,
             sourceBuildUrl: target.buildUrl,
+            sourceBuildNumber: target.buildNumber,
             cause: "replay",
             jobLabel: target.jobLabel,
             mayReturnQueueItem: true
@@ -174,6 +176,7 @@ export class LocalJenkinsfileReplayWorkflow {
       return {
         environment: selection.environment,
         buildUrl: selection.buildUrl,
+        buildNumber: selection.buildNumber,
         label: selection.jobNameHint
           ? `${selection.jobNameHint} ${getTreeItemLabel(selection)}`
           : getTreeItemLabel(selection),
@@ -196,6 +199,7 @@ export class LocalJenkinsfileReplayWorkflow {
     return {
       environment: selection.environment,
       buildUrl: buildActionUrl(selection.jobUrl, `${completed.number}/`),
+      buildNumber: completed.number,
       label: `${selection.label} #${completed.number}`,
       jobLabel: selection.label
     };

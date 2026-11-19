@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import { BuildActionError, JenkinsRequestError } from "../src/jenkins/errors";
 import type { JenkinsBuildCause, JenkinsBuildDetails } from "../src/jenkins/types";
+import { nextBuildObservationOrder } from "../src/services/buildFollow/BuildFollowObservationOrder";
 import type {
   CauseTriggeredBuildOrigin,
   QueueTriggeredBuildOrigin,
@@ -12,7 +13,7 @@ import {
   matchesTriggerCause,
   TriggeredBuildLocator
 } from "../src/services/buildFollow/TriggeredBuildLocator";
-import type { QueuedBuildOutcome } from "../src/services/QueuedBuildWaiter";
+import { type QueuedBuildOutcome, QueuedBuildWaiter } from "../src/services/QueuedBuildWaiter";
 
 const environment: JenkinsEnvironmentRef = {
   environmentId: "env",
@@ -83,6 +84,80 @@ function createLocator(
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("queued executable endpoint selection", () => {
+  it.each([
+    { failures: 1, timeoutMs: 1000, expectedReads: 2, kind: "started" },
+    { failures: 3, timeoutMs: 1000, expectedReads: 3, kind: "unknown" },
+    { failures: 1, timeoutMs: 50, expectedReads: 1, kind: "unknown" }
+  ])(
+    "retries transient verification failures within the discovery budget ($failures, $timeoutMs)",
+    async ({ failures, timeoutMs, expectedReads, kind }) => {
+      vi.useFakeTimers();
+      const url = `${jobUrl}13/`;
+      const awaitQueuedBuild = vi.fn().mockResolvedValue({
+        kind: "started",
+        number: 13,
+        url,
+        fallbackUrl: `${environment.url}view/team/job/app/13/`
+      });
+      let reads = 0;
+      const getBuildDetails = vi.fn(async () => {
+        if (++reads <= failures) throw new JenkinsRequestError("Unavailable", 503);
+        return { number: 13, url, queueId: 9, building: true };
+      });
+      const locating = createLocator(getBuildDetails, awaitQueuedBuild, {
+        timeoutMs,
+        pollIntervalMs: 100,
+        maxPollIntervalMs: 200
+      }).locate(queueOrigin);
+      await vi.runAllTimersAsync();
+      expect((await locating).kind).toBe(kind);
+      expect(awaitQueuedBuild).toHaveBeenCalledTimes(1);
+      expect(getBuildDetails).toHaveBeenCalledTimes(expectedReads);
+      for (const call of getBuildDetails.mock.calls) {
+        expect(call).toEqual([environment, url, { statusOnly: true, bypassCache: true }]);
+      }
+    }
+  );
+
+  it.each([
+    { primary: 200, number: 13, id: 9, selected: "primary" },
+    { primary: 403, number: 13, id: 9, selected: undefined },
+    { primary: 404, number: 13, id: 9, selected: "submitted" },
+    { primary: 404, number: 13, id: 18, selected: undefined },
+    { primary: 404, number: 13, id: undefined, selected: undefined },
+    { primary: 404, number: 14, id: 9, selected: undefined }
+  ])(
+    "checks the submitted endpoint only for a missing advertised route ($primary, $number, $id)",
+    async ({ primary, number, id, selected }) => {
+      const submittedJob = `${environment.url}custom-runs/job/app/`;
+      const advertised = `${environment.url}jenkins/job/app/13/`;
+      const submitted = `${submittedJob}13/`;
+      const getQueueItem = vi
+        .fn()
+        .mockResolvedValue({ id: 9, executable: { number: 13, url: advertised } });
+      const getBuildDetails = vi.fn(async (_env: JenkinsEnvironmentRef, url: string) => {
+        if (url === advertised && primary !== 200)
+          throw new JenkinsRequestError("Run unavailable", primary);
+        return { number, queueId: id, url, building: true };
+      });
+      const locator = new TriggeredBuildLocator(
+        { getBuildDetails },
+        new QueuedBuildWaiter({ getQueueItem })
+      );
+      const location = await locator.locate({ ...queueOrigin, jobUrl: submittedJob });
+      expect(getBuildDetails.mock.calls.map(([, url]) => url)).toEqual(
+        primary === 404 ? [advertised, submitted] : [advertised]
+      );
+      expect(location.kind).toBe(selected ? "started" : "unknown");
+      if (location.kind === "started") {
+        expect(location.buildUrl).toBe(selected === "primary" ? advertised : submitted);
+        expect(location.queueStatus?.queueId).toBe(id);
+      }
+    }
+  );
 });
 
 describe("matchesTriggerCause", () => {
@@ -275,36 +350,34 @@ describe("TriggeredBuildLocator queue origin", () => {
     assert.deepEqual(awaitQueuedBuild.mock.calls[0], [
       environment,
       queueOrigin.queueLocation,
-      { timeoutMs: 5000, maxPollIntervalMs: 3000, token }
+      { timeoutMs: 5000, maxPollIntervalMs: 3000, token, submittedJobUrl: jobUrl }
     ]);
   });
 
-  it("builds the url from the job when the executable has none", async () => {
-    const awaitQueuedBuild = vi.fn(
-      async (): Promise<QueuedBuildOutcome> => ({ kind: "started", number: 42 })
-    );
-    const location = await createLocator(vi.fn(), awaitQueuedBuild).locate(queueOrigin);
-    assert.equal(location.kind, "started");
-    assert.equal(
-      (location as Extract<TriggeredBuildLocation, { kind: "started" }>).buildUrl,
-      `${jobUrl}42/`
-    );
-  });
-
-  it("builds the url from the job when Jenkins reports another origin", async () => {
-    const awaitQueuedBuild = vi.fn(
-      async (): Promise<QueuedBuildOutcome> => ({
-        kind: "started",
-        number: 42,
-        url: "http://ci.internal:8080/job/folder/job/app/42/"
-      })
-    );
-    const location = await createLocator(vi.fn(), awaitQueuedBuild).locate(queueOrigin);
-    assert.equal(
-      (location as Extract<TriggeredBuildLocation, { kind: "started" }>).buildUrl,
-      `${jobUrl}42/`
-    );
-  });
+  it.each([
+    { executable: { number: 42 }, expected: `${jobUrl}42/` },
+    {
+      executable: { number: 42, url: "http://ci.internal:8080/job/folder/job/app/42/" },
+      expected: `${jobUrl}42/`
+    },
+    {
+      executable: { number: 42, url: `${jobUrl}custom-runs/42/` },
+      expected: `${jobUrl}custom-runs/42/`
+    }
+  ])(
+    "locates the executable on the configured controller ($expected)",
+    async ({ executable, expected }) => {
+      const waiter = new QueuedBuildWaiter({
+        getQueueItem: vi.fn().mockResolvedValue({ id: 9, executable })
+      });
+      const location = await new TriggeredBuildLocator(
+        { getBuildDetails: vi.fn().mockResolvedValue({ number: 42, url: expected }) },
+        waiter
+      ).locate(queueOrigin);
+      assert.equal(location.kind, "started");
+      assert.equal(location.buildUrl, expected);
+    }
+  );
 
   it("passes through cancelled and unknown outcomes", async () => {
     const awaitQueuedBuild = vi
@@ -329,20 +402,20 @@ describe("TriggeredBuildLocator queue origin", () => {
 
 describe("TriggeredBuildLocator proxied URLs", () => {
   it.each(["queue", "cause"] as const)(
-    "preserves the submitted job context for a %s origin",
+    "uses the verified run endpoint for a %s origin",
     async (kind) => {
       const proxiedJobUrl = "https://jenkins.example/proxy/job/folder/job/feature%2Fmain/";
       const advertisedUrl = "https://jenkins.example/jenkins/job/folder/job/feature%2Fmain/13/";
       const getBuildDetails = vi
         .fn()
         .mockResolvedValue(build(13, [replayCause(12)], advertisedUrl));
-      const awaitQueuedBuild = vi.fn().mockResolvedValue({
-        kind: "started",
-        number: 13,
-        url: advertisedUrl
+      const waiter = new QueuedBuildWaiter({
+        getQueueItem: vi
+          .fn()
+          .mockResolvedValue({ id: 9, executable: { number: 13, url: advertisedUrl } })
       });
       const origin = kind === "queue" ? queueOrigin : causeOrigin();
-      const location = await createLocator(getBuildDetails, awaitQueuedBuild).locate({
+      const location = await new TriggeredBuildLocator({ getBuildDetails }, waiter).locate({
         ...origin,
         jobUrl: proxiedJobUrl
       });
@@ -350,7 +423,7 @@ describe("TriggeredBuildLocator proxied URLs", () => {
       assert.equal(location.kind, "started");
       assert.equal(
         (location as Extract<TriggeredBuildLocation, { kind: "started" }>).buildUrl,
-        `${proxiedJobUrl}13/`
+        kind === "queue" ? advertisedUrl : `${proxiedJobUrl}13/`
       );
       if (kind === "cause") {
         assert.equal(getBuildDetails.mock.calls[0][1], `${proxiedJobUrl}13/`);
@@ -360,6 +433,59 @@ describe("TriggeredBuildLocator proxied URLs", () => {
 });
 
 describe("TriggeredBuildLocator cause origin", () => {
+  it.each([
+    { number: 13, building: true },
+    { number: 13, building: false },
+    { number: 13, building: undefined }
+  ])(
+    "records the phase and start of a number-confirmed request ($number, $building)",
+    async ({ number, building }) => {
+      const before = nextBuildObservationOrder();
+      let inRequest: number | undefined;
+      const getDetails = vi.fn(async () => {
+        inRequest = nextBuildObservationOrder();
+        return { ...build(number, [replayCause(12)]), building };
+      });
+      const location = await createLocator(getDetails).locate(causeOrigin());
+      assert.equal(location.kind, "started");
+      assert.ok(location.causeObservation && inRequest !== undefined);
+      assert.equal(location.causeObservation.building, building);
+      assert.ok(
+        before < location.causeObservation.requestOrder &&
+          location.causeObservation.requestOrder < inRequest
+      );
+    }
+  );
+
+  it("rejects a matching cause returned for a different build number", async () => {
+    const getBuildDetails = vi.fn().mockResolvedValue(build(14, [replayCause(12)]));
+    const locator = createLocator(getBuildDetails, vi.fn(), { candidateWindow: 1 });
+
+    expect(await locator.locate(causeOrigin())).toEqual({ kind: "unknown" });
+    expect(getBuildDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles at the deadline even when a matching cause response is still in flight", async () => {
+    vi.useFakeTimers();
+    let finish!: (details: JenkinsBuildDetails) => void;
+    const getBuildDetails = vi.fn(
+      () =>
+        new Promise<JenkinsBuildDetails>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const settled = vi.fn();
+    void createLocator(getBuildDetails).locate(causeOrigin()).then(settled);
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(settled).toHaveBeenCalledExactlyOnceWith({ kind: "unknown" });
+    finish(build(13, [replayCause(12)]));
+    await vi.runAllTimersAsync();
+    expect(getBuildDetails).toHaveBeenCalledTimes(1);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
   it("locates a localized replay while skipping a replay of another source build", async () => {
     const getBuildDetails = vi
       .fn()
@@ -373,7 +499,8 @@ describe("TriggeredBuildLocator cause origin", () => {
       candidateWindow: 2
     }).locate(causeOrigin());
 
-    assert.deepEqual(location, {
+    expect(location).toEqual({
+      causeObservation: { requestOrder: expect.any(Number), building: undefined },
       kind: "started",
       environment,
       buildUrl: `${jobUrl}14/`,
@@ -401,7 +528,8 @@ describe("TriggeredBuildLocator cause origin", () => {
     assert.equal(getBuildDetails.mock.calls.length, 2);
     await vi.advanceTimersByTimeAsync(300);
 
-    assert.deepEqual(await promise, {
+    expect(await promise).toEqual({
+      causeObservation: { requestOrder: expect.any(Number), building: undefined },
       kind: "started",
       environment,
       buildUrl: `${jobUrl}13/`,
@@ -424,7 +552,8 @@ describe("TriggeredBuildLocator cause origin", () => {
       .mockResolvedValueOnce(build(14, [{ _class: REBUILD_CAUSE, upstreamBuild: 12 }]));
     const location = await createLocator(getBuildDetails).locate(causeOrigin({ cause: "rebuild" }));
 
-    assert.deepEqual(location, {
+    expect(location).toEqual({
+      causeObservation: { requestOrder: expect.any(Number), building: undefined },
       kind: "started",
       environment,
       buildUrl: `${jobUrl}14/`,
@@ -446,7 +575,8 @@ describe("TriggeredBuildLocator cause origin", () => {
       .mockResolvedValueOnce(build(14, [replayCause(12)]));
     const location = await createLocator(getBuildDetails).locate(causeOrigin());
 
-    assert.deepEqual(location, {
+    expect(location).toEqual({
+      causeObservation: { requestOrder: expect.any(Number), building: undefined },
       kind: "started",
       environment,
       buildUrl: `${jobUrl}14/`,
@@ -476,7 +606,8 @@ describe("TriggeredBuildLocator cause origin", () => {
       causeOrigin({ cause: "restart", stageName: "Deploy" })
     );
 
-    assert.deepEqual(location, {
+    expect(location).toEqual({
+      causeObservation: { requestOrder: expect.any(Number), building: undefined },
       kind: "started",
       environment,
       buildUrl: `${jobUrl}14/`,
@@ -513,7 +644,8 @@ describe("TriggeredBuildLocator cause origin", () => {
       causeOrigin({ cause: "restart", firstCandidateNumber: 43, sourceBuildNumber: 42, stageName })
     );
 
-    assert.deepEqual(location, {
+    expect(location).toEqual({
+      causeObservation: { requestOrder: expect.any(Number), building: undefined },
       kind: "started",
       environment,
       buildUrl: `${jobUrl}44/`,

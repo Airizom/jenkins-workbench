@@ -93,6 +93,52 @@ describe("BuildDetailsPanel.closeForBuild", () => {
     }
   );
 
+  it.each([
+    ["https://ci/jenkins/job/app/42/", true],
+    ["https://ci/jenkins/job/app/43/", false],
+    ["https://ci/jenkins/job/other/42/", false],
+    ["https://ci/public/view/All/job/app/42/", true],
+    ["https://ci/public/view/team/custom-runs/job/app/42/", false]
+  ] as const)("matches restored panel URL %s against the deleted public build", (url, matches) => {
+    const environment = { ...target, url: "https://ci/public/" };
+    const dispose = vi.fn();
+    Reflect.set(BuildDetailsPanel, "currentPanel", {
+      controller: { getEnvironment: () => environment, getBuildUrl: () => url },
+      panel: { dispose }
+    });
+    BuildDetailsPanel.closeForBuild(
+      environment.scope,
+      environment.environmentId,
+      "https://ci/public/job/app/42/"
+    );
+    assert.equal(dispose.mock.calls.length, matches ? 1 : 0);
+  });
+
+  it.each([
+    ["view/team/custom-runs/job/demo/42/", "view/team/custom-runs/job/demo/42/", true],
+    ["view/team/custom-runs/job/demo/42/", "job/demo/42/", false],
+    ["view/team/custom-runs/job/demo/42/", "view/All/job/demo/42/", false],
+    ["view/All/job/demo/42/", "job/demo/42/", true],
+    ["http://internal.example/ci/job/demo/42/", "view/All/job/demo/42/", true],
+    ["http://internal.example/ci/job/demo/42/", "view/team/custom-runs/job/demo/42/", false],
+    ["view/All/job/demo/42/", "http://internal.example/ci/job/demo/42/", true]
+  ] as const)("matches verified deletion of %s against panel %s", (deleted, panel, matches) => {
+    const dispose = vi.fn();
+    Reflect.set(BuildDetailsPanel, "currentPanel", {
+      controller: {
+        getEnvironment: () => target,
+        getBuildUrl: () => new URL(panel, target.url).href
+      },
+      panel: { dispose }
+    });
+    BuildDetailsPanel.closeForBuild(
+      target.scope,
+      target.environmentId,
+      new URL(deleted, target.url).href
+    );
+    assert.equal(dispose.mock.calls.length, matches ? 1 : 0);
+  });
+
   it("does nothing when no build panel is open", () => {
     assert.doesNotThrow(() =>
       BuildDetailsPanel.closeForBuild(target.scope, target.environmentId, buildUrl)

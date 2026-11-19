@@ -21,6 +21,7 @@ function reduceBuildDetailsMessage(
     case "setPipelineNodeLogError":
     case "setErrors":
     case "setBuildRelationships":
+    case "buildFollowingChanged":
     case "setBuildNavigation":
     case "setBuildDiagnostics":
     case "pendingInputActionComplete":

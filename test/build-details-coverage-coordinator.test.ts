@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it, vi } from "vitest";
+import type { JenkinsClientProvider } from "../src/jenkins/JenkinsClientProvider";
+import { JenkinsCoverageDataOperations } from "../src/jenkins/data/JenkinsCoverageDataOperations";
+import { JenkinsDataRuntimeContext } from "../src/jenkins/data/JenkinsDataRuntimeContext";
 import type { JenkinsEnvironmentRef } from "../src/jenkins/JenkinsEnvironmentRef";
 import type {
   JenkinsCoverageOverview,
@@ -94,11 +97,22 @@ function createHarness(options: HarnessOptions = {}) {
     ...options.backend
   };
 
+  const terminalRun = {
+    buildNumber: 12,
+    buildUrl: options.buildUrl ?? createDetails().url,
+    queueId: options.details?.queueId,
+    result: options.details?.result
+  };
   const state = {
     environment: "environment" in options ? options.environment : createEnvironment(),
     currentBuildUrl:
       "buildUrl" in options ? options.buildUrl : "https://jenkins.example/job/app/12/",
     currentDetails: "details" in options ? options.details : createDetails(),
+    get terminalRun() {
+      return this.currentDetails?.building === false && this.currentBuildUrl
+        ? terminalRun
+        : undefined;
+    },
     setCoverageActionPath: (actionPath: string | undefined): boolean => {
       calls.push(`state.setCoverageActionPath:${actionPath}`);
       return true;
@@ -228,6 +242,63 @@ describe("planCoverageRefresh", () => {
 });
 
 describe("BuildDetailsCoverageCoordinator refresh", () => {
+  it.each([
+    [17, 18],
+    [17, undefined],
+    [undefined, undefined]
+  ])("isolates cached terminal reports at a reused URL (%s then %s)", async (first, next) => {
+    setCoverageConfig();
+    let label = "previous";
+    const client = {
+      discoverCoverageActionPath: vi.fn(async () => "coverage"),
+      getCoverageOverview: vi.fn(async () => ({ projectCoverage: label, qualityGates: [] })),
+      getModifiedCoverageFiles: vi.fn(async () => [{ path: label, blocks: [] }])
+    };
+    const context = new JenkinsDataRuntimeContext(
+      {
+        getClient: async () => client,
+        getAuthSignature: async () => "auth"
+      } as unknown as JenkinsClientProvider,
+      {
+        buildParameterRequestPreparer: {
+          prepareBuildParameters: async () => ({ hasParameters: false })
+        }
+      }
+    );
+    const coverage = new JenkinsCoverageDataOperations(context);
+    const open = (queueId: number | undefined) =>
+      createHarness({
+        details: createDetails({ queueId, result: "SUCCESS" }),
+        backend: {
+          discoverCoverageActionPath: (...args) => coverage.discoverCoverageActionPath(...args),
+          getCoverageOverview: (...args) => coverage.getCoverageOverview(...args),
+          getModifiedCoverageFiles: (...args) => coverage.getModifiedCoverageFiles(...args)
+        }
+      });
+    const previous = open(first);
+    await previous.coordinator.refresh(1);
+    assert.deepEqual(previous.setCoverageArgs[0], [
+      { projectCoverage: "previous", qualityGates: [] },
+      [{ path: "previous", blocks: [] }]
+    ]);
+    if (first !== undefined) {
+      await previous.coordinator.refresh(1);
+      for (const read of Object.values(client)) assert.equal(read.mock.calls.length, 1);
+    }
+    label = "replacement";
+    const replacement = open(next);
+    await replacement.coordinator.refresh(1);
+    for (const read of Object.values(client)) assert.equal(read.mock.calls.length, 2);
+    assert.deepEqual(replacement.setCoverageArgs[0], [
+      { projectCoverage: "replacement", qualityGates: [] },
+      [{ path: "replacement", blocks: [] }]
+    ]);
+    assert.deepEqual(replacement.applyOptions[0].modifiedCoverageFiles, [
+      { path: "replacement", blocks: [] }
+    ]);
+    previous.coordinator.dispose();
+    replacement.coordinator.dispose();
+  });
   it("does nothing when the coverage backend is missing", async () => {
     setCoverageConfig();
     const { coordinator, calls } = createHarness({ hasBackend: false });
@@ -431,7 +502,7 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
     assert.deepEqual(applyOptions[0].modifiedCoverageFiles, createModifiedFiles());
   });
 
-  it("swallows modified-file errors when the overview loaded successfully", async () => {
+  it("keeps a successful overview and allows retrying a failed modified-file load", async () => {
     setCoverageConfig();
     const { coordinator, calls, setCoverageArgs } = createHarness({
       details: createDetailsWithCoverageAction(),
@@ -442,7 +513,7 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
       }
     });
 
-    await coordinator.refresh(1);
+    assert.equal(await coordinator.refresh(1), false);
 
     assert.ok(!calls.some((call) => call.startsWith("state.setCoverageError")));
     assert.deepEqual(setCoverageArgs, [[createOverview(), undefined]]);
@@ -526,10 +597,12 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
   it("suppresses error handling when the token became stale before the failure", async () => {
     setCoverageConfig();
     let tokenCurrent = true;
+    const getModifiedCoverageFiles = vi.fn(async () => []);
     const { coordinator, calls } = createHarness({
       details: createDetailsWithCoverageAction(),
       isTokenCurrent: () => tokenCurrent,
       backend: {
+        getModifiedCoverageFiles,
         getCoverageOverview: async () => {
           tokenCurrent = false;
           throw new Error("overview failed");
@@ -541,6 +614,7 @@ describe("BuildDetailsCoverageCoordinator refresh", () => {
 
     assert.ok(!calls.some((call) => call.startsWith("state.setCoverageError")));
     assert.ok(!calls.includes("adapter.clear"));
+    assert.equal(getModifiedCoverageFiles.mock.calls.length, 0);
   });
 });
 

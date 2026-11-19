@@ -72,6 +72,7 @@ Use node context menus or the Node Details **Actions** menu for existing nodes, 
 - **Rebuild** — Re-run a build with the same parameters
 - **Rebuild with Changes…** — Open a build's parameter values in one list, change the ones you need, and run; passwords and files must be entered again. Uses `buildWithParameters`, so it doesn't need the Rebuild Plugin
 - **Follow Triggered Builds** — After Trigger Build, Rebuild, Rebuild with Changes, Replay, or Restart from Stage, get a notification when the new build starts with **View Build Details**, **Preview Log** (updates live until the build finishes), and **Notify When Finished** (tracked in the status bar)
+- **Follow This Build** — Get a completion notification for any running build, including one opened from a teammate’s link. Choose **Follow This Build** in the Build Details header or the build’s tree context menu. For a queued run, choose **Follow Queue Item** in the tree. Workbench tracks that queue ID and switches to its build number when it starts.
 - **Manage Builds** — Delete a completed build, keep it forever, or edit its display name and description (multi-line descriptions open in a draft editor)
 - **Preview Build Logs** — Open console output in a lightweight preview editor
 - **Approve / Reject Inputs** — Handle pending input steps for Pipeline builds with the same controls as Trigger Build, such as multi-select and multiline text. Inputs with file, run, or plugin parameters open the Jenkins input page, because Jenkins doesn't report enough about them to fill them in from VS Code
@@ -333,6 +334,12 @@ links use the URI scheme of the editor that copied them (for example
 `vscode-insiders://` or `cursor://`), so change the scheme if your recipients
 use a different editor.
 
+Click the following count in the status bar or run **Jenkins: Show Followed Builds**
+to see your queue items and running builds. Choose **Stop Following** in the
+list, tree, or Build Details to end a subscription. The build keeps running.
+You can close Build Details and still receive the result. Follows end when
+you close or reload the VS Code window.
+
 ## Deep Links
 
 Build and job links use `vscode://airizom.jenkins-workbench/build` and
@@ -495,7 +502,7 @@ If Jenkins does not support progressive console retrieval, task output falls bac
 | `jenkinsWorkbench.pollIntervalSeconds` | 60 | Polling interval for shared Jenkins status refreshes, including watched jobs and current-branch status. |
 | `jenkinsWorkbench.watchErrorThreshold` | 3 | Consecutive errors before warning. |
 | `jenkinsWorkbench.queuePollIntervalSeconds` | 10 | Polling interval for the build queue. |
-| `jenkinsWorkbench.followTriggeredBuilds` | true | After a trigger, rebuild (with or without changes), replay, or restart, wait up to 10 minutes for the new build and offer View Build Details, Preview Log (live), and Notify When Finished when it starts. |
+| `jenkinsWorkbench.followTriggeredBuilds` | true | After a trigger, rebuild (with or without changes), replay, or restart, wait up to 10 minutes for the new build and offer View Build Details, Preview Log (live), and Notify When Finished when it starts. Follow This Build and Follow Queue Item are available with either setting. |
 | `jenkinsWorkbench.taskRunner.pollIntervalSeconds` | 2 | Polling interval while a task follows its queue item, build status, and console output. |
 | `jenkinsWorkbench.taskRunner.maxConsecutiveErrors` | 5 | Consecutive Jenkins API errors allowed per task-runner operation before cleanup and failure. |
 | `jenkinsWorkbench.buildDetailsRefreshIntervalSeconds` | 5 | Polling interval for build details and logs. |
@@ -720,7 +727,7 @@ Workspace-only data in other workspaces is moved the next time the extension act
 | `Jenkins: Edit Build Description` | Edit the build description; multi-line descriptions open in a draft editor |
 | `Jenkins: Submit Build Description` | Submit the active build description draft |
 | `Jenkins: Preview Build Logs` | Open console output in a read-only preview |
-| `Jenkins: Show Followed Builds` | List builds you asked to be notified about; open one or stop following it |
+| `Jenkins: Show Followed Builds` | List followed queue items and builds in this window, open a started build, or stop following an item |
 | `Jenkins: View Build Details` | Open the build details panel |
 | `Jenkins: Compare With Build` | Compare the selected build with another build of the same job |
 | `Jenkins: Open Last Failed Build` | Jump to the last failed build |

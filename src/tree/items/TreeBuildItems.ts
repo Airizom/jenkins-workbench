@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import type { JenkinsBuild } from "../../jenkins/JenkinsClient";
 import type { JenkinsEnvironmentRef } from "../../jenkins/JenkinsEnvironmentRef";
+import { getTreeBuildDetailsUrl } from "../../jenkins/ReportedBuildUrl";
+import { formatJobUrlLabel } from "../../jenkins/urls";
+import type { FollowedBuild } from "../../services/buildFollow/BuildFollowTypes";
+import { isBuildQueueId } from "../../shared/build/BuildCompletionEvidence";
 import { type BuildTooltipOptions, buildBuildTooltip } from "../BuildTooltips";
 import { buildIcon, formatBuildDescription } from "../formatters";
 import { applyTreeFileIcon } from "../TreeFileIcons";
@@ -18,6 +22,8 @@ export class BuildTreeItem extends vscode.TreeItem {
 
   public readonly buildUrl: string;
   public readonly buildNumber: number;
+  public readonly queueId?: number;
+  public readonly followTarget?: FollowedBuild;
   public readonly isBuilding: boolean;
   public readonly awaitingInput: boolean;
   public readonly keptForever: boolean;
@@ -38,6 +44,20 @@ export class BuildTreeItem extends vscode.TreeItem {
     this.isBuilding = Boolean(build.building);
     this.awaitingInput = awaitingInput;
     this.jobNameHint = jobNameHint;
+    this.queueId = isBuildQueueId(build.queueId) ? build.queueId : undefined;
+    if (this.isBuilding && this.buildNumber > 0) {
+      const buildUrl = getTreeBuildDetailsUrl(this);
+      if (buildUrl) {
+        const jobLabel = jobNameHint ?? formatJobUrlLabel(buildUrl, environment.url);
+        this.followTarget = {
+          environment,
+          buildUrl,
+          buildNumber: this.buildNumber,
+          queueId: this.queueId,
+          label: `${jobLabel} #${this.buildNumber}`
+        };
+      }
+    }
     this.id = BuildTreeItem.buildId(environment, build.url, jobScope);
     this.keptForever = build.keepLog === true;
     // Space-separated tokens; package.json menus match each with /(^|\s)token(\s|$)/.

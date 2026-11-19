@@ -62,11 +62,9 @@ export class BuildDetailsCompletionPoller {
     const pollGeneration = this.pollGeneration;
     try {
       const details = await this.options.fetchBuildDetails(token).catch(() => undefined);
-      if (pollGeneration !== this.pollGeneration) {
-        return;
-      }
-      if (!this.options.shouldPoll() || !this.options.isTokenCurrent(token)) {
-        this.stop();
+      if (!this.options.isTokenCurrent(token)) return;
+      if (pollGeneration !== this.pollGeneration || !this.options.shouldPoll()) {
+        if (pollGeneration === this.pollGeneration) this.stop();
         return;
       }
       if (!details) {

@@ -6,13 +6,25 @@ import type {
   BuildRelationshipsViewModel,
   PipelineNodeLogViewModel
 } from "./BuildDetailsContracts";
-import { normalizePipelineLogTarget } from "./BuildDetailsContracts";
+import {
+  isBuildQueueId,
+  isFollowTargetToken,
+  normalizePipelineLogTarget
+} from "./BuildDetailsContracts";
 import { normalizeBuildDiagnosticsViewModel } from "./BuildDetailsDiagnosticsNormalizer";
 
 export type { BuildDetailsUpdateMessage } from "./BuildDetailsContracts";
 
 export type BuildDetailsOutgoingMessage =
   | { type: "setBuildRelationships"; relationships: BuildRelationshipsViewModel }
+  | {
+      type: "buildFollowingChanged";
+      loadToken: number;
+      followTargetToken: number;
+      buildNumber: number | null;
+      queueId?: number;
+      following: boolean;
+    }
   | { type: "setBuildNavigation"; navigation: BuildNavigationViewModel }
   | BuildDetailsUpdateMessage
   | { type: "appendConsole"; text: string }
@@ -50,6 +62,27 @@ export function parseBuildDetailsOutgoingMessage(
     case "setBuildRelationships": {
       return isBuildRelationshipsPayload(record.relationships)
         ? { type: "setBuildRelationships", relationships: record.relationships }
+        : undefined;
+    }
+    case "buildFollowingChanged": {
+      const { loadToken, followTargetToken, buildNumber, queueId, following } = record;
+      return typeof loadToken === "number" &&
+        Number.isSafeInteger(loadToken) &&
+        isFollowTargetToken(followTargetToken) &&
+        (buildNumber === null ||
+          (typeof buildNumber === "number" &&
+            Number.isSafeInteger(buildNumber) &&
+            buildNumber > 0)) &&
+        (queueId === undefined || (buildNumber !== null && isBuildQueueId(queueId))) &&
+        typeof following === "boolean"
+        ? {
+            type: "buildFollowingChanged",
+            loadToken,
+            followTargetToken,
+            buildNumber,
+            ...(queueId !== undefined && { queueId }),
+            following
+          }
         : undefined;
     }
     case "setBuildNavigation": {
@@ -174,6 +207,12 @@ function isBuildDetailsUpdateMessage(
   const booleanFields = ["pipelineStagesLoading", "keptForever", "canDelete", "canManage"] as const;
   return (
     record.type === "updateDetails" &&
+    (record.followTargetToken === undefined || isFollowTargetToken(record.followTargetToken)) &&
+    (record.queueId === undefined || isBuildQueueId(record.queueId)) &&
+    (record.buildNumber === undefined ||
+      (typeof record.buildNumber === "number" &&
+        Number.isSafeInteger(record.buildNumber) &&
+        record.buildNumber > 0)) &&
     stringFields.every((field) => typeof record[field] === "string") &&
     (typeof record.description === "undefined" || typeof record.description === "string") &&
     booleanFields.every((field) => typeof record[field] === "boolean") &&

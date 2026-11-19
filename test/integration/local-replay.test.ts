@@ -19,7 +19,11 @@ async function modules() {
     load("services/buildFollow/BuildFollowUpService.js")
   ]);
   const createBuildFollowUp = (queuedBuildWaiter: {
-    awaitQueuedBuildStart: (environment: unknown, queueLocation?: string) => Promise<void>;
+    awaitQueuedBuildStart: (
+      environment: unknown,
+      queueLocation?: string,
+      submittedJobUrl?: string
+    ) => Promise<unknown>;
   }) =>
     new followUp.BuildFollowUpService({
       dataService: {
@@ -33,7 +37,13 @@ async function modules() {
         showBuildDetails: async () => undefined,
         previewLog: async () => undefined
       },
-      completionTracker: { follow: () => true },
+      completionTracker: {
+        onDidNotifyCompletion: () => ({ dispose() {} }),
+        observeBuildIdentity: () => undefined,
+        watchQueueCancellation: () => ({ claim: () => true, dispose() {} }),
+        beginSubmittedQueueDiscovery: () => ({ finish() {} }),
+        followStartedBuild: async () => "following"
+      },
       isEnabled: () => false
     });
   return { ...resolver, ...matcher, ...workflow, ...client, ...waiter, createBuildFollowUp };
@@ -128,6 +138,7 @@ describe("local Jenkinsfile replay", () => {
       const previousDrafts = drafts();
       const submissions: Array<{ buildUrl: string; payload: Payload }> = [];
       const refreshed: string[] = [];
+      const waitedJobs: (string | undefined)[] = [];
       let getJobCalls = 0;
       let pickedSource: vscode.Uri | undefined;
       let cancelled = false;
@@ -156,7 +167,15 @@ describe("local Jenkinsfile replay", () => {
             return cancelled ? undefined : { environment, jobUrl, label: "example" };
           }
         },
-        createBuildFollowUp({ awaitQueuedBuildStart: async () => undefined })
+        createBuildFollowUp({
+          awaitQueuedBuildStart: async (
+            _environment: unknown,
+            _location?: string,
+            submittedJobUrl?: string
+          ) => {
+            waitedJobs.push(submittedJobUrl);
+          }
+        })
       );
       const refreshHost = {
         fullEnvironmentRefresh: ({ environmentId }: { environmentId: string }) => {
@@ -179,6 +198,7 @@ describe("local Jenkinsfile replay", () => {
         assert.equal(submissions[1]?.buildUrl, `${jobUrl}11/`);
         assert.equal(submissions[1]?.payload.mainScript, dirtyText);
         await until(() => refreshed.length === 2, "Expected both replay refreshes");
+        assert.deepEqual(waitedJobs, [jobUrl, jobUrl]);
 
         cancelled = true;
         await workflow.run(refreshHost, document.uri);

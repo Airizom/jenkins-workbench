@@ -29,13 +29,19 @@ export function createBuildDetailsPollingCallbacks(
   hooks: BuildDetailsPollingCallbackHooks
 ): BuildDetailsPollingCallbacks {
   return {
+    getBuilding: () => state.currentDetails?.building,
+    getRunTarget: () => state.runTarget,
+    hasNewerDisplayedDetails: (details) => state.hasNewerDisplayedDetails(details),
     onDetails: (details) => {
       if (!hooks.isTokenCurrent(token)) {
         return;
       }
-      state.updateDetails(details);
-      hooks.onBuildDetailsChanged?.(details);
-      hooks.postStateUpdate();
+      const change = state.updateDetails(details);
+      if (!change.superseded) {
+        hooks.onBuildDetailsChanged?.(details);
+        hooks.postStateUpdate();
+      }
+      return change;
     },
     onWorkflowFetchStart: () => {
       if (!hooks.isTokenCurrent(token)) {
@@ -101,11 +107,16 @@ export function createBuildDetailsPollingCallbacks(
       });
       hooks.onConsoleHtmlChanged?.(payload.textRange);
     },
-    onErrors: (errors) => {
+    onErrors: (errors, preserveConsoleError) => {
       if (!hooks.isTokenCurrent(token)) {
         return;
       }
-      state.setBaseErrors(errors);
+      // A skipped or retired console read has no evidence about the current
+      // tail. Its independent catch-up may already have published an error.
+      const consoleErrors = preserveConsoleError
+        ? state.currentErrors.filter((message) => message.startsWith("Console output: "))
+        : [];
+      state.setBaseErrors([...errors, ...consoleErrors]);
       hooks.publishErrors();
     },
     onPendingInputs: (pendingInputs) => {

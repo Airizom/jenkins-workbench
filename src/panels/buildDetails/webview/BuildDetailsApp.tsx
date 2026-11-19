@@ -15,7 +15,10 @@ import type {
   BuildDetailsIncomingMessage,
   BuildManagementMessage
 } from "../shared/BuildDetailsPanelMessages";
-import { buildArtifactActionMessage } from "./buildDetailsWebviewMessages";
+import {
+  buildArtifactActionMessage,
+  buildFollowActionMessage
+} from "./buildDetailsWebviewMessages";
 import {
   BuildDetailsErrors,
   hasLoadedBuildHeader
@@ -48,11 +51,17 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const postMessage: (message: BuildDetailsIncomingMessage) => void = postVsCodeMessage;
   const handleOpenExternal = useOpenExternalMessage(postMessage);
   useBuildDetailsMessages(dispatch);
+  const [documentId] = useState(() => crypto.randomUUID());
   // The new document must install its message listener before the host republishes
   // transient navigation and relationship state after replacing the webview HTML.
   React.useEffect(() => {
-    postVsCodeMessage({ type: "buildDetailsReady" } satisfies BuildDetailsIncomingMessage);
-  }, []);
+    if (initialState.loadToken !== undefined)
+      postVsCodeMessage({
+        type: "buildDetailsReady",
+        loadToken: initialState.loadToken,
+        documentId
+      } satisfies BuildDetailsIncomingMessage);
+  }, [initialState.loadToken, documentId]);
   const { showButton, scrollToTop } = useScrollToTopButton();
 
   const coverageState = state.coverageState ?? DEFAULT_COVERAGE_STATE;
@@ -62,6 +71,11 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
   const hasPipelineStages = state.pipelineStages.length > 0 || state.pipelineStagesLoading;
   const hasTests = state.testState.summary.hasAnyResults || coverageState.showTab;
   const buildUrl = state.buildUrl;
+  const followMessage = buildFollowActionMessage(state);
+  const followAction = followMessage && {
+    following: !followMessage.following,
+    onClick: () => postMessage(followMessage)
+  };
   const pendingInputIds = useMemo(
     () => state.pendingInputs.map((input) => input.id),
     [state.pendingInputs]
@@ -180,6 +194,7 @@ export function BuildDetailsApp({ initialState }: { initialState: BuildDetailsVi
             culpritsLabel={state.culpritsLabel}
             loading={Boolean(state.loading)}
             isRunning={isRunning}
+            followAction={followAction}
             buildUrl={buildUrl}
             testsSummary={state.testState.summary}
             stageCount={stripSegments.length}

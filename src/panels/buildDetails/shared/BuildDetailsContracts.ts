@@ -309,9 +309,22 @@ export const EMPTY_BUILD_NAVIGATION: BuildNavigationViewModel = {
   busy: false
 };
 
+export { isBuildQueueId } from "../../../shared/build/BuildCompletionEvidence";
+
+export function isFollowTargetToken(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
 export interface BuildDetailsViewModel {
   relationships?: BuildRelationshipsViewModel;
   navigation?: BuildNavigationViewModel;
+  /** Identifies the document that requested a follow action across panel navigation. */
+  loadToken?: number;
+  /** Changes when the numbered endpoint or queue identity displayed in this load changes. */
+  followTargetToken?: number;
+  /** Number shown in the header, including when a permalink advances during this load. */
+  buildNumber?: number;
+  queueId?: number;
   displayName: string;
   buildUrl?: string;
   /** Plain-text build description with markup stripped; omitted when empty. */
@@ -346,6 +359,9 @@ export interface BuildDetailsViewModel {
 
 export type BuildDetailsUpdateMessage = { type: "updateDetails" } & Pick<
   BuildDetailsViewModel,
+  | "followTargetToken"
+  | "buildNumber"
+  | "queueId"
   | "displayName"
   | "description"
   | "keptForever"

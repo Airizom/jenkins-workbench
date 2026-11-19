@@ -36,7 +36,9 @@ export function createBuildDetailsMessageRouter({
     },
     onOpenRelatedBuild: (targetId) => openRelatedBuild?.(targetId),
     onNavigateBuild: (direction) => navigateBuild?.(direction),
-    onBuildDetailsReady: () => onBuildDetailsReady?.(),
+    onBuildDetailsReady: (loadToken, documentId) => {
+      if (controller.handleWebviewReady(loadToken, documentId)) onBuildDetailsReady?.();
+    },
     onDownloadAllArtifacts: () => {
       void actions.handleDownloadAllArtifacts();
     },
@@ -93,6 +95,7 @@ export function createBuildDetailsMessageRouter({
     onShowBuildDiagnosticProblems: () => {
       buildDiagnosticsCoordinator.showProblems();
     },
+    onSetBuildFollowing: (message) => actions.handleSetBuildFollowing(message),
     onBuildManagement: (message) => {
       void actions.handleBuildManagement(message);
     },

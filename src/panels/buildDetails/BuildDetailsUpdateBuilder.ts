@@ -16,6 +16,7 @@ function buildSectionsInputFromPanelState(
 ): BuildDetailsSectionsInput {
   return {
     details: state.currentDetails,
+    followTargetToken: state.followTargetToken,
     buildUrl: state.currentBuildUrl,
     hasEnvironment: Boolean(state.environment),
     testReport: state.currentTestReport,

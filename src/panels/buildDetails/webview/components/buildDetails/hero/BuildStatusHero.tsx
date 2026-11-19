@@ -11,7 +11,9 @@ import {
   TooltipTrigger
 } from "../../../../../shared/webview/components/ui/tooltip";
 import {
+  CheckIcon,
   ExternalLinkIcon,
+  EyeIcon,
   LinkIcon,
   LockIcon,
   PauseCircleIcon,
@@ -194,7 +196,7 @@ function HeroIconAction({
 }: {
   label: string;
   tooltip: string;
-  disabled: boolean;
+  disabled?: boolean;
   pressed?: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -273,6 +275,7 @@ function HeroActions({
   buildUrl,
   onOpenBuild,
   onCopyLink,
+  followAction,
   management
 }: {
   testsSummary: BuildTestsSummaryViewModel;
@@ -280,9 +283,11 @@ function HeroActions({
   buildUrl?: string;
   onOpenBuild: () => void;
   onCopyLink: () => void;
+  followAction?: BuildStatusHeroProps["followAction"];
   management: HeroManagementProps;
 }): React.JSX.Element {
   const testsPill = describeTestsPill(testsSummary);
+  const followLabel = followAction?.following ? "Stop Following" : "Follow This Build";
   return (
     <div className="flex items-center gap-2 shrink-0">
       {testsPill ? (
@@ -301,6 +306,21 @@ function HeroActions({
           {stageCount === 1 ? "1 stage" : `${stageCount} stages`}
         </Badge>
       ) : null}
+      {followAction && (
+        <HeroIconAction
+          label={followLabel}
+          tooltip={followLabel}
+          pressed={followAction.following}
+          onClick={followAction.onClick}
+        >
+          {followAction.following ? (
+            <CheckIcon className="h-3.5 w-3.5" />
+          ) : (
+            <EyeIcon className="h-3.5 w-3.5" />
+          )}
+          <span className="hidden lg:inline">{followLabel}</span>
+        </HeroIconAction>
+      )}
       <HeroManagementActions {...management} />
       <HeroIconAction
         label="Copy link"
@@ -331,6 +351,7 @@ function HeroActions({
 }
 
 type BuildStatusHeroProps = HeroManagementProps & {
+  followAction?: { following: boolean; onClick: () => void };
   navigation?: BuildNavigationViewModel;
   onNavigateBuild?: (direction: "back" | "forward") => void;
   displayName: string;
@@ -415,6 +436,7 @@ function HeroContent(props: HeroContentProps): React.JSX.Element {
           buildUrl={props.buildUrl}
           onOpenBuild={props.onOpenBuild}
           onCopyLink={props.onCopyLink}
+          followAction={props.followAction}
           management={{
             keptForever: props.keptForever,
             canManage: props.canManage,

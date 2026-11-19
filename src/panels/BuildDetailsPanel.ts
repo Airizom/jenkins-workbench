@@ -5,12 +5,13 @@ import { formatActionError } from "../formatters/ErrorFormatters";
 import type { JenkinsEnvironmentRef } from "../jenkins/JenkinsEnvironmentRef";
 import type { JenkinsBuildDetails } from "../jenkins/types";
 import {
-  canonicalizeBuildUrlForEnvironment,
   normalizeJenkinsUrlForComparison,
-  parseBuildUrl
+  parseBuildUrl,
+  resolveBuildIdentityForEnvironment
 } from "../jenkins/urls";
 import type { BuildConsoleExporter } from "../services/BuildConsoleExporter";
 import type { BuildManagementWorkflow } from "../services/build/BuildManagementWorkflow";
+import type { BuildCompletionTracker } from "../services/buildFollow/BuildCompletionTracker";
 import type { BuildFollowUpService } from "../services/buildFollow/BuildFollowUpService";
 import type { CoverageDecorationService } from "../services/CoverageDecorationService";
 import { pickAndCopyBuildLink } from "../services/links/BuildShareLinks";
@@ -19,10 +20,14 @@ import {
   buildTestSourceNavigationContext,
   type TestSourceResolver
 } from "../services/TestSourceResolver";
+import { matchesBuildActionRun } from "../shared/build/BuildCompletionEvidence";
 import { isPlainRecord } from "../shared/runtimeGuards";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import type { ArtifactActionHandler } from "../ui/ArtifactActionHandler";
-import type { PipelineNodeSelection } from "./BuildDetailsPanelLauncher";
+import type {
+  BuildDetailsPanelLaunchRequest,
+  PipelineNodeSelection
+} from "./BuildDetailsPanelLauncher";
 import type {
   BuildDetailsBackend,
   BuildDetailsPendingInputProvider
@@ -44,6 +49,8 @@ import {
   BuildDetailsPanelController,
   type BuildDetailsPanelLoadResult
 } from "./buildDetails/BuildDetailsPanelController";
+import { readPanelBuildDetails } from "./buildDetails/BuildDetailsPanelState";
+import { resolveDisplayedRun } from "./buildDetails/BuildDetailsRunIdentity";
 import type { BuildDetailsCanOpenTestSource } from "./buildDetails/BuildDetailsTestSource";
 import type { PipelineLogTargetViewModel } from "./buildDetails/shared/BuildDetailsContracts";
 import {
@@ -75,18 +82,18 @@ export interface BuildDetailsPanelServices {
   testSourceResolver?: TestSourceResolver;
   testSourceNavigationUiService?: TestSourceNavigationUiService;
   buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator;
+  completionTracker: BuildCompletionTracker;
   /** Usually a lazy container reference, resolved on the first keep/edit/delete request. */
   buildManagementWorkflow?: BuildManagementWorkflow;
   /** Usually a lazy container reference, resolved on the first restart from stage. */
   buildFollowUp?: BuildFollowUpService;
 }
 
-interface BuildDetailsPanelShowOptions extends BuildDetailsPanelServices {
-  environment: JenkinsEnvironmentRef;
-  buildUrl: string;
+interface BuildDetailsPanelShowOptions
+  extends BuildDetailsPanelServices,
+    BuildDetailsPanelLaunchRequest {
+  environmentStore: Pick<JenkinsEnvironmentStore, "isCurrentController">;
   extensionUri: vscode.Uri;
-  label?: string;
-  pipelineNodeSelection?: PipelineNodeSelection;
 }
 
 interface BuildDetailsPanelReviveOptions extends BuildDetailsPanelServices {
@@ -125,6 +132,7 @@ export class BuildDetailsPanel {
   private historyEnvironment?: JenkinsEnvironmentRef;
   private historyBuildUrl?: string;
   private static currentPanel: BuildDetailsPanel | undefined;
+  private static showGeneration = 0;
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private mutableServices!: BuildDetailsPanelMutableServices;
@@ -142,44 +150,53 @@ export class BuildDetailsPanel {
   private disposed = false;
 
   static async show(options: BuildDetailsPanelShowOptions): Promise<void> {
-    const {
-      backend,
-      artifactActionHandler,
-      coverageDecorationService,
-      environment,
-      buildUrl,
-      extensionUri,
-      label,
-      pipelineNodeSelection
-    } = options;
+    const { backend, artifactActionHandler, environment, buildUrl, label, pipelineNodeSelection } =
+      options;
     const mutableServices = getMutableServices(options);
 
     let activePanel = BuildDetailsPanel.currentPanel;
-    if (!activePanel) {
-      const panel = vscode.window.createWebviewPanel(
-        "jenkinsWorkbench.buildDetails",
-        "Build Details",
-        vscode.ViewColumn.Active,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
-        }
-      );
-      configureWebviewPanel(panel, extensionUri, "terminal");
-      activePanel = new BuildDetailsPanel(
-        panel,
-        extensionUri,
-        coverageDecorationService,
-        mutableServices,
-        options.buildDiagnosticsCoordinator,
-        options.historyDependencies
-      );
-      BuildDetailsPanel.currentPanel = activePanel;
-    } else {
-      activePanel.configure(mutableServices);
+    const generation = ++BuildDetailsPanel.showGeneration;
+    let initialDetails: JenkinsBuildDetails | undefined;
+    if (options.expectedRun) {
+      const navigation = activePanel?.navigationGeneration;
+      const loadToken = activePanel?.controller.getLoadToken();
+      const current = () =>
+        generation === BuildDetailsPanel.showGeneration &&
+        activePanel === BuildDetailsPanel.currentPanel &&
+        activePanel?.navigationGeneration === navigation &&
+        activePanel?.controller.getLoadToken() === loadToken;
+      const controllerMatches = () =>
+        options.environmentStore.isCurrentController(
+          environment.scope,
+          environment.environmentId,
+          environment.url
+        );
+      const warn = () =>
+        void vscode.window.showWarningMessage(
+          `Unable to open ${label ?? "build details"}: Jenkins could not confirm the selected run at its numbered URL.`
+        );
+      if (!controllerMatches()) {
+        warn();
+        return;
+      }
+      try {
+        initialDetails = await readPanelBuildDetails(() =>
+          backend.status.getBuildDetails(environment, buildUrl, {
+            includeCauses: true,
+            bypassCache: true
+          })
+        );
+      } catch {
+        if (current()) warn();
+        return;
+      }
+      if (!current()) return;
+      if (!controllerMatches() || !matchesBuildActionRun(options.expectedRun, initialDetails)) {
+        warn();
+        return;
+      }
     }
-
+    activePanel = BuildDetailsPanel.openPanel(activePanel, options, mutableServices);
     activePanel.panel.reveal(undefined, true);
     await activePanel.load(
       backend,
@@ -187,8 +204,43 @@ export class BuildDetailsPanel {
       environment,
       buildUrl,
       label,
-      pipelineNodeSelection
+      pipelineNodeSelection,
+      initialDetails ? { initialDetails, verifiedSelection: true } : undefined
     );
+  }
+
+  private static openPanel(
+    activePanel: BuildDetailsPanel | undefined,
+    options: BuildDetailsPanelShowOptions,
+    mutableServices: BuildDetailsPanelMutableServices
+  ): BuildDetailsPanel {
+    if (activePanel) {
+      activePanel.configure(mutableServices);
+      return activePanel;
+    }
+    const { extensionUri, coverageDecorationService } = options;
+    const panel = vscode.window.createWebviewPanel(
+      "jenkinsWorkbench.buildDetails",
+      "Build Details",
+      vscode.ViewColumn.Active,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [getWebviewAssetsRoot(extensionUri)]
+      }
+    );
+    configureWebviewPanel(panel, extensionUri, "terminal");
+    const opened = new BuildDetailsPanel(
+      panel,
+      extensionUri,
+      coverageDecorationService,
+      mutableServices,
+      options.buildDiagnosticsCoordinator,
+      options.completionTracker,
+      options.historyDependencies
+    );
+    BuildDetailsPanel.currentPanel = opened;
+    return opened;
   }
 
   static async revive(
@@ -205,6 +257,7 @@ export class BuildDetailsPanel {
       options.coverageDecorationService,
       getMutableServices(options),
       options.buildDiagnosticsCoordinator,
+      options.completionTracker,
       options.historyDependencies
     );
     BuildDetailsPanel.currentPanel = revived;
@@ -268,7 +321,7 @@ export class BuildDetailsPanel {
       environment?.scope === scope &&
       environment.environmentId === environmentId &&
       currentBuildUrl &&
-      areBuildUrlsEqual(currentBuildUrl, buildUrl)
+      matchesDeletedBuild(environment.url, currentBuildUrl, buildUrl)
     ) {
       current.panel.dispose();
     }
@@ -280,6 +333,7 @@ export class BuildDetailsPanel {
     coverageDecorationService: CoverageDecorationService,
     mutableServices: BuildDetailsPanelMutableServices,
     private readonly buildDiagnosticsCoordinator: BuildDiagnosticsCoordinator,
+    completionTracker: BuildCompletionTracker,
     historyDependencies?: HistoryDependencies
   ) {
     this.panel = panel;
@@ -307,13 +361,16 @@ export class BuildDetailsPanel {
         );
         this.updateHistory();
         this.recordRecoveredNavigation();
+        this.actions.postBuildFollowState("details");
       },
       () => this.postCurrentBuildDiagnostics(),
       () => this.mutableServices.testSourceResolver?.whenReady() ?? Promise.resolve(),
-      () => this.updateHistory()
+      () => this.updateHistory(),
+      completionTracker
     );
     this.configure(mutableServices);
     this.actions = new BuildDetailsPanelActions({
+      completionTracker,
       controller: this.controller,
       getArtifactActionHandler: () => this.artifactActionHandler,
       getConsoleExporter: () => this.mutableServices.consoleExporter,
@@ -328,6 +385,7 @@ export class BuildDetailsPanel {
       buildDiagnosticsCoordinator: this.buildDiagnosticsCoordinator,
       getSerializedState: () => this.serializedState,
       onBuildDetailsReady: () => {
+        this.actions.postBuildFollowState();
         this.postNavigation();
         this.controller.republishRelationships();
       },
@@ -363,6 +421,7 @@ export class BuildDetailsPanel {
     this.panel.onDidChangeViewState(
       () => {
         if (this.panel.visible) {
+          this.actions.postBuildFollowState();
           void this.controller.handlePanelVisible();
         } else {
           this.controller.handlePanelHidden();
@@ -383,6 +442,7 @@ export class BuildDetailsPanel {
       this.disposables
     );
     this.disposables.push(
+      completionTracker.onDidChange(() => this.actions.postBuildFollowState()),
       this.buildDiagnosticsCoordinator.onDidChange((event) => {
         const buildUrl = this.controller.getBuildUrl();
         if (!buildUrl || (event.buildUrl && !areBuildUrlsEqual(event.buildUrl, buildUrl))) {
@@ -436,7 +496,8 @@ export class BuildDetailsPanel {
     label?: string,
     pipelineNodeSelection?: PipelineNodeSelection,
     navigationLoad?: {
-      generation: number;
+      generation?: number;
+      verifiedSelection?: true;
       target?: BuildDetailsNavigationTarget;
       initialDetails: JenkinsBuildDetails;
     }
@@ -446,7 +507,7 @@ export class BuildDetailsPanel {
       return;
     }
     this.currentLoadComplete = false;
-    if (!navigationLoad) {
+    if (navigationLoad?.generation === undefined) {
       this.navigationBusy = false;
     }
     this.navigation.snapshot(this.serializedState);
@@ -476,7 +537,8 @@ export class BuildDetailsPanel {
       {
         label,
         panelState,
-        initialDetails: navigationLoad?.initialDetails
+        initialDetails: navigationLoad?.initialDetails,
+        ...(navigationLoad?.verifiedSelection && { verifiedSelection: true })
       }
     );
 
@@ -533,10 +595,25 @@ export class BuildDetailsPanel {
       return undefined;
     }
     const details = this.controller.getCurrentDetails();
+    let sharedUrl: string | undefined;
+    if (details) {
+      sharedUrl = resolveDisplayedRun(environment, buildUrl, details, "share")?.buildUrl;
+    } else {
+      const onController = normalizeJenkinsUrlForComparison(buildUrl, environment.url).startsWith(
+        normalizeJenkinsUrlForComparison(environment.url)
+      );
+      sharedUrl = resolveBuildIdentityForEnvironment(
+        environment.url,
+        buildUrl,
+        "share",
+        undefined,
+        onController ? "configured" : "reported"
+      )?.buildUrl;
+    }
+    if (!sharedUrl) return undefined;
     return {
       environment,
-      // Builds opened from a view keep the view path; share the canonical URL.
-      buildUrl: canonicalizeBuildUrlForEnvironment(environment.url, buildUrl) ?? buildUrl,
+      buildUrl: sharedUrl,
       label: details?.fullDisplayName ?? details?.displayName,
       pipelineNode: toPipelineNodeSelection(this.controller.getCurrentPipelineNodeLog()?.target)
     };
@@ -619,10 +696,12 @@ export class BuildDetailsPanel {
     try {
       // Validate access before replacing the current webview. Reuse these details
       // in the load so an unavailable target cannot clear the source build.
-      const initialDetails = await backend.status.getBuildDetails(environment, buildUrl, {
-        includeCauses: true,
-        bypassCache: true
-      });
+      const initialDetails = await readPanelBuildDetails(() =>
+        backend.status.getBuildDetails(environment, buildUrl, {
+          includeCauses: true,
+          bypassCache: true
+        })
+      );
       if (
         this.disposed ||
         generation !== this.navigationGeneration ||
@@ -710,6 +789,28 @@ function getMutableServices(
     buildManagementWorkflow: options.buildManagementWorkflow,
     buildFollowUp: options.buildFollowUp
   };
+}
+
+/** Both restored panels and verified mutation endpoints can use an internal Jenkins URL. */
+function matchesDeletedBuild(
+  environmentUrl: string,
+  panelUrl: string,
+  deletedUrl: string
+): boolean {
+  const base = normalizeJenkinsUrlForComparison(environmentUrl);
+  const identity = (url: string) => {
+    const endpoint = normalizeJenkinsUrlForComparison(url, environmentUrl);
+    return (
+      resolveBuildIdentityForEnvironment(
+        environmentUrl,
+        endpoint,
+        "comparison",
+        undefined,
+        endpoint.startsWith(base) ? "configured" : "reported"
+      )?.buildUrl ?? endpoint
+    );
+  };
+  return identity(deletedUrl) === identity(panelUrl);
 }
 
 function areBuildUrlsEqual(left: string, right: string): boolean {

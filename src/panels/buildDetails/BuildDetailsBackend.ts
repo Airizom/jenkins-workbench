@@ -50,7 +50,12 @@ export class BuildDetailsBackendAdapter implements BuildDetailsBackend {
   constructor(dataService: JenkinsDataService) {
     this.relationships = dataService;
     const inspection = new BuildInspectionBackendAdapter(dataService);
-    this.status = inspection.status;
+    this.status = {
+      // Panel reads establish the current run at a permalink or a recycled numbered URL.
+      getBuildDetails: (environment, url, options) =>
+        inspection.status.getBuildDetails(environment, url, { ...options, bypassCache: true }),
+      getWorkflowRun: (...args) => inspection.status.getWorkflowRun(...args)
+    };
     this.tests = inspection.tests;
     this.console = inspection.console;
     this.coverage = dataService;

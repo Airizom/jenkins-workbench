@@ -91,7 +91,7 @@ export class ConsoleStreamManager {
     return this.htmlConsoleStream.shouldContinuePolling();
   }
 
-  async loadInitialConsole(): Promise<ConsoleSnapshotResult> {
+  async loadInitialConsole(isCurrent = () => true): Promise<ConsoleSnapshotResult> {
     let consoleTextResult: JenkinsConsoleTextTail | undefined;
     let consoleError: unknown;
     try {
@@ -103,6 +103,7 @@ export class ConsoleStreamManager {
     } catch (error) {
       consoleError = error;
     }
+    if (!isCurrent()) return {};
     this.textConsoleStream.seedFromTail(consoleTextResult);
     if (!consoleTextResult) {
       // Without a tail there is no bounded HTML start; let a later probe initialize HTML.
@@ -110,17 +111,6 @@ export class ConsoleStreamManager {
     }
     const consoleHtmlResult = await this.htmlConsoleStream.tryInitialize(consoleTextResult);
     return { consoleTextResult, consoleHtmlResult, consoleError };
-  }
-
-  async refreshSnapshot(): Promise<{
-    consoleTextResult?: JenkinsConsoleTextTail;
-    consoleHtmlResult?: { html: string; truncated: boolean };
-  }> {
-    const result = await this.loadInitialConsole();
-    return {
-      consoleTextResult: result.consoleTextResult,
-      consoleHtmlResult: result.consoleHtmlResult
-    };
   }
 
   async fetchNext(): Promise<ConsoleFetchResult> {

@@ -10,8 +10,8 @@ import { buildBuildDetailsViewModel } from "./BuildDetailsViewModel";
 export function applyBuildDetailsInitialState(
   state: BuildDetailsPanelState,
   initialState: BuildDetailsInitialState
-): void {
-  state.applyInitialState(
+): boolean {
+  return state.applyInitialState(
     initialState,
     toPipelineRun(initialState.workflowRun),
     formatInitialPipelineError(initialState.workflowError)
@@ -25,6 +25,7 @@ export function buildInitialBuildDetailsViewModel(
 ) {
   return buildBuildDetailsViewModel({
     details: state.currentDetails,
+    followTargetToken: state.followTargetToken,
     buildUrl: state.currentBuildUrl,
     hasEnvironment: Boolean(state.environment),
     pipelineRun: state.currentPipelineRun,
@@ -38,6 +39,7 @@ export function buildInitialBuildDetailsViewModel(
     pipelineRestartEnabled: state.pipelineRestartEnabled,
     pipelineRestartableStages: state.pipelineRestartableStages,
     pipelineNodeLog: state.pipelineNodeLog,
+    testReport: state.currentTestReport,
     testReportFetched: state.testReportFetched,
     testReportLogsIncluded: state.testReportLogsIncluded,
     testResultsLoading: state.testResultsLoading,

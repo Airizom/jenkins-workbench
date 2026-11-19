@@ -6,7 +6,17 @@ import {
 } from "../src/panels/buildDetails/BuildDetailsNavigation";
 import type { BuildDetailsPanelSerializedState } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 
-vi.doMock("vscode", () => ({ window: { showErrorMessage: vi.fn(async () => undefined) } }));
+const writeText = vi.fn();
+const showWarningMessage = vi.fn();
+vi.doMock("vscode", () => ({
+  env: { uriScheme: "vscode", clipboard: { writeText } },
+  window: {
+    showErrorMessage: vi.fn(async () => undefined),
+    showWarningMessage,
+    showQuickPick: async (items: unknown[]) => items[0],
+    setStatusBarMessage: vi.fn()
+  }
+}));
 const { BuildDetailsPanel, toPipelineLogTargetViewModel, toPipelineNodeSelection } = await import(
   "../src/panels/BuildDetailsPanel"
 );
@@ -16,6 +26,140 @@ const environment = {
   scope: "workspace" as const,
   url: "https://jenkins.example/"
 };
+
+const { BuildDetailsPanelLauncher } = await import("../src/panels/BuildDetailsPanelLauncher");
+type Selection = NonNullable<
+  Parameters<InstanceType<typeof BuildDetailsPanelLauncher>["show"]>[0]["expectedRun"]
+>;
+type SelectedStatus = {
+  number: number;
+  queueId?: number;
+  building?: boolean;
+  result?: string;
+  url: string;
+};
+
+function selectedPanel(read: () => Promise<SelectedStatus>) {
+  const statics = BuildDetailsPanel as unknown as { currentPanel: unknown };
+  const previous = statics.currentPanel;
+  const panel = {
+    navigationGeneration: 1,
+    controller: { getLoadToken: vi.fn(() => 1) },
+    panel: { reveal: vi.fn() },
+    configure: vi.fn(),
+    load: vi.fn()
+  };
+  statics.currentPanel = panel;
+  const getBuildDetails = vi.fn(read);
+  const isCurrentController = vi.fn(() => true);
+  const launcher = new BuildDetailsPanelLauncher({
+    backend: { status: { getBuildDetails } },
+    environmentStore: { isCurrentController }
+  } as never);
+  showWarningMessage.mockClear();
+  return {
+    panel,
+    launcher,
+    getBuildDetails,
+    isCurrentController,
+    restore: () => {
+      statics.currentPanel = previous;
+    }
+  };
+}
+
+describe("Build Details opened from a one-run action", () => {
+  it.each([
+    ["queue handoff without Run proof", { queueId: 17 }, { queueId: -1 }, true],
+    ["matching queue ID", { queueId: 17, requireQueueId: true }, { queueId: 17 }, true],
+    ["different positive queue ID", { queueId: 17 }, { queueId: 18 }, false],
+    ["lost proven ID", { queueId: 17, requireQueueId: true }, { queueId: -1 }, false],
+    ["missing proven ID", { queueId: 17, requireQueueId: true }, {}, false],
+    ["number-only action", {}, { queueId: 17 }, true],
+    ["different run number", { queueId: 17 }, { number: 43, queueId: 17 }, false],
+    [
+      "confirmed anonymous completion",
+      { completion: { result: "SUCCESS" } },
+      { building: false, result: "SUCCESS", queueId: -1 },
+      true
+    ],
+    [
+      "new run after anonymous completion",
+      { completion: { result: "SUCCESS" } },
+      { building: true, queueId: 18 },
+      false
+    ],
+    [
+      "changed terminal result",
+      { queueId: 17, requireQueueId: true, completion: { result: "SUCCESS" } },
+      { queueId: 17, building: false, result: "FAILURE" },
+      false
+    ]
+  ] as const)(
+    "checks the first full, uncached Run for %s",
+    async (_scenario, proof, response, open) => {
+      const target = entry(42);
+      const details = { number: 42, url: target.buildUrl, ...response };
+      const h = selectedPanel(async () => details);
+      try {
+        await h.launcher.show({ ...target, expectedRun: { buildNumber: 42, ...proof } });
+        assert.deepEqual(h.getBuildDetails.mock.calls, [
+          [environment, target.buildUrl, { includeCauses: true, bypassCache: true }]
+        ]);
+        assert.equal(h.panel.panel.reveal.mock.calls.length, Number(open));
+        assert.equal(h.panel.load.mock.calls.length, Number(open));
+        assert.equal(showWarningMessage.mock.calls.length, Number(!open));
+        if (open) {
+          assert.deepEqual(h.panel.load.mock.lastCall?.at(-1), {
+            initialDetails: details,
+            verifiedSelection: true
+          });
+        }
+      } finally {
+        h.restore();
+      }
+    }
+  );
+
+  it.each(["new show", "navigation", "refresh", "different controller", "failed read"])(
+    "does not publish a delayed selection after %s",
+    async (scenario) => {
+      let resolve!: (run: SelectedStatus) => void;
+      let reject!: (error: Error) => void;
+      const h = selectedPanel(
+        () =>
+          new Promise((r, j) => {
+            resolve = r;
+            reject = j;
+          })
+      );
+      const target = entry(42);
+      try {
+        const opening = h.launcher.show({
+          ...target,
+          expectedRun: { buildNumber: 42, queueId: 17 } satisfies Selection
+        });
+        if (scenario === "new show") {
+          await h.launcher.show(entry(43));
+          h.panel.load.mockClear();
+        }
+        if (scenario === "navigation") h.panel.navigationGeneration++;
+        if (scenario === "refresh") h.panel.controller.getLoadToken.mockReturnValue(2);
+        if (scenario === "different controller") h.isCurrentController.mockReturnValue(false);
+        if (scenario === "failed read") reject(new Error("build unavailable"));
+        else resolve({ number: 42, url: target.buildUrl, queueId: 17 });
+        await opening;
+        assert.equal(h.panel.load.mock.calls.length, 0);
+        assert.equal(
+          showWarningMessage.mock.calls.length,
+          Number(["different controller", "failed read"].includes(scenario))
+        );
+      } finally {
+        h.restore();
+      }
+    }
+  );
+});
 
 function entry(number: number): BuildDetailsNavigationEntry {
   return {
@@ -422,6 +566,70 @@ describe("BuildDetailsPanel pipeline node selection mapping", () => {
 describe("BuildDetailsPanel.getCurrentBuildContext", () => {
   type PanelStatics = { currentPanel: unknown };
 
+  it.each([
+    ["job/app/0?view=full#log", 0, "job/app/0/"],
+    ["view/team/custom-runs/job/app/0/", 0, "view/team/custom-runs/job/app/0/"],
+    ["job/app/0/", 1, undefined],
+    ["job/app/1/", 0, undefined],
+    ["job/app/lastBuild/", 0, undefined],
+    ["job/app/7/artifact/0/", 0, undefined],
+    ["https://internal/job/app/0/", 0, undefined]
+  ] as const)(
+    "copies only a verified literal zero endpoint for %s displaying #%s",
+    async (path, number, expected) => {
+      const mounted = { ...environment, url: "https://public/job/team/" };
+      const panel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
+        disposed: false,
+        controller: {
+          getEnvironment: () => mounted,
+          getBuildUrl: () => new URL(path, mounted.url).href,
+          getCurrentDetails: () => ({ number, url: `https://internal/job/app/${number}/` }),
+          getCurrentPipelineNodeLog: () => undefined
+        }
+      });
+      writeText.mockClear();
+      await panel.copyBuildLink();
+      assert.deepEqual(writeText.mock.calls, expected ? [[mounted.url + expected]] : []);
+    }
+  );
+
+  it.each([
+    [
+      "view/team/custom-runs/job/matrix/os=linux/42/",
+      "view/team/custom-runs/job/matrix/os=linux/42/"
+    ],
+    ["job/matrix/lastBuild/", "job/matrix/42/"],
+    ["view/team/job/matrix/lastBuild/", "job/matrix/42/"],
+    ["job/matrix/lastBuild/", "job/matrix/custom-runs/42/", "job/matrix/custom-runs/42/"]
+  ])(
+    "shares %s as the displayed numbered run",
+    (panelPath, expected, reportedPath = "job/matrix/os=linux/42/") => {
+      const buildUrl = `${environment.url}${panelPath}`;
+      const statics = BuildDetailsPanel as unknown as PanelStatics;
+      const previous = statics.currentPanel;
+      try {
+        statics.currentPanel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
+          disposed: false,
+          controller: {
+            getEnvironment: () => environment,
+            getBuildUrl: () => buildUrl,
+            getCurrentDetails: () => ({
+              number: 42,
+              url: environment.url + reportedPath
+            }),
+            getCurrentPipelineNodeLog: () => undefined
+          }
+        });
+        assert.equal(
+          BuildDetailsPanel.getCurrentBuildContext()?.buildUrl,
+          `${environment.url}${expected}`
+        );
+      } finally {
+        statics.currentPanel = previous;
+      }
+    }
+  );
+
   it("returns undefined without an open panel and the loaded build otherwise", () => {
     const statics = BuildDetailsPanel as unknown as PanelStatics;
     const previous = statics.currentPanel;
@@ -435,7 +643,11 @@ describe("BuildDetailsPanel.getCurrentBuildContext", () => {
         controller: {
           getEnvironment: () => environment,
           getBuildUrl: () => entry(5).buildUrl,
-          getCurrentDetails: () => ({ fullDisplayName: "example #5" }),
+          getCurrentDetails: () => ({
+            number: 5,
+            url: entry(5).buildUrl,
+            fullDisplayName: "example #5"
+          }),
           getCurrentPipelineNodeLog: () => ({ target, text: "", truncated: false, loading: false })
         }
       });
@@ -456,6 +668,16 @@ describe("BuildDetailsPanel.getCurrentBuildContext", () => {
         }
       });
       assert.equal(BuildDetailsPanel.getCurrentBuildContext()?.buildUrl, entry(6).buildUrl);
+
+      statics.currentPanel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
+        disposed: false,
+        controller: {
+          getEnvironment: () => environment,
+          getBuildUrl: () => `${environment.url}job/example/lastBuild/`,
+          getCurrentDetails: () => undefined
+        }
+      });
+      assert.equal(BuildDetailsPanel.getCurrentBuildContext(), undefined);
 
       statics.currentPanel = Object.assign(Object.create(BuildDetailsPanel.prototype), {
         disposed: false,
