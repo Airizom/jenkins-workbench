@@ -34,6 +34,8 @@ export function decorateMultibranchScanItem(
       : warning
         ? new vscode.ThemeIcon("warning")
         : item.iconPath,
-    accessibilityInformation: { label: `${state.target.label}, ${description}` }
+    accessibilityInformation: {
+      label: `${item.accessibilityInformation?.label ?? state.target.label}, ${status}`
+    }
   };
 }

@@ -91,6 +91,7 @@ describe("MultibranchScanService", () => {
     data.getMultibranchScanLog.mockResolvedValue(log("new scan\n", true));
     await vi.advanceTimersByTimeAsync(2000);
     assert.equal(store.get(target)?.phase, "running");
+    assert.equal(store.get(target)?.detail, undefined);
     data.getMultibranchScanLog.mockResolvedValue(log("new scan\nFinished: SUCCESS\n"));
     await vi.advanceTimersByTimeAsync(2000);
     assert.equal(store.get(target)?.outcome, "success");
@@ -122,6 +123,7 @@ describe("MultibranchScanService", () => {
     data.getMultibranchScanLog.mockResolvedValue(log("new scan\nFinished: SUCCESS\n"));
     await vi.advanceTimersByTimeAsync(2000);
     assert.equal(completed.length, 1);
+    assert.equal(completed[0]?.detail, undefined);
   });
 
   it("does not treat the previous success as a new scan, including after a queue entry expires", async () => {

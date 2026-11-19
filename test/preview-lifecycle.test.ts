@@ -6,6 +6,7 @@ import * as vscodeStub from "./helpers/vscodeStub";
 const tabChanges = new vscodeStub.EventEmitter<vscode.TabChangeEvent>();
 const documentCloses = new vscodeStub.EventEmitter<vscode.TextDocument>();
 const tabGroups: { tabs: vscode.Tab[] }[] = [];
+const closeTabs = vi.fn(async (_tabs: vscode.Tab[], _preserveFocus?: boolean) => true);
 const executeCommand = vi.fn(async (_command: string, uri: vscode.Uri) => {
   addTab(uri);
 });
@@ -24,7 +25,7 @@ vi.doMock("vscode", () => ({
   FileSystemError: { FileNotFound: () => new Error("FileNotFound") },
   commands: { executeCommand },
   window: {
-    tabGroups: { all: tabGroups, onDidChangeTabs: tabChanges.event },
+    tabGroups: { all: tabGroups, close: closeTabs, onDidChangeTabs: tabChanges.event },
     showTextDocument
   },
   workspace: { onDidCloseTextDocument: documentCloses.event },
@@ -32,7 +33,9 @@ vi.doMock("vscode", () => ({
 }));
 
 const { ArtifactPreviewProvider } = await import("../src/ui/ArtifactPreviewProvider");
-const { openResourcePreview, openTextPreview } = await import("../src/ui/PreviewLifecycle");
+const { closeRestoredPreviews, openResourcePreview, openTextPreview } = await import(
+  "../src/ui/PreviewLifecycle"
+);
 const providers: InstanceType<typeof ArtifactPreviewProvider>[] = [];
 
 afterEach(() => {
@@ -72,6 +75,17 @@ function applyCachePressure(provider: InstanceType<typeof ArtifactPreviewProvide
   provider.registerArtifact(new Uint8Array([4]), "other");
   provider.registerArtifact(new Uint8Array([5]), "another");
 }
+
+it("closes expired preview tabs at startup while preserving workspace and draft editors", async () => {
+  const { uri } = createPreview();
+  const restored = addTab(uri);
+  addTab(vscodeStub.Uri.file("/workspace/Jenkinsfile") as vscode.Uri);
+  addTab(vscodeStub.Uri.parse("jenkins-replay:/draft.groovy") as vscode.Uri);
+
+  await closeRestoredPreviews();
+
+  assert.deepEqual(closeTabs.mock.calls, [[[restored], true]]);
+});
 
 it.each([
   ["resource", openResourcePreview],

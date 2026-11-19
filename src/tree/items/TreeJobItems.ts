@@ -85,6 +85,11 @@ export class JenkinsFolderTreeItem extends vscode.TreeItem {
         ? formatMultibranchFolderTooltip(options?.branchFilter)
         : undefined;
     this.iconPath = folderKind === "multibranch" ? GIT_BRANCH_ICON : FOLDER_ICON;
+    if (folderKind === "multibranch") {
+      this.accessibilityInformation = {
+        label: [label, "Multibranch", this.tooltip].filter(Boolean).join(", ")
+      };
+    }
   }
 }
 

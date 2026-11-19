@@ -1,5 +1,18 @@
 import * as vscode from "vscode";
-import type { ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
+import { ARTIFACT_PREVIEW_SCHEME, type ArtifactPreviewProvider } from "./ArtifactPreviewProvider";
+
+export async function closeRestoredPreviews(): Promise<void> {
+  // Preview bytes live in the previous extension host's memory.
+  const tabs = vscode.window.tabGroups.all.flatMap((group) =>
+    group.tabs.filter((tab) => {
+      const uris = getTabInputUris(tab.input);
+      return uris.length > 0 && uris.every((uri) => uri.scheme === ARTIFACT_PREVIEW_SCHEME);
+    })
+  );
+  if (tabs.length > 0) {
+    await vscode.window.tabGroups.close(tabs, true);
+  }
+}
 
 export async function openResourcePreview(
   previewProvider: ArtifactPreviewProvider,

@@ -8,6 +8,7 @@ import { registerJenkinsTasks } from "../tasks/JenkinsTasks";
 import type { TreeViewSummary } from "../tree/TreeDataProvider";
 import { formatJobFilterDescription, formatTreeViewSummary } from "../tree/TreeViewPresentation";
 import { ARTIFACT_PREVIEW_SCHEME } from "../ui/ArtifactPreviewProvider";
+import { closeRestoredPreviews } from "../ui/PreviewLifecycle";
 import { createExtensionContainer } from "./container/ExtensionContainer";
 import { syncJenkinsfileContext, syncNoEnvironmentsContext } from "./contextKeys";
 import { registerExtensionCommands } from "./ExtensionCommands";
@@ -244,6 +245,7 @@ export async function activateRuntime(
     jenkinsSharedLibraryIndex
   );
 
+  void runStartupStep("Failed to close expired Jenkins previews.", closeRestoredPreviews);
   registerExtensionSubscriptions(context, container);
   registerExtensionCommands(context, container);
   registerJenkinsTasks(context, container);

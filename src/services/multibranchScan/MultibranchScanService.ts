@@ -351,7 +351,11 @@ export class MultibranchScanService implements vscode.Disposable {
       log: log ?? previous,
       logError: logError ? errorMessage(logError) : undefined,
       logRevision: session.state.logRevision + (replaced ? 1 : 0),
-      detail: replaced ? "The indexing log was replaced by a later scan." : undefined
+      // The first log for a queued or requested scan normally replaces the preflight log.
+      detail:
+        replaced && session.confirmedNewLog
+          ? "The indexing log was replaced by a later scan."
+          : undefined
     };
   }
 

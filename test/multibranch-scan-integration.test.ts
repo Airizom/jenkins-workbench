@@ -135,7 +135,14 @@ describe("multibranch scan tree presentation", () => {
     assert.equal(first.id, item.id);
     assert.equal(first.contextValue, before.contextValue);
     assert.match(String(first.tooltip), /Branch filter: feature\/\*/);
-    assert.match(first.accessibilityInformation?.label ?? "", /project.*Filtered.*Scan running/);
+    assert.equal(
+      item.accessibilityInformation?.label,
+      "project, Multibranch, Branch filter: feature/*"
+    );
+    assert.equal(
+      first.accessibilityInformation?.label,
+      "project, Multibranch, Branch filter: feature/*, Scan running"
+    );
     assert.deepEqual(
       { description: item.description, tooltip: item.tooltip, contextValue: item.contextValue },
       before
