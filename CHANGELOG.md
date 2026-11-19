@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.68.1] - 2026-11-19
+
+### Fixed
+
+- fix(artifacts): close expired artifact preview tabs restored when VS Code starts.
+- fix(scans): show the log replacement notice only after the requested multibranch scan is confirmed, and preserve branch filter details in accessible tree labels while showing scan status.
+
 ## [1.68.0] - 2026-11-19
 
 ### Added
