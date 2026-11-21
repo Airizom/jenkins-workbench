@@ -108,6 +108,26 @@ describe("Jenkins job picker", () => {
     expect(f.picker.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a readable branch name and returns its original Jenkins path", async () => {
+    const branch = entry("feature%2Fcart");
+    branch.path = [
+      { name: "folder", kind: "multibranch", url: "https://jenkins.example/job/folder/" },
+      { name: branch.name, kind: branch.kind, url: branch.url }
+    ];
+    const f = await fixture(async function* () {
+      yield [branch];
+    });
+    const result = f.pickJenkinsJob(f.data, f.store);
+    await vi.waitFor(() => expect(f.picker.items).toHaveLength(1));
+    expect(f.picker.items[0]).toMatchObject({
+      label: "feature/cart",
+      detail: expect.stringContaining("folder / feature/cart")
+    });
+    f.picker.selectedItems = f.picker.items;
+    f.picker.accept.fire();
+    await expect(result).resolves.toEqual({ environment, entry: branch });
+  });
+
   it("loads ordinary results before a suggestion and deduplicates the suggestion", async () => {
     const f = await fixture(async function* () {
       yield [entry("alpha"), entry("zulu")];

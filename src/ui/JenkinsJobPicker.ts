@@ -11,6 +11,7 @@ import {
   type JenkinsEnvironmentRef,
   toJenkinsEnvironmentRef
 } from "../jenkins/JenkinsEnvironmentRef";
+import { decodeJenkinsJobName } from "../jenkins/JenkinsJobNames";
 import { normalizeJenkinsUrlForComparison } from "../jenkins/urls";
 import type { JenkinsEnvironmentStore } from "../storage/JenkinsEnvironmentStore";
 import { formatJobColor } from "../tree/formatters";
@@ -138,10 +139,15 @@ export async function pickJenkinsJob(
         continue;
       }
       const statusLabel = formatJobColor(entry.color) ?? "Unknown";
+      const isBranch = entry.path?.at(-2)?.kind === "multibranch";
+      const label = isBranch ? decodeJenkinsJobName(entry.name) : entry.name;
+      const fullName = isBranch
+        ? [...entry.path.slice(0, -1).map((segment) => segment.name), label].join(" / ")
+        : entry.fullName;
       const pick: JobQuickPickItem = {
-        label: entry.name,
+        label,
         description: suggested ? `Suggested • ${statusLabel}` : statusLabel,
-        detail: `${entry.fullName} • ${formatEnvironmentDisplayName(environment)}`,
+        detail: `${fullName} • ${formatEnvironmentDisplayName(environment)}`,
         environment,
         entry,
         suggested
