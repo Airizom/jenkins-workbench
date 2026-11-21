@@ -109,14 +109,6 @@ export function NodeDetailsHero({
   const statusStyle = resolveNodeStatusStyle(statusClass);
   // The subtitle repeats the node name only when it differs from the title.
   const showName = name.trim().length > 0 && name !== displayName;
-  const bannerTone =
-    statusClass === "offline" || statusClass === "temporary"
-      ? OFFLINE_BANNER_TONES[statusClass]
-      : OFFLINE_BANNER_TONES.offline;
-  // One filled button at most: the action that resolves the current state.
-  // Taking a healthy node offline and opening Jenkins stay secondary.
-  const nodeActionIsPrimary = nodeAction?.type === "bringNodeOnline";
-  const offlineSince = formatOfflineSince(offlineSinceMs);
 
   return (
     <header className="node-hero" data-status={statusClass}>
@@ -213,7 +205,7 @@ export function NodeDetailsHero({
             ) : null}
             {nodeAction ? (
               <Button
-                variant={nodeActionIsPrimary ? "default" : "outline"}
+                variant={nodeAction.type === "bringNodeOnline" ? "default" : "outline"}
                 size="sm"
                 onClick={onNodeAction}
                 disabled={loading}
@@ -231,31 +223,12 @@ export function NodeDetailsHero({
         </div>
 
         {showOfflineBanner ? (
-          <div
-            role="status"
-            className={cn(
-              "flex items-start gap-2 rounded-lg border px-3 py-2 shadow-xs",
-              bannerTone.container
-            )}
-          >
-            <AlertTriangleIcon
-              className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", bannerTone.icon)}
-              aria-hidden="true"
-            />
-            <div className="min-w-0 text-xs [overflow-wrap:anywhere]">
-              <span className="font-semibold">{statusLabel}</span>
-              {offlineSince ? (
-                <span className="text-muted-foreground" title={offlineSince.title}>
-                  {" "}
-                  · {offlineSince.label}
-                </span>
-              ) : null}
-              .{" "}
-              <span className="text-muted-foreground">
-                {offlineReason ?? "Jenkins reported this node as offline."}
-              </span>
-            </div>
-          </div>
+          <OfflineBanner
+            statusClass={statusClass}
+            statusLabel={statusLabel}
+            offlineReason={offlineReason}
+            offlineSinceMs={offlineSinceMs}
+          />
         ) : null}
 
         <ExecutorUtilizationSummary
@@ -287,5 +260,46 @@ function MetaItem({
       ) : null}
       {children}
     </span>
+  );
+}
+
+function OfflineBanner({
+  statusClass,
+  statusLabel,
+  offlineReason,
+  offlineSinceMs
+}: Pick<NodeDetailsHeroProps, "statusClass" | "statusLabel" | "offlineReason" | "offlineSinceMs">) {
+  const bannerTone =
+    statusClass === "offline" || statusClass === "temporary"
+      ? OFFLINE_BANNER_TONES[statusClass]
+      : OFFLINE_BANNER_TONES.offline;
+  const offlineSince = formatOfflineSince(offlineSinceMs);
+
+  return (
+    <div
+      role="status"
+      className={cn(
+        "flex items-start gap-2 rounded-lg border px-3 py-2 shadow-xs",
+        bannerTone.container
+      )}
+    >
+      <AlertTriangleIcon
+        className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", bannerTone.icon)}
+        aria-hidden="true"
+      />
+      <div className="min-w-0 text-xs [overflow-wrap:anywhere]">
+        <span className="font-semibold">{statusLabel}</span>
+        {offlineSince ? (
+          <span className="text-muted-foreground" title={offlineSince.title}>
+            {" "}
+            · {offlineSince.label}
+          </span>
+        ) : null}
+        .{" "}
+        <span className="text-muted-foreground">
+          {offlineReason ?? "Jenkins reported this node as offline."}
+        </span>
+      </div>
+    </div>
   );
 }

@@ -7,7 +7,9 @@ import {
   normalizeBuildDetailsPanelUiState
 } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 import {
+  type BuildDetailsTabSelection,
   hasNewPendingInputs,
+  reconcileBuildDetailsTabSelection,
   resolveBuildDetailsSelectedTab,
   shouldFallBackFromSelectedTab
 } from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsTabsModel";
@@ -67,6 +69,47 @@ describe("BuildDetailsTabs", () => {
     assert.equal(hasNewPendingInputs(new Set(["a"]), ["a"]), false);
     assert.equal(hasNewPendingInputs(new Set(["a"]), ["a", "b"]), true);
     assert.equal(hasNewPendingInputs(new Set(["a"]), []), false);
+  });
+
+  it("selects new inputs until the user chooses a tab and requests focus when Inputs disappears", () => {
+    const initial: BuildDetailsTabSelection = {
+      tab: "overview",
+      wasAvailable: true,
+      userChoseTab: false,
+      seenInputIds: [],
+      persist: false
+    };
+    const withInputs = {
+      availableTabs: ["overview", "inputs", "console"],
+      defaultTab: "inputs",
+      detailsLoaded: true,
+      pendingInputIds: ["approval"]
+    } as const;
+    const automatic = reconcileBuildDetailsTabSelection(initial, withInputs);
+    assert.equal(automatic.tab, "inputs");
+    assert.equal(automatic.persist, true);
+    assert.equal(
+      reconcileBuildDetailsTabSelection(automatic, {
+        ...withInputs,
+        pendingInputIds: ["approval"]
+      }),
+      automatic
+    );
+
+    const explicit = reconcileBuildDetailsTabSelection(
+      { ...initial, tab: "console", userChoseTab: true },
+      withInputs
+    );
+    assert.equal(explicit.tab, "console");
+
+    const afterApproval = reconcileBuildDetailsTabSelection(automatic, {
+      availableTabs: ["overview", "console"],
+      defaultTab: "overview",
+      detailsLoaded: true,
+      pendingInputIds: []
+    });
+    assert.equal(afterApproval.tab, "overview");
+    assert.deepEqual(afterApproval.focusRequest, { tab: "overview" });
   });
 
   it("replaces a restored tab that is still unavailable once details have loaded", () => {

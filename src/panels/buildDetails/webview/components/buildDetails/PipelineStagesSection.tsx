@@ -12,7 +12,7 @@ import {
 } from "./pipelineStages/pipelineStagesUtils";
 import { StageNode } from "./pipelineStages/StageNode";
 
-const { useEffect, useMemo, useState } = React;
+const { useMemo, useState } = React;
 export function PipelineStagesSection({
   stages,
   expandRequest,
@@ -31,20 +31,23 @@ export function PipelineStagesSection({
   const stageIds = useMemo(() => stages.map((stage, index) => getStageId(stage, index)), [stages]);
   const stageIdSet = useMemo(() => new Set(stageIds), [stageIds]);
 
-  useEffect(() => {
-    setOpenStages((prev) => prev.filter((id) => stageIdSet.has(id)));
-    setShowAllStages((prev) => pruneStageFlags(prev, stageIdSet));
-  }, [stageIdSet]);
+  const [previousStageIds, setPreviousStageIds] = useState(stageIdSet);
+  if (previousStageIds !== stageIdSet) {
+    setPreviousStageIds(stageIdSet);
+    setOpenStages(openStages.filter((id) => stageIdSet.has(id)));
+    setShowAllStages(pruneStageFlags(showAllStages, stageIdSet));
+  }
 
   const expandedStageId =
     expandRequest && stageIdSet.has(expandRequest.stageKey) ? expandRequest.stageKey : undefined;
-  const expandRequestId = expandRequest?.id;
-  useEffect(() => {
-    if (!expandedStageId || expandRequestId === undefined) {
-      return;
+  const requestId = expandRequest?.id;
+  const [previousRequest, setPreviousRequest] = useState<{ stageId?: string; id?: number }>({});
+  if (previousRequest.stageId !== expandedStageId || previousRequest.id !== requestId) {
+    setPreviousRequest({ stageId: expandedStageId, id: requestId });
+    if (expandedStageId && requestId !== undefined) {
+      setOpenStages((open) => (open.includes(expandedStageId) ? open : [...open, expandedStageId]));
     }
-    setOpenStages((prev) => (prev.includes(expandedStageId) ? prev : [...prev, expandedStageId]));
-  }, [expandedStageId, expandRequestId]);
+  }
 
   return (
     <Accordion type="multiple" value={openStages} onValueChange={setOpenStages}>

@@ -2,18 +2,17 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { analyzeTests, normalizeHistoryReport } from "../src/history/HistoryAnalysis";
+import { mergeBuildDetailsPanelState } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
 import {
   emptyHistory,
   HISTORY_FILTERS,
   HISTORY_WINDOW_SIZES,
-  type HistoryViewModel,
   historyJobDisplayName,
   isHistoryAction,
-  normalizeHistoryUi
+  normalizeHistoryUi,
+  type HistoryViewModel
 } from "../src/panels/jobHistory/shared/HistoryContracts";
-import { HistoryContext, historyReducer } from "../src/panels/jobHistory/webview/HistoryContext";
-import { HistoryTestsSection } from "../src/panels/jobHistory/webview/HistoryTestsSection";
-import { HistoryView } from "../src/panels/jobHistory/webview/HistoryView";
+import { HistoryContext, historyReducer } from "../src/panels/jobHistory/webview/historyModel";
 import {
   compareBuildsLabel,
   failureHistorySummary,
@@ -24,7 +23,8 @@ import {
   observationGaps,
   outcomePresentation
 } from "../src/panels/jobHistory/webview/historyPresentation";
-import { mergeBuildDetailsPanelState } from "../src/panels/buildDetails/shared/BuildDetailsPanelWebviewState";
+import { HistoryTestsSection } from "../src/panels/jobHistory/webview/HistoryTestsSection";
+import { HistoryView } from "../src/panels/jobHistory/webview/HistoryView";
 
 describe("history webview contract", () => {
   it("ignores unrelated and stale messages and rejects malformed actions", () => {
@@ -449,7 +449,7 @@ describe("history test ordering and labels", () => {
         })
       });
       try {
-        const context = await import("../src/panels/jobHistory/webview/HistoryContext");
+        const context = await import("../src/panels/jobHistory/webview/historyModel");
         const view = await import("../src/panels/jobHistory/webview/HistoryView");
         return renderToStaticMarkup(
           createElement(

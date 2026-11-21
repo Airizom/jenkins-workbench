@@ -155,18 +155,16 @@ function normalizeBuiltIns(
     return BROAD_CORE_DIAGNOSTIC_PARSERS;
   }
 
-  const result: BuiltInDiagnosticParserId[] = [];
+  const result = new Set<BuiltInDiagnosticParserId>();
   for (let index = 0; index < value.length; index += 1) {
     const candidate = value[index];
     if (!isBuiltInParserId(candidate)) {
       addIssue(issues, `${issuePath}[${index}]`, `Unknown built-in parser '${String(candidate)}'.`);
       continue;
     }
-    if (!result.includes(candidate)) {
-      result.push(candidate);
-    }
+    result.add(candidate);
   }
-  return result;
+  return [...result];
 }
 
 function freezeProfile(profile: NormalizedDiagnosticProfile): NormalizedDiagnosticProfile {

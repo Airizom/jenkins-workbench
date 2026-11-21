@@ -28,6 +28,7 @@ import type {
   AdoptionResult,
   EnvironmentAdoptionService
 } from "../../services/EnvironmentAdoptionService";
+import { runWithConcurrency } from "../../shared/concurrency";
 import {
   isDeclaredEnvironmentId,
   toComparableEnvironmentUrl,
@@ -213,8 +214,11 @@ async function buildExportDeclarations(
 
   const declarations: EnvironmentDeclaration[] = [];
   const skipped: Skipped[] = [];
-  for (const environment of environments) {
-    const authHint = await resolveShareableAuthHint(store, environment);
+  const authHints = await runWithConcurrency(environments, 4, (environment) =>
+    resolveShareableAuthHint(store, environment)
+  );
+  for (const [index, environment] of environments.entries()) {
+    const authHint = authHints[index];
     const { declaration, problem } = buildShareableDeclaration(
       environment,
       slugs.get(environment) ?? toSlugCandidate(environment),
@@ -414,6 +418,7 @@ async function confirmImportedInsecureTls(
     }
     const allowInsecureTls =
       isHttps(declaration.url) &&
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Show one TLS confirmation at a time.
       (await promptTlsCertificateValidation(undefined, {
         placeHolder: `TLS certificate validation for ${declaration.name ?? declaration.id} (the file turns verification off)`
       })) === true;
@@ -444,6 +449,7 @@ async function importLocally(
       continue;
     }
 
+    // eslint-disable-next-line react-doctor/async-await-in-loop -- Save each import before prompting for the next environment.
     const environment = await buildLocalEnvironment(declaration);
     try {
       await store.addEnvironment("global", environment);
@@ -524,6 +530,7 @@ async function showImportSummary(
     dependencies.log?.show(true);
   } else if (choice === SIGN_IN_NOW) {
     for (const environment of needsSignIn) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- The VS Code sign-in commands may each display a prompt.
       await vscode.commands.executeCommand(
         "jenkinsWorkbench.signInToEnvironment",
         toJenkinsEnvironmentRef(environment)
@@ -562,17 +569,15 @@ async function findEnvironmentsNeedingSignIn(
   store: Pick<JenkinsEnvironmentStore, "getSignInRequirement">,
   environments: readonly EnvironmentWithScope[]
 ): Promise<EnvironmentWithScope[]> {
-  const required: EnvironmentWithScope[] = [];
-  for (const environment of environments) {
+  const needsSignIn = await runWithConcurrency(environments, 4, async (environment) => {
     try {
-      if ((await store.getSignInRequirement(environment.scope, environment.id)) !== "none") {
-        required.push(environment);
-      }
+      return (await store.getSignInRequirement(environment.scope, environment.id)) !== "none";
     } catch {
       // Unknown requirement: leave it to the tree's sign-in prompt.
+      return false;
     }
-  }
-  return required;
+  });
+  return environments.filter((_, index) => needsSignIn[index]);
 }
 
 // ---------------------------------------------------------------------------------------------

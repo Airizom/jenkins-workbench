@@ -11,7 +11,7 @@ import {
 } from "../../../../../shared/webview/components/ui/card";
 import { FileIcon } from "../../../../../shared/webview/icons";
 import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/BuildDetailsContracts";
-import { formatQualityGateBadgeLabel } from "../testResults/CoverageSection";
+import { formatQualityGateBadgeLabel } from "../testResults/qualityGateBadgeLabel";
 
 type CoverageGlanceCardProps = {
   coverageState: BuildDetailsCoverageStateViewModel;

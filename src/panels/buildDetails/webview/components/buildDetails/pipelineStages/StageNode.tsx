@@ -19,9 +19,9 @@ import type {
 import { BranchCard } from "./BranchCard";
 import { EmptyStepsMessage } from "./EmptyStepsMessage";
 import { getStageIcon } from "./PipelineStageIcons";
-import { formatCount } from "./pipelineStagesUtils";
 import { StepsList } from "./StepsList";
 import { StepsVisibilityToggle } from "./StepsVisibilityToggle";
+import { describeStageMeta, isStageNotRun } from "./stageMeta";
 export function StageNode({
   stageId,
   stage,
@@ -39,20 +39,9 @@ export function StageNode({
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onShowAllChange: (next: boolean) => void;
 }) {
-  const hasBranches = stage.parallelBranches.length > 0;
-  const hasBranchSteps = stage.parallelBranches.some((branch) => branch.hasSteps);
-  const hasDirectSteps = stage.stepsAll.length > 0;
-  const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
   const stageIcon = getStageIcon(stage.statusClass);
   const nodeStyle = resolveBuildResultStageNodeClass(stage.statusClass);
   const connectorColor = resolveBuildResultStyle(stage.statusClass).connectorColor;
-  const stageName = stage.name;
-  const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
-  const stageLogTarget = stage.logTarget;
-  // One "failed steps only" filter per stage covers its direct and branch
-  // steps, so it sits in the stage toolbar rather than on either list.
-  const hasAnySteps = hasDirectSteps || hasBranchSteps;
-  const hasStageToolbar = Boolean(stageLogTarget) || canRestartStage || hasAnySteps;
   const didNotRun = isStageNotRun(stage);
   const stageMeta = describeStageMeta(stage);
 
@@ -104,81 +93,13 @@ export function StageNode({
             </AccordionTrigger>
 
             <AccordionContent>
-              <div className="border-t border-border px-3 py-2.5 space-y-2.5">
-                {hasStageToolbar ? (
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    {hasAnySteps ? (
-                      <div className="mr-auto">
-                        <StepsVisibilityToggle
-                          showAll={showAll}
-                          onShowAllChange={onShowAllChange}
-                        />
-                      </div>
-                    ) : null}
-                    {stageLogTarget ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-caption"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onSelectPipelineLog(stageLogTarget);
-                        }}
-                      >
-                        <TerminalIcon className="mr-1 h-3 w-3" />
-                        Log
-                      </Button>
-                    ) : null}
-                    {canRestartStage ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-6 px-2 text-caption"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRestartStage(stageName);
-                        }}
-                      >
-                        Restart from this stage
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : null}
-                {hasBranches ? (
-                  <div className="space-y-2">
-                    <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
-                      Parallel branches
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {stage.parallelBranches.map((branch) => (
-                        <BranchCard
-                          key={branch.key}
-                          branch={branch}
-                          showAll={showAll}
-                          onSelectPipelineLog={onSelectPipelineLog}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {hasDirectSteps ? (
-                  <div className="space-y-2">
-                    <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
-                      {showAll ? "Steps" : "Failed steps"}
-                    </div>
-                    {steps.length > 0 ? (
-                      <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />
-                    ) : (
-                      <EmptyStepsMessage showAll={showAll} />
-                    )}
-                  </div>
-                ) : null}
-
-                {!hasDirectSteps && !hasBranches ? (
-                  <div className="text-xs text-muted-foreground">No step details available.</div>
-                ) : null}
-              </div>
+              <StageDetails
+                stage={stage}
+                showAll={showAll}
+                onRestartStage={onRestartStage}
+                onSelectPipelineLog={onSelectPipelineLog}
+                onShowAllChange={onShowAllChange}
+              />
             </AccordionContent>
           </div>
         </AccordionItem>
@@ -187,17 +108,108 @@ export function StageNode({
   );
 }
 
-// Jenkins reports skipped stages as neutral with a zero duration; "0ms" reads
-// as a real (suspiciously fast) run, so those stages are labelled as not run.
-export function isStageNotRun(stage: PipelineStageViewModel): boolean {
-  return stage.statusClass === "neutral" && stage.durationMs === 0;
+type StageDetailsProps = {
+  stage: PipelineStageViewModel;
+  showAll: boolean;
+  onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
+  onShowAllChange: (next: boolean) => void;
+};
+
+function StageDetails(props: StageDetailsProps) {
+  const { stage, showAll, onSelectPipelineLog } = props;
+  const hasBranches = stage.parallelBranches.length > 0;
+  const hasDirectSteps = stage.stepsAll.length > 0;
+  const steps = showAll ? stage.stepsAll : stage.stepsFailedOnly;
+  return (
+    <div className="border-t border-border px-3 py-2.5 space-y-2.5">
+      <StageToolbar {...props} />
+      {hasBranches ? (
+        <div className="space-y-2">
+          <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
+            Parallel branches
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {stage.parallelBranches.map((branch) => (
+              <BranchCard
+                key={branch.key}
+                branch={branch}
+                showAll={showAll}
+                onSelectPipelineLog={onSelectPipelineLog}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {hasDirectSteps ? (
+        <div className="space-y-2">
+          <div className="text-caption font-medium uppercase tracking-wide text-muted-foreground">
+            {showAll ? "Steps" : "Failed steps"}
+          </div>
+          {steps.length > 0 ? (
+            <StepsList steps={steps} onSelectPipelineLog={onSelectPipelineLog} />
+          ) : (
+            <EmptyStepsMessage showAll={showAll} />
+          )}
+        </div>
+      ) : null}
+
+      {!hasDirectSteps && !hasBranches ? (
+        <div className="text-xs text-muted-foreground">No step details available.</div>
+      ) : null}
+    </div>
+  );
 }
 
-export function describeStageMeta(stage: PipelineStageViewModel): string {
-  const parts = [isStageNotRun(stage) ? "Did not run" : stage.durationLabel || "Unknown"];
-  const branchCount = stage.parallelBranches.length;
-  if (branchCount > 0) {
-    parts.push(formatCount(branchCount, "parallel branch", "parallel branches"));
-  }
-  return parts.join(" · ");
+function StageToolbar({
+  stage,
+  showAll,
+  onRestartStage,
+  onSelectPipelineLog,
+  onShowAllChange
+}: StageDetailsProps) {
+  const stageName = stage.name;
+  const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
+  const stageLogTarget = stage.logTarget;
+  // The filter applies to both direct and branch steps.
+  const hasAnySteps =
+    stage.stepsAll.length > 0 || stage.parallelBranches.some((branch) => branch.hasSteps);
+  const hasStageToolbar = Boolean(stageLogTarget) || canRestartStage || hasAnySteps;
+  return hasStageToolbar ? (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {hasAnySteps ? (
+        <div className="mr-auto">
+          <StepsVisibilityToggle showAll={showAll} onShowAllChange={onShowAllChange} />
+        </div>
+      ) : null}
+      {stageLogTarget ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-caption"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelectPipelineLog(stageLogTarget);
+          }}
+        >
+          <TerminalIcon className="mr-1 h-3 w-3" />
+          Log
+        </Button>
+      ) : null}
+      {canRestartStage ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-caption"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRestartStage(stageName);
+          }}
+        >
+          Restart from this stage
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
 }

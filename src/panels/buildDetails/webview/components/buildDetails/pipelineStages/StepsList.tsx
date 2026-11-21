@@ -1,4 +1,4 @@
-import { getResultBadgeClass } from "../../../../../shared/webview/components/ResultBadge";
+import { getResultBadgeClass } from "../../../../../shared/webview/components/resultBadgeClass";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import {
   Tooltip,

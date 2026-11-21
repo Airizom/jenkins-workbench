@@ -10,6 +10,7 @@ export function useMediaQuery(query: string): boolean {
         return () => undefined;
       }
       const list = window.matchMedia(query);
+      // eslint-disable-next-line react-doctor/effect-needs-cleanup -- useSyncExternalStore calls the unsubscribe function returned below.
       list.addEventListener("change", onChange);
       return () => list.removeEventListener("change", onChange);
     },

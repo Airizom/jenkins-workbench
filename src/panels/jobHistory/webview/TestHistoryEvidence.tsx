@@ -7,8 +7,8 @@ import {
   CollapsibleTrigger
 } from "../../shared/webview/components/ui/collapsible";
 import { DisclosureChevron } from "../../shared/webview/components/ui/disclosure-chevron";
-import { HistoryContext } from "./HistoryContext";
 import { TestOutcomeTimeline, useHistoryAction } from "./HistoryOutcomes";
+import { HistoryContext } from "./historyModel";
 
 /** Compact per-test history for Build Details test rows; styles itself (no ancestor classes). */
 export function TestHistoryEvidence({

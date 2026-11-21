@@ -98,6 +98,7 @@ export class TreeExpansionState implements vscode.Disposable {
         continue;
       }
       try {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Restore expansions in order because each reveal can change the visible tree.
         await this.revealForRestore(outcome.element);
         const collapsedElement = this.findNewerCollapsedElement(
           path,

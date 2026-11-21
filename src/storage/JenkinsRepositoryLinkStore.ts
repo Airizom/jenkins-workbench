@@ -178,6 +178,7 @@ export class JenkinsRepositoryLinkStore implements EnvironmentRecordStore {
 
         const count = Object.keys(rebased).length;
         if (count > 0) {
+          // eslint-disable-next-line react-doctor/async-await-in-loop -- Apply each scope update in order and stop if a memento write fails.
           await this.updateLinks(scope, (links) => Object.assign(links, rebased));
           moved += count;
         }
@@ -287,6 +288,7 @@ export class JenkinsRepositoryLinkStore implements EnvironmentRecordStore {
       if (inScope.length === 0) {
         continue;
       }
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Restore scoped links in order and stop if a memento write fails.
       await this.updateLinks(scope, (links) => {
         for (const { key, next } of inScope) {
           if (next) {

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { HistoryProvider } from "../../jobHistory/webview/HistoryContext";
+import { HistoryProvider } from "../../jobHistory/webview/HistoryProvider";
 import { HistoryView } from "../../jobHistory/webview/HistoryView";
 import { PanelInitialLoadingGate } from "../../shared/webview/components/PanelInitialLoadingGate";
 import { Toaster } from "../../shared/webview/components/ui/toaster";
@@ -19,12 +19,10 @@ import {
   buildArtifactActionMessage,
   buildFollowActionMessage
 } from "./buildDetailsWebviewMessages";
-import {
-  BuildDetailsErrors,
-  hasLoadedBuildHeader
-} from "./components/buildDetails/BuildDetailsErrors";
+import { BuildDetailsErrors } from "./components/buildDetails/BuildDetailsErrors";
 import { BuildDetailsScrollToTopButton } from "./components/buildDetails/BuildDetailsScrollToTopButton";
 import { BuildDetailsTabs } from "./components/buildDetails/BuildDetailsTabs";
+import { hasLoadedBuildHeader } from "./components/buildDetails/buildDetailsErrorMode";
 import { BuildStatusHero } from "./components/buildDetails/hero/BuildStatusHero";
 import type { PipelineStageRequest } from "./components/buildDetails/pipelineSectionState";
 import { PipelineStageStrip } from "./components/buildDetails/stageStrip/PipelineStageStrip";

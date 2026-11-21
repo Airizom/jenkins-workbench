@@ -63,6 +63,7 @@ export class TreeActivityChildrenLoader {
         return jobUrlStatePromise;
       };
       for (const group of viewModel.groups) {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Resolve one group at a time so an invalidated tree load can stop scheduling work.
         const children = await this.mapEntriesToTreeItems(
           folder.environment,
           group.items,

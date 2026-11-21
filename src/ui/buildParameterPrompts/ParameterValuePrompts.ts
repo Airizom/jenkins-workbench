@@ -115,15 +115,13 @@ export async function promptParameterValue(
   }
 
   if (parameter.kind === "multiChoice" && parameter.choices?.length) {
-    const defaultValues = resolveMultiDefaultValue(
-      presetValue,
-      parameter.defaultValue,
-      parameter.multiSelectDelimiter
+    const defaultValues = new Set(
+      resolveMultiDefaultValue(presetValue, parameter.defaultValue, parameter.multiSelectDelimiter)
     );
     const picks = await vscode.window.showQuickPick(
       parameter.choices.map((choice) => ({
         label: choice,
-        picked: defaultValues.includes(choice)
+        picked: defaultValues.has(choice)
       })),
       {
         placeHolder: prompt,

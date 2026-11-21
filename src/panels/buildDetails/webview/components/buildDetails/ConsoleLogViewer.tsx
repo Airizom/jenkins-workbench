@@ -278,24 +278,21 @@ function useConsoleAnnouncement({
   note: string;
   finishedAnnouncement?: string;
 }): string {
-  const [announcement, setAnnouncement] = useState("");
-  const previousRef = useRef({ logKey, canFollow, truncated });
-
-  useEffect(() => {
-    const previous = previousRef.current;
-    previousRef.current = { logKey, canFollow, truncated };
+  const [previous, setPrevious] = useState({ logKey, canFollow, truncated, announcement: "" });
+  if (
+    previous.logKey !== logKey ||
+    previous.canFollow !== canFollow ||
+    previous.truncated !== truncated
+  ) {
+    let announcement = previous.announcement;
     if (previous.logKey !== logKey) {
-      setAnnouncement("");
-      return;
+      announcement = "";
+    } else if (previous.canFollow && !canFollow && finishedAnnouncement) {
+      announcement = finishedAnnouncement;
+    } else if (!previous.truncated && truncated && note) {
+      announcement = note;
     }
-    if (previous.canFollow && !canFollow && finishedAnnouncement) {
-      setAnnouncement(finishedAnnouncement);
-      return;
-    }
-    if (!previous.truncated && truncated && note) {
-      setAnnouncement(note);
-    }
-  }, [logKey, canFollow, truncated, note, finishedAnnouncement]);
-
-  return announcement;
+    setPrevious({ logKey, canFollow, truncated, announcement });
+  }
+  return previous.announcement;
 }

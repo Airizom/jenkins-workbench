@@ -111,14 +111,15 @@ export function findDefaultPipelineStage(
   stages: PipelineStageViewModel[],
   isRunning: boolean
 ): PipelineStageViewModel | undefined {
-  const preferredStatuses = isRunning
-    ? ["running", "failure", "unstable"]
-    : ["failure", "unstable"];
-  for (const status of preferredStatuses) {
-    const stage = stages.find((candidate) => candidate.statusClass === status);
-    if (stage) {
-      return stage;
+  const firstByStatus = new Map<string, PipelineStageViewModel>();
+  for (const stage of stages) {
+    if (!firstByStatus.has(stage.statusClass)) {
+      firstByStatus.set(stage.statusClass, stage);
     }
   }
-  return undefined;
+  return (
+    (isRunning ? firstByStatus.get("running") : undefined) ??
+    firstByStatus.get("failure") ??
+    firstByStatus.get("unstable")
+  );
 }

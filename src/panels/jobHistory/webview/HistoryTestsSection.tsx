@@ -329,10 +329,12 @@ export function HistoryTestsSection({
   const detailsHeading = React.useRef<HTMLHeadingElement>(null);
   const focusTop = React.useRef(false);
   const sectionHeading = React.useRef<HTMLSpanElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: These changes reset pagination even though their values are not read by the effect.
-  React.useEffect(() => {
+  const pageScope = JSON.stringify([model.jobUrl, ui.search, ui.filter, ui.sort]);
+  const [previousPageScope, setPreviousPageScope] = React.useState(pageScope);
+  if (previousPageScope !== pageScope) {
+    setPreviousPageScope(pageScope);
     setPage(0);
-  }, [ui.search, ui.filter, ui.sort, model.jobUrl]);
+  }
   // biome-ignore lint/correctness/useExhaustiveDependencies: Focus follows the user's expansion, not re-renders.
   React.useEffect(() => {
     if (!focusDetails.current) return;

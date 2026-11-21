@@ -1,6 +1,5 @@
 import * as React from "react";
 import { isPlainRecord } from "../../../shared/runtimeGuards";
-import { postVsCodeMessage } from "../../shared/webview/lib/vscodeApi";
 import {
   emptyHistory,
   HISTORY_STATUSES,
@@ -9,6 +8,7 @@ import {
 } from "../shared/HistoryContracts";
 
 export const HistoryContext = React.createContext<HistoryViewModel>(emptyHistory());
+
 export function historyReducer(state: HistoryViewModel, value: unknown): HistoryViewModel {
   if (
     !isPlainRecord(value) ||
@@ -25,14 +25,4 @@ export function historyReducer(state: HistoryViewModel, value: unknown): History
   )
     return state;
   return value as unknown as HistoryViewModel;
-}
-export function HistoryProvider({ children }: { children: React.ReactNode }) {
-  const [model, dispatch] = React.useReducer(historyReducer, undefined, emptyHistory);
-  React.useEffect(() => {
-    const receive = (event: MessageEvent) => dispatch(event.data);
-    window.addEventListener("message", receive);
-    postVsCodeMessage({ type: "historyAction", action: "ready", revision: 0 });
-    return () => window.removeEventListener("message", receive);
-  }, []);
-  return <HistoryContext.Provider value={model}>{children}</HistoryContext.Provider>;
 }

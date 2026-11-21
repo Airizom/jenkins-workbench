@@ -219,6 +219,7 @@ export function useNodeCapacityExecutorLoading(
   const [refreshGeneration, setRefreshGeneration] = useState(0);
   const requestedExecutorKeys = useRef(new Map<string, string>());
   useEffect(() => {
+    // eslint-disable-next-line react-doctor/no-pass-data-to-parent -- Send a host request when a new snapshot needs executor details for expanded nodes.
     requestExecutors(
       planExecutorLoads(expandedNodes, requestedExecutorKeys.current, refreshGeneration, snapshotId)
     );

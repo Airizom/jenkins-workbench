@@ -11,16 +11,9 @@ import { ToneBadge } from "../../../../../shared/webview/components/ToneBadge";
 import { ToneMetricCard } from "../../../../../shared/webview/components/ToneMetricCard";
 import { FileIcon } from "../../../../../shared/webview/icons";
 import type { BuildDetailsCoverageStateViewModel } from "../../../../shared/BuildDetailsContracts";
+import { formatQualityGateBadgeLabel } from "./qualityGateBadgeLabel";
 
 const COVERAGE_ICON = <FileIcon className="h-4 w-4" />;
-
-/**
- * The overall gate result sits beside the build's own result badge, so it is
- * labelled as a gate outcome rather than a second build status.
- */
-export function formatQualityGateBadgeLabel(statusLabel: string): string {
-  return `Quality gate: ${statusLabel}`;
-}
 
 function describeQualityGatesPassed(
   qualityGates: BuildDetailsCoverageStateViewModel["qualityGates"]

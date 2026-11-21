@@ -70,7 +70,9 @@ export function RelatedBuildsSection({
   const [expanded, setExpanded] = React.useState(false);
   const expandedRef = React.useRef(false);
   const callbackRef = React.useRef(onExpandedChange);
-  callbackRef.current = onExpandedChange;
+  React.useLayoutEffect(() => {
+    callbackRef.current = onExpandedChange;
+  }, [onExpandedChange]);
   // Switching tabs unmounts the overview. End any active search just as a collapse does.
   React.useEffect(
     () => () => {

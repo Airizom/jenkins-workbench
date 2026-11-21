@@ -77,7 +77,13 @@ async function trigger(path, parameters) {
 async function triggerAndWait(path, parameters) {
   const number = await trigger(path, parameters);
   const build = await waitForBuild(path, number);
-  console.log(`  ${decodeURIComponent(path)} #${build.number} ${build.result}`);
+  let label = path;
+  try {
+    label = decodeURIComponent(path);
+  } catch {
+    // The encoded path still identifies the build if the label cannot be decoded.
+  }
+  console.log(`  ${label} #${build.number} ${build.result}`);
 }
 
 function resetState() {

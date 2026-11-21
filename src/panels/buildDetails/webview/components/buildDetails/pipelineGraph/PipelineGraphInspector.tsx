@@ -18,7 +18,7 @@ import { formatCount } from "../pipelineStages/pipelineStagesUtils";
 import { StepsList } from "../pipelineStages/StepsList";
 import { StepsVisibilityToggle } from "../pipelineStages/StepsVisibilityToggle";
 
-const { useEffect, useState } = React;
+const { useState } = React;
 export function PipelineGraphInspector({
   stage,
   onRestartStage,
@@ -28,12 +28,6 @@ export function PipelineGraphInspector({
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
 }) {
-  const [showAllSteps, setShowAllSteps] = useState(false);
-
-  useEffect(() => {
-    setShowAllSteps(false);
-  }, [stage?.key]);
-
   if (!stage) {
     return (
       <Card className="h-full">
@@ -47,52 +41,33 @@ export function PipelineGraphInspector({
     );
   }
 
-  const stageName = stage.name;
-  const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
+  return (
+    <SelectedStageInspector
+      key={stage.key}
+      stage={stage}
+      onRestartStage={onRestartStage}
+      onSelectPipelineLog={onSelectPipelineLog}
+    />
+  );
+}
+
+type SelectedStageInspectorProps = {
+  stage: PipelineStageViewModel;
+  onRestartStage: (stageName: string) => void;
+  onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
+};
+
+function SelectedStageInspector(props: SelectedStageInspectorProps) {
+  const { stage, onSelectPipelineLog } = props;
+  const [showAllSteps, setShowAllSteps] = useState(false);
   const steps = showAllSteps ? stage.stepsAll : stage.stepsFailedOnly;
   const hasDirectSteps = stage.stepsAll.length > 0;
   const hasParallelBranches = stage.parallelBranches.length > 0;
   const hasBranchSteps = stage.parallelBranches.some((branch) => branch.hasSteps);
-  const stageLogTarget = stage.logTarget;
 
   return (
     <Card className="h-full">
-      <CardHeader className="gap-3 border-b border-border pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-              Stage inspector
-            </div>
-            <CardTitle className="text-base break-words">{stage.name || "Stage"}</CardTitle>
-            <div className="text-xs text-muted-foreground">{stage.durationLabel || "Unknown"}</div>
-          </div>
-          <ResultBadge label={stage.statusLabel || "Unknown"} status={stage.statusClass} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
-          <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
-            {formatCount(stage.parallelBranches.length, "branch", "branches")}
-          </span>
-          <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
-            {formatCount(stage.stepsAll.length, "direct step")}
-          </span>
-          {canRestartStage ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={() => onRestartStage(stageName)}
-            >
-              Restart from this stage
-            </Button>
-          ) : null}
-          {stageLogTarget ? (
-            <Button variant="outline" size="sm" onClick={() => onSelectPipelineLog(stageLogTarget)}>
-              <TerminalIcon className="mr-1 h-3.5 w-3.5" />
-              Log
-            </Button>
-          ) : null}
-        </div>
-      </CardHeader>
+      <StageInspectorHeader {...props} />
 
       <CardContent className="space-y-4 pt-4">
         {hasParallelBranches ? (
@@ -141,5 +116,53 @@ export function PipelineGraphInspector({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function StageInspectorHeader({
+  stage,
+  onRestartStage,
+  onSelectPipelineLog
+}: SelectedStageInspectorProps) {
+  const stageName = stage.name;
+  const canRestartStage = stage.canRestartFromStage && stageName.trim().length > 0;
+  const stageLogTarget = stage.logTarget;
+  return (
+    <CardHeader className="gap-3 border-b border-border pb-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+            Stage inspector
+          </div>
+          <CardTitle className="text-base break-words">{stage.name || "Stage"}</CardTitle>
+          <div className="text-xs text-muted-foreground">{stage.durationLabel || "Unknown"}</div>
+        </div>
+        <ResultBadge label={stage.statusLabel || "Unknown"} status={stage.statusClass} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
+        <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
+          {formatCount(stage.parallelBranches.length, "branch", "branches")}
+        </span>
+        <span className="rounded-full border border-mutedBorder bg-muted-soft px-2 py-1">
+          {formatCount(stage.stepsAll.length, "direct step")}
+        </span>
+        {canRestartStage ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            onClick={() => onRestartStage(stageName)}
+          >
+            Restart from this stage
+          </Button>
+        ) : null}
+        {stageLogTarget ? (
+          <Button variant="outline" size="sm" onClick={() => onSelectPipelineLog(stageLogTarget)}>
+            <TerminalIcon className="mr-1 h-3.5 w-3.5" />
+            Log
+          </Button>
+        ) : null}
+      </div>
+    </CardHeader>
   );
 }

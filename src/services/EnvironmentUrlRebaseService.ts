@@ -242,6 +242,7 @@ export class EnvironmentUrlRebaseService implements EnvironmentRecordStore {
       ) {
         continue;
       }
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Each rebase can update the same persisted records used by the next environment.
       const failures = await this.rebaseAndRecord(environment);
       if (failures.length > 0) {
         console.warn(

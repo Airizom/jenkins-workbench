@@ -515,9 +515,12 @@ export class JenkinsBuildDataOperations {
   ): Promise<void> {
     try {
       const cache = this.context.getCache();
-      for (const kind of BUILD_DETAILS_CACHE_KINDS) {
-        cache.delete(await this.context.buildCacheKey(environment, kind, buildUrl));
-      }
+      await Promise.all(
+        BUILD_DETAILS_CACHE_KINDS.map(async (kind) => {
+          const key = await this.context.buildCacheKey(environment, kind, buildUrl);
+          cache.delete(key);
+        })
+      );
     } catch {
       // Cache cleanup is best effort; callers refresh the environment afterwards.
     }

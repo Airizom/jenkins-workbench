@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { resolveIconClassName } from "../src/panels/shared/webview/icons/IconBase";
+import { resolveIconClassName } from "../src/panels/shared/webview/icons/iconClassName";
 
 describe("resolveIconClassName", () => {
   it("keeps default icon colors when callers add text size classes", () => {

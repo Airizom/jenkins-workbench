@@ -610,13 +610,7 @@ export class BuildDetailsPanelState {
     restartableStages: string[],
     availability: PipelineRestartAvailability
   ): boolean {
-    const normalizedStages: string[] = [];
-    for (const stage of restartableStages) {
-      if (!stage.trim() || normalizedStages.includes(stage)) {
-        continue;
-      }
-      normalizedStages.push(stage);
-    }
+    const normalizedStages = [...new Set(restartableStages.filter((stage) => stage.trim()))];
     const availabilityChanged = this.pipelineRestartAvailabilityValue !== availability;
     const restartEnabledChanged = this.pipelineRestartEnabledValue !== restartEnabled;
     const stagesChanged = !areStringArraysEqual(

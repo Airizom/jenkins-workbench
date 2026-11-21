@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import { Children, createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "vitest";
-import {
-  describePendingInputParameter,
-  PendingInputsSection
-} from "../src/panels/buildDetails/webview/components/buildDetails/PendingInputsSection";
 import type { PendingInputViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import { PendingInputsSection } from "../src/panels/buildDetails/webview/components/buildDetails/PendingInputsSection";
+import { describePendingInputParameter } from "../src/panels/buildDetails/webview/components/buildDetails/pendingInputParameterDescription";
 import type { PendingInputProcessingAction } from "../src/panels/buildDetails/webview/state/buildDetailsState";
 
 const BROWSER_APPROVE_TITLE = "Open the Jenkins input page to enter these values and approve";

@@ -18,7 +18,11 @@ import { resolve } from "node:path";
 const port = process.env.SHOWCASE_CDP_PORT ?? "9333";
 
 async function connectWorkbench() {
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+  const response = await fetch(`http://127.0.0.1:${port}/json`);
+  if (!response.ok) {
+    throw new Error(`Could not list Chrome targets (HTTP ${response.status}).`);
+  }
+  const targets = await response.json();
   const workbench = targets.find(
     (target) => target.type === "page" && target.url.includes("workbench.html")
   );
@@ -98,6 +102,7 @@ async function pressKey(key, modifierList = "") {
 
 async function click(x, y, button = "left") {
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+    // eslint-disable-next-line react-doctor/async-await-in-loop -- CDP must receive move, press, and release in that order.
     await page.send("Input.dispatchMouseEvent", { type, x, y, button, clickCount: 1 });
   }
 }
@@ -149,6 +154,7 @@ switch (command) {
     for (let step = 1; step <= 10; step += 1) {
       const x = x1 + ((x2 - x1) * step) / 10;
       const y = y1 + ((y2 - y1) * step) / 10;
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- The drag advances in order and keeps each intermediate pointer position.
       await page.send("Input.dispatchMouseEvent", {
         type: "mouseMoved",
         x,

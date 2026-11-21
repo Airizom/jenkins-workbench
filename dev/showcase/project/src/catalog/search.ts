@@ -22,10 +22,11 @@ function tokenize(text: string): string[] {
 export function score(product: Product, query: string): number {
   const terms = tokenize(query);
   const title = tokenize(product.title);
-  const tags = product.tags.map((tag) => tag.toLowerCase());
+  const titleWords = new Set(title);
+  const tags = new Set(product.tags.map((tag) => tag.toLowerCase()));
   return terms.reduce((total, term) => {
-    if (title.includes(term)) return total + 3;
-    if (tags.includes(term)) return total + 2;
+    if (titleWords.has(term)) return total + 3;
+    if (tags.has(term)) return total + 2;
     if (title.some((word) => word.startsWith(term))) return total + 1;
     return total;
   }, 0);

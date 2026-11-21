@@ -95,6 +95,7 @@ export class DeclaredEnvironmentStateStore implements DeclaredEnvironmentStateRe
         if (inScope.length === 0) {
           continue;
         }
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Process scope writes in order and stop if persistence fails.
         await this.mutate(scope, (state) => {
           let changed = false;
           for (const environment of inScope) {

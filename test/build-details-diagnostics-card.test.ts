@@ -6,11 +6,11 @@ import {
   type BuildDiagnosticsViewModel,
   EMPTY_BUILD_DIAGNOSTICS
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import { BuildFailureDiagnosticsCard } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureDiagnosticsCard";
 import {
-  BuildFailureDiagnosticsCard,
   countHiddenDiagnostics,
   describeBuildDiagnostics
-} from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureDiagnosticsCard";
+} from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/buildDiagnosticsDescription";
 
 function renderCard(diagnostics: BuildDiagnosticsViewModel): string {
   return renderToStaticMarkup(

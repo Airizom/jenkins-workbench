@@ -191,6 +191,7 @@ export class CoverageDecorationService implements vscode.Disposable {
     const editorDecorations = new Map<string, DecorationRanges>();
 
     for (const file of context.modifiedFiles) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Keep workspace searches serial while checking whether the generation is still current.
       const targetUri = await this.resolveWorkspaceFile(file.path, generation);
       if (!targetUri || generation !== this.resolveGeneration) {
         continue;
@@ -359,6 +360,7 @@ export class CoverageDecorationService implements vscode.Disposable {
   ): Promise<vscode.Uri | undefined> {
     const matches: vscode.Uri[] = [];
     for (const root of repositoryRoots) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Stop searching roots once the aggregate result budget is reached.
       const found = await vscode.workspace.findFiles(
         new vscode.RelativePattern(root, `**/${relativePath}`),
         undefined,

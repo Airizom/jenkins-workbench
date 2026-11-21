@@ -102,6 +102,7 @@ class ConsoleComparisonReader {
       if (remaining <= 0) {
         return;
       }
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- The next console offset and byte budget depend on the current chunk.
       await this.appendNextChunk(remaining);
     }
   }
@@ -193,8 +194,10 @@ async function compareConsoleReaders(
   let sharedTail = "";
 
   while (true) {
-    await baselineReader.ensureBufferWithLimit();
-    await targetReader.ensureBufferWithLimit();
+    await Promise.all([
+      baselineReader.ensureBufferWithLimit(),
+      targetReader.ensureBufferWithLimit()
+    ]);
 
     if (baselineReader.buffer.length === 0 && targetReader.buffer.length === 0) {
       if (

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { PipelineStageViewModel } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
+import { formatCount } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils";
 import {
   describeStageMeta,
   isStageNotRun
-} from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode";
-import { formatCount } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/pipelineStagesUtils";
+} from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/stageMeta";
 
 function stage(overrides: Partial<PipelineStageViewModel> = {}): PipelineStageViewModel {
   return {

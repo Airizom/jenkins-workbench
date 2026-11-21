@@ -17,7 +17,7 @@ import { cn } from "../../../../../shared/webview/lib/utils";
 import type { BuildTestCaseViewModel } from "../../../../shared/BuildDetailsContracts";
 import { hasTestDetails, resolveFailureBlocks } from "./testResultsUtils";
 
-const { memo, useEffect, useState } = React;
+const { memo, useState } = React;
 
 function TestResultRowHeaderContent({
   failureHistoryLabel,
@@ -90,12 +90,13 @@ export function TestResultRow({
   const borderClass = resolveStatusBorderClass(testStatusToVisualTone(item.status));
   const failureBlocks = resolveFailureBlocks(item.errorDetails, item.errorStackTrace);
 
-  useEffect(() => {
-    if (!initialOpen) {
-      return;
+  const [previousInitialOpen, setPreviousInitialOpen] = useState(initialOpen);
+  if (previousInitialOpen !== initialOpen) {
+    setPreviousInitialOpen(initialOpen);
+    if (initialOpen) {
+      setOpen(true);
     }
-    setOpen(true);
-  }, [initialOpen]);
+  }
 
   const content = (
     <MemoizedTestResultRowHeaderContent

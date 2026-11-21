@@ -107,6 +107,7 @@ export class ReplayDraftEditorCoordinator implements vscode.Disposable {
       if (this.store.getSessionForUri(document.uri)?.sessionId !== session.sessionId) {
         continue;
       }
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Finish each document save before attempting the next or closing any tabs.
       await document.save();
     }
 

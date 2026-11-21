@@ -11,9 +11,8 @@ const { useEffect } = React;
 
 export function PipelineGraphSection({
   stages,
-  selectedStageKey,
+  selectedStageKey: requestedStageKey,
   onSelectStage,
-  onSyncSelectedStage,
   onRestartStage,
   onSelectPipelineLog,
   onGraphError
@@ -22,31 +21,11 @@ export function PipelineGraphSection({
   selectedStageKey?: string;
   /** User selection in the canvas; also opens the stage log. */
   onSelectStage: (stageKey: string | undefined) => void;
-  /** Keeps the selection valid for the current layout without opening logs. */
-  onSyncSelectedStage: (stageKey: string | undefined) => void;
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onGraphError: () => void;
 }) {
   const graphLayout = usePipelineGraphLayout(stages);
-
-  useEffect(() => {
-    if (graphLayout.status !== "ready") {
-      return;
-    }
-
-    const [firstStageKey] = graphLayout.layout.model.orderedStageIds;
-    if (!firstStageKey) {
-      if (selectedStageKey !== undefined) {
-        onSyncSelectedStage(undefined);
-      }
-      return;
-    }
-
-    if (!selectedStageKey || !graphLayout.layout.model.stageById.has(selectedStageKey)) {
-      onSyncSelectedStage(firstStageKey);
-    }
-  }, [graphLayout, onSyncSelectedStage, selectedStageKey]);
 
   useEffect(() => {
     if (graphLayout.status === "error") {
@@ -56,9 +35,12 @@ export function PipelineGraphSection({
 
   const activeLayout =
     graphLayout.status === "ready" ? graphLayout.layout : graphLayout.previousLayout;
-  const selectedStage = selectedStageKey
-    ? activeLayout?.model.stageById.get(selectedStageKey)
-    : undefined;
+  const model = activeLayout?.model;
+  const selectedStageKey =
+    requestedStageKey && model?.stageById.has(requestedStageKey)
+      ? requestedStageKey
+      : model?.orderedStageIds[0];
+  const selectedStage = selectedStageKey ? model?.stageById.get(selectedStageKey) : undefined;
 
   if (!activeLayout) {
     return (

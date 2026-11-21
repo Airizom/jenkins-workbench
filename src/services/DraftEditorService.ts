@@ -62,6 +62,7 @@ export class DraftEditorService {
 
     const orderedUris = orderUris(uris, options?.focusUri);
     for (const [index, uri] of orderedUris.entries()) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Open editors in tab order while preserving focus on the first editor.
       const document = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(document, {
         preview: false,

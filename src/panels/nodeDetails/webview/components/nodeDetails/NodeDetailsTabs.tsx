@@ -1,12 +1,6 @@
 import * as React from "react";
-import {
-  countQueuedWorkItems,
-  type NodeQueuedWorkViewModel
-} from "../../../../../shared/queueWork/QueueWorkContracts";
-import {
-  TabCountBadge,
-  type TabCountTone
-} from "../../../../shared/webview/components/TabCountBadge";
+import { countQueuedWorkItems } from "../../../../../shared/queueWork/QueueWorkContracts";
+import { TabCountBadge } from "../../../../shared/webview/components/TabCountBadge";
 import {
   Tabs,
   TabsContent,
@@ -26,24 +20,9 @@ import { NodeDetailsAdvancedSection } from "./NodeDetailsAdvancedSection";
 import { NodeDetailsExecutorsSection } from "./NodeDetailsExecutorsSection";
 import { NodeDetailsOverviewSection } from "./NodeDetailsOverviewSection";
 import { NodeDetailsQueuedWorkSection } from "./NodeDetailsQueuedWorkSection";
+import { resolveQueueTabTone } from "./queueTabTone";
 
 const { useRef } = React;
-
-/**
- * Waiting work is normal, so the Queue count stays neutral unless an item
- * needs attention: stuck items use the failure tone, blocked ones warning.
- */
-export function resolveQueueTabTone(queuedWork: NodeQueuedWorkViewModel): TabCountTone {
-  const items = [
-    ...queuedWork.matchingQueueItems,
-    ...queuedWork.anyQueueItems,
-    ...queuedWork.selfLabelQueueItems
-  ];
-  if (items.some((item) => item.stuck)) {
-    return "failure";
-  }
-  return items.some((item) => item.blocked) ? "warning" : "neutral";
-}
 
 type NodeDetailsTabsProps = {
   state: NodeDetailsState;

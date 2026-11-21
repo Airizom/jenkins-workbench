@@ -9,7 +9,7 @@ import {
 import { PlayIcon, TerminalIcon, WorkflowIcon } from "../../../../../shared/webview/icons";
 import type { PipelineStageViewModel } from "../../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../../hooks/useBuildDetailsTabs";
-import { hasMetaValue } from "../BuildDetailsMetaFields";
+import { hasMetaValue } from "../buildDetailsMetaValues";
 import { extractConsoleTail, findRunningStages } from "./runningProgressModel";
 
 const CONSOLE_TAIL_LINES = 6;

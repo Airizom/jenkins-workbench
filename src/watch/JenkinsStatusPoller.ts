@@ -164,6 +164,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
     try {
       do {
         this.hasPendingPoll = false;
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Coalesce each poll while its discovery pass is in flight.
         await this.discoverWatchedJobs(environmentPolls);
         if (this.disposed) return;
       } while (this.hasPendingPoll && !this.disposed);
@@ -215,6 +216,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
       const environment = environmentMap.get(`${entry.scope}:${entry.environmentId}`);
       if (!environment) {
         // Hidden or suppressed environments are only out of view; poll them later, never prune.
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Cache stored IDs once per scope and stop on disposal before processing more watches.
         if (await this.isEnvironmentGone(entry, storedIdsByScope)) {
           this.trackStaleEnvironment(staleByScope, entry);
         }
@@ -254,6 +256,7 @@ export class JenkinsStatusPoller implements vscode.Disposable, JenkinsStatusPoll
         if (this.disposed) {
           return false;
         }
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Remove watches serially and stop pruning as soon as the poller is disposed.
         await this.watchStore.removeWatchesForEnvironment(scope, environmentId);
         if (this.disposed) {
           return false;

@@ -172,6 +172,7 @@ export class JenkinsParameterPresetStore implements EnvironmentRecordStore {
         jobs.filter((entry) => entry.environmentId !== environmentId)
       );
       for (const entry of removed) {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Finish deleting the secrets for each job before starting the next deletion.
         await this.deletePresetSecrets(entry.presets);
       }
     });
@@ -289,6 +290,7 @@ export class JenkinsParameterPresetStore implements EnvironmentRecordStore {
           }
           const copies: StoredParameterPreset[] = [];
           for (const preset of incoming) {
+            // eslint-disable-next-line react-doctor/async-await-in-loop -- Record each copied key before attempting the next copy so rollback can remove it.
             const secrets = await this.secrets.copyMappedKeys(preset.secretKeys);
             newlyStoredKeys.push(...secrets.newlyStoredKeys);
             copies.push({
@@ -451,6 +453,7 @@ export class JenkinsParameterPresetStore implements EnvironmentRecordStore {
 
   private async deletePresetSecrets(presets: StoredParameterPreset[]): Promise<void> {
     for (const preset of presets) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Finish each secret deletion before attempting the next preset.
       await this.secrets.deleteMappedKeys(preset.secretKeys);
     }
   }

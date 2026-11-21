@@ -40,8 +40,11 @@ for (const modulePath of [
   }));
 }
 
-const { NodeDetailsTabs, resolveQueueTabTone } = await import(
+const { NodeDetailsTabs } = await import(
   "../src/panels/nodeDetails/webview/components/nodeDetails/NodeDetailsTabs"
+);
+const { resolveQueueTabTone } = await import(
+  "../src/panels/nodeDetails/webview/components/nodeDetails/queueTabTone"
 );
 
 describe("NodeDetailsTabs", () => {

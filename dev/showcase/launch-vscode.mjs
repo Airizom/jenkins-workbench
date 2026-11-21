@@ -41,7 +41,18 @@ function findVsCode() {
 function findVsix() {
   const index = process.argv.indexOf("--vsix");
   if (index !== -1) return resolve(process.argv[index + 1]);
-  const { version } = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+  const manifestPath = join(repoRoot, "package.json");
+  const manifestText = readFileSync(manifestPath, "utf8");
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch (error) {
+    throw new Error(`Invalid JSON in ${manifestPath}.`, { cause: error });
+  }
+  const version = manifest?.version;
+  if (typeof version !== "string" || !version) {
+    throw new Error(`Missing extension version in ${manifestPath}.`);
+  }
   const vsix = join(repoRoot, `jenkins-workbench-${version}.vsix`);
   if (!existsSync(vsix)) {
     throw new Error(

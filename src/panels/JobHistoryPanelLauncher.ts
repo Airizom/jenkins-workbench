@@ -25,17 +25,13 @@ function jobHistoryPanelTitle(jobUrl: string, environmentUrl: string): string {
   return `History: ${historyJobDisplayName(jobUrl, environmentUrl)}`;
 }
 
-function jobHistoryPanelKey(environment: JenkinsEnvironmentRef, jobUrl: string): string {
-  return JSON.stringify([
-    environment.scope,
-    environment.environmentId,
-    ensureTrailingSlash(jobUrl)
-  ]);
+function jobHistoryEnvironmentKey(scope: string, environmentId: string): string {
+  return `${JSON.stringify([scope, environmentId])}:`;
 }
 
-function isPanelKeyForEnvironment(key: string, scope: string, environmentId: string): boolean {
-  const [keyScope, keyEnvironmentId] = JSON.parse(key) as [string, string, string];
-  return keyScope === scope && keyEnvironmentId === environmentId;
+function jobHistoryPanelKey(environment: JenkinsEnvironmentRef, jobUrl: string): string {
+  const environmentKey = jobHistoryEnvironmentKey(environment.scope, environment.environmentId);
+  return environmentKey + ensureTrailingSlash(jobUrl);
 }
 
 export class JobHistoryPanelLauncher implements vscode.Disposable {
@@ -92,12 +88,14 @@ export class JobHistoryPanelLauncher implements vscode.Disposable {
     if (change.kind !== "environment-updated" || (!change.urlChanged && !change.tlsPolicyChanged)) {
       return;
     }
+    const prefix = jobHistoryEnvironmentKey(change.scope, change.environmentId);
     for (const [key, panel] of [...this.panels]) {
-      if (isPanelKeyForEnvironment(key, change.scope, change.environmentId)) {
+      if (key.startsWith(prefix)) {
         panel.dispose();
       }
     }
   }
+
   private attach(
     panel: vscode.WebviewPanel,
     environment: JenkinsEnvironmentRef,

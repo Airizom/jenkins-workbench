@@ -9,11 +9,9 @@ import {
   UserIcon,
   XIcon
 } from "../../../../shared/webview/icons";
-import type {
-  PendingInputParameterViewModel,
-  PendingInputViewModel
-} from "../../../shared/BuildDetailsContracts";
+import type { PendingInputViewModel } from "../../../shared/BuildDetailsContracts";
 import type { PendingInputProcessingAction } from "../../state/buildDetailsState";
+import { describePendingInputParameter } from "./pendingInputParameterDescription";
 
 type ProcessingAction = PendingInputProcessingAction;
 const ACTION_LABELS: Record<ProcessingAction, string> = {
@@ -203,34 +201,4 @@ function describePendingInputParametersNote(input: PendingInputViewModel): strin
     .map((param) => param.name)
     .join(", ");
   return `Approve this input in Jenkins: ${names} can't be entered in VS Code.`;
-}
-
-export function describePendingInputParameter(param: PendingInputParameterViewModel): string {
-  const parts: string[] = [];
-  if (param.description) {
-    parts.push(param.description);
-  }
-  if (param.choices && param.choices.length > 0) {
-    parts.push(`Choices: ${param.choices.join(", ")}`);
-  }
-  const defaultLabel = formatDefaultValue(param.defaultValue);
-  if (defaultLabel) {
-    parts.push(`Default: ${defaultLabel}`);
-  }
-  if (parts.length > 0) {
-    return parts.join(" · ");
-  }
-  return param.requiresBrowser
-    ? "Entered on the Jenkins input page."
-    : "You will be prompted for a value.";
-}
-
-function formatDefaultValue(value: PendingInputParameterViewModel["defaultValue"]): string {
-  if (value === undefined || value === "") {
-    return "";
-  }
-  if (Array.isArray(value)) {
-    return value.join(", ");
-  }
-  return String(value);
 }

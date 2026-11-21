@@ -3,31 +3,10 @@ import { PanelErrorList } from "../../../../shared/webview/components/PanelError
 import { Alert, AlertTitle } from "../../../../shared/webview/components/ui/alert";
 import { Button } from "../../../../shared/webview/components/ui/button";
 import { RefreshIcon } from "../../../../shared/webview/icons";
+import { resolveBuildDetailsErrorMode } from "./buildDetailsErrorMode";
 
 const BLOCKING_ERRORS_TITLE = "Unable to load build details";
 const PARTIAL_ERRORS_TITLE = "Some information couldn't be loaded";
-
-/**
- * "Blocking" only when the build itself never loaded; otherwise errors describe
- * individual sections (pending inputs, console, …) of an otherwise usable panel.
- */
-export function resolveBuildDetailsErrorMode(
-  errors: readonly string[],
-  buildLoaded: boolean
-): "none" | "blocking" | "partial" {
-  if (errors.length === 0) {
-    return "none";
-  }
-  return buildLoaded ? "partial" : "blocking";
-}
-
-/** The header labels stay "Unknown" until Jenkins has returned the build itself. */
-export function hasLoadedBuildHeader(labels: {
-  resultLabel: string;
-  timestampLabel: string;
-}): boolean {
-  return labels.resultLabel !== "Unknown" || labels.timestampLabel !== "Unknown";
-}
 
 export function BuildDetailsErrors({
   errors,

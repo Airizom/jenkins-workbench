@@ -174,17 +174,11 @@ export class JenkinsPendingInputDataOperations {
     environment: JenkinsEnvironmentRef,
     buildUrl: string
   ): Promise<PendingInputCacheKeys> {
-    const cacheKey = await this.context.buildCacheKey(environment, "pending-inputs", buildUrl);
-    const summaryKey = await this.context.buildCacheKey(
-      environment,
-      "pending-input-summary",
-      buildUrl
-    );
-    const unsupportedKey = await this.context.buildCacheKey(
-      environment,
-      "pending-inputs-unsupported",
-      buildUrl
-    );
+    const [cacheKey, summaryKey, unsupportedKey] = await Promise.all([
+      this.context.buildCacheKey(environment, "pending-inputs", buildUrl),
+      this.context.buildCacheKey(environment, "pending-input-summary", buildUrl),
+      this.context.buildCacheKey(environment, "pending-inputs-unsupported", buildUrl)
+    ]);
     return { cacheKey, summaryKey, unsupportedKey };
   }
 

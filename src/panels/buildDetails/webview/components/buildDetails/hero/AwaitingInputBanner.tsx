@@ -1,19 +1,7 @@
 import type * as React from "react";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { AlertCircleIcon } from "../../../../../shared/webview/icons";
-
-export type AwaitingInputSummary = {
-  count: number;
-  /** Prompt text of the first pending input. */
-  message: string;
-};
-
-export function describeAwaitingInput(summary: AwaitingInputSummary): string {
-  if (summary.count > 1) {
-    return `${summary.count} inputs are waiting for a response.`;
-  }
-  return summary.message || "An input step is waiting for a response.";
-}
+import { type AwaitingInputSummary, describeAwaitingInput } from "./awaitingInputSummary";
 
 export function AwaitingInputBanner({
   summary,

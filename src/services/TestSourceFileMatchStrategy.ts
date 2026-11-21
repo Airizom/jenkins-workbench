@@ -42,6 +42,7 @@ export class DefaultTestSourceFileMatchStrategy implements TestSourceFileMatchSt
     // Preserve the aggregate bound from the former one-search-per-extension implementation.
     const maxResultsPerRoot = settings.maxResultsPerPattern * settings.fileExtensions.length;
     for (const root of repositoryRoots) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Run one workspace file search at a time to bound concurrent filesystem work.
       const found = await vscode.workspace.findFiles(
         new vscode.RelativePattern(root, pattern),
         settings.excludeGlob,

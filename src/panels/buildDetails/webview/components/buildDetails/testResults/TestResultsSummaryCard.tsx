@@ -52,19 +52,19 @@ export function TestResultsSummaryCard({ summary }: { summary: BuildTestsSummary
             >
               {failedPct > 0 ? (
                 <div
-                  className="bg-failure transition-all duration-300"
+                  className="bg-failure transition-[width] duration-300"
                   style={{ width: `${failedPct}%` }}
                 />
               ) : null}
               {skippedPct > 0 ? (
                 <div
-                  className="bg-warning transition-all duration-300"
+                  className="bg-warning transition-[width] duration-300"
                   style={{ width: `${skippedPct}%` }}
                 />
               ) : null}
               {passedPct > 0 ? (
                 <div
-                  className="bg-success transition-all duration-300"
+                  className="bg-success transition-[width] duration-300"
                   style={{ width: `${passedPct}%` }}
                 />
               ) : null}

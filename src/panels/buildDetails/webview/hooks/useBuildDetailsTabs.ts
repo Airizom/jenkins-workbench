@@ -1,15 +1,15 @@
 import * as React from "react";
 import type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState";
 import {
-  hasNewPendingInputs,
-  shouldFallBackFromSelectedTab
+  type BuildDetailsTabSelection,
+  reconcileBuildDetailsTabSelection
 } from "../components/buildDetails/buildDetailsTabsModel";
 import {
   getBuildDetailsPanelUiState,
   setBuildDetailsPanelUiState
 } from "../lib/buildDetailsPanelState";
 
-const { useCallback, useEffect, useMemo, useRef, useState } = React;
+const { useCallback, useEffect, useMemo, useState } = React;
 
 export type { BuildDetailsTab } from "../../shared/BuildDetailsPanelWebviewState";
 
@@ -72,51 +72,49 @@ export function useBuildDetailsTabs({
     return tabs;
   }, [hasPendingInputs, hasPipelineStages, hasTests]);
 
-  const [selectedTab, setSelectedTabState] = useState<BuildDetailsTab>(
-    () => getBuildDetailsPanelUiState().selectedTab ?? defaultTab
-  );
-  const selectedTabWasAvailable = useRef(availableTabs.includes(selectedTab));
-  // A restored tab counts as a user choice, so reopening a panel keeps its tab.
-  const userChoseTab = useRef(getBuildDetailsPanelUiState().selectedTab !== undefined);
-  const seenInputIds = useRef(new Set<string>());
+  const [selection, setSelection] = useState<BuildDetailsTabSelection>(() => {
+    const restored = getBuildDetailsPanelUiState().selectedTab;
+    const tab = restored ?? defaultTab;
+    return {
+      tab,
+      wasAvailable: availableTabs.includes(tab),
+      userChoseTab: restored !== undefined,
+      seenInputIds: NO_INPUT_IDS,
+      persist: false,
+      focusRequest: undefined
+    };
+  });
 
-  const applySelectedTab = useCallback((tab: BuildDetailsTab) => {
-    selectedTabWasAvailable.current = true;
-    setSelectedTabState(tab);
-    setBuildDetailsPanelUiState({ selectedTab: tab });
+  const nextSelection = reconcileBuildDetailsTabSelection(selection, {
+    availableTabs,
+    defaultTab,
+    detailsLoaded,
+    pendingInputIds
+  });
+  if (nextSelection !== selection) {
+    setSelection(nextSelection);
+  }
+
+  const { tab: selectedTab, persist, focusRequest } = selection;
+  const setSelectedTab = useCallback((tab: BuildDetailsTab) => {
+    setSelection((previous) => ({
+      ...previous,
+      tab,
+      wasAvailable: true,
+      userChoseTab: true,
+      persist: true,
+      focusRequest: undefined
+    }));
   }, []);
 
-  const setSelectedTab = useCallback(
-    (tab: BuildDetailsTab) => {
-      userChoseTab.current = true;
-      applySelectedTab(tab);
-    },
-    [applySelectedTab]
-  );
-
   useEffect(() => {
-    const appeared = hasNewPendingInputs(seenInputIds.current, pendingInputIds);
-    seenInputIds.current = new Set(pendingInputIds);
-    if (appeared && !userChoseTab.current) {
-      applySelectedTab("inputs");
+    if (persist) {
+      setBuildDetailsPanelUiState({ selectedTab });
     }
-  }, [pendingInputIds, applySelectedTab]);
-
-  useEffect(() => {
-    const isAvailable = availableTabs.includes(selectedTab);
-    if (isAvailable) {
-      selectedTabWasAvailable.current = true;
-    } else if (
-      shouldFallBackFromSelectedTab({
-        isAvailable,
-        wasAvailable: selectedTabWasAvailable.current,
-        detailsLoaded
-      })
-    ) {
-      applySelectedTab(defaultTab);
-      focusTabTriggerIfFocusLost(defaultTab);
+    if (focusRequest?.tab === selectedTab) {
+      focusTabTriggerIfFocusLost(selectedTab);
     }
-  }, [availableTabs, defaultTab, selectedTab, detailsLoaded, applySelectedTab]);
+  }, [persist, selectedTab, focusRequest]);
 
   return {
     selectedTab,

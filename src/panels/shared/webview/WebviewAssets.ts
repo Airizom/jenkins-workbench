@@ -78,7 +78,7 @@ function findEntryKey(manifest: ViteManifest, entryName: WebviewEntryName): stri
 
 function collectCssFiles(manifest: ViteManifest, entryKey: string): string[] {
   const visited = new Set<string>();
-  const cssFiles: string[] = [];
+  const cssFiles = new Set<string>();
 
   const visit = (key: string) => {
     if (visited.has(key)) {
@@ -101,15 +101,15 @@ function collectCssFiles(manifest: ViteManifest, entryKey: string): string[] {
     }
     if (Array.isArray(entry.css)) {
       for (const css of entry.css) {
-        if (typeof css === "string" && !cssFiles.includes(css)) {
-          cssFiles.push(css);
+        if (typeof css === "string") {
+          cssFiles.add(css);
         }
       }
     }
   };
 
   visit(entryKey);
-  return cssFiles;
+  return [...cssFiles];
 }
 
 function toWebviewAssetUri(

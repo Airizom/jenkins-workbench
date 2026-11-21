@@ -72,6 +72,7 @@ export function assessBuildRevision(
   repositories: readonly string[]
 ): RevisionAssessment {
   const evidence: RevisionEvidence[] = [];
+  const repositorySet = new Set(repositories);
   let conflicting = false;
   const checkoutRecords = (build.actions ?? [])
     .map(record)
@@ -83,7 +84,7 @@ export function assessBuildRevision(
   for (const raw of build.actions ?? []) {
     const action = record(raw);
     if (!action) continue;
-    const matches = normalizedRemotes(action).filter((url) => repositories.includes(url));
+    const matches = normalizedRemotes(action).filter((url) => repositorySet.has(url));
     const revision = fullGitRevision(record(action.lastBuiltRevision)?.SHA1);
     if (matches.length) {
       if (!revision) conflicting = true;
@@ -114,7 +115,7 @@ export function assessBuildRevision(
       /^[^/]+$/.test(repo)
         ? normalizeRepositoryUrl(`ssh://${[...checkoutHosts][0]}/${owner}/${repo}`)
         : undefined;
-    if (!sourceUrl || !repositories.includes(sourceUrl)) continue;
+    if (!sourceUrl || !repositorySet.has(sourceUrl)) continue;
     const pull = fullGitRevision(scm.pullHash);
     const tested = fullGitRevision(record(checkout?.lastBuiltRevision)?.SHA1);
     if (head?.checkoutStrategy === "HEAD") {

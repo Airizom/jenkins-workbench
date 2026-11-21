@@ -224,6 +224,7 @@ class EnvironmentDiagnosticRun {
 
   private captureVersion(value: string | undefined, secrets: string[]): void {
     if (!value || !/^\d+\.\d+(?:\.\d+)?(?:[-+][a-zA-Z0-9.]+)?$/.test(value)) return;
+    // eslint-disable-next-line react-doctor/js-set-map-lookups -- Redaction checks for secret substrings, including inside longer values.
     if (secrets.some((secret) => secret.length > 0 && value.includes(secret))) return;
     this.jenkinsVersion ??= value;
   }
@@ -296,6 +297,7 @@ class EnvironmentDiagnosticRun {
           this.signal.throwIfAborted();
           const id = pending.shift();
           if (!id) return;
+          // eslint-disable-next-line react-doctor/async-await-in-loop -- Each of the two workers has one probe in flight.
           this.publish(classifyProbeOutcome(id, await this.probe(id, context), context));
         }
       })

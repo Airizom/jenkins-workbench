@@ -221,15 +221,26 @@ export class DeclaredEnvironmentRegistry {
           ]
         : [];
     });
-    const stored: HiddenEnvironment[] = [];
-    for (const { scope, id } of state.listHiddenStored()) {
-      const environment = (await environmentStore.getStoredEnvironments(scope)).find(
-        (entry) => entry?.id === id
-      );
-      if (environment) {
-        stored.push({ ...environment, scope, hidden: "stored" });
-      }
-    }
+    const hiddenStored = state.listHiddenStored();
+    const scopes = new Set(hiddenStored.map(({ scope }) => scope));
+    const storedByScope = new Map(
+      await Promise.all(
+        [...scopes].map(async (scope) => {
+          const environments = await environmentStore.getStoredEnvironments(scope);
+          const byId = new Map<string, JenkinsEnvironment>();
+          for (const entry of environments) {
+            if (entry && !byId.has(entry.id)) {
+              byId.set(entry.id, entry);
+            }
+          }
+          return [scope, byId] as const;
+        })
+      )
+    );
+    const stored = hiddenStored.flatMap(({ scope, id }): HiddenEnvironment[] => {
+      const environment = storedByScope.get(scope)?.get(id);
+      return environment ? [{ ...environment, scope, hidden: "stored" }] : [];
+    });
     return [...declared, ...stored];
   }
 
@@ -318,6 +329,7 @@ export class DeclaredEnvironmentRegistry {
     for (const { declaredScope, declared } of matchDeclaredWithStored(shown, storedByScope, {
       includeHidden: true
     })) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Finish each queued declaration write before attempting the next.
       await state.update(declaredScope, declared.id, { adoptDeclined: true });
     }
   }

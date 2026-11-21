@@ -33,9 +33,9 @@ import {
 } from "../shared/HistoryContracts";
 import { HistoryBaselineSection } from "./HistoryBaselineSection";
 import { HistoryBuildsTable } from "./HistoryBuildsTable";
-import { HistoryContext } from "./HistoryContext";
 import { type HistorySend, useHistoryAction } from "./HistoryOutcomes";
 import { HistoryTestsSection } from "./HistoryTestsSection";
+import { HistoryContext } from "./historyModel";
 import { failureHistorySummary, historyAnnouncement } from "./historyPresentation";
 
 function LoadingState({ label }: { label: string }) {

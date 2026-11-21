@@ -197,7 +197,6 @@ export function PipelineSection(props: PipelineSectionProps) {
             selectedStageKey={state.selectedStageKey}
             expandRequest={state.expandRequest}
             onSelectStage={state.selectGraphStage}
-            onSyncSelectedStage={state.syncGraphStage}
             onRestartStage={props.onRestartStage}
             onSelectPipelineLog={handleUserSelectPipelineLog}
             onGraphError={state.fallBackToList}
@@ -215,7 +214,6 @@ function PipelineSectionBody({
   selectedStageKey,
   expandRequest,
   onSelectStage,
-  onSyncSelectedStage,
   onRestartStage,
   onSelectPipelineLog,
   onGraphError
@@ -225,7 +223,6 @@ function PipelineSectionBody({
   selectedStageKey?: string;
   expandRequest?: PipelineStageRequest;
   onSelectStage: (stageKey: string | undefined) => void;
-  onSyncSelectedStage: (stageKey: string | undefined) => void;
   onRestartStage: (stageName: string) => void;
   onSelectPipelineLog: (target: PipelineLogTargetViewModel) => void;
   onGraphError: () => void;
@@ -246,7 +243,6 @@ function PipelineSectionBody({
           stages={stages}
           selectedStageKey={selectedStageKey}
           onSelectStage={onSelectStage}
-          onSyncSelectedStage={onSyncSelectedStage}
           onRestartStage={onRestartStage}
           onSelectPipelineLog={onSelectPipelineLog}
           onGraphError={onGraphError}

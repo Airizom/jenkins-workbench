@@ -230,7 +230,8 @@ describe("Build Details outgoing messages", () => {
       });
       state.setTestReport({ totalCount: 5, passCount: 5 });
 
-      const message = JSON.parse(JSON.stringify(buildUpdateMessageFromState(state)));
+      const serialized = JSON.stringify(buildUpdateMessageFromState(state));
+      const message = JSON.parse(serialized);
       const update = parseBuildDetailsOutgoingMessage(message);
       assert.ok(update?.type === "updateDetails");
       assert.equal(update.resultClass, "running");
@@ -265,7 +266,8 @@ describe("Build Details outgoing messages", () => {
 
     for (const state of [empty, populated]) {
       // Webview messages are serialized, which drops undefined-valued fields.
-      const message = JSON.parse(JSON.stringify(buildUpdateMessageFromState(state)));
+      const serialized = JSON.stringify(buildUpdateMessageFromState(state));
+      const message = JSON.parse(serialized);
       const parsed = parseBuildDetailsOutgoingMessage(message);
       assert.equal(parsed?.type, "updateDetails");
     }

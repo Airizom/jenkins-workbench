@@ -25,6 +25,7 @@ function safeIdentity(value: unknown, secrets: string[]): string | undefined {
   if (typeof value !== "string" || !/^[\p{L}\p{N}_.@ -]{1,120}$/u.test(value)) {
     return undefined;
   }
+  // eslint-disable-next-line react-doctor/js-set-map-lookups -- Redaction checks for secret substrings, including inside longer values.
   return secrets.some((secret) => secret.length > 0 && value.includes(secret)) ? undefined : value;
 }
 

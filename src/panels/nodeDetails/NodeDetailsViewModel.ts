@@ -293,11 +293,8 @@ function toValidMs(value?: number): number | undefined {
 }
 
 function buildMonitorEntries(data?: Record<string, unknown>): NodeMonitorViewModel[] {
-  if (!isPlainRecord(data)) {
-    return [];
-  }
-
-  return Object.entries(data)
+  const entries = Object.entries(isPlainRecord(data) ? data : {});
+  return entries
     .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
     .map(([key, value]) => ({
       key,

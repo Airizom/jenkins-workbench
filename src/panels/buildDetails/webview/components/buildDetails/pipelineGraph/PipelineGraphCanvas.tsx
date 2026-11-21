@@ -1,5 +1,5 @@
 import * as React from "react";
-import { getResultBadgeClass } from "../../../../../shared/webview/components/ResultBadge";
+import { getResultBadgeClass } from "../../../../../shared/webview/components/resultBadgeClass";
 import { Button } from "../../../../../shared/webview/components/ui/button";
 import { MinusIcon, PlusIcon } from "../../../../../shared/webview/icons";
 import { resolveBuildResultStyle } from "../../../../../shared/webview/lib/statusStyles";
@@ -44,6 +44,131 @@ export function PipelineGraphCanvas({
   selectedStageKey?: string;
   onSelectStage: (stageKey: string) => void;
 }) {
+  const {
+    containerRef,
+    viewport,
+    isPanning,
+    zoomBy,
+    fit,
+    handleNodeSelect,
+    handleNodeFocus,
+    handleKeyDown,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp
+  } = usePipelineGraphViewport(layout, selectedStageKey, onSelectStage);
+
+  // Edge geometry only changes with the layout, so keep the elements stable
+  // across pan/zoom/selection re-renders and let React skip reconciling them.
+  const edgePaths = useMemo(
+    () =>
+      layout.edges.map((edge) => (
+        <path
+          key={edge.id}
+          d={edge.path}
+          fill="none"
+          stroke={EDGE_STROKE_COLORS[edge.kind]}
+          strokeWidth={edge.kind === "parallel" ? 2.4 : 1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={edge.kind === "join" ? 0.68 : 0.84}
+        />
+      )),
+    [layout.edges]
+  );
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
+      <PipelineGraphToolbar onZoom={zoomBy} onFit={fit} />
+      <div
+        ref={containerRef}
+        role="application"
+        aria-label="Pipeline graph. Arrow keys pan, plus and minus zoom."
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the canvas must be keyboard-focusable so arrow keys can pan and +/- can zoom without a pointer
+        tabIndex={0}
+        className="pipeline-graph-canvas relative max-h-90 overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:max-h-110"
+        onKeyDown={handleKeyDown}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        style={{ cursor: isPanning ? "grabbing" : "grab", height: resolveCanvasHeight(layout) }}
+      >
+        <svg className="h-full w-full">
+          <title>Pipeline stage graph</title>
+          <defs>
+            <pattern id="pipeline-grid" width="36" height="36" patternUnits="userSpaceOnUse">
+              <path
+                d="M 36 0 L 0 0 0 36"
+                fill="none"
+                stroke="color-mix(in srgb, var(--border) 60%, transparent)"
+                strokeWidth="1"
+              />
+            </pattern>
+          </defs>
+          <rect x="0" y="0" width="100%" height="100%" fill="url(#pipeline-grid)" opacity="0.35" />
+          <g
+            transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.scale})`}
+            style={{ transformOrigin: "0 0" }}
+          >
+            {edgePaths}
+            {layout.nodes.map((node) => (
+              <PipelineGraphStageNode
+                key={node.id}
+                node={node}
+                selected={selectedStageKey === node.id}
+                onSelect={handleNodeSelect}
+                onKeyboardFocus={handleNodeFocus}
+              />
+            ))}
+          </g>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function PipelineGraphToolbar({
+  onZoom,
+  onFit
+}: {
+  onZoom: (factor: number) => void;
+  onFit: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
+      <div>
+        <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
+          Pipeline graph
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Drag or use arrow keys to pan. Selection syncs the inspector.
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="mr-1 hidden text-caption text-muted-foreground sm:inline">
+          {ZOOM_HINT}
+        </span>
+        <Button variant="outline" size="sm" aria-label="Zoom out" onClick={() => onZoom(0.9)}>
+          <MinusIcon className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="outline" size="sm" aria-label="Zoom in" onClick={() => onZoom(1.1)}>
+          <PlusIcon className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={onFit}>
+          Fit
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function usePipelineGraphViewport(
+  layout: PipelineGraphLayoutResult,
+  selectedStageKey: string | undefined,
+  onSelectStage: (stageKey: string) => void
+) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layoutRef = useRef(layout);
   const hasAutoFittedRef = useRef(false);
@@ -274,109 +399,26 @@ export function PipelineGraphCanvas({
     }
   };
 
-  // Edge geometry only changes with the layout, so keep the elements stable
-  // across pan/zoom/selection re-renders and let React skip reconciling them.
-  const edgePaths = useMemo(
-    () =>
-      layout.edges.map((edge) => (
-        <path
-          key={edge.id}
-          d={edge.path}
-          fill="none"
-          stroke={EDGE_STROKE_COLORS[edge.kind]}
-          strokeWidth={edge.kind === "parallel" ? 2.4 : 1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={edge.kind === "join" ? 0.68 : 0.84}
-        />
-      )),
-    [layout.edges]
-  );
+  const fit = () => {
+    const container = containerRef.current;
+    if (container) {
+      adjustViewport(createFittedViewport(layout, container, { allowBelowMinimum: true }));
+    }
+  };
 
-  return (
-    <div className="overflow-hidden rounded-lg border border-card-border bg-card shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-raised px-3 py-2">
-        <div>
-          <div className="text-caption font-semibold uppercase tracking-wide text-muted-foreground">
-            Pipeline graph
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Drag or use arrow keys to pan. Selection syncs the inspector.
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="mr-1 hidden text-caption text-muted-foreground sm:inline">
-            {ZOOM_HINT}
-          </span>
-          <Button variant="outline" size="sm" aria-label="Zoom out" onClick={() => zoomBy(0.9)}>
-            <MinusIcon className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="outline" size="sm" aria-label="Zoom in" onClick={() => zoomBy(1.1)}>
-            <PlusIcon className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const container = containerRef.current;
-              if (!container) {
-                return;
-              }
-              adjustViewport(createFittedViewport(layout, container, { allowBelowMinimum: true }));
-            }}
-          >
-            Fit
-          </Button>
-        </div>
-      </div>
-
-      <div
-        ref={containerRef}
-        role="application"
-        aria-label="Pipeline graph. Arrow keys pan, plus and minus zoom."
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: the canvas must be keyboard-focusable so arrow keys can pan and +/- can zoom without a pointer
-        tabIndex={0}
-        className="pipeline-graph-canvas relative max-h-90 overflow-hidden bg-surface-sunken focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring md:max-h-110"
-        onKeyDown={handleKeyDown}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        style={{ cursor: isPanning ? "grabbing" : "grab", height: resolveCanvasHeight(layout) }}
-      >
-        <svg className="h-full w-full">
-          <title>Pipeline stage graph</title>
-          <defs>
-            <pattern id="pipeline-grid" width="36" height="36" patternUnits="userSpaceOnUse">
-              <path
-                d="M 36 0 L 0 0 0 36"
-                fill="none"
-                stroke="color-mix(in srgb, var(--border) 60%, transparent)"
-                strokeWidth="1"
-              />
-            </pattern>
-          </defs>
-          <rect x="0" y="0" width="100%" height="100%" fill="url(#pipeline-grid)" opacity="0.35" />
-          <g
-            transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.scale})`}
-            style={{ transformOrigin: "0 0" }}
-          >
-            {edgePaths}
-            {layout.nodes.map((node) => (
-              <PipelineGraphStageNode
-                key={node.id}
-                node={node}
-                selected={selectedStageKey === node.id}
-                onSelect={handleNodeSelect}
-                onKeyboardFocus={handleNodeFocus}
-              />
-            ))}
-          </g>
-        </svg>
-      </div>
-    </div>
-  );
+  return {
+    containerRef,
+    viewport,
+    isPanning,
+    zoomBy,
+    fit,
+    handleNodeSelect,
+    handleNodeFocus,
+    handleKeyDown,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp
+  };
 }
 
 const PipelineGraphStageNode = memo(function PipelineGraphStageNode({

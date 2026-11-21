@@ -6,17 +6,15 @@ import type {
   BuildDetailsCoverageStateViewModel,
   BuildTestsSummaryViewModel
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
-import {
-  BuildDetailsErrors,
-  hasLoadedBuildHeader,
-  resolveBuildDetailsErrorMode
-} from "../src/panels/buildDetails/webview/components/buildDetails/BuildDetailsErrors";
-import { describeAwaitingInput } from "../src/panels/buildDetails/webview/components/buildDetails/hero/AwaitingInputBanner";
+import { BuildDetailsErrors } from "../src/panels/buildDetails/webview/components/buildDetails/BuildDetailsErrors";
 import { BuildDetailsMetaFields } from "../src/panels/buildDetails/webview/components/buildDetails/BuildDetailsMetaFields";
 import {
-  BuildStatusHero,
-  describeTestsPill
-} from "../src/panels/buildDetails/webview/components/buildDetails/hero/BuildStatusHero";
+  hasLoadedBuildHeader,
+  resolveBuildDetailsErrorMode
+} from "../src/panels/buildDetails/webview/components/buildDetails/buildDetailsErrorMode";
+import { BuildStatusHero } from "../src/panels/buildDetails/webview/components/buildDetails/hero/BuildStatusHero";
+import { describeAwaitingInput } from "../src/panels/buildDetails/webview/components/buildDetails/hero/awaitingInputSummary";
+import { describeTestsPill } from "../src/panels/buildDetails/webview/components/buildDetails/hero/testsPill";
 import { CoverageGlanceCard } from "../src/panels/buildDetails/webview/components/buildDetails/overview/CoverageGlanceCard";
 import { TooltipProvider } from "../src/panels/shared/webview/components/ui/tooltip";
 

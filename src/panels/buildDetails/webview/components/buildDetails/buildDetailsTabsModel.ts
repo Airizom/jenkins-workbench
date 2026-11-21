@@ -1,4 +1,4 @@
-import type { BuildDetailsTab } from "../../hooks/useBuildDetailsTabs";
+import type { BuildDetailsTab } from "../../../shared/BuildDetailsPanelWebviewState";
 
 export type BuildDetailsTabAvailability = {
   hasPendingInputs: boolean;
@@ -50,4 +50,60 @@ export function shouldFallBackFromSelectedTab({
   detailsLoaded: boolean;
 }): boolean {
   return !isAvailable && (wasAvailable || detailsLoaded);
+}
+
+export type BuildDetailsTabSelection = {
+  tab: BuildDetailsTab;
+  wasAvailable: boolean;
+  userChoseTab: boolean;
+  seenInputIds: readonly string[];
+  persist: boolean;
+  focusRequest?: { tab: BuildDetailsTab };
+};
+
+export function reconcileBuildDetailsTabSelection(
+  selection: BuildDetailsTabSelection,
+  {
+    availableTabs,
+    defaultTab,
+    detailsLoaded,
+    pendingInputIds
+  }: {
+    availableTabs: readonly BuildDetailsTab[];
+    defaultTab: BuildDetailsTab;
+    detailsLoaded: boolean;
+    pendingInputIds: readonly string[];
+  }
+): BuildDetailsTabSelection {
+  const inputIdsChanged =
+    selection.seenInputIds.length !== pendingInputIds.length ||
+    selection.seenInputIds.some((id, index) => id !== pendingInputIds[index]);
+  const autoSelectInputs =
+    inputIdsChanged &&
+    !selection.userChoseTab &&
+    hasNewPendingInputs(new Set(selection.seenInputIds), pendingInputIds);
+  const candidate = autoSelectInputs ? "inputs" : selection.tab;
+  const isAvailable = availableTabs.includes(candidate);
+  const fallBack = shouldFallBackFromSelectedTab({
+    isAvailable,
+    wasAvailable: selection.wasAvailable || autoSelectInputs,
+    detailsLoaded
+  });
+
+  if (!inputIdsChanged && !fallBack && (!isAvailable || selection.wasAvailable)) {
+    return selection;
+  }
+
+  return {
+    ...selection,
+    tab: fallBack ? defaultTab : candidate,
+    wasAvailable: isAvailable || fallBack,
+    seenInputIds: pendingInputIds,
+    persist: selection.persist || autoSelectInputs || fallBack,
+    focusRequest: fallBack
+      ? { tab: defaultTab }
+      : autoSelectInputs
+        ? undefined
+        : selection.focusRequest
+  };
 }

@@ -118,6 +118,7 @@ function useRestoredPipelineLogSelection({
     consumedRef.current = true;
     if (plan.targetToRestore) {
       selectedRef.current = true;
+      // eslint-disable-next-line react-doctor/no-pass-data-to-parent -- Request the saved log from the extension host after the first valid snapshot.
       onSelectPipelineLog(plan.targetToRestore);
     }
   }, [canValidateLogTarget, currentTarget, restoredLogTarget, stages, onSelectPipelineLog]);
@@ -154,6 +155,7 @@ function useDefaultPipelineStageSelection(
       restoredLogSelected: selectedRef.current
     });
     if (stage) {
+      // eslint-disable-next-line react-doctor/no-pass-data-to-parent -- Opening the default stage can request its log from the extension host.
       openStage(stage);
     }
   }, [
@@ -224,9 +226,6 @@ function usePipelineStageSelection(
         onSelectPipelineLog(target);
       }
     },
-    // Keeps the graph selection valid as the layout changes. Unlike a user
-    // selection it must not request a log: it runs after every graph render.
-    syncGraphStage: setSelectedStageKey,
     markUserSelection: () => {
       doneRef.current = true;
     }
@@ -262,7 +261,9 @@ function useExternalStageRequest(
       return;
     }
     doneRef.current = true;
+    // eslint-disable-next-line react-doctor/no-pass-data-to-parent -- Handle the external stage request, which can fetch its log from the extension host.
     openStage(plan.stage);
+    // eslint-disable-next-line react-doctor/no-pass-data-to-parent -- Reveal the requested stage or log pane in the browser after commit.
     onStageRequestOpened?.(plan.stage);
   }, [stageRequest, stages, doneRef, openStage, onStageRequestOpened]);
 }

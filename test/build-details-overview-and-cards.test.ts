@@ -10,10 +10,8 @@ import {
   type PipelineStageViewModel
 } from "../src/panels/buildDetails/shared/BuildDetailsContracts";
 import { BuildFailureArtifactsCard } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureArtifactsCard";
-import {
-  BuildFailureChangelogCard,
-  isLongChangelogMessage
-} from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureChangelogCard";
+import { BuildFailureChangelogCard } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/BuildFailureChangelogCard";
+import { isLongChangelogMessage } from "../src/panels/buildDetails/webview/components/buildDetails/buildFailure/changelogMessage";
 import { OverviewTab } from "../src/panels/buildDetails/webview/components/buildDetails/overview/OverviewTab";
 import { StageNode } from "../src/panels/buildDetails/webview/components/buildDetails/pipelineStages/StageNode";
 import { TestResultsSection } from "../src/panels/buildDetails/webview/components/buildDetails/TestResultsSection";

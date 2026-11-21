@@ -83,6 +83,7 @@ export class BuildParameterRequestPreparerService implements BuildParameterReque
 
       let data: Buffer;
       try {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Read one file at a time and stop at the first invalid file in form order.
         data = await fs.readFile(filePath);
       } catch (error) {
         const detail = error instanceof Error ? error.message : "Unknown error";

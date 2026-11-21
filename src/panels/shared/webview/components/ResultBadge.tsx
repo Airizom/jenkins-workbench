@@ -1,9 +1,7 @@
-import { resolveBuildResultStyle } from "../lib/statusStyles";
 import { cn } from "../lib/utils";
+import { getResultBadgeClass } from "./resultBadgeClass";
 import { Badge } from "./ui/badge";
-export function getResultBadgeClass(status?: string): string {
-  return resolveBuildResultStyle(status).badge;
-}
+
 export function ResultBadge({
   label,
   status,

@@ -212,6 +212,7 @@ export class HistoryService implements vscode.Disposable {
         while (cursor < selected.length && request.active()) {
           const index = cursor++;
           const build = selected[index];
+          // eslint-disable-next-line react-doctor/async-await-in-loop -- Each of the three workers has one report request in flight.
           const report = await this.report(request, build);
           builds[index] = {
             build,

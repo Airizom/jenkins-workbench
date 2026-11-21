@@ -22,6 +22,7 @@ export function buildConsoleMatches(
     let regex: RegExp;
     try {
       // Case-insensitive, like plain-text search.
+      // eslint-disable-next-line react-doctor/no-unescaped-dynamic-string-in-regexp -- Regex mode intentionally compiles a user pattern and checks its safety before executing it.
       regex = new RegExp(query, "gi");
     } catch (error) {
       return {

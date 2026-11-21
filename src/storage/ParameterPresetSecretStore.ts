@@ -31,6 +31,7 @@ export class ParameterPresetSecretStore {
   ): Promise<ParameterPresetValues> {
     const resolved = cloneParameterValues(values);
     for (const [name, key] of Object.entries(secretKeys ?? {})) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Read one keychain entry at a time and stop on a storage failure.
       const stored = await this.secrets.get(key);
       if (typeof stored !== "string") {
         continue;
@@ -69,6 +70,7 @@ export class ParameterPresetSecretStore {
     try {
       for (const [name, value] of Object.entries(secretValues)) {
         const secretKey = this.buildSecretKey();
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Record each stored key before attempting the next write so rollback can remove it.
         await this.secrets.store(secretKey, JSON.stringify(value));
         secretKeys[name] = secretKey;
         newlyStoredKeys.push(secretKey);
@@ -93,6 +95,7 @@ export class ParameterPresetSecretStore {
     const newlyStoredKeys: string[] = [];
     try {
       for (const [name, key] of Object.entries(secretKeys ?? {})) {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Finish copying each secret and recording its rollback key before reading the next.
         const value = await this.secrets.get(key);
         if (typeof value !== "string") {
           continue;
@@ -115,6 +118,7 @@ export class ParameterPresetSecretStore {
   ): Promise<void> {
     for (const [name, key] of Object.entries(previousSecretKeys)) {
       if (nextSecretKeys[name] !== key) {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Stop at the first failed deletion before touching any later keys.
         await this.secrets.delete(key);
       }
     }
@@ -122,6 +126,7 @@ export class ParameterPresetSecretStore {
 
   async deleteMappedKeys(secretKeys?: Record<string, string>): Promise<void> {
     for (const key of Object.values(secretKeys ?? {})) {
+      // eslint-disable-next-line react-doctor/async-await-in-loop -- Stop at the first failed deletion before touching any later keys.
       await this.secrets.delete(key);
     }
   }
@@ -129,6 +134,7 @@ export class ParameterPresetSecretStore {
   async deleteKeyValuesBestEffort(secretKeys: readonly string[]): Promise<void> {
     for (const key of secretKeys) {
       try {
+        // eslint-disable-next-line react-doctor/async-await-in-loop -- Roll back one write at a time and continue independently after a failed deletion.
         await this.secrets.delete(key);
       } catch {
         // The operation that triggered this rollback remains the primary error.

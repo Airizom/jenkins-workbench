@@ -29,8 +29,9 @@ import type {
 } from "../../../../shared/BuildDetailsContracts";
 import type { BuildManagementMessage } from "../../../../shared/BuildDetailsPanelMessages";
 import { BuildDetailsMetaFields } from "../BuildDetailsMetaFields";
-import { describeTestOutcome } from "../testResults/testResultsUtils";
-import { AwaitingInputBanner, type AwaitingInputSummary } from "./AwaitingInputBanner";
+import { AwaitingInputBanner } from "./AwaitingInputBanner";
+import { type AwaitingInputSummary } from "./awaitingInputSummary";
+import { describeTestsPill } from "./testsPill";
 
 const AWAITING_INPUT_LABEL = "Waiting for input";
 
@@ -58,22 +59,6 @@ function useStickyHeroOffset(): React.RefObject<HTMLElement | null> {
   }, []);
 
   return heroRef;
-}
-
-const TESTS_PILL_TONE_CLASSES = {
-  failed: "border-failure-border bg-failure-soft text-failure",
-  passed: "border-success-border bg-success-soft text-success",
-  skipped: "border-warning-border bg-warning-soft text-warning"
-} as const;
-
-export function describeTestsPill(
-  summary: BuildTestsSummaryViewModel
-): { label: string; className: string } | undefined {
-  if (!summary.hasAnyResults || summary.totalCount === 0) {
-    return undefined;
-  }
-  const outcome = describeTestOutcome(summary);
-  return { label: outcome.countsLabel, className: TESTS_PILL_TONE_CLASSES[outcome.tone] };
 }
 
 // A build paused on an input step is not making progress, so it drops the

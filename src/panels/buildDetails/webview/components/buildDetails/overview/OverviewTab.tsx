@@ -9,7 +9,8 @@ import type {
   PipelineStageViewModel
 } from "../../../../shared/BuildDetailsContracts";
 import type { BuildDetailsTab } from "../../../hooks/useBuildDetailsTabs";
-import { BuildFailureInsightsSection, hasVisibleInsights } from "../BuildFailureInsightsSection";
+import { BuildFailureInsightsSection } from "../BuildFailureInsightsSection";
+import { hasVisibleInsights } from "../buildFailureInsightsVisibility";
 import { CoverageGlanceCard } from "./CoverageGlanceCard";
 import { OverviewSummaryCard } from "./OverviewSummaryCard";
 import { RelatedBuildsSection, type RelatedBuildsSectionProps } from "./RelatedBuildsSection";
@@ -76,19 +77,14 @@ export function OverviewTab({
           onNavigateTab={onNavigateTab}
         />
       ) : null}
-      {showTestsCard || showCoverageCard ? (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {showTestsCard ? (
-            <TestPassDonutCard summary={testsSummary} onShowTests={() => onNavigateTab("tests")} />
-          ) : null}
-          {showCoverageCard ? (
-            <CoverageGlanceCard
-              coverageState={coverageState}
-              onShowTests={hasTests ? () => onNavigateTab("tests") : undefined}
-            />
-          ) : null}
-        </div>
-      ) : null}
+      <OverviewMetrics
+        showTestsCard={showTestsCard}
+        showCoverageCard={showCoverageCard}
+        testsSummary={testsSummary}
+        coverageState={coverageState}
+        onShowTests={() => onNavigateTab("tests")}
+        hasTests={hasTests}
+      />
       {showInsights ? (
         <BuildFailureInsightsSection
           resultClass={resultClass}
@@ -116,4 +112,32 @@ export function OverviewTab({
       ) : null}
     </div>
   );
+}
+
+function OverviewMetrics({
+  showTestsCard,
+  showCoverageCard,
+  testsSummary,
+  coverageState,
+  onShowTests,
+  hasTests
+}: Pick<OverviewTabProps, "testsSummary" | "coverageState"> & {
+  showTestsCard: boolean;
+  showCoverageCard: boolean;
+  onShowTests: () => void;
+  hasTests: boolean;
+}) {
+  return showTestsCard || showCoverageCard ? (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {showTestsCard ? (
+        <TestPassDonutCard summary={testsSummary} onShowTests={onShowTests} />
+      ) : null}
+      {showCoverageCard ? (
+        <CoverageGlanceCard
+          coverageState={coverageState}
+          onShowTests={hasTests ? onShowTests : undefined}
+        />
+      ) : null}
+    </div>
+  ) : null;
 }

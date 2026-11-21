@@ -51,11 +51,11 @@ export function PipelineNodeLogPane({
   const consoleUrl = log.consoleUrl;
 
   // Each newly selected node starts out following its latest output.
-  useEffect(() => {
-    if (targetKey) {
-      setFollowLog(true);
-    }
-  }, [targetKey]);
+  const [previousTargetKey, setPreviousTargetKey] = useState(targetKey);
+  if (previousTargetKey !== targetKey) {
+    setPreviousTargetKey(targetKey);
+    setFollowLog(true);
+  }
 
   // Closing unmounts the Close button; once the host clears the target, move
   // focus to the empty state unless the user already focused something else.
