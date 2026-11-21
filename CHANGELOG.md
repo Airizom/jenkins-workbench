@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.68.2] - 2026-11-21
+
+### Fixed
+
+- fix(jobs): display decoded branch names in the Jenkins job picker.
+
+### Changed
+
+- refactor(src): simplify webview state and run independent environment checks, cache lookups, and console reads in parallel.
+
 ## [1.68.1] - 2026-11-19
 
 ### Fixed
